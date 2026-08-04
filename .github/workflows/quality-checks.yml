@@ -55,6 +55,7 @@ jobs:
           npm run test:backup-contracts
           npm run test:generate-changelog
           npm run test:release-artifact
+          npm run test:release-confirmation
           npm run test:build-relevance
           npm run check:build-relevance
           npm test

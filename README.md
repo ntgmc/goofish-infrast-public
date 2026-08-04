@@ -64,18 +64,15 @@ Authorization: Bearer <WEBSITE_EVENTS_TOKEN>
 
 公告从未启用状态首次保存为启用状态时，公告文档和 `announcement.published` 事件在同一 PostgreSQL 事务中提交；再次编辑已发布公告不会产生新事件。部署此功能前必须先运行 `npm run migrate:database`，创建 append-only 的 `website_notification_events` 表。
 
-正式生产版本不能在构建或服务启动时自动确认。部署、公开 changelog 和 `/api/health/ready` 健康检查全部成功后，CI/CD 使用独立写权限 Token 调用：
+正式生产版本不能在构建或服务启动时自动确认。部署、公开 changelog 和 `/api/health/ready` 健康检查全部成功后，CI/CD 使用独立写权限 Token 运行：
 
 ```bash
-curl --fail-with-body \
-  --request POST \
-  --header "Authorization: Bearer ${WEBSITE_RELEASE_CONFIRMATION_TOKEN}" \
-  --header 'Content-Type: application/json' \
-  --data "{\"version\":\"${DEPLOYED_VERSION}\"}" \
-  "${PUBLIC_APP_URL%/}/api/internal/releases/confirm"
+PUBLIC_APP_URL=https://maatool.com npm run release:confirm-production
 ```
 
-服务端只接受与当前前后端构建版本完全一致、且已经出现在公开 changelog 中的版本，并从公开 changelog 自行生成 `release.published` 内容。相同版本重复确认返回幂等成功；同一事件 ID 的不同内容返回 409。`WEBSITE_EVENTS_TOKEN` 与 `WEBSITE_RELEASE_CONFIRMATION_TOKEN` 必须分别生成并放入密钥管理系统，不能复用或提交到仓库。
+运行命令前，部署系统必须已经把 `WEBSITE_RELEASE_CONFIRMATION_TOKEN` 作为脱敏环境变量注入。确认脚本从线上 readiness 响应自动读取版本，不依赖人工设置 `DEPLOYED_VERSION`；前后端版本不一致、服务未 ready、响应不符合契约或确认失败时以非零状态退出。临时网络错误、429 和 5xx 最多重试 5 次，且禁止跨地址重定向。首次确认成功输出 `created`，重复执行输出 `already confirmed`，不会创建重复事件。
+
+服务端只接受与当前前后端构建版本完全一致、且已经出现在公开 changelog 中的版本，并从公开 changelog 自行生成 `release.published` 内容。相同版本重复确认返回幂等成功；同一事件 ID 的不同内容返回 409。`WEBSITE_EVENTS_TOKEN` 与 `WEBSITE_RELEASE_CONFIRMATION_TOKEN` 必须分别生成并放入密钥管理系统，不能复用或提交到仓库。部署任务不得启用 shell xtrace，也不得输出确认 Token；现有质量检查 workflow 只负责构建和验证工件，不得用于触发生产通知。
 
 PostgreSQL 新连接默认最多等待 10 秒；可通过 `POSTGRES_CONNECTION_TIMEOUT_MS` 覆盖，允许范围为 1000–60000 毫秒。有限连接超时可以避免 API 或外部 worker 在数据库不可达时无限停留在启动阶段。
 

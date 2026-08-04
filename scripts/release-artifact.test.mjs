@@ -61,6 +61,19 @@ test('requires the public HTTPS smoke runner in release artifacts', async () => 
   }
 })
 
+test('requires the production release confirmation runner in release artifacts', async () => {
+  const fixture = await createFixture('public')
+  try {
+    await rm(join(fixture.artifact, 'scripts/confirm-production-release.mjs'))
+    assert.throws(
+      () => run(fixture, ['create', '--kind', 'public', '--sha', sha]),
+      /required public artifact entry.*confirm-production-release\.mjs/,
+    )
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true })
+  }
+})
+
 test('rejects private optimizer sources embedded in a public sourcemap', async () => {
   const fixture = await createFixture('public')
   try {

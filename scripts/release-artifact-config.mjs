@@ -11,6 +11,7 @@ export const ARTIFACT_KINDS = Object.freeze({
       'server/database-schema-contract.json',
       'scripts/check-public-http-smoke.mjs',
       'scripts/check-release-runtime.mjs',
+      'scripts/confirm-production-release.mjs',
       'scripts/backup-manifest.mjs',
       'scripts/migration-verifier-lib.mjs',
       'scripts/verify-migrated-data.mjs',
