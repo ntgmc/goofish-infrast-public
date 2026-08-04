@@ -1257,6 +1257,140 @@ CREATE TABLE IF NOT EXISTS user_profile_workspaces (
 );
 
 -- goofish:migration-phase
+CREATE SEQUENCE IF NOT EXISTS optimization_result_history_position_seq;
+
+CREATE TABLE IF NOT EXISTS optimization_result_history (
+  profile_id TEXT NOT NULL REFERENCES user_game_accounts(id) ON DELETE CASCADE,
+  id TEXT NOT NULL,
+  job_id TEXT,
+  name TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  config_json JSONB,
+  result_json JSONB NOT NULL,
+  operator_count INTEGER NOT NULL DEFAULT 0 CHECK (operator_count >= 0),
+  source TEXT NOT NULL CHECK (source IN ('generated', 'applied_suggestions', 'legacy')),
+  archived_at TIMESTAMPTZ,
+  position BIGINT NOT NULL DEFAULT nextval('optimization_result_history_position_seq'),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (profile_id, id),
+  UNIQUE (position)
+);
+CREATE INDEX IF NOT EXISTS idx_optimization_result_history_profile_active_position
+  ON optimization_result_history(profile_id, position DESC) WHERE archived_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_optimization_result_history_profile_archived_position
+  ON optimization_result_history(profile_id, position DESC) WHERE archived_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_optimization_result_history_job
+  ON optimization_result_history(job_id) WHERE job_id IS NOT NULL;
+
+-- Backfill every structurally valid legacy result before removing the embedded
+-- copies.  Arrays are stored newest-first, so reverse ordinality preserves the
+-- same ordering when the sequence-backed cursor positions are assigned.
+WITH legacy_results AS (
+  SELECT workspace.profile_id, item.value, item.ordinality, FALSE AS archived,
+         workspace.updated_at
+    FROM user_profile_workspaces workspace
+   CROSS JOIN LATERAL jsonb_array_elements(
+     CASE
+       WHEN jsonb_typeof(workspace.record_json->'result_history') = 'array'
+         THEN workspace.record_json->'result_history'
+       ELSE '[]'::jsonb
+     END
+   ) WITH ORDINALITY AS item(value, ordinality)
+  UNION ALL
+  SELECT workspace.profile_id, item.value, item.ordinality, TRUE AS archived,
+         workspace.updated_at
+    FROM user_profile_workspaces workspace
+   CROSS JOIN LATERAL jsonb_array_elements(
+     CASE
+       WHEN jsonb_typeof(workspace.record_json->'archived_results') = 'array'
+         THEN workspace.record_json->'archived_results'
+       ELSE '[]'::jsonb
+     END
+   ) WITH ORDINALITY AS item(value, ordinality)
+), valid_results AS (
+  SELECT *
+    FROM legacy_results
+   WHERE jsonb_typeof(value) = 'object'
+     AND jsonb_typeof(value->'result') = 'object'
+     AND nullif(value->>'id', '') IS NOT NULL
+     AND nullif(value->>'name', '') IS NOT NULL
+     AND nullif(value->>'created_at', '') IS NOT NULL
+)
+INSERT INTO optimization_result_history (
+  profile_id, id, job_id, name, created_at, config_json, result_json,
+  operator_count, source, archived_at, updated_at
+)
+SELECT profile_id,
+       value->>'id',
+       nullif(value->>'job_id', ''),
+       value->>'name',
+       value->>'created_at',
+       CASE WHEN jsonb_typeof(value->'config') = 'object' THEN value->'config' ELSE NULL END,
+       value->'result',
+       CASE
+         WHEN coalesce(value->>'operator_count', '') ~ '^[0-9]+$'
+           THEN LEAST((value->>'operator_count')::numeric, 2147483647)::integer
+         ELSE 0
+       END,
+       CASE value->>'source'
+         WHEN 'applied_suggestions' THEN 'applied_suggestions'
+         WHEN 'legacy' THEN 'legacy'
+         ELSE 'generated'
+       END,
+       CASE WHEN archived THEN updated_at ELSE NULL END,
+       updated_at
+  FROM valid_results
+ ORDER BY profile_id, archived, ordinality DESC
+ON CONFLICT (profile_id, id) DO NOTHING;
+
+-- Very old workspaces only carried last_result.  Give that snapshot a stable,
+-- profile-scoped identifier when no active history item could be recovered.
+INSERT INTO optimization_result_history (
+  profile_id, id, name, created_at, config_json, result_json,
+  operator_count, source, updated_at
+)
+SELECT workspace.profile_id,
+       'legacy-last-result',
+       '上次排班结果',
+       workspace.updated_at::text,
+       CASE WHEN jsonb_typeof(workspace.record_json->'config') = 'object'
+         THEN workspace.record_json->'config'
+         ELSE workspace.config_json
+       END,
+       CASE WHEN jsonb_typeof(workspace.record_json->'last_result') = 'object'
+         THEN workspace.record_json->'last_result'
+         ELSE workspace.last_result_json
+       END,
+       CASE WHEN jsonb_typeof(workspace.record_json->'operators') = 'array'
+         THEN jsonb_array_length(workspace.record_json->'operators')
+         WHEN jsonb_typeof(workspace.operators_json) = 'array'
+         THEN jsonb_array_length(workspace.operators_json)
+         ELSE 0
+       END,
+       'legacy',
+       workspace.updated_at
+  FROM user_profile_workspaces workspace
+ WHERE (
+   jsonb_typeof(workspace.record_json->'last_result') = 'object'
+   OR jsonb_typeof(workspace.last_result_json) = 'object'
+ )
+   AND NOT EXISTS (
+     SELECT 1
+       FROM optimization_result_history history
+      WHERE history.profile_id = workspace.profile_id
+        AND history.archived_at IS NULL
+   )
+ON CONFLICT (profile_id, id) DO NOTHING;
+
+UPDATE user_profile_workspaces
+   SET last_result_json = NULL,
+       record_json = record_json - 'last_result' - 'result_history' - 'archived_results'
+ WHERE last_result_json IS NOT NULL
+    OR record_json ? 'last_result'
+    OR record_json ? 'result_history'
+    OR record_json ? 'archived_results';
+
+-- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS profile_entitlements (
   profile_id TEXT PRIMARY KEY REFERENCES user_game_accounts(id) ON DELETE CASCADE,
   first_generated_at TIMESTAMPTZ,
@@ -2189,7 +2323,7 @@ export const DATABASE_SCHEMA_CHECKSUM = createHash('sha256')
   .update(DATABASE_SCHEMA_MINIMUM_APP_VERSION)
   .digest('hex')
 
-const TABLE_CONSTRAINT_KEYWORDS = new Set(['check', 'constraint', 'foreign', 'primary', 'unique'])
+const TABLE_CONSTRAINT_KEYWORDS = new Set(['and', 'check', 'constraint', 'foreign', 'or', 'primary', 'unique'])
 const API_ONLY_RUNTIME_TABLES = new Set([
   'feature_settings',
   'public_content_settings',

@@ -85,6 +85,8 @@ describe('database schema ownership', () => {
     expect(combinedSchema).toMatch(/ADD COLUMN IF NOT EXISTS reserved/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_notifications/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS website_notification_events/)
+    expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS optimization_result_history/)
+    expect(combinedSchema).toMatch(/record_json = record_json - 'last_result' - 'result_history' - 'archived_results'/)
     expect(combinedSchema).toMatch(/website_notification_events_version_check/)
     expect(combinedSchema).toMatch(/cdk_records_type_payload_check/)
     expect(combinedSchema).toMatch(/cdk_type = 'balance'/)
@@ -184,6 +186,8 @@ describe('database schema ownership', () => {
       { table_name: 'optimize_jobs', column_name: 'stage_updated_at' },
       { table_name: 'optimize_job_attempts', column_name: 'heartbeat_at' },
       { table_name: 'user_profile_workspaces', column_name: 'record_json' },
+      { table_name: 'optimization_result_history', column_name: 'result_json' },
+      { table_name: 'optimization_result_history', column_name: 'position' },
       { table_name: 'admin_sessions', column_name: 'token_hash' },
       { table_name: 'security_rate_limit_buckets', column_name: 'expires_at' },
     ]))
@@ -220,6 +224,7 @@ describe('database schema ownership', () => {
     expect(workerRequirements).toEqual(expect.arrayContaining([
       { table_name: 'optimize_jobs', column_name: 'execution_stage' },
       { table_name: 'optimize_job_attempts', column_name: 'heartbeat_at' },
+      { table_name: 'optimization_result_history', column_name: 'result_json' },
     ]))
     expect(workerRequirements).not.toEqual(expect.arrayContaining([
       { table_name: 'feature_settings', column_name: 'key' },
@@ -249,6 +254,14 @@ describe('database schema ownership', () => {
       { table_name: 'website_notification_events', column_name: 'event_id' },
       { table_name: 'website_notification_events', column_name: 'published_at' },
     ]))
+    expect(apiRequirements).not.toContainEqual({
+      table_name: 'website_notification_events',
+      column_name: 'and',
+    })
+    expect(apiRequirements).not.toContainEqual({
+      table_name: 'website_notification_events',
+      column_name: 'or',
+    })
   })
 
   it('keeps DDL out of production roles and dedicated workers', () => {
