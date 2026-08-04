@@ -15,7 +15,7 @@ import { useOptimizeWorkflow, type Props } from './useOptimizeWorkflow'
 import { copy } from '../../../copy/index'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import { fetchOptimizationJobSnapshot } from './optimization-api'
-import type { OptimizeResult, ReorderCheckResult, WorkspaceResultHistoryItem } from '../../../lib/types'
+import type { ReorderCheckResult, WorkspaceResultHistorySummary } from '../../../lib/types'
 import SessionLoader from '../../../components/SessionLoader'
 import { restoreScenarioComparisonJob } from './scenario-lab/useScenarioComparison'
 
@@ -27,7 +27,7 @@ export default function OptimizeWorkflowPage(props: Props) {
   const compactTaskCenterButtonRef = useRef<HTMLButtonElement>(null)
   const taskCenterTriggerRef = useRef(taskCenterButtonRef)
   const taskCenter = useOptimizationTaskCenter(props.profileId, taskCenterOpen)
-  const { license, progress, profile, onReset, announcement, redeemedNotice, permission, billingQuote, billingQuoteLoading, billingQuoteError, refreshBillingQuote, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, priorityCouponLoading, priorityCouponError, refreshRewardBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, reorderQuota, inventoryLoaded, inventoryLoading, inventoryError, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, useAdditionalRecomputeCoupon, setUseAdditionalRecomputeCoupon, additionalRecomputeCouponEligible, useReorderCheckCoupon, setUseReorderCheckCoupon, refreshInventory, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userCanDownloadFullResult, userCanViewFullData, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleReorderCheck, handleCancelReorderCheck, handleOpenReorderCheckResult, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleDownloadFullResult, handleUpgradePreviewProfile, declarationDialog } = useOptimizeWorkflow(props)
+  const { license, progress, profile, onReset, announcement, redeemedNotice, permission, billingQuote, billingQuoteLoading, billingQuoteError, refreshBillingQuote, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, priorityCouponLoading, priorityCouponError, refreshRewardBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, reorderQuota, inventoryLoaded, inventoryLoading, inventoryError, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, useAdditionalRecomputeCoupon, setUseAdditionalRecomputeCoupon, additionalRecomputeCouponEligible, useReorderCheckCoupon, setUseReorderCheckCoupon, refreshInventory, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userCanDownloadFullResult, userCanViewFullData, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults, resultHistoryHasMore, archivedResultsHasMore, resultHistoryLoadingScope, resultHistoryError, loadMoreResultHistory, loadMoreArchivedResults, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleReorderCheck, handleCancelReorderCheck, handleOpenReorderCheckResult, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleDownloadFullResult, handleUpgradePreviewProfile, declarationDialog } = useOptimizeWorkflow(props)
   const isMetered = profile.kind === 'metered_personal' || profile.kind === 'metered_commercial'
   const generationDisabledReason = !features.schedule_generation
     ? copy.features.schedule_read_only
@@ -199,28 +199,20 @@ export default function OptimizeWorkflowPage(props: Props) {
                 }
                 const resultId = job.historyResultId ?? job.id
                 const stored = [...resultHistory, ...archivedResults].find((item) => item.id === resultId)
-                if (stored) {
-                  closeTaskCenter()
-                  handleViewHistory(stored)
-                  return
-                }
-                const snapshot = await fetchOptimizationJobSnapshot<OptimizeResult>(
-                  job.id,
-                  copy.optimize.pages_tool_optimize_OptimizationTaskCenter_038,
-                )
-                if (snapshot.status !== 'succeeded') throw new Error(copy.optimize.pages_tool_optimize_OptimizationTaskCenter_038)
-                const transientHistoryItem: WorkspaceResultHistoryItem = {
+                const resultReference: WorkspaceResultHistorySummary = stored ?? {
                   id: resultId,
                   job_id: job.id,
                   name: copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_002(new Date(job.timestamps.submittedAt).toLocaleString()),
                   created_at: job.timestamps.finishedAt ?? job.timestamps.submittedAt,
-                  config: null,
-                  result: snapshot.result,
                   operator_count: mergedOperators.filter((operator) => operator.own !== false).length,
                   source: 'generated',
+                  archived: false,
+                  schedule_mode: null,
+                  maa_exportable: true,
+                  has_config: false,
                 }
                 closeTaskCenter()
-                handleViewHistory(transientHistoryItem)
+                await handleViewHistory(resultReference)
               })().catch((error) => window.alert(error instanceof Error ? error.message : copy.optimize.pages_tool_optimize_OptimizationTaskCenter_038))
             }}
             retryEnabled={features.schedule_generation}
@@ -275,7 +267,7 @@ export default function OptimizeWorkflowPage(props: Props) {
               ]}
               savedConfigCount={savedConfigs.length}
               savedConfigLimit={profileCapacity?.plan_slots.limit}
-              resultHistoryCount={resultHistory.length}
+              resultHistoryCount={profileCapacity?.history_slots.used ?? resultHistory.length}
               resultHistoryLimit={profileCapacity?.history_slots.limit}
               latestResult={latestWorkspaceResult}
               generationDisabledReason={generationDisabledReason}
@@ -323,6 +315,12 @@ export default function OptimizeWorkflowPage(props: Props) {
               savedConfigLimit={profileCapacity?.plan_slots.limit}
               resultHistoryLimit={profileCapacity?.history_slots.limit}
               archiveLimit={profileCapacity?.archive_slots.limit}
+              resultHistoryUsed={profileCapacity?.history_slots.used}
+              archivedResultsUsed={profileCapacity?.archive_slots.used}
+              resultHistoryHasMore={resultHistoryHasMore}
+              archivedResultsHasMore={archivedResultsHasMore}
+              historyLoadingScope={resultHistoryLoadingScope}
+              historyLoadError={resultHistoryError}
               selectedHistoryId={historyItem?.id ?? null}
               busyAction={workspaceBusyAction}
               notice={workspaceNotice}
@@ -337,6 +335,8 @@ export default function OptimizeWorkflowPage(props: Props) {
               onArchiveHistory={handleArchiveHistory}
               onUnarchiveHistory={handleUnarchiveHistory}
               onDeleteHistory={handleDeleteHistory}
+              onLoadMoreResultHistory={loadMoreResultHistory}
+              onLoadMoreArchivedResults={loadMoreArchivedResults}
             />
           )}
   

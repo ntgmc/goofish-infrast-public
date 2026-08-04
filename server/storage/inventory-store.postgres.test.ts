@@ -30,6 +30,10 @@ import { closePool, query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import { buildAuthPayload } from '../handlers/user-auth'
 import type { UserAccountRecord } from './user-store'
+import {
+  insertProfileOptimizationResultInTransaction,
+  mutateProfileOptimizationResultInTransaction,
+} from './optimization-result-store'
 
 let container: PostgreSqlContainer
 
@@ -228,11 +232,9 @@ describe('PostgreSQL unified inventory', () => {
       operators: null,
       config: null,
       elite_overrides: {},
-      last_result: null,
       saved_configs: [],
-      result_history: history,
-      archived_results: archived,
       free_schedule_entitlement: null,
+      free_preview_normalized_activity_id: null,
       updated_at: '2026-07-01T00:00:00.000Z',
     }
     await query(
@@ -241,6 +243,20 @@ describe('PostgreSQL unified inventory', () => {
        values ($1, null, null, '{}'::jsonb, null, $2::jsonb, $3)`,
       [profileId, JSON.stringify(workspace), workspace.updated_at],
     )
+    await withTransaction(async (client) => {
+      for (const item of [...history].reverse()) {
+        await insertProfileOptimizationResultInTransaction(client, profileId, item, 6)
+      }
+      await insertProfileOptimizationResultInTransaction(client, profileId, archived[0]!, 7)
+      await mutateProfileOptimizationResultInTransaction(client, {
+        profileId,
+        resultId: archived[0]!.id,
+        action: 'archive',
+        historyLimit: 6,
+        archiveLimit: 1,
+        now: workspace.updated_at,
+      })
+    })
     const user = (await query<{ record_json: UserAccountRecord }>(
       'select record_json from user_accounts where id = $1',
       [userId],
@@ -259,9 +275,9 @@ describe('PostgreSQL unified inventory', () => {
     expect(refreshed.workspace?.result_history.map((item) => item.id)).toEqual(history.map((item) => item.id))
     expect(refreshed.workspace?.archived_results.map((item) => item.id)).toEqual(['archive-1'])
     const stored = await query<{ history_count: number; archive_count: number }>(
-      `select jsonb_array_length(record_json->'result_history') as history_count,
-              jsonb_array_length(record_json->'archived_results') as archive_count
-         from user_profile_workspaces where profile_id = $1`,
+      `select count(*) filter (where archived_at is null)::int as history_count,
+              count(*) filter (where archived_at is not null)::int as archive_count
+         from optimization_result_history where profile_id = $1`,
       [profileId],
     )
     expect(stored.rows[0]).toEqual({ history_count: 6, archive_count: 1 })
@@ -587,7 +603,7 @@ function historyItem(id: string) {
     config: null,
     result: {},
     operator_count: 0,
-    source: 'generated',
+    source: 'generated' as const,
   }
 }
 

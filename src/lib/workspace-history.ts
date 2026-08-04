@@ -1,4 +1,4 @@
-import type { LicenseConfig, OptimizeResult } from './types'
+import type { LicenseConfig, OptimizeResult, WorkspaceResultHistorySummary } from './types'
 import { copy, CURRENT_LOCALE } from '../copy/index'
 
 
@@ -65,13 +65,8 @@ export function formatPlanName(config: LicenseConfig | null | undefined, fallbac
   return config.desc || config.layout || fallback
 }
 
-export function formatResultSummary(result: OptimizeResult): string {
-  const mode = formatScheduleMode(result)
-  const planCount = Array.isArray(result.plans) ? result.plans.length : 0
-  const efficiency = typeof result.total_efficiency === 'number'
-    ? `${copy.common.lib_workspace_history_028}${Math.round(result.total_efficiency)}`
-    : ''
-  return `${mode} · ${planCount}${copy.common.lib_workspace_history_029}${efficiency}`
+export function formatResultHistorySummary(summary: WorkspaceResultHistorySummary): string {
+  return formatScheduleMode(summary)
 }
 
 export function isMaaJsonDownloadable(result: OptimizeResult): boolean {
@@ -91,7 +86,7 @@ function formatLayout(config: LicenseConfig): string {
   return `${config.trading_stations_count}-${config.manufacturing_stations_count}-3`
 }
 
-function formatScheduleMode(value: Pick<LicenseConfig, 'schedule_mode'> | Pick<OptimizeResult, 'schedule_mode'>): string {
+function formatScheduleMode(value: { schedule_mode?: string | null }): string {
   const mode = String(value.schedule_mode ?? 'maa')
   return SCHEDULE_MODE_LABELS[mode] ?? mode
 }

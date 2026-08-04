@@ -324,16 +324,20 @@ async function assertOptimizeHistory() {
     include_upgrade_suggestions: true,
   })
   const workspace = store.workspaces.get('profile-1')
-  if (generated.status !== 200 || !workspace?.last_result || workspace.result_history.length !== 1) {
-    throw new Error(`optimize history: expected stored last_result and one history item, got ${generated.status}: ${JSON.stringify(generated.body)}`)
+  const history = getProfileResults('profile-1')
+  if (generated.status !== 200 || history.length !== 1) {
+    throw new Error(`optimize history: expected one independently stored history item, got ${generated.status}: ${JSON.stringify(generated.body)}`)
   }
-  if (workspace.result_history[0].name !== '333 orundum' || workspace.result_history[0].source !== 'generated') {
+  if (history[0].name !== '333 orundum' || history[0].source !== 'generated') {
     throw new Error('optimize history: saved config name/source not used')
+  }
+  if (['last_result', 'result_history', 'archived_results'].some((field) => Object.hasOwn(workspace, field))) {
+    throw new Error('optimize history: workspace should not embed optimization results')
   }
   if (!workspace.saved_configs[0].last_used_at) {
     throw new Error('optimize history: matching saved config should be touched')
   }
-  if (workspace.last_result.upgrade_suggestions_status !== 'completed' || !Array.isArray(workspace.last_result.upgrade_suggestions)) {
+  if (history[0].result.upgrade_suggestions_status !== 'completed' || !Array.isArray(history[0].result.upgrade_suggestions)) {
     throw new Error('optimize history: merged suggestions should be stored with the first result')
   }
 }
@@ -397,7 +401,7 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
 
   await assertFreePreviewModeRoundTrip()
 
-  const beforeHistoryCount = store.workspaces.get(preview.id)?.result_history.length ?? 0
+  const beforeHistoryCount = getProfileResults(preview.id).length
 
   const unboundReorder = await call(optimizeHandler, '/api/optimize/reorder-check', {
     profile_id: unboundPreview.id,
@@ -445,40 +449,40 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
   }
 
   const workspace = store.workspaces.get(preview.id)
-  if (!workspace?.last_result || workspace.result_history.length !== beforeHistoryCount + 1) {
+  const history = getProfileResults(preview.id)
+  if (!workspace || history.length !== beforeHistoryCount + 1) {
     throw new Error('免费档案生成：预期受限结果写入历史')
   }
-  assertFreePreviewResult(workspace.last_result, '免费档案保存的 last_result')
-  assertFreePreviewResult(workspace.result_history[0].result, '免费档案保存的历史结果')
+  assertFreePreviewResult(history[0].result, '免费档案保存的历史结果')
 
-  const reorderBeforeHistoryCount = workspace.result_history.length
-  const reorderBeforeLastResult = workspace.last_result
+  const reorderBeforeHistoryCount = history.length
+  const reorderBeforeLatestResult = history[0]
   const noNeedReorder = await call(optimizeHandler, '/api/optimize/reorder-check', {
     profile_id: preview.id,
     config: free333OrundumConfig,
-    baseline_history_id: workspace.result_history[0].id,
+    baseline_history_id: history[0].id,
   })
   if (noNeedReorder.status !== 200 || noNeedReorder.body?.recommendation !== 'no_need') {
-    throw new Error(`免费档案无变化重排检测：预期 200 no_need，实际 ${noNeedReorder.status}`)
+    throw new Error(`免费档案无变化重排检测：预期 200 no_need，实际 ${noNeedReorder.status}: ${JSON.stringify(noNeedReorder.body)}`)
   }
   assertReorderCheckResult(noNeedReorder.body, '免费档案无变化重排检测')
-  const reorderWorkspace = store.workspaces.get(preview.id)
-  if (reorderWorkspace?.result_history.length !== reorderBeforeHistoryCount || reorderWorkspace.last_result !== reorderBeforeLastResult) {
-    throw new Error('免费档案重排检测：不应写入 last_result 或历史')
+  const reorderHistory = getProfileResults(preview.id)
+  if (reorderHistory.length !== reorderBeforeHistoryCount || reorderHistory[0] !== reorderBeforeLatestResult) {
+    throw new Error('免费档案重排检测：不应写入排班历史')
   }
 
   const invalidConfigReorder = await call(optimizeHandler, '/api/optimize/reorder-check', {
     profile_id: preview.id,
     config: { ...free333OrundumConfig, trading_stations_count: 4 },
-    baseline_history_id: workspace.result_history[0].id,
+    baseline_history_id: history[0].id,
   })
   if (invalidConfigReorder.status !== 403) {
     throw new Error(`免费档案非法配置重排检测：预期 403，实际 ${invalidConfigReorder.status}`)
   }
 
-  await assertReorderRecommendationFromBaseline('preview-reorder-recommended', cloneWithRoomOperator(workspace.last_result, 'power', 0, { id: 'old-power', name: 'Old Power' }), 'recommended')
-  await assertReorderRecommendationFromBaseline('preview-reorder-strong', cloneWithRoomOperator(workspace.last_result, 'trading', 0, { id: 'old-trade', name: 'Old Trader' }), 'strongly_recommended')
-  await assertReorderQuotaLimit(workspace.last_result)
+  await assertReorderRecommendationFromBaseline('preview-reorder-recommended', cloneWithRoomOperator(history[0].result, 'power', 0, { id: 'old-power', name: 'Old Power' }), 'recommended')
+  await assertReorderRecommendationFromBaseline('preview-reorder-strong', cloneWithRoomOperator(history[0].result, 'trading', 0, { id: 'old-trade', name: 'Old Trader' }), 'strongly_recommended')
+  await assertReorderQuotaLimit(history[0].result)
 
   const previewEvents = store.usageEvents.filter((event) => event.profile_id === preview.id)
   if (!previewEvents.some((event) => event.event === 'schedule_generate' && event.status === 'success')) {
@@ -622,12 +626,11 @@ async function assertFreeScheduleRevisionLimit() {
     label: '免费完整排班第 3 次修正',
   })
 
-  const beforeBlocked = store.workspaces.get(profile.id)
+  const beforeBlockedHistoryCount = getProfileResults(profile.id).length
   const blocked = await generateFreeSchedule(profile.id)
-  const afterBlocked = store.workspaces.get(profile.id)
   if (blocked.status !== 403) throw new Error(`免费完整排班第 4 次生成：预期 403，实际 ${blocked.status}`)
-  if (afterBlocked?.result_history.length !== beforeBlocked?.result_history.length || afterBlocked?.last_result !== beforeBlocked?.last_result) {
-    throw new Error('免费完整排班第 4 次生成：不应写入 last_result 或历史')
+  if (getProfileResults(profile.id).length !== beforeBlockedHistoryCount) {
+    throw new Error('免费完整排班第 4 次生成：不应写入排班历史')
   }
 }
 
@@ -641,7 +644,7 @@ async function assertFreeScheduleConfirmLocks() {
 
   const generated = await generateFreeSchedule(profile.id)
   if (generated.status !== 200) throw new Error(`免费完整排班确认前生成：预期 200，实际 ${generated.status}`)
-  const historyId = store.workspaces.get(profile.id)?.result_history[0]?.id
+  const historyId = getProfileResults(profile.id)[0]?.id
   const confirmed = await call(workspaceHandler, '/api/user/workspace/free-schedule/confirm', {
     profile_id: profile.id,
     result_history_id: historyId,
@@ -654,10 +657,10 @@ async function assertFreeScheduleConfirmLocks() {
     label: '免费完整排班确认接口',
   })
 
-  const beforeBlocked = store.workspaces.get(profile.id)
+  const beforeBlockedHistoryCount = getProfileResults(profile.id).length
   const blocked = await generateFreeSchedule(profile.id)
   if (blocked.status !== 403) throw new Error(`免费完整排班确认后生成：预期 403，实际 ${blocked.status}`)
-  if (store.workspaces.get(profile.id)?.result_history.length !== beforeBlocked?.result_history.length) {
+  if (getProfileResults(profile.id).length !== beforeBlockedHistoryCount) {
     throw new Error('免费完整排班确认后生成：不应写入历史')
   }
 }
@@ -704,12 +707,11 @@ async function assertStrongReorderBonusGeneration() {
     ...emptyWorkspace(profile.id),
     operators: sampleOperators,
     config: free333OrundumConfig,
-    last_result: baselineResult,
-    result_history: [historyItem],
     free_schedule_entitlement: lockedEntitlement,
   })
+  setProfileResults(profile.id, [historyItem])
 
-  const beforeCheck = store.workspaces.get(profile.id)
+  const beforeCheckHistoryCount = getProfileResults(profile.id).length
   const checked = await call(optimizeHandler, '/api/optimize/reorder-check', {
     profile_id: profile.id,
     config: free333OrundumConfig,
@@ -720,7 +722,7 @@ async function assertStrongReorderBonusGeneration() {
   }
   const granted = store.workspaces.get(profile.id)?.free_schedule_entitlement?.strong_reorder_bonus
   if (!granted || granted.used_at) throw new Error('强烈建议重排 bonus 授予：预期写入未使用的当月 bonus')
-  if (store.workspaces.get(profile.id)?.result_history.length !== beforeCheck?.result_history.length) {
+  if (getProfileResults(profile.id).length !== beforeCheckHistoryCount) {
     throw new Error('强烈建议重排检测：不应写入排班历史')
   }
 
@@ -729,10 +731,10 @@ async function assertStrongReorderBonusGeneration() {
   const usedBonus = store.workspaces.get(profile.id)?.free_schedule_entitlement?.strong_reorder_bonus
   if (!usedBonus?.used_at) throw new Error('强烈建议重排 bonus 生成：预期标记 used_at')
 
-  const beforeSecondBonus = store.workspaces.get(profile.id)
+  const beforeSecondBonusHistoryCount = getProfileResults(profile.id).length
   const blocked = await generateFreeSchedule(profile.id)
   if (blocked.status !== 403) throw new Error(`强烈建议重排 bonus 二次生成：预期 403，实际 ${blocked.status}`)
-  if (store.workspaces.get(profile.id)?.result_history.length !== beforeSecondBonus?.result_history.length) {
+  if (getProfileResults(profile.id).length !== beforeSecondBonusHistoryCount) {
     throw new Error('强烈建议重排 bonus 二次生成：不应写入历史')
   }
 }
@@ -838,7 +840,8 @@ async function assertFreeConfigPatchStatus(profileId, config, expectedStatus, la
 
 async function assertOperatorsPatchKeepsHistory() {
   const before = store.workspaces.get('profile-1')
-  if (!before?.last_result || before.result_history.length !== 1 || before.saved_configs.length !== 1) {
+  const beforeHistory = getProfileResults('profile-1')
+  if (!before || beforeHistory.length !== 1 || before.saved_configs.length !== 1) {
     throw new Error('operators patch precondition failed')
   }
   const updated = await call(workspaceHandler, '/api/user/workspace', {
@@ -846,11 +849,14 @@ async function assertOperatorsPatchKeepsHistory() {
     operators: sampleOperators,
   }, { method: 'PATCH' })
   const workspace = updated.body.workspace
-  if (updated.status !== 200 || workspace.last_result !== null) {
-    throw new Error('operators patch: last_result should be cleared')
+  if (updated.status !== 200 || workspace.latest_result?.id !== beforeHistory[0].id) {
+    throw new Error('operators patch: latest result summary should be preserved')
   }
   if (workspace.result_history.length !== 1 || workspace.saved_configs.length !== 1) {
     throw new Error('operators patch: history and saved configs should be kept')
+  }
+  if ('result' in workspace.result_history[0] || 'config' in workspace.result_history[0]) {
+    throw new Error('operators patch: workspace history should only expose summaries')
   }
 }
 
@@ -960,9 +966,8 @@ async function assertReorderRecommendationFromBaseline(profileId, baselineResult
     ...emptyWorkspace(profile.id),
     operators: sampleOperators,
     config: free333OrundumConfig,
-    last_result: baselineResult,
-    result_history: [historyItem],
   })
+  setProfileResults(profile.id, [historyItem])
   const checked = await call(optimizeHandler, '/api/optimize/reorder-check', {
     profile_id: profile.id,
     config: free333OrundumConfig,
@@ -987,9 +992,8 @@ async function assertReorderQuotaLimit(baselineResult) {
     ...emptyWorkspace(profile.id),
     operators: sampleOperators,
     config: free333OrundumConfig,
-    last_result: baselineResult,
-    result_history: [historyItem],
   })
+  setProfileResults(profile.id, [historyItem])
 
   const failedBeforeQuota = await call(optimizeHandler, '/api/optimize/reorder-check', {
     profile_id: profile.id,
@@ -1032,6 +1036,17 @@ function createHistoryItem(profileId, result) {
     operator_count: sampleOperators.length,
     source: 'generated',
   }
+}
+
+function getProfileResults(profileId) {
+  return store.results.get(profileId) ?? []
+}
+
+function setProfileResults(profileId, items) {
+  store.results.set(profileId, items.map((item) => ({
+    ...item,
+    archived_at: item.archived_at ?? null,
+  })))
 }
 
 function cloneWithRoomOperator(result, roomType, roomIndex, operator) {
@@ -1159,6 +1174,10 @@ function memoryStorePlugin() {
         path: 'memory-user-auth',
         namespace: 'workspace-history-smoke',
       }))
+      build.onResolve({ filter: /(^|[\\/])optimization-result-store(\.ts)?$/ }, () => ({
+        path: 'memory-optimization-result-store',
+        namespace: 'workspace-history-smoke',
+      }))
       build.onResolve({ filter: /(^|[\\/])license-utils(\.ts)?$/ }, () => ({
         path: 'memory-license-utils',
         namespace: 'workspace-history-smoke',
@@ -1194,6 +1213,7 @@ function memoryStorePlugin() {
 function memoryModule(path) {
   if (path === 'memory-user-store') return memoryUserStoreModule()
   if (path === 'memory-user-auth') return memoryUserAuthModule()
+  if (path === 'memory-optimization-result-store') return memoryOptimizationResultStoreModule()
   if (path === 'memory-license-utils') return memoryLicenseUtilsModule()
   if (path === 'memory-usage-stats') return memoryUsageStatsModule()
   if (path === 'memory-training-cost') return 'export async function attachTrainingCostsToUpgradeSuggestions({ suggestions }) { return suggestions }'
@@ -1264,7 +1284,7 @@ function memoryUserStoreModule() {
   return `
     const store = globalThis.__workspaceHistorySmokeStore
 export function emptyWorkspace(profileId) {
-return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], free_schedule_entitlement: null, updated_at: new Date().toISOString() }
+return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, saved_configs: [], free_schedule_entitlement: null, free_preview_normalized_activity_id: null, updated_at: new Date().toISOString() }
 }
     export async function insertUserAccountForRegistrationInTransaction() {}
     export async function listProfilesForUser(userId) {
@@ -1344,19 +1364,22 @@ return { version: 1, profile_id: profileId, operators: null, config: null, elite
       store.workspaces.set(profileId, next)
       return next
     }
-    export function toPublicWorkspace(workspace) {
+    export function toPublicWorkspace(workspace, limits = { plan: 20, history: 10, archive: 0 }, overview) {
       const normalized = workspace ? normalizeWorkspace(workspace) : null
       return {
         profile_id: normalized?.profile_id ?? null,
         operators: normalized?.operators ?? null,
         config: normalized?.config ?? null,
         elite_overrides: normalized?.elite_overrides ?? {},
-        last_result: normalized?.last_result ?? null,
-        saved_configs: normalized?.saved_configs ?? [],
-result_history: normalized?.result_history ?? [],
-free_schedule_entitlement: normalized?.free_schedule_entitlement ?? null,
-updated_at: normalized?.updated_at ?? null,
-}
+        latest_result: overview?.latest_result ?? null,
+        saved_configs: (normalized?.saved_configs ?? []).slice(0, limits.plan),
+        result_history: (overview?.result_history.items ?? []).slice(0, limits.history),
+        archived_results: (overview?.archived_results.items ?? []).slice(0, limits.archive),
+        result_history_next_cursor: overview?.result_history.next_cursor ?? null,
+        archived_results_next_cursor: overview?.archived_results.next_cursor ?? null,
+        free_schedule_entitlement: normalized?.free_schedule_entitlement ?? null,
+        updated_at: normalized?.updated_at ?? null,
+      }
     }
     export function toPublicProfile(profile, workspace) {
       return {
@@ -1375,7 +1398,69 @@ updated_at: normalized?.updated_at ?? null,
       }
     }
     function normalizeWorkspace(workspace) {
-      return { ...emptyWorkspace(workspace.profile_id), ...workspace, saved_configs: Array.isArray(workspace.saved_configs) ? workspace.saved_configs.slice(0, 20) : [], result_history: Array.isArray(workspace.result_history) ? workspace.result_history.slice(0, 10) : [] }
+      return {
+        ...emptyWorkspace(workspace.profile_id),
+        operators: Array.isArray(workspace.operators) ? workspace.operators : null,
+        config: workspace.config ?? null,
+        elite_overrides: workspace.elite_overrides ?? {},
+        saved_configs: Array.isArray(workspace.saved_configs) ? workspace.saved_configs.slice(0, 20) : [],
+        free_schedule_entitlement: workspace.free_schedule_entitlement ?? null,
+        free_preview_normalized_activity_id: workspace.free_preview_normalized_activity_id ?? null,
+        updated_at: workspace.updated_at ?? new Date().toISOString(),
+      }
+    }
+  `
+}
+
+function memoryOptimizationResultStoreModule() {
+  return `
+    const store = globalThis.__workspaceHistorySmokeStore
+    function profileResults(profileId) {
+      return store.results.get(profileId) ?? []
+    }
+    function summary(item) {
+      return {
+        id: item.id,
+        ...(item.job_id ? { job_id: item.job_id } : {}),
+        name: item.name,
+        created_at: item.created_at,
+        operator_count: item.operator_count,
+        source: item.source,
+        archived: item.archived_at != null,
+        schedule_mode: typeof item.result?.schedule_mode === 'string' ? item.result.schedule_mode : null,
+        maa_exportable: item.archived_at == null && item.result?.schedule_mode === 'maa',
+        has_config: item.config != null,
+      }
+    }
+    export async function getProfileOptimizationResult(profileId, resultId) {
+      return profileResults(profileId).find((item) => item.id === resultId) ?? null
+    }
+    export async function getProfileOptimizationResultWithClient(_client, profileId, resultId) {
+      return getProfileOptimizationResult(profileId, resultId)
+    }
+    export async function getLatestProfileOptimizationResult(profileId) {
+      return profileResults(profileId).find((item) => item.archived_at == null) ?? null
+    }
+    export async function getWorkspaceOptimizationResultOverview(profileId) {
+      const active = profileResults(profileId).filter((item) => item.archived_at == null).map(summary)
+      const archived = profileResults(profileId).filter((item) => item.archived_at != null).map(summary)
+      return {
+        latest_result: active[0] ?? null,
+        result_history: { items: active, next_cursor: null },
+        archived_results: { items: archived, next_cursor: null },
+      }
+    }
+    export async function getWorkspaceOptimizationResultOverviewWithClient(_client, profileId) {
+      return getWorkspaceOptimizationResultOverview(profileId)
+    }
+    export async function insertProfileOptimizationResultInTransaction(_client, profileId, item, historyLimit) {
+      const current = profileResults(profileId)
+      if (current.some((entry) => entry.id === item.id)) return false
+      const archived = current.filter((entry) => entry.archived_at != null)
+      const active = [{ ...item, archived_at: null }, ...current.filter((entry) => entry.archived_at == null)]
+        .slice(0, Math.max(0, Math.floor(historyLimit)))
+      store.results.set(profileId, [...active, ...archived])
+      return true
     }
   `
 }
@@ -1452,19 +1537,35 @@ function memoryUserAuthModule() {
       return { id: profile.id, user_id: profile.user_id, kind: profile.kind, permission: profile.permission, status: profile.status, cdk_order_hash: profile.cdk_order_hash, display_name: profile.display_name, note: profile.note, skland_binding: profile.skland_binding ? { uid: profile.skland_binding.uid, nickname: profile.skland_binding.nickname, channel_name: profile.skland_binding.channel_name, bound_at: profile.skland_binding.bound_at, last_imported_at: profile.skland_binding.last_imported_at, credential_status: 'available', credential_invalid_at: null, credential_invalid_reason: null } : null, operator_count: workspace?.operators?.length ?? 0, updated_at: workspace?.updated_at ?? profile.updated_at, created_at: profile.created_at }
     }
     function toPublicWorkspace(workspace) {
+      const active = (store.results.get(workspace?.profile_id) ?? []).filter((item) => item.archived_at == null)
+      const summaries = active.map((item) => ({
+        id: item.id,
+        name: item.name,
+        created_at: item.created_at,
+        operator_count: item.operator_count,
+        source: item.source,
+        archived: false,
+        schedule_mode: item.result?.schedule_mode ?? null,
+        maa_exportable: item.result?.schedule_mode === 'maa',
+        has_config: item.config != null,
+      }))
       return {
         profile_id: workspace?.profile_id ?? null,
         operators: workspace?.operators ?? null,
         config: workspace?.config ?? null,
         elite_overrides: workspace?.elite_overrides ?? {},
-        last_result: workspace?.last_result ?? null,
+        latest_result: summaries[0] ?? null,
         saved_configs: workspace?.saved_configs ?? [],
-        result_history: workspace?.result_history ?? [],
+        result_history: summaries,
+        archived_results: [],
+        result_history_next_cursor: null,
+        archived_results_next_cursor: null,
+        free_schedule_entitlement: workspace?.free_schedule_entitlement ?? null,
         updated_at: workspace?.updated_at ?? null,
       }
     }
     function emptyWorkspace(profileId) {
-      return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], updated_at: new Date().toISOString() }
+      return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, saved_configs: [], free_schedule_entitlement: null, free_preview_normalized_activity_id: null, updated_at: new Date().toISOString() }
     }
     function normalizeDisplayName(value) {
       return typeof value === 'string' ? value.trim().slice(0, 40) : ''
@@ -1712,19 +1813,20 @@ function memoryOptimizerPortModule() {
         }
       }
       if (result.preview_limit && entitlement) result.preview_limit.free_schedule_entitlement = entitlement
+      const currentResults = store.results.get(profileId) ?? []
       const history = {
-        id: 'history-' + profileId + '-' + (workspace.result_history.length + 1),
+        id: 'history-' + profileId + '-' + (currentResults.length + 1),
         name: matchingConfig?.name ?? 'Generated schedule',
         created_at: now,
         config: payload.effectiveConfig,
         result,
         operator_count: payload.operators.length,
         source: payload.request.history_source ?? 'generated',
+        archived_at: null,
       }
+      store.results.set(profileId, [history, ...currentResults.filter((item) => item.archived_at == null)].slice(0, 10))
       store.workspaces.set(profileId, {
         ...workspace,
-        last_result: result,
-        result_history: [history, ...workspace.result_history].slice(0, 10),
         free_schedule_entitlement: entitlement,
         updated_at: now,
       })
@@ -1869,6 +1971,7 @@ function createMemoryStore() {
       updated_at: now,
     }]]),
     workspaces: new Map(),
+    results: new Map(),
     cdks: new Map([['cdk/profile-1.json', {
       version: 2,
       cdk_type: 'profile',
@@ -1885,5 +1988,5 @@ function createMemoryStore() {
 }
 
 function emptyWorkspace(profileId) {
-  return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], free_schedule_entitlement: null, updated_at: new Date().toISOString() }
+  return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, saved_configs: [], free_schedule_entitlement: null, free_preview_normalized_activity_id: null, updated_at: new Date().toISOString() }
 }

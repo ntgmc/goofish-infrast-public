@@ -588,9 +588,11 @@ async function assertUserSessionTouchAndAuthPayload() {
   globalThis.__authSecurityWorkspaceFullCalls = []
   globalThis.__authSecurityWorkspaceSummaryCalls = []
   globalThis.__authSecurityWorkspaceSingleCalls = 0
+  globalThis.__authSecurityResultOverviewCalls = []
   const payload = await userAuth.buildAuthPayload(activeUser, 'profile-1')
   assert.deepEqual(globalThis.__authSecurityWorkspaceFullCalls, [['profile-1']])
   assert.deepEqual(globalThis.__authSecurityWorkspaceSummaryCalls, [['profile-2', 'profile-1']])
+  assert.deepEqual(globalThis.__authSecurityResultOverviewCalls, ['profile-1'])
   assert.equal(globalThis.__authSecurityWorkspaceSingleCalls, 0, 'auth payload should not read workspaces individually')
   assert.deepEqual(payload.profiles.map((profile) => profile.id), ['profile-2', 'profile-1'])
   assert.equal(payload.profiles[0].workspace_profile_id, null)
@@ -601,18 +603,22 @@ async function assertUserSessionTouchAndAuthPayload() {
 
   globalThis.__authSecurityWorkspaceFullCalls = []
   globalThis.__authSecurityWorkspaceSummaryCalls = []
+  globalThis.__authSecurityResultOverviewCalls = []
   const fallbackPayload = await userAuth.buildAuthPayload(activeUser, 'missing-profile')
   assert.deepEqual(globalThis.__authSecurityWorkspaceFullCalls, [['profile-2']])
   assert.deepEqual(globalThis.__authSecurityWorkspaceSummaryCalls, [['profile-2', 'profile-1']])
+  assert.deepEqual(globalThis.__authSecurityResultOverviewCalls, ['profile-2'])
   assert.equal(fallbackPayload.active_profile.id, 'profile-2')
   assert.equal(fallbackPayload.workspace, null)
 
   globalThis.__authSecurityProfiles = [profiles[1]]
   globalThis.__authSecurityWorkspaceFullCalls = []
   globalThis.__authSecurityWorkspaceSummaryCalls = []
+  globalThis.__authSecurityResultOverviewCalls = []
   const singleProfilePayload = await userAuth.buildAuthPayload(activeUser)
   assert.deepEqual(globalThis.__authSecurityWorkspaceFullCalls, [['profile-1']])
   assert.deepEqual(globalThis.__authSecurityWorkspaceSummaryCalls, [['profile-1']])
+  assert.deepEqual(globalThis.__authSecurityResultOverviewCalls, ['profile-1'])
   assert.deepEqual(singleProfilePayload.profiles.map((profile) => profile.id), ['profile-1'])
   assert.equal(singleProfilePayload.active_profile.id, 'profile-1')
   assert.equal(singleProfilePayload.workspace.profile_id, 'profile-1')
@@ -620,9 +626,11 @@ async function assertUserSessionTouchAndAuthPayload() {
   globalThis.__authSecurityProfiles = []
   globalThis.__authSecurityWorkspaceFullCalls = []
   globalThis.__authSecurityWorkspaceSummaryCalls = []
+  globalThis.__authSecurityResultOverviewCalls = []
   const emptyPayload = await userAuth.buildAuthPayload(activeUser, 'missing-profile')
   assert.deepEqual(globalThis.__authSecurityWorkspaceFullCalls, [[]])
   assert.deepEqual(globalThis.__authSecurityWorkspaceSummaryCalls, [[]])
+  assert.deepEqual(globalThis.__authSecurityResultOverviewCalls, [])
   assert.deepEqual(emptyPayload.profiles, [])
   assert.equal(emptyPayload.active_profile, null)
   assert.equal(emptyPayload.workspace, null)
@@ -686,7 +694,8 @@ async function assertUserSessionStorage() {
   assert.deepEqual([...workspaces.keys()].sort(), ['profile-1', 'profile-2'])
   assert.equal(workspaces.get('profile-1').profile_id, 'profile-1')
   assert.deepEqual(workspaces.get('profile-1').saved_configs, [])
-  assert.deepEqual(workspaces.get('profile-2').result_history, [])
+  assert.equal(Object.hasOwn(workspaces.get('profile-2'), 'last_result'), false)
+  assert.equal(Object.hasOwn(workspaces.get('profile-2'), 'result_history'), false)
 
   const summaries = await userStore.listProfileWorkspaceSummaries(['profile-1', 'missing', 'profile-2'])
   const summaryQuery = globalThis.__authSecurityStorageQueries.at(-1)
@@ -1737,7 +1746,7 @@ function userSessionAuthPlugin() {
   return {
     name: 'auth-security-user-session-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'inventory-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email']) {
+      for (const moduleName of ['user-store', 'optimization-result-store', 'inventory-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email']) {
         build.onResolve({ filter: new RegExp(`(^|[\\\\/])${moduleName}(\\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-user-session',
@@ -1746,6 +1755,7 @@ function userSessionAuthPlugin() {
       build.onLoad({ filter: /.*/, namespace: 'auth-security-user-session' }, (args) => {
         const mocks = {
           'user-store': userSessionAuthStoreMock(),
+          'optimization-result-store': userSessionOptimizationResultStoreMock(),
           'inventory-store': inventoryStoreMock(),
           'announcement-store': announcementStoreMock(),
           'license-utils': userLicenseUtilsMock(),
@@ -2227,6 +2237,19 @@ function userSessionAuthStoreMock() {
     export function isFreePreviewProfile() { return false }
     export function normalizeProfileKind(profile) { return profile.kind ?? 'cdk' }
     export async function upgradeUserPasswordHash() { return null }
+  `
+}
+
+function userSessionOptimizationResultStoreMock() {
+  return `
+    export async function getWorkspaceOptimizationResultOverview(profileId) {
+      globalThis.__authSecurityResultOverviewCalls.push(profileId)
+      return {
+        latest_result: null,
+        result_history: { items: [], next_cursor: null },
+        archived_results: { items: [], next_cursor: null },
+      }
+    }
   `
 }
 

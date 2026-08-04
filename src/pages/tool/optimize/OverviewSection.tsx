@@ -1,7 +1,7 @@
-import type { FreeScheduleEntitlement, LicenseConfig, PriorityCouponBalance, ReorderCheckResult, WorkspaceResultHistoryItem } from '../../../lib/types'
+import type { FreeScheduleEntitlement, LicenseConfig, PriorityCouponBalance, ReorderCheckResult, WorkspaceResultHistorySummary } from '../../../lib/types'
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
 import InfoTooltip from '../../../components/InfoTooltip'
-import { formatResultSummary, formatWorkspaceDate, isMaaJsonDownloadable } from '../../../lib/workspace-history'
+import { formatResultHistorySummary, formatWorkspaceDate } from '../../../lib/workspace-history'
 import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../../lib/workspace-limits'
 import GenerateControlBar, { DashboardMiniStat } from './GenerateControlBar'
 import { SmallActionButton } from './feedback'
@@ -80,7 +80,7 @@ export default function OverviewSection({
   savedConfigLimit?: number;
   resultHistoryCount: number;
   resultHistoryLimit?: number;
-  latestResult: WorkspaceResultHistoryItem | null;
+  latestResult: WorkspaceResultHistorySummary | null;
   generationDisabledReason?: string | null;
   freeSchedule?: FreeScheduleViewState;
   reorderCheck?: ReorderCheckViewState;
@@ -88,9 +88,9 @@ export default function OverviewSection({
   onReset: () => void;
   onOpenPlans: () => void;
   onOpenConfig: () => void;
-  onViewHistory: (item: WorkspaceResultHistoryItem) => void;
-  onUseHistoryConfig: (item: WorkspaceResultHistoryItem) => void;
-  onDownloadHistory: (item: WorkspaceResultHistoryItem) => void;
+  onViewHistory: (item: WorkspaceResultHistorySummary) => Promise<void>;
+  onUseHistoryConfig: (item: WorkspaceResultHistorySummary) => Promise<void>;
+  onDownloadHistory: (item: WorkspaceResultHistorySummary) => void;
   downloadBusy?: boolean;
 }) {
   return (
@@ -149,7 +149,7 @@ export default function OverviewSection({
               </h2>
               <p className="mt-1 text-sm leading-6 text-ink-secondary">
                 {latestResult
-                  ? `${formatWorkspaceDate(latestResult.created_at)} · ${formatResultSummary(latestResult.result)}`
+                  ? `${formatWorkspaceDate(latestResult.created_at)} · ${formatResultHistorySummary(latestResult)}`
                   : copy.optimize.pages_tool_optimize_OverviewSection_014}
               </p>
             </div>
@@ -161,9 +161,9 @@ export default function OverviewSection({
           </div>
           {latestResult ? (
             <div className="mt-4 flex flex-wrap gap-2">
-              <SmallActionButton onClick={() => onViewHistory(latestResult)}>{copy.optimize.pages_tool_optimize_OverviewSection_018}</SmallActionButton>
-              <SmallActionButton onClick={() => onDownloadHistory(latestResult)} disabled={downloadBusy || !isMaaJsonDownloadable(latestResult.result)}>{downloadBusy ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_OverviewSection_019}</SmallActionButton>
-              <SmallActionButton onClick={() => onUseHistoryConfig(latestResult)} disabled={!latestResult.config}>{copy.optimize.pages_tool_optimize_OverviewSection_020}</SmallActionButton>
+              <SmallActionButton onClick={() => void onViewHistory(latestResult)}>{copy.optimize.pages_tool_optimize_OverviewSection_018}</SmallActionButton>
+              <SmallActionButton onClick={() => onDownloadHistory(latestResult)} disabled={downloadBusy || !latestResult.maa_exportable}>{downloadBusy ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_OverviewSection_019}</SmallActionButton>
+              <SmallActionButton onClick={() => void onUseHistoryConfig(latestResult)} disabled={!latestResult.has_config}>{copy.optimize.pages_tool_optimize_OverviewSection_020}</SmallActionButton>
             </div>
           ) : null}
         </section>

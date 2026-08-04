@@ -985,6 +985,9 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/optimization-api.ts
   pages_tool_optimize_optimization_api_001: "加载优化任务列表失败。",
   pages_tool_optimize_optimization_api_002: "取消优化任务失败。",
+  pages_tool_optimize_result_history_load_more: "加载更多",
+  pages_tool_optimize_result_history_loading: "正在加载…",
+  pages_tool_optimize_result_history_load_failed: "加载更多结果失败，请稍后重试。",
   // src/pages/tool/optimize/OptimizeWorkflowPage.tsx
   pages_tool_optimize_tour_001: "使用导览",
   pages_tool_optimize_tour_002: "排班总览",

@@ -412,10 +412,12 @@ function createAdvancedWorkspace(): NonNullable<AuthSuccessResponse['workspace']
     operators: [{ id: 'char_010_chen', name: '陈', own: true, elite: 2, rarity: 5 }],
     config: null,
     elite_overrides: {},
-    last_result: null,
+    latest_result: null,
     saved_configs: [],
     result_history: [],
     archived_results: [],
+    result_history_next_cursor: null,
+    archived_results_next_cursor: null,
     free_schedule_entitlement: null,
     updated_at: '2026-07-25T00:00:00.000Z',
   }

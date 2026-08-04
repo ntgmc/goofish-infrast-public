@@ -977,15 +977,15 @@ async function getProfileCapacities(userId: string): Promise<ProfileCapacitySumm
       history_used: number
       archive_used: number
     }>(
-      `select profile_id,
-              case when jsonb_typeof(record_json->'saved_configs') = 'array'
-                then jsonb_array_length(record_json->'saved_configs') else 0 end as plan_used,
-              case when jsonb_typeof(record_json->'result_history') = 'array'
-                then jsonb_array_length(record_json->'result_history') else 0 end as history_used,
-              case when jsonb_typeof(record_json->'archived_results') = 'array'
-                then jsonb_array_length(record_json->'archived_results') else 0 end as archive_used
-         from user_profile_workspaces
-        where profile_id = any($1::text[])`,
+      `select workspace.profile_id,
+              case when jsonb_typeof(workspace.record_json->'saved_configs') = 'array'
+                then jsonb_array_length(workspace.record_json->'saved_configs') else 0 end as plan_used,
+              count(result.id) filter (where result.archived_at is null)::int as history_used,
+              count(result.id) filter (where result.archived_at is not null)::int as archive_used
+         from user_profile_workspaces workspace
+         left join optimization_result_history result on result.profile_id = workspace.profile_id
+        where workspace.profile_id = any($1::text[])
+        group by workspace.profile_id, workspace.record_json`,
       [profiles.map((profile) => profile.id)],
     ),
   ])

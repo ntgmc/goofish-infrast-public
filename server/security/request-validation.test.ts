@@ -37,6 +37,7 @@ describe('request validation boundary', () => {
     for (const registeredRoute of getRegisteredApiRoutes()) {
       const pathname = registeredRoute
         .replace(':jobId', 'job_test-1')
+        .replace(':resultId', 'result-1')
         .replace(':code', 'welcome_inventory')
       const policy = getRoutePolicy(pathname)
       expect(policy, `missing request policy for ${registeredRoute}`).not.toBeNull()

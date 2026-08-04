@@ -48,6 +48,7 @@ function requiredFeatures(pathname: string, method: string): SiteFeatureKey[] {
   if (pathname === '/api/user/profiles' || pathname === '/api/user/status') return ['profiles']
   if (pathname === '/api/user/workspace/free-schedule/confirm') return ['schedule_generation']
   if (pathname === '/api/user/workspace') return ['profiles']
+  if (pathname === '/api/user/results' || pathname.startsWith('/api/user/results/')) return ['profiles']
   if (pathname === '/api/user/inventory' || pathname === '/api/user/maa-export' || pathname === '/api/user/result-archive') {
     return ['inventory']
   }

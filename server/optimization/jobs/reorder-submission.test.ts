@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   requestProcessing: vi.fn(),
   recordEvent: vi.fn(),
   recordPersonalUseDeclarationUsage: vi.fn(),
+  getProfileOptimizationResult: vi.fn(),
+  getLatestProfileOptimizationResult: vi.fn(),
   body: {
     profileId: 'profile-1',
     config: { Fiammetta: { enable: false } },
@@ -51,6 +53,10 @@ vi.mock('../../storage/personal-use-declaration-store', () => ({
   },
   recordPersonalUseDeclarationUsage: mocks.recordPersonalUseDeclarationUsage,
 }))
+vi.mock('../../storage/optimization-result-store', () => ({
+  getProfileOptimizationResult: mocks.getProfileOptimizationResult,
+  getLatestProfileOptimizationResult: mocks.getLatestProfileOptimizationResult,
+}))
 vi.mock('../../storage/user-store', () => ({
   getProfileForUser: vi.fn(async () => ({
     id: 'profile-1',
@@ -61,15 +67,6 @@ vi.mock('../../storage/user-store', () => ({
   isFreePreviewProfile: vi.fn(() => true),
   getWorkspace: vi.fn(async () => ({
     operators: [{ id: 'char-1', name: '测试干员' }],
-    result_history: [{
-      id: 'history-1',
-      name: '历史方案',
-      created_at: '2026-07-01T00:00:00.000Z',
-      config: {},
-      result: {},
-      operator_count: 1,
-      source: 'generated',
-    }],
   })),
   emptyWorkspace: vi.fn(),
 }))
@@ -107,7 +104,21 @@ describe('reorder check submission', () => {
     mocks.requestProcessing.mockReset()
     mocks.recordEvent.mockReset()
     mocks.recordPersonalUseDeclarationUsage.mockReset()
+    mocks.getProfileOptimizationResult.mockReset()
+    mocks.getLatestProfileOptimizationResult.mockReset()
     mocks.recordPersonalUseDeclarationUsage.mockResolvedValue({ declaration_version: 'V1.1' })
+    const baseline = {
+      id: 'history-1',
+      name: '历史方案',
+      created_at: '2026-07-01T00:00:00.000Z',
+      config: {},
+      result: {},
+      operator_count: 1,
+      source: 'generated',
+      archived_at: null,
+    }
+    mocks.getProfileOptimizationResult.mockResolvedValue(baseline)
+    mocks.getLatestProfileOptimizationResult.mockResolvedValue(baseline)
     mocks.admitJob.mockResolvedValue({ job: { id: 'job-1' }, replayed: false })
     mocks.findIdempotentJob.mockResolvedValue(null)
   })
@@ -131,6 +142,9 @@ describe('reorder check submission', () => {
       }),
     }))
     expect(mocks.requestProcessing).toHaveBeenCalledTimes(1)
+    expect(mocks.getProfileOptimizationResult).toHaveBeenCalledWith('profile-1', 'history-1')
+    expect(mocks.getLatestProfileOptimizationResult).not.toHaveBeenCalled()
+    expect(mocks.admitJob.mock.calls[0]?.[0].payload_json.baseline).not.toHaveProperty('archived_at')
     expect(mocks.recordPersonalUseDeclarationUsage).toHaveBeenCalledWith(expect.objectContaining({
       userId: 'user-1',
       profileId: 'profile-1',

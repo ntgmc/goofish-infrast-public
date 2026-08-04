@@ -4,11 +4,14 @@ import { ensureDatabaseSchema } from './schema'
 import { getShanghaiMonthKey } from '../reorder-check-policy'
 import {
   emptyWorkspace,
-  getProfileWorkspaceForUpdateInTransaction,
   updateProfileWorkspaceAtomically,
   updateProfileWorkspaceInTransaction,
   type UserWorkspaceRecord,
 } from './user-store'
+import {
+  getProfileOptimizationResult,
+  getProfileOptimizationResultWithClient,
+} from './optimization-result-store'
 
 type FreeScheduleEntitlementRow = {
   first_generated_at: string | Date | null
@@ -83,10 +86,10 @@ export async function confirmFreeScheduleEntitlement(
   now = new Date().toISOString(),
 ): Promise<UserWorkspaceRecord> {
   if (!hasDatabaseUrl()) {
+    const historyItem = await getProfileOptimizationResult(profileId, resultHistoryId)
+    if (!historyItem) throw new FreeScheduleConfirmationError('暂无可确认的免费排班方案。', 409)
     return updateProfileWorkspaceAtomically(profileId, (currentWorkspace) => {
       const workspace = currentWorkspace ?? emptyWorkspace(profileId)
-      const historyItem = findWorkspaceHistoryItem(workspace, resultHistoryId)
-      if (!historyItem) throw new FreeScheduleConfirmationError('暂无可确认的免费排班方案。', 409)
       return {
         ...workspace,
         free_schedule_entitlement: confirmedEntitlement(
@@ -102,8 +105,7 @@ export async function confirmFreeScheduleEntitlement(
   await ensureDatabaseSchema()
   return withTransaction(async (client) => {
     await client.query('select pg_advisory_xact_lock(hashtextextended($1, 0))', [`entitlement:${profileId}`])
-    const workspace = await getProfileWorkspaceForUpdateInTransaction(client, profileId) ?? emptyWorkspace(profileId)
-    const historyItem = findWorkspaceHistoryItem(workspace, resultHistoryId)
+    const historyItem = await getProfileOptimizationResultWithClient(client, profileId, resultHistoryId)
     if (!historyItem) throw new FreeScheduleConfirmationError('暂无可确认的免费排班方案。', 409)
 
     await client.query(
@@ -175,12 +177,6 @@ function fromFreeScheduleEntitlementRow(row: FreeScheduleEntitlementRow | undefi
         }
       : null,
   }
-}
-
-function findWorkspaceHistoryItem(workspace: UserWorkspaceRecord, resultHistoryId: string) {
-  return workspace.result_history.find((item) => item.id === resultHistoryId)
-    ?? workspace.archived_results.find((item) => item.id === resultHistoryId)
-    ?? null
 }
 
 function confirmedEntitlement(

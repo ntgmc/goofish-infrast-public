@@ -679,6 +679,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/balance/redeem', route({ POST: json('standard', requestSchemas.balanceRedeem) })],
   ['/api/user/onboarding-tasks', route({ GET: none() })],
   ['/api/user/onboarding-tasks/claim', route({ POST: json('standard', requestSchemas.onboardingTaskClaim) })],
+  ['/api/user/results', route({ GET: none() }, ['profile_id', 'scope', 'cursor', 'limit'])],
   ['/api/user/maa-export', route({ POST: json('standard', requestSchemas.maaExport) })],
   ['/api/user/full-result-export', route({ POST: json('standard', requestSchemas.fullResultExport) })],
   ['/api/user/result-archive', route({ POST: json('standard', requestSchemas.resultArchive) })],
@@ -697,6 +698,17 @@ export function getRoutePolicy(pathname: string): RoutePolicy | null {
   if (exact) return exact
   if (/^\/api\/user\/onboarding-tasks\/(welcome_inventory|bind_skland|first_main_schedule)\/claim$/.test(pathname)) {
     return route({ POST: json('standard', requestSchemas.onboardingTaskClaim) })
+  }
+  if (pathname.startsWith('/api/user/results/')) {
+    const encoded = pathname.slice('/api/user/results/'.length)
+    if (!encoded || encoded.includes('/')) return null
+    try {
+      const resultId = decodeURIComponent(encoded)
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(resultId)) return null
+    } catch {
+      return null
+    }
+    return route({ GET: none() }, ['profile_id'])
   }
   if (!pathname.startsWith('/api/optimization/jobs/')) return null
   const suffix = pathname.slice('/api/optimization/jobs/'.length)
@@ -719,6 +731,7 @@ export function getDeclaredApiPolicyRoutes(): string[] {
   return [
     ...ROUTE_POLICIES.keys(),
     '/api/user/onboarding-tasks/:code/claim',
+    '/api/user/results/:resultId',
     '/api/optimization/jobs/:jobId',
     '/api/optimization/jobs/:jobId/cancel',
   ].sort()

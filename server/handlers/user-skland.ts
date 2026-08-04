@@ -695,7 +695,6 @@ async function persistPreparedSklandImportInTransaction(
       operators: prepared.operators,
       config: configResult.config ?? existingWorkspace?.config ?? null,
       elite_overrides: {},
-      last_result: null,
       updated_at: prepared.importedAt,
     }
   })
@@ -1022,7 +1021,7 @@ async function confirmLifetimeVoucherBinding(
     await saveProfileInTransaction(client, nextProfile)
     await updateProfileWorkspaceInTransaction(client, profileId, () => ({
       ...currentWorkspace, profile_id: profileId, operators: operatorsCheck.operators,
-      config: configResult.config ?? currentWorkspace.config, elite_overrides: {}, last_result: null, updated_at: now,
+      config: configResult.config ?? currentWorkspace.config, elite_overrides: {}, updated_at: now,
     }))
     await reserveItemsInTransaction(client, user.id, ['lifetime_profile_voucher'], 'inventory_operation', operationId, profileId, now)
     await commitReservedItemsInTransaction(client, 'inventory_operation', operationId, now)

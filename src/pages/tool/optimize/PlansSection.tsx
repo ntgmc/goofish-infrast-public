@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import type { LicenseConfig, WorkspaceResultHistoryItem, WorkspaceSavedConfig } from '../../../lib/types'
-import { formatPlanName, formatResultSummary, formatWorkspaceDate, isMaaJsonDownloadable } from '../../../lib/workspace-history'
+import type { LicenseConfig, WorkspaceResultHistorySummary, WorkspaceSavedConfig } from '../../../lib/types'
+import { formatPlanName, formatResultHistorySummary, formatWorkspaceDate } from '../../../lib/workspace-history'
 import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../../lib/workspace-limits'
 import { SmallActionButton } from './feedback'
 import { copy } from '../../../copy/index'
@@ -11,9 +11,15 @@ export default function PlansSection({
   savedConfigs,
   resultHistory,
   archivedResults = [],
+  resultHistoryHasMore = false,
+  archivedResultsHasMore = false,
+  historyLoadingScope = null,
+  historyLoadError = null,
   savedConfigLimit = WORKSPACE_SAVED_CONFIG_LIMIT,
   resultHistoryLimit = WORKSPACE_RESULT_HISTORY_LIMIT,
   archiveLimit = 0,
+  resultHistoryUsed = resultHistory.length,
+  archivedResultsUsed = archivedResults.length,
   selectedHistoryId,
   busyAction,
   notice,
@@ -28,14 +34,22 @@ export default function PlansSection({
   onArchiveHistory = async () => {},
   onUnarchiveHistory = async () => {},
   onDeleteHistory = async () => {},
+  onLoadMoreResultHistory = async () => {},
+  onLoadMoreArchivedResults = async () => {},
 }: {
   activeConfig: LicenseConfig;
   savedConfigs: WorkspaceSavedConfig[];
-  resultHistory: WorkspaceResultHistoryItem[];
-  archivedResults?: WorkspaceResultHistoryItem[];
+  resultHistory: WorkspaceResultHistorySummary[];
+  archivedResults?: WorkspaceResultHistorySummary[];
+  resultHistoryHasMore?: boolean;
+  archivedResultsHasMore?: boolean;
+  historyLoadingScope?: 'active' | 'archived' | null;
+  historyLoadError?: string | null;
   savedConfigLimit?: number;
   resultHistoryLimit?: number;
   archiveLimit?: number;
+  resultHistoryUsed?: number;
+  archivedResultsUsed?: number;
   selectedHistoryId: string | null;
   busyAction: string | null;
   notice: string | null;
@@ -44,12 +58,14 @@ export default function PlansSection({
   onUseSavedConfig: (config: WorkspaceSavedConfig) => void;
   onRenameSavedConfig: (config: WorkspaceSavedConfig) => Promise<void>;
   onDeleteSavedConfig: (config: WorkspaceSavedConfig) => Promise<void>;
-  onViewHistory: (item: WorkspaceResultHistoryItem) => void;
-  onUseHistoryConfig: (item: WorkspaceResultHistoryItem) => void;
-  onDownloadHistory: (item: WorkspaceResultHistoryItem) => void;
-  onArchiveHistory?: (item: WorkspaceResultHistoryItem) => Promise<void>;
-  onUnarchiveHistory?: (item: WorkspaceResultHistoryItem) => Promise<void>;
-  onDeleteHistory?: (item: WorkspaceResultHistoryItem) => Promise<void>;
+  onViewHistory: (item: WorkspaceResultHistorySummary) => Promise<void>;
+  onUseHistoryConfig: (item: WorkspaceResultHistorySummary) => Promise<void>;
+  onDownloadHistory: (item: WorkspaceResultHistorySummary) => void;
+  onArchiveHistory?: (item: WorkspaceResultHistorySummary) => Promise<void>;
+  onUnarchiveHistory?: (item: WorkspaceResultHistorySummary) => Promise<void>;
+  onDeleteHistory?: (item: WorkspaceResultHistorySummary) => Promise<void>;
+  onLoadMoreResultHistory?: () => Promise<void>;
+  onLoadMoreArchivedResults?: () => Promise<void>;
 }) {
   const [draftName, setDraftName] = useState(formatPlanName(activeConfig))
 
@@ -59,8 +75,8 @@ export default function PlansSection({
 
   const saving = busyAction === 'save-current'
   const savedConfigLimitReached = savedConfigs.length >= savedConfigLimit
-  const archiveLimitReached = archivedResults.length >= archiveLimit
-  const historyLimitReached = resultHistory.length >= resultHistoryLimit
+  const archiveLimitReached = archivedResultsUsed >= archiveLimit
+  const historyLimitReached = resultHistoryUsed >= resultHistoryLimit
 
   const submitSave = (event: FormEvent) => {
     event.preventDefault()
@@ -148,7 +164,7 @@ export default function PlansSection({
               <h2 id="result-history-title" className="mt-1 text-lg font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_PlansSection_028}</h2>
               <p className="mt-1 text-sm leading-6 text-ink-secondary">{copy.optimize.pages_tool_optimize_PlansSection_033}</p>
             </div>
-            <span className="tool-status">{resultHistory.length}/{resultHistoryLimit}</span>
+            <span className="tool-status">{resultHistoryUsed}/{resultHistoryLimit}</span>
           </div>
         </div>
         <div className="p-5 sm:p-6">
@@ -160,19 +176,24 @@ export default function PlansSection({
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink-primary">{item.name}</p>
                     <p className="mt-1 text-xs text-ink-muted">
-                      {formatWorkspaceDate(item.created_at)} · {formatResultSummary(item.result)}
+                      {formatWorkspaceDate(item.created_at)} · {formatResultHistorySummary(item)}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
-                    <SmallActionButton onClick={() => onViewHistory(item)} tone="primary">{copy.optimize.pages_tool_optimize_PlansSection_030}</SmallActionButton>
-                    <SmallActionButton onClick={() => onDownloadHistory(item)} disabled={busyAction === `download:${item.id}` || !isMaaJsonDownloadable(item.result)}>{busyAction === `download:${item.id}` ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_PlansSection_031}</SmallActionButton>
-                    <SmallActionButton onClick={() => onUseHistoryConfig(item)} disabled={!item.config}>{copy.optimize.pages_tool_optimize_PlansSection_032}</SmallActionButton>
+                    <SmallActionButton onClick={() => void onViewHistory(item)} disabled={busyAction === `detail:${item.id}`} tone="primary">{copy.optimize.pages_tool_optimize_PlansSection_030}</SmallActionButton>
+                    <SmallActionButton onClick={() => onDownloadHistory(item)} disabled={busyAction === `download:${item.id}` || !item.maa_exportable}>{busyAction === `download:${item.id}` ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_PlansSection_031}</SmallActionButton>
+                    <SmallActionButton onClick={() => void onUseHistoryConfig(item)} disabled={busyAction === `detail:${item.id}` || !item.has_config}>{copy.optimize.pages_tool_optimize_PlansSection_032}</SmallActionButton>
                     <SmallActionButton onClick={() => void onArchiveHistory(item)} disabled={archiveLimitReached || busyAction === `archive:${item.id}`}>{copy.inventory.archive_action}</SmallActionButton>
                     <SmallActionButton onClick={() => void onDeleteHistory(item)} disabled={busyAction === `delete:${item.id}`} tone="danger">{copy.inventory.delete_result}</SmallActionButton>
                   </div>
                 </div>
               </div>
             ))}
+            {resultHistoryHasMore && (
+              <button type="button" className="tool-secondary-action w-full" disabled={historyLoadingScope !== null} onClick={() => void onLoadMoreResultHistory()}>
+                {historyLoadingScope === 'active' ? copy.optimize.pages_tool_optimize_result_history_loading : copy.optimize.pages_tool_optimize_result_history_load_more}
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -185,7 +206,7 @@ export default function PlansSection({
               <h2 id="archived-results-title" className="mt-1 text-lg font-semibold text-ink-primary">{copy.inventory.archive_title}</h2>
               <p className="mt-1 text-sm leading-6 text-ink-secondary">{copy.inventory.archive_description}</p>
             </div>
-            <span className="tool-status tool-status--current">{archivedResults.length}/{archiveLimit}</span>
+            <span className="tool-status tool-status--current">{archivedResultsUsed}/{archiveLimit}</span>
           </div>
           {archiveLimitReached && archiveLimit > 0 && <p className="tool-alert tool-alert--warning mt-4" role="status">{copy.inventory.archive_full}</p>}
         </div>
@@ -197,18 +218,24 @@ export default function PlansSection({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink-primary">{item.name}</p>
-                    <p className="mt-1 text-xs text-ink-muted">{formatWorkspaceDate(item.created_at)} · {formatResultSummary(item.result)}</p>
+                    <p className="mt-1 text-xs text-ink-muted">{formatWorkspaceDate(item.created_at)} · {formatResultHistorySummary(item)}</p>
                   </div>
                   <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
-                    <SmallActionButton onClick={() => onViewHistory(item)} tone="primary">{copy.optimize.pages_tool_optimize_PlansSection_030}</SmallActionButton>
-                    <SmallActionButton onClick={() => onDownloadHistory(item)} disabled={busyAction === `download:${item.id}` || !isMaaJsonDownloadable(item.result)}>{busyAction === `download:${item.id}` ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_PlansSection_031}</SmallActionButton>
-                    <SmallActionButton onClick={() => onUseHistoryConfig(item)} disabled={!item.config}>{copy.optimize.pages_tool_optimize_PlansSection_032}</SmallActionButton>
+                    <SmallActionButton onClick={() => void onViewHistory(item)} disabled={busyAction === `detail:${item.id}`} tone="primary">{copy.optimize.pages_tool_optimize_PlansSection_030}</SmallActionButton>
+                    <SmallActionButton onClick={() => onDownloadHistory(item)} disabled={busyAction === `download:${item.id}` || !item.maa_exportable}>{busyAction === `download:${item.id}` ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_PlansSection_031}</SmallActionButton>
+                    <SmallActionButton onClick={() => void onUseHistoryConfig(item)} disabled={busyAction === `detail:${item.id}` || !item.has_config}>{copy.optimize.pages_tool_optimize_PlansSection_032}</SmallActionButton>
                     <SmallActionButton onClick={() => void onUnarchiveHistory(item)} disabled={historyLimitReached || busyAction === `unarchive:${item.id}`}>{copy.inventory.unarchive_action}</SmallActionButton>
                   </div>
                 </div>
               </div>
             ))}
+            {archivedResultsHasMore && (
+              <button type="button" className="tool-secondary-action w-full" disabled={historyLoadingScope !== null} onClick={() => void onLoadMoreArchivedResults()}>
+                {historyLoadingScope === 'archived' ? copy.optimize.pages_tool_optimize_result_history_loading : copy.optimize.pages_tool_optimize_result_history_load_more}
+              </button>
+            )}
           </div>
+          {historyLoadError && <p className="tool-alert tool-alert--error mt-4" role="alert">{historyLoadError}</p>}
           {historyLimitReached && archivedResults.length > 0 && <p className="tool-alert tool-alert--warning mt-4" role="status">{copy.inventory.history_full_for_unarchive}</p>}
         </div>
       </section>

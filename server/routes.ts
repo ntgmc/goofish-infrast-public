@@ -129,6 +129,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/balance/redeem', userBalanceHandler as unknown as ApiHandler],
   ['/api/user/onboarding-tasks', userInventoryHandler as unknown as ApiHandler],
   ['/api/user/onboarding-tasks/claim', userInventoryHandler as unknown as ApiHandler],
+  ['/api/user/results', userResultsHandler as unknown as ApiHandler],
   ['/api/user/maa-export', userResultsHandler as unknown as ApiHandler],
   ['/api/user/full-result-export', userResultsHandler as unknown as ApiHandler],
   ['/api/user/result-archive', userResultsHandler as unknown as ApiHandler],
@@ -154,6 +155,8 @@ async function dispatchRequest(req: Request): Promise<Response> {
 
   const handler = /^\/api\/user\/onboarding-tasks\/(welcome_inventory|bind_skland|first_main_schedule)\/claim$/.test(url.pathname)
     ? userInventoryHandler as unknown as ApiHandler
+    : url.pathname.startsWith('/api/user/results/')
+    ? userResultsHandler as unknown as ApiHandler
     : url.pathname.startsWith('/api/optimization/jobs/')
     ? optimizationHandler as unknown as ApiHandler
     : ROUTES.get(url.pathname)
@@ -170,7 +173,7 @@ async function dispatchRequest(req: Request): Promise<Response> {
 }
 
 export function getRegisteredApiRoutes(): string[] {
-  return ['/api/health', '/api/health/live', '/api/health/ready', '/api/data', '/api/user/onboarding-tasks/:code/claim', '/api/optimization/jobs/:jobId', '/api/optimization/jobs/:jobId/cancel', ...ROUTES.keys()].sort()
+  return ['/api/health', '/api/health/live', '/api/health/ready', '/api/data', '/api/user/onboarding-tasks/:code/claim', '/api/user/results/:resultId', '/api/optimization/jobs/:jobId', '/api/optimization/jobs/:jobId/cancel', ...ROUTES.keys()].sort()
 }
 
 function handleLiveness(): Response {

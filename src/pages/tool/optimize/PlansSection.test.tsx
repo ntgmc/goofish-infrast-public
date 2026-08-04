@@ -5,14 +5,12 @@ import userEvent from '@testing-library/user-event'
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CONFIG_PRESETS } from '../../../lib/config'
-import type { OptimizeResult, WorkspaceResultHistoryItem, WorkspaceSavedConfig } from '../../../lib/types'
+import type { WorkspaceResultHistorySummary, WorkspaceSavedConfig } from '../../../lib/types'
 import PlansSection from './PlansSection'
 
 afterEach(cleanup)
 
 const config = CONFIG_PRESETS['243']
-const result = { schedule_mode: 'maa', plans: [] } as unknown as OptimizeResult
-
 describe('PlansSection', () => {
   it('separates configuration and history retention, disabling saves at the configuration limit', () => {
     renderSection({
@@ -106,14 +104,16 @@ function savedConfig(index: number): WorkspaceSavedConfig {
   }
 }
 
-function historyItem(index: number, scheduleMode: 'maa' | 'rotation' = 'maa'): WorkspaceResultHistoryItem {
+function historyItem(index: number, scheduleMode: 'maa' | 'rotation' = 'maa'): WorkspaceResultHistorySummary {
   return {
     id: `history-${index}`,
     name: `结果 ${index}`,
     created_at: '2026-07-23T00:00:00.000Z',
-    config,
-    result: { ...result, schedule_mode: scheduleMode },
     operator_count: 1,
     source: 'generated',
+    archived: false,
+    schedule_mode: scheduleMode,
+    maa_exportable: scheduleMode !== 'rotation',
+    has_config: true,
   }
 }

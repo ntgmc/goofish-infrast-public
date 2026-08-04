@@ -4,20 +4,22 @@ import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CONFIG_PRESETS } from '../../../lib/config'
-import type { OptimizeResult, WorkspaceResultHistoryItem } from '../../../lib/types'
+import type { WorkspaceResultHistorySummary } from '../../../lib/types'
 import OverviewSection from './OverviewSection'
 
 afterEach(cleanup)
 
 const config = CONFIG_PRESETS['243']
-const historyItem: WorkspaceResultHistoryItem = {
+const historyItem: WorkspaceResultHistorySummary = {
   id: 'history-1',
   name: '最近排班',
   created_at: '2026-07-23T00:00:00.000Z',
-  config,
-  result: { schedule_mode: 'maa', plans: [] } as unknown as OptimizeResult,
   operator_count: 1,
   source: 'legacy',
+  archived: false,
+  schedule_mode: 'maa',
+  maa_exportable: true,
+  has_config: true,
 }
 
 describe('OverviewSection', () => {

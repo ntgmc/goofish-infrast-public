@@ -481,7 +481,10 @@ async function assertConfirmImport() {
   ) {
     throw new Error(`confirm import: import summary missing inventory sync ${JSON.stringify(result.body.skland_import)}`)
   }
-  if (Object.keys(workspace.elite_overrides ?? {}).length !== 0 || workspace.last_result !== null) {
+  if (
+    Object.keys(workspace.elite_overrides ?? {}).length !== 0
+    || ['last_result', 'result_history', 'archived_results'].some((field) => Object.hasOwn(workspace, field))
+  ) {
     throw new Error('confirm import: workspace transient fields were not cleared')
   }
   const fetchCountBeforeReplay = store.fetchCalls.length
@@ -667,8 +670,8 @@ async function assertRefreshImport() {
   ) {
     throw new Error(`refresh import: intermediate inventory was not refreshed ${JSON.stringify(workspace?.config?.intermediate_inventory)}`)
   }
-  if (workspace?.last_result !== null) {
-    throw new Error('refresh import: stale result should be cleared')
+  if (['last_result', 'result_history', 'archived_results'].some((field) => Object.hasOwn(workspace, field))) {
+    throw new Error('refresh import: workspace should not embed optimization results')
   }
 }
 
@@ -1070,10 +1073,9 @@ function seedProfile({ id, status, archivedAt = null }) {
       drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
     },
     elite_overrides: { char_old: 2 },
-    last_result: { stale: true },
     saved_configs: [],
-    result_history: [],
     free_schedule_entitlement: null,
+    free_preview_normalized_activity_id: null,
     updated_at: now,
   })
 }
@@ -1563,7 +1565,7 @@ function memoryUserStoreModule() {
     const store = globalThis.__sklandHandlerSmokeStore
     export async function insertUserAccountForRegistrationInTransaction() {}
 export function emptyWorkspace(profileId) {
-return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], free_schedule_entitlement: null, updated_at: new Date().toISOString() }
+return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, saved_configs: [], free_schedule_entitlement: null, free_preview_normalized_activity_id: null, updated_at: new Date().toISOString() }
 }
     export async function listProfilesForUser(userId) {
       return [...store.profiles.values()].filter((profile) => profile.user_id === userId)
@@ -1643,7 +1645,16 @@ return { version: 1, profile_id: profileId, operators: null, config: null, elite
       if (pending?.user_id === userId) store.lifetimeVoucherPendingBindings.delete(confirmationId)
     }
     function normalizeWorkspace(workspace) {
-      return { ...emptyWorkspace(workspace.profile_id), ...workspace, saved_configs: Array.isArray(workspace.saved_configs) ? workspace.saved_configs.slice(0, 20) : [], result_history: Array.isArray(workspace.result_history) ? workspace.result_history.slice(0, 10) : [] }
+      return {
+        ...emptyWorkspace(workspace.profile_id),
+        operators: Array.isArray(workspace.operators) ? workspace.operators : null,
+        config: workspace.config ?? null,
+        elite_overrides: workspace.elite_overrides ?? {},
+        saved_configs: Array.isArray(workspace.saved_configs) ? workspace.saved_configs.slice(0, 20) : [],
+        free_schedule_entitlement: workspace.free_schedule_entitlement ?? null,
+        free_preview_normalized_activity_id: workspace.free_preview_normalized_activity_id ?? null,
+        updated_at: workspace.updated_at ?? new Date().toISOString(),
+      }
     }
   `
 }
@@ -1710,15 +1721,15 @@ function memoryUserAuthModule() {
         operators: workspace?.operators ?? null,
         config: workspace?.config ?? null,
         elite_overrides: workspace?.elite_overrides ?? {},
-        last_result: workspace?.last_result ?? null,
+        latest_result: null,
         saved_configs: workspace?.saved_configs ?? [],
-result_history: workspace?.result_history ?? [],
-free_schedule_entitlement: workspace?.free_schedule_entitlement ?? null,
-updated_at: workspace?.updated_at ?? null,
-}
-    }
-    function normalizeWorkspace(workspace) {
-      return { ...emptyWorkspace(workspace.profile_id), ...workspace, saved_configs: Array.isArray(workspace.saved_configs) ? workspace.saved_configs.slice(0, 20) : [], result_history: Array.isArray(workspace.result_history) ? workspace.result_history.slice(0, 10) : [] }
+        result_history: [],
+        archived_results: [],
+        result_history_next_cursor: null,
+        archived_results_next_cursor: null,
+        free_schedule_entitlement: workspace?.free_schedule_entitlement ?? null,
+        updated_at: workspace?.updated_at ?? null,
+      }
     }
   `
 }

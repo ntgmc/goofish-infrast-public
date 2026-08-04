@@ -1,11 +1,11 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react'
-import type { AuthSuccessResponse, LicenseConfig, OptimizeResult, UpgradeSuggestion, UserWorkspace, WorkspaceResultHistoryItem, WorkspaceSavedConfig, WorkspaceSavedConfigAction } from '../../../lib/types'
-import { isMaaJsonDownloadable } from '../../../lib/workspace-history'
+import type { AuthSuccessResponse, LicenseConfig, OptimizeResult, UpgradeSuggestion, UserWorkspace, WorkspaceResultHistoryItem, WorkspaceResultHistorySummary, WorkspaceSavedConfig, WorkspaceSavedConfigAction } from '../../../lib/types'
 import { normalizeUpgradeSuggestions } from './workflow-utils'
 import type { WorkspacePatch } from '../useToolSession'
 import type { OptimizePhase, OptimizeSection } from './types'
 import { copy } from '../../../copy/index'
 import { apiJson } from '../../../lib/api-client'
+import { fetchResultHistoryDetail } from './optimization-api'
 
 
 type Setter<T> = Dispatch<SetStateAction<T>>
@@ -118,7 +118,22 @@ export function useOptimizeWorkspace({
     }, `${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_009}${config.name}”。`)
   }, [normalizeAllowedConfigOverride, runSavedConfigAction, setConfigOverride, setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions, setWorkspaceNotice])
 
-  const handleViewHistory = useCallback((item: WorkspaceResultHistoryItem) => {
+  const loadHistoryDetail = useCallback(async (item: WorkspaceResultHistorySummary) => {
+    setWorkspaceBusyAction(`detail:${item.id}`)
+    setWorkspaceError(null)
+    try {
+      return await fetchResultHistoryDetail(profileId, item.id)
+    } catch (error) {
+      setWorkspaceError((error as Error).message)
+      return null
+    } finally {
+      setWorkspaceBusyAction(null)
+    }
+  }, [profileId, setWorkspaceBusyAction, setWorkspaceError])
+
+  const handleViewHistory = useCallback(async (summary: WorkspaceResultHistorySummary) => {
+    const item = await loadHistoryDetail(summary)
+    if (!item) return
     setCurrentResult(null)
     setFinalResult(null)
     setSuggestions(normalizeUpgradeSuggestions(item.result.upgrade_suggestions))
@@ -127,21 +142,29 @@ export function useOptimizeWorkspace({
     setLastGeneratedSignature(null)
     setInlineError(null)
     setSection('result')
-  }, [setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions])
+  }, [loadHistoryDetail, setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions])
 
-  const handleUseHistoryConfig = useCallback((item: WorkspaceResultHistoryItem) => {
-    handleViewHistory(item)
+  const handleUseHistoryConfig = useCallback(async (summary: WorkspaceResultHistorySummary) => {
+    const item = await loadHistoryDetail(summary)
+    if (!item) return
     if (!item.config) {
       setWorkspaceError(copy.workspace.pages_tool_optimize_useOptimizeWorkspace_010)
       return
     }
     setConfigOverride(normalizeAllowedConfigOverride(item.config))
+    setCurrentResult(null)
+    setFinalResult(null)
+    setHistoryItem(item)
+    setSuggestions(normalizeUpgradeSuggestions(item.result.upgrade_suggestions))
+    setPhase('history')
+    setLastGeneratedSignature(null)
+    setInlineError(null)
     setWorkspaceNotice(`${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_011}${item.name}${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_012}`)
     setSection('config')
-  }, [handleViewHistory, normalizeAllowedConfigOverride, setConfigOverride, setSection, setWorkspaceError, setWorkspaceNotice])
+  }, [loadHistoryDetail, normalizeAllowedConfigOverride, setConfigOverride, setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions, setWorkspaceError, setWorkspaceNotice])
 
-  const handleDownloadHistory = useCallback((item: WorkspaceResultHistoryItem) => {
-    if (!isMaaJsonDownloadable(item.result)) {
+  const handleDownloadHistory = useCallback((item: WorkspaceResultHistorySummary) => {
+    if (!item.maa_exportable) {
       setWorkspaceError(copy.workspace.pages_tool_optimize_useOptimizeWorkspace_013)
       return
     }
@@ -149,7 +172,7 @@ export function useOptimizeWorkspace({
   }, [onDownloadMaaResult, setWorkspaceError])
 
   const mutateHistoryResult = useCallback(async (
-    item: WorkspaceResultHistoryItem,
+    item: WorkspaceResultHistorySummary,
     action: 'archive' | 'unarchive' | 'delete',
   ) => {
     if (action === 'delete' && !window.confirm(copy.inventory.delete_result_confirm)) return
@@ -178,8 +201,8 @@ export function useOptimizeWorkspace({
     handleViewHistory,
     handleUseHistoryConfig,
     handleDownloadHistory,
-    handleArchiveHistory: (item: WorkspaceResultHistoryItem) => mutateHistoryResult(item, 'archive'),
-    handleUnarchiveHistory: (item: WorkspaceResultHistoryItem) => mutateHistoryResult(item, 'unarchive'),
-    handleDeleteHistory: (item: WorkspaceResultHistoryItem) => mutateHistoryResult(item, 'delete'),
+    handleArchiveHistory: (item: WorkspaceResultHistorySummary) => mutateHistoryResult(item, 'archive'),
+    handleUnarchiveHistory: (item: WorkspaceResultHistorySummary) => mutateHistoryResult(item, 'unarchive'),
+    handleDeleteHistory: (item: WorkspaceResultHistorySummary) => mutateHistoryResult(item, 'delete'),
   }
 }

@@ -1315,10 +1315,23 @@ WITH legacy_results AS (
      AND nullif(value->>'id', '') IS NOT NULL
      AND nullif(value->>'name', '') IS NOT NULL
      AND nullif(value->>'created_at', '') IS NOT NULL
+), sequence_base AS (
+  SELECT greatest(
+    coalesce(max(position), 0),
+    (SELECT last_value FROM optimization_result_history_position_seq)
+  ) AS value
+  FROM optimization_result_history
+), positioned_results AS (
+  SELECT valid_results.*,
+         sequence_base.value + row_number() OVER (
+           ORDER BY profile_id, archived, ordinality DESC
+         ) AS migration_position
+    FROM valid_results
+   CROSS JOIN sequence_base
 )
 INSERT INTO optimization_result_history (
   profile_id, id, job_id, name, created_at, config_json, result_json,
-  operator_count, source, archived_at, updated_at
+  operator_count, source, archived_at, position, updated_at
 )
 SELECT profile_id,
        value->>'id',
@@ -1338,10 +1351,19 @@ SELECT profile_id,
          ELSE 'generated'
        END,
        CASE WHEN archived THEN updated_at ELSE NULL END,
+       migration_position,
        updated_at
-  FROM valid_results
- ORDER BY profile_id, archived, ordinality DESC
+  FROM positioned_results
 ON CONFLICT (profile_id, id) DO NOTHING;
+
+SELECT setval(
+  'optimization_result_history_position_seq',
+  greatest(
+    coalesce((SELECT max(position) FROM optimization_result_history), 1),
+    (SELECT last_value FROM optimization_result_history_position_seq)
+  ),
+  true
+);
 
 -- Very old workspaces only carried last_result.  Give that snapshot a stable,
 -- profile-scoped identifier when no active history item could be recovered.

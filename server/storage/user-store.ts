@@ -31,8 +31,10 @@ import {
   WORKSPACE_SAVED_CONFIG_LIMIT,
   WORKSPACE_SAVED_CONFIG_MAX_LIMIT,
 } from '../../src/lib/workspace-limits'
-import type { CapabilitySubject } from '../../src/lib/product-catalog'
-import { projectOptimizeResultForCapabilities } from '../../src/lib/optimize-result-projection'
+import {
+  migrateLegacyWorkspaceResultsInTransaction,
+  type WorkspaceOptimizationResultOverview,
+} from './optimization-result-store'
 
 let schemaReady: Promise<void> | null = null
 
@@ -206,10 +208,7 @@ export interface UserWorkspaceRecord {
   operators: LicenseOperator[] | null
   config: LicenseConfig | null
   elite_overrides: Record<string, number>
-  last_result: OptimizeResult | null
   saved_configs: WorkspaceSavedConfig[]
-  result_history: WorkspaceResultHistoryItem[]
-  archived_results: WorkspaceResultHistoryItem[]
   free_schedule_entitlement: FreeScheduleEntitlement | null
   free_preview_normalized_activity_id?: string | null
   updated_at: string
@@ -221,7 +220,7 @@ interface LegacyUserWorkspaceRecord {
   operators: LicenseOperator[] | null
   config: LicenseConfig | null
   elite_overrides: Record<string, number>
-  last_result: OptimizeResult | null
+  last_result: WorkspaceResultHistoryItem['result'] | null
   saved_configs?: WorkspaceSavedConfig[]
   result_history?: WorkspaceResultHistoryItem[]
   archived_results?: WorkspaceResultHistoryItem[]
@@ -1297,12 +1296,12 @@ async function saveProfileWorkspaceWithClient(client: PoolClient, normalized: Us
   await client.query(
     `insert into user_profile_workspaces
       (profile_id, operators_json, config_json, elite_overrides_json, last_result_json, record_json, updated_at)
-     values ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, $6::jsonb, $7)
+     values ($1, $2::jsonb, $3::jsonb, $4::jsonb, null, $5::jsonb, $6)
      on conflict (profile_id) do update set
       operators_json = excluded.operators_json,
       config_json = excluded.config_json,
       elite_overrides_json = excluded.elite_overrides_json,
-      last_result_json = excluded.last_result_json,
+      last_result_json = null,
       record_json = excluded.record_json,
       updated_at = excluded.updated_at`,
     [
@@ -1310,7 +1309,6 @@ async function saveProfileWorkspaceWithClient(client: PoolClient, normalized: Us
       JSON.stringify(normalized.operators),
       JSON.stringify(normalized.config),
       JSON.stringify(normalized.elite_overrides),
-      JSON.stringify(normalized.last_result),
       JSON.stringify(normalized),
       normalized.updated_at,
     ],
@@ -1434,21 +1432,36 @@ export async function migrateLegacyUserIfNeeded(user: UserAccountRecord): Promis
   await saveUserProfile(profile)
 
   const legacyWorkspace = await getLegacyWorkspace(user.id)
-  await saveProfileWorkspace(
-    legacyWorkspace
-      ? {
-          version: 1,
-          profile_id: profile.id,
-          operators: legacyWorkspace.operators,
-          config: legacyWorkspace.config,
-          elite_overrides: legacyWorkspace.elite_overrides ?? {},
-          last_result: legacyWorkspace.last_result ?? null,
-          saved_configs: normalizeSavedConfigs(legacyWorkspace.saved_configs),
-          result_history: normalizeResultHistory(legacyWorkspace.result_history),
-          updated_at: legacyWorkspace.updated_at ?? now,
-        }
-      : emptyWorkspace(profile.id),
-  )
+  const workspace = legacyWorkspace
+    ? {
+        version: 1 as const,
+        profile_id: profile.id,
+        operators: legacyWorkspace.operators,
+        config: legacyWorkspace.config,
+        elite_overrides: legacyWorkspace.elite_overrides ?? {},
+        saved_configs: normalizeSavedConfigs(legacyWorkspace.saved_configs),
+        free_schedule_entitlement: normalizeFreeScheduleEntitlement(legacyWorkspace.free_schedule_entitlement),
+        free_preview_normalized_activity_id: null,
+        updated_at: legacyWorkspace.updated_at ?? now,
+      }
+    : emptyWorkspace(profile.id)
+  await withTransaction(async (client) => {
+    await lockWorkspaceForUpdate(client, profile.id)
+    if (legacyWorkspace) {
+      await migrateLegacyWorkspaceResultsInTransaction(client, profile.id, {
+        updated_at: workspace.updated_at,
+        config: workspace.config,
+        last_result: legacyWorkspace.last_result ?? null,
+        result_history: normalizeResultHistory(legacyWorkspace.result_history),
+        archived_results: normalizeResultHistory(
+          legacyWorkspace.archived_results,
+          WORKSPACE_ARCHIVED_RESULT_MAX_LIMIT,
+        ),
+        operator_count: countOwnedOperators(workspace.operators),
+      })
+    }
+    await saveProfileWorkspaceWithClient(client, workspace)
+  })
   return [profile]
 }
 
@@ -1511,10 +1524,7 @@ export function emptyWorkspace(profileId: string): UserWorkspaceRecord {
     operators: null,
     config: null,
     elite_overrides: {},
-    last_result: null,
     saved_configs: [],
-    result_history: [],
-    archived_results: [],
     free_schedule_entitlement: null,
     free_preview_normalized_activity_id: null,
     updated_at: new Date().toISOString(),
@@ -1564,26 +1574,20 @@ export function toPublicWorkspace(
     history: WORKSPACE_RESULT_HISTORY_LIMIT,
     archive: 0,
   },
-  subject?: CapabilitySubject,
+  overview?: WorkspaceOptimizationResultOverview,
 ): UserWorkspace {
   const normalized = normalizeWorkspaceRecord(workspace)
-  const resultHistory = normalized ? getPublicResultHistory(normalized) : []
-  const projectResult = (result: OptimizeResult) => subject
-    ? projectOptimizeResultForCapabilities(result, subject)
-    : result
-  const projectHistoryItem = (item: WorkspaceResultHistoryItem): WorkspaceResultHistoryItem => ({
-    ...item,
-    result: projectResult(item.result),
-  })
   return {
     profile_id: normalized?.profile_id ?? null,
     operators: normalized?.operators ?? null,
     config: normalized?.config ?? null,
     elite_overrides: normalized?.elite_overrides ?? {},
-    last_result: normalized?.last_result ? projectResult(normalized.last_result) : null,
+    latest_result: overview?.latest_result ?? null,
     saved_configs: (normalized?.saved_configs ?? []).slice(0, limits.plan),
-    result_history: resultHistory.slice(0, limits.history).map(projectHistoryItem),
-    archived_results: (normalized?.archived_results ?? []).slice(0, limits.archive).map(projectHistoryItem),
+    result_history: overview?.result_history.items.slice(0, limits.history) ?? [],
+    archived_results: overview?.archived_results.items.slice(0, limits.archive) ?? [],
+    result_history_next_cursor: overview?.result_history.next_cursor ?? null,
+    archived_results_next_cursor: overview?.archived_results.next_cursor ?? null,
     free_schedule_entitlement: normalized?.free_schedule_entitlement ?? null,
     updated_at: normalized?.updated_at ?? null,
   }
@@ -1631,16 +1635,7 @@ export function normalizeWorkspaceRecord(workspace: UserWorkspaceRecord | null |
     operators: Array.isArray(workspace.operators) ? workspace.operators : null,
     config: isRecord(workspace.config) ? workspace.config as LicenseConfig : null,
     elite_overrides: isRecord(workspace.elite_overrides) ? workspace.elite_overrides as Record<string, number> : {},
-    last_result: isRecord(workspace.last_result) ? workspace.last_result as OptimizeResult : null,
     saved_configs: normalizeSavedConfigs((workspace as { saved_configs?: unknown }).saved_configs),
-    result_history: normalizeResultHistory(
-      (workspace as { result_history?: unknown }).result_history,
-      WORKSPACE_RESULT_HISTORY_MAX_LIMIT,
-    ),
-    archived_results: normalizeResultHistory(
-      (workspace as { archived_results?: unknown }).archived_results,
-      WORKSPACE_ARCHIVED_RESULT_MAX_LIMIT,
-    ),
     free_schedule_entitlement: normalizeFreeScheduleEntitlement((workspace as { free_schedule_entitlement?: unknown }).free_schedule_entitlement),
     free_preview_normalized_activity_id: typeof workspace.free_preview_normalized_activity_id === 'string'
       ? workspace.free_preview_normalized_activity_id
@@ -1707,32 +1702,20 @@ function normalizeResultHistory(value: unknown, maximum = WORKSPACE_RESULT_HISTO
     const name = typeof raw.name === 'string' ? raw.name : ''
     const createdAt = typeof raw.created_at === 'string' ? raw.created_at : ''
     if (!id || !name || !createdAt) return []
-    const source = raw.source === 'applied_suggestions' || raw.source === 'legacy' ? raw.source : 'generated'
+    const source: WorkspaceResultHistoryItem['source'] = raw.source === 'applied_suggestions' || raw.source === 'legacy'
+      ? raw.source
+      : 'generated'
     return [{
       id,
       ...(typeof raw.job_id === 'string' && raw.job_id ? { job_id: raw.job_id } : {}),
       name,
       created_at: createdAt,
       config: isRecord(raw.config) ? raw.config as LicenseConfig : null,
-      result: raw.result as OptimizeResult,
+      result: raw.result as unknown as OptimizeResult,
       operator_count: typeof raw.operator_count === 'number' && Number.isFinite(raw.operator_count) ? raw.operator_count : 0,
       source,
     }]
   }).slice(0, maximum)
-}
-
-function getPublicResultHistory(workspace: UserWorkspaceRecord): WorkspaceResultHistoryItem[] {
-  if (workspace.result_history.length > 0) return workspace.result_history
-  if (!workspace.last_result) return []
-  return [{
-    id: 'legacy-last-result',
-    name: '上次排班结果',
-    created_at: workspace.updated_at,
-    config: workspace.config,
-    result: workspace.last_result,
-    operator_count: countOwnedOperators(workspace.operators),
-    source: 'legacy',
-  }]
 }
 
 function normalizeSklandCredentialInvalidReason(value: unknown): SklandCredentialInvalidReason | null {

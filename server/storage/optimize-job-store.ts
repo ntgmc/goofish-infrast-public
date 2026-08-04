@@ -23,6 +23,7 @@ import { normalizePersistedOptimizationJobPayload, type OptimizationJobPayload, 
 import { parseOptimizationJobResult } from '../optimization/jobs/runtime-contracts'
 import { countReorderCheckQuotaInTransaction } from './reorder-quota-store'
 import { confirmMeteredQuoteInTransaction, MeteredBillingQuoteError } from './metered-billing-store'
+import { insertProfileOptimizationResultInTransaction } from './optimization-result-store'
 
 export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered'
 export type OptimizeJobPriority = 'priority_coupon' | 'paid' | 'analysis' | 'standard'
@@ -2311,18 +2312,18 @@ async function persistScheduleCompletionInTransaction(
       operator_count: payload.operators.filter((operator) => operator.own !== false).length,
       source: payload.request.history_source ?? 'generated',
     }
+    await insertProfileOptimizationResultInTransaction(
+      client,
+      profileId,
+      historyItem,
+      limits.history,
+    )
     await updateProfileWorkspaceInTransaction(client, profileId, (current) => {
       const workspace = current ?? emptyWorkspace(profileId)
-      const nextHistory = [
-        historyItem,
-        ...workspace.result_history.filter((item) => item.id !== historyItem.id),
-      ].slice(0, limits.history)
       return {
         ...workspace,
         operators: workspace.operators ?? payload.operators,
         config: workspace.config ?? payload.effectiveConfig,
-        last_result: persistedResult,
-        result_history: nextHistory,
         free_schedule_entitlement: entitlement ?? workspace.free_schedule_entitlement,
         updated_at: nowIso,
       }

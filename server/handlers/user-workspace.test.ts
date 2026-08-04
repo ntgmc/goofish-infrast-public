@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LicenseConfig, WorkspaceSavedConfig } from '../../src/lib/types'
+import type { UserWorkspaceRecord } from '../storage/user-store'
 import workspaceHandler from './user-workspace'
 
 const mocks = vi.hoisted(() => ({
@@ -177,17 +178,16 @@ function savePayload(name: string) {
   }
 }
 
-function createWorkspace(savedConfigs: WorkspaceSavedConfig[]) {
+function createWorkspace(savedConfigs: WorkspaceSavedConfig[]): UserWorkspaceRecord {
   return {
     version: 1 as const,
     profile_id: 'profile-1',
     operators: null,
     config: null,
     elite_overrides: {},
-    last_result: null,
     saved_configs: savedConfigs,
-    result_history: [],
     free_schedule_entitlement: null,
+    free_preview_normalized_activity_id: null,
     updated_at: '2026-07-23T00:00:00.000Z',
   }
 }
