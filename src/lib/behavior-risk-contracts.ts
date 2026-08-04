@@ -2,6 +2,20 @@ import { z } from 'zod'
 
 const behaviorRiskStatusSchema = z.enum(['pending', 'dismissed', 'actioned'])
 
+const adminCapabilitySchema = z.enum([
+  'risk_view',
+  'risk_review',
+  'risk_config',
+  'usage_view',
+  'user_view',
+  'sensitive_data_view',
+  'user_manage',
+  'user_delete',
+  'optimization_view',
+  'optimization_manage',
+  'admin_manage',
+])
+
 const evidenceSchema = z.record(z.string(), z.unknown())
 
 const behaviorRiskRuleSchema = z.object({
@@ -83,7 +97,7 @@ export const behaviorRiskCasePageSchema = z.object({
     total_pages: z.number().int().nonnegative(),
   }).strict(),
   health: behaviorRiskHealthSchema,
-  capabilities: z.array(z.enum(['risk_view', 'risk_review', 'risk_config'])).optional(),
+  capabilities: z.array(adminCapabilitySchema).optional(),
 }).strict()
 
 export type BehaviorRiskMemberDto = z.infer<typeof behaviorRiskMemberSchema>

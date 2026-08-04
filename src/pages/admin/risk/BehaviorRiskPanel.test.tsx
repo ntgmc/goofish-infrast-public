@@ -87,7 +87,19 @@ beforeEach(() => {
       duration_ms: 12,
       purged_events: 0,
     },
-    capabilities: ['risk_view', 'risk_review'],
+    capabilities: [
+      'risk_view',
+      'risk_review',
+      'risk_config',
+      'usage_view',
+      'user_view',
+      'sensitive_data_view',
+      'user_manage',
+      'user_delete',
+      'optimization_view',
+      'optimization_manage',
+      'admin_manage',
+    ],
   })
 })
 
@@ -96,6 +108,14 @@ afterEach(() => {
 })
 
 describe('BehaviorRiskPanel review form', () => {
+  it('renders collection health for a security administrator with the full capability set', async () => {
+    render(<BehaviorRiskPanel />)
+
+    expect(await screen.findByText('采集与评估健康：正常')).toBeInTheDocument()
+    expect(screen.getByText(/采集状态 success.*评估状态 success.*本次事件 3/)).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('keeps rendering while the reviewer types a note and changes member actions', async () => {
     const user = userEvent.setup()
     render(<BehaviorRiskPanel />)
