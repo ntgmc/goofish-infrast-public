@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { copy } from '../copy/index'
+import { appBuildMetaSchema } from './app-build-meta-validation'
 import type {
   ScenarioComparisonFactors,
   ScenarioComparisonResult,
@@ -20,16 +21,6 @@ const scenarioDroneStrategySchema = z.enum([
   'battle_record',
   'originium_shard',
 ])
-
-const appBuildMetaSchema = z.strictObject({
-  frontend_version: boundedString(128),
-  backend_version: boundedString(128),
-  data_version: boundedString(128),
-  generated_at: boundedString(128),
-  source_summary: z.string().max(2_000),
-  git_sha: z.string().max(128).nullable().optional(),
-  build_context: z.string().max(256).optional(),
-})
 
 const scenarioProductionPlanSchema: z.ZodType<ScenarioProductionPlan> = z.strictObject({
   trading: z.strictObject({
