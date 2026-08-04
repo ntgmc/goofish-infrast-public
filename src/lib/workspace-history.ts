@@ -24,6 +24,7 @@ const SCHEDULE_MODE_LABELS: Record<string, string> = {
 const DORMITORY_RULE_LABELS: Record<string, string> = {
   fixed: copy.common.lib_workspace_history_008,
   maa_autofill: copy.common.lib_workspace_history_009,
+  maa_pure_autofill: copy.common.lib_workspace_history_041,
 }
 
 const DRONE_ORDER_LABELS: Record<string, string> = {

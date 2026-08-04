@@ -1,5 +1,26 @@
 import { describe, expect, it } from 'vitest'
-import { CONFIG_PRESETS, normalizeConfig, parseShiftHours, validateConfig } from './config'
+import { CONFIG_PRESETS, normalizeConfig, normalizeDormitoryRule, parseShiftHours, validateConfig } from './config'
+
+describe('dormitory rule normalization', () => {
+  it('uses fixed dormitories for new presets while preserving explicit autofill', () => {
+    expect(Object.values(CONFIG_PRESETS).every((preset) => preset.dormitory_rule === 'fixed')).toBe(true)
+    expect(normalizeDormitoryRule(undefined)).toBe('fixed')
+    expect(normalizeDormitoryRule('自动填满')).toBe('maa_autofill')
+  })
+
+  it.each(['maa_pure_autofill', 'maa-pure-autofill', 'pure_autofill', '纯自动填满'])(
+    'normalizes %s without disabling Fiammetta',
+    (rule) => {
+      const config = normalizeConfig({
+        ...CONFIG_PRESETS['243'],
+        dormitory_rule: rule,
+        Fiammetta: { enable: true },
+      })
+      expect(config.dormitory_rule).toBe('maa_pure_autofill')
+      expect(config.Fiammetta?.enable).toBe(true)
+    },
+  )
+})
 
 describe('shift hour normalization', () => {
   it.each([
