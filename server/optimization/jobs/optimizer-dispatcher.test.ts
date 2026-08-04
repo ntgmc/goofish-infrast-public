@@ -117,6 +117,17 @@ describe('optimization job dispatcher', () => {
       .resolves.toEqual(result)
   })
 
+  it('accepts the current generated application build metadata for scenario comparisons', async () => {
+    const result = {
+      ...scenarioResult(),
+      buildMeta: { ...APP_BUILD_META },
+    }
+    const port = fakePort({ executeScenarioComparison: vi.fn(async () => result) })
+
+    await expect(executeOptimizationJobWithPort(job(scenarioPayload()), context, port))
+      .resolves.toEqual(result)
+  })
+
   it('still rejects non-finite optimizer result values', async () => {
     const port = fakePort({
       executeSchedule: vi.fn(async () => ({
