@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from 'react'
 import { MotionConfig } from 'motion/react'
 import { Route, Routes, useLocation, useNavigate } from 'react-router'
 import BuildMetaStrip from './components/BuildMetaStrip'
+import DeploymentUpdatePrompt from './components/DeploymentUpdatePrompt'
 import { AnimatedPresenceRegion, motionTokens } from './components/MotionPrimitives'
 import RouteLifecycle from './components/RouteLifecycle'
 import RouteMetadata from './components/RouteMetadata'
@@ -85,6 +86,7 @@ function AppContent() {
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </AnimatedPresenceRegion>
+      <DeploymentUpdatePrompt />
       <BuildMetaStrip placement="corner" />
     </div>
   )

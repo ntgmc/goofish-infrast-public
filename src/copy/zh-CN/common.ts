@@ -79,6 +79,18 @@ export const commonCopy = {
   components_BuildMetaStrip_012: "版本一致",
   // src/components/BuildMetaStrip.tsx
   components_BuildMetaStrip_013: "版本漂移",
+  // src/components/DeploymentUpdatePrompt.tsx
+  components_DeploymentUpdatePrompt_001: "版本更新",
+  // src/components/DeploymentUpdatePrompt.tsx
+  components_DeploymentUpdatePrompt_002: "新版本已发布",
+  // src/components/DeploymentUpdatePrompt.tsx
+  components_DeploymentUpdatePrompt_003: "当前页面仍在运行旧版本。继续使用可能出现功能或数据不一致，请刷新页面完成更新。",
+  // src/components/DeploymentUpdatePrompt.tsx
+  components_DeploymentUpdatePrompt_004: "当前版本",
+  // src/components/DeploymentUpdatePrompt.tsx
+  components_DeploymentUpdatePrompt_005: "最新版本",
+  // src/components/DeploymentUpdatePrompt.tsx
+  components_DeploymentUpdatePrompt_006: "立即刷新",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_001: "龙门币",
   // src/components/ConfigEditor.tsx
