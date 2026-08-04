@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   authenticateAdminRequest: vi.fn(),
@@ -27,6 +27,8 @@ const popup = {
   created_at: '2026-07-31T00:00:00.000Z', updated_at: '2026-07-31T01:00:00.000Z',
 }
 
+const originalPublicAppUrl = process.env.PUBLIC_APP_URL
+
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.authenticateAdminRequest.mockResolvedValue({ ok: true })
@@ -35,6 +37,7 @@ beforeEach(() => {
   mocks.getAnnouncementEventCounts.mockResolvedValue({})
   mocks.getAnnouncementReadCounts.mockResolvedValue({})
   mocks.getValidatedJson.mockResolvedValue({ banner: null, announcements: [popup], expected_revision: 3 })
+  process.env.PUBLIC_APP_URL = 'https://example.test'
 })
 
 describe('announcement handler', () => {
@@ -86,6 +89,15 @@ describe('announcement handler', () => {
       { banner: null, announcements: [expect.objectContaining({ id: 'popup-2', title: '公告' })] },
       3,
       ['popup-2'],
+      [{
+        id: 'announcement:popup-2',
+        type: 'announcement.published',
+        title: '公告',
+        summary: '正文',
+        url: 'https://example.test/#announcement-popup-2',
+        published_at: expect.any(String),
+        version: null,
+      }],
     )
     expect(mocks.getAnnouncementEventCounts).not.toHaveBeenCalled()
   })
@@ -102,4 +114,9 @@ describe('announcement handler', () => {
       announcements: [{ title: '新公告' }],
     })
   })
+})
+
+afterAll(() => {
+  if (originalPublicAppUrl === undefined) delete process.env.PUBLIC_APP_URL
+  else process.env.PUBLIC_APP_URL = originalPublicAppUrl
 })

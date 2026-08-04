@@ -84,6 +84,8 @@ describe('database schema ownership', () => {
     expect(combinedSchema).toMatch(/ADD COLUMN IF NOT EXISTS billing_json/)
     expect(combinedSchema).toMatch(/ADD COLUMN IF NOT EXISTS reserved/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_notifications/)
+    expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS website_notification_events/)
+    expect(combinedSchema).toMatch(/website_notification_events_version_check/)
     expect(combinedSchema).toMatch(/cdk_records_type_payload_check/)
     expect(combinedSchema).toMatch(/cdk_type = 'balance'/)
     expect(combinedSchema).toMatch(/ADD COLUMN IF NOT EXISTS item_code/)
@@ -225,6 +227,7 @@ describe('database schema ownership', () => {
       { table_name: 'public_content_settings', column_name: 'key' },
       { table_name: 'public_content_settings', column_name: 'revision' },
       { table_name: 'user_notifications', column_name: 'payload_json' },
+      { table_name: 'website_notification_events', column_name: 'event_id' },
     ]))
 
     queryMock.mockClear()
@@ -243,6 +246,8 @@ describe('database schema ownership', () => {
       { table_name: 'public_content_settings', column_name: 'record_json' },
       { table_name: 'public_content_settings', column_name: 'revision' },
       { table_name: 'user_notifications', column_name: 'payload_json' },
+      { table_name: 'website_notification_events', column_name: 'event_id' },
+      { table_name: 'website_notification_events', column_name: 'published_at' },
     ]))
   })
 

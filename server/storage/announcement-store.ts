@@ -1,4 +1,8 @@
 import { query, withTransaction } from './postgres'
+import {
+  insertWebsiteNotificationEventsInTransaction,
+  type WebsiteNotificationEventInput,
+} from './website-notification-event-store'
 
 interface AnnouncementDocument {
   data: unknown
@@ -14,7 +18,12 @@ export class AnnouncementConflictError extends Error {
 
 export interface AnnouncementStore {
   get: () => Promise<AnnouncementDocument>
-  set: (data: unknown, expectedRevision: number, retainedAnnouncementIds?: string[]) => Promise<number>
+  set: (
+    data: unknown,
+    expectedRevision: number,
+    retainedAnnouncementIds?: string[],
+    publicationEvents?: WebsiteNotificationEventInput[],
+  ) => Promise<number>
 }
 
 export function createPostgresAnnouncementStore(key = 'current.json'): AnnouncementStore {
@@ -27,7 +36,12 @@ export function createPostgresAnnouncementStore(key = 'current.json'): Announcem
       const row = result.rows[0]
       return { data: row?.data_json ?? null, revision: row?.revision ?? 0 }
     },
-    set: async (data, expectedRevision, retainedAnnouncementIds = []) => withTransaction(async (client) => {
+    set: async (
+      data,
+      expectedRevision,
+      retainedAnnouncementIds = [],
+      publicationEvents = [],
+    ) => withTransaction(async (client) => {
       const saved = await client.query<{ revision: number }>(
         `with updated as (
            update announcements
@@ -48,6 +62,7 @@ export function createPostgresAnnouncementStore(key = 'current.json'): Announcem
       )
       const revision = saved.rows[0]?.revision
       if (revision === undefined) throw new AnnouncementConflictError()
+      await insertWebsiteNotificationEventsInTransaction(client, publicationEvents)
       await client.query(
         'delete from user_announcement_reads where not (announcement_id = any($1::text[]))',
         [retainedAnnouncementIds],

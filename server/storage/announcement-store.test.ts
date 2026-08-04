@@ -4,9 +4,13 @@ const mocks = vi.hoisted(() => ({
   query: vi.fn(),
   transactionQuery: vi.fn(),
   withTransaction: vi.fn(),
+  insertWebsiteNotificationEventsInTransaction: vi.fn(),
 }))
 
 vi.mock('./postgres', () => ({ query: mocks.query, withTransaction: mocks.withTransaction }))
+vi.mock('./website-notification-event-store', () => ({
+  insertWebsiteNotificationEventsInTransaction: mocks.insertWebsiteNotificationEventsInTransaction,
+}))
 
 import { AnnouncementConflictError, createPostgresAnnouncementStore } from './announcement-store'
 
@@ -38,6 +42,28 @@ describe('announcement store', () => {
       'delete from user_announcement_reads where not (announcement_id = any($1::text[]))',
       [['retained-1']],
     ])
+  })
+
+  it('persists publication events before completing the announcement transaction', async () => {
+    mocks.transactionQuery
+      .mockResolvedValueOnce({ rows: [{ revision: 1 }] })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+    const event = {
+      id: 'announcement:new',
+      type: 'announcement.published' as const,
+      title: '新公告',
+      summary: '摘要',
+      url: 'https://example.test/#announcement-new',
+      published_at: '2026-08-04T08:00:00.000Z',
+      version: null,
+    }
+
+    await createPostgresAnnouncementStore().set({ announcements: [] }, 0, [], [event])
+
+    expect(mocks.insertWebsiteNotificationEventsInTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ query: mocks.transactionQuery }),
+      [event],
+    )
   })
 
   it('rejects a stale revision without deleting read rows', async () => {

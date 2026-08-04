@@ -102,6 +102,32 @@ CREATE TABLE IF NOT EXISTS announcements (
 );
 ALTER TABLE announcements ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 0;
 
+-- goofish:migration-phase
+CREATE TABLE IF NOT EXISTS website_notification_events (
+  sequence BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  event_id VARCHAR(128) NOT NULL UNIQUE,
+  event_type TEXT NOT NULL,
+  title VARCHAR(120) NOT NULL,
+  summary VARCHAR(500),
+  url TEXT NOT NULL,
+  version VARCHAR(128),
+  published_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT website_notification_events_type_check
+    CHECK (event_type IN ('announcement.published', 'release.published')),
+  CONSTRAINT website_notification_events_title_check
+    CHECK (char_length(btrim(title)) BETWEEN 1 AND 120),
+  CONSTRAINT website_notification_events_summary_check
+    CHECK (summary IS NULL OR char_length(summary) <= 500),
+  CONSTRAINT website_notification_events_url_check
+    CHECK (url ~ '^https://[^[:space:]]+$'),
+  CONSTRAINT website_notification_events_version_check
+    CHECK (
+      (event_type = 'announcement.published' AND version IS NULL)
+      OR (event_type = 'release.published' AND char_length(btrim(version)) BETWEEN 1 AND 128)
+    )
+);
+
 CREATE TABLE IF NOT EXISTS risk_settings (
   key TEXT PRIMARY KEY,
   record_json JSONB NOT NULL,
@@ -2167,6 +2193,7 @@ const TABLE_CONSTRAINT_KEYWORDS = new Set(['check', 'constraint', 'foreign', 'pr
 const API_ONLY_RUNTIME_TABLES = new Set([
   'feature_settings',
   'public_content_settings',
+  'website_notification_events',
   'personal_use_declaration_versions',
   'personal_use_declaration_acceptances',
   'personal_use_declaration_usage_events',

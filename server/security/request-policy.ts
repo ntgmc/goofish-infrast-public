@@ -302,6 +302,9 @@ export const requestSchemas = {
     announcements: z.array(z.unknown()).max(100),
     expected_revision: expectedRevisionSchema,
   }),
+  releaseConfirmation: strict({
+    version: z.string().trim().min(1).max(120).regex(/^[0-9A-Za-z][0-9A-Za-z._+-]*$/),
+  }),
   usageStats: strict({
     event: shortString(64),
     announcement_id: optionalString(120),
@@ -641,6 +644,8 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/data/credential/clear', route({ POST: json('standard', requestSchemas.profileId) })],
   ['/api/announcement', route({ GET: none() }, ['admin'])],
   ['/api/admin/announcement', route({ GET: none(), PUT: json('admin', requestSchemas.announcement) }, ['admin'])],
+  ['/api/integrations/qqbot/events', route({ GET: none() }, ['cursor', 'limit'])],
+  ['/api/internal/releases/confirm', route({ POST: json('standard', requestSchemas.releaseConfirmation) })],
   ['/api/usage-stats', route({ POST: json('standard', requestSchemas.usageStats) }, ['admin'])],
   ['/api/admin/usage-stats', route({ GET: none() }, ['admin', 'format', 'from', 'to', 'range'])],
   ['/api/depot-value', route({
