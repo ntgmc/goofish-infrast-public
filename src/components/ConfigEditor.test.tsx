@@ -21,9 +21,11 @@ describe('ConfigEditor shift patterns', () => {
       />,
     )
 
-    expect(screen.getByRole('button', { name: '排班表写死' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: /MAA 自动填满（保留技能依赖）.*推荐/ })).toHaveAttribute('aria-pressed', 'false')
-    await user.click(screen.getByRole('button', { name: '纯 MAA 自动填满（高级）' }))
+    const fixedRule = screen.getByRole('button', { name: /排班表固定.*推荐/ })
+    expect(fixedRule).toHaveAttribute('aria-pressed', 'true')
+    expect(within(fixedRule).getByText('推荐')).toHaveClass('text-brand-600')
+    expect(screen.getByRole('button', { name: 'MAA 自动填满（保留技能依赖）' })).toHaveAttribute('aria-pressed', 'false')
+    await user.click(screen.getByRole('button', { name: '纯 MAA 自动填满（效率低）' }))
 
     const mutate = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
     const next = cloneConfig(config)

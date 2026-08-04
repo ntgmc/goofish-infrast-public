@@ -108,7 +108,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_008: "MAA 自动非固定",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_009: "排班表写死",
+  components_ConfigEditor_009: "排班表固定",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_010: "MAA 自动填满（保留技能依赖）",
   // src/components/ConfigEditor.tsx
@@ -286,7 +286,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_096: "推荐",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_097: "纯 MAA 自动填满（高级）",
+  components_ConfigEditor_097: "纯 MAA 自动填满（效率低）",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_098: "导出的 MAA JSON 不指定生产技能依赖的宿舍干员，并过滤相关生产组合；可能损失部分产能。菲亚梅塔仍可执行换心情，完成后由 MAA 自动填入宿舍。",
   // src/components/InputNumber.tsx

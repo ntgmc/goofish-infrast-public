@@ -2,7 +2,7 @@
 
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { UserStatusPill } from './helpers'
+import { createDraftAnnouncement, createDraftBanner, UserStatusPill } from './helpers'
 
 afterEach(cleanup)
 
@@ -23,5 +23,15 @@ describe('UserStatusPill', () => {
     render(<UserStatusPill status="revoked" emailVerifiedAt={null} />)
 
     expect(screen.getByText('已撤销')).toHaveClass('tool-status--error')
+  })
+})
+
+describe('announcement drafts', () => {
+  it('enables new popup announcements by default', () => {
+    expect(createDraftAnnouncement()).toMatchObject({ kind: 'popup', active: true })
+  })
+
+  it('keeps a new global banner disabled by default', () => {
+    expect(createDraftBanner()).toMatchObject({ kind: 'banner', active: false })
   })
 })

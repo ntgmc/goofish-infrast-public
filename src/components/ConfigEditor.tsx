@@ -383,7 +383,7 @@ export default function ConfigEditor({
                       }`}
                     >
                       <span>{DORMITORY_RULE_LABELS[rule]}</span>
-                      {rule === 'maa_autofill' && (
+                      {rule === 'fixed' && (
                         <span className="ml-1 text-xs text-brand-600">{copy.common.components_ConfigEditor_096}</span>
                       )}
                     </button>
@@ -603,7 +603,7 @@ export default function ConfigEditor({
                     }`}
                   >
                     <span>{DORMITORY_RULE_LABELS[rule]}</span>
-                    {rule === 'maa_autofill' && (
+                    {rule === 'fixed' && (
                       <span className="ml-1 text-xs text-brand-600">{copy.common.components_ConfigEditor_096}</span>
                     )}
                   </button>

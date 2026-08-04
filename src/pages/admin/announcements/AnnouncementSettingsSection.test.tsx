@@ -25,6 +25,7 @@ describe('AnnouncementSettingsSection', () => {
 
     const list = screen.getByRole('list', { name: '弹出式公告列表' })
     expect(within(list).getAllByRole('listitem')).toHaveLength(2)
+    expect(within(list).getAllByText(/^已启用 ·/)).toHaveLength(2)
     expect(screen.getByTestId('announcement-one')).toHaveTextContent('第一条正文')
     expect(screen.queryByTestId('announcement-two')).not.toBeInTheDocument()
 

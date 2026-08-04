@@ -415,7 +415,7 @@ function createDraftAnnouncementItem(kind: Announcement['kind']): Announcement {
   return {
     id: createDraftId(),
     kind,
-    active: false,
+    active: kind === 'popup',
     title: '',
     body: '',
     created_at: now,
