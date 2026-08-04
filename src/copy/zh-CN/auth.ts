@@ -131,6 +131,14 @@ export const authCopy = {
   components_AuthForm_043: "密码不能超过 128 位",
   // src/components/AuthForm.tsx
   components_AuthForm_044: "秒后可重新发送",
+  // src/components/AuthForm.tsx
+  components_AuthForm_045: "注册设置加载失败，请重试。",
+  // src/components/AuthForm.tsx
+  components_AuthForm_046: "正在确认注册要求，请稍后再试。",
+  // src/components/AuthForm.tsx
+  components_AuthForm_047: "正在确认邀请码要求...",
+  // src/components/AuthForm.tsx
+  components_AuthForm_048: "重试",
   // src/pages/VerifyEmailPage.tsx
   pages_VerifyEmailPage_001: "验证链接无效或已过期。",
   // src/pages/VerifyEmailPage.tsx

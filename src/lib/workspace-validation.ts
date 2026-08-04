@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { copy } from '../copy/index'
 
 const WORKSPACE_OPERATOR_LIMIT = 500
 const WORKSPACE_ELITE_OVERRIDE_LIMIT = 500
@@ -15,7 +16,7 @@ const boundedCountRecord = z.record(
       origin: 'object',
       maximum: 16,
       inclusive: true,
-      message: '产物类型不能超过 16 种。',
+      message: copy.domain.lib_workspace_validation_001,
     })
   }
 })
@@ -40,7 +41,7 @@ const assertUniqueOperatorIds = (
       context.addIssue({
         code: 'custom',
         path: [index, 'id'],
-        message: '干员 ID 不能重复。',
+        message: copy.domain.lib_workspace_validation_002,
       })
     }
     ids.add(operator.id)
@@ -137,7 +138,7 @@ export const eliteOverridesSchema = z.record(
       origin: 'object',
       maximum: WORKSPACE_ELITE_OVERRIDE_LIMIT,
       inclusive: true,
-      message: `精英覆盖不能超过 ${WORKSPACE_ELITE_OVERRIDE_LIMIT} 项。`,
+      message: copy.domain.lib_workspace_validation_003(WORKSPACE_ELITE_OVERRIDE_LIMIT),
     })
   }
 })

@@ -68,7 +68,7 @@ export default function InvitationsSection() {
   }
 
   const manageCode = async (action: 'rotate' | 'pause' | 'resume') => {
-    if (action === 'rotate' && !window.confirm('轮换后旧邀请码将立即失效，历史邀请记录会保留。确认继续吗？')) return
+    if (action === 'rotate' && !window.confirm(copy.dashboard.pages_tool_dashboard_InvitationsSection_078)) return
     setBusy(true)
     setError(null)
     setNotice(null)
@@ -76,10 +76,14 @@ export default function InvitationsSection() {
       await apiJson('/api/user/invitations/code', {
         method: 'POST',
         json: { action },
-        fallbackMessage: '更新邀请码失败。',
+        fallbackMessage: copy.dashboard.pages_tool_dashboard_InvitationsSection_079,
       })
       await load()
-      setNotice(action === 'pause' ? '邀请码已暂停。' : action === 'resume' ? '邀请码已恢复。' : '邀请码已轮换。')
+      setNotice(action === 'pause'
+        ? copy.dashboard.pages_tool_dashboard_InvitationsSection_080
+        : action === 'resume'
+          ? copy.dashboard.pages_tool_dashboard_InvitationsSection_081
+          : copy.dashboard.pages_tool_dashboard_InvitationsSection_082)
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
@@ -131,7 +135,7 @@ export default function InvitationsSection() {
           <div className="flex max-w-md flex-col items-start gap-3 lg:items-end">
             <p className="text-xs leading-5 text-ink-muted">{copy.dashboard.pages_tool_dashboard_InvitationsSection_077}</p>
             <button type="button" disabled={loading} onClick={() => void load()} className="tool-secondary-action min-h-9 px-3 text-sm">
-              {loading ? '刷新中...' : '刷新状态'}
+              {loading ? copy.dashboard.pages_tool_dashboard_InvitationsSection_083 : copy.dashboard.pages_tool_dashboard_InvitationsSection_084}
             </button>
           </div>
         </div>
@@ -142,16 +146,16 @@ export default function InvitationsSection() {
           <div className="tool-alert tool-alert--warning mt-5" role="status">{copy.dashboard.pages_tool_dashboard_InvitationsSection_013}</div>
         ) : summary.code ? (
           <div className="mt-5 space-y-4">
-            {summary.code_status === 'paused' && <div className="tool-alert tool-alert--warning" role="status">当前邀请码已暂停，旧链接暂不可注册。</div>}
+            {summary.code_status === 'paused' && <div className="tool-alert tool-alert--warning" role="status">{copy.dashboard.pages_tool_dashboard_InvitationsSection_085}</div>}
             <div className="grid gap-4 lg:grid-cols-2">
               <CopyField id="invitation-code" label={copy.dashboard.pages_tool_dashboard_InvitationsSection_014} value={summary.code} onCopy={() => void copyToClipboard(summary.code!, copy.dashboard.pages_tool_dashboard_InvitationsSection_015)} />
               {absoluteShareUrl && <CopyField id="invitation-link" label={copy.dashboard.pages_tool_dashboard_InvitationsSection_016} value={absoluteShareUrl} onCopy={() => void copyToClipboard(absoluteShareUrl, copy.dashboard.pages_tool_dashboard_InvitationsSection_017)} />}
             </div>
             <div className="flex flex-wrap gap-2">
               <button type="button" disabled={busy} onClick={() => void manageCode(summary.code_status === 'paused' ? 'resume' : 'pause')} className="tool-secondary-action min-h-9 px-3 text-sm">
-                {summary.code_status === 'paused' ? '恢复邀请码' : '暂停邀请码'}
+                {summary.code_status === 'paused' ? copy.dashboard.pages_tool_dashboard_InvitationsSection_086 : copy.dashboard.pages_tool_dashboard_InvitationsSection_087}
               </button>
-              <button type="button" disabled={busy} onClick={() => void manageCode('rotate')} className="tool-secondary-action min-h-9 px-3 text-sm">轮换邀请码</button>
+              <button type="button" disabled={busy} onClick={() => void manageCode('rotate')} className="tool-secondary-action min-h-9 px-3 text-sm">{copy.dashboard.pages_tool_dashboard_InvitationsSection_088}</button>
             </div>
           </div>
         ) : (
@@ -230,7 +234,7 @@ function formatExpiry(reward: InvitationRewardPreviewItem): string {
 function progressLabel(record: InvitationRecordSummary): string {
   if (record.status === 'registered') return copy.dashboard.pages_tool_dashboard_InvitationsSection_061
   if (record.status === 'activated' || record.status === 'processing' || record.status === 'failed') return copy.dashboard.pages_tool_dashboard_InvitationsSection_062
-  if (record.status === 'dead_letter') return '结算异常'
+  if (record.status === 'dead_letter') return copy.dashboard.pages_tool_dashboard_InvitationsSection_089
   return copy.dashboard.pages_tool_dashboard_InvitationsSection_063
 }
 
@@ -239,8 +243,8 @@ function rewardStatusLabel(status: InviterRewardStatus): string {
     pending_activation: copy.dashboard.pages_tool_dashboard_InvitationsSection_064,
     pending_campaign_resume: copy.dashboard.pages_tool_dashboard_InvitationsSection_065,
     settlement_pending: copy.dashboard.pages_tool_dashboard_InvitationsSection_066,
-    settlement_retry: '结算失败，等待自动重试',
-    settlement_failed: '结算失败，请联系客服',
+    settlement_retry: copy.dashboard.pages_tool_dashboard_InvitationsSection_090,
+    settlement_failed: copy.dashboard.pages_tool_dashboard_InvitationsSection_091,
     granted: copy.dashboard.pages_tool_dashboard_InvitationsSection_067,
     daily_limit_skipped: copy.dashboard.pages_tool_dashboard_InvitationsSection_068,
     inviter_ineligible: copy.dashboard.pages_tool_dashboard_InvitationsSection_069,
@@ -258,5 +262,5 @@ function formatDate(value: string): string {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-  }).format(new Date(value))} 上海时间`
+  }).format(new Date(value))}${copy.dashboard.pages_tool_dashboard_InvitationsSection_092}`
 }

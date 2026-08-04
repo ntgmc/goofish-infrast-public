@@ -1,3 +1,5 @@
+import { copy } from '../copy/index'
+
 export interface AdminOperationReasonRequest {
   title: string
   description: string
@@ -39,13 +41,13 @@ export function requestAdminOperationReason(
     label.className = 'block'
     const labelText = document.createElement('span')
     labelText.className = 'mb-2 block text-sm font-medium text-ink-secondary'
-    labelText.textContent = '操作原因或工单号'
+    labelText.textContent = copy.common.lib_admin_operation_reason_001
     const textarea = document.createElement('textarea')
     textarea.className = 'tool-field min-h-28 resize-y'
     textarea.required = true
     textarea.minLength = 2
     textarea.maxLength = 500
-    textarea.placeholder = '请填写 2–500 个字符，审计记录将永久保留此原因。'
+    textarea.placeholder = copy.common.lib_admin_operation_reason_002
     textarea.setAttribute('aria-describedby', errorId)
     label.append(labelText, textarea)
 
@@ -59,11 +61,11 @@ export function requestAdminOperationReason(
     const cancel = document.createElement('button')
     cancel.type = 'button'
     cancel.className = 'tool-secondary-action'
-    cancel.textContent = '取消'
+    cancel.textContent = copy.common.lib_admin_operation_reason_003
     const confirm = document.createElement('button')
     confirm.type = 'submit'
     confirm.className = 'tool-primary-action'
-    confirm.textContent = request.confirmLabel ?? '确认并继续'
+    confirm.textContent = request.confirmLabel ?? copy.common.lib_admin_operation_reason_004
     actions.append(cancel, confirm)
     form.append(title, description, label, error, actions)
     dialog.append(form)
@@ -90,7 +92,7 @@ export function requestAdminOperationReason(
       event.preventDefault()
       const reason = textarea.value.trim()
       if (reason.length < 2 || reason.length > 500) {
-        error.textContent = '操作原因必须为 2–500 个字符。'
+        error.textContent = copy.common.lib_admin_operation_reason_005
         error.classList.remove('hidden')
         textarea.setAttribute('aria-invalid', 'true')
         textarea.focus()

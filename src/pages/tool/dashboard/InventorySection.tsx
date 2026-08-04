@@ -122,7 +122,7 @@ export default function InventorySection({
       } else {
         setNotice({
           message: typeof response.previous_limit === 'number' && typeof response.next_limit === 'number'
-            ? `扩容已生效：${response.previous_limit} → ${response.next_limit}（上限 ${response.maximum ?? response.next_limit}）。`
+            ? copy.inventory.capacity_expansion_done(response.previous_limit, response.next_limit, response.maximum ?? response.next_limit)
             : copy.inventory.operation_done,
         })
       }
@@ -228,10 +228,10 @@ export default function InventorySection({
               <article key={task.code} className="tool-inset p-4">
                 <h4 className="text-sm font-semibold text-ink-primary">{task.title}</h4>
                 <p className="mt-1 text-xs leading-5 text-ink-secondary">{task.description}</p>
-                <ul className="mt-3 space-y-2" aria-label={`${task.title}奖励`}>
+                <ul className="mt-3 space-y-2" aria-label={copy.inventory.task_rewards_label(task.title)}>
                   {task.rewards.map((reward) => <li key={reward.item_code} className="flex items-center gap-2 text-xs text-ink-secondary">
                     <img src={itemIconPath(reward.icon_key)} onError={fallbackItemIcon} alt="" width={28} height={28} className="h-7 w-7 object-contain" />
-                    <span>{reward.name} × {reward.quantity} · {reward.expiry.mode === 'never' ? copy.inventory.permanent : `领取后 ${reward.expiry.days} 天`}</span>
+                    <span>{reward.name} × {reward.quantity} · {reward.expiry.mode === 'never' ? copy.inventory.permanent : copy.inventory.expires_after_days(reward.expiry.days)}</span>
                   </li>)}
                 </ul>
                 <button type="button" className="tool-secondary-action mt-4 w-full" disabled={busy || task.status !== 'claimable'} onClick={() => void claimTask(task)}>
@@ -325,7 +325,7 @@ export default function InventorySection({
 
       {rewards && rewards.length > 0 && <section className="tool-panel p-5" aria-live="polite"><h3 className="text-base font-semibold text-ink-primary">{copy.inventory.rewards_received}</h3><ul className="mt-3 grid gap-2 sm:grid-cols-2">{rewards.map((reward) => <li key={reward.item_code} className="tool-inset flex items-center gap-3 p-3 text-sm text-ink-secondary"><img src={itemIconPath(reward.icon_key)} onError={fallbackItemIcon} alt="" width={36} height={36} className="h-9 w-9 object-contain" /><span>{reward.name} × {reward.quantity} · {reward.expires_at ? formatShanghaiDateTime(reward.expires_at) : copy.inventory.permanent}</span></li>)}</ul></section>}
       {(inventory?.recent_events.length ?? 0) > 0 && <section className="tool-panel p-5 sm:p-6" aria-labelledby="inventory-events-title">
-        <h3 id="inventory-events-title" className="text-base font-semibold text-ink-primary">最近资产变动</h3>
+        <h3 id="inventory-events-title" className="text-base font-semibold text-ink-primary">{copy.inventory.recent_events}</h3>
         <ul className="mt-3 space-y-2">{inventory!.recent_events.map((event) => <li key={event.id} className="tool-inset flex items-center gap-3 p-3 text-sm text-ink-secondary">
           <img src={itemIconPath(event.icon_key ?? 'placeholder')} onError={fallbackItemIcon} alt="" width={36} height={36} className="h-9 w-9 object-contain" />
           <span className="min-w-0 flex-1"><strong className="text-ink-primary">{event.item_name ?? event.item_code}</strong><span className="ml-2">{ledgerEventLabel(event.event_type)} × {event.quantity}</span><span className="mt-1 block text-xs text-ink-muted">{formatShanghaiDateTime(event.created_at)}</span></span>
@@ -360,13 +360,13 @@ function capacityForItem(code: string, profileId: string, profiles: ProfileCapac
 }
 
 function ledgerEventLabel(eventType: InventoryResponse['recent_events'][number]['event_type']): string {
-  if (eventType === 'grant') return '到账'
-  if (eventType === 'reserve') return '预留'
-  if (eventType === 'consume') return '消费'
-  if (eventType === 'refund') return '退回'
-  if (eventType === 'revoke') return '撤回'
-  if (eventType === 'gift_open') return '开启礼包'
-  return '容量生效'
+  if (eventType === 'grant') return copy.inventory.ledger_grant
+  if (eventType === 'reserve') return copy.inventory.ledger_reserve
+  if (eventType === 'consume') return copy.inventory.ledger_consume
+  if (eventType === 'refund') return copy.inventory.ledger_refund
+  if (eventType === 'revoke') return copy.inventory.ledger_revoke
+  if (eventType === 'gift_open') return copy.inventory.ledger_gift_open
+  return copy.inventory.ledger_capacity_effective
 }
 
 function isLimitedProfileUseResponse(response: UseResponse): response is LimitedProfileUseResponse {

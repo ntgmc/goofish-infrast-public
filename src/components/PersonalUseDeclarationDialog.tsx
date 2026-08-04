@@ -98,7 +98,7 @@ export default function PersonalUseDeclarationDialog({
           <div>
             <h2 id="personal-use-declaration-title" className="text-lg font-semibold text-ink-primary">{copy.personalUse.confirmation_title}</h2>
             <p className="mt-1 text-xs font-medium text-ink-muted">
-              {declaration.title} · {declaration.version} · 生效日期：{declaration.effectiveDate}
+              {declaration.title} · {declaration.version} · {copy.personalUse.confirmation_effective_date}{declaration.effectiveDate}
             </p>
             <p id="personal-use-declaration-description" className="mt-3 text-sm leading-6 text-ink-secondary">{copy.personalUse.confirmation_intro}</p>
             <p className="mt-3 text-sm leading-6 text-ink-secondary">{copy.personalUse.confirmation_commitment}</p>

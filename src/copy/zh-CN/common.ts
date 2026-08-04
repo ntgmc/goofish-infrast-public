@@ -635,6 +635,28 @@ export const commonCopy = {
   pages_AdminSetupPage_023: " · 更新 ",
   // src/pages/AdminSetupPage.tsx
   pages_AdminSetupPage_024: "删除账号",
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_025: "加载管理员列表失败。",
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_026: (username: string) => `管理员 ${username} 已存在。确认替换其密码和角色并撤销全部现有会话？`,
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_027: (username: string) => `已替换管理员 ${username}`,
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_028: "操作原因 / 工单号",
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_029: "风控角色",
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_030: "风险只读",
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_031: "风险复核",
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_032: "安全管理员",
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_033: "正在加载管理账号…",
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_034: "重试",
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_035: "角色：",
   // src/pages/ToolPage.tsx
   pages_ToolPage_001: "正在确认登录信息...",
   // src/pages/ToolPage.tsx
@@ -737,4 +759,14 @@ export const commonCopy = {
   components_GuidedTour_003: "下一步",
   // src/components/GuidedTour.tsx
   components_GuidedTour_004: "完成",
+  // src/lib/admin-operation-reason.ts
+  lib_admin_operation_reason_001: "操作原因或工单号",
+  // src/lib/admin-operation-reason.ts
+  lib_admin_operation_reason_002: "请填写 2–500 个字符，审计记录将永久保留此原因。",
+  // src/lib/admin-operation-reason.ts
+  lib_admin_operation_reason_003: "取消",
+  // src/lib/admin-operation-reason.ts
+  lib_admin_operation_reason_004: "确认并继续",
+  // src/lib/admin-operation-reason.ts
+  lib_admin_operation_reason_005: "操作原因必须为 2–500 个字符。",
 } as const

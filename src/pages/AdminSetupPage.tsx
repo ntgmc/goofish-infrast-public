@@ -33,7 +33,7 @@ export default function AdminSetupPage() {
       .then((data) => {
         setUsers(data.users ?? [])
       })
-      .catch((caught) => setUsersError(getApiErrorMessage(caught, '加载管理员列表失败。')))
+      .catch((caught) => setUsersError(getApiErrorMessage(caught, copy.common.pages_AdminSetupPage_025)))
       .finally(() => setUsersLoading(false))
   }, [])
 
@@ -46,7 +46,7 @@ export default function AdminSetupPage() {
     setNotice(null)
     try {
       const replaceExisting = users.some((item) => item.username === username.trim())
-      if (replaceExisting && !window.confirm(`管理员 ${username.trim()} 已存在。确认替换其密码和角色并撤销全部现有会话？`)) return
+      if (replaceExisting && !window.confirm(copy.common.pages_AdminSetupPage_026(username.trim()))) return
       const data = await adminApiJson<{ user?: AdminUserSummary; replaced?: boolean }>('/api/admin/users', {
         method: 'POST',
         json: {
@@ -64,7 +64,7 @@ export default function AdminSetupPage() {
       setUsername('')
       setPassword('')
       setOperationReason('')
-      setNotice(data.replaced ? `已替换管理员 ${data.user.username}` : `${copy.common.pages_AdminSetupPage_003}${data.user.username}`)
+      setNotice(data.replaced ? copy.common.pages_AdminSetupPage_027(data.user.username) : `${copy.common.pages_AdminSetupPage_003}${data.user.username}`)
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
@@ -127,15 +127,15 @@ export default function AdminSetupPage() {
               <input type="password" value={password} onChange={(event) => setPassword(event.currentTarget.value)} className="tool-field" autoComplete="new-password" />
             </label>
             <label className="mt-4 block">
-              <span className="mb-2 block text-sm font-medium text-ink-secondary">操作原因 / 工单号</span>
+              <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.common.pages_AdminSetupPage_028}</span>
               <input value={operationReason} onChange={(event) => setOperationReason(event.currentTarget.value)} maxLength={500} className="tool-field" />
             </label>
             <label className="mt-4 block">
-              <span className="mb-2 block text-sm font-medium text-ink-secondary">风控角色</span>
+              <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.common.pages_AdminSetupPage_029}</span>
               <select value={role} onChange={(event) => setRole(event.currentTarget.value as AdminUserSummary['role'])} className="tool-field">
-                <option value="risk_viewer">风险只读</option>
-                <option value="risk_reviewer">风险复核</option>
-                <option value="security_admin">安全管理员</option>
+                <option value="risk_viewer">{copy.common.pages_AdminSetupPage_030}</option>
+                <option value="risk_reviewer">{copy.common.pages_AdminSetupPage_031}</option>
+                <option value="security_admin">{copy.common.pages_AdminSetupPage_032}</option>
               </select>
             </label>
             {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error}</div>}
@@ -152,11 +152,11 @@ export default function AdminSetupPage() {
             </div>
             <div className="divide-y divide-surface-3">
               {usersLoading ? (
-                <div className="p-8 text-center text-sm text-ink-muted">正在加载管理账号…</div>
+                <div className="p-8 text-center text-sm text-ink-muted">{copy.common.pages_AdminSetupPage_033}</div>
               ) : usersError ? (
                 <div className="p-6 text-center">
                   <p className="text-sm text-error" role="alert">{usersError}</p>
-                  <button type="button" onClick={() => void loadUsers()} className="tool-secondary-action mt-3">重试</button>
+                  <button type="button" onClick={() => void loadUsers()} className="tool-secondary-action mt-3">{copy.common.pages_AdminSetupPage_034}</button>
                 </div>
               ) : users.length === 0 ? (
                 <div className="p-8 text-center text-sm text-ink-muted">{copy.common.pages_AdminSetupPage_021}</div>
@@ -164,7 +164,7 @@ export default function AdminSetupPage() {
                 <div key={user.username} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="font-medium text-ink-primary">{user.username}</div>
-                    <div className="mt-1 text-xs text-ink-muted">角色：{adminRoleLabel(user.role)}</div>
+                    <div className="mt-1 text-xs text-ink-muted">{copy.common.pages_AdminSetupPage_035}{adminRoleLabel(user.role)}</div>
                     <div className="mt-1 text-xs text-ink-muted">{copy.common.pages_AdminSetupPage_022}{formatDate(user.created_at)} {copy.common.pages_AdminSetupPage_023}{formatDate(user.updated_at)}</div>
                   </div>
                   <button type="button" onClick={() => handleDelete(user.username)} disabled={loading || !rootPassword || operationReason.trim().length < 2} className="tool-secondary-action border-error/35 bg-error/10 text-error hover:bg-error/20">{copy.common.pages_AdminSetupPage_024}</button>
@@ -186,5 +186,9 @@ function formatDate(value: string | null): string {
 }
 
 function adminRoleLabel(role: AdminUserSummary['role']): string {
-  return role === 'security_admin' ? '安全管理员' : role === 'risk_reviewer' ? '风险复核' : '风险只读'
+  return role === 'security_admin'
+    ? copy.common.pages_AdminSetupPage_032
+    : role === 'risk_reviewer'
+      ? copy.common.pages_AdminSetupPage_031
+      : copy.common.pages_AdminSetupPage_030
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { copy } from '../copy/index'
 import type {
   ScenarioComparisonFactors,
   ScenarioComparisonResult,
@@ -53,14 +54,14 @@ export const scenarioComparisonFactorsSchema: z.ZodType<ScenarioComparisonFactor
   includeRotation: z.boolean(),
   droneStrategies: z.array(scenarioDroneStrategySchema).min(1).max(7),
 }).superRefine((factors, context) => {
-  assertUnique(factors.layouts.map((entry) => entry.layout), ['layouts'], '布局不能重复。', context)
-  assertUnique(factors.maaSchedules, ['maaSchedules'], 'MAA 班次不能重复。', context)
-  assertUnique(factors.droneStrategies, ['droneStrategies'], '无人机策略不能重复。', context)
+  assertUnique(factors.layouts.map((entry) => entry.layout), ['layouts'], copy.domain.lib_scenario_comparison_validation_001, context)
+  assertUnique(factors.maaSchedules, ['maaSchedules'], copy.domain.lib_scenario_comparison_validation_002, context)
+  assertUnique(factors.droneStrategies, ['droneStrategies'], copy.domain.lib_scenario_comparison_validation_003, context)
   factors.layouts.forEach((entry, layoutIndex) => {
     assertUnique(
       entry.plans.map((plan) => JSON.stringify(plan)),
       ['layouts', layoutIndex, 'plans'],
-      '同一布局的产品方案不能重复。',
+      copy.domain.lib_scenario_comparison_validation_004,
       context,
     )
   })
@@ -70,7 +71,7 @@ export const scenarioComparisonFactorsSchema: z.ZodType<ScenarioComparisonFactor
   if (rawCombinationCount > MAX_RAW_SCENARIO_COMBINATIONS) {
     context.addIssue({
       code: 'custom',
-      message: `情景原始组合不能超过 ${MAX_RAW_SCENARIO_COMBINATIONS} 个。`,
+      message: copy.domain.lib_scenario_comparison_validation_005(MAX_RAW_SCENARIO_COMBINATIONS),
     })
   }
 }) as z.ZodType<ScenarioComparisonFactors>
@@ -144,8 +145,8 @@ export const scenarioComparisonResultSchema: z.ZodType<ScenarioComparisonResult>
   buildMeta: appBuildMetaSchema,
 }).passthrough().superRefine((result, context) => {
   const pointIds = result.points.map((point) => point.id)
-  assertUnique(pointIds, ['points'], '情景 ID 不能重复。', context)
-  assertUnique(result.frontierScenarioIds, ['frontierScenarioIds'], 'Pareto 情景 ID 不能重复。', context)
+  assertUnique(pointIds, ['points'], copy.domain.lib_scenario_comparison_validation_006, context)
+  assertUnique(result.frontierScenarioIds, ['frontierScenarioIds'], copy.domain.lib_scenario_comparison_validation_007, context)
   const screeningCount = result.points.filter((point) => point.screening).length
   const verifiedCount = result.points.filter((point) => point.verified).length
   const failedCount = result.points.filter((point) => point.status === 'failed').length
@@ -156,20 +157,20 @@ export const scenarioComparisonResultSchema: z.ZodType<ScenarioComparisonResult>
     ['failedCount', failedCount, result.failedCount],
   ] as const
   for (const [field, expected, actual] of expectedCounts) {
-    if (expected !== actual) context.addIssue({ code: 'custom', path: [field], message: `${field} 与 points 不一致。` })
+    if (expected !== actual) context.addIssue({ code: 'custom', path: [field], message: copy.domain.lib_scenario_comparison_validation_008(field) })
   }
   const frontierFromPoints = new Set(result.points.filter((point) => point.isFrontier).map((point) => point.id))
   const frontierFromSummary = new Set(result.frontierScenarioIds)
   if (frontierFromPoints.size !== frontierFromSummary.size
     || [...frontierFromPoints].some((id) => !frontierFromSummary.has(id))) {
-    context.addIssue({ code: 'custom', path: ['frontierScenarioIds'], message: 'Pareto 汇总与 points 标记不一致。' })
+    context.addIssue({ code: 'custom', path: ['frontierScenarioIds'], message: copy.domain.lib_scenario_comparison_validation_009 })
   }
   result.points.forEach((point, index) => {
     if (point.status === 'succeeded' && !point.screening && !point.verified) {
-      context.addIssue({ code: 'custom', path: ['points', index], message: '成功情景必须包含计算指标。' })
+      context.addIssue({ code: 'custom', path: ['points', index], message: copy.domain.lib_scenario_comparison_validation_010 })
     }
     if (point.isFrontier && (point.status !== 'succeeded' || !point.verified)) {
-      context.addIssue({ code: 'custom', path: ['points', index, 'isFrontier'], message: 'Pareto 点必须是已复算的成功情景。' })
+      context.addIssue({ code: 'custom', path: ['points', index, 'isFrontier'], message: copy.domain.lib_scenario_comparison_validation_011 })
     }
   })
 }) as z.ZodType<ScenarioComparisonResult>

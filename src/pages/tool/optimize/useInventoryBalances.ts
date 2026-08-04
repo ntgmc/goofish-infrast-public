@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { copy } from '../../../copy/index'
 import { apiJson } from '../../../lib/api-client'
 import type { InventoryResponse, ProfileCapacitySummary, ProfileReorderQuotaSummary, SystemItemCode } from '../../../lib/inventory-contracts'
 
@@ -22,7 +23,7 @@ export function useInventoryBalances(profileId: string) {
       setInventory(await apiJson<InventoryResponse>('/api/user/inventory'))
       setLoaded(true)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '库存数据加载失败。')
+      setError(caught instanceof Error ? caught.message : copy.inventory.balances_load_failed)
     } finally {
       setLoading(false)
     }

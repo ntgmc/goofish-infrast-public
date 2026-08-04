@@ -217,4 +217,6 @@ export const toolsCopy = {
   pages_DepotValuePage_108: "上传数据不适用",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_109: "保存服务不可用",
+  // src/pages/tool/profile-redemption.ts
+  pages_tool_profile_redemption_001: "当前 CDK 不能用于升级档案。",
 } as const

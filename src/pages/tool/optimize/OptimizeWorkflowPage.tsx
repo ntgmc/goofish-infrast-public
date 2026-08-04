@@ -212,7 +212,7 @@ export default function OptimizeWorkflowPage(props: Props) {
                 const transientHistoryItem: WorkspaceResultHistoryItem = {
                   id: resultId,
                   job_id: job.id,
-                  name: `排班结果 ${new Date(job.timestamps.submittedAt).toLocaleString()}`,
+                  name: copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_002(new Date(job.timestamps.submittedAt).toLocaleString()),
                   created_at: job.timestamps.finishedAt ?? job.timestamps.submittedAt,
                   config: null,
                   result: snapshot.result,
@@ -235,10 +235,10 @@ export default function OptimizeWorkflowPage(props: Props) {
               onRetry={refreshBillingQuote}
             />
             {(inventoryError || priorityCouponError) && <div className="tool-alert tool-alert--error mb-4" role="alert">
-              <p>{[inventoryError && `库存数据：${inventoryError}`, priorityCouponError && `优先计算券：${priorityCouponError}`].filter(Boolean).join('；')}</p>
+              <p>{[inventoryError && `${copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_003}${inventoryError}`, priorityCouponError && `${copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_004}${priorityCouponError}`].filter(Boolean).join('；')}</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {inventoryError && <button type="button" className="tool-secondary-action" disabled={inventoryLoading} onClick={() => void refreshInventory()}>{inventoryLoading ? '正在重试…' : '重试库存'}</button>}
-                {priorityCouponError && <button type="button" className="tool-secondary-action" disabled={priorityCouponLoading} onClick={() => void refreshRewardBalance()}>{priorityCouponLoading ? '正在重试…' : '重试优先券'}</button>}
+                {inventoryError && <button type="button" className="tool-secondary-action" disabled={inventoryLoading} onClick={() => void refreshInventory()}>{inventoryLoading ? copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_005 : copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_006}</button>}
+                {priorityCouponError && <button type="button" className="tool-secondary-action" disabled={priorityCouponLoading} onClick={() => void refreshRewardBalance()}>{priorityCouponLoading ? copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_005 : copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_007}</button>}
               </div>
             </div>}
             <OverviewSection
