@@ -47,6 +47,10 @@ function workspace(): UserWorkspaceRecord {
 }
 
 describe('expired free-preview workspace projection', () => {
+  it('uses fixed dormitories in the default free-preview config', () => {
+    expect(getFreePreviewDefaultConfig().dormitory_rule).toBe('fixed')
+  })
+
   it('uses deterministic archive metadata and becomes idempotent after marking the activity', () => {
     const now = new Date(FREE_PREVIEW_LIMITED_CDK_ACTIVITY.endsAt)
     const first = projectExpiredFreePreviewWorkspace(profile, workspace(), now)

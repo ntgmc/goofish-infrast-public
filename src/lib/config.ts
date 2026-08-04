@@ -1,4 +1,4 @@
-import type { IntermediateProduct, LicenseConfig } from './types'
+import type { DormitoryRule, IntermediateProduct, LicenseConfig } from './types'
 import { copy } from '../copy/index'
 
 export const SCHEDULE_MODE_LABELS: Record<string, string> = {
@@ -78,8 +78,11 @@ export function isVariableShiftScheduleEnabled(config: Pick<LicenseConfig, 'sche
     || config.variable_shift_schedule?.enabled === true
 }
 
-export function normalizeDormitoryRule(rule: unknown): 'fixed' | 'maa_autofill' {
+export function normalizeDormitoryRule(rule: unknown): DormitoryRule {
   const ruleText = String(rule ?? 'fixed').trim().toLowerCase()
+  if (['maa_pure_autofill', 'maa-pure-autofill', 'pure_autofill', 'pure-autofill', copy.domain.lib_config_037, copy.domain.lib_config_038].includes(ruleText)) {
+    return 'maa_pure_autofill'
+  }
   return ['maa_autofill', 'maa-autofill', 'autofill', 'auto', copy.domain.lib_config_025, copy.domain.lib_config_026].includes(ruleText)
     ? 'maa_autofill'
     : 'fixed'
@@ -135,7 +138,10 @@ export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   next.layout = next.layout || `${next.trading_stations_count}-${next.manufacturing_stations_count}-3`
   next.desc = next.desc || `${next.layout}${copy.domain.lib_config_027}`
   next.Fiammetta = next.Fiammetta ?? { enable: false }
-  if (isVariableShiftScheduleEnabled(next) || !isFiammettaShiftHoursSupported(next.shift_hours)) {
+  if (
+    isVariableShiftScheduleEnabled(next) ||
+    !isFiammettaShiftHoursSupported(next.shift_hours)
+  ) {
     next.Fiammetta = { ...next.Fiammetta, enable: false }
   }
   next.drones = {

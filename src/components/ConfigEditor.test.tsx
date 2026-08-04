@@ -8,6 +8,42 @@ import ConfigEditor from './ConfigEditor'
 afterEach(cleanup)
 
 describe('ConfigEditor shift patterns', () => {
+  it('defaults to fixed dormitories while keeping both autofill choices available', async () => {
+    const user = userEvent.setup()
+    const config = normalizeConfig(CONFIG_PRESETS['243'])
+    const onUpdate = vi.fn()
+    const view = render(
+      <ConfigEditor
+        config={config}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={onUpdate}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: '排班表写死' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /MAA 自动填满（保留技能依赖）.*推荐/ })).toHaveAttribute('aria-pressed', 'false')
+    await user.click(screen.getByRole('button', { name: '纯 MAA 自动填满（高级）' }))
+
+    const mutate = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
+    const next = cloneConfig(config)
+    mutate?.(next)
+    expect(next.dormitory_rule).toBe('maa_pure_autofill')
+    expect(next.Fiammetta?.enable).toBe(true)
+
+    view.rerender(
+      <ConfigEditor
+        config={next}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={onUpdate}
+      />,
+    )
+    expect(screen.getByRole('checkbox', { name: '菲亚梅塔' })).toBeEnabled()
+    expect(screen.getByText(/过滤相关生产组合/)).toBeInTheDocument()
+    expect(screen.getByText(/菲亚梅塔仍可执行换心情/)).toBeInTheDocument()
+  })
+
   it('displays and applies a non-uniform 24-hour MAA pattern', async () => {
     const user = userEvent.setup()
     const config = normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: [8, 8, 8] })

@@ -61,12 +61,10 @@ const stages: readonly WorkerLifecycleStage[] = [
   },
 ]
 
-export function getWorkerLifecycleStages(): readonly WorkerLifecycleStage[] {
-  return stages
-}
-
-export async function initializeWorkerLifecycleStages(): Promise<void> {
-  for (const stage of stages) await stage.initialize()
+export async function initializeWorkerLifecycleStages(
+  lifecycleStages: readonly Pick<WorkerLifecycleStage, 'initialize'>[] = stages,
+): Promise<void> {
+  await Promise.all(lifecycleStages.map((stage) => stage.initialize()))
 }
 
 export function stopWorkerLifecycleStages(): void {

@@ -16,7 +16,7 @@ import {
   type WorkerLifecycleState,
 } from './worker-health'
 import {
-  getWorkerLifecycleStages,
+  initializeWorkerLifecycleStages,
   stopWorkerLifecycleStages,
   waitForWorkerLifecycleStagesIdle,
 } from './worker-lifecycle-stages'
@@ -177,7 +177,7 @@ export async function initializeOptimizeWorkerRuntime(
 function optimizeWorkerStartupStages(): readonly OptimizeWorkerStartupStage[] {
   return [
     { name: 'database schema validation', initialize: ensureDatabaseSchema },
-    ...getWorkerLifecycleStages().map(({ name, initialize }) => ({ name, initialize })),
+    { name: 'background worker responsibilities', initialize: initializeWorkerLifecycleStages },
     { name: 'optimize job processing', initialize: initializeOptimizeJobProcessing },
     { name: 'worker runtime registration', initialize: initializeOptimizeWorkerRegistration },
   ]

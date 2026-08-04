@@ -847,8 +847,11 @@ function sumCounts(counts: Record<string, number>): number {
   return Object.values(counts).reduce((sum, value) => sum + value, 0)
 }
 
-function normalizeDormitoryRule(rule: unknown): 'fixed' | 'maa_autofill' {
+function normalizeDormitoryRule(rule: unknown): 'fixed' | 'maa_autofill' | 'maa_pure_autofill' {
   const ruleText = String(rule ?? 'fixed').trim().toLowerCase()
+  if (['maa_pure_autofill', 'maa-pure-autofill', 'pure_autofill', 'pure-autofill', '纯maa自动填满', '纯自动填满'].includes(ruleText)) {
+    return 'maa_pure_autofill'
+  }
   return ['maa_autofill', 'maa-autofill', 'autofill', 'auto', 'maa自动填满', '自动填满'].includes(ruleText)
     ? 'maa_autofill'
     : 'fixed'

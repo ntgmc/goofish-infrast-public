@@ -110,7 +110,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_009: "排班表写死",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_010: "MAA 自动填满",
+  components_ConfigEditor_010: "MAA 自动填满（保留技能依赖）",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_011: "单次重置卡",
   // src/components/ConfigEditor.tsx
@@ -224,7 +224,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_065: "游戏内轮换不生成 MAA 排班 JSON，宿舍规则不参与导出。",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_066: "导出的 MAA JSON 不写死宿舍干员，宿舍由 MAA 自动填满；心情仍按自动填满估算。",
+  components_ConfigEditor_066: "导出的 MAA JSON 仅固定生产技能必需的宿舍干员，其余空位由 MAA 自动填满；可保留依赖宿舍的高效组合。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_067: "导出的 MAA JSON 会固定宿舍干员，和当前行为一致。",
   // src/components/ConfigEditor.tsx
@@ -283,6 +283,12 @@ export const commonCopy = {
   components_ConfigEditor_094: "暂不支持 2 发电站。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_095: "未安装或不想安装 MAA？可生成 MAA 排班表后，手动在游戏内设置队列，再定时执行全部轮换。",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_096: "推荐",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_097: "纯 MAA 自动填满（高级）",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_098: "导出的 MAA JSON 不指定生产技能依赖的宿舍干员，并过滤相关生产组合；可能损失部分产能。菲亚梅塔仍可执行换心情，完成后由 MAA 自动填入宿舍。",
   // src/components/InputNumber.tsx
   components_InputNumber_001: "减少",
   // src/components/InputNumber.tsx
@@ -524,7 +530,7 @@ export const commonCopy = {
   // src/lib/workspace-history.ts
   lib_workspace_history_008: "排班表写死",
   // src/lib/workspace-history.ts
-  lib_workspace_history_009: "MAA 自动填满",
+  lib_workspace_history_009: "MAA 自动填满（保留技能依赖）",
   // src/lib/workspace-history.ts
   lib_workspace_history_010: "换班前",
   // src/lib/workspace-history.ts
@@ -587,6 +593,8 @@ export const commonCopy = {
   lib_workspace_history_039: "未指定目标",
   // src/lib/workspace-history.ts
   lib_workspace_history_040: "未设置",
+  // src/lib/workspace-history.ts
+  lib_workspace_history_041: "纯 MAA 自动填满",
   // src/pages/AdminSetupPage.tsx
   pages_AdminSetupPage_001: "创建失败",
   // src/pages/AdminSetupPage.tsx
