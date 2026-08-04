@@ -5,6 +5,7 @@ import {
   type OptimizeExecutionContext,
   type OptimizerPort,
 } from './optimizer-port'
+import { APP_BUILD_META } from '../../../src/lib/build-meta'
 
 const context: OptimizeExecutionContext = {
   jobId: 'job-1',
@@ -98,6 +99,17 @@ describe('optimization job dispatcher', () => {
           }],
         },
       }],
+    }
+    const port = fakePort({ executeSchedule: vi.fn(async () => result) })
+
+    await expect(executeOptimizationJobWithPort(job(schedulePayload()), context, port))
+      .resolves.toEqual(result)
+  })
+
+  it('accepts the current generated application build metadata', async () => {
+    const result = {
+      ...scheduleResult(),
+      build_meta: { ...APP_BUILD_META },
     }
     const port = fakePort({ executeSchedule: vi.fn(async () => result) })
 
