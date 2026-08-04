@@ -1,5 +1,6 @@
 import type { AuthSuccessResponse } from '../../lib/types'
 import { apiJson } from '../../lib/api-client'
+import { copy } from '../../copy/index'
 
 type ProfileRedemptionResponse =
   | { redemption_type: 'profile'; auth: AuthSuccessResponse }
@@ -21,7 +22,7 @@ export async function upgradeProfileWithCdk(options: {
     fallbackMessage: options.fallbackMessage,
   })
   if (response.redemption_type !== 'profile') {
-    throw new Error('当前 CDK 不能用于升级档案。')
+    throw new Error(copy.tools.pages_tool_profile_redemption_001)
   }
   return response.auth
 }

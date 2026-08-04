@@ -499,4 +499,32 @@ export const domainCopy = {
   lib_scenario_comparison_038: "MAA 自动非固定",
   // src/lib/scenario-comparison.ts
   lib_scenario_comparison_039: "轮换 12h×2",
+  // src/lib/scenario-comparison-validation.ts
+  lib_scenario_comparison_validation_001: "布局不能重复。",
+  // src/lib/scenario-comparison-validation.ts
+  lib_scenario_comparison_validation_002: "MAA 班次不能重复。",
+  // src/lib/scenario-comparison-validation.ts
+  lib_scenario_comparison_validation_003: "无人机策略不能重复。",
+  // src/lib/scenario-comparison-validation.ts
+  lib_scenario_comparison_validation_004: "同一布局的产品方案不能重复。",
+  // src/lib/scenario-comparison-validation.ts
+  lib_scenario_comparison_validation_005: (maximum: number) => `情景原始组合不能超过 ${maximum} 个。`,
+  // src/lib/scenario-comparison-validation.ts
+  lib_scenario_comparison_validation_006: "情景 ID 不能重复。",
+  // src/lib/scenario-comparison-validation.ts
+  lib_scenario_comparison_validation_007: "Pareto 情景 ID 不能重复。",
+  // src/lib/scenario-comparison-validation.ts
+  lib_scenario_comparison_validation_008: (field: string) => `${field} 与 points 不一致。`,
+  // src/lib/scenario-comparison-validation.ts
+  lib_scenario_comparison_validation_009: "Pareto 汇总与 points 标记不一致。",
+  // src/lib/scenario-comparison-validation.ts
+  lib_scenario_comparison_validation_010: "成功情景必须包含计算指标。",
+  // src/lib/scenario-comparison-validation.ts
+  lib_scenario_comparison_validation_011: "Pareto 点必须是已复算的成功情景。",
+  // src/lib/workspace-validation.ts
+  lib_workspace_validation_001: "产物类型不能超过 16 种。",
+  // src/lib/workspace-validation.ts
+  lib_workspace_validation_002: "干员 ID 不能重复。",
+  // src/lib/workspace-validation.ts
+  lib_workspace_validation_003: (maximum: number) => `精英覆盖不能超过 ${maximum} 项。`,
 } as const

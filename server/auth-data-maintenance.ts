@@ -187,17 +187,16 @@ async function persistExpiredFreePreviewWorkspaces(now: Date): Promise<number> {
             set operators_json = $2::jsonb,
                 config_json = $3::jsonb,
                 elite_overrides_json = $4::jsonb,
-                last_result_json = $5::jsonb,
-                record_json = $6::jsonb,
-                updated_at = $7
+                last_result_json = null,
+                record_json = $5::jsonb,
+                updated_at = $6
           where profile_id = $1
-            and coalesce(record_json->>'free_preview_normalized_activity_id', '') <> $8`,
+            and coalesce(record_json->>'free_preview_normalized_activity_id', '') <> $7`,
         [
           next.profile_id,
           JSON.stringify(next.operators),
           JSON.stringify(next.config),
           JSON.stringify(next.elite_overrides),
-          JSON.stringify(next.last_result),
           JSON.stringify(next),
           next.updated_at,
           FREE_PREVIEW_LIMITED_CDK_ACTIVITY.id,

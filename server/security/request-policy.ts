@@ -302,6 +302,9 @@ export const requestSchemas = {
     announcements: z.array(z.unknown()).max(100),
     expected_revision: expectedRevisionSchema,
   }),
+  releaseConfirmation: strict({
+    version: z.string().trim().min(1).max(120).regex(/^[0-9A-Za-z][0-9A-Za-z._+-]*$/),
+  }),
   usageStats: strict({
     event: shortString(64),
     announcement_id: optionalString(120),
@@ -620,7 +623,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/admin/invitation-settlements', route({ POST: json('admin', requestSchemas.adminInvitationSettlement) })],
   ['/api/admin/optimization', route({ GET: none(), POST: json('admin', requestSchemas.adminOptimization) }, ['view', 'status', 'limit', 'id'])],
   ['/api/admin/session', route({ GET: none(), POST: json('auth', requestSchemas.adminSession), DELETE: none() })],
-  ['/api/admin/users', route({ GET: none(), POST: json('admin', requestSchemas.adminUserCreate), PATCH: json('admin', requestSchemas.adminUserPatch), DELETE: json('admin', requestSchemas.adminUserDelete) }, ['user_id', 'profile_id', 'include', 'page', 'page_size', 'search'])],
+  ['/api/admin/users', route({ GET: none(), POST: json('admin', requestSchemas.adminUserCreate), PATCH: json('admin', requestSchemas.adminUserPatch), DELETE: json('admin', requestSchemas.adminUserDelete) }, ['user_id', 'profile_id', 'include', 'page', 'page_size', 'profile_page', 'profile_page_size', 'search'])],
   ['/api/admin/balance', route({ GET: none(), POST: json('admin', requestSchemas.adminBalanceAdjust) }, ['user_id', 'cursor', 'limit'])],
   ['/api/admin/commercial', route({ GET: none(), POST: json('admin', requestSchemas.adminCommercial) }, ['user_id', 'summary'])],
   ['/api/auth/register', route({ POST: json('auth', requestSchemas.authRegister) })],
@@ -641,6 +644,8 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/data/credential/clear', route({ POST: json('standard', requestSchemas.profileId) })],
   ['/api/announcement', route({ GET: none() }, ['admin'])],
   ['/api/admin/announcement', route({ GET: none(), PUT: json('admin', requestSchemas.announcement) }, ['admin'])],
+  ['/api/integrations/qqbot/events', route({ GET: none() }, ['cursor', 'limit'])],
+  ['/api/internal/releases/confirm', route({ POST: json('standard', requestSchemas.releaseConfirmation) })],
   ['/api/usage-stats', route({ POST: json('standard', requestSchemas.usageStats) }, ['admin'])],
   ['/api/admin/usage-stats', route({ GET: none() }, ['admin', 'format', 'from', 'to', 'range'])],
   ['/api/depot-value', route({
@@ -674,6 +679,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/balance/redeem', route({ POST: json('standard', requestSchemas.balanceRedeem) })],
   ['/api/user/onboarding-tasks', route({ GET: none() })],
   ['/api/user/onboarding-tasks/claim', route({ POST: json('standard', requestSchemas.onboardingTaskClaim) })],
+  ['/api/user/results', route({ GET: none() }, ['profile_id', 'scope', 'cursor', 'limit'])],
   ['/api/user/maa-export', route({ POST: json('standard', requestSchemas.maaExport) })],
   ['/api/user/full-result-export', route({ POST: json('standard', requestSchemas.fullResultExport) })],
   ['/api/user/result-archive', route({ POST: json('standard', requestSchemas.resultArchive) })],
@@ -692,6 +698,17 @@ export function getRoutePolicy(pathname: string): RoutePolicy | null {
   if (exact) return exact
   if (/^\/api\/user\/onboarding-tasks\/(welcome_inventory|bind_skland|first_main_schedule)\/claim$/.test(pathname)) {
     return route({ POST: json('standard', requestSchemas.onboardingTaskClaim) })
+  }
+  if (pathname.startsWith('/api/user/results/')) {
+    const encoded = pathname.slice('/api/user/results/'.length)
+    if (!encoded || encoded.includes('/')) return null
+    try {
+      const resultId = decodeURIComponent(encoded)
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(resultId)) return null
+    } catch {
+      return null
+    }
+    return route({ GET: none() }, ['profile_id'])
   }
   if (!pathname.startsWith('/api/optimization/jobs/')) return null
   const suffix = pathname.slice('/api/optimization/jobs/'.length)
@@ -714,6 +731,7 @@ export function getDeclaredApiPolicyRoutes(): string[] {
   return [
     ...ROUTE_POLICIES.keys(),
     '/api/user/onboarding-tasks/:code/claim',
+    '/api/user/results/:resultId',
     '/api/optimization/jobs/:jobId',
     '/api/optimization/jobs/:jobId/cancel',
   ].sort()

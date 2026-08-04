@@ -1,12 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_BODY_LENGTH,
+  normalizeAnnouncementSummary,
   normalizeAnnouncementData,
   validateAnnouncementBanner,
   validateAnnouncementList,
 } from './announcement'
 
 describe('announcement validation', () => {
+  it('normalizes Markdown into a bounded plain-text notification summary', () => {
+    const summary = normalizeAnnouncementSummary(`# 标题\n\n[详情](https://example.test) **加粗**\n${'文'.repeat(600)}`)
+
+    expect(summary).toMatch(/^标题 详情 加粗/)
+    expect(Array.from(summary ?? '')).toHaveLength(500)
+  })
+
   it('accepts a 5,000-character Markdown body without changing it', () => {
     const prefix = '# 更新\n\n'
     const body = `${prefix}${'a'.repeat(MAX_BODY_LENGTH - prefix.length)}`

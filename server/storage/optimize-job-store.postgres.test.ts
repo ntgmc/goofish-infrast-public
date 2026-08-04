@@ -27,6 +27,11 @@ import { issueMeteredScheduleQuote } from './metered-billing-store'
 import { recordOperatorFingerprintInTransaction } from './cdk-store'
 import { getItemBalance, grantItem } from './inventory-store'
 import { SettingsConflictError } from './settings-conflict'
+import {
+  getLatestProfileOptimizationResult,
+  insertProfileOptimizationResultInTransaction,
+  listProfileOptimizationResults,
+} from './optimization-result-store'
 
 let container: PostgreSqlContainer
 const legacyJobId = randomUUID()
@@ -873,19 +878,17 @@ describe('PostgreSQL optimization job admission', () => {
       "update entitlement_ledger set status = 'consumed', settled_at = now() where reference_type = 'optimization_job' and reference_id = $1",
       [admitted.job.id],
     )
-    await updateProfileWorkspaceAtomically(profileId, (current) => ({
-      ...(current ?? emptyWorkspace(profileId)),
-      result_history: [{
+    await withTransaction(async (client) => {
+      await insertProfileOptimizationResultInTransaction(client, profileId, {
         id: admitted.job.id,
         name: '首次免费方案',
         created_at: createdAt,
-        config: null,
-        result: {} as never,
+        config: formalConfig(),
+        result: formalScheduleResult('首次免费方案'),
         operator_count: 1,
         source: 'generated',
-      }],
-      updated_at: createdAt,
-    }))
+      }, 5)
+    })
 
     const confirmed = await confirmFreeScheduleEntitlement(profileId, admitted.job.id, createdAt)
 
@@ -1409,7 +1412,11 @@ describe('PostgreSQL optimization job admission', () => {
       ...emptyWorkspace(profileId),
       operators: formalOperators(),
       config: formalConfig(),
-      result_history: existingHistory,
+    })
+    await withTransaction(async (client) => {
+      for (const item of [...existingHistory].reverse()) {
+        await insertProfileOptimizationResultInTransaction(client, profileId, item, 6)
+      }
     })
     await query(
       `insert into profile_entitlement_balances (profile_id, entitlement_type, units, updated_at)
@@ -1435,9 +1442,9 @@ describe('PostgreSQL optimization job admission', () => {
       formalScheduleResult('new-result'),
     )).resolves.toBe(true)
 
-    const workspace = await getWorkspace(profileId)
-    expect(workspace?.result_history).toHaveLength(6)
-    expect(workspace?.result_history.map((item) => item.id)).toEqual([
+    const history = await listProfileOptimizationResults(profileId, 'active', { limit: 50 })
+    expect(history.items).toHaveLength(6)
+    expect(history.items.map((item) => item.id)).toEqual([
       admitted.job.id,
       'history-0',
       'history-1',
@@ -1445,11 +1452,14 @@ describe('PostgreSQL optimization job admission', () => {
       'history-3',
       'history-4',
     ])
-    expect(workspace?.result_history[0]).toMatchObject({
+    expect(history.items[0]).toMatchObject({
       id: admitted.job.id,
       job_id: admitted.job.id,
     })
-    expect(workspace?.last_result).toMatchObject({ title: 'new-result' })
+    await expect(getLatestProfileOptimizationResult(profileId)).resolves.toMatchObject({
+      id: admitted.job.id,
+      result: { title: 'new-result' },
+    })
     expect((await query<{ effect_type: string; status: string | null }>(
       `select effect_type, metadata_json->>'status' as status
        from optimization_job_effects where job_id = $1 order by effect_type`,
@@ -1465,7 +1475,7 @@ describe('PostgreSQL optimization job admission', () => {
       'schedule-success-lock',
       formalScheduleResult('duplicate'),
     )).resolves.toBe(false)
-    expect((await getWorkspace(profileId))?.result_history).toHaveLength(6)
+    expect((await listProfileOptimizationResults(profileId, 'active', { limit: 50 })).items).toHaveLength(6)
   })
 
   it('rejects an invalid formal optimizer result without charging or persisting success effects', async () => {
@@ -1516,7 +1526,7 @@ describe('PostgreSQL optimization job admission', () => {
       'select count(*)::text as count from optimization_job_effects where job_id = $1',
       [admitted.job.id],
     )).rows[0]?.count).toBe('0')
-    expect((await getWorkspace(profileId))?.result_history ?? []).toHaveLength(0)
+    expect((await listProfileOptimizationResults(profileId, 'active')).items).toHaveLength(0)
   })
 
   it('commits and rolls back workspace and operator fingerprint updates together', async () => {

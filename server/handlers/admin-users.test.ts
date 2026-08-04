@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   getUserById: vi.fn(),
   listProfilesForUser: vi.fn(),
   listProfileWorkspaces: vi.fn(),
+  listOptimizationResultsForProfiles: vi.fn(),
+  getLatestProfileOptimizationResultSummaries: vi.fn(),
   resetUserPasswordByAdmin: vi.fn(),
   saveUserAccountByAdmin: vi.fn(),
   saveUserProfileByAdmin: vi.fn(),
@@ -59,6 +61,10 @@ vi.mock('../storage/user-store', () => ({
 vi.mock('../storage/cdk-store', () => ({ listCdkRecordsByKeys: mocks.listCdkRecordsByKeys }))
 vi.mock('../storage/admin-operation-audit-store', () => ({
   recordAdminOperationAudit: mocks.recordAdminOperationAudit,
+}))
+vi.mock('../storage/optimization-result-store', () => ({
+  listOptimizationResultsForProfiles: mocks.listOptimizationResultsForProfiles,
+  getLatestProfileOptimizationResultSummaries: mocks.getLatestProfileOptimizationResultSummaries,
 }))
 
 vi.mock('./user-auth', () => ({ resetUserPasswordByAdmin: mocks.resetUserPasswordByAdmin }))
@@ -126,6 +132,8 @@ beforeEach(() => {
     mocks.saveUserProfileByAdmin.mock.calls.at(-1)?.[0] ?? profile,
   ])
   mocks.listProfileWorkspaces.mockResolvedValue(new Map())
+  mocks.listOptimizationResultsForProfiles.mockResolvedValue(new Map())
+  mocks.getLatestProfileOptimizationResultSummaries.mockResolvedValue(new Map())
 })
 
 describe('admin user workspace export', () => {
@@ -146,16 +154,36 @@ describe('admin user workspace export', () => {
       operators: [{ name: 'Amiya', own: true }],
       config: { desc: '243 基建', layout: '243' },
       elite_overrides: { Amiya: 2 },
-      last_result: { title: '最近排班' },
       saved_configs: [{ id: 'config-1', name: '243', config: { desc: '243' } }],
-      result_history: [{ id: 'history-1', name: '历史排班', result: { title: '历史' } }],
-      archived_results: [{ id: 'archive-1', name: '封存排班', result: { title: '封存' } }],
       free_schedule_entitlement: { revision_count: 2 },
       free_preview_normalized_activity_id: 'internal-activity-marker',
       updated_at: '2026-08-03T00:00:00.000Z',
     }
+    const activeResult = {
+      id: 'history-1',
+      name: '历史排班',
+      created_at: '2026-07-31T00:00:00.000Z',
+      config: null,
+      result: { title: '历史' },
+      operator_count: 12,
+      source: 'generated' as const,
+      archived_at: null,
+    }
+    const archivedResult = {
+      id: 'archive-1',
+      name: '封存排班',
+      created_at: '2026-07-30T00:00:00.000Z',
+      config: null,
+      result: { title: '封存' },
+      operator_count: 10,
+      source: 'legacy' as const,
+      archived_at: '2026-08-01T00:00:00.000Z',
+    }
     mocks.listProfilesForUser.mockResolvedValue([profile, secondProfile])
     mocks.listProfileWorkspaces.mockResolvedValue(new Map([[profile.id, workspace]]))
+    mocks.listOptimizationResultsForProfiles.mockResolvedValue(new Map([
+      [profile.id, [activeResult, archivedResult]],
+    ]))
 
     const response = await adminUsersHandler(workspaceExportRequest())
     const body = await response.json() as AdminUserWorkspaceExportV1
@@ -169,15 +197,33 @@ describe('admin user workspace export', () => {
     expect(new Date(body.exported_at).toISOString()).toBe(body.exported_at)
     expect(mocks.listProfileWorkspaces).toHaveBeenCalledOnce()
     expect(mocks.listProfileWorkspaces).toHaveBeenCalledWith([profile.id, secondProfile.id])
+    expect(mocks.listOptimizationResultsForProfiles).toHaveBeenCalledOnce()
+    expect(mocks.listOptimizationResultsForProfiles).toHaveBeenCalledWith([profile.id, secondProfile.id])
     expect(body.profiles.map((item) => item.id)).toEqual([profile.id, secondProfile.id])
     expect(body.profiles[0]?.workspace).toMatchObject({
       operators: workspace.operators,
       config: workspace.config,
       elite_overrides: workspace.elite_overrides,
-      last_result: workspace.last_result,
+      last_result: activeResult.result,
       saved_configs: workspace.saved_configs,
-      result_history: workspace.result_history,
-      archived_results: workspace.archived_results,
+      result_history: [{
+        id: activeResult.id,
+        name: activeResult.name,
+        created_at: activeResult.created_at,
+        config: activeResult.config,
+        result: activeResult.result,
+        operator_count: activeResult.operator_count,
+        source: activeResult.source,
+      }],
+      archived_results: [{
+        id: archivedResult.id,
+        name: archivedResult.name,
+        created_at: archivedResult.created_at,
+        config: archivedResult.config,
+        result: archivedResult.result,
+        operator_count: archivedResult.operator_count,
+        source: archivedResult.source,
+      }],
       free_schedule_entitlement: workspace.free_schedule_entitlement,
       updated_at: workspace.updated_at,
     })

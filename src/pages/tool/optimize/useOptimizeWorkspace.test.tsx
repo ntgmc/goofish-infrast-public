@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { LicenseConfig, UserWorkspace, WorkspaceResultHistoryItem } from '../../../lib/types'
+import type { LicenseConfig, UserWorkspace, WorkspaceResultHistorySummary } from '../../../lib/types'
 import { useOptimizeWorkspace } from './useOptimizeWorkspace'
 
 const mocks = vi.hoisted(() => ({ apiJson: vi.fn() }))
@@ -19,10 +19,12 @@ describe('useOptimizeWorkspace history mutations', () => {
       operators: [],
       config: null,
       elite_overrides: {},
-      last_result: null,
+      latest_result: null,
       saved_configs: [],
       result_history: [],
       archived_results: [historyItem()],
+      result_history_next_cursor: null,
+      archived_results_next_cursor: null,
       free_schedule_entitlement: null,
       updated_at: '2026-08-01T00:00:00.000Z',
     } satisfies UserWorkspace
@@ -60,14 +62,16 @@ describe('useOptimizeWorkspace history mutations', () => {
   })
 })
 
-function historyItem(): WorkspaceResultHistoryItem {
+function historyItem(): WorkspaceResultHistorySummary {
   return {
     id: 'result-1',
     name: '历史方案',
     created_at: '2026-08-01T00:00:00.000Z',
-    config: null,
-    result: {} as never,
     operator_count: 1,
     source: 'generated',
+    archived: false,
+    schedule_mode: 'maa',
+    maa_exportable: true,
+    has_config: false,
   }
 }

@@ -14,6 +14,8 @@ import adminItemsHandler from './handlers/admin-items'
 import adminBalanceHandler from './handlers/admin-balance'
 import adminCommercialHandler from './handlers/admin-commercial'
 import announcementHandler from './handlers/announcement'
+import websiteEventsHandler from './handlers/website-events'
+import releaseConfirmationHandler from './handlers/release-confirmation'
 import authHandler from './handlers/auth'
 import { EFFICIENCY_DATA, EFFICIENCY_DATA_METADATA } from './handlers/data'
 import depotValueHandler from './handlers/depot-value'
@@ -83,6 +85,8 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/data/credential/clear', accountDataHandler as unknown as ApiHandler],
   ['/api/announcement', announcementHandler as unknown as ApiHandler],
   ['/api/admin/announcement', announcementHandler as unknown as ApiHandler],
+  ['/api/integrations/qqbot/events', websiteEventsHandler as unknown as ApiHandler],
+  ['/api/internal/releases/confirm', releaseConfirmationHandler as unknown as ApiHandler],
   ['/api/usage-stats', usageStatsHandler as unknown as ApiHandler],
   ['/api/admin/usage-stats', usageStatsHandler as unknown as ApiHandler],
   ['/api/depot-value', depotValueHandler as unknown as ApiHandler],
@@ -125,6 +129,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/balance/redeem', userBalanceHandler as unknown as ApiHandler],
   ['/api/user/onboarding-tasks', userInventoryHandler as unknown as ApiHandler],
   ['/api/user/onboarding-tasks/claim', userInventoryHandler as unknown as ApiHandler],
+  ['/api/user/results', userResultsHandler as unknown as ApiHandler],
   ['/api/user/maa-export', userResultsHandler as unknown as ApiHandler],
   ['/api/user/full-result-export', userResultsHandler as unknown as ApiHandler],
   ['/api/user/result-archive', userResultsHandler as unknown as ApiHandler],
@@ -150,6 +155,8 @@ async function dispatchRequest(req: Request): Promise<Response> {
 
   const handler = /^\/api\/user\/onboarding-tasks\/(welcome_inventory|bind_skland|first_main_schedule)\/claim$/.test(url.pathname)
     ? userInventoryHandler as unknown as ApiHandler
+    : url.pathname.startsWith('/api/user/results/')
+    ? userResultsHandler as unknown as ApiHandler
     : url.pathname.startsWith('/api/optimization/jobs/')
     ? optimizationHandler as unknown as ApiHandler
     : ROUTES.get(url.pathname)
@@ -166,7 +173,7 @@ async function dispatchRequest(req: Request): Promise<Response> {
 }
 
 export function getRegisteredApiRoutes(): string[] {
-  return ['/api/health', '/api/health/live', '/api/health/ready', '/api/data', '/api/user/onboarding-tasks/:code/claim', '/api/optimization/jobs/:jobId', '/api/optimization/jobs/:jobId/cancel', ...ROUTES.keys()].sort()
+  return ['/api/health', '/api/health/live', '/api/health/ready', '/api/data', '/api/user/onboarding-tasks/:code/claim', '/api/user/results/:resultId', '/api/optimization/jobs/:jobId', '/api/optimization/jobs/:jobId/cancel', ...ROUTES.keys()].sort()
 }
 
 function handleLiveness(): Response {

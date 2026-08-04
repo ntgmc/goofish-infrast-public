@@ -7,7 +7,6 @@ import {
   getProfileWorkspace,
   isDepotValueProfile,
   isFreePreviewProfile,
-  normalizeProfileKind,
   toPublicWorkspace,
   updateProfileWorkspaceAtomically,
   updateProfileWorkspaceInTransaction,
@@ -35,6 +34,7 @@ import { hasDatabaseUrl, withTransaction } from '../storage/postgres'
 import { recordAuthenticatedRequestBehaviorEvent, recordOperatorDataAnomalyBehaviorEvent } from '../behavior-risk/service'
 import { confirmFreeScheduleEntitlement, FreeScheduleConfirmationError } from '../storage/reorder-admission'
 import { recordOperatorFingerprintInTransaction } from '../storage/cdk-store'
+import { getWorkspaceOptimizationResultOverview } from '../storage/optimization-result-store'
 
 export default async (req: Request): Promise<Response> => {
 
@@ -51,14 +51,14 @@ export default async (req: Request): Promise<Response> => {
       if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案没有排班工作区。' }, 403)
       const authorization = await resolveProfileAuthorization(profile)
       if (!authorization.ok) return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
-      const capacityLimits = await getWorkspaceCapacityLimits(profile.id)
-      const workspace = await getProfileWorkspace(profile.id)
+      const [capacityLimits, workspace, overview] = await Promise.all([
+        getWorkspaceCapacityLimits(profile.id),
+        getProfileWorkspace(profile.id),
+        getWorkspaceOptimizationResultOverview(profile.id),
+      ])
       return jsonResponse({
         ...(await buildAuthPayload(auth.user, profile.id)),
-        workspace: toPublicWorkspace(workspace, capacityLimits, {
-          kind: normalizeProfileKind(profile),
-          permission: authorization.permission,
-        }),
+        workspace: toPublicWorkspace(workspace, capacityLimits, overview),
       })
     }
 
@@ -94,13 +94,11 @@ export default async (req: Request): Promise<Response> => {
       if (!isRestrictedPreview) return jsonResponse({ error: '当前档案不需要确认免费方案。' }, 403)
       if (!('result_history_id' in body)) return jsonResponse({ error: '缺少 result_history_id。' }, 400)
       const next = await confirmFreeScheduleEntitlement(profile.id, body.result_history_id)
+      const overview = await getWorkspaceOptimizationResultOverview(profile.id)
       await recordAuthenticatedRequestBehaviorEvent({ req, auth, eventType: 'workspace_save', profileId: profile.id })
       return jsonResponse({
         ...(await buildAuthPayload(auth.user, profile.id)),
-        workspace: toPublicWorkspace(next, capacityLimits, {
-          kind: normalizeProfileKind(profile),
-          permission: authorization.permission,
-        }),
+        workspace: toPublicWorkspace(next, capacityLimits, overview),
       })
     }
 
@@ -169,7 +167,7 @@ export default async (req: Request): Promise<Response> => {
       const workspace: UserWorkspaceRecord = { ...(currentWorkspace ?? emptyWorkspace(profile.id)) }
       if ('operators' in body) workspace.operators = operatorsValue ?? null
       if ('config' in body) workspace.config = configValue ?? null
-      if ('elite_overrides' in body) {
+      if ('elite_overrides' in body && body.elite_overrides) {
         const operators = 'operators' in body ? operatorsValue ?? null : workspace.operators
         workspace.elite_overrides = validateEliteOverridesForOperators(body.elite_overrides, operators)
       }
@@ -177,7 +175,6 @@ export default async (req: Request): Promise<Response> => {
         const savedConfigResult = applySavedConfigAction(workspace, body.saved_config_action, effectivePermission, isRestrictedPreview, capacityLimits.plan)
         if (!savedConfigResult.ok) throw new WorkspaceMutationError(savedConfigResult.message, savedConfigResult.status ?? 400)
       }
-      if ('operators' in body) workspace.last_result = null
       workspace.updated_at = new Date().toISOString()
       return workspace
     }

@@ -2,6 +2,7 @@ export const personalUseCopy = {
   declaration_title: '《个人使用声明》',
   declaration_version: '版本 V1.1 / 生效日期：2026-07-31',
   confirmation_title: '个人使用确认',
+  confirmation_effective_date: '生效日期：',
   confirmation_intro: '本人确认，本次及后续使用本服务所生成的全部内容（包括排班方案、分析报告、可执行文件等），仅服务于本人绑定的游戏账号，用于个人非商业参考。',
   confirmation_commitment: '本人承诺不会以收费接单、代注册、代领取、代生成、批量导出、转售文件或其他商业方式，向任何第三方提供本服务的访问资格或生成成果。',
   confirmation_consequence: '违反上述承诺时，本人理解平台有权限制相关权益。',

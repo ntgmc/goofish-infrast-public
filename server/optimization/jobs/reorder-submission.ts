@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { CreateReorderCheckRequest } from '../../../src/lib/optimization-contracts'
+import type { WorkspaceResultHistoryExportItem, WorkspaceResultHistoryItem } from '../../../src/lib/types'
 import { resolveConfigForPermission, resolveFreePreviewConfig } from '../../handlers/license-utils'
 import { resolveProfileAuthorization } from '../../handlers/profile-authorization'
 import { requireUserSession } from '../../handlers/user-auth'
@@ -11,6 +12,10 @@ import { requestSchemas } from '../../security/request-policy'
 import { getValidatedJson, stableJsonStringify } from '../../security/request-validation'
 import { getOptimizeJobStore, isOptimizeJobAdmissionError } from '../../storage/optimize-job-store'
 import { emptyWorkspace, getProfileForUser, getWorkspace, isFreePreviewProfile } from '../../storage/user-store'
+import {
+  getLatestProfileOptimizationResult,
+  getProfileOptimizationResult,
+} from '../../storage/optimization-result-store'
 import { getReorderCheckQuota } from './entitlements'
 import { buildOptimizeJobAccepted, getOptimizeEstimateBucket, resolveOptimizeDurationEstimate } from './job-status'
 import { jsonResponse, sanitizeConfigForPublicOptimize } from './http-core'
@@ -85,7 +90,11 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
       await recordReorderCheckEvent('failure', 'validation_failed', startedAt, profileIdForUsage)
       return jsonResponse({ error: '暂无可用于重排检测的森空岛干员数据。' }, 409)
     }
-    const baseline = resolveBaselineHistoryItem(workspace.result_history, body.baselineHistoryId)
+    const storedBaselineItem = typeof body.baselineHistoryId === 'string' && body.baselineHistoryId.trim()
+      ? await getProfileOptimizationResult(activeProfileId, body.baselineHistoryId.trim())
+      : await getLatestProfileOptimizationResult(activeProfileId)
+    const baselineItem = storedBaselineItem ? toReorderJobBaseline(storedBaselineItem) : null
+    const baseline = resolveBaselineHistoryItem(baselineItem ? [baselineItem] : [], body.baselineHistoryId)
     if (!baseline.ok) {
       await recordReorderCheckEvent('failure', 'validation_failed', startedAt, profileIdForUsage)
       return jsonResponse({ error: baseline.message }, baseline.status)
@@ -160,6 +169,19 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
     console.error('reorder-check enqueue error:', error)
     await recordReorderCheckEvent('failure', 'optimizer_runtime_error', startedAt, profileIdForUsage)
     return jsonResponse({ error: 'Internal server error' }, 500)
+  }
+}
+
+function toReorderJobBaseline(item: WorkspaceResultHistoryExportItem): WorkspaceResultHistoryItem {
+  return {
+    id: item.id,
+    ...(item.job_id ? { job_id: item.job_id } : {}),
+    name: item.name,
+    created_at: item.created_at,
+    config: item.config,
+    result: item.result,
+    operator_count: item.operator_count,
+    source: item.source,
   }
 }
 

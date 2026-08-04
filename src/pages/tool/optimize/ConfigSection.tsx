@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../../../lib/config'
 import type { ConfigDiffItem } from '../../../lib/workspace-history'
-import type { LicenseConfig, PermissionMode, WorkspaceResultHistoryItem } from '../../../lib/types'
+import type { LicenseConfig, PermissionMode, WorkspaceResultHistorySummary } from '../../../lib/types'
 import type { ConfigSyncStatus } from '../useToolSession'
 import { ResultFallback } from './feedback'
 import type { ValidationState } from './types'
@@ -33,7 +33,7 @@ export default function ConfigSection({
   configPresetLabel: string
   configValidation: ValidationState
   configSyncStatus: ConfigSyncStatus
-  latestResult: WorkspaceResultHistoryItem | null
+  latestResult: WorkspaceResultHistorySummary | null
   diffRows: ConfigDiffItem[]
   updateConfig: (mutate: (config: LicenseConfig) => void) => void
   resetConfig: () => void

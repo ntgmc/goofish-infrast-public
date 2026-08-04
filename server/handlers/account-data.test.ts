@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   getUserById: vi.fn(),
   listProfilesForUser: vi.fn(),
   listProfileWorkspaces: vi.fn(),
+  listOptimizationResultsForProfiles: vi.fn(),
+  toPublicWorkspace: vi.fn(),
   normalizeEmail: vi.fn(),
   PasswordWorkCapacityError: class PasswordWorkCapacityError extends Error {},
   query: vi.fn(),
@@ -26,9 +28,13 @@ vi.mock('../storage/user-store', () => ({
   listProfilesForUser: mocks.listProfilesForUser,
   listProfileWorkspaces: mocks.listProfileWorkspaces,
   saveUserProfile: mocks.saveUserProfile,
+  toPublicWorkspace: mocks.toPublicWorkspace,
 }))
 
 vi.mock('../storage/postgres', () => ({ query: mocks.query }))
+vi.mock('../storage/optimization-result-store', () => ({
+  listOptimizationResultsForProfiles: mocks.listOptimizationResultsForProfiles,
+}))
 vi.mock('../storage/notification-store', () => ({ exportUserNotifications: mocks.exportUserNotifications }))
 vi.mock('../storage/personal-use-declaration-store', () => ({
   listPersonalUseDeclarationAcceptancesForUser: mocks.listPersonalUseDeclarationAcceptancesForUser,
@@ -70,6 +76,15 @@ beforeEach(() => {
   mocks.query.mockResolvedValue({ rows: [] })
   mocks.listProfilesForUser.mockResolvedValue([])
   mocks.listProfileWorkspaces.mockResolvedValue(new Map())
+  mocks.listOptimizationResultsForProfiles.mockResolvedValue(new Map())
+  mocks.toPublicWorkspace.mockImplementation((workspace: Record<string, unknown>) => ({
+    profile_id: workspace.profile_id,
+    latest_result: null,
+    result_history: [],
+    archived_results: [],
+    result_history_next_cursor: null,
+    archived_results_next_cursor: null,
+  }))
   mocks.getUserById.mockResolvedValue(null)
   mocks.listPersonalUseDeclarationAcceptancesForUser.mockResolvedValue([])
   mocks.listPersonalUseDeclarationUsageEventsForUser.mockResolvedValue([])
@@ -176,6 +191,19 @@ describe('account data Skland controls', () => {
       ['profile-2', { profile_id: 'profile-2' }],
       ['profile-1', { profile_id: 'profile-1' }],
     ]))
+    const optimizationResult = {
+      id: 'result-1',
+      name: '历史排班',
+      created_at: '2026-07-31T00:00:00.000Z',
+      config: null,
+      result: { title: '历史排班' },
+      operator_count: 12,
+      source: 'generated',
+      archived_at: null,
+    }
+    mocks.listOptimizationResultsForProfiles.mockResolvedValue(new Map([
+      ['profile-1', [optimizationResult]],
+    ]))
     mocks.query.mockImplementation(async (statement: string) => {
       if (statement.includes('from optimization_submissions')) {
         return { rows: [{ id: 'submission-1', owner_key: 'reorder-job:profile-1' }] }
@@ -195,8 +223,11 @@ describe('account data Skland controls', () => {
     expect(response.status).toBe(200)
     expect(mocks.listProfileWorkspaces).toHaveBeenCalledOnce()
     expect(mocks.listProfileWorkspaces).toHaveBeenCalledWith(['profile-1', 'profile-2'])
+    expect(mocks.listOptimizationResultsForProfiles).toHaveBeenCalledOnce()
+    expect(mocks.listOptimizationResultsForProfiles).toHaveBeenCalledWith(['profile-1', 'profile-2'])
     expect(body.workspaces.map((workspace: { profile_id: string }) => workspace.profile_id))
       .toEqual(['profile-1', 'profile-2'])
+    expect(body.optimization_results).toEqual([optimizationResult])
     expect(body.optimization_submissions).toEqual([
       { id: 'submission-1', owner_key: 'reorder-job:profile-1' },
     ])

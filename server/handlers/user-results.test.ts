@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { FREE_PREVIEW_LIMITED_CDK_ACTIVITY } from '../free-preview-trial'
 import { InventoryError } from '../storage/inventory-store'
 import { PersonalUseDeclarationRequiredError } from '../storage/personal-use-declaration-store'
+import { OptimizationResultMutationError } from '../storage/optimization-result-store'
 import userResultsHandler from './user-results'
 
 const mocks = vi.hoisted(() => ({
@@ -10,13 +11,15 @@ const mocks = vi.hoisted(() => ({
   getProfileCapacityLimitsInTransaction: vi.fn(),
   recordPersonalUseDeclarationUsage: vi.fn(),
   getProfileForUser: vi.fn(),
-  getProfileWorkspace: vi.fn(),
   getValidatedJson: vi.fn(),
   recordTrackedExportBehaviorEvent: vi.fn(),
   requireUserSession: vi.fn(),
-  emptyWorkspace: vi.fn(),
   toPublicWorkspace: vi.fn(),
   updateProfileWorkspaceInTransaction: vi.fn(),
+  getProfileOptimizationResult: vi.fn(),
+  getWorkspaceOptimizationResultOverviewWithClient: vi.fn(),
+  listProfileOptimizationResults: vi.fn(),
+  mutateProfileOptimizationResultInTransaction: vi.fn(),
   withTransaction: vi.fn(),
   clientQuery: vi.fn(),
 }))
@@ -42,15 +45,38 @@ vi.mock('../storage/inventory-store', () => {
 })
 
 vi.mock('../storage/user-store', () => ({
-  emptyWorkspace: mocks.emptyWorkspace,
   getProfileForUser: mocks.getProfileForUser,
-  getProfileWorkspace: mocks.getProfileWorkspace,
   isDepotValueProfile: (profile: { kind?: string }) => profile.kind === 'depot_value',
   isFreePreviewProfile: (profile: { kind?: string }) => profile.kind === 'free_preview',
   normalizeProfileKind: (profile: { kind?: string }) => profile.kind ?? 'cdk',
   toPublicWorkspace: mocks.toPublicWorkspace,
   updateProfileWorkspaceInTransaction: mocks.updateProfileWorkspaceInTransaction,
 }))
+
+vi.mock('../storage/optimization-result-store', () => {
+  class MockOptimizationResultCursorError extends Error {
+    readonly code = 'result_cursor_invalid'
+    readonly status = 400
+  }
+  class MockOptimizationResultMutationError extends Error {
+    constructor(
+      message: string,
+      readonly status: 404 | 409,
+      readonly code: 'result_not_found' | 'result_archive_full' | 'result_history_full',
+    ) {
+      super(message)
+    }
+  }
+  return {
+    getProfileOptimizationResult: mocks.getProfileOptimizationResult,
+    getWorkspaceOptimizationResultOverviewWithClient: mocks.getWorkspaceOptimizationResultOverviewWithClient,
+    listProfileOptimizationResults: mocks.listProfileOptimizationResults,
+    mutateProfileOptimizationResultInTransaction: mocks.mutateProfileOptimizationResultInTransaction,
+    OPTIMIZATION_RESULT_PAGE_MAX_SIZE: 50,
+    OptimizationResultCursorError: MockOptimizationResultCursorError,
+    OptimizationResultMutationError: MockOptimizationResultMutationError,
+  }
+})
 
 vi.mock('../storage/postgres', () => ({ withTransaction: mocks.withTransaction }))
 vi.mock('../behavior-risk/service', () => ({
@@ -95,8 +121,6 @@ const exportBody = {
   idempotency_key: 'export-request-1',
 }
 
-let workspaceState: ReturnType<typeof workspaceRecord>
-
 beforeEach(() => {
   vi.useFakeTimers()
   vi.setSystemTime(new Date(FREE_PREVIEW_LIMITED_CDK_ACTIVITY.startsAt))
@@ -107,9 +131,10 @@ beforeEach(() => {
   })
   mocks.getValidatedJson.mockResolvedValue(exportBody)
   mocks.getProfileForUser.mockResolvedValue(profile('cdk', 'advanced'))
-  mocks.getProfileWorkspace.mockResolvedValue({
-    result_history: [{ id: 'result-1', job_id: 'job-1', result: optimizerResult() }],
-    archived_results: [],
+  mocks.getProfileOptimizationResult.mockResolvedValue(storedHistoryItem())
+  mocks.listProfileOptimizationResults.mockResolvedValue({
+    items: [historySummary()],
+    next_cursor: 'next-page',
   })
   mocks.recordPersonalUseDeclarationUsage.mockResolvedValue({
     declaration_version: 'V1.1',
@@ -120,26 +145,22 @@ beforeEach(() => {
     ...input.response,
     operation_id: 'operation-1',
   }))
-  workspaceState = workspaceRecord()
   mocks.getProfileCapacityLimitsInTransaction.mockResolvedValue({ plan: 3, history: 5, archive: 1 })
-  mocks.emptyWorkspace.mockImplementation((profileId: string) => workspaceRecord(profileId, []))
-  mocks.toPublicWorkspace.mockImplementation((workspace: unknown) => workspace)
+  mocks.getWorkspaceOptimizationResultOverviewWithClient.mockResolvedValue({
+    latest_result: historySummary(),
+    result_history: { items: [historySummary()], next_cursor: null },
+    archived_results: { items: [], next_cursor: null },
+  })
+  mocks.toPublicWorkspace.mockImplementation((_workspace: unknown, _limits: unknown, overview: unknown) => overview)
   mocks.clientQuery.mockResolvedValue({ rows: [], rowCount: 1 })
   mocks.withTransaction.mockImplementation(async (run: (client: { query: typeof mocks.clientQuery }) => unknown) => (
     run({ query: mocks.clientQuery })
   ))
-  mocks.updateProfileWorkspaceInTransaction.mockImplementation(async (
-    _client: unknown,
-    _profileId: string,
-    update: (current: typeof workspaceState) => typeof workspaceState,
-  ) => {
-    workspaceState = update(workspaceState)
-    return workspaceState
-  })
+  mocks.updateProfileWorkspaceInTransaction.mockResolvedValue(workspaceRecord())
 })
 
 describe('result history mutations', () => {
-  it('archives the only result without recreating a legacy duplicate', async () => {
+  it('archives by profile and result ID and returns a fresh summary overview', async () => {
     mocks.getValidatedJson.mockResolvedValue({ ...exportBody, action: 'archive' })
 
     const response = await userResultsHandler(exportRequest('result-archive'))
@@ -147,51 +168,37 @@ describe('result history mutations', () => {
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({
       workspace: {
-        last_result: null,
-        result_history: [],
-        archived_results: [{ id: 'result-1' }],
+        latest_result: { id: 'result-1' },
       },
       action: 'archive',
       result_id: 'result-1',
     })
-    expect(workspaceState.last_result).toBeNull()
-  })
-
-  it('restores last_result when unarchiving a result', async () => {
-    const item = storedHistoryItem()
-    workspaceState = workspaceRecord('profile-1', [], [item])
-    mocks.getValidatedJson.mockResolvedValue({ ...exportBody, action: 'unarchive' })
-
-    const response = await userResultsHandler(exportRequest('result-archive'))
-
-    expect(response.status).toBe(200)
-    expect(workspaceState.result_history.map((entry) => entry.id)).toEqual(['result-1'])
-    expect(workspaceState.archived_results).toEqual([])
-    expect(workspaceState.last_result).toEqual(item.result)
-  })
-
-  it('deletes the only result and clears last_result', async () => {
-    mocks.getValidatedJson.mockResolvedValue({ ...exportBody, action: 'delete' })
-
-    const response = await userResultsHandler(exportRequest('result-archive'))
-
-    expect(response.status).toBe(200)
-    expect(workspaceState.result_history).toEqual([])
-    expect(workspaceState.last_result).toBeNull()
+    expect(mocks.mutateProfileOptimizationResultInTransaction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        profileId: 'profile-1',
+        resultId: 'result-1',
+        action: 'archive',
+        historyLimit: 5,
+        archiveLimit: 1,
+      }),
+    )
   })
 
   it('returns 404 for a new delete operation targeting a missing result', async () => {
-    workspaceState = workspaceRecord('profile-1', [])
     mocks.getValidatedJson.mockResolvedValue({ ...exportBody, action: 'delete' })
+    mocks.mutateProfileOptimizationResultInTransaction.mockRejectedValue(
+      new OptimizationResultMutationError('排班结果不存在。', 404, 'result_not_found'),
+    )
 
     const response = await userResultsHandler(exportRequest('result-archive'))
 
     expect(response.status).toBe(404)
-    await expect(response.json()).resolves.toMatchObject({ code: 'result_archive_failed' })
+    await expect(response.json()).resolves.toMatchObject({ code: 'result_not_found' })
   })
 
   it('replays a completed mutation with the same idempotency key', async () => {
-    const replay = { workspace: workspaceRecord('profile-1', []), action: 'delete', result_id: 'result-1', operation_id: 'operation-replay' }
+    const replay = { workspace: null, action: 'delete', result_id: 'result-1', operation_id: 'operation-replay' }
     mocks.getValidatedJson.mockResolvedValue({ ...exportBody, action: 'delete' })
     mocks.clientQuery.mockResolvedValueOnce({
       rows: [{
@@ -207,7 +214,47 @@ describe('result history mutations', () => {
 
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual(replay)
-    expect(mocks.updateProfileWorkspaceInTransaction).not.toHaveBeenCalled()
+    expect(mocks.mutateProfileOptimizationResultInTransaction).not.toHaveBeenCalled()
+  })
+})
+
+describe('result history reads', () => {
+  it('returns a cursor-paginated summary list for an owned profile', async () => {
+    const response = await userResultsHandler(new Request(
+      'http://localhost/api/user/results?profile_id=profile-1&scope=active&cursor=cursor-1&limit=20',
+    ))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ items: [historySummary()], next_cursor: 'next-page' })
+    expect(mocks.listProfileOptimizationResults).toHaveBeenCalledWith('profile-1', 'active', {
+      cursor: 'cursor-1',
+      limit: 20,
+    })
+  })
+
+  it('loads one capability-projected detail by profile and result ID', async () => {
+    mocks.getProfileForUser.mockResolvedValue(profile('cdk', 'growth'))
+
+    const response = await userResultsHandler(new Request(
+      'http://localhost/api/user/results/result-1?profile_id=profile-1',
+    ))
+
+    expect(response.status).toBe(200)
+    const body = await response.json() as { item: { result: Record<string, unknown> } }
+    expect(body.item.result.raw_results).toEqual([])
+    expect(body.item.result).not.toHaveProperty('daily_production')
+    expect(mocks.getProfileOptimizationResult).toHaveBeenCalledWith('profile-1', 'result-1')
+  })
+
+  it('does not query result storage when the profile is not owned by the session user', async () => {
+    mocks.getProfileForUser.mockResolvedValue(null)
+
+    const response = await userResultsHandler(new Request(
+      'http://localhost/api/user/results/result-1?profile_id=other-profile',
+    ))
+
+    expect(response.status).toBe(404)
+    expect(mocks.getProfileOptimizationResult).not.toHaveBeenCalled()
   })
 })
 
@@ -366,7 +413,7 @@ describe('MAA JSON export entitlement', () => {
 
   it('returns a stable localized error for an unexpected export failure', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    mocks.getProfileWorkspace.mockRejectedValue(new Error('database unavailable'))
+    mocks.getProfileOptimizationResult.mockRejectedValue(new Error('database unavailable'))
 
     const response = await userResultsHandler(exportRequest())
 
@@ -462,15 +509,15 @@ describe('MAA JSON export entitlement', () => {
       error: '当前档案不支持下载完整计算数据。',
       code: 'full_result_export_forbidden',
     })
-    expect(mocks.getProfileWorkspace).not.toHaveBeenCalled()
+    expect(mocks.getProfileOptimizationResult).not.toHaveBeenCalled()
     expect(mocks.consumeInventoryItemImmediately).not.toHaveBeenCalled()
   })
 
   it('downloads a complete rotation result from the archive', async () => {
     mocks.getProfileForUser.mockResolvedValue(profile('cdk', 'advanced'))
-    mocks.getProfileWorkspace.mockResolvedValue({
-      result_history: [],
-      archived_results: [{ id: 'result-1', result: { ...optimizerResult(), schedule_mode: 'rotation' } }],
+    mocks.getProfileOptimizationResult.mockResolvedValue({
+      ...storedHistoryItem(),
+      result: { ...optimizerResult(), schedule_mode: 'rotation' },
     })
 
     const response = await userResultsHandler(exportRequest('full-result-export'))
@@ -495,7 +542,7 @@ describe('MAA JSON export entitlement', () => {
   it('returns a stable localized error for an unexpected complete-result export failure', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     mocks.getProfileForUser.mockResolvedValue(profile('cdk', 'advanced'))
-    mocks.getProfileWorkspace.mockRejectedValue(new Error('database unavailable'))
+    mocks.getProfileOptimizationResult.mockRejectedValue(new Error('database unavailable'))
 
     const response = await userResultsHandler(exportRequest('full-result-export'))
 
@@ -563,20 +610,33 @@ function storedHistoryItem() {
     result: optimizerResult(),
     operator_count: 1,
     source: 'generated' as const,
+    archived_at: null,
   }
 }
 
-function workspaceRecord(profileId = 'profile-1', resultHistory = [storedHistoryItem()], archivedResults: ReturnType<typeof storedHistoryItem>[] = []) {
+function historySummary() {
+  return {
+    id: 'result-1',
+    job_id: 'job-1',
+    name: '历史结果',
+    created_at: '2026-08-01T00:00:00.000Z',
+    operator_count: 1,
+    source: 'generated' as const,
+    archived: false,
+    schedule_mode: 'maa',
+    maa_exportable: true,
+    has_config: false,
+  }
+}
+
+function workspaceRecord(profileId = 'profile-1') {
   return {
     version: 1 as const,
     profile_id: profileId,
     operators: [],
     config: null,
     elite_overrides: {},
-    last_result: resultHistory[0]?.result ?? null,
     saved_configs: [],
-    result_history: resultHistory,
-    archived_results: archivedResults,
     free_schedule_entitlement: null,
     updated_at: '2026-08-01T00:00:00.000Z',
   }

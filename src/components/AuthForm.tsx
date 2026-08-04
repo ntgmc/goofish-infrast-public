@@ -66,7 +66,7 @@ export default function AuthForm({
       .then((data) => setInviteCodeRequired(data.invite_code_required === true))
       .catch((caught) => {
         if ((caught as Error).name !== 'AbortError') {
-          setRegistrationSettingsError((caught as Error).message || '注册设置加载失败，请重试。')
+          setRegistrationSettingsError((caught as Error).message || copy.auth.components_AuthForm_045)
         }
       })
       .finally(() => setRegistrationSettingsLoading(false))
@@ -93,7 +93,7 @@ export default function AuthForm({
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
     if (mode === 'register' && inviteCodeRequired === null) {
-      setError(registrationSettingsError ?? '正在确认注册要求，请稍后再试。')
+      setError(registrationSettingsError ?? copy.auth.components_AuthForm_046)
       return
     }
     const nextErrors: FieldErrors = {}
@@ -328,7 +328,7 @@ export default function AuthForm({
           <FieldMessage id="auth-invite-code-error" message={fieldErrors.inviteCode} />
         </label>
         {registrationSettingsLoading && (
-          <p className="-mt-3 text-sm text-ink-muted" role="status">正在确认邀请码要求...</p>
+          <p className="-mt-3 text-sm text-ink-muted" role="status">{copy.auth.components_AuthForm_047}</p>
         )}
         {registrationSettingsError && (
           <div className="tool-alert tool-alert--error -mt-2 flex flex-wrap items-center justify-between gap-3" role="alert">
@@ -340,7 +340,7 @@ export default function AuthForm({
                 setRegistrationSettingsError(null)
                 setRegistrationSettingsAttempt((current) => current + 1)
               }}
-            >重试</button>
+            >{copy.auth.components_AuthForm_048}</button>
           </div>
         )}
       </>}

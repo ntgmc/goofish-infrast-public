@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { copy } from '../../../copy/index'
 import { apiJson } from '../../../lib/api-client'
 import type { PriorityCouponBalance } from '../../../lib/types'
 
@@ -17,7 +18,7 @@ export function usePriorityCoupon(profileId: string) {
       setBalance(next)
       if (!next?.available) setSelected(false)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '优先计算券余额加载失败。')
+      setError(caught instanceof Error ? caught.message : copy.inventory.priority_coupon_balance_load_failed)
       setSelected(false)
     } finally {
       setLoading(false)

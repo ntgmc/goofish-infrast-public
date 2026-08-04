@@ -38,15 +38,44 @@ npm run start:server
 
 ```text
 DATABASE_URL=postgresql://<user>:<password>@127.0.0.1:5432/<database>
+PUBLIC_APP_URL=https://<public-origin>/
 SKLAND_CREDENTIAL_SECRET=<stable local random value of at least 16 characters>
 FREE_PREVIEW_UID_HASH_SECRET=<stable local random value of at least 32 characters>
 USAGE_VISITOR_SECRET=<stable random value of at least 32 characters>
 # USAGE_VISITOR_SECRET_PREVIOUS=<previous value during a controlled rotation>
+WEBSITE_EVENTS_TOKEN=<independent random value of at least 32 bytes>
+WEBSITE_RELEASE_CONFIRMATION_TOKEN=<different random value of at least 32 bytes>
 ```
 
 `SKLAND_CREDENTIAL_SECRET`（或其 keyring 配置）用于加密可刷新的森空岛凭证；`FREE_PREVIEW_UID_HASH_SECRET` 用于生成稳定的 UID HMAC、防止重复领取。两者都必须由密码学安全随机源生成、纳入受控密钥备份，并在所有 API 实例间保持一致。不要直接替换 UID HMAC 密钥；轮换前必须迁移现有 claim hash。凭证 keyring 轮换应保留旧解密密钥，完成 `scripts/rekey-skland-credentials.mjs` 重加密后再移除旧密钥。生产环境会在监听端口前校验这两类配置，缺失或长度不足时启动失败。
 
 `USAGE_VISITOR_SECRET` 用于签名匿名 usage visitor cookie，必须在所有 API 实例间保持一致。轮换时先配置新值，并将旧值放入 `USAGE_VISITOR_SECRET_PREVIOUS`；至少保留一个 visitor cookie 有效期（当前为 180 天）后再移除旧值。为兼容旧部署，服务端在未配置专用值时会回退到管理员签名密钥，但生产环境应使用独立 secret，避免不同安全域共用密钥。
+
+### 网站公告与正式版本事件流
+
+QQ Bot 通过只读接口定时拉取公告和正式版本事件：
+
+```http
+GET /api/integrations/qqbot/events?cursor={cursor|latest}&limit=100
+Authorization: Bearer <WEBSITE_EVENTS_TOKEN>
+```
+
+首次注册消费者时使用 `cursor=latest`，响应只返回当前高水位游标，不回放历史事件；之后把每次响应的 `next_cursor` 原样保存并继续拉取。接口最多返回 100 条，按数据库 `sequence` 严格升序，响应设置 `Cache-Control: private, no-store`。Token 缺失或错误返回 401，使用仅具发布权限的有效 Token 返回 403，超过宽松的持久化限流窗口返回带 `Retry-After` 的 429。
+
+公告从未启用状态首次保存为启用状态时，公告文档和 `announcement.published` 事件在同一 PostgreSQL 事务中提交；再次编辑已发布公告不会产生新事件。部署此功能前必须先运行 `npm run migrate:database`，创建 append-only 的 `website_notification_events` 表。
+
+正式生产版本不能在构建或服务启动时自动确认。部署、公开 changelog 和 `/api/health/ready` 健康检查全部成功后，CI/CD 使用独立写权限 Token 调用：
+
+```bash
+curl --fail-with-body \
+  --request POST \
+  --header "Authorization: Bearer ${WEBSITE_RELEASE_CONFIRMATION_TOKEN}" \
+  --header 'Content-Type: application/json' \
+  --data "{\"version\":\"${DEPLOYED_VERSION}\"}" \
+  "${PUBLIC_APP_URL%/}/api/internal/releases/confirm"
+```
+
+服务端只接受与当前前后端构建版本完全一致、且已经出现在公开 changelog 中的版本，并从公开 changelog 自行生成 `release.published` 内容。相同版本重复确认返回幂等成功；同一事件 ID 的不同内容返回 409。`WEBSITE_EVENTS_TOKEN` 与 `WEBSITE_RELEASE_CONFIRMATION_TOKEN` 必须分别生成并放入密钥管理系统，不能复用或提交到仓库。
 
 PostgreSQL 新连接默认最多等待 10 秒；可通过 `POSTGRES_CONNECTION_TIMEOUT_MS` 覆盖，允许范围为 1000–60000 毫秒。有限连接超时可以避免 API 或外部 worker 在数据库不可达时无限停留在启动阶段。
 

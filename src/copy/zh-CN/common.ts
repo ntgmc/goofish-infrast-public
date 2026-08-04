@@ -79,6 +79,18 @@ export const commonCopy = {
   components_BuildMetaStrip_012: "版本一致",
   // src/components/BuildMetaStrip.tsx
   components_BuildMetaStrip_013: "版本漂移",
+  // src/components/DeploymentUpdatePrompt.tsx
+  components_DeploymentUpdatePrompt_001: "版本更新",
+  // src/components/DeploymentUpdatePrompt.tsx
+  components_DeploymentUpdatePrompt_002: "新版本已发布",
+  // src/components/DeploymentUpdatePrompt.tsx
+  components_DeploymentUpdatePrompt_003: "当前页面仍在运行旧版本。继续使用可能出现功能或数据不一致，请刷新页面完成更新。",
+  // src/components/DeploymentUpdatePrompt.tsx
+  components_DeploymentUpdatePrompt_004: "当前版本",
+  // src/components/DeploymentUpdatePrompt.tsx
+  components_DeploymentUpdatePrompt_005: "最新版本",
+  // src/components/DeploymentUpdatePrompt.tsx
+  components_DeploymentUpdatePrompt_006: "立即刷新",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_001: "龙门币",
   // src/components/ConfigEditor.tsx
@@ -623,6 +635,28 @@ export const commonCopy = {
   pages_AdminSetupPage_023: " · 更新 ",
   // src/pages/AdminSetupPage.tsx
   pages_AdminSetupPage_024: "删除账号",
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_025: "加载管理员列表失败。",
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_026: (username: string) => `管理员 ${username} 已存在。确认替换其密码和角色并撤销全部现有会话？`,
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_027: (username: string) => `已替换管理员 ${username}`,
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_028: "操作原因 / 工单号",
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_029: "风控角色",
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_030: "风险只读",
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_031: "风险复核",
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_032: "安全管理员",
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_033: "正在加载管理账号…",
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_034: "重试",
+  // src/pages/AdminSetupPage.tsx
+  pages_AdminSetupPage_035: "角色：",
   // src/pages/ToolPage.tsx
   pages_ToolPage_001: "正在确认登录信息...",
   // src/pages/ToolPage.tsx
@@ -725,4 +759,14 @@ export const commonCopy = {
   components_GuidedTour_003: "下一步",
   // src/components/GuidedTour.tsx
   components_GuidedTour_004: "完成",
+  // src/lib/admin-operation-reason.ts
+  lib_admin_operation_reason_001: "操作原因或工单号",
+  // src/lib/admin-operation-reason.ts
+  lib_admin_operation_reason_002: "请填写 2–500 个字符，审计记录将永久保留此原因。",
+  // src/lib/admin-operation-reason.ts
+  lib_admin_operation_reason_003: "取消",
+  // src/lib/admin-operation-reason.ts
+  lib_admin_operation_reason_004: "确认并继续",
+  // src/lib/admin-operation-reason.ts
+  lib_admin_operation_reason_005: "操作原因必须为 2–500 个字符。",
 } as const

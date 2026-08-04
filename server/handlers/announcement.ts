@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import type { Announcement, AnnouncementKind } from '../../src/lib/types'
 import { authenticateAdminRequest } from './admin-auth'
 import { jsonResponse } from './license-utils'
@@ -12,6 +12,7 @@ import { getAnnouncementEventCounts } from '../storage/usage-store'
 import type { AnnouncementStats } from '../../src/lib/types'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
+import type { WebsiteNotificationEventInput } from '../storage/website-notification-event-store'
 
 const ANNOUNCEMENT_KEY = 'current.json'
 const MAX_TITLE_LENGTH = 80
@@ -101,9 +102,10 @@ async function handleAdminPut(req: Request): Promise<Response> {
   }
   const store = await getAnnouncementStore()
   const retainedIds = data.announcements.map((announcement) => announcement.id)
+  const publicationEvents = buildAnnouncementPublicationEvents(current, data)
   let revision: number
   try {
-    revision = await store.set(data, body.expected_revision, retainedIds)
+    revision = await store.set(data, body.expected_revision, retainedIds, publicationEvents)
   } catch (error) {
     if (!(error instanceof AnnouncementConflictError)) throw error
     const latest = await readAnnouncementDocument()
@@ -119,6 +121,68 @@ async function handleAdminPut(req: Request): Promise<Response> {
     ...data,
     revision,
   })
+}
+
+function buildAnnouncementPublicationEvents(
+  current: AnnouncementData,
+  next: AnnouncementData,
+): WebsiteNotificationEventInput[] {
+  const currentById = new Map(allAnnouncements(current).map((announcement) => [announcement.id, announcement]))
+  const newlyPublished = allAnnouncements(next).filter((announcement) => (
+    announcement.active && currentById.get(announcement.id)?.active !== true
+  ))
+  if (newlyPublished.length === 0) return []
+
+  const publicAppUrl = resolvePublicAppUrl()
+  return newlyPublished.map((announcement) => {
+    const url = new URL('/', publicAppUrl)
+    url.hash = `announcement-${encodeURIComponent(announcement.id)}`
+    return {
+      id: createAnnouncementEventId(announcement.id),
+      type: 'announcement.published',
+      title: announcement.title,
+      summary: normalizeAnnouncementSummary(announcement.body),
+      url: url.toString(),
+      published_at: announcement.updated_at,
+      version: null,
+    }
+  })
+}
+
+export function normalizeAnnouncementSummary(markdown: string): string | null {
+  const plainText = markdown
+    .replace(/```[^\n]*\n([\s\S]*?)```/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/^\s{0,3}(?:#{1,6}|>|[-+*]|\d+[.)])\s+/gm, '')
+    .replace(/[*_~]+/g, '')
+    .replace(/[\u0000-\u001F\u007F]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!plainText) return null
+  return Array.from(plainText).slice(0, 500).join('')
+}
+
+function allAnnouncements(data: AnnouncementData): Announcement[] {
+  return [...(data.banner ? [data.banner] : []), ...data.announcements]
+}
+
+function resolvePublicAppUrl(): URL {
+  const configured = process.env.PUBLIC_APP_URL?.trim()
+  if (!configured) throw new Error('PUBLIC_APP_URL is required before publishing website notifications.')
+  const url = new URL(configured)
+  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) {
+    throw new Error('PUBLIC_APP_URL must be an HTTPS URL without credentials, query, or fragment.')
+  }
+  return url
+}
+
+function createAnnouncementEventId(announcementId: string): string {
+  if (/^[A-Za-z0-9._-]{1,115}$/.test(announcementId)) return `announcement:${announcementId}`
+  const digest = createHash('sha256').update(announcementId).digest('base64url')
+  return `announcement:${digest}`
 }
 
 async function buildAnnouncementStats(announcements: Announcement[]): Promise<Record<string, AnnouncementStats>> {

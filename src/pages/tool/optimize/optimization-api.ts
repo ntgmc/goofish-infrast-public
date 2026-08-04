@@ -1,6 +1,11 @@
 import { apiJson } from '../../../lib/api-client'
 import type { CreateOptimizationJobRequest, CreateOptimizationJobResponse, CreateReorderCheckJobResponse, CreateReorderCheckRequest, OptimizationJobListResponse, OptimizationJobMutationResponse, OptimizationJobSnapshot } from '../../../lib/optimization-contracts'
-import type { OptimizeJobAccepted, OptimizeJobStatusResponse } from '../../../lib/types'
+import type {
+  OptimizeJobAccepted,
+  OptimizeJobStatusResponse,
+  WorkspaceResultHistoryItem,
+  WorkspaceResultHistoryPage,
+} from '../../../lib/types'
 import { copy } from '../../../copy/index'
 
 export const OPTIMIZE_SUBMIT_TIMEOUT_MS = 30_000
@@ -64,6 +69,30 @@ export async function listOptimizationJobs(profileId: string, before?: string, s
     signal,
     fallbackMessage: copy.optimize.pages_tool_optimize_optimization_api_001,
   })
+}
+
+export async function fetchResultHistoryPage(
+  profileId: string,
+  scope: 'active' | 'archived',
+  cursor?: string | null,
+): Promise<WorkspaceResultHistoryPage> {
+  const params = new URLSearchParams({ profile_id: profileId, scope, limit: '20' })
+  if (cursor) params.set('cursor', cursor)
+  return await apiJson<WorkspaceResultHistoryPage>(`/api/user/results?${params.toString()}`, {
+    fallbackMessage: copy.common.pages_tool_useToolSession_002,
+  })
+}
+
+export async function fetchResultHistoryDetail(
+  profileId: string,
+  resultId: string,
+): Promise<WorkspaceResultHistoryItem> {
+  const params = new URLSearchParams({ profile_id: profileId })
+  const response = await apiJson<{ item: WorkspaceResultHistoryItem }>(
+    `/api/user/results/${encodeURIComponent(resultId)}?${params.toString()}`,
+    { fallbackMessage: copy.common.pages_tool_useToolSession_002 },
+  )
+  return response.item
 }
 
 export async function cancelOptimizationJob(jobId: string): Promise<OptimizationJobSnapshot> {

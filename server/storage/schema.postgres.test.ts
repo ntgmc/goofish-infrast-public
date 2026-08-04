@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { closePool, getPool, query, withPostgresAdvisoryLock } from './postgres'
+import { closePool, getPool, query, withPostgresAdvisoryLock, withTransaction } from './postgres'
 import { DATABASE_SCHEMA_VERSION, migrateDatabaseSchema } from './schema'
 import {
   getDepotValueSampleStore,
@@ -17,6 +17,13 @@ import {
 import { CURRENT_PERSONAL_USE_DECLARATION } from '../personal-use-declaration'
 import { createPostgresAdminUserStore } from './admin-user-store'
 import type { AdminUserRecord } from '../handlers/admin-auth'
+import type { WorkspaceResultHistoryItem } from '../../src/lib/types'
+import {
+  getProfileOptimizationResult,
+  insertProfileOptimizationResultInTransaction,
+  listProfileOptimizationResults,
+  mutateProfileOptimizationResultInTransaction,
+} from './optimization-result-store'
 
 let container: PostgreSqlContainer
 
@@ -199,53 +206,112 @@ describe('PostgreSQL schema migration', () => {
     }
   })
 
-  it('preserves workspace entries above base limits across idempotent migrations', async () => {
+  it('moves every legacy result out of workspace JSON across idempotent migrations', async () => {
     const profile = await seedProfile()
     const savedConfigs = Array.from({ length: 4 }, (_, index) => ({ id: `config-${index + 1}` }))
-    const resultHistory = Array.from({ length: 6 }, (_, index) => ({ id: `result-${index + 1}` }))
+    const resultHistory = Array.from({ length: 50 }, (_, index) => buildLegacyHistoryItem(`result-${index + 1}`))
+    const archivedResults = Array.from({ length: 2 }, (_, index) => buildLegacyHistoryItem(`archived-${index + 1}`))
     const workspace = {
       version: 1,
       profile_id: profile.profileId,
+      operators: [{ owned: true }, { owned: true }],
+      config: { schedule_mode: 'normal' },
+      last_result: { schedule_mode: 'normal', plans: [] },
       saved_configs: savedConfigs,
       result_history: resultHistory,
+      archived_results: archivedResults,
       updated_at: '2026-07-23T00:00:00.000Z',
     }
 
     try {
       await query(
         `insert into user_profile_workspaces
-          (profile_id, elite_overrides_json, record_json, updated_at)
-         values ($1, '{}'::jsonb, $2::jsonb, now())`,
-        [profile.profileId, JSON.stringify(workspace)],
+          (profile_id, elite_overrides_json, last_result_json, record_json, updated_at)
+         values ($1, '{}'::jsonb, $2::jsonb, $3::jsonb, $4)`,
+        [profile.profileId, JSON.stringify(workspace.last_result), JSON.stringify(workspace), workspace.updated_at],
       )
 
+      await markCurrentMigrationPending()
       await migrateDatabaseSchema()
 
       const afterFirstMigration = await readWorkspace(profile.profileId)
       expect(afterFirstMigration.saved_configs.map((item) => item.id)).toEqual(['config-1', 'config-2', 'config-3', 'config-4'])
-      expect(afterFirstMigration.result_history.map((item) => item.id)).toEqual([
-        'result-1',
-        'result-2',
-        'result-3',
-        'result-4',
-        'result-5',
-        'result-6',
-      ])
+      expect(afterFirstMigration).not.toHaveProperty('last_result')
+      expect(afterFirstMigration).not.toHaveProperty('result_history')
+      expect(afterFirstMigration).not.toHaveProperty('archived_results')
+      const afterFirstRows = await readOptimizationResults(profile.profileId)
+      expect(afterFirstRows).toHaveLength(52)
+      expect(afterFirstRows.filter((item) => item.archived_at === null).map((item) => item.id)).toEqual(
+        resultHistory.map((item) => item.id),
+      )
+      expect(afterFirstRows.filter((item) => item.archived_at !== null).map((item) => item.id)).toEqual(
+        archivedResults.map((item) => item.id),
+      )
+      expect(afterFirstRows.find((item) => item.id === 'legacy-last-result')).toBeUndefined()
+      const legacyColumn = await query<{ last_result_json: unknown }>(
+        'select last_result_json from user_profile_workspaces where profile_id = $1',
+        [profile.profileId],
+      )
+      expect(legacyColumn.rows[0]?.last_result_json).toBeNull()
 
+      await markCurrentMigrationPending()
       await migrateDatabaseSchema()
 
       const afterSecondMigration = await readWorkspace(profile.profileId)
       expect(afterSecondMigration.saved_configs.map((item) => item.id)).toEqual(['config-1', 'config-2', 'config-3', 'config-4'])
-      expect(afterSecondMigration.result_history.map((item) => item.id)).toEqual([
-        'result-1',
-        'result-2',
-        'result-3',
-        'result-4',
-        'result-5',
-        'result-6',
-      ])
+      expect(await readOptimizationResults(profile.profileId)).toEqual(afterFirstRows)
     } finally {
       await query('delete from user_accounts where id = $1', [profile.userId])
+    }
+  })
+
+  it('paginates profile-scoped result history and moves archived results atomically', async () => {
+    const first = await seedProfile()
+    const second = await seedProfile()
+    const sharedId = `shared-${randomUUID()}`
+    try {
+      await withPostgresResults(first.profileId, [
+        buildStoredHistoryItem(sharedId, 'first-shared'),
+        buildStoredHistoryItem(`first-middle-${randomUUID()}`, 'first-middle'),
+        buildStoredHistoryItem(`first-newest-${randomUUID()}`, 'first-newest'),
+      ])
+      await withPostgresResults(second.profileId, [
+        buildStoredHistoryItem(sharedId, 'second-shared'),
+      ])
+
+      const firstPage = await listProfileOptimizationResults(first.profileId, 'active', { limit: 2 })
+      expect(firstPage.items.map((item) => item.name)).toEqual(['first-newest', 'first-middle'])
+      expect(firstPage.next_cursor).not.toBeNull()
+      const secondPage = await listProfileOptimizationResults(first.profileId, 'active', {
+        cursor: firstPage.next_cursor,
+        limit: 2,
+      })
+      expect(secondPage.items.map((item) => item.name)).toEqual(['first-shared'])
+      expect(secondPage.next_cursor).toBeNull()
+
+      await expect(getProfileOptimizationResult(first.profileId, sharedId)).resolves.toMatchObject({
+        name: 'first-shared',
+      })
+      await expect(getProfileOptimizationResult(second.profileId, sharedId)).resolves.toMatchObject({
+        name: 'second-shared',
+      })
+
+      const archivedId = firstPage.items[1].id
+      await withTransaction((client) => mutateProfileOptimizationResultInTransaction(client, {
+        profileId: first.profileId,
+        resultId: archivedId,
+        action: 'archive',
+        historyLimit: 5,
+        archiveLimit: 1,
+        now: '2026-08-04T00:00:00.000Z',
+      }))
+      await expect(listProfileOptimizationResults(first.profileId, 'archived')).resolves.toMatchObject({
+        items: [{ id: archivedId, archived: true }],
+      })
+      expect((await listProfileOptimizationResults(first.profileId, 'active')).items.map((item) => item.id))
+        .not.toContain(archivedId)
+    } finally {
+      await query('delete from user_accounts where id = any($1::text[])', [[first.userId, second.userId]])
     }
   })
 
@@ -577,7 +643,67 @@ async function seedProfile(): Promise<{ userId: string; profileId: string }> {
 
 type StoredWorkspaceRecord = {
   saved_configs: Array<{ id: string }>
-  result_history: Array<{ id: string }>
+}
+
+type StoredOptimizationResult = {
+  id: string
+  archived_at: string | null
+  position: string
+}
+
+async function readOptimizationResults(profileId: string): Promise<StoredOptimizationResult[]> {
+  const result = await query<StoredOptimizationResult>(
+    `select id, archived_at::text, position::text
+       from optimization_result_history
+      where profile_id = $1
+      order by archived_at nulls first, optimization_result_history.position desc`,
+    [profileId],
+  )
+  return result.rows
+}
+
+function buildLegacyHistoryItem(id: string): Record<string, unknown> {
+  return {
+    id,
+    name: id,
+    created_at: `2026-07-23T00:${id.replace(/\D/g, '').padStart(2, '0')}:00.000Z`,
+    config: { schedule_mode: 'normal' },
+    result: { schedule_mode: 'normal', plans: [] },
+    operator_count: 2,
+    source: 'generated',
+  }
+}
+
+async function withPostgresResults(
+  profileId: string,
+  items: WorkspaceResultHistoryItem[],
+): Promise<void> {
+  await withTransaction(async (client) => {
+    for (const item of items) {
+      await insertProfileOptimizationResultInTransaction(client, profileId, item, 50)
+    }
+  })
+}
+
+function buildStoredHistoryItem(id: string, name: string): WorkspaceResultHistoryItem {
+  return {
+    id,
+    name,
+    created_at: '2026-08-04T00:00:00.000Z',
+    config: null,
+    result: {
+      author: 'test',
+      title: name,
+      description: name,
+      schedule_mode: 'maa',
+      buildingType: 253,
+      planTimes: '1班',
+      plans: [],
+      raw_results: [],
+    },
+    operator_count: 1,
+    source: 'generated',
+  }
 }
 
 function buildDepotSample(overrides: Partial<DepotValueSampleRecord> = {}): DepotValueSampleRecord {

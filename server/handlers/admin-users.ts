@@ -52,6 +52,11 @@ import { recordAccountDeletedBehaviorEvent } from '../behavior-risk/service'
 import { getRequestClientIp } from '../security/client-ip'
 import { recordAdminOperationAudit } from '../storage/admin-operation-audit-store'
 import { listCdkRecordsByKeys } from '../storage/cdk-store'
+import {
+  getLatestProfileOptimizationResultSummaries,
+  listOptimizationResultsForProfiles,
+} from '../storage/optimization-result-store'
+import type { WorkspaceResultHistorySummary } from '../../src/lib/types'
 
 export default async (req: Request): Promise<Response> => {
 
@@ -499,7 +504,11 @@ async function saveProfilePatch(
 
 async function exportAdminUserWorkspaces(user: UserAccountRecord): Promise<Response> {
   const profiles = await listProfilesForUser(user.id)
-  const workspaceMap = await listProfileWorkspaces(profiles.map((profile) => profile.id))
+  const profileIds = profiles.map((profile) => profile.id)
+  const [workspaceMap, resultsByProfile] = await Promise.all([
+    listProfileWorkspaces(profileIds),
+    listOptimizationResultsForProfiles(profileIds),
+  ])
   const body = {
     version: 1,
     exported_at: new Date().toISOString(),
@@ -509,6 +518,9 @@ async function exportAdminUserWorkspaces(user: UserAccountRecord): Promise<Respo
     },
     profiles: profiles.map((profile) => {
       const workspace = workspaceMap.get(profile.id)
+      const results = resultsByProfile.get(profile.id) ?? []
+      const resultHistory = results.filter((item) => item.archived_at === null).map(stripArchivedAt)
+      const archivedResults = results.filter((item) => item.archived_at !== null).map(stripArchivedAt)
       return {
         id: profile.id,
         display_name: profile.display_name,
@@ -522,10 +534,10 @@ async function exportAdminUserWorkspaces(user: UserAccountRecord): Promise<Respo
               operators: workspace.operators,
               config: workspace.config,
               elite_overrides: workspace.elite_overrides,
-              last_result: workspace.last_result,
+              last_result: resultHistory[0]?.result ?? null,
               saved_configs: workspace.saved_configs,
-              result_history: workspace.result_history,
-              archived_results: workspace.archived_results,
+              result_history: resultHistory,
+              archived_results: archivedResults,
               free_schedule_entitlement: workspace.free_schedule_entitlement,
               updated_at: workspace.updated_at,
             }
@@ -555,9 +567,10 @@ async function buildAdminUserDetail(
   const pagination = buildAdminPagination(profilePage.page, profilePage.pageSize, allProfiles.length)
   const profileOffset = (pagination.page - 1) * pagination.page_size
   const profiles = allProfiles.slice(profileOffset, profileOffset + pagination.page_size)
-  const [workspaceMap, cdkMap] = await Promise.all([
+  const [workspaceMap, cdkMap, latestResults] = await Promise.all([
     listProfileWorkspaces(profiles.map((profile) => profile.id)),
     listCdkRecordsByKeys(profiles.flatMap((profile) => profile.cdk_key ? [profile.cdk_key] : [])),
+    getLatestProfileOptimizationResultSummaries(profiles.map((profile) => profile.id)),
   ])
   const personalUseAudit = [
     ...personalUseDeclarations.map((acceptance) => ({
@@ -586,6 +599,7 @@ async function buildAdminUserDetail(
     profiles: await Promise.all(profiles.map((profile) => buildAdminProfileSummary(profile, {
       workspace: workspaceMap.get(profile.id) ?? null,
       cdk: profile.cdk_key ? cdkMap.get(profile.cdk_key) ?? null : null,
+      latestResult: latestResults.get(profile.id) ?? null,
     }))),
     profile_pagination: {
       ...pagination,
@@ -598,9 +612,16 @@ async function buildAdminUserDetail(
 
 async function buildAdminProfileSummary(
   profile: UserGameAccountRecord,
-  prefetched?: { workspace: UserWorkspaceRecord | null; cdk: CdkRecord | null },
+  prefetched?: {
+    workspace: UserWorkspaceRecord | null
+    cdk: CdkRecord | null
+    latestResult?: WorkspaceResultHistorySummary | null
+  },
 ) {
   const workspace = prefetched ? prefetched.workspace : await getProfileWorkspace(profile.id)
+  const latestResult = prefetched
+    ? prefetched.latestResult ?? null
+    : (await getLatestProfileOptimizationResultSummaries([profile.id])).get(profile.id) ?? null
   const cdk = prefetched
     ? prefetched.cdk
     : profile.cdk_key ? await (await getCdkRecordStore()).get(profile.cdk_key) : null
@@ -626,7 +647,7 @@ async function buildAdminProfileSummary(
           last_mismatch_at: profile.skland_risk.last_mismatch_at,
         }
       : null,
-    workspace: summarizeWorkspace(workspace),
+    workspace: summarizeWorkspace(workspace, latestResult),
     cdk: summarizeCdkForProfile(cdk),
   }
 }
@@ -685,11 +706,11 @@ async function buildAdminProfileOperatorData(user: UserAccountRecord, profile: U
   }
 }
 
-function summarizeWorkspace(workspace: UserWorkspaceRecord | null) {
+function summarizeWorkspace(
+  workspace: UserWorkspaceRecord | null,
+  latestResult: WorkspaceResultHistorySummary | null,
+) {
   const config = workspace?.config
-  const result = workspace?.last_result && typeof workspace.last_result === 'object'
-    ? workspace.last_result as Record<string, unknown>
-    : null
   return {
     exists: Boolean(workspace),
     operator_count: countOwnedOperators(workspace?.operators),
@@ -697,14 +718,19 @@ function summarizeWorkspace(workspace: UserWorkspaceRecord | null) {
     has_config: Boolean(config),
     config_desc: config?.desc || config?.layout || null,
     layout: config?.layout ?? null,
-    schedule_mode: String(config?.schedule_mode ?? result?.schedule_mode ?? ''),
+    schedule_mode: String(config?.schedule_mode ?? latestResult?.schedule_mode ?? ''),
     dormitory_rule: config?.dormitory_rule ?? null,
     trading_stations_count: config?.trading_stations_count ?? null,
     manufacturing_stations_count: config?.manufacturing_stations_count ?? null,
-    has_last_result: Boolean(result),
-    last_result_title: typeof result?.title === 'string' ? result.title : null,
+    has_last_result: Boolean(latestResult),
+    last_result_title: latestResult?.name ?? null,
     updated_at: workspace?.updated_at ?? null,
   }
+}
+
+function stripArchivedAt<T extends { archived_at: string | null }>(item: T): Omit<T, 'archived_at'> {
+  const { archived_at: _archivedAt, ...historyItem } = item
+  return historyItem
 }
 
 function summarizeCdkForProfile(record: CdkRecord | null) {

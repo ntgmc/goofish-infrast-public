@@ -267,6 +267,18 @@ export const optimizeCopy = {
   pages_tool_optimize_OptimizeShell_006: "移动端排班工作台分区",
   // src/pages/tool/optimize/OptimizeWorkflowPage.tsx
   pages_tool_optimize_OptimizeWorkflowPage_001: "有结果",
+  // src/pages/tool/optimize/OptimizeWorkflowPage.tsx
+  pages_tool_optimize_OptimizeWorkflowPage_002: (submittedAt: string) => `排班结果 ${submittedAt}`,
+  // src/pages/tool/optimize/OptimizeWorkflowPage.tsx
+  pages_tool_optimize_OptimizeWorkflowPage_003: "库存数据：",
+  // src/pages/tool/optimize/OptimizeWorkflowPage.tsx
+  pages_tool_optimize_OptimizeWorkflowPage_004: "优先计算券：",
+  // src/pages/tool/optimize/OptimizeWorkflowPage.tsx
+  pages_tool_optimize_OptimizeWorkflowPage_005: "正在重试…",
+  // src/pages/tool/optimize/OptimizeWorkflowPage.tsx
+  pages_tool_optimize_OptimizeWorkflowPage_006: "重试库存",
+  // src/pages/tool/optimize/OptimizeWorkflowPage.tsx
+  pages_tool_optimize_OptimizeWorkflowPage_007: "重试优先券",
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_001: "方案与历史",
   // src/pages/tool/optimize/OverviewSection.tsx
@@ -973,6 +985,9 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/optimization-api.ts
   pages_tool_optimize_optimization_api_001: "加载优化任务列表失败。",
   pages_tool_optimize_optimization_api_002: "取消优化任务失败。",
+  pages_tool_optimize_result_history_load_more: "加载更多",
+  pages_tool_optimize_result_history_loading: "正在加载…",
+  pages_tool_optimize_result_history_load_failed: "加载更多结果失败，请稍后重试。",
   // src/pages/tool/optimize/OptimizeWorkflowPage.tsx
   pages_tool_optimize_tour_001: "使用导览",
   pages_tool_optimize_tour_002: "排班总览",

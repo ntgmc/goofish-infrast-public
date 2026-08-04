@@ -9,7 +9,9 @@ import {
   listProfilesForUser,
   listProfileWorkspaces,
   saveUserProfile,
+  toPublicWorkspace,
 } from '../storage/user-store'
+import { listOptimizationResultsForProfiles } from '../storage/optimization-result-store'
 import { query } from '../storage/postgres'
 import {
   listPersonalUseDeclarationAcceptancesForUser,
@@ -63,6 +65,7 @@ async function exportData(userId: string): Promise<Response> {
   const [
     user,
     workspaceMap,
+    optimizationResultsByProfile,
     legacyWorkspace,
     usage,
     jobs,
@@ -96,6 +99,7 @@ async function exportData(userId: string): Promise<Response> {
   ] = await Promise.all([
     getUserById(userId),
     listProfileWorkspaces(profileIds),
+    listOptimizationResultsForProfiles(profileIds),
     query<{ record_json: Record<string, unknown> }>('select record_json from user_workspaces where user_id = $1', [userId]),
     query<{ record_json: unknown }>(
       'select record_json from usage_events where user_id = $1 or profile_id = any($2::text[])',
@@ -252,7 +256,11 @@ async function exportData(userId: string): Promise<Response> {
     coverage: PERSONAL_DATA_EXPORT_COVERAGE,
     user: publicUser,
     profiles: safeProfiles,
-    workspaces: profileIds.map((profileId) => workspaceMap.get(profileId) ?? null),
+    workspaces: profileIds.map((profileId) => {
+      const workspace = workspaceMap.get(profileId)
+      return workspace ? toPublicWorkspace(workspace) : null
+    }),
+    optimization_results: profileIds.flatMap((profileId) => optimizationResultsByProfile.get(profileId) ?? []),
     legacy_workspace: legacyWorkspace.rows[0]?.record_json ?? null,
     usage_events: usage.rows.map((row) => row.record_json),
     optimize_jobs: jobs.rows,

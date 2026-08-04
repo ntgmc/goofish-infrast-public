@@ -183,8 +183,8 @@ export async function saveWorkspaceInTransaction(client: PoolClient, workspace: 
   await client.query(
     `insert into user_profile_workspaces
       (profile_id,operators_json,config_json,elite_overrides_json,last_result_json,record_json,updated_at)
-     values ($1,$2::jsonb,$3::jsonb,$4::jsonb,$5::jsonb,$6::jsonb,$7)
+     values ($1,$2::jsonb,$3::jsonb,$4::jsonb,null,$5::jsonb,$6)
      on conflict (profile_id) do nothing`,
-    [workspace.profile_id, JSON.stringify(workspace.operators), JSON.stringify(workspace.config), JSON.stringify(workspace.elite_overrides), JSON.stringify(workspace.last_result), JSON.stringify(workspace), workspace.updated_at],
+    [workspace.profile_id, JSON.stringify(workspace.operators), JSON.stringify(workspace.config), JSON.stringify(workspace.elite_overrides), JSON.stringify(workspace), workspace.updated_at],
   )
 }

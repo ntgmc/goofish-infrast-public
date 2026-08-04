@@ -793,10 +793,12 @@ export interface UserWorkspace {
   operators: LicenseOperator[] | null;
   config: LicenseConfig | null;
   elite_overrides: Record<string, number>;
-  last_result: OptimizeResult | null;
+  latest_result: WorkspaceResultHistorySummary | null;
   saved_configs: WorkspaceSavedConfig[];
-  result_history: WorkspaceResultHistoryItem[];
-  archived_results: WorkspaceResultHistoryItem[];
+  result_history: WorkspaceResultHistorySummary[];
+  archived_results: WorkspaceResultHistorySummary[];
+  result_history_next_cursor: string | null;
+  archived_results_next_cursor: string | null;
   free_schedule_entitlement: FreeScheduleEntitlement | null;
   updated_at: string | null;
 }
@@ -826,7 +828,7 @@ export interface AdminUserWorkspaceExportV1 {
     id: string;
     display_name: string;
     kind: UserGameAccountKind;
-    permission: ProductPermissionMode;
+    permission: PermissionMode;
     status: 'active' | 'frozen' | 'revoked';
     workspace: AdminUserWorkspaceExportWorkspace | null;
   }>;
@@ -844,6 +846,24 @@ export interface WorkspaceSavedConfig {
 
 type WorkspaceResultHistorySource = 'generated' | 'applied_suggestions' | 'legacy';
 
+export interface WorkspaceResultHistorySummary {
+  id: string;
+  job_id?: string;
+  name: string;
+  created_at: string;
+  operator_count: number;
+  source: WorkspaceResultHistorySource;
+  archived: boolean;
+  schedule_mode: string | null;
+  maa_exportable: boolean;
+  has_config: boolean;
+}
+
+export interface WorkspaceResultHistoryPage {
+  items: WorkspaceResultHistorySummary[];
+  next_cursor: string | null;
+}
+
 export interface WorkspaceResultHistoryItem {
   id: string;
   job_id?: string;
@@ -853,6 +873,10 @@ export interface WorkspaceResultHistoryItem {
   result: OptimizeResult;
   operator_count: number;
   source: WorkspaceResultHistorySource;
+}
+
+export interface WorkspaceResultHistoryExportItem extends WorkspaceResultHistoryItem {
+  archived_at: string | null;
 }
 
 export type WorkspaceSavedConfigAction =
@@ -1162,6 +1186,7 @@ export interface PersonalDataExportV4 {
   } | null;
   profiles: PersonalDataExportRecord[];
   workspaces: Array<UserWorkspace | null>;
+  optimization_results: WorkspaceResultHistoryExportItem[];
   legacy_workspace: PersonalDataExportRecord | null;
   usage_events: unknown[];
   optimize_jobs: PersonalDataExportRecord[];
