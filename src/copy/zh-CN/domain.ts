@@ -196,7 +196,7 @@ export const domainCopy = {
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_014: "轮换模式不导出宿舍",
   // src/components/result-panel/ResultPanel.tsx
-  components_result_panel_ResultPanel_015: "MAA 自动填满",
+  components_result_panel_ResultPanel_015: "MAA 自动填满（保留技能依赖）",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_016: "排班表写死",
   // src/components/result-panel/ResultPanel.tsx
@@ -245,6 +245,8 @@ export const domainCopy = {
   components_result_panel_ResultPanel_040: "开发者与排障",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_041: "完整计算 JSON 包含心情、效率、原始结果和调试字段，仅用于分析或问题排查，不应导入 MAA。",
+  // src/components/result-panel/ResultPanel.tsx
+  components_result_panel_ResultPanel_042: "纯 MAA 自动填满",
   // src/components/result-panel/formatters.ts
   components_result_panel_formatters_001: "按每队列 ",
   // src/components/result-panel/formatters.ts
@@ -415,6 +417,10 @@ export const domainCopy = {
   lib_config_035: "MAA 排班表需要 3–6 班；非等长间隔需覆盖 24 小时，等长间隔支持每 8、12 或 24 小时换班。",
   // src/lib/config.ts
   lib_config_036: "启用无人机时至少需要一个加速目标。",
+  // src/lib/config.ts
+  lib_config_037: "纯maa自动填满",
+  // src/lib/config.ts
+  lib_config_038: "纯自动填满",
   // src/lib/production-sanity.ts
   lib_production_sanity_001: "制造 ",
   // src/lib/production-sanity.ts

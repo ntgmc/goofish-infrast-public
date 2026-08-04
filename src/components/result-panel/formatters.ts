@@ -78,7 +78,7 @@ function getRoomDisplayRank(roomType: string): number {
 export function prepareResult(
   result: OptimizeResult,
   isRotationMode: boolean,
-  isMaaDormitoryAutofill: boolean,
+  isPureMaaDormitoryAutofill: boolean,
   operators: LicenseOperator[] = [],
 ): PreparedResult {
   const operatorLookup = buildOperatorLookup(operators)
@@ -96,7 +96,7 @@ export function prepareResult(
       if (isRotationMode && roomType === 'dormitory') return []
       return rooms.flatMap((room, index) => {
         const queueLabel = isRotationMode ? plan.name || `${copy.domain.components_result_panel_formatters_003}${planIndex + 1}` : plan.name || `${copy.domain.components_result_panel_formatters_004}${planIndex + 1}`
-        if (roomType === 'dormitory' && isMaaDormitoryAutofill) {
+        if (roomType === 'dormitory' && isPureMaaDormitoryAutofill) {
           if (index > 0) return []
           return [{
             key: `${planIndex}-${roomType}-maa-autofill`,

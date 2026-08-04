@@ -562,6 +562,23 @@ async function assertFreePreviewModeRoundTrip() {
     throw new Error(`免费档案模式往返：切回 MAA 后设置丢失，实际 ${maa.status}`)
   }
 
+  const pureAutofill = await call(workspaceHandler, '/api/user/workspace', {
+    profile_id: preview.id,
+    config: {
+      ...free333RoundTripConfig,
+      dormitory_rule: 'maa_pure_autofill',
+      Fiammetta: { enable: true },
+    },
+  }, { method: 'PATCH' })
+  const storedPureAutofill = store.workspaces.get(preview.id)?.config
+  if (
+    pureAutofill.status !== 200 ||
+    storedPureAutofill?.dormitory_rule !== 'maa_pure_autofill' ||
+    storedPureAutofill.Fiammetta?.enable !== true
+  ) {
+    throw new Error(`免费档案纯 MAA 宿舍规则：配置未被正确归一化，实际 ${pureAutofill.status}`)
+  }
+
   const generated = await call(optimizeHandler, '/api/optimize', {
     profile_id: preview.id,
     license: null,

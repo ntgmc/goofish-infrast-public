@@ -24,10 +24,10 @@ export default function ResultPanel({
   previewLimit,
 }: ResultPanelProps) {
   const isRotationMode = result.schedule_mode === 'rotation'
-  const isMaaDormitoryAutofill = !isRotationMode && result.dormitory_rule === 'maa_autofill'
+  const isPureMaaDormitoryAutofill = !isRotationMode && result.dormitory_rule === 'maa_pure_autofill'
   const prepared = useMemo(
-    () => prepareResult(result, isRotationMode, isMaaDormitoryAutofill, operators),
-    [result, isRotationMode, isMaaDormitoryAutofill, operators],
+    () => prepareResult(result, isRotationMode, isPureMaaDormitoryAutofill, operators),
+    [result, isRotationMode, isPureMaaDormitoryAutofill, operators],
   )
   const { detailStats } = prepared
   const isPreview = Boolean(previewLimit)
@@ -48,7 +48,15 @@ export default function ResultPanel({
     },
     {
       label: copy.domain.components_result_panel_ResultPanel_013,
-      value: isRotationMode ? copy.domain.components_result_panel_ResultPanel_014 : result.dormitory_rule_name ?? (isMaaDormitoryAutofill ? copy.domain.components_result_panel_ResultPanel_015 : copy.domain.components_result_panel_ResultPanel_016),
+      value: isRotationMode
+        ? copy.domain.components_result_panel_ResultPanel_014
+        : result.dormitory_rule_name ?? (
+          isPureMaaDormitoryAutofill
+            ? copy.domain.components_result_panel_ResultPanel_042
+            : result.dormitory_rule === 'maa_autofill'
+              ? copy.domain.components_result_panel_ResultPanel_015
+              : copy.domain.components_result_panel_ResultPanel_016
+        ),
     },
   ]
   const tabs: Array<{ id: ResultTabId; label: string }> = [

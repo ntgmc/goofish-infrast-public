@@ -18,6 +18,22 @@ describe('ResultPanel tabs', () => {
     ])
   })
 
+  it('shows dependency anchors for regular autofill and collapses dormitories only for pure autofill', () => {
+    const regular = createPreviewOrderResult()
+    regular.dormitory_rule = 'maa_autofill'
+    const view = render(<ResultPanel result={regular} />)
+
+    expect(screen.getByText('宿舍干员')).toBeInTheDocument()
+    expect(screen.queryByText('宿舍由 MAA 自动填满')).not.toBeInTheDocument()
+
+    view.rerender(
+      <ResultPanel result={{ ...createPreviewOrderResult(), dormitory_rule: 'maa_pure_autofill' }} />,
+    )
+    expect(screen.queryByText('宿舍干员')).not.toBeInTheDocument()
+    expect(screen.getByText('宿舍由 MAA 自动填满')).toBeInTheDocument()
+    expect(screen.getByText('纯 MAA 自动填满')).toBeInTheDocument()
+  })
+
   it('keeps aria controls and the latest panel synchronized during rapid switching', async () => {
     const user = userEvent.setup()
     render(<ResultPanel result={createResult()} />)

@@ -36,7 +36,10 @@ export const SCHEDULE_MODE_LABELS: Record<string, string> = {
 export const DORMITORY_RULE_LABELS: Record<string, string> = {
   fixed: copy.common.components_ConfigEditor_009,
   maa_autofill: copy.common.components_ConfigEditor_010,
+  maa_pure_autofill: copy.common.components_ConfigEditor_097,
 }
+
+const DORMITORY_RULE_OPTIONS = ['fixed', 'maa_autofill', 'maa_pure_autofill'] as const
 
 const VARIABLE_SHIFT_SCHEDULE_DEFAULTS = {
   enable: true,
@@ -201,6 +204,7 @@ export default function ConfigEditor({
   const rotationMode = scheduleMode === 'rotation'
   const isScheduleModeSelected = (mode: 'maa' | 'rotation') => mode === 'maa' ? !rotationMode : scheduleMode === mode
   const variableShiftMode = isVariableShiftScheduleEnabled(config)
+  const dormitoryRule = normalizeDormitoryRule(config.dormitory_rule)
   const fiammettaShiftHoursSupported = !variableShiftMode && isFiammettaShiftHoursSupported(config.shift_hours)
   const validationMessage = validation.ok === false ? validation.message : null
   const intermediateInventory = normalizeIntermediateInventory(config.intermediate_inventory)
@@ -361,27 +365,39 @@ export default function ConfigEditor({
               </div>
               <div>
                 <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_040}</p>
-                <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label={copy.common.components_ConfigEditor_041}>
-                  {(['fixed', 'maa_autofill'] as const).map((rule) => (
+                <div className="tool-inset grid gap-2 p-1 sm:grid-cols-3" role="group" aria-label={copy.common.components_ConfigEditor_041}>
+                  {DORMITORY_RULE_OPTIONS.map((rule) => (
                     <button
                       key={rule}
                       type="button"
-                      aria-pressed={normalizeDormitoryRule(config.dormitory_rule) === rule}
+                      aria-pressed={dormitoryRule === rule}
                       disabled={rotationMode}
                       onClick={() => onUpdate((next) => {
                         next.dormitory_rule = rule
                         applyCounts(next)
                       })}
                       className={`tool-secondary-action min-h-11 px-3 text-sm disabled:cursor-not-allowed ${
-                        normalizeDormitoryRule(config.dormitory_rule) === rule
+                        dormitoryRule === rule
                           ? 'tool-option-selected'
                           : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary disabled:text-ink-muted'
                       }`}
                     >
-                      {DORMITORY_RULE_LABELS[rule]}
+                      <span>{DORMITORY_RULE_LABELS[rule]}</span>
+                      {rule === 'maa_autofill' && (
+                        <span className="ml-1 text-xs text-brand-600">{copy.common.components_ConfigEditor_096}</span>
+                      )}
                     </button>
                   ))}
                 </div>
+                <p className="mt-2 text-xs leading-5 text-ink-muted">
+                  {rotationMode
+                    ? copy.common.components_ConfigEditor_065
+                    : dormitoryRule === 'maa_pure_autofill'
+                      ? copy.common.components_ConfigEditor_098
+                      : dormitoryRule === 'maa_autofill'
+                        ? copy.common.components_ConfigEditor_066
+                        : copy.common.components_ConfigEditor_067}
+                </p>
               </div>
             </div>
             <div className="mt-4">
@@ -569,33 +585,38 @@ export default function ConfigEditor({
             )}
             <div>
               <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_063}</p>
-              <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label={copy.common.components_ConfigEditor_064}>
-                {(['fixed', 'maa_autofill'] as const).map((rule) => (
+              <div className="tool-inset grid gap-2 p-1 sm:grid-cols-3" role="group" aria-label={copy.common.components_ConfigEditor_064}>
+                {DORMITORY_RULE_OPTIONS.map((rule) => (
                   <button
                     key={rule}
                     type="button"
-                    aria-pressed={normalizeDormitoryRule(config.dormitory_rule) === rule}
+                    aria-pressed={dormitoryRule === rule}
                     disabled={rotationMode}
                     onClick={() => onUpdate((next) => {
                       next.dormitory_rule = rule
                       applyCounts(next)
                     })}
                     className={`tool-secondary-action min-h-11 px-3 text-sm disabled:cursor-not-allowed ${
-                      normalizeDormitoryRule(config.dormitory_rule) === rule
+                      dormitoryRule === rule
                         ? 'tool-option-selected'
                         : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary disabled:text-ink-muted'
                     }`}
                   >
-                    {DORMITORY_RULE_LABELS[rule]}
+                    <span>{DORMITORY_RULE_LABELS[rule]}</span>
+                    {rule === 'maa_autofill' && (
+                      <span className="ml-1 text-xs text-brand-600">{copy.common.components_ConfigEditor_096}</span>
+                    )}
                   </button>
                 ))}
               </div>
               <p className="mt-2 text-xs leading-5 text-ink-muted">
                 {rotationMode
                   ? copy.common.components_ConfigEditor_065
-                  : normalizeDormitoryRule(config.dormitory_rule) === 'maa_autofill'
-                    ? copy.common.components_ConfigEditor_066
-                    : copy.common.components_ConfigEditor_067}
+                  : dormitoryRule === 'maa_pure_autofill'
+                    ? copy.common.components_ConfigEditor_098
+                    : dormitoryRule === 'maa_autofill'
+                      ? copy.common.components_ConfigEditor_066
+                      : copy.common.components_ConfigEditor_067}
               </p>
             </div>
           <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
