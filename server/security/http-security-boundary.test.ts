@@ -53,6 +53,26 @@ describe('HTTP security boundary', () => {
     )).allowed).toBe(false)
   })
 
+  it('allows admin user profile pagination query parameters and rejects unknown keys', async () => {
+    const allowed = inspectIncomingRequest(incomingGet(
+      '/api/admin/users?user_id=user-1&profile_page=2&profile_page_size=100',
+      'localhost:3001',
+      '127.0.0.1',
+    ))
+    expect(allowed.allowed).toBe(true)
+
+    const rejected = inspectIncomingRequest(incomingGet(
+      '/api/admin/users?user_id=user-1&profile_limit=100',
+      'localhost:3001',
+      '127.0.0.1',
+    ))
+    expect(rejected.allowed).toBe(false)
+    if (!rejected.allowed) {
+      expect(rejected.response.status).toBe(400)
+      await expect(rejected.response.json()).resolves.toMatchObject({ code: 'invalid_request' })
+    }
+  })
+
   it('ships a strict-style report-only policy during inline-style migration', () => {
     const response = applyHttpSecurityHeaders(new Response('ok'), true)
 
