@@ -1,4 +1,4 @@
-import type { FreeScheduleEntitlement, LicenseConfig, LicenseOperator, OptimizeResult, UpgradeSuggestion } from '../../../lib/types'
+import type { FreeScheduleEntitlement, LicenseConfig, LicenseOperator, OptimizeResult, UpgradeSuggestion, WorkspaceResultHistoryItem, WorkspaceResultHistorySummary } from '../../../lib/types'
 import { canonicalJson } from '../../../lib/crypto'
 import { SCHEDULE_PROGRESS_COMPLETION_DURATION_MS } from '../../../components/ScheduleProgress'
 import { getUpgradeSuggestionId } from '../../../lib/upgrade-suggestion-id'
@@ -16,6 +16,14 @@ export function formatConfigPresetLabel(config: LicenseConfig): string {
   const trading = config.product_requirements?.trading_stations ?? {}
   const suffix = (trading.Orundum ?? 0) > 0 ? copy.optimize.pages_tool_optimize_workflow_utils_001 : copy.optimize.pages_tool_optimize_workflow_utils_002
   return `${presetLayout} ${suffix}`
+}
+
+export function resolveLatestHistoryConfig(
+  historyItem: WorkspaceResultHistoryItem | null,
+  latestResult: WorkspaceResultHistorySummary | null,
+): LicenseConfig | null {
+  if (!historyItem || historyItem.id !== latestResult?.id) return null
+  return historyItem.config
 }
 
 export function normalizeUpgradeSuggestions(
