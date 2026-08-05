@@ -1,6 +1,12 @@
-import { Dialog } from 'radix-ui'
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
 import { copy } from '../../../copy/index'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '../../../components/ui/dialog'
 import { apiJson, getApiErrorMessage } from '../../../lib/api-client'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import SklandBindingDialog, { type SklandPayload } from '../../../components/SklandBindingDialog'
@@ -62,6 +68,7 @@ export default function InventorySection({
   const [notice, setNotice] = useState<InventoryNotice | null>(null)
   const [rewards, setRewards] = useState<UseResponse['rewards']>(undefined)
   const [lifetimeDialogOpen, setLifetimeDialogOpen] = useState(false)
+  const selectedTriggerRef = useRef<HTMLButtonElement | null>(null)
   const itemIdempotencyKeyRef = useRef(crypto.randomUUID())
   const { features } = useSiteFeatures()
 
@@ -260,7 +267,7 @@ export default function InventorySection({
         ) : (
           <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {filtered.map((stack) => (
-              <button key={stack.stack_id} type="button" onClick={() => { setSelected(stack); setProfileId(''); setLifetimeDisplayName(''); setLifetimeNote('') }} className="tool-inset min-w-0 p-4 text-left transition hover:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
+              <button key={stack.stack_id} type="button" onClick={(event) => { selectedTriggerRef.current = event.currentTarget; setSelected(stack); setProfileId(''); setLifetimeDisplayName(''); setLifetimeNote('') }} className="tool-inset min-w-0 p-4 text-left transition hover:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
                 <img src={itemIconPath(stack.item.icon_key)} onError={fallbackItemIcon} alt="" width={64} height={64} className="mx-auto h-16 w-16 object-contain" />
                 <strong className="mt-3 block truncate text-sm text-ink-primary">{stack.item.name}</strong>
                 <span className="mt-1 block text-xs text-ink-secondary">{copy.inventory.quantity} × {stack.quantity}</span>
@@ -271,15 +278,21 @@ export default function InventorySection({
         )}
       </section>
 
-      <Dialog.Root open={Boolean(selected)} onOpenChange={(open) => { if (!open) setSelected(null) }}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[85dvh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-surface-3 bg-surface-1 p-5 shadow-2xl focus:outline-none sm:p-6">
-            {selected && <>
-              <div className="flex gap-4">
-                <img src={itemIconPath(selected.item.icon_key)} onError={fallbackItemIcon} alt="" width={64} height={64} className="h-16 w-16 object-contain" />
-                <div className="min-w-0"><Dialog.Title className="text-lg font-semibold text-ink-primary">{selected.item.name}</Dialog.Title><Dialog.Description className="mt-1 text-sm leading-6 text-ink-secondary">{selected.item.description}</Dialog.Description></div>
-              </div>
+      <Dialog open={Boolean(selected)} onOpenChange={(open) => { if (!open) setSelected(null) }}>
+        <DialogContent
+          className="block"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault()
+            if (!lifetimeDialogOpen && selectedTriggerRef.current?.isConnected) {
+              selectedTriggerRef.current.focus()
+            }
+          }}
+        >
+          {selected && <>
+            <div className="flex gap-4">
+              <img src={itemIconPath(selected.item.icon_key)} onError={fallbackItemIcon} alt="" width={64} height={64} className="h-16 w-16 object-contain" />
+              <div className="min-w-0"><DialogTitle className="text-ink-primary">{selected.item.name}</DialogTitle><DialogDescription className="mt-1">{selected.item.description}</DialogDescription></div>
+            </div>
               <h4 className="mt-5 text-sm font-semibold text-ink-primary">{copy.inventory.batches}</h4>
               <ul className="mt-2 space-y-2 text-sm text-ink-secondary">
                 {selected.expiry_buckets.map((bucket, index) => <li key={`${bucket.expires_at ?? 'never'}-${index}`} className="tool-inset flex justify-between p-3"><span>× {bucket.quantity}</span><span>{bucket.expires_at ? formatShanghaiDateTime(bucket.expires_at) : copy.inventory.permanent}</span></li>)}
@@ -307,21 +320,20 @@ export default function InventorySection({
                 </div>
               </>}
               {selected.item.code === 'limited_profile_voucher' && <div className="tool-alert mt-5">{copy.inventory.limited_use_help}</div>}
-              <div className="mt-6 flex flex-wrap justify-end gap-3">
-                <Dialog.Close className="tool-secondary-action">{copy.inventory.close}</Dialog.Close>
-                {selected.item.code === 'lifetime_profile_voucher' ? <>
-                  <button type="button" disabled={busy || !canUseSelected} onClick={() => void createLifetimeProfileWithJson()} className="tool-secondary-action">
-                    {busy ? copy.inventory.processing : copy.inventory.create_with_json}
-                  </button>
-                  <button type="button" disabled={busy || !canUseSelected} onClick={() => { setSelected(null); setLifetimeDialogOpen(true) }} className="tool-primary-action">
-                    {copy.inventory.bind_and_use}
-                  </button>
-                </> : !selected.actions.includes('context_only') && <button type="button" disabled={busy || !canUseSelected} onClick={() => void runItemAction()} className="tool-primary-action">{busy ? copy.inventory.processing : selected.item.kind === 'gift_pack' ? copy.inventory.open : copy.inventory.use}</button>}
-              </div>
-            </>}
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
+              <DialogClose className="tool-secondary-action">{copy.inventory.close}</DialogClose>
+              {selected.item.code === 'lifetime_profile_voucher' ? <>
+                <button type="button" disabled={busy || !canUseSelected} onClick={() => void createLifetimeProfileWithJson()} className="tool-secondary-action">
+                  {busy ? copy.inventory.processing : copy.inventory.create_with_json}
+                </button>
+                <button type="button" disabled={busy || !canUseSelected} onClick={() => { setSelected(null); setLifetimeDialogOpen(true) }} className="tool-primary-action">
+                  {copy.inventory.bind_and_use}
+                </button>
+              </> : !selected.actions.includes('context_only') && <button type="button" disabled={busy || !canUseSelected} onClick={() => void runItemAction()} className="tool-primary-action">{busy ? copy.inventory.processing : selected.item.kind === 'gift_pack' ? copy.inventory.open : copy.inventory.use}</button>}
+            </div>
+          </>}
+        </DialogContent>
+      </Dialog>
 
       {rewards && rewards.length > 0 && <section className="tool-panel p-5" aria-live="polite"><h3 className="text-base font-semibold text-ink-primary">{copy.inventory.rewards_received}</h3><ul className="mt-3 grid gap-2 sm:grid-cols-2">{rewards.map((reward) => <li key={reward.item_code} className="tool-inset flex items-center gap-3 p-3 text-sm text-ink-secondary"><img src={itemIconPath(reward.icon_key)} onError={fallbackItemIcon} alt="" width={36} height={36} className="h-9 w-9 object-contain" /><span>{reward.name} × {reward.quantity} · {reward.expires_at ? formatShanghaiDateTime(reward.expires_at) : copy.inventory.permanent}</span></li>)}</ul></section>}
       {(inventory?.recent_events.length ?? 0) > 0 && <section className="tool-panel p-5 sm:p-6" aria-labelledby="inventory-events-title">

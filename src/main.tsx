@@ -4,9 +4,11 @@ import { BrowserRouter } from 'react-router'
 import App from './App'
 import { installStaleChunkReloadHandler } from './lib/chunk-reload'
 import { clearLocalViteDevCaches } from './lib/local-dev-cache'
+import { installDebugDiagnostics } from './lib/debug-diagnostics'
 import './index.css'
 
 clearLocalViteDevCaches()
+installDebugDiagnostics()
 installStaleChunkReloadHandler()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

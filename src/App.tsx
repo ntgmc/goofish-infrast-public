@@ -20,6 +20,7 @@ import PublicContentRoute from './components/PublicContentRoute'
 import { apiVoid } from './lib/api-client'
 import { categorizeBehaviorRiskPath } from './lib/behavior-risk-client'
 import NotFoundPage from './components/NotFoundPage'
+import { recordDebugNavigation } from './lib/debug-diagnostics'
 
 
 const ToolPage = lazy(() => import('./pages/ToolPage'))
@@ -48,6 +49,10 @@ function AppContent() {
   const navigate = useNavigate()
   const location = useLocation()
   const routeGroup = getRouteGroup(location.pathname)
+
+  useEffect(() => {
+    recordDebugNavigation(location.pathname)
+  }, [location.pathname])
 
   useEffect(() => {
     if (location.pathname.startsWith('/admin')) return

@@ -18,16 +18,25 @@ describe('CompactHeaderMenu', () => {
 
     const trigger = screen.getByRole('button', { name: '打开栏目菜单' })
     expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
+    expect(trigger).toHaveAttribute('data-slot', 'dropdown-menu-trigger')
     expect(trigger).toHaveClass('h-11')
 
     await user.click(trigger)
 
+    expect(screen.getByRole('menu')).toHaveAttribute('data-slot', 'dropdown-menu-content')
     expect(screen.getByText('测试账号')).toBeInTheDocument()
     const currentItem = screen.getByRole('menuitem', { name: /当前栏目.*3/ })
     expect(currentItem).toHaveAttribute('aria-current', 'page')
     expect(screen.getByText('3')).toHaveClass('tool-status')
     expect(screen.getByRole('menuitem', { name: '链接栏目' })).toHaveAttribute('href', '/linked')
-    expect(screen.getByRole('menuitem', { name: '退出登录' })).toHaveClass('text-error')
+    expect(screen.getByRole('menuitem', { name: '退出登录' }))
+      .toHaveAttribute('data-variant', 'destructive')
+    expect(screen.getByRole('menuitem', { name: '退出登录' }))
+      .toHaveClass(
+        'data-[variant=destructive]:text-destructive',
+        'text-error',
+        'data-[highlighted]:text-error',
+      )
 
     await user.click(currentItem)
     expect(onCurrent).toHaveBeenCalledOnce()

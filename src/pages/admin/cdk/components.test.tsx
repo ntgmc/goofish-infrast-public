@@ -55,9 +55,10 @@ describe('CdkDetailDialog', () => {
     await user.click(trigger)
 
     const dialog = screen.getByRole('dialog', { name: detail.cdk_id })
-    expect(dialog.parentElement).toHaveClass('fixed', 'inset-0')
+    expect(dialog).toHaveAttribute('data-slot', 'dialog-content')
     expect(dialog).toHaveClass('overflow-y-auto')
     expect(dialog.className).toContain('100dvh')
+    expect(document.querySelector('[data-slot="dialog-overlay"]')).toBeInTheDocument()
     expect(document.body).toHaveStyle({ overflow: 'hidden' })
     await waitFor(() => expect(screen.getByRole('button', { name: '关闭' })).toHaveFocus())
 
@@ -73,9 +74,10 @@ describe('CdkDetailDialog', () => {
     render(<DialogHarness />)
     await user.click(screen.getByRole('button', { name: '打开 CDK 详情' }))
 
-    const backdrop = screen.getByRole('dialog', { name: detail.cdk_id }).parentElement
+    const backdrop = document.querySelector<HTMLElement>('[data-slot="dialog-overlay"]')
     if (!backdrop) throw new Error('Expected dialog backdrop.')
-    fireEvent.mouseDown(backdrop)
+    fireEvent.pointerDown(backdrop)
+    fireEvent.click(backdrop)
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })

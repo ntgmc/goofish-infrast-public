@@ -16,6 +16,7 @@ describe('SettingsSection privacy controls', () => {
       id: 'profile-1', user_id: 'user-1', kind: 'depot_value', permission: 'growth', status: 'active', cdk_order_hash: null,
       display_name: '仓库分析', note: '', skland_binding: null, operator_count: 0, created_at: '2026-01-01T00:00:00.000Z', updated_at: null,
     }]} onLogout={vi.fn()} onPayload={vi.fn()} />)
+    expect(screen.getByRole('heading', { name: '调试模式' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '数据与隐私' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '导出个人数据' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '撤回仓库样本' })).not.toBeInTheDocument()

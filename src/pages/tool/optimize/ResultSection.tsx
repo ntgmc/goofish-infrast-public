@@ -5,6 +5,7 @@ import { isMaaJsonDownloadable } from '../../../lib/workspace-history'
 import { ResultFallback } from './feedback'
 import type { OptimizePhase } from './types'
 import { copy } from '../../../copy/index'
+import { recordDebugError } from '../../../lib/debug-diagnostics'
 
 
 const ResultPanel = lazy(() => import('../../../components/ResultPanel'))
@@ -173,6 +174,7 @@ class ResultErrorBoundary extends Component<{
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    recordDebugError(error, 'react_error', { context: 'result_render' })
     console.error('result rendering failed:', error, info.componentStack)
   }
 

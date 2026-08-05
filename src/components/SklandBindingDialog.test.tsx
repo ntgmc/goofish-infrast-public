@@ -35,6 +35,9 @@ describe('SklandBindingDialog accessibility', () => {
     const dialog = screen.getByRole('dialog', { name: '森空岛导入' })
     expect(dialog).toHaveAttribute('aria-modal', 'true')
     expect(dialog).toHaveAttribute('aria-describedby', 'skland-binding-description')
+    expect(dialog).toHaveAttribute('data-slot', 'dialog-content')
+    expect(dialog).toHaveClass('block', 'max-w-2xl')
+    expect(document.querySelector('[data-slot="dialog-overlay"]')).toBeInTheDocument()
     await waitFor(() => expect(screen.getByRole('button', { name: '关闭森空岛导入' })).toHaveFocus())
 
     await user.keyboard('{Escape}')

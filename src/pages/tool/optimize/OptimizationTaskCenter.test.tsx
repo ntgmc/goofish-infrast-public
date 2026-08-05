@@ -26,6 +26,9 @@ describe('OptimizationTaskCenter', () => {
 
     const dialog = screen.getByRole('dialog', { name: '异步任务中心' })
     expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(dialog).toHaveAttribute('data-slot', 'dialog-content')
+    expect(dialog).toHaveClass('block', 'max-w-3xl')
+    expect(document.querySelector('[data-slot="dialog-overlay"]')).toBeInTheDocument()
     expect(trigger).toHaveAttribute('aria-expanded', 'true')
     expect(document.body).toHaveStyle({ overflow: 'hidden' })
     await waitFor(() => expect(screen.getByRole('button', { name: '关闭' })).toHaveFocus())

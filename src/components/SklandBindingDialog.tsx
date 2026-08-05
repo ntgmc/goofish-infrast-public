@@ -1,7 +1,8 @@
-import { useEffect, useRef, type KeyboardEvent, type RefObject } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 import type { UserGameAccount } from '../lib/types'
 import { useSklandBinding, type SklandAccountOption, type SklandImportMode, type SklandLoginState, type SklandPayload, type SklandPreview } from '../hooks/useSklandBinding'
 import { copy } from '../copy/index'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
 
 
 export type { SklandPayload } from '../hooks/useSklandBinding'
@@ -57,28 +58,15 @@ export default function SklandBindingDialog({
     selectMode,
     setMessage,
   } = useSklandBinding({ open, profile, context, claimProfileMeta, autoStart, onOpenChange, onPayload, onCompleted })
-  const dialogRef = useRef<HTMLElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const firstAccountRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const previousActiveElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    const focusTimer = window.setTimeout(() => closeButtonRef.current?.focus(), 0)
-
-    return () => {
-      window.clearTimeout(focusTimer)
-      if (previousActiveElement?.isConnected) previousActiveElement.focus()
-    }
-  }, [open])
+  const returnFocusRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     if (!open || sklandLogin.status !== 'account_selection_required') return
     const focusTimer = window.setTimeout(() => firstAccountRef.current?.focus(), 0)
     return () => window.clearTimeout(focusTimer)
   }, [open, sklandLogin.status])
-
-  if (!open) return null
 
   const currentStep = stepForStatus(sklandLogin.status)
   const hasError = sklandLogin.status === 'error' || sklandLogin.status === 'account_mismatch' || sklandLogin.status === 'frozen'
@@ -94,46 +82,29 @@ export default function SklandBindingDialog({
         ? copy.workspace.components_SklandBindingDialog_lifetime_description
         : copy.workspace.components_SklandBindingDialog_010
 
-  const handleDialogKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      close()
-      return
-    }
-    if (event.key !== 'Tab') return
-
-    const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
-      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
-    )
-    if (!focusable || focusable.length === 0) return
-
-    const first = focusable[0]
-    const last = focusable[focusable.length - 1]
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault()
-      last.focus()
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault()
-      first.focus()
-    }
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4 py-6">
-      <section
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) close() }}>
+      <DialogContent
         aria-labelledby="skland-binding-title"
         aria-describedby="skland-binding-description"
-        tabIndex={-1}
-        onKeyDown={handleDialogKeyDown}
-        className="tool-panel max-h-[calc(100vh-3rem)] w-full max-w-2xl overflow-y-auto p-5 shadow-2xl"
+        className="block max-w-2xl"
+        onOpenAutoFocus={(event) => {
+          returnFocusRef.current = document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null
+          event.preventDefault()
+          closeButtonRef.current?.focus()
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          if (returnFocusRef.current?.isConnected) returnFocusRef.current.focus()
+          returnFocusRef.current = null
+        }}
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 id="skland-binding-title" className="text-lg font-semibold text-ink-primary">{title}</h2>
-            <p id="skland-binding-description" className="mt-1 text-sm leading-6 text-ink-secondary">{description}</p>
+            <DialogTitle id="skland-binding-title" className="text-ink-primary">{title}</DialogTitle>
+            <DialogDescription id="skland-binding-description" className="mt-1">{description}</DialogDescription>
           </div>
           <button ref={closeButtonRef} type="button" onClick={close} className="tool-secondary-action shrink-0 px-3 py-2 text-sm" aria-label={copy.workspace.components_SklandBindingDialog_011}>
             {copy.workspace.components_SklandBindingDialog_012}</button>
@@ -243,8 +214,8 @@ export default function SklandBindingDialog({
             </button>
           )}
         </div>
-      </section>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 

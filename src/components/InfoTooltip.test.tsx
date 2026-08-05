@@ -26,11 +26,15 @@ describe('InfoTooltip', () => {
     )
 
     const trigger = screen.getByRole('button', { name: '了解优先计算券' })
+    expect(trigger).toHaveAttribute('data-slot', 'tooltip-trigger')
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
 
     await user.hover(trigger)
 
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('券只影响排队顺序')
+    const tooltip = await screen.findByRole('tooltip')
+    expect(tooltip).toHaveAttribute('data-slot', 'tooltip-content')
+    expect(tooltip).toHaveClass('w-[min(20rem,calc(100vw-2rem))]')
+    expect(tooltip).toHaveTextContent('券只影响排队顺序')
   })
 
   it('opens from a touch-style click', async () => {

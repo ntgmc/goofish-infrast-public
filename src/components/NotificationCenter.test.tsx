@@ -50,6 +50,26 @@ describe('NotificationCenter', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: '通知，无未读消息' })).toBeInTheDocument())
   })
 
+  it('uses the local popover contract and restores trigger focus on Escape', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(page(1)))
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    renderCenter()
+
+    const trigger = await screen.findByRole('button', { name: '通知，1 条未读' })
+    expect(trigger).toHaveAttribute('data-slot', 'popover-trigger')
+    trigger.focus()
+    await user.click(trigger)
+
+    const content = await screen.findByLabelText('通知')
+    expect(content).toHaveAttribute('data-slot', 'popover-content')
+    expect(content).toHaveClass('w-[min(24rem,calc(100vw-1.5rem))]', 'gap-0', 'p-0')
+
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByLabelText('通知')).not.toBeInTheDocument())
+    expect(trigger).toHaveFocus()
+  })
+
   it('refreshes when the visible window regains focus', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(page(1)))
     vi.stubGlobal('fetch', fetchMock)
