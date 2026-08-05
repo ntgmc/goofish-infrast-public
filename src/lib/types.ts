@@ -269,7 +269,7 @@ export type DepotValueRequest =
   | {
       source: 'skland';
       profile_id: string;
-      sample_consent: boolean;
+      sample_consent?: boolean;
     };
 
 export interface DepotValueItem {

@@ -1657,6 +1657,42 @@ CREATE INDEX IF NOT EXISTS idx_depot_value_samples_valuation_total
 UPDATE depot_value_samples SET contributor_profile_id = NULL
  WHERE contributor_profile_id IS NOT NULL
    AND NOT EXISTS (SELECT 1 FROM user_game_accounts WHERE id = depot_value_samples.contributor_profile_id);
+WITH migratable_v1_samples AS (
+  SELECT uid_hash, round(priced_count::numeric / inventory_item_count, 4) AS pricing_coverage
+    FROM depot_value_samples
+   WHERE version = 1
+     AND complete = false
+     AND jsonb_typeof(sample_json) = 'object'
+     AND total_equivalent_sanity BETWEEN 0 AND 9007199254740991
+     AND operator_power_score BETWEEN 0 AND 9007199254740991
+     AND (account_level IS NULL OR account_level >= 0)
+     AND operator_count >= 0 AND elite2_count >= 0 AND six_star_count >= 0
+     AND six_star_e2_count >= 0 AND e2_90_count >= 0
+     AND inventory_item_count > 0 AND priced_count >= 0 AND unpriced_count >= 0
+     AND priced_count + unpriced_count = inventory_item_count
+     AND priced_count::numeric / inventory_item_count >= 0.8
+)
+UPDATE depot_value_samples AS sample
+   SET uid_hash_key_version = coalesce(nullif(btrim(sample.uid_hash_key_version), ''), 'legacy'),
+       version = 2,
+       valuation_version = 'depot-v2:migrated:v1',
+       pricing_snapshot_id = 'legacy-v1',
+       pricing_fetched_at = sample.sampled_at,
+       pricing_status = 'stale',
+       pricing_coverage = migrated.pricing_coverage,
+       complete = true,
+       sample_json = sample.sample_json || jsonb_build_object(
+         'version', 2,
+         'valuation_version', 'depot-v2:migrated:v1',
+         'pricing_snapshot_id', 'legacy-v1',
+         'pricing_fetched_at', sample.sampled_at,
+         'pricing_status', 'stale',
+         'pricing_coverage', migrated.pricing_coverage,
+         'complete', true,
+         'migration_source', 'depot-v1'
+       )
+  FROM migratable_v1_samples AS migrated
+ WHERE sample.uid_hash = migrated.uid_hash;
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_usage_events_user') THEN

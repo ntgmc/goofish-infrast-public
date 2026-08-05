@@ -242,10 +242,10 @@ async function assertSklandFlow() {
     },
   }]
 
-  const missingAuth = await callDepot({ source: 'skland', profile_id: 'bound-profile', sample_consent: true }, { auth: false })
+  const missingAuth = await callDepot({ source: 'skland', profile_id: 'bound-profile' }, { auth: false })
   if (missingAuth.status !== 401) throw new Error(`skland auth: expected 401, got ${missingAuth.status}`)
 
-  const unbound = await callDepot({ source: 'skland', profile_id: 'unbound-profile', sample_consent: true })
+  const unbound = await callDepot({ source: 'skland', profile_id: 'unbound-profile' })
   if (unbound.status !== 404) throw new Error(`skland unbound: expected 404, got ${unbound.status}`)
 
   const declined = await callDepot({ source: 'skland', profile_id: 'bound-profile', sample_consent: false })
@@ -255,7 +255,7 @@ async function assertSklandFlow() {
     throw new Error('skland import: explicit sample consent should be required before reading sample-only player data')
   }
 
-  const imported = await callDepot({ source: 'skland', profile_id: 'bound-profile', sample_consent: true })
+  const imported = await callDepot({ source: 'skland', profile_id: 'bound-profile' })
   assertNoSecretLeak(imported.body, 'skland import response')
   if (imported.body.ranking.contribution_status !== 'saved') {
     throw new Error(`skland import: expected consented saved contribution, got ${imported.body.ranking.contribution_status}`)
@@ -285,13 +285,13 @@ async function assertSklandFlow() {
   }
   assertNoRawSampleLeak(record, 'skland import sample record')
 
-  const repeated = await callDepot({ source: 'skland', profile_id: 'bound-profile', sample_consent: true })
+  const repeated = await callDepot({ source: 'skland', profile_id: 'bound-profile' })
   if (repeated.status !== 200 || sampleStore.records.size !== 1) {
     throw new Error('skland import: repeated same uid should update one sample record')
   }
 
   globalThis.__depotGameInfoFails = true
-  const unavailable = await callDepot({ source: 'skland', profile_id: 'bound-profile', sample_consent: true })
+  const unavailable = await callDepot({ source: 'skland', profile_id: 'bound-profile' })
   globalThis.__depotGameInfoFails = false
   if (unavailable.status !== 200 || unavailable.body.ranking.contribution_status !== 'unavailable') {
     throw new Error(`skland import: game info failure should not block analysis, got ${unavailable.status}/${unavailable.body.ranking.contribution_status}`)
@@ -299,7 +299,7 @@ async function assertSklandFlow() {
 
   const secret = process.env.DEPOT_SAMPLE_HASH_SECRET
   delete process.env.DEPOT_SAMPLE_HASH_SECRET
-  const missingSecret = await callDepot({ source: 'skland', profile_id: 'bound-profile', sample_consent: true })
+  const missingSecret = await callDepot({ source: 'skland', profile_id: 'bound-profile' })
   process.env.DEPOT_SAMPLE_HASH_SECRET = secret
   if (missingSecret.status !== 200 || missingSecret.body.ranking.contribution_status !== 'unavailable') {
     throw new Error('skland import: missing sample hash secret should degrade without failing valuation')
@@ -310,7 +310,7 @@ async function assertSklandFlow() {
   process.env.MAA_MATERIAL_VALUE_MAX_STALE_MS = '0'
   globalThis.fetch = async () => { throw new Error('remote price source down') }
   handler = await loadHandler(handlerPath)
-  const pricingUnavailable = await callDepot({ source: 'skland', profile_id: 'bound-profile', sample_consent: true })
+  const pricingUnavailable = await callDepot({ source: 'skland', profile_id: 'bound-profile' })
   const preservedRecord = [...sampleStore.records.values()][0]
   if (pricingUnavailable.status !== 200
     || pricingUnavailable.body.ranking.contribution_status !== 'skipped'
@@ -320,8 +320,8 @@ async function assertSklandFlow() {
   }
 
   const revoked = await callDepotDelete({ profile_id: 'bound-profile' })
-  if (revoked.status !== 200 || sampleStore.records.size !== 0) {
-    throw new Error('skland import: contributor should be able to revoke the profile sample')
+  if (revoked.status !== 405 || sampleStore.records.size !== 1) {
+    throw new Error('skland import: saved profile samples must not be manually revocable')
   }
 }
 
@@ -573,15 +573,6 @@ function createMemoryDepotValueSampleStore() {
         less_count: values.filter((record) => record.total_equivalent_sanity < totalEquivalentSanity).length,
         equal_count: values.filter((record) => record.total_equivalent_sanity === totalEquivalentSanity).length,
       }
-    },
-    deleteForContributorProfile: async (profileId) => {
-      let deleted = 0
-      for (const [hash, record] of records) {
-        if (record.contributor_profile_id !== profileId) continue
-        records.delete(hash)
-        deleted += 1
-      }
-      return deleted
     },
   }
 }

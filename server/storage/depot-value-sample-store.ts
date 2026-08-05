@@ -1,6 +1,8 @@
 import { hasDatabaseUrl, query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 
+const MIGRATED_V1_VALUATION_VERSION = 'depot-v2:migrated:v1'
+
 export interface DepotValueSampleRecord {
   version: 2
   uid_hash: string
@@ -37,7 +39,6 @@ interface DepotValueSampleDistribution {
 export interface DepotValueSampleStore {
   save: (record: DepotValueSampleRecord, previousUidHashes?: string[]) => Promise<void>
   getDistribution: (totalEquivalentSanity: number, valuationVersion: string) => Promise<DepotValueSampleDistribution>
-  deleteForContributorProfile: (profileId: string) => Promise<number>
 }
 
 let schemaReady: Promise<void> | null = null
@@ -129,7 +130,9 @@ function createPostgresDepotValueSampleStore(): DepotValueSampleStore {
         `with current_samples as (
            select distinct on (coalesce(contributor_profile_id, uid_hash)) total_equivalent_sanity
              from depot_value_samples
-            where version = 2 and complete = true and valuation_version = $2
+            where version = 2
+              and complete = true
+              and valuation_version in ($2, $3)
             order by coalesce(contributor_profile_id, uid_hash), sampled_at desc, updated_at desc
          )
          select
@@ -137,18 +140,13 @@ function createPostgresDepotValueSampleStore(): DepotValueSampleStore {
            count(*) filter (where total_equivalent_sanity < $1)::int as less_count,
            count(*) filter (where total_equivalent_sanity = $1)::int as equal_count
          from current_samples`,
-        [totalEquivalentSanity, valuationVersion],
+        [totalEquivalentSanity, valuationVersion, MIGRATED_V1_VALUATION_VERSION],
       )
       return {
         sample_count: result.rows[0]?.sample_count ?? 0,
         less_count: result.rows[0]?.less_count ?? 0,
         equal_count: result.rows[0]?.equal_count ?? 0,
       }
-    },
-    deleteForContributorProfile: async (profileId) => {
-      await ensureSchema()
-      const result = await query('delete from depot_value_samples where contributor_profile_id = $1', [profileId])
-      return result.rowCount ?? 0
     },
   }
 }

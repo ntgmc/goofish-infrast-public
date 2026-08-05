@@ -47,7 +47,7 @@ describe('DepotValuePage', () => {
     await waitFor(() => expect(mocks.apiJsonOrNull).toHaveBeenCalledTimes(2))
   })
 
-  it('requires explicit sample consent and renders pricing provenance', async () => {
+  it('defaults sample contribution on, allows opting out before analysis, and renders pricing provenance', async () => {
     const user = userEvent.setup()
     mocks.apiJsonOrNull.mockResolvedValue(authPayload())
     mocks.apiJson.mockResolvedValue(depotResult())
@@ -57,16 +57,17 @@ describe('DepotValuePage', () => {
     const analyzeButton = await screen.findByRole('button', { name: '使用森空岛库存' })
     await user.click(analyzeButton)
     expect(mocks.apiJson).toHaveBeenNthCalledWith(1, '/api/depot-value', expect.objectContaining({
-      json: { source: 'skland', profile_id: 'profile-1', sample_consent: false },
+      json: { source: 'skland', profile_id: 'profile-1', sample_consent: true },
     }))
     expect(await screen.findByText(/新鲜快照/, { selector: 'dd' })).toBeInTheDocument()
     expect(screen.getByText('snapshot-abcdef1')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('checkbox', { name: /我明确同意贡献假名化聚合样本/ }))
+    await user.click(screen.getByRole('checkbox', { name: /默认同意贡献假名化聚合样本/ }))
     await user.click(screen.getByRole('button', { name: '使用森空岛库存' }))
     expect(mocks.apiJson).toHaveBeenNthCalledWith(2, '/api/depot-value', expect.objectContaining({
-      json: { source: 'skland', profile_id: 'profile-1', sample_consent: true },
+      json: { source: 'skland', profile_id: 'profile-1', sample_consent: false },
     }))
+    expect(screen.queryByRole('button', { name: /撤回.*仓库样本/ })).not.toBeInTheDocument()
   })
 })
 

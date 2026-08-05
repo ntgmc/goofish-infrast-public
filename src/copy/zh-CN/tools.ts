@@ -68,7 +68,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_034: "绑定森空岛并分析仓库",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_035: "统计样本属于假名化数据而非匿名数据：它不含仓库/干员明细、昵称、UID 明文或凭据，但会关联本网站档案，以支持导出、撤回和账户删除。",
+  pages_DepotValuePage_035: "统计样本属于假名化数据而非匿名数据：它不含仓库/干员明细、昵称、UID 明文或凭据，但会关联本网站档案，以支持导出和账户删除。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_036: "估值说明",
   // src/pages/DepotValuePage.tsx
@@ -78,7 +78,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_039: "材料价格优先参考一图流/企鹅物流的物品价值。模组数据块、数据增补仪、数据增补条、家具零件不会参与计算。",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_040: "只有明确同意、价格快照有效且覆盖率达标的同版本样本才会进入排名；你可以随时撤回。",
+  pages_DepotValuePage_040: "默认贡献已开启，分析前可以取消；价格快照有效且覆盖率达标的当前样本与兼容迁移样本会进入排名。样本保存后不支持单独撤回，账户注销时仍会删除关联数据。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_041: "分析完成",
   // src/pages/DepotValuePage.tsx
@@ -160,10 +160,6 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_080: "登录状态加载失败，请重试。",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_081: "撤回仓库统计样本失败，请稍后重试。",
-  // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_082: "该档案关联的仓库统计样本已撤回。",
-  // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_083: " · ",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_084: " 字节",
@@ -172,11 +168,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_086: "重试登录状态",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_087: "我明确同意贡献假名化聚合样本，用于改进同版本仓库排名。样本保存总值、价格快照/覆盖率、账号等级和干员聚合计数，并关联本网站档案以支持导出、撤回和账户删除；保存至撤回或账户删除为止。",
-  // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_088: "正在撤回...",
-  // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_089: "撤回该档案的仓库样本",
+  pages_DepotValuePage_087: "默认同意贡献假名化聚合样本，用于改进仓库排名；如不同意，请在分析前取消勾选。样本保存总值、价格快照/覆盖率、账号等级和干员聚合计数，并关联本网站档案以支持导出和账户删除；保存后不支持单独撤回，账户注销时删除。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_090: "估值口径",
   // src/pages/DepotValuePage.tsx

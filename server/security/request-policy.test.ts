@@ -347,7 +347,7 @@ describe('invitation request policy', () => {
 })
 
 describe('depot value request policy', () => {
-  it('uses a strict source union with bounded integer inventory counts and explicit consent', () => {
+  it('uses a strict source union with bounded integer inventory counts and optional consent override', () => {
     expect(requestSchemas.depotValue.safeParse({
       source: 'upload',
       inventory: { '2001': 1, '30011': 100 },
@@ -368,7 +368,7 @@ describe('depot value request policy', () => {
     expect(requestSchemas.depotValue.safeParse({
       source: 'skland',
       profile_id: 'profile-1',
-    }).success).toBe(false)
+    }).success).toBe(true)
     expect(requestSchemas.depotValue.safeParse({
       source: 'upload',
       inventory: { '2001': 1.5 },
@@ -389,11 +389,5 @@ describe('depot value request policy', () => {
         (_, index) => [String(index), 1],
       )),
     }).success).toBe(false)
-  })
-
-  it('limits sample revocation to one bounded profile id', () => {
-    expect(requestSchemas.depotSampleRevoke.safeParse({ profile_id: 'profile-1' }).success).toBe(true)
-    expect(requestSchemas.depotSampleRevoke.safeParse({ profile_id: '' }).success).toBe(false)
-    expect(requestSchemas.depotSampleRevoke.safeParse({ profile_id: 'profile-1', all: true }).success).toBe(false)
   })
 })
