@@ -8,35 +8,15 @@ export const optimizeCopy = {
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_004: "练度优化建议",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_005: "建议按缺口理智和每日理智收益估算回本，材料成本来自森空岛养成库存。",
+  components_UpgradeSuggestions_005: "建议仅供练度规划；完成训练并刷新干员数据后，后续计算会自动使用最新练度。缺口与回本估算使用森空岛养成库存。",
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_006: "建议排序",
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_007: "只看单人提升",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_008: "重新计算中",
-  // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_009: "应用建议 (",
-  // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_010: "应用建议失败，请稍后重试",
-  // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_011: "重试",
-  // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_012: "重新选择文件",
-  // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_013: "当前筛选下没有可展示的建议。",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_014: "选择至少一项建议后，才可应用并重新计算；当前方案仍可下载留底。",
-  // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_015: "已选 ",
-  // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_016: " 项。应用建议后会重新计算并生成新方案，当前方案仍可下载留底。",
-  // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_017: "升级建议",
-  // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_018: "选择 ",
-  // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_019: "选择 ",
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_020: "影响 ",
   // src/components/UpgradeSuggestions.tsx
@@ -909,10 +889,6 @@ export const optimizeCopy = {
   pages_tool_optimize_useOptimizeWorkflow_019: ": 精",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_020: "→精",
-  // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_021: "基建配置已修改，请先重新计算排班后再应用练度建议。",
-  // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_022: "优化失败，请稍后重试",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_023: "解锁失败，请稍后重试",
   // src/pages/tool/optimize/workflow-utils.ts

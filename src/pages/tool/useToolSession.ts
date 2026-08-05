@@ -216,11 +216,6 @@ export function useToolSession(requestedProfileId?: string | null) {
     }
   }, [applyAuthPayloadInternal])
 
-  const setEliteOverrides = useCallback(async (next: Record<string, number>) => {
-    setEliteOverridesState(next)
-    await persistWorkspacePatch({ elite_overrides: next })
-  }, [persistWorkspacePatch])
-
   const applyWorkspaceSnapshot = useCallback((profileId: string, nextWorkspace: UserWorkspace) => {
     const profile = activeProfileRef.current
     if (!profile || profile.id !== profileId) return
@@ -283,7 +278,6 @@ export function useToolSession(requestedProfileId?: string | null) {
     license,
     setLicense,
     eliteOverrides,
-    setEliteOverrides,
     configOverride,
     setConfigOverride,
     configSyncStatus,

@@ -57,7 +57,6 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
     license,
     setLicense,
     eliteOverrides,
-    setEliteOverrides,
     configOverride,
     setConfigOverride,
     configSyncStatus,
@@ -200,7 +199,6 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
           workspace={workspace}
           setLicense={setLicense}
           eliteOverrides={eliteOverrides}
-          setEliteOverrides={setEliteOverrides}
           configOverride={configOverride}
           setConfigOverride={setConfigOverride}
           configSyncStatus={configSyncStatus}

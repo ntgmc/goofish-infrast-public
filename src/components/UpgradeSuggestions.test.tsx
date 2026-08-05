@@ -2,7 +2,7 @@
 
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import type { UpgradeSuggestion, UpgradeTrainingCostBucket } from '../lib/types'
 import UpgradeSuggestions from './UpgradeSuggestions'
 
@@ -29,20 +29,24 @@ describe('UpgradeSuggestions', () => {
     expect(screen.getByText(/价格来源：stale/)).toBeInTheDocument()
   })
 
-  it('prunes selected and expanded ids when suggestions are replaced', async () => {
+  it('renders suggestions without selection or apply controls', () => {
+    renderComponent([suggestion('upgrade-a', '干员 A')])
+
+    expect(screen.queryByRole('checkbox', { name: '选择 干员 A' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /应用建议/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: '只看单人提升' })).toBeInTheDocument()
+  })
+
+  it('prunes expanded ids when suggestions are replaced', async () => {
     const user = userEvent.setup()
     const props = baseProps()
     const { rerender } = render(<UpgradeSuggestions {...props} suggestions={[suggestion('upgrade-a', '干员 A')]} />)
 
-    await user.click(screen.getByRole('checkbox', { name: '选择 干员 A' }))
     await user.click(screen.getByRole('button', { name: '查看解释' }))
-    expect(screen.getByRole('button', { name: /应用建议/ })).toBeEnabled()
 
     rerender(<UpgradeSuggestions {...props} suggestions={[suggestion('upgrade-b', '干员 B')]} />)
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /应用建议/ })).toBeDisabled())
-    expect(screen.getByRole('checkbox', { name: '选择 干员 B' })).not.toBeChecked()
-    expect(screen.getByRole('button', { name: '查看解释' })).toHaveAttribute('aria-expanded', 'false')
+    await waitFor(() => expect(screen.getByRole('button', { name: '查看解释' })).toHaveAttribute('aria-expanded', 'false'))
   })
 })
 
@@ -51,11 +55,7 @@ function renderComponent(suggestions: UpgradeSuggestion[]) {
 }
 
 function baseProps() {
-  return {
-    onApply: vi.fn(),
-    loading: false,
-    onReset: vi.fn(),
-  }
+  return {}
 }
 
 function suggestion(id: string, name: string, partial = false): UpgradeSuggestion {

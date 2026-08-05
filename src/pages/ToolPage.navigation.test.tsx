@@ -213,7 +213,6 @@ function createSession(overrides: Record<string, unknown> = {}) {
     license: null,
     setLicense: vi.fn(),
     eliteOverrides: {},
-    setEliteOverrides: vi.fn(),
     configOverride: null,
     setConfigOverride: vi.fn(),
     banner: null,

@@ -73,7 +73,6 @@ describe('ResultSection compatibility fallback', () => {
         suggestions={[]}
         loading={false}
         progress={null}
-        inlineError={null}
         previewProfile={false}
         upgradeCdk=""
         upgradeLoading={false}
@@ -81,8 +80,6 @@ describe('ResultSection compatibility fallback', () => {
         onUpgradeCdkChange={vi.fn()}
         onUpgradePreviewProfile={vi.fn()}
         onDownloadFullResult={onDownloadFullResult}
-        onApplySuggestions={vi.fn(async () => undefined)}
-        onReset={vi.fn()}
       />,
     )
 

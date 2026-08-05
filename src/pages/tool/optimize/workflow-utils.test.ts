@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { LicenseConfig, OptimizeResult, WorkspaceResultHistoryItem, WorkspaceResultHistorySummary } from '../../../lib/types'
 import { getUpgradeSuggestionId } from '../../../lib/upgrade-suggestion-id'
-import { buildUpgradeSuggestionEliteOverrides, normalizeUpgradeSuggestions, resolveLatestHistoryConfig } from './workflow-utils'
+import { normalizeUpgradeSuggestions, resolveLatestHistoryConfig } from './workflow-utils'
 
 describe('resolveLatestHistoryConfig', () => {
   it('returns null when the workspace has no result history', () => {
@@ -68,7 +68,7 @@ describe('normalizeUpgradeSuggestions', () => {
     expect(restored[restored.length - 1]?.gain).toBe(2)
   })
 
-  it('preserves stable IDs and applies selected single and bundle suggestions', () => {
+  it('preserves stable IDs for single and bundle suggestions', () => {
     const persisted: NonNullable<OptimizeResult['upgrade_suggestions']> = [{
       type: 'single',
       suggestion_id: 'upgrade-single',
@@ -86,15 +86,6 @@ describe('normalizeUpgradeSuggestions', () => {
     const restored = normalizeUpgradeSuggestions(persisted)
 
     expect(restored.map((suggestion) => suggestion.suggestion_id)).toEqual(['upgrade-bundle', 'upgrade-single'])
-    expect(buildUpgradeSuggestionEliteOverrides(
-      restored,
-      ['upgrade-bundle', 'upgrade-single'],
-      { 'char-existing': 1 },
-    )).toEqual({
-      'char-existing': 1,
-      'char-1': 1,
-      'char-2': 2,
-    })
   })
 
   it('keeps legacy bundle fallback IDs stable when suggestions are reordered', () => {

@@ -8,19 +8,12 @@ import type {
   UpgradeTrainingMaterial,
 } from '../lib/types'
 import { getUpgradeSuggestionId } from '../lib/upgrade-suggestion-id'
-import ScheduleProgress, { type ScheduleProgressState } from './ScheduleProgress'
 import { copy, CURRENT_LOCALE } from '../copy/index'
 
 
 interface Props {
   suggestions: UpgradeSuggestion[];
-  onApply: (selectedIds: string[]) => void;
-  loading: boolean;
-  progress?: ScheduleProgressState | null;
-  error?: string | null;
-  onReset: () => void;
   embedded?: boolean;
-  readOnly?: boolean;
 }
 
 type SortMode = 'payback' | 'gain' | 'stock'
@@ -31,8 +24,7 @@ const SORT_OPTIONS: { id: SortMode; label: string }[] = [
   { id: 'stock', label: copy.optimize.components_UpgradeSuggestions_003 },
 ]
 
-export default function UpgradeSuggestions({ suggestions, onApply, loading, progress, error, onReset, embedded = false, readOnly = false }: Props) {
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+export default function UpgradeSuggestions({ suggestions, embedded = false }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [sortMode, setSortMode] = useState<SortMode>('payback')
   const [singleOnly, setSingleOnly] = useState(false)
@@ -44,28 +36,14 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
       .sort((left, right) => compareSuggestions(left.suggestion, right.suggestion, sortMode, left.index, right.index))
   }, [singleOnly, sortMode, suggestions])
   const visibleIdSet = useMemo(() => new Set(visibleSuggestions.map((item) => item.id)), [visibleSuggestions])
-  const selectedIds = useMemo(
-    () => Array.from(selected).filter((id) => visibleIdSet.has(id)),
-    [selected, visibleIdSet],
-  )
 
   useEffect(() => {
     const prune = (current: Set<string>) => {
       const next = new Set(Array.from(current).filter((id) => visibleIdSet.has(id)))
       return next.size === current.size ? current : next
     }
-    setSelected(prune)
     setExpanded(prune)
   }, [visibleIdSet])
-
-  const toggle = useCallback((id: string) => {
-    setSelected((current) => {
-      const next = new Set(current)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }, [])
 
   const toggleExpanded = useCallback((id: string) => {
     setExpanded((current) => {
@@ -113,53 +91,8 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
               className="h-4 w-4 accent-brand-500"
             />
             {copy.optimize.components_UpgradeSuggestions_007}</label>
-          {!readOnly && (
-            <button
-              onClick={() => onApply(selectedIds)}
-              disabled={loading || selectedIds.length === 0}
-              aria-describedby="upgrade-selection-note"
-              className="tool-primary-action lg:flex-shrink-0"
-            >
-              {loading ? (
-                <span className="inline-flex items-center gap-3">
-                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" aria-hidden="true">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  {copy.optimize.components_UpgradeSuggestions_008}</span>
-              ) : (
-                `${copy.optimize.components_UpgradeSuggestions_009}${selectedIds.length})`
-              )}
-            </button>
-          )}
         </div>
       </div>
-
-      {progress && (loading || progress.estimatePhase === 'cancelled') && (
-        <ScheduleProgress progress={progress} />
-      )}
-
-      {error && (
-        <div className="tool-alert tool-alert--error" role="alert">
-          <p className="text-sm font-semibold text-error">{copy.optimize.components_UpgradeSuggestions_010}</p>
-          <p className="mt-1 text-sm leading-6 text-ink-secondary">{error}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => onApply(selectedIds)}
-              disabled={loading || selectedIds.length === 0}
-              className="tool-primary-action"
-            >
-              {copy.optimize.components_UpgradeSuggestions_011}</button>
-            <button
-              type="button"
-              onClick={onReset}
-              className="tool-secondary-action"
-            >
-              {copy.optimize.components_UpgradeSuggestions_012}</button>
-          </div>
-        </div>
-      )}
 
       <div className="space-y-3">
         {visibleSuggestions.map(({ suggestion, id }, displayIndex) => (
@@ -167,12 +100,9 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
             key={id}
             suggestion={suggestion}
             rank={displayIndex + 1}
-            selected={selected.has(id)}
             expanded={expanded.has(id)}
-            onToggle={() => toggle(id)}
             onToggleExpanded={() => toggleExpanded(id)}
             embedded={embedded}
-            selectable={!readOnly}
           />
         ))}
       </div>
@@ -181,14 +111,6 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
         <div className="tool-inset p-4 text-sm text-ink-secondary">
           {copy.optimize.components_UpgradeSuggestions_013}</div>
       )}
-
-      {!readOnly && (
-        <div id="upgrade-selection-note" className="tool-inset p-4 text-sm leading-6 text-ink-secondary" role="status" aria-live="polite">
-          {selectedIds.length === 0
-            ? copy.optimize.components_UpgradeSuggestions_014
-            : `${copy.optimize.components_UpgradeSuggestions_015}${selectedIds.length}${copy.optimize.components_UpgradeSuggestions_016}`}
-        </div>
-      )}
     </div>
   )
 }
@@ -196,21 +118,15 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
 function SuggestionCard({
   suggestion,
   rank,
-  selected,
   expanded,
-  onToggle,
   onToggleExpanded,
   embedded,
-  selectable,
 }: {
   suggestion: UpgradeSuggestion;
   rank: number;
-  selected: boolean;
   expanded: boolean;
-  onToggle: () => void;
   onToggleExpanded: () => void;
   embedded: boolean;
-  selectable: boolean;
 }) {
   const title = suggestion.name || suggestion.ops?.map((op) => op.name).join(' + ') || copy.optimize.components_UpgradeSuggestions_017
   const cost = suggestion.training_cost
@@ -218,21 +134,9 @@ function SuggestionCard({
   const stockLabel = getStockLabel(cost)
 
   return (
-    <article className={`tool-panel transition-colors duration-150 ${selected ? 'border-brand-500/40 bg-brand-500/10' : `${embedded ? 'bg-surface-2/60' : ''} hover:border-surface-4`}`}>
+    <article className={`tool-panel transition-colors duration-150 ${embedded ? 'bg-surface-2/60' : ''} hover:border-surface-4`}>
       <div className="grid gap-4 p-4 lg:grid-cols-[auto_1fr] lg:items-start">
-        <div className="flex items-start gap-3">
-          {selectable && (
-            <label className="mt-1 inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md bg-surface-0">
-              <input
-                type="checkbox"
-                checked={selected}
-                onChange={onToggle}
-                className="h-5 w-5 accent-brand-500"
-                aria-label={`${copy.optimize.components_UpgradeSuggestions_018}${title}`}
-              />
-              <span className="sr-only">{copy.optimize.components_UpgradeSuggestions_019}{title}</span>
-            </label>
-          )}
+        <div className="flex items-start">
           <OperatorPortraits suggestion={suggestion} />
         </div>
 

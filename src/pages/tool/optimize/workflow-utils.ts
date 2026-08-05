@@ -1,7 +1,6 @@
 import type { FreeScheduleEntitlement, LicenseConfig, LicenseOperator, OptimizeResult, UpgradeSuggestion, WorkspaceResultHistoryItem, WorkspaceResultHistorySummary } from '../../../lib/types'
 import { canonicalJson } from '../../../lib/crypto'
 import { SCHEDULE_PROGRESS_COMPLETION_DURATION_MS } from '../../../components/ScheduleProgress'
-import { getUpgradeSuggestionId } from '../../../lib/upgrade-suggestion-id'
 import { copy } from '../../../copy/index'
 
 
@@ -79,30 +78,6 @@ export function normalizeUpgradeSuggestions(
     })
     .sort((left, right) => right.gain - left.gain)
     .slice(0, 20)
-}
-
-export function buildUpgradeSuggestionEliteOverrides(
-  suggestions: UpgradeSuggestion[],
-  selectedIds: string[],
-  eliteOverrides: Record<string, number>,
-): Record<string, number> {
-  const selectedSet = new Set(selectedIds)
-  const nextOverrides = { ...eliteOverrides }
-  suggestions.forEach((suggestion, index) => {
-    if (!selectedSet.has(getUpgradeSuggestionId(suggestion, index))) return
-    if (suggestion.type === 'single' && suggestion.id && suggestion.target_elite !== undefined) {
-      nextOverrides[suggestion.id] = suggestion.target_elite
-      return
-    }
-    if (suggestion.type === 'bundle') {
-      for (const operator of suggestion.ops ?? []) {
-        if (operator.id && operator.target_elite !== undefined) {
-          nextOverrides[operator.id] = operator.target_elite
-        }
-      }
-    }
-  })
-  return nextOverrides
 }
 
 export function waitForProgressCompletion(): Promise<void> {
