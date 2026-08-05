@@ -16,7 +16,7 @@ import { isFreePreviewProfile, isFreePreviewTrialActive } from '../tool-utils'
 import type { ConfigSyncStatus, WorkspacePatch } from '../useToolSession'
 import { useLicenseSync } from './useLicenseSync'
 import { useOptimizeWorkspace } from './useOptimizeWorkspace'
-import { buildOptimizeSignature, buildUpgradeSuggestionEliteOverrides, formatConfigPresetLabel, waitForProgressCompletion, formatOptimizeError, getFreeScheduleGenerateBlockedReason, normalizeUpgradeSuggestions } from './workflow-utils'
+import { buildOptimizeSignature, buildUpgradeSuggestionEliteOverrides, formatConfigPresetLabel, waitForProgressCompletion, formatOptimizeError, getFreeScheduleGenerateBlockedReason, normalizeUpgradeSuggestions, resolveLatestHistoryConfig } from './workflow-utils'
 import { usePriorityCoupon as usePriorityCouponState } from './usePriorityCoupon'
 import { useInventoryBalances } from './useInventoryBalances'
 import { copy } from '../../../copy/index'
@@ -229,7 +229,7 @@ export function useOptimizeWorkflow(props: Props) {
   const configDiffRows = useMemo(
       () => describeConfigDiff(
         activeConfig,
-        historyItem?.id === latestWorkspaceResult?.id ? historyItem.config : null,
+        resolveLatestHistoryConfig(historyItem, latestWorkspaceResult),
       ),
       [activeConfig, historyItem, latestWorkspaceResult?.id]
     )

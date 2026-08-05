@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import type { OptimizeResult } from '../../../lib/types'
+import type { LicenseConfig, OptimizeResult, WorkspaceResultHistoryItem, WorkspaceResultHistorySummary } from '../../../lib/types'
 import { getUpgradeSuggestionId } from '../../../lib/upgrade-suggestion-id'
-import { buildUpgradeSuggestionEliteOverrides, normalizeUpgradeSuggestions } from './workflow-utils'
+import { buildUpgradeSuggestionEliteOverrides, normalizeUpgradeSuggestions, resolveLatestHistoryConfig } from './workflow-utils'
+
+describe('resolveLatestHistoryConfig', () => {
+  it('returns null when the workspace has no result history', () => {
+    expect(resolveLatestHistoryConfig(null, null)).toBeNull()
+  })
+
+  it('returns history config only when the selected and latest result IDs match', () => {
+    const config = { layout: '243' } as LicenseConfig
+    const historyItem = { id: 'result-1', config } as WorkspaceResultHistoryItem
+    const latestResult = { id: 'result-1' } as WorkspaceResultHistorySummary
+
+    expect(resolveLatestHistoryConfig(historyItem, latestResult)).toBe(config)
+    expect(resolveLatestHistoryConfig(historyItem, { ...latestResult, id: 'result-2' })).toBeNull()
+  })
+})
 
 describe('normalizeUpgradeSuggestions', () => {
   it('restores persisted suggestions with ROI and apply-ready elite fields', () => {
