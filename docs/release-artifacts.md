@@ -28,3 +28,19 @@ node scripts/check-release-runtime.mjs .
 efficiency dataset was used. Such an archive is a reproducible demo/SDK build,
 not a production deployment candidate, even when its hashes and attestation
 are valid.
+
+After the verified artifact is deployed, the public changelog is reachable,
+traffic has switched, and the production readiness endpoint succeeds, run the
+packaged idempotent confirmation command from the deployment job:
+
+```bash
+PUBLIC_APP_URL=https://maatool.com npm run release:confirm-production
+```
+
+The deployment environment must inject `WEBSITE_RELEASE_CONFIRMATION_TOKEN`
+from its secret manager before running the command. The command derives the
+release version from `/api/health/ready`, rejects
+frontend/backend version drift, and creates the `release.published` event that
+the QQ Bot polls. A first confirmation returns `created`; a deployment retry
+returns `already confirmed`. Do not run this command from artifact creation,
+pull-request validation, staging, or preview jobs.

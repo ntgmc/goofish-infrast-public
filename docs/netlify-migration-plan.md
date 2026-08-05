@@ -186,8 +186,13 @@ WantedBy=multi-user.target
 6. 重启 systemd 服务。
 7. 检查服务日志无启动错误。
 8. 访问 `GET /api/health`，确认 `ok=true` 且 `storage.type=postgres`。
-9. 访问前端页面，确认刷新任意 SPA 路由不 404。
-10. 验证核心 API 和后台页面。
+9. 访问 `GET /api/health/ready`，确认 `ok=true` 且前后端构建版本一致。
+10. 确认公开 changelog 已显示该版本，随后在已注入 `PUBLIC_APP_URL` 和独立
+    `WEBSITE_RELEASE_CONFIRMATION_TOKEN` 的部署环境运行
+    `npm run release:confirm-production`；首次发布应输出 `created`，部署重试应输出
+    `already confirmed`。
+11. 访问前端页面，确认刷新任意 SPA 路由不 404。
+12. 验证核心 API 和后台页面。
 
 ## 验证清单
 

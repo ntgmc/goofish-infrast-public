@@ -5,7 +5,12 @@ import { copy } from '../../../copy/index'
 const CHANNEL_NAME = 'maa:optimization-jobs:v1'
 const NOTIFICATION_PREFERENCE_KEY = 'maa:optimization-notifications:v1'
 const SUBMIT_LEASE_PREFIX = 'maa:optimization-submit-lease:v1:'
-const TAB_ID = crypto.randomUUID()
+const TAB_ID = createOptimizationTabId()
+
+function createOptimizationTabId(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID()
+  return `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+}
 
 export interface OptimizationJobBroadcast {
   type: 'job-updated';
