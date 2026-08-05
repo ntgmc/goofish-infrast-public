@@ -111,7 +111,7 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
   }
 
   const navigateToToolPath = (path: string, options?: { replace?: boolean }) => {
-    navigate(path, { replace: options?.replace, flushSync: true })
+    void navigate(path, { replace: options?.replace })
   }
   const navigateDashboard = (section: DashboardSection, options?: { replace?: boolean }) => {
     navigateToToolPath(dashboardPath(section), options)

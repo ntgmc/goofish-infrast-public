@@ -41,6 +41,10 @@ describe('InvitationSettingsSection', () => {
     await user.click(screen.getAllByRole('button', { name: '添加道具' })[0])
 
     const dialog = await screen.findByRole('dialog', { name: '添加邀请人奖励' })
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(dialog).toHaveAttribute('data-slot', 'dialog-content')
+    expect(dialog).toHaveClass('block', 'max-w-2xl')
+    expect(document.querySelector('[data-slot="dialog-overlay"]')).toBeInTheDocument()
     expect(dialog).toHaveTextContent('方案扩容证')
     await user.click(screen.getByRole('button', { name: /方案扩容证/ }))
 
@@ -52,5 +56,20 @@ describe('InvitationSettingsSection', () => {
       method: 'PUT',
       json: expect.objectContaining({ expected_revision: 3 }),
     })))
+  })
+
+  it('closes the local dialog with Escape and restores the add trigger', async () => {
+    const user = userEvent.setup()
+    render(<InvitationSettingsSection />)
+
+    await screen.findByText('优先计算券')
+    const trigger = screen.getAllByRole('button', { name: '添加道具' })[0]
+    trigger.focus()
+    await user.click(trigger)
+    await screen.findByRole('dialog', { name: '添加邀请人奖励' })
+
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(trigger).toHaveFocus()
   })
 })

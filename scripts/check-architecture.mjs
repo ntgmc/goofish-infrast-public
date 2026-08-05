@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { glob } from 'node:fs/promises'
-import ts from 'typescript'
+import { ts } from 'ts-morph'
 import { isPrivateOptimizerSource } from './private-optimizer-sources.mjs'
 
 const failures = []
@@ -19,6 +19,7 @@ const typeProgram = createArchitectureTypeProgram()
 checkNewPageModuleUnusedSymbols(typeProgram)
 checkOptimizationUnusedImports(typeProgram)
 await checkProductCatalogOwnership()
+await checkRadixUiOwnership()
 await checkLocalDevelopmentScripts()
 await checkPrivateCompositionContract()
 
@@ -275,6 +276,35 @@ async function checkProductCatalogOwnership() {
       for (const [pattern, label] of duplicatePatterns) {
         if (pattern.test(source)) failures.push(`${filename}: ${label} must come from product/catalog.json`)
       }
+    }
+  }
+}
+
+async function checkRadixUiOwnership() {
+  const directRadixUiExceptions = new Set([
+    // The tour owns target-aware positioning, its transparent overlay, and its custom scrim.
+    'src/components/GuidedTour.tsx',
+  ])
+
+  for await (const filename of glob('src/**/*.{ts,tsx}')) {
+    const normalized = filename.replaceAll('\\', '/')
+    if (normalized.startsWith('src/components/ui/') || directRadixUiExceptions.has(normalized)) continue
+
+    const source = await readFile(filename, 'utf8')
+    const sourceFile = ts.createSourceFile(
+      normalized,
+      source,
+      ts.ScriptTarget.Latest,
+      true,
+      normalized.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+    )
+    const importsRadixUi = sourceFile.statements.some(
+      (statement) => ts.isImportDeclaration(statement)
+        && ts.isStringLiteral(statement.moduleSpecifier)
+        && statement.moduleSpecifier.text === 'radix-ui',
+    )
+    if (importsRadixUi) {
+      failures.push(`${filename}: direct radix-ui imports belong in src/components/ui`)
     }
   }
 }

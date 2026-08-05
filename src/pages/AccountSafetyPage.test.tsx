@@ -20,6 +20,7 @@ describe('AccountSafetyPage lifecycle controls', () => {
     }), { status: 401, headers: { 'Content-Type': 'application/json' } })))
     renderPage()
 
+    expect(screen.getByRole('heading', { name: '调试模式' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '导出个人数据' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('当前会话已失效，请重新登录后再试。')

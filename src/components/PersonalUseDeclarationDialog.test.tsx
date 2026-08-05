@@ -2,6 +2,7 @@
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import PersonalUseDeclarationDialog from './PersonalUseDeclarationDialog'
 import { PERSONAL_USE_DECLARATION } from '../lib/personal-use-declaration'
@@ -22,6 +23,10 @@ describe('PersonalUseDeclarationDialog', () => {
     const onClose = vi.fn()
     render(<PersonalUseDeclarationDialog open={true} submitting={false} declaration={declaration} onClose={onClose} onConfirm={onConfirm} />)
 
+    const dialog = screen.getByRole('dialog', { name: '个人使用确认' })
+    expect(dialog).toHaveAttribute('data-slot', 'dialog-content')
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(document.querySelector('[data-slot="dialog-overlay"]')).toBeInTheDocument()
     const continueButton = screen.getByRole('button', { name: '确认并继续' })
     expect(continueButton).toBeDisabled()
     await waitFor(() => expect(screen.getByRole('checkbox')).toHaveFocus())
@@ -81,4 +86,47 @@ describe('PersonalUseDeclarationDialog', () => {
     expect(checkbox).toBeChecked()
     expect(screen.getByRole('button', { name: '确认并继续' })).toBeEnabled()
   })
+
+  it('closes with Escape and restores focus to the opening action', async () => {
+    const user = userEvent.setup()
+    render(<LifecycleHarness />)
+    const trigger = screen.getByRole('button', { name: '打开个人声明' })
+    await user.click(trigger)
+    await screen.findByRole('dialog', { name: '个人使用确认' })
+
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(trigger).toHaveFocus()
+  })
+
+  it('cannot be dismissed with Escape or the overlay while submitting', async () => {
+    const user = userEvent.setup()
+    render(<LifecycleHarness submitting />)
+    await user.click(screen.getByRole('button', { name: '打开个人声明' }))
+    await screen.findByRole('dialog', { name: '个人使用确认' })
+
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('dialog', { name: '个人使用确认' })).toBeInTheDocument()
+
+    const overlay = document.querySelector<HTMLElement>('[data-slot="dialog-overlay"]')
+    if (!overlay) throw new Error('Expected dialog overlay.')
+    await user.click(overlay)
+    expect(screen.getByRole('dialog', { name: '个人使用确认' })).toBeInTheDocument()
+  })
 })
+
+function LifecycleHarness({ submitting = false }: { submitting?: boolean }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>打开个人声明</button>
+      <PersonalUseDeclarationDialog
+        open={open}
+        submitting={submitting}
+        declaration={declaration}
+        onClose={() => setOpen(false)}
+        onConfirm={vi.fn()}
+      />
+    </>
+  )
+}

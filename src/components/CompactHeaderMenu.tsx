@@ -1,6 +1,13 @@
 import { Check, ChevronDown, MoreHorizontal } from 'lucide-react'
-import { DropdownMenu } from 'radix-ui'
 import { Link } from 'react-router'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu'
 
 type CompactHeaderMenuItem =
   | {
@@ -47,8 +54,6 @@ interface CompactHeaderMenuProps {
   className?: string
 }
 
-const itemClassName = 'relative flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink-secondary outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-surface-2 data-[highlighted]:text-ink-primary'
-
 export default function CompactHeaderMenu({
   ariaLabel,
   triggerLabel,
@@ -64,8 +69,8 @@ export default function CompactHeaderMenu({
   const iconTrigger = triggerVariant === 'icon'
 
   return (
-    <DropdownMenu.Root modal={false}>
-      <DropdownMenu.Trigger asChild>
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
         <button
           type="button"
           aria-label={ariaLabel}
@@ -86,73 +91,71 @@ export default function CompactHeaderMenu({
             </>
           )}
         </button>
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content
-          side="bottom"
-          align={align}
-          sideOffset={8}
-          collisionPadding={16}
-          sticky="always"
-          updatePositionStrategy="always"
-          style={{ maxHeight: 'min(32rem, calc(100dvh - 5rem), var(--radix-dropdown-menu-content-available-height))' }}
-          className="z-50 w-[min(18rem,calc(100vw-2rem))] overscroll-contain overflow-y-auto rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lg"
-        >
-          {metadata && (
-            <DropdownMenu.Label className="border-b border-surface-3 px-3 py-2.5">
-              <span className="block truncate text-sm font-semibold text-ink-primary">{metadata.title}</span>
-              {metadata.description && <span className="mt-1 block text-xs leading-5 text-ink-muted">{metadata.description}</span>}
-            </DropdownMenu.Label>
-          )}
-          {items.map((item) => {
-            if (item.type === 'separator') {
-              return <DropdownMenu.Separator key={item.id} className="my-1 h-px bg-surface-3" />
-            }
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        side="bottom"
+        align={align}
+        sticky="always"
+        updatePositionStrategy="always"
+        style={{ maxHeight: 'min(32rem, calc(100dvh - 5rem), var(--radix-dropdown-menu-content-available-height))' }}
+        className="w-[min(18rem,calc(100vw-2rem))]"
+      >
+        {metadata && (
+          <DropdownMenuLabel className="border-b border-surface-3 py-2.5">
+            <span className="block truncate text-sm font-semibold text-ink-primary">{metadata.title}</span>
+            {metadata.description && <span className="mt-1 block text-xs leading-5 text-ink-muted">{metadata.description}</span>}
+          </DropdownMenuLabel>
+        )}
+        {items.map((item) => {
+          if (item.type === 'separator') {
+            return <DropdownMenuSeparator key={item.id} className="mx-0" />
+          }
 
-            const content = (
-              <>
-                <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                {item.badge && (
-                  <span aria-label={item.badgeLabel} className="tool-status shrink-0 px-1.5 py-0.5 text-[11px]">
-                    {item.badge}
-                  </span>
-                )}
-                {item.current && <Check aria-hidden="true" className="size-4 shrink-0 text-brand-500" />}
-              </>
-            )
-            const className = `${itemClassName} ${item.intent === 'danger' ? 'text-error data-[highlighted]:text-error' : ''}`
-            const ariaLabel = item.badgeLabel ? `${item.label} ${item.badgeLabel}` : undefined
+          const content = (
+            <>
+              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              {item.badge && (
+                <span aria-label={item.badgeLabel} className="tool-status shrink-0 px-1.5 py-0.5 text-[11px]">
+                  {item.badge}
+                </span>
+              )}
+              {item.current && <Check aria-hidden="true" className="size-4 shrink-0 text-brand-500" />}
+            </>
+          )
+          const ariaLabel = item.badgeLabel ? `${item.label} ${item.badgeLabel}` : undefined
+          const variant = item.intent === 'danger' ? 'destructive' : 'default'
+          const intentClassName = item.intent === 'danger' ? 'text-error data-[highlighted]:text-error' : undefined
 
-            if (item.type === 'link' && !item.disabled) {
-              return (
-                <DropdownMenu.Item key={item.id} asChild className={className}>
-                  <Link
-                    to={item.to}
-                    aria-label={ariaLabel}
-                    aria-current={item.current ? 'page' : undefined}
-                  >
-                    {content}
-                  </Link>
-                </DropdownMenu.Item>
-              )
-            }
-
+          if (item.type === 'link' && !item.disabled) {
             return (
-              <DropdownMenu.Item
-                key={item.id}
-                disabled={item.disabled}
-                aria-label={ariaLabel}
-                aria-current={item.current ? 'page' : undefined}
-                data-tour-target={item.type === 'button' ? item.tourTarget : undefined}
-                onSelect={item.type === 'button' ? item.onSelect : undefined}
-                className={className}
-              >
-                {content}
-              </DropdownMenu.Item>
+              <DropdownMenuItem key={item.id} asChild variant={variant} className={intentClassName}>
+                <Link
+                  to={item.to}
+                  aria-label={ariaLabel}
+                  aria-current={item.current ? 'page' : undefined}
+                >
+                  {content}
+                </Link>
+              </DropdownMenuItem>
             )
-          })}
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
+          }
+
+          return (
+            <DropdownMenuItem
+              key={item.id}
+              disabled={item.disabled}
+              variant={variant}
+              className={intentClassName}
+              aria-label={ariaLabel}
+              aria-current={item.current ? 'page' : undefined}
+              data-tour-target={item.type === 'button' ? item.tourTarget : undefined}
+              onSelect={item.type === 'button' ? item.onSelect : undefined}
+            >
+              {content}
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

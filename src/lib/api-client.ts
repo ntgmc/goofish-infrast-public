@@ -1,3 +1,5 @@
+import { recordDebugApiEvent, type DebugApiOutcome } from './debug-diagnostics'
+
 export class ApiError extends Error {
   readonly status: number
   readonly data: unknown
@@ -40,9 +42,13 @@ export type ApiRequestInit = Omit<RequestInit, 'body'> & {
 export async function apiJson<T>(url: string, init: ApiRequestInit = {}): Promise<T> {
   const pending = await request(url, init)
   try {
-    return await parseJson<T>(pending.response, url, init.fallbackMessage)
+    const result = await parseJson<T>(pending.response, url, init.fallbackMessage)
+    pending.completeSuccess()
+    return result
   } catch (error) {
-    throw pending.normalizeError(error)
+    const normalized = pending.normalizeError(error)
+    pending.completeFailure(normalized)
+    throw normalized
   } finally {
     pending.cleanup()
   }
@@ -51,10 +57,17 @@ export async function apiJson<T>(url: string, init: ApiRequestInit = {}): Promis
 export async function apiJsonOrNull<T>(url: string, init: ApiRequestInit = {}): Promise<T | null> {
   const pending = await request(url, init)
   try {
-    if (pending.response.status === 204) return null
-    return await parseJson<T>(pending.response, url, init.fallbackMessage)
+    if (pending.response.status === 204) {
+      pending.completeSuccess()
+      return null
+    }
+    const result = await parseJson<T>(pending.response, url, init.fallbackMessage)
+    pending.completeSuccess()
+    return result
   } catch (error) {
-    throw pending.normalizeError(error)
+    const normalized = pending.normalizeError(error)
+    pending.completeFailure(normalized)
+    throw normalized
   } finally {
     pending.cleanup()
   }
@@ -64,8 +77,11 @@ export async function apiVoid(url: string, init: ApiRequestInit = {}): Promise<v
   const pending = await request(url, init)
   try {
     await pending.response.body?.cancel()
+    pending.completeSuccess()
   } catch (error) {
-    throw pending.normalizeError(error)
+    const normalized = pending.normalizeError(error)
+    pending.completeFailure(normalized)
+    throw normalized
   } finally {
     pending.cleanup()
   }
@@ -74,9 +90,13 @@ export async function apiVoid(url: string, init: ApiRequestInit = {}): Promise<v
 export async function apiBlob(url: string, init: ApiRequestInit = {}): Promise<Blob> {
   const pending = await request(url, init)
   try {
-    return await pending.response.blob()
+    const result = await pending.response.blob()
+    pending.completeSuccess()
+    return result
   } catch (error) {
-    throw pending.normalizeError(error)
+    const normalized = pending.normalizeError(error)
+    pending.completeFailure(normalized)
+    throw normalized
   } finally {
     pending.cleanup()
   }
@@ -103,10 +123,13 @@ type PendingResponse = {
   response: Response
   cleanup: () => void
   normalizeError: (error: unknown) => ApiError
+  completeSuccess: () => void
+  completeFailure: (error: ApiError) => void
 }
 
 async function request(url: string, init: ApiRequestInit): Promise<PendingResponse> {
   const { json, fallbackMessage, headers, timeoutMs, signal: callerSignal, ...rest } = init
+  const diagnostics = createRequestDiagnostics(url, rest.method)
   const requestHeaders = new Headers(headers)
   const deadline = createRequestDeadline(
     callerSignal,
@@ -121,11 +144,14 @@ async function request(url: string, init: ApiRequestInit): Promise<PendingRespon
 
   try {
     const response = await fetch(url, requestInit)
+    diagnostics.setResponse(response)
     if (response.ok) {
       return {
         response,
         cleanup: deadline.cleanup,
         normalizeError: (error) => normalizeRequestError(error, url, fallbackMessage, callerSignal, deadline),
+        completeSuccess: diagnostics.completeSuccess,
+        completeFailure: diagnostics.completeFailure,
       }
     }
 
@@ -139,8 +165,58 @@ async function request(url: string, init: ApiRequestInit): Promise<PendingRespon
     )
   } catch (error) {
     deadline.cleanup()
-    throw normalizeRequestError(error, url, fallbackMessage, callerSignal, deadline)
+    const normalized = normalizeRequestError(error, url, fallbackMessage, callerSignal, deadline)
+    diagnostics.completeFailure(normalized)
+    throw normalized
   }
+}
+
+function createRequestDiagnostics(url: string, method: string | undefined): {
+  setResponse: (response: Response) => void
+  completeSuccess: () => void
+  completeFailure: (error: ApiError) => void
+} {
+  const startedAt = debugNow()
+  let response: Response | null = null
+  let completed = false
+  const finish = (error: ApiError | null) => {
+    if (completed) return
+    completed = true
+    const status = response?.status ?? (error && error.status > 0 ? error.status : null)
+    try {
+      recordDebugApiEvent({
+        url,
+        method,
+        status,
+        durationMs: debugNow() - startedAt,
+        outcome: debugApiOutcome(error, status),
+        requestId: response?.headers.get('X-Request-ID') || error?.requestId,
+        errorCode: error?.code,
+      })
+    } catch {
+      // Diagnostics must never affect the API contract.
+    }
+  }
+  return {
+    setResponse: (nextResponse) => { response = nextResponse },
+    completeSuccess: () => finish(null),
+    completeFailure: (error) => finish(error),
+  }
+}
+
+function debugApiOutcome(error: ApiError | null, status: number | null): DebugApiOutcome {
+  if (!error) return 'success'
+  if (error.code === 'request_timeout') return 'timeout'
+  if (error.code === 'request_aborted') return 'aborted'
+  if (error.code === 'invalid_response') return 'invalid_response'
+  if (status !== null && status >= 300) return 'http_error'
+  return 'network_error'
+}
+
+function debugNow(): number {
+  return typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now()
 }
 
 function withJsonHeader(headers: HeadersInit | undefined): HeadersInit {

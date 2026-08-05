@@ -9,6 +9,7 @@ import {
   deletionEmailMessage,
   formatAccountDeletionDeadline,
 } from '../../../lib/account-lifecycle-client'
+import DebugModePanel from '../../../components/DebugModePanel'
 
 
 type FieldErrors = Record<string, string>
@@ -189,6 +190,7 @@ export default function SettingsSection({
       </label>
       <button type="submit" disabled={loading} className="tool-primary-action mt-5">{loading ? copy.dashboard.pages_tool_dashboard_SettingsSection_020 : copy.dashboard.pages_tool_dashboard_SettingsSection_021}</button>
     </form>
+    <DebugModePanel />
     <section className="tool-panel p-6">
       <h2 className="text-lg font-semibold text-ink-primary">{copy.dashboard.pages_tool_dashboard_SettingsSection_022}</h2>
       <p className="mt-2 text-sm text-ink-secondary">{copy.dashboard.pages_tool_dashboard_SettingsSection_023}</p>

@@ -8,12 +8,12 @@ import {
   type ReactNode,
 } from 'react'
 import { Bell } from 'lucide-react'
-import { Popover } from 'radix-ui'
 import { useNavigate } from 'react-router'
 import { copy, CURRENT_LOCALE } from '../copy'
 import { apiJson, getApiErrorMessage } from '../lib/api-client'
 import { itemIconPath } from '../lib/inventory-contracts'
 import type { UserNotification, UserNotificationPage } from '../lib/types'
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 
 const POLL_INTERVAL_MS = 60_000
 
@@ -272,11 +272,11 @@ function NotificationBellContent({ center, iconOnly }: { center: NotificationCen
   }
 
   return (
-    <Popover.Root open={open} onOpenChange={(nextOpen) => {
+    <Popover open={open} onOpenChange={(nextOpen) => {
       setOpen(nextOpen)
       if (nextOpen) void center.refresh()
     }}>
-      <Popover.Trigger asChild>
+      <PopoverTrigger asChild>
         <button
           type="button"
           aria-label={triggerLabel}
@@ -293,93 +293,90 @@ function NotificationBellContent({ center, iconOnly }: { center: NotificationCen
             </span>
           )}
         </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          align="end"
-          sideOffset={8}
-          collisionPadding={12}
-          aria-label={copy.notifications.title}
-          className="z-[70] w-[min(24rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-surface-3 bg-surface-1 text-ink-primary shadow-2xl focus:outline-none"
-        >
-          <div className="flex items-center justify-between gap-3 border-b border-surface-3 px-4 py-3">
-            <div>
-              <h2 className="text-sm font-semibold text-ink-primary">{copy.notifications.title}</h2>
-              <p className="mt-0.5 text-xs text-ink-muted">{copy.notifications.unreadLive(center.unreadCount)}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => void center.markAllRead()}
-              disabled={center.unreadCount === 0 || center.markingAll || center.markingId !== null}
-              className="tool-secondary-action h-9 px-3 text-xs disabled:cursor-wait disabled:opacity-60"
-            >
-              {center.markingAll ? copy.notifications.markingAllRead : copy.notifications.markAllRead}
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        collisionPadding={12}
+        aria-label={copy.notifications.title}
+        className="w-[min(24rem,calc(100vw-1.5rem))] gap-0 overflow-hidden rounded-2xl p-0 shadow-2xl"
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-surface-3 px-4 py-3">
+          <div>
+            <h2 className="text-sm font-semibold text-ink-primary">{copy.notifications.title}</h2>
+            <p className="mt-0.5 text-xs text-ink-muted">{copy.notifications.unreadLive(center.unreadCount)}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void center.markAllRead()}
+            disabled={center.unreadCount === 0 || center.markingAll || center.markingId !== null}
+            className="tool-secondary-action h-9 px-3 text-xs disabled:cursor-wait disabled:opacity-60"
+          >
+            {center.markingAll ? copy.notifications.markingAllRead : copy.notifications.markAllRead}
+          </button>
+        </div>
+
+        {center.error && (
+          <div className="m-3 flex items-center justify-between gap-3 rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger" role="alert">
+            <span>{center.error}</span>
+            <button type="button" onClick={() => void center.refresh()} className="shrink-0 font-semibold underline underline-offset-2">
+              {copy.notifications.retry}
             </button>
           </div>
+        )}
 
-          {center.error && (
-            <div className="m-3 flex items-center justify-between gap-3 rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs text-danger" role="alert">
-              <span>{center.error}</span>
-              <button type="button" onClick={() => void center.refresh()} className="shrink-0 font-semibold underline underline-offset-2">
-                {copy.notifications.retry}
+        <div className="max-h-[min(32rem,calc(100dvh-9rem))] overflow-y-auto overscroll-contain">
+          {center.loading && center.notifications.length === 0 && (
+            <p className="p-6 text-center text-sm text-ink-secondary" role="status">{copy.notifications.loading}</p>
+          )}
+          {!center.loading && center.notifications.length === 0 && (
+            <p className="p-8 text-center text-sm text-ink-secondary">{copy.notifications.empty}</p>
+          )}
+          {center.notifications.map((notification) => (
+            <button
+              key={notification.id}
+              type="button"
+              onClick={() => void openNotification(notification)}
+              disabled={center.markingId === notification.id}
+              className={`block w-full border-b border-surface-3 px-4 py-4 text-left transition-colors last:border-b-0 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500 ${notification.read_at ? '' : 'bg-brand-500/5'}`}
+            >
+              <span className="flex items-start justify-between gap-3">
+                <span className="min-w-0">
+                  <span className="flex items-center gap-2">
+                    <strong className="truncate text-sm font-semibold text-ink-primary">{notification.title}</strong>
+                    {!notification.read_at && <span className="tool-status tool-status--current shrink-0">{copy.notifications.unread}</span>}
+                  </span>
+                  <span className="mt-1 block text-xs text-ink-secondary">{notification.body}</span>
+                </span>
+                <span className="shrink-0 text-[11px] text-ink-muted">{formatNotificationTime(notification.updated_at)}</span>
+              </span>
+              <span className="mt-3 grid gap-2">
+                {notification.payload.items.map((item) => (
+                  <span key={`${item.item_code}:${item.expires_at ?? 'never'}`} className="flex items-center gap-3 rounded-xl bg-surface-2/70 p-2.5">
+                    <img src={itemIconPath(item.icon_key)} alt="" width={40} height={40} className="size-10 shrink-0 object-contain" />
+                    <span className="min-w-0 flex-1">
+                      <strong className="block truncate text-xs font-semibold text-ink-primary">{item.name} ×{item.quantity}</strong>
+                      <span className="mt-0.5 block text-[11px] text-ink-muted">{formatExpiry(item.expires_at)}</span>
+                    </span>
+                  </span>
+                ))}
+              </span>
+            </button>
+          ))}
+          {center.nextCursor && (
+            <div className="border-t border-surface-3 p-3 text-center">
+              <button
+                type="button"
+                onClick={() => void center.loadMore()}
+                disabled={center.loadingMore}
+                className="tool-secondary-action h-9 px-4 text-xs disabled:cursor-wait"
+              >
+                {center.loadingMore ? copy.notifications.loadingMore : copy.notifications.loadMore}
               </button>
             </div>
           )}
-
-          <div className="max-h-[min(32rem,calc(100dvh-9rem))] overflow-y-auto overscroll-contain">
-            {center.loading && center.notifications.length === 0 && (
-              <p className="p-6 text-center text-sm text-ink-secondary" role="status">{copy.notifications.loading}</p>
-            )}
-            {!center.loading && center.notifications.length === 0 && (
-              <p className="p-8 text-center text-sm text-ink-secondary">{copy.notifications.empty}</p>
-            )}
-            {center.notifications.map((notification) => (
-              <button
-                key={notification.id}
-                type="button"
-                onClick={() => void openNotification(notification)}
-                disabled={center.markingId === notification.id}
-                className={`block w-full border-b border-surface-3 px-4 py-4 text-left transition-colors last:border-b-0 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500 ${notification.read_at ? '' : 'bg-brand-500/5'}`}
-              >
-                <span className="flex items-start justify-between gap-3">
-                  <span className="min-w-0">
-                    <span className="flex items-center gap-2">
-                      <strong className="truncate text-sm font-semibold text-ink-primary">{notification.title}</strong>
-                      {!notification.read_at && <span className="tool-status tool-status--current shrink-0">{copy.notifications.unread}</span>}
-                    </span>
-                    <span className="mt-1 block text-xs text-ink-secondary">{notification.body}</span>
-                  </span>
-                  <span className="shrink-0 text-[11px] text-ink-muted">{formatNotificationTime(notification.updated_at)}</span>
-                </span>
-                <span className="mt-3 grid gap-2">
-                  {notification.payload.items.map((item) => (
-                    <span key={`${item.item_code}:${item.expires_at ?? 'never'}`} className="flex items-center gap-3 rounded-xl bg-surface-2/70 p-2.5">
-                      <img src={itemIconPath(item.icon_key)} alt="" width={40} height={40} className="size-10 shrink-0 object-contain" />
-                      <span className="min-w-0 flex-1">
-                        <strong className="block truncate text-xs font-semibold text-ink-primary">{item.name} ×{item.quantity}</strong>
-                        <span className="mt-0.5 block text-[11px] text-ink-muted">{formatExpiry(item.expires_at)}</span>
-                      </span>
-                    </span>
-                  ))}
-                </span>
-              </button>
-            ))}
-            {center.nextCursor && (
-              <div className="border-t border-surface-3 p-3 text-center">
-                <button
-                  type="button"
-                  onClick={() => void center.loadMore()}
-                  disabled={center.loadingMore}
-                  className="tool-secondary-action h-9 px-4 text-xs disabled:cursor-wait"
-                >
-                  {center.loadingMore ? copy.notifications.loadingMore : copy.notifications.loadMore}
-                </button>
-              </div>
-            )}
-          </div>
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 

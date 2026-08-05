@@ -77,6 +77,30 @@ afterEach(() => {
 })
 
 describe('InventorySection idempotent item use', () => {
+  it('uses the local dialog contract and restores item focus on Escape', async () => {
+    mocks.apiJson.mockImplementation(async (path: string) => {
+      if (path === '/api/user/onboarding-tasks') return { tasks: [] }
+      if (path === '/api/user/inventory') return inventory
+      throw new Error(`unexpected request: ${path}`)
+    })
+    const user = userEvent.setup()
+    render(<InventorySection onPayload={vi.fn()} />)
+
+    const trigger = await screen.findByRole('button', { name: /限时 CDK/ })
+    trigger.focus()
+    await user.click(trigger)
+
+    const dialog = await screen.findByRole('dialog', { name: '限时 CDK' })
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    expect(dialog).toHaveAttribute('data-slot', 'dialog-content')
+    expect(dialog).toHaveClass('block')
+    expect(document.querySelector('[data-slot="dialog-overlay"]')).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(trigger).toHaveFocus()
+  })
+
   it('shows onboarding reward details and recent asset events', async () => {
     mocks.apiJson.mockImplementation(async (path: string) => {
       if (path === '/api/user/onboarding-tasks') return { tasks: [{

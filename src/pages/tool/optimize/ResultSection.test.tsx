@@ -4,10 +4,12 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { OptimizeResult } from '../../../lib/types'
 import ResultSection, { UpgradeSuggestionStatusNotice } from './ResultSection'
+import { disableDebugMode, enableDebugMode, getDebugDiagnosticsSnapshot } from '../../../lib/debug-diagnostics'
 
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  disableDebugMode()
 })
 
 describe('UpgradeSuggestionStatusNotice', () => {
@@ -41,6 +43,7 @@ describe('UpgradeSuggestionStatusNotice', () => {
 describe('ResultSection compatibility fallback', () => {
   it('contains malformed history rendering and keeps the diagnostic download action', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    expect(enableDebugMode()).toBe(true)
     const onDownloadFullResult = vi.fn()
     const invalidResult = {
       author: 'test',
@@ -85,5 +88,9 @@ describe('ResultSection compatibility fallback', () => {
 
     expect(await screen.findByRole('alert', undefined, { timeout: 5_000 })).toHaveTextContent('这条排班结果的数据版本不兼容或已损坏')
     expect(screen.getByRole('button', { name: '下载完整计算数据' })).toBeInTheDocument()
+    expect(getDebugDiagnosticsSnapshot().events).toContainEqual(expect.objectContaining({
+      type: 'react_error',
+      context: 'result_render',
+    }))
   })
 })

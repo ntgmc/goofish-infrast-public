@@ -2,13 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { copy } from '../copy/index'
 import type { PublicPersonalUseDeclaration } from '../lib/personal-use-declaration'
-
-const FOCUSABLE_SELECTOR = [
-  'button:not([disabled])',
-  'a[href]',
-  'input:not([disabled])',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',')
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
 
 export default function PersonalUseDeclarationDialog({
   open,
@@ -24,71 +18,38 @@ export default function PersonalUseDeclarationDialog({
   onConfirm: () => void
 }) {
   const [confirmed, setConfirmed] = useState(false)
-  const dialogRef = useRef<HTMLDivElement>(null)
+  const checkboxRef = useRef<HTMLInputElement>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
-  const submittingRef = useRef(submitting)
-  submittingRef.current = submitting
 
   useEffect(() => {
     if (open) setConfirmed(false)
   }, [declaration?.contentHash, declaration?.id, open])
 
-  useEffect(() => {
-    if (!open) return
-    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    const focusFrame = window.requestAnimationFrame(() => {
-      dialogRef.current?.querySelector<HTMLElement>('input')?.focus()
-    })
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !submittingRef.current) onClose()
-    }
-    document.addEventListener('keydown', handleEscape)
-    return () => {
-      window.cancelAnimationFrame(focusFrame)
-      document.removeEventListener('keydown', handleEscape)
-      document.body.style.overflow = previousOverflow
-      const returnFocusTarget = returnFocusRef.current
-      window.requestAnimationFrame(() => {
-        if (returnFocusTarget?.isConnected) returnFocusTarget.focus()
-      })
-    }
-  }, [onClose, open])
-
-  if (!open || !declaration) return null
+  if (!declaration) return null
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 p-4 sm:p-8"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !submitting) onClose()
-      }}
-    >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen && !submitting) onClose() }}>
+      <DialogContent
         aria-labelledby="personal-use-declaration-title"
         aria-describedby="personal-use-declaration-description"
-        tabIndex={-1}
-        className="tool-panel max-h-[calc(100dvh-2rem)] w-full max-w-xl overflow-y-auto p-5 shadow-2xl focus:outline-none sm:max-h-[calc(100dvh-4rem)] sm:p-6"
-        onKeyDown={(event) => {
-          if (event.key !== 'Tab') return
-          const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-          if (focusable.length === 0) {
-            event.preventDefault()
-            return
-          }
-          const first = focusable[0]
-          const last = focusable[focusable.length - 1]
-          if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault()
-            last.focus()
-          } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault()
-            first.focus()
-          }
+        className="block max-h-[calc(100dvh-2rem)] max-w-xl sm:max-h-[calc(100dvh-4rem)]"
+        onOpenAutoFocus={(event) => {
+          returnFocusRef.current = document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null
+          event.preventDefault()
+          checkboxRef.current?.focus()
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          if (returnFocusRef.current?.isConnected) returnFocusRef.current.focus()
+          returnFocusRef.current = null
+        }}
+        onEscapeKeyDown={(event) => {
+          if (submitting) event.preventDefault()
+        }}
+        onPointerDownOutside={(event) => {
+          if (submitting) event.preventDefault()
         }}
       >
         <div className="flex items-start gap-3">
@@ -96,11 +57,11 @@ export default function PersonalUseDeclarationDialog({
             <ShieldCheck size={18} strokeWidth={2.25} />
           </span>
           <div>
-            <h2 id="personal-use-declaration-title" className="text-lg font-semibold text-ink-primary">{copy.personalUse.confirmation_title}</h2>
+            <DialogTitle id="personal-use-declaration-title" className="text-ink-primary">{copy.personalUse.confirmation_title}</DialogTitle>
             <p className="mt-1 text-xs font-medium text-ink-muted">
               {declaration.title} · {declaration.version} · {copy.personalUse.confirmation_effective_date}{declaration.effectiveDate}
             </p>
-            <p id="personal-use-declaration-description" className="mt-3 text-sm leading-6 text-ink-secondary">{copy.personalUse.confirmation_intro}</p>
+            <DialogDescription id="personal-use-declaration-description" className="mt-3">{copy.personalUse.confirmation_intro}</DialogDescription>
             <p className="mt-3 text-sm leading-6 text-ink-secondary">{copy.personalUse.confirmation_commitment}</p>
             <p className="mt-3 text-sm leading-6 text-ink-secondary">{copy.personalUse.confirmation_consequence}</p>
           </div>
@@ -108,6 +69,7 @@ export default function PersonalUseDeclarationDialog({
 
         <label className="tool-inset mt-5 flex cursor-pointer items-start gap-3 p-3 text-sm leading-6 text-ink-primary">
           <input
+            ref={checkboxRef}
             type="checkbox"
             checked={confirmed}
             disabled={submitting}
@@ -142,7 +104,7 @@ export default function PersonalUseDeclarationDialog({
             {submitting ? copy.personalUse.confirmation_submitting : copy.personalUse.confirmation_continue}
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

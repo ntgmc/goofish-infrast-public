@@ -1,5 +1,11 @@
-import { Dialog } from 'radix-ui'
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '../../../components/ui/dialog'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import { itemIconPath } from '../../../lib/inventory-contracts'
 import type {
@@ -38,6 +44,7 @@ export default function InvitationSettingsSection() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const itemPickerTriggerRef = useRef<HTMLButtonElement | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -156,7 +163,10 @@ export default function InvitationSettingsSection() {
               rewards={settings.rewards.filter((reward) => reward.recipient === recipient)}
               catalogByCode={catalogByCode}
               giftPackVersionById={giftPackVersionById}
-              onAdd={() => setAddingFor(recipient)}
+              onAdd={(trigger) => {
+                itemPickerTriggerRef.current = trigger
+                setAddingFor(recipient)
+              }}
               onUpdate={updateReward}
               onRemove={removeReward}
             />
@@ -183,6 +193,7 @@ export default function InvitationSettingsSection() {
         recipient={addingFor}
         catalog={catalog}
         selectedCodes={new Set(settings.rewards.filter((reward) => reward.recipient === addingFor).map((reward) => reward.item_code))}
+        returnFocusTarget={itemPickerTriggerRef.current}
         onClose={() => setAddingFor(null)}
         onSelect={(item) => addingFor && addReward(addingFor, item)}
       />
@@ -195,7 +206,7 @@ function RewardGroup({ recipient, rewards, catalogByCode, giftPackVersionById, o
   rewards: InvitationRewardRule[]
   catalogByCode: Map<string, InvitationRewardCatalogItem>
   giftPackVersionById: Map<string, InvitationGiftPackSummary>
-  onAdd: () => void
+  onAdd: (trigger: HTMLButtonElement) => void
   onUpdate: (recipient: InvitationRewardRecipient, itemCode: string, update: Partial<InvitationRewardRule>) => void
   onRemove: (recipient: InvitationRewardRecipient, itemCode: string) => void
 }) {
@@ -233,15 +244,16 @@ function RewardGroup({ recipient, rewards, catalogByCode, giftPackVersionById, o
           })}
         </div>
       )}
-      <button type="button" disabled={rewards.length >= 16} onClick={onAdd} className="tool-secondary-action mt-4 w-full disabled:cursor-not-allowed disabled:opacity-50">{rewards.length >= 16 ? '已达到 16 项上限' : '添加道具'}</button>
+      <button type="button" disabled={rewards.length >= 16} onClick={(event) => onAdd(event.currentTarget)} className="tool-secondary-action mt-4 w-full disabled:cursor-not-allowed disabled:opacity-50">{rewards.length >= 16 ? '已达到 16 项上限' : '添加道具'}</button>
     </fieldset>
   )
 }
 
-function ItemPickerDialog({ recipient, catalog, selectedCodes, onClose, onSelect }: {
+function ItemPickerDialog({ recipient, catalog, selectedCodes, returnFocusTarget, onClose, onSelect }: {
   recipient: InvitationRewardRecipient | null
   catalog: InvitationRewardCatalogItem[]
   selectedCodes: Set<string>
+  returnFocusTarget: HTMLButtonElement | null
   onClose: () => void
   onSelect: (item: InvitationRewardCatalogItem) => void
 }) {
@@ -249,28 +261,32 @@ function ItemPickerDialog({ recipient, catalog, selectedCodes, onClose, onSelect
   const filtered = catalog.filter((item) => !search.trim()
     || `${item.name} ${item.item_code}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
   return (
-    <Dialog.Root open={recipient !== null} onOpenChange={(open) => { if (!open) onClose() }}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/55" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[85dvh] w-[calc(100vw-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-surface-3 bg-surface-1 p-5 shadow-2xl focus:outline-none sm:p-6">
-          <Dialog.Title className="text-lg font-semibold text-ink-primary">添加{recipient === 'inviter' ? '邀请人' : '新用户'}奖励</Dialog.Title>
-          <Dialog.Description className="mt-1 text-sm leading-6 text-ink-secondary">选择一个当前允许发放的道具；已添加的道具不能重复选择。</Dialog.Description>
-          <label htmlFor="invitation-item-search" className="sr-only">搜索道具</label>
-          <input id="invitation-item-search" autoFocus className="tool-field mt-4 w-full" value={search} onChange={(event) => setSearch(event.currentTarget.value)} placeholder="搜索道具名称或代码" />
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            {filtered.map((item) => {
-              const disabled = selectedCodes.has(item.item_code) || !item.selectable
-              return <button key={item.item_code} type="button" disabled={disabled} onClick={() => onSelect(item)} className="tool-inset flex items-center gap-3 p-3 text-left transition hover:border-brand-400 disabled:cursor-not-allowed disabled:opacity-45">
-                <img src={itemIconPath(item.icon_key)} alt="" width={48} height={48} className="h-12 w-12 shrink-0 object-contain" />
-                <span className="min-w-0"><strong className="block truncate text-sm text-ink-primary">{item.name}</strong><span className="block truncate text-xs text-ink-muted">{kindLabel(item.kind)}{selectedCodes.has(item.item_code) ? ' · 已添加' : item.unavailable_reason ? ` · ${item.unavailable_reason}` : ''}</span></span>
-              </button>
-            })}
-          </div>
-          {filtered.length === 0 && <p className="tool-inset mt-4 p-6 text-center text-sm text-ink-muted">没有匹配的道具</p>}
-          <div className="mt-5 flex justify-end"><Dialog.Close className="tool-secondary-action">关闭</Dialog.Close></div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <Dialog open={recipient !== null} onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent
+        className="block max-w-2xl"
+        onCloseAutoFocus={(event) => {
+          if (!returnFocusTarget?.isConnected) return
+          event.preventDefault()
+          returnFocusTarget.focus()
+        }}
+      >
+        <DialogTitle className="text-ink-primary">添加{recipient === 'inviter' ? '邀请人' : '新用户'}奖励</DialogTitle>
+        <DialogDescription className="mt-1">选择一个当前允许发放的道具；已添加的道具不能重复选择。</DialogDescription>
+        <label htmlFor="invitation-item-search" className="sr-only">搜索道具</label>
+        <input id="invitation-item-search" autoFocus className="tool-field mt-4 w-full" value={search} onChange={(event) => setSearch(event.currentTarget.value)} placeholder="搜索道具名称或代码" />
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          {filtered.map((item) => {
+            const disabled = selectedCodes.has(item.item_code) || !item.selectable
+            return <button key={item.item_code} type="button" disabled={disabled} onClick={() => onSelect(item)} className="tool-inset flex items-center gap-3 p-3 text-left transition hover:border-brand-400 disabled:cursor-not-allowed disabled:opacity-45">
+              <img src={itemIconPath(item.icon_key)} alt="" width={48} height={48} className="h-12 w-12 shrink-0 object-contain" />
+              <span className="min-w-0"><strong className="block truncate text-sm text-ink-primary">{item.name}</strong><span className="block truncate text-xs text-ink-muted">{kindLabel(item.kind)}{selectedCodes.has(item.item_code) ? ' · 已添加' : item.unavailable_reason ? ` · ${item.unavailable_reason}` : ''}</span></span>
+            </button>
+          })}
+        </div>
+        {filtered.length === 0 && <p className="tool-inset mt-4 p-6 text-center text-sm text-ink-muted">没有匹配的道具</p>}
+        <div className="mt-5 flex justify-end"><DialogClose className="tool-secondary-action">关闭</DialogClose></div>
+      </DialogContent>
+    </Dialog>
   )
 }
 

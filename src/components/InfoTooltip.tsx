@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Tooltip } from 'radix-ui'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
 
 export default function InfoTooltip({
   label,
@@ -13,9 +13,9 @@ export default function InfoTooltip({
   const [open, setOpen] = useState(false)
 
   return (
-    <Tooltip.Provider delayDuration={180} skipDelayDuration={80}>
-      <Tooltip.Root open={open} onOpenChange={setOpen}>
-        <Tooltip.Trigger asChild>
+    <TooltipProvider>
+      <Tooltip open={open} onOpenChange={setOpen}>
+        <TooltipTrigger asChild>
           <button
             type="button"
             aria-label={label}
@@ -24,19 +24,14 @@ export default function InfoTooltip({
           >
             <span aria-hidden="true">?</span>
           </button>
-        </Tooltip.Trigger>
-        <Tooltip.Portal>
-          <Tooltip.Content
-            side={side}
-            sideOffset={8}
-            collisionPadding={16}
-            className="z-[80] w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-surface-3 bg-surface-1 px-3.5 py-3 text-left text-xs leading-5 text-ink-secondary shadow-xl shadow-black/20 data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in data-[state=delayed-open]:zoom-in-95 motion-reduce:animate-none"
-          >
-            {children}
-            <Tooltip.Arrow className="fill-surface-3" width={10} height={5} />
-          </Tooltip.Content>
-        </Tooltip.Portal>
-      </Tooltip.Root>
-    </Tooltip.Provider>
+        </TooltipTrigger>
+        <TooltipContent
+          side={side}
+          className="block w-[min(20rem,calc(100vw-2rem))] shadow-black/20"
+        >
+          {children}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }

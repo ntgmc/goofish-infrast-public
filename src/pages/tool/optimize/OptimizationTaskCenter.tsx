@@ -1,5 +1,6 @@
 import { ListTodo } from 'lucide-react'
-import { useEffect, useRef, type KeyboardEvent, type RefObject } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../../components/ui/dialog'
 import type { OptimizationJobListItem } from '../../../lib/optimization-contracts'
 import { copy, CURRENT_LOCALE } from '../../../copy/index'
 import type { OptimizationTaskCenterController } from './useOptimizationTaskCenter'
@@ -61,76 +62,41 @@ export default function OptimizationTaskCenterDialog({
   onOpenResult?: (job: OptimizationJobListItem) => void;
   retryEnabled?: boolean;
 }) {
-  const dialogRef = useRef<HTMLElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const { jobs, activeCount, attentionCount, loading, refreshing, loadingMore, error, notice, busyJobId, notificationsEnabled } = controller
 
   useEffect(() => {
     if (!open) return
     void controller.refresh()
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    const focusTimer = window.setTimeout(() => closeButtonRef.current?.focus(), 0)
-    return () => {
-      window.clearTimeout(focusTimer)
-      document.body.style.overflow = previousOverflow
-    }
   }, [controller.refresh, open])
 
-  if (!open) return null
-
-  const handleDialogKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      onClose()
-      return
-    }
-    if (event.key !== 'Tab') return
-    const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
-      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    )
-    if (!focusable || focusable.length === 0) return
-    const first = focusable[0]
-    const last = focusable[focusable.length - 1]
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault()
-      last.focus()
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault()
-      first.focus()
-    }
-  }
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4 py-6"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose()
-      }}
-    >
-      <section
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose() }}>
+      <DialogContent
         id="optimization-task-center-dialog"
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
         aria-labelledby="optimization-task-center-title"
         aria-describedby="optimization-task-center-description"
-        tabIndex={-1}
-        onKeyDown={handleDialogKeyDown}
-        className="tool-panel max-h-[calc(100vh-3rem)] w-full max-w-3xl overflow-y-auto p-5 shadow-2xl sm:p-6"
+        className="block max-w-3xl"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+          closeButtonRef.current?.focus()
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+        }}
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h2 id="optimization-task-center-title" className="text-lg font-semibold text-ink-primary">
+              <DialogTitle id="optimization-task-center-title" className="text-ink-primary">
                 {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_001}
-              </h2>
+              </DialogTitle>
               {activeCount > 0 && <span className="tool-status tool-status--current">{activeCount} {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_030}</span>}
               {attentionCount > 0 && <span className="tool-status tool-status--error">{attentionCount} {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_035}</span>}
             </div>
-            <p id="optimization-task-center-description" className="mt-1 text-sm leading-6 text-ink-secondary">
+            <DialogDescription id="optimization-task-center-description" className="mt-1">
               {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_002}
-            </p>
+            </DialogDescription>
           </div>
           <button ref={closeButtonRef} type="button" onClick={onClose} className="tool-secondary-action shrink-0" aria-label={copy.optimize.pages_tool_optimize_OptimizationTaskCenter_034}>
             {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_034}
@@ -174,8 +140,8 @@ export default function OptimizationTaskCenterDialog({
             {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_024}
           </button>
         )}
-      </section>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
