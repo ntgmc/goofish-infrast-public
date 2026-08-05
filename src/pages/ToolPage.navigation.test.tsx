@@ -87,19 +87,22 @@ describe('ToolPage route guards', () => {
     expect(refreshProfileWorkspace).toHaveBeenCalledWith(secondProfile)
   })
 
-  it('updates the active dashboard tab immediately while its code is still loading', async () => {
+  it('keeps the current dashboard section visible until the next section code is ready', async () => {
     const user = userEvent.setup()
     const router = renderToolRoute('/tool/profiles')
 
     await user.click(screen.getAllByRole('button', { name: '工具' })[0])
 
     expect(router.state.location.pathname).toBe('/tool/tools')
-    expect(screen.getAllByRole('button', { name: '工具' })[0]).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('heading', { name: '工具' })).toBeInTheDocument()
-    expect(screen.getByText('正在载入...')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '还没有添加游戏账号' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: '游戏账号' })[0]).toHaveAttribute('aria-current', 'page')
+    expect(screen.getAllByRole('button', { name: '工具' })[0]).not.toHaveAttribute('aria-current')
+    expect(screen.queryByText('正在载入...')).not.toBeInTheDocument()
 
     toolsSectionImport.resolve()
     expect(await screen.findByText('工具内容')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: '工具' })[0]).toHaveAttribute('aria-current', 'page')
+    expect(screen.queryByRole('heading', { name: '还没有添加游戏账号' })).not.toBeInTheDocument()
   })
 
   it('keeps a requested deep link while the user is signed out', async () => {
