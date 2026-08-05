@@ -33,7 +33,7 @@ describe('scenario comparison estimates', () => {
     expect(oneVariable.estimated_duration_ms).toBe(100_000)
   })
 
-  it('keeps the raw worst-case estimate so admission can reject it above the ten-minute cap', () => {
+  it('keeps the raw worst-case estimate so admission can reject it above the fifteen-minute cap', () => {
     expect(buildScenarioComparisonEstimate(24, 24).estimated_duration_ms).toBe(1_329_000)
   })
 })
@@ -48,18 +48,18 @@ describe('schedule duration estimate buckets', () => {
 })
 
 describe('optimization hard timeout configuration', () => {
-  it('defaults to ten minutes, supports lower test overrides, and caps larger values', () => {
-    expect(DEFAULT_OPTIMIZE_JOB_HARD_TIMEOUT_MS).toBe(600_000)
-    expect(getOptimizeJobHardTimeoutMs()).toBe(600_000)
-    expect(formatOptimizeJobHardTimeout()).toBe('10 分钟')
+  it('defaults to fifteen minutes, supports lower test overrides, and caps larger values', () => {
+    expect(DEFAULT_OPTIMIZE_JOB_HARD_TIMEOUT_MS).toBe(900_000)
+    expect(getOptimizeJobHardTimeoutMs()).toBe(900_000)
+    expect(formatOptimizeJobHardTimeout()).toBe('15 分钟')
 
     vi.stubEnv('OPTIMIZE_JOB_HARD_TIMEOUT_MS', '2500')
     expect(getOptimizeJobHardTimeoutMs()).toBe(2_500)
     expect(formatOptimizeJobHardTimeout()).toBe('3 秒')
 
-    vi.stubEnv('OPTIMIZE_JOB_HARD_TIMEOUT_MS', '900000')
-    expect(getOptimizeJobHardTimeoutMs()).toBe(600_000)
-    expect(formatOptimizeJobHardTimeout()).toBe('10 分钟')
+    vi.stubEnv('OPTIMIZE_JOB_HARD_TIMEOUT_MS', '1200000')
+    expect(getOptimizeJobHardTimeoutMs()).toBe(900_000)
+    expect(formatOptimizeJobHardTimeout()).toBe('15 分钟')
   })
 })
 
