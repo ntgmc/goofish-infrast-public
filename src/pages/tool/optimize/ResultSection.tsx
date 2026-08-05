@@ -20,7 +20,6 @@ export default function ResultSection({
   suggestions,
   loading,
   progress,
-  inlineError,
   previewProfile,
   upgradeCdk,
   upgradeLoading,
@@ -32,9 +31,6 @@ export default function ResultSection({
   maaDownloadBusy = false,
   fullResultDownloadBusy = false,
   fullDataAvailable = true,
-  onApplySuggestions,
-  suggestionsReadOnly = false,
-  onReset,
 }: {
   phase: OptimizePhase;
   historyItem: WorkspaceResultHistoryItem | null;
@@ -44,7 +40,6 @@ export default function ResultSection({
   suggestions: UpgradeSuggestion[];
   loading: boolean;
   progress: ScheduleProgressState | null;
-  inlineError: { scope: 'generate' | 'apply'; message: string } | null;
   previewProfile: boolean;
   upgradeCdk: string;
   upgradeLoading: boolean;
@@ -56,9 +51,6 @@ export default function ResultSection({
   maaDownloadBusy?: boolean;
   fullResultDownloadBusy?: boolean;
   fullDataAvailable?: boolean;
-  onApplySuggestions: (selectedIds: string[]) => Promise<void>;
-  suggestionsReadOnly?: boolean;
-  onReset: () => void;
 }) {
   return (
     <section className="min-w-0" data-tour-target="optimize-result-content">
@@ -96,11 +88,7 @@ export default function ResultSection({
               <Suspense fallback={<ResultFallback />}>
                 <UpgradeSuggestions
                   suggestions={suggestions}
-                  onApply={onApplySuggestions}
-                  loading={false}
-                  onReset={onReset}
                   embedded
-                  readOnly
                 />
               </Suspense>
             ) : null}
@@ -125,13 +113,7 @@ export default function ResultSection({
               <Suspense fallback={<ResultFallback />}>
                 <UpgradeSuggestions
                   suggestions={suggestions}
-                  onApply={onApplySuggestions}
-                  loading={loading}
-                  progress={progress?.mode === 'apply' ? progress : null}
-                  error={inlineError?.scope === 'apply' ? inlineError.message : null}
-                  onReset={onReset}
                   embedded
-                  readOnly={suggestionsReadOnly}
                 />
               </Suspense>
             ) : null}

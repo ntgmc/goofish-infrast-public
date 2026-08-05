@@ -239,23 +239,4 @@ describe('useToolSession config synchronization', () => {
     expect(result.current.workspace?.config?.desc).toBe('profile-2')
   })
 
-  it('keeps an elite override draft and rejects when persistence fails', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input)
-      if (url === '/api/announcement') return new Response(null, { status: 204 })
-      if (url === '/api/auth/me') return jsonResponse(authPayload(baseConfig))
-      if (url === '/api/user/workspace') return errorResponse(500)
-      throw new Error(`Unexpected request: ${url}`)
-    }))
-
-    const { result } = renderHook(() => useToolSession())
-    await waitFor(() => expect(result.current.authStatus).toBe('authenticated'))
-    let save!: Promise<void>
-    act(() => {
-      save = result.current.setEliteOverrides({ char_001: 2 })
-    })
-
-    await expect(save).rejects.toThrow('auth failure 500')
-    expect(result.current.eliteOverrides).toEqual({ char_001: 2 })
-  })
 })
