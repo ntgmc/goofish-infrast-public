@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { glob } from 'node:fs/promises'
-import ts from 'typescript'
+import { ts } from 'ts-morph'
 import { isPrivateOptimizerSource } from './private-optimizer-sources.mjs'
 
 const failures = []

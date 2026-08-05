@@ -1,4 +1,4 @@
-import ts from 'typescript'
+import { ts } from 'ts-morph'
 
 const UNUSED_DIAGNOSTIC_CODES = new Set([6133, 6192, 6196, 6198])
 const failures = []

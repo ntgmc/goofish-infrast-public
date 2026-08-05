@@ -16,10 +16,10 @@ import InputNumber from './InputNumber'
 
 type ProductGroup = 'trading_stations' | 'manufacturing_stations'
 
-export const TRADING_PRODUCTS = ['LMD', 'Orundum']
-export const MANUFACTURING_PRODUCTS = ['Pure Gold', 'Battle Record', 'Originium Shard']
+const TRADING_PRODUCTS = ['LMD', 'Orundum']
+const MANUFACTURING_PRODUCTS = ['Pure Gold', 'Battle Record', 'Originium Shard']
 
-export const PRODUCT_LABELS: Record<string, string> = {
+const PRODUCT_LABELS: Record<string, string> = {
   LMD: copy.common.components_ConfigEditor_001,
   Orundum: copy.common.components_ConfigEditor_002,
   'Pure Gold': copy.common.components_ConfigEditor_003,
@@ -27,13 +27,13 @@ export const PRODUCT_LABELS: Record<string, string> = {
   'Originium Shard': copy.common.components_ConfigEditor_005,
 }
 
-export const SCHEDULE_MODE_LABELS: Record<string, string> = {
+const SCHEDULE_MODE_LABELS: Record<string, string> = {
   maa: copy.common.components_ConfigEditor_006,
   rotation: copy.common.components_ConfigEditor_007,
   variable: copy.common.components_ConfigEditor_008,
 }
 
-export const DORMITORY_RULE_LABELS: Record<string, string> = {
+const DORMITORY_RULE_LABELS: Record<string, string> = {
   fixed: copy.common.components_ConfigEditor_009,
   maa_autofill: copy.common.components_ConfigEditor_010,
   maa_pure_autofill: copy.common.components_ConfigEditor_097,
@@ -62,7 +62,7 @@ const SHIFT_SCHEDULE_OPTIONS = [
 
 type ShiftScheduleChoice = typeof SHIFT_SCHEDULE_OPTIONS[number]['id']
 
-export const PERMISSION_LABELS: Record<PermissionMode, string> = {
+const PERMISSION_LABELS: Record<PermissionMode, string> = {
   recommended: copy.common.components_ConfigEditor_011,
   growth: copy.common.components_ConfigEditor_012,
   advanced: copy.common.components_ConfigEditor_013,
@@ -71,7 +71,7 @@ export const PERMISSION_LABELS: Record<PermissionMode, string> = {
   admin: copy.common.components_ConfigEditor_015,
 }
 
-export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
+const CONFIG_PRESETS: Record<string, LicenseConfig> = {
   '243': {
     layout: '2-4-3',
     desc: copy.common.components_ConfigEditor_016,
