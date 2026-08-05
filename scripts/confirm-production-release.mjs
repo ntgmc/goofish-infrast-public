@@ -6,7 +6,7 @@ const DEFAULT_MAX_ATTEMPTS = 5
 const DEFAULT_REQUEST_TIMEOUT_MS = 10_000
 const MAX_RETRY_DELAY_MS = 30_000
 
-export class ProductionReleaseConfirmationError extends Error {
+class ProductionReleaseConfirmationError extends Error {
   constructor(message) {
     super(message)
     this.name = 'ProductionReleaseConfirmationError'
