@@ -82,12 +82,9 @@ const depotValueRequestSchema = z.discriminatedUnion('source', [
   strict({
     source: z.literal('skland'),
     profile_id: z.string().trim().min(1).max(MAX_DEPOT_PROFILE_ID_LENGTH),
-    sample_consent: z.boolean(),
+    sample_consent: z.boolean().optional(),
   }),
 ])
-const depotSampleRevokeSchema = strict({
-  profile_id: z.string().trim().min(1).max(MAX_DEPOT_PROFILE_ID_LENGTH),
-})
 const inventoryExpirySchema = z.discriminatedUnion('mode', [
   strict({ mode: z.literal('never') }),
   strict({ mode: z.literal('relative_days'), days: z.number().int().min(1).max(3650) }),
@@ -125,7 +122,6 @@ const adminTargetProfileShape = {
 
 export const requestSchemas = {
   depotValue: depotValueRequestSchema,
-  depotSampleRevoke: depotSampleRevokeSchema,
   adminSession: strict({ username: shortString(64), password: shortString(128) }),
   authRegister: strict({
     email: shortString(AUTH_EMAIL_MAX_LENGTH),
@@ -648,10 +644,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/internal/releases/confirm', route({ POST: json('standard', requestSchemas.releaseConfirmation) })],
   ['/api/usage-stats', route({ POST: json('standard', requestSchemas.usageStats) }, ['admin'])],
   ['/api/admin/usage-stats', route({ GET: none() }, ['admin', 'format', 'from', 'to', 'range'])],
-  ['/api/depot-value', route({
-    POST: json('depot', requestSchemas.depotValue),
-    DELETE: json('standard', requestSchemas.depotSampleRevoke),
-  })],
+  ['/api/depot-value', route({ POST: json('depot', requestSchemas.depotValue) })],
   ['/api/user/announcements', route({ GET: none(), PATCH: json('standard', requestSchemas.userAnnouncement) })],
   ['/api/user/notifications', route({ GET: none(), PATCH: json('standard', requestSchemas.userNotification) }, ['cursor', 'limit'])],
   ['/api/user/profiles', route({ GET: none(), PATCH: json('standard', requestSchemas.profilePatch) })],

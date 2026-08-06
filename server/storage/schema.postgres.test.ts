@@ -315,7 +315,7 @@ describe('PostgreSQL schema migration', () => {
     }
   })
 
-  it('rotates depot sample hashes atomically and isolates distributions by valuation version', async () => {
+  it('rotates depot sample hashes atomically and isolates current distributions by valuation version', async () => {
     const firstProfile = await seedProfile()
     const secondProfile = await seedProfile()
     const previousHash = `previous-${randomUUID()}`
@@ -360,14 +360,82 @@ describe('PostgreSQL schema migration', () => {
         equal_count: 1,
       })
 
-      await expect(store.deleteForContributorProfile(firstProfile.profileId)).resolves.toBe(1)
-      await expect(store.getDistribution(100, valuationVersion)).resolves.toEqual({
-        sample_count: 0,
-        less_count: 0,
-        equal_count: 0,
-      })
     } finally {
       await query('delete from user_accounts where id = any($1::text[])', [[firstProfile.userId, secondProfile.userId]])
+    }
+  })
+
+  it('migrates eligible depot v1 samples into the v2 compatibility pool idempotently', async () => {
+    const eligibleHash = `legacy-eligible-${randomUUID()}`
+    const lowCoverageHash = `legacy-low-coverage-${randomUUID()}`
+    const now = '2026-07-06T00:00:00.000Z'
+    const insertLegacySample = async (uidHash: string, pricedCount: number, unpricedCount: number, total: number) => {
+      await query(
+        `insert into depot_value_samples
+          (uid_hash, total_equivalent_sanity, account_level, operator_power_score, operator_count,
+           elite2_count, six_star_count, six_star_e2_count, e2_90_count, inventory_item_count,
+           priced_count, unpriced_count, sample_json, sampled_at, updated_at)
+         values ($1, $2, 120, 10, 3, 2, 2, 2, 1, 10, $3, $4, $5::jsonb, $6, $6)`,
+        [uidHash, total, pricedCount, unpricedCount, JSON.stringify({ version: 1, source: 'skland' }), now],
+      )
+    }
+
+    try {
+      await insertLegacySample(eligibleHash, 9, 1, 123)
+      await insertLegacySample(lowCoverageHash, 7, 3, 321)
+
+      await markCurrentMigrationPending()
+      await migrateDatabaseSchema()
+      await markCurrentMigrationPending()
+      await migrateDatabaseSchema()
+
+      const samples = await query<{
+        uid_hash: string
+        version: number
+        valuation_version: string | null
+        pricing_snapshot_id: string | null
+        pricing_status: string | null
+        pricing_coverage: string | null
+        complete: boolean
+        sample_json: Record<string, unknown>
+      }>(
+        `select uid_hash, version, valuation_version, pricing_snapshot_id, pricing_status,
+                pricing_coverage::text, complete, sample_json
+           from depot_value_samples
+          where uid_hash = any($1::text[])
+          order by uid_hash`,
+        [[eligibleHash, lowCoverageHash]],
+      )
+      const eligible = samples.rows.find((sample) => sample.uid_hash === eligibleHash)
+      const lowCoverage = samples.rows.find((sample) => sample.uid_hash === lowCoverageHash)
+      expect(eligible).toMatchObject({
+        version: 2,
+        valuation_version: 'depot-v2:migrated:v1',
+        pricing_snapshot_id: 'legacy-v1',
+        pricing_status: 'stale',
+        pricing_coverage: '0.9000',
+        complete: true,
+        sample_json: {
+          version: 2,
+          migration_source: 'depot-v1',
+          valuation_version: 'depot-v2:migrated:v1',
+        },
+      })
+      expect(lowCoverage).toMatchObject({
+        version: 1,
+        valuation_version: null,
+        complete: false,
+      })
+
+      const store = getDepotValueSampleStore()
+      if (!store) throw new Error('Expected the PostgreSQL depot sample store to be available.')
+      await expect(store.getDistribution(123, `current-${randomUUID()}`)).resolves.toEqual({
+        sample_count: 1,
+        less_count: 0,
+        equal_count: 1,
+      })
+    } finally {
+      await query('delete from depot_value_samples where uid_hash = any($1::text[])', [[eligibleHash, lowCoverageHash]])
     }
   })
 

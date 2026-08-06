@@ -803,7 +803,7 @@ describe('PostgreSQL optimization job admission', () => {
        where id = $1`,
       [
         admitted.job.id,
-        new Date(Date.now() - 10 * 60_000 - 1).toISOString(),
+        new Date(Date.now() - 15 * 60_000 - 1).toISOString(),
         new Date(Date.now() + 60_000).toISOString(),
       ],
     )

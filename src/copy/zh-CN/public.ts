@@ -62,7 +62,7 @@ export const publicCopy = {
   // src/lib/changelog.ts
   pages_ChangelogPage_009: "修正 Jaye 的精英化门槛与效率规则，提升排班结果准确性。",
   // src/lib/changelog.ts
-  pages_ChangelogPage_010: "平滑排班阶段进度显示，并在优化计算超过十分钟时及时终止异常任务。",
+  pages_ChangelogPage_010: "平滑排班阶段进度显示，并在优化计算超过十五分钟时及时终止异常任务。",
   // src/lib/changelog.ts
   pages_ChangelogPage_011: "账号与个人使用",
   // src/lib/changelog.ts

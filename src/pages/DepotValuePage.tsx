@@ -27,9 +27,7 @@ export default function DepotValuePage() {
   const [loading, setLoading] = useState<DepotValueRequest['source'] | null>(null)
   const [profilePreparing, setProfilePreparing] = useState(false)
   const [sklandDialogOpen, setSklandDialogOpen] = useState(false)
-  const [sampleConsent, setSampleConsent] = useState(false)
-  const [sampleActionLoading, setSampleActionLoading] = useState(false)
-  const [sampleStatus, setSampleStatus] = useState<string | null>(null)
+  const [sampleConsent, setSampleConsent] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const applyAuthData = useCallback((data: AuthMeResponse | null) => {
@@ -196,31 +194,6 @@ export default function DepotValuePage() {
     setSklandDialogOpen(false)
     setSelectedProfileId(completedProfile.id)
     void analyze({ source: 'skland', profile_id: completedProfile.id, sample_consent: sampleConsent })
-  }
-
-  const revokeSample = async () => {
-    const profileId = selectedSklandProfile?.id
-    if (!profileId) return
-    setSampleActionLoading(true)
-    setSampleStatus(null)
-    setError(null)
-    try {
-      await apiJson<{ revoked: true }>('/api/depot-value', {
-        method: 'DELETE',
-        json: { profile_id: profileId },
-        fallbackMessage: copy.tools.pages_DepotValuePage_081,
-      })
-      setSampleConsent(false)
-      setSampleStatus(copy.tools.pages_DepotValuePage_082)
-      setResult((current) => current ? {
-        ...current,
-        ranking: { ...current.ranking, contribution_status: 'declined' },
-      } : current)
-    } catch (caught) {
-      setError((caught as Error).message)
-    } finally {
-      setSampleActionLoading(false)
-    }
   }
 
   const downloadShareImage = () => {
@@ -405,17 +378,6 @@ export default function DepotValuePage() {
                     />
                     <span>{copy.tools.pages_DepotValuePage_087}</span>
                   </label>
-                  {selectedSklandProfile && (
-                    <button
-                      type="button"
-                      onClick={() => void revokeSample()}
-                      disabled={sampleActionLoading}
-                      className="tool-secondary-action"
-                    >
-                      {sampleActionLoading ? copy.tools.pages_DepotValuePage_088 : copy.tools.pages_DepotValuePage_089}
-                    </button>
-                  )}
-                  {sampleStatus && <p className="tool-alert tool-alert--success" role="status">{sampleStatus}</p>}
                 </div>
               )}
               <p className="tool-alert tool-alert--warning mt-4">

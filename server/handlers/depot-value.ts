@@ -165,19 +165,18 @@ const ITEM_NAMES: Record<string, string> = {
 }
 
 export default async (req: Request): Promise<Response> => {
-  if (req.method !== 'POST' && req.method !== 'DELETE') return jsonResponse({ error: 'Method not allowed' }, 405)
+  if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
 
   try {
     const body = await readLimitedJsonBody(req)
     if (!isRecord(body)) return jsonResponse({ error: '请求体必须是对象。' }, 400)
-    if (req.method === 'DELETE') return revokeDepotSample(req, body.profile_id)
     if (body.source === 'upload') {
       return jsonResponse(await buildDepotValueResponse(normalizeDepotInventory(body.inventory), 'upload'))
     }
     if (body.source === 'skland') {
       const gated = await requireSiteFeatures(['login', 'profiles', 'skland'])
       if (gated) return gated
-      const sampleConsent = body.sample_consent === true
+      const sampleConsent = body.sample_consent !== false
       const skland = await readSklandInventory(req, body.profile_id, sampleConsent)
       return jsonResponse(await buildDepotValueResponse(skland.inventory, 'skland', undefined, {
         sample: skland.sample,
@@ -192,16 +191,6 @@ export default async (req: Request): Promise<Response> => {
     const message = isHandlerError(error) ? error.message : 'Internal server error'
     return jsonResponse({ error: message, ...(isHandlerError(error) && error.code ? { code: error.code } : {}) }, status)
   }
-}
-
-async function revokeDepotSample(req: Request, profileIdValue: unknown): Promise<Response> {
-  const auth = await requireUserSession(req)
-  if (!auth) throw createError('请先登录。', 401)
-  const profileId = typeof profileIdValue === 'string' ? profileIdValue.trim() : ''
-  if (!profileId) throw createError('缺少 profile_id。', 400)
-  if (!auth.profiles.some((profile) => profile.id === profileId)) throw createError('账号档案不存在。', 404)
-  const deletedCount = await getDepotValueSampleStore()?.deleteForContributorProfile(profileId) ?? 0
-  return jsonResponse({ revoked: true, deleted_count: deletedCount })
 }
 
 function normalizeDepotInventory(value: unknown): DepotInventoryItem[] {

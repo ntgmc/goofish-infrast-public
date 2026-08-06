@@ -3,10 +3,10 @@ import BrandLogo from '../components/BrandLogo'
 import CompactHeaderMenu from '../components/CompactHeaderMenu'
 import PublicFooter, { SupportGroupLink } from '../components/PublicFooter'
 import ThemeSwitcher from '../components/ThemeSwitcher'
-import { copy } from '../copy/index'
+import { copy, CURRENT_LOCALE } from '../copy/index'
 import { PUBLIC_PRICING_PLAN_IDS } from '../lib/public-content'
 import { usePublicContent } from '../lib/public-content-context'
-import { getMeteredBillingPolicy } from '../lib/metered-billing'
+import { getMeteredBillingPolicy, getMeteredScheduleQuote } from '../lib/metered-billing'
 import { useSiteFeatures } from '../lib/site-feature-context'
 
 export default function PricingPage() {
@@ -15,6 +15,12 @@ export default function PricingPage() {
   const plans = PUBLIC_PRICING_PLAN_IDS.map((id) => ({ id, ...pricing.plans[id] }))
   const featureState = useSiteFeatures()
   const metered = getMeteredBillingPolicy()
+  const commercialTiers = metered.commercial.tiers.map((tier) => ({
+    ...tier,
+    chargePoints: getMeteredScheduleQuote('metered_commercial', tier.threshold_points).charge,
+  }))
+  const highestCommercialCharge = commercialTiers[0]!.chargePoints
+  const lowestCommercialCharge = commercialTiers[commercialTiers.length - 1]!.chargePoints
   return (
     <main className="tool-page" tabIndex={-1} data-route-focus>
       <div className="public-shell">
@@ -68,9 +74,77 @@ export default function PricingPage() {
             <>
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <article className="tool-panel p-5"><h3 className="font-semibold text-ink-primary">{copy.metered.pricing.personal_title}</h3><p className="mt-3 text-3xl font-semibold text-brand-400">{copy.metered.pricing.personal_price(metered.personal.main_schedule_points)}</p><p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.metered.pricing.personal_description}</p></article>
-                <article className="tool-panel p-5"><h3 className="font-semibold text-ink-primary">{copy.metered.pricing.commercial_title}</h3><p className="mt-3 text-3xl font-semibold text-brand-400">{copy.metered.pricing.commercial_price}</p><p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.metered.pricing.commercial_description}</p></article>
+                <article className="tool-panel p-5">
+                  <h3 className="font-semibold text-ink-primary">{copy.metered.pricing.commercial_title}</h3>
+                  <p className="mt-3 text-3xl font-semibold text-brand-400">
+                    {copy.metered.pricing.commercial_price(formatPoints(lowestCommercialCharge), formatPoints(highestCommercialCharge))}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-ink-secondary">
+                    {copy.metered.pricing.commercial_description(
+                      formatPoints(commercialTiers[0]!.threshold_points),
+                      formatCount(metered.commercial.default_active_profile_limit),
+                      formatCount(metered.commercial.default_total_profile_limit),
+                    )}
+                  </p>
+                </article>
               </div>
               <p className="mt-4 text-sm leading-7 text-ink-secondary">{copy.metered.pricing.capabilities}</p>
+
+              <div className="mt-8 grid gap-8 lg:grid-cols-2">
+                <section aria-labelledby="metered-billing-rules-title">
+                  <h3 id="metered-billing-rules-title" className="text-base font-semibold text-ink-primary">{copy.metered.pricing.billing_title}</h3>
+                  <ol className="mt-4 grid gap-3">
+                    {copy.metered.pricing.billing_steps.map((step, index) => (
+                      <li key={step.title} className="tool-inset flex gap-3 p-4">
+                        <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-brand-400/30 bg-brand-400/10 text-xs font-semibold text-brand-400">{index + 1}</span>
+                        <div>
+                          <h4 className="text-sm font-semibold text-ink-primary">{step.title}</h4>
+                          <p className="mt-1 text-sm leading-6 text-ink-secondary">{step.description}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+
+                <section aria-labelledby="commercial-rules-title">
+                  <h3 id="commercial-rules-title" className="text-base font-semibold text-ink-primary">{copy.metered.pricing.commercial_rules_title}</h3>
+                  <ul className="mt-4 grid gap-2 text-sm leading-6 text-ink-secondary">
+                    <li>{copy.metered.pricing.commercial_unlock_rule(formatPoints(commercialTiers[0]!.threshold_points))}</li>
+                    <li>{copy.metered.pricing.commercial_limits_rule(
+                      formatCount(metered.commercial.default_active_profile_limit),
+                      formatCount(metered.commercial.default_total_profile_limit),
+                      formatCount(metered.commercial.max_running_jobs),
+                      formatCount(metered.commercial.max_queued_jobs),
+                      formatCount(metered.commercial.max_submissions_per_hour),
+                    )}</li>
+                    <li>{copy.metered.pricing.commercial_debt_rule}</li>
+                    <li>{copy.metered.pricing.commercial_use_rule}</li>
+                  </ul>
+
+                  <div className="mt-4 overflow-x-auto">
+                    <table aria-label={copy.metered.pricing.commercial_tier_table_label} className="w-full min-w-[560px] text-left text-sm">
+                      <thead className="text-ink-muted">
+                        <tr>
+                          <th scope="col" className="p-3">{copy.metered.pricing.commercial_tier_level}</th>
+                          <th scope="col" className="p-3">{copy.metered.pricing.commercial_tier_threshold}</th>
+                          <th scope="col" className="p-3">{copy.metered.pricing.commercial_tier_discount}</th>
+                          <th scope="col" className="p-3">{copy.metered.pricing.commercial_tier_charge}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-surface-3 text-ink-secondary">
+                        {commercialTiers.map((tier) => (
+                          <tr key={tier.level}>
+                            <th scope="row" className="p-3 font-medium text-ink-primary">Lv{tier.level}</th>
+                            <td className="p-3 tabular-nums">{copy.metered.pricing.commercial_tier_points_value(formatPoints(tier.threshold_points))}</td>
+                            <td className="p-3 tabular-nums">-{tier.discount_bps / 100}%</td>
+                            <td className="p-3 tabular-nums">{copy.metered.pricing.commercial_tier_points_value(formatPoints(tier.chargePoints))}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </div>
             </>
           ) : (
             <div className="tool-alert mt-4" role="note">
@@ -90,7 +164,7 @@ export default function PricingPage() {
         <section className="border-b border-surface-4 py-8" aria-labelledby="pricing-comparison-title">
           <h2 id="pricing-comparison-title" className="text-xl font-semibold text-ink-primary">{pricing.comparison_heading}</h2>
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
+            <table aria-label={pricing.comparison_heading} className="w-full min-w-[720px] text-left text-sm">
               <thead className="text-ink-muted"><tr><th className="p-3">{copy.public.pages_PricingPage_008}</th>{plans.map((plan) => <th key={plan.id} className="p-3">{plan.label}</th>)}</tr></thead>
               <tbody className="divide-y divide-surface-3 text-ink-secondary">
                 {pricing.comparison_rows.map((row) => <tr key={row.id}><th className="p-3 font-medium text-ink-primary">{row.feature}</th><td className="whitespace-pre-line p-3">{row.free_preview}</td><td className="whitespace-pre-line p-3">{row.single_account_lifetime}</td></tr>)}
@@ -107,4 +181,14 @@ export default function PricingPage() {
       <PublicFooter variant="tool" className="mt-10" />
     </main>
   )
+}
+
+function formatPoints(value: string): string {
+  const amount = Number(value)
+  if (!Number.isFinite(amount)) return value
+  return new Intl.NumberFormat(CURRENT_LOCALE, { maximumFractionDigits: 2 }).format(amount)
+}
+
+function formatCount(value: number): string {
+  return new Intl.NumberFormat(CURRENT_LOCALE).format(value)
 }

@@ -250,7 +250,7 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_022: "数据与隐私",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_023: "服务保存登录资料、游戏档案、工作区、使用记录和你主动贡献的仓库样本。注销后进入 7 天冷静期，期满删除常规账号与工作区数据；HMAC 行为风控证据最长保留 90 天，个人使用声明确认记录按账号存续期加注销后一年保留。详情见隐私政策。",
+  pages_tool_dashboard_SettingsSection_023: "服务保存登录资料、游戏档案、工作区、使用记录和仓库分析时默认贡献的假名化聚合样本。注销后进入 7 天冷静期，期满删除常规账号、工作区与关联仓库样本；HMAC 行为风控证据最长保留 90 天，个人使用声明确认记录按账号存续期加注销后一年保留。详情见隐私政策。",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_026: "清除凭据",
   // src/pages/tool/dashboard/SettingsSection.tsx
