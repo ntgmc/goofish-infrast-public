@@ -135,9 +135,9 @@ export default function PricingPage() {
                         {commercialTiers.map((tier) => (
                           <tr key={tier.level}>
                             <th scope="row" className="p-3 font-medium text-ink-primary">Lv{tier.level}</th>
-                            <td className="p-3 tabular-nums">{formatPoints(tier.threshold_points)} 积分</td>
+                            <td className="p-3 tabular-nums">{copy.metered.pricing.commercial_tier_points_value(formatPoints(tier.threshold_points))}</td>
                             <td className="p-3 tabular-nums">-{tier.discount_bps / 100}%</td>
-                            <td className="p-3 tabular-nums">{formatPoints(tier.chargePoints)} 积分</td>
+                            <td className="p-3 tabular-nums">{copy.metered.pricing.commercial_tier_points_value(formatPoints(tier.chargePoints))}</td>
                           </tr>
                         ))}
                       </tbody>

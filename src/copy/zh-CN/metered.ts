@@ -22,6 +22,7 @@ export const meteredCopy = {
     commercial_tier_threshold: '累计获得积分',
     commercial_tier_discount: '折扣',
     commercial_tier_charge: '成功主排班实扣',
+    commercial_tier_points_value: (points: string) => `${points} 积分`,
     commercial_unlock_rule: (threshold: string) => `网站账号累计获得积分达到 ${threshold} 积分且无待追偿时，自动解锁商用资格；等级按累计获得积分计算。`,
     commercial_limits_rule: (active: string, total: string, running: string, queued: string, hourly: string) => `默认最多 ${active} 个活跃档案、${total} 个总档案；同时运行不超过 ${running} 个、排队不超过 ${queued} 个，每小时最多接纳 ${hourly} 个新任务。`,
     commercial_debt_rule: '账户存在待追偿或商用资格被暂停时，不能新建商用档案或提交新的商用任务。',
