@@ -1,4 +1,4 @@
-export const BEHAVIOR_RISK_MODEL_VERSION = 'behavior-risk-v1.2.0'
+export const BEHAVIOR_RISK_MODEL_VERSION = 'behavior-risk-v1.3.0'
 const MULTI_IDENTITY_THRESHOLD = 3
 
 export type BehaviorRiskEventType =
@@ -11,6 +11,7 @@ export type BehaviorRiskEventType =
   | 'export'
   | 'workspace_save'
   | 'page_view'
+  | 'skland_uid_mismatch'
   | 'operator_data_anomaly'
   | 'account_deleted'
 
@@ -241,7 +242,28 @@ function evaluateGroup(events: IdentifiedEvent[], userIds: string[], now: Date):
     }))
   }
 
-  const strongSignal = repeatedOperatorAnomaly
+  const sklandUidMismatchEvents = events.filter((event) => event.event_type === 'skland_uid_mismatch')
+  const mismatchEventsByProfile = new Map<string, IdentifiedEvent[]>()
+  for (const event of sklandUidMismatchEvents) {
+    if (!event.profile_id) continue
+    mismatchEventsByProfile.set(event.profile_id, [...(mismatchEventsByProfile.get(event.profile_id) ?? []), event])
+  }
+  const repeatedMismatchProfile = [...mismatchEventsByProfile.values()].find((profileEvents) => profileEvents.length >= MULTI_IDENTITY_THRESHOLD) ?? null
+  const repeatedSklandUidMismatch = Boolean(repeatedMismatchProfile)
+  if (repeatedSklandUidMismatch) {
+    rules.push(rule(
+      'skland_uid_mismatch_repeated',
+      'identity',
+      55,
+      '同一账号档案累计三次使用与当前绑定 UID 不一致的森空岛账号，档案已触发冻结保护。',
+      {
+        event_count: repeatedMismatchProfile.length,
+        profile_count: 1,
+      },
+    ))
+  }
+
+  const strongSignal = repeatedOperatorAnomaly || repeatedSklandUidMismatch
   const score = Math.min(100, rules.reduce((sum, item) => sum + item.score, 0))
   const categories = [...new Set(rules.map((item) => item.category))]
   const firstSeenAt = events[0]?.occurred_at ?? now.toISOString()

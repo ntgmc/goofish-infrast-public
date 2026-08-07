@@ -412,6 +412,7 @@ function shouldEvaluateImmediately(eventType: BehaviorRiskEventType): boolean {
   return eventType === 'register'
     || eventType === 'activation'
     || eventType === 'bind'
+    || eventType === 'skland_uid_mismatch'
     || eventType === 'export'
     || eventType === 'operator_data_anomaly'
 }
