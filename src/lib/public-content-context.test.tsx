@@ -35,11 +35,12 @@ describe('PublicContentProvider', () => {
 
   it('overrides public pricing without changing the product catalog', async () => {
     const server = cloneDefaultPublicContentSettings()
-    server.pricing.plans.single_account_lifetime.display_price = '88 元展示价'
+    server.pricing.plans.single_account_lifetime.original_price = '88 元 / 长期'
+    server.pricing.plans.single_account_lifetime.discount_fold = 10
     apiJson.mockResolvedValue(server)
     render(<PublicContentProvider><MemoryRouter><PricingPage /></MemoryRouter></PublicContentProvider>)
-    expect(await screen.findByText('88 元展示价')).toBeInTheDocument()
-    expect(getSku('single_account_lifetime').display_price).toBe('49 元')
+    expect(await screen.findByText('88 元 / 长期')).toBeInTheDocument()
+    expect((getSku('single_account_lifetime') as unknown as { original_display_price: string }).original_display_price).toBe('129 元 / 长期')
   })
 
   it('exposes fallback state on network failure and retries successfully', async () => {

@@ -100,6 +100,40 @@ describe('PublicContentSettingsSection', () => {
     })))
   })
 
+  it('edits a plan original price and discount and recalculates the public sale price', async () => {
+    const user = userEvent.setup()
+    render(<PublicContentSettingsSection />)
+    await screen.findByRole('heading', { name: '公开内容管理' })
+    await user.click(screen.getByRole('tab', { name: '价格与权益' }))
+
+    const panel = screen.getByRole('tabpanel')
+    const lifetime = within(panel).getByRole('group', { name: '单账号终身卡 CDK' })
+    const originalPrice = within(lifetime).getByLabelText(/原价（含单位和有效期）/)
+    const discountFold = within(lifetime).getByLabelText(/折扣（折）/)
+    await user.clear(originalPrice)
+    await user.type(originalPrice, '99 元 / 长期')
+    await user.clear(discountFold)
+    await user.type(discountFold, '4')
+
+    expect(within(lifetime).getByText('39.6 元 / 长期')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '保存并发布' }))
+
+    await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/public-content', expect.objectContaining({
+      method: 'PUT',
+      json: expect.objectContaining({
+        pricing: expect.objectContaining({
+          plans: expect.objectContaining({
+            single_account_lifetime: expect.objectContaining({
+              original_price: '99 元 / 长期',
+              discount_fold: 4,
+              display_price: '39.6 元 / 长期',
+            }),
+          }),
+        }),
+      }),
+    })))
+  })
+
   it('switches to the CDK purchase tab and focuses a non-HTTPS Xianyu URL', async () => {
     const settings = { ...cloneDefaultPublicContentSettings(), revision: 3 }
     settings.cdk_purchase.xianyu_url = 'http://example.com/xianyu-listing'

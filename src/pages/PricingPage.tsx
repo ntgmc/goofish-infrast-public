@@ -51,14 +51,21 @@ export default function PricingPage() {
           <p className="public-kicker">{pricing.eyebrow}</p>
           <h1 className="display-title mt-3 text-3xl text-ink-primary sm:text-4xl">{pricing.title}</h1>
           <p className="mt-4 max-w-3xl whitespace-pre-line text-base leading-7 text-ink-secondary">{pricing.intro}</p>
-          <div className="mt-8 grid border-t border-surface-4 md:grid-cols-2">
+          <div className="mt-8 grid border-t border-surface-4 md:grid-cols-2 xl:grid-cols-3">
             {plans.map((plan) => (
               <article key={plan.id} className="flex h-full flex-col border-b border-surface-3 py-6 md:border-r md:px-6 md:first:pl-0 md:last:border-r-0">
                 <div className="flex items-start justify-between gap-4">
                   <h2 className="text-xl font-semibold text-ink-primary">{plan.label}</h2>
                   <span className="tool-status tool-status--current">{plan.badge}</span>
                 </div>
-                <p className="mt-5 text-4xl font-semibold tracking-tight text-brand-400 tabular-nums">{plan.display_price}</p>
+                <div className="mt-5">
+                  <p className="text-4xl font-semibold tracking-tight text-brand-400 tabular-nums">{plan.display_price}</p>
+                  {plan.discount_fold < 10 && (
+                    <p className="mt-2 text-sm text-ink-muted">
+                      原价 <del>{plan.original_price}</del> · {plan.discount_fold} 折
+                    </p>
+                  )}
+                </div>
                 <p className="mt-4 whitespace-pre-line text-sm leading-7 text-ink-secondary">{plan.summary}</p>
                 <p className="mt-4 whitespace-pre-line border-t border-surface-3 pt-4 text-sm leading-6 text-ink-muted">{plan.account_scope}</p>
               </article>
@@ -164,10 +171,13 @@ export default function PricingPage() {
         <section className="border-b border-surface-4 py-8" aria-labelledby="pricing-comparison-title">
           <h2 id="pricing-comparison-title" className="text-xl font-semibold text-ink-primary">{pricing.comparison_heading}</h2>
           <div className="mt-4 overflow-x-auto">
-            <table aria-label={pricing.comparison_heading} className="w-full min-w-[720px] text-left text-sm">
+            <table aria-label={pricing.comparison_heading} className="w-full min-w-[1180px] text-left text-sm">
               <thead className="text-ink-muted"><tr><th className="p-3">{copy.public.pages_PricingPage_008}</th>{plans.map((plan) => <th key={plan.id} className="p-3">{plan.label}</th>)}</tr></thead>
               <tbody className="divide-y divide-surface-3 text-ink-secondary">
-                {pricing.comparison_rows.map((row) => <tr key={row.id}><th className="p-3 font-medium text-ink-primary">{row.feature}</th><td className="whitespace-pre-line p-3">{row.free_preview}</td><td className="whitespace-pre-line p-3">{row.single_account_lifetime}</td></tr>)}
+                {pricing.comparison_rows.map((row) => <tr key={row.id}>
+                  <th className="p-3 font-medium text-ink-primary">{row.feature}</th>
+                  {plans.map((plan) => <td key={plan.id} className="whitespace-pre-line p-3">{row[plan.id] ?? '—'}</td>)}
+                </tr>)}
               </tbody>
             </table>
           </div>

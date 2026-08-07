@@ -157,8 +157,8 @@ describe('request validation boundary', () => {
       kind: 'schedule',
       includeUpgradeSuggestions: true,
       billing_quote_id: 'quote-1',
-      pricing_version: '2026-07-31-v1',
-      accepted_max_points: '600.00',
+      pricing_version: '2026-08-06-v3',
+      accepted_max_points: '1200.00',
     }).success).toBe(true)
     expect(requestSchemas.optimizationJob.safeParse({ ...base, kind: 'schedule' }).success).toBe(false)
     expect(requestSchemas.optimizationJob.safeParse({

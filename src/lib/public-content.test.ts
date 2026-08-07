@@ -28,6 +28,31 @@ describe('public content settings', () => {
       url: '',
       avatar_url: '',
     })
+    expect(parsed.pricing.plans).toMatchObject({
+      single_account_monthly: { original_price: '15 元 / 31 天', discount_fold: 4, display_price: '6 元 / 31 天' },
+      single_account_lifetime: { original_price: '129 元 / 长期', discount_fold: 4, display_price: '51.6 元 / 长期' },
+    })
+  })
+
+  it('validates discount fields and migrates the old lifetime display price to the default sale price', () => {
+    const invalid = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
+    invalid.pricing.plans.single_account_lifetime.original_price = '129'
+    expect(() => parsePublicContentDraft(invalid)).toThrow()
+    const invalidFold = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
+    invalidFold.pricing.plans.single_account_lifetime.discount_fold = 0
+    expect(() => parsePublicContentDraft(invalidFold)).toThrow()
+
+    const legacy = cloneDefaultPublicContentSettings()
+    const lifetime = legacy.pricing.plans.single_account_lifetime as unknown as Record<string, unknown>
+    delete lifetime.original_price
+    delete lifetime.discount_fold
+    lifetime.display_price = '129 元 / 长期'
+    const migrated = normalizePublicContentSettings(legacy)
+    expect(migrated.pricing.plans.single_account_lifetime).toMatchObject({
+      original_price: '129 元 / 长期',
+      discount_fold: 4,
+      display_price: '51.6 元 / 长期',
+    })
   })
 
   it('rejects unsafe links, invalid group numbers, duplicate ids, and unknown fields', () => {
@@ -108,7 +133,7 @@ describe('public content settings', () => {
     delete (intermediate as unknown as { defaults_revision?: number }).defaults_revision
     intermediate.thanks.sections[1].entries[0].avatar_url = 'https://avatars.githubusercontent.com/u/74061867?v=4'
     expect(normalizePublicContentSettings(intermediate)).toMatchObject({
-      defaults_revision: 3,
+      defaults_revision: 5,
       thanks: {
         sections: expect.arrayContaining([
           expect.objectContaining({
@@ -154,7 +179,7 @@ describe('public content settings', () => {
     delete (legacy as unknown as { cdk_purchase?: unknown }).cdk_purchase
 
     const migrated = normalizePublicContentSettings(legacy)
-    expect(migrated.defaults_revision).toBe(3)
+    expect(migrated.defaults_revision).toBe(5)
     expect(migrated.qq_group.name).toBe('管理员自定义群名')
     expect(migrated.cdk_purchase.xianyu_url).toBe(DEFAULT_PUBLIC_CONTENT_DRAFT.cdk_purchase.xianyu_url)
 
