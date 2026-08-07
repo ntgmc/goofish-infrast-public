@@ -1556,7 +1556,7 @@ async function handleAccountMismatch(
     try {
       await recordRequestBehaviorEvent({
         req: requestContext.req,
-        eventType: 'bind',
+        eventType: 'skland_uid_mismatch',
         userId: user.id,
         sessionTokenHash: requestContext.sessionTokenHash,
         profileId: profile.id,

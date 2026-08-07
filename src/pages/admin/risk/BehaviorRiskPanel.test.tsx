@@ -116,6 +116,20 @@ describe('BehaviorRiskPanel review form', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('labels repeated Skland UID mismatches in the member evidence', async () => {
+    apiJsonMock.mockResolvedValueOnce(buildCasePage({
+      id: 'mismatch-case',
+      status: 'pending',
+      email: 'mismatch@example.test',
+      counts: { skland_uid_mismatch: 3 },
+    }))
+
+    render(<BehaviorRiskPanel />)
+
+    const account = await screen.findByText('mismatch@example.test')
+    expect(account.parentElement).toHaveTextContent('事件 森空岛 UID 不匹配=3')
+  })
+
   it('keeps rendering while the reviewer types a note and changes member actions', async () => {
     const user = userEvent.setup()
     render(<BehaviorRiskPanel />)
@@ -238,7 +252,7 @@ describe('BehaviorRiskPanel review form', () => {
   })
 })
 
-function buildCasePage(input: { id: string; status: 'pending' | 'dismissed' | 'actioned'; email: string }) {
+function buildCasePage(input: { id: string; status: 'pending' | 'dismissed' | 'actioned'; email: string; counts?: Record<string, number> }) {
   return {
     cases: [{
       id: input.id,
@@ -256,7 +270,7 @@ function buildCasePage(input: { id: string; status: 'pending' | 'dismissed' | 'a
       members: [{
         user_id: `${input.id}-user`,
         account_email: input.email,
-        counts: {},
+        counts: input.counts ?? {},
         first_seen_at: '2026-07-25T00:00:00.000Z',
         last_seen_at: '2026-07-25T01:00:00.000Z',
         browser_prefixes: [],

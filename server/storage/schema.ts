@@ -2143,7 +2143,7 @@ CREATE INDEX IF NOT EXISTS idx_inventory_distribution_ready
 CREATE TABLE IF NOT EXISTS behavior_risk_events (
   id TEXT PRIMARY KEY,
   event_key TEXT UNIQUE,
-  event_type TEXT NOT NULL CHECK (event_type IN ('register', 'activation', 'login', 'bind', 'job_submit', 'generate', 'export', 'workspace_save', 'page_view', 'operator_data_anomaly', 'account_deleted')),
+  event_type TEXT NOT NULL CHECK (event_type IN ('register', 'activation', 'login', 'bind', 'job_submit', 'generate', 'export', 'workspace_save', 'page_view', 'skland_uid_mismatch', 'operator_data_anomaly', 'account_deleted')),
   user_id TEXT,
   profile_id TEXT,
   job_id TEXT,
@@ -2169,7 +2169,7 @@ ALTER TABLE behavior_risk_events ADD COLUMN IF NOT EXISTS signal_aliases_json JS
 ALTER TABLE behavior_risk_events DROP CONSTRAINT IF EXISTS behavior_risk_events_event_type_check;
 ALTER TABLE behavior_risk_events
   ADD CONSTRAINT behavior_risk_events_event_type_check
-  CHECK (event_type IN ('register', 'activation', 'login', 'bind', 'job_submit', 'generate', 'export', 'workspace_save', 'page_view', 'operator_data_anomaly', 'account_deleted'));
+  CHECK (event_type IN ('register', 'activation', 'login', 'bind', 'job_submit', 'generate', 'export', 'workspace_save', 'page_view', 'skland_uid_mismatch', 'operator_data_anomaly', 'account_deleted'));
 ALTER TABLE behavior_risk_events DROP CONSTRAINT IF EXISTS behavior_risk_events_page_category_check;
 ALTER TABLE behavior_risk_events ADD CONSTRAINT behavior_risk_events_page_category_check
   CHECK (page_category IS NULL OR page_category IN ('landing', 'auth', 'profiles', 'workspace', 'optimizer', 'result', 'account', 'public_info', 'other')) NOT VALID;

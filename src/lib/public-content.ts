@@ -3,8 +3,15 @@ import { copy } from '../copy/index'
 import { getSku, productPolicies } from './product-catalog'
 
 export const PUBLIC_CONTENT_VERSION = 1 as const
-export const PUBLIC_CONTENT_DEFAULTS_REVISION = 3 as const
-export const PUBLIC_PRICING_PLAN_IDS = ['free_preview', 'single_account_lifetime'] as const
+export const PUBLIC_CONTENT_DEFAULTS_REVISION = 5 as const
+export const PUBLIC_PRICING_PLAN_IDS = [
+  'free_preview',
+  'single_account_monthly',
+  'single_account_half_year',
+  'single_account_annual',
+  'single_account_lifetime',
+] as const
+type PublicPricingPlanId = typeof PUBLIC_PRICING_PLAN_IDS[number]
 export const PUBLIC_CONTENT_LIMITS = Object.freeze({
   faqItems: 50,
   pricingDisclosures: 30,
@@ -36,18 +43,112 @@ const faqItemSchema = z.strictObject({
   action: z.enum(['none', 'qq_group']),
 })
 
+const pricingPriceLabel = z.string().trim().max(40).regex(/^\d+(?:\.\d{1,2})?\s*元(?:\s*\/\s*\S.*)?$/, {
+  message: '原价必须使用“数字 元 / 有效期”的格式。',
+})
+const pricingDiscountFold = z.number().int().min(1).max(10)
+
 const pricingPlanSchema = z.strictObject({
   label: text(80),
   badge: text(40),
   display_price: text(40),
+  original_price: pricingPriceLabel,
+  discount_fold: pricingDiscountFold,
   summary: text(1000),
   account_scope: text(500),
 })
+
+const pricingPlanInputSchema = z.strictObject({
+  label: text(80),
+  badge: text(40),
+  display_price: text(40).optional(),
+  original_price: pricingPriceLabel.optional(),
+  discount_fold: pricingDiscountFold.optional(),
+  summary: text(1000),
+  account_scope: text(500),
+})
+
+type PublicPricingSku = ReturnType<typeof getSku> & {
+  display_price: string
+  original_display_price: string
+  default_discount_fold: number
+}
+
+const freePreview = getSku('free_preview') as PublicPricingSku
+const singleAccountMonthly = getSku('single_account_monthly') as PublicPricingSku
+const singleAccountHalfYear = getSku('single_account_half_year') as PublicPricingSku
+const singleAccountAnnual = getSku('single_account_annual') as PublicPricingSku
+const singleAccountLifetime = getSku('single_account_lifetime') as PublicPricingSku
+
+const defaultPricingPlans = {
+  free_preview: {
+    label: freePreview.label,
+    badge: copy.public.pages_PricingPage_005,
+    display_price: freePreview.display_price!,
+    original_price: freePreview.original_display_price!,
+    discount_fold: freePreview.default_discount_fold,
+    summary: freePreview.summary,
+    account_scope: freePreview.account_scope,
+  },
+  single_account_monthly: {
+    label: singleAccountMonthly.label,
+    badge: '低门槛',
+    display_price: singleAccountMonthly.display_price!,
+    original_price: singleAccountMonthly.original_display_price!,
+    discount_fold: singleAccountMonthly.default_discount_fold,
+    summary: singleAccountMonthly.summary,
+    account_scope: singleAccountMonthly.account_scope,
+  },
+  single_account_half_year: {
+    label: singleAccountHalfYear.label,
+    badge: '高性价比',
+    display_price: singleAccountHalfYear.display_price!,
+    original_price: singleAccountHalfYear.original_display_price!,
+    discount_fold: singleAccountHalfYear.default_discount_fold,
+    summary: singleAccountHalfYear.summary,
+    account_scope: singleAccountHalfYear.account_scope,
+  },
+  single_account_annual: {
+    label: singleAccountAnnual.label,
+    badge: '年度推荐',
+    display_price: singleAccountAnnual.display_price!,
+    original_price: singleAccountAnnual.original_display_price!,
+    discount_fold: singleAccountAnnual.default_discount_fold,
+    summary: singleAccountAnnual.summary,
+    account_scope: singleAccountAnnual.account_scope,
+  },
+  single_account_lifetime: {
+    label: singleAccountLifetime.label,
+    badge: '长期方案',
+    display_price: singleAccountLifetime.display_price!,
+    original_price: singleAccountLifetime.original_display_price!,
+    discount_fold: singleAccountLifetime.default_discount_fold,
+    summary: singleAccountLifetime.summary,
+    account_scope: singleAccountLifetime.account_scope,
+  },
+} satisfies Record<PublicPricingPlanId, z.infer<typeof pricingPlanSchema>>
+
+const pricingPlansSchema = z.strictObject({
+  free_preview: pricingPlanInputSchema,
+  single_account_monthly: pricingPlanInputSchema.optional(),
+  single_account_half_year: pricingPlanInputSchema.optional(),
+  single_account_annual: pricingPlanInputSchema.optional(),
+  single_account_lifetime: pricingPlanInputSchema,
+}).transform((plans) => ({
+  free_preview: normalizePricingPlan(plans.free_preview, defaultPricingPlans.free_preview, freePreview.display_price!),
+  single_account_monthly: normalizePricingPlan(plans.single_account_monthly, defaultPricingPlans.single_account_monthly, singleAccountMonthly.display_price!),
+  single_account_half_year: normalizePricingPlan(plans.single_account_half_year, defaultPricingPlans.single_account_half_year, singleAccountHalfYear.display_price!),
+  single_account_annual: normalizePricingPlan(plans.single_account_annual, defaultPricingPlans.single_account_annual, singleAccountAnnual.display_price!),
+  single_account_lifetime: normalizePricingPlan(plans.single_account_lifetime, defaultPricingPlans.single_account_lifetime, singleAccountLifetime.display_price!),
+}))
 
 const comparisonRowSchema = z.strictObject({
   id: identifier,
   feature: text(120),
   free_preview: text(1000),
+  single_account_monthly: text(1000).optional(),
+  single_account_half_year: text(1000).optional(),
+  single_account_annual: text(1000).optional(),
   single_account_lifetime: text(1000),
 })
 
@@ -88,10 +189,7 @@ export const publicContentDraftSchema = z.strictObject({
     eyebrow: text(80),
     title: text(80),
     intro: text(1000),
-    plans: z.strictObject({
-      free_preview: pricingPlanSchema,
-      single_account_lifetime: pricingPlanSchema,
-    }),
+    plans: pricingPlansSchema,
     policy_heading: text(120),
     disclosures: z.array(text(500)).max(PUBLIC_CONTENT_LIMITS.pricingDisclosures),
     comparison_heading: text(120),
@@ -116,8 +214,6 @@ export type PublicContentSettingsV1 = PublicContentDraftV1 & {
 export type AdminPublicContentSettingsV1 = PublicContentSettingsV1 & {
   revision: number
 }
-const freePreview = getSku('free_preview')
-const singleAccountLifetime = getSku('single_account_lifetime')
 
 export const DEFAULT_PUBLIC_CONTENT_DRAFT: PublicContentDraftV1 = {
   cdk_purchase: {
@@ -162,20 +258,11 @@ export const DEFAULT_PUBLIC_CONTENT_DRAFT: PublicContentDraftV1 = {
     title: copy.public.pages_PricingPage_001,
     intro: copy.public.pages_PricingPage_003,
     plans: {
-      free_preview: {
-        label: freePreview.label,
-        badge: copy.public.pages_PricingPage_005,
-        display_price: freePreview.display_price!,
-        summary: freePreview.summary,
-        account_scope: freePreview.account_scope,
-      },
-      single_account_lifetime: {
-        label: singleAccountLifetime.label,
-        badge: copy.public.pages_PricingPage_004,
-        display_price: singleAccountLifetime.display_price!,
-        summary: singleAccountLifetime.summary,
-        account_scope: singleAccountLifetime.account_scope,
-      },
+      free_preview: { ...defaultPricingPlans.free_preview },
+      single_account_monthly: { ...defaultPricingPlans.single_account_monthly },
+      single_account_half_year: { ...defaultPricingPlans.single_account_half_year },
+      single_account_annual: { ...defaultPricingPlans.single_account_annual },
+      single_account_lifetime: { ...defaultPricingPlans.single_account_lifetime },
     },
     policy_heading: copy.public.pages_PricingPage_006,
     disclosures: [...productPolicies.public_disclosures],
@@ -258,11 +345,12 @@ export function resolvePublicContentSettings(value: unknown): { content: PublicC
     return { content: cloneDefaultPublicContentSettings(), isFallback: true }
   }
   const storedDefaultsRevision = normalizeDefaultsRevision(source.defaults_revision)
+  const normalizedDraft = normalizePricingComparisonDefaults(parsed.data)
   return {
     content: {
       version: PUBLIC_CONTENT_VERSION,
       defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION,
-      ...(storedDefaultsRevision < PUBLIC_CONTENT_DEFAULTS_REVISION ? migrateLegacyDefaultCredits(parsed.data) : parsed.data),
+      ...(storedDefaultsRevision < PUBLIC_CONTENT_DEFAULTS_REVISION ? migrateLegacyDefaultCredits(normalizedDraft) : normalizedDraft),
       updated_at: typeof source.updated_at === 'string' ? source.updated_at : null,
     },
     isFallback: false,
@@ -279,6 +367,54 @@ function faq(id: string, question: string, answer: string, action: 'none' | 'qq_
 
 function thanksEntry(id: string, name: string, description: string, url = '', avatarUrl = '') {
   return { id, name, description, url, avatar_url: avatarUrl }
+}
+
+export function formatPricingDiscountedPrice(originalPrice: string, discountFold: number): string {
+  const match = /^(\d+(?:\.\d{1,2})?)(\s*元(?:\s*\/\s*\S.*)?)$/u.exec(originalPrice.trim())
+  if (!match || !Number.isInteger(discountFold) || discountFold < 1 || discountFold > 10) return originalPrice
+  const discountedAmount = Math.round((Number(match[1]) * discountFold / 10) * 100) / 100
+  const formattedAmount = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(discountedAmount)
+  return `${formattedAmount}${match[2]}`
+}
+
+function normalizePricingPlan(
+  plan: z.infer<typeof pricingPlanInputSchema> | undefined,
+  defaultPlan: z.infer<typeof pricingPlanSchema>,
+  legacyDisplayPrice: string,
+): z.infer<typeof pricingPlanSchema> {
+  const next: Partial<z.infer<typeof pricingPlanInputSchema>> = plan ?? {}
+  const originalPrice = next.original_price ?? defaultPlan.original_price
+  const discountFold = next.discount_fold ?? defaultPlan.discount_fold
+  const pricingWasConfigured = next.original_price !== undefined || next.discount_fold !== undefined
+  const displayPrice = pricingWasConfigured || !next.display_price || next.display_price === legacyDisplayPrice || next.display_price === defaultPlan.original_price
+    ? formatPricingDiscountedPrice(originalPrice, discountFold)
+    : next.display_price
+  return {
+    ...defaultPlan,
+    ...next,
+    display_price: displayPrice,
+    original_price: originalPrice,
+    discount_fold: discountFold,
+  }
+}
+
+function normalizePricingComparisonDefaults(draft: PublicContentDraftV1): PublicContentDraftV1 {
+  const defaults = productPolicies.public_feature_comparison as readonly Record<string, string>[]
+  return {
+    ...draft,
+    pricing: {
+      ...draft.pricing,
+      comparison_rows: draft.pricing.comparison_rows.map((row, index) => {
+        const defaultRow = defaults[index]
+        if (!defaultRow) return row
+        const next = { ...row } as Record<string, string | undefined>
+        for (const planId of PUBLIC_PRICING_PLAN_IDS) {
+          if (next[planId] === undefined && typeof defaultRow[planId] === 'string') next[planId] = defaultRow[planId]
+        }
+        return next as typeof row
+      }),
+    },
+  }
 }
 
 function migrateLegacyDefaultCredits(draft: PublicContentDraftV1): PublicContentDraftV1 {

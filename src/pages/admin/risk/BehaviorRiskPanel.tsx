@@ -216,7 +216,7 @@ export default function BehaviorRiskPanel() {
                       <div className="break-all text-sm font-medium text-ink-primary">{member.account_email ?? '账号已删除'}</div>
                       <div className="mt-1 break-all font-mono text-xs text-ink-muted">用户 ID：{member.user_id}</div>
                       <div className="mt-1 text-xs leading-5 text-ink-muted">
-                        事件 {Object.entries(member.counts).map(([name, count]) => `${name}=${count}`).join(' · ') || '无'}<br />
+                        事件 {Object.entries(member.counts).map(([name, count]) => `${behaviorRiskEventLabel(name)}=${count}`).join(' · ') || '无'}<br />
                         设备 {member.browser_prefixes.join(', ') || '—'} · 网络 {member.network_prefixes.join(', ') || '—'} · UID {member.uid_prefixes.join(', ') || '—'} · 输出 {member.output_prefixes.join(', ') || '—'} · 干员指纹 {member.operator_fingerprint_prefixes?.join(', ') || '—'}
                       </div>
                     </div>
@@ -322,6 +322,12 @@ export default function BehaviorRiskPanel() {
       </div>
     </section>
   )
+}
+
+function behaviorRiskEventLabel(eventType: string): string {
+  if (eventType === 'skland_uid_mismatch') return '森空岛 UID 不匹配'
+  if (eventType === 'operator_data_anomaly') return '干员数据异常'
+  return eventType
 }
 
 function HealthCard({ health, loading }: { health: BehaviorRiskHealthDto; loading: boolean }) {

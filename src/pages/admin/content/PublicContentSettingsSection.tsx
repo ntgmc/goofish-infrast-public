@@ -5,6 +5,7 @@ import { adminApiJson } from '../../../lib/admin-api-client'
 import {
   PUBLIC_CONTENT_LIMITS,
   PUBLIC_PRICING_PLAN_IDS,
+  formatPricingDiscountedPrice,
   publicContentDraftSchema,
   type AdminPublicContentSettingsV1,
   type PublicContentDraftV1,
@@ -334,7 +335,13 @@ function PricingEditor({ settings, edit }: { settings: PublicContentSettingsV1; 
 
   const addComparison = () => {
     const id = newId('comparison')
-    edit((next) => { next.pricing.comparison_rows.push({ id, feature: '', free_preview: '', single_account_lifetime: '' }) })
+    edit((next) => {
+      next.pricing.comparison_rows.push({
+        id,
+        feature: '',
+        ...Object.fromEntries(PUBLIC_PRICING_PLAN_IDS.map((planId) => [planId, ''])),
+      } as typeof next.pricing.comparison_rows[number])
+    })
     setSelectedComparisonId(id)
   }
 
@@ -361,7 +368,41 @@ function PricingEditor({ settings, edit }: { settings: PublicContentSettingsV1; 
                   <TextField path={`pricing.plans.${planId}.label`} id={`${planId}-label`} label={copy.publicContent.admin_plan_label} value={plan.label} maxLength={80} onChange={(value) => edit((next) => { next.pricing.plans[planId].label = value })} />
                   <div className="grid gap-4 sm:grid-cols-2">
                     <TextField path={`pricing.plans.${planId}.badge`} id={`${planId}-badge`} label={copy.publicContent.admin_plan_badge} value={plan.badge} maxLength={40} onChange={(value) => edit((next) => { next.pricing.plans[planId].badge = value })} />
-                    <TextField path={`pricing.plans.${planId}.display_price`} id={`${planId}-price`} label={copy.publicContent.admin_plan_price} value={plan.display_price} maxLength={40} onChange={(value) => edit((next) => { next.pricing.plans[planId].display_price = value })} />
+                    <TextField
+                      path={`pricing.plans.${planId}.original_price`}
+                      id={`${planId}-original-price`}
+                      label={copy.publicContent.admin_plan_original_price}
+                      value={plan.original_price}
+                      maxLength={40}
+                      onChange={(value) => edit((next) => {
+                        const target = next.pricing.plans[planId]
+                        target.original_price = value
+                        target.display_price = formatPricingDiscountedPrice(value, target.discount_fold)
+                      })}
+                    />
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <TextField
+                      path={`pricing.plans.${planId}.discount_fold`}
+                      id={`${planId}-discount-fold`}
+                      label={copy.publicContent.admin_plan_discount_fold}
+                      value={String(plan.discount_fold)}
+                      maxLength={2}
+                      type="number"
+                      inputMode="numeric"
+                      onChange={(value) => edit((next) => {
+                        const target = next.pricing.plans[planId]
+                        const parsed = value.trim() === '' ? Number.NaN : Number(value)
+                        target.discount_fold = parsed
+                        target.display_price = formatPricingDiscountedPrice(target.original_price, parsed)
+                      })}
+                    />
+                    <div className="flex items-end">
+                      <p className="w-full rounded-md border border-surface-3 bg-surface-1 px-3 py-2.5 text-sm leading-6 text-ink-secondary">
+                        <span className="font-medium text-ink-primary">{copy.publicContent.admin_plan_effective_price}</span>
+                        <span className="ml-2 tabular-nums text-brand-400">{plan.display_price}</span>
+                      </p>
+                    </div>
                   </div>
                   <TextareaField path={`pricing.plans.${planId}.summary`} id={`${planId}-summary`} label={copy.publicContent.admin_plan_summary} value={plan.summary} maxLength={1000} onChange={(value) => edit((next) => { next.pricing.plans[planId].summary = value })} />
                   <TextareaField path={`pricing.plans.${planId}.account_scope`} id={`${planId}-scope`} label={copy.publicContent.admin_plan_scope} value={plan.account_scope} maxLength={500} onChange={(value) => edit((next) => { next.pricing.plans[planId].account_scope = value })} />
@@ -406,7 +447,7 @@ function PricingEditor({ settings, edit }: { settings: PublicContentSettingsV1; 
         <TextField path="pricing.comparison_heading" id="pricing-comparison-heading" label={copy.publicContent.admin_comparison_heading} value={settings.pricing.comparison_heading} maxLength={120} onChange={(value) => edit((next) => { next.pricing.comparison_heading = value })} />
         <div className="mt-4">
           <SortableMasterDetailList
-            items={settings.pricing.comparison_rows.map((row, index) => ({ id: comparisonSelectionIds[index], title: row.feature, description: `${row.free_preview} / ${row.single_account_lifetime}` }))}
+            items={settings.pricing.comparison_rows.map((row, index) => ({ id: comparisonSelectionIds[index], title: row.feature, description: PUBLIC_PRICING_PLAN_IDS.map((planId) => row[planId] ?? '').filter(Boolean).join(' / ') }))}
             selectedId={selectedComparisonId}
             onSelect={setSelectedComparisonId}
             onReorder={(from, to) => edit((next) => { next.pricing.comparison_rows = moveItem(next.pricing.comparison_rows, from, to) })}
@@ -417,8 +458,18 @@ function PricingEditor({ settings, edit }: { settings: PublicContentSettingsV1; 
                 <div className="mt-4 grid gap-4">
                   <TextField path={`pricing.comparison_rows.${selectedComparisonIndex}.feature`} id={`comparison-feature-${selectedComparison.id}`} label={copy.publicContent.admin_feature_name} value={selectedComparison.feature} maxLength={120} onChange={(value) => edit((next) => { next.pricing.comparison_rows[selectedComparisonIndex].feature = value })} />
                   <div className="grid gap-4 lg:grid-cols-2">
-                    <TextareaField path={`pricing.comparison_rows.${selectedComparisonIndex}.free_preview`} id={`comparison-free-${selectedComparison.id}`} label={copy.publicContent.admin_free_preview} value={selectedComparison.free_preview} maxLength={1000} onChange={(value) => edit((next) => { next.pricing.comparison_rows[selectedComparisonIndex].free_preview = value })} />
-                    <TextareaField path={`pricing.comparison_rows.${selectedComparisonIndex}.single_account_lifetime`} id={`comparison-paid-${selectedComparison.id}`} label={copy.publicContent.admin_single_lifetime} value={selectedComparison.single_account_lifetime} maxLength={1000} onChange={(value) => edit((next) => { next.pricing.comparison_rows[selectedComparisonIndex].single_account_lifetime = value })} />
+                    {PUBLIC_PRICING_PLAN_IDS.map((planId) => {
+                      const plan = settings.pricing.plans[planId]
+                      return <TextareaField
+                        key={planId}
+                        path={`pricing.comparison_rows.${selectedComparisonIndex}.${planId}`}
+                        id={`comparison-${planId}-${selectedComparison.id}`}
+                        label={plan.label}
+                        value={selectedComparison[planId] ?? ''}
+                        maxLength={1000}
+                        onChange={(value) => edit((next) => { next.pricing.comparison_rows[selectedComparisonIndex][planId] = value })}
+                      />
+                    })}
                   </div>
                 </div>
               </div>

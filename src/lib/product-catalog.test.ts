@@ -11,13 +11,41 @@ import {
 } from './product-catalog'
 
 describe('product catalog', () => {
-  it('publishes only free preview and the 49 CNY lifetime SKU', () => {
-    expect(listPublicSkus().map((sku) => sku.id)).toEqual(['free_preview', 'single_account_lifetime'])
+  it('publishes free preview and four duration-based single-account SKUs', () => {
+    expect(listPublicSkus().map((sku) => sku.id)).toEqual([
+      'free_preview',
+      'single_account_monthly',
+      'single_account_half_year',
+      'single_account_annual',
+      'single_account_lifetime',
+    ])
     expect(getSku('free_preview').price?.amount).toBe(0)
-    expect(getSku('single_account_lifetime')).toMatchObject({
+    expect(getSku('single_account_monthly')).toMatchObject({
+      public: true,
+      runtime_permission: 'advanced',
+      price: { amount: 15, currency: 'CNY', billing: 'one_time' },
+      duration_days: 31,
+    })
+    expect(getSku('single_account_half_year')).toMatchObject({
       public: true,
       runtime_permission: 'advanced',
       price: { amount: 49, currency: 'CNY', billing: 'one_time' },
+      duration_days: 183,
+    })
+    expect(getSku('single_account_annual')).toMatchObject({
+      public: true,
+      runtime_permission: 'advanced',
+      price: { amount: 79, currency: 'CNY', billing: 'one_time' },
+      duration_days: 365,
+    })
+    expect(getSku('single_account_lifetime')).toMatchObject({
+      public: true,
+      runtime_permission: 'advanced',
+      price: { amount: 129, currency: 'CNY', billing: 'one_time' },
+      original_display_price: '129 元 / 长期',
+      default_discount_fold: 4,
+      display_price: '51.6 元 / 长期',
+      duration_days: null,
     })
   })
 

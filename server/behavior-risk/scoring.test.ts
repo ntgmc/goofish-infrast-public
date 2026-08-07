@@ -123,6 +123,23 @@ describe('evaluateBehaviorRiskEvents', () => {
     expect(threeUids.createCase).toBe(false)
   })
 
+  it('creates an explainable strong case for three Skland UID mismatches', () => {
+    const result = evaluateBehaviorRiskEvents([
+      event('mismatch-a', 'user-a', 'skland_uid_mismatch', 30, { profile_id: 'profile-a', uid_hmac: 'uid-a' }),
+      event('mismatch-b', 'user-a', 'skland_uid_mismatch', 20, { profile_id: 'profile-a', uid_hmac: 'uid-b' }),
+      event('mismatch-c', 'user-a', 'skland_uid_mismatch', 10, { profile_id: 'profile-a', uid_hmac: 'uid-c' }),
+    ], now)[0]
+
+    expect(result.score).toBe(75)
+    expect(result.strongSignal).toBe(true)
+    expect(result.createCase).toBe(true)
+    expect(result.rules.map((rule) => rule.code)).toEqual(['account_multi_uid', 'skland_uid_mismatch_repeated'])
+    expect(result.rules.at(-1)).toMatchObject({
+      explanation: '同一账号档案累计三次使用与当前绑定 UID 不一致的森空岛账号，档案已触发冻结保护。',
+      evidence: { event_count: 3, profile_count: 1 },
+    })
+  })
+
   it('does not treat any volume of distinct exports as risk evidence', () => {
     const exports = Array.from({ length: 6 }, (_, index) => (
       event(`export-${index}`, 'user-a', 'export', index * 10, { output_hash: `output-${index}` })

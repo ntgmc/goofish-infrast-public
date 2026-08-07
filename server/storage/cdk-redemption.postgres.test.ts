@@ -614,7 +614,7 @@ describe('CDK redemption PostgreSQL concurrency', () => {
       userId, kind: 'admin_credit', amount: '10000.00', referenceType: 'admin_adjustment',
       referenceId: randomUUID(), idempotencyKey: 'qualification-credit', adminUsername: 'root', reason: 'commercial activation',
     })
-    expect(credited.balance.commercial).toMatchObject({ eligible: true, level: 1, charge_points: '900.00' })
+    expect(credited.balance.commercial).toMatchObject({ eligible: true, level: 1, charge_points: '1350.00' })
     await adjustBalance({
       userId, kind: 'admin_debit', amount: '10000.00', referenceType: 'admin_adjustment',
       referenceId: randomUUID(), idempotencyKey: 'normal-spend', adminUsername: 'root', reason: 'normal debit does not affect tier',
@@ -649,7 +649,7 @@ describe('CDK redemption PostgreSQL concurrency', () => {
   it('serializes schedule reservations and settles or releases each job exactly once', async () => {
     const userId = await seedUser()
     await adjustBalance({
-      userId, kind: 'admin_credit', amount: '1200.00', referenceType: 'admin_adjustment',
+      userId, kind: 'admin_credit', amount: '2400.00', referenceType: 'admin_adjustment',
       referenceId: randomUUID(), idempotencyKey: 'reservation-funding', adminUsername: 'root', reason: 'reservation test',
     })
     const quote = getMeteredScheduleQuote('metered_personal')
@@ -681,13 +681,13 @@ describe('CDK redemption PostgreSQL concurrency', () => {
     const firstTwo = await Promise.all([reserve(jobIds[0]!), reserve(jobIds[1]!)])
     expect(firstTwo.map((item) => item.status)).toEqual(['reserved', 'reserved'])
     await expect(reserve(jobIds[2]!)).rejects.toMatchObject({ code: 'insufficient_balance' })
-    expect(await getBalanceSummary(userId)).toMatchObject({ available: '0.00', reserved: '1200.00' })
+    expect(await getBalanceSummary(userId)).toMatchObject({ available: '0.00', reserved: '2400.00' })
 
     await withTransaction((client) => settleScheduleBalanceInTransaction(client, jobIds[0]!))
     await withTransaction((client) => settleScheduleBalanceInTransaction(client, jobIds[0]!))
     await withTransaction((client) => releaseScheduleBalanceInTransaction(client, jobIds[1]!))
     await withTransaction((client) => releaseScheduleBalanceInTransaction(client, jobIds[1]!))
-    expect(await getBalanceSummary(userId)).toMatchObject({ available: '600.00', reserved: '0.00' })
+    expect(await getBalanceSummary(userId)).toMatchObject({ available: '1200.00', reserved: '0.00' })
     expect((await query<{ count: string }>("select count(*)::text as count from user_balance_transactions where user_id = $1 and kind = 'schedule_debit'", [userId])).rows[0]?.count).toBe('1')
   })
 

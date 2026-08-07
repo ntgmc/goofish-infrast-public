@@ -517,6 +517,7 @@ function ProfileDetailCard({
       ? `待确认：${profile.skland_pending_binding.nickname || '-'} / ${profile.skland_pending_binding.uid}`
       : '-'
   const riskCount = profile.skland_risk?.uid_mismatch_count ?? 0
+  const riskReason = formatSklandRiskReason(profile.skland_risk)
   return (
     <article className="tool-inset p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -548,6 +549,7 @@ function ProfileDetailCard({
         <DetailItem label="绑定时间" value={formatDate(profile.skland_binding?.bound_at ?? null)} />
         <DetailItem label="最近导入" value={formatDate(profile.skland_binding?.last_imported_at ?? null)} />
         <DetailItem label="风险计数" value={String(riskCount)} />
+        <DetailItem label="风险计数原因" value={riskReason} />
         <DetailItem label="工作区存在" value={profile.workspace.exists ? '是' : '否'} />
         <DetailItem label="工作区干员" value={String(profile.workspace.operator_count)} />
         <DetailItem label="拥有干员" value={String(profile.operator_count)} />
@@ -572,6 +574,16 @@ function ProfileDetailCard({
       {operatorsExpanded && operatorData && <ProfileOperatorsPanel data={operatorData} />}
     </article>
   )
+}
+
+function formatSklandRiskReason(risk: AdminProfileSummary['skland_risk']): string {
+  if (!risk || risk.uid_mismatch_count <= 0) return '-'
+  const latest = [
+    risk.last_mismatch_nickname ? `最近账号：${risk.last_mismatch_nickname}` : null,
+    risk.last_mismatch_uid ? `UID：${risk.last_mismatch_uid}` : null,
+    risk.last_mismatch_at ? `时间：${formatDate(risk.last_mismatch_at)}` : null,
+  ].filter((value): value is string => Boolean(value))
+  return [`森空岛 UID 与当前绑定不一致（累计 ${risk.uid_mismatch_count} 次）`, ...latest].join(' · ')
 }
 
 function ProfileOperatorsPanel({ data }: { data: AdminProfileOperatorData }) {

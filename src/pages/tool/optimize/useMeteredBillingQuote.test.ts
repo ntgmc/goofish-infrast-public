@@ -6,13 +6,13 @@ import { submitWithMeteredBillingQuote } from './useMeteredBillingQuote'
 const quote: BillingQuote = {
   quote_id: 'quote-1',
   expires_at: '2026-08-02T00:05:00.000Z',
-  pricing_version: '2026-07-31-v1',
+  pricing_version: '2026-08-06-v3',
   billing_kind: 'metered_commercial',
-  list_price: '1000.00',
+  list_price: '1500.00',
   tier: 2,
   discount_bps: 2000,
-  charge: '800.00',
-  available: '1000.00',
+  charge: '1200.00',
+  available: '1500.00',
   sufficient: true,
 }
 
@@ -34,7 +34,7 @@ describe('submitWithMeteredBillingQuote', () => {
   })
 
   it('refreshes once and requires another click when the accepted price changed', async () => {
-    const latest = { ...quote, quote_id: 'quote-2', charge: '900.00' }
+    const latest = { ...quote, quote_id: 'quote-2', charge: '1350.00' }
     const refreshQuote = vi.fn().mockResolvedValue(latest)
 
     await expect(submitWithMeteredBillingQuote({
@@ -48,7 +48,7 @@ describe('submitWithMeteredBillingQuote', () => {
         { code: 'pricing_changed' },
         '/api/optimization/jobs',
       )),
-    })).rejects.toThrow('报价已从 800.00 积分更新为 900.00 积分')
+    })).rejects.toThrow('报价已从 1200.00 积分更新为 1350.00 积分')
 
     expect(refreshQuote).toHaveBeenCalledTimes(1)
   })

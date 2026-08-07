@@ -21,15 +21,22 @@ afterEach(() => {
 })
 
 describe('PricingPage', () => {
-  it('renders the two public SKUs and full disclosure policy', () => {
+  it('renders the duration-based single-account plans and full disclosure policy', () => {
     render(<MemoryRouter><PricingPage /></MemoryRouter>)
     expect(screen.getByRole('heading', { level: 1, name: '价格与权益' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '免费预览' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '单账号终身版 CDK' })).toBeInTheDocument()
-    expect(screen.getByText('49 元')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '单账号月卡 CDK' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '单账号半年卡 CDK' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '单账号年卡 CDK' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '单账号终身卡 CDK' })).toBeInTheDocument()
+    expect(screen.getByText('6 元 / 31 天')).toBeInTheDocument()
+    expect(screen.getByText('19.6 元 / 183 天')).toBeInTheDocument()
+    expect(screen.getByText('31.6 元 / 365 天')).toBeInTheDocument()
+    expect(screen.getByText('51.6 元 / 长期')).toBeInTheDocument()
+    expect(screen.getByText('129 元 / 长期')).toBeInTheDocument()
     expect(screen.queryByText('单次重置卡')).not.toBeInTheDocument()
     expect(screen.queryByText('Admin卡')).not.toBeInTheDocument()
-    expect(screen.getByText(/长期更新.*维护同一账号/)).toBeInTheDocument()
+    expect(screen.getByText(/月卡、半年卡、年卡和终身卡 CDK 均仅用于一个游戏账号/)).toBeInTheDocument()
     expect(screen.getByText(/干员归属、练度或干员池出现异常变化时可能先拦截/)).toBeInTheDocument()
     expect(screen.queryByText(/滚动 7 天窗口，最多成功更新 2 次/)).not.toBeInTheDocument()
     expect(screen.queryByText(/设备 Token、浏览器 User-Agent 和网络 IP 前缀/)).not.toBeInTheDocument()
@@ -38,9 +45,9 @@ describe('PricingPage', () => {
     const supportPageLink = contactLinks.find((link) => link.getAttribute('href') === '/support')
     expect(supportPageLink).toHaveClass('hidden', 'items-center', 'sm:inline-flex')
     const table = screen.getByRole('table', { name: '功能对比' })
-    expect(within(table).getByText('支持，可选绑定并保存到同一账号工作区')).toBeInTheDocument()
+    expect(within(table).getAllByText('支持，可绑定并保存到同一账号工作区')).toHaveLength(4)
     expect(within(table).getByText('更换游戏账号')).toBeInTheDocument()
-    expect(within(table).getByText('不支持自行更换；需人工核验')).toBeInTheDocument()
+    expect(within(table).getAllByText('不支持自行更换；需人工核验')).toHaveLength(4)
   })
 
   it('keeps support and home links in the compact mobile menu', async () => {
@@ -68,15 +75,15 @@ describe('PricingPage', () => {
     expect(within(commercialRules!).getByText(/仅可处理数据权利人已授权的数据/)).toBeInTheDocument()
 
     const tiers = within(commercialRules!).getByRole('table', { name: '商用等级与单次费用' })
-    expect(within(tiers).getByRole('row', { name: 'Lv1 10,000 积分 -10% 900 积分' })).toBeInTheDocument()
-    expect(within(tiers).getByRole('row', { name: 'Lv4 100,000 积分 -40% 600 积分' })).toBeInTheDocument()
+    expect(within(tiers).getByRole('row', { name: 'Lv1 10,000 积分 -10% 1,350 积分' })).toBeInTheDocument()
+    expect(within(tiers).getByRole('row', { name: 'Lv4 100,000 积分 -40% 900 积分' })).toBeInTheDocument()
   })
 
   it('hides metered prices and capabilities when metered billing is closed', () => {
     featureState.meteredBilling = false
     render(<MemoryRouter><PricingPage /></MemoryRouter>)
     expect(screen.getByText('暂未开放')).toBeInTheDocument()
-    expect(screen.queryByText('600–900 积分/次')).not.toBeInTheDocument()
+    expect(screen.queryByText('1200–1800 积分/次')).not.toBeInTheDocument()
     expect(screen.queryByText(/按次档案包含高级版单次结果/)).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '积分如何扣除' })).not.toBeInTheDocument()
     expect(screen.queryByRole('table', { name: '商用等级与单次费用' })).not.toBeInTheDocument()
@@ -89,7 +96,7 @@ describe('PricingPage', () => {
     featureState.status = status
     render(<MemoryRouter><PricingPage /></MemoryRouter>)
     expect(screen.getByText(new RegExp(message))).toBeInTheDocument()
-    expect(screen.queryByText('600–900 积分/次')).not.toBeInTheDocument()
+    expect(screen.queryByText('1200–1800 积分/次')).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '商用版规则' })).not.toBeInTheDocument()
   })
 })

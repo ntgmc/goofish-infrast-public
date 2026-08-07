@@ -1101,20 +1101,20 @@ describe('PostgreSQL optimization job admission', () => {
     const store = createPostgresOptimizeJobStore()
     const { userId, profileId } = await seedMeteredProfile()
     await adjustBalance({
-      userId, kind: 'admin_credit', amount: '1200.00', referenceType: 'admin_adjustment',
+      userId, kind: 'admin_credit', amount: '2400.00', referenceType: 'admin_adjustment',
       referenceId: randomUUID(), idempotencyKey: `fund:${userId}`, adminUsername: 'root', reason: 'metered test',
     })
     const first = await store.admitJob(input({
       priority: 500_000, owner_key: `profile:${profileId}`, profile_id: profileId,
       permission: 'metered_advanced', billing: await meteredBillingConfirmation(userId, profileId),
     }))
-    expect(first.job.billing_json).toMatchObject({ status: 'reserved', charge: '600.00' })
-    expect(await getBalanceSummary(userId)).toMatchObject({ available: '600.00', reserved: '600.00' })
+    expect(first.job.billing_json).toMatchObject({ status: 'reserved', charge: '1200.00' })
+    expect(await getBalanceSummary(userId)).toMatchObject({ available: '1200.00', reserved: '1200.00' })
     const claimed = await store.claimNextJob('billing-success-worker', randomUUID(), new Date(Date.now() + 60_000).toISOString(), 2, 100)
     expect(claimed?.id).toBe(first.job.id)
     await store.completeAttempt(claimed!.id, claimed!.attempt_count, claimed!.worker_id!, claimed!.lock_token!, { ok: true })
     expect((await store.getJob(first.job.id))?.billing_json?.status).toBe('settled')
-    expect(await getBalanceSummary(userId)).toMatchObject({ available: '600.00', reserved: '0.00' })
+    expect(await getBalanceSummary(userId)).toMatchObject({ available: '1200.00', reserved: '0.00' })
 
     const second = await store.admitJob(input({
       priority: 500_001, owner_key: `profile:${profileId}`, profile_id: profileId,
@@ -1124,7 +1124,7 @@ describe('PostgreSQL optimization job admission', () => {
     expect(failedClaim?.id).toBe(second.job.id)
     await store.failAttempt(failedClaim!.id, failedClaim!.attempt_count, failedClaim!.worker_id!, failedClaim!.lock_token!, 'expected failure')
     expect((await store.getJob(second.job.id))?.billing_json?.status).toBe('released')
-    expect(await getBalanceSummary(userId)).toMatchObject({ available: '600.00', reserved: '0.00' })
+    expect(await getBalanceSummary(userId)).toMatchObject({ available: '1200.00', reserved: '0.00' })
     expect((await query<{ count: string }>("select count(*)::text as count from user_balance_transactions where user_id = $1 and kind = 'schedule_debit'", [userId])).rows[0]?.count).toBe('1')
 
     const pending = await store.admitJob(input({
@@ -1168,7 +1168,7 @@ describe('PostgreSQL optimization job admission', () => {
     expect(quote).toMatchObject({
       billing_kind: 'metered_commercial',
       tier: 1,
-      charge: '900.00',
+      charge: '1350.00',
       available: '750.00',
       sufficient: false,
     })
@@ -1194,7 +1194,7 @@ describe('PostgreSQL optimization job admission', () => {
       reason: 'commercial price revalidation test',
     })
     const billing = await meteredBillingConfirmation(userId, profileId)
-    expect(billing.confirmation.acceptedMaxPoints).toBe('800.00')
+    expect(billing.confirmation.acceptedMaxPoints).toBe('1200.00')
     await reverseQualificationCredit({
       userId,
       originalTransactionId: credit.transaction.id,
@@ -1256,7 +1256,7 @@ describe('PostgreSQL optimization job admission', () => {
     await adjustBalance({
       userId: expired.userId,
       kind: 'admin_credit',
-      amount: '600.00',
+      amount: '1200.00',
       referenceType: 'admin_adjustment',
       referenceId: randomUUID(),
       idempotencyKey: `expired-quote-fund:${expired.userId}`,
@@ -1355,7 +1355,7 @@ describe('PostgreSQL optimization job admission', () => {
     expect((await query<{ reserved: string }>(
       'select reserved::text from user_balance_accounts where user_id = $1',
       [userId],
-    )).rows[0]?.reserved).toBe('600.00')
+    )).rows[0]?.reserved).toBe('1200.00')
     expect((await query<{ status: string }>(
       "select status from billing_reconciliation_cases where kind = 'account_projection_mismatch' and user_id = $1 order by last_seen_at desc limit 1",
       [userId],
