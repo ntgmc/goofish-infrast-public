@@ -6,6 +6,8 @@ import {
   aggregateServiceStatusSample,
   floorStatusTimestampToHour,
   historyBucketFromAggregate,
+  createDefaultServiceStatusCostConfig,
+  normalizeServiceStatusCostConfig,
   type AdminServiceStatusHistoryBucket,
   type PublicStatusIncident,
   type PublicStatusIncidentUpdate,
@@ -13,6 +15,7 @@ import {
   type ServiceStatusHistoryAggregate,
   type ServiceStatusHistoryBucket,
   type ServiceStatusSample,
+  type ServiceStatusCostConfig,
   type StatusIncidentImpact,
   type StatusIncidentState,
 } from '../../src/lib/service-status'
@@ -21,6 +24,7 @@ import { ensureDatabaseSchema } from './schema'
 import { query, withTransaction } from './postgres'
 
 export type ServiceStatusIncidentConflict = Error & { code: 'service_status_incident_conflict' }
+type ServiceStatusCostConfigConflict = Error & { code: 'service_status_cost_config_conflict' }
 
 export interface CreateServiceStatusIncidentInput {
   componentId: ServiceStatusComponentId
@@ -45,7 +49,7 @@ export async function recordServiceStatusSample(sample: ServiceStatusSample): Pr
   const bucketStart = floorStatusTimestampToHour(sample.bucketStart)
   const current = await query<ServiceStatusHourlyRow>(
     `select component_id, bucket_start::text, status, sample_count, available_samples,
-            busy_samples, congested_samples, unavailable_samples, running_sum::text, provisioned_sum::text, utilization_sum::text,
+            busy_samples, congested_samples, unavailable_samples, running_sum::text, provisioned_sum::text, utilization_sum::text, worker_instances_sum::text,
             peak_queued, peak_running, peak_worker_instances, last_sample_at::text
        from service_status_hourly
       where component_id = $1 and bucket_start = $2`,
@@ -55,10 +59,10 @@ export async function recordServiceStatusSample(sample: ServiceStatusSample): Pr
   const next = aggregateServiceStatusSample(currentAggregate, { ...sample, bucketStart })
   await query(
     `insert into service_status_hourly
-      (component_id, bucket_start, status, sample_count, available_samples, busy_samples, congested_samples, unavailable_samples,
-       running_sum, provisioned_sum, utilization_sum, peak_queued, peak_running, peak_worker_instances,
+       (component_id, bucket_start, status, sample_count, available_samples, busy_samples, congested_samples, unavailable_samples,
+       running_sum, provisioned_sum, utilization_sum, worker_instances_sum, peak_queued, peak_running, peak_worker_instances,
        last_sample_at, updated_at)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, now())
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, now())
      on conflict (component_id, bucket_start) do update set
        status = excluded.status,
        sample_count = excluded.sample_count,
@@ -69,6 +73,7 @@ export async function recordServiceStatusSample(sample: ServiceStatusSample): Pr
        running_sum = excluded.running_sum,
        provisioned_sum = excluded.provisioned_sum,
        utilization_sum = excluded.utilization_sum,
+       worker_instances_sum = excluded.worker_instances_sum,
        peak_queued = excluded.peak_queued,
        peak_running = excluded.peak_running,
        peak_worker_instances = excluded.peak_worker_instances,
@@ -86,6 +91,7 @@ export async function recordServiceStatusSample(sample: ServiceStatusSample): Pr
       next.runningSum,
       next.provisionedSum,
       next.utilizationSum,
+      next.workerInstancesSum,
       next.peakQueued,
       next.peakRunning,
       next.peakWorkerInstances,
@@ -121,7 +127,7 @@ export async function getServiceStatusHistory(
   const from = new Date(Date.parse(to) - SERVICE_STATUS_HISTORY_HOURS * 60 * 60 * 1000).toISOString()
   const result = await query<ServiceStatusHourlyRow>(
     `select component_id, bucket_start::text, status, sample_count, available_samples,
-            busy_samples, congested_samples, unavailable_samples, running_sum::text, provisioned_sum::text, utilization_sum::text,
+            busy_samples, congested_samples, unavailable_samples, running_sum::text, provisioned_sum::text, utilization_sum::text, worker_instances_sum::text,
             peak_queued, peak_running, peak_worker_instances, last_sample_at::text
        from service_status_hourly
       where component_id = $1 and bucket_start >= $2 and bucket_start < $3
@@ -157,7 +163,7 @@ export async function getAdminServiceStatusHistory(
   const from = new Date(Date.parse(to) - SERVICE_STATUS_HISTORY_HOURS * 60 * 60 * 1000).toISOString()
   const result = await query<ServiceStatusHourlyRow>(
     `select component_id, bucket_start::text, status, sample_count, available_samples,
-            busy_samples, congested_samples, unavailable_samples, running_sum::text, provisioned_sum::text, utilization_sum::text,
+            busy_samples, congested_samples, unavailable_samples, running_sum::text, provisioned_sum::text, utilization_sum::text, worker_instances_sum::text,
             peak_queued, peak_running, peak_worker_instances, last_sample_at::text
        from service_status_hourly
       where component_id = $1 and bucket_start >= $2 and bucket_start < $3
@@ -169,6 +175,87 @@ export async function getAdminServiceStatusHistory(
     to,
     buckets: result.rows.map((row) => historyBucketFromAggregate(rowToAggregate(row))),
   }
+}
+
+export async function getServiceStatusCostConfig(
+  componentId: ServiceStatusComponentId = SERVICE_STATUS_COMPONENT_IDS[0],
+): Promise<ServiceStatusCostConfig> {
+  await ensureDatabaseSchema()
+  const result = await query<ServiceStatusCostConfigRow>(
+    `select component_id, billing_model, currency, hourly_price_cny::text, timezone,
+            schedule_enabled, valley_worker_instances, peak_windows_json, updated_at::text
+       from service_status_cost_config
+      where component_id = $1`,
+    [componentId],
+  )
+  const row = result.rows[0]
+  if (!row) return createDefaultServiceStatusCostConfig(componentId)
+  return normalizeServiceStatusCostConfig({
+    component_id: row.component_id,
+    billing_model: row.billing_model,
+    currency: row.currency,
+    hourly_price_cny: row.hourly_price_cny === null ? null : Number(row.hourly_price_cny),
+    timezone: row.timezone,
+    schedule_enabled: row.schedule_enabled,
+    valley_worker_instances: row.valley_worker_instances,
+    peak_windows: Array.isArray(row.peak_windows_json) ? row.peak_windows_json : [],
+    updated_at: normalizeTimestamp(row.updated_at),
+  }, componentId)
+}
+
+export interface SaveServiceStatusCostConfigInput {
+  config: ServiceStatusCostConfig
+  expectedUpdatedAt: string | null
+  audit: AdminOperationAuditInput
+}
+
+export async function saveServiceStatusCostConfig(
+  input: SaveServiceStatusCostConfigInput,
+): Promise<ServiceStatusCostConfig> {
+  await ensureDatabaseSchema()
+  return withTransaction(async (client) => {
+    const currentResult = await client.query<ServiceStatusCostConfigRow>(
+      `select component_id, billing_model, currency, hourly_price_cny::text, timezone,
+              schedule_enabled, valley_worker_instances, peak_windows_json, updated_at::text
+         from service_status_cost_config
+        where component_id = $1
+        for update`,
+      [input.config.component_id],
+    )
+    const current = currentResult.rows[0]
+    if (normalizeTimestamp(current?.updated_at ?? '') !== normalizeTimestamp(input.expectedUpdatedAt ?? '')) {
+      if (current || input.expectedUpdatedAt !== null) throw costConfigConflictError()
+    }
+    const now = new Date().toISOString()
+    const config = normalizeServiceStatusCostConfig({ ...input.config, updated_at: now }, input.config.component_id)
+    await client.query(
+      `insert into service_status_cost_config
+        (component_id, billing_model, currency, hourly_price_cny, timezone, schedule_enabled,
+         valley_worker_instances, peak_windows_json, updated_at, updated_by)
+       values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)
+       on conflict (component_id) do update set
+         billing_model = excluded.billing_model,
+         currency = excluded.currency,
+         hourly_price_cny = excluded.hourly_price_cny,
+         timezone = excluded.timezone,
+         schedule_enabled = excluded.schedule_enabled,
+         valley_worker_instances = excluded.valley_worker_instances,
+         peak_windows_json = excluded.peak_windows_json,
+         updated_at = excluded.updated_at,
+         updated_by = excluded.updated_by`,
+      [config.component_id, config.billing_model, config.currency, config.hourly_price_cny, config.timezone, config.schedule_enabled,
+        config.valley_worker_instances, JSON.stringify(config.peak_windows), now, input.audit.actorUsername],
+    )
+    await recordAdminOperationAuditInTransaction(client, {
+      ...input.audit,
+      action: 'service_status_cost_config.update',
+      targetType: 'service_status_cost_config',
+      targetId: config.component_id,
+      before: current ? { hourly_price_cny: current.hourly_price_cny, schedule_enabled: current.schedule_enabled, valley_worker_instances: current.valley_worker_instances, peak_windows: current.peak_windows_json } : null,
+      after: { hourly_price_cny: config.hourly_price_cny, schedule_enabled: config.schedule_enabled, valley_worker_instances: config.valley_worker_instances, peak_windows: config.peak_windows },
+    })
+    return config
+  })
 }
 
 export async function listPublicServiceStatusIncidents(
@@ -358,10 +445,23 @@ interface ServiceStatusHourlyRow extends QueryResultRow {
   running_sum: string
   provisioned_sum: string
   utilization_sum: string
+  worker_instances_sum: string
   peak_queued: number
   peak_running: number
   peak_worker_instances: number
   last_sample_at: string
+}
+
+interface ServiceStatusCostConfigRow extends QueryResultRow {
+  component_id: ServiceStatusComponentId
+  billing_model: string
+  currency: string
+  hourly_price_cny: string | null
+  timezone: string
+  schedule_enabled: boolean
+  valley_worker_instances: number
+  peak_windows_json: unknown
+  updated_at: string
 }
 
 interface ServiceStatusIncidentRow extends QueryResultRow {
@@ -397,11 +497,16 @@ function rowToAggregate(row: ServiceStatusHourlyRow): ServiceStatusHistoryAggreg
     runningSum: Number(row.running_sum),
     provisionedSum: Number(row.provisioned_sum),
     utilizationSum: Number(row.utilization_sum),
+    workerInstancesSum: Number(row.worker_instances_sum),
     peakQueued: Number(row.peak_queued),
     peakRunning: Number(row.peak_running),
     peakWorkerInstances: Number(row.peak_worker_instances),
     lastSampleAt: normalizeTimestamp(row.last_sample_at),
   }
+}
+
+function costConfigConflictError(): ServiceStatusCostConfigConflict {
+  return Object.assign(new Error('service_status_cost_config_conflict'), { code: 'service_status_cost_config_conflict' as const })
 }
 
 function normalizeTimestamp(value: string): string {

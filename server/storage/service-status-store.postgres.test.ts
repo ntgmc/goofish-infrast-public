@@ -7,10 +7,12 @@ import {
   appendServiceStatusIncidentUpdate,
   createServiceStatusIncident,
   getAdminServiceStatusHistory,
+  getServiceStatusCostConfig,
   getServiceStatusHistory,
   listPublicServiceStatusIncidents,
   pruneServiceStatusHistory,
   recordServiceStatusSample,
+  saveServiceStatusCostConfig,
 } from './service-status-store'
 
 let container: PostgreSqlContainer
@@ -34,8 +36,25 @@ describe('PostgreSQL service status history', () => {
     expect(history.buckets).toHaveLength(1)
     expect(history.buckets[0]).toMatchObject({ bucket_start: '2026-08-08T01:00:00.000Z', status: 'congested', sample_count: 2, availability_percent: 50 })
     const admin = await getAdminServiceStatusHistory('optimization', new Date('2026-08-08T02:00:00.000Z'))
-    expect(admin.buckets[0]).toMatchObject({ busy_samples: 0, congested_samples: 1, peak_queued: 6, average_utilization_percent: 62.5 })
+    expect(admin.buckets[0]).toMatchObject({ busy_samples: 0, congested_samples: 1, peak_queued: 6, average_utilization_percent: 62.5, average_worker_instances: 1 })
     await query('delete from service_status_hourly where bucket_start = $1', ['2026-08-08T01:00:00.000Z'])
+  })
+
+  it('persists ECS cost planning with optimistic concurrency', async () => {
+    const initial = await getServiceStatusCostConfig()
+    expect(initial).toMatchObject({ component_id: 'optimization', billing_model: 'ecs_payg', hourly_price_cny: null })
+    const saved = await saveServiceStatusCostConfig({
+      config: { ...initial, hourly_price_cny: 0.82, schedule_enabled: true, valley_worker_instances: 1, peak_windows: [{ start: '09:00', end: '18:00', worker_instances: 3 }] },
+      expectedUpdatedAt: initial.updated_at,
+      audit: { actorUsername: 'postgres-test', reason: '测试 ECS 成本计划', requestId: randomUUID() },
+    })
+    expect(saved.hourly_price_cny).toBe(0.82)
+    await expect(saveServiceStatusCostConfig({
+      config: saved,
+      expectedUpdatedAt: '2026-08-08T00:00:00.000Z',
+      audit: { actorUsername: 'postgres-test', reason: '测试成本并发冲突', requestId: randomUUID() },
+    })).rejects.toMatchObject({ code: 'service_status_cost_config_conflict' })
+    await query('delete from service_status_cost_config where component_id = $1', ['optimization'])
   })
 
   it('prunes only buckets older than the retention cutoff', async () => {

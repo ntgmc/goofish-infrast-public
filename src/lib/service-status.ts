@@ -25,6 +25,46 @@ export interface OptimizationCostInputs {
   utilizationPercent: number
 }
 
+const SERVICE_STATUS_COST_TIMEZONE = 'Asia/Shanghai' as const
+type ServiceStatusCostBillingModel = 'ecs_payg'
+
+export interface ServiceStatusCostScheduleWindow {
+  start: string
+  end: string
+  worker_instances: number
+}
+
+export interface ServiceStatusCostConfig {
+  component_id: ServiceStatusComponentId
+  billing_model: ServiceStatusCostBillingModel
+  currency: 'CNY'
+  hourly_price_cny: number | null
+  timezone: typeof SERVICE_STATUS_COST_TIMEZONE
+  schedule_enabled: boolean
+  valley_worker_instances: number
+  peak_windows: ServiceStatusCostScheduleWindow[]
+  updated_at: string | null
+}
+
+export interface ServiceStatusCostEstimate {
+  observed_24h_worker_hours: number | null
+  observed_30d_worker_hours: number | null
+  planned_daily_worker_hours: number
+  planned_monthly_worker_hours: number
+  estimated_daily_cost_cny: number | null
+  estimated_monthly_cost_cny: number | null
+}
+
+export interface ServiceStatusCostRecommendation {
+  generated_at: string
+  source_sample_count: number
+  confidence: 'none' | 'limited' | 'observed'
+  valley_worker_instances: number
+  peak_windows: ServiceStatusCostScheduleWindow[]
+  hourly_worker_instances: number[]
+  rationale: string[]
+}
+
 interface ServiceStatusQueueSnapshot {
   queued: number
   running: number
@@ -61,6 +101,7 @@ export interface AdminServiceStatusHistoryBucket extends ServiceStatusHistoryBuc
   congested_samples: number
   average_active_concurrency: number | null
   average_provisioned_concurrency: number | null
+  average_worker_instances: number | null
   average_utilization_percent: number | null
   peak_queued: number | null
   peak_running: number | null
@@ -102,6 +143,11 @@ export interface AdminServiceStatusResponse extends ServiceStatusResponse {
   history: Omit<ServiceStatusHistoryResponse, 'buckets'> & {
     buckets: AdminServiceStatusHistoryBucket[]
   }
+  cost: {
+    config: ServiceStatusCostConfig
+    estimate: ServiceStatusCostEstimate
+    recommendation: ServiceStatusCostRecommendation
+  }
 }
 
 export interface ServiceStatusSample {
@@ -127,6 +173,7 @@ export interface ServiceStatusHistoryAggregate {
   runningSum: number
   provisionedSum: number
   utilizationSum: number
+  workerInstancesSum: number
   peakQueued: number
   peakRunning: number
   peakWorkerInstances: number
@@ -192,6 +239,7 @@ export function aggregateServiceStatusSample(
       runningSum: sample.running,
       provisionedSum: sample.workerConcurrency,
       utilizationSum: sample.workerConcurrency > 0 ? Math.min(100, (sample.running / sample.workerConcurrency) * 100) : 0,
+      workerInstancesSum: Math.max(0, sample.workerInstances),
       peakQueued: sample.queued,
       peakRunning: sample.running,
       peakWorkerInstances: sample.workerInstances,
@@ -210,6 +258,7 @@ export function aggregateServiceStatusSample(
     runningSum: current.runningSum + sample.running,
     provisionedSum: current.provisionedSum + sample.workerConcurrency,
     utilizationSum: current.utilizationSum + (sample.workerConcurrency > 0 ? Math.min(100, (sample.running / sample.workerConcurrency) * 100) : 0),
+    workerInstancesSum: current.workerInstancesSum + Math.max(0, sample.workerInstances),
     peakQueued: Math.max(current.peakQueued, sample.queued),
     peakRunning: Math.max(current.peakRunning, sample.running),
     peakWorkerInstances: Math.max(current.peakWorkerInstances, sample.workerInstances),
@@ -237,6 +286,9 @@ export function historyBucketFromAggregate(
     average_utilization_percent: aggregate.sampleCount > 0
       ? Math.round((aggregate.utilizationSum / aggregate.sampleCount) * 100) / 100
       : null,
+    average_worker_instances: aggregate.sampleCount > 0
+      ? Math.round((aggregate.workerInstancesSum / aggregate.sampleCount) * 100) / 100
+      : null,
     peak_queued: aggregate.peakQueued,
     peak_running: aggregate.peakRunning,
     peak_worker_instances: aggregate.peakWorkerInstances,
@@ -254,4 +306,49 @@ export function resolveOptimizationCostInputs(running: number, workerConcurrency
     ? Math.min(100, Math.round((activeConcurrency / provisionedConcurrency) * 100))
     : 0
   return { activeConcurrency, provisionedConcurrency, idleConcurrency, utilizationPercent }
+}
+
+export function createDefaultServiceStatusCostConfig(
+  componentId: ServiceStatusComponentId = SERVICE_STATUS_COMPONENT_IDS[0],
+): ServiceStatusCostConfig {
+  return {
+    component_id: componentId,
+    billing_model: 'ecs_payg',
+    currency: 'CNY',
+    hourly_price_cny: null,
+    timezone: SERVICE_STATUS_COST_TIMEZONE,
+    schedule_enabled: false,
+    valley_worker_instances: 0,
+    peak_windows: [],
+    updated_at: null,
+  }
+}
+
+export function normalizeServiceStatusCostConfig(
+  value: Partial<ServiceStatusCostConfig> | null | undefined,
+  componentId: ServiceStatusComponentId = SERVICE_STATUS_COMPONENT_IDS[0],
+): ServiceStatusCostConfig {
+  const fallback = createDefaultServiceStatusCostConfig(componentId)
+  const windows = Array.isArray(value?.peak_windows)
+    ? value.peak_windows
+      .filter((window): window is ServiceStatusCostScheduleWindow => Boolean(window && typeof window === 'object'))
+      .map((window) => ({
+        start: typeof window.start === 'string' ? window.start : '09:00',
+        end: typeof window.end === 'string' ? window.end : '22:00',
+        worker_instances: Number.isFinite(Number(window.worker_instances)) ? Math.max(0, Math.floor(Number(window.worker_instances))) : 0,
+      }))
+      .slice(0, 24)
+    : fallback.peak_windows
+  const price = value?.hourly_price_cny
+  return {
+    component_id: componentId,
+    billing_model: 'ecs_payg',
+    currency: 'CNY',
+    hourly_price_cny: price === null || price === undefined || !Number.isFinite(Number(price)) ? null : Math.max(0, Number(price)),
+    timezone: SERVICE_STATUS_COST_TIMEZONE,
+    schedule_enabled: value?.schedule_enabled === true,
+    valley_worker_instances: Number.isFinite(Number(value?.valley_worker_instances)) ? Math.max(0, Math.floor(Number(value?.valley_worker_instances))) : fallback.valley_worker_instances,
+    peak_windows: windows,
+    updated_at: typeof value?.updated_at === 'string' ? value.updated_at : null,
+  }
 }
