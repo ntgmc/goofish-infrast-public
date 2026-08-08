@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { QUEUE_CONGESTION_THRESHOLD, resolveOptimizationServiceStatus, type AdminServiceStatusResponse } from '../../src/lib/service-status'
+import { QUEUE_CONGESTION_THRESHOLD, resolveOptimizationServiceStatus, type AdminServiceStatusResponse, normalizeServiceStatusCostConfig } from '../../src/lib/service-status'
+import { calculateServiceStatusCostEstimate, recommendServiceStatusCostPlan } from '../../src/lib/service-status-cost'
 import { authenticateAdminRequest } from './admin-auth'
 import { jsonResponse } from './license-utils'
 import { requestSchemas } from '../security/request-policy'
@@ -8,8 +9,10 @@ import { getRequestClientIp } from '../security/client-ip'
 import {
   appendServiceStatusIncidentUpdate,
   createServiceStatusIncident,
+  getServiceStatusCostConfig,
   getAdminServiceStatusHistory,
   listAdminServiceStatusIncidents,
+  saveServiceStatusCostConfig,
   type ServiceStatusIncidentConflict,
 } from '../storage/service-status-store'
 import { getAdminOptimizationQueueSnapshot } from '../storage/optimize-job-store'
@@ -27,6 +30,7 @@ export default async function adminServiceStatusHandler(req: Request): Promise<R
     try {
       const history = await getAdminServiceStatusHistory()
       const incidents = await listAdminServiceStatusIncidents(history.from)
+      const costConfig = await getServiceStatusCostConfig()
       const snapshot = await getAdminOptimizationQueueSnapshot(undefined, 1)
       const currentStatus = resolveOptimizationServiceStatus({
         serviceReady: isServiceReady(), queued: snapshot.counts.queued, running: snapshot.counts.running,
@@ -40,6 +44,11 @@ export default async function adminServiceStatusHandler(req: Request): Promise<R
         thresholds: { queue_congested_at: QUEUE_CONGESTION_THRESHOLD },
         history: { ...history, interval: 'hour', complete: true },
         incidents,
+        cost: {
+          config: costConfig,
+          estimate: calculateServiceStatusCostEstimate(costConfig, history.buckets),
+          recommendation: recommendServiceStatusCostPlan(history.buckets, costConfig, snapshot.snapshot_at),
+        },
       }
       return noStore(jsonResponse(response))
     } catch (error) {
@@ -56,6 +65,19 @@ export default async function adminServiceStatusHandler(req: Request): Promise<R
     const clientIp = getRequestClientIp(req)
     if (req.method === 'POST') {
       const body = await getValidatedJson(req, requestSchemas.adminServiceStatusCreate, true)
+      if (body.action === 'save_cost_config') {
+        const config = await saveServiceStatusCostConfig({
+          config: normalizeServiceStatusCostConfig(body, body.component_id),
+          expectedUpdatedAt: body.expected_updated_at,
+          audit: {
+            actorUsername: authentication.username,
+            reason: body.reason,
+            requestId,
+            clientIp,
+          },
+        })
+        return noStore(jsonResponse({ cost: config }))
+      }
       const incident = await createServiceStatusIncident({
         componentId: body.component_id,
         title: body.title,
@@ -90,7 +112,7 @@ export default async function adminServiceStatusHandler(req: Request): Promise<R
     }
     return jsonResponse({ error: 'Method not allowed' }, 405)
   } catch (error) {
-    if (isConflict(error)) return noStore(jsonResponse({ error: '事件已被其他管理员更新，请刷新后重试。' }, 409))
+    if (isConflict(error)) return noStore(jsonResponse({ error: '状态或成本配置已被其他管理员更新，请刷新后重试。' }, 409))
     if (error instanceof Error && error.message === 'service_status_incident_not_found') {
       return noStore(jsonResponse({ error: '事件不存在。' }, 404))
     }
@@ -101,7 +123,7 @@ export default async function adminServiceStatusHandler(req: Request): Promise<R
 }
 
 function isConflict(error: unknown): error is ServiceStatusIncidentConflict {
-  return Boolean(error && typeof error === 'object' && (error as { code?: unknown }).code === 'service_status_incident_conflict')
+  return Boolean(error && typeof error === 'object' && ['service_status_incident_conflict', 'service_status_cost_config_conflict'].includes(String((error as { code?: unknown }).code)))
 }
 
 function noStore(response: Response): Response {

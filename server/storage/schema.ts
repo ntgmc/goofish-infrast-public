@@ -375,6 +375,7 @@ CREATE TABLE IF NOT EXISTS service_status_hourly (
   running_sum NUMERIC(20,4) NOT NULL DEFAULT 0 CHECK (running_sum >= 0),
   provisioned_sum NUMERIC(20,4) NOT NULL DEFAULT 0 CHECK (provisioned_sum >= 0),
   utilization_sum NUMERIC(20,4) NOT NULL DEFAULT 0 CHECK (utilization_sum >= 0 AND utilization_sum <= sample_count * 100),
+  worker_instances_sum NUMERIC(20,4) NOT NULL DEFAULT 0 CHECK (worker_instances_sum >= 0),
   peak_queued INTEGER NOT NULL DEFAULT 0 CHECK (peak_queued >= 0),
   peak_running INTEGER NOT NULL DEFAULT 0 CHECK (peak_running >= 0),
   peak_worker_instances INTEGER NOT NULL DEFAULT 0 CHECK (peak_worker_instances >= 0),
@@ -390,9 +391,27 @@ CREATE INDEX IF NOT EXISTS idx_service_status_hourly_bucket
 ALTER TABLE service_status_hourly ADD COLUMN IF NOT EXISTS busy_samples INTEGER NOT NULL DEFAULT 0 CHECK (busy_samples >= 0);
 ALTER TABLE service_status_hourly ADD COLUMN IF NOT EXISTS congested_samples INTEGER NOT NULL DEFAULT 0 CHECK (congested_samples >= 0);
 ALTER TABLE service_status_hourly ADD COLUMN IF NOT EXISTS utilization_sum NUMERIC(20,4) NOT NULL DEFAULT 0 CHECK (utilization_sum >= 0);
+ALTER TABLE service_status_hourly ADD COLUMN IF NOT EXISTS worker_instances_sum NUMERIC(20,4) NOT NULL DEFAULT 0 CHECK (worker_instances_sum >= 0);
 ALTER TABLE service_status_hourly DROP CONSTRAINT IF EXISTS service_status_hourly_sample_balance_check;
 ALTER TABLE service_status_hourly ADD CONSTRAINT service_status_hourly_sample_balance_check CHECK (available_samples + busy_samples + congested_samples + unavailable_samples = sample_count);
 ALTER TABLE service_status_hourly DROP CONSTRAINT IF EXISTS service_status_hourly_level_balance_check;
+
+CREATE TABLE IF NOT EXISTS service_status_cost_config (
+  component_id TEXT PRIMARY KEY,
+  billing_model TEXT NOT NULL DEFAULT 'ecs_payg',
+  currency TEXT NOT NULL DEFAULT 'CNY',
+  hourly_price_cny NUMERIC(12,4),
+  timezone TEXT NOT NULL DEFAULT 'Asia/Shanghai',
+  schedule_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  valley_worker_instances INTEGER NOT NULL DEFAULT 0 CHECK (valley_worker_instances BETWEEN 0 AND 100),
+  peak_windows_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+  updated_at TIMESTAMPTZ NOT NULL,
+  updated_by TEXT,
+  CONSTRAINT service_status_cost_component_check CHECK (component_id IN ('optimization')),
+  CONSTRAINT service_status_cost_billing_model_check CHECK (billing_model IN ('ecs_payg')),
+  CONSTRAINT service_status_cost_currency_check CHECK (currency = 'CNY'),
+  CONSTRAINT service_status_cost_hourly_price_check CHECK (hourly_price_cny IS NULL OR hourly_price_cny >= 0)
+);
 
 CREATE TABLE IF NOT EXISTS service_status_incidents (
   id TEXT PRIMARY KEY,
@@ -2461,6 +2480,7 @@ const API_ONLY_RUNTIME_TABLES = new Set([
   'inventory_admin_operations',
   'admin_operation_audit',
   'service_status_hourly',
+  'service_status_cost_config',
   'service_status_incidents',
   'service_status_incident_updates',
 ])
