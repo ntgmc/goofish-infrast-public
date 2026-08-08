@@ -13,6 +13,8 @@ export default function PricingPage() {
   const { content } = usePublicContent()
   const pricing = content.pricing
   const plans = PUBLIC_PRICING_PLAN_IDS.map((id) => ({ id, ...pricing.plans[id] }))
+  const freePlan = plans[0]!
+  const cdkPlans = plans.slice(1)
   const featureState = useSiteFeatures()
   const metered = getMeteredBillingPolicy()
   const commercialTiers = metered.commercial.tiers.map((tier) => ({
@@ -21,6 +23,23 @@ export default function PricingPage() {
   }))
   const highestCommercialCharge = commercialTiers[0]!.chargePoints
   const lowestCommercialCharge = commercialTiers[commercialTiers.length - 1]!.chargePoints
+  const mergedCdkComparisonValue = (row: typeof pricing.comparison_rows[number]) => {
+    const values = cdkPlans.map((plan) => ({
+      label: formatPlanTerm(plan.label),
+      value: row[plan.id] ?? '—',
+    }))
+    if (values.every((item) => item.value === values[0]?.value)) return values[0]?.value ?? '—'
+    return (
+      <dl className="space-y-1">
+        {values.map((item) => (
+          <div key={item.label} className="flex flex-wrap gap-x-2">
+            <dt className="font-medium text-ink-primary">{item.label}</dt>
+            <dd className="whitespace-pre-line">{item.value}</dd>
+          </div>
+        ))}
+      </dl>
+    )
+  }
   return (
     <main className="tool-page" tabIndex={-1} data-route-focus>
       <div className="public-shell">
@@ -47,29 +66,45 @@ export default function PricingPage() {
           </nav>
         </header>
 
-        <section className="border-b border-surface-4 py-12 sm:py-16">
+        <section className="border-b border-surface-4 py-12 sm:py-16" aria-labelledby="pricing-title">
           <p className="public-kicker">{pricing.eyebrow}</p>
-          <h1 className="display-title mt-3 text-3xl text-ink-primary sm:text-4xl">{pricing.title}</h1>
+          <h1 id="pricing-title" className="display-title mt-3 text-3xl text-ink-primary sm:text-4xl">{pricing.title}</h1>
           <p className="mt-4 max-w-3xl whitespace-pre-line text-base leading-7 text-ink-secondary">{pricing.intro}</p>
-          <div className="mt-8 grid border-t border-surface-4 md:grid-cols-2 xl:grid-cols-3">
-            {plans.map((plan) => (
-              <article key={plan.id} className="flex h-full flex-col border-b border-surface-3 py-6 md:border-r md:px-6 md:first:pl-0 md:last:border-r-0">
-                <div className="flex items-start justify-between gap-4">
-                  <h2 className="text-xl font-semibold text-ink-primary">{plan.label}</h2>
-                  <span className="tool-status tool-status--current">{plan.badge}</span>
+          <div className="mt-10 grid gap-5 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+            <article className="tool-panel flex h-full flex-col p-5 sm:p-6" aria-labelledby="free-preview-pricing-title">
+              <div className="flex items-start justify-between gap-4">
+                <h2 id="free-preview-pricing-title" className="text-xl font-semibold text-ink-primary">{freePlan.label}</h2>
+                <span className="tool-status tool-status--current">{freePlan.badge}</span>
+              </div>
+              <p className="mt-5 text-4xl font-semibold tracking-tight text-brand-400 tabular-nums">{freePlan.display_price}</p>
+              <p className="mt-4 whitespace-pre-line text-sm leading-7 text-ink-secondary">{freePlan.summary}</p>
+              <p className="mt-4 whitespace-pre-line border-t border-surface-3 pt-4 text-sm leading-6 text-ink-muted">{freePlan.account_scope}</p>
+            </article>
+
+            <article className="tool-panel flex h-full flex-col p-5 sm:p-6" aria-labelledby="single-account-pricing-title">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h2 id="single-account-pricing-title" className="text-xl font-semibold text-ink-primary">{copy.public.pages_PricingPage_012}</h2>
+                  <p className="mt-1 text-sm text-ink-secondary">{copy.public.pages_PricingPage_013}</p>
                 </div>
-                <div className="mt-5">
-                  <p className="text-4xl font-semibold tracking-tight text-brand-400 tabular-nums">{plan.display_price}</p>
-                  {plan.discount_fold < 10 && (
-                    <p className="mt-2 text-sm text-ink-muted">
-                      原价 <del>{plan.original_price}</del> · {plan.discount_fold} 折
-                    </p>
-                  )}
-                </div>
-                <p className="mt-4 whitespace-pre-line text-sm leading-7 text-ink-secondary">{plan.summary}</p>
-                <p className="mt-4 whitespace-pre-line border-t border-surface-3 pt-4 text-sm leading-6 text-ink-muted">{plan.account_scope}</p>
-              </article>
-            ))}
+                <span className="tool-status tool-status--current">{copy.public.pages_PricingPage_004}</span>
+              </div>
+              <p className="mt-5 text-sm leading-7 text-ink-secondary">{copy.public.pages_PricingPage_014}</p>
+              <h3 className="mt-5 text-sm font-semibold text-ink-primary">{copy.public.pages_PricingPage_015}</h3>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2" role="list" aria-label={copy.public.pages_PricingPage_015}>
+                {cdkPlans.map((plan) => (
+                  <div key={plan.id} role="listitem" className="tool-inset p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-medium text-ink-primary">{formatPlanTerm(plan.label)}</p>
+                      <span className="text-xs text-ink-muted">{plan.badge}</span>
+                    </div>
+                    <p className="mt-3 text-2xl font-semibold tracking-tight text-brand-400 tabular-nums">{plan.display_price}</p>
+                    {plan.discount_fold < 10 && <p className="mt-1 text-xs text-ink-muted">原价 <del>{plan.original_price}</del> · {plan.discount_fold} 折</p>}
+                  </div>
+                ))}
+              </div>
+              <p className="mt-5 border-t border-surface-3 pt-4 text-sm leading-6 text-ink-muted">{copy.public.pages_PricingPage_016}</p>
+            </article>
           </div>
         </section>
 
@@ -171,12 +206,13 @@ export default function PricingPage() {
         <section className="border-b border-surface-4 py-8" aria-labelledby="pricing-comparison-title">
           <h2 id="pricing-comparison-title" className="text-xl font-semibold text-ink-primary">{pricing.comparison_heading}</h2>
           <div className="mt-4 overflow-x-auto">
-            <table aria-label={pricing.comparison_heading} className="w-full min-w-[1180px] text-left text-sm">
-              <thead className="text-ink-muted"><tr><th className="p-3">{copy.public.pages_PricingPage_008}</th>{plans.map((plan) => <th key={plan.id} className="p-3">{plan.label}</th>)}</tr></thead>
+            <table aria-label={pricing.comparison_heading} className="w-full min-w-[680px] text-left text-sm">
+              <thead className="text-ink-muted"><tr><th className="p-3">{copy.public.pages_PricingPage_008}</th><th className="p-3">{freePlan.label}</th><th className="p-3">{copy.public.pages_PricingPage_012}</th></tr></thead>
               <tbody className="divide-y divide-surface-3 text-ink-secondary">
                 {pricing.comparison_rows.map((row) => <tr key={row.id}>
                   <th className="p-3 font-medium text-ink-primary">{row.feature}</th>
-                  {plans.map((plan) => <td key={plan.id} className="whitespace-pre-line p-3">{row[plan.id] ?? '—'}</td>)}
+                  <td className="whitespace-pre-line p-3">{row.free_preview}</td>
+                  <td className="whitespace-pre-line p-3">{mergedCdkComparisonValue(row)}</td>
                 </tr>)}
               </tbody>
             </table>
@@ -201,4 +237,8 @@ function formatPoints(value: string): string {
 
 function formatCount(value: number): string {
   return new Intl.NumberFormat(CURRENT_LOCALE).format(value)
+}
+
+function formatPlanTerm(label: string): string {
+  return label.replace(/^单账号\s*/u, '').replace(/\s*CDK$/u, '')
 }

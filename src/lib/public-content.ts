@@ -3,7 +3,7 @@ import { copy } from '../copy/index'
 import { getSku, productPolicies } from './product-catalog'
 
 export const PUBLIC_CONTENT_VERSION = 1 as const
-export const PUBLIC_CONTENT_DEFAULTS_REVISION = 5 as const
+export const PUBLIC_CONTENT_DEFAULTS_REVISION = 6 as const
 export const PUBLIC_PRICING_PLAN_IDS = [
   'free_preview',
   'single_account_monthly',
@@ -12,6 +12,8 @@ export const PUBLIC_PRICING_PLAN_IDS = [
   'single_account_lifetime',
 ] as const
 type PublicPricingPlanId = typeof PUBLIC_PRICING_PLAN_IDS[number]
+const LEGACY_PRICING_EYEBROW = '公开 SKU'
+const LEGACY_PRICING_INTRO = '先了解完整权益与限制，再选择适合自己的版本。现在提供月卡、半年卡、年卡、终身卡，以及个人和商用积分单次排班。'
 export const PUBLIC_CONTENT_LIMITS = Object.freeze({
   faqItems: 50,
   pricingDisclosures: 30,
@@ -346,11 +348,14 @@ export function resolvePublicContentSettings(value: unknown): { content: PublicC
   }
   const storedDefaultsRevision = normalizeDefaultsRevision(source.defaults_revision)
   const normalizedDraft = normalizePricingComparisonDefaults(parsed.data)
+  const migratedDraft = storedDefaultsRevision < PUBLIC_CONTENT_DEFAULTS_REVISION
+    ? migrateLegacyPricingCopy(migrateLegacyDefaultCredits(normalizedDraft))
+    : normalizedDraft
   return {
     content: {
       version: PUBLIC_CONTENT_VERSION,
       defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION,
-      ...(storedDefaultsRevision < PUBLIC_CONTENT_DEFAULTS_REVISION ? migrateLegacyDefaultCredits(normalizedDraft) : normalizedDraft),
+      ...migratedDraft,
       updated_at: typeof source.updated_at === 'string' ? source.updated_at : null,
     },
     isFallback: false,
@@ -415,6 +420,12 @@ function normalizePricingComparisonDefaults(draft: PublicContentDraftV1): Public
       }),
     },
   }
+}
+
+function migrateLegacyPricingCopy(draft: PublicContentDraftV1): PublicContentDraftV1 {
+  if (draft.pricing.eyebrow === LEGACY_PRICING_EYEBROW) draft.pricing.eyebrow = copy.public.pages_PricingPage_002
+  if (draft.pricing.intro === LEGACY_PRICING_INTRO) draft.pricing.intro = copy.public.pages_PricingPage_003
+  return draft
 }
 
 function migrateLegacyDefaultCredits(draft: PublicContentDraftV1): PublicContentDraftV1 {

@@ -396,9 +396,9 @@ export const publicCopy = {
   // src/pages/PricingPage.tsx
   pages_PricingPage_001: "价格与权益",
   // src/pages/PricingPage.tsx
-  pages_PricingPage_002: "公开 SKU",
+  pages_PricingPage_002: "Pricing",
   // src/pages/PricingPage.tsx
-  pages_PricingPage_003: "先了解完整权益与限制，再选择适合自己的版本。现在提供月卡、半年卡、年卡、终身卡，以及个人和商用积分单次排班。",
+  pages_PricingPage_003: "完整高级权益统一为单账号 CDK，月卡、半年卡、年卡和终身卡只在有效期与价格上不同；另有个人和商用积分单次排班。",
   // src/pages/PricingPage.tsx
   pages_PricingPage_004: "一次性付费",
   // src/pages/PricingPage.tsx
@@ -415,6 +415,16 @@ export const publicCopy = {
   pages_PricingPage_010: "联系客服",
   // src/pages/PricingPage.tsx
   pages_PricingPage_011: "返回首页",
+  // src/pages/PricingPage.tsx
+  pages_PricingPage_012: "单账号 CDK",
+  // src/pages/PricingPage.tsx
+  pages_PricingPage_013: "完整高级权益 · 按有效期选择",
+  // src/pages/PricingPage.tsx
+  pages_PricingPage_014: "四种期限共享同一套高级能力，差异只在有效期与价格。",
+  // src/pages/PricingPage.tsx
+  pages_PricingPage_015: "选择有效期",
+  // src/pages/PricingPage.tsx
+  pages_PricingPage_016: "仅限一个游戏 UID；按所选期限有效，不支持自行更换游戏账号。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_079: "换设备、误拦截与解冻",
   // src/pages/PublicInfoPage.tsx
