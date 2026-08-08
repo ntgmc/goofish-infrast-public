@@ -21,6 +21,7 @@ vi.mock('./admin-auth', () => ({ authenticateAdminRequest: mocks.authenticateAdm
 
 vi.mock('./license-utils', () => ({
   CDK_PRODUCT_PERMISSIONS: ['recommended', 'growth', 'advanced', 'ultimate'],
+  PROFILE_CDK_DURATION_DAYS: { month: 30, half_year: 180, year: 365 },
   acceptLatestOperatorBaselineAndUnfreeze: vi.fn(),
   buildOperatorFingerprint: mocks.buildOperatorFingerprint,
   generateCdk: mocks.generateCdk,
@@ -28,6 +29,9 @@ vi.mock('./license-utils', () => ({
   getCdkType: (record: { cdk_type?: string }) => record.cdk_type ?? 'profile',
   getCdkItemCode: (record: { item_code?: string | null }) => record.item_code ?? null,
   getCdkItemExpiresAt: (record: { item_expires_at?: string | null }) => record.item_expires_at ?? null,
+  getCdkProfileDuration: (record: { profile_duration?: string }) => record.profile_duration ?? 'lifetime',
+  getCdkProfileDurationDays: (record: { profile_duration_days?: number | null }) => record.profile_duration_days ?? null,
+  getCdkProfileExpiresAt: (record: { profile_expires_at?: string | null }) => record.profile_expires_at ?? null,
   getCdkRecordStore: vi.fn(async () => ({
     get: mocks.getCdk,
     listAdminPage: mocks.listAdminPage,
@@ -199,6 +203,53 @@ describe('admin item CDK generation', () => {
     expect(response.status).toBe(400)
     expect(await response.json()).toMatchObject({ code: 'cdk_payload_mismatch' })
     expect(mocks.createCdkBatch).not.toHaveBeenCalled()
+  })
+
+  it('creates a profile CDK with a selected subscription duration', async () => {
+    mocks.getCdk.mockResolvedValue(null)
+    const response = await adminCdkHandler(createRequest({
+      cdk_type: 'profile',
+      permission: 'advanced',
+      profile_duration: 'half_year',
+      count: 1,
+    }))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      cdk_type: 'profile',
+      profile_duration: 'half_year',
+      profile_duration_days: 180,
+    })
+    expect(mocks.createCdkBatch).toHaveBeenCalledWith([{
+      key: `cdk/${codeHash}.json`,
+      record: expect.objectContaining({
+        cdk_type: 'profile',
+        profile_duration: 'half_year',
+        profile_duration_days: 180,
+        profile_expires_at: null,
+      }),
+    }])
+  })
+
+  it('creates a limited item CDK with an absolute expiry date', async () => {
+    mocks.getCdk.mockResolvedValue(null)
+    const response = await adminCdkHandler(createRequest({
+      cdk_type: 'item',
+      item_code: 'limited_profile_voucher',
+      item_validity_mode: 'date',
+      item_expires_at: '2026-09-01',
+      count: 1,
+    }))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      item_code: 'limited_profile_voucher',
+      item_expires_at: '2026-09-01T15:59:59.000Z',
+    })
+    expect(mocks.createCdkBatch).toHaveBeenCalledWith([{
+      key: `cdk/${codeHash}.json`,
+      record: expect.objectContaining({ item_expires_at: '2026-09-01T15:59:59.000Z' }),
+    }])
   })
 })
 

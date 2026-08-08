@@ -32,6 +32,7 @@ const DepotValuePage = lazy(() => import('./pages/DepotValuePage'))
 const PublicInfoPage = lazy(() => import('./pages/PublicInfoPage'))
 const PricingPage = lazy(() => import('./pages/PricingPage'))
 const ThanksPage = lazy(() => import('./pages/ThanksPage'))
+const StatusPage = lazy(() => import('./pages/StatusPage'))
 
 export default function App() {
   return (
@@ -75,6 +76,7 @@ function AppContent() {
             <Route path="/support" element={<LazyPage fallback={copy.common.App_004}><PublicInfoPage page="support" /></LazyPage>} />
             <Route path="/pricing" element={<LazyPage fallback={copy.common.App_012}><PricingPage /></LazyPage>} />
             <Route path="/thanks" element={<LazyPage fallback={copy.common.App_013}><ThanksPage /></LazyPage>} />
+            <Route path="/status" element={<LazyPage fallback={copy.status.pages_StatusPage_024}><StatusPage /></LazyPage>} />
             <Route path="/privacy" element={<LazyPage fallback={copy.common.App_005}><PublicInfoPage page="privacy" /></LazyPage>} />
             <Route path="/terms" element={<LazyPage fallback={copy.common.App_006}><PublicInfoPage page="terms" /></LazyPage>} />
             <Route path="/disclaimer" element={<LazyPage fallback={copy.common.App_007}><PublicInfoPage page="disclaimer" /></LazyPage>} />

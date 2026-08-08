@@ -73,6 +73,7 @@ export interface UserGameAccountRecord {
   skland_pending_binding?: SklandPendingBindingRecord | null
   skland_risk?: SklandRiskRecord | null
   temporary_permission?: TemporaryProfilePermission | null
+  expires_at?: string | null
   created_at: string
   updated_at: string
 }
@@ -1605,6 +1606,7 @@ export function toPublicProfile(
     permission: profile.permission,
     trial,
     status: profile.status,
+    expires_at: profile.expires_at ?? null,
     archived_at: profile.archived_at ?? null,
     cdk_order_hash: profile.cdk_order_hash,
     display_name: profile.display_name,

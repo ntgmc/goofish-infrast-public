@@ -1,5 +1,17 @@
 [
   {
+    "date": "2026-08-08",
+    "scope": "page",
+    "macrostructure": "Long Document",
+    "theme": "custom",
+    "theme_axes": "light / geometric-sans / cool-violet",
+    "vibe": "technical, restrained, precise, trustworthy",
+    "enrichment": "none",
+    "nav": "N9 edge-aligned public",
+    "footer": "Ft2 inline rule",
+    "brief": "Live service status page with queue health and admin cost inputs"
+  },
+  {
     "date": "2026-07-20",
     "scope": "app",
     "macrostructure": "Marketing: Workbench; Application: Workbench; Content: Long Document",

@@ -5,6 +5,12 @@
 @import "@fontsource-variable/noto-sans-sc";
 @import "../tokens.css";
 
+/* Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V4
+ * scope: status page · genre: modern-minimal · macrostructure: Long Document
+ * theme: locked custom · tone: technical + utilitarian · enrichment: none
+ * nav: N9 · footer: Ft2 · honest/chrome/tokens/responsive: pass (46–49)
+ */
+
 @custom-variant dark (&:is(.dark *));
 
 @theme {
@@ -423,6 +429,59 @@ body {
     border-color: color-mix(in oklch, var(--theme-error) 38%, var(--border));
     background: color-mix(in oklch, var(--theme-error) 10%, var(--theme-surface-2));
     color: var(--theme-error);
+  }
+
+  .service-status-badge {
+    display: inline-flex;
+    min-height: 2.25rem;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-pill);
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 650;
+    line-height: 1.25rem;
+    white-space: nowrap;
+  }
+
+  .service-status-badge--compact {
+    min-height: 1.75rem;
+    padding: 0.125rem 0.625rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .service-status-badge--available {
+    border-color: color-mix(in oklch, var(--theme-success) 54%, var(--border));
+    background: color-mix(in oklch, var(--theme-success) 12%, var(--theme-surface-1));
+    color: color-mix(in oklch, var(--theme-success) 82%, var(--theme-ink-primary));
+  }
+
+  .service-status-badge--busy {
+    border-color: color-mix(in oklch, var(--theme-success) 36%, var(--border));
+    background: color-mix(in oklch, var(--theme-success) 8%, var(--theme-surface-1));
+    color: var(--theme-success);
+  }
+
+  .service-status-badge--congested {
+    border-color: color-mix(in oklch, var(--theme-warning) 46%, var(--border));
+    background: color-mix(in oklch, var(--theme-warning) 12%, var(--theme-surface-1));
+    color: color-mix(in oklch, var(--theme-warning) 86%, var(--theme-ink-primary));
+  }
+
+  .service-status-badge--unavailable {
+    border-color: color-mix(in oklch, var(--theme-error) 48%, var(--border));
+    background: color-mix(in oklch, var(--theme-error) 10%, var(--theme-surface-1));
+    color: var(--theme-error);
+  }
+
+  .dark .service-status-badge--available {
+    color: color-mix(in oklch, var(--theme-success) 84%, var(--theme-surface-0));
+  }
+
+  .status-reading-measure {
+    width: min(100%, var(--reading-measure));
   }
 
   .dark .tool-eyebrow,

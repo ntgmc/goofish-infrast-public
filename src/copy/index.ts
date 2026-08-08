@@ -16,6 +16,7 @@ import { balanceCopy } from './zh-CN/balance'
 import { notificationsCopy } from './zh-CN/notifications'
 import { meteredCopy } from './zh-CN/metered'
 import { debugCopy } from './zh-CN/debug'
+import { statusCopy } from './zh-CN/status'
 
 export const CURRENT_LOCALE = 'zh-CN' as const
 
@@ -38,4 +39,5 @@ export const copy = {
   notifications: notificationsCopy,
   metered: meteredCopy,
   debug: debugCopy,
+  status: statusCopy,
 } as const

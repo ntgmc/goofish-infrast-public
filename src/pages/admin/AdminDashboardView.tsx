@@ -290,7 +290,7 @@ export default function AdminDashboardView() {
         {activeSection === 'cdk' && (
           <section className="space-y-5">
             <form onSubmit={handleGenerateCdk} className="tool-panel p-5">
-              <div className="grid gap-4 lg:grid-cols-[180px_220px_140px_1fr_auto] lg:items-end">
+              <div className="grid gap-4 lg:grid-cols-3 xl:grid-cols-6 xl:items-end">
                 <label>
                   <span className="mb-2 block text-sm font-medium text-ink-secondary">CDK 类型</span>
                   <select value={cdkType} onChange={(event) => setCdkType(event.currentTarget.value as 'profile' | 'balance' | 'item')} className="tool-field">
@@ -299,21 +299,50 @@ export default function AdminDashboardView() {
                     <option value="item">道具兑换</option>
                   </select>
                 </label>
-                {cdkType === 'profile' ? <label>
-                  <span className="mb-2 block text-sm font-medium text-ink-secondary">授权类型</span>
-                  <select value={permission} onChange={(event) => setPermission(event.currentTarget.value as GeneratedPermission)} className="tool-field">
-                    {cdkProductPermissions.map((item) => <option key={item} value={item}>{permissionLabels[item]}</option>)}
-                  </select>
-                </label> : cdkType === 'balance' ? <label>
+                {cdkType === 'profile' ? <>
+                  <label>
+                    <span className="mb-2 block text-sm font-medium text-ink-secondary">授权类型</span>
+                    <select value={permission} onChange={(event) => setPermission(event.currentTarget.value as GeneratedPermission)} className="tool-field">
+                      {cdkProductPermissions.map((item) => <option key={item} value={item}>{permissionLabels[item]}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    <span className="mb-2 block text-sm font-medium text-ink-secondary">档案有效期</span>
+                    <select name="profile_duration" className="tool-field" defaultValue="lifetime">
+                      <option value="lifetime">终身卡</option>
+                      <option value="month">月卡（30 天）</option>
+                      <option value="half_year">半年卡（180 天）</option>
+                      <option value="year">年卡（365 天）</option>
+                    </select>
+                  </label>
+                </> : cdkType === 'balance' ? <label>
                   <span className="mb-2 block text-sm font-medium text-ink-secondary">积分面额</span>
                   <input value={balanceAmount} onChange={(event) => setBalanceAmount(event.currentTarget.value)} inputMode="decimal" pattern="\d+(\.\d{1,2})?" className="tool-field" required />
                 </label> : <label>
                   <span className="mb-2 block text-sm font-medium text-ink-secondary">道具类型</span>
                   <select name="item_code" className="tool-field" defaultValue="lifetime_profile_voucher">
                     <option value="lifetime_profile_voucher">终身版兑换 CDK</option>
-                    <option value="limited_profile_voucher" disabled={Date.now() < Date.parse('2026-07-17T04:00:00.000Z') || Date.now() >= Date.parse('2026-08-19T16:00:00.000Z')}>限时 CDK（2026-08-20 00:00 到期）</option>
+                    <option value="limited_profile_voucher">限时 CDK</option>
                   </select>
                 </label>}
+                {cdkType === 'item' && <>
+                  <label>
+                    <span className="mb-2 block text-sm font-medium text-ink-secondary">限时方式</span>
+                    <select name="item_validity_mode" className="tool-field" defaultValue="never">
+                      <option value="never">不设置（仅终身道具）</option>
+                      <option value="days">指定天数</option>
+                      <option value="date">指定到期日</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span className="mb-2 block text-sm font-medium text-ink-secondary">有效天数</span>
+                    <input name="item_validity_days" type="number" min={1} max={3650} step={1} defaultValue={30} className="tool-field" />
+                  </label>
+                  <label>
+                    <span className="mb-2 block text-sm font-medium text-ink-secondary">到期日（北京时间）</span>
+                    <input name="item_expires_at" type="date" className="tool-field" />
+                  </label>
+                </>}
                 <label>
                   <span className="mb-2 block text-sm font-medium text-ink-secondary">生成数量</span>
                   <input type="number" min={1} max={MAX_CDK_BATCH_COUNT} step={1} value={cdkCount} onChange={(event) => setCdkCount(event.currentTarget.value)} className="tool-field" />
@@ -329,7 +358,7 @@ export default function AdminDashboardView() {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="text-sm font-semibold text-ink-primary">已生成 {generatedCodes.length} 个 CDK</div>
-                      <div className="mt-1 text-xs text-ink-muted">{generatedCodes[0].cdk_type === 'balance' ? `余额 ${generatedCodes[0].amount} 积分` : generatedCodes[0].cdk_type === 'item' ? `${generatedCodes[0].item_name ?? generatedCodes[0].item_code}${generatedCodes[0].item_expires_at ? ` · ${formatDate(generatedCodes[0].item_expires_at)} 到期` : ''}` : permissionLabels[generatedCodes[0].permission!]} · {formatDate(generatedCodes[0].created_at)}</div>
+                      <div className="mt-1 text-xs text-ink-muted">{generatedCodes[0].cdk_type === 'balance' ? `余额 ${generatedCodes[0].amount} 积分` : generatedCodes[0].cdk_type === 'item' ? `${generatedCodes[0].item_name ?? generatedCodes[0].item_code}${generatedCodes[0].item_expires_at ? ` · ${formatDate(generatedCodes[0].item_expires_at)} 到期` : ''}` : `${permissionLabels[generatedCodes[0].permission!]}${generatedCodes[0].profile_duration && generatedCodes[0].profile_duration !== 'lifetime' ? ` · ${generatedCodes[0].profile_duration_days} 天` : ' · 终身'}`} · {formatDate(generatedCodes[0].created_at)}</div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <button type="button" onClick={handleCopyGeneratedCdks} className="tool-secondary-action">{generatedCodes.length === 1 ? '复制 CDK' : '复制全部'}</button>

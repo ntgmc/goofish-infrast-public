@@ -40,6 +40,7 @@ import accountDataHandler from './handlers/account-data'
 import usageStatsHandler from './handlers/usage-stats'
 import siteFeaturesHandler from './handlers/site-features'
 import sitePublicContentHandler from './handlers/site-public-content'
+import serviceStatusHandler from './handlers/service-status'
 import { enforceFeatureGate } from './feature-gate'
 import { checkPostgresHealth, hasDatabaseUrl } from './storage/postgres'
 import { applyHttpSecurityHeaders, isSecureWebRequest } from './security/http-security'
@@ -79,6 +80,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/auth/me', authHandler as unknown as ApiHandler],
   ['/api/site/features', siteFeaturesHandler as unknown as ApiHandler],
   ['/api/site/public-content', sitePublicContentHandler as unknown as ApiHandler],
+  ['/api/status', serviceStatusHandler as unknown as ApiHandler],
   ['/api/user/data/export', accountDataHandler as unknown as ApiHandler],
   ['/api/user/data/delete-request', accountDataHandler as unknown as ApiHandler],
   ['/api/user/data/cancel', accountDataHandler as unknown as ApiHandler],

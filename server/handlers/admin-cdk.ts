@@ -4,10 +4,14 @@ import { getPermissionRank, normalizeRuntimePermission } from '../../src/lib/pro
 import { authenticateAdminRequest } from './admin-auth'
 import {
   CDK_PRODUCT_PERMISSIONS,
+  PROFILE_CDK_DURATION_DAYS,
   generateCdk,
   getCdkBalanceAmount,
   getCdkItemCode,
   getCdkItemExpiresAt,
+  getCdkProfileDuration,
+  getCdkProfileDurationDays,
+  getCdkProfileExpiresAt,
   getCdkType,
   isProfileCdkRecord,
   getCdkRecordStore,
@@ -23,6 +27,7 @@ import {
   type CdkStatus,
   type CdkType,
   type ItemCdkCode,
+  type ProfileCdkDuration,
   type OperatorBaselineSource,
   type AdminCdkPageOptions,
   type AdminCdkPageResult,
@@ -55,7 +60,20 @@ export default async (req: Request): Promise<Response> => {
 
   try {
     const body = await getValidatedJson(req, requestSchemas.adminCdkCreate)
-    const { permission, order_note, count, cdk_type, amount, item_code } = body
+    const {
+      permission,
+      order_note,
+      count,
+      cdk_type,
+      amount,
+      item_code,
+      profile_duration,
+      item_validity_mode,
+      item_validity_days,
+      item_expires_at,
+      validity_days,
+      expires_at,
+    } = body
     const hashSecret = requireEnv('CDK_HASH_SECRET')
 
     const authentication = await authenticateAdminRequest(req, {
@@ -64,13 +82,30 @@ export default async (req: Request): Promise<Response> => {
     })
     if (!authentication.ok) return authentication.response
     const cdkType = (cdk_type ?? 'profile') as CdkType
-    if (cdkType === 'profile' && (amount !== undefined || item_code !== undefined)) {
+    if (cdkType === 'profile' && (
+      amount !== undefined
+      || item_code !== undefined
+      || item_validity_mode !== undefined
+      || item_validity_days !== undefined
+      || item_expires_at !== undefined
+      || validity_days !== undefined
+      || expires_at !== undefined
+    )) {
       return jsonResponse({ error: '档案 CDK 只能设置档案权限。', code: 'cdk_payload_mismatch' }, 400)
     }
-    if (cdkType === 'balance' && (permission !== undefined || item_code !== undefined)) {
+    if (cdkType === 'balance' && (
+      permission !== undefined
+      || item_code !== undefined
+      || profile_duration !== undefined
+      || item_validity_mode !== undefined
+      || item_validity_days !== undefined
+      || item_expires_at !== undefined
+      || validity_days !== undefined
+      || expires_at !== undefined
+    )) {
       return jsonResponse({ error: '余额 CDK 只能设置积分面额。', code: 'cdk_payload_mismatch' }, 400)
     }
-    if (cdkType === 'item' && (permission !== undefined || amount !== undefined)) {
+    if (cdkType === 'item' && (permission !== undefined || amount !== undefined || profile_duration !== undefined)) {
       return jsonResponse({ error: '道具 CDK 只能设置道具类型。', code: 'cdk_payload_mismatch' }, 400)
     }
     const cdkPermission = cdkType === 'profile' && permission && (CDK_PRODUCT_PERMISSIONS as string[]).includes(permission)
@@ -87,17 +122,30 @@ export default async (req: Request): Promise<Response> => {
     if (cdkType === 'item' && !itemCode) {
       return jsonResponse({ error: '道具 CDK 必须选择终身版或限时版道具。', code: 'cdk_payload_required' }, 400)
     }
-    if (itemCode === 'limited_profile_voucher' && !isFreePreviewLimitedCdkActivityActive()) {
-      return jsonResponse({ error: '限时 CDK 活动尚未开始或已经结束。', code: 'cdk_item_expired' }, 409)
+    const profileDuration = cdkType === 'profile'
+      ? normalizeProfileDuration(profile_duration)
+      : null
+    if (cdkType === 'profile' && !profileDuration) {
+      return jsonResponse({ error: '档案 CDK 有效期必须是终身、月卡、半年卡或年卡。', code: 'cdk_profile_duration_invalid' }, 400)
     }
-    const itemExpiresAt = itemCode === 'limited_profile_voucher' ? FREE_PREVIEW_LIMITED_CDK_ACTIVITY.endsAt : null
+    const createdAt = new Date().toISOString()
+    const itemExpiry = cdkType === 'item'
+      ? resolveItemCdkExpiresAt({
+          itemCode: itemCode!,
+          validityMode: item_validity_mode,
+          validityDays: item_validity_days ?? validity_days,
+          expiresAt: item_expires_at ?? expires_at,
+          now: createdAt,
+        })
+      : { ok: true as const, expiresAt: null }
+    if (!itemExpiry.ok) return jsonResponse({ error: itemExpiry.error, code: itemExpiry.code }, itemExpiry.status)
+    const itemExpiresAt = itemExpiry.expiresAt
 
     const store = await getCdkRecordStore()
     const batchCount = normalizeCreateCount(count)
     if (batchCount === null) {
       return jsonResponse({ error: `生成数量必须是 1-${MAX_BATCH_CREATE_COUNT} 的整数。` }, 400)
     }
-    const createdAt = new Date().toISOString()
     const orderNote = order_note?.trim() || null
     const createdCdks = await createCdkBatch(store, {
       count: batchCount,
@@ -106,6 +154,7 @@ export default async (req: Request): Promise<Response> => {
       orderNote,
       cdkType,
       permission: cdkPermission,
+      profileDuration,
       balanceAmount,
       itemCode: itemCode ?? null,
       itemExpiresAt,
@@ -113,6 +162,7 @@ export default async (req: Request): Promise<Response> => {
     const response = {
       cdk_type: cdkType,
       ...(cdkPermission ? { permission: cdkPermission } : {}),
+      ...(profileDuration ? { profile_duration: profileDuration, profile_duration_days: profileDuration === 'lifetime' ? null : PROFILE_CDK_DURATION_DAYS[profileDuration] } : {}),
       ...(balanceAmount ? { amount: balanceAmount } : {}),
       ...(itemCode ? { item_code: itemCode, item_name: itemCdkName(itemCode), item_expires_at: itemExpiresAt } : {}),
       created_at: createdAt,
@@ -121,6 +171,7 @@ export default async (req: Request): Promise<Response> => {
         code,
         cdk_type: cdkType,
         ...(cdkPermission ? { permission: cdkPermission } : {}),
+        ...(profileDuration ? { profile_duration: profileDuration, profile_duration_days: profileDuration === 'lifetime' ? null : PROFILE_CDK_DURATION_DAYS[profileDuration] } : {}),
         ...(balanceAmount ? { amount: balanceAmount } : {}),
         ...(itemCode ? { item_code: itemCode, item_name: itemCdkName(itemCode), item_expires_at: itemExpiresAt } : {}),
         created_at: createdAt,
@@ -146,6 +197,7 @@ interface CreateCdkBatchOptions {
   orderNote: string | null;
   cdkType: CdkType;
   permission: ProductPermissionMode | null;
+  profileDuration: ProfileCdkDuration | null;
   balanceAmount: string | null;
   itemCode: ItemCdkCode | null;
   itemExpiresAt: string | null;
@@ -156,6 +208,65 @@ function normalizeCreateCount(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isInteger(value)) return null
   if (value < 1 || value > MAX_BATCH_CREATE_COUNT) return null
   return value
+}
+
+function normalizeProfileDuration(value: unknown): ProfileCdkDuration | null {
+  if (value === undefined || value === 'lifetime') return 'lifetime'
+  return value === 'month' || value === 'half_year' || value === 'year' ? value : null
+}
+
+function resolveItemCdkExpiresAt(input: {
+  itemCode: ItemCdkCode
+  validityMode: 'days' | 'date' | 'never' | undefined
+  validityDays: number | undefined
+  expiresAt: string | undefined
+  now: string
+}):
+  | { ok: true; expiresAt: string | null }
+  | { ok: false; status: 400; code: string; error: string } {
+  if (input.itemCode === 'lifetime_profile_voucher') {
+    if (input.validityMode !== undefined && input.validityMode !== 'never') {
+      return { ok: false, status: 400, code: 'cdk_item_validity_mismatch', error: '终身版道具 CDK 不支持限时有效期。' }
+    }
+    if (input.validityDays !== undefined || input.expiresAt !== undefined) {
+      return { ok: false, status: 400, code: 'cdk_item_validity_mismatch', error: '终身版道具 CDK 不支持限时有效期。' }
+    }
+    return { ok: true, expiresAt: null }
+  }
+
+  if (input.validityMode === undefined) {
+    if (!isFreePreviewLimitedCdkActivityActive(new Date(input.now))) {
+      return { ok: false, status: 409, code: 'cdk_item_expired', error: '限时 CDK 活动尚未开始或已经结束。' }
+    }
+    return { ok: true, expiresAt: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.endsAt }
+  }
+  if (input.validityMode === 'never') {
+    return { ok: false, status: 400, code: 'cdk_item_validity_required', error: '限时 CDK 必须指定有效天数或到期日。' }
+  }
+  if (input.validityMode === 'days') {
+    if (input.validityDays === undefined || !Number.isInteger(input.validityDays) || input.validityDays < 1 || input.validityDays > 3650) {
+      return { ok: false, status: 400, code: 'cdk_item_validity_days_invalid', error: '限时 CDK 有效天数必须是 1-3650 的整数。' }
+    }
+    return {
+      ok: true,
+      expiresAt: new Date(Date.parse(input.now) + input.validityDays * 86_400_000).toISOString(),
+    }
+  }
+
+  if (input.validityDays !== undefined || !input.expiresAt?.trim()) {
+    return { ok: false, status: 400, code: 'cdk_item_validity_mismatch', error: '指定到期日时不能同时提交有效天数。' }
+  }
+  const raw = input.expiresAt.trim()
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T23:59:59+08:00` : raw
+  const timestamp = Date.parse(normalized)
+  if (!Number.isFinite(timestamp)) {
+    return { ok: false, status: 400, code: 'cdk_item_expiry_invalid', error: '限时 CDK 到期日格式无效。' }
+  }
+  const nowMs = Date.parse(input.now)
+  if (timestamp <= nowMs || timestamp > nowMs + 3650 * 86_400_000) {
+    return { ok: false, status: 400, code: 'cdk_item_expiry_invalid', error: '限时 CDK 到期日必须晚于当前时间且不超过 3650 天。' }
+  }
+  return { ok: true, expiresAt: new Date(timestamp).toISOString() }
 }
 
 async function createCdkBatch(
@@ -186,7 +297,18 @@ async function createCdkBatch(
       ? { ...base, version: 2, cdk_type: 'balance', permission: null, balance_amount: options.balanceAmount! }
       : options.cdkType === 'item'
         ? { ...base, version: 3, cdk_type: 'item', permission: null, balance_amount: null, item_code: options.itemCode!, item_expires_at: options.itemExpiresAt }
-        : { ...base, version: 2, cdk_type: 'profile', permission: options.permission!, balance_amount: null }
+        : {
+            ...base,
+            version: 2,
+            cdk_type: 'profile',
+            permission: options.permission!,
+            balance_amount: null,
+            profile_duration: options.profileDuration ?? 'lifetime',
+            profile_duration_days: options.profileDuration && options.profileDuration !== 'lifetime'
+              ? PROFILE_CDK_DURATION_DAYS[options.profileDuration]
+              : null,
+            profile_expires_at: null,
+          }
     entries.push({ key: `cdk/${generated.codeHash}.json`, record })
     created.push(generated)
   }
@@ -522,6 +644,9 @@ function toAdminCdkRecord(record: CdkRecord) {
     cdk_id: record.code_hash.slice(0, 12),
     cdk_type: getCdkType(record),
     permission: record.permission,
+    profile_duration: isProfileCdkRecord(record) ? getCdkProfileDuration(record) : null,
+    profile_duration_days: isProfileCdkRecord(record) ? getCdkProfileDurationDays(record) : null,
+    profile_expires_at: isProfileCdkRecord(record) ? getCdkProfileExpiresAt(record) : null,
     amount: getCdkBalanceAmount(record),
     item_code: getCdkItemCode(record),
     item_name: getCdkItemCode(record) ? itemCdkName(getCdkItemCode(record)!) : null,

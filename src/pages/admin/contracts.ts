@@ -31,6 +31,7 @@ export interface AdminSessionUser {
 export type CdkStatus = 'unused' | 'claiming' | 'used' | 'frozen' | 'revoked'
 export type CdkType = 'profile' | 'balance' | 'item'
 type ItemCdkCode = 'lifetime_profile_voucher' | 'limited_profile_voucher'
+type ProfileCdkDuration = 'lifetime' | 'month' | 'half_year' | 'year'
 
 export type AppUserStatus = 'active' | 'frozen' | 'revoked'
 
@@ -65,6 +66,9 @@ export interface GeneratedCdk {
   code: string;
   cdk_type: CdkType;
   permission?: GeneratedPermission;
+  profile_duration?: ProfileCdkDuration;
+  profile_duration_days?: number | null;
+  profile_expires_at?: string | null;
   amount?: string;
   item_code?: ItemCdkCode;
   item_name?: string;
@@ -76,6 +80,9 @@ export interface AdminCdkCreateResponse {
   code?: string;
   cdk_type?: CdkType;
   permission?: GeneratedPermission;
+  profile_duration?: ProfileCdkDuration;
+  profile_duration_days?: number | null;
+  profile_expires_at?: string | null;
   amount?: string;
   item_code?: ItemCdkCode;
   item_name?: string;
@@ -90,6 +97,9 @@ export interface AdminCdkRecord {
   cdk_id: string;
   cdk_type: CdkType;
   permission: Permission | null;
+  profile_duration?: ProfileCdkDuration | null;
+  profile_duration_days?: number | null;
+  profile_expires_at?: string | null;
   amount: string | null;
   item_code?: ItemCdkCode | null;
   item_name?: string | null;

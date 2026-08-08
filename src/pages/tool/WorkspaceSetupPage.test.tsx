@@ -187,7 +187,7 @@ describe('WorkspaceSetupPage CDK paths', () => {
     const accountActions = screen.getByRole('navigation', { name: '账号操作' })
     expect(accountActions).toHaveClass('grid-cols-2', 'gap-2')
     expect(within(accountActions).getByRole('button', { name: '返回账号列表' })).toBeInTheDocument()
-    expect(within(accountActions).getByRole('button', { name: '退出登录' })).toBeInTheDocument()
+    expect(within(accountActions).getByRole('button', { name: '退出登录' })).toHaveClass('tool-danger-action')
     expect(screen.getAllByRole('button', { name: '返回账号列表' })).toHaveLength(1)
   })
 
@@ -287,21 +287,23 @@ describe('WorkspaceSetupPage CDK paths', () => {
 
   it('can open the account dashboard directly on the CDK redemption path', async () => {
     render(
-      <AccountDashboard
-        user={{ id: 'user-1', email: 'test@example.com' } as AuthUser}
-        profiles={[createPreviewProfile()]}
-        activeProfile={createPreviewProfile()}
-        announcement={null}
-        announcementUnreadCount={0}
-        onAnnouncementUnreadCountChange={vi.fn()}
-        openingProfileId={null}
-        workspaceLoadError={null}
-        section="redeem"
-        onSectionChange={vi.fn()}
-        onLogout={vi.fn()}
-        onPayload={vi.fn()}
-        onOpenProfile={vi.fn()}
-      />,
+      <MemoryRouter>
+        <AccountDashboard
+          user={{ id: 'user-1', email: 'test@example.com' } as AuthUser}
+          profiles={[createPreviewProfile()]}
+          activeProfile={createPreviewProfile()}
+          announcement={null}
+          announcementUnreadCount={0}
+          onAnnouncementUnreadCountChange={vi.fn()}
+          openingProfileId={null}
+          workspaceLoadError={null}
+          section="redeem"
+          onSectionChange={vi.fn()}
+          onLogout={vi.fn()}
+          onPayload={vi.fn()}
+          onOpenProfile={vi.fn()}
+        />
+      </MemoryRouter>,
     )
 
     expect(screen.getByRole('heading', { name: '添加账号' })).toBeInTheDocument()

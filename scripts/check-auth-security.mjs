@@ -2121,6 +2121,21 @@ function userRegistrationLicenseUtilsMock() {
     export function getCdkRecordStore() { return { get: async () => null } }
     export function getCdkType(record) { return record.cdk_type ?? 'profile' }
     export function isProfileCdkRecord(record) { return getCdkType(record) === 'profile' }
+    export function getCdkProfileDuration(record) {
+      return ['month', 'half_year', 'year'].includes(record.profile_duration)
+        ? record.profile_duration
+        : 'lifetime'
+    }
+    export function getCdkProfileExpiresAt(record) {
+      return isProfileCdkRecord(record) && typeof record.profile_expires_at === 'string'
+        ? record.profile_expires_at
+        : null
+    }
+    export function addProfileCdkDuration(now, duration) {
+      if (duration === 'lifetime') return null
+      const days = { month: 30, half_year: 180, year: 365 }[duration]
+      return new Date(Date.parse(now) + days * 86_400_000).toISOString()
+    }
     export function normalizeCode(value) { return value.trim().toUpperCase() }
     export function normalizePermissionMode(value) { return value }
     export function formatRiskFreezeMessage(value) { return value }
@@ -2503,6 +2518,21 @@ function userLicenseUtilsMock() {
     export function getCdkRecordStore() { return { get: async () => null } }
     export function getCdkType(record) { return record.cdk_type ?? 'profile' }
     export function isProfileCdkRecord(record) { return getCdkType(record) === 'profile' }
+    export function getCdkProfileDuration(record) {
+      return ['month', 'half_year', 'year'].includes(record.profile_duration)
+        ? record.profile_duration
+        : 'lifetime'
+    }
+    export function getCdkProfileExpiresAt(record) {
+      return isProfileCdkRecord(record) && typeof record.profile_expires_at === 'string'
+        ? record.profile_expires_at
+        : null
+    }
+    export function addProfileCdkDuration(now, duration) {
+      if (duration === 'lifetime') return null
+      const days = { month: 30, half_year: 180, year: 365 }[duration]
+      return new Date(Date.parse(now) + days * 86_400_000).toISOString()
+    }
     export function hashCdk(value) { return value }
     export function normalizeCode(value) { return value }
     export function normalizePermissionMode(value) { return value }

@@ -73,6 +73,11 @@ describe('HTTP security boundary', () => {
     }
   })
 
+  it('allows the public service status endpoint without query parameters', () => {
+    expect(inspectIncomingRequest(incomingGet('/api/status', 'localhost:3001', '127.0.0.1')).allowed).toBe(true)
+    expect(inspectIncomingRequest(incomingGet('/api/status?unexpected=true', 'localhost:3001', '127.0.0.1')).allowed).toBe(false)
+  })
+
   it('ships a strict-style report-only policy during inline-style migration', () => {
     const response = applyHttpSecurityHeaders(new Response('ok'), true)
 

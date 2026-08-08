@@ -5,6 +5,7 @@ import type { UserGameAccountRecord } from '../storage/user-store'
 import {
   formatRiskFreezeMessage,
   getCdkRecordStore,
+  getCdkProfileExpiresAt,
   isProfileCdkRecord,
   type CdkRecord,
 } from './license-utils'
@@ -15,6 +16,7 @@ type ProfileAuthorizationFailureCode =
   | 'license_frozen'
   | 'license_revoked'
   | 'license_unavailable'
+  | 'profile_expired'
   | 'permission_invalid'
 
 export type ProfileAuthorizationResult =
@@ -29,6 +31,10 @@ export async function resolveProfileAuthorization(
   }
   if (profile.status === 'revoked') {
     return { ok: false, status: 403, code: 'profile_revoked', message: '账号授权已撤销，请联系卖家。' }
+  }
+
+  if (profile.expires_at && isExpired(profile.expires_at)) {
+    return { ok: false, status: 403, code: 'profile_expired', message: '档案有效期已结束，请续费或兑换新的档案卡。' }
   }
 
   if (profile.kind === 'free_preview') {
@@ -60,7 +66,16 @@ export async function resolveProfileAuthorization(
   if (cdkRecord.status !== 'used') {
     return { ok: false, status: 403, code: 'license_unavailable', message: '账号授权尚未生效，请联系支持人员。' }
   }
+  const cdkExpiresAt = getCdkProfileExpiresAt(cdkRecord)
+  if (cdkExpiresAt && isExpired(cdkExpiresAt)) {
+    return { ok: false, status: 403, code: 'profile_expired', message: '档案有效期已结束，请续费或兑换新的档案卡。' }
+  }
   return resolvePermission(cdkRecord.permission, cdkRecord)
+}
+
+function isExpired(value: string): boolean {
+  const timestamp = Date.parse(value)
+  return !Number.isFinite(timestamp) || timestamp <= Date.now()
 }
 
 function resolvePermission(permission: string | null | undefined, cdkRecord: CdkRecord | null): ProfileAuthorizationResult {

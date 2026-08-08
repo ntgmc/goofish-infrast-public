@@ -468,11 +468,28 @@ export function useAdminController() {
   
       setBusyAction('generate')
       try {
+        const formData = new FormData(event.currentTarget as HTMLFormElement)
+        const selectedItemCode = formData.get('item_code')
+        const validityMode = formData.get('item_validity_mode')
         const data = await apiJson<AdminCdkCreateResponse>('/api/admin/cdk', {
           method: 'POST',
           json: {
             cdk_type: cdkType,
-            ...(cdkType === 'profile' ? { permission } : cdkType === 'balance' ? { amount: balanceAmount } : { item_code: new FormData(event.currentTarget as HTMLFormElement).get('item_code') }),
+            ...(cdkType === 'profile'
+              ? { permission, profile_duration: formData.get('profile_duration') }
+              : cdkType === 'balance'
+                ? { amount: balanceAmount }
+                : {
+                    item_code: selectedItemCode,
+                    ...(selectedItemCode === 'limited_profile_voucher'
+                      ? {
+                          item_validity_mode: validityMode,
+                          ...(validityMode === 'days'
+                            ? { item_validity_days: Number(formData.get('item_validity_days')) }
+                            : { item_expires_at: formData.get('item_expires_at') }),
+                        }
+                      : {}),
+                  }),
             order_note: orderNote,
             count: batchCount,
           },

@@ -226,6 +226,7 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
             section={route.section}
             onSectionChange={navigateOptimize}
             onReset={() => navigate(profileScopedPath(workspaceSetupPath('operators'), activeProfile.id))}
+            onLogout={handleLogout}
             announcement={banner}
             redeemedNotice={null}
             onProfileUpgraded={applyAuthPayload}

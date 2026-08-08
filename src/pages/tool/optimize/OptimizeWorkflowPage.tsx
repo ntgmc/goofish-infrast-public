@@ -139,6 +139,7 @@ export default function OptimizeWorkflowPage(props: Props) {
         onSectionChange={setSection}
         onOpenTour={openCurrentTour}
         onReset={onReset}
+        onLogout={props.onLogout}
       >
         {configToast && <ConfigValidationToast key={configToast.id} message={configToast.message} />}
         <div className="space-y-4">

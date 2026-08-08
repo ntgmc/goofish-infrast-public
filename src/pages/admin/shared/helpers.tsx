@@ -498,7 +498,18 @@ export function normalizeGeneratedCdks(data: AdminCdkCreateResponse): GeneratedC
         if (cdkType === 'profile' && !permission) return null
         if (cdkType === 'balance' && !amount) return null
         if (cdkType === 'item' && !itemCode) return null
-        return { code: item.code, cdk_type: cdkType, ...(permission ? { permission } : {}), ...(amount ? { amount } : {}), ...(itemCode ? { item_code: itemCode, item_name: item.item_name, item_expires_at: item.item_expires_at } : {}), created_at: item.created_at }
+        const profileDuration = item.profile_duration === 'lifetime' || item.profile_duration === 'month' || item.profile_duration === 'half_year' || item.profile_duration === 'year'
+          ? item.profile_duration
+          : undefined
+        return {
+          code: item.code,
+          cdk_type: cdkType,
+          ...(permission ? { permission } : {}),
+          ...(profileDuration ? { profile_duration: profileDuration, profile_duration_days: item.profile_duration_days, profile_expires_at: item.profile_expires_at } : {}),
+          ...(amount ? { amount } : {}),
+          ...(itemCode ? { item_code: itemCode, item_name: item.item_name, item_expires_at: item.item_expires_at } : {}),
+          created_at: item.created_at,
+        }
       })
       .filter((item): item is GeneratedCdk => Boolean(item))
     : []
@@ -511,7 +522,18 @@ export function normalizeGeneratedCdks(data: AdminCdkCreateResponse): GeneratedC
   const itemCode = data.item_code === 'lifetime_profile_voucher' || data.item_code === 'limited_profile_voucher' ? data.item_code : undefined
   if (typeof data.code === 'string' && data.code.trim() && typeof data.created_at === 'string'
     && ((cdkType === 'profile' && permission) || (cdkType === 'balance' && amount) || (cdkType === 'item' && itemCode))) {
-    return [{ code: data.code, cdk_type: cdkType, ...(permission ? { permission } : {}), ...(amount ? { amount } : {}), ...(itemCode ? { item_code: itemCode, item_name: data.item_name, item_expires_at: data.item_expires_at } : {}), created_at: data.created_at }]
+    const profileDuration = data.profile_duration === 'lifetime' || data.profile_duration === 'month' || data.profile_duration === 'half_year' || data.profile_duration === 'year'
+      ? data.profile_duration
+      : undefined
+    return [{
+      code: data.code,
+      cdk_type: cdkType,
+      ...(permission ? { permission } : {}),
+      ...(profileDuration ? { profile_duration: profileDuration, profile_duration_days: data.profile_duration_days, profile_expires_at: data.profile_expires_at } : {}),
+      ...(amount ? { amount } : {}),
+      ...(itemCode ? { item_code: itemCode, item_name: data.item_name, item_expires_at: data.item_expires_at } : {}),
+      created_at: data.created_at,
+    }]
   }
   return []
 }
@@ -642,8 +664,8 @@ export function buildCurrentOpsReportCsv(report: ReturnType<typeof buildCurrentO
 
 export function buildGeneratedCdkCsv(cdks: GeneratedCdk[]): string {
   const rows = [
-    ['code', 'cdk_type', 'permission', 'permission_label', 'amount', 'item_code', 'item_name', 'item_expires_at', 'created_at'],
-    ...cdks.map((item) => [item.code, item.cdk_type, item.permission ?? '', item.permission ? permissionLabels[item.permission] : '', item.amount ?? '', item.item_code ?? '', item.item_name ?? '', item.item_expires_at ?? '', item.created_at]),
+    ['code', 'cdk_type', 'permission', 'permission_label', 'profile_duration', 'profile_duration_days', 'profile_expires_at', 'amount', 'item_code', 'item_name', 'item_expires_at', 'created_at'],
+    ...cdks.map((item) => [item.code, item.cdk_type, item.permission ?? '', item.permission ? permissionLabels[item.permission] : '', item.profile_duration ?? '', item.profile_duration_days == null ? '' : String(item.profile_duration_days), item.profile_expires_at ?? '', item.amount ?? '', item.item_code ?? '', item.item_name ?? '', item.item_expires_at ?? '', item.created_at]),
   ]
   return rows.map((row) => row.map(csvCell).join(',')).join('\r\n')
 }

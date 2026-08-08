@@ -140,15 +140,13 @@ export default function AccountDashboard({
         </LayoutGroup>
 
         <nav
-          className={`absolute inset-x-4 bottom-5 grid gap-2 border-t border-surface-3 pt-4 ${displayedSection === 'profiles' ? 'grid-cols-2' : 'grid-cols-1'}`}
+          className="absolute inset-x-4 bottom-5 grid grid-cols-2 gap-2 border-t border-surface-3 pt-4"
           aria-label={copy.common.pages_tool_AccountDashboard_017}
         >
-          {displayedSection === 'profiles' && (
-            <Link to="/" className="tool-secondary-action w-full">
-              {copy.common.pages_tool_AccountDashboard_016}
-            </Link>
-          )}
-          <button type="button" onClick={onLogout} className="tool-secondary-action w-full">
+          <Link to="/" className="tool-secondary-action w-full">
+            {copy.common.pages_tool_AccountDashboard_016}
+          </Link>
+          <button type="button" onClick={onLogout} className="tool-danger-action w-full">
             {copy.common.pages_tool_AccountDashboard_009}</button>
         </nav>
       </aside>
@@ -185,7 +183,7 @@ export default function AccountDashboard({
                   })),
                   { type: 'separator' as const, id: 'actions' },
                   { type: 'button' as const, id: 'tour', label: copy.dashboard.pages_tool_AccountDashboard_tour_001, onSelect: replayTour },
-                  ...(displayedSection === 'profiles' ? [{ type: 'link' as const, id: 'home', label: copy.common.pages_tool_AccountDashboard_016, to: '/' }] : []),
+                  { type: 'link' as const, id: 'home', label: copy.common.pages_tool_AccountDashboard_016, to: '/' },
                   { type: 'button' as const, id: 'logout', label: copy.common.pages_tool_AccountDashboard_013, intent: 'danger' as const, onSelect: onLogout },
                 ]}
               />
