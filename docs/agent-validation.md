@@ -195,6 +195,7 @@ npm run check:catalog
 npm test
 npm run build
 npm run check:api
+npm run check:copy
 npm run check:public-export
 ```
 
@@ -230,6 +231,37 @@ npm run check:local
 contracts, release tests, workflow contracts, the full Vitest suite, build,
 architecture, copy, API, and route checks. It may require PostgreSQL or other
 environment services; report unavailable external prerequisites separately.
+
+### Historical service-status changes
+
+Changes to `/api/status`, the service-status sampler/storage, public status
+history UI, or the optimization admin status panel span frontend, HTTP,
+background-worker, PostgreSQL, and migration boundaries. Run the nearest tests
+for every changed layer, then this complete matrix:
+
+```sh
+npx tsc --noEmit
+npm test -- src/lib/service-status.test.ts server/handlers/service-status.test.ts server/handlers/admin-service-status.test.ts src/pages/StatusPage.test.tsx src/pages/admin/optimization/QueueMonitorPanel.test.tsx server/process-hooks.test.ts server/storage/schema.test.ts
+npm run test:postgres
+npm run build:web
+npm run build:server:public
+npm run check:api
+npm run check:copy
+npm run check:public-export
+npm run check:architecture
+npm run check:dead-code
+npm run check:migration
+node scripts/check-server-routes.mjs
+git diff --check
+```
+
+If the sampler or queue snapshot changes, also run all queue, worker lifecycle,
+dispatcher, retry, and optimization storage tests, plus
+`node scripts/check-api-handlers.mjs`. If request policy, route declarations,
+authentication, or security-boundary code changes, run matching security
+boundary tests and `npm run check:public-http`. If schema or migration
+contracts change, read `docs/database-migration.md`, run the PostgreSQL suite
+and migration gate, and verify that the schema version is new.
 
 ## Failure handling and completion
 

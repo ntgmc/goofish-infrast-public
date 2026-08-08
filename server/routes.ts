@@ -41,6 +41,7 @@ import usageStatsHandler from './handlers/usage-stats'
 import siteFeaturesHandler from './handlers/site-features'
 import sitePublicContentHandler from './handlers/site-public-content'
 import serviceStatusHandler from './handlers/service-status'
+import adminServiceStatusHandler from './handlers/admin-service-status'
 import { enforceFeatureGate } from './feature-gate'
 import { checkPostgresHealth, hasDatabaseUrl } from './storage/postgres'
 import { applyHttpSecurityHeaders, isSecureWebRequest } from './security/http-security'
@@ -62,6 +63,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/public-content', adminPublicContentHandler as unknown as ApiHandler],
   ['/api/admin/registration-invitations', adminRegistrationInvitationsHandler as unknown as ApiHandler],
   ['/api/admin/optimization', adminOptimizationHandler as unknown as ApiHandler],
+  ['/api/admin/service-status', adminServiceStatusHandler as unknown as ApiHandler],
   ['/api/admin/session', adminSessionHandler as unknown as ApiHandler],
   ['/api/admin/users', adminUsersHandler as unknown as ApiHandler],
   ['/api/admin/items', adminItemsHandler as unknown as ApiHandler],

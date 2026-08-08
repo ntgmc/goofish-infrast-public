@@ -4,6 +4,7 @@ const expectedRoutes = [
   '/api/admin/invitation-settings',
   '/api/admin/registration-settings',
   '/api/admin/optimization',
+  '/api/admin/service-status',
   '/api/admin/users',
   '/api/admin/announcement',
   '/api/admin/commercial',
