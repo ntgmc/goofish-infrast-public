@@ -251,7 +251,7 @@ export default function WorkspaceSetupPage({
         </LayoutGroup>
         <nav className="absolute bottom-5 left-4 right-4 grid grid-cols-2 gap-2" aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_018_account_actions}>
           <button type="button" onClick={onBack} className="tool-secondary-action w-full">{copy.workspace.pages_tool_WorkspaceSetupPage_017}</button>
-          <button type="button" onClick={onLogout} className="tool-secondary-action w-full">{copy.workspace.pages_tool_WorkspaceSetupPage_018}</button>
+          <button type="button" onClick={onLogout} className="tool-danger-action w-full">{copy.workspace.pages_tool_WorkspaceSetupPage_018}</button>
         </nav>
       </aside>
 

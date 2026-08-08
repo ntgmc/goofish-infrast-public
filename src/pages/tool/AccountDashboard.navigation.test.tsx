@@ -98,6 +98,7 @@ describe('AccountDashboard route navigation', () => {
     const homeLink = within(accountActions).getByRole('link', { name: '返回首页' })
     const logoutButton = within(accountActions).getByRole('button', { name: '退出登录' })
     expect(accountActions).toHaveClass('grid-cols-2', 'gap-2')
+    expect(logoutButton).toHaveClass('tool-danger-action')
     expect(homeLink).toHaveAttribute('href', '/')
     expect(accountActions).toContainElement(logoutButton)
 
@@ -108,6 +109,23 @@ describe('AccountDashboard route navigation', () => {
     await user.click(homeLink)
     expect(await screen.findByRole('heading', { name: '主页' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/')
+  })
+
+  it('keeps the home action available on non-profile dashboard tabs', async () => {
+    window.localStorage.setItem(tourStorageKey('dashboard-overview', 1), 'done')
+    const user = userEvent.setup()
+    const router = createMemoryRouter([
+      { path: '/tool/*', element: <DashboardRouteHarness /> },
+      { path: '/', element: <h1>主页</h1> },
+    ], { initialEntries: ['/tool/tools'] })
+
+    render(<RouterProvider router={router} />)
+
+    const accountActions = screen.getByRole('navigation', { name: '账号操作' })
+    expect(within(accountActions).getByRole('link', { name: '返回首页' })).toHaveAttribute('href', '/')
+
+    await user.click(screen.getByRole('button', { name: '打开栏目菜单' }))
+    expect(screen.getByRole('menuitem', { name: '返回首页' })).toHaveAttribute('href', '/')
   })
 
   it('pushes the profiles route from the inventory success action', async () => {

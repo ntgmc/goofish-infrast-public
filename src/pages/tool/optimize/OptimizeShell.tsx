@@ -20,6 +20,7 @@ export default function OptimizeShell({
   onSectionChange,
   onOpenTour,
   onReset,
+  onLogout,
   children,
 }: {
   section: OptimizeSection
@@ -31,6 +32,7 @@ export default function OptimizeShell({
   onSectionChange: (section: OptimizeSection) => void
   onOpenTour: () => void
   onReset: () => void
+  onLogout: () => void
   children: ReactNode
 }) {
   const sections = OPTIMIZE_SECTIONS.filter((item) => item.id !== 'lab' || showScenarioLab)
@@ -68,9 +70,10 @@ export default function OptimizeShell({
           </nav>
         </LayoutGroup>
 
-        <div className="absolute inset-x-4 bottom-5 border-t border-surface-3 pt-4">
+        <nav className="absolute inset-x-4 bottom-5 grid grid-cols-2 gap-2 border-t border-surface-3 pt-4" aria-label={copy.common.pages_tool_AccountDashboard_017}>
           <button type="button" onClick={onReset} className="tool-secondary-action w-full">{copy.optimize.pages_tool_optimize_OptimizeShell_003}</button>
-        </div>
+          <button type="button" onClick={onLogout} className="tool-danger-action w-full">{copy.common.pages_tool_AccountDashboard_009}</button>
+        </nav>
       </aside>
 
       <main className="lg:pl-64" tabIndex={-1} data-route-focus>
@@ -97,7 +100,8 @@ export default function OptimizeShell({
                   })),
                   { type: 'separator' as const, id: 'actions' },
                   { type: 'button' as const, id: 'tour', label: copy.optimize.pages_tool_optimize_tour_001, onSelect: onOpenTour },
-                  { type: 'button' as const, id: 'reset', label: copy.optimize.pages_tool_optimize_OptimizeShell_005, intent: 'danger' as const, onSelect: onReset },
+                  { type: 'button' as const, id: 'reset', label: copy.optimize.pages_tool_optimize_OptimizeShell_005, onSelect: onReset },
+                  { type: 'button' as const, id: 'logout', label: copy.common.pages_tool_AccountDashboard_013, intent: 'danger' as const, onSelect: onLogout },
                 ]}
               />
             </div>

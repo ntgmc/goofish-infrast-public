@@ -43,6 +43,7 @@ export interface Props {
   section: OptimizeSection;
   onSectionChange: (section: OptimizeSection) => void;
   onReset: () => void;
+  onLogout: () => void;
   announcement: Announcement | null;
   redeemedNotice: string | null;
   onProfileUpgraded: (payload: AuthSuccessResponse) => void;

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -14,6 +14,7 @@ describe('OptimizeShell compact navigation', () => {
     const onSectionChange = vi.fn()
     const onOpenTour = vi.fn()
     const onReset = vi.fn()
+    const onLogout = vi.fn()
     render(
       <MemoryRouter>
       <OptimizeShell
@@ -24,6 +25,7 @@ describe('OptimizeShell compact navigation', () => {
         onSectionChange={onSectionChange}
         onOpenTour={onOpenTour}
         onReset={onReset}
+        onLogout={onLogout}
         headerActions={<button type="button">桌面任务中心</button>}
         compactHeaderActions={<button type="button" aria-label="移动任务中心" className="h-11 w-11" />}
       >
@@ -33,6 +35,9 @@ describe('OptimizeShell compact navigation', () => {
     )
 
     expect(screen.getByRole('button', { name: '移动任务中心' })).toHaveClass('h-11', 'w-11')
+    const accountActions = screen.getByRole('navigation', { name: '账号操作' })
+    expect(within(accountActions).getByRole('button', { name: '返回数据空间' })).not.toHaveClass('tool-danger-action')
+    expect(within(accountActions).getByRole('button', { name: '退出登录' })).toHaveClass('tool-danger-action')
     await user.click(screen.getByRole('button', { name: '打开栏目菜单' }))
     expect(screen.getByRole('menuitem', { name: /排班结果.*已有结果/ })).toBeInTheDocument()
     await user.click(screen.getByRole('menuitem', { name: /排班结果.*已有结果/ }))
@@ -44,9 +49,15 @@ describe('OptimizeShell compact navigation', () => {
 
     await user.click(screen.getByRole('button', { name: '打开栏目菜单' }))
     const reset = screen.getByRole('menuitem', { name: '返回数据空间' })
-    expect(reset).toHaveClass('text-error')
+    expect(reset).not.toHaveClass('text-error')
     await user.click(reset)
     expect(onReset).toHaveBeenCalledOnce()
+
+    await user.click(screen.getByRole('button', { name: '打开栏目菜单' }))
+    const logout = screen.getByRole('menuitem', { name: '退出登录' })
+    expect(logout).toHaveClass('text-error')
+    await user.click(logout)
+    expect(onLogout).toHaveBeenCalledOnce()
 
     expect(screen.getByRole('navigation', { name: '排班工作台分区' })).toBeInTheDocument()
   })
