@@ -14,6 +14,7 @@ import {
 } from '../lib/app-routes'
 import AccountDashboard from './tool/AccountDashboard'
 import AuthPage from './tool/AuthPage'
+import ProfileUpgradePrompt from './tool/ProfileUpgradePrompt'
 import WorkspaceSetupPage from './tool/WorkspaceSetupPage'
 import { isSchedulableProfile } from './tool/tool-utils'
 import { useToolSession } from './tool/useToolSession'
@@ -117,34 +118,46 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
   }
   const navigateSetup = (section: WorkspaceSetupSection) => navigateToToolPath(profileScopedPath(workspaceSetupPath(section), activeProfile?.id))
   const navigateOptimize = (section: OptimizeSection) => navigateToToolPath(profileScopedPath(optimizePath(section), activeProfile?.id))
+  const profileUpgradePrompt = (
+    <ProfileUpgradePrompt
+      userId={user.id}
+      profile={activeCdkProfile}
+      inventoryEnabled={features.inventory}
+      currentPath={location.pathname}
+      onOpenInventory={() => navigateDashboard('inventory')}
+    />
+  )
 
   if (route.kind === 'dashboard') {
     const requiredFeature = dashboardFeature(route.section, features)
     if (requiredFeature) return <FeatureUnavailablePage feature={requiredFeature} />
     return (
-      <NotificationCenterProvider userId={user.id}>
-        {features.announcements && <AnnouncementPopup announcements={popups} userId={user.id} onUnreadCountChange={setAnnouncementUnreadCount} />}
-        <AccountDashboard
-          user={user}
-          profiles={cdkProfiles}
-          activeProfile={activeCdkProfile}
-          announcement={banner}
-          announcementUnreadCount={announcementUnreadCount}
-          onAnnouncementUnreadCountChange={setAnnouncementUnreadCount}
-          openingProfileId={openingProfileId}
-          workspaceLoadError={workspaceLoadError}
-          section={route.section}
-          onSectionChange={navigateDashboard}
-          onLogout={handleLogout}
-          onPayload={applyAuthPayload}
-          onOpenProfile={(profile) => {
-            void refreshProfileWorkspace(profile)
-              .then(() => navigate(profileScopedPath(workspaceSetupPath('operators'), profile.id)))
-              .catch(console.error)
-          }}
-          features={features}
-        />
-      </NotificationCenterProvider>
+      <>
+        <NotificationCenterProvider userId={user.id}>
+          {features.announcements && <AnnouncementPopup announcements={popups} userId={user.id} onUnreadCountChange={setAnnouncementUnreadCount} />}
+          <AccountDashboard
+            user={user}
+            profiles={cdkProfiles}
+            activeProfile={activeCdkProfile}
+            announcement={banner}
+            announcementUnreadCount={announcementUnreadCount}
+            onAnnouncementUnreadCountChange={setAnnouncementUnreadCount}
+            openingProfileId={openingProfileId}
+            workspaceLoadError={workspaceLoadError}
+            section={route.section}
+            onSectionChange={navigateDashboard}
+            onLogout={handleLogout}
+            onPayload={applyAuthPayload}
+            onOpenProfile={(profile) => {
+              void refreshProfileWorkspace(profile)
+                .then(() => navigate(profileScopedPath(workspaceSetupPath('operators'), profile.id)))
+                .catch(console.error)
+            }}
+            features={features}
+          />
+        </NotificationCenterProvider>
+        {profileUpgradePrompt}
+      </>
     )
   }
 
@@ -156,27 +169,30 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
     if (!features.profiles) return <FeatureUnavailablePage feature="profiles" />
     if (route.section === 'cdk' && !features.cdk_redemption) return <FeatureUnavailablePage feature="cdk_redemption" />
     return (
-      <PublicContentProvider>
-        <NotificationCenterProvider userId={user.id}>
-          {features.announcements && <AnnouncementPopup announcements={popups} userId={user.id} onUnreadCountChange={setAnnouncementUnreadCount} />}
-          <WorkspaceSetupPage
-            user={user}
-            profile={activeProfile}
-            workspace={workspace}
-            announcement={banner}
-            activeSection={route.section}
-            onSectionChange={navigateSetup}
-            onSaved={(payload) => {
-              applyAuthPayload(payload)
-              navigate(profileScopedPath(optimizePath('overview'), activeProfile.id))
-            }}
-            onSynced={applyAuthPayload}
-            onBack={() => navigate(dashboardPath('profiles'))}
-            onRedeemNewProfile={() => navigate(dashboardPath('redeem'))}
-            onLogout={handleLogout}
-          />
-        </NotificationCenterProvider>
-      </PublicContentProvider>
+      <>
+        <PublicContentProvider>
+          <NotificationCenterProvider userId={user.id}>
+            {features.announcements && <AnnouncementPopup announcements={popups} userId={user.id} onUnreadCountChange={setAnnouncementUnreadCount} />}
+            <WorkspaceSetupPage
+              user={user}
+              profile={activeProfile}
+              workspace={workspace}
+              announcement={banner}
+              activeSection={route.section}
+              onSectionChange={navigateSetup}
+              onSaved={(payload) => {
+                applyAuthPayload(payload)
+                navigate(profileScopedPath(optimizePath('overview'), activeProfile.id))
+              }}
+              onSynced={applyAuthPayload}
+              onBack={() => navigate(dashboardPath('profiles'))}
+              onRedeemNewProfile={() => navigate(dashboardPath('redeem'))}
+              onLogout={handleLogout}
+            />
+          </NotificationCenterProvider>
+        </PublicContentProvider>
+        {profileUpgradePrompt}
+      </>
     )
   }
 
@@ -189,32 +205,35 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
   }
 
   return (
-    <NotificationCenterProvider userId={user.id}>
-      {features.announcements && <AnnouncementPopup announcements={popups} userId={user.id} onUnreadCountChange={setAnnouncementUnreadCount} />}
-      <Suspense fallback={<SessionLoader label={copy.common.pages_ToolPage_002} />}>
-        <OptimizePage
-          profileId={activeProfile.id}
-          profile={activeProfile}
-          license={license}
-          workspace={workspace}
-          setLicense={setLicense}
-          eliteOverrides={eliteOverrides}
-          configOverride={configOverride}
-          setConfigOverride={setConfigOverride}
-          configSyncStatus={configSyncStatus}
-          flushConfigSave={flushConfigSave}
-          retryConfigSave={retryConfigSave}
-          onWorkspacePatch={persistWorkspacePatch}
-          onWorkspaceUpdated={applyWorkspaceSnapshot}
-          section={route.section}
-          onSectionChange={navigateOptimize}
-          onReset={() => navigate(profileScopedPath(workspaceSetupPath('operators'), activeProfile.id))}
-          announcement={banner}
-          redeemedNotice={null}
-          onProfileUpgraded={applyAuthPayload}
-        />
-      </Suspense>
-    </NotificationCenterProvider>
+    <>
+      <NotificationCenterProvider userId={user.id}>
+        {features.announcements && <AnnouncementPopup announcements={popups} userId={user.id} onUnreadCountChange={setAnnouncementUnreadCount} />}
+        <Suspense fallback={<SessionLoader label={copy.common.pages_ToolPage_002} />}>
+          <OptimizePage
+            profileId={activeProfile.id}
+            profile={activeProfile}
+            license={license}
+            workspace={workspace}
+            setLicense={setLicense}
+            eliteOverrides={eliteOverrides}
+            configOverride={configOverride}
+            setConfigOverride={setConfigOverride}
+            configSyncStatus={configSyncStatus}
+            flushConfigSave={flushConfigSave}
+            retryConfigSave={retryConfigSave}
+            onWorkspacePatch={persistWorkspacePatch}
+            onWorkspaceUpdated={applyWorkspaceSnapshot}
+            section={route.section}
+            onSectionChange={navigateOptimize}
+            onReset={() => navigate(profileScopedPath(workspaceSetupPath('operators'), activeProfile.id))}
+            announcement={banner}
+            redeemedNotice={null}
+            onProfileUpgraded={applyAuthPayload}
+          />
+        </Suspense>
+      </NotificationCenterProvider>
+      {profileUpgradePrompt}
+    </>
   )
 }
 
