@@ -8,7 +8,11 @@ import ThemeSwitcher from '../components/ThemeSwitcher'
 import { copy } from '../copy/index'
 import {
   QUEUE_CONGESTION_THRESHOLD,
+  SERVICE_STATUS_HISTORY_HOURS,
   SERVICE_STATUS_LEVELS,
+  type PublicStatusIncident,
+  type ServiceStatusHistoryBucket,
+  type ServiceStatusHistoryLevel,
   type ServiceStatusLevel,
   type ServiceStatusResponse,
 } from '../lib/service-status'
@@ -21,6 +25,14 @@ const UNAVAILABLE_STATUS: ServiceStatusResponse = {
   queue: null,
   components: [{ id: 'optimization', status: 'unavailable' }],
   thresholds: { queue_congested_at: QUEUE_CONGESTION_THRESHOLD },
+  history: {
+    from: new Date(0).toISOString(),
+    to: new Date(0).toISOString(),
+    interval: 'hour',
+    complete: false,
+    buckets: [],
+  },
+  incidents: [],
 }
 
 export default function StatusPage() {
@@ -44,7 +56,7 @@ export default function StatusPage() {
       const payload = await response.json() as unknown
       if (controller.signal.aborted) return
       if (!isServiceStatusResponse(payload)) throw new Error('invalid_status_response')
-      setStatus(payload)
+      setStatus(normalizeStatusResponse(payload))
       setError(!response.ok)
     } catch {
       if (controller.signal.aborted) return
@@ -75,7 +87,6 @@ export default function StatusPage() {
   }, [loadStatus])
 
   const currentStatus = status ?? UNAVAILABLE_STATUS
-  const queue = currentStatus.queue
   const optimizationStatus = currentStatus.components[0]?.status ?? currentStatus.status
   const statusMessage = status ? statusMessageFor(status.status) : copy.status.pages_StatusPage_024
 
@@ -140,13 +151,11 @@ export default function StatusPage() {
                 </div>
                 <ServiceStatusBadge level={optimizationStatus} compact />
               </div>
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                <StatusMetric label={copy.status.pages_StatusPage_011} value={queue?.queued} suffix={copy.status.pages_StatusPage_029} />
-                <StatusMetric label={copy.status.pages_StatusPage_012} value={queue?.running} suffix={copy.status.pages_StatusPage_029} />
-                <StatusMetric label={copy.status.pages_StatusPage_013} value={queue?.worker_concurrency} suffix={copy.status.pages_StatusPage_030} />
-              </div>
             </article>
           </section>
+
+          <StatusHistorySection history={currentStatus.history} />
+          <StatusIncidentSection incidents={currentStatus.incidents} />
 
           <section className="mt-12 status-reading-measure" aria-labelledby="status-rules-title">
             <h2 id="status-rules-title" className="text-2xl font-semibold text-ink-primary">{copy.status.pages_StatusPage_015}</h2>
@@ -162,16 +171,6 @@ export default function StatusPage() {
       </div>
       <PublicFooter variant="tool" />
     </main>
-  )
-}
-
-function StatusMetric({ label, value, suffix }: { label: string; value: number | undefined; suffix: string }) {
-  return (
-    <div className="tool-inset px-4 py-4">
-      <p className="text-xs font-semibold tracking-wide text-ink-muted">{label}</p>
-      <p className="mt-2 text-3xl font-semibold tabular-nums text-ink-primary">{value ?? '—'}</p>
-      <p className="mt-1 text-xs text-ink-muted">{value === undefined ? '' : suffix}</p>
-    </div>
   )
 }
 
@@ -193,10 +192,95 @@ function isServiceStatusResponse(value: unknown): value is ServiceStatusResponse
     && Array.isArray(candidate.components)
 }
 
+function normalizeStatusResponse(value: ServiceStatusResponse): ServiceStatusResponse {
+  return {
+    ...value,
+    history: value.history ?? { from: new Date(0).toISOString(), to: new Date(0).toISOString(), interval: 'hour', complete: false, buckets: [] },
+    incidents: Array.isArray(value.incidents) ? value.incidents : [],
+  }
+}
+
+function StatusHistorySection({ history }: { history: ServiceStatusResponse['history'] }) {
+  const cells = createHistoryCells(history)
+  const rows = Array.from({ length: 30 }, (_, index) => cells.slice(index * 24, (index + 1) * 24))
+  const sampled = history.buckets.reduce((sum, bucket) => sum + bucket.sample_count, 0)
+  return (
+    <section className="mt-12 status-reading-measure" aria-labelledby="status-history-title">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div><p className="public-kicker">{copy.status.pages_StatusPage_036}</p><h2 id="status-history-title" className="mt-2 text-2xl font-semibold text-ink-primary">{copy.status.pages_StatusPage_037}</h2></div>
+        <span className="text-sm text-ink-muted">{formatHistoryRange(history.from, history.to)}</span>
+      </div>
+      <div className="tool-panel mt-5 overflow-hidden p-4 sm:p-5">
+        <p className="text-sm leading-7 text-ink-secondary">{copy.status.pages_StatusPage_038}{history.complete ? `${copy.status.pages_StatusPage_039} ${sampled} ${copy.status.pages_StatusPage_040}` : copy.status.pages_StatusPage_041}</p>
+        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-ink-muted" aria-label={copy.status.pages_StatusPage_042}>
+          {(['available', 'busy', 'congested', 'unavailable', 'unknown'] as const).map((level) => <span key={level} className="inline-flex items-center gap-1.5"><span className={`service-status-history-swatch service-status-history-cell--${level}`} aria-hidden="true" />{statusLabel(level)}</span>)}
+        </div>
+        <div className="service-status-history-scroll mt-5" tabIndex={0} aria-label={copy.status.pages_StatusPage_043}>
+          <div className="service-status-history-grid" role="grid" aria-rowcount={rows.length}>
+            {rows.map((row, rowIndex) => <div className="service-status-history-row" role="row" key={rowIndex}>
+              <span className="service-status-history-day" aria-hidden="true">{formatDay(row[0]?.bucket_start)}</span>
+              {row.map((cell) => <span key={cell.bucket_start} role="gridcell" tabIndex={0} title={historyCellLabel(cell)} aria-label={historyCellLabel(cell)} className={`service-status-history-cell service-status-history-cell--${cell.status}`} />)}
+            </div>)}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function StatusIncidentSection({ incidents }: { incidents: PublicStatusIncident[] }) {
+  const active = incidents.filter((incident) => incident.status !== 'resolved')
+  const resolved = incidents.filter((incident) => incident.status === 'resolved')
+  return (
+    <section className="mt-12 status-reading-measure" aria-labelledby="status-incidents-title">
+      <p className="public-kicker">{copy.status.pages_StatusPage_044}</p><h2 id="status-incidents-title" className="mt-2 text-2xl font-semibold text-ink-primary">{copy.status.pages_StatusPage_045}</h2>
+      {incidents.length === 0 ? <p className="mt-5 text-sm leading-7 text-ink-muted">{copy.status.pages_StatusPage_046}</p> : <div className="mt-5 space-y-4">{[...active, ...resolved].map((incident) => <IncidentCard incident={incident} key={incident.id} />)}</div>}
+    </section>
+  )
+}
+
+function IncidentCard({ incident }: { incident: PublicStatusIncident }) {
+  return (
+    <article className={`tool-panel border-l-4 p-5 ${incident.status === 'resolved' ? 'border-l-success' : incident.impact === 'critical' ? 'border-l-error' : incident.impact === 'major' ? 'border-l-warning' : 'border-l-brand-500'}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-base font-semibold text-ink-primary">{incident.title}</h3><p className="mt-1 text-xs text-ink-muted">{incidentImpactLabel(incident.impact)} · {copy.status.pages_StatusPage_047} {formatUpdatedAt(incident.started_at)}</p></div><span className="tool-status">{incidentStatusLabel(incident.status)}</span></div>
+      <ol className="mt-4 space-y-3 border-l border-surface-3 pl-4">{incident.updates.map((update) => <li key={update.id} className="relative text-sm leading-6 text-ink-secondary"><span className="absolute -left-[1.35rem] top-2 h-2 w-2 rounded-full bg-brand-500" aria-hidden="true" /><p>{update.body}</p><time className="text-xs text-ink-muted" dateTime={update.created_at}>{incidentStatusLabel(update.status)} · {formatUpdatedAt(update.created_at)}</time></li>)}</ol>
+    </article>
+  )
+}
+
+function createHistoryCells(history: ServiceStatusResponse['history']): ServiceStatusHistoryBucket[] {
+  const end = Date.parse(history.to); const start = Date.parse(history.from)
+  const lookup = new Map(history.buckets.map((bucket) => [bucket.bucket_start, bucket]))
+  const cells: ServiceStatusHistoryBucket[] = []
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return Array.from({ length: SERVICE_STATUS_HISTORY_HOURS }, (_, index) => ({ component_id: 'optimization', bucket_start: new Date(index * 3600000).toISOString(), status: 'unknown', sample_count: 0, availability_percent: null }))
+  for (let timestamp = start; timestamp < end; timestamp += 3600000) {
+    const bucketStart = new Date(timestamp).toISOString()
+    cells.push(lookup.get(bucketStart) ?? { component_id: 'optimization', bucket_start: bucketStart, status: 'unknown', sample_count: 0, availability_percent: null })
+  }
+  while (cells.length < SERVICE_STATUS_HISTORY_HOURS) {
+    const first = Date.parse(cells[0]?.bucket_start ?? new Date(end).toISOString()) - 3600000
+    cells.unshift({ component_id: 'optimization', bucket_start: new Date(first).toISOString(), status: 'unknown', sample_count: 0, availability_percent: null })
+  }
+  return cells.slice(-SERVICE_STATUS_HISTORY_HOURS)
+}
+
+function historyCellLabel(cell: ServiceStatusHistoryBucket): string {
+  const start = Date.parse(cell.bucket_start); const end = new Date(start + 3600000)
+  const range = `${new Date(start).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })}–${end.toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })}`
+  return `${range}，${statusLabel(cell.status)}，${copy.status.pages_StatusPage_048} ${cell.sample_count}，${copy.status.pages_StatusPage_049} ${cell.availability_percent === null ? copy.status.pages_StatusPage_050 : `${cell.availability_percent}%`}`
+}
+
+function formatHistoryRange(from: string, to: string): string { return `${formatDateInProjectTimezone(from)} – ${formatDateInProjectTimezone(to)}` }
+function formatDateInProjectTimezone(value: string): string { const timestamp = Date.parse(value); return Number.isFinite(timestamp) ? new Date(timestamp).toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' }) : copy.status.pages_StatusPage_051 }
+function formatDay(value: string | undefined): string { if (!value) return ''; const timestamp = Date.parse(value); return Number.isFinite(timestamp) ? new Date(timestamp).toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', month: 'numeric', day: 'numeric' }) : '' }
+function statusLabel(level: ServiceStatusHistoryLevel): string { return ({ available: copy.status.pages_StatusPage_052, busy: copy.status.pages_StatusPage_053, congested: copy.status.pages_StatusPage_054, unavailable: copy.status.pages_StatusPage_055, unknown: copy.status.pages_StatusPage_050 } as const)[level] }
+function incidentStatusLabel(status: PublicStatusIncident['status']): string { return ({ investigating: copy.status.pages_StatusPage_056, identified: copy.status.pages_StatusPage_057, monitoring: copy.status.pages_StatusPage_058, resolved: copy.status.pages_StatusPage_059 } as const)[status] }
+function incidentImpactLabel(impact: PublicStatusIncident['impact']): string { return ({ minor: copy.status.pages_StatusPage_060, major: copy.status.pages_StatusPage_061, critical: copy.status.pages_StatusPage_062 } as const)[impact] }
+
 function formatUpdatedAt(value: string): string {
   const timestamp = Date.parse(value)
   if (!Number.isFinite(timestamp) || timestamp === 0) return copy.status.pages_StatusPage_024
-  return new Date(timestamp).toLocaleString('zh-CN', { hour12: false })
+  return new Date(timestamp).toLocaleString('zh-CN', { hour12: false, timeZone: 'Asia/Shanghai' })
 }
 
 function statusMessageFor(level: ServiceStatusLevel): string {
