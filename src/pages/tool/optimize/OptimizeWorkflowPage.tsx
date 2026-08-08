@@ -110,6 +110,8 @@ export default function OptimizeWorkflowPage(props: Props) {
   return (
       <OptimizeShell
         section={section}
+        profileId={profile.id}
+        profileLabel={profile.display_name}
         permissionLabel={getProfileAccessLabel(profile)}
         showScenarioLab={userCanUseScenarioLab && features.schedule_generation}
         badges={{ result: hasResult ? copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_001 : undefined }}

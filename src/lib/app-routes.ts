@@ -93,6 +93,12 @@ export function adminPath(section: AdminSection): string {
   return adminPaths[section]
 }
 
+export function profileScopedPath(path: string, profileId?: string | null): string {
+  if (!profileId) return path
+  const separator = path.includes('?') ? '&' : '?'
+  return path + separator + new URLSearchParams({ profile_id: profileId })
+}
+
 export function resolveToolRoute(pathname: string): ToolRoute | null {
   const path = normalizePath(pathname)
   const dashboardSection = entryForValue(dashboardPaths, path)

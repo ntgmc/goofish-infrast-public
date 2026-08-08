@@ -5,13 +5,17 @@ import CompactHeaderMenu from '../../../components/CompactHeaderMenu'
 import DeferredFeatureMenu from '../../../components/DeferredFeatureMenu'
 import { AnimatedPresenceRegion, MotionNavIndicator } from '../../../components/MotionPrimitives'
 import ThemeSwitcher from '../../../components/ThemeSwitcher'
+import ToolBreadcrumbs from '../../../components/ToolBreadcrumbs'
 import { OPTIMIZE_SECTIONS, type OptimizeSection } from './types'
 import { copy } from '../../../copy/index'
 import { NotificationBell } from '../../../components/NotificationCenter'
+import { dashboardPath, optimizePath, profileScopedPath } from '../../../lib/app-routes'
 
 
 export default function OptimizeShell({
   section,
+  profileId,
+  profileLabel,
   permissionLabel,
   badges,
   headerActions,
@@ -24,6 +28,8 @@ export default function OptimizeShell({
   children,
 }: {
   section: OptimizeSection
+  profileId: string
+  profileLabel: string
   permissionLabel: string
   badges?: Partial<Record<OptimizeSection, string>>
   headerActions?: ReactNode
@@ -117,7 +123,15 @@ export default function OptimizeShell({
             <div className="flex min-w-0 items-start gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="section-index">{copy.optimize.pages_tool_optimize_OptimizeShell_004}</p>
+                  <ToolBreadcrumbs
+                    items={[
+                      { id: 'home', label: copy.common.components_ToolBreadcrumbs_002, to: '/' },
+                      { id: 'profiles', label: copy.common.components_ToolBreadcrumbs_003, to: dashboardPath('profiles') },
+                      { id: 'profile', label: profileLabel, to: profileScopedPath(dashboardPath('profiles'), profileId) },
+                      { id: 'optimize', label: copy.optimize.pages_tool_optimize_OptimizeShell_001, to: profileScopedPath(optimizePath('overview'), profileId) },
+                      { id: 'current', label: current.label },
+                    ]}
+                  />
                   <span className="tool-status tool-status--current">{permissionLabel}</span>
                 </div>
                 <h1 className="display-title mt-1 text-xl text-ink-primary">{current.label}</h1>

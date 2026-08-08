@@ -13,6 +13,12 @@ export const commonCopy = {
   components_CompactHeaderMenu_001: "打开栏目菜单",
   // src/components/CompactHeaderMenu.tsx
   components_CompactHeaderMenu_002: "更多操作",
+  // src/components/ToolBreadcrumbs.tsx
+  components_ToolBreadcrumbs_001: "面包屑",
+  // src/components/ToolBreadcrumbs.tsx
+  components_ToolBreadcrumbs_002: "首页",
+  // src/components/ToolBreadcrumbs.tsx
+  components_ToolBreadcrumbs_003: "游戏账号",
   // src/App.tsx
   App_001: "正在载入工作台...",
   // src/App.tsx

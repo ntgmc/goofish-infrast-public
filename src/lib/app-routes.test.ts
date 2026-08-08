@@ -10,6 +10,7 @@ import {
   fallbackToolPath,
   isAppRoutePath,
   optimizePath,
+  profileScopedPath,
   resolveAdminSection,
   resolveToolRoute,
   workspaceSetupPath,
@@ -43,6 +44,12 @@ describe('app route contract', () => {
     expect(fallbackToolPath('/tool/setup/unknown')).toBe('/tool/setup/operators')
     expect(fallbackToolPath('/tool/optimize')).toBe('/tool/optimize/overview')
     expect(fallbackToolPath('/tool/optimize/unknown')).toBe('/tool/optimize/overview')
+  })
+
+  it('builds profile-scoped paths without dropping existing query parameters', () => {
+    expect(profileScopedPath('/tool/profiles')).toBe('/tool/profiles')
+    expect(profileScopedPath('/tool/profiles', 'profile 1')).toBe('/tool/profiles?profile_id=profile+1')
+    expect(profileScopedPath('/tool/profiles?source=breadcrumb', 'profile-1')).toBe('/tool/profiles?source=breadcrumb&profile_id=profile-1')
   })
 
   it('normalizes admin paths without treating the standalone setup page as a section', () => {

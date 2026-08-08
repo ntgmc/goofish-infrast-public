@@ -240,8 +240,6 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/OptimizeShell.tsx
   pages_tool_optimize_OptimizeShell_003: "返回数据空间",
   // src/pages/tool/optimize/OptimizeShell.tsx
-  pages_tool_optimize_OptimizeShell_004: "排班工作区",
-  // src/pages/tool/optimize/OptimizeShell.tsx
   pages_tool_optimize_OptimizeShell_005: "返回数据空间",
   // src/pages/tool/optimize/OptimizeShell.tsx
   pages_tool_optimize_OptimizeShell_006: "移动端排班工作台分区",

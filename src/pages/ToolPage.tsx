@@ -6,6 +6,7 @@ import {
   dashboardPath,
   fallbackToolPath,
   optimizePath,
+  profileScopedPath,
   resolveToolRoute,
   workspaceSetupPath,
   type DashboardSection,
@@ -246,9 +247,4 @@ function dashboardFeature(section: DashboardSection, features: SiteFeatures) {
   if (section === 'inventory' && !features.inventory) return 'inventory' as const
   if (section === 'announcements' && !features.announcements) return 'announcements' as const
   return null
-}
-
-function profileScopedPath(path: string, profileId?: string | null): string {
-  if (!profileId) return path
-  return `${path}?${new URLSearchParams({ profile_id: profileId })}`
 }
