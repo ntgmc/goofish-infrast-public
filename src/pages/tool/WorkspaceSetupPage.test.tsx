@@ -191,6 +191,17 @@ describe('WorkspaceSetupPage CDK paths', () => {
     expect(screen.getAllByRole('button', { name: '返回账号列表' })).toHaveLength(1)
   })
 
+  it('renders the business workflow breadcrumb with the active profile context', () => {
+    renderWorkspace({ profile: createAdvancedProfile() })
+
+    const breadcrumb = screen.getByRole('navigation', { name: '面包屑' })
+    expect(within(breadcrumb).getByRole('link', { name: '首页' })).toHaveAttribute('href', '/')
+    expect(within(breadcrumb).getByRole('link', { name: '游戏账号' })).toHaveAttribute('href', '/tool/profiles')
+    expect(within(breadcrumb).getByRole('link', { name: '高级档案' })).toHaveAttribute('href', '/tool/profiles?profile_id=advanced-profile')
+    expect(within(breadcrumb).getByRole('link', { name: '工作区设置' })).toHaveAttribute('href', '/tool/setup/operators?profile_id=advanced-profile')
+    expect(within(breadcrumb).getByText('干员数据')).toHaveAttribute('aria-current', 'page')
+  })
+
   it('switches sections and preserves account actions in the compact menu', async () => {
     window.localStorage.setItem(tourStorageKey('workspace-setup', 1), 'done')
     const user = userEvent.setup()
