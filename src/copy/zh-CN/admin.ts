@@ -72,7 +72,7 @@ export const adminCopy = {
   registration_admin_invites_description: '邀请码固定 7 天有效、只能使用一次且不绑定邮箱。系统不会发送邀请邮件。',
   registration_admin_invites_create: '生成邀请码',
   registration_admin_invites_creating: '生成中...',
-  registration_admin_invites_once: '明文邀请码只显示这一次。请立即复制注册链接；丢失后只能撤销并重新生成。',
+  registration_admin_invites_once: '明文邀请码仅在创建时提供，请立即复制注册链接；丢失后需要撤销并重新生成。',
   registration_admin_invites_code: '邀请码',
   registration_admin_invites_link: '注册链接',
   registration_admin_invites_copy: '复制链接',

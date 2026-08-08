@@ -35,7 +35,7 @@ describe('PricingPage', () => {
     expect(screen.getByText('19.6 元 / 183 天')).toBeInTheDocument()
     expect(screen.getByText('31.6 元 / 365 天')).toBeInTheDocument()
     expect(screen.getByText('51.6 元 / 长期')).toBeInTheDocument()
-    expect(screen.getByText('129 元 / 长期')).toBeInTheDocument()
+    expect(screen.getByText(/原价 129 元 \/ 长期/)).toBeInTheDocument()
     expect(screen.queryByText('单次重置卡')).not.toBeInTheDocument()
     expect(screen.queryByText('Admin卡')).not.toBeInTheDocument()
     expect(screen.getByText(/月卡、半年卡、年卡和终身卡 CDK 均仅用于一个游戏账号/)).toBeInTheDocument()

@@ -234,6 +234,10 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_067: "导出的 MAA JSON 会固定宿舍干员，和当前行为一致。",
   // src/components/ConfigEditor.tsx
+  components_ConfigEditor_099: "小时",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_100: "8小时/12小时",
+  // src/components/ConfigEditor.tsx
   components_ConfigEditor_068: "菲亚梅塔",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_069: "游戏内轮换按两班生成，菲亚梅塔不会参与计算。",
@@ -620,7 +624,7 @@ export const commonCopy = {
   // src/pages/AdminSetupPage.tsx
   pages_AdminSetupPage_009: "管理账号设置",
   // src/pages/AdminSetupPage.tsx
-  pages_AdminSetupPage_010: "首次使用管理后台时，请使用 Root 口令创建第一个管理账号；已有账号时，可在这里继续维护。",
+  pages_AdminSetupPage_010: "首次使用管理后台时，请使用 Root 口令创建第一个管理账号；已有账号时，可继续维护。",
   // src/pages/AdminSetupPage.tsx
   pages_AdminSetupPage_011: "返回后台",
   // src/pages/AdminSetupPage.tsx

@@ -12,8 +12,8 @@ export const PUBLIC_PRICING_PLAN_IDS = [
   'single_account_lifetime',
 ] as const
 type PublicPricingPlanId = typeof PUBLIC_PRICING_PLAN_IDS[number]
-const LEGACY_PRICING_EYEBROW = '公开 SKU'
-const LEGACY_PRICING_INTRO = '先了解完整权益与限制，再选择适合自己的版本。现在提供月卡、半年卡、年卡、终身卡，以及个人和商用积分单次排班。'
+const LEGACY_PRICING_EYEBROW = copy.publicContent.legacy_pricing_eyebrow
+const LEGACY_PRICING_INTRO = copy.publicContent.legacy_pricing_intro
 export const PUBLIC_CONTENT_LIMITS = Object.freeze({
   faqItems: 50,
   pricingDisclosures: 30,
@@ -46,7 +46,7 @@ const faqItemSchema = z.strictObject({
 })
 
 const pricingPriceLabel = z.string().trim().max(40).regex(/^\d+(?:\.\d{1,2})?\s*元(?:\s*\/\s*\S.*)?$/, {
-  message: '原价必须使用“数字 元 / 有效期”的格式。',
+  message: copy.publicContent.validation_pricing_price_format,
 })
 const pricingDiscountFold = z.number().int().min(1).max(10)
 
@@ -94,7 +94,7 @@ const defaultPricingPlans = {
   },
   single_account_monthly: {
     label: singleAccountMonthly.label,
-    badge: '低门槛',
+    badge: copy.publicContent.default_pricing_badge_monthly,
     display_price: singleAccountMonthly.display_price!,
     original_price: singleAccountMonthly.original_display_price!,
     discount_fold: singleAccountMonthly.default_discount_fold,
@@ -103,7 +103,7 @@ const defaultPricingPlans = {
   },
   single_account_half_year: {
     label: singleAccountHalfYear.label,
-    badge: '高性价比',
+    badge: copy.publicContent.default_pricing_badge_half_year,
     display_price: singleAccountHalfYear.display_price!,
     original_price: singleAccountHalfYear.original_display_price!,
     discount_fold: singleAccountHalfYear.default_discount_fold,
@@ -112,7 +112,7 @@ const defaultPricingPlans = {
   },
   single_account_annual: {
     label: singleAccountAnnual.label,
-    badge: '年度推荐',
+    badge: copy.publicContent.default_pricing_badge_annual,
     display_price: singleAccountAnnual.display_price!,
     original_price: singleAccountAnnual.original_display_price!,
     discount_fold: singleAccountAnnual.default_discount_fold,
@@ -121,7 +121,7 @@ const defaultPricingPlans = {
   },
   single_account_lifetime: {
     label: singleAccountLifetime.label,
-    badge: '长期方案',
+    badge: copy.publicContent.default_pricing_badge_lifetime,
     display_price: singleAccountLifetime.display_price!,
     original_price: singleAccountLifetime.original_display_price!,
     discount_fold: singleAccountLifetime.default_discount_fold,

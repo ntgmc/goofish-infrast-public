@@ -59,7 +59,7 @@ describe('StatusPage', () => {
 
     expect(screen.getByRole('heading', { name: '过去 30 天' })).toBeInTheDocument()
     expect(screen.getAllByRole('gridcell')).toHaveLength(30 * 24)
-    expect(screen.getByLabelText(/队列拥堵/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/服务繁忙/)).toBeInTheDocument()
     expect(screen.getByText('队列延迟')).toBeInTheDocument()
     expect(screen.getByText('已恢复。')).toBeInTheDocument()
   })
