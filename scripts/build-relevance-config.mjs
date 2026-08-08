@@ -10,7 +10,6 @@ export const BUILD_RELEVANT_FILES = Object.freeze([
   '.github/workflows/record-pr-changelog.yml',
   '.github/workflows/security-analysis.yml',
   'docs/disaster-recovery.md',
-  'docs/netlify-migration-plan.md',
   'docs/release-artifacts.md',
 ])
 

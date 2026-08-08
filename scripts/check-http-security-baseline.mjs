@@ -298,10 +298,7 @@ async function assertNoServerCorsHeaders() {
 }
 
 async function assertDeploymentDocumentation() {
-  for (const path of [
-    'README.md',
-    'docs/netlify-migration-plan.md',
-  ]) {
+  for (const path of ['README.md']) {
     const contents = await readFile(path, 'utf8')
     assert(contents.includes('goofish-security-headers.conf'), `${path} should install the security header snippet`)
     assert(contents.includes('goofish-static-files.conf'), `${path} should install the static Nginx snippet`)
