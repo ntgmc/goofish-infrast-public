@@ -144,6 +144,8 @@ export default function QueueMonitorPanel() {
         )}
       </section>
 
+      <ServiceStatusHistoryPanel />
+
       <QueueFilters filters={filters} sources={sources} onChange={setFilters} />
 
       {snapshot && (
@@ -186,7 +188,6 @@ export default function QueueMonitorPanel() {
       )}
 
       <DeadLetterPanel />
-      <ServiceStatusHistoryPanel />
     </section>
   )
 }
