@@ -232,7 +232,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_069: "游戏内轮换按两班生成，菲亚梅塔不会参与计算。",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_070: "菲亚梅塔仅支持固定 8-8-8 或 12-12-12 换班节奏。",
+  components_ConfigEditor_070: (interval: string) => `启用条件：换班间隔须锁定为${interval}（误差需控制在5分钟以内），否则将引发干员“红脸”状态，导致实际效率低于未启用时的水平。`,
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_071: "无人机",
   // src/components/ConfigEditor.tsx
