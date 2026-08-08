@@ -168,7 +168,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_014: "当前配置与上次生成配置一致。",
   // src/pages/tool/optimize/ConfigSection.tsx
-  pages_tool_optimize_ConfigSection_015: "暂无上次方案可对比。生成一次后，这里会记录会影响结果的配置变化。",
+  pages_tool_optimize_ConfigSection_015: "暂无上次方案可对比。生成一次后，系统会记录影响结果的配置变化。",
   // src/pages/tool/optimize/GenerateControlBar.tsx
   pages_tool_optimize_GenerateControlBar_001: "方案已是最新",
   // src/pages/tool/optimize/GenerateControlBar.tsx
@@ -284,7 +284,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_013: "还没有生成过排班结果",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_014: "生成后会自动保存最近 5 次排班结果，并在这里提供查看、下载和继续调整入口。",
+  pages_tool_optimize_OverviewSection_014: "生成后会自动保存最近 5 次排班结果，可继续查看、下载和调整。",
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_015: "建议后",
   // src/pages/tool/optimize/OverviewSection.tsx
@@ -334,7 +334,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_038: "查看重排检测说明",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_039: "只返回收益区间、影响设施和关键干员摘要，不展示完整新方案。",
+  pages_tool_optimize_OverviewSection_039: "检测结果提供收益区间、影响设施和关键干员摘要；需要完整新方案时可继续生成。",
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_040: "检测中",
   // src/pages/tool/optimize/OverviewSection.tsx
@@ -426,7 +426,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/PlansSection.tsx
   pages_tool_optimize_PlansSection_015: "继续调配置",
   // src/pages/tool/optimize/PlansSection.tsx
-  pages_tool_optimize_PlansSection_016: "生成一次排班后，这里会保留可回看的上次结果。",
+  pages_tool_optimize_PlansSection_016: "生成一次排班后，系统会保留上次结果供回看。",
   // src/pages/tool/optimize/PlansSection.tsx
   pages_tool_optimize_PlansSection_017: "当前方案 vs 上次方案",
   // src/pages/tool/optimize/PlansSection.tsx
@@ -464,7 +464,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/PlansSection.tsx
   pages_tool_optimize_PlansSection_034: "结果记录",
   // src/pages/tool/optimize/ResultSection.tsx
-  pages_tool_optimize_ResultSection_001: "生成后将在这里显示排班结果",
+  pages_tool_optimize_ResultSection_001: "生成后即可查看排班结果",
   // src/pages/tool/optimize/ResultSection.tsx
   pages_tool_optimize_ResultSection_002: "确认总览状态并点击生成，结果会按数据、详情、导入和建议分区展示。",
   // src/pages/tool/optimize/ResultSection.tsx
@@ -965,7 +965,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/OptimizeWorkflowPage.tsx
   pages_tool_optimize_tour_001: "使用导览",
   pages_tool_optimize_tour_002: "排班总览",
-  pages_tool_optimize_tour_003: "检查当前配置和干员状态，并从这里开始第一次排班或重新计算。",
+  pages_tool_optimize_tour_003: "检查当前配置和干员状态，然后开始第一次排班或重新计算。",
   pages_tool_optimize_tour_004: "方案与历史",
   pages_tool_optimize_tour_005: "保存最多 3 套常用配置，回看最近 5 条排班结果，并可恢复当时的配置继续调整。",
   pages_tool_optimize_tour_006: "调整配置",
@@ -975,9 +975,9 @@ export const optimizeCopy = {
   pages_tool_optimize_tour_010: "情景实验室",
   pages_tool_optimize_tour_011: "批量比较多组情景，从图表或表格中选择方案，再把选中配置带回普通优化流程。",
   pages_tool_optimize_tour_012: "确认输入并编辑配置",
-  pages_tool_optimize_tour_013: "这里汇总当前配置、干员数量和结果状态；需要调整参数时可直接进入配置编辑器。",
+  pages_tool_optimize_tour_013: "总览汇总当前配置、干员数量和结果状态；需要调整参数时可直接进入配置编辑器。",
   pages_tool_optimize_tour_014: "开始排班",
-  pages_tool_optimize_tour_015: "使用开始排班或重新计算按钮提交任务；禁用原因、优先券和计算进度也会显示在这里。",
+  pages_tool_optimize_tour_015: "使用开始排班或重新计算按钮提交任务；禁用原因、优先券和计算进度会同步显示。",
   pages_tool_optimize_tour_016: "使用最近一次排班结果",
   pages_tool_optimize_tour_017: "可直接查看排班结果、下载轻量 MAA JSON，或恢复当时配置继续调整。完整历史位于方案与历史页。",
   pages_tool_optimize_tour_018: "保存当前配置",
@@ -991,13 +991,13 @@ export const optimizeCopy = {
   pages_tool_optimize_tour_026: "留意校验与同步",
   pages_tool_optimize_tour_027: "先解决校验问题并等待配置同步完成，再回到总览重新计算。导览不会修改或保存配置。",
   pages_tool_optimize_tour_028: "阅读排班结果",
-  pages_tool_optimize_tour_029: "这里展示当前或选中的历史结果，包括房间安排、轮换与相关分析。",
+  pages_tool_optimize_tour_029: "查看当前或选中的历史结果，包括房间安排、轮换与相关分析。",
   pages_tool_optimize_tour_030: "继续使用结果",
   pages_tool_optimize_tour_031: "权限允许时可下载轻量 MAA JSON、应用升级建议；完整计算数据仅收在数据页签底部的开发者与排障区域。",
   pages_tool_optimize_tour_032: "选择实验因素",
   pages_tool_optimize_tour_033: "设置要比较的班次、策略等因素，并先检查页面计算出的有效组合数量。",
   pages_tool_optimize_tour_034: "开始情景对比",
-  pages_tool_optimize_tour_035: "点击后才会创建实验任务；进度、失败原因和重试信息会在当前页面显示。",
+  pages_tool_optimize_tour_035: "点击后创建实验任务；进度、失败原因和重试信息会同步显示。",
   pages_tool_optimize_tour_036: "选择并应用方案",
   pages_tool_optimize_tour_037: "结果生成后可通过帕累托图或表格选择情景，再用“应用此配置”带回普通优化流程。",
 } as const
