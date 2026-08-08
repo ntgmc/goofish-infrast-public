@@ -1,5 +1,5 @@
 {
-  "date": "2026-07-20",
+  "date": "2026-08-08",
   "design_system": "design.md",
   "font_stack": {
     "display": "Noto Sans SC Variable",
@@ -9,7 +9,7 @@
   "palette": "Custom OKLCH semantic properties in tokens.css; cool-violet anchor at 285 degrees",
   "motion": "motion-on dependency; composed route and state transitions with reduced-motion fallback",
   "spacing": "Tailwind v4 plus a canonical 4px token scale",
-  "framework": "React 18, React Router, Vite 6, Tailwind CSS 4, shadcn/ui",
+  "framework": "React 19.2, React Router 8.3, Vite 8.2, Tailwind CSS 4, shadcn/ui",
   "assets": [
     "public/assets/logo.png",
     "public/assets/logo-horizontal.png",
@@ -27,6 +27,7 @@
     "Long Document content composition",
     "Semantic contrast-safe tokens",
     "Stable input feedback slots",
-    "Hallmark 58-gate design discipline"
+    "Hallmark 58-gate design discipline",
+    "Long Document service status page with live status signals"
   ]
 }

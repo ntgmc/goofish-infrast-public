@@ -8,6 +8,7 @@ export const GITHUB_REPOSITORY_URL = 'https://github.com/ntgmc/goofish-infrast-p
 export const SUPPORT_QQ_GROUP_URL = DEFAULT_PUBLIC_CONTENT_SETTINGS.qq_group.join_url
 
 const footerLinks = [
+  { to: '/status', label: copy.status.pages_StatusPage_002 },
   { to: '/pricing', label: copy.public.components_PublicFooter_012 },
   { to: '/faq', label: copy.public.components_PublicFooter_001 },
   { to: '/changelog', label: copy.public.components_PublicFooter_014 },

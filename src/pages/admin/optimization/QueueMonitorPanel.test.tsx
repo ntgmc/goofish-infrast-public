@@ -27,6 +27,8 @@ describe('QueueMonitorPanel', () => {
 
     expect(screen.getByText('2 / 200')).toBeInTheDocument()
     expect(screen.getByText('1 / 3')).toBeInTheDocument()
+    expect(screen.getByText('少量排队')).toBeInTheDocument()
+    expect(screen.getByText('33%')).toBeInTheDocument()
     expect(screen.getAllByText('user@example.test').length).toBeGreaterThan(0)
     expect(screen.queryByText('secret payload')).not.toBeInTheDocument()
 

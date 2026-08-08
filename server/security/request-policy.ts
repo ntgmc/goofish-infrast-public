@@ -634,6 +634,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/auth/me', route({ GET: none() }, ['profile_id'])],
   ['/api/site/features', route({ GET: none() })],
   ['/api/site/public-content', route({ GET: none() })],
+  ['/api/status', route({ GET: none() })],
   ['/api/user/data/export', route({ GET: none() })],
   ['/api/user/data/delete-request', route({ POST: json('auth', requestSchemas.accountDelete) })],
   ['/api/user/data/cancel', route({ POST: json('auth', requestSchemas.deletionToken) })],

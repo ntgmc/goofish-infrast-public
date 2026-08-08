@@ -68,6 +68,7 @@ const standaloneAppPaths = new Set([
   '/pricing',
   '/privacy',
   '/reset-password',
+  '/status',
   '/support',
   '/terms',
   '/thanks',

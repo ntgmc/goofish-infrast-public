@@ -46,6 +46,11 @@ describe('RouteMetadata', () => {
     expect(metaByName('robots')).toBe('index, follow')
     expect(metaByProperty('og:url')).toBe(currentUrl('/changelog'))
 
+    await act(async () => router.navigate('/status'))
+    expect(document.title).toBe('服务状态 | MaaTool')
+    expect(metaByName('description')).toBe('查看 MaaTool 网站与排班计算服务的实时状态、队列压力和可用容量。')
+    expect(metaByName('robots')).toBe('index, follow')
+
     await act(async () => router.navigate('/tool/profiles'))
 
     expect(document.title).toBe('MaaTool 工作台')

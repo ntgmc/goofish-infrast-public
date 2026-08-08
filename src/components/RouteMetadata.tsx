@@ -28,6 +28,11 @@ const PUBLIC_METADATA: Record<string, Metadata> = {
     description: copy.metadata.components_RouteMetadata_026,
     indexable: true,
   },
+  '/status': {
+    title: copy.metadata.components_RouteMetadata_027,
+    description: copy.metadata.components_RouteMetadata_028,
+    indexable: true,
+  },
   '/faq': {
     title: copy.metadata.components_RouteMetadata_005,
     description: copy.metadata.components_RouteMetadata_006,

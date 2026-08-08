@@ -47,4 +47,8 @@ export const metadataCopy = {
   components_RouteMetadata_025: "更新日志 | MaaTool",
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_026: "查看 MaaTool 各版本的功能更新、体验优化与问题修复。",
+  // src/components/RouteMetadata.tsx
+  components_RouteMetadata_027: "服务状态 | MaaTool",
+  // src/components/RouteMetadata.tsx
+  components_RouteMetadata_028: "查看 MaaTool 网站与排班计算服务的实时状态、队列压力和可用容量。",
 } as const

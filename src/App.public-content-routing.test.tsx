@@ -54,6 +54,7 @@ describe('App public content routing', () => {
     '/privacy',
     '/terms',
     '/disclaimer',
+    '/status',
   ])('loads public content for content route %s', async (route) => {
     render(<MemoryRouter initialEntries={[route]}><App /></MemoryRouter>)
     await waitFor(() => expect(apiJson.mock.calls.some(([url]) => url === '/api/site/public-content')).toBe(true))
