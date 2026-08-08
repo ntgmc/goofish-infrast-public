@@ -7,12 +7,13 @@ import CompactHeaderMenu from '../../components/CompactHeaderMenu'
 import GuidedTour, { useFirstRunTour, type TourDefinition } from '../../components/GuidedTour'
 import { AnimatedPresenceRegion, MotionNavIndicator, MotionSkeleton } from '../../components/MotionPrimitives'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
+import ToolBreadcrumbs from '../../components/ToolBreadcrumbs'
 import SklandBindingDialog, { type SklandPayload } from '../../components/SklandBindingDialog'
 import { ApiError, apiJson } from '../../lib/api-client'
 import { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../../lib/config'
 import { canonicalJson } from '../../lib/crypto'
 import { resolveActivePurchaseChannel } from '../../lib/purchase'
-import type { WorkspaceSetupSection } from '../../lib/app-routes'
+import { dashboardPath, profileScopedPath, workspaceSetupPath, type WorkspaceSetupSection } from '../../lib/app-routes'
 import { countOwnedOperators, formatDate, getEffectiveProfilePermission, getProfileAccessLabel, isFreePreviewProfile, parseOperatorsText, sortOperatorsForPreview } from './tool-utils'
 import { copy } from '../../copy/index'
 import { hasCapability } from '../../lib/product-catalog'
@@ -293,7 +294,16 @@ export default function WorkspaceSetupPage({
           <div className="mx-auto hidden max-w-7xl items-center justify-between gap-4 lg:flex">
             <div className="flex min-w-0 items-start gap-3">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-brand-400">{profile.display_name}</p>
+                <ToolBreadcrumbs
+                  className="mb-2"
+                  items={[
+                    { id: 'home', label: copy.common.components_ToolBreadcrumbs_002, to: '/' },
+                    { id: 'profiles', label: copy.common.components_ToolBreadcrumbs_003, to: dashboardPath('profiles') },
+                    { id: 'profile', label: profile.display_name, to: profileScopedPath(dashboardPath('profiles'), profile.id) },
+                    { id: 'workspace', label: copy.workspace.pages_tool_WorkspaceSetupPage_014, to: profileScopedPath(workspaceSetupPath('operators'), profile.id) },
+                    { id: 'current', label: setupSections.find((item) => item.id === activeSection)?.label ?? setupSections[0].label },
+                  ]}
+                />
                 <h1 className="display-title mt-1 text-xl text-ink-primary">{copy.workspace.pages_tool_WorkspaceSetupPage_019}</h1>
                 <p className="mt-1 text-sm text-ink-muted">{copy.workspace.pages_tool_WorkspaceSetupPage_020}</p>
               </div>

@@ -207,8 +207,8 @@ export default function ConfigEditor({
   const dormitoryRule = normalizeDormitoryRule(config.dormitory_rule)
   const fiammettaShiftHoursSupported = !variableShiftMode && isFiammettaShiftHoursSupported(config.shift_hours)
   const fiammettaShiftInterval = fiammettaShiftHoursSupported
-    ? `${parseShiftHours(config.shift_hours)?.[0] ?? 8}小时`
-    : '8小时/12小时'
+    ? `${parseShiftHours(config.shift_hours)?.[0] ?? 8}${copy.common.components_ConfigEditor_099}`
+    : copy.common.components_ConfigEditor_100
   const validationMessage = validation.ok === false ? validation.message : null
   const intermediateInventory = normalizeIntermediateInventory(config.intermediate_inventory)
   const orundumPlanning = normalizeOrundumPlanning(config)

@@ -64,7 +64,7 @@ export const workspaceCopy = {
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_031: "粘贴凭据",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_032: "在森空岛网页登录后，复制本地凭据并粘贴到这里。读取后会先展示昵称和 UID。",
+  components_SklandBindingDialog_032: "在森空岛网页登录后，复制本地凭据并粘贴到输入框。读取后会先显示昵称和 UID。",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_033: "打开森空岛官网",
   // src/components/SklandBindingDialog.tsx
@@ -80,7 +80,7 @@ export const workspaceCopy = {
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_039: "书签脚本",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_040: "把助手拖到浏览器书签栏，在森空岛网页登录后点击书签复制凭据，再回到这里粘贴预览。",
+  components_SklandBindingDialog_040: "把助手拖到浏览器书签栏，在森空岛网页登录后点击书签复制凭据，再返回页面粘贴预览。",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_041: "显示浏览器书签栏",
   // src/components/SklandBindingDialog.tsx
@@ -138,7 +138,7 @@ export const workspaceCopy = {
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_068: "打开控制台：Windows / Linux 按 F12 或 Ctrl + Shift + J；macOS 按 ⌘ + ⌥ + J。也可以右键页面选择“检查”，再点击 Console（控制台）。",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_069: "回到这里复制下方命令，粘贴到控制台后按 Enter。看到“已复制到粘贴板”后，将凭据粘贴到最下方输入框。",
+  components_SklandBindingDialog_069: "返回页面复制下方命令，粘贴到控制台后按 Enter。看到“已复制到粘贴板”后，将凭据粘贴到最下方输入框。",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_070: "若 Chrome / Edge 阻止粘贴，请按控制台提示手动输入 allow pasting 并按 Enter，再粘贴命令。只执行本站展示且由你确认过的命令。",
   // src/hooks/useSklandBinding.ts

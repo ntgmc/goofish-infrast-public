@@ -37,14 +37,14 @@ describe('ProfilesSection limited profile trial', () => {
     expect(screen.getByText('高级版限时体验')).toBeInTheDocument()
     expect(screen.getByText('用于主账号排班')).toBeInTheDocument()
     expect(screen.getByText(/高级版功能已临时解锁，有效至 2026\/08\/20 00:00；到期后恢复免费预览权限/)).toBeInTheDocument()
-    expect(screen.queryByText('免费个人排班可查看完整游戏内轮换，但不提供导出和高级分析。')).not.toBeInTheDocument()
+    expect(screen.queryByText('免费个人排班支持查看完整游戏内轮换；导出和高级分析随高级权限开放。')).not.toBeInTheDocument()
   })
 
   it('keeps the ordinary free-preview description when no trial is active', () => {
     renderProfiles(baseProfile)
 
     expect(screen.getByText('免费预览')).toBeInTheDocument()
-    expect(screen.getByText('免费个人排班可查看完整游戏内轮换，但不提供导出和高级分析。')).toBeInTheDocument()
+    expect(screen.getByText('免费个人排班支持查看完整游戏内轮换；导出和高级分析随高级权限开放。')).toBeInTheDocument()
     expect(screen.queryByText(/高级版功能已临时解锁/)).not.toBeInTheDocument()
   })
 })

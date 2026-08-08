@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { getQueueSnapshot, isServiceReady } = vi.hoisted(() => ({
+const { getQueueSnapshot, isServiceReady, getHistory, listIncidents } = vi.hoisted(() => ({
   getQueueSnapshot: vi.fn(),
   isServiceReady: vi.fn(),
+  getHistory: vi.fn(),
+  listIncidents: vi.fn(),
 }))
 
 vi.mock('../storage/optimize-job-store', () => ({ getAdminOptimizationQueueSnapshot: getQueueSnapshot }))
+vi.mock('../storage/service-status-store', () => ({ getServiceStatusHistory: getHistory, listPublicServiceStatusIncidents: listIncidents }))
 vi.mock('../lifecycle', () => ({ isServiceReady }))
 
 import serviceStatusHandler from './service-status'
@@ -15,6 +18,8 @@ describe('service status handler', () => {
     vi.clearAllMocks()
     isServiceReady.mockReturnValue(true)
     getQueueSnapshot.mockResolvedValue(snapshot({ queued: 0, running: 1, workerConcurrency: 3, workerInstances: 1 }))
+    getHistory.mockResolvedValue({ from: '2026-07-09T09:00:00.000Z', to: '2026-08-08T09:00:00.000Z', buckets: [{ component_id: 'optimization', bucket_start: '2026-08-08T08:00:00.000Z', status: 'available', sample_count: 12, availability_percent: 100 }] })
+    listIncidents.mockResolvedValue([{ id: 'incident-1', component_id: 'optimization', title: '短暂延迟', impact: 'minor', status: 'resolved', started_at: '2026-08-01T01:00:00.000Z', resolved_at: '2026-08-01T02:00:00.000Z', created_at: '2026-08-01T01:00:00.000Z', updated_at: '2026-08-01T02:00:00.000Z', updates: [] }])
   })
 
   it('returns a safe no-store aggregate for the public status page', async () => {
@@ -27,7 +32,21 @@ describe('service status handler', () => {
       status: 'available',
       queue: expect.objectContaining({ queued: 0, running: 1, worker_concurrency: 3 }),
       components: [{ id: 'optimization', status: 'available' }],
+      history: expect.objectContaining({ interval: 'hour', complete: true, buckets: expect.any(Array) }),
+      incidents: expect.arrayContaining([expect.objectContaining({ id: 'incident-1', status: 'resolved' })]),
     }))
+  })
+
+  it('keeps the realtime response when history storage is unavailable', async () => {
+    getHistory.mockRejectedValue(new Error('secret history storage'))
+    listIncidents.mockRejectedValue(new Error('secret incident storage'))
+    const response = await serviceStatusHandler(new Request('http://localhost/api/status'))
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body.status).toBe('available')
+    expect(body.history.complete).toBe(false)
+    expect(body.history.buckets).toEqual([])
+    expect(JSON.stringify(body)).not.toContain('secret')
   })
 
   it('reports congestion at the yellow threshold', async () => {
@@ -55,6 +74,11 @@ describe('service status handler', () => {
   it('rejects non-GET requests', async () => {
     const response = await serviceStatusHandler(new Request('http://localhost/api/status', { method: 'POST' }))
     expect(response.status).toBe(405)
+  })
+
+  it('rejects unknown query parameters', async () => {
+    const response = await serviceStatusHandler(new Request('http://localhost/api/status?debug=true'))
+    expect(response.status).toBe(400)
   })
 })
 

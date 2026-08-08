@@ -138,7 +138,7 @@ function ProfileCard({
           )}
           {profile.expires_at && !activeTrial && (
             <p className="mt-2 text-sm leading-6 text-ink-secondary">
-              档案有效期至 {formatShanghaiDateTime(profile.expires_at)}
+              {copy.dashboard.pages_tool_dashboard_ProfilesSection_017(formatShanghaiDateTime(profile.expires_at))}
             </p>
           )}
           <p className="mt-3 text-xs text-ink-muted">{profile.operator_count} {copy.dashboard.pages_tool_dashboard_ProfilesSection_008}{formatDate(profile.updated_at)}</p>

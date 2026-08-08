@@ -13,6 +13,12 @@ export const commonCopy = {
   components_CompactHeaderMenu_001: "打开栏目菜单",
   // src/components/CompactHeaderMenu.tsx
   components_CompactHeaderMenu_002: "更多操作",
+  // src/components/ToolBreadcrumbs.tsx
+  components_ToolBreadcrumbs_001: "面包屑",
+  // src/components/ToolBreadcrumbs.tsx
+  components_ToolBreadcrumbs_002: "首页",
+  // src/components/ToolBreadcrumbs.tsx
+  components_ToolBreadcrumbs_003: "游戏账号",
   // src/App.tsx
   App_001: "正在载入工作台...",
   // src/App.tsx
@@ -227,6 +233,10 @@ export const commonCopy = {
   components_ConfigEditor_066: "导出的 MAA JSON 仅固定生产技能必需的宿舍干员，其余空位由 MAA 自动填满；可保留依赖宿舍的高效组合。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_067: "导出的 MAA JSON 会固定宿舍干员，和当前行为一致。",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_099: "小时",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_100: "8小时/12小时",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_068: "菲亚梅塔",
   // src/components/ConfigEditor.tsx
@@ -614,7 +624,7 @@ export const commonCopy = {
   // src/pages/AdminSetupPage.tsx
   pages_AdminSetupPage_009: "管理账号设置",
   // src/pages/AdminSetupPage.tsx
-  pages_AdminSetupPage_010: "首次使用管理后台时，请使用 Root 口令创建第一个管理账号；已有账号时，可在这里继续维护。",
+  pages_AdminSetupPage_010: "首次使用管理后台时，请使用 Root 口令创建第一个管理账号；已有账号时，可继续维护。",
   // src/pages/AdminSetupPage.tsx
   pages_AdminSetupPage_011: "返回后台",
   // src/pages/AdminSetupPage.tsx

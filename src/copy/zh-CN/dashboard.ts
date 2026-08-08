@@ -4,7 +4,7 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
   pages_tool_dashboard_AnnouncementsSection_002: "标记公告失败",
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
-  pages_tool_dashboard_AnnouncementsSection_003: "这里会显示近期通知，读过的内容会自动留在公告列表中方便回看。",
+  pages_tool_dashboard_AnnouncementsSection_003: "近期通知会保留在公告列表中，方便随时回看。",
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
   pages_tool_dashboard_AnnouncementsSection_004: "处理中...",
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
@@ -113,7 +113,7 @@ export const dashboardCopy = {
   pages_tool_dashboard_InvitationsSection_052: " 个名额，下次重置：",
   pages_tool_dashboard_InvitationsSection_053: "今日名额已用完；后续激活不会补发你的邀请奖励，但新用户奖励仍会正常发放。",
   pages_tool_dashboard_InvitationsSection_054: "最近邀请",
-  pages_tool_dashboard_InvitationsSection_055: "还没有邀请记录。分享邀请链接后，注册与激活进度会显示在这里。",
+  pages_tool_dashboard_InvitationsSection_055: "还没有邀请记录。分享邀请链接后，可在邀请列表中查看注册与激活进度。",
   pages_tool_dashboard_InvitationsSection_056: "受邀用户",
   pages_tool_dashboard_InvitationsSection_057: "注册时间",
   pages_tool_dashboard_InvitationsSection_058: "激活时间",
@@ -162,7 +162,7 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/ProfilesSection.tsx
   pages_tool_dashboard_ProfilesSection_005: "保存失败，请稍后重试",
   // src/pages/tool/dashboard/ProfilesSection.tsx
-  pages_tool_dashboard_ProfilesSection_006: "免费个人排班可查看完整游戏内轮换，但不提供导出和高级分析。",
+  pages_tool_dashboard_ProfilesSection_006: "免费个人排班支持查看完整游戏内轮换；导出和高级分析随高级权限开放。",
   // src/pages/tool/dashboard/ProfilesSection.tsx
   pages_tool_dashboard_ProfilesSection_007: "暂无备注",
   // src/pages/tool/dashboard/ProfilesSection.tsx
@@ -183,6 +183,8 @@ export const dashboardCopy = {
   pages_tool_dashboard_ProfilesSection_015: "保存",
   // src/pages/tool/dashboard/ProfilesSection.tsx
   pages_tool_dashboard_ProfilesSection_016: (endsAt: string) => `高级版功能已临时解锁，有效至 ${endsAt}；到期后恢复免费预览权限。`,
+  // src/pages/tool/dashboard/ProfilesSection.tsx
+  pages_tool_dashboard_ProfilesSection_017: (expiresAt: string) => `档案有效期至 ${expiresAt}`,
   // src/pages/tool/dashboard/RedeemSection.tsx
   pages_tool_dashboard_RedeemSection_001: "CDK 兑换失败，请稍后重试",
   // src/pages/tool/dashboard/RedeemSection.tsx
@@ -196,7 +198,7 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/RedeemSection.tsx
   pages_tool_dashboard_RedeemSection_006: "免费个人排班",
   // src/pages/tool/dashboard/RedeemSection.tsx
-  pages_tool_dashboard_RedeemSection_007: "免费个人排班会展示完整游戏内轮换队列，但不提供 MAA JSON 下载、原始数据、高级分析、批量导出或商用授权。活动期间首次绑定森空岛后会赠送一张限时 CDK 道具，需在背包主动使用，高级权限于 2026 年 8 月 20 日 00:00 结束。",
+  pages_tool_dashboard_RedeemSection_007: "免费个人排班支持查看完整游戏内轮换队列；MAA JSON 下载、原始数据、高级分析、批量导出和商用授权随高级权限开放。活动期间首次绑定森空岛后会赠送一张限时 CDK 道具，需在背包主动使用，高级权限于 2026 年 8 月 20 日 00:00 结束。",
   // src/pages/tool/dashboard/RedeemSection.tsx
   pages_tool_dashboard_RedeemSection_008: "档案名称",
   // src/pages/tool/dashboard/RedeemSection.tsx
@@ -279,11 +281,11 @@ export const dashboardCopy = {
   // src/pages/tool/AccountDashboard.tsx
   pages_tool_AccountDashboard_tour_001: "使用导览",
   pages_tool_AccountDashboard_tour_002: "管理游戏账号",
-  pages_tool_AccountDashboard_tour_003: "查看正式档案和免费预览档案，并从这里进入干员与基建配置准备流程。",
+  pages_tool_AccountDashboard_tour_003: "查看正式档案和免费预览档案，然后进入干员与基建配置准备流程。",
   pages_tool_AccountDashboard_tour_004: "独立实用工具",
   pages_tool_AccountDashboard_tour_005: "仓库价值分析使用独立页面，不会覆盖当前账号保存的工作区。",
   pages_tool_AccountDashboard_tour_006: "添加账号档案",
-  pages_tool_AccountDashboard_tour_007: "在这里兑换 CDK 创建正式档案；没有 CDK 时也可以领取免费个人排班。",
+  pages_tool_AccountDashboard_tour_007: "使用 CDK 创建正式档案；没有 CDK 时也可以领取免费个人排班。",
   pages_tool_AccountDashboard_tour_008: "邀请奖励",
   pages_tool_AccountDashboard_tour_009: "查看邀请链接、好友激活进度，以及可用于提升排队优先级的计算券。",
   pages_tool_AccountDashboard_tour_010: "公告与设置",

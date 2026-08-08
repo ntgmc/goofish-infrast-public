@@ -25,9 +25,12 @@ describe('QueueMonitorPanel', () => {
     render(<QueueMonitorPanel />)
     await act(async () => { await Promise.resolve() })
 
+    const statusHeading = screen.getByRole('heading', { name: '30 天服务历史' })
+    const deadLetterHeading = screen.getByRole('heading', { name: '异步优化死信队列' })
+    expect(statusHeading.compareDocumentPosition(deadLetterHeading) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
     expect(screen.getByText('2 / 200')).toBeInTheDocument()
     expect(screen.getByText('1 / 3')).toBeInTheDocument()
-    expect(screen.getByText('少量排队')).toBeInTheDocument()
+    expect(screen.getByText('可用，处理稍慢')).toBeInTheDocument()
     expect(screen.getByText('33%')).toBeInTheDocument()
     expect(screen.getAllByText('user@example.test').length).toBeGreaterThan(0)
     expect(screen.queryByText('secret payload')).not.toBeInTheDocument()

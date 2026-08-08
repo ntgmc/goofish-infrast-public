@@ -19,6 +19,8 @@ describe('OptimizeShell compact navigation', () => {
       <MemoryRouter>
       <OptimizeShell
         section="overview"
+        profileId="profile-1"
+        profileLabel="高级账号"
         permissionLabel="高级权限"
         badges={{ result: '已有结果' }}
         showScenarioLab={false}
@@ -35,6 +37,12 @@ describe('OptimizeShell compact navigation', () => {
     )
 
     expect(screen.getByRole('button', { name: '移动任务中心' })).toHaveClass('h-11', 'w-11')
+    const breadcrumb = screen.getByRole('navigation', { name: '面包屑' })
+    expect(within(breadcrumb).getByRole('link', { name: '首页' })).toHaveAttribute('href', '/')
+    expect(within(breadcrumb).getByRole('link', { name: '游戏账号' })).toHaveAttribute('href', '/tool/profiles')
+    expect(within(breadcrumb).getByRole('link', { name: '高级账号' })).toHaveAttribute('href', '/tool/profiles?profile_id=profile-1')
+    expect(within(breadcrumb).getByRole('link', { name: '排班工作台' })).toHaveAttribute('href', '/tool/optimize/overview?profile_id=profile-1')
+    expect(within(breadcrumb).getByText('总览')).toHaveAttribute('aria-current', 'page')
     const accountActions = screen.getByRole('navigation', { name: '账号操作' })
     expect(within(accountActions).getByRole('button', { name: '返回数据空间' })).not.toHaveClass('tool-danger-action')
     expect(within(accountActions).getByRole('button', { name: '退出登录' })).toHaveClass('tool-danger-action')

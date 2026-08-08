@@ -10,6 +10,7 @@ import type {
   AdminOptimizationQueueStatus,
 } from '../contracts'
 import DeadLetterPanel from './DeadLetterPanel'
+import ServiceStatusHistoryPanel from './ServiceStatusHistoryPanel'
 
 const POLL_INTERVAL_MS = 5_000
 
@@ -142,6 +143,8 @@ export default function QueueMonitorPanel() {
           </>
         )}
       </section>
+
+      <ServiceStatusHistoryPanel />
 
       <QueueFilters filters={filters} sources={sources} onChange={setFilters} />
 

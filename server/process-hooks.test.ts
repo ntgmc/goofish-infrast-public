@@ -20,6 +20,9 @@ const {
   waitInventoryWorker,
   waitInvitationWorker,
   waitWorkerRegistration,
+  initializeStatusHistory,
+  shutdownStatusHistory,
+  waitStatusHistory,
 } = vi.hoisted(() => ({
   initializeJobProcessing: vi.fn(async () => undefined),
   initializeQueueMaintenance: vi.fn(async () => undefined),
@@ -40,6 +43,9 @@ const {
   waitInventoryWorker: vi.fn(async () => undefined),
   waitInvitationWorker: vi.fn(async () => undefined),
   waitWorkerRegistration: vi.fn(async () => undefined),
+  initializeStatusHistory: vi.fn(async () => undefined),
+  shutdownStatusHistory: vi.fn(),
+  waitStatusHistory: vi.fn(async () => undefined),
 }))
 
 vi.mock('./optimize-job-runner', () => ({
@@ -75,6 +81,11 @@ vi.mock('./auth-data-maintenance', () => ({
   initializeAuthDataMaintenance: initializeAuthMaintenance,
   shutdownAuthDataMaintenance: shutdownAuthMaintenance,
 }))
+vi.mock('./service-status-history', () => ({
+  initializeServiceStatusHistory: initializeStatusHistory,
+  shutdownServiceStatusHistory: shutdownStatusHistory,
+  waitForServiceStatusHistoryIdle: waitStatusHistory,
+}))
 
 import { apiOnlyProcessHooks } from './api-process-hooks'
 import { createCombinedProcessHooks } from './combined-process-hooks'
@@ -101,8 +112,11 @@ describe('API process hook compositions', () => {
 
     expect(initializeQueueMaintenance).toHaveBeenCalledOnce()
     expect(initializeAuthMaintenance).toHaveBeenCalledOnce()
+    expect(initializeStatusHistory).toHaveBeenCalledOnce()
     expect(shutdownQueueMaintenance).toHaveBeenCalledTimes(2)
     expect(shutdownAuthMaintenance).toHaveBeenCalledTimes(2)
+    expect(shutdownStatusHistory).toHaveBeenCalledTimes(2)
+    expect(waitStatusHistory).toHaveBeenCalledOnce()
     expect(initializeJobProcessing).not.toHaveBeenCalled()
     expect(shutdownJobProcessing).not.toHaveBeenCalled()
   })

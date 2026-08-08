@@ -362,6 +362,91 @@ CREATE TABLE IF NOT EXISTS optimize_worker_registry (
 CREATE INDEX IF NOT EXISTS idx_optimize_worker_registry_active
   ON optimize_worker_registry(draining, heartbeat_at DESC);
 
+-- goofish:migration-phase
+CREATE TABLE IF NOT EXISTS service_status_hourly (
+  component_id TEXT NOT NULL,
+  bucket_start TIMESTAMPTZ NOT NULL,
+  status TEXT NOT NULL,
+  sample_count INTEGER NOT NULL DEFAULT 0 CHECK (sample_count >= 0),
+  available_samples INTEGER NOT NULL DEFAULT 0 CHECK (available_samples >= 0),
+  busy_samples INTEGER NOT NULL DEFAULT 0 CHECK (busy_samples >= 0),
+  congested_samples INTEGER NOT NULL DEFAULT 0 CHECK (congested_samples >= 0),
+  unavailable_samples INTEGER NOT NULL DEFAULT 0 CHECK (unavailable_samples >= 0),
+  running_sum NUMERIC(20,4) NOT NULL DEFAULT 0 CHECK (running_sum >= 0),
+  provisioned_sum NUMERIC(20,4) NOT NULL DEFAULT 0 CHECK (provisioned_sum >= 0),
+  utilization_sum NUMERIC(20,4) NOT NULL DEFAULT 0 CHECK (utilization_sum >= 0 AND utilization_sum <= sample_count * 100),
+  worker_instances_sum NUMERIC(20,4) NOT NULL DEFAULT 0 CHECK (worker_instances_sum >= 0),
+  peak_queued INTEGER NOT NULL DEFAULT 0 CHECK (peak_queued >= 0),
+  peak_running INTEGER NOT NULL DEFAULT 0 CHECK (peak_running >= 0),
+  peak_worker_instances INTEGER NOT NULL DEFAULT 0 CHECK (peak_worker_instances >= 0),
+  last_sample_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (component_id, bucket_start),
+  CONSTRAINT service_status_hourly_component_check CHECK (component_id IN ('optimization')),
+  CONSTRAINT service_status_hourly_status_check CHECK (status IN ('available', 'busy', 'congested', 'unavailable')),
+  CONSTRAINT service_status_hourly_sample_balance_check CHECK (available_samples + busy_samples + congested_samples + unavailable_samples = sample_count)
+);
+CREATE INDEX IF NOT EXISTS idx_service_status_hourly_bucket
+  ON service_status_hourly(bucket_start DESC, component_id);
+ALTER TABLE service_status_hourly ADD COLUMN IF NOT EXISTS busy_samples INTEGER NOT NULL DEFAULT 0 CHECK (busy_samples >= 0);
+ALTER TABLE service_status_hourly ADD COLUMN IF NOT EXISTS congested_samples INTEGER NOT NULL DEFAULT 0 CHECK (congested_samples >= 0);
+ALTER TABLE service_status_hourly ADD COLUMN IF NOT EXISTS utilization_sum NUMERIC(20,4) NOT NULL DEFAULT 0 CHECK (utilization_sum >= 0);
+ALTER TABLE service_status_hourly ADD COLUMN IF NOT EXISTS worker_instances_sum NUMERIC(20,4) NOT NULL DEFAULT 0 CHECK (worker_instances_sum >= 0);
+ALTER TABLE service_status_hourly DROP CONSTRAINT IF EXISTS service_status_hourly_sample_balance_check;
+ALTER TABLE service_status_hourly ADD CONSTRAINT service_status_hourly_sample_balance_check CHECK (available_samples + busy_samples + congested_samples + unavailable_samples = sample_count);
+ALTER TABLE service_status_hourly DROP CONSTRAINT IF EXISTS service_status_hourly_level_balance_check;
+
+CREATE TABLE IF NOT EXISTS service_status_cost_config (
+  component_id TEXT PRIMARY KEY,
+  billing_model TEXT NOT NULL DEFAULT 'ecs_payg',
+  currency TEXT NOT NULL DEFAULT 'CNY',
+  hourly_price_cny NUMERIC(12,4),
+  timezone TEXT NOT NULL DEFAULT 'Asia/Shanghai',
+  schedule_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  valley_worker_instances INTEGER NOT NULL DEFAULT 0 CHECK (valley_worker_instances BETWEEN 0 AND 100),
+  peak_windows_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+  updated_at TIMESTAMPTZ NOT NULL,
+  updated_by TEXT,
+  CONSTRAINT service_status_cost_component_check CHECK (component_id IN ('optimization')),
+  CONSTRAINT service_status_cost_billing_model_check CHECK (billing_model IN ('ecs_payg')),
+  CONSTRAINT service_status_cost_currency_check CHECK (currency = 'CNY'),
+  CONSTRAINT service_status_cost_hourly_price_check CHECK (hourly_price_cny IS NULL OR hourly_price_cny >= 0)
+);
+
+CREATE TABLE IF NOT EXISTS service_status_incidents (
+  id TEXT PRIMARY KEY,
+  component_id TEXT NOT NULL,
+  title VARCHAR(160) NOT NULL,
+  impact TEXT NOT NULL,
+  status TEXT NOT NULL,
+  started_at TIMESTAMPTZ NOT NULL,
+  resolved_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  CONSTRAINT service_status_incidents_component_check CHECK (component_id IN ('optimization')),
+  CONSTRAINT service_status_incidents_title_check CHECK (char_length(btrim(title)) BETWEEN 2 AND 160),
+  CONSTRAINT service_status_incidents_impact_check CHECK (impact IN ('minor', 'major', 'critical')),
+  CONSTRAINT service_status_incidents_status_check CHECK (status IN ('investigating', 'identified', 'monitoring', 'resolved')),
+  CONSTRAINT service_status_incidents_resolution_check CHECK (
+    (status = 'resolved' AND resolved_at IS NOT NULL)
+    OR (status <> 'resolved' AND resolved_at IS NULL)
+  )
+);
+CREATE INDEX IF NOT EXISTS idx_service_status_incidents_public
+  ON service_status_incidents(resolved_at, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS service_status_incident_updates (
+  id TEXT PRIMARY KEY,
+  incident_id TEXT NOT NULL REFERENCES service_status_incidents(id) ON DELETE RESTRICT,
+  status TEXT NOT NULL,
+  body VARCHAR(2000) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  CONSTRAINT service_status_incident_updates_status_check CHECK (status IN ('investigating', 'identified', 'monitoring', 'resolved')),
+  CONSTRAINT service_status_incident_updates_body_check CHECK (char_length(btrim(body)) BETWEEN 2 AND 2000)
+);
+CREATE INDEX IF NOT EXISTS idx_service_status_incident_updates_incident
+  ON service_status_incident_updates(incident_id, created_at ASC, id ASC);
+
 CREATE TABLE IF NOT EXISTS optimization_dead_letters (
   id TEXT PRIMARY KEY,
   job_id TEXT NOT NULL REFERENCES optimize_jobs(id) ON DELETE RESTRICT,
@@ -2394,6 +2479,10 @@ const API_ONLY_RUNTIME_TABLES = new Set([
   'user_notifications',
   'inventory_admin_operations',
   'admin_operation_audit',
+  'service_status_hourly',
+  'service_status_cost_config',
+  'service_status_incidents',
+  'service_status_incident_updates',
 ])
 
 export type DatabaseSchemaMode = 'migrate' | 'validate'

@@ -32,7 +32,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_016: "粘贴仓库 JSON",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_017: "从 MAA 选择“企鹅物流刷图规划”或“明日方舟工具箱”导出，复制内容后粘贴到这里。\n                      粘贴 JSON 只用于本次分析，不会进入样本池。\n                    ",
+  pages_DepotValuePage_017: "从 MAA 选择“企鹅物流刷图规划”或“明日方舟工具箱”导出，复制内容后粘贴到输入框。\n                      粘贴 JSON 只用于本次分析，不会进入样本池。\n                    ",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_018: "读取剪贴板",
   // src/pages/DepotValuePage.tsx
@@ -186,7 +186,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_097: "生成时间 / 数据版本",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_098: "（仅展示前 12 类）",
+  pages_DepotValuePage_098: "（按价值排序的前 12 类）",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_099: "仓库 JSON 超过 1 MiB 请求上限，请缩减后重试。",
   // src/pages/DepotValuePage.tsx

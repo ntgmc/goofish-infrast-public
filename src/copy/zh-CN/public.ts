@@ -96,7 +96,7 @@ export const publicCopy = {
   // src/pages/AnnouncementsPage.tsx
   pages_AnnouncementsPage_003: "公告",
   // src/pages/AnnouncementsPage.tsx
-  pages_AnnouncementsPage_004: "这里会集中展示近期通知，方便你随时回看。",
+  pages_AnnouncementsPage_004: "集中查看近期通知，方便你随时回看。",
   // src/pages/AnnouncementsPage.tsx
   pages_AnnouncementsPage_005: "返回工具",
   // src/pages/AnnouncementsPage.tsx
@@ -252,7 +252,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_012: "免费仓库估值和排班功能有什么区别？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_013: "免费仓库估值只用于查看库存价值和等效理智参考，不会生成个人排班。排班功能会结合干员、房间、生产目标和策略计算排班及相关指标；轻量 MAA JSON 按现有档案权益、体验期或体验券规则导出，完整计算 JSON 则是高级版独立的分析与排障下载。",
+  pages_PublicInfoPage_013: "免费仓库估值用于查看库存价值和等效理智参考；个人排班会结合干员、房间、生产目标和策略计算排班及相关指标；轻量 MAA JSON 按现有档案权益、体验期或体验券规则导出，完整计算 JSON 则是高级版独立的分析与排障下载。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_014: "授权或导入失败怎么办？",
   // src/pages/PublicInfoPage.tsx
@@ -390,7 +390,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_103: "浏览器随机实例标识、会话、网络地址、浏览器 User-Agent 和游戏 UID 仅以服务端 HMAC 标识进入行为风控库；不会在该库长期保存它们的原始值，也不会采集硬件指纹。输出证据仅包含下载文件 SHA-256、生成或下载次数，以及不含干员、房间名称和完整 JSON 的排班结构摘要。干员数据异常证据只记录异常类型、拥有数量和规范化快照 SHA-256，不把干员名称、干员 ID 或完整干员列表写入行为风控库。",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_104: "异常信号采用多项评分并进入人工复核；共用同一 IP、一次快速操作或一次导出高峰不会单独构成强风险结论。待复核状态、分数和证据不会向普通用户展示；只有管理员人工确认并实施限制后，账号或档案才会显示中性的不可用与联系客服提示。",
+  pages_PublicInfoPage_104: "异常信号采用多项评分并进入人工复核；共用同一 IP、一次快速操作或一次导出高峰不会单独构成强风险结论。待复核状态、分数和证据由管理员人工处理；确认并实施限制后，账号或档案会显示中性的不可用与联系客服提示。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_105: "上述行为风控事件、关联复核单和可关联审计证据最长保留 90 天，到期删除。账号注销冷静期结束后，常规账户和工作区数据会删除，但尚未到期的 HMAC 风控证据仍按该 90 天上限到期删除。个人使用声明确认记录属于独立的法律与争议处理记录，其中包含确认时客户端 IP，按账号存续期加注销后一年保留，不适用行为风控库的 90 天期限。",
   // src/pages/PricingPage.tsx
@@ -425,6 +425,8 @@ export const publicCopy = {
   pages_PricingPage_015: "选择有效期",
   // src/pages/PricingPage.tsx
   pages_PricingPage_016: "仅限一个游戏 UID；按所选期限有效，不支持自行更换游戏账号。",
+  // src/pages/PricingPage.tsx
+  pages_PricingPage_017: (originalPrice: string, discountFold: number) => `原价 ${originalPrice} · ${discountFold} 折`,
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_079: "换设备、误拦截与解冻",
   // src/pages/PublicInfoPage.tsx
@@ -440,7 +442,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_085: "免费档案和单账号终身版有什么区别？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_086: "免费档案通过森空岛确认 UID 后领取，一个游戏 UID 全站只能领取一次，可生成并查看完整游戏内轮换；轻量 MAA JSON 仅可按有效高级体验期或导出体验券规则下载，不提供完整计算数据和高级分析。单账号月卡、半年卡、年卡和终身卡均可选择森空岛导入或 MAA 干员 JSON 初始化，按购买时长提供完整高级能力；具体期限、价格与权益以价格与权益页为准。",
+  pages_PublicInfoPage_086: "免费档案通过森空岛确认 UID 后领取，一个游戏 UID 全站只能领取一次，可生成并查看完整游戏内轮换；轻量 MAA JSON 按有效高级体验期或导出体验券规则下载，完整计算数据和高级分析随高级权限开放。单账号月卡、半年卡、年卡和终身卡均可选择森空岛导入或 MAA 干员 JSON 初始化，按购买时长提供完整高级能力；具体期限、价格与权益以价格与权益页为准。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_087: "森空岛授权后会立即保存账号吗？",
   // src/pages/PublicInfoPage.tsx

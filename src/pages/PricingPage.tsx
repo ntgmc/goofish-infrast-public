@@ -99,7 +99,7 @@ export default function PricingPage() {
                       <span className="text-xs text-ink-muted">{plan.badge}</span>
                     </div>
                     <p className="mt-3 text-2xl font-semibold tracking-tight text-brand-400 tabular-nums">{plan.display_price}</p>
-                    {plan.discount_fold < 10 && <p className="mt-1 text-xs text-ink-muted">原价 <del>{plan.original_price}</del> · {plan.discount_fold} 折</p>}
+                    {plan.discount_fold < 10 && <p className="mt-1 text-xs text-ink-muted">{copy.public.pages_PricingPage_017(plan.original_price, plan.discount_fold)}</p>}
                   </div>
                 ))}
               </div>
