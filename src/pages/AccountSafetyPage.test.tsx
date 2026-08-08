@@ -12,18 +12,11 @@ afterEach(() => {
 })
 
 describe('AccountSafetyPage lifecycle controls', () => {
-  it('uses the shared API error contract for export failures', async () => {
-    const user = userEvent.setup()
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      error: '请先登录。',
-      code: 'authentication_required',
-    }), { status: 401, headers: { 'Content-Type': 'application/json' } })))
+  it('does not render the personal data export control', () => {
     renderPage()
 
     expect(screen.getByRole('heading', { name: '调试模式' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: '导出个人数据' }))
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('当前会话已失效，请重新登录后再试。')
+    expect(screen.queryByRole('button', { name: '导出个人数据' })).not.toBeInTheDocument()
   })
 
   it('shows the scheduled deletion and queued cancellation email before leaving', async () => {
