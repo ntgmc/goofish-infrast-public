@@ -21,7 +21,7 @@ describe('public content settings store', () => {
     const settings = await getPublicContentSettings()
     expect(settings).toMatchObject({
       version: 1,
-      defaults_revision: 5,
+      defaults_revision: 6,
       revision: 0,
       updated_at: null,
       cdk_purchase: { xianyu_url: DEFAULT_PUBLIC_CONTENT_DRAFT.cdk_purchase.xianyu_url },
@@ -77,7 +77,7 @@ describe('public content settings store', () => {
 
     const settings = await getPublicContentSettings()
 
-    expect(settings.defaults_revision).toBe(5)
+    expect(settings.defaults_revision).toBe(6)
     expect(settings.revision).toBe(7)
     expect(settings.cdk_purchase.xianyu_url).toBe(DEFAULT_PUBLIC_CONTENT_DRAFT.cdk_purchase.xianyu_url)
     expect(settings.qq_group.name).toBe('管理员自定义群名')

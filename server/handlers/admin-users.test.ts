@@ -317,6 +317,49 @@ describe('admin user profile pagination', () => {
   })
 })
 
+describe('admin user profile concurrency', () => {
+  it('uses the profile timestamp instead of the workspace timestamp for mutations', async () => {
+    const workspace = {
+      version: 1,
+      profile_id: profile.id,
+      operators: [],
+      config: null,
+      elite_overrides: {},
+      saved_configs: [],
+      free_schedule_entitlement: null,
+      free_preview_normalized_activity_id: null,
+      updated_at: '2026-01-03T00:00:00.000Z',
+    }
+    mocks.listProfileWorkspaces.mockResolvedValue(new Map([[profile.id, workspace]]))
+
+    const detailResponse = await adminUsersHandler(new Request(`http://localhost/api/admin/users?user_id=${user.id}`))
+    const detailBody = await detailResponse.json() as { detail: { profiles: Array<{ updated_at: string; workspace: { updated_at: string } }> } }
+    const summary = detailBody.detail.profiles[0]
+
+    expect(detailResponse.status).toBe(200)
+    expect(summary.updated_at).toBe(profile.updated_at)
+    expect(summary.workspace.updated_at).toBe(workspace.updated_at)
+
+    const mutationResponse = await adminUsersHandler(new Request('http://localhost/api/admin/users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'set_profile_status',
+        user_id: user.id,
+        profile_id: profile.id,
+        expected_updated_at: summary.updated_at,
+        status: 'frozen',
+        reason: '工单 OPS-102 冻结档案',
+      }),
+    }))
+
+    expect(mutationResponse.status).toBe(200)
+    expect(mocks.saveUserProfileByAdmin).toHaveBeenCalledWith(expect.objectContaining({ status: 'frozen' }), expect.objectContaining({
+      expectedUpdatedAt: profile.updated_at,
+    }))
+  })
+})
+
 describe('admin user Skland binding reset', () => {
   it('clears the binding and linked CDK baseline in one storage transaction', async () => {
     const response = await adminUsersHandler(clearBindingRequest())

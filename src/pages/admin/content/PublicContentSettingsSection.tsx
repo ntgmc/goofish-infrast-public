@@ -357,7 +357,7 @@ function PricingEditor({ settings, edit }: { settings: PublicContentSettingsV1; 
       <EditorPanel title={copy.publicContent.admin_tab_pricing} description={copy.publicContent.admin_display_only_warning}>
         <PageFields prefix="pricing" page={settings.pricing} edit={(field, value) => edit((next) => { next.pricing[field] = value })} />
       </EditorPanel>
-      <EditorPanel title={copy.publicContent.admin_pricing_plans}>
+      <EditorPanel title={copy.publicContent.admin_pricing_plans} description={copy.publicContent.admin_pricing_plans_description}>
         <div className="grid gap-4 xl:grid-cols-2">
           {PUBLIC_PRICING_PLAN_IDS.map((planId) => {
             const plan = settings.pricing.plans[planId]

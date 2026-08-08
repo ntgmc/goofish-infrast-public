@@ -44,6 +44,22 @@ describe('ConfigEditor shift patterns', () => {
     expect(screen.getByRole('checkbox', { name: '菲亚梅塔' })).toBeEnabled()
     expect(screen.getByText(/过滤相关生产组合/)).toBeInTheDocument()
     expect(screen.getByText(/菲亚梅塔仍可执行换心情/)).toBeInTheDocument()
+    expect(screen.getByText(/启用条件：换班间隔须锁定为8小时（误差需控制在5分钟以内）/)).toBeInTheDocument()
+  })
+
+  it('shows the selected 12-hour interval in the Fiammetta warning', () => {
+    const config = normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: [12, 12, 12] })
+
+    render(
+      <ConfigEditor
+        config={config}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText(/启用条件：换班间隔须锁定为12小时（误差需控制在5分钟以内）/)).toBeInTheDocument()
   })
 
   it('displays and applies a non-uniform 24-hour MAA pattern', async () => {
@@ -239,7 +255,7 @@ describe('ConfigEditor shift patterns', () => {
 
     expect(screen.getByRole('checkbox', { name: '菲亚梅塔' })).toBeDisabled()
     expect(screen.getByRole('checkbox', { name: '菲亚梅塔' })).not.toBeChecked()
-    expect(screen.getByText('菲亚梅塔仅支持固定 8-8-8 或 12-12-12 换班节奏。')).toBeInTheDocument()
+    expect(screen.getByText('启用条件：换班间隔须锁定为8小时/12小时（误差需控制在5分钟以内），否则将引发干员“红脸”状态，导致实际效率低于未启用时的水平。')).toBeInTheDocument()
   })
 
   it('keeps the orundum budget explanation collapsed until requested', async () => {

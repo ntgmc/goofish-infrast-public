@@ -247,6 +247,10 @@ export const domainCopy = {
   components_result_panel_ResultPanel_041: "完整计算 JSON 包含心情、效率、原始结果和调试字段，仅用于分析或问题排查，不应导入 MAA。",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_042: "纯 MAA 自动填满",
+  // src/components/result-panel/ResultPanel.tsx
+  components_result_panel_ResultPanel_043: "已启用但无目标",
+  // src/components/result-panel/ResultPanel.tsx
+  components_result_panel_ResultPanel_044: "优化器未找到收益达到阈值的换心情目标",
   // src/components/result-panel/formatters.ts
   components_result_panel_formatters_001: "按每队列 ",
   // src/components/result-panel/formatters.ts

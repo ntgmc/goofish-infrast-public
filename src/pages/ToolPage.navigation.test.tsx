@@ -4,7 +4,9 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import type { AuthUser, UserGameAccount } from '../lib/types'
+import type { InventoryResponse } from '../lib/inventory-contracts'
 import { cloneDefaultPublicContentSettings } from '../lib/public-content'
+import { tourStorageKey } from '../components/GuidedTour'
 import ToolPage from './ToolPage'
 
 const { apiJson, sessionState, toolsSectionImport } = vi.hoisted(() => {
@@ -38,6 +40,8 @@ vi.mock('./tool/dashboard/ToolsSection', async () => {
 })
 
 beforeEach(() => {
+  window.localStorage.setItem(tourStorageKey('dashboard-overview', 1), 'done')
+  window.localStorage.setItem(tourStorageKey('workspace-setup', 1), 'done')
   apiJson.mockReset().mockImplementation(async (url: string) => {
     if (url === '/api/site/public-content') return cloneDefaultPublicContentSettings()
     throw new Error(`Unexpected request: ${url}`)
@@ -183,6 +187,34 @@ describe('ToolPage route guards', () => {
     await waitFor(() => expect(unavailableLab.state.location.pathname).toBe('/tool/optimize/lab'))
     expect(await screen.findByText('优化页')).toBeInTheDocument()
   })
+
+  it.each([
+    ['dashboard', '/tool/profiles'],
+    ['setup', '/tool/setup/operators'],
+    ['optimize', '/tool/optimize/overview'],
+  ])('opens the shared upgrade prompt from the %s route and navigates to inventory', async (routeName, path) => {
+    const user = userEvent.setup()
+    const userId = `upgrade-${routeName}`
+    const profile = createBoundFreePreviewProfile(userId, `profile-${routeName}`)
+    apiJson.mockImplementation(async (url: string) => {
+      if (url === '/api/site/public-content') return cloneDefaultPublicContentSettings()
+      if (url === '/api/user/inventory') return createUpgradeInventory()
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    const router = renderToolRoute(path, {
+      user: { id: userId, email: `${userId}@example.com` } as AuthUser,
+      activeProfile: profile,
+      activeCdkProfile: profile,
+      cdkProfiles: [profile],
+      workspace: { profile_id: profile.id, operators: [], config: {} },
+      license: { operators: [], config: {}, order_hash: 'order' },
+    })
+
+    await user.click(await screen.findByRole('button', { name: '前往背包升级' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/tool/inventory'))
+    expect(screen.queryByRole('dialog', { name: '背包里有可用的档案升级券' })).not.toBeInTheDocument()
+  })
 })
 
 function renderToolRoute(path: string, overrides: Record<string, unknown> = {}) {
@@ -242,5 +274,54 @@ function createProfile(kind: UserGameAccount['kind'] = 'cdk'): UserGameAccount {
     operator_count: 0,
     updated_at: null,
     created_at: '2026-07-11T00:00:00.000Z',
+  }
+}
+
+function createBoundFreePreviewProfile(userId: string, profileId: string): UserGameAccount {
+  return {
+    ...createProfile('free_preview'),
+    id: profileId,
+    user_id: userId,
+    permission: 'recommended',
+    cdk_order_hash: null,
+    skland_binding: {
+      uid: `skland-${profileId}`,
+      nickname: '测试用户',
+      channel_name: '官服',
+      bound_at: '2026-08-01T00:00:00.000Z',
+      last_imported_at: null,
+      credential_status: 'available',
+      credential_invalid_at: null,
+      credential_invalid_reason: null,
+    },
+  }
+}
+
+function createUpgradeInventory(): InventoryResponse {
+  return {
+    stacks: [{
+      stack_id: 'lifetime-profile-voucher',
+      item: {
+        code: 'lifetime_profile_voucher',
+        kind: 'license_voucher',
+        effect_code: 'bind_lifetime_profile',
+        name: '终身版兑换 CDK',
+        description: '升级档案',
+        icon_key: 'lifetime_profile_voucher',
+        system_owned: true,
+        issuance_enabled: true,
+        created_at: null,
+        updated_at: null,
+      },
+      gift_pack_version_id: null,
+      quantity: 1,
+      permanent: 1,
+      next_expiry_at: null,
+      expiry_buckets: [{ quantity: 1, expires_at: null }],
+      actions: ['bind'],
+    }],
+    capacities: [],
+    reorder_quotas: [],
+    recent_events: [],
   }
 }

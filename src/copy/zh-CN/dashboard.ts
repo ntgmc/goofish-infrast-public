@@ -295,4 +295,20 @@ export const dashboardCopy = {
   pages_tool_dashboard_RedeemSection_tour_004: "输入未使用的 CDK，并可填写档案名称与备注。兑换成功后会创建正式游戏档案。",
   pages_tool_dashboard_RedeemSection_tour_005: "领取免费个人排班",
   pages_tool_dashboard_RedeemSection_tour_006: "点击领取后会打开森空岛确认流程；确认游戏 UID 后才会创建免费档案。导览不会替你发起授权。",
+  // src/pages/tool/ProfileUpgradePrompt.tsx
+  pages_tool_ProfileUpgradePrompt_001: "背包里有可用的档案升级券",
+  // src/pages/tool/ProfileUpgradePrompt.tsx
+  pages_tool_ProfileUpgradePrompt_002: "当前免费预览档案可以使用限时 CDK，立即开启高级版限时体验。",
+  // src/pages/tool/ProfileUpgradePrompt.tsx
+  pages_tool_ProfileUpgradePrompt_003: "背包中同时有可用于当前免费预览档案的限时 CDK 和终身版兑换 CDK。",
+  // src/pages/tool/ProfileUpgradePrompt.tsx
+  pages_tool_ProfileUpgradePrompt_004: "当前免费预览档案可以使用终身版兑换 CDK，升级为长期高级档案。",
+  // src/pages/tool/ProfileUpgradePrompt.tsx
+  pages_tool_ProfileUpgradePrompt_005: "前往背包选择对应档案升级券；只有升级成功后才会消耗道具。",
+  // src/pages/tool/ProfileUpgradePrompt.tsx
+  pages_tool_ProfileUpgradePrompt_006: "不再提示",
+  // src/pages/tool/ProfileUpgradePrompt.tsx
+  pages_tool_ProfileUpgradePrompt_007: "暂时关闭升级提示",
+  // src/pages/tool/ProfileUpgradePrompt.tsx
+  pages_tool_ProfileUpgradePrompt_008: "前往背包升级",
 } as const

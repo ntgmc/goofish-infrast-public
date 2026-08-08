@@ -34,6 +34,32 @@ describe('ResultPanel tabs', () => {
     expect(screen.getByText('纯 MAA 自动填满')).toBeInTheDocument()
   })
 
+  it('explains that requested Fiammetta has no target instead of showing it as disabled', () => {
+    render(
+      <ResultPanel
+        result={{
+          ...createResult(),
+          plans: [{
+            name: '班次 1',
+            rooms: {},
+            Fiammetta: {
+              enable: false,
+              requested: true,
+              available: true,
+              target: '',
+              order: 'pre',
+              status: 'no_target',
+            },
+          }],
+        }}
+      />,
+    )
+
+    expect(screen.getByText('已启用但无目标')).toBeInTheDocument()
+    expect(screen.getByText('优化器未找到收益达到阈值的换心情目标')).toBeInTheDocument()
+    expect(screen.queryByText('未启用')).not.toBeInTheDocument()
+  })
+
   it('keeps aria controls and the latest panel synchronized during rapid switching', async () => {
     const user = userEvent.setup()
     render(<ResultPanel result={createResult()} />)

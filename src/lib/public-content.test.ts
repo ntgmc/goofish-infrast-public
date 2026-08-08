@@ -133,7 +133,7 @@ describe('public content settings', () => {
     delete (intermediate as unknown as { defaults_revision?: number }).defaults_revision
     intermediate.thanks.sections[1].entries[0].avatar_url = 'https://avatars.githubusercontent.com/u/74061867?v=4'
     expect(normalizePublicContentSettings(intermediate)).toMatchObject({
-      defaults_revision: 5,
+      defaults_revision: 6,
       thanks: {
         sections: expect.arrayContaining([
           expect.objectContaining({
@@ -142,6 +142,29 @@ describe('public content settings', () => {
           }),
         ]),
       },
+    })
+  })
+
+  it('migrates untouched pricing copy to the grouped Pricing presentation', () => {
+    const legacy = cloneDefaultPublicContentSettings()
+    const legacyRecord = legacy as unknown as { defaults_revision: number }
+    legacyRecord.defaults_revision = 5
+    legacy.pricing.eyebrow = '公开 SKU'
+    legacy.pricing.intro = '先了解完整权益与限制，再选择适合自己的版本。现在提供月卡、半年卡、年卡、终身卡，以及个人和商用积分单次排班。'
+
+    expect(normalizePublicContentSettings(legacy)).toMatchObject({
+      defaults_revision: 6,
+      pricing: {
+        eyebrow: 'Pricing',
+        intro: '完整高级权益统一为单账号 CDK，月卡、半年卡、年卡和终身卡只在有效期与价格上不同；另有个人和商用积分单次排班。',
+      },
+    })
+
+    legacy.pricing.eyebrow = '管理员自定义页眉'
+    legacy.pricing.intro = '管理员自定义介绍'
+    expect(normalizePublicContentSettings(legacy).pricing).toMatchObject({
+      eyebrow: '管理员自定义页眉',
+      intro: '管理员自定义介绍',
     })
   })
 
@@ -179,7 +202,7 @@ describe('public content settings', () => {
     delete (legacy as unknown as { cdk_purchase?: unknown }).cdk_purchase
 
     const migrated = normalizePublicContentSettings(legacy)
-    expect(migrated.defaults_revision).toBe(5)
+    expect(migrated.defaults_revision).toBe(6)
     expect(migrated.qq_group.name).toBe('管理员自定义群名')
     expect(migrated.cdk_purchase.xianyu_url).toBe(DEFAULT_PUBLIC_CONTENT_DRAFT.cdk_purchase.xianyu_url)
 

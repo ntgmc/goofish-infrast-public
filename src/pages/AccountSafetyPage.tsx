@@ -4,7 +4,6 @@ import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import DebugModePanel from '../components/DebugModePanel'
 import {
-  apiBlob,
   apiJson,
   apiVoid,
 } from '../lib/api-client'
@@ -21,28 +20,10 @@ export default function AccountSafetyPage() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [busy, setBusy] = useState<'export' | 'delete' | 'logout' | null>(null)
+  const [busy, setBusy] = useState<'delete' | 'logout' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [deletion, setDeletion] = useState<AccountDeletionAccepted | null>(null)
-
-  const exportData = async () => {
-    setBusy('export')
-    setError(null)
-    try {
-      const blob = await apiBlob('/api/user/data/export', { fallbackMessage: copy.features.export_failed })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = 'maa-personal-data.json'
-      link.click()
-      URL.revokeObjectURL(url)
-    } catch (caught) {
-      setError(accountLifecycleErrorMessage(caught, copy.features.export_failed))
-    } finally {
-      setBusy(null)
-    }
-  }
 
   const requestDeletion = async () => {
     if (!window.confirm(copy.features.delete_confirm)) return
@@ -87,9 +68,6 @@ export default function AccountSafetyPage() {
           {error && <div className="tool-alert tool-alert--error mt-5" role="alert">{error}</div>}
           {notice && <div className="tool-alert tool-alert--success mt-5" role="status">{notice}</div>}
           <div className="mt-6 flex flex-wrap gap-3">
-            <button type="button" onClick={() => void exportData()} disabled={busy !== null || Boolean(deletion)} className="tool-secondary-action">
-              {busy === 'export' ? copy.features.exporting : copy.features.export_data}
-            </button>
             <button type="button" onClick={() => void logout()} disabled={busy !== null || Boolean(deletion)} className="tool-secondary-action">{copy.features.logout}</button>
             <Link to="/tool/profiles?recovery=1" className="tool-secondary-action">{copy.features.recovery}</Link>
           </div>

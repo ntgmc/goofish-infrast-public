@@ -19,7 +19,23 @@ import BalanceSection from './BalanceSection'
 import { ApiError } from '../../../lib/api-client'
 
 const firstPage = {
-  balance: { currency: 'points' as const, available: '12.30' },
+  balance: {
+    currency: 'points' as const,
+    available: '12.30',
+    reserved: '0.00',
+    lifetime_credited: '12000.00',
+    qualification_reversed: '0.00',
+    debt: '0.00',
+    commercial: {
+      eligible: true,
+      level: 1 as const,
+      threshold_points: '10000.00',
+      discount_bps: 9000,
+      charge_points: '1350.00',
+      next_threshold_points: '50000.00',
+      points_to_next_level: '38000.00',
+    },
+  },
   transactions: [{
     id: 'tx-1',
     kind: 'cdk_credit' as const,
@@ -74,11 +90,41 @@ describe('BalanceSection', () => {
 
     expect(await screen.findByText('12.30')).toBeInTheDocument()
     expect(screen.getByText('+12.30')).toBeInTheDocument()
+    expect(screen.getByText('12000')).toBeInTheDocument()
+    expect(screen.getByText('1200 积分/成功主排班')).toBeInTheDocument()
+    expect(screen.getByText('Lv1 · 1350 积分/成功主排班')).toBeInTheDocument()
+    expect(screen.getByText('还差 38000 积分（门槛 50000）')).toBeInTheDocument()
+    expect(screen.queryByText(/\.00/)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '加载更多' }))
 
     await waitFor(() => expect(mocks.apiJson).toHaveBeenNthCalledWith(2, '/api/user/balance?cursor=next%20page'))
-    expect(await screen.findByText('-2.00')).toBeInTheDocument()
+    expect(await screen.findByText('-2')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '加载更多' })).not.toBeInTheDocument()
+  })
+
+  it('shows pending recovery only when the account has debt', async () => {
+    mocks.apiJson.mockResolvedValueOnce({ ...firstPage, next_cursor: null })
+
+    const { unmount } = render(<BalanceSection redemptionEnabled />)
+
+    await screen.findByText('12.30')
+    expect(screen.queryByText('待追偿')).not.toBeInTheDocument()
+    unmount()
+
+    mocks.apiJson.mockResolvedValueOnce({
+      ...firstPage,
+      balance: {
+        ...firstPage.balance,
+        debt: '25.00',
+        commercial: { ...firstPage.balance.commercial, eligible: false },
+      },
+      next_cursor: null,
+    })
+    render(<BalanceSection redemptionEnabled />)
+
+    expect(await screen.findByText('待追偿')).toBeInTheDocument()
+    expect(screen.getByText('25')).toBeInTheDocument()
+    expect(screen.getByText('Lv1 · 已暂停，待追偿 25 积分')).toBeInTheDocument()
   })
 
   it('reuses the idempotency key after an unknown result and refreshes after success', async () => {
@@ -106,7 +152,7 @@ describe('BalanceSection', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('网络结果未知')
 
     await user.click(screen.getByRole('button', { name: '确认兑换' }))
-    expect(await screen.findByText(/兑换成功：\+10\.00 积分/)).toBeInTheDocument()
+    expect(await screen.findByText(/兑换成功：\+10 积分/)).toBeInTheDocument()
     expect(await screen.findByText('22.30')).toBeInTheDocument()
 
     const redeemCalls = mocks.apiJson.mock.calls.filter(([url]) => url === '/api/user/balance/redeem')
