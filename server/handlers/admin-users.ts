@@ -628,6 +628,7 @@ async function buildAdminProfileSummary(
   const publicProfile = toPublicProfile(profile, workspace)
   return {
     ...publicProfile,
+    updated_at: profile.updated_at,
     note: profile.note,
     skland_binding: profile.skland_binding
       ? {
