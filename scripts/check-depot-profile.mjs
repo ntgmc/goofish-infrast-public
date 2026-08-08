@@ -326,6 +326,11 @@ function memoryLicenseUtilsModule() {
         ? record.item_expires_at
         : null
     }
+    export function getCdkProfileExpiresAt(record) {
+      return isProfileCdkRecord(record) && typeof record?.profile_expires_at === 'string'
+        ? record.profile_expires_at
+        : null
+    }
     export async function getCdkRecordStore() { return { get: async () => null, mutate: async () => null } }
     export async function getRiskControlSettings() { return { operator_data_risk_enabled: true, updated_at: null } }
     export async function incrementCdkScheduleGenerateCount() {}
