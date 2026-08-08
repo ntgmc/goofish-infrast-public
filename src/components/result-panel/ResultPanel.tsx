@@ -35,6 +35,15 @@ export default function ResultPanel({
   const shiftPattern = result.shift_pattern ?? result.shift_hours?.map((hour) => `${hour}h`).join('-') ?? result.planTimes
   const totalScheduleHours = result.total_schedule_hours ?? result.daily_production?.hours
   const fiammettaSlots = result.fiammetta_target_slots ?? []
+  const fiammettaRequested = !isRotationMode && result.plans.some((plan) => plan.Fiammetta?.requested === true)
+  const fiammettaNoTarget = fiammettaRequested
+    && fiammettaSlots.length === 0
+    && result.plans.some((plan) => plan.Fiammetta?.status === 'no_target')
+  const fiammettaStatus = fiammettaSlots.length > 0
+    ? fiammettaSlots.join('、')
+    : fiammettaNoTarget
+      ? copy.domain.components_result_panel_ResultPanel_043
+      : copy.domain.components_result_panel_ResultPanel_037
   const contextItems = [
     { label: copy.domain.components_result_panel_ResultPanel_001, value: result.schedule_mode_name ?? (isRotationMode ? copy.domain.components_result_panel_ResultPanel_002 : copy.domain.components_result_panel_ResultPanel_003) },
     { label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_004 : copy.domain.components_result_panel_ResultPanel_005, value: isRotationMode ? result.planTimes ?? `${detailStats.planCount}${copy.domain.components_result_panel_ResultPanel_006}` : shiftPattern },
@@ -131,11 +140,12 @@ export default function ResultPanel({
                 <span className="font-semibold text-ink-primary">{item.value}</span>
               </span>
             ))}
-            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            <span className="inline-flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-1">
               <span>{copy.domain.components_result_panel_ResultPanel_036}</span>
-              <span className="font-semibold text-ink-primary">
-                {fiammettaSlots.length > 0 ? fiammettaSlots.join('、') : copy.domain.components_result_panel_ResultPanel_037}
-              </span>
+              <span className="font-semibold text-ink-primary">{fiammettaStatus}</span>
+              {fiammettaNoTarget && (
+                <span className="whitespace-normal text-ink-muted">{copy.domain.components_result_panel_ResultPanel_044}</span>
+              )}
             </span>
           </div>
         </div>
