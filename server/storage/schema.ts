@@ -75,7 +75,7 @@ ALTER TABLE cdk_records ADD CONSTRAINT cdk_records_type_payload_check CHECK (
   OR (cdk_type = 'item' AND permission IS NULL AND balance_amount IS NULL AND (
       (item_code IS NULL AND item_expires_at IS NULL)
       OR (item_code = 'lifetime_profile_voucher' AND item_expires_at IS NULL)
-      OR (item_code = 'limited_profile_voucher' AND item_expires_at = '2026-08-19T16:00:00.000Z'::timestamptz)
+      OR (item_code = 'limited_profile_voucher' AND item_expires_at IS NOT NULL)
   ))
 );
 DO $$

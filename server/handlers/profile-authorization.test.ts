@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({ getCdk: vi.fn() }))
 vi.mock('./license-utils', () => ({
   formatRiskFreezeMessage: (message: string) => message,
   getCdkRecordStore: vi.fn(async () => ({ get: mocks.getCdk })),
+  getCdkProfileExpiresAt: (record: { profile_expires_at?: string | null }) => record.profile_expires_at ?? null,
   isProfileCdkRecord: (record: { cdk_type?: string }) => (record.cdk_type ?? 'profile') === 'profile',
 }))
 
@@ -41,6 +42,16 @@ describe('authoritative profile authorization', () => {
     await expect(resolveProfileAuthorization(profile())).resolves.toMatchObject({
       ok: false,
       code: 'permission_invalid',
+    })
+  })
+
+  it('rejects an expired subscription profile even when the linked CDK is still used', async () => {
+    mocks.getCdk.mockResolvedValue(cdkRecord({ profile_expires_at: '2020-01-01T00:00:00.000Z' }))
+
+    await expect(resolveProfileAuthorization(profile())).resolves.toMatchObject({
+      ok: false,
+      code: 'profile_expired',
+      status: 403,
     })
   })
 

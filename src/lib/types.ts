@@ -762,6 +762,7 @@ export interface UserGameAccount {
   permission: PermissionMode;
   trial?: FreePreviewTrial | null;
   status: 'active' | 'frozen' | 'revoked';
+  expires_at?: string | null;
   archived_at?: string | null;
   cdk_order_hash: string | null;
   display_name: string;

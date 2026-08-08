@@ -58,7 +58,10 @@ import { validateRegistrationEmailForRegistration } from '../security/registrati
 import { authCopy } from '../../src/copy/zh-CN/auth'
 import {
   findCdkRecordByCode,
+  addProfileCdkDuration,
   getCdkType,
+  getCdkProfileDuration,
+  getCdkProfileExpiresAt,
   isProfileCdkRecord,
   getCdkRecordStore,
   normalizeCode,
@@ -500,15 +503,18 @@ export async function redeemProfileCdk(
       complete: async (client, cdkRecord) => {
         if (!isProfileCdkRecord(cdkRecord)) throw new Error(authCopy.api_cdk_type_mismatch)
         const permission = normalizePermissionMode(cdkRecord.permission)
+        const profileExpiresAt = resolveProfileCdkExpiresAt(cdkRecord, now)
         const cdkOrderHash = cdkRecord.license_order_hash || createAccountOrderHash(codeHash, profileId)
         const profile: UserGameAccountRecord = {
           version: 1, id: profileId, user_id: user.id, kind: 'cdk', cdk_key: cdkKey, cdk_code_hash: codeHash,
-          cdk_order_hash: cdkOrderHash, permission, status: 'active', display_name: displayName, note, created_at: now, updated_at: now,
+          cdk_order_hash: cdkOrderHash, permission, status: 'active', display_name: displayName, note,
+          expires_at: profileExpiresAt, created_at: now, updated_at: now,
         }
         await saveProfileInTransaction(client, profile)
         await saveWorkspaceInTransaction(client, emptyWorkspace(profile.id))
         const record = {
           ...cdkRecord, status: 'used' as const, used_at: now, license_order_hash: cdkOrderHash,
+          profile_expires_at: profileExpiresAt,
           operator_count: cdkRecord.operator_count ?? null, config_desc: cdkRecord.config_desc ?? null,
           account_id: user.id, profile_id: profile.id, account_email_hash: createHash('sha256').update(user.email).digest('hex'), bound_at: now,
         }
@@ -603,14 +609,17 @@ export async function upgradePreviewProfileWithCdk(
         const current = locked.rows[0]?.record_json
         if (!current || (!isFreePreviewProfile(current) && current.kind !== 'metered_personal') || current.status !== 'active') throw new Error('档案当前不可用。')
         const cdkOrderHash = cdkRecord.license_order_hash || createAccountOrderHash(codeHash, current.id)
+        const profileExpiresAt = resolveProfileCdkExpiresAt(cdkRecord, now)
         const upgraded: UserGameAccountRecord = {
           ...current, kind: 'cdk', cdk_key: cdkKey, cdk_code_hash: codeHash, cdk_order_hash: cdkOrderHash,
-          permission: normalizePermissionMode(cdkRecord.permission), display_name: displayName || current.display_name || '免费个人排班', note: note || current.note, updated_at: now,
+          permission: normalizePermissionMode(cdkRecord.permission), display_name: displayName || current.display_name || '免费个人排班', note: note || current.note,
+          expires_at: profileExpiresAt, updated_at: now,
         }
         await saveProfileInTransaction(client, upgraded)
         await saveWorkspaceInTransaction(client, emptyWorkspace(upgraded.id))
         const record = {
           ...cdkRecord, status: 'used' as const, used_at: now, license_order_hash: cdkOrderHash,
+          profile_expires_at: profileExpiresAt,
           operator_count: cdkRecord.operator_count ?? null, config_desc: cdkRecord.config_desc ?? null,
           account_id: user.id, profile_id: upgraded.id, account_email_hash: createHash('sha256').update(user.email).digest('hex'), bound_at: now,
         }
@@ -648,12 +657,14 @@ async function redeemRegistrationCdk(
         if (!isProfileCdkRecord(cdkRecord)) throw new Error(authCopy.api_cdk_type_mismatch)
         const cdkOrderHash = cdkRecord.license_order_hash || createAccountOrderHash(codeHash, profileId)
         const permission = normalizePermissionMode(cdkRecord.permission)
+        const profileExpiresAt = resolveProfileCdkExpiresAt(cdkRecord, now)
         const boundUser: UserAccountRecord = {
           ...user, permission, cdk_key: cdkKey, cdk_code_hash: codeHash, cdk_order_hash: cdkOrderHash, updated_at: now,
         }
         const profile: UserGameAccountRecord = {
           version: 1, id: profileId, user_id: user.id, kind: 'cdk', cdk_key: cdkKey, cdk_code_hash: codeHash,
-          cdk_order_hash: cdkOrderHash, permission, status: 'active', display_name: '账号 1', note: '', created_at: now, updated_at: now,
+          cdk_order_hash: cdkOrderHash, permission, status: 'active', display_name: '账号 1', note: '',
+          expires_at: profileExpiresAt, created_at: now, updated_at: now,
         }
         await updateRegisteredUserCdkInTransaction(client, boundUser)
         if (invitation) await saveInvitationInTransaction(client, user.id, invitation)
@@ -663,6 +674,7 @@ async function redeemRegistrationCdk(
         return {
           record: {
             ...cdkRecord, status: 'used' as const, used_at: now, license_order_hash: cdkOrderHash,
+            profile_expires_at: profileExpiresAt,
             operator_count: cdkRecord.operator_count ?? null, config_desc: cdkRecord.config_desc ?? null,
             account_id: user.id, profile_id: profile.id, account_email_hash: createHash('sha256').update(user.email).digest('hex'), bound_at: now,
           },
@@ -1016,6 +1028,10 @@ function normalizeProfileDisplayName(value: unknown): string {
 
 function normalizeProfileNote(value: unknown): string {
   return typeof value === 'string' ? value.trim().slice(0, 500) : ''
+}
+
+function resolveProfileCdkExpiresAt(cdkRecord: CdkRecord, now: string): string | null {
+  return getCdkProfileExpiresAt(cdkRecord) ?? addProfileCdkDuration(now, getCdkProfileDuration(cdkRecord))
 }
 
 async function getCdkRecordForProfile(profile: UserGameAccountRecord): Promise<CdkRecord | null> {

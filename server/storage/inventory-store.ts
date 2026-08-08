@@ -769,9 +769,6 @@ async function activateLimitedProfileInTransaction(
   now: string,
 ): Promise<Record<string, unknown>> {
   const nowDate = new Date(now)
-  if (!isFreePreviewLimitedCdkActivityActive(nowDate)) {
-    throw new InventoryError('limited_cdk_activity_inactive', '限时 CDK 活动尚未开始或已经结束。', 409)
-  }
   const selected = await client.query<{ id: string; record_json: import('./user-store').UserGameAccountRecord }>(
     `select id, record_json from user_game_accounts
       where user_id = $1 and status = 'active'
@@ -789,6 +786,25 @@ async function activateLimitedProfileInTransaction(
     throw new InventoryError('limited_permission_already_active', '当前免费预览档案已经激活限时高级权限。', 409)
   }
   await reserveItemsInTransaction(client, userId, [itemCode], 'inventory_operation', operationId, row.id, now)
+  const reserved = await client.query<{ original_expires_at: string | null; source_type: string | null }>(
+    `select consumption.original_expires_at, source_grant.source_type
+       from reward_consumptions consumption
+       join reward_grants source_grant on source_grant.id = consumption.grant_id
+      where consumption.reference_type = 'inventory_operation'
+        and consumption.reference_id = $1
+        and consumption.reward_type = $2
+      order by consumption.consumed_at desc
+      limit 1`,
+    [operationId, itemCode],
+  )
+  const expiry = reserved.rows[0]
+  const endsAt = expiry?.original_expires_at ?? null
+  if (!endsAt || Date.parse(endsAt) <= nowDate.getTime()) {
+    throw new InventoryError('limited_cdk_expired', '该限时 CDK 的有效期已结束。', 409)
+  }
+  if (expiry?.source_type === 'free_preview_activity' && !isFreePreviewLimitedCdkActivityActive(nowDate)) {
+    throw new InventoryError('limited_cdk_activity_inactive', '限时 CDK 活动尚未开始或已经结束。', 409)
+  }
   const next = {
     ...current,
     temporary_permission: {
@@ -796,7 +812,7 @@ async function activateLimitedProfileInTransaction(
       activity_id: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.id,
       permission: 'advanced' as const,
       starts_at: now,
-      ends_at: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.endsAt,
+      ends_at: new Date(endsAt).toISOString(),
       operation_id: operationId,
     },
     updated_at: now,
@@ -813,7 +829,7 @@ async function activateLimitedProfileInTransaction(
     profile_id: row.id,
     permission: 'advanced',
     starts_at: now,
-    ends_at: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.endsAt,
+    ends_at: new Date(endsAt).toISOString(),
   }
 }
 

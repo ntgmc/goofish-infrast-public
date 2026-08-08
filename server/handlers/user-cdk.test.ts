@@ -123,6 +123,22 @@ describe('user CDK redemption', () => {
       sourceId: itemRecord.code_hash,
     }))
   })
+
+  it('passes a limited item CDK expiry through to the inventory grant', async () => {
+    const limitedRecord = { ...itemRecord, item_code: 'limited_profile_voucher', item_expires_at: '2026-09-01T15:59:59.000Z' }
+    mocks.findCdkRecordByCode.mockResolvedValue({ key: 'cdk/item.json', codeHash: itemRecord.code_hash, record: limitedRecord })
+    mocks.redeemCdkAtomically.mockImplementation(async (options) => {
+      const completed = await options.complete({}, limitedRecord)
+      return { response: completed.response, replayed: false }
+    })
+
+    const response = await userCdkHandler(request())
+    expect(response.status).toBe(200)
+    expect(mocks.grantItemInTransaction).toHaveBeenCalledWith({}, expect.objectContaining({
+      itemCode: 'limited_profile_voucher',
+      expiresAt: '2026-09-01T15:59:59.000Z',
+    }))
+  })
 })
 
 function request(): Request {

@@ -30,6 +30,13 @@ export const CDK_PRODUCT_PERMISSIONS: ProductPermissionMode[] = listAdminIssuabl
 export type CdkStatus = 'unused' | 'claiming' | 'used' | 'frozen' | 'revoked'
 export type CdkType = 'profile' | 'balance' | 'item'
 export type ItemCdkCode = 'lifetime_profile_voucher' | 'limited_profile_voucher'
+export type ProfileCdkDuration = 'lifetime' | 'month' | 'half_year' | 'year'
+
+export const PROFILE_CDK_DURATION_DAYS: Record<Exclude<ProfileCdkDuration, 'lifetime'>, number> = {
+  month: 30,
+  half_year: 180,
+  year: 365,
+}
 
 export interface OperatorFingerprint {
   hash: string;
@@ -124,8 +131,24 @@ interface CdkRecordBase {
   profile_id?: string | null;
 }
 
-export type LegacyProfileCdkRecord = CdkRecordBase & { version: 1; cdk_type?: undefined; permission: RawPermissionMode; balance_amount?: null }
-export type ProfileCdkRecord = CdkRecordBase & { version: 2; cdk_type: 'profile'; permission: RawPermissionMode; balance_amount: null }
+export type LegacyProfileCdkRecord = CdkRecordBase & {
+  version: 1;
+  cdk_type?: undefined;
+  permission: RawPermissionMode;
+  balance_amount?: null;
+  profile_duration?: ProfileCdkDuration;
+  profile_duration_days?: number | null;
+  profile_expires_at?: string | null;
+}
+export type ProfileCdkRecord = CdkRecordBase & {
+  version: 2;
+  cdk_type: 'profile';
+  permission: RawPermissionMode;
+  balance_amount: null;
+  profile_duration?: ProfileCdkDuration;
+  profile_duration_days?: number | null;
+  profile_expires_at?: string | null;
+}
 export type BalanceCdkRecord = CdkRecordBase & { version: 2; cdk_type: 'balance'; permission: null; balance_amount: string }
 export type LegacyItemCdkRecord = CdkRecordBase & { version: 2; cdk_type: 'item'; permission: null; balance_amount: null; item_code?: null; item_expires_at?: null }
 export type ItemCdkRecord = CdkRecordBase & { version: 3; cdk_type: 'item'; permission: null; balance_amount: null; item_code: ItemCdkCode; item_expires_at: string | null }
@@ -152,6 +175,31 @@ export function getCdkItemExpiresAt(record: CdkRecord): string | null {
   return getCdkType(record) === 'item' && typeof record.item_expires_at === 'string'
     ? record.item_expires_at
     : null
+}
+
+export function getCdkProfileDuration(record: CdkRecord): ProfileCdkDuration {
+  if (!isProfileCdkRecord(record)) return 'lifetime'
+  if (record.profile_duration === 'month' || record.profile_duration === 'half_year' || record.profile_duration === 'year') {
+    return record.profile_duration
+  }
+  return 'lifetime'
+}
+
+export function getCdkProfileDurationDays(record: CdkRecord): number | null {
+  const duration = getCdkProfileDuration(record)
+  return duration === 'lifetime' ? null : PROFILE_CDK_DURATION_DAYS[duration]
+}
+
+export function getCdkProfileExpiresAt(record: CdkRecord): string | null {
+  return isProfileCdkRecord(record) && typeof record.profile_expires_at === 'string'
+    ? record.profile_expires_at
+    : null
+}
+
+export function addProfileCdkDuration(now: string, duration: ProfileCdkDuration): string | null {
+  if (duration === 'lifetime') return null
+  const days = PROFILE_CDK_DURATION_DAYS[duration]
+  return new Date(Date.parse(now) + days * 86_400_000).toISOString()
 }
 
 export function isProfileCdkRecord(record: CdkRecord): record is LegacyProfileCdkRecord | ProfileCdkRecord {

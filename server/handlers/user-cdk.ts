@@ -57,7 +57,7 @@ export default async function userCdkHandler(req: Request): Promise<Response> {
           throw new InventoryError('cdk_type_mismatch', '该 CDK 不是可兑换的道具 CDK。', 409)
         }
         const expiresAt = getCdkItemExpiresAt(record)
-        if (expiresAt && Date.now() >= Date.parse(expiresAt)) {
+        if (expiresAt && (!Number.isFinite(Date.parse(expiresAt)) || Date.now() >= Date.parse(expiresAt))) {
           throw new InventoryError('cdk_item_expired', '该限时 CDK 的兑换期限已过。', 409)
         }
         const redeemedAt = new Date().toISOString()
