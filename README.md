@@ -107,7 +107,25 @@ AWS_SES_CONFIGURATION_SET_NAME=<optional configuration set>
 
 SES 模板数据沿用现有事务邮件参数：验证模板接收 `verification_url`、`expires_hours`；重置模板接收 `reset_url`、`expires_minutes`；注销取消模板接收 `cancel_url`、`expires_days`；注销回执模板接收 `receipt_id`。
 
-没有外部 worker 时，已提交任务会可靠保留在 PostgreSQL 队列中，直到兼容的 `OptimizerPort` worker 消费。仓库不提供 fake optimizer，避免生成看似成功但并非真实优化结果的数据。
+API-only 构建没有外部 worker 时，已提交任务会可靠保留在 PostgreSQL 队列中，直到兼容的 `OptimizerPort` worker 消费。仓库不提供 fake optimizer，避免生成看似成功但并非真实优化结果的数据。
+
+私有组合构建可在服务机使用 `APP_ROLE=all` 开启阿里云 ECS worker 自动伸缩。启用后，combined 进程始终把本机计算并发限制为 1：远端实例停止时由本机继续消费；排队数严格超过扩容阈值时启动指定 ECS；排队数连续 10 分钟不超过 1 且没有运行中的任务时，以 `StopCharging` 模式停止远端实例。自动伸缩默认关闭，所需配置如下：
+
+```text
+OPTIMIZE_WORKER_AUTOSCALING_ENABLED=true
+OPTIMIZE_WORKER_SCALE_UP_QUEUE_THRESHOLD=4
+OPTIMIZE_WORKER_SCALE_DOWN_QUEUE_THRESHOLD=1
+OPTIMIZE_WORKER_SCALE_DOWN_IDLE_MS=600000
+OPTIMIZE_WORKER_AUTOSCALE_INTERVAL_MS=30000
+ALIYUN_ACCESS_KEY_ID=<restricted RAM access key id>
+ALIYUN_ACCESS_KEY_SECRET=<restricted RAM access key secret>
+ALIYUN_ECS_REGION_ID=cn-hangzhou
+ALIYUN_ECS_WORKER_INSTANCE_ID=i-xxxxxxxx
+# ALIYUN_SECURITY_TOKEN=<required when using temporary STS credentials>
+# ALIYUN_ECS_ENDPOINT=https://ecs.aliyuncs.com
+```
+
+RAM 身份只应获得目标实例的 `ecs:DescribeInstanceStatus`、`ecs:StartInstance` 和 `ecs:StopInstance` 权限；凭证必须由部署系统以 secret 注入，不得写入仓库或日志。`StopCharging` 会停止符合条件的按量实例的计算资源计费，但云盘、保留公网 IP 等资源仍可能计费。生产 combined 进程还需按既有边界显式配置 `ALLOW_PRODUCTION_COMBINED_PROCESS=true`，并由私有组合构建提供真实 `OptimizerPort`。
 
 默认 API 地址为 `http://127.0.0.1:3000`；可通过 `HOST` 和 `PORT` 覆盖。
 

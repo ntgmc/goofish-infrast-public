@@ -5,7 +5,7 @@ vi.mock('./storage/postgres', () => ({ query }))
 vi.mock('./optimize-job-runner', () => ({
   getOptimizeJobProcessingState: () => ({ workerId: 'worker-runtime-1' }),
 }))
-vi.mock('./optimize-job-config', () => ({ getOptimizeWorkerConcurrency: () => 4 }))
+vi.mock('./optimize-job-config', () => ({ getOptimizeWorkerRuntimeConcurrency: () => 4 }))
 
 import {
   initializeOptimizeWorkerRegistration,

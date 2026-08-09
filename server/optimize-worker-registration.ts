@@ -1,6 +1,6 @@
 import { createBackgroundWorker } from './background-worker-runtime'
 import { getOptimizeJobProcessingState } from './optimize-job-runner'
-import { getOptimizeWorkerConcurrency } from './optimize-job-config'
+import { getOptimizeWorkerRuntimeConcurrency } from './optimize-job-config'
 import { describeServerError } from './security/error-reporting'
 import { query } from './storage/postgres'
 
@@ -30,7 +30,7 @@ const controller = createBackgroundWorker({
              draining = false`,
       [
         getOptimizeJobProcessingState().workerId,
-        getOptimizeWorkerConcurrency(),
+        getOptimizeWorkerRuntimeConcurrency(),
         OPTIMIZE_WORKER_HEARTBEAT_INTERVAL_MS,
         OPTIMIZE_WORKER_STALE_AFTER_MS,
         ['optimize_jobs', 'optimize_queue', 'inventory_campaign', 'invitation_settlement', 'behavior_risk'],
