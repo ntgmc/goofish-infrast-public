@@ -173,6 +173,17 @@ CPU work. During a prolonged incident, lower the global and analysis queue
 limits or temporarily suspend submissions so admitted jobs do not accumulate
 beyond operational capacity.
 
+A capacity-reviewed private combined deployment may instead run the service
+host with `APP_ROLE=all`, `ALLOW_PRODUCTION_COMBINED_PROCESS=true`, and Aliyun
+worker autoscaling enabled. That topology keeps exactly one local optimization
+thread available while the remote ECS instance is stopped. It starts the
+designated instance only when the queued count is strictly above the configured
+scale-up threshold. It requests a non-forced `StopCharging` stop only after the
+queue has remained at or below the scale-down threshold for the full idle
+window and the global running count is zero. Do not enable this topology on a
+service host that has not been load-tested for one CPU-bound optimization plus
+normal API traffic.
+
 Do not expose PostgreSQL publicly as a recovery shortcut. Restore
 `wg-quick@wg0.service`, verify a recent handshake, run
 `scripts/check-worker-link.mjs` with the worker EnvironmentFile, and require the
@@ -180,11 +191,9 @@ inactive worker slot readiness check to pass before resuming normal admission.
 Expired running leases are safely returned to the queue; ownership checks stop
 a stale worker from committing results after recovery.
 
-If Seoul must temporarily execute urgent work, install a separate standby
-worker unit that is disabled by default and uses concurrency one. Enabling it is
-a documented incident action, not an automatic fallback, because CPU-bound
-jobs can make the two-core API host unavailable. Disable the standby again as
-soon as Hangzhou readiness is restored.
+Deployments that remain `APP_ROLE=api` still require the separate standby worker
+procedure for urgent local execution. Keep that unit disabled by default with
+concurrency one, and disable it again as soon as Hangzhou readiness is restored.
 
 Worker rollback uses the same validated main SHA as API rollback. Keep the
 current and previous worker releases protected from cleanup and record any

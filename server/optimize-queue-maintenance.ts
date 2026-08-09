@@ -7,6 +7,11 @@ import { processPendingOptimizationJobEffects } from './optimization/jobs/job-ef
 import { describeServerError } from './security/error-reporting'
 import { createBackgroundWorker } from './background-worker-runtime'
 import { hasDatabaseUrl, withPostgresAdvisoryLock } from './storage/postgres'
+import {
+  initializeOptimizeWorkerAutoscaling,
+  shutdownOptimizeWorkerAutoscaling,
+  waitForOptimizeWorkerAutoscalingIdle,
+} from './optimize-worker-autoscaler'
 
 const DEFAULT_CLEANUP_AGE_MS = 24 * 60 * 60 * 1000
 const MAINTENANCE_INTERVAL_MS = 60_000
@@ -20,9 +25,11 @@ const controller = createBackgroundWorker({
 export async function initializeOptimizeQueueMaintenance(): Promise<void> {
   if (!canMaintainOptimizeQueue()) return
   await controller.initialize()
+  await initializeOptimizeWorkerAutoscaling()
 }
 
 export function shutdownOptimizeQueueMaintenance(): void {
+  shutdownOptimizeWorkerAutoscaling()
   controller.stop()
 }
 
@@ -31,7 +38,10 @@ export function isOptimizeQueueMaintenanceInitialized(): boolean {
 }
 
 export function waitForOptimizeQueueMaintenanceIdle(): Promise<void> {
-  return controller.waitForIdle()
+  return Promise.all([
+    controller.waitForIdle(),
+    waitForOptimizeWorkerAutoscalingIdle(),
+  ]).then(() => undefined)
 }
 
 async function runQueueMaintenance(): Promise<void> {

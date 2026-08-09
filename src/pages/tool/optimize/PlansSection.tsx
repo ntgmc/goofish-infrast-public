@@ -198,47 +198,49 @@ export default function PlansSection({
         </div>
       </section>
 
-      <section className="tool-panel overflow-hidden" aria-labelledby="archived-results-title">
-        <div className="tool-panel-header px-5 py-4 sm:px-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="tool-eyebrow">{copy.inventory.archive_title}</p>
-              <h2 id="archived-results-title" className="mt-1 text-lg font-semibold text-ink-primary">{copy.inventory.archive_title}</h2>
-              <p className="mt-1 text-sm leading-6 text-ink-secondary">{copy.inventory.archive_description}</p>
+      {archiveLimit > 0 && (
+        <section className="tool-panel overflow-hidden" aria-labelledby="archived-results-title">
+          <div className="tool-panel-header px-5 py-4 sm:px-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="tool-eyebrow">{copy.inventory.archive_title}</p>
+                <h2 id="archived-results-title" className="mt-1 text-lg font-semibold text-ink-primary">{copy.inventory.archive_title}</h2>
+                <p className="mt-1 text-sm leading-6 text-ink-secondary">{copy.inventory.archive_description}</p>
+              </div>
+              <span className="tool-status tool-status--current">{archivedResultsUsed}/{archiveLimit}</span>
             </div>
-            <span className="tool-status tool-status--current">{archivedResultsUsed}/{archiveLimit}</span>
+            {archiveLimitReached && <p className="tool-alert tool-alert--warning mt-4" role="status">{copy.inventory.archive_full}</p>}
           </div>
-          {archiveLimitReached && archiveLimit > 0 && <p className="tool-alert tool-alert--warning mt-4" role="status">{copy.inventory.archive_full}</p>}
-        </div>
-        <div className="p-5 sm:p-6">
-          <div className="space-y-3">
-            {archivedResults.length === 0 && <p className="tool-inset px-3 py-3 text-sm text-ink-muted">{copy.inventory.archive_empty}</p>}
-            {archivedResults.map((item) => (
-              <div key={item.id} className={`tool-inset px-3 py-3 ${selectedHistoryId === item.id ? 'border-brand-500/60 bg-brand-600/10' : ''}`}>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-ink-primary">{item.name}</p>
-                    <p className="mt-1 text-xs text-ink-muted">{formatWorkspaceDate(item.created_at)} · {formatResultHistorySummary(item)}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
-                    <SmallActionButton onClick={() => void onViewHistory(item)} disabled={busyAction === `detail:${item.id}`} tone="primary">{copy.optimize.pages_tool_optimize_PlansSection_030}</SmallActionButton>
-                    <SmallActionButton onClick={() => onDownloadHistory(item)} disabled={busyAction === `download:${item.id}` || !item.maa_exportable}>{busyAction === `download:${item.id}` ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_PlansSection_031}</SmallActionButton>
-                    <SmallActionButton onClick={() => void onUseHistoryConfig(item)} disabled={busyAction === `detail:${item.id}` || !item.has_config}>{copy.optimize.pages_tool_optimize_PlansSection_032}</SmallActionButton>
-                    <SmallActionButton onClick={() => void onUnarchiveHistory(item)} disabled={historyLimitReached || busyAction === `unarchive:${item.id}`}>{copy.inventory.unarchive_action}</SmallActionButton>
+          <div className="p-5 sm:p-6">
+            <div className="space-y-3">
+              {archivedResults.length === 0 && <p className="tool-inset px-3 py-3 text-sm text-ink-muted">{copy.inventory.archive_empty}</p>}
+              {archivedResults.map((item) => (
+                <div key={item.id} className={`tool-inset px-3 py-3 ${selectedHistoryId === item.id ? 'border-brand-500/60 bg-brand-600/10' : ''}`}>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-ink-primary">{item.name}</p>
+                      <p className="mt-1 text-xs text-ink-muted">{formatWorkspaceDate(item.created_at)} · {formatResultHistorySummary(item)}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
+                      <SmallActionButton onClick={() => void onViewHistory(item)} disabled={busyAction === `detail:${item.id}`} tone="primary">{copy.optimize.pages_tool_optimize_PlansSection_030}</SmallActionButton>
+                      <SmallActionButton onClick={() => onDownloadHistory(item)} disabled={busyAction === `download:${item.id}` || !item.maa_exportable}>{busyAction === `download:${item.id}` ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_PlansSection_031}</SmallActionButton>
+                      <SmallActionButton onClick={() => void onUseHistoryConfig(item)} disabled={busyAction === `detail:${item.id}` || !item.has_config}>{copy.optimize.pages_tool_optimize_PlansSection_032}</SmallActionButton>
+                      <SmallActionButton onClick={() => void onUnarchiveHistory(item)} disabled={historyLimitReached || busyAction === `unarchive:${item.id}`}>{copy.inventory.unarchive_action}</SmallActionButton>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-            {archivedResultsHasMore && (
-              <button type="button" className="tool-secondary-action w-full" disabled={historyLoadingScope !== null} onClick={() => void onLoadMoreArchivedResults()}>
-                {historyLoadingScope === 'archived' ? copy.optimize.pages_tool_optimize_result_history_loading : copy.optimize.pages_tool_optimize_result_history_load_more}
-              </button>
-            )}
+              ))}
+              {archivedResultsHasMore && (
+                <button type="button" className="tool-secondary-action w-full" disabled={historyLoadingScope !== null} onClick={() => void onLoadMoreArchivedResults()}>
+                  {historyLoadingScope === 'archived' ? copy.optimize.pages_tool_optimize_result_history_loading : copy.optimize.pages_tool_optimize_result_history_load_more}
+                </button>
+              )}
+            </div>
+            {historyLoadError && <p className="tool-alert tool-alert--error mt-4" role="alert">{historyLoadError}</p>}
+            {historyLimitReached && archivedResults.length > 0 && <p className="tool-alert tool-alert--warning mt-4" role="status">{copy.inventory.history_full_for_unarchive}</p>}
           </div>
-          {historyLoadError && <p className="tool-alert tool-alert--error mt-4" role="alert">{historyLoadError}</p>}
-          {historyLimitReached && archivedResults.length > 0 && <p className="tool-alert tool-alert--warning mt-4" role="status">{copy.inventory.history_full_for_unarchive}</p>}
-        </div>
-      </section>
+        </section>
+      )}
     </section>
   )
 }

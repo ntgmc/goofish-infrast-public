@@ -15,8 +15,8 @@ import {
   formatOptimizeJobHardTimeout,
   getOptimizeGlobalWorkerConcurrency,
   getOptimizeJobMaxAttempts,
-  getOptimizeWorkerConcurrency,
   getOptimizeWorkerConfiguration,
+  getOptimizeWorkerRuntimeConcurrency,
 } from './optimize-job-config'
 import {
   calculateOptimizeExecutionDeadlineAtMs,
@@ -82,7 +82,10 @@ let pollTimer: ReturnType<typeof setInterval> | null = null
 export async function initializeOptimizeJobProcessing(): Promise<void> {
   if (!canRunOptimizeWorker() || initialized) return
   requireRegisteredOptimizerPort()
-  const configuration = getOptimizeWorkerConfiguration()
+  const configuration = {
+    ...getOptimizeWorkerConfiguration(),
+    localConcurrency: workerConcurrency(),
+  }
   console.info('[optimize-worker-config]', configuration)
   initialized = true
   accepting = true
@@ -475,7 +478,7 @@ function shouldRunInline(): boolean {
 }
 
 function workerConcurrency(): number {
-  return getOptimizeWorkerConcurrency()
+  return getOptimizeWorkerRuntimeConcurrency()
 }
 
 function lockTtlMs(): number {

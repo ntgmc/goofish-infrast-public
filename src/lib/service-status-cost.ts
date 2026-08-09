@@ -98,7 +98,11 @@ function recommendWorkers(samples: AdminServiceStatusHistoryBucket[], baseline: 
   if (samples.length === 0) return Math.max(0, baseline)
   const average = Math.max(...samples.map((sample) => sample.average_worker_instances ?? 0))
   const peak = Math.max(...samples.map((sample) => sample.peak_worker_instances ?? 0))
-  const pressured = samples.some((sample) => sample.status === 'congested' || (sample.peak_queued ?? 0) > 0)
+  const pressured = samples.some((sample) =>
+    sample.status === 'congested'
+    || sample.status === 'overloaded'
+    || (sample.peak_queued ?? 0) > 0,
+  )
   return Math.max(0, Math.ceil(Math.max(baseline, average, peak + (pressured ? 1 : 0))))
 }
 

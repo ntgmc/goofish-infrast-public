@@ -1,5 +1,6 @@
 import {
   QUEUE_CONGESTION_THRESHOLD,
+  QUEUE_OVERLOAD_THRESHOLD,
   createEmptyServiceStatusHistory,
   resolveOptimizationServiceStatus,
   type ServiceStatusHistoryResponse,
@@ -49,7 +50,7 @@ export default async function serviceStatusHandler(req: Request): Promise<Respon
         worker_instances: snapshot.capacity.worker_instances,
       },
       components: [{ id: 'optimization', status }],
-      thresholds: { queue_congested_at: QUEUE_CONGESTION_THRESHOLD },
+      thresholds: { queue_congested_at: QUEUE_CONGESTION_THRESHOLD, queue_overloaded_at: QUEUE_OVERLOAD_THRESHOLD },
       history,
       incidents,
     }
@@ -66,7 +67,7 @@ function unavailablePayload(): ServiceStatusResponse {
     status: 'unavailable',
     queue: null,
     components: [{ id: 'optimization', status: 'unavailable' }],
-    thresholds: { queue_congested_at: QUEUE_CONGESTION_THRESHOLD },
+    thresholds: { queue_congested_at: QUEUE_CONGESTION_THRESHOLD, queue_overloaded_at: QUEUE_OVERLOAD_THRESHOLD },
     history: createEmptyServiceStatusHistory(),
     incidents: [],
   }

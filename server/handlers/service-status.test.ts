@@ -57,6 +57,17 @@ describe('service status handler', () => {
     await expect(response.json()).resolves.toMatchObject({ status: 'congested' })
   })
 
+  it('reports orange overload above twenty queued jobs', async () => {
+    getQueueSnapshot.mockResolvedValue(snapshot({ queued: 21, running: 3, workerConcurrency: 3, workerInstances: 1 }))
+    const response = await serviceStatusHandler(new Request('http://localhost/api/status'))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      status: 'overloaded',
+      thresholds: { queue_congested_at: 5, queue_overloaded_at: 20 },
+    })
+  })
+
   it('reports red when readiness or the worker registry is unavailable', async () => {
     isServiceReady.mockReturnValue(false)
     const response = await serviceStatusHandler(new Request('http://localhost/api/status'))

@@ -26,7 +26,10 @@
 The API can authenticate, validate, enqueue, query, and cancel optimization
 jobs without an optimizer implementation. PostgreSQL is the reliable boundary
 between the public API and an external worker. Without a compatible worker,
-jobs remain queued; the API never computes a substitute result.
+jobs remain queued in the API-only topology; the API never computes a substitute
+result. A private combined composition may register the real `OptimizerPort` on
+the service host and consume work with one local thread while an optional
+Aliyun ECS worker is stopped.
 
 The public worker runtime requires an explicitly registered OptimizerPort v1
 before it can become ready or claim work. Missing or incompatible ports fail

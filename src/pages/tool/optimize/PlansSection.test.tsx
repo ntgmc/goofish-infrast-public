@@ -61,13 +61,20 @@ describe('PlansSection', () => {
 
   it('keeps full calculation downloads out of history shortcuts', () => {
     const rotation = historyItem(2, 'rotation')
-    renderSection({ resultHistory: [historyItem(1)], archivedResults: [rotation] })
+    renderSection({ resultHistory: [historyItem(1)], archivedResults: [rotation], archiveLimit: 1 })
 
     const maaButtons = screen.getAllByRole('button', { name: '下载 MAA JSON' })
     expect(maaButtons).toHaveLength(2)
     expect(maaButtons[0]).toBeEnabled()
     expect(maaButtons[1]).toBeDisabled()
     expect(screen.queryByRole('button', { name: '下载完整计算数据' })).not.toBeInTheDocument()
+  })
+
+  it('hides the result archive area when its capacity is zero', () => {
+    renderSection({ resultHistory: [historyItem(1)] })
+
+    expect(screen.queryByRole('heading', { name: '结果封存区' })).not.toBeInTheDocument()
+    expect(screen.queryByText('封存区暂无结果。')).not.toBeInTheDocument()
   })
 })
 

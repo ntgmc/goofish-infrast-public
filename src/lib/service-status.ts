@@ -1,9 +1,10 @@
 export const QUEUE_CONGESTION_THRESHOLD = 5
+export const QUEUE_OVERLOAD_THRESHOLD = 20
 const SERVICE_STATUS_HISTORY_DAYS = 30
 export const SERVICE_STATUS_HISTORY_HOURS = SERVICE_STATUS_HISTORY_DAYS * 24
 const SERVICE_STATUS_HISTORY_INTERVAL = 'hour' as const
 
-export const SERVICE_STATUS_LEVELS = ['available', 'busy', 'congested', 'unavailable'] as const
+export const SERVICE_STATUS_LEVELS = ['available', 'busy', 'congested', 'overloaded', 'unavailable'] as const
 export type ServiceStatusLevel = typeof SERVICE_STATUS_LEVELS[number]
 const SERVICE_STATUS_HISTORY_LEVELS = [...SERVICE_STATUS_LEVELS, 'unknown'] as const
 export type ServiceStatusHistoryLevel = typeof SERVICE_STATUS_HISTORY_LEVELS[number]
@@ -83,6 +84,7 @@ export interface ServiceStatusResponse {
   }>
   thresholds: {
     queue_congested_at: number
+    queue_overloaded_at: number
   }
   history: ServiceStatusHistoryResponse
   incidents: PublicStatusIncident[]
@@ -99,6 +101,7 @@ export interface ServiceStatusHistoryBucket {
 export interface AdminServiceStatusHistoryBucket extends ServiceStatusHistoryBucket {
   busy_samples: number
   congested_samples: number
+  overloaded_samples: number
   average_active_concurrency: number | null
   average_provisioned_concurrency: number | null
   average_worker_instances: number | null
@@ -170,6 +173,7 @@ export interface ServiceStatusHistoryAggregate {
   unavailableSamples: number
   busySamples: number
   congestedSamples: number
+  overloadedSamples: number
   runningSum: number
   provisionedSum: number
   utilizationSum: number
@@ -184,6 +188,7 @@ export function resolveOptimizationServiceStatus(input: OptimizationServiceStatu
   if (!input.serviceReady || input.workerInstances <= 0 || input.workerConcurrency <= 0) return 'unavailable'
   if (input.queued === 0 && input.running < input.workerConcurrency) return 'available'
   if (input.queued < QUEUE_CONGESTION_THRESHOLD) return 'busy'
+  if (input.queued > QUEUE_OVERLOAD_THRESHOLD) return 'overloaded'
   return 'congested'
 }
 
@@ -235,6 +240,7 @@ export function aggregateServiceStatusSample(
       availableSamples: sample.status === 'available' ? 1 : 0,
       busySamples: sample.status === 'busy' ? 1 : 0,
       congestedSamples: sample.status === 'congested' ? 1 : 0,
+      overloadedSamples: sample.status === 'overloaded' ? 1 : 0,
       unavailableSamples: sample.status === 'unavailable' ? 1 : 0,
       runningSum: sample.running,
       provisionedSum: sample.workerConcurrency,
@@ -255,6 +261,7 @@ export function aggregateServiceStatusSample(
     unavailableSamples: current.unavailableSamples + (sample.status === 'unavailable' ? 1 : 0),
     busySamples: current.busySamples + (sample.status === 'busy' ? 1 : 0),
     congestedSamples: current.congestedSamples + (sample.status === 'congested' ? 1 : 0),
+    overloadedSamples: current.overloadedSamples + (sample.status === 'overloaded' ? 1 : 0),
     runningSum: current.runningSum + sample.running,
     provisionedSum: current.provisionedSum + sample.workerConcurrency,
     utilizationSum: current.utilizationSum + (sample.workerConcurrency > 0 ? Math.min(100, (sample.running / sample.workerConcurrency) * 100) : 0),
@@ -295,6 +302,7 @@ export function historyBucketFromAggregate(
     unavailable_samples: aggregate.unavailableSamples,
     busy_samples: aggregate.busySamples,
     congested_samples: aggregate.congestedSamples,
+    overloaded_samples: aggregate.overloadedSamples,
   }
 }
 

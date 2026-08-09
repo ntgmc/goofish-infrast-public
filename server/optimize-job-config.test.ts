@@ -1,12 +1,20 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   DEFAULT_OPTIMIZE_GLOBAL_WORKER_CONCURRENCY,
+  DEFAULT_OPTIMIZE_LOCAL_FALLBACK_CONCURRENCY,
+  DEFAULT_OPTIMIZE_WORKER_AUTOSCALE_INTERVAL_MS,
+  DEFAULT_OPTIMIZE_WORKER_SCALE_DOWN_IDLE_MS,
+  DEFAULT_OPTIMIZE_WORKER_SCALE_DOWN_QUEUE_THRESHOLD,
+  DEFAULT_OPTIMIZE_WORKER_SCALE_UP_QUEUE_THRESHOLD,
   DEFAULT_OPTIMIZE_JOB_MAX_ATTEMPTS,
   DEFAULT_OPTIMIZE_WORKER_CONCURRENCY,
   getOptimizeGlobalWorkerConcurrency,
   getOptimizeJobMaxAttempts,
+  getOptimizeLocalFallbackConcurrency,
+  getOptimizeWorkerAutoscalingConfiguration,
   getOptimizeWorkerConfiguration,
   getOptimizeWorkerConcurrency,
+  getOptimizeWorkerRuntimeConcurrency,
   MAX_OPTIMIZE_GLOBAL_WORKER_CONCURRENCY,
   MAX_OPTIMIZE_JOB_ATTEMPTS,
   MAX_OPTIMIZE_WORKER_CONCURRENCY,
@@ -60,5 +68,55 @@ describe('optimization job configuration', () => {
       OPTIMIZE_WORKER_CONCURRENCY: '4',
       OPTIMIZE_GLOBAL_WORKER_CONCURRENCY: '3',
     })).toThrow('OPTIMIZE_WORKER_CONCURRENCY must not exceed OPTIMIZE_GLOBAL_WORKER_CONCURRENCY')
+  })
+
+  it('keeps the combined service fallback at one execution thread', () => {
+    expect(getOptimizeLocalFallbackConcurrency()).toBe(1)
+    expect(DEFAULT_OPTIMIZE_LOCAL_FALLBACK_CONCURRENCY).toBe(1)
+    expect(getOptimizeWorkerRuntimeConcurrency({
+      NODE_ENV: 'production',
+      APP_ROLE: 'all',
+      OPTIMIZE_WORKER_AUTOSCALING_ENABLED: 'true',
+      OPTIMIZE_WORKER_CONCURRENCY: '8',
+    })).toBe(1)
+    expect(getOptimizeWorkerRuntimeConcurrency({
+      NODE_ENV: 'production',
+      APP_ROLE: 'worker',
+      OPTIMIZE_WORKER_AUTOSCALING_ENABLED: 'true',
+      OPTIMIZE_WORKER_CONCURRENCY: '8',
+    })).toBe(8)
+  })
+
+  it('defaults autoscaling to opt-in with safe queue thresholds', () => {
+    expect(getOptimizeWorkerAutoscalingConfiguration({})).toEqual({
+      enabled: false,
+      scaleUpQueueThreshold: DEFAULT_OPTIMIZE_WORKER_SCALE_UP_QUEUE_THRESHOLD,
+      scaleDownQueueThreshold: DEFAULT_OPTIMIZE_WORKER_SCALE_DOWN_QUEUE_THRESHOLD,
+      scaleDownIdleMs: DEFAULT_OPTIMIZE_WORKER_SCALE_DOWN_IDLE_MS,
+      intervalMs: DEFAULT_OPTIMIZE_WORKER_AUTOSCALE_INTERVAL_MS,
+    })
+  })
+
+  it('validates configured autoscaling thresholds and the enabled flag', () => {
+    expect(getOptimizeWorkerAutoscalingConfiguration({
+      OPTIMIZE_WORKER_AUTOSCALING_ENABLED: 'true',
+      OPTIMIZE_WORKER_SCALE_UP_QUEUE_THRESHOLD: '5',
+      OPTIMIZE_WORKER_SCALE_DOWN_QUEUE_THRESHOLD: '1',
+      OPTIMIZE_WORKER_SCALE_DOWN_IDLE_MS: '600000',
+      OPTIMIZE_WORKER_AUTOSCALE_INTERVAL_MS: '15000',
+    })).toEqual({
+      enabled: true,
+      scaleUpQueueThreshold: 5,
+      scaleDownQueueThreshold: 1,
+      scaleDownIdleMs: 600_000,
+      intervalMs: 15_000,
+    })
+    expect(() => getOptimizeWorkerAutoscalingConfiguration({
+      OPTIMIZE_WORKER_SCALE_UP_QUEUE_THRESHOLD: '4',
+      OPTIMIZE_WORKER_SCALE_DOWN_QUEUE_THRESHOLD: '5',
+    })).toThrow('must not exceed')
+    expect(() => getOptimizeWorkerAutoscalingConfiguration({
+      OPTIMIZE_WORKER_AUTOSCALING_ENABLED: 'yes',
+    })).toThrow('must be true or false')
   })
 })

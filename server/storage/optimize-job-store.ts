@@ -231,6 +231,12 @@ export interface AdminOptimizationQueueSnapshot {
   recent_jobs: AdminOptimizationQueueJob[]
 }
 
+export type OptimizeQueueLoad = {
+  queued: number
+  running: number
+  workerInstances: number
+}
+
 declare global {
   var __maaOptimizeJobStoreForTesting: OptimizeJobStore | undefined
 }
@@ -239,6 +245,34 @@ let schemaReady: Promise<void> | null = null
 
 export function getOptimizeJobStore(): OptimizeJobStore {
   return globalThis.__maaOptimizeJobStoreForTesting ?? createPostgresOptimizeJobStore()
+}
+
+/**
+ * Read only the counters required by the worker autoscaler. Keeping this
+ * separate from the admin snapshot avoids loading queue rows and account
+ * metadata on every autoscaling tick.
+ */
+export async function getOptimizeQueueLoad(): Promise<OptimizeQueueLoad> {
+  await ensureSchema()
+  const result = await query<{
+    queued: string
+    running: string
+    worker_instances: string
+  }>(`
+    select
+      (select count(*) from optimize_jobs where status = 'queued')::text as queued,
+      (select count(*) from optimize_jobs where status = 'running')::text as running,
+      (select count(*) from optimize_worker_registry
+        where draining = false
+          and heartbeat_at + stale_after_ms * interval '1 millisecond' > transaction_timestamp())::text
+        as worker_instances
+  `)
+  const row = result.rows[0]
+  return {
+    queued: Math.max(0, Number(row?.queued ?? 0)),
+    running: Math.max(0, Number(row?.running ?? 0)),
+    workerInstances: Math.max(0, Number(row?.worker_instances ?? 0)),
+  }
 }
 
 export function createPostgresOptimizeJobStore(): OptimizeJobStore {

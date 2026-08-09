@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { QUEUE_CONGESTION_THRESHOLD, resolveOptimizationServiceStatus, type AdminServiceStatusResponse, normalizeServiceStatusCostConfig } from '../../src/lib/service-status'
+import { QUEUE_CONGESTION_THRESHOLD, QUEUE_OVERLOAD_THRESHOLD, resolveOptimizationServiceStatus, type AdminServiceStatusResponse, normalizeServiceStatusCostConfig } from '../../src/lib/service-status'
 import { calculateServiceStatusCostEstimate, recommendServiceStatusCostPlan } from '../../src/lib/service-status-cost'
 import { authenticateAdminRequest } from './admin-auth'
 import { jsonResponse } from './license-utils'
@@ -41,7 +41,7 @@ export default async function adminServiceStatusHandler(req: Request): Promise<R
         status: currentStatus,
         queue: { queued: snapshot.counts.queued, running: snapshot.counts.running, queue_limit: snapshot.capacity.queue_limit, worker_concurrency: snapshot.capacity.worker_concurrency, worker_instances: snapshot.capacity.worker_instances },
         components: [{ id: 'optimization', status: currentStatus }],
-        thresholds: { queue_congested_at: QUEUE_CONGESTION_THRESHOLD },
+        thresholds: { queue_congested_at: QUEUE_CONGESTION_THRESHOLD, queue_overloaded_at: QUEUE_OVERLOAD_THRESHOLD },
         history: { ...history, interval: 'hour', complete: true },
         incidents,
         cost: {
