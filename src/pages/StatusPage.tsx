@@ -8,6 +8,7 @@ import ThemeSwitcher from '../components/ThemeSwitcher'
 import { copy } from '../copy/index'
 import {
   QUEUE_CONGESTION_THRESHOLD,
+  QUEUE_OVERLOAD_THRESHOLD,
   SERVICE_STATUS_HISTORY_HOURS,
   SERVICE_STATUS_LEVELS,
   type PublicStatusIncident,
@@ -24,7 +25,7 @@ const UNAVAILABLE_STATUS: ServiceStatusResponse = {
   status: 'unavailable',
   queue: null,
   components: [{ id: 'optimization', status: 'unavailable' }],
-  thresholds: { queue_congested_at: QUEUE_CONGESTION_THRESHOLD },
+  thresholds: { queue_congested_at: QUEUE_CONGESTION_THRESHOLD, queue_overloaded_at: QUEUE_OVERLOAD_THRESHOLD },
   history: {
     from: new Date(0).toISOString(),
     to: new Date(0).toISOString(),
@@ -163,6 +164,7 @@ export default function StatusPage() {
               <StatusRule level="available" label={copy.status.pages_StatusPage_025} description={copy.status.pages_StatusPage_016} />
               <StatusRule level="busy" label={copy.status.pages_StatusPage_026} description={copy.status.pages_StatusPage_017} />
               <StatusRule level="congested" label={copy.status.pages_StatusPage_027} description={copy.status.pages_StatusPage_018} />
+              <StatusRule level="overloaded" label={copy.status.pages_StatusPage_063} description={copy.status.pages_StatusPage_064} />
               <StatusRule level="unavailable" label={copy.status.pages_StatusPage_028} description={copy.status.pages_StatusPage_019} />
             </div>
             <p className="mt-5 text-sm leading-7 text-ink-muted">{copy.status.pages_StatusPage_031}</p>
@@ -195,6 +197,10 @@ function isServiceStatusResponse(value: unknown): value is ServiceStatusResponse
 function normalizeStatusResponse(value: ServiceStatusResponse): ServiceStatusResponse {
   return {
     ...value,
+    thresholds: {
+      queue_congested_at: value.thresholds?.queue_congested_at ?? QUEUE_CONGESTION_THRESHOLD,
+      queue_overloaded_at: value.thresholds?.queue_overloaded_at ?? QUEUE_OVERLOAD_THRESHOLD,
+    },
     history: value.history ?? { from: new Date(0).toISOString(), to: new Date(0).toISOString(), interval: 'hour', complete: false, buckets: [] },
     incidents: Array.isArray(value.incidents) ? value.incidents : [],
   }
@@ -213,7 +219,7 @@ function StatusHistorySection({ history }: { history: ServiceStatusResponse['his
       <div className="tool-panel mt-5 overflow-hidden p-4 sm:p-5">
         <p className="text-sm leading-7 text-ink-secondary">{copy.status.pages_StatusPage_038}{history.complete ? `${copy.status.pages_StatusPage_039} ${sampled} ${copy.status.pages_StatusPage_040}` : copy.status.pages_StatusPage_041}</p>
         <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-ink-muted" aria-label={copy.status.pages_StatusPage_042}>
-          {(['available', 'busy', 'congested', 'unavailable', 'unknown'] as const).map((level) => <span key={level} className="inline-flex items-center gap-1.5"><span className={`service-status-history-swatch service-status-history-cell--${level}`} aria-hidden="true" />{statusLabel(level)}</span>)}
+          {(['available', 'busy', 'congested', 'overloaded', 'unavailable', 'unknown'] as const).map((level) => <span key={level} className="inline-flex items-center gap-1.5"><span className={`service-status-history-swatch service-status-history-cell--${level}`} aria-hidden="true" />{statusLabel(level)}</span>)}
         </div>
         <div className="service-status-history-scroll mt-5" tabIndex={0} aria-label={copy.status.pages_StatusPage_043}>
           <div className="service-status-history-grid" role="grid" aria-rowcount={rows.length}>
@@ -273,7 +279,7 @@ function historyCellLabel(cell: ServiceStatusHistoryBucket): string {
 function formatHistoryRange(from: string, to: string): string { return `${formatDateInProjectTimezone(from)} – ${formatDateInProjectTimezone(to)}` }
 function formatDateInProjectTimezone(value: string): string { const timestamp = Date.parse(value); return Number.isFinite(timestamp) ? new Date(timestamp).toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' }) : copy.status.pages_StatusPage_051 }
 function formatDay(value: string | undefined): string { if (!value) return ''; const timestamp = Date.parse(value); return Number.isFinite(timestamp) ? new Date(timestamp).toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', month: 'numeric', day: 'numeric' }) : '' }
-function statusLabel(level: ServiceStatusHistoryLevel): string { return ({ available: copy.status.pages_StatusPage_052, busy: copy.status.pages_StatusPage_053, congested: copy.status.pages_StatusPage_054, unavailable: copy.status.pages_StatusPage_055, unknown: copy.status.pages_StatusPage_050 } as const)[level] }
+function statusLabel(level: ServiceStatusHistoryLevel): string { return ({ available: copy.status.pages_StatusPage_052, busy: copy.status.pages_StatusPage_053, congested: copy.status.pages_StatusPage_054, overloaded: copy.status.pages_StatusPage_065, unavailable: copy.status.pages_StatusPage_055, unknown: copy.status.pages_StatusPage_050 } as const)[level] }
 function incidentStatusLabel(status: PublicStatusIncident['status']): string { return ({ investigating: copy.status.pages_StatusPage_056, identified: copy.status.pages_StatusPage_057, monitoring: copy.status.pages_StatusPage_058, resolved: copy.status.pages_StatusPage_059 } as const)[status] }
 function incidentImpactLabel(impact: PublicStatusIncident['impact']): string { return ({ minor: copy.status.pages_StatusPage_060, major: copy.status.pages_StatusPage_061, critical: copy.status.pages_StatusPage_062 } as const)[impact] }
 
@@ -290,5 +296,7 @@ function statusMessageFor(level: ServiceStatusLevel): string {
       ? copy.status.pages_StatusPage_033
       : level === 'congested'
         ? copy.status.pages_StatusPage_034
-        : copy.status.pages_StatusPage_035
+        : level === 'overloaded'
+          ? copy.status.pages_StatusPage_064
+          : copy.status.pages_StatusPage_035
 }

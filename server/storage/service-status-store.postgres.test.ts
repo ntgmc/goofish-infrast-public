@@ -31,12 +31,12 @@ afterAll(async () => {
 describe('PostgreSQL service status history', () => {
   it('merges samples into one UTC hour and exposes cost aggregates', async () => {
     await recordServiceStatusSample({ componentId: 'optimization', bucketStart: '2026-08-08T01:15:00.000Z', status: 'available', queued: 0, running: 1, workerConcurrency: 4, workerInstances: 1, sampledAt: '2026-08-08T01:15:00.000Z' })
-    await recordServiceStatusSample({ componentId: 'optimization', bucketStart: '2026-08-08T01:45:00.000Z', status: 'congested', queued: 6, running: 4, workerConcurrency: 4, workerInstances: 1, sampledAt: '2026-08-08T01:45:00.000Z' })
+    await recordServiceStatusSample({ componentId: 'optimization', bucketStart: '2026-08-08T01:45:00.000Z', status: 'overloaded', queued: 21, running: 4, workerConcurrency: 4, workerInstances: 1, sampledAt: '2026-08-08T01:45:00.000Z' })
     const history = await getServiceStatusHistory('optimization', new Date('2026-08-08T02:00:00.000Z'))
     expect(history.buckets).toHaveLength(1)
-    expect(history.buckets[0]).toMatchObject({ bucket_start: '2026-08-08T01:00:00.000Z', status: 'congested', sample_count: 2, availability_percent: 50 })
+    expect(history.buckets[0]).toMatchObject({ bucket_start: '2026-08-08T01:00:00.000Z', status: 'overloaded', sample_count: 2, availability_percent: 50 })
     const admin = await getAdminServiceStatusHistory('optimization', new Date('2026-08-08T02:00:00.000Z'))
-    expect(admin.buckets[0]).toMatchObject({ busy_samples: 0, congested_samples: 1, peak_queued: 6, average_utilization_percent: 62.5, average_worker_instances: 1 })
+    expect(admin.buckets[0]).toMatchObject({ busy_samples: 0, congested_samples: 0, overloaded_samples: 1, peak_queued: 21, average_utilization_percent: 62.5, average_worker_instances: 1 })
     await query('delete from service_status_hourly where bucket_start = $1', ['2026-08-08T01:00:00.000Z'])
   })
 

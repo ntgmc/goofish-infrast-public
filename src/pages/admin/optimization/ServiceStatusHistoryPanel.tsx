@@ -10,7 +10,7 @@ import { createDefaultServiceStatusCostConfig, type AdminServiceStatusResponse, 
 
 const EMPTY: AdminServiceStatusResponse = {
   generated_at: new Date(0).toISOString(), status: 'unavailable', queue: null,
-  components: [{ id: 'optimization', status: 'unavailable' }], thresholds: { queue_congested_at: 5 },
+  components: [{ id: 'optimization', status: 'unavailable' }], thresholds: { queue_congested_at: 5, queue_overloaded_at: 20 },
   history: { from: new Date(0).toISOString(), to: new Date(0).toISOString(), interval: 'hour', complete: false, buckets: [] }, incidents: [],
   cost: { config: createDefaultServiceStatusCostConfig(), estimate: calculateServiceStatusCostEstimate(createDefaultServiceStatusCostConfig(), []), recommendation: { generated_at: new Date(0).toISOString(), source_sample_count: 0, confidence: 'none', valley_worker_instances: 0, peak_windows: [], hourly_worker_instances: Array.from({ length: 24 }, () => 0), rationale: [] } },
 }

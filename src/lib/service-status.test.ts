@@ -19,8 +19,13 @@ describe('service status rules', () => {
     expect(resolveOptimizationServiceStatus({ serviceReady: true, queued: 4, running: 3, workerConcurrency: 3, workerInstances: 1 })).toBe('busy')
   })
 
-  it('uses yellow when five or more jobs are waiting', () => {
+  it('uses yellow when five through twenty jobs are waiting', () => {
     expect(resolveOptimizationServiceStatus({ serviceReady: true, queued: 5, running: 3, workerConcurrency: 3, workerInstances: 1 })).toBe('congested')
+    expect(resolveOptimizationServiceStatus({ serviceReady: true, queued: 20, running: 3, workerConcurrency: 3, workerInstances: 1 })).toBe('congested')
+  })
+
+  it('uses orange when more than twenty jobs are waiting', () => {
+    expect(resolveOptimizationServiceStatus({ serviceReady: true, queued: 21, running: 3, workerConcurrency: 3, workerInstances: 1 })).toBe('overloaded')
   })
 
   it('uses red when the service or worker capacity is unavailable', () => {
@@ -43,7 +48,7 @@ describe('service status rules', () => {
     const config = { ...createDefaultServiceStatusCostConfig(), schedule_enabled: true, valley_worker_instances: 1, peak_windows: [{ start: '23:00', end: '00:00', worker_instances: 2 }] }
     expect(calculatePlannedDailyWorkerHours(config)).toBe(25)
     const recommendation = recommendServiceStatusCostPlan([
-      { component_id: 'optimization' as const, bucket_start: '2026-08-08T15:00:00.000Z', status: 'congested' as const, sample_count: 12, availability_percent: 50, busy_samples: 0, congested_samples: 6, average_active_concurrency: 2, average_provisioned_concurrency: 2, average_worker_instances: 1, average_utilization_percent: 100, peak_queued: 8, peak_running: 2, peak_worker_instances: 1, unavailable_samples: 0 },
+      { component_id: 'optimization' as const, bucket_start: '2026-08-08T15:00:00.000Z', status: 'congested' as const, sample_count: 12, availability_percent: 50, busy_samples: 0, congested_samples: 6, overloaded_samples: 0, average_active_concurrency: 2, average_provisioned_concurrency: 2, average_worker_instances: 1, average_utilization_percent: 100, peak_queued: 8, peak_running: 2, peak_worker_instances: 1, unavailable_samples: 0 },
     ], createDefaultServiceStatusCostConfig(), '2026-08-09T00:00:00.000Z')
     expect(recommendation.valley_worker_instances).toBe(1)
     expect(recommendation.peak_windows).toContainEqual({ start: '23:00', end: '00:00', worker_instances: 2 })
@@ -52,8 +57,8 @@ describe('service status rules', () => {
   it('recommends extra instances for historical queue pressure by local hour', () => {
     const config = createDefaultServiceStatusCostConfig()
     const buckets = [
-      { component_id: 'optimization' as const, bucket_start: '2026-08-08T01:00:00.000Z', status: 'available' as const, sample_count: 12, availability_percent: 100, busy_samples: 0, congested_samples: 0, average_active_concurrency: 1, average_provisioned_concurrency: 3, average_worker_instances: 1, average_utilization_percent: 33, peak_queued: 0, peak_running: 1, peak_worker_instances: 1, unavailable_samples: 0 },
-      { component_id: 'optimization' as const, bucket_start: '2026-08-08T09:00:00.000Z', status: 'congested' as const, sample_count: 12, availability_percent: 50, busy_samples: 0, congested_samples: 6, average_active_concurrency: 3, average_provisioned_concurrency: 3, average_worker_instances: 1, average_utilization_percent: 100, peak_queued: 8, peak_running: 3, peak_worker_instances: 1, unavailable_samples: 0 },
+      { component_id: 'optimization' as const, bucket_start: '2026-08-08T01:00:00.000Z', status: 'available' as const, sample_count: 12, availability_percent: 100, busy_samples: 0, congested_samples: 0, overloaded_samples: 0, average_active_concurrency: 1, average_provisioned_concurrency: 3, average_worker_instances: 1, average_utilization_percent: 33, peak_queued: 0, peak_running: 1, peak_worker_instances: 1, unavailable_samples: 0 },
+      { component_id: 'optimization' as const, bucket_start: '2026-08-08T09:00:00.000Z', status: 'congested' as const, sample_count: 12, availability_percent: 50, busy_samples: 0, congested_samples: 6, overloaded_samples: 0, average_active_concurrency: 3, average_provisioned_concurrency: 3, average_worker_instances: 1, average_utilization_percent: 100, peak_queued: 8, peak_running: 3, peak_worker_instances: 1, unavailable_samples: 0 },
     ]
     const recommendation = recommendServiceStatusCostPlan(buckets, config, '2026-08-09T00:00:00.000Z')
     expect(recommendation.source_sample_count).toBe(24)
@@ -66,12 +71,17 @@ describe('service status rules', () => {
     expect(floorStatusTimestampToHour('2026-08-08T09:59:59+08:00')).toBe('2026-08-08T01:00:00.000Z')
     expect(mergeServiceStatusLevels('available', 'congested')).toBe('congested')
     expect(mergeServiceStatusLevels('congested', 'available')).toBe('congested')
+    expect(mergeServiceStatusLevels('congested', 'overloaded')).toBe('overloaded')
     const first = aggregateServiceStatusSample(null, {
       componentId: 'optimization', bucketStart: '2026-08-08T01:00:00.000Z', status: 'available', queued: 0, running: 1, workerConcurrency: 3, workerInstances: 1, sampledAt: '2026-08-08T01:01:00.000Z',
     })
-    const merged = aggregateServiceStatusSample(first, {
+    const overloaded = aggregateServiceStatusSample(first, {
+      componentId: 'optimization', bucketStart: '2026-08-08T01:00:00.000Z', status: 'overloaded', queued: 21, running: 3, workerConcurrency: 3, workerInstances: 1, sampledAt: '2026-08-08T01:03:00.000Z',
+    })
+    expect(historyBucketFromAggregate(overloaded)).toMatchObject({ status: 'overloaded', sample_count: 2, overloaded_samples: 1, peak_queued: 21 })
+    const merged = aggregateServiceStatusSample(overloaded, {
       componentId: 'optimization', bucketStart: '2026-08-08T01:00:00.000Z', status: 'unavailable', queued: 8, running: 0, workerConcurrency: 0, workerInstances: 0, sampledAt: '2026-08-08T01:06:00.000Z',
     })
-    expect(historyBucketFromAggregate(merged)).toMatchObject({ status: 'unavailable', sample_count: 2, availability_percent: 50, peak_queued: 8, unavailable_samples: 1 })
+    expect(historyBucketFromAggregate(merged)).toMatchObject({ status: 'unavailable', sample_count: 3, availability_percent: 33.33, peak_queued: 21, unavailable_samples: 1, overloaded_samples: 1 })
   })
 })
