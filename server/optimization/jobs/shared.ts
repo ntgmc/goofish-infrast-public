@@ -3,7 +3,7 @@ import { type CdkRecord } from "../../handlers/license-utils"
 import type { UsageReasonCode } from "../../storage/usage-store";
 import { type OptimizeJobPriority } from "../../storage/optimize-job-store"
 import type { ScenarioComparisonFactors } from '../../../src/lib/scenario-comparison'
-import type { MeteredBillingKind, MeteredQuoteConfirmation } from '../../../src/lib/metered-billing'
+import type { MeteredBillingKind, MeteredBillingOperation, MeteredQuoteConfirmation } from '../../../src/lib/metered-billing'
 import { optimizationJobPayloadSchema } from './runtime-contracts'
 
 export const UPGRADE_MAX_SIMULATIONS = 24;
@@ -88,13 +88,15 @@ type OptimizeJobPayloadBase = {
     include_upgrade_suggestions: boolean;
     upgrade_suggestions_allowed: boolean;
     history_source?: 'generated' | 'applied_suggestions';
+    billing_operation?: MeteredBillingOperation;
+    baseline_history_id?: string;
   };
 };
 
 export type OptimizeJobPayload = OptimizeJobPayloadBase & {
   version: 3;
   configPermission: OptimizeConfigPermission;
-  cdkUsageRef: Pick<CdkRecord, 'code_hash'> | null;
+  cdkUsageRef?: Pick<CdkRecord, 'code_hash'> | null;
 };
 
 export function createPersistedOptimizeJobPayload(input: Omit<OptimizeJobPayload, 'version'>): OptimizeJobPayload {
@@ -108,6 +110,7 @@ export type ScenarioComparisonJobPayload = {
   operators: LicenseOperator[];
   effectiveConfig: LicenseConfig;
   activeProfileId: string;
+  cdkUsageRef?: Pick<CdkRecord, 'code_hash'> | null;
   factors: ScenarioComparisonFactors;
   estimate: OptimizeDurationEstimate;
 };
@@ -176,7 +179,7 @@ export type PreparedOptimizeJob = {
   rewardItemCodes?: string[];
   behaviorIdentity?: { userId: string; sessionTokenHash: string };
   personalUseAudit?: { userId: string; profileId: string };
-  billing?: { userId: string; billingKind: MeteredBillingKind; confirmation: MeteredQuoteConfirmation } | null;
+  billing?: { userId: string; operation: MeteredBillingOperation; billingKind: MeteredBillingKind; confirmation: MeteredQuoteConfirmation } | null;
 };
 
 export type OptimizeConfigPermission = PermissionMode | "free_preview";

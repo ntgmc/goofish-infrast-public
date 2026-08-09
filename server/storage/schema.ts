@@ -1232,6 +1232,7 @@ CREATE TABLE IF NOT EXISTS metered_billing_quotes (
   user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
   profile_id TEXT NOT NULL REFERENCES user_game_accounts(id) ON DELETE CASCADE,
   billing_kind TEXT NOT NULL CHECK (billing_kind IN ('metered_personal', 'metered_commercial')),
+  operation TEXT NOT NULL DEFAULT 'main_schedule' CHECK (operation IN ('main_schedule', 'incremental_recompute', 'scenario_comparison')),
   pricing_version TEXT NOT NULL,
   tier INTEGER CHECK (tier BETWEEN 1 AND 4),
   list_price NUMERIC(20,2) NOT NULL CHECK (list_price > 0),
@@ -1242,6 +1243,10 @@ CREATE TABLE IF NOT EXISTS metered_billing_quotes (
   created_at TIMESTAMPTZ NOT NULL,
   confirmed_at TIMESTAMPTZ
 );
+ALTER TABLE metered_billing_quotes ADD COLUMN IF NOT EXISTS operation TEXT NOT NULL DEFAULT 'main_schedule';
+ALTER TABLE metered_billing_quotes DROP CONSTRAINT IF EXISTS metered_billing_quotes_operation_check;
+ALTER TABLE metered_billing_quotes ADD CONSTRAINT metered_billing_quotes_operation_check
+  CHECK (operation IN ('main_schedule', 'incremental_recompute', 'scenario_comparison'));
 CREATE INDEX IF NOT EXISTS idx_metered_billing_quotes_expiry
   ON metered_billing_quotes(expires_at) WHERE admitted_job_id IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_metered_billing_quotes_admitted_job

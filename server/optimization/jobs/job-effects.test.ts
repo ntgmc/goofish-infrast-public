@@ -48,6 +48,7 @@ describe('optimization completion effect outbox', () => {
       expect.objectContaining({ status: 'success', reason_code: 'ok', profile_id: 'profile-1' }),
       expect.objectContaining({ submittedAt: 1 }),
       'job-1',
+      true,
     )
     expect(mocks.recordGeneratedBehaviorEvent).toHaveBeenCalledWith(expect.objectContaining({
       userId: 'user-1',

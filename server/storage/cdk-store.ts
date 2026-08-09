@@ -5,6 +5,8 @@ import {
   getCdkBalanceAmount,
   getCdkItemCode,
   getCdkItemExpiresAt,
+  getCdkScheduleQuotaLimit,
+  getCdkScenarioQuotaLimit,
   getCdkType,
   isProfileCdkRecord,
   type CdkRecord,
@@ -14,6 +16,216 @@ import {
 import { normalizeRuntimePermission } from '../../src/lib/product-catalog'
 
 let schemaReady: Promise<void> | null = null
+
+export class CdkScheduleQuotaExceededError extends Error {
+  readonly code = 'subscription_quota_exceeded' as const
+
+  constructor(readonly limit: number) {
+    super(`当前周期卡的完整主排班额度已用完（${limit} 次），可购买增量重算包或升级长期方案。`)
+    this.name = 'CdkScheduleQuotaExceededError'
+  }
+}
+
+export class CdkScenarioQuotaExceededError extends Error {
+  readonly code = 'subscription_scenario_quota_exceeded' as const
+
+  constructor(readonly limit: number) {
+    super(`当前周期卡的场景对比额度已用完（${limit} 次），请升级方案。`)
+    this.name = 'CdkScenarioQuotaExceededError'
+  }
+}
+
+export async function reserveCdkScheduleQuotaInTransaction(
+  client: PoolClient,
+  input: { jobId: string; codeHash: string; now?: string },
+): Promise<boolean> {
+  const key = `cdk/${input.codeHash}.json`
+  const selected = await client.query<{ record_json: CdkRecord }>(
+    `select record_json from cdk_records where key = $1 and status = 'used' for update`,
+    [key],
+  )
+  const record = selected.rows[0]?.record_json
+  if (!record) throw new Error('CDK schedule quota record is missing.')
+  const limit = getCdkScheduleQuotaLimit(record)
+  if (limit === null) return false
+  const generated = Math.max(0, Math.floor(record?.schedule_generate_count ?? 0))
+  const reserved = Math.max(0, Math.floor((record as CdkRecord & { schedule_generate_reserved_count?: number })?.schedule_generate_reserved_count ?? 0))
+  if (generated + reserved >= limit) throw new CdkScheduleQuotaExceededError(limit)
+  const effect = await client.query(
+    `insert into optimization_job_effects (job_id, effect_type, metadata_json, applied_at)
+     values ($1, 'cdk_schedule_quota', $2::jsonb, $3)
+     on conflict (job_id, effect_type) do nothing
+     returning job_id`,
+    [input.jobId, JSON.stringify({ key, limit, status: 'reserved' }), input.now ?? new Date().toISOString()],
+  )
+  if (!effect.rowCount) return true
+  const next = { ...record, schedule_generate_reserved_count: reserved + 1 }
+  await updateStoredCdkRecordInTransaction(client, key, next)
+  return true
+}
+
+export async function settleCdkScheduleQuota(jobId: string, now = new Date().toISOString()): Promise<boolean> {
+  await ensureSchema()
+  return withTransaction(async (client) => {
+    const effect = await client.query<{ metadata_json: Record<string, unknown> }>(
+      `select metadata_json from optimization_job_effects
+       where job_id = $1 and effect_type = 'cdk_schedule_quota'
+       for update`,
+      [jobId],
+    )
+    const metadata = effect.rows[0]?.metadata_json
+    if (!metadata || typeof metadata.key !== 'string') return false
+    // A completion effect can be retried after the quota settlement itself
+    // succeeded (for example, if behavior-event recording failed). Treat any
+    // existing quota effect as already handled so the legacy fallback counter
+    // cannot double-count the same successful job.
+    if (metadata.status !== 'reserved') return true
+    const selected = await client.query<{ record_json: CdkRecord }>(
+      'select record_json from cdk_records where key = $1 for update', [metadata.key],
+    )
+    const record = selected.rows[0]?.record_json
+    if (!record) throw new Error('CDK schedule quota record is missing.')
+    const reserved = Math.max(0, Math.floor((record as CdkRecord & { schedule_generate_reserved_count?: number }).schedule_generate_reserved_count ?? 0))
+    const next = {
+      ...record,
+      schedule_generate_reserved_count: Math.max(0, reserved - 1),
+      schedule_generate_count: Math.max(0, Math.floor(record.schedule_generate_count ?? 0)) + 1,
+    }
+    await updateStoredCdkRecordInTransaction(client, metadata.key, next)
+    await client.query(
+      `update optimization_job_effects
+          set metadata_json = metadata_json || $2::jsonb, applied_at = $3
+        where job_id = $1 and effect_type = 'cdk_schedule_quota'`,
+      [jobId, JSON.stringify({ status: 'applied' }), now],
+    )
+    return true
+  })
+}
+
+export async function releaseCdkScheduleQuotaInTransaction(
+  client: PoolClient,
+  jobId: string,
+  now = new Date().toISOString(),
+): Promise<boolean> {
+  const effect = await client.query<{ metadata_json: Record<string, unknown> }>(
+    `select metadata_json from optimization_job_effects
+     where job_id = $1 and effect_type = 'cdk_schedule_quota'
+       and coalesce(metadata_json->>'status', 'reserved') = 'reserved'
+     for update`,
+    [jobId],
+  )
+  const metadata = effect.rows[0]?.metadata_json
+  if (!metadata || typeof metadata.key !== 'string') return false
+  const selected = await client.query<{ record_json: CdkRecord }>(
+    'select record_json from cdk_records where key = $1 for update', [metadata.key],
+  )
+  const record = selected.rows[0]?.record_json
+  if (record) {
+    const reserved = Math.max(0, Math.floor((record as CdkRecord & { schedule_generate_reserved_count?: number }).schedule_generate_reserved_count ?? 0))
+    await updateStoredCdkRecordInTransaction(client, metadata.key, {
+      ...record,
+      schedule_generate_reserved_count: Math.max(0, reserved - 1),
+    })
+  }
+  await client.query(
+    `update optimization_job_effects
+        set metadata_json = metadata_json || $2::jsonb, applied_at = $3
+      where job_id = $1 and effect_type = 'cdk_schedule_quota'`,
+    [jobId, JSON.stringify({ status: 'released' }), now],
+  )
+  return true
+}
+
+export async function reserveCdkScenarioQuotaInTransaction(
+  client: PoolClient,
+  input: { jobId: string; codeHash: string; now?: string },
+): Promise<boolean> {
+  const key = `cdk/${input.codeHash}.json`
+  const selected = await client.query<{ record_json: CdkRecord }>(
+    `select record_json from cdk_records where key = $1 and status = 'used' for update`, [key],
+  )
+  const record = selected.rows[0]?.record_json
+  if (!record) throw new Error('CDK scenario quota record is missing.')
+  const limit = getCdkScenarioQuotaLimit(record)
+  if (limit === null) return false
+  const completed = Math.max(0, Math.floor(record.scenario_comparison_count ?? 0))
+  const reserved = Math.max(0, Math.floor(record.scenario_comparison_reserved_count ?? 0))
+  if (completed + reserved >= limit) throw new CdkScenarioQuotaExceededError(limit)
+  const effect = await client.query(
+    `insert into optimization_job_effects (job_id, effect_type, metadata_json, applied_at)
+     values ($1, 'cdk_scenario_quota', $2::jsonb, $3)
+     on conflict (job_id, effect_type) do nothing returning job_id`,
+    [input.jobId, JSON.stringify({ key, limit, status: 'reserved' }), input.now ?? new Date().toISOString()],
+  )
+  if (!effect.rowCount) return true
+  await updateStoredCdkRecordInTransaction(client, key, {
+    ...record,
+    scenario_comparison_reserved_count: reserved + 1,
+  })
+  return true
+}
+
+export async function settleCdkScenarioQuotaInTransaction(
+  client: PoolClient,
+  jobId: string,
+  now = new Date().toISOString(),
+): Promise<boolean> {
+  const effect = await client.query<{ metadata_json: Record<string, unknown> }>(
+    `select metadata_json from optimization_job_effects
+       where job_id = $1 and effect_type = 'cdk_scenario_quota'
+         and coalesce(metadata_json->>'status', 'reserved') = 'reserved' for update`, [jobId],
+  )
+  const metadata = effect.rows[0]?.metadata_json
+  if (!metadata || typeof metadata.key !== 'string') return false
+  const selected = await client.query<{ record_json: CdkRecord }>(
+    'select record_json from cdk_records where key = $1 for update', [metadata.key],
+  )
+  const record = selected.rows[0]?.record_json
+  if (!record) throw new Error('CDK scenario quota record is missing.')
+  await updateStoredCdkRecordInTransaction(client, metadata.key, {
+    ...record,
+    scenario_comparison_reserved_count: Math.max(0, Math.floor(record.scenario_comparison_reserved_count ?? 0) - 1),
+    scenario_comparison_count: Math.max(0, Math.floor(record.scenario_comparison_count ?? 0)) + 1,
+  })
+  await client.query(
+    `update optimization_job_effects
+        set metadata_json = metadata_json || $2::jsonb, applied_at = $3
+      where job_id = $1 and effect_type = 'cdk_scenario_quota'`,
+    [jobId, JSON.stringify({ status: 'applied' }), now],
+  )
+  return true
+}
+
+export async function releaseCdkScenarioQuotaInTransaction(
+  client: PoolClient,
+  jobId: string,
+  now = new Date().toISOString(),
+): Promise<boolean> {
+  const effect = await client.query<{ metadata_json: Record<string, unknown> }>(
+    `select metadata_json from optimization_job_effects
+       where job_id = $1 and effect_type = 'cdk_scenario_quota'
+         and coalesce(metadata_json->>'status', 'reserved') = 'reserved' for update`, [jobId],
+  )
+  const metadata = effect.rows[0]?.metadata_json
+  if (!metadata || typeof metadata.key !== 'string') return false
+  const selected = await client.query<{ record_json: CdkRecord }>(
+    'select record_json from cdk_records where key = $1 for update', [metadata.key],
+  )
+  const record = selected.rows[0]?.record_json
+  if (record) {
+    await updateStoredCdkRecordInTransaction(client, metadata.key, {
+      ...record,
+      scenario_comparison_reserved_count: Math.max(0, Math.floor(record.scenario_comparison_reserved_count ?? 0) - 1),
+    })
+  }
+  await client.query(
+    `update optimization_job_effects
+        set metadata_json = metadata_json || $2::jsonb, applied_at = $3
+      where job_id = $1 and effect_type = 'cdk_scenario_quota'`,
+    [jobId, JSON.stringify({ status: 'released' }), now],
+  )
+  return true
+}
 
 export async function listCdkRecordsByKeys(keys: string[]): Promise<Map<string, CdkRecord>> {
   if (keys.length === 0) return new Map()
@@ -274,6 +486,25 @@ async function insertCdkRecord(client: Pick<PoolClient, 'query'>, key: string, r
     ],
   )
   if (result.rowCount !== 1) throw new Error('CDK record already exists')
+}
+
+async function updateStoredCdkRecordInTransaction(
+  client: Pick<PoolClient, 'query'>,
+  key: string,
+  record: CdkRecord,
+): Promise<void> {
+  const storedRecord = normalizeCdkRecordForPersistence(record)
+  const result = await client.query(
+    `update cdk_records
+        set status = $2, cdk_type = $3, permission = $4, balance_amount = $5::numeric,
+            item_code = $6, item_expires_at = $7, license_order_hash = $8,
+            record_json = $9::jsonb, record_revision = record_revision + 1, updated_at = now()
+      where key = $1`,
+    [key, storedRecord.status, getCdkType(storedRecord), storedRecord.permission,
+      getCdkBalanceAmount(storedRecord), getCdkItemCode(storedRecord), getCdkItemExpiresAt(storedRecord),
+      storedRecord.license_order_hash, JSON.stringify(storedRecord)],
+  )
+  if (result.rowCount !== 1) throw new Error('CDK record changed before its schedule quota could be updated')
 }
 
 function normalizeCdkRecordForPersistence(record: CdkRecord): CdkRecord {

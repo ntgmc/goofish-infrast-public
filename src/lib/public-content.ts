@@ -3,7 +3,7 @@ import { copy } from '../copy/index'
 import { getSku, productPolicies } from './product-catalog'
 
 export const PUBLIC_CONTENT_VERSION = 1 as const
-export const PUBLIC_CONTENT_DEFAULTS_REVISION = 6 as const
+export const PUBLIC_CONTENT_DEFAULTS_REVISION = 7 as const
 export const PUBLIC_PRICING_PLAN_IDS = [
   'free_preview',
   'single_account_monthly',
@@ -129,6 +129,8 @@ const defaultPricingPlans = {
     account_scope: singleAccountLifetime.account_scope,
   },
 } satisfies Record<PublicPricingPlanId, z.infer<typeof pricingPlanSchema>>
+
+const previousDefaultPricingPlans = copy.publicContent.legacy_pricing_plans
 
 const pricingPlansSchema = z.strictObject({
   free_preview: pricingPlanInputSchema,
@@ -349,7 +351,7 @@ export function resolvePublicContentSettings(value: unknown): { content: PublicC
   const storedDefaultsRevision = normalizeDefaultsRevision(source.defaults_revision)
   const normalizedDraft = normalizePricingComparisonDefaults(parsed.data)
   const migratedDraft = storedDefaultsRevision < PUBLIC_CONTENT_DEFAULTS_REVISION
-    ? migrateLegacyPricingCopy(migrateLegacyDefaultCredits(normalizedDraft))
+    ? migrateDefaultPricingPlans(migrateLegacyPricingCopy(migrateLegacyDefaultCredits(normalizedDraft)))
     : normalizedDraft
   return {
     content: {
@@ -425,6 +427,25 @@ function normalizePricingComparisonDefaults(draft: PublicContentDraftV1): Public
 function migrateLegacyPricingCopy(draft: PublicContentDraftV1): PublicContentDraftV1 {
   if (draft.pricing.eyebrow === LEGACY_PRICING_EYEBROW) draft.pricing.eyebrow = copy.public.pages_PricingPage_002
   if (draft.pricing.intro === LEGACY_PRICING_INTRO) draft.pricing.intro = copy.public.pages_PricingPage_003
+  return draft
+}
+
+function migrateDefaultPricingPlans(draft: PublicContentDraftV1): PublicContentDraftV1 {
+  for (const planId of Object.keys(previousDefaultPricingPlans) as Array<keyof typeof previousDefaultPricingPlans>) {
+    const plan = draft.pricing.plans[planId]
+    const previous = previousDefaultPricingPlans[planId]
+    const current = defaultPricingPlans[planId]
+    if (plan.original_price === previous.original_price
+      && plan.discount_fold === previous.discount_fold
+      && plan.display_price === previous.display_price) {
+      plan.original_price = current.original_price
+      plan.discount_fold = current.discount_fold
+      plan.display_price = current.display_price
+    }
+    for (const field of ['label', 'badge', 'summary', 'account_scope'] as const) {
+      if (plan[field] === previous[field]) plan[field] = current[field]
+    }
+  }
   return draft
 }
 

@@ -4,7 +4,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { closePool, query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import { CdkAlreadyRedeemedError, createRequestHash, redeemCdkAtomically, saveProfileInTransaction, saveWorkspaceInTransaction } from './cdk-redemption'
-import { claimCdkRecord, createPostgresCdkRecordStore } from './cdk-store'
+import {
+  CdkScenarioQuotaExceededError,
+  claimCdkRecord,
+  createPostgresCdkRecordStore,
+  releaseCdkScenarioQuotaInTransaction,
+  reserveCdkScenarioQuotaInTransaction,
+  settleCdkScenarioQuotaInTransaction,
+} from './cdk-store'
 import { createPostgresUsageEventStore } from './usage-store'
 import {
   emptyWorkspace,
@@ -184,6 +191,62 @@ describe('CDK redemption PostgreSQL concurrency', () => {
     expect(Boolean(claimed)).not.toBe(deleted)
     const remaining = await query<{ status: string }>('select status from cdk_records where key = $1', [key])
     expect(deleted ? remaining.rowCount : remaining.rows[0]?.status).toBe(deleted ? 0 : 'claiming')
+  })
+
+  it('reserves, settles, releases, and enforces periodic CDK scenario quotas atomically', async () => {
+    const key = await seedUsedCdk({ permission: 'advanced', profile_duration: 'half_year' })
+    const codeHash = key.slice('cdk/'.length, -'.json'.length)
+    const jobIds = [randomUUID(), randomUUID(), randomUUID(), randomUUID()]
+    await query(
+      `insert into optimize_jobs
+        (id, status, priority, owner_key, permission, source, payload_json, created_at, updated_at)
+       select job.id, 'queued', 10, 'scenario-quota:' || job.id, 'advanced',
+              'scenario_comparison', '{}'::jsonb, now(), now()
+         from unnest($1::text[]) as job(id)`,
+      [jobIds],
+    )
+    const reserve = (jobId: string) => withTransaction((client) => reserveCdkScenarioQuotaInTransaction(client, {
+      jobId,
+      codeHash,
+    }))
+    const release = (jobId: string) => withTransaction((client) => releaseCdkScenarioQuotaInTransaction(client, jobId))
+    const settle = (jobId: string) => withTransaction((client) => settleCdkScenarioQuotaInTransaction(client, jobId))
+
+    await Promise.all(jobIds.slice(0, 3).map(reserve))
+    await expect(reserve(jobIds[3]!)).rejects.toBeInstanceOf(CdkScenarioQuotaExceededError)
+    const reservedRecord = (await query<{ record_json: CdkRecord }>(
+      'select record_json from cdk_records where key = $1',
+      [key],
+    )).rows[0]?.record_json
+    expect(reservedRecord?.scenario_comparison_count ?? 0).toBe(0)
+    expect(reservedRecord?.scenario_comparison_reserved_count).toBe(3)
+
+    await expect(release(jobIds[1]!)).resolves.toBe(true)
+    await expect(release(jobIds[1]!)).resolves.toBe(false)
+    await expect(reserve(jobIds[3]!)).resolves.toBe(true)
+    await expect(Promise.all([settle(jobIds[0]!), settle(jobIds[2]!), settle(jobIds[3]!)])).resolves.toEqual([true, true, true])
+    await expect(settle(jobIds[0]!)).resolves.toBe(false)
+
+    const finalRecord = (await query<{ record_json: CdkRecord }>(
+      'select record_json from cdk_records where key = $1',
+      [key],
+    )).rows[0]?.record_json
+    expect(finalRecord).toMatchObject({
+      scenario_comparison_count: 3,
+      scenario_comparison_reserved_count: 0,
+    })
+    const effects = await query<{ job_id: string; status: string }>(
+      `select job_id, metadata_json->>'status' as status
+         from optimization_job_effects
+        where job_id = any($1::text[]) and effect_type = 'cdk_scenario_quota'`,
+      [jobIds],
+    )
+    expect(new Map(effects.rows.map((row) => [row.job_id, row.status]))).toEqual(new Map([
+      [jobIds[0]!, 'applied'],
+      [jobIds[1]!, 'released'],
+      [jobIds[2]!, 'applied'],
+      [jobIds[3]!, 'applied'],
+    ]))
   })
 
   it('synchronizes linked profile authorization in the same CDK mutation', async () => {
@@ -681,13 +744,13 @@ describe('CDK redemption PostgreSQL concurrency', () => {
     const firstTwo = await Promise.all([reserve(jobIds[0]!), reserve(jobIds[1]!)])
     expect(firstTwo.map((item) => item.status)).toEqual(['reserved', 'reserved'])
     await expect(reserve(jobIds[2]!)).rejects.toMatchObject({ code: 'insufficient_balance' })
-    expect(await getBalanceSummary(userId)).toMatchObject({ available: '0.00', reserved: '2400.00' })
+    expect(await getBalanceSummary(userId)).toMatchObject({ available: '400.00', reserved: '2000.00' })
 
     await withTransaction((client) => settleScheduleBalanceInTransaction(client, jobIds[0]!))
     await withTransaction((client) => settleScheduleBalanceInTransaction(client, jobIds[0]!))
     await withTransaction((client) => releaseScheduleBalanceInTransaction(client, jobIds[1]!))
     await withTransaction((client) => releaseScheduleBalanceInTransaction(client, jobIds[1]!))
-    expect(await getBalanceSummary(userId)).toMatchObject({ available: '1200.00', reserved: '0.00' })
+    expect(await getBalanceSummary(userId)).toMatchObject({ available: '1400.00', reserved: '0.00' })
     expect((await query<{ count: string }>("select count(*)::text as count from user_balance_transactions where user_id = $1 and kind = 'schedule_debit'", [userId])).rows[0]?.count).toBe('1')
   })
 

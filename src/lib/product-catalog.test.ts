@@ -23,28 +23,28 @@ describe('product catalog', () => {
     expect(getSku('single_account_monthly')).toMatchObject({
       public: true,
       runtime_permission: 'advanced',
-      price: { amount: 15, currency: 'CNY', billing: 'one_time' },
-      duration_days: 31,
+      price: { amount: 12.9, currency: 'CNY', billing: 'one_time' },
+      duration_days: 30,
     })
     expect(getSku('single_account_half_year')).toMatchObject({
       public: true,
       runtime_permission: 'advanced',
-      price: { amount: 49, currency: 'CNY', billing: 'one_time' },
-      duration_days: 183,
+      price: { amount: 24.9, currency: 'CNY', billing: 'one_time' },
+      duration_days: 90,
     })
     expect(getSku('single_account_annual')).toMatchObject({
       public: true,
       runtime_permission: 'advanced',
-      price: { amount: 79, currency: 'CNY', billing: 'one_time' },
+      price: { amount: 44.9, currency: 'CNY', billing: 'one_time' },
       duration_days: 365,
     })
     expect(getSku('single_account_lifetime')).toMatchObject({
       public: true,
       runtime_permission: 'advanced',
-      price: { amount: 129, currency: 'CNY', billing: 'one_time' },
-      original_display_price: '129 元 / 长期',
-      default_discount_fold: 4,
-      display_price: '51.6 元 / 长期',
+      price: { amount: 59, currency: 'CNY', billing: 'one_time' },
+      original_display_price: '59 元 / 长期',
+      default_discount_fold: 10,
+      display_price: '59 元 / 长期',
       duration_days: null,
     })
   })

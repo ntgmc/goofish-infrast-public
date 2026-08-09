@@ -13,7 +13,7 @@ import {
   reserveItemsInTransaction,
   getProfileCapacityLimitsInTransaction,
 } from './inventory-store'
-import type { MeteredBillingKind, MeteredQuoteConfirmation, MeteredScheduleQuote } from '../../src/lib/metered-billing'
+import type { MeteredBillingKind, MeteredBillingOperation, MeteredQuoteConfirmation, MeteredScheduleQuote } from '../../src/lib/metered-billing'
 import type { OptimizationBillingSnapshot } from '../../src/lib/optimization-contracts'
 import { getMeteredBillingPolicy, getMeteredScheduleQuote } from '../../src/lib/metered-billing'
 import { BalanceError, releaseScheduleBalanceInTransaction, reserveScheduleBalanceInTransaction, settleScheduleBalanceInTransaction } from './balance-store'
@@ -24,6 +24,7 @@ import { parseOptimizationJobResult } from '../optimization/jobs/runtime-contrac
 import { countReorderCheckQuotaInTransaction } from './reorder-quota-store'
 import { confirmMeteredQuoteInTransaction, MeteredBillingQuoteError } from './metered-billing-store'
 import { insertProfileOptimizationResultInTransaction } from './optimization-result-store'
+import { CdkScenarioQuotaExceededError, CdkScheduleQuotaExceededError, releaseCdkScenarioQuotaInTransaction, releaseCdkScheduleQuotaInTransaction, reserveCdkScenarioQuotaInTransaction, reserveCdkScheduleQuotaInTransaction, settleCdkScenarioQuotaInTransaction } from './cdk-store'
 
 export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered'
 export type OptimizeJobPriority = 'priority_coupon' | 'paid' | 'analysis' | 'standard'
@@ -104,12 +105,12 @@ interface AdmitOptimizeJobInput<TPayload = unknown> extends CreateOptimizeJobInp
     limit: number
     useCoupon?: boolean
   } | null
-  billing?: { userId: string; billingKind: MeteredBillingKind; confirmation: MeteredQuoteConfirmation } | null
+  billing?: { userId: string; operation: MeteredBillingOperation; billingKind: MeteredBillingKind; confirmation: MeteredQuoteConfirmation } | null
 }
 
 export class OptimizeJobAdmissionError extends Error {
   constructor(
-    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'commercial_queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'commercial_submission_rate_exceeded' | 'free_revision_limit_exceeded' | 'priority_coupon_unavailable' | 'item_unavailable' | 'item_not_applicable' | 'reorder_check_quota_exceeded' | 'insufficient_balance' | 'pricing_changed' | 'quote_already_used' | 'profile_not_found' | 'not_metered_profile' | 'profile_archived' | 'commercial_not_eligible' | 'commercial_suspended' | 'debt_outstanding',
+    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'commercial_queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'commercial_submission_rate_exceeded' | 'free_revision_limit_exceeded' | 'priority_coupon_unavailable' | 'item_unavailable' | 'item_not_applicable' | 'reorder_check_quota_exceeded' | 'insufficient_balance' | 'pricing_changed' | 'quote_already_used' | 'profile_not_found' | 'not_metered_profile' | 'profile_archived' | 'commercial_not_eligible' | 'commercial_suspended' | 'debt_outstanding' | 'subscription_quota_exceeded' | 'subscription_scenario_quota_exceeded',
     readonly status: 404 | 409 | 429,
     message: string,
   ) {
@@ -319,6 +320,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
               jobId: input.id,
               userId: input.billing.userId,
               profileId: input.profile_id!,
+              operation: input.billing.operation,
               confirmation: input.billing.confirmation,
               now,
             })
@@ -455,6 +457,47 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
             if (error instanceof ItemUnavailableError) {
               const isPriority = error.itemCode === 'priority_compute_coupon'
               throw new OptimizeJobAdmissionError(isPriority ? 'priority_coupon_unavailable' : 'item_unavailable', 409, error.message)
+            }
+            throw error
+          }
+        }
+
+        const payloadRecord = input.payload_json && typeof input.payload_json === 'object' && !Array.isArray(input.payload_json)
+          ? input.payload_json as Record<string, unknown>
+          : null
+        const cdkUsageRef = payloadRecord
+          && payloadRecord.cdkUsageRef && typeof payloadRecord.cdkUsageRef === 'object'
+          && typeof (payloadRecord.cdkUsageRef as Record<string, unknown>).code_hash === 'string'
+          ? (payloadRecord.cdkUsageRef as { code_hash: string })
+          : null
+        const payloadRequest = payloadRecord?.request && typeof payloadRecord.request === 'object'
+          ? payloadRecord.request as Record<string, unknown>
+          : null
+        const isIncrementalRecompute = payloadRequest?.billing_operation === 'incremental_recompute'
+        if (input.source === 'account_profile' && cdkUsageRef && !isIncrementalRecompute) {
+          try {
+            await reserveCdkScheduleQuotaInTransaction(client, {
+              jobId: input.id,
+              codeHash: cdkUsageRef.code_hash,
+              now,
+            })
+          } catch (error) {
+            if (error instanceof CdkScheduleQuotaExceededError) {
+              throw new OptimizeJobAdmissionError(error.code, 409, error.message)
+            }
+            throw error
+          }
+        }
+        if (input.source === 'scenario_comparison' && cdkUsageRef) {
+          try {
+            await reserveCdkScenarioQuotaInTransaction(client, {
+              jobId: input.id,
+              codeHash: cdkUsageRef.code_hash,
+              now,
+            })
+          } catch (error) {
+            if (error instanceof CdkScenarioQuotaExceededError) {
+              throw new OptimizeJobAdmissionError(error.code, 409, error.message)
             }
             throw error
           }
@@ -699,6 +742,9 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           'where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = $8 and cancel_requested_at is null',
         ].join(' '), [id, attemptNo, workerId, lockToken, resultJson, now, 'succeeded', 'running'])
         if (!completed.rowCount) return false
+        if (selectedJob.source === 'scenario_comparison') {
+          await settleCdkScenarioQuotaInTransaction(client, id, now)
+        }
         await client.query(
           `update entitlement_ledger set status = 'consumed', settled_at = $2
            where reference_type = 'optimization_job' and reference_id = $1
@@ -1252,7 +1298,7 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       const job = await (async () => {
         const value = await Promise.resolve({ ...input, created_at: input.created_at ?? new Date(now).toISOString() })
         const memoryBillingQuote = value.billing ? {
-          ...getMeteredScheduleQuote(value.billing.billingKind),
+          ...getMeteredScheduleQuote(value.billing.billingKind, '0.00', '0.00', value.billing.operation),
           pricing_version: value.billing.confirmation.pricingVersion,
           charge: value.billing.confirmation.acceptedMaxPoints,
         } : null
@@ -2298,6 +2344,8 @@ async function releaseQueuedEntitlementInTransaction(client: PoolClient, jobId: 
 }
 
 async function releaseMeteredBillingInTransaction(client: PoolClient, jobId: string, nowIso: string): Promise<void> {
+  await releaseCdkScheduleQuotaInTransaction(client, jobId, nowIso)
+  await releaseCdkScenarioQuotaInTransaction(client, jobId, nowIso)
   if (await releaseScheduleBalanceInTransaction(client, jobId, nowIso)) {
     await client.query(
       "update optimize_jobs set billing_json = jsonb_set(billing_json, '{status}', '\"released\"'::jsonb) where id = $1",

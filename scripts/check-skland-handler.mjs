@@ -1798,6 +1798,13 @@ function memoryLicenseUtilsModuleFixed() {
     export function isProfileCdkRecord(record) {
       return (record.cdk_type ?? 'profile') === 'profile'
     }
+    export function getCdkProfileDuration(record) {
+      return record?.profile_duration === 'month' || record?.profile_duration === 'half_year' || record?.profile_duration === 'year'
+        ? record.profile_duration
+        : 'lifetime'
+    }
+    export function getCdkScheduleQuotaLimit() { return null }
+    export function getCdkScenarioQuotaLimit() { return null }
     export function getCdkType(record) {
       return record.cdk_type ?? 'profile'
     }

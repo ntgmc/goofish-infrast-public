@@ -9,7 +9,7 @@ import {
   type PublicBalanceTransaction,
   normalizeStoredPoints,
 } from '../../src/lib/balance-contracts'
-import { getCommercialTierSummary, type MeteredBillingKind, type MeteredScheduleQuote } from '../../src/lib/metered-billing'
+import { getCommercialTierSummary, type MeteredBillingKind, type MeteredBillingOperation, type MeteredScheduleQuote } from '../../src/lib/metered-billing'
 import { ensureDatabaseSchema } from './schema'
 import { query, withTransaction } from './postgres'
 
@@ -63,6 +63,7 @@ export interface StoredScheduleBalanceReservation {
   status: 'reserved' | 'consumed' | 'released'
   created_at: string
   settled_at: string | null
+  operation?: MeteredBillingOperation
 }
 
 type BalanceAccountRow = {
@@ -71,6 +72,12 @@ type BalanceAccountRow = {
   lifetime_credited: string
   qualification_reversed: string
   debt: string
+}
+
+function billingReason(operation: MeteredBillingOperation | null | undefined): string {
+  if (operation === 'incremental_recompute') return '成功个人增量重算'
+  if (operation === 'scenario_comparison') return '成功场景对比'
+  return '成功主排班'
 }
 
 export type StoredBalanceTransaction = {
@@ -399,9 +406,14 @@ export async function settleScheduleBalanceInTransaction(
   now = new Date().toISOString(),
 ): Promise<StoredScheduleBalanceReservation | null> {
   const result = await client.query<StoredScheduleBalanceReservation>(
-    `select id, job_id, user_id, profile_id, billing_kind, pricing_version, tier,
-            list_price::text, discount_bps, amount::text, status, created_at, settled_at
-       from user_balance_reservations where job_id = $1 for update`,
+    `select reservation.id, reservation.job_id, reservation.user_id, reservation.profile_id,
+            reservation.billing_kind, reservation.pricing_version, reservation.tier,
+            reservation.list_price::text, reservation.discount_bps, reservation.amount::text,
+            reservation.status, reservation.created_at, reservation.settled_at,
+            coalesce(job.billing_json->>'operation', 'main_schedule') as operation
+       from user_balance_reservations reservation
+       left join optimize_jobs job on job.id = reservation.job_id
+      where reservation.job_id = $1 for update of reservation`,
     [jobId],
   )
   const reservation = result.rows[0] ? normalizeReservation(result.rows[0]) : null
@@ -420,9 +432,9 @@ export async function settleScheduleBalanceInTransaction(
       (id, user_id, kind, amount, balance_after, reference_type, reference_id, idempotency_key,
        admin_username, reason, request_hash, created_at)
      values ($1, $2, 'schedule_debit', -$3::numeric, $4::numeric, 'optimization_job', $5,
-             $6, null, '成功主排班', null, $7)
+             $6, null, $7, null, $8)
      returning id`,
-    [randomUUID(), reservation.user_id, reservation.amount, account.rows[0]!.available, jobId, `schedule:${jobId}`, now],
+    [randomUUID(), reservation.user_id, reservation.amount, account.rows[0]!.available, jobId, `schedule:${jobId}`, billingReason(reservation.operation), now],
   )
   if (!transaction.rowCount) throw new BalanceError('reservation_conflict', '积分结算流水写入失败。', 409)
   await client.query(

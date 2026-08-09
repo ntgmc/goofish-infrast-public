@@ -425,7 +425,7 @@ function itemCdkLabel(record: AdminCdkRecord): string {
 function profileCdkLabel(record: AdminCdkRecord): string {
   const permission = permissionLabels[record.permission!] ?? record.permission ?? '档案'
   if (record.profile_duration === 'month') return `${permission} · 月卡`
-  if (record.profile_duration === 'half_year') return `${permission} · 半年卡`
+  if (record.profile_duration === 'half_year') return `${permission} · 90 天版本维护卡`
   if (record.profile_duration === 'year') return `${permission} · 年卡`
   if (record.profile_expires_at) return `${permission} · ${formatDate(record.profile_expires_at)} 到期`
   return `${permission} · 终身卡`

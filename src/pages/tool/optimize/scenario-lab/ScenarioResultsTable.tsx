@@ -16,6 +16,8 @@ export default function ScenarioResultsTable({
 }) {
   const [sort, setSort] = useState<{ key: SortKey; direction: 'ascending' | 'descending' }>({ key: 'frontier', direction: 'descending' })
   const sorted = useMemo(() => [...points].sort((left, right) => compare(left, right, sort)), [points, sort])
+  const baseline = points.find((point) => metric(point))
+  const baselineMetric = baseline ? metric(baseline) : undefined
   const changeSort = (key: SortKey) => setSort((current) => ({
     key,
     direction: current.key === key
@@ -32,6 +34,7 @@ export default function ScenarioResultsTable({
               <Header label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_001} sticky />
               <SortableHeader label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_002} sortKey="operations" sort={sort} onSort={changeSort} />
               <SortableHeader label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_003} sortKey="sanity" sort={sort} onSort={changeSort} />
+              <Header label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_048} />
               <SortableHeader label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_004} sortKey="lmd" sort={sort} onSort={changeSort} />
               <SortableHeader label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_005} sortKey="battle" sort={sort} onSort={changeSort} />
               <SortableHeader label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_006} sortKey="orundum" sort={sort} onSort={changeSort} />
@@ -40,6 +43,7 @@ export default function ScenarioResultsTable({
               <SortableHeader label={`${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_009}（${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_047}）`} sortKey="opportunity" sort={sort} onSort={changeSort} />
               <Header label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_010} />
               <Header label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_011} />
+              <Header label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_049} />
               <SortableHeader label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_012} sortKey="frontier" sort={sort} onSort={changeSort} />
             </tr>
           </thead>
@@ -57,6 +61,7 @@ export default function ScenarioResultsTable({
                   </td>
                   <Cell value={point.operationsPerDay > 0 ? `${point.operationsPerDay}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_013}` : '—'} />
                   <Cell value={value ? number(value.productionSanityPerDay) : '—'} strong />
+                  <Cell value={value && baselineMetric ? signedDelta(value.productionSanityPerDay - baselineMetric.productionSanityPerDay) : '—'} />
                   <Cell value={value ? number(value.lmdPerDay) : '—'} />
                   <Cell value={value ? number(value.battleRecordPerDay) : '—'} />
                   <Cell value={value?.orundumEconomy ? `${number(value.orundumEconomy.sustainablePerDay)} / ${number(value.orundumEconomy.shortTermPerDay)}` : '—'} />
@@ -65,6 +70,7 @@ export default function ScenarioResultsTable({
                   <Cell value={value?.orundumEconomy ? `${number(value.orundumEconomy.opportunityCostSanityPerDay)} / ${number(value.orundumEconomy.hardLmdCostPerDay)}` : '—'} />
                   <Cell value={value?.orundumEconomy?.inventoryDepletionDays == null ? '—' : `${number(value.orundumEconomy.inventoryDepletionDays)}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_014}`} />
                   <Cell value={value ? `${number(value.dronesUsedPerDay)} / ${number(value.dronesDiscardedPerDay)}` : '—'} />
+                  <Cell value={value ? applicability(point, value) : '—'} />
                   <td className="px-3 py-2"><Status point={point} /></td>
                 </tr>
               )
@@ -196,4 +202,20 @@ function number(value: number): string {
 
 function signed(value: number): string {
   return `${value > 0 ? '+' : ''}${number(value)}`
+}
+
+function signedDelta(value: number): string {
+  return `${value > 0 ? '+' : ''}${number(value)}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_050}`
+}
+
+function applicability(point: ScenarioComparisonPoint, value: ScenarioMetrics): string {
+  if (value.orundumEconomy) {
+    const caseLabel = value.orundumEconomy.case === 'capacity_limited' ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_051
+      : value.orundumEconomy.case === 'budget_limited' ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_052 : copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_053
+    const bottleneck = value.orundumEconomy.bottleneck === 'inventory' ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_054
+      : value.orundumEconomy.bottleneck === 'orirock_budget' ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_055
+        : value.orundumEconomy.bottleneck === 'manufacture' ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_056 : copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_057
+    return `${caseLabel} · ${bottleneck}`
+  }
+  return point.scheduleMode === 'rotation' ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_058 : `${point.scheduleStrategy === 'variable' ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_059 : copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_060} · ${point.droneStrategy === 'off' ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_061 : copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_062}`
 }

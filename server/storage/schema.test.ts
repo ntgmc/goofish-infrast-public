@@ -78,6 +78,8 @@ describe('database schema ownership', () => {
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_balance_transactions/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_balance_qualification_ledger/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_balance_reservations/)
+    expect(combinedSchema).toMatch(/ADD COLUMN IF NOT EXISTS operation TEXT NOT NULL DEFAULT 'main_schedule'/)
+    expect(combinedSchema).toMatch(/metered_billing_quotes_operation_check/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS commercial_account_limits/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS metered_personal_claims/)
     expect(combinedSchema).toMatch(/ADD COLUMN IF NOT EXISTS billing_user_id/)

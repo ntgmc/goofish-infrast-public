@@ -2133,7 +2133,7 @@ function userRegistrationLicenseUtilsMock() {
     }
     export function addProfileCdkDuration(now, duration) {
       if (duration === 'lifetime') return null
-      const days = { month: 30, half_year: 180, year: 365 }[duration]
+      const days = { month: 30, half_year: 90, year: 365 }[duration]
       return new Date(Date.parse(now) + days * 86_400_000).toISOString()
     }
     export function normalizeCode(value) { return value.trim().toUpperCase() }
@@ -2530,7 +2530,7 @@ function userLicenseUtilsMock() {
     }
     export function addProfileCdkDuration(now, duration) {
       if (duration === 'lifetime') return null
-      const days = { month: 30, half_year: 180, year: 365 }[duration]
+      const days = { month: 30, half_year: 90, year: 365 }[duration]
       return new Date(Date.parse(now) + days * 86_400_000).toISOString()
     }
     export function hashCdk(value) { return value }

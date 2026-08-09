@@ -1,4 +1,5 @@
 import type { FreeScheduleEntitlement, LicenseConfig, PriorityCouponBalance, ReorderCheckResult, WorkspaceResultHistorySummary } from '../../../lib/types'
+import type { IssuedMeteredScheduleQuote } from '../../../lib/metered-billing'
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
 import InfoTooltip from '../../../components/InfoTooltip'
 import { formatResultHistorySummary, formatWorkspaceDate } from '../../../lib/workspace-history'
@@ -54,6 +55,7 @@ export default function OverviewSection({
   freeSchedule,
   reorderCheck,
   onGenerate,
+  incrementalRecompute,
   onReset,
   onOpenPlans,
   onOpenConfig,
@@ -85,6 +87,14 @@ export default function OverviewSection({
   freeSchedule?: FreeScheduleViewState;
   reorderCheck?: ReorderCheckViewState;
   onGenerate: () => void;
+  incrementalRecompute?: {
+    visible: boolean;
+    loading: boolean;
+    quote: IssuedMeteredScheduleQuote | null;
+    quoteLoading: boolean;
+    quoteError: string | null;
+    onRun: () => void;
+  };
   onReset: () => void;
   onOpenPlans: () => void;
   onOpenConfig: () => void;
@@ -117,6 +127,24 @@ export default function OverviewSection({
         onOpenConfig={onOpenConfig}
         />
       </div>
+
+      {incrementalRecompute?.visible && (
+        <section className="tool-panel border-brand-500/30 p-5 sm:p-6" aria-labelledby="incremental-recompute-title">
+          <p className="tool-eyebrow">{copy.optimize.pages_tool_optimize_OverviewSection_071}</p>
+          <h2 id="incremental-recompute-title" className="mt-1 text-lg font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_OverviewSection_072}</h2>
+          <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.optimize.pages_tool_optimize_OverviewSection_073}</p>
+          <p className="mt-2 text-xs leading-5 text-ink-muted">{incrementalRecompute.quote ? copy.optimize.pages_tool_optimize_OverviewSection_074(incrementalRecompute.quote.charge) : copy.optimize.pages_tool_optimize_OverviewSection_075}</p>
+          {incrementalRecompute.quoteError && <p className="tool-alert tool-alert--warning mt-3 text-sm" role="status">{incrementalRecompute.quoteError}</p>}
+          <button
+            type="button"
+            className="tool-secondary-action mt-4 w-full"
+            disabled={incrementalRecompute.loading || incrementalRecompute.quoteLoading || Boolean(incrementalRecompute.quote && !incrementalRecompute.quote.sufficient)}
+            onClick={incrementalRecompute.onRun}
+          >
+            {incrementalRecompute.loading ? copy.optimize.pages_tool_optimize_OverviewSection_076 : copy.optimize.pages_tool_optimize_OverviewSection_077}
+          </button>
+        </section>
+      )}
 
       {freeSchedule?.visible && (
         <FreeScheduleEntitlementCard state={freeSchedule} />

@@ -115,6 +115,23 @@ describe('expandScenarioComparison', () => {
     })).toThrow(/最多允许 24/)
   })
 
+  it('rejects more than three additional base configurations before expansion', () => {
+    expect(() => expandScenarioComparison(CONFIG_PRESETS['243'], {
+      layouts: [{
+        layout: '243',
+        plans: [
+          balancedPlan,
+          orundumPlan,
+          { trading: { lmd: 2, orundum: 0 }, manufacturing: { pureGold: 1, battleRecord: 3, originiumShard: 0 } },
+          { trading: { lmd: 2, orundum: 0 }, manufacturing: { pureGold: 3, battleRecord: 1, originiumShard: 0 } },
+        ],
+      }],
+      maaSchedules: ['8x3'],
+      includeRotation: false,
+      droneStrategies: ['off'],
+    })).toThrow(/最多可提交 3 个额外基建配置/)
+  })
+
   it('rejects legacy and unknown factor fields instead of silently ignoring them', () => {
     expect(() => expandScenarioComparison(CONFIG_PRESETS['243'], {
       ...baseFactors,

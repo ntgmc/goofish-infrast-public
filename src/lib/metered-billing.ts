@@ -3,6 +3,7 @@ import type { UserGameAccountKind } from './types'
 
 export type MeteredBillingKind = Extract<UserGameAccountKind, 'metered_personal' | 'metered_commercial'>
 export type CommercialTierLevel = 1 | 2 | 3 | 4
+export type MeteredBillingOperation = 'main_schedule' | 'incremental_recompute' | 'scenario_comparison'
 
 export interface CommercialTierSummary {
   eligible: boolean
@@ -15,6 +16,7 @@ export interface CommercialTierSummary {
 }
 
 export interface MeteredScheduleQuote {
+  operation: MeteredBillingOperation
   pricing_version: string
   billing_kind: MeteredBillingKind
   list_price: string
@@ -54,7 +56,7 @@ export function getCommercialTierSummary(
     level: matched ? matched.level as CommercialTierLevel : null,
     threshold_points: tiers[0]!.threshold_points,
     discount_bps: discountBps,
-    charge_points: minorToPoints(applyDiscount(listPriceMinor, discountBps)),
+    charge_points: matched?.charge_points ?? minorToPoints(listPriceMinor),
     next_threshold_points: next?.threshold_points ?? null,
     points_to_next_level: next
       ? minorToPoints(pointsToMinor(next.threshold_points) - creditedMinor)
@@ -66,9 +68,25 @@ export function getMeteredScheduleQuote(
   billingKind: MeteredBillingKind,
   lifetimeCredited = '0.00',
   debt = '0.00',
+  operation: MeteredBillingOperation = 'main_schedule',
 ): MeteredScheduleQuote {
+  if (operation === 'incremental_recompute' || operation === 'scenario_comparison') {
+    const charge = operation === 'incremental_recompute'
+      ? policy.personal.incremental_recompute_points
+      : policy.personal.scenario_comparison_points
+    return {
+      operation,
+      pricing_version: policy.pricing_version,
+      billing_kind: 'metered_personal',
+      list_price: charge,
+      tier: null,
+      discount_bps: 0,
+      charge,
+    }
+  }
   if (billingKind === 'metered_personal') {
     return {
+      operation,
       pricing_version: policy.pricing_version,
       billing_kind: billingKind,
       list_price: policy.personal.main_schedule_points,
@@ -79,6 +97,7 @@ export function getMeteredScheduleQuote(
   }
   const tier = getCommercialTierSummary(lifetimeCredited, debt)
   return {
+    operation,
     pricing_version: policy.pricing_version,
     billing_kind: billingKind,
     list_price: policy.commercial.list_price_points,
@@ -101,11 +120,4 @@ export function pointsToMinor(value: string): bigint {
 function minorToPoints(value: bigint): string {
   if (value < 0n) throw new Error('Points amount cannot be negative.')
   return `${value / 100n}.${String(value % 100n).padStart(2, '0')}`
-}
-
-function applyDiscount(value: bigint, discountBps: number): bigint {
-  if (!Number.isInteger(discountBps) || discountBps < 0 || discountBps > 10_000) {
-    throw new Error('Invalid discount basis points.')
-  }
-  return (value * BigInt(10_000 - discountBps) + 5_000n) / 10_000n
 }

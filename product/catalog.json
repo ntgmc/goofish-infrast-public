@@ -76,56 +76,56 @@
       "audience": "想先试用、低频使用、不想研究复杂配置的普通玩家"
     },
     "single_account_monthly": {
-      "label": "单账号月卡 CDK",
+      "label": "30 天尝鲜维护包 CDK",
       "public": true,
-      "price": { "amount": 15, "currency": "CNY", "billing": "one_time" },
-      "original_display_price": "15 元 / 31 天",
-      "default_discount_fold": 4,
-      "display_price": "6 元 / 31 天",
-      "duration_days": 31,
-      "account_scope": "仅限一个游戏 UID，兑换后连续 31 天有效，不支持自行更换游戏账号",
+      "price": { "amount": 12.9, "currency": "CNY", "billing": "one_time" },
+      "original_display_price": "12.9 元 / 30 天",
+      "default_discount_fold": 10,
+      "display_price": "12.9 元 / 30 天",
+      "duration_days": 30,
+      "account_scope": "仅限一个游戏 UID，兑换后连续 30 天有效，不支持自行更换游戏账号",
       "runtime_permission": "advanced",
-      "summary": "完整高级排班能力，适合先按月维护单个游戏账号；到期后可续购或升级长期方案。",
-      "audience": "想低门槛试用完整能力、预计使用 1–2 个月的玩家"
+      "summary": "30 天内维护同一游戏 UID，包含 2 次完整主排班；后续数据变化可购买 700 积分增量重算。",
+      "audience": "近期会练度提升或想先验证完整能力的玩家"
     },
     "single_account_half_year": {
-      "label": "单账号半年卡 CDK",
+      "label": "90 天版本维护卡 CDK",
       "public": true,
-      "price": { "amount": 49, "currency": "CNY", "billing": "one_time" },
-      "original_display_price": "49 元 / 183 天",
-      "default_discount_fold": 4,
-      "display_price": "19.6 元 / 183 天",
-      "duration_days": 183,
-      "account_scope": "仅限一个游戏 UID，兑换后连续 183 天有效，不支持自行更换游戏账号",
+      "price": { "amount": 24.9, "currency": "CNY", "billing": "one_time" },
+      "original_display_price": "24.9 元 / 90 天",
+      "default_discount_fold": 10,
+      "display_price": "24.9 元 / 90 天",
+      "duration_days": 90,
+      "account_scope": "仅限一个游戏 UID，兑换后连续 90 天有效，不支持自行更换游戏账号",
       "runtime_permission": "advanced",
-      "summary": "完整高级排班能力，相比月卡降低约 46% 的月均成本，适合稳定使用半年的玩家。",
-      "audience": "希望覆盖一个版本周期、又不想一次购买终身卡的玩家"
+      "summary": "覆盖一个版本周期，包含 4 次完整主排班；适合抽到新干员或练度提升后继续优化。",
+      "audience": "一个版本周期内会持续养成和调整方案的玩家"
     },
     "single_account_annual": {
-      "label": "单账号年卡 CDK",
+      "label": "365 天年度维护卡 CDK",
       "public": true,
-      "price": { "amount": 79, "currency": "CNY", "billing": "one_time" },
-      "original_display_price": "79 元 / 365 天",
-      "default_discount_fold": 4,
-      "display_price": "31.6 元 / 365 天",
+      "price": { "amount": 44.9, "currency": "CNY", "billing": "one_time" },
+      "original_display_price": "44.9 元 / 365 天",
+      "default_discount_fold": 10,
+      "display_price": "44.9 元 / 365 天",
       "duration_days": 365,
       "account_scope": "仅限一个游戏 UID，兑换后连续 365 天有效，不支持自行更换游戏账号",
       "runtime_permission": "advanced",
-      "summary": "完整高级排班能力，默认 4 折活动价月均约 2.6 元；适合长期维护同一账号并持续导出结果的玩家。",
-      "audience": "全年稳定使用、希望获得最优年均价格的玩家"
+      "summary": "全年维护同一游戏 UID，包含 8 次完整主排班；后续可按需购买增量重算。",
+      "audience": "全年会持续养成、希望降低长期维护成本的玩家"
     },
     "single_account_lifetime": {
       "label": "单账号终身卡 CDK",
       "public": true,
-      "price": { "amount": 129, "currency": "CNY", "billing": "one_time" },
-      "original_display_price": "129 元 / 长期",
-      "default_discount_fold": 4,
-      "display_price": "51.6 元 / 长期",
+      "price": { "amount": 59, "currency": "CNY", "billing": "one_time" },
+      "original_display_price": "59 元 / 长期",
+      "default_discount_fold": 10,
+      "display_price": "59 元 / 长期",
       "duration_days": null,
       "account_scope": "仅限长期维护同一个游戏 UID，不支持自行更换游戏账号",
       "runtime_permission": "advanced",
-      "summary": "一次购买即可长期使用完整高级能力，包含持续重新生成、MAA JSON、完整数据下载、高级分析、练度建议和自定义配置。",
-      "audience": "希望以活动价一次锁定长期权益、长期维护同一账号的玩家"
+      "summary": "一次购买即可长期使用完整高级能力，支持无限重新优化、配置切换、MAA JSON、完整数据下载、高级分析、练度建议和自定义配置。",
+      "audience": "长期维护同一账号、会持续研究和重新优化基建方案的玩家"
     },
     "recommended_internal": { "label": "单次重置卡", "public": false, "price": null, "display_price": null, "account_scope": "内部发放", "runtime_permission": "recommended", "summary": "内部卡种", "audience": "内部使用" },
     "growth_internal": { "label": "练度提升卡", "public": false, "price": null, "display_price": null, "account_scope": "内部发放", "runtime_permission": "growth", "summary": "内部卡种", "audience": "内部使用" },
@@ -133,11 +133,25 @@
   },
   "policies": {
     "metered_billing": {
-      "pricing_version": "2026-08-06-v3",
+      "pricing_version": "2026-08-09-v4",
       "personal": {
         "label": "积分单次排班",
-        "main_schedule_points": "1200.00",
+        "main_schedule_points": "1000.00",
+        "incremental_recompute_points": "700.00",
+        "scenario_comparison_points": "300.00",
         "profile_limit": 1
+      },
+      "schedule_quotas": {
+        "month": 2,
+        "half_year": 4,
+        "year": 8,
+        "lifetime": null
+      },
+      "scenario_quotas": {
+        "month": 1,
+        "half_year": 3,
+        "year": 8,
+        "lifetime": null
       },
       "commercial": {
         "label": "商用版积分单次",
@@ -148,10 +162,10 @@
         "max_queued_jobs": 8,
         "max_submissions_per_hour": 30,
         "tiers": [
-          { "level": 1, "threshold_points": "10000.00", "discount_bps": 1000 },
-          { "level": 2, "threshold_points": "30000.00", "discount_bps": 2000 },
-          { "level": 3, "threshold_points": "50000.00", "discount_bps": 3000 },
-          { "level": 4, "threshold_points": "100000.00", "discount_bps": 4000 }
+          { "level": 1, "threshold_points": "10000.00", "discount_bps": 1000, "charge_points": "1350.00" },
+          { "level": 2, "threshold_points": "30000.00", "discount_bps": 1667, "charge_points": "1250.00" },
+          { "level": 3, "threshold_points": "50000.00", "discount_bps": 2333, "charge_points": "1150.00" },
+          { "level": 4, "threshold_points": "100000.00", "discount_bps": 2667, "charge_points": "1100.00" }
         ]
       }
     },
@@ -175,25 +189,26 @@
       "forbidden_information": ["密码", "完整 CDK", "二维码", "Cookie", "森空岛凭据"]
     },
     "public_disclosures": [
-      "单账号月卡、半年卡、年卡和终身卡 CDK 均仅用于一个游戏账号；绑定森空岛 UID 后不支持自行更换。",
-      "月卡、半年卡和年卡按兑换时长提供高级权益；终身卡指在服务持续提供且授权正常的前提下长期维护同一账号，不表示可以任意换号。",
+      "30 天尝鲜维护包、90 天版本维护卡、365 天年度维护卡和终身卡 CDK 均仅用于一个游戏账号；绑定森空岛 UID 后不支持自行更换。",
+      "30 天、90 天和 365 天维护包均为一次性预付，不自动续费；终身卡指在服务持续提供且授权正常的前提下长期维护同一账号。",
+      "早期已按 49 元购买的终身卡继续保留原有长期权益；当前公开终身卡价格为 59 元。",
       "干员归属、练度或干员池出现异常变化时可能先拦截；重复异常可能冻结档案。",
       "干员数据误拦截需要通过 MaaTool 官方 QQ 群人工核验。",
       "个人按次档案仅限本人非商业使用；商用档案仅可处理数据权利人已授权的数据。",
       "商用主排班按成功任务计费；MaaTool 账号、CDK、档案和积分均不可转让或转售。"
     ],
     "public_feature_comparison": [
-      { "feature": "有效期", "free_preview": "免费预览权益，按页面规则使用", "single_account_monthly": "31 天", "single_account_half_year": "183 天", "single_account_annual": "365 天", "single_account_lifetime": "长期，不设到期日" },
+      { "feature": "有效期", "free_preview": "免费预览权益，按页面规则使用", "single_account_monthly": "30 天", "single_account_half_year": "90 天", "single_account_annual": "365 天", "single_account_lifetime": "长期，不设到期日" },
       { "feature": "森空岛导入干员数据", "free_preview": "支持，必须绑定 UID", "single_account_monthly": "支持，可绑定并保存到同一账号工作区", "single_account_half_year": "支持，可绑定并保存到同一账号工作区", "single_account_annual": "支持，可绑定并保存到同一账号工作区", "single_account_lifetime": "支持，可绑定并保存到同一账号工作区" },
       { "feature": "MAA 干员识别文件导入", "free_preview": "不支持手动上传干员", "single_account_monthly": "支持，受干员数据风控规则约束", "single_account_half_year": "支持，受干员数据风控规则约束", "single_account_annual": "支持，受干员数据风控规则约束", "single_account_lifetime": "支持，受干员数据风控规则约束" },
-      { "feature": "完整个人游戏内轮换队列", "free_preview": "支持，受免费完整排班权益限制", "single_account_monthly": "支持，权益有效期内可重新生成", "single_account_half_year": "支持，权益有效期内可重新生成", "single_account_annual": "支持，权益有效期内可重新生成", "single_account_lifetime": "支持，可长期重新生成" },
+      { "feature": "完整个人游戏内轮换队列", "free_preview": "支持，受免费完整排班权益限制", "single_account_monthly": "支持，30 天内含 2 次完整主排班", "single_account_half_year": "支持，90 天内含 4 次完整主排班", "single_account_annual": "支持，365 天内含 8 次完整主排班", "single_account_lifetime": "支持，可长期无限重新生成" },
       { "feature": "MAA JSON 下载", "free_preview": "高级体验期或导出体验券可用", "single_account_monthly": "支持，仅包含 MAA 执行所需排班数据", "single_account_half_year": "支持，仅包含 MAA 执行所需排班数据", "single_account_annual": "支持，仅包含 MAA 执行所需排班数据", "single_account_lifetime": "支持，仅包含 MAA 执行所需排班数据" },
       { "feature": "243 均衡 / 243 搓玉 / 333 搓玉预设", "free_preview": "支持", "single_account_monthly": "支持", "single_account_half_year": "支持", "single_account_annual": "支持", "single_account_lifetime": "支持" },
       { "feature": "检测是否值得重排", "free_preview": "每月 2 次；强烈建议时当月额外 1 次完整免费生成", "single_account_monthly": "可直接重新生成并查看完整结果", "single_account_half_year": "可直接重新生成并查看完整结果", "single_account_annual": "可直接重新生成并查看完整结果", "single_account_lifetime": "可直接重新生成并查看完整结果" },
       { "feature": "练度提升建议与 ROI", "free_preview": "不支持", "single_account_monthly": "支持", "single_account_half_year": "支持", "single_account_annual": "支持", "single_account_lifetime": "支持" },
       { "feature": "完整数据与原始结果", "free_preview": "不支持", "single_account_monthly": "支持，可独立下载完整计算 JSON", "single_account_half_year": "支持，可独立下载完整计算 JSON", "single_account_annual": "支持，可独立下载完整计算 JSON", "single_account_lifetime": "支持，可独立下载完整计算 JSON" },
       { "feature": "自定义配置", "free_preview": "不支持", "single_account_monthly": "支持", "single_account_half_year": "支持", "single_account_annual": "支持", "single_account_lifetime": "支持" },
-      { "feature": "场景对比实验室 / Pareto 高级分析", "free_preview": "不支持", "single_account_monthly": "支持，最多比较 24 个场景", "single_account_half_year": "支持，最多比较 24 个场景", "single_account_annual": "支持，最多比较 24 个场景", "single_account_lifetime": "支持，最多比较 24 个场景" },
+      { "feature": "场景对比实验室 / Pareto 高级分析", "free_preview": "不支持", "single_account_monthly": "含 1 次，单次最多 3 个额外配置", "single_account_half_year": "含 3 次，单次最多 3 个额外配置", "single_account_annual": "含 8 次，单次最多 3 个额外配置", "single_account_lifetime": "无限次，单次最多 3 个额外配置" },
       { "feature": "批量报告导出 / 商用授权", "free_preview": "不支持", "single_account_monthly": "不支持", "single_account_half_year": "不支持", "single_account_annual": "不支持", "single_account_lifetime": "不支持" },
       { "feature": "更换游戏账号", "free_preview": "不支持", "single_account_monthly": "不支持自行更换；需人工核验", "single_account_half_year": "不支持自行更换；需人工核验", "single_account_annual": "不支持自行更换；需人工核验", "single_account_lifetime": "不支持自行更换；需人工核验" }
     ]

@@ -165,9 +165,11 @@ const schedulePayloadSchema: z.ZodType<OptimizeJobPayload> = z.strictObject({
     include_upgrade_suggestions: z.boolean(),
     upgrade_suggestions_allowed: z.boolean(),
     history_source: z.enum(['generated', 'applied_suggestions']).optional(),
+    billing_operation: z.enum(['main_schedule', 'incremental_recompute']).optional(),
+    baseline_history_id: boundedString(128).optional(),
   }),
   configPermission: z.enum(['recommended', 'growth', 'advanced', 'ultimate', 'metered_advanced', 'admin', 'free_preview']),
-  cdkUsageRef: z.strictObject({ code_hash: boundedString(256) }).nullable(),
+  cdkUsageRef: z.strictObject({ code_hash: boundedString(256) }).nullable().optional(),
 })
 
 const scenarioPayloadSchema: z.ZodType<ScenarioComparisonJobPayload> = z.strictObject({
@@ -177,6 +179,7 @@ const scenarioPayloadSchema: z.ZodType<ScenarioComparisonJobPayload> = z.strictO
   operators: extensibleLicenseOperatorsSchema,
   effectiveConfig: extensibleLicenseConfigSchema,
   activeProfileId: boundedString(128),
+  cdkUsageRef: z.strictObject({ code_hash: boundedString(256) }).nullable().optional(),
   factors: scenarioComparisonFactorsSchema,
   estimate: optimizeDurationEstimateSchema,
 })
