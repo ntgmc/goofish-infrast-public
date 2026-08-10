@@ -464,6 +464,12 @@ body {
     color: var(--theme-success);
   }
 
+  .service-status-badge--scaling {
+    border-color: color-mix(in oklch, var(--theme-brand-500) 54%, var(--border));
+    background: color-mix(in oklch, var(--theme-brand-500) 12%, var(--theme-surface-1));
+    color: color-mix(in oklch, var(--theme-brand-600) 88%, var(--theme-ink-primary));
+  }
+
   .service-status-badge--congested {
     border-color: color-mix(in oklch, var(--theme-warning) 46%, var(--border));
     background: color-mix(in oklch, var(--theme-warning) 12%, var(--theme-surface-1));
@@ -531,6 +537,7 @@ body {
   .service-status-history-cell:focus-visible { outline: 2px solid var(--theme-brand-500); outline-offset: 2px; }
   .service-status-history-cell--available { background: color-mix(in oklch, #0b6b3a 88%, var(--theme-surface-1)); }
   .service-status-history-cell--busy { background: color-mix(in oklch, #2ca35a 88%, var(--theme-surface-1)); }
+  .service-status-history-cell--scaling { background: color-mix(in oklch, #2563eb 88%, var(--theme-surface-1)); }
   .service-status-history-cell--congested { background: color-mix(in oklch, #d49b1f 88%, var(--theme-surface-1)); }
   .service-status-history-cell--overloaded { background: color-mix(in oklch, #d97706 88%, var(--theme-surface-1)); }
   .service-status-history-cell--unavailable { background: color-mix(in oklch, #c83d49 88%, var(--theme-surface-1)); }

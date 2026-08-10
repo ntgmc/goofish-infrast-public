@@ -3,6 +3,7 @@ import { getOptimizeJobProcessingState } from './optimize-job-runner'
 import { getOptimizeWorkerRuntimeConcurrency } from './optimize-job-config'
 import { describeServerError } from './security/error-reporting'
 import { query } from './storage/postgres'
+import { resolveAppRole } from './process-role'
 
 export const OPTIMIZE_WORKER_HEARTBEAT_INTERVAL_MS = 10_000
 export const OPTIMIZE_WORKER_STALE_AFTER_MS = 30_000
@@ -33,7 +34,7 @@ const controller = createBackgroundWorker({
         getOptimizeWorkerRuntimeConcurrency(),
         OPTIMIZE_WORKER_HEARTBEAT_INTERVAL_MS,
         OPTIMIZE_WORKER_STALE_AFTER_MS,
-        ['optimize_jobs', 'optimize_queue', 'inventory_campaign', 'invitation_settlement', 'behavior_risk'],
+        workerCapabilities(),
         buildSha(),
         startedAt,
         now,
@@ -66,4 +67,9 @@ export async function waitForOptimizeWorkerRegistrationIdle(): Promise<void> {
 function buildSha(): string | null {
   const configured = process.env.APP_BUILD_SHA?.trim() || process.env.GIT_COMMIT_SHA?.trim()
   return configured && /^[A-Za-z0-9._-]{7,64}$/.test(configured) ? configured : null
+}
+
+function workerCapabilities(): string[] {
+  const runtimeKind = resolveAppRole() === 'all' ? 'runtime:local_fallback' : 'runtime:ecs_worker'
+  return ['optimize_jobs', 'optimize_queue', 'inventory_campaign', 'invitation_settlement', 'behavior_risk', runtimeKind]
 }

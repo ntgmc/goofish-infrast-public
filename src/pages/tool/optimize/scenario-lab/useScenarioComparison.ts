@@ -8,6 +8,7 @@ import type {
   ScenarioComparisonJobSnapshot,
 } from '../../../../lib/optimization-contracts'
 import type { ScenarioComparisonFactors, ScenarioComparisonResult } from '../../../../lib/scenario-comparison'
+import type { IssuedMeteredScheduleQuote } from '../../../../lib/metered-billing'
 import {
   scenarioComparisonFactorsSchema,
   scenarioComparisonResultSchema,
@@ -167,7 +168,7 @@ export function useScenarioComparison({
     pollJobRef.current = pollJob
   }, [pollJob])
 
-  const run = useCallback(async (useCoupon = false) => {
+  const run = useCallback(async (useCoupon = false, billingQuote: IssuedMeteredScheduleQuote | null = null) => {
     setError(null)
     setLoading(true)
     setResult(null)
@@ -178,6 +179,11 @@ export function useScenarioComparison({
       config,
       factors,
       ...(useCoupon && { use_items: ['scenario_simulation_coupon'] }),
+      ...(billingQuote && {
+        billing_quote_id: billingQuote.quote_id,
+        pricing_version: billingQuote.pricing_version,
+        accepted_max_points: billingQuote.charge,
+      }),
     }
     const requestJson = JSON.stringify(request)
     const previousPending = readSession(profileId)?.pendingSubmission

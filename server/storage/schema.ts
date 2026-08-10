@@ -370,6 +370,7 @@ CREATE TABLE IF NOT EXISTS service_status_hourly (
   sample_count INTEGER NOT NULL DEFAULT 0 CHECK (sample_count >= 0),
   available_samples INTEGER NOT NULL DEFAULT 0 CHECK (available_samples >= 0),
   busy_samples INTEGER NOT NULL DEFAULT 0 CHECK (busy_samples >= 0),
+  scaling_samples INTEGER NOT NULL DEFAULT 0 CHECK (scaling_samples >= 0),
   congested_samples INTEGER NOT NULL DEFAULT 0 CHECK (congested_samples >= 0),
   overloaded_samples INTEGER NOT NULL DEFAULT 0 CHECK (overloaded_samples >= 0),
   unavailable_samples INTEGER NOT NULL DEFAULT 0 CHECK (unavailable_samples >= 0),
@@ -384,18 +385,19 @@ CREATE TABLE IF NOT EXISTS service_status_hourly (
   updated_at TIMESTAMPTZ NOT NULL,
   PRIMARY KEY (component_id, bucket_start),
   CONSTRAINT service_status_hourly_component_check CHECK (component_id IN ('optimization')),
-  CONSTRAINT service_status_hourly_status_check CHECK (status IN ('available', 'busy', 'congested', 'overloaded', 'unavailable')),
+  CONSTRAINT service_status_hourly_status_check CHECK (status IN ('available', 'scaling', 'busy', 'congested', 'overloaded', 'unavailable')),
   CONSTRAINT service_status_hourly_sample_balance_check CHECK (available_samples + busy_samples + congested_samples + overloaded_samples + unavailable_samples = sample_count)
 );
 CREATE INDEX IF NOT EXISTS idx_service_status_hourly_bucket
   ON service_status_hourly(bucket_start DESC, component_id);
 ALTER TABLE service_status_hourly ADD COLUMN IF NOT EXISTS busy_samples INTEGER NOT NULL DEFAULT 0 CHECK (busy_samples >= 0);
+ALTER TABLE service_status_hourly ADD COLUMN IF NOT EXISTS scaling_samples INTEGER NOT NULL DEFAULT 0 CHECK (scaling_samples >= 0);
 ALTER TABLE service_status_hourly ADD COLUMN IF NOT EXISTS congested_samples INTEGER NOT NULL DEFAULT 0 CHECK (congested_samples >= 0);
 ALTER TABLE service_status_hourly ADD COLUMN IF NOT EXISTS overloaded_samples INTEGER NOT NULL DEFAULT 0 CHECK (overloaded_samples >= 0);
 ALTER TABLE service_status_hourly ADD COLUMN IF NOT EXISTS utilization_sum NUMERIC(20,4) NOT NULL DEFAULT 0 CHECK (utilization_sum >= 0);
 ALTER TABLE service_status_hourly ADD COLUMN IF NOT EXISTS worker_instances_sum NUMERIC(20,4) NOT NULL DEFAULT 0 CHECK (worker_instances_sum >= 0);
 ALTER TABLE service_status_hourly DROP CONSTRAINT IF EXISTS service_status_hourly_status_check;
-ALTER TABLE service_status_hourly ADD CONSTRAINT service_status_hourly_status_check CHECK (status IN ('available', 'busy', 'congested', 'overloaded', 'unavailable'));
+ALTER TABLE service_status_hourly ADD CONSTRAINT service_status_hourly_status_check CHECK (status IN ('available', 'scaling', 'busy', 'congested', 'overloaded', 'unavailable'));
 ALTER TABLE service_status_hourly DROP CONSTRAINT IF EXISTS service_status_hourly_sample_balance_check;
 ALTER TABLE service_status_hourly ADD CONSTRAINT service_status_hourly_sample_balance_check CHECK (available_samples + busy_samples + congested_samples + overloaded_samples + unavailable_samples = sample_count);
 ALTER TABLE service_status_hourly DROP CONSTRAINT IF EXISTS service_status_hourly_level_balance_check;
@@ -1232,6 +1234,7 @@ CREATE TABLE IF NOT EXISTS metered_billing_quotes (
   user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
   profile_id TEXT NOT NULL REFERENCES user_game_accounts(id) ON DELETE CASCADE,
   billing_kind TEXT NOT NULL CHECK (billing_kind IN ('metered_personal', 'metered_commercial')),
+  operation TEXT NOT NULL DEFAULT 'main_schedule' CHECK (operation IN ('main_schedule', 'incremental_recompute', 'scenario_comparison')),
   pricing_version TEXT NOT NULL,
   tier INTEGER CHECK (tier BETWEEN 1 AND 4),
   list_price NUMERIC(20,2) NOT NULL CHECK (list_price > 0),
@@ -1242,6 +1245,10 @@ CREATE TABLE IF NOT EXISTS metered_billing_quotes (
   created_at TIMESTAMPTZ NOT NULL,
   confirmed_at TIMESTAMPTZ
 );
+ALTER TABLE metered_billing_quotes ADD COLUMN IF NOT EXISTS operation TEXT NOT NULL DEFAULT 'main_schedule';
+ALTER TABLE metered_billing_quotes DROP CONSTRAINT IF EXISTS metered_billing_quotes_operation_check;
+ALTER TABLE metered_billing_quotes ADD CONSTRAINT metered_billing_quotes_operation_check
+  CHECK (operation IN ('main_schedule', 'incremental_recompute', 'scenario_comparison'));
 CREATE INDEX IF NOT EXISTS idx_metered_billing_quotes_expiry
   ON metered_billing_quotes(expires_at) WHERE admitted_job_id IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_metered_billing_quotes_admitted_job

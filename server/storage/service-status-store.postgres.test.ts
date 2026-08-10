@@ -40,6 +40,15 @@ describe('PostgreSQL service status history', () => {
     await query('delete from service_status_hourly where bucket_start = $1', ['2026-08-08T01:00:00.000Z'])
   })
 
+  it('stores scaling samples as available and exposes their diagnostic count', async () => {
+    await recordServiceStatusSample({ componentId: 'optimization', bucketStart: '2026-08-08T05:15:00.000Z', status: 'scaling', queued: 5, running: 3, workerConcurrency: 3, workerInstances: 1, sampledAt: '2026-08-08T05:15:00.000Z' })
+    const history = await getServiceStatusHistory('optimization', new Date('2026-08-08T06:00:00.000Z'))
+    expect(history.buckets[0]).toMatchObject({ bucket_start: '2026-08-08T05:00:00.000Z', status: 'scaling', sample_count: 1, availability_percent: 100 })
+    const admin = await getAdminServiceStatusHistory('optimization', new Date('2026-08-08T06:00:00.000Z'))
+    expect(admin.buckets[0]).toMatchObject({ scaling_samples: 1, unavailable_samples: 0 })
+    await query('delete from service_status_hourly where bucket_start = $1', ['2026-08-08T05:00:00.000Z'])
+  })
+
   it('persists ECS cost planning with optimistic concurrency', async () => {
     const initial = await getServiceStatusCostConfig()
     expect(initial).toMatchObject({ component_id: 'optimization', billing_model: 'ecs_payg', hourly_price_cny: null })

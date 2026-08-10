@@ -311,7 +311,7 @@ export default function AdminDashboardView() {
                     <select name="profile_duration" className="tool-field" defaultValue="lifetime">
                       <option value="lifetime">终身卡</option>
                       <option value="month">月卡（30 天）</option>
-                      <option value="half_year">半年卡（180 天）</option>
+                      <option value="half_year">90 天版本维护卡（90 天）</option>
                       <option value="year">年卡（365 天）</option>
                     </select>
                   </label>

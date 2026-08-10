@@ -27,11 +27,11 @@ const accepted: OptimizeJobAccepted = {
   billing: {
     status: 'reserved',
     billing_kind: 'metered_personal',
-    pricing_version: '2026-08-06-v3',
-    list_price: '1200.00',
+    pricing_version: '2026-08-09-v4',
+    list_price: '1000.00',
     tier: null,
     discount_bps: 0,
-    charge: '1200.00',
+    charge: '1000.00',
   },
 }
 
@@ -93,7 +93,7 @@ describe('optimization progress mapping', () => {
     expect(progress.jobId).toBe('job-1')
     expect(progress.queueStatus).toBe('queued')
     expect(progress.estimatedRemainingMs).toBe(10_000)
-    expect(progress.billing).toMatchObject({ status: 'reserved', charge: '1200.00' })
+    expect(progress.billing).toMatchObject({ status: 'reserved', charge: '1000.00' })
   })
 
   it('maps the persisted history result id from a successful job', () => {

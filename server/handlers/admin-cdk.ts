@@ -126,7 +126,7 @@ export default async (req: Request): Promise<Response> => {
       ? normalizeProfileDuration(profile_duration)
       : null
     if (cdkType === 'profile' && !profileDuration) {
-      return jsonResponse({ error: '档案 CDK 有效期必须是终身、月卡、半年卡或年卡。', code: 'cdk_profile_duration_invalid' }, 400)
+      return jsonResponse({ error: '档案 CDK 有效期必须是终身、30 天、90 天或 365 天。', code: 'cdk_profile_duration_invalid' }, 400)
     }
     const createdAt = new Date().toISOString()
     const itemExpiry = cdkType === 'item'

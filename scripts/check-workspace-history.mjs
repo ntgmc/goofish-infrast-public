@@ -1629,6 +1629,8 @@ function memoryLicenseUtilsModule() {
     export function formatRiskFreezeMessage(message) { return message }
     export function getPermissionMode(license) { return license?.permission ?? 'advanced' }
     export function getSecretKeyring() { return ['workspace-history-test-secret'] }
+    export function getCdkScheduleQuotaLimit() { return null }
+    export function getCdkScenarioQuotaLimit() { return null }
     export function getCdkType(record) { return record?.cdk_type ?? 'profile' }
     export function getCdkBalanceAmount(record) {
       return getCdkType(record) === 'balance' && typeof record?.balance_amount === 'string'
@@ -1650,6 +1652,11 @@ function memoryLicenseUtilsModule() {
       return isProfileCdkRecord(record) && typeof record?.profile_expires_at === 'string'
         ? record.profile_expires_at
         : null
+    }
+    export function getCdkProfileDuration(record) {
+      return record?.profile_duration === 'month' || record?.profile_duration === 'half_year' || record?.profile_duration === 'year'
+        ? record.profile_duration
+        : 'lifetime'
     }
     export async function getCdkRecordStore() {
       return {

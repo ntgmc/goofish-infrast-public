@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, within } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AdminOptimizationDeadLetter, AdminOptimizationDeadLetterDetail } from '../contracts'
 
-const { adminApiBlob, adminApiJson } = vi.hoisted(() => ({ adminApiBlob: vi.fn(), adminApiJson: vi.fn() }))
+const { adminApiBlob, adminApiJson, requestAdminOperationReason } = vi.hoisted(() => ({ adminApiBlob: vi.fn(), adminApiJson: vi.fn(), requestAdminOperationReason: vi.fn() }))
 vi.mock('../../../lib/admin-api-client', () => ({ adminApiBlob, adminApiJson }))
+vi.mock('../../../lib/admin-operation-reason', () => ({ requestAdminOperationReason }))
 
 import DeadLetterPanel from './DeadLetterPanel'
 
@@ -13,10 +14,16 @@ describe('DeadLetterPanel', () => {
   beforeEach(() => {
     adminApiJson.mockReset()
     adminApiBlob.mockReset().mockResolvedValue(new Blob(['{}'], { type: 'application/json' }))
+    requestAdminOperationReason.mockReset().mockResolvedValue('已确认批量丢弃')
     adminApiJson.mockImplementation(async (url: string) => {
       if (url.includes('view=dead_letter')) return { dead_letter: detail() }
       return { dead_letters: [record()] }
     })
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
   })
 
   it('shows the original configuration and operator data on demand while exposing the complete payload as a download', async () => {
@@ -60,6 +67,41 @@ describe('DeadLetterPanel', () => {
     const legacyRecord = readOnlyNotice.closest('article')!
     expect(within(legacyRecord).queryByRole('button', { name: '重放' })).not.toBeInTheDocument()
     expect(within(legacyRecord).getByRole('button', { name: '丢弃' })).toBeInTheDocument()
+  })
+
+  it('automatically recovers from a transient list failure while the page remains visible', async () => {
+    vi.useFakeTimers()
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+    adminApiJson
+      .mockRejectedValueOnce(new Error('加载优化死信失败'))
+      .mockResolvedValue({ dead_letters: [record()] })
+
+    render(<DeadLetterPanel />)
+    await act(async () => { await Promise.resolve() })
+    expect(screen.getByRole('alert')).toHaveTextContent('加载优化死信失败')
+
+    await act(async () => { vi.advanceTimersByTime(15_000); await Promise.resolve() })
+    expect(screen.getByText(/任务 job-1/)).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('discards every pending dead-letter with one confirmed admin action', async () => {
+    adminApiJson.mockImplementation(async (_url: string, options?: { method?: string; json?: { action?: string } }) => {
+      if (options?.method === 'POST' && options.json?.action === 'discard_all') return { discarded_count: 1 }
+      return { dead_letters: [record()] }
+    })
+
+    render(<DeadLetterPanel />)
+    await screen.findByText(/任务 job-1/)
+    fireEvent.click(screen.getByRole('button', { name: '全部丢弃' }))
+
+    await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/optimization', expect.objectContaining({
+      method: 'POST',
+      json: { action: 'discard_all', reason: '已确认批量丢弃' },
+      fallbackMessage: '批量丢弃死信失败',
+    })))
+    expect(requestAdminOperationReason).toHaveBeenCalledWith(expect.objectContaining({ title: '确认丢弃全部待处理死信' }))
+    expect(await screen.findByText('已丢弃 1 条待处理死信。')).toBeInTheDocument()
   })
 })
 

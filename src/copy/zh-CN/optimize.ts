@@ -1000,4 +1000,66 @@ export const optimizeCopy = {
   pages_tool_optimize_tour_035: "点击后创建实验任务；进度、失败原因和重试信息会同步显示。",
   pages_tool_optimize_tour_036: "选择并应用方案",
   pages_tool_optimize_tour_037: "结果生成后可通过帕累托图或表格选择情景，再用“应用此配置”带回普通优化流程。",
+  // src/pages/tool/optimize/OverviewSection.tsx
+  pages_tool_optimize_OverviewSection_071: "数据变化后的快速更新",
+  // src/pages/tool/optimize/OverviewSection.tsx
+  pages_tool_optimize_OverviewSection_072: "个人增量重算",
+  // src/pages/tool/optimize/OverviewSection.tsx
+  pages_tool_optimize_OverviewSection_073: "绑定最近一次成功结果，用于练度提高或新增干员后的重新优化。当前版本会重新执行排班计算，暂未复用底层计算缓存。",
+  // src/pages/tool/optimize/OverviewSection.tsx
+  pages_tool_optimize_OverviewSection_074: (charge: string) => `${charge} 积分/次 · 仅成功后结算`,
+  // src/pages/tool/optimize/OverviewSection.tsx
+  pages_tool_optimize_OverviewSection_075: "终身卡包含此能力",
+  // src/pages/tool/optimize/OverviewSection.tsx
+  pages_tool_optimize_OverviewSection_076: "正在提交增量重算…",
+  // src/pages/tool/optimize/OverviewSection.tsx
+  pages_tool_optimize_OverviewSection_077: "提交个人增量重算",
+  // src/pages/tool/optimize/ScenarioLabSection.tsx
+  pages_tool_optimize_ScenarioLabSection_054: "场景对比包：300 积分/次",
+  // src/pages/tool/optimize/ScenarioLabSection.tsx
+  pages_tool_optimize_ScenarioLabSection_055: "正在获取场景对比报价…",
+  // src/pages/tool/optimize/ScenarioLabSection.tsx
+  pages_tool_optimize_ScenarioLabSection_056: "积分余额不足。",
+  // src/pages/tool/optimize/ScenarioLabSection.tsx
+  pages_tool_optimize_ScenarioLabSection_057: "提交成功后才会结算场景对比费用。",
+  // src/pages/tool/optimize/ScenarioLabSection.tsx
+  pages_tool_optimize_ScenarioLabSection_058: "重新获取报价",
+  // src/pages/tool/optimize/useOptimizeWorkflow.tsx
+  pages_tool_optimize_useOptimizeWorkflow_024: "个人增量重算必须先有一份成功主排班结果。",
+  // src/pages/tool/optimize/useOptimizeWorkflow.tsx
+  pages_tool_optimize_useOptimizeWorkflow_025: "当前干员与配置数据没有变化，无需提交增量重算。",
+  // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
+  pages_tool_optimize_scenario_lab_ScenarioFactors_033: (count: number, maximum: number) => `额外配置 ${count} / ${maximum}；每次场景对比最多比较 ${maximum} 个额外基建配置。`,
+  // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
+  pages_tool_optimize_scenario_lab_ScenarioFactors_034: (maximum: number) => `已达 ${maximum} 个额外配置上限`,
+  // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_048: "相对基准效率差",
+  // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_049: "适用条件",
+  // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_050: " / 日",
+  // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_051: "产能受限",
+  // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_052: "理智预算受限",
+  // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_053: "库存爆发期",
+  // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_054: "库存",
+  // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_055: "源石预算",
+  // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_056: "制造",
+  // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_057: "贸易",
+  // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_058: "适合需要轮换提醒",
+  // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_059: "自动变间隔",
+  // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_060: "固定 8×3",
+  // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_061: "不使用无人机",
+  // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_062: "使用无人机",
 } as const

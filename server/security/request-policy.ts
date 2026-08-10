@@ -182,6 +182,7 @@ export const requestSchemas = {
   adminOptimization: z.discriminatedUnion('action', [
     strict({ action: z.literal('replay'), id: shortString(128), reason: adminOperationReasonSchema }),
     strict({ action: z.literal('discard'), id: shortString(128), reason: adminOperationReasonSchema }),
+    strict({ action: z.literal('discard_all'), reason: adminOperationReasonSchema }),
   ]),
   adminServiceStatusCreate: z.discriminatedUnion('action', [
     strict({
@@ -474,6 +475,8 @@ export const requestSchemas = {
       billing_quote_id: optionalString(128),
       pricing_version: optionalString(64),
       accepted_max_points: optionalString(32),
+      billing_operation: z.enum(['main_schedule', 'incremental_recompute']).optional(),
+      baseline_history_id: optionalString(128),
     }),
     strict({
       kind: z.literal('scenario_comparison'),
@@ -481,6 +484,9 @@ export const requestSchemas = {
       operators: licenseOperatorsSchema,
       config: licenseConfigSchema,
       factors: scenarioComparisonFactorsSchema,
+      billing_quote_id: optionalString(128),
+      pricing_version: optionalString(64),
+      accepted_max_points: optionalString(32),
       use_items: z.array(z.enum([
         'priority_compute_coupon', 'reorder_check_coupon', 'scenario_simulation_coupon',
         'training_diagnosis_coupon', 'additional_recompute_coupon', 'plan_capacity_certificate',

@@ -28,9 +28,23 @@ export function calculateServiceStatusCostEstimate(
   const price = config.hourly_price_cny
   const observed24 = observedWorkerHours(buckets, 24)
   const observed30d = observedWorkerHours(buckets, HOURS_PER_MONTH)
+  const observed24Cost = price === null || observed24 === null ? null : roundMoney(observed24.workerHours * price)
+  const observed30dCost = price === null || observed30d === null ? null : roundMoney(observed30d.workerHours * price)
+  const projectedMonthly = price === null || observed24 === null || observed24.sampleHours === 0
+    ? null
+    : roundMoney((observed24.workerHours / observed24.sampleHours) * HOURS_PER_MONTH * price)
+  const observedSavings = price === null || observed30d === null
+    ? null
+    : roundMoney(Math.max(0, observed30d.sampleHours - observed30d.workerHours) * price)
   return {
-    observed_24h_worker_hours: observed24,
-    observed_30d_worker_hours: observed30d,
+    observed_24h_worker_hours: observed24?.workerHours ?? null,
+    observed_30d_worker_hours: observed30d?.workerHours ?? null,
+    observed_24h_sample_hours: observed24?.sampleHours ?? 0,
+    observed_30d_sample_hours: observed30d?.sampleHours ?? 0,
+    observed_24h_cost_cny: observed24Cost,
+    observed_30d_cost_cny: observed30dCost,
+    projected_monthly_cost_cny: projectedMonthly,
+    observed_savings_cny: observedSavings,
     planned_daily_worker_hours: plannedDaily,
     planned_monthly_worker_hours: roundHours(plannedDaily * 30),
     estimated_daily_cost_cny: price === null ? null : roundMoney(plannedDaily * price),
@@ -86,12 +100,15 @@ export function recommendServiceStatusCostPlan(
   }
 }
 
-function observedWorkerHours(buckets: AdminServiceStatusHistoryBucket[], hours: number): number | null {
+function observedWorkerHours(buckets: AdminServiceStatusHistoryBucket[], hours: number): { workerHours: number; sampleHours: number } | null {
   const samples = buckets
-    .filter((bucket) => bucket.sample_count > 0 && typeof bucket.average_worker_instances === 'number')
     .slice(-hours)
+    .filter((bucket) => bucket.sample_count > 0 && typeof bucket.average_worker_instances === 'number')
   if (samples.length === 0) return null
-  return roundHours(samples.reduce((sum, bucket) => sum + (bucket.average_worker_instances ?? 0), 0))
+  return {
+    workerHours: roundHours(samples.reduce((sum, bucket) => sum + (bucket.average_worker_instances ?? 0), 0)),
+    sampleHours: samples.length,
+  }
 }
 
 function recommendWorkers(samples: AdminServiceStatusHistoryBucket[], baseline: number): number {

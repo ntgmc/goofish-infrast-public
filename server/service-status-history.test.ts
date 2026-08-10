@@ -7,12 +7,14 @@ const mocks = vi.hoisted(() => ({
   snapshot: vi.fn(),
   record: vi.fn(),
   prune: vi.fn(),
+  autoscalingConfig: vi.fn(),
 }))
 
 vi.mock('./lifecycle', () => ({ isServiceReady: mocks.ready }))
 vi.mock('./storage/postgres', () => ({ hasDatabaseUrl: mocks.hasDatabaseUrl, withPostgresAdvisoryLock: mocks.advisoryLock }))
 vi.mock('./storage/optimize-job-store', () => ({ getAdminOptimizationQueueSnapshot: mocks.snapshot }))
 vi.mock('./storage/service-status-store', () => ({ recordServiceStatusSample: mocks.record, pruneServiceStatusHistory: mocks.prune }))
+vi.mock('./optimize-job-config', () => ({ getOptimizeWorkerAutoscalingConfiguration: mocks.autoscalingConfig }))
 
 import { runServiceStatusSampling } from './service-status-history'
 
@@ -26,6 +28,7 @@ describe('service status history sampler', () => {
     mocks.snapshot.mockResolvedValue({ snapshot_at: '2026-08-08T09:04:00.000Z', capacity: { worker_concurrency: 3, worker_instances: 1 }, counts: { queued: 2, running: 1 } })
     mocks.record.mockResolvedValue(undefined)
     mocks.prune.mockResolvedValue(0)
+    mocks.autoscalingConfig.mockReturnValue({ enabled: false, scaleUpQueueThreshold: 4, scaleDownQueueThreshold: 1, scaleDownIdleMs: 600000, intervalMs: 30000 })
     warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
   })
 
@@ -42,6 +45,25 @@ describe('service status history sampler', () => {
     expect(mocks.advisoryLock).toHaveBeenCalledWith('service-status-history-sampler', expect.any(Function))
     expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({ bucketStart: '2026-08-08T09:00:00.000Z', status: 'busy' }))
     expect(mocks.prune).toHaveBeenCalledWith(expect.any(String))
+  })
+
+  it('uses total capacity for availability while recording only billable ECS workers', async () => {
+    mocks.snapshot.mockResolvedValue({
+      snapshot_at: '2026-08-08T09:04:00.000Z',
+      capacity: { worker_concurrency: 1, worker_instances: 1, billable_worker_instances: 0 },
+      counts: { queued: 0, running: 0 },
+    })
+
+    await expect(runServiceStatusSampling()).resolves.toBe(true)
+    expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({ status: 'available', workerInstances: 0 }))
+  })
+
+  it('records elastic processing when autoscaling is enabled above its trigger threshold', async () => {
+    mocks.autoscalingConfig.mockReturnValue({ enabled: true, scaleUpQueueThreshold: 4, scaleDownQueueThreshold: 1, scaleDownIdleMs: 600000, intervalMs: 30000 })
+    mocks.snapshot.mockResolvedValue({ snapshot_at: '2026-08-08T09:04:00.000Z', capacity: { worker_concurrency: 3, worker_instances: 1 }, counts: { queued: 5, running: 3 } })
+
+    await expect(runServiceStatusSampling()).resolves.toBe(true)
+    expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({ status: 'scaling', workerInstances: 1 }))
   })
 
   it('does not write when another API instance owns the lock', async () => {

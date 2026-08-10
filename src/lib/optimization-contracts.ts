@@ -10,7 +10,7 @@ import type {
 } from './types'
 import type { ScenarioComparisonFactors, ScenarioComparisonResult } from './scenario-comparison'
 import type { SystemItemCode } from './inventory-contracts'
-import type { CommercialTierLevel, MeteredBillingKind } from './metered-billing'
+import type { CommercialTierLevel, MeteredBillingKind, MeteredBillingOperation } from './metered-billing'
 
 type OptimizationIdentity = { type: 'profile'; profileId: string }
 
@@ -30,12 +30,17 @@ export type CreateOptimizationJobRequest =
       billing_quote_id?: string;
       pricing_version?: string;
       accepted_max_points?: string;
+      billing_operation?: MeteredBillingOperation;
+      baseline_history_id?: string;
     })
   | (Omit<OptimizationJobInput, 'identity'> & {
       kind: 'scenario_comparison';
       identity: OptimizationIdentity;
       factors: ScenarioComparisonFactors;
       use_items?: SystemItemCode[];
+      billing_quote_id?: string;
+      pricing_version?: string;
+      accepted_max_points?: string;
     })
 
 export interface CreateReorderCheckRequest {
@@ -115,6 +120,7 @@ interface OptimizationJobSnapshotBase {
 
 export interface OptimizationBillingSnapshot {
   status: 'reserved' | 'settled' | 'released';
+  operation?: MeteredBillingOperation;
   billing_kind: MeteredBillingKind;
   pricing_version: string;
   list_price: string;

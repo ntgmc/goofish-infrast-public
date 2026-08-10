@@ -6,6 +6,7 @@ import type {
   ScenarioMaaSchedule,
   ScenarioProductionPlan,
 } from '../../../../lib/scenario-comparison'
+import { SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS } from '../../../../lib/scenario-comparison'
 import { copy } from '../../../../copy/index'
 
 
@@ -39,6 +40,7 @@ export default function ScenarioFactors({
   disabled: boolean;
   onChange: (next: ScenarioComparisonFactors) => void;
 }) {
+  const additionalConfigCount = factors.layouts.reduce((sum, entry) => sum + entry.plans.length, 0)
   const toggleSchedule = (value: ScenarioMaaSchedule) => {
     const selected = factors.maaSchedules.includes(value)
     onChange({
@@ -71,6 +73,7 @@ export default function ScenarioFactors({
       <div>
         <h3 className="text-sm font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_012}</h3>
         <p className="mt-1 text-xs leading-5 text-ink-muted">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_013}</p>
+        <p className="mt-1 text-xs leading-5 text-ink-secondary">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_033(additionalConfigCount, SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS)}</p>
         <div
           data-testid="scenario-layout-grid"
           className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3"
@@ -80,6 +83,7 @@ export default function ScenarioFactors({
               key={layout.id}
               layout={layout}
               plans={factors.layouts.find((item) => item.layout === layout.id)?.plans ?? []}
+              canAdd={additionalConfigCount < SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS}
               onChange={(plans) => updatePlans(layout.id, plans)}
             />
           ))}
@@ -134,10 +138,12 @@ export default function ScenarioFactors({
 function LayoutPlanEditor({
   layout,
   plans,
+  canAdd,
   onChange,
 }: {
   layout: { id: ScenarioLayout; trading: number; manufacturing: number };
   plans: ScenarioProductionPlan[];
+  canAdd: boolean;
   onChange: (plans: ScenarioProductionPlan[]) => void;
 }) {
   const [orundum, setOrundum] = useState(0)
@@ -183,11 +189,11 @@ function LayoutPlanEditor({
       <p className="mt-3 text-xs leading-5 text-ink-secondary">{planLabel(draft)}</p>
       <button
         type="button"
-        disabled={duplicate}
+        disabled={duplicate || !canAdd}
         onClick={() => onChange([...plans, draft])}
         className="tool-secondary-action mt-3 w-full"
       >
-        {duplicate ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_023 : copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_024}
+        {duplicate ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_023 : !canAdd ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_034(SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS) : copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_024}
       </button>
       {plans.length > 0 && (
         <ul className="mt-3 space-y-2" aria-label={`${layout.id}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_025}`}>

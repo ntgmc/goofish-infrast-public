@@ -13,7 +13,7 @@ import {
   reserveItemsInTransaction,
   getProfileCapacityLimitsInTransaction,
 } from './inventory-store'
-import type { MeteredBillingKind, MeteredQuoteConfirmation, MeteredScheduleQuote } from '../../src/lib/metered-billing'
+import type { MeteredBillingKind, MeteredBillingOperation, MeteredQuoteConfirmation, MeteredScheduleQuote } from '../../src/lib/metered-billing'
 import type { OptimizationBillingSnapshot } from '../../src/lib/optimization-contracts'
 import { getMeteredBillingPolicy, getMeteredScheduleQuote } from '../../src/lib/metered-billing'
 import { BalanceError, releaseScheduleBalanceInTransaction, reserveScheduleBalanceInTransaction, settleScheduleBalanceInTransaction } from './balance-store'
@@ -24,6 +24,7 @@ import { parseOptimizationJobResult } from '../optimization/jobs/runtime-contrac
 import { countReorderCheckQuotaInTransaction } from './reorder-quota-store'
 import { confirmMeteredQuoteInTransaction, MeteredBillingQuoteError } from './metered-billing-store'
 import { insertProfileOptimizationResultInTransaction } from './optimization-result-store'
+import { CdkScenarioQuotaExceededError, CdkScheduleQuotaExceededError, releaseCdkScenarioQuotaInTransaction, releaseCdkScheduleQuotaInTransaction, reserveCdkScenarioQuotaInTransaction, reserveCdkScheduleQuotaInTransaction, settleCdkScenarioQuotaInTransaction } from './cdk-store'
 
 export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered'
 export type OptimizeJobPriority = 'priority_coupon' | 'paid' | 'analysis' | 'standard'
@@ -45,6 +46,12 @@ interface OptimizeJobCursor {
 interface OptimizeJobListRecord {
   job: OptimizeJobRecord
   queuePosition: number | null
+  queueWaitMs?: number | null
+}
+
+export interface OptimizeJobQueueEstimate {
+  queuePosition: number | null
+  estimatedWaitMs: number | null
 }
 
 export interface OptimizeJobRecord<TPayload = unknown, TResult = unknown> {
@@ -104,12 +111,12 @@ interface AdmitOptimizeJobInput<TPayload = unknown> extends CreateOptimizeJobInp
     limit: number
     useCoupon?: boolean
   } | null
-  billing?: { userId: string; billingKind: MeteredBillingKind; confirmation: MeteredQuoteConfirmation } | null
+  billing?: { userId: string; operation: MeteredBillingOperation; billingKind: MeteredBillingKind; confirmation: MeteredQuoteConfirmation } | null
 }
 
 export class OptimizeJobAdmissionError extends Error {
   constructor(
-    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'commercial_queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'commercial_submission_rate_exceeded' | 'free_revision_limit_exceeded' | 'priority_coupon_unavailable' | 'item_unavailable' | 'item_not_applicable' | 'reorder_check_quota_exceeded' | 'insufficient_balance' | 'pricing_changed' | 'quote_already_used' | 'profile_not_found' | 'not_metered_profile' | 'profile_archived' | 'commercial_not_eligible' | 'commercial_suspended' | 'debt_outstanding',
+    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'commercial_queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'commercial_submission_rate_exceeded' | 'free_revision_limit_exceeded' | 'priority_coupon_unavailable' | 'item_unavailable' | 'item_not_applicable' | 'reorder_check_quota_exceeded' | 'insufficient_balance' | 'pricing_changed' | 'quote_already_used' | 'profile_not_found' | 'not_metered_profile' | 'profile_archived' | 'commercial_not_eligible' | 'commercial_suspended' | 'debt_outstanding' | 'subscription_quota_exceeded' | 'subscription_scenario_quota_exceeded',
     readonly status: 404 | 409 | 429,
     message: string,
   ) {
@@ -126,6 +133,7 @@ export interface OptimizeJobStore {
   listJobsByProfile: (profileId: string, limit?: number, before?: OptimizeJobCursor | null) => Promise<OptimizeJobListRecord[]>
   findActiveByOwnerKey: (ownerKey: string) => Promise<OptimizeJobRecord | null>
   getQueuePosition: (id: string) => Promise<number | null>
+  getQueueEstimate?: (id: string) => Promise<OptimizeJobQueueEstimate>
   claimNextJob: (workerId: string, lockToken: string, lockExpiresAt: string, maxFailures: number, maxGlobalRunning?: number) => Promise<OptimizeJobRecord | null>
   heartbeatAttempt: (id: string, attemptNo: number, workerId: string, lockToken: string, lockExpiresAt: string) => Promise<boolean>
   ownsAttempt: (id: string, attemptNo: number, workerId: string, lockToken: string) => Promise<boolean>
@@ -216,6 +224,7 @@ export interface AdminOptimizationQueueSnapshot {
     queue_limit: number
     worker_concurrency: number
     worker_instances: number
+    billable_worker_instances: number
     source: 'runtime_registry' | 'configured_fallback'
     heartbeat_interval_ms: number
     stale_after_ms: number
@@ -319,6 +328,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
               jobId: input.id,
               userId: input.billing.userId,
               profileId: input.profile_id!,
+              operation: input.billing.operation,
               confirmation: input.billing.confirmation,
               now,
             })
@@ -352,7 +362,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           }
         }
         const activeQueue = await client.query<OptimizeQueueCapacityRow>(
-          `select status, priority, owner_key, payload_json, created_at, started_at
+          `select id, status, priority, owner_key, payload_json, created_at, started_at
            from optimize_jobs where status in ('queued', 'running')`,
         )
         assertOptimizeQueueWaitCapacity(activeQueue.rows.map(fromQueueCapacityRow), input.owner_key, now)
@@ -460,6 +470,47 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           }
         }
 
+        const payloadRecord = input.payload_json && typeof input.payload_json === 'object' && !Array.isArray(input.payload_json)
+          ? input.payload_json as Record<string, unknown>
+          : null
+        const cdkUsageRef = payloadRecord
+          && payloadRecord.cdkUsageRef && typeof payloadRecord.cdkUsageRef === 'object'
+          && typeof (payloadRecord.cdkUsageRef as Record<string, unknown>).code_hash === 'string'
+          ? (payloadRecord.cdkUsageRef as { code_hash: string })
+          : null
+        const payloadRequest = payloadRecord?.request && typeof payloadRecord.request === 'object'
+          ? payloadRecord.request as Record<string, unknown>
+          : null
+        const isIncrementalRecompute = payloadRequest?.billing_operation === 'incremental_recompute'
+        if (input.source === 'account_profile' && cdkUsageRef && !isIncrementalRecompute) {
+          try {
+            await reserveCdkScheduleQuotaInTransaction(client, {
+              jobId: input.id,
+              codeHash: cdkUsageRef.code_hash,
+              now,
+            })
+          } catch (error) {
+            if (error instanceof CdkScheduleQuotaExceededError) {
+              throw new OptimizeJobAdmissionError(error.code, 409, error.message)
+            }
+            throw error
+          }
+        }
+        if (input.source === 'scenario_comparison' && cdkUsageRef) {
+          try {
+            await reserveCdkScenarioQuotaInTransaction(client, {
+              jobId: input.id,
+              codeHash: cdkUsageRef.code_hash,
+              now,
+            })
+          } catch (error) {
+            if (error instanceof CdkScenarioQuotaExceededError) {
+              throw new OptimizeJobAdmissionError(error.code, 409, error.message)
+            }
+            throw error
+          }
+        }
+
         const billingSnapshot: OptimizationBillingSnapshot | null = confirmedBillingQuote ? {
           status: 'reserved', ...confirmedBillingQuote,
         } : null
@@ -540,9 +591,15 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
          order by job.created_at desc, job.id desc limit $4`,
         [profileId, before?.createdAt ?? null, before?.id ?? null, Math.max(1, Math.min(101, Math.floor(limit)))],
       )
+      const activeQueue = await query<OptimizeQueueCapacityRow>(
+        `select id, status, priority, owner_key, payload_json, created_at, started_at
+           from optimize_jobs where status in ('queued', 'running')`,
+      )
+      const queueEstimates = buildOptimizeQueueEstimates(activeQueue.rows.map(fromQueueCapacityRow), Date.now())
       return result.rows.map((row) => ({
         job: fromRow(row),
         queuePosition: row.queue_position === null ? null : Number(row.queue_position),
+        queueWaitMs: queueEstimates.get(row.id)?.estimatedWaitMs ?? null,
       }))
     },
     findActiveByOwnerKey: async (ownerKey) => {
@@ -566,6 +623,15 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         'and (priority > $1 or (priority = $1 and (created_at < $2 or (created_at = $2 and id < $4))))',
       ].join(' '), [row.priority, row.created_at, 'queued', row.id])
       return Number(result.rows[0]?.position ?? 1)
+    },
+    getQueueEstimate: async (id) => {
+      await ensureSchema()
+      const result = await query<OptimizeQueueCapacityRow>(
+        `select id, status, priority, owner_key, payload_json, created_at, started_at
+           from optimize_jobs where status in ('queued', 'running')`,
+      )
+      return buildOptimizeQueueEstimates(result.rows.map(fromQueueCapacityRow), Date.now()).get(id)
+        ?? { queuePosition: null, estimatedWaitMs: null }
     },
     claimNextJob: async (workerId, lockToken, lockExpiresAt, maxFailures, maxGlobalRunning = Number.MAX_SAFE_INTEGER) => {
       await ensureSchema()
@@ -699,6 +765,9 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           'where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = $8 and cancel_requested_at is null',
         ].join(' '), [id, attemptNo, workerId, lockToken, resultJson, now, 'succeeded', 'running'])
         if (!completed.rowCount) return false
+        if (selectedJob.source === 'scenario_comparison') {
+          await settleCdkScenarioQuotaInTransaction(client, id, now)
+        }
         await client.query(
           `update entitlement_ledger set status = 'consumed', settled_at = $2
            where reference_type = 'optimization_job' and reference_id = $1
@@ -1252,7 +1321,7 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       const job = await (async () => {
         const value = await Promise.resolve({ ...input, created_at: input.created_at ?? new Date(now).toISOString() })
         const memoryBillingQuote = value.billing ? {
-          ...getMeteredScheduleQuote(value.billing.billingKind),
+          ...getMeteredScheduleQuote(value.billing.billingKind, '0.00', '0.00', value.billing.operation),
           pricing_version: value.billing.confirmation.pricingVersion,
           charge: value.billing.confirmation.acceptedMaxPoints,
         } : null
@@ -1291,13 +1360,23 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       return clone(job)
     },
     getJob: async (id) => records.has(id) ? clone(records.get(id)!) : null,
-    listJobsByProfile: async (profileId, limit = 50, before = null) => [...records.values()]
-      .filter((job) => job.profile_id === profileId && (!before
-        || Date.parse(job.created_at) < Date.parse(before.createdAt)
-        || (job.created_at === before.createdAt && job.id < before.id)))
-      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id.localeCompare(a.id))
-      .slice(0, Math.max(1, Math.min(101, Math.floor(limit))))
-      .map((job) => ({ job: clone(job), queuePosition: memoryQueuePosition(records, job) })),
+    listJobsByProfile: async (profileId, limit = 50, before = null) => {
+      const queueEstimates = buildOptimizeQueueEstimates(
+        [...records.values()].filter((job) => activeStatuses.has(job.status)),
+        Date.now(),
+      )
+      return [...records.values()]
+        .filter((job) => job.profile_id === profileId && (!before
+          || Date.parse(job.created_at) < Date.parse(before.createdAt)
+          || (job.created_at === before.createdAt && job.id < before.id)))
+        .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id.localeCompare(a.id))
+        .slice(0, Math.max(1, Math.min(101, Math.floor(limit))))
+        .map((job) => ({
+          job: clone(job),
+          queuePosition: memoryQueuePosition(records, job),
+          queueWaitMs: queueEstimates.get(job.id)?.estimatedWaitMs ?? null,
+        }))
+    },
     findActiveByOwnerKey: async (ownerKey) => [...records.values()]
       .filter((job) => job.owner_key === ownerKey && activeStatuses.has(job.status))
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0] ?? null,
@@ -1310,6 +1389,10 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
             && (Date.parse(candidate.created_at) < Date.parse(job.created_at)
               || (candidate.created_at === job.created_at && candidate.id < job.id))))).length + 1
     },
+    getQueueEstimate: async (id) => buildOptimizeQueueEstimates(
+      [...records.values()].filter((job) => activeStatuses.has(job.status)),
+      Date.now(),
+    ).get(id) ?? { queuePosition: null, estimatedWaitMs: null },
     claimNextJob: async (workerId, lockToken, lockExpiresAt, maxFailures, maxGlobalRunning = Number.MAX_SAFE_INTEGER) => {
       const nowMs = Date.now()
       const runningOwners = new Set([...records.values()].filter((job) => job.status === 'running').map((job) => job.owner_key))
@@ -1665,7 +1748,7 @@ async function upsertBillingReconciliationCase(
 }
 
 type OptimizeQueueCapacityJob = Pick<OptimizeJobRecord,
-  'status' | 'priority' | 'owner_key' | 'payload_json' | 'created_at' | 'started_at'>
+  'id' | 'status' | 'priority' | 'owner_key' | 'payload_json' | 'created_at' | 'started_at'>
 
 type OptimizeQueueCapacityRow = Omit<OptimizeQueueCapacityJob, 'priority' | 'created_at' | 'started_at'> & {
   priority: number | string
@@ -1742,6 +1825,42 @@ function estimateOptimizeQueueWaitMs(
   ownerKey: string,
   nowMs: number,
 ): number {
+  const schedule = createOptimizeQueueSchedule(activeJobs, nowMs)
+  for (const job of schedule.queuedJobs) {
+    scheduleQueueWork(schedule.workerAvailableAt, schedule.ownerAvailableAt, job.owner_key, getQueueJobDurationMs(job.payload_json))
+  }
+  return getEarliestQueueStart(schedule.workerAvailableAt, schedule.ownerAvailableAt.get(ownerKey) ?? 0)
+}
+
+function buildOptimizeQueueEstimates(
+  activeJobs: OptimizeQueueCapacityJob[],
+  nowMs: number,
+): Map<string, OptimizeJobQueueEstimate> {
+  const schedule = createOptimizeQueueSchedule(activeJobs, nowMs)
+  const estimates = new Map<string, OptimizeJobQueueEstimate>()
+  for (const [index, job] of schedule.queuedJobs.entries()) {
+    const estimatedWaitMs = scheduleQueueWork(
+      schedule.workerAvailableAt,
+      schedule.ownerAvailableAt,
+      job.owner_key,
+      getQueueJobDurationMs(job.payload_json),
+    )
+    estimates.set(job.id, {
+      queuePosition: index + 1,
+      estimatedWaitMs,
+    })
+  }
+  return estimates
+}
+
+function createOptimizeQueueSchedule(
+  activeJobs: OptimizeQueueCapacityJob[],
+  nowMs: number,
+): {
+  workerAvailableAt: number[]
+  ownerAvailableAt: Map<string, number>
+  queuedJobs: OptimizeQueueCapacityJob[]
+} {
   const workerAvailableAt = Array.from({ length: getOptimizeGlobalWorkerConcurrency() }, () => 0)
   const ownerAvailableAt = new Map<string, number>()
   const runningJobs = activeJobs.filter((job) => job.status === 'running')
@@ -1749,7 +1868,9 @@ function estimateOptimizeQueueWaitMs(
   // submissions must not push an already admitted job past its expiry time.
   const queuedJobs = activeJobs
     .filter((job) => job.status === 'queued')
-    .sort((left, right) => right.priority - left.priority || Date.parse(left.created_at) - Date.parse(right.created_at))
+    .sort((left, right) => right.priority - left.priority
+      || Date.parse(left.created_at) - Date.parse(right.created_at)
+      || left.id.localeCompare(right.id))
 
   for (const job of runningJobs) {
     const elapsedMs = Math.max(0, nowMs - parseQueueTimestamp(job.started_at, nowMs))
@@ -1759,11 +1880,7 @@ function estimateOptimizeQueueWaitMs(
       : Math.max(1_000, estimatedDurationMs - elapsedMs)
     scheduleQueueWork(workerAvailableAt, ownerAvailableAt, job.owner_key, remainingMs)
   }
-  for (const job of queuedJobs) {
-    scheduleQueueWork(workerAvailableAt, ownerAvailableAt, job.owner_key, getQueueJobDurationMs(job.payload_json))
-  }
-
-  return getEarliestQueueStart(workerAvailableAt, ownerAvailableAt.get(ownerKey) ?? 0)
+  return { workerAvailableAt, ownerAvailableAt, queuedJobs }
 }
 
 function scheduleQueueWork(
@@ -1771,7 +1888,7 @@ function scheduleQueueWork(
   ownerAvailableAt: Map<string, number>,
   ownerKey: string,
   durationMs: number,
-): void {
+): number {
   const ownerReadyAt = ownerAvailableAt.get(ownerKey) ?? 0
   let selectedWorker = 0
   let selectedStart = Math.max(workerAvailableAt[0] ?? 0, ownerReadyAt)
@@ -1785,6 +1902,7 @@ function scheduleQueueWork(
   const finishesAt = selectedStart + durationMs
   workerAvailableAt[selectedWorker] = finishesAt
   ownerAvailableAt.set(ownerKey, finishesAt)
+  return selectedStart
 }
 
 function getEarliestQueueStart(workerAvailableAt: number[], ownerReadyAt: number): number {
@@ -1910,11 +2028,15 @@ export async function getAdminOptimizationQueueSnapshot(
     const workerCapacity = (await client.query<{
       worker_concurrency: string
       worker_instances: string
+      billable_worker_instances: string
       heartbeat_interval_ms: string | null
       stale_after_ms: string | null
     }>(
       `select coalesce(sum(concurrency), 0)::text as worker_concurrency,
               count(*)::text as worker_instances,
+              count(*) filter (
+                where not capabilities @> array['runtime:local_fallback']::text[]
+              )::text as billable_worker_instances,
               max(heartbeat_interval_ms)::text as heartbeat_interval_ms,
               max(stale_after_ms)::text as stale_after_ms
          from optimize_worker_registry
@@ -1946,6 +2068,7 @@ export async function getAdminOptimizationQueueSnapshot(
     const recentJobs = recent.rows.map((row) => toAdminOptimizationQueueJob(row, null))
     const registeredConcurrency = Number(workerCapacity?.worker_concurrency ?? 0)
     const workerInstances = Number(workerCapacity?.worker_instances ?? 0)
+    const billableWorkerInstances = Number(workerCapacity?.billable_worker_instances ?? workerInstances)
     const useFallback = workerInstances === 0 && configuredFallbackConcurrency !== undefined
 
     return {
@@ -1956,6 +2079,7 @@ export async function getAdminOptimizationQueueSnapshot(
           ? Math.max(1, Math.floor(configuredFallbackConcurrency))
           : Math.max(0, registeredConcurrency),
         worker_instances: Math.max(0, workerInstances),
+        billable_worker_instances: Math.max(0, billableWorkerInstances),
         source: useFallback ? 'configured_fallback' : 'runtime_registry',
         heartbeat_interval_ms: Number(workerCapacity?.heartbeat_interval_ms ?? 10_000),
         stale_after_ms: Number(workerCapacity?.stale_after_ms ?? 30_000),
@@ -2239,6 +2363,44 @@ export async function discardOptimizationDeadLetter(
   })
 }
 
+export async function discardAllOptimizationDeadLetters(
+  resolution: OptimizationDeadLetterResolution,
+): Promise<number> {
+  await ensureSchema()
+  const now = new Date().toISOString()
+  return withTransaction(async (client) => {
+    const selected = await client.query<{ id: string }>(
+      `select id from optimization_dead_letters
+        where status = 'pending_review'
+        order by created_at asc
+        for update`,
+    )
+    if (selected.rows.length === 0) return 0
+    const ids = selected.rows.map((row) => row.id)
+    const result = await client.query(
+      `update optimization_dead_letters
+          set status = 'discarded', resolution_reason = $1, resolved_by = $2,
+              resolved_at = $3, updated_at = $3
+        where id = any($4::text[]) and status = 'pending_review'`,
+      [resolution.reason, resolution.actorUsername, now, ids],
+    )
+    const discardedCount = result.rowCount ?? 0
+    await recordAdminOperationAuditInTransaction(client, {
+      actorUsername: resolution.actorUsername,
+      action: 'optimization_dead_letter.discard_all',
+      targetType: 'optimization_dead_letter_batch',
+      targetId: resolution.requestId,
+      reason: resolution.reason,
+      requestId: resolution.requestId,
+      clientIp: resolution.clientIp,
+      before: { pending_review_count: selected.rows.length },
+      after: { discarded_count: discardedCount },
+      createdAt: now,
+    })
+    return discardedCount
+  })
+}
+
 type OptimizationDeadLetterRow = Omit<OptimizationDeadLetterRecord,
   'attempt_count' | 'replay_count' | 'replayed_at' | 'resolved_at' | 'created_at' | 'updated_at'> & {
   attempt_count: number | string
@@ -2298,6 +2460,8 @@ async function releaseQueuedEntitlementInTransaction(client: PoolClient, jobId: 
 }
 
 async function releaseMeteredBillingInTransaction(client: PoolClient, jobId: string, nowIso: string): Promise<void> {
+  await releaseCdkScheduleQuotaInTransaction(client, jobId, nowIso)
+  await releaseCdkScenarioQuotaInTransaction(client, jobId, nowIso)
   if (await releaseScheduleBalanceInTransaction(client, jobId, nowIso)) {
     await client.query(
       "update optimize_jobs set billing_json = jsonb_set(billing_json, '{status}', '\"released\"'::jsonb) where id = $1",

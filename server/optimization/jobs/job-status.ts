@@ -6,7 +6,7 @@ import type { OptimizationFailureSnapshot, OptimizationJobListItem, Optimization
 import { getScheduleGenerateDurationStatsByBucket, recordUsageEvent } from "../../handlers/usage-stats";
 import { getProfileForUser, normalizeProfileKind } from "../../storage/user-store";
 import { requireUserSession } from "../../handlers/user-auth";
-import { getOptimizeJobStore, OptimizeJobAdmissionError, type OptimizeJobPriority, type OptimizeJobRecord, type OptimizeJobStore } from "../../storage/optimize-job-store";
+import { getOptimizeJobStore, OptimizeJobAdmissionError, type OptimizeJobPriority, type OptimizeJobQueueEstimate, type OptimizeJobRecord, type OptimizeJobStore } from "../../storage/optimize-job-store";
 import { requestOptimizeJobCancellation, requestOptimizeJobProcessing } from "../../optimize-job-signals";
 import { isOptimizeEstimateOverdue } from "../../optimize-estimate";
 import type { OptimizeDurationEstimate, OptimizeRuntimeEstimate, OptimizationJobPayload, OptimizeJobSource } from './shared';
@@ -194,9 +194,9 @@ export async function getOptimizationJob(req: Request, rawJobId: string): Promis
   const access = await canReadOptimizeJob(req, job);
   if (!access.ok) return jsonResponse({ error: access.message }, access.status);
 
-  const queuePosition = await store.getQueuePosition(job.id);
+  const queueEstimate = await getOptimizeJobQueueEstimate(store, job.id);
   return jsonResponse(projectOptimizeJobSnapshot(
-    formatOptimizeJobStatus(job, queuePosition),
+    formatOptimizeJobStatus(job, queueEstimate.queuePosition, queueEstimate.estimatedWaitMs),
     access.subject,
   ));
 }
@@ -217,8 +217,8 @@ export async function listOptimizationJobs(req: Request): Promise<Response> {
   const jobs = await store.listJobsByProfile(profileId, limit + 1, before)
   const page = jobs.slice(0, limit)
   const response: OptimizationJobListResponse = {
-    jobs: page.map(({ job, queuePosition }) => toOptimizationJobListItem(
-      formatOptimizeJobStatus(job, queuePosition),
+    jobs: page.map(({ job, queuePosition, queueWaitMs }) => toOptimizationJobListItem(
+      formatOptimizeJobStatus(job, queuePosition, queueWaitMs),
     )),
     nextCursor: jobs.length > limit && page.at(-1)
       ? encodeOptimizationJobCursor(page.at(-1)!.job)
@@ -254,7 +254,7 @@ export async function cancelOptimizationJob(req: Request, rawJobId: string): Pro
   if (!cancelled) return jsonResponse({ error: '任务不存在。' }, 404)
   requestOptimizeJobCancellation(jobId)
   return jsonResponse(
-    { job: formatOptimizeJobStatus(cancelled, await store.getQueuePosition(jobId)) },
+    { job: formatOptimizeJobStatus(cancelled, (await getOptimizeJobQueueEstimate(store, jobId)).queuePosition) },
     cancelled.status === 'cancelled' ? 200 : 202,
   )
 }
@@ -284,11 +284,11 @@ async function canReadOptimizeJob(
 }
 
 export async function buildOptimizeJobAccepted(job: OptimizeJobRecord): Promise<OptimizationJobSnapshot> {
-  const queuePosition = await getOptimizeJobStore().getQueuePosition(job.id);
+  const queueEstimate = await getOptimizeJobQueueEstimate(getOptimizeJobStore(), job.id);
   const estimate = getOptimizeJobEstimate(job);
-  const runtimeEstimate = getOptimizeRuntimeEstimate(job, queuePosition, estimate);
+  const runtimeEstimate = getOptimizeRuntimeEstimate(job, queueEstimate.queuePosition, estimate, new Date(), queueEstimate.estimatedWaitMs);
   return projectOptimizeJobSnapshot(
-    formatOptimizationJobSnapshot(job, queuePosition, estimate, runtimeEstimate),
+    formatOptimizationJobSnapshot(job, queueEstimate.queuePosition, estimate, runtimeEstimate),
     getJobCapabilitySubject(job),
   );
 }
@@ -311,9 +311,21 @@ function projectOptimizeJobSnapshot(
   }
 }
 
-function formatOptimizeJobStatus(job: OptimizeJobRecord, queuePosition: number | null): OptimizationJobSnapshot {
+async function getOptimizeJobQueueEstimate(store: OptimizeJobStore, jobId: string): Promise<OptimizeJobQueueEstimate> {
+  if (typeof store.getQueueEstimate === 'function') return store.getQueueEstimate(jobId)
+  return { queuePosition: await store.getQueuePosition(jobId), estimatedWaitMs: null }
+}
+
+function formatOptimizeJobStatus(
+  job: OptimizeJobRecord,
+  queuePosition: number | null,
+  queueWaitMs: number | null | undefined = null,
+): OptimizationJobSnapshot {
   const estimate = getOptimizeJobEstimate(job);
-  const runtimeEstimate = getOptimizeRuntimeEstimate(job, queuePosition, estimate);
+  const normalizedQueueWaitMs = typeof queueWaitMs === 'number' && Number.isFinite(queueWaitMs)
+    ? queueWaitMs
+    : null;
+  const runtimeEstimate = getOptimizeRuntimeEstimate(job, queuePosition, estimate, new Date(), normalizedQueueWaitMs);
   return formatOptimizationJobSnapshot(job, queuePosition, estimate, runtimeEstimate);
 }
 
@@ -500,6 +512,7 @@ function getOptimizeRuntimeEstimate(
   queuePosition: number | null,
   estimate: OptimizeDurationEstimate,
   now = new Date(),
+  queueWaitMs: number | null = null,
 ): OptimizeRuntimeEstimate {
   const nowMs = now.getTime();
   const submittedMs = parseOptimizeJobTime(job.created_at, nowMs);
@@ -556,8 +569,12 @@ function getOptimizeRuntimeEstimate(
   }
 
   const position = Math.max(1, queuePosition ?? 1);
-  const queueEstimateMs = baseMs * position;
-  const estimatedRemainingMs = Math.max(1_000, queueEstimateMs - submittedElapsedMs);
+  const queueEstimateMs = queueWaitMs === null
+    ? baseMs * position
+    : Math.max(0, queueWaitMs) + baseMs;
+  const estimatedRemainingMs = queueWaitMs === null
+    ? Math.max(1_000, queueEstimateMs - submittedElapsedMs)
+    : Math.max(1_000, queueEstimateMs);
   return {
     estimated_remaining_ms: estimatedRemainingMs,
     estimated_total_ms: Math.max(queueEstimateMs, submittedElapsedMs + estimatedRemainingMs),

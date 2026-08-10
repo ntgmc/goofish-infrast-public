@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import ScheduleProgress from '../../../components/ScheduleProgress'
 import { expandScenarioComparison, type ScenarioComparisonPoint } from '../../../lib/scenario-comparison'
 import type { LicenseConfig, LicenseOperator } from '../../../lib/types'
+import type { IssuedMeteredScheduleQuote } from '../../../lib/metered-billing'
 import ScenarioFactors from './scenario-lab/ScenarioFactors'
 import ScenarioParetoChart from './scenario-lab/ScenarioParetoChart'
 import ScenarioResultsTable from './scenario-lab/ScenarioResultsTable'
@@ -15,6 +16,11 @@ export default function ScenarioLabSection({
   activeConfig,
   requiresCoupon = false,
   couponBalance = 0,
+  requiresQuote = false,
+  billingQuote = null,
+  billingQuoteLoading = false,
+  billingQuoteError = null,
+  onRefreshBillingQuote,
   onInventoryChange,
   onApplyConfig,
 }: {
@@ -23,6 +29,11 @@ export default function ScenarioLabSection({
   activeConfig: LicenseConfig;
   requiresCoupon?: boolean;
   couponBalance?: number;
+  requiresQuote?: boolean;
+  billingQuote?: IssuedMeteredScheduleQuote | null;
+  billingQuoteLoading?: boolean;
+  billingQuoteError?: string | null;
+  onRefreshBillingQuote?: () => Promise<IssuedMeteredScheduleQuote | null>;
   onInventoryChange?: () => void | Promise<void>;
   onApplyConfig: (config: LicenseConfig) => void;
 }) {
@@ -53,6 +64,7 @@ export default function ScenarioLabSection({
   }, [couponBalance, requiresCoupon])
 
   const selected = result?.points.find((point) => point.id === selectedId) ?? null
+  const quoteUnavailable = requiresQuote && (!billingQuote || billingQuoteLoading || billingQuote.sufficient === false)
   return (
     <section aria-labelledby="scenario-lab-title" className="grid min-w-0 gap-4">
       <div className="tool-panel min-w-0 p-5 sm:p-6">
@@ -92,13 +104,20 @@ export default function ScenarioLabSection({
             </span>
           </label>
         )}
+        {requiresQuote && (
+          <div className="tool-inset mt-4 px-4 py-3 text-sm text-ink-secondary">
+            <span className="block font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_ScenarioLabSection_054}</span>
+            <span className="mt-1 block text-xs leading-5">{billingQuoteLoading ? copy.optimize.pages_tool_optimize_ScenarioLabSection_055 : billingQuoteError ?? (billingQuote?.sufficient === false ? copy.optimize.pages_tool_optimize_ScenarioLabSection_056 : copy.optimize.pages_tool_optimize_ScenarioLabSection_057)}</span>
+            {billingQuoteError && onRefreshBillingQuote && <button type="button" className="tool-secondary-action mt-2" onClick={() => void onRefreshBillingQuote()}>{copy.optimize.pages_tool_optimize_ScenarioLabSection_058}</button>}
+          </div>
+        )}
         {requiresCoupon && !useCoupon && (
           <p className="tool-alert tool-alert--warning mt-4 text-sm" role="status">{copy.inventory.scenario_coupon_required}</p>
         )}
         <button
           type="button"
-          disabled={loading || !expansion.value || (requiresCoupon && !useCoupon)}
-          onClick={() => void run(requiresCoupon && useCoupon)}
+          disabled={loading || !expansion.value || (requiresCoupon && !useCoupon) || quoteUnavailable}
+          onClick={() => void run(requiresCoupon && useCoupon, billingQuote)}
           className="tool-primary-action mt-4 w-full"
           data-tour-target="optimize-lab-run"
         >

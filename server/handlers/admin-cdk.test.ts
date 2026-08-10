@@ -21,7 +21,7 @@ vi.mock('./admin-auth', () => ({ authenticateAdminRequest: mocks.authenticateAdm
 
 vi.mock('./license-utils', () => ({
   CDK_PRODUCT_PERMISSIONS: ['recommended', 'growth', 'advanced', 'ultimate'],
-  PROFILE_CDK_DURATION_DAYS: { month: 30, half_year: 180, year: 365 },
+  PROFILE_CDK_DURATION_DAYS: { month: 30, half_year: 90, year: 365 },
   acceptLatestOperatorBaselineAndUnfreeze: vi.fn(),
   buildOperatorFingerprint: mocks.buildOperatorFingerprint,
   generateCdk: mocks.generateCdk,
@@ -218,14 +218,14 @@ describe('admin item CDK generation', () => {
     await expect(response.json()).resolves.toMatchObject({
       cdk_type: 'profile',
       profile_duration: 'half_year',
-      profile_duration_days: 180,
+      profile_duration_days: 90,
     })
     expect(mocks.createCdkBatch).toHaveBeenCalledWith([{
       key: `cdk/${codeHash}.json`,
       record: expect.objectContaining({
         cdk_type: 'profile',
         profile_duration: 'half_year',
-        profile_duration_days: 180,
+        profile_duration_days: 90,
         profile_expires_at: null,
       }),
     }])

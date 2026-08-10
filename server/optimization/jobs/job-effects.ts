@@ -99,6 +99,7 @@ async function applyScheduleCompletionEffect(row: PendingScheduleEffectRow): Pro
       ...(row.started_at && { attemptStartedAt: Date.parse(String(row.started_at)) }),
     },
     row.job_id,
+    payload.request.billing_operation !== 'incremental_recompute',
   )
   const recorded = await recordGeneratedBehaviorEvent({
     userId: row.user_id,

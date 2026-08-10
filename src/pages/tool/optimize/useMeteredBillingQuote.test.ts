@@ -4,14 +4,15 @@ import type { BillingQuote } from './useMeteredBillingQuote'
 import { submitWithMeteredBillingQuote } from './useMeteredBillingQuote'
 
 const quote: BillingQuote = {
+  operation: 'main_schedule',
   quote_id: 'quote-1',
   expires_at: '2026-08-02T00:05:00.000Z',
-  pricing_version: '2026-08-06-v3',
+  pricing_version: '2026-08-09-v4',
   billing_kind: 'metered_commercial',
   list_price: '1500.00',
   tier: 2,
-  discount_bps: 2000,
-  charge: '1200.00',
+  discount_bps: 1667,
+  charge: '1250.00',
   available: '1500.00',
   sufficient: true,
 }
@@ -48,7 +49,7 @@ describe('submitWithMeteredBillingQuote', () => {
         { code: 'pricing_changed' },
         '/api/optimization/jobs',
       )),
-    })).rejects.toThrow('报价已从 1200.00 积分更新为 1350.00 积分')
+    })).rejects.toThrow('报价已从 1250.00 积分更新为 1350.00 积分')
 
     expect(refreshQuote).toHaveBeenCalledTimes(1)
   })

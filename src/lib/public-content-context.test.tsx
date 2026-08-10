@@ -40,7 +40,7 @@ describe('PublicContentProvider', () => {
     apiJson.mockResolvedValue(server)
     render(<PublicContentProvider><MemoryRouter><PricingPage /></MemoryRouter></PublicContentProvider>)
     expect(await screen.findByText('88 元 / 长期')).toBeInTheDocument()
-    expect((getSku('single_account_lifetime') as unknown as { original_display_price: string }).original_display_price).toBe('129 元 / 长期')
+    expect((getSku('single_account_lifetime') as unknown as { original_display_price: string }).original_display_price).toBe('59 元 / 长期')
   })
 
   it('exposes fallback state on network failure and retries successfully', async () => {

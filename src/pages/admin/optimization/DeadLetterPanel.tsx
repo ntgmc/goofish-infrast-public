@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { adminApiBlob as apiBlob, adminApiJson as apiJson } from '../../../lib/admin-api-client'
 import type { AdminOptimizationDeadLetter, AdminOptimizationDeadLetterDetail } from '../contracts'
@@ -12,17 +12,35 @@ export default function DeadLetterPanel() {
   const [detailErrors, setDetailErrors] = useState<Record<string, string>>({})
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const load = useCallback(async () => {
+    setLoading(true)
     try {
       const response = await apiJson<{ dead_letters?: AdminOptimizationDeadLetter[] }>('/api/admin/optimization?limit=50', { fallbackMessage: '加载优化死信失败' })
       setRecords(response.dead_letters ?? [])
       setError(null)
     } catch (caught) {
       setError((caught as Error).message)
+    } finally {
+      setLoading(false)
     }
   }, [])
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load()
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void load()
+    }, 15_000)
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void load()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      window.clearInterval(poll)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [load])
   const loadDetail = async (id: string) => {
     if (loadingDetailIds.has(id)) return
     setLoadingDetailIds((current) => new Set(current).add(id))
@@ -66,9 +84,36 @@ export default function DeadLetterPanel() {
     })
     if (!reason) return
     setBusyAction(`dead-letter:${id}`)
+    setNotice(null)
     try {
       await apiJson('/api/admin/optimization', { method: 'POST', json: { action, id, reason }, fallbackMessage: action === 'replay' ? '重放失败' : '丢弃失败' })
       await load()
+      setError(null)
+    } catch (caught) {
+      setError((caught as Error).message)
+    } finally {
+      setBusyAction(null)
+    }
+  }
+  const discardAll = async () => {
+    if (pendingCount === 0) return
+    const reason = await requestAdminOperationReason({
+      title: '确认丢弃全部待处理死信',
+      description: '所有当前仍处于待处理状态的异步优化死信都会被标记为丢弃，不能再次重放。请输入本次批量丢弃原因。',
+      confirmLabel: '确认全部丢弃',
+    })
+    if (!reason) return
+    setBusyAction('dead-letter:all')
+    setNotice(null)
+    setError(null)
+    try {
+      const response = await apiJson<{ discarded_count?: number }>('/api/admin/optimization', {
+        method: 'POST',
+        json: { action: 'discard_all', reason },
+        fallbackMessage: '批量丢弃死信失败',
+      })
+      await load()
+      setNotice(`已丢弃 ${response.discarded_count ?? pendingCount} 条待处理死信。`)
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
@@ -98,9 +143,17 @@ export default function DeadLetterPanel() {
           <h2 id="optimization-dlq-title" className="text-base font-semibold text-ink-primary">异步优化死信队列</h2>
           <p className="mt-1 text-sm text-ink-muted">列表展示诊断摘要，可按需查看原始申请配置、干员数据，并下载完整任务载荷。重放为管理员无偿覆盖，不扣用户额度。</p>
         </div>
-        <span className={`tool-status ${pendingCount > 0 ? 'tool-status--warning' : 'tool-status--current'}`}>待处理 {pendingCount}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`tool-status ${pendingCount > 0 ? 'tool-status--warning' : 'tool-status--current'}`}>待处理 {pendingCount}</span>
+          <button type="button" className="tool-secondary-action gap-2" onClick={() => void load()} disabled={loading || busyAction !== null}>
+            <RefreshCw aria-hidden="true" className={`h-4 w-4 ${loading ? 'animate-spin motion-reduce:animate-none' : ''}`} />
+            {loading ? '加载中…' : '刷新死信'}
+          </button>
+          {pendingCount > 0 && <button type="button" className="tool-secondary-action" onClick={() => void discardAll()} disabled={loading || busyAction !== null}>全部丢弃</button>}
+        </div>
       </div>
       {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error}</div>}
+      {notice && <div className="tool-alert tool-alert--success mt-4" role="status">{notice}</div>}
       {records.length === 0 ? <p className="mt-4 text-sm text-ink-muted">暂无死信任务。</p> : (
         <div className="mt-4 space-y-3">
           {records.map((record) => {

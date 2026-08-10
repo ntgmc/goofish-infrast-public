@@ -4,6 +4,7 @@ import { countSuccessfulUsageEventsForProfileInRange, recordUsageEvent } from ".
 import type { UsageReasonCode } from "../../storage/usage-store";
 import { hasDatabaseUrl } from '../../storage/postgres';
 import { countReorderCheckQuota, countReorderCheckQuotas } from '../../storage/reorder-quota-store';
+import { settleCdkScheduleQuota } from '../../storage/cdk-store';
 import type { ReorderCheckQuota, ScheduleUsageContext, FreeScheduleGenerateDecision } from './shared';
 import { FREE_PREVIEW_MODE, FREE_SCHEDULE_REVISION_LIMIT, FREE_SCHEDULE_REVISION_WINDOW_HOURS, SHANGHAI_TIMEZONE, SHANGHAI_UTC_OFFSET_MS } from './shared';
 import { REORDER_CHECK_MONTHLY_LIMIT } from '../../reorder-check-policy';
@@ -87,6 +88,7 @@ export async function applyScheduleGenerateEffects(
   context: ScheduleUsageContext,
   timing: { submittedAt: number; attemptStartedAt?: number },
   jobId: string,
+  countCdkGeneration = true,
 ): Promise<void> {
   await recordUsageEvent("schedule_generate", {
     status: context.status,
@@ -102,7 +104,8 @@ export async function applyScheduleGenerateEffects(
     estimate_bucket: context.estimate_bucket,
   }, `optimize-job/${jobId}/schedule-generate`)
 
-  if (!cdkRecord || context.status !== "success") return
+  if (!cdkRecord || context.status !== "success" || !countCdkGeneration) return
+  if (await settleCdkScheduleQuota(jobId)) return
   const applied = await incrementCdkScheduleGenerateCount(cdkRecord, jobId)
   if (!applied) throw new Error('CDK schedule generation count could not be applied.')
 }

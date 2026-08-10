@@ -1,5 +1,6 @@
 import { createBackgroundWorker } from './background-worker-runtime'
 import { isServiceReady } from './lifecycle'
+import { getOptimizeWorkerAutoscalingConfiguration } from './optimize-job-config'
 import { getAdminOptimizationQueueSnapshot } from './storage/optimize-job-store'
 import {
   recordServiceStatusSample,
@@ -47,12 +48,17 @@ export async function runServiceStatusSampling(): Promise<boolean> {
     const result = await withPostgresAdvisoryLock(SERVICE_STATUS_ADVISORY_LOCK, async () => {
       const snapshot = await getAdminOptimizationQueueSnapshot(undefined, 1)
       const sampledAt = snapshot.snapshot_at || new Date().toISOString()
+      const autoscaling = getOptimizeWorkerAutoscalingConfiguration()
       const status = resolveOptimizationServiceStatus({
         serviceReady: isServiceReady(),
         queued: snapshot.counts.queued,
         running: snapshot.counts.running,
         workerConcurrency: snapshot.capacity.worker_concurrency,
         workerInstances: snapshot.capacity.worker_instances,
+        autoscaling: {
+          enabled: autoscaling.enabled,
+          scaleUpQueueThreshold: autoscaling.scaleUpQueueThreshold,
+        },
       })
       await recordServiceStatusSample({
         componentId: 'optimization',
@@ -61,7 +67,7 @@ export async function runServiceStatusSampling(): Promise<boolean> {
         queued: snapshot.counts.queued,
         running: snapshot.counts.running,
         workerConcurrency: snapshot.capacity.worker_concurrency,
-        workerInstances: snapshot.capacity.worker_instances,
+        workerInstances: snapshot.capacity.billable_worker_instances ?? snapshot.capacity.worker_instances,
         sampledAt,
       })
       const before = new Date(Date.parse(sampledAt) - SERVICE_STATUS_HISTORY_RETENTION_MS).toISOString()

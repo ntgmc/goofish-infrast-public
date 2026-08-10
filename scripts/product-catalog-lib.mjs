@@ -25,10 +25,10 @@ export function validateCatalog(value) {
   }
   if (value.skus.free_preview?.price?.amount !== 0) throw new Error('免费预览价格必须为 0。')
   const termSkus = [
-    ['single_account_monthly', 15, 31, 4, '15 元 / 31 天', '6 元 / 31 天'],
-    ['single_account_half_year', 49, 183, 4, '49 元 / 183 天', '19.6 元 / 183 天'],
-    ['single_account_annual', 79, 365, 4, '79 元 / 365 天', '31.6 元 / 365 天'],
-    ['single_account_lifetime', 129, null, 4, '129 元 / 长期', '51.6 元 / 长期'],
+    ['single_account_monthly', 12.9, 30, 10, '12.9 元 / 30 天', '12.9 元 / 30 天'],
+    ['single_account_half_year', 24.9, 90, 10, '24.9 元 / 90 天', '24.9 元 / 90 天'],
+    ['single_account_annual', 44.9, 365, 10, '44.9 元 / 365 天', '44.9 元 / 365 天'],
+    ['single_account_lifetime', 59, null, 10, '59 元 / 长期', '59 元 / 长期'],
   ]
   for (const [id, amount, durationDays, discountFold, originalDisplayPrice, displayPrice] of termSkus) {
     const sku = value.skus[id]
@@ -42,15 +42,19 @@ export function validateCatalog(value) {
     throw new Error('metered_advanced 不得作为 CDK 权限签发或公开 SKU。')
   }
   const metered = value.policies.metered_billing
-  if (metered?.pricing_version !== '2026-08-06-v3' || metered.personal?.label !== '积分单次排班' || metered.personal?.main_schedule_points !== '1200.00'
+  if (metered?.pricing_version !== '2026-08-09-v4' || metered.personal?.label !== '积分单次排班' || metered.personal?.main_schedule_points !== '1000.00'
+    || metered.personal?.incremental_recompute_points !== '700.00'
+    || metered.personal?.scenario_comparison_points !== '300.00'
+    || JSON.stringify(metered.schedule_quotas) !== JSON.stringify({ month: 2, half_year: 4, year: 8, lifetime: null })
+    || JSON.stringify(metered.scenario_quotas) !== JSON.stringify({ month: 1, half_year: 3, year: 8, lifetime: null })
     || metered.commercial?.label !== '商用版积分单次'
     || metered.commercial?.list_price_points !== '1500.00') {
     throw new Error('积分按次计价策略无效。')
   }
   const tierSignature = (metered.commercial.tiers ?? [])
-    .map((tier) => `${tier.level}:${tier.threshold_points}:${tier.discount_bps}`).join('|')
-  if (tierSignature !== '1:10000.00:1000|2:30000.00:2000|3:50000.00:3000|4:100000.00:4000') {
-    throw new Error('商用等级必须为 1万/3万/5万/10万与 10%/20%/30%/40% 折扣。')
+    .map((tier) => `${tier.level}:${tier.threshold_points}:${tier.discount_bps}:${tier.charge_points}`).join('|')
+  if (tierSignature !== '1:10000.00:1000:1350.00|2:30000.00:1667:1250.00|3:50000.00:2333:1150.00|4:100000.00:2667:1100.00') {
+    throw new Error('商用等级必须为 1万/3万/5万/10万与 1350/1250/1150/1100 积分。')
   }
   if (!Number.isInteger(value.policies.support.first_response_business_days) || value.policies.support.first_response_business_days <= 0) {
     throw new Error('客服 SLA 必须为正整数。')
@@ -63,11 +67,15 @@ export function renderPrice(value) {
   const support = value.policies.support
   const metered = value.policies.metered_billing
   const personalPoints = metered.personal.main_schedule_points
-  const commercialCharges = metered.commercial.tiers.map((tier) => formatDiscountedPoints(metered.commercial.list_price_points, tier.discount_bps))
+  const incrementalPoints = metered.personal.incremental_recompute_points
+  const scenarioPoints = metered.personal.scenario_comparison_points
+  const scheduleQuotas = metered.schedule_quotas
+  const scenarioQuotas = metered.scenario_quotas
+  const commercialCharges = metered.commercial.tiers.map((tier) => tier.charge_points)
   const commercialLowest = commercialCharges.at(-1)
   const commercialHighest = commercialCharges[0]
   const monthly = value.skus.single_account_monthly
-  const halfYear = value.skus.single_account_half_year
+  const version = value.skus.single_account_half_year
   const annual = value.skus.single_account_annual
   const lifetime = value.skus.single_account_lifetime
   return `<!-- 此文件由 product/catalog.json 生成，请勿手工编辑。运行 npm run generate:catalog 更新。 -->
@@ -79,21 +87,25 @@ export function renderPrice(value) {
 | --- | ---: | --- | --- |
 ${publicSkus.map(([, sku]) => `| ${tableCell(sku.label)} | ${tableCell(formatPublicPrice(sku))} | ${tableCell(sku.summary)} | ${tableCell(sku.audience)} |`).join('\n')}
 | ${tableCell(metered.personal.label)} | ${personalPoints} 积分/成功主排班 | 高级版单次结果，不含场景对比 | 低频个人用户；按成功任务使用，不锁定长期权益 |
+| 个人增量重算 | ${incrementalPoints} 积分/成功重算 | 绑定同一 UID 的已有成功结果，用于练度提高或新增干员后的重新优化 | 已有方案、只需跟进干员数据变化的个人用户 |
+| 场景对比包 | ${scenarioPoints} 积分/成功对比 | 一次最多比较 3 个额外基建配置，输出效率指标、差距与适用条件 | 想比较多种基建配置但不需要长期权益的用户 |
 | ${tableCell(metered.commercial.label)} | ${commercialLowest}–${commercialHighest} 积分/成功主排班 | 标价 ${metered.commercial.list_price_points} 积分，累计等级自动折扣 | 已获授权处理多个 UID 的服务商 |
 
-## 单账号卡选购建议
+## 维护方案选购建议
 
-- 月卡：${monthly.display_price}（原价 ${monthly.original_display_price}，${monthly.default_discount_fold} 折），作为最低门槛的完整能力体验；约生成 1 次时就比积分单次更划算。
-- 半年卡：${halfYear.display_price}（原价 ${halfYear.original_display_price}，${halfYear.default_discount_fold} 折），适合覆盖一个版本周期。
-- 年卡：${annual.display_price}（原价 ${annual.original_display_price}，${annual.default_discount_fold} 折），适合全年稳定使用。
-- 终身卡：${lifetime.display_price}（原价 ${lifetime.original_display_price}，${lifetime.default_discount_fold} 折），约生成 5 次后总成本低于积分单次；四种单账号卡都只绑定一个游戏 UID。
+- 30 天尝鲜维护包：${monthly.display_price}，适合近期练度变化较多、想集中验证方案的用户。
+- 90 天版本维护卡：${version.display_price}，适合覆盖一个版本周期并持续调整方案的用户。
+- 365 天年度维护卡：${annual.display_price}，适合全年维护同一 UID 的用户。
+- 终身卡：${lifetime.display_price}，长期使用和高频重新优化的用户更划算；所有个人维护方案都只绑定一个游戏 UID。
 
 ## 按次排班规则
 
-- ${metered.personal.label}档案每个网站账号终身最多 1 个，每次成功主排班扣除 ${metered.personal.main_schedule_points} 积分（约 12 元）。
+- ${metered.personal.label}档案每个网站账号终身最多 1 个，每次成功主排班扣除 ${metered.personal.main_schedule_points} 积分（约 10 元）。
+- 个人增量重算每次成功扣除 ${incrementalPoints} 积分（约 7 元），必须绑定同一档案的一份已有成功结果；当前版本绑定历史基线并重新执行完整计算，暂未复用底层计算缓存。
+- 场景对比包每次成功扣除 ${scenarioPoints} 积分（约 3 元），一次最多提交 3 个额外基建配置；已有场景券仍可替代积分包且不会重复消耗。
 - ${metered.commercial.label}标价 ${metered.commercial.list_price_points} 积分；Lv1–Lv4 实扣依次为 ${commercialCharges.join(' / ')} 积分，最低价不低于个人按次价。
 - 仅成功且结果已持久化的主排班扣费；排队时预留，失败、取消、队列过期或死信会释放预留。
-- 按次档案包含高级版单次结果、MAA JSON、完整计算 JSON、练度建议和 ROI，但不开放场景对比实验室或 trusted 优化器选项。
+- 按次档案包含高级版单次结果、MAA JSON、完整计算 JSON、练度建议和 ROI；同一数据快照的格式导出不重复收费，但不开放场景对比实验室或 trusted 优化器选项。
 - 商用档案仅可处理已获授权的数据；不得转售 MaaTool 账号或 CDK，档案和积分不可转让。
 
 ## 免费预览规则
@@ -104,6 +116,10 @@ ${publicSkus.map(([, sku]) => `| ${tableCell(sku.label)} | ${tableCell(formatPub
 - 检测结果为“强烈建议重排”时，当月额外允许 ${freePolicy.strong_reorder_bonus} 次完整免费生成；该生成不再开启新的确认期。
 
 ## 单账号卡账号规则
+
+- 完整主排班额度：30 天卡 ${scheduleQuotas.month} 次、90 天卡 ${scheduleQuotas.half_year} 次、365 天卡 ${scheduleQuotas.year} 次；任务失败、取消、排队过期或进入死信不会占用额度，终身卡不设次数上限。
+- 场景对比额度：30 天卡 ${scenarioQuotas.month} 次、90 天卡 ${scenarioQuotas.half_year} 次、365 天卡 ${scenarioQuotas.year} 次，终身卡无限；每次最多提交 3 个额外基建配置。周期卡额度用完后不能继续提交场景对比，个人按次档案可购买 ${scenarioPoints} 积分场景对比包。
+- 30/90/365 天周期卡超出完整主排班额度后，可按 ${incrementalPoints} 积分购买个人增量重算；终身卡继续包含无限完整重算和场景对比。
 
 ${value.policies.public_disclosures.map((line) => `- ${line}`).join('\n')}
 - 人工核验材料齐全后，客服将在 ${support.first_response_business_days} 个工作日内首次响应；工作日按${support.business_day_definition}计算，最终核验与解冻时间视复杂度而定。
@@ -140,11 +156,4 @@ function formatDiscountedPrice(originalPrice, discountFold) {
   const amount = Math.round((Number(match[1]) * discountFold / 10) * 100) / 100
   const amountText = Number.isInteger(amount) ? String(amount) : amount.toFixed(2).replace(/0+$/, '')
   return `${amountText}${match[2]}`
-}
-
-function formatDiscountedPoints(value, discountBps) {
-  const [whole, fraction = ''] = value.split('.')
-  const minor = BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'))
-  const discounted = (minor * BigInt(10000 - discountBps) + 5000n) / 10000n
-  return `${discounted / 100n}.${String(discounted % 100n).padStart(2, '0')}`
 }

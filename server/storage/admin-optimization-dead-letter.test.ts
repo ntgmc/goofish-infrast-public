@@ -11,7 +11,7 @@ vi.mock('./postgres', () => ({
   withTransaction: vi.fn(async (work: (client: { query: typeof clientQueryMock }) => Promise<unknown>) => work({ query: clientQueryMock })),
 }))
 
-import { getOptimizationDeadLetterDetail, OptimizeJobAdmissionError, replayOptimizationDeadLetter } from './optimize-job-store'
+import { discardAllOptimizationDeadLetters, getOptimizationDeadLetterDetail, OptimizeJobAdmissionError, replayOptimizationDeadLetter } from './optimize-job-store'
 
 describe('admin optimization dead-letter detail', () => {
   beforeEach(() => {
@@ -86,6 +86,20 @@ describe('admin optimization dead-letter detail', () => {
       new OptimizeJobAdmissionError('reorder_check_quota_exceeded', 429, '本月重排检测次数已用完。'),
     )
     expect(clientQueryMock.mock.calls.some(([sql]) => String(sql).includes('insert into optimize_jobs'))).toBe(false)
+  })
+
+  it('discards every pending dead-letter in one audited transaction', async () => {
+    clientQueryMock
+      .mockResolvedValueOnce({ rows: [{ id: 'letter-1' }, { id: 'letter-2' }] })
+      .mockResolvedValueOnce({ rowCount: 2, rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    await expect(discardAllOptimizationDeadLetters(resolution())).resolves.toBe(2)
+    expect(clientQueryMock.mock.calls[0][0]).toContain("status = 'pending_review'")
+    expect(clientQueryMock.mock.calls[1][0]).toContain("set status = 'discarded'")
+    expect(clientQueryMock.mock.calls[1][1]).toEqual(['工单 OPS-102 确认安全重放', 'ops', expect.any(String), ['letter-1', 'letter-2']])
+    expect(clientQueryMock.mock.calls[2][0]).toContain('insert into admin_operation_audit')
+    expect(clientQueryMock.mock.calls[2][1]).toEqual(expect.arrayContaining(['optimization_dead_letter_batch', 'request-1']))
   })
 })
 

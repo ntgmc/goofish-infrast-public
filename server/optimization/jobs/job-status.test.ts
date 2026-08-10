@@ -1,5 +1,6 @@
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  buildOptimizeJobAccepted,
   buildScenarioComparisonEstimate,
   createOptimizeJobPollToken,
   decodeOptimizationJobCursor,
@@ -10,6 +11,7 @@ import {
 } from './job-status'
 import { createPersistedOptimizeJobPayload } from './shared'
 import { DEFAULT_OPTIMIZE_JOB_HARD_TIMEOUT_MS, formatOptimizeJobHardTimeout, getOptimizeJobHardTimeoutMs } from '../../optimize-job-config'
+import { createMemoryOptimizeJobStore } from '../../storage/optimize-job-store'
 
 const originalAdminSecret = process.env.MAA_ADMIN_SECRET
 const originalPreviousAdminSecret = process.env.MAA_ADMIN_SECRET_PREVIOUS
@@ -23,6 +25,8 @@ afterAll(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs()
+  vi.useRealTimers()
+  globalThis.__maaOptimizeJobStoreForTesting = undefined
 })
 
 describe('scenario comparison estimates', () => {
@@ -44,6 +48,63 @@ describe('schedule duration estimate buckets', () => {
     expect(getOptimizeEstimateBucket({ Fiammetta: { enable: false } }, true)).toBe('maa_plain_with_suggestions')
     expect(getOptimizeEstimateBucket({ Fiammetta: { enable: true } }, true)).toBe('maa_fiammetta_with_suggestions')
     expect(getOptimizeEstimateBucket({ schedule_mode: 'rotation' }, true)).toBe('rotation_with_suggestions')
+  })
+})
+
+describe('queued runtime estimates', () => {
+  it('includes the estimated duration of jobs ahead in the queue', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-10T00:00:00.000Z'))
+    vi.stubEnv('OPTIMIZE_GLOBAL_WORKER_CONCURRENCY', '1')
+    const store = createMemoryOptimizeJobStore()
+    globalThis.__maaOptimizeJobStoreForTesting = store
+
+    await store.createJob({
+      id: 'ahead-job', priority: 10, owner_key: 'profile:ahead', profile_id: null,
+      permission: 'advanced', source: 'account_profile',
+      payload_json: { estimate: { estimated_duration_ms: 30_000, estimate_bucket: 'maa_plain', estimate_source: 'fallback_p95', estimate_sample_count: 0 } },
+    })
+    const target = await store.createJob({
+      id: 'target-job', priority: 0, owner_key: 'profile:target', profile_id: null,
+      permission: 'advanced', source: 'account_profile',
+      payload_json: { estimate: { estimated_duration_ms: 5_000, estimate_bucket: 'maa_plain', estimate_source: 'fallback_p95', estimate_sample_count: 0 } },
+    })
+
+    const snapshot = await buildOptimizeJobAccepted(target)
+
+    expect(snapshot.queuePosition).toBe(2)
+    expect(snapshot.estimate.remainingMs).toBe(35_000)
+    expect(snapshot.estimate.totalMs).toBe(35_000)
+  })
+
+  it('includes the remaining duration of a running job ahead of the queue', async () => {
+    vi.useFakeTimers()
+    const now = new Date('2026-08-10T00:00:10.000Z')
+    vi.setSystemTime(now)
+    vi.stubEnv('OPTIMIZE_GLOBAL_WORKER_CONCURRENCY', '1')
+    const store = createMemoryOptimizeJobStore()
+    globalThis.__maaOptimizeJobStoreForTesting = store
+
+    const running = await store.createJob({
+      id: 'running-job', priority: 10, owner_key: 'profile:running', profile_id: null,
+      permission: 'advanced', source: 'account_profile',
+      payload_json: { estimate: { estimated_duration_ms: 30_000, estimate_bucket: 'maa_plain', estimate_source: 'fallback_p95', estimate_sample_count: 0 } },
+      created_at: '2026-08-10T00:00:00.000Z',
+    })
+    store.records.get(running.id)!.status = 'running'
+    store.records.get(running.id)!.started_at = '2026-08-10T00:00:00.000Z'
+    const target = await store.createJob({
+      id: 'target-job', priority: 0, owner_key: 'profile:target', profile_id: null,
+      permission: 'advanced', source: 'account_profile',
+      payload_json: { estimate: { estimated_duration_ms: 5_000, estimate_bucket: 'maa_plain', estimate_source: 'fallback_p95', estimate_sample_count: 0 } },
+      created_at: now.toISOString(),
+    })
+
+    const snapshot = await buildOptimizeJobAccepted(target)
+
+    expect(snapshot.queuePosition).toBe(1)
+    expect(snapshot.estimate.remainingMs).toBe(25_000)
+    expect(snapshot.estimate.totalMs).toBe(25_000)
   })
 })
 

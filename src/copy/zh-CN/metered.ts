@@ -5,7 +5,7 @@ export const meteredCopy = {
     title: '按次排班与商用账户',
     personal_title: '积分单次排班',
     personal_price: (points: string) => `${points} 积分`,
-    personal_description: '约 12 元/次，仅成功主排班扣费。每个账号终身最多一个个人按次档案；约第 2 次起，月卡通常更划算。',
+    personal_description: '约 10 元/次，仅成功主排班扣费。每个账号终身最多一个个人按次档案；需要持续重新优化时，可选择 90 天、365 天或终身方案。',
     commercial_title: '商用版积分单次',
     commercial_price: (lowest: string, highest: string) => `${lowest}–${highest} 积分/次`,
     commercial_description: (threshold: string, activeLimit: string, totalLimit: string) => `累计获得 ${threshold} 积分自动解锁，按等级享受单次费用折扣。默认可维护 ${activeLimit} 个活跃、${totalLimit} 个总档案。`,
@@ -48,7 +48,7 @@ export const meteredCopy = {
     open_failed: '开通个人按次档案失败。',
     create: '创建个人按次档案',
     title: '个人按次排班',
-    description: '1200 积分/次，仅成功主排班扣费。每个网站账号终身最多一个个人按次档案，可继续升级为月卡、半年卡、年卡或终身卡。',
+    description: '1000 积分/次，仅成功主排班扣费。每个网站账号终身最多一个个人按次档案，可继续升级为维护方案或终身卡。',
     convert: '转为个人按次',
   },
   commercial_profiles: {

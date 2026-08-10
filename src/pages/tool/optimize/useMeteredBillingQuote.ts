@@ -1,17 +1,23 @@
 import { useCallback, useEffect, useState } from 'react'
 import { copy } from '../../../copy/index'
 import { apiJson, getApiErrorCode, getApiErrorMessage } from '../../../lib/api-client'
-import type { IssuedMeteredScheduleQuote } from '../../../lib/metered-billing'
+import type { IssuedMeteredScheduleQuote, MeteredBillingOperation } from '../../../lib/metered-billing'
 import type { UserGameAccountKind } from '../../../lib/types'
 
 export type BillingQuote = IssuedMeteredScheduleQuote
 
-export function useMeteredBillingQuote(profileKind: UserGameAccountKind, profileId: string) {
+export function useMeteredBillingQuote(
+  profileKind: UserGameAccountKind,
+  profileId: string,
+  operation: MeteredBillingOperation = 'main_schedule',
+  enabled = true,
+) {
   const [quote, setQuote] = useState<BillingQuote | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const refresh = useCallback(async (): Promise<BillingQuote | null> => {
-    if (!isMeteredProfileKind(profileKind)) {
+    const shouldQuote = enabled && (operation !== 'main_schedule' || isMeteredProfileKind(profileKind))
+    if (!shouldQuote) {
       setQuote(null)
       setError(null)
       return null
@@ -19,7 +25,7 @@ export function useMeteredBillingQuote(profileKind: UserGameAccountKind, profile
     setLoading(true)
     setError(null)
     try {
-      const next = await apiJson<BillingQuote>(`/api/user/billing/quote?profile_id=${encodeURIComponent(profileId)}&operation=main_schedule`, {
+      const next = await apiJson<BillingQuote>(`/api/user/billing/quote?profile_id=${encodeURIComponent(profileId)}&operation=${operation}`, {
         fallbackMessage: copy.metered.quote.load_failed,
       })
       setQuote(next)
@@ -31,7 +37,7 @@ export function useMeteredBillingQuote(profileKind: UserGameAccountKind, profile
     } finally {
       setLoading(false)
     }
-  }, [profileId, profileKind])
+  }, [enabled, operation, profileId, profileKind])
   useEffect(() => { void refresh().catch(() => undefined) }, [refresh])
   return { quote, loading, error, refresh }
 }
@@ -40,10 +46,11 @@ export async function submitWithMeteredBillingQuote<T>(options: {
   profileKind: UserGameAccountKind
   quote: BillingQuote | null
   quoteError: string | null
+  requireQuote?: boolean
   refreshQuote: () => Promise<BillingQuote | null>
   submit: (quote: BillingQuote | null) => Promise<T>
 }): Promise<T> {
-  if (isMeteredProfileKind(options.profileKind) && !options.quote) {
+  if ((options.requireQuote || isMeteredProfileKind(options.profileKind)) && !options.quote) {
     throw new Error(options.quoteError ?? copy.metered.quote.load_failed)
   }
   if (options.quote?.sufficient === false) throw new Error(copy.metered.quote.insufficient)

@@ -1,15 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { getQueueSnapshot, isServiceReady, getHistory, listIncidents } = vi.hoisted(() => ({
+const { getQueueSnapshot, isServiceReady, getHistory, listIncidents, autoscalingConfig } = vi.hoisted(() => ({
   getQueueSnapshot: vi.fn(),
   isServiceReady: vi.fn(),
   getHistory: vi.fn(),
   listIncidents: vi.fn(),
+  autoscalingConfig: vi.fn(),
 }))
 
 vi.mock('../storage/optimize-job-store', () => ({ getAdminOptimizationQueueSnapshot: getQueueSnapshot }))
 vi.mock('../storage/service-status-store', () => ({ getServiceStatusHistory: getHistory, listPublicServiceStatusIncidents: listIncidents }))
 vi.mock('../lifecycle', () => ({ isServiceReady }))
+vi.mock('../optimize-job-config', () => ({ getOptimizeWorkerAutoscalingConfiguration: autoscalingConfig }))
 
 import serviceStatusHandler from './service-status'
 
@@ -17,6 +19,7 @@ describe('service status handler', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     isServiceReady.mockReturnValue(true)
+    autoscalingConfig.mockReturnValue({ enabled: false, scaleUpQueueThreshold: 4, scaleDownQueueThreshold: 1, scaleDownIdleMs: 600000, intervalMs: 30000 })
     getQueueSnapshot.mockResolvedValue(snapshot({ queued: 0, running: 1, workerConcurrency: 3, workerInstances: 1 }))
     getHistory.mockResolvedValue({ from: '2026-07-09T09:00:00.000Z', to: '2026-08-08T09:00:00.000Z', buckets: [{ component_id: 'optimization', bucket_start: '2026-08-08T08:00:00.000Z', status: 'available', sample_count: 12, availability_percent: 100 }] })
     listIncidents.mockResolvedValue([{ id: 'incident-1', component_id: 'optimization', title: '短暂延迟', impact: 'minor', status: 'resolved', started_at: '2026-08-01T01:00:00.000Z', resolved_at: '2026-08-01T02:00:00.000Z', created_at: '2026-08-01T01:00:00.000Z', updated_at: '2026-08-01T02:00:00.000Z', updates: [] }])
@@ -55,6 +58,15 @@ describe('service status handler', () => {
 
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({ status: 'congested' })
+  })
+
+  it('reports elastic processing when autoscaling is consuming the queue', async () => {
+    autoscalingConfig.mockReturnValue({ enabled: true, scaleUpQueueThreshold: 4, scaleDownQueueThreshold: 1, scaleDownIdleMs: 600000, intervalMs: 30000 })
+    getQueueSnapshot.mockResolvedValue(snapshot({ queued: 5, running: 3, workerConcurrency: 3, workerInstances: 1 }))
+    const response = await serviceStatusHandler(new Request('http://localhost/api/status'))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ status: 'scaling', components: [{ id: 'optimization', status: 'scaling' }] })
   })
 
   it('reports orange overload above twenty queued jobs', async () => {

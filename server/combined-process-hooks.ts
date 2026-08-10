@@ -5,6 +5,11 @@ import {
 } from './optimize-job-runner'
 import { initializeAuthDataMaintenance, shutdownAuthDataMaintenance } from './auth-data-maintenance'
 import {
+  initializeServiceStatusHistory,
+  shutdownServiceStatusHistory,
+  waitForServiceStatusHistoryIdle,
+} from './service-status-history'
+import {
   registerOptimizerPort,
   type OptimizerPort,
 } from './optimization/jobs/optimizer-port'
@@ -30,6 +35,7 @@ export function createCombinedProcessHooks(optimizerPort: OptimizerPort): ApiPro
   const stop = async (graceMs?: number) => {
     stopOptimizeWorkerRegistration()
     stopWorkerLifecycleStages()
+    shutdownServiceStatusHistory()
     shutdownAuthDataMaintenance()
     try {
       if (graceMs === undefined) await shutdownOptimizeJobProcessing()
@@ -38,6 +44,7 @@ export function createCombinedProcessHooks(optimizerPort: OptimizerPort): ApiPro
       try {
         await waitForOptimizeWorkerRegistrationIdle()
         await waitForWorkerLifecycleStagesIdle()
+        await waitForServiceStatusHistoryIdle()
       } finally {
         releaseOptimizerPort()
       }
@@ -51,6 +58,7 @@ export function createCombinedProcessHooks(optimizerPort: OptimizerPort): ApiPro
       try {
         await initializeWorkerLifecycleStages()
         await initializeAuthDataMaintenance()
+        await initializeServiceStatusHistory()
         await initializeOptimizeJobProcessing()
         await initializeOptimizeWorkerRegistration()
       } catch (error) {

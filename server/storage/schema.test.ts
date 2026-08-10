@@ -78,6 +78,8 @@ describe('database schema ownership', () => {
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_balance_transactions/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_balance_qualification_ledger/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_balance_reservations/)
+    expect(combinedSchema).toMatch(/ADD COLUMN IF NOT EXISTS operation TEXT NOT NULL DEFAULT 'main_schedule'/)
+    expect(combinedSchema).toMatch(/metered_billing_quotes_operation_check/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS commercial_account_limits/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS metered_personal_claims/)
     expect(combinedSchema).toMatch(/ADD COLUMN IF NOT EXISTS billing_user_id/)
@@ -105,6 +107,8 @@ describe('database schema ownership', () => {
     expect(combinedSchema).not.toMatch(/trimmed_workspace_history AS/)
     expect(combinedSchema).toMatch(/select 1 from optimize_jobs job/)
     expect(combinedSchema).not.toMatch(/\boptimization_jobs\b/)
+    expect(combinedSchema).toMatch(/scaling_samples INTEGER NOT NULL DEFAULT 0/)
+    expect(combinedSchema).toMatch(/status IN \('available', 'scaling', 'busy', 'congested', 'overloaded', 'unavailable'\)/)
     expect(statements).toEqual(expect.arrayContaining([
       expect.stringMatching(/select set_config\('statement_timeout', \$1, false\)/i),
       expect.stringMatching(/select pg_advisory_lock/i),

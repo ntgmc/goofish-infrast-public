@@ -509,6 +509,8 @@ export const domainCopy = {
   lib_scenario_comparison_038: "MAA 自动非固定",
   // src/lib/scenario-comparison.ts
   lib_scenario_comparison_039: "轮换 12h×2",
+  // src/lib/scenario-comparison.ts
+  lib_scenario_comparison_040: (maximum: number) => `一次场景对比最多可提交 ${maximum} 个额外基建配置。`,
   // src/lib/scenario-comparison-validation.ts
   lib_scenario_comparison_validation_001: "布局不能重复。",
   // src/lib/scenario-comparison-validation.ts
@@ -531,6 +533,8 @@ export const domainCopy = {
   lib_scenario_comparison_validation_010: "成功情景必须包含计算指标。",
   // src/lib/scenario-comparison-validation.ts
   lib_scenario_comparison_validation_011: "Pareto 点必须是已复算的成功情景。",
+  // src/lib/scenario-comparison-validation.ts
+  lib_scenario_comparison_validation_012: (maximum: number) => `一次场景对比最多可提交 ${maximum} 个额外基建配置。`,
   // src/lib/workspace-validation.ts
   lib_workspace_validation_001: "产物类型不能超过 16 种。",
   // src/lib/workspace-validation.ts

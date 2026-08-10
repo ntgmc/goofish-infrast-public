@@ -53,6 +53,15 @@ describe('StatusPage', () => {
     expect(screen.getByText('服务排队超过 20 个，处理等待明显增加。')).toBeInTheDocument()
   })
 
+  it('renders elastic processing while autoscaling consumes the queue', async () => {
+    vi.mocked(fetch).mockResolvedValue(response(200, payload('scaling', { queued: 5, running: 3 })))
+    render(<MemoryRouter><StatusPage /></MemoryRouter>)
+    await act(async () => { await Promise.resolve() })
+
+    expect(screen.getAllByText('弹性处理中').length).toBeGreaterThan(0)
+    expect(screen.getByText('自动扩缩容正在消化排队任务，服务保持可用。')).toBeInTheDocument()
+  })
+
   it('renders a 30-day hourly history grid and incident updates', async () => {
     const body = payload('available', { queued: 0, running: 1 }) as Record<string, unknown>
     body.history = {
@@ -63,6 +72,7 @@ describe('StatusPage', () => {
       buckets: [
         { component_id: 'optimization', bucket_start: '2026-08-08T07:00:00.000Z', status: 'overloaded', sample_count: 12, availability_percent: 50 },
         { component_id: 'optimization', bucket_start: '2026-08-08T08:00:00.000Z', status: 'congested', sample_count: 12, availability_percent: 75 },
+        { component_id: 'optimization', bucket_start: '2026-08-08T06:00:00.000Z', status: 'scaling', sample_count: 12, availability_percent: 100 },
       ],
     }
     body.incidents = [{ id: 'incident-1', component_id: 'optimization', title: '队列延迟', impact: 'minor', status: 'resolved', started_at: '2026-08-01T01:00:00.000Z', resolved_at: '2026-08-01T02:00:00.000Z', updated_at: '2026-08-01T02:00:00.000Z', updates: [{ id: 'update-1', status: 'resolved', body: '已恢复。', created_at: '2026-08-01T02:00:00.000Z' }] }]
@@ -74,6 +84,7 @@ describe('StatusPage', () => {
     expect(screen.getAllByRole('gridcell')).toHaveLength(30 * 24)
     expect(screen.getByLabelText(/排队过多/)).toBeInTheDocument()
     expect(screen.getByLabelText(/服务繁忙/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/弹性处理中/)).toBeInTheDocument()
     expect(screen.getByText('队列延迟')).toBeInTheDocument()
     expect(screen.getByText('已恢复。')).toBeInTheDocument()
   })

@@ -91,7 +91,7 @@ describe('BalanceSection', () => {
     expect(await screen.findByText('12.30')).toBeInTheDocument()
     expect(screen.getByText('+12.30')).toBeInTheDocument()
     expect(screen.getByText('12000')).toBeInTheDocument()
-    expect(screen.getByText('1200 积分/成功主排班')).toBeInTheDocument()
+    expect(screen.getByText('1000 积分/成功主排班')).toBeInTheDocument()
     expect(screen.getByText('Lv1 · 1350 积分/成功主排班')).toBeInTheDocument()
     expect(screen.getByText('还差 38000 积分（门槛 50000）')).toBeInTheDocument()
     expect(screen.queryByText(/\.00/)).not.toBeInTheDocument()

@@ -7,6 +7,7 @@ import {
   type ServiceStatusResponse,
 } from '../../src/lib/service-status'
 import { isServiceReady } from '../lifecycle'
+import { getOptimizeWorkerAutoscalingConfiguration } from '../optimize-job-config'
 import { getAdminOptimizationQueueSnapshot } from '../storage/optimize-job-store'
 import { getServiceStatusHistory, listPublicServiceStatusIncidents } from '../storage/service-status-store'
 import { jsonResponse } from './user-auth'
@@ -18,12 +19,17 @@ export default async function serviceStatusHandler(req: Request): Promise<Respon
 
   try {
     const snapshot = await getAdminOptimizationQueueSnapshot(undefined, 1)
+    const autoscaling = getOptimizeWorkerAutoscalingConfiguration()
     const status = resolveOptimizationServiceStatus({
       serviceReady: isServiceReady(),
       queued: snapshot.counts.queued,
       running: snapshot.counts.running,
       workerConcurrency: snapshot.capacity.worker_concurrency,
       workerInstances: snapshot.capacity.worker_instances,
+      autoscaling: {
+        enabled: autoscaling.enabled,
+        scaleUpQueueThreshold: autoscaling.scaleUpQueueThreshold,
+      },
     })
     const emptyHistory = createEmptyServiceStatusHistory(new Date(snapshot.snapshot_at))
     let history: ServiceStatusHistoryResponse = emptyHistory
@@ -48,6 +54,7 @@ export default async function serviceStatusHandler(req: Request): Promise<Respon
         queue_limit: snapshot.capacity.queue_limit,
         worker_concurrency: snapshot.capacity.worker_concurrency,
         worker_instances: snapshot.capacity.worker_instances,
+        billable_worker_instances: snapshot.capacity.billable_worker_instances,
       },
       components: [{ id: 'optimization', status }],
       thresholds: { queue_congested_at: QUEUE_CONGESTION_THRESHOLD, queue_overloaded_at: QUEUE_OVERLOAD_THRESHOLD },

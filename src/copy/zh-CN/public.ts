@@ -398,7 +398,7 @@ export const publicCopy = {
   // src/pages/PricingPage.tsx
   pages_PricingPage_002: "Pricing",
   // src/pages/PricingPage.tsx
-  pages_PricingPage_003: "完整高级权益统一为单账号 CDK，月卡、半年卡、年卡和终身卡只在有效期与价格上不同；另有个人和商用积分单次排班。",
+  pages_PricingPage_003: "按使用频率选择个人方案：30 天尝鲜维护包、90 天版本维护卡、365 天年度维护卡或终身卡；另有个人和商用积分单次排班。所有个人方案只绑定一个游戏 UID。",
   // src/pages/PricingPage.tsx
   pages_PricingPage_004: "一次性付费",
   // src/pages/PricingPage.tsx
@@ -416,11 +416,11 @@ export const publicCopy = {
   // src/pages/PricingPage.tsx
   pages_PricingPage_011: "返回首页",
   // src/pages/PricingPage.tsx
-  pages_PricingPage_012: "单账号 CDK",
+  pages_PricingPage_012: "个人维护方案",
   // src/pages/PricingPage.tsx
-  pages_PricingPage_013: "完整高级权益 · 按有效期选择",
+  pages_PricingPage_013: "完整高级权益 · 按使用周期选择",
   // src/pages/PricingPage.tsx
-  pages_PricingPage_014: "四种期限共享同一套高级能力，差异只在有效期与价格。",
+  pages_PricingPage_014: "短期、版本周期、年度和长期方案共享完整高级能力，差异在有效期与价格。",
   // src/pages/PricingPage.tsx
   pages_PricingPage_015: "选择有效期",
   // src/pages/PricingPage.tsx
@@ -442,7 +442,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_085: "免费档案和单账号终身版有什么区别？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_086: "免费档案通过森空岛确认 UID 后领取，一个游戏 UID 全站只能领取一次，可生成并查看完整游戏内轮换；轻量 MAA JSON 按有效高级体验期或导出体验券规则下载，完整计算数据和高级分析随高级权限开放。单账号月卡、半年卡、年卡和终身卡均可选择森空岛导入或 MAA 干员 JSON 初始化，按购买时长提供完整高级能力；具体期限、价格与权益以价格与权益页为准。",
+  pages_PublicInfoPage_086: "免费档案通过森空岛确认 UID 后领取，一个游戏 UID 全站只能领取一次，可生成并查看完整游戏内轮换；轻量 MAA JSON 按有效高级体验期或导出体验券规则下载，完整计算数据和高级分析随高级权限开放。30 天尝鲜维护包、90 天版本维护卡、365 天年度维护卡和终身卡均可选择森空岛导入或 MAA 干员 JSON 初始化，按购买时长提供完整高级能力；具体期限、价格与权益以价格与权益页为准。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_087: "森空岛授权后会立即保存账号吗？",
   // src/pages/PublicInfoPage.tsx
@@ -462,7 +462,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_095: "绑定后可以自行更换游戏 UID 吗？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_096: "不可以自行更换。免费档案绑定确认时选择的游戏 UID；单账号月卡、半年卡、年卡和终身卡无论使用森空岛还是 JSON 初始化，都仅用于同一个游戏账号。预览阶段发现角色不对时请不要确认，返回后重新选择；已经绑定或被异常拦截时，请通过 MaaTool 官方 QQ 群申请人工核验，不要重复尝试导入其他账号。",
+  pages_PublicInfoPage_096: "不可以自行更换。免费档案绑定确认时选择的游戏 UID；30 天尝鲜维护包、90 天版本维护卡、365 天年度维护卡和终身卡无论使用森空岛还是 JSON 初始化，都仅用于同一个游戏账号。预览阶段发现角色不对时请不要确认，返回后重新选择；已经绑定或被异常拦截时，请通过 MaaTool 官方 QQ 群申请人工核验，不要重复尝试导入其他账号。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_097: "MaaTool 如何保护账号和授权数据？",
   // src/pages/PublicInfoPage.tsx

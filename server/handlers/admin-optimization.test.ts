@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { authenticateAdminRequest, discardDeadLetter, getDeadLetterDetail, getQueueSnapshot, listDeadLetters, recordAudit, replayDeadLetter, requestProcessing } = vi.hoisted(() => ({
+const { authenticateAdminRequest, discardAllDeadLetters, discardDeadLetter, getDeadLetterDetail, getQueueSnapshot, listDeadLetters, recordAudit, replayDeadLetter, requestProcessing } = vi.hoisted(() => ({
   authenticateAdminRequest: vi.fn(),
+  discardAllDeadLetters: vi.fn(),
   discardDeadLetter: vi.fn(),
   getDeadLetterDetail: vi.fn(),
   getQueueSnapshot: vi.fn(),
@@ -13,6 +14,7 @@ const { authenticateAdminRequest, discardDeadLetter, getDeadLetterDetail, getQue
 
 vi.mock('./admin-auth', () => ({ authenticateAdminRequest }))
 vi.mock('../storage/optimize-job-store', () => ({
+  discardAllOptimizationDeadLetters: discardAllDeadLetters,
   discardOptimizationDeadLetter: discardDeadLetter,
   getAdminOptimizationQueueSnapshot: getQueueSnapshot,
   getOptimizationDeadLetterDetail: getDeadLetterDetail,
@@ -34,6 +36,7 @@ describe('admin optimization handler', () => {
     getDeadLetterDetail.mockResolvedValue(null)
     listDeadLetters.mockResolvedValue([])
     replayDeadLetter.mockResolvedValue(null)
+    discardAllDeadLetters.mockResolvedValue(0)
   })
 
   it('requires an authenticated admin session', async () => {
@@ -157,6 +160,24 @@ describe('admin optimization handler', () => {
       reason: 'invalid legacy payload',
       requestId: 'request-1',
     }))
+  })
+
+  it('discards all pending dead-letters with one audited admin operation', async () => {
+    discardAllDeadLetters.mockResolvedValue(3)
+
+    const response = await adminOptimizationHandler(new Request('http://localhost/api/admin/optimization', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-request-id': 'request-all' },
+      body: JSON.stringify({ action: 'discard_all', reason: '批量清理已确认的失败任务' }),
+    }))
+
+    expect(response.status).toBe(200)
+    expect(discardAllDeadLetters).toHaveBeenCalledWith(expect.objectContaining({
+      actorUsername: 'ops',
+      reason: '批量清理已确认的失败任务',
+      requestId: 'request-all',
+    }))
+    await expect(response.json()).resolves.toEqual({ ok: true, discarded_count: 3 })
   })
 
   it('rejects unknown views and preserves the default dead-letter response', async () => {

@@ -1,8 +1,9 @@
 import type { LicenseFile } from "../../../src/lib/types";
 import type { CreateOptimizationJobRequest } from "../../../src/lib/optimization-contracts";
-import { canUseUpgradeFeatures, evaluateOperatorRisk, formatOperatorRiskBlockMessage, recordOperatorFingerprint, recordSoftBlockedRiskEvent, getPermissionMode, getRiskControlSettings, isProfileCdkRecord, type CdkRecord, normalizePermissionMode, resolveConfigForPermission, resolveFreePreviewConfig } from "../../handlers/license-utils";
+import { canUseUpgradeFeatures, evaluateOperatorRisk, formatOperatorRiskBlockMessage, recordOperatorFingerprint, recordSoftBlockedRiskEvent, getPermissionMode, getRiskControlSettings, getCdkProfileDuration, isProfileCdkRecord, type CdkRecord, normalizePermissionMode, resolveConfigForPermission, resolveFreePreviewConfig } from "../../handlers/license-utils";
 import { resolveProfileAuthorization } from '../../handlers/profile-authorization';
 import { getWorkspace, emptyWorkspace, getProfileForUser, isDepotValueProfile, isFreePreviewProfile, normalizeProfileKind, updateProfileWorkspaceAtomically } from "../../storage/user-store";
+import { getProfileOptimizationResult } from '../../storage/optimization-result-store';
 import { requireUserSession } from "../../handlers/user-auth";
 import { type OptimizeJobPriority } from "../../storage/optimize-job-store";
 import type { ScheduleUsageContext, OptimizeJobSource, PreparedOptimizeJob, OptimizeConfigPermission, FreeScheduleGenerateDecision } from './shared';
@@ -19,7 +20,7 @@ import { requestSchemas } from '../../security/request-policy';
 import { getValidatedJson } from '../../security/request-validation';
 import { formatOptimizeJobHardTimeout, getOptimizeJobHardTimeoutMs } from '../../optimize-job-config';
 import { recordOperatorDataAnomalyBehaviorEvent } from '../../behavior-risk/service';
-import type { MeteredBillingKind } from '../../../src/lib/metered-billing';
+import type { MeteredBillingKind, MeteredBillingOperation } from '../../../src/lib/metered-billing';
 import { normalizePointsAmount } from '../../../src/lib/balance-contracts';
 import { requireMeteredBillingFeature } from '../../feature-gate';
 
@@ -52,6 +53,10 @@ export async function prepareOptimizeJob(
     const profile_id = body.identity.profileId;
     const includeUpgradeSuggestions = body.kind === 'schedule' && body.includeUpgradeSuggestions;
     const history_source = body.kind === 'schedule' ? body.historySource : undefined;
+    const billingOperation: MeteredBillingOperation = body.kind === 'scenario_comparison'
+      ? 'scenario_comparison'
+      : body.billing_operation ?? 'main_schedule';
+    const baselineHistoryId = body.kind === 'schedule' ? body.baseline_history_id?.trim() : undefined;
     const submittedItems = Array.isArray(body.use_items) ? body.use_items : [];
     if (new Set(submittedItems).size !== submittedItems.length) {
       return fail({ error: '同一种道具每次最多使用一张。', code: 'duplicate_item' }, 400);
@@ -129,17 +134,18 @@ export async function prepareOptimizeJob(
         return fail({ error: authorization.message, code: authorization.code }, authorization.status);
       }
       checkedCdkRecord = authorization.cdkRecord;
-      if ((profileKind === 'metered_personal' || profileKind === 'metered_commercial') && isScenarioComparison) {
+      if (profileKind === 'free_preview' && isScenarioComparison) {
         scheduleUsage = scheduleFailure('permission_denied', { profile_id: activeProfileId, permission: profile.permission, source: 'account_profile' });
-        return fail({ error: '按次计费档案不开放场景对比实验室。', code: 'capability_not_available' }, 403);
+        return fail({ error: '免费预览档案不开放场景对比实验室。', code: 'capability_not_available' }, 403);
       }
       if (profileKind === 'metered_personal' || profileKind === 'metered_commercial') {
-        const accepted = body.kind === 'schedule' ? normalizePointsAmount(body.accepted_max_points) : null;
-        if (body.kind !== 'schedule' || !body.billing_quote_id || !body.pricing_version || !accepted) {
+        const accepted = normalizePointsAmount(body.accepted_max_points);
+        if (!body.billing_quote_id || !body.pricing_version || !accepted) {
           return fail({ error: '缺少已确认的计费报价，请刷新报价后重新确认。', code: 'pricing_changed' }, 409);
         }
         meteredBilling = {
           userId: auth.user.id,
+          operation: billingOperation,
           billingKind: profileKind as MeteredBillingKind,
           confirmation: {
             quoteId: body.billing_quote_id,
@@ -151,6 +157,45 @@ export async function prepareOptimizeJob(
       isPreviewProfile = isFreePreviewProfile(profile);
       activeProfileUid = profile.skland_binding?.uid ?? null;
       isPreviewTrial = isFreePreviewTrialActive(profile);
+      const unlimitedService = Boolean(checkedCdkRecord && isProfileCdkRecord(checkedCdkRecord)
+        && getCdkProfileDuration(checkedCdkRecord) === 'lifetime');
+      const hasBillingQuoteFields = Boolean(body.billing_quote_id || body.pricing_version || body.accepted_max_points);
+      if (billingOperation === 'scenario_comparison' && profileKind === 'cdk' && hasBillingQuoteFields) {
+        return fail({ error: '周期卡场景对比使用卡内次数，不需要 300 积分报价。', code: 'billing_not_applicable' }, 409);
+      }
+      if (billingOperation === 'incremental_recompute' && unlimitedService && hasBillingQuoteFields) {
+        return fail({ error: '终身卡已包含无限个人增量重算，不需要 700 积分报价。', code: 'billing_not_applicable' }, 409);
+      }
+      if (billingOperation !== 'main_schedule' && !meteredBilling) {
+        const accepted = normalizePointsAmount(body.accepted_max_points);
+        if (body.billing_quote_id && body.pricing_version && accepted) {
+          meteredBilling = {
+            userId: auth.user.id,
+            operation: billingOperation,
+            billingKind: 'metered_personal',
+            confirmation: {
+              quoteId: body.billing_quote_id,
+              pricingVersion: body.pricing_version,
+              acceptedMaxPoints: accepted,
+            },
+          };
+        }
+      }
+      if (billingOperation === 'incremental_recompute') {
+        if (isPreviewProfile) {
+          return fail({ error: '免费预览档案不能使用个人增量重算，请使用免费修订或追加重算券。', code: 'operation_not_available' }, 409);
+        }
+        if (!baselineHistoryId) {
+          return fail({ error: '个人增量重算必须绑定一份已有成功结果。', code: 'baseline_required' }, 409);
+        }
+        const baseline = await getProfileOptimizationResult(activeProfileId, baselineHistoryId);
+        if (!baseline || baseline.archived_at) {
+          return fail({ error: '增量重算基线不存在或已归档，请先选择最新成功结果。', code: 'baseline_not_found' }, 409);
+        }
+        if (!unlimitedService && !meteredBilling) {
+          return fail({ error: '当前档案需要先确认 700 积分的增量重算报价。', code: 'pricing_changed' }, 409);
+        }
+      }
       if (isPreviewProfile && !profile.skland_binding) {
         scheduleUsage = scheduleFailure('permission_denied', { profile_id: activeProfileId, permission: 'free_preview', source: 'free_preview' });
         return fail({ error: '免费个人排班档案必须先绑定森空岛后才能生成排班。' }, 403);
@@ -181,9 +226,12 @@ export async function prepareOptimizeJob(
       && hasCapability({ permission: optimizePermission }, 'run_scenario_comparison');
     const useScenarioCoupon = isScenarioComparison && !hasScenarioCapability
       && requestedItems.has('scenario_simulation_coupon');
-    if (isScenarioComparison && !hasScenarioCapability && !useScenarioCoupon) {
-      return fail({ error: '当前套餐不包含场景对比实验室。' }, 403);
+    if (isScenarioComparison && !hasScenarioCapability && !useScenarioCoupon && !meteredBilling) {
+      return fail({ error: '当前套餐需要先确认 300 积分的场景对比包。', code: 'pricing_changed' }, 409);
     }
+    // Periodic CDKs reserve and consume their catalog-defined scenario quota in
+    // the job admission transaction. Only metered profiles use the 300-point
+    // quote path; lifetime CDKs have an unlimited quota and need no quote.
 
     if (checkedCdkRecord && isProfileCdkRecord(checkedCdkRecord) && normalizePermissionMode(checkedCdkRecord.permission) === 'advanced') {
       const riskSettings = await getRiskControlSettings();
@@ -262,9 +310,11 @@ export async function prepareOptimizeJob(
             operators,
             effectiveConfig,
             activeProfileId,
+            cdkUsageRef: checkedCdkRecord ? { code_hash: checkedCdkRecord.code_hash } : null,
             factors: body.factors,
             estimate,
           },
+          billing: meteredBilling,
         },
       };
     }
@@ -357,6 +407,8 @@ export async function prepareOptimizeJob(
             include_upgrade_suggestions: includeUpgradeSuggestions,
             upgrade_suggestions_allowed: canUseUpgrades,
             history_source,
+            billing_operation: billingOperation,
+            ...(baselineHistoryId ? { baseline_history_id: baselineHistoryId } : {}),
           },
         }),
       },

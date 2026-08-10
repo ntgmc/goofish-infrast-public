@@ -65,20 +65,20 @@ describe('ScheduleProgress motion', () => {
   it('shows reserved, settled, and released billing snapshots', () => {
     const billing = {
       billing_kind: 'metered_personal' as const,
-      pricing_version: '2026-08-06-v3',
-      list_price: '1200.00',
+      pricing_version: '2026-08-09-v4',
+      list_price: '1000.00',
       tier: null,
       discount_bps: 0,
-      charge: '1200.00',
+      charge: '1000.00',
     }
     const { rerender } = render(<ScheduleProgress progress={createProgress({ billing: { ...billing, status: 'reserved' } })} />)
-    expect(screen.getByText('已预留 1200.00 积分')).toBeInTheDocument()
+    expect(screen.getByText('已预留 1000.00 积分')).toBeInTheDocument()
 
     rerender(<ScheduleProgress progress={createProgress({ completedAt: NOW, estimatePhase: 'completed', billing: { ...billing, status: 'settled' } })} />)
-    expect(screen.getByText('已扣除 1200.00 积分')).toBeInTheDocument()
+    expect(screen.getByText('已扣除 1000.00 积分')).toBeInTheDocument()
 
     rerender(<ScheduleProgress progress={createProgress({ estimatePhase: 'failed', billing: { ...billing, status: 'released' } })} />)
-    expect(screen.getByText('预留已释放：1200.00 积分')).toBeInTheDocument()
+    expect(screen.getByText('预留已释放：1000.00 积分')).toBeInTheDocument()
     expect(screen.getByText('任务未完成')).toBeInTheDocument()
   })
 

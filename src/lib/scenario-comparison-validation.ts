@@ -7,6 +7,7 @@ import type {
   ScenarioMetrics,
   ScenarioProductionPlan,
 } from './scenario-comparison'
+import { SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS } from './scenario-comparison'
 import { extensibleLicenseConfigSchema } from './workspace-validation'
 
 const finiteNumber = z.number().finite()
@@ -57,6 +58,13 @@ export const scenarioComparisonFactorsSchema: z.ZodType<ScenarioComparisonFactor
     )
   })
   const planCount = factors.layouts.reduce((sum, entry) => sum + entry.plans.length, 0)
+  if (planCount > SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS) {
+    context.addIssue({
+      code: 'custom',
+      path: ['layouts'],
+      message: copy.domain.lib_scenario_comparison_validation_012(SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS),
+    })
+  }
   const scheduleCount = factors.maaSchedules.length + (factors.includeRotation ? 1 : 0)
   const rawCombinationCount = planCount * scheduleCount * factors.droneStrategies.length
   if (rawCombinationCount > MAX_RAW_SCENARIO_COMBINATIONS) {

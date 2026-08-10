@@ -3,6 +3,7 @@ import { copy } from '../copy/index'
 
 
 const SCENARIO_COMPARISON_MAX_SCENARIOS = 24
+export const SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS = 3
 const SCENARIO_COMPARISON_VERIFY_PER_COST = 3
 const SCENARIO_PARETO_EPSILON = 0.01
 export const SCENARIO_VARIABLE_SHIFT_CANDIDATE_LIMIT = 13
@@ -272,6 +273,10 @@ function validateFactors(factors: ScenarioComparisonFactors): void {
   if (factors.layouts.length === 0) throw new Error(copy.domain.lib_scenario_comparison_018)
   if (factors.maaSchedules.length === 0 && !factors.includeRotation) throw new Error(copy.domain.lib_scenario_comparison_019)
   if (factors.maaSchedules.length > 0 && factors.droneStrategies.length === 0) throw new Error(copy.domain.lib_scenario_comparison_020)
+  const additionalConfigCount = factors.layouts.reduce((sum, layout) => sum + layout.plans.length, 0)
+  if (additionalConfigCount > SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS) {
+    throw new Error(copy.domain.lib_scenario_comparison_040(SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS))
+  }
   for (const layoutFactor of factors.layouts) {
     assertExactKeys(layoutFactor, ['layout', 'plans'], copy.domain.lib_scenario_comparison_021)
     if (!Object.prototype.hasOwnProperty.call(LAYOUT_COUNTS, layoutFactor.layout)
