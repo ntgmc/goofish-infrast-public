@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { authenticateAdminRequest } from './admin-auth'
 import { jsonResponse } from './license-utils'
 import {
+  discardAllOptimizationDeadLetters,
   discardOptimizationDeadLetter,
   getAdminOptimizationQueueSnapshot,
   getOptimizationDeadLetterDetail,
@@ -57,9 +58,7 @@ export default async function adminOptimizationHandler(req: Request): Promise<Re
 
     if (req.method === 'POST') {
       const body = await getValidatedJson(req, requestSchemas.adminOptimization)
-      const id = typeof body.id === 'string' ? body.id.trim() : ''
       const reason = typeof body.reason === 'string' ? body.reason.trim() : ''
-      if (!id) return jsonResponse({ error: '缺少死信任务 ID。' }, 400)
       if (!reason) return jsonResponse({ error: '必须填写死信任务处理原因。' }, 400)
       const resolution: OptimizationDeadLetterResolution = {
         actorUsername: authentication.username,
@@ -67,6 +66,12 @@ export default async function adminOptimizationHandler(req: Request): Promise<Re
         requestId: requestId(req),
         clientIp: getRequestClientIp(req),
       }
+      if (body.action === 'discard_all') {
+        const discardedCount = await discardAllOptimizationDeadLetters(resolution)
+        return noStore(jsonResponse({ ok: true, discarded_count: discardedCount }))
+      }
+      const id = typeof body.id === 'string' ? body.id.trim() : ''
+      if (!id) return jsonResponse({ error: '缺少死信任务 ID。' }, 400)
       if (body.action === 'replay') {
         const job = await replayOptimizationDeadLetter(id, resolution)
         if (!job) return jsonResponse({ error: '死信任务不存在、已处理或原任务状态无效。' }, 409)

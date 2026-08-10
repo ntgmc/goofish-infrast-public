@@ -61,7 +61,7 @@ export async function runServiceStatusSampling(): Promise<boolean> {
         queued: snapshot.counts.queued,
         running: snapshot.counts.running,
         workerConcurrency: snapshot.capacity.worker_concurrency,
-        workerInstances: snapshot.capacity.worker_instances,
+        workerInstances: snapshot.capacity.billable_worker_instances ?? snapshot.capacity.worker_instances,
         sampledAt,
       })
       const before = new Date(Date.parse(sampledAt) - SERVICE_STATUS_HISTORY_RETENTION_MS).toISOString()

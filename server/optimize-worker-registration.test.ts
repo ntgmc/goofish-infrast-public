@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const query = vi.hoisted(() => vi.fn(async () => ({ rows: [], rowCount: 1 })))
+const originalAppRole = process.env.APP_ROLE
 vi.mock('./storage/postgres', () => ({ query }))
 vi.mock('./optimize-job-runner', () => ({
   getOptimizeJobProcessingState: () => ({ workerId: 'worker-runtime-1' }),
@@ -19,10 +20,13 @@ afterEach(async () => {
   stopOptimizeWorkerRegistration()
   await waitForOptimizeWorkerRegistrationIdle()
   query.mockClear()
+  if (originalAppRole === undefined) delete process.env.APP_ROLE
+  else process.env.APP_ROLE = originalAppRole
 })
 
 describe('optimize worker runtime registration', () => {
   it('publishes actual capacity and marks the instance draining on shutdown', async () => {
+    process.env.APP_ROLE = 'all'
     await initializeOptimizeWorkerRegistration()
 
     expect(query).toHaveBeenCalledWith(
@@ -34,6 +38,7 @@ describe('optimize worker runtime registration', () => {
         OPTIMIZE_WORKER_STALE_AFTER_MS,
       ]),
     )
+    expect(query.mock.calls[0]?.[1]?.[4]).toContain('runtime:local_fallback')
 
     stopOptimizeWorkerRegistration()
     await waitForOptimizeWorkerRegistrationIdle()
@@ -41,5 +46,13 @@ describe('optimize worker runtime registration', () => {
       expect.stringContaining('set draining = true'),
       ['worker-runtime-1'],
     )
+  })
+
+  it('marks a dedicated worker as a billable ECS runtime', async () => {
+    process.env.APP_ROLE = 'worker'
+
+    await initializeOptimizeWorkerRegistration()
+
+    expect(query.mock.calls[0]?.[1]?.[4]).toContain('runtime:ecs_worker')
   })
 })

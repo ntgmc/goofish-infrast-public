@@ -48,6 +48,7 @@ export default async function serviceStatusHandler(req: Request): Promise<Respon
         queue_limit: snapshot.capacity.queue_limit,
         worker_concurrency: snapshot.capacity.worker_concurrency,
         worker_instances: snapshot.capacity.worker_instances,
+        billable_worker_instances: snapshot.capacity.billable_worker_instances,
       },
       components: [{ id: 'optimization', status }],
       thresholds: { queue_congested_at: QUEUE_CONGESTION_THRESHOLD, queue_overloaded_at: QUEUE_OVERLOAD_THRESHOLD },

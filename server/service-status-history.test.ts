@@ -44,6 +44,17 @@ describe('service status history sampler', () => {
     expect(mocks.prune).toHaveBeenCalledWith(expect.any(String))
   })
 
+  it('uses total capacity for availability while recording only billable ECS workers', async () => {
+    mocks.snapshot.mockResolvedValue({
+      snapshot_at: '2026-08-08T09:04:00.000Z',
+      capacity: { worker_concurrency: 1, worker_instances: 1, billable_worker_instances: 0 },
+      counts: { queued: 0, running: 0 },
+    })
+
+    await expect(runServiceStatusSampling()).resolves.toBe(true)
+    expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({ status: 'available', workerInstances: 0 }))
+  })
+
   it('does not write when another API instance owns the lock', async () => {
     mocks.advisoryLock.mockResolvedValue({ acquired: false })
     await expect(runServiceStatusSampling()).resolves.toBe(false)

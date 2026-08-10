@@ -50,6 +50,12 @@ export interface ServiceStatusCostConfig {
 export interface ServiceStatusCostEstimate {
   observed_24h_worker_hours: number | null
   observed_30d_worker_hours: number | null
+  observed_24h_sample_hours: number
+  observed_30d_sample_hours: number
+  observed_24h_cost_cny: number | null
+  observed_30d_cost_cny: number | null
+  projected_monthly_cost_cny: number | null
+  observed_savings_cny: number | null
   planned_daily_worker_hours: number
   planned_monthly_worker_hours: number
   estimated_daily_cost_cny: number | null
@@ -72,6 +78,7 @@ interface ServiceStatusQueueSnapshot {
   queue_limit: number
   worker_concurrency: number
   worker_instances: number
+  billable_worker_instances?: number
 }
 
 export interface ServiceStatusResponse {

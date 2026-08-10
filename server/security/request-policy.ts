@@ -182,6 +182,7 @@ export const requestSchemas = {
   adminOptimization: z.discriminatedUnion('action', [
     strict({ action: z.literal('replay'), id: shortString(128), reason: adminOperationReasonSchema }),
     strict({ action: z.literal('discard'), id: shortString(128), reason: adminOperationReasonSchema }),
+    strict({ action: z.literal('discard_all'), reason: adminOperationReasonSchema }),
   ]),
   adminServiceStatusCreate: z.discriminatedUnion('action', [
     strict({

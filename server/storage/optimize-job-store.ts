@@ -217,6 +217,7 @@ export interface AdminOptimizationQueueSnapshot {
     queue_limit: number
     worker_concurrency: number
     worker_instances: number
+    billable_worker_instances: number
     source: 'runtime_registry' | 'configured_fallback'
     heartbeat_interval_ms: number
     stale_after_ms: number
@@ -1956,11 +1957,15 @@ export async function getAdminOptimizationQueueSnapshot(
     const workerCapacity = (await client.query<{
       worker_concurrency: string
       worker_instances: string
+      billable_worker_instances: string
       heartbeat_interval_ms: string | null
       stale_after_ms: string | null
     }>(
       `select coalesce(sum(concurrency), 0)::text as worker_concurrency,
               count(*)::text as worker_instances,
+              count(*) filter (
+                where not capabilities @> array['runtime:local_fallback']::text[]
+              )::text as billable_worker_instances,
               max(heartbeat_interval_ms)::text as heartbeat_interval_ms,
               max(stale_after_ms)::text as stale_after_ms
          from optimize_worker_registry
@@ -1992,6 +1997,7 @@ export async function getAdminOptimizationQueueSnapshot(
     const recentJobs = recent.rows.map((row) => toAdminOptimizationQueueJob(row, null))
     const registeredConcurrency = Number(workerCapacity?.worker_concurrency ?? 0)
     const workerInstances = Number(workerCapacity?.worker_instances ?? 0)
+    const billableWorkerInstances = Number(workerCapacity?.billable_worker_instances ?? workerInstances)
     const useFallback = workerInstances === 0 && configuredFallbackConcurrency !== undefined
 
     return {
@@ -2002,6 +2008,7 @@ export async function getAdminOptimizationQueueSnapshot(
           ? Math.max(1, Math.floor(configuredFallbackConcurrency))
           : Math.max(0, registeredConcurrency),
         worker_instances: Math.max(0, workerInstances),
+        billable_worker_instances: Math.max(0, billableWorkerInstances),
         source: useFallback ? 'configured_fallback' : 'runtime_registry',
         heartbeat_interval_ms: Number(workerCapacity?.heartbeat_interval_ms ?? 10_000),
         stale_after_ms: Number(workerCapacity?.stale_after_ms ?? 30_000),
@@ -2282,6 +2289,44 @@ export async function discardOptimizationDeadLetter(
       createdAt: now,
     })
     return true
+  })
+}
+
+export async function discardAllOptimizationDeadLetters(
+  resolution: OptimizationDeadLetterResolution,
+): Promise<number> {
+  await ensureSchema()
+  const now = new Date().toISOString()
+  return withTransaction(async (client) => {
+    const selected = await client.query<{ id: string }>(
+      `select id from optimization_dead_letters
+        where status = 'pending_review'
+        order by created_at asc
+        for update`,
+    )
+    if (selected.rows.length === 0) return 0
+    const ids = selected.rows.map((row) => row.id)
+    const result = await client.query(
+      `update optimization_dead_letters
+          set status = 'discarded', resolution_reason = $1, resolved_by = $2,
+              resolved_at = $3, updated_at = $3
+        where id = any($4::text[]) and status = 'pending_review'`,
+      [resolution.reason, resolution.actorUsername, now, ids],
+    )
+    const discardedCount = result.rowCount ?? 0
+    await recordAdminOperationAuditInTransaction(client, {
+      actorUsername: resolution.actorUsername,
+      action: 'optimization_dead_letter.discard_all',
+      targetType: 'optimization_dead_letter_batch',
+      targetId: resolution.requestId,
+      reason: resolution.reason,
+      requestId: resolution.requestId,
+      clientIp: resolution.clientIp,
+      before: { pending_review_count: selected.rows.length },
+      after: { discarded_count: discardedCount },
+      createdAt: now,
+    })
+    return discardedCount
   })
 }
 

@@ -30,8 +30,8 @@ describe('QueueMonitorPanel', () => {
     expect(statusHeading.compareDocumentPosition(deadLetterHeading) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
     expect(screen.getByText('2 / 200')).toBeInTheDocument()
     expect(screen.getByText('1 / 3')).toBeInTheDocument()
-    expect(screen.getByText('可用，处理稍慢')).toBeInTheDocument()
-    expect(screen.getByText('33%')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '实时资源状态' })).not.toBeInTheDocument()
+    expect(screen.queryByText('运行资源')).not.toBeInTheDocument()
     expect(screen.getAllByText('user@example.test').length).toBeGreaterThan(0)
     expect(screen.queryByText('secret payload')).not.toBeInTheDocument()
 

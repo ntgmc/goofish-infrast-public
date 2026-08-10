@@ -1,9 +1,6 @@
 import { ChevronDown, ChevronRight, RefreshCw, Search } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { adminApiJson } from '../../../lib/admin-api-client'
-import ServiceStatusBadge from '../../../components/ServiceStatusBadge'
-import { copy } from '../../../copy/index'
-import { resolveOptimizationCostInputs, resolveOptimizationServiceStatus } from '../../../lib/service-status'
 import type {
   AdminOptimizationQueueJob,
   AdminOptimizationQueueSnapshot,
@@ -139,7 +136,6 @@ export default function QueueMonitorPanel() {
               <QueueMetric label="重试等待" value={String(snapshot.counts.retry_waiting)} hint="已有执行尝试的排队任务" tone={snapshot.counts.retry_waiting > 0 ? 'warning' : 'default'} />
               <QueueMetric label="近期失败" value={String(snapshot.counts.recent_failed)} hint="最近 20 条终态任务" tone={snapshot.counts.recent_failed > 0 ? 'error' : 'default'} />
             </div>
-            <QueueStatusCostPanel snapshot={snapshot} />
           </>
         )}
       </section>
@@ -199,48 +195,6 @@ function QueueMetric({ label, value, hint, tone }: { label: string; value: strin
       <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{label}</p>
       <p className={`mt-2 text-2xl font-semibold tabular-nums ${toneClass}`}>{value}</p>
       <p className="mt-1 text-xs text-ink-muted">{hint}</p>
-    </div>
-  )
-}
-
-function QueueStatusCostPanel({ snapshot }: { snapshot: AdminOptimizationQueueSnapshot }) {
-  const status = resolveOptimizationServiceStatus({
-    serviceReady: true,
-    queued: snapshot.counts.queued,
-    running: snapshot.counts.running,
-    workerConcurrency: snapshot.capacity.worker_concurrency,
-    workerInstances: snapshot.capacity.worker_instances,
-  })
-  const costInputs = resolveOptimizationCostInputs(snapshot.counts.running, snapshot.capacity.worker_concurrency)
-  return (
-    <section className="tool-panel mt-5 p-5" aria-labelledby="queue-status-cost-title">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="tool-eyebrow">{copy.status.pages_AdminQueueStatus_002}</p>
-          <h3 id="queue-status-cost-title" className="mt-2 text-base font-semibold text-ink-primary">{copy.status.pages_AdminQueueStatus_001}</h3>
-          <p className="mt-1 text-sm text-ink-muted">{copy.status.pages_AdminQueueStatus_003}</p>
-        </div>
-        <ServiceStatusBadge level={status} compact />
-      </div>
-      <dl className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <CostInputMetric label={copy.status.pages_AdminQueueStatus_004} value={costInputs.activeConcurrency} hint={copy.status.pages_AdminQueueStatus_013} />
-        <CostInputMetric label={copy.status.pages_AdminQueueStatus_005} value={costInputs.provisionedConcurrency} hint={copy.status.pages_AdminQueueStatus_014} />
-        <CostInputMetric label={copy.status.pages_AdminQueueStatus_006} value={costInputs.idleConcurrency} hint={copy.status.pages_AdminQueueStatus_015} />
-        <CostInputMetric label={copy.status.pages_AdminQueueStatus_007} value={`${costInputs.utilizationPercent}%`} hint={copy.status.pages_AdminQueueStatus_016} />
-      </dl>
-      <p className="mt-4 text-xs leading-6 text-ink-muted">{copy.status.pages_AdminQueueStatus_008}</p>
-      {status === 'unavailable' && <p className="mt-1 text-xs leading-6 text-error">{copy.status.pages_AdminQueueStatus_009}</p>}
-      <p className="mt-1 text-xs leading-6 text-ink-muted">{copy.status.pages_AdminQueueStatus_010}</p>
-    </section>
-  )
-}
-
-function CostInputMetric({ label, value, hint }: { label: string; value: number | string; hint: string }) {
-  return (
-    <div className="tool-inset p-4">
-      <dt className="text-xs font-semibold tracking-wide text-ink-muted">{label}</dt>
-      <dd className="mt-2 text-2xl font-semibold tabular-nums text-ink-primary">{value}</dd>
-      <p className="mt-1 text-xs leading-5 text-ink-muted">{hint}</p>
     </div>
   )
 }

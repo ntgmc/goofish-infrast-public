@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { adminApiJson } = vi.hoisted(() => ({ adminApiJson: vi.fn() }))
@@ -15,11 +15,16 @@ describe('ServiceStatusHistoryPanel', () => {
     adminApiJson.mockReset().mockImplementation(async (_url: string, options?: { method?: string }) => options?.method ? { incident: incident() } : response())
   })
 
-  it('shows cost inputs and appends an incident update', async () => {
+  it('shows automatic lifecycle cost inputs and appends an incident update', async () => {
     render(<ServiceStatusHistoryPanel />)
     expect(await screen.findByText(/利用率\s*62\.5%/)).toBeInTheDocument()
-    expect(screen.getByText('ECS 按量成本计划')).toBeInTheDocument()
-    expect(screen.getByText('计划每日实例小时')).toBeInTheDocument()
+    expect(screen.getByText('Worker ECS 自动启停成本')).toBeInTheDocument()
+    expect(screen.getByText('过去 24 小时实际费用')).toBeInTheDocument()
+    expect(screen.getByText('按近 24 小时推算月费用')).toBeInTheDocument()
+    expect(screen.getByText('已停止，当前不计费')).toBeInTheDocument()
+    expect(screen.queryByText('自动启停建议')).not.toBeInTheDocument()
+    expect(screen.queryByText('低谷常态实例数')).not.toBeInTheDocument()
+    expect(screen.queryByText('启用峰谷启停计划')).not.toBeInTheDocument()
     fireEvent.change(screen.getByPlaceholderText('追加公开更新'), { target: { value: '正在观察恢复情况。' } })
     fireEvent.click(screen.getByRole('button', { name: '追加更新' }))
     await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/service-status', expect.objectContaining({
@@ -28,26 +33,22 @@ describe('ServiceStatusHistoryPanel', () => {
     })))
   })
 
-  it('applies the dynamic ECS recommendation and saves the plan', async () => {
+  it('saves only the ECS price and clears obsolete peak/valley settings', async () => {
     render(<ServiceStatusHistoryPanel />)
-    await screen.findByText('自动启停建议')
-    fireEvent.click(screen.getByRole('button', { name: '采用推荐计划' }))
-    expect(within(screen.getByText('低谷常态实例数').closest('label')!).getByRole('spinbutton')).toHaveValue(1)
-    fireEvent.click(screen.getByRole('button', { name: '保存成本计划' }))
+    const price = await screen.findByRole('spinbutton', { name: /每实例每小时单价（元）/ })
+    fireEvent.change(price, { target: { value: '0.9' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存计费单价' }))
     await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/service-status', expect.objectContaining({
       method: 'POST',
-      json: expect.objectContaining({ action: 'save_cost_config', schedule_enabled: true, valley_worker_instances: 1 }),
+      json: expect.objectContaining({ action: 'save_cost_config', hourly_price_cny: 0.9, schedule_enabled: false, valley_worker_instances: 0, peak_windows: [] }),
     })))
   })
 
-  it('keeps the recommendation read-only while historical coverage is limited', async () => {
-    adminApiJson.mockImplementation(async (_url: string, options?: { method?: string }) => options?.method
-      ? { incident: incident() }
-      : ({ ...response(), cost: { ...response().cost, recommendation: { ...response().cost.recommendation, confidence: 'limited' } } }))
+  it('keeps cost values available without rendering the retired recommendation controls', async () => {
     render(<ServiceStatusHistoryPanel />)
-    const applyButton = await screen.findByRole('button', { name: '采用推荐计划' })
-    expect(applyButton).toBeDisabled()
-    expect(screen.getByText('建议覆盖至少 12 个小时段后采用推荐计划。')).toBeInTheDocument()
+    expect(await screen.findByText('4.80 元')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '采用推荐计划' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: '启用峰谷启停计划' })).not.toBeInTheDocument()
   })
 
   it('creates incidents and disables duplicate submission while saving', async () => {
@@ -69,11 +70,11 @@ describe('ServiceStatusHistoryPanel', () => {
 
 function response() {
   return {
-    generated_at: '2026-08-08T09:00:00.000Z', status: 'busy', queue: null,
+    generated_at: '2026-08-08T09:00:00.000Z', status: 'busy', queue: { queued: 0, running: 0, queue_limit: 200, worker_concurrency: 1, worker_instances: 1, billable_worker_instances: 0 },
     components: [{ id: 'optimization', status: 'busy' }], thresholds: { queue_congested_at: 5, queue_overloaded_at: 20 },
     history: { from: '2026-07-09T09:00:00.000Z', to: '2026-08-08T09:00:00.000Z', interval: 'hour', complete: true, buckets: [{ component_id: 'optimization', bucket_start: '2026-08-08T08:00:00.000Z', status: 'busy', sample_count: 12, availability_percent: 75, busy_samples: 3, congested_samples: 0, overloaded_samples: 0, average_active_concurrency: 2.5, average_provisioned_concurrency: 4, average_utilization_percent: 62.5, peak_queued: 3, peak_running: 4, peak_worker_instances: 1, unavailable_samples: 0 }] },
     incidents: [incident()],
-    cost: { config: { component_id: 'optimization', billing_model: 'ecs_payg', currency: 'CNY', hourly_price_cny: 0.8, timezone: 'Asia/Shanghai', schedule_enabled: false, valley_worker_instances: 1, peak_windows: [], updated_at: null }, estimate: { observed_24h_worker_hours: 24, observed_30d_worker_hours: 720, planned_daily_worker_hours: 24, planned_monthly_worker_hours: 720, estimated_daily_cost_cny: 19.2, estimated_monthly_cost_cny: 576 }, recommendation: { generated_at: '2026-08-08T09:00:00.000Z', source_sample_count: 12, confidence: 'observed', valley_worker_instances: 1, peak_windows: [{ start: '09:00', end: '18:00', worker_instances: 3 }], hourly_worker_instances: [1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 1, 1, 1, 1, 1, 1], rationale: ['按上海时区分析了 1 个小时段的历史样本。'] } },
+    cost: { config: { component_id: 'optimization', billing_model: 'ecs_payg', currency: 'CNY', hourly_price_cny: 0.8, timezone: 'Asia/Shanghai', schedule_enabled: false, valley_worker_instances: 1, peak_windows: [], updated_at: null }, estimate: { observed_24h_worker_hours: 6, observed_30d_worker_hours: 120, observed_24h_sample_hours: 24, observed_30d_sample_hours: 720, observed_24h_cost_cny: 4.8, observed_30d_cost_cny: 96, projected_monthly_cost_cny: 144, observed_savings_cny: 480, planned_daily_worker_hours: 24, planned_monthly_worker_hours: 720, estimated_daily_cost_cny: 19.2, estimated_monthly_cost_cny: 576 }, recommendation: { generated_at: '2026-08-08T09:00:00.000Z', source_sample_count: 12, confidence: 'observed', valley_worker_instances: 1, peak_windows: [{ start: '09:00', end: '18:00', worker_instances: 3 }], hourly_worker_instances: [1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 1, 1, 1, 1, 1, 1], rationale: ['按上海时区分析了 1 个小时段的历史样本。'] } },
   }
 }
 

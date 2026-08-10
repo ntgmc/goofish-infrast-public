@@ -44,6 +44,32 @@ describe('service status rules', () => {
     expect(calculateServiceStatusCostEstimate({ ...config, hourly_price_cny: 0.5 }, []).estimated_monthly_cost_cny).toBe(630)
   })
 
+  it('keeps observed cost windows bounded when recent hourly samples are sparse', () => {
+    const config = { ...createDefaultServiceStatusCostConfig(), hourly_price_cny: 0.5 }
+    const buckets = Array.from({ length: 26 }, (_, index) => ({
+      component_id: 'optimization' as const,
+      bucket_start: new Date(Date.UTC(2026, 7, 1, index)).toISOString(),
+      status: 'unknown' as const,
+      sample_count: index === 0 || index === 25 ? 12 : 0,
+      availability_percent: null,
+      busy_samples: 0,
+      congested_samples: 0,
+      overloaded_samples: 0,
+      average_active_concurrency: null,
+      average_provisioned_concurrency: null,
+      average_worker_instances: index === 0 || index === 25 ? 1 : null,
+      average_utilization_percent: null,
+      peak_queued: null,
+      peak_running: null,
+      peak_worker_instances: null,
+      unavailable_samples: 0,
+    }))
+    const estimate = calculateServiceStatusCostEstimate(config, buckets)
+    expect(estimate.observed_24h_worker_hours).toBe(1)
+    expect(estimate.observed_24h_sample_hours).toBe(1)
+    expect(estimate.observed_24h_cost_cny).toBe(0.5)
+  })
+
   it('represents a final peak window with browser-compatible midnight', () => {
     const config = { ...createDefaultServiceStatusCostConfig(), schedule_enabled: true, valley_worker_instances: 1, peak_windows: [{ start: '23:00', end: '00:00', worker_instances: 2 }] }
     expect(calculatePlannedDailyWorkerHours(config)).toBe(25)
