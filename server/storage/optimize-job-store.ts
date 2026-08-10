@@ -46,6 +46,12 @@ interface OptimizeJobCursor {
 interface OptimizeJobListRecord {
   job: OptimizeJobRecord
   queuePosition: number | null
+  queueWaitMs?: number | null
+}
+
+export interface OptimizeJobQueueEstimate {
+  queuePosition: number | null
+  estimatedWaitMs: number | null
 }
 
 export interface OptimizeJobRecord<TPayload = unknown, TResult = unknown> {
@@ -127,6 +133,7 @@ export interface OptimizeJobStore {
   listJobsByProfile: (profileId: string, limit?: number, before?: OptimizeJobCursor | null) => Promise<OptimizeJobListRecord[]>
   findActiveByOwnerKey: (ownerKey: string) => Promise<OptimizeJobRecord | null>
   getQueuePosition: (id: string) => Promise<number | null>
+  getQueueEstimate?: (id: string) => Promise<OptimizeJobQueueEstimate>
   claimNextJob: (workerId: string, lockToken: string, lockExpiresAt: string, maxFailures: number, maxGlobalRunning?: number) => Promise<OptimizeJobRecord | null>
   heartbeatAttempt: (id: string, attemptNo: number, workerId: string, lockToken: string, lockExpiresAt: string) => Promise<boolean>
   ownsAttempt: (id: string, attemptNo: number, workerId: string, lockToken: string) => Promise<boolean>
@@ -355,7 +362,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           }
         }
         const activeQueue = await client.query<OptimizeQueueCapacityRow>(
-          `select status, priority, owner_key, payload_json, created_at, started_at
+          `select id, status, priority, owner_key, payload_json, created_at, started_at
            from optimize_jobs where status in ('queued', 'running')`,
         )
         assertOptimizeQueueWaitCapacity(activeQueue.rows.map(fromQueueCapacityRow), input.owner_key, now)
@@ -584,9 +591,15 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
          order by job.created_at desc, job.id desc limit $4`,
         [profileId, before?.createdAt ?? null, before?.id ?? null, Math.max(1, Math.min(101, Math.floor(limit)))],
       )
+      const activeQueue = await query<OptimizeQueueCapacityRow>(
+        `select id, status, priority, owner_key, payload_json, created_at, started_at
+           from optimize_jobs where status in ('queued', 'running')`,
+      )
+      const queueEstimates = buildOptimizeQueueEstimates(activeQueue.rows.map(fromQueueCapacityRow), Date.now())
       return result.rows.map((row) => ({
         job: fromRow(row),
         queuePosition: row.queue_position === null ? null : Number(row.queue_position),
+        queueWaitMs: queueEstimates.get(row.id)?.estimatedWaitMs ?? null,
       }))
     },
     findActiveByOwnerKey: async (ownerKey) => {
@@ -610,6 +623,15 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         'and (priority > $1 or (priority = $1 and (created_at < $2 or (created_at = $2 and id < $4))))',
       ].join(' '), [row.priority, row.created_at, 'queued', row.id])
       return Number(result.rows[0]?.position ?? 1)
+    },
+    getQueueEstimate: async (id) => {
+      await ensureSchema()
+      const result = await query<OptimizeQueueCapacityRow>(
+        `select id, status, priority, owner_key, payload_json, created_at, started_at
+           from optimize_jobs where status in ('queued', 'running')`,
+      )
+      return buildOptimizeQueueEstimates(result.rows.map(fromQueueCapacityRow), Date.now()).get(id)
+        ?? { queuePosition: null, estimatedWaitMs: null }
     },
     claimNextJob: async (workerId, lockToken, lockExpiresAt, maxFailures, maxGlobalRunning = Number.MAX_SAFE_INTEGER) => {
       await ensureSchema()
@@ -1338,13 +1360,23 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       return clone(job)
     },
     getJob: async (id) => records.has(id) ? clone(records.get(id)!) : null,
-    listJobsByProfile: async (profileId, limit = 50, before = null) => [...records.values()]
-      .filter((job) => job.profile_id === profileId && (!before
-        || Date.parse(job.created_at) < Date.parse(before.createdAt)
-        || (job.created_at === before.createdAt && job.id < before.id)))
-      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id.localeCompare(a.id))
-      .slice(0, Math.max(1, Math.min(101, Math.floor(limit))))
-      .map((job) => ({ job: clone(job), queuePosition: memoryQueuePosition(records, job) })),
+    listJobsByProfile: async (profileId, limit = 50, before = null) => {
+      const queueEstimates = buildOptimizeQueueEstimates(
+        [...records.values()].filter((job) => activeStatuses.has(job.status)),
+        Date.now(),
+      )
+      return [...records.values()]
+        .filter((job) => job.profile_id === profileId && (!before
+          || Date.parse(job.created_at) < Date.parse(before.createdAt)
+          || (job.created_at === before.createdAt && job.id < before.id)))
+        .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id.localeCompare(a.id))
+        .slice(0, Math.max(1, Math.min(101, Math.floor(limit))))
+        .map((job) => ({
+          job: clone(job),
+          queuePosition: memoryQueuePosition(records, job),
+          queueWaitMs: queueEstimates.get(job.id)?.estimatedWaitMs ?? null,
+        }))
+    },
     findActiveByOwnerKey: async (ownerKey) => [...records.values()]
       .filter((job) => job.owner_key === ownerKey && activeStatuses.has(job.status))
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0] ?? null,
@@ -1357,6 +1389,10 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
             && (Date.parse(candidate.created_at) < Date.parse(job.created_at)
               || (candidate.created_at === job.created_at && candidate.id < job.id))))).length + 1
     },
+    getQueueEstimate: async (id) => buildOptimizeQueueEstimates(
+      [...records.values()].filter((job) => activeStatuses.has(job.status)),
+      Date.now(),
+    ).get(id) ?? { queuePosition: null, estimatedWaitMs: null },
     claimNextJob: async (workerId, lockToken, lockExpiresAt, maxFailures, maxGlobalRunning = Number.MAX_SAFE_INTEGER) => {
       const nowMs = Date.now()
       const runningOwners = new Set([...records.values()].filter((job) => job.status === 'running').map((job) => job.owner_key))
@@ -1712,7 +1748,7 @@ async function upsertBillingReconciliationCase(
 }
 
 type OptimizeQueueCapacityJob = Pick<OptimizeJobRecord,
-  'status' | 'priority' | 'owner_key' | 'payload_json' | 'created_at' | 'started_at'>
+  'id' | 'status' | 'priority' | 'owner_key' | 'payload_json' | 'created_at' | 'started_at'>
 
 type OptimizeQueueCapacityRow = Omit<OptimizeQueueCapacityJob, 'priority' | 'created_at' | 'started_at'> & {
   priority: number | string
@@ -1789,6 +1825,42 @@ function estimateOptimizeQueueWaitMs(
   ownerKey: string,
   nowMs: number,
 ): number {
+  const schedule = createOptimizeQueueSchedule(activeJobs, nowMs)
+  for (const job of schedule.queuedJobs) {
+    scheduleQueueWork(schedule.workerAvailableAt, schedule.ownerAvailableAt, job.owner_key, getQueueJobDurationMs(job.payload_json))
+  }
+  return getEarliestQueueStart(schedule.workerAvailableAt, schedule.ownerAvailableAt.get(ownerKey) ?? 0)
+}
+
+function buildOptimizeQueueEstimates(
+  activeJobs: OptimizeQueueCapacityJob[],
+  nowMs: number,
+): Map<string, OptimizeJobQueueEstimate> {
+  const schedule = createOptimizeQueueSchedule(activeJobs, nowMs)
+  const estimates = new Map<string, OptimizeJobQueueEstimate>()
+  for (const [index, job] of schedule.queuedJobs.entries()) {
+    const estimatedWaitMs = scheduleQueueWork(
+      schedule.workerAvailableAt,
+      schedule.ownerAvailableAt,
+      job.owner_key,
+      getQueueJobDurationMs(job.payload_json),
+    )
+    estimates.set(job.id, {
+      queuePosition: index + 1,
+      estimatedWaitMs,
+    })
+  }
+  return estimates
+}
+
+function createOptimizeQueueSchedule(
+  activeJobs: OptimizeQueueCapacityJob[],
+  nowMs: number,
+): {
+  workerAvailableAt: number[]
+  ownerAvailableAt: Map<string, number>
+  queuedJobs: OptimizeQueueCapacityJob[]
+} {
   const workerAvailableAt = Array.from({ length: getOptimizeGlobalWorkerConcurrency() }, () => 0)
   const ownerAvailableAt = new Map<string, number>()
   const runningJobs = activeJobs.filter((job) => job.status === 'running')
@@ -1796,7 +1868,9 @@ function estimateOptimizeQueueWaitMs(
   // submissions must not push an already admitted job past its expiry time.
   const queuedJobs = activeJobs
     .filter((job) => job.status === 'queued')
-    .sort((left, right) => right.priority - left.priority || Date.parse(left.created_at) - Date.parse(right.created_at))
+    .sort((left, right) => right.priority - left.priority
+      || Date.parse(left.created_at) - Date.parse(right.created_at)
+      || left.id.localeCompare(right.id))
 
   for (const job of runningJobs) {
     const elapsedMs = Math.max(0, nowMs - parseQueueTimestamp(job.started_at, nowMs))
@@ -1806,11 +1880,7 @@ function estimateOptimizeQueueWaitMs(
       : Math.max(1_000, estimatedDurationMs - elapsedMs)
     scheduleQueueWork(workerAvailableAt, ownerAvailableAt, job.owner_key, remainingMs)
   }
-  for (const job of queuedJobs) {
-    scheduleQueueWork(workerAvailableAt, ownerAvailableAt, job.owner_key, getQueueJobDurationMs(job.payload_json))
-  }
-
-  return getEarliestQueueStart(workerAvailableAt, ownerAvailableAt.get(ownerKey) ?? 0)
+  return { workerAvailableAt, ownerAvailableAt, queuedJobs }
 }
 
 function scheduleQueueWork(
@@ -1818,7 +1888,7 @@ function scheduleQueueWork(
   ownerAvailableAt: Map<string, number>,
   ownerKey: string,
   durationMs: number,
-): void {
+): number {
   const ownerReadyAt = ownerAvailableAt.get(ownerKey) ?? 0
   let selectedWorker = 0
   let selectedStart = Math.max(workerAvailableAt[0] ?? 0, ownerReadyAt)
@@ -1832,6 +1902,7 @@ function scheduleQueueWork(
   const finishesAt = selectedStart + durationMs
   workerAvailableAt[selectedWorker] = finishesAt
   ownerAvailableAt.set(ownerKey, finishesAt)
+  return selectedStart
 }
 
 function getEarliestQueueStart(workerAvailableAt: number[], ownerReadyAt: number): number {
