@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   appendUpdate: vi.fn(),
   saveCost: vi.fn(),
   getSnapshot: vi.fn(),
+  autoscalingConfig: vi.fn(),
 }))
 
 vi.mock('./admin-auth', () => ({ authenticateAdminRequest: mocks.authenticate }))
@@ -22,6 +23,7 @@ vi.mock('../storage/service-status-store', () => ({
 }))
 vi.mock('../storage/optimize-job-store', () => ({ getAdminOptimizationQueueSnapshot: mocks.getSnapshot }))
 vi.mock('../lifecycle', () => ({ isServiceReady: () => true }))
+vi.mock('../optimize-job-config', () => ({ getOptimizeWorkerAutoscalingConfiguration: mocks.autoscalingConfig }))
 
 import adminServiceStatusHandler from './admin-service-status'
 
@@ -29,6 +31,7 @@ describe('admin service status handler', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.authenticate.mockResolvedValue({ ok: true, username: 'ops', capabilities: ['optimization_view', 'optimization_manage'] })
+    mocks.autoscalingConfig.mockReturnValue({ enabled: false, scaleUpQueueThreshold: 4, scaleDownQueueThreshold: 1, scaleDownIdleMs: 600000, intervalMs: 30000 })
     mocks.getHistory.mockResolvedValue({ from: '2026-07-09T00:00:00.000Z', to: '2026-08-08T00:00:00.000Z', buckets: [] })
     mocks.getCost.mockResolvedValue({ component_id: 'optimization', billing_model: 'ecs_payg', currency: 'CNY', hourly_price_cny: null, timezone: 'Asia/Shanghai', schedule_enabled: false, valley_worker_instances: 0, peak_windows: [], updated_at: null })
     mocks.listIncidents.mockResolvedValue([])
@@ -50,6 +53,15 @@ describe('admin service status handler', () => {
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     await expect(response.json()).resolves.toMatchObject({ history: { interval: 'hour', buckets: [] }, incidents: [] })
     expect(mocks.authenticate).toHaveBeenCalledWith(expect.any(Request), 'optimization_view')
+  })
+
+  it('reports elastic processing in the management status view', async () => {
+    mocks.autoscalingConfig.mockReturnValue({ enabled: true, scaleUpQueueThreshold: 4, scaleDownQueueThreshold: 1, scaleDownIdleMs: 600000, intervalMs: 30000 })
+    mocks.getSnapshot.mockResolvedValue({ snapshot_at: '2026-08-08T09:00:00.000Z', capacity: { queue_limit: 200, worker_concurrency: 3, worker_instances: 1 }, counts: { queued: 5, running: 3 } })
+    const response = await adminServiceStatusHandler(new Request('http://localhost/api/admin/service-status?view=history'))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ status: 'scaling', components: [{ id: 'optimization', status: 'scaling' }] })
   })
 
   it('requires manage capability and recent login for mutations', async () => {

@@ -107,6 +107,8 @@ describe('database schema ownership', () => {
     expect(combinedSchema).not.toMatch(/trimmed_workspace_history AS/)
     expect(combinedSchema).toMatch(/select 1 from optimize_jobs job/)
     expect(combinedSchema).not.toMatch(/\boptimization_jobs\b/)
+    expect(combinedSchema).toMatch(/scaling_samples INTEGER NOT NULL DEFAULT 0/)
+    expect(combinedSchema).toMatch(/status IN \('available', 'scaling', 'busy', 'congested', 'overloaded', 'unavailable'\)/)
     expect(statements).toEqual(expect.arrayContaining([
       expect.stringMatching(/select set_config\('statement_timeout', \$1, false\)/i),
       expect.stringMatching(/select pg_advisory_lock/i),

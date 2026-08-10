@@ -49,7 +49,7 @@ export async function recordServiceStatusSample(sample: ServiceStatusSample): Pr
   const bucketStart = floorStatusTimestampToHour(sample.bucketStart)
   const current = await query<ServiceStatusHourlyRow>(
     `select component_id, bucket_start::text, status, sample_count, available_samples,
-            busy_samples, congested_samples, overloaded_samples, unavailable_samples, running_sum::text, provisioned_sum::text, utilization_sum::text, worker_instances_sum::text,
+            busy_samples, scaling_samples, congested_samples, overloaded_samples, unavailable_samples, running_sum::text, provisioned_sum::text, utilization_sum::text, worker_instances_sum::text,
             peak_queued, peak_running, peak_worker_instances, last_sample_at::text
        from service_status_hourly
       where component_id = $1 and bucket_start = $2`,
@@ -59,15 +59,16 @@ export async function recordServiceStatusSample(sample: ServiceStatusSample): Pr
   const next = aggregateServiceStatusSample(currentAggregate, { ...sample, bucketStart })
   await query(
     `insert into service_status_hourly
-       (component_id, bucket_start, status, sample_count, available_samples, busy_samples, congested_samples, overloaded_samples, unavailable_samples,
+       (component_id, bucket_start, status, sample_count, available_samples, busy_samples, scaling_samples, congested_samples, overloaded_samples, unavailable_samples,
        running_sum, provisioned_sum, utilization_sum, worker_instances_sum, peak_queued, peak_running, peak_worker_instances,
        last_sample_at, updated_at)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, now())
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, now())
      on conflict (component_id, bucket_start) do update set
        status = excluded.status,
        sample_count = excluded.sample_count,
        available_samples = excluded.available_samples,
        busy_samples = excluded.busy_samples,
+       scaling_samples = excluded.scaling_samples,
        congested_samples = excluded.congested_samples,
        overloaded_samples = excluded.overloaded_samples,
        unavailable_samples = excluded.unavailable_samples,
@@ -87,6 +88,7 @@ export async function recordServiceStatusSample(sample: ServiceStatusSample): Pr
       next.sampleCount,
       next.availableSamples,
       next.busySamples,
+      next.scalingSamples,
       next.congestedSamples,
       next.overloadedSamples,
       next.unavailableSamples,
@@ -129,7 +131,7 @@ export async function getServiceStatusHistory(
   const from = new Date(Date.parse(to) - SERVICE_STATUS_HISTORY_HOURS * 60 * 60 * 1000).toISOString()
   const result = await query<ServiceStatusHourlyRow>(
     `select component_id, bucket_start::text, status, sample_count, available_samples,
-            busy_samples, congested_samples, overloaded_samples, unavailable_samples, running_sum::text, provisioned_sum::text, utilization_sum::text, worker_instances_sum::text,
+            busy_samples, scaling_samples, congested_samples, overloaded_samples, unavailable_samples, running_sum::text, provisioned_sum::text, utilization_sum::text, worker_instances_sum::text,
             peak_queued, peak_running, peak_worker_instances, last_sample_at::text
        from service_status_hourly
       where component_id = $1 and bucket_start >= $2 and bucket_start < $3
@@ -165,7 +167,7 @@ export async function getAdminServiceStatusHistory(
   const from = new Date(Date.parse(to) - SERVICE_STATUS_HISTORY_HOURS * 60 * 60 * 1000).toISOString()
   const result = await query<ServiceStatusHourlyRow>(
     `select component_id, bucket_start::text, status, sample_count, available_samples,
-            busy_samples, congested_samples, overloaded_samples, unavailable_samples, running_sum::text, provisioned_sum::text, utilization_sum::text, worker_instances_sum::text,
+            busy_samples, scaling_samples, congested_samples, overloaded_samples, unavailable_samples, running_sum::text, provisioned_sum::text, utilization_sum::text, worker_instances_sum::text,
             peak_queued, peak_running, peak_worker_instances, last_sample_at::text
        from service_status_hourly
       where component_id = $1 and bucket_start >= $2 and bucket_start < $3
@@ -438,10 +440,11 @@ function conflictError(): ServiceStatusIncidentConflict {
 interface ServiceStatusHourlyRow extends QueryResultRow {
   component_id: ServiceStatusComponentId
   bucket_start: string
-  status: 'available' | 'busy' | 'congested' | 'overloaded' | 'unavailable'
+  status: 'available' | 'scaling' | 'busy' | 'congested' | 'overloaded' | 'unavailable'
   sample_count: number
   available_samples: number
   busy_samples: number
+  scaling_samples: number
   congested_samples: number
   overloaded_samples: number
   unavailable_samples: number
@@ -495,6 +498,7 @@ function rowToAggregate(row: ServiceStatusHourlyRow): ServiceStatusHistoryAggreg
     sampleCount: Number(row.sample_count),
     availableSamples: Number(row.available_samples),
     busySamples: Number(row.busy_samples),
+    scalingSamples: Number(row.scaling_samples),
     congestedSamples: Number(row.congested_samples),
     overloadedSamples: Number(row.overloaded_samples),
     unavailableSamples: Number(row.unavailable_samples),
