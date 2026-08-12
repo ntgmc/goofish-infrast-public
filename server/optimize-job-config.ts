@@ -16,6 +16,10 @@ const MAX_OPTIMIZE_JOB_HARD_TIMEOUT_MS = 15 * 60_000
 export const DEFAULT_OPTIMIZE_JOB_HARD_TIMEOUT_MS = MAX_OPTIMIZE_JOB_HARD_TIMEOUT_MS
 export const DEFAULT_OPTIMIZE_JOB_MAX_ATTEMPTS = 2
 export const MAX_OPTIMIZE_JOB_ATTEMPTS = 10
+export const DEFAULT_OPTIMIZE_WORKER_CLAIM_PRIORITY = 0
+export const MAX_OPTIMIZE_WORKER_CLAIM_PRIORITY = 1_000
+export const DEFAULT_OPTIMIZE_WORKER_MAX_OLD_SPACE_MB = 0
+export const MAX_OPTIMIZE_WORKER_MAX_OLD_SPACE_MB = 16_384
 
 export function getOptimizeGlobalWorkerConcurrency(
   environment: Pick<NodeJS.ProcessEnv, 'OPTIMIZE_GLOBAL_WORKER_CONCURRENCY'> = process.env,
@@ -38,6 +42,30 @@ export function getOptimizeWorkerConcurrency(
     DEFAULT_OPTIMIZE_WORKER_CONCURRENCY,
     1,
     MAX_OPTIMIZE_WORKER_CONCURRENCY,
+  )
+}
+
+export function getOptimizeWorkerClaimPriority(
+  environment: Pick<NodeJS.ProcessEnv, 'OPTIMIZE_WORKER_CLAIM_PRIORITY'> = process.env,
+): number {
+  return resolveInteger(
+    'OPTIMIZE_WORKER_CLAIM_PRIORITY',
+    environment.OPTIMIZE_WORKER_CLAIM_PRIORITY,
+    DEFAULT_OPTIMIZE_WORKER_CLAIM_PRIORITY,
+    0,
+    MAX_OPTIMIZE_WORKER_CLAIM_PRIORITY,
+  )
+}
+
+export function getOptimizeWorkerMaxOldSpaceMb(
+  environment: Pick<NodeJS.ProcessEnv, 'OPTIMIZE_WORKER_MAX_OLD_SPACE_MB'> = process.env,
+): number {
+  return resolveInteger(
+    'OPTIMIZE_WORKER_MAX_OLD_SPACE_MB',
+    environment.OPTIMIZE_WORKER_MAX_OLD_SPACE_MB,
+    DEFAULT_OPTIMIZE_WORKER_MAX_OLD_SPACE_MB,
+    0,
+    MAX_OPTIMIZE_WORKER_MAX_OLD_SPACE_MB,
   )
 }
 

@@ -134,7 +134,7 @@ export interface OptimizeJobStore {
   findActiveByOwnerKey: (ownerKey: string) => Promise<OptimizeJobRecord | null>
   getQueuePosition: (id: string) => Promise<number | null>
   getQueueEstimate?: (id: string) => Promise<OptimizeJobQueueEstimate>
-  claimNextJob: (workerId: string, lockToken: string, lockExpiresAt: string, maxFailures: number, maxGlobalRunning?: number) => Promise<OptimizeJobRecord | null>
+  claimNextJob: (workerId: string, lockToken: string, lockExpiresAt: string, maxFailures: number, maxGlobalRunning?: number, claimPriority?: number) => Promise<OptimizeJobRecord | null>
   heartbeatAttempt: (id: string, attemptNo: number, workerId: string, lockToken: string, lockExpiresAt: string) => Promise<boolean>
   ownsAttempt: (id: string, attemptNo: number, workerId: string, lockToken: string) => Promise<boolean>
   updateAttemptStage: (id: string, attemptNo: number, workerId: string, lockToken: string, stage: OptimizeCalculationStage) => Promise<boolean>
@@ -633,11 +633,29 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       return buildOptimizeQueueEstimates(result.rows.map(fromQueueCapacityRow), Date.now()).get(id)
         ?? { queuePosition: null, estimatedWaitMs: null }
     },
-    claimNextJob: async (workerId, lockToken, lockExpiresAt, maxFailures, maxGlobalRunning = Number.MAX_SAFE_INTEGER) => {
+    claimNextJob: async (workerId, lockToken, lockExpiresAt, maxFailures, maxGlobalRunning = Number.MAX_SAFE_INTEGER, claimPriority = 0) => {
       await ensureSchema()
       const now = new Date().toISOString()
       return withTransaction(async (client) => {
-      const state = await client.query<{ prioritized_streak: number }>('select prioritized_streak from optimize_dispatch_state where id = true for update')
+        const state = await client.query<{ prioritized_streak: number }>('select prioritized_streak from optimize_dispatch_state where id = true for update')
+        const higherPriorityWorker = await client.query<{ has_higher_priority: boolean }>(
+          `select exists (
+             select 1
+             from optimize_worker_registry peer
+             where peer.worker_id <> $1
+               and peer.draining = false
+               and peer.heartbeat_at is not null
+               and peer.heartbeat_at + peer.stale_after_ms * interval '1 millisecond' > transaction_timestamp()
+               and exists (
+                 select 1
+                 from unnest(peer.capabilities) as capability
+                 where capability like 'worker-claim-priority:%'
+                   and split_part(capability, ':', 2)::int > $2
+               )
+           ) as has_higher_priority`,
+          [workerId, claimPriority],
+        )
+        if (higherPriorityWorker.rows[0]?.has_higher_priority) return null
       const runningTotal = await client.query<{ count: string }>("select count(*)::text as count from optimize_jobs where status = 'running'")
       if (Number(runningTotal.rows[0]?.count ?? 0) >= maxGlobalRunning) return null
       const waitingStandard = await client.query<{ count: string }>("select count(*)::text as count from optimize_jobs where status = 'queued' and priority < 10 and failure_count < $1", [maxFailures])
@@ -1206,7 +1224,15 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
   }
 }
 
-export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Map<string, OptimizeJobRecord> } {
+export type MemoryWorkerRegistryEntry = {
+  priority: number
+  draining?: boolean
+  stale?: boolean
+}
+
+export function createMemoryOptimizeJobStore(
+  workerRegistry: Map<string, MemoryWorkerRegistryEntry> = new Map(),
+): OptimizeJobStore & { records: Map<string, OptimizeJobRecord> } {
   const records = new Map<string, OptimizeJobRecord>()
   const attempts = new Map<string, { status: OptimizeJobAttemptStatus; heartbeat_at: string; failure_kind: OptimizeJobFailureKind | null }>()
   const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
@@ -1393,8 +1419,13 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       [...records.values()].filter((job) => activeStatuses.has(job.status)),
       Date.now(),
     ).get(id) ?? { queuePosition: null, estimatedWaitMs: null },
-    claimNextJob: async (workerId, lockToken, lockExpiresAt, maxFailures, maxGlobalRunning = Number.MAX_SAFE_INTEGER) => {
+    claimNextJob: async (workerId, lockToken, lockExpiresAt, maxFailures, maxGlobalRunning = Number.MAX_SAFE_INTEGER, claimPriority = 0) => {
       const nowMs = Date.now()
+      const hasHigherPriorityWorker = [...workerRegistry.entries()].some(
+        ([candidateId, entry]) =>
+          candidateId !== workerId && (entry.priority ?? 0) > claimPriority && !entry.draining && !entry.stale,
+      )
+      if (hasHigherPriorityWorker) return null
       const runningOwners = new Set([...records.values()].filter((job) => job.status === 'running').map((job) => job.owner_key))
       const commercialRunning = new Map<string, number>()
       for (const job of records.values()) {

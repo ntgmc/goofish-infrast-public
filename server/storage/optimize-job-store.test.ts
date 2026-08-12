@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createMemoryOptimizeJobStore, OptimizeJobAdmissionError } from './optimize-job-store'
+import { createMemoryOptimizeJobStore, OptimizeJobAdmissionError, type MemoryWorkerRegistryEntry } from './optimize-job-store'
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -350,3 +350,68 @@ function future(): string {
 function past(): string {
   return new Date(Date.now() - 1_000).toISOString()
 }
+
+describe('worker claim priority', () => {
+  it('keeps a lower-priority worker from claiming while a live higher-priority worker exists', async () => {
+    const registry = new Map<string, MemoryWorkerRegistryEntry>([
+      ['hangzhou', { priority: 10 }],
+      ['resident', { priority: 0 }],
+    ])
+    const store = createMemoryOptimizeJobStore(registry)
+    await store.createJob(input())
+    await expect(
+      store.claimNextJob('resident', 'lock-resident', future(), 2, Number.MAX_SAFE_INTEGER, 0),
+    ).resolves.toBeNull()
+    await expect(
+      store.claimNextJob('hangzhou', 'lock-hangzhou', future(), 2, Number.MAX_SAFE_INTEGER, 10),
+    ).resolves.toMatchObject({ status: 'running' })
+  })
+
+  it('lets the lower-priority worker claim once the higher-priority worker drains or goes stale', async () => {
+    const draining = new Map<string, MemoryWorkerRegistryEntry>([
+      ['hangzhou', { priority: 10, draining: true }],
+      ['resident', { priority: 0 }],
+    ])
+    const drainingStore = createMemoryOptimizeJobStore(draining)
+    await drainingStore.createJob(input())
+    await expect(
+      drainingStore.claimNextJob(
+        'resident',
+        'lock-resident',
+        future(),
+        2,
+        Number.MAX_SAFE_INTEGER,
+        0,
+      ),
+    ).resolves.toMatchObject({ status: 'running' })
+
+    const stale = new Map<string, MemoryWorkerRegistryEntry>([
+      ['hangzhou', { priority: 10, stale: true }],
+      ['resident', { priority: 0 }],
+    ])
+    const staleStore = createMemoryOptimizeJobStore(stale)
+    await staleStore.createJob(input())
+    await expect(
+      staleStore.claimNextJob(
+        'resident',
+        'lock-resident',
+        future(),
+        2,
+        Number.MAX_SAFE_INTEGER,
+        0,
+      ),
+    ).resolves.toMatchObject({ status: 'running' })
+  })
+
+  it('does not block a worker when its own priority matches the live peer', async () => {
+    const registry = new Map<string, MemoryWorkerRegistryEntry>([
+      ['hangzhou', { priority: 10 }],
+      ['resident', { priority: 10 }],
+    ])
+    const store = createMemoryOptimizeJobStore(registry)
+    await store.createJob(input())
+    await expect(
+      store.claimNextJob('resident', 'lock-resident', future(), 2, Number.MAX_SAFE_INTEGER, 10),
+    ).resolves.toMatchObject({ status: 'running' })
+  })
+})

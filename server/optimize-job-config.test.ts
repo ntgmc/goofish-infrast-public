@@ -7,17 +7,23 @@ import {
   DEFAULT_OPTIMIZE_WORKER_SCALE_DOWN_QUEUE_THRESHOLD,
   DEFAULT_OPTIMIZE_WORKER_SCALE_UP_QUEUE_THRESHOLD,
   DEFAULT_OPTIMIZE_JOB_MAX_ATTEMPTS,
+  DEFAULT_OPTIMIZE_WORKER_CLAIM_PRIORITY,
   DEFAULT_OPTIMIZE_WORKER_CONCURRENCY,
+  DEFAULT_OPTIMIZE_WORKER_MAX_OLD_SPACE_MB,
   getOptimizeGlobalWorkerConcurrency,
   getOptimizeJobMaxAttempts,
   getOptimizeLocalFallbackConcurrency,
   getOptimizeWorkerAutoscalingConfiguration,
+  getOptimizeWorkerClaimPriority,
   getOptimizeWorkerConfiguration,
   getOptimizeWorkerConcurrency,
+  getOptimizeWorkerMaxOldSpaceMb,
   getOptimizeWorkerRuntimeConcurrency,
   MAX_OPTIMIZE_GLOBAL_WORKER_CONCURRENCY,
   MAX_OPTIMIZE_JOB_ATTEMPTS,
+  MAX_OPTIMIZE_WORKER_CLAIM_PRIORITY,
   MAX_OPTIMIZE_WORKER_CONCURRENCY,
+  MAX_OPTIMIZE_WORKER_MAX_OLD_SPACE_MB,
 } from './optimize-job-config'
 
 const originalGlobalWorkerConcurrency = process.env.OPTIMIZE_GLOBAL_WORKER_CONCURRENCY
@@ -118,5 +124,35 @@ describe('optimization job configuration', () => {
     expect(() => getOptimizeWorkerAutoscalingConfiguration({
       OPTIMIZE_WORKER_AUTOSCALING_ENABLED: 'yes',
     })).toThrow('must be true or false')
+  })
+})
+
+describe('optimization worker claim priority', () => {
+  it('defaults to zero and accepts a configured value', () => {
+    expect(getOptimizeWorkerClaimPriority({})).toBe(DEFAULT_OPTIMIZE_WORKER_CLAIM_PRIORITY)
+    expect(DEFAULT_OPTIMIZE_WORKER_CLAIM_PRIORITY).toBe(0)
+    expect(getOptimizeWorkerClaimPriority({ OPTIMIZE_WORKER_CLAIM_PRIORITY: '10' })).toBe(10)
+    expect(getOptimizeWorkerClaimPriority({ OPTIMIZE_WORKER_CLAIM_PRIORITY: String(MAX_OPTIMIZE_WORKER_CLAIM_PRIORITY) })).toBe(MAX_OPTIMIZE_WORKER_CLAIM_PRIORITY)
+  })
+
+  it('rejects invalid or unsafe claim priority values', () => {
+    for (const value of ['invalid', '-1', '1.5', String(MAX_OPTIMIZE_WORKER_CLAIM_PRIORITY + 1)]) {
+      expect(() => getOptimizeWorkerClaimPriority({ OPTIMIZE_WORKER_CLAIM_PRIORITY: value })).toThrow(/integer|between/)
+    }
+  })
+})
+
+describe('optimization worker max old space', () => {
+  it('defaults to the V8 default (0) and accepts a configured value', () => {
+    expect(getOptimizeWorkerMaxOldSpaceMb({})).toBe(DEFAULT_OPTIMIZE_WORKER_MAX_OLD_SPACE_MB)
+    expect(DEFAULT_OPTIMIZE_WORKER_MAX_OLD_SPACE_MB).toBe(0)
+    expect(getOptimizeWorkerMaxOldSpaceMb({ OPTIMIZE_WORKER_MAX_OLD_SPACE_MB: '0' })).toBe(0)
+    expect(getOptimizeWorkerMaxOldSpaceMb({ OPTIMIZE_WORKER_MAX_OLD_SPACE_MB: '1536' })).toBe(1_536)
+  })
+
+  it('rejects invalid or unsafe max old space values', () => {
+    for (const value of ['invalid', '-1', '1.5', String(MAX_OPTIMIZE_WORKER_MAX_OLD_SPACE_MB + 1)]) {
+      expect(() => getOptimizeWorkerMaxOldSpaceMb({ OPTIMIZE_WORKER_MAX_OLD_SPACE_MB: value })).toThrow(/integer|between/)
+    }
   })
 })

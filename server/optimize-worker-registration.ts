@@ -1,6 +1,6 @@
 import { createBackgroundWorker } from './background-worker-runtime'
 import { getOptimizeJobProcessingState } from './optimize-job-runner'
-import { getOptimizeWorkerRuntimeConcurrency } from './optimize-job-config'
+import { getOptimizeWorkerClaimPriority, getOptimizeWorkerRuntimeConcurrency } from './optimize-job-config'
 import { describeServerError } from './security/error-reporting'
 import { query } from './storage/postgres'
 import { resolveAppRole } from './process-role'
@@ -71,5 +71,13 @@ function buildSha(): string | null {
 
 function workerCapabilities(): string[] {
   const runtimeKind = resolveAppRole() === 'all' ? 'runtime:local_fallback' : 'runtime:ecs_worker'
-  return ['optimize_jobs', 'optimize_queue', 'inventory_campaign', 'invitation_settlement', 'behavior_risk', runtimeKind]
+  return [
+    'optimize_jobs',
+    'optimize_queue',
+    'inventory_campaign',
+    'invitation_settlement',
+    'behavior_risk',
+    runtimeKind,
+    `worker-claim-priority:${getOptimizeWorkerClaimPriority()}`,
+  ]
 }

@@ -25,6 +25,7 @@
     "scripts/rekey-skland-credentials.mjs",
     "server/test-fixtures/optimize-busy-worker.mjs",
     "server/test-fixtures/optimize-progress-worker.mjs",
+    "server/test-fixtures/optimize-heap-probe-worker.mjs",
     "server/optimize-job-runner.ts",
     "server/optimize-worker-process.ts",
     "server/optimize-worker-runtime.ts",

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
@@ -172,6 +173,27 @@ describe('optimization dispatcher startup recovery', () => {
 
     delete process.env.OPTIMIZE_FORCE_WORKER_THREADS_FOR_TESTING
     delete process.env.OPTIMIZE_WORKER_ENTRY_FOR_TESTING
+  })
+
+  it('applies the configured worker heap limit to spawned worker threads', async () => {
+    const store = createMemoryOptimizeJobStore()
+    globalThis.__maaOptimizeJobStoreForTesting = store
+    process.env.OPTIMIZE_FORCE_WORKER_THREADS_FOR_TESTING = '1'
+    process.env.OPTIMIZE_WORKER_ENTRY_FOR_TESTING = resolve('server/test-fixtures/optimize-heap-probe-worker.mjs')
+    process.env.OPTIMIZE_WORKER_MAX_OLD_SPACE_MB = '512'
+    const job = await store.createJob(input())
+    try {
+      requestOptimizeJobProcessing()
+      await waitFor(async () => (await store.getJob(job.id))?.status === 'succeeded')
+      const probe = JSON.parse(readFileSync('/tmp/optimize-heap-probe-result.json', 'utf8'))
+      const heapLimitMb = Number(probe.heapLimitMb)
+      expect(heapLimitMb).toBeGreaterThan(500)
+      expect(heapLimitMb).toBeLessThan(900)
+    } finally {
+      delete process.env.OPTIMIZE_FORCE_WORKER_THREADS_FOR_TESTING
+      delete process.env.OPTIMIZE_WORKER_ENTRY_FOR_TESTING
+      delete process.env.OPTIMIZE_WORKER_MAX_OLD_SPACE_MB
+    }
   })
 
   it('terminates and requeues unfinished work after the shutdown grace period', async () => {
