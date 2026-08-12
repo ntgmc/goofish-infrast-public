@@ -15,7 +15,9 @@ import {
   formatOptimizeJobHardTimeout,
   getOptimizeGlobalWorkerConcurrency,
   getOptimizeJobMaxAttempts,
+  getOptimizeWorkerClaimPriority,
   getOptimizeWorkerConfiguration,
+  getOptimizeWorkerMaxOldSpaceMb,
   getOptimizeWorkerRuntimeConcurrency,
 } from './optimize-job-config'
 import {
@@ -240,8 +242,12 @@ async function runInlineExecutorWithTimeout(
 
 function spawnClaimedWorker(job: OptimizeJobRecord, lockToken: string): void {
   const context = executionContext(job, lockToken)
+  const maxOldGenerationSizeMb = getOptimizeWorkerMaxOldSpaceMb()
   const worker = new Worker(workerEntryUrl(), {
     workerData: { job, context },
+    ...(maxOldGenerationSizeMb > 0
+      ? { resourceLimits: { maxOldGenerationSizeMb } }
+      : {}),
   })
   const attempt: ActiveAttempt = {
     job,
@@ -542,7 +548,7 @@ async function waitUntil(promise: Promise<unknown>, deadlineAt: number): Promise
 
 function claimNext(store: OptimizeJobStore, lockToken: string): Promise<OptimizeJobRecord | null> {
   const expiresAt = lockExpiresAt()
-  return store.claimNextJob(processWorkerId, lockToken, expiresAt, getOptimizeJobMaxAttempts(), getOptimizeGlobalWorkerConcurrency())
+  return store.claimNextJob(processWorkerId, lockToken, expiresAt, getOptimizeJobMaxAttempts(), getOptimizeGlobalWorkerConcurrency(), getOptimizeWorkerClaimPriority())
 }
 
 function heartbeatAttempt(store: OptimizeJobStore, attempt: ActiveAttempt, expiresAt: string): Promise<boolean> {

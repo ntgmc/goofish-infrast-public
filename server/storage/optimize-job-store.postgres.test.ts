@@ -1739,3 +1739,53 @@ function shanghaiMonthKey(value: string): string {
   const shanghai = new Date(Date.parse(value) + 8 * 60 * 60_000)
   return `${shanghai.getUTCFullYear()}-${String(shanghai.getUTCMonth() + 1).padStart(2, '0')}`
 }
+
+describe('worker claim priority (postgres)', () => {
+  async function resetPriorityWorkers(): Promise<void> {
+    await query(`delete from optimize_worker_registry where worker_id like 'hz-%' or worker_id like 'resident-%'`)
+  }
+
+  it('prefers a live higher-priority worker over the resident fallback', async () => {
+    await resetPriorityWorkers()
+    const store = createPostgresOptimizeJobStore()
+    const highWorker = `hz-${randomUUID()}`
+    const lowWorker = `resident-${randomUUID()}`
+    await query(
+      `insert into optimize_worker_registry
+         (worker_id, concurrency, heartbeat_interval_ms, stale_after_ms, capabilities, build_sha, started_at, heartbeat_at, draining)
+       values ($1, 1, 10000, 30000, $2::text[], 'test-sha', now(), now(), false)`,
+      [highWorker, ['optimize_jobs', 'worker-claim-priority:10']],
+    )
+    const admitted = await store.admitJob(input({ priority: 2_000_000_000 }))
+    await expect(
+      store.claimNextJob(lowWorker, randomUUID(), new Date(Date.now() + 60_000).toISOString(), 2, 10, 0),
+    ).resolves.toBeNull()
+    await expect(
+      store.claimNextJob(highWorker, randomUUID(), new Date(Date.now() + 60_000).toISOString(), 2, 10, 10),
+    ).resolves.toMatchObject({ id: admitted.job.id })
+  })
+
+  it('lets the resident fallback claim when the higher-priority worker is stale or draining', async () => {
+    await resetPriorityWorkers()
+    const store = createPostgresOptimizeJobStore()
+    const lowWorker = `resident-${randomUUID()}`
+    const cases = [
+      { label: 'stale', heartbeatAgoMs: 60_000, draining: false },
+      { label: 'draining', heartbeatAgoMs: 0, draining: true },
+    ]
+    for (const testCase of cases) {
+      const highWorker = `hz-${testCase.label}-${randomUUID()}`
+      const heartbeatAt = new Date(Date.now() - testCase.heartbeatAgoMs).toISOString()
+      await query(
+        `insert into optimize_worker_registry
+           (worker_id, concurrency, heartbeat_interval_ms, stale_after_ms, capabilities, build_sha, started_at, heartbeat_at, draining)
+         values ($1, 1, 10000, 30000, $2::text[], 'test-sha', $3, $3, $4)`,
+        [highWorker, ['optimize_jobs', 'worker-claim-priority:10'], heartbeatAt, testCase.draining],
+      )
+      const admitted = await store.admitJob(input({ priority: 2_000_000_000 }))
+      await expect(
+        store.claimNextJob(lowWorker, randomUUID(), new Date(Date.now() + 60_000).toISOString(), 2, 10, 0),
+      ).resolves.toMatchObject({ id: admitted.job.id })
+    }
+  })
+})
