@@ -218,9 +218,16 @@ export default function ConfigEditor({
 
   const applyPreset = (preset: LicenseConfig) => {
     onUpdate((next) => {
+      const intermediateInventory = normalizeIntermediateInventory(next.intermediate_inventory)
+      const autoBalanceEnabled =
+        next.auto_balance_source === 'intermediate_inventory' ||
+        next.auto_balance_source === 'limited_config'
       const copy = normalizeConfig(preset)
       Object.assign(next, copy)
-      delete next.auto_balance_source
+      next.intermediate_inventory = intermediateInventory
+      if (autoBalanceEnabled) {
+        markIntermediateInventoryForOptimizer(next)
+      }
     })
   }
 

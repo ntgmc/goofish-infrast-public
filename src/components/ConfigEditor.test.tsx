@@ -336,3 +336,45 @@ describe('ConfigEditor number inputs', () => {
     expect(screen.getByRole('button', { name: '减少合成玉' })).toBeDisabled()
   })
 })
+
+describe('ConfigEditor preset actions', () => {
+  it('keeps intermediate inventory when applying a preset in auto-balance mode', async () => {
+    const user = userEvent.setup()
+    const config = normalizeConfig({
+      ...CONFIG_PRESETS['243'],
+      intermediate_inventory: {
+        'Originium Shard': 12,
+        'Pure Gold': 34,
+        'Orirock Cube': 56,
+      },
+      auto_balance_source: 'intermediate_inventory',
+    })
+    const onUpdate = vi.fn()
+    render(
+      <ConfigEditor
+        config={config}
+        canEdit={false}
+        canEditIntermediateInventory
+        canSelectPreset
+        validation={{ ok: true }}
+        onUpdate={onUpdate}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: '243 搓玉' }))
+
+    const mutate = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as
+      | ((value: typeof config) => void)
+      | undefined
+    const next = cloneConfig(config)
+    mutate?.(next)
+
+    expect(next.intermediate_inventory).toEqual({
+      'Originium Shard': 12,
+      'Pure Gold': 34,
+      'Orirock Cube': 56,
+    })
+    expect(next.auto_balance_source).toBe('intermediate_inventory')
+    expect(next.product_requirements.trading_stations.Orundum).toBe(1)
+  })
+})
