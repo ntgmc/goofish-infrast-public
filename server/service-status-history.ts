@@ -1,6 +1,6 @@
 import { createBackgroundWorker } from './background-worker-runtime'
 import { isServiceReady } from './lifecycle'
-import { getOptimizeWorkerAutoscalingConfiguration } from './optimize-job-config'
+import { getOptimizeStatusQueuePickupGraceMs, getOptimizeWorkerAutoscalingConfiguration } from './optimize-job-config'
 import { getAdminOptimizationQueueSnapshot } from './storage/optimize-job-store'
 import {
   recordServiceStatusSample,
@@ -10,6 +10,7 @@ import { hasDatabaseUrl, withPostgresAdvisoryLock } from './storage/postgres'
 import {
   floorStatusTimestampToHour,
   resolveOptimizationServiceStatus,
+  resolveOptimizationStatusQueueDepth,
 } from '../src/lib/service-status'
 
 const SERVICE_STATUS_SAMPLE_INTERVAL_MS = 5 * 60 * 1000
@@ -49,9 +50,12 @@ export async function runServiceStatusSampling(): Promise<boolean> {
       const snapshot = await getAdminOptimizationQueueSnapshot(undefined, 1)
       const sampledAt = snapshot.snapshot_at || new Date().toISOString()
       const autoscaling = getOptimizeWorkerAutoscalingConfiguration()
-      const status = resolveOptimizationServiceStatus({
+      const statusInput = {
         serviceReady: isServiceReady(),
         queued: snapshot.counts.queued,
+        readyQueued: snapshot.counts.ready_queued,
+        oldestReadyQueuedWaitMs: snapshot.counts.oldest_ready_wait_ms,
+        queuePickupGraceMs: getOptimizeStatusQueuePickupGraceMs(),
         running: snapshot.counts.running,
         workerConcurrency: snapshot.capacity.worker_concurrency,
         workerInstances: snapshot.capacity.worker_instances,
@@ -59,12 +63,13 @@ export async function runServiceStatusSampling(): Promise<boolean> {
           enabled: autoscaling.enabled,
           scaleUpQueueThreshold: autoscaling.scaleUpQueueThreshold,
         },
-      })
+      }
+      const status = resolveOptimizationServiceStatus(statusInput)
       await recordServiceStatusSample({
         componentId: 'optimization',
         bucketStart: floorStatusTimestampToHour(sampledAt),
         status,
-        queued: snapshot.counts.queued,
+        queued: resolveOptimizationStatusQueueDepth(statusInput),
         running: snapshot.counts.running,
         workerConcurrency: snapshot.capacity.worker_concurrency,
         workerInstances: snapshot.capacity.billable_worker_instances ?? snapshot.capacity.worker_instances,

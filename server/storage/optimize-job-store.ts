@@ -231,6 +231,8 @@ export interface AdminOptimizationQueueSnapshot {
   }
   counts: {
     queued: number
+    ready_queued: number
+    oldest_ready_wait_ms: number | null
     running: number
     retry_waiting: number
     recent_failed: number
@@ -2097,13 +2099,15 @@ export async function getAdminOptimizationQueueSnapshot(
     const queuedJobs = queuedRows.map((row, index) => toAdminOptimizationQueueJob(row, index + 1))
     const runningJobs = runningRows.map((row) => toAdminOptimizationQueueJob(row, null))
     const recentJobs = recent.rows.map((row) => toAdminOptimizationQueueJob(row, null))
+    const snapshotAt = normalizeTimestamp(snapshotResult.rows[0]?.snapshot_at ?? null) ?? new Date().toISOString()
+    const readyQueue = summarizeReadyOptimizationQueue(queuedJobs, snapshotAt)
     const registeredConcurrency = Number(workerCapacity?.worker_concurrency ?? 0)
     const workerInstances = Number(workerCapacity?.worker_instances ?? 0)
     const billableWorkerInstances = Number(workerCapacity?.billable_worker_instances ?? workerInstances)
     const useFallback = workerInstances === 0 && configuredFallbackConcurrency !== undefined
 
     return {
-      snapshot_at: normalizeTimestamp(snapshotResult.rows[0]?.snapshot_at ?? null) ?? new Date().toISOString(),
+      snapshot_at: snapshotAt,
       capacity: {
         queue_limit: getOptimizeGlobalQueueLimit(),
         worker_concurrency: useFallback
@@ -2117,6 +2121,8 @@ export async function getAdminOptimizationQueueSnapshot(
       },
       counts: {
         queued: queuedJobs.length,
+        ready_queued: readyQueue.count,
+        oldest_ready_wait_ms: readyQueue.oldestWaitMs,
         running: runningJobs.length,
         retry_waiting: queuedJobs.filter((job) => job.attempt_count > 0 || job.failure_count > 0).length,
         recent_failed: recentJobs.filter((job) => job.status === 'failed' || job.status === 'dead_lettered').length,
@@ -2197,6 +2203,33 @@ function toAdminOptimizationQueueJob(
     failure_kind: row.failure_kind,
     public_error_code: row.public_error_code,
     error_summary: safeOptimizationErrorSummary(row.public_error_code, row.failure_kind),
+  }
+}
+
+function summarizeReadyOptimizationQueue(
+  queuedJobs: AdminOptimizationQueueJob[],
+  snapshotAt: string,
+): { count: number; oldestWaitMs: number | null } {
+  const snapshotMs = Date.parse(snapshotAt)
+  if (!Number.isFinite(snapshotMs)) return { count: 0, oldestWaitMs: null }
+
+  let count = 0
+  let oldestReadySinceMs = Number.POSITIVE_INFINITY
+  for (const job of queuedJobs) {
+    const createdMs = Date.parse(job.created_at)
+    const nextAttemptMs = job.next_attempt_at ? Date.parse(job.next_attempt_at) : Number.NaN
+    if (Number.isFinite(nextAttemptMs) && nextAttemptMs > snapshotMs) continue
+
+    count += 1
+    const readySinceMs = Number.isFinite(nextAttemptMs)
+      ? Math.max(Number.isFinite(createdMs) ? createdMs : nextAttemptMs, nextAttemptMs)
+      : Number.isFinite(createdMs) ? createdMs : snapshotMs
+    oldestReadySinceMs = Math.min(oldestReadySinceMs, readySinceMs)
+  }
+
+  return {
+    count,
+    oldestWaitMs: count > 0 ? Math.max(0, snapshotMs - oldestReadySinceMs) : null,
   }
 }
 

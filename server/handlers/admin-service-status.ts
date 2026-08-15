@@ -17,7 +17,7 @@ import {
 } from '../storage/service-status-store'
 import { getAdminOptimizationQueueSnapshot } from '../storage/optimize-job-store'
 import { isServiceReady } from '../lifecycle'
-import { getOptimizeWorkerAutoscalingConfiguration } from '../optimize-job-config'
+import { getOptimizeStatusQueuePickupGraceMs, getOptimizeWorkerAutoscalingConfiguration } from '../optimize-job-config'
 
 export default async function adminServiceStatusHandler(req: Request): Promise<Response> {
   const url = new URL(req.url)
@@ -35,8 +35,14 @@ export default async function adminServiceStatusHandler(req: Request): Promise<R
       const snapshot = await getAdminOptimizationQueueSnapshot(undefined, 1)
       const autoscaling = getOptimizeWorkerAutoscalingConfiguration()
       const currentStatus = resolveOptimizationServiceStatus({
-        serviceReady: isServiceReady(), queued: snapshot.counts.queued, running: snapshot.counts.running,
-        workerConcurrency: snapshot.capacity.worker_concurrency, workerInstances: snapshot.capacity.worker_instances,
+        serviceReady: isServiceReady(),
+        queued: snapshot.counts.queued,
+        readyQueued: snapshot.counts.ready_queued,
+        oldestReadyQueuedWaitMs: snapshot.counts.oldest_ready_wait_ms,
+        queuePickupGraceMs: getOptimizeStatusQueuePickupGraceMs(),
+        running: snapshot.counts.running,
+        workerConcurrency: snapshot.capacity.worker_concurrency,
+        workerInstances: snapshot.capacity.worker_instances,
         autoscaling: {
           enabled: autoscaling.enabled,
           scaleUpQueueThreshold: autoscaling.scaleUpQueueThreshold,

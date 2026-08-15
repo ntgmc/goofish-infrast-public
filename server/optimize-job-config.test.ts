@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   DEFAULT_OPTIMIZE_GLOBAL_WORKER_CONCURRENCY,
   DEFAULT_OPTIMIZE_LOCAL_FALLBACK_CONCURRENCY,
+  DEFAULT_OPTIMIZE_QUEUE_POLL_MS,
   DEFAULT_OPTIMIZE_WORKER_AUTOSCALE_INTERVAL_MS,
   DEFAULT_OPTIMIZE_WORKER_SCALE_DOWN_IDLE_MS,
   DEFAULT_OPTIMIZE_WORKER_SCALE_DOWN_QUEUE_THRESHOLD,
@@ -13,6 +14,8 @@ import {
   getOptimizeGlobalWorkerConcurrency,
   getOptimizeJobMaxAttempts,
   getOptimizeLocalFallbackConcurrency,
+  getOptimizeQueuePollMs,
+  getOptimizeStatusQueuePickupGraceMs,
   getOptimizeWorkerAutoscalingConfiguration,
   getOptimizeWorkerClaimPriority,
   getOptimizeWorkerConfiguration,
@@ -37,6 +40,13 @@ afterEach(() => {
 })
 
 describe('optimization job configuration', () => {
+  it('derives the status pickup grace from the worker polling cadence', () => {
+    expect(getOptimizeQueuePollMs({})).toBe(DEFAULT_OPTIMIZE_QUEUE_POLL_MS)
+    expect(getOptimizeStatusQueuePickupGraceMs({})).toBe(5_000)
+    expect(getOptimizeQueuePollMs({ OPTIMIZE_QUEUE_POLL_MS: '2000' })).toBe(2_000)
+    expect(getOptimizeStatusQueuePickupGraceMs({ OPTIMIZE_QUEUE_POLL_MS: '2000' })).toBe(10_000)
+  })
+
   it('defaults the global worker concurrency to the production capacity', () => {
     delete process.env.OPTIMIZE_GLOBAL_WORKER_CONCURRENCY
 

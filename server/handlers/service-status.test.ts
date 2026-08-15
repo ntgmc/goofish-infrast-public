@@ -11,7 +11,10 @@ const { getQueueSnapshot, isServiceReady, getHistory, listIncidents, autoscaling
 vi.mock('../storage/optimize-job-store', () => ({ getAdminOptimizationQueueSnapshot: getQueueSnapshot }))
 vi.mock('../storage/service-status-store', () => ({ getServiceStatusHistory: getHistory, listPublicServiceStatusIncidents: listIncidents }))
 vi.mock('../lifecycle', () => ({ isServiceReady }))
-vi.mock('../optimize-job-config', () => ({ getOptimizeWorkerAutoscalingConfiguration: autoscalingConfig }))
+vi.mock('../optimize-job-config', () => ({
+  getOptimizeStatusQueuePickupGraceMs: () => 5_000,
+  getOptimizeWorkerAutoscalingConfiguration: autoscalingConfig,
+}))
 
 import serviceStatusHandler from './service-status'
 
@@ -60,6 +63,21 @@ describe('service status handler', () => {
     await expect(response.json()).resolves.toMatchObject({ status: 'congested' })
   })
 
+  it('keeps a newly queued job available while a free worker is picking it up', async () => {
+    getQueueSnapshot.mockResolvedValue(snapshot({
+      queued: 1,
+      readyQueued: 1,
+      oldestReadyWaitMs: 1_000,
+      running: 0,
+      workerConcurrency: 3,
+      workerInstances: 1,
+    }))
+    const response = await serviceStatusHandler(new Request('http://localhost/api/status'))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ status: 'available' })
+  })
+
   it('reports elastic processing when autoscaling is consuming the queue', async () => {
     autoscalingConfig.mockReturnValue({ enabled: true, scaleUpQueueThreshold: 4, scaleDownQueueThreshold: 1, scaleDownIdleMs: 600000, intervalMs: 30000 })
     getQueueSnapshot.mockResolvedValue(snapshot({ queued: 5, running: 3, workerConcurrency: 3, workerInstances: 1 }))
@@ -105,7 +123,14 @@ describe('service status handler', () => {
   })
 })
 
-function snapshot(input: { queued: number; running: number; workerConcurrency: number; workerInstances: number }) {
+function snapshot(input: {
+  queued: number
+  readyQueued?: number
+  oldestReadyWaitMs?: number | null
+  running: number
+  workerConcurrency: number
+  workerInstances: number
+}) {
   return {
     snapshot_at: '2026-08-08T09:00:00.000Z',
     capacity: {
@@ -116,7 +141,14 @@ function snapshot(input: { queued: number; running: number; workerConcurrency: n
       heartbeat_interval_ms: 10_000,
       stale_after_ms: 30_000,
     },
-    counts: { queued: input.queued, running: input.running, retry_waiting: 0, recent_failed: 0 },
+    counts: {
+      queued: input.queued,
+      ready_queued: input.readyQueued ?? input.queued,
+      oldest_ready_wait_ms: input.oldestReadyWaitMs ?? (input.queued > 0 ? 10_000 : null),
+      running: input.running,
+      retry_waiting: 0,
+      recent_failed: 0,
+    },
     queued_jobs: [],
     running_jobs: [],
     recent_jobs: [],

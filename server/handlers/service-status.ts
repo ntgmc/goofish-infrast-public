@@ -7,7 +7,7 @@ import {
   type ServiceStatusResponse,
 } from '../../src/lib/service-status'
 import { isServiceReady } from '../lifecycle'
-import { getOptimizeWorkerAutoscalingConfiguration } from '../optimize-job-config'
+import { getOptimizeStatusQueuePickupGraceMs, getOptimizeWorkerAutoscalingConfiguration } from '../optimize-job-config'
 import { getAdminOptimizationQueueSnapshot } from '../storage/optimize-job-store'
 import { getServiceStatusHistory, listPublicServiceStatusIncidents } from '../storage/service-status-store'
 import { jsonResponse } from './user-auth'
@@ -23,6 +23,9 @@ export default async function serviceStatusHandler(req: Request): Promise<Respon
     const status = resolveOptimizationServiceStatus({
       serviceReady: isServiceReady(),
       queued: snapshot.counts.queued,
+      readyQueued: snapshot.counts.ready_queued,
+      oldestReadyQueuedWaitMs: snapshot.counts.oldest_ready_wait_ms,
+      queuePickupGraceMs: getOptimizeStatusQueuePickupGraceMs(),
       running: snapshot.counts.running,
       workerConcurrency: snapshot.capacity.worker_concurrency,
       workerInstances: snapshot.capacity.worker_instances,

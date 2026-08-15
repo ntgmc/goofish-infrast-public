@@ -3,6 +3,8 @@ import { resolveAppRole } from './process-role'
 export const DEFAULT_OPTIMIZE_GLOBAL_WORKER_CONCURRENCY = 3
 export const DEFAULT_OPTIMIZE_WORKER_CONCURRENCY = 1
 export const DEFAULT_OPTIMIZE_LOCAL_FALLBACK_CONCURRENCY = 1
+export const DEFAULT_OPTIMIZE_QUEUE_POLL_MS = 1_000
+const OPTIMIZE_STATUS_QUEUE_PICKUP_GRACE_POLLS = 5
 export const MAX_OPTIMIZE_GLOBAL_WORKER_CONCURRENCY = 100
 export const MAX_OPTIMIZE_WORKER_CONCURRENCY = 32
 export const DEFAULT_OPTIMIZE_WORKER_SCALE_UP_QUEUE_THRESHOLD = 4
@@ -43,6 +45,21 @@ export function getOptimizeWorkerConcurrency(
     1,
     MAX_OPTIMIZE_WORKER_CONCURRENCY,
   )
+}
+
+export function getOptimizeQueuePollMs(
+  environment: Pick<NodeJS.ProcessEnv, 'OPTIMIZE_QUEUE_POLL_MS'> = process.env,
+): number {
+  const configured = Number(environment.OPTIMIZE_QUEUE_POLL_MS ?? DEFAULT_OPTIMIZE_QUEUE_POLL_MS)
+  return Number.isFinite(configured)
+    ? Math.max(250, Math.floor(configured))
+    : DEFAULT_OPTIMIZE_QUEUE_POLL_MS
+}
+
+export function getOptimizeStatusQueuePickupGraceMs(
+  environment: Pick<NodeJS.ProcessEnv, 'OPTIMIZE_QUEUE_POLL_MS'> = process.env,
+): number {
+  return getOptimizeQueuePollMs(environment) * OPTIMIZE_STATUS_QUEUE_PICKUP_GRACE_POLLS
 }
 
 export function getOptimizeWorkerClaimPriority(

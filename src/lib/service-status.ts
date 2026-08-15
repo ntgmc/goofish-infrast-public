@@ -14,6 +14,9 @@ export type ServiceStatusComponentId = typeof SERVICE_STATUS_COMPONENT_IDS[numbe
 export interface OptimizationServiceStatusInput {
   serviceReady: boolean
   queued: number
+  readyQueued?: number
+  oldestReadyQueuedWaitMs?: number | null
+  queuePickupGraceMs?: number
   running: number
   workerConcurrency: number
   workerInstances: number
@@ -199,11 +202,26 @@ export interface ServiceStatusHistoryAggregate {
 
 export function resolveOptimizationServiceStatus(input: OptimizationServiceStatusInput): ServiceStatusLevel {
   if (!input.serviceReady || input.workerInstances <= 0 || input.workerConcurrency <= 0) return 'unavailable'
-  if (input.queued === 0 && input.running < input.workerConcurrency) return 'available'
-  if (input.queued > QUEUE_OVERLOAD_THRESHOLD) return 'overloaded'
-  if (input.autoscaling?.enabled && input.queued > Math.max(0, Math.floor(input.autoscaling.scaleUpQueueThreshold))) return 'scaling'
-  if (input.queued < QUEUE_CONGESTION_THRESHOLD) return 'busy'
+  const statusQueued = resolveOptimizationStatusQueueDepth(input)
+
+  if (statusQueued === 0 && input.running < input.workerConcurrency) return 'available'
+  if (statusQueued > QUEUE_OVERLOAD_THRESHOLD) return 'overloaded'
+  if (input.autoscaling?.enabled && statusQueued > Math.max(0, Math.floor(input.autoscaling.scaleUpQueueThreshold))) return 'scaling'
+  if (statusQueued < QUEUE_CONGESTION_THRESHOLD) return 'busy'
   return 'congested'
+}
+
+export function resolveOptimizationStatusQueueDepth(input: OptimizationServiceStatusInput): number {
+  const readyQueued = Math.max(0, Math.floor(input.readyQueued ?? input.queued))
+  const oldestReadyWaitMs = typeof input.oldestReadyQueuedWaitMs === 'number'
+    ? Math.max(0, input.oldestReadyQueuedWaitMs)
+    : null
+  const pickupGraceMs = Math.max(0, Math.floor(input.queuePickupGraceMs ?? 0))
+  const isNormalPickupDelay = readyQueued > 0
+    && readyQueued < QUEUE_CONGESTION_THRESHOLD
+    && oldestReadyWaitMs !== null
+    && oldestReadyWaitMs < pickupGraceMs
+  return isNormalPickupDelay ? 0 : readyQueued
 }
 
 function statusSeverity(level: ServiceStatusHistoryLevel): number {

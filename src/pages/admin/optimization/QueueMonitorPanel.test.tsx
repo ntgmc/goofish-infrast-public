@@ -94,7 +94,7 @@ function snapshot(): AdminOptimizationQueueSnapshot {
       heartbeat_interval_ms: 10_000,
       stale_after_ms: 30_000,
     },
-    counts: { queued: 2, running: 1, retry_waiting: 1, recent_failed: 0 },
+    counts: { queued: 2, ready_queued: 1, oldest_ready_wait_ms: 120_000, running: 1, retry_waiting: 1, recent_failed: 0 },
     queued_jobs: [{ ...base, id: 'queued-job', status: 'queued', queue_position: 1 }],
     running_jobs: [{ ...base, id: 'running-job', status: 'running', worker_id: 'worker-a', started_at: '2026-07-19T09:59:00.000Z', heartbeat_at: '2026-07-19T10:00:00.000Z' }],
     recent_jobs: [],

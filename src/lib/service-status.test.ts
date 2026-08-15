@@ -19,6 +19,46 @@ describe('service status rules', () => {
     expect(resolveOptimizationServiceStatus({ serviceReady: true, queued: 4, running: 3, workerConcurrency: 3, workerInstances: 1 })).toBe('busy')
   })
 
+  it('keeps a newly ready small queue available during the worker pickup window', () => {
+    const base = {
+      serviceReady: true,
+      queued: 1,
+      readyQueued: 1,
+      running: 0,
+      workerConcurrency: 3,
+      workerInstances: 1,
+      queuePickupGraceMs: 5_000,
+    }
+    expect(resolveOptimizationServiceStatus({ ...base, oldestReadyQueuedWaitMs: 4_999 })).toBe('available')
+    expect(resolveOptimizationServiceStatus({ ...base, oldestReadyQueuedWaitMs: 5_000 })).toBe('busy')
+  })
+
+  it('ignores retry backoff rows that are not ready for a worker', () => {
+    expect(resolveOptimizationServiceStatus({
+      serviceReady: true,
+      queued: 1,
+      readyQueued: 0,
+      oldestReadyQueuedWaitMs: null,
+      queuePickupGraceMs: 5_000,
+      running: 0,
+      workerConcurrency: 3,
+      workerInstances: 1,
+    })).toBe('available')
+  })
+
+  it('still reports busy when all capacity is occupied during pickup grace', () => {
+    expect(resolveOptimizationServiceStatus({
+      serviceReady: true,
+      queued: 1,
+      readyQueued: 1,
+      oldestReadyQueuedWaitMs: 1_000,
+      queuePickupGraceMs: 5_000,
+      running: 3,
+      workerConcurrency: 3,
+      workerInstances: 1,
+    })).toBe('busy')
+  })
+
   it('uses yellow when five through twenty jobs are waiting', () => {
     expect(resolveOptimizationServiceStatus({ serviceReady: true, queued: 5, running: 3, workerConcurrency: 3, workerInstances: 1 })).toBe('congested')
     expect(resolveOptimizationServiceStatus({ serviceReady: true, queued: 20, running: 3, workerConcurrency: 3, workerInstances: 1 })).toBe('congested')

@@ -232,6 +232,8 @@ describe('PostgreSQL optimization job admission', () => {
         id: failedId,
         error_summary: '任务执行重试次数已用尽。',
       }))
+      expect(snapshot.counts.ready_queued).toBe(snapshot.counts.queued - 1)
+      expect(snapshot.counts.oldest_ready_wait_ms).toBeGreaterThan(60_000)
       expect(snapshot.counts.retry_waiting).toBeGreaterThanOrEqual(1)
       expect(JSON.stringify(snapshot)).not.toContain('secret')
       expect(JSON.stringify(snapshot)).not.toContain('internal exception detail')
