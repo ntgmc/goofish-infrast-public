@@ -385,6 +385,8 @@ export interface AdminOptimizationQueueSnapshot {
   };
   counts: {
     queued: number;
+    ready_queued: number;
+    oldest_ready_wait_ms: number | null;
     running: number;
     retry_waiting: number;
     recent_failed: number;

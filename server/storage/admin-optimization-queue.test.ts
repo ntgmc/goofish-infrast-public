@@ -39,7 +39,7 @@ describe('admin optimization queue snapshot', () => {
     expect(snapshot).toMatchObject({
       snapshot_at: now,
       capacity: { queue_limit: 240, worker_concurrency: 3 },
-      counts: { queued: 2, running: 1, retry_waiting: 1, recent_failed: 1 },
+      counts: { queued: 2, ready_queued: 1, oldest_ready_wait_ms: 120_000, running: 1, retry_waiting: 1, recent_failed: 1 },
     })
     expect(snapshot.queued_jobs.map((job) => [job.id, job.queue_position])).toEqual([
       ['priority-job', 1],

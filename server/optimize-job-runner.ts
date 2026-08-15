@@ -15,6 +15,7 @@ import {
   formatOptimizeJobHardTimeout,
   getOptimizeGlobalWorkerConcurrency,
   getOptimizeJobMaxAttempts,
+  getOptimizeQueuePollMs,
   getOptimizeWorkerClaimPriority,
   getOptimizeWorkerConfiguration,
   getOptimizeWorkerMaxOldSpaceMb,
@@ -42,7 +43,6 @@ import { describeServerError } from './security/error-reporting'
 
 const DEFAULT_LOCK_TTL_MS = 60_000
 const DEFAULT_HEARTBEAT_MS = 15_000
-const DEFAULT_QUEUE_POLL_MS = 1_000
 const DEFAULT_SHUTDOWN_GRACE_MS = 60_000
 const FORCED_RELEASE_DEADLINE_MS = 5_000
 
@@ -156,7 +156,7 @@ export function getOptimizeJobProcessingState(): {
 }
 
 function startDispatcherTimer(): void {
-  pollTimer = setInterval(handleOptimizeJobProcessingRequest, queuePollMs())
+  pollTimer = setInterval(handleOptimizeJobProcessingRequest, getOptimizeQueuePollMs())
   pollTimer.unref?.()
 }
 
@@ -496,10 +496,6 @@ function heartbeatMs(): number {
     positiveInteger(process.env.OPTIMIZE_JOB_HEARTBEAT_MS, DEFAULT_HEARTBEAT_MS, 1_000),
     Math.max(1_000, Math.floor(lockTtlMs() / 3)),
   )
-}
-
-function queuePollMs(): number {
-  return positiveInteger(process.env.OPTIMIZE_QUEUE_POLL_MS, DEFAULT_QUEUE_POLL_MS, 250)
 }
 
 function shutdownGraceMs(): number {
