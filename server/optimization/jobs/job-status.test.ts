@@ -109,18 +109,18 @@ describe('queued runtime estimates', () => {
 })
 
 describe('optimization hard timeout configuration', () => {
-  it('defaults to fifteen minutes, supports lower test overrides, and caps larger values', () => {
-    expect(DEFAULT_OPTIMIZE_JOB_HARD_TIMEOUT_MS).toBe(900_000)
-    expect(getOptimizeJobHardTimeoutMs()).toBe(900_000)
-    expect(formatOptimizeJobHardTimeout()).toBe('15 分钟')
+  it('defaults to twenty minutes, supports lower test overrides, and caps larger values', () => {
+    expect(DEFAULT_OPTIMIZE_JOB_HARD_TIMEOUT_MS).toBe(1_200_000)
+    expect(getOptimizeJobHardTimeoutMs()).toBe(1_200_000)
+    expect(formatOptimizeJobHardTimeout()).toBe('20 分钟')
 
     vi.stubEnv('OPTIMIZE_JOB_HARD_TIMEOUT_MS', '2500')
     expect(getOptimizeJobHardTimeoutMs()).toBe(2_500)
     expect(formatOptimizeJobHardTimeout()).toBe('3 秒')
 
-    vi.stubEnv('OPTIMIZE_JOB_HARD_TIMEOUT_MS', '1200000')
-    expect(getOptimizeJobHardTimeoutMs()).toBe(900_000)
-    expect(formatOptimizeJobHardTimeout()).toBe('15 分钟')
+    vi.stubEnv('OPTIMIZE_JOB_HARD_TIMEOUT_MS', '1800000')
+    expect(getOptimizeJobHardTimeoutMs()).toBe(1_200_000)
+    expect(formatOptimizeJobHardTimeout()).toBe('20 分钟')
   })
 })
 

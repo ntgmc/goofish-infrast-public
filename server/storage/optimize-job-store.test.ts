@@ -128,7 +128,7 @@ describe('optimization job attempt lifecycle', () => {
     const job = await store.createJob(input())
     const claimed = await store.claimNextJob('worker-a', 'lock-a', future(), 2)
     const record = store.records.get(job.id)!
-    record.started_at = new Date(Date.now() - 15 * 60_000 - 1).toISOString()
+    record.started_at = new Date(Date.now() - 20 * 60_000 - 1).toISOString()
     record.lock_expires_at = future()
 
     await expect(store.recoverExpiredAttempts(new Date().toISOString(), 2)).resolves.toBe(1)
