@@ -264,13 +264,13 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_080: "固源岩",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_081: "请输入 3–6 班；非等长间隔需总计 24 小时，等长间隔支持 8、12 或 24 小时。",
+  components_ConfigEditor_081: "请输入 3–6 班；非等长间隔需总计 24 小时，等长间隔支持 8 或 12 小时。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_082: "MAA 换班间隔",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_083: "应用间隔",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_084: "使用短横线或逗号分隔，例如 12-6-6、12-12-12（12 小时一换）或 24-24-24（一天一换）。至少 3 班；长班会优先作为高效率班。",
+  components_ConfigEditor_084: "使用短横线或逗号分隔，例如 12-6-6 或 12-12-12（12 小时一换）。至少 3 班；长班会优先作为高效率班。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_085: "龙门币，赤金，龙门币",
   // src/components/ConfigEditor.tsx
@@ -299,6 +299,8 @@ export const commonCopy = {
   components_ConfigEditor_097: "纯 MAA 自动填满（效率低）",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_098: "导出的 MAA JSON 不指定生产技能依赖的宿舍干员，并过滤相关生产组合；可能损失部分产能。菲亚梅塔仍可执行换心情，完成后由 MAA 自动填入宿舍。",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_101: "一天一换已停用，建议直接使用游戏内队列轮换。",
   // src/components/InputNumber.tsx
   components_InputNumber_001: "减少",
   // src/components/InputNumber.tsx
