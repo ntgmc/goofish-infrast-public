@@ -55,7 +55,7 @@ const VARIABLE_SHIFT_SCHEDULE_DEFAULTS = {
 const SHIFT_SCHEDULE_OPTIONS = [
   { id: '8x3', label: copy.common.components_ConfigEditor_087, hours: [8, 8, 8] },
   { id: '12x3', label: copy.common.components_ConfigEditor_088, hours: [12, 12, 12] },
-  { id: '24x3', label: copy.common.components_ConfigEditor_089, hours: [24, 24, 24] },
+  { id: '24x3', label: copy.common.components_ConfigEditor_089, hours: [24, 24, 24], disabled: true },
   { id: 'variable', label: copy.common.components_ConfigEditor_090 },
   { id: 'custom', label: copy.common.components_ConfigEditor_091 },
 ] as const
@@ -920,6 +920,10 @@ function ShiftHoursEditor({
   const commitDraft = () => {
     if (!canEdit) return
     const parsed = parseShiftHours(draftValue)
+    if (parsed?.every((hours) => Math.abs(hours - 24) <= 0.0001)) {
+      setError(copy.common.components_ConfigEditor_101)
+      return
+    }
     if (!parsed || !isValidShiftHours(parsed)) {
       setError(copy.common.components_ConfigEditor_081)
       return
@@ -934,7 +938,7 @@ function ShiftHoursEditor({
   }
 
   const selectChoice = (choice: typeof SHIFT_SCHEDULE_OPTIONS[number]) => {
-    if (!canEdit) return
+    if (!canEdit || ('disabled' in choice && choice.disabled)) return
     if (choice.id === 'custom') {
       setCustomSelected(true)
       return
@@ -956,7 +960,7 @@ function ShiftHoursEditor({
             key={choice.id}
             type="button"
             aria-pressed={selectedChoice === choice.id}
-            disabled={!canEdit}
+            disabled={!canEdit || ('disabled' in choice && choice.disabled)}
             onClick={() => selectChoice(choice)}
             className={`tool-secondary-action min-h-11 whitespace-normal px-2 py-2 text-xs leading-5 disabled:cursor-not-allowed disabled:text-ink-muted sm:text-sm ${
               selectedChoice === choice.id
@@ -1007,6 +1011,9 @@ function ShiftHoursEditor({
             : copy.common.components_ConfigEditor_093}
         </p>
       )}
+      <p className="mt-2 text-xs leading-5 text-ink-muted">
+        {copy.common.components_ConfigEditor_101}
+      </p>
     </div>
   )
 }
