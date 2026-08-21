@@ -47,6 +47,24 @@ describe('ConfigEditor shift patterns', () => {
     expect(screen.getByText(/启用条件：换班间隔须锁定为8小时（误差需控制在5分钟以内）/)).toBeInTheDocument()
   })
 
+  it('wraps dormitory rule labels in the limited free-preview editor', () => {
+    const config = normalizeConfig(CONFIG_PRESETS['243'])
+
+    render(
+      <ConfigEditor
+        config={config}
+        canEdit={false}
+        canEditIntermediateInventory
+        validation={{ ok: true }}
+        onUpdate={vi.fn()}
+      />,
+    )
+
+    const dormitoryRules = within(screen.getByRole('group', { name: '宿舍规则' })).getAllByRole('button')
+    expect(dormitoryRules).toHaveLength(3)
+    expect(dormitoryRules.every((button) => button.classList.contains('whitespace-normal'))).toBe(true)
+  })
+
   it('shows the selected 12-hour interval in the Fiammetta warning', () => {
     const config = normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: [12, 12, 12] })
 
