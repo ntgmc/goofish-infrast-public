@@ -386,7 +386,7 @@ export default function ConfigEditor({
                         next.dormitory_rule = rule
                         applyCounts(next)
                       })}
-                      className={`tool-secondary-action min-h-11 px-3 text-sm disabled:cursor-not-allowed ${
+                      className={`tool-secondary-action min-h-11 min-w-0 whitespace-normal px-3 py-2 text-sm leading-5 disabled:cursor-not-allowed ${
                         dormitoryRule === rule
                           ? 'tool-option-selected'
                           : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary disabled:text-ink-muted'
@@ -606,7 +606,7 @@ export default function ConfigEditor({
                       next.dormitory_rule = rule
                       applyCounts(next)
                     })}
-                    className={`tool-secondary-action min-h-11 px-3 text-sm disabled:cursor-not-allowed ${
+                    className={`tool-secondary-action min-h-11 min-w-0 whitespace-normal px-3 py-2 text-sm leading-5 disabled:cursor-not-allowed ${
                       dormitoryRule === rule
                         ? 'tool-option-selected'
                         : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary disabled:text-ink-muted'
