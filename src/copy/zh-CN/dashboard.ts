@@ -34,9 +34,9 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/InvitationsSection.tsx
   pages_tool_dashboard_InvitationsSection_006: "邀请奖励",
   // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_007: "邀请好友完成账号激活",
+  pages_tool_dashboard_InvitationsSection_007: "邀请好友绑定森空岛，领取活动奖励",
   // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_008: "好友注册时填写你的邀请码，首次兑换 CDK 或完成森空岛免费档案确认后，奖励会自动结算。",
+  pages_tool_dashboard_InvitationsSection_008: "好友注册时填写你的邀请码后，还需要绑定森空岛并成功激活有效档案，邀请才算完成，奖励会自动发放。",
   // src/pages/tool/dashboard/InvitationsSection.tsx
   pages_tool_dashboard_InvitationsSection_009: "优先计算券是什么？",
   // src/pages/tool/dashboard/InvitationsSection.tsx
@@ -98,7 +98,7 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/InvitationsSection.tsx
   pages_tool_dashboard_InvitationsSection_038: "奖励券永久有效",
   pages_tool_dashboard_InvitationsSection_039: "邀请奖励一览",
-  pages_tool_dashboard_InvitationsSection_040: "好友完成账号激活后，系统按活动配置发放道具；邀请人奖励受每日获奖人数上限约束。",
+  pages_tool_dashboard_InvitationsSection_040: "好友注册时填写你的邀请码后，还需要绑定森空岛并成功激活有效档案，邀请才算完成并发放奖励；邀请人奖励受每日名额限制。",
   pages_tool_dashboard_InvitationsSection_041: "活动已暂停；已激活且待处理的邀请会在活动恢复后继续结算。",
   pages_tool_dashboard_InvitationsSection_042: "你可获得",
   pages_tool_dashboard_InvitationsSection_043: "新用户可获得",
@@ -135,7 +135,7 @@ export const dashboardCopy = {
   pages_tool_dashboard_InvitationsSection_074: "加载邀请记录失败",
   pages_tool_dashboard_InvitationsSection_075: "暂无",
   pages_tool_dashboard_InvitationsSection_076: "礼包 v",
-  pages_tool_dashboard_InvitationsSection_077: "奖励将在新用户首次激活有效档案时固定；完整道具余额请前往背包查看。",
+  pages_tool_dashboard_InvitationsSection_077: "奖励发放后，可前往背包查看数量、有效期和使用方式。",
   pages_tool_dashboard_InvitationsSection_078: "轮换后旧邀请码将立即失效，历史邀请记录会保留。确认继续吗？",
   pages_tool_dashboard_InvitationsSection_079: "更新邀请码失败。",
   pages_tool_dashboard_InvitationsSection_080: "邀请码已暂停。",

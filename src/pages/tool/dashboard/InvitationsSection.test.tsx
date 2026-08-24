@@ -46,8 +46,13 @@ describe('InvitationsSection', () => {
   it('shows reward cards, quota progress and anonymized invitation records without loading legacy balances', async () => {
     render(<InvitationsSection />)
 
+    expect(await screen.findByRole('heading', { name: '邀请好友绑定森空岛，领取活动奖励' })).toBeInTheDocument()
+    expect(screen.getByText(/还需要绑定森空岛并成功激活有效档案/)).toBeInTheDocument()
+    expect(screen.getByText('奖励发放后，可前往背包查看数量、有效期和使用方式。')).toBeInTheDocument()
     expect(await screen.findAllByText(/优先计算券/)).not.toHaveLength(0)
+    expect(screen.getByText('优先排队')).toBeInTheDocument()
     expect(screen.getByText(/方案扩容证/)).toBeInTheDocument()
+    expect(screen.getByText('增加槽位')).toBeInTheDocument()
     expect(screen.getAllByText('1 / 10')).not.toHaveLength(0)
     expect(screen.getAllByText('受邀用户 #A1B2C3')).not.toHaveLength(0)
     expect(screen.getAllByText(/上海时间/)).not.toHaveLength(0)
