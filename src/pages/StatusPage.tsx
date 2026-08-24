@@ -9,7 +9,6 @@ import { copy } from '../copy/index'
 import {
   QUEUE_CONGESTION_THRESHOLD,
   QUEUE_OVERLOAD_THRESHOLD,
-  SERVICE_STATUS_HISTORY_HOURS,
   SERVICE_STATUS_LEVELS,
   type PublicStatusIncident,
   type ServiceStatusHistoryBucket,
@@ -19,6 +18,9 @@ import {
 } from '../lib/service-status'
 
 const POLL_INTERVAL_MS = 30_000
+const PUBLIC_STATUS_HISTORY_DAYS = 7
+const PUBLIC_STATUS_HISTORY_HOURS = PUBLIC_STATUS_HISTORY_DAYS * 24
+const RESOLVED_INCIDENT_LIMIT = 3
 
 const UNAVAILABLE_STATUS: ServiceStatusResponse = {
   generated_at: new Date(0).toISOString(),
@@ -211,13 +213,13 @@ function normalizeStatusResponse(value: ServiceStatusResponse): ServiceStatusRes
 
 function StatusHistorySection({ history }: { history: ServiceStatusResponse['history'] }) {
   const cells = createHistoryCells(history)
-  const rows = Array.from({ length: 30 }, (_, index) => cells.slice(index * 24, (index + 1) * 24))
-  const sampled = history.buckets.reduce((sum, bucket) => sum + bucket.sample_count, 0)
+  const rows = Array.from({ length: PUBLIC_STATUS_HISTORY_DAYS }, (_, index) => cells.slice(index * 24, (index + 1) * 24))
+  const sampled = cells.reduce((sum, bucket) => sum + bucket.sample_count, 0)
   return (
     <section className="mt-12 status-reading-measure" aria-labelledby="status-history-title">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div><p className="public-kicker">{copy.status.pages_StatusPage_036}</p><h2 id="status-history-title" className="mt-2 text-2xl font-semibold text-ink-primary">{copy.status.pages_StatusPage_037}</h2></div>
-        <span className="text-sm text-ink-muted">{formatHistoryRange(history.from, history.to)}</span>
+        <span className="text-sm text-ink-muted">{formatHistoryRange(cells[0]?.bucket_start ?? history.from, history.to)}</span>
       </div>
       <div className="tool-panel mt-5 overflow-hidden p-4 sm:p-5">
         <p id="status-history-description" className="text-sm leading-7 text-ink-secondary">{copy.status.pages_StatusPage_038}{history.complete ? `${copy.status.pages_StatusPage_039} ${sampled} ${copy.status.pages_StatusPage_040}` : copy.status.pages_StatusPage_041}</p>
@@ -243,11 +245,14 @@ function StatusHistorySection({ history }: { history: ServiceStatusResponse['his
 
 function StatusIncidentSection({ incidents }: { incidents: PublicStatusIncident[] }) {
   const active = incidents.filter((incident) => incident.status !== 'resolved')
-  const resolved = incidents.filter((incident) => incident.status === 'resolved')
+  const resolved = incidents.filter((incident) => incident.status === 'resolved').slice(0, RESOLVED_INCIDENT_LIMIT)
   return (
     <section className="mt-12 status-reading-measure" aria-labelledby="status-incidents-title">
       <p className="public-kicker">{copy.status.pages_StatusPage_044}</p><h2 id="status-incidents-title" className="mt-2 text-2xl font-semibold text-ink-primary">{copy.status.pages_StatusPage_045}</h2>
-      {incidents.length === 0 ? <p className="mt-5 text-sm leading-7 text-ink-muted">{copy.status.pages_StatusPage_046}</p> : <div className="mt-5 space-y-4">{[...active, ...resolved].map((incident) => <IncidentCard incident={incident} key={incident.id} />)}</div>}
+      {incidents.length === 0 ? <p className="mt-5 text-sm leading-7 text-ink-muted">{copy.status.pages_StatusPage_046}</p> : <div className="mt-5 space-y-7">
+        {active.length > 0 && <div><h3 className="text-sm font-semibold text-ink-primary">{copy.status.pages_StatusPage_073}</h3><div className="mt-3 space-y-4">{active.map((incident) => <IncidentCard incident={incident} key={incident.id} />)}</div></div>}
+        {resolved.length > 0 && <div><h3 className="text-sm font-semibold text-ink-primary">{copy.status.pages_StatusPage_074}</h3><div className="mt-3 space-y-4">{resolved.map((incident) => <IncidentCard incident={incident} key={incident.id} />)}</div></div>}
+      </div>}
     </section>
   )
 }
@@ -265,16 +270,16 @@ function createHistoryCells(history: ServiceStatusResponse['history']): ServiceS
   const end = Date.parse(history.to); const start = Date.parse(history.from)
   const lookup = new Map(history.buckets.map((bucket) => [bucket.bucket_start, bucket]))
   const cells: ServiceStatusHistoryBucket[] = []
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return Array.from({ length: SERVICE_STATUS_HISTORY_HOURS }, (_, index) => ({ component_id: 'optimization', bucket_start: new Date(index * 3600000).toISOString(), status: 'unknown', sample_count: 0, availability_percent: null }))
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return Array.from({ length: PUBLIC_STATUS_HISTORY_HOURS }, (_, index) => ({ component_id: 'optimization', bucket_start: new Date(index * 3600000).toISOString(), status: 'unknown', sample_count: 0, availability_percent: null }))
   for (let timestamp = start; timestamp < end; timestamp += 3600000) {
     const bucketStart = new Date(timestamp).toISOString()
     cells.push(lookup.get(bucketStart) ?? { component_id: 'optimization', bucket_start: bucketStart, status: 'unknown', sample_count: 0, availability_percent: null })
   }
-  while (cells.length < SERVICE_STATUS_HISTORY_HOURS) {
+  while (cells.length < PUBLIC_STATUS_HISTORY_HOURS) {
     const first = Date.parse(cells[0]?.bucket_start ?? new Date(end).toISOString()) - 3600000
     cells.unshift({ component_id: 'optimization', bucket_start: new Date(first).toISOString(), status: 'unknown', sample_count: 0, availability_percent: null })
   }
-  return cells.slice(-SERVICE_STATUS_HISTORY_HOURS)
+  return cells.slice(-PUBLIC_STATUS_HISTORY_HOURS)
 }
 
 function historyCellLabel(cell: ServiceStatusHistoryBucket): string {

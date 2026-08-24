@@ -90,7 +90,7 @@ describe('StatusPage', () => {
     expect(screen.getByText('自动扩缩容正在消化排队任务，服务保持可用。')).toBeInTheDocument()
   })
 
-  it('renders a 30-day hourly history grid and incident updates', async () => {
+  it('renders a 7-day hourly history grid and incident updates', async () => {
     const body = payload('available', { queued: 0, running: 1 }) as Record<string, unknown>
     body.history = {
       from: '2026-07-09T09:00:00.000Z',
@@ -108,8 +108,8 @@ describe('StatusPage', () => {
     render(<MemoryRouter><StatusPage /></MemoryRouter>)
     await act(async () => { await Promise.resolve() })
 
-    expect(screen.getByRole('heading', { name: '过去 30 天' })).toBeInTheDocument()
-    expect(screen.getAllByRole('gridcell')).toHaveLength(30 * 24)
+    expect(screen.getByRole('heading', { name: '最近 7 天' })).toBeInTheDocument()
+    expect(screen.getAllByRole('gridcell')).toHaveLength(7 * 24)
     expect(screen.getByLabelText(/排队过多/)).toBeInTheDocument()
     expect(screen.getByLabelText(/服务繁忙/)).toBeInTheDocument()
     expect(screen.getByLabelText(/弹性处理中/)).toBeInTheDocument()
@@ -117,6 +117,30 @@ describe('StatusPage', () => {
     expect(screen.getByText('已恢复。')).toBeInTheDocument()
     expect(screen.getAllByRole('gridcell').every((cell) => !cell.hasAttribute('tabindex'))).toBe(true)
     expect(document.querySelector('.service-status-history-axis')).toHaveTextContent('17时')
+  })
+
+  it('shows every active incident and only the three most recent resolved incidents', async () => {
+    const body = payload('available', { queued: 0, running: 1 }) as Record<string, unknown>
+    body.incidents = [
+      incident('active-1', '进行中一', 'investigating'),
+      incident('active-2', '进行中二', 'monitoring'),
+      incident('resolved-1', '最近解决一', 'resolved'),
+      incident('resolved-2', '最近解决二', 'resolved'),
+      incident('resolved-3', '最近解决三', 'resolved'),
+      incident('resolved-4', '更早解决', 'resolved'),
+    ]
+    vi.mocked(fetch).mockResolvedValue(response(200, body))
+    render(<MemoryRouter><StatusPage /></MemoryRouter>)
+    await act(async () => { await Promise.resolve() })
+
+    expect(screen.getByText('进行中的事件')).toBeInTheDocument()
+    expect(screen.getByText('最近已解决')).toBeInTheDocument()
+    expect(screen.getByText('进行中一')).toBeInTheDocument()
+    expect(screen.getByText('进行中二')).toBeInTheDocument()
+    expect(screen.getByText('最近解决一')).toBeInTheDocument()
+    expect(screen.getByText('最近解决二')).toBeInTheDocument()
+    expect(screen.getByText('最近解决三')).toBeInTheDocument()
+    expect(screen.queryByText('更早解决')).not.toBeInTheDocument()
   })
 })
 
@@ -131,5 +155,19 @@ function payload(status: ServiceStatusLevel, queue: { queued: number; running: n
     queue: queue ? { ...queue, queue_limit: 200, worker_concurrency: 3, worker_instances: 1 } : null,
     components: [{ id: 'optimization', status }],
     thresholds: { queue_congested_at: 5, queue_overloaded_at: 20 },
+  }
+}
+
+function incident(id: string, title: string, status: 'investigating' | 'monitoring' | 'resolved') {
+  return {
+    id,
+    component_id: 'optimization',
+    title,
+    impact: 'minor',
+    status,
+    started_at: '2026-08-01T01:00:00.000Z',
+    resolved_at: status === 'resolved' ? '2026-08-01T02:00:00.000Z' : null,
+    updated_at: '2026-08-01T02:00:00.000Z',
+    updates: [],
   }
 }
