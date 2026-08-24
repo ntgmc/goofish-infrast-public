@@ -19,7 +19,7 @@ describe('AuthForm registration email policy', () => {
     render(<AuthForm onAuthenticated={vi.fn()} />)
     await user.click(screen.getByRole('button', { name: '注册' }))
 
-    const restriction = '仅支持常用公共邮箱；不支持企业、自建、临时或别名邮箱。'
+    const restriction = '请使用常用公共邮箱注册，暂不支持企业、自建、临时或别名邮箱。'
     const emailField = screen.getByLabelText('邮箱')
     expect(screen.queryByText(restriction)).not.toBeInTheDocument()
     expect(emailField).not.toHaveAttribute('aria-describedby')
@@ -48,10 +48,10 @@ describe('AuthForm registration email policy', () => {
     await user.type(emailField, 'correct@gmial.com')
     await user.tab()
 
-    expect(await screen.findByText('邮箱域名可能有误，请使用建议地址。')).toHaveAttribute('role', 'alert')
+    expect(await screen.findByText('邮箱域名可能拼错了，请确认或使用建议地址。')).toHaveAttribute('role', 'alert')
     expect(fetchMock.mock.calls.some(([url]) => url === '/api/auth/register')).toBe(false)
 
-    await user.click(screen.getByRole('button', { name: '使用 correct@gmail.com' }))
+    await user.click(screen.getByRole('button', { name: '改用 correct@gmail.com' }))
     expect(emailField).toHaveValue('correct@gmail.com')
     expect(fetchMock.mock.calls.some(([url]) => url === '/api/auth/register')).toBe(false)
 
@@ -66,7 +66,7 @@ describe('AuthForm registration email policy', () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse({ invite_code_required: false }))
       .mockResolvedValueOnce(jsonResponse({
-        error: '注册不支持邮箱别名。请移除“+”；Gmail 请同时移除用户名中的“.”并使用 gmail.com。',
+        error: '请使用不含别名的邮箱地址：移除“+”及其后内容；Gmail 地址还需去掉用户名中的“.”。',
         code: 'email_alias_not_allowed',
         suggested_email: 'username@gmail.com',
       }, 400))
@@ -79,8 +79,8 @@ describe('AuthForm registration email policy', () => {
     await user.type(screen.getByLabelText('密码'), 'password123')
     await user.click(screen.getByRole('button', { name: '创建账号' }))
 
-    expect(await screen.findByText('注册不支持邮箱别名。请移除“+”；Gmail 请同时移除用户名中的“.”并使用 gmail.com。')).toHaveAttribute('role', 'alert')
-    expect(screen.getByRole('button', { name: '使用 username@gmail.com' })).toBeInTheDocument()
+    expect(await screen.findByText('请使用不含别名的邮箱地址：移除“+”及其后内容；Gmail 地址还需去掉用户名中的“.”。')).toHaveAttribute('role', 'alert')
+    expect(screen.getByRole('button', { name: '改用 username@gmail.com' })).toBeInTheDocument()
   })
 
   it('does not apply the registration provider policy to login', async () => {

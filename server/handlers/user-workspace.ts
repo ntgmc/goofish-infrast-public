@@ -45,7 +45,7 @@ export default async (req: Request): Promise<Response> => {
 
     if (req.method === 'GET') {
       const profileId = url.searchParams.get('profile_id')
-      if (!profileId) return jsonResponse({ error: '缺少 profile_id。' }, 400)
+      if (!profileId) return jsonResponse({ error: '请先选择游戏账号。', code: 'profile_id_invalid' }, 400)
       const profile = await getProfileForUser(auth.user.id, profileId)
       if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
       if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案没有排班工作区。' }, 403)
@@ -71,7 +71,7 @@ export default async (req: Request): Promise<Response> => {
       ? await getValidatedJson(req, requestSchemas.workspaceFreeScheduleConfirm)
       : await getValidatedJson(req, requestSchemas.userWorkspace)
     if (typeof body.profile_id !== 'string' || !body.profile_id) {
-      return jsonResponse({ error: '缺少 profile_id。' }, 400)
+      return jsonResponse({ error: '请先选择游戏账号。', code: 'profile_id_invalid' }, 400)
     }
     const profile = await getProfileForUser(auth.user.id, body.profile_id)
     if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
@@ -92,7 +92,9 @@ export default async (req: Request): Promise<Response> => {
     if (isFreeScheduleConfirmRequest) {
       if (req.method !== 'POST') return jsonResponse({ error: '方法不允许。' }, 405)
       if (!isRestrictedPreview) return jsonResponse({ error: '当前档案不需要确认免费方案。' }, 403)
-      if (!('result_history_id' in body)) return jsonResponse({ error: '缺少 result_history_id。' }, 400)
+      if (!('result_history_id' in body)) {
+        return jsonResponse({ error: '请选择一条历史结果。', code: 'result_history_required' }, 400)
+      }
       const next = await confirmFreeScheduleEntitlement(profile.id, body.result_history_id)
       const overview = await getWorkspaceOptimizationResultOverview(profile.id)
       await recordAuthenticatedRequestBehaviorEvent({ req, auth, eventType: 'workspace_save', profileId: profile.id })

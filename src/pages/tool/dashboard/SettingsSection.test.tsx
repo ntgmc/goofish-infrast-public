@@ -20,7 +20,7 @@ describe('SettingsSection privacy controls', () => {
     expect(screen.getByRole('heading', { name: '数据与隐私' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '导出个人数据' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '撤回仓库样本' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '发起注销请求' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '申请注销账号' })).toBeDisabled()
   })
 
   it('allows clearing credentials without offering to unlink the bound UID', () => {
@@ -33,9 +33,9 @@ describe('SettingsSection privacy controls', () => {
       },
     }]} onLogout={vi.fn()} onPayload={vi.fn()} />)
 
-    expect(screen.getByRole('button', { name: '清除凭据' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '清除授权信息' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '解绑森空岛' })).not.toBeInTheDocument()
-    expect(screen.getByText(/不会解除游戏账号绑定/)).toBeInTheDocument()
+    expect(screen.getByText(/不会删除游戏账号/)).toBeInTheDocument()
   })
 
   it('limits all change-password fields and reports oversized passwords', async () => {
@@ -76,12 +76,12 @@ describe('SettingsSection privacy controls', () => {
       },
     }]} onLogout={vi.fn()} onPayload={onPayload} />)
 
-    await user.click(screen.getByRole('button', { name: '清除凭据' }))
+    await user.click(screen.getByRole('button', { name: '清除授权信息' }))
 
     await waitFor(() => expect(onPayload).toHaveBeenCalledOnce())
-    expect(screen.getByRole('status')).toHaveTextContent('森空岛凭据已清除')
-    expect(screen.queryByRole('button', { name: '清除凭据' })).not.toBeInTheDocument()
-    expect(screen.getByText(/需要再次导入时请重新授权相同 UID/)).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('森空岛授权信息已清除')
+    expect(screen.queryByRole('button', { name: '清除授权信息' })).not.toBeInTheDocument()
+    expect(screen.getByText(/再次导入数据时，请使用相同 UID 重新授权/)).toBeInTheDocument()
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/user/data/credential/clear', expect.any(Object))
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/auth/me', expect.any(Object))
   })
@@ -102,10 +102,10 @@ describe('SettingsSection privacy controls', () => {
     expect(email).toHaveAttribute('maxlength', '254')
     await user.type(email, 'user@example.test')
     await user.type(screen.getByLabelText('当前密码', { selector: '#settings-delete-password' }), 'password')
-    await user.click(screen.getByRole('button', { name: '发起注销请求' }))
+    await user.click(screen.getByRole('button', { name: '申请注销账号' }))
 
     expect(await screen.findByText('注销申请已受理')).toBeInTheDocument()
-    expect(screen.getByText(/撤销邮件已进入投递队列/)).toBeInTheDocument()
+    expect(screen.getByText(/撤销邮件正在发送/)).toBeInTheDocument()
     expect(onLogout).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: '返回首页' }))
     expect(onLogout).toHaveBeenCalledOnce()

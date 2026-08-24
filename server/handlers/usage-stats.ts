@@ -103,7 +103,7 @@ async function handlePublicPost(req: Request): Promise<Response> {
     const announcementId = normalizeNullableString(body.announcement_id, 120)
     const announcementVersion = normalizeIsoString(body.announcement_version)
     if (!announcementId || !announcementVersion) {
-      return jsonResponse({ error: 'Invalid announcement event identity.' }, 400)
+      return jsonResponse({ error: '公告记录无效，请刷新页面后重试。' }, 400)
     }
     await recordUsageEvent(body.event, {
       visitor_id: visitor.id,
@@ -117,7 +117,7 @@ async function handlePublicPost(req: Request): Promise<Response> {
     return publicUsageResponse(visitor.cookie)
   }
   if (body.event !== 'tool_visit') {
-    return jsonResponse({ error: 'Unsupported usage event.' }, 400)
+    return jsonResponse({ error: '不支持该统计操作。' }, 400)
   }
   const bucket = Math.floor(Date.now() / USAGE_EVENT_BUCKET_MS)
   const networkBucket = usageHmac(`event-bucket:${getRequestClientIp(req)}:${visitor.id}:${bucket}`)
@@ -222,7 +222,7 @@ function parseDateRange(url: URL): { ok: true; dates: string[] } | { ok: false; 
   const to = url.searchParams.get('to')
   if (from || to) {
     if (!from || !to || !isValidDateString(from) || !isValidDateString(to)) {
-      return { ok: false, message: 'Invalid date range.' }
+      return { ok: false, message: '日期范围无效。' }
     }
     const dates = getDatesBetween(from, to)
     if (dates.length === 0 || dates.length > MAX_CUSTOM_RANGE_DAYS) {
@@ -233,7 +233,7 @@ function parseDateRange(url: URL): { ok: true; dates: string[] } | { ok: false; 
 
   const range = url.searchParams.get('range') ?? '7d'
   if (!VALID_RANGE_VALUES.has(range)) {
-    return { ok: false, message: 'Unsupported range. Use 7d, 14d, or 30d.' }
+    return { ok: false, message: '请选择 7 天、14 天或 30 天。' }
   }
   return { ok: true, dates: getLastDates(Number.parseInt(range, 10)) }
 }

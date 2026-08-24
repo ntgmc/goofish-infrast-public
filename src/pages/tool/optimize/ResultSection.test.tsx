@@ -17,7 +17,7 @@ describe('UpgradeSuggestionStatusNotice', () => {
     ['completed', '排班和优化建议均已完成，本次没有发现可推荐的升级项。', 'status'],
     ['not_requested', '排班已完成，本次未请求优化建议。', 'status'],
     ['not_allowed', '排班已完成，当前权益不包含优化建议。', 'status'],
-    ['failed', '排班已完成，但优化建议计算失败。主排班结果已保留，可重新生成后再试。', 'alert'],
+    ['failed', '排班已完成，但优化建议计算失败。排班结果已保留，可重新生成后再试。', 'alert'],
   ] as const)('renders the %s terminal state', (status, message, role) => {
     render(<UpgradeSuggestionStatusNotice result={{ upgrade_suggestions_status: status } as OptimizeResult} />)
 
@@ -83,7 +83,7 @@ describe('ResultSection compatibility fallback', () => {
       />,
     )
 
-    expect(await screen.findByRole('alert', undefined, { timeout: 5_000 })).toHaveTextContent('这条排班结果的数据版本不兼容或已损坏')
+    expect(await screen.findByRole('alert', undefined, { timeout: 5_000 })).toHaveTextContent('这条排班结果版本过旧或数据不完整，暂时无法完整展示。')
     expect(screen.getByRole('button', { name: '下载完整计算数据' })).toBeInTheDocument()
     expect(getDebugDiagnosticsSnapshot().events).toContainEqual(expect.objectContaining({
       type: 'react_error',

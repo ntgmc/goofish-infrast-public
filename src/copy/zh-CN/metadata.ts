@@ -38,7 +38,7 @@ export const metadataCopy = {
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_021: "价格与权益 | MaaTool",
   // src/components/RouteMetadata.tsx
-  components_RouteMetadata_022: "查看 MaaTool 30 天、90 天、365 天维护方案、终身卡与积分单次排班的价格、能力、账号限制、风控规则和售后说明。",
+  components_RouteMetadata_022: "查看 MaaTool 各类维护方案、终身卡与积分单次排班的价格、功能、账号限制和售后说明。",
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_023: "致谢 | MaaTool",
   // src/components/RouteMetadata.tsx
@@ -50,5 +50,5 @@ export const metadataCopy = {
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_027: "服务状态 | MaaTool",
   // src/components/RouteMetadata.tsx
-  components_RouteMetadata_028: "查看 MaaTool 网站与排班计算服务的实时状态、队列压力和可用容量。",
+  components_RouteMetadata_028: "查看 MaaTool 网站与排班计算服务的实时状态、繁忙程度和预计可用情况。",
 } as const

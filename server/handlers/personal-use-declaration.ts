@@ -47,7 +47,7 @@ export default async function personalUseDeclarationHandler(req: Request): Promi
         if (!profile || !isFreePreviewProfile(profile)) return jsonResponse({ error: '只能将免费预览档案转换为个人按次档案。' }, 403)
       }
       if (action === 'generated_result_export' || action === 'optimization_generate' || action === 'reorder_check') {
-        if (!profileId) return jsonResponse({ error: '缺少 profile_id。' }, 400)
+        if (!profileId) return jsonResponse({ error: '请先选择游戏账号。', code: 'profile_id_invalid' }, 400)
         const profile = await getProfileForUser(auth.user.id, profileId)
         if (!profile || (!isFreePreviewProfile(profile) && profile.kind !== 'metered_personal')) {
           return jsonResponse({ error: '该操作仅适用于免费预览或个人按次档案。' }, 403)

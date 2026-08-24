@@ -318,7 +318,7 @@ describe('WorkspaceSetupPage CDK paths', () => {
     )
 
     expect(screen.getByRole('heading', { name: '添加账号' })).toBeInTheDocument()
-    expect(await screen.findByRole('heading', { name: '新增账号档案' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '添加游戏账号' })).toBeInTheDocument()
   })
 })
 

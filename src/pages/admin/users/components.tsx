@@ -188,7 +188,7 @@ function UserBalanceCard({
       return
     }
     if (operation === 'reverse_credit' && !originalTransactionId.trim()) {
-      setValidationError('资格冲正必须填写原正向积分交易 ID。')
+      setValidationError('撤销积分发放时，必须填写原发放交易 ID。')
       return
     }
     if (!rootPassword) {
@@ -216,8 +216,8 @@ function UserBalanceCard({
       <div className="border-t border-surface-3 p-4">
         <div>
           <p className="text-3xl font-semibold tabular-nums text-ink-primary">{balance?.balance.available ?? '0.00'}</p>
-          <p className="mt-1 text-xs text-ink-muted">可用 {balance?.balance.available ?? '0.00'} · 预留 {balance?.balance.reserved ?? '0.00'} · 待追偿 {balance?.balance.debt ?? '0.00'}</p>
-          <p className="mt-1 text-xs text-ink-muted">累计获得 {balance?.balance.lifetime_credited ?? '0.00'} · 资格冲正 {balance?.balance.qualification_reversed ?? '0.00'} · {balance?.balance.commercial?.eligible ? `商用 Lv${balance.balance.commercial.level}` : '商用未生效'}</p>
+          <p className="mt-1 text-xs text-ink-muted">可用 {balance?.balance.available ?? '0.00'} · 计算中暂扣 {balance?.balance.reserved ?? '0.00'} · 待补扣 {balance?.balance.debt ?? '0.00'}</p>
+          <p className="mt-1 text-xs text-ink-muted">累计获得 {balance?.balance.lifetime_credited ?? '0.00'} · 已撤销发放 {balance?.balance.qualification_reversed ?? '0.00'} · {balance?.balance.commercial?.eligible ? `商用 Lv${balance.balance.commercial.level}` : '商用未生效'}</p>
         </div>
 
         <form onSubmit={submit} className="mt-4 grid gap-3 lg:grid-cols-[140px_180px_1fr_180px_auto]" noValidate>
@@ -230,7 +230,7 @@ function UserBalanceCard({
             >
               <option value="credit">增加积分</option>
               <option value="debit">扣减积分</option>
-              <option value="reverse_credit">资格冲正</option>
+              <option value="reverse_credit">撤销积分发放</option>
             </select>
           </label>
           <label>
@@ -375,7 +375,7 @@ function EffectiveCommercialAdminControls({ userId }: { userId: string }) {
       return
     }
     if (suspended && !limits.suspended && limits.inflight_jobs > 0
-      && !window.confirm(`当前仍有 ${limits.inflight_jobs} 个在途任务、已预留 ${limits.inflight_reserved} 积分。暂停仅阻止新任务，在途任务仍会执行并按结果结算。确认继续？`)) return
+      && !window.confirm(`当前仍有 ${limits.inflight_jobs} 个计算中任务、暂扣 ${limits.inflight_reserved} 积分。暂停仅阻止新任务，计算中任务仍会继续并按结果结算。确认继续？`)) return
     const signature = JSON.stringify({ active, total, suspended, normalizedReason, revision: limits.revision })
     const request = requestIdentity.current?.signature === signature
       ? requestIdentity.current
@@ -409,7 +409,7 @@ function EffectiveCommercialAdminControls({ userId }: { userId: string }) {
     {loading && <p className="mt-2 text-sm text-ink-muted" role="status">正在加载商用账户真实状态…</p>}
     {limits && <>
       <p className="mt-1 text-xs text-ink-muted">档案用量：活跃 {limits.active} / {limits.active_limit}，总量 {limits.total} / {limits.total_limit}；状态：{limits.suspended ? '已暂停' : '正常'}；revision {limits.revision}</p>
-      <p className="mt-1 text-xs text-ink-muted">在途任务 {limits.inflight_jobs} 个 · 已预留 {limits.inflight_reserved} 积分。暂停只阻止新任务，在途任务仍会执行并结算。</p>
+      <p className="mt-1 text-xs text-ink-muted">计算中任务 {limits.inflight_jobs} 个 · 暂扣 {limits.inflight_reserved} 积分。暂停只阻止新任务，计算中任务仍会继续并结算。</p>
     </>}
     <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4"><input aria-label="商用活跃档案上限" disabled={!limits || loading || busy} value={activeLimit} onChange={(event) => { setActiveLimit(event.currentTarget.value); resetRequestIdentity() }} className="tool-field" inputMode="numeric" /><input aria-label="商用档案总量上限" disabled={!limits || loading || busy} value={totalLimit} onChange={(event) => { setTotalLimit(event.currentTarget.value); resetRequestIdentity() }} className="tool-field" inputMode="numeric" /><input aria-label="商用变更原因" disabled={!limits || loading || busy} value={reason} onChange={(event) => { setReason(event.currentTarget.value); resetRequestIdentity() }} className="tool-field" placeholder="必填，将写入审计" /><input aria-label="商用 Root 口令" type="password" disabled={!limits || loading || busy} value={rootPassword} onChange={(event) => { setRootPassword(event.currentTarget.value); resetRequestIdentity() }} className="tool-field" autoComplete="off" placeholder="高风险操作二次认证" /></div>
     <div className="mt-3 flex flex-wrap gap-2"><button type="button" disabled={!limits || loading || busy} onClick={() => void save()} className="tool-secondary-action">保存限额</button><button type="button" disabled={!limits || loading || busy} onClick={() => void save(!limits?.suspended)} className={limits?.suspended ? 'tool-primary-action' : 'tool-danger-action'}>{limits?.suspended ? '恢复商用' : '暂停商用'}</button>{!limits && !loading && <button type="button" onClick={() => void load()} className="tool-secondary-action">重新加载</button>}</div>
@@ -418,11 +418,11 @@ function EffectiveCommercialAdminControls({ userId }: { userId: string }) {
 }
 
 function adminBalanceKindLabel(kind: AdminBalanceTransaction['kind']): string {
-  if (kind === 'cdk_credit') return '余额 CDK'
+  if (kind === 'cdk_credit') return '积分 CDK'
   if (kind === 'admin_debit') return '管理员扣减'
-  if (kind === 'schedule_debit') return '成功主排班'
-  if (kind === 'admin_credit_reversal') return '资格冲正'
-  if (kind === 'debt_repayment') return '待追偿抵扣'
+  if (kind === 'schedule_debit') return '排班成功扣费'
+  if (kind === 'admin_credit_reversal') return '撤销发放'
+  if (kind === 'debt_repayment') return '补扣积分'
   return '管理员发放'
 }
 

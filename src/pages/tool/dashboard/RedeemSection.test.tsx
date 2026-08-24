@@ -14,7 +14,7 @@ describe('RedeemSection guided tour', () => {
     const onRedeemed = vi.fn()
     render(<RedeemSection onRedeemed={onRedeemed} />)
 
-    expect(await screen.findByRole('heading', { name: '选择新增方式' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '选择添加账号的方式' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '下一步' }))
     expect(await screen.findByRole('heading', { name: '兑换 CDK' })).toBeInTheDocument()
     expect(screen.getByLabelText('CDK', { selector: 'input', exact: true })).toBeInTheDocument()

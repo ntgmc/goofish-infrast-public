@@ -41,7 +41,7 @@ describe('commercial admin controls', () => {
     await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/commercial?user_id=user-2'))
     expect(screen.getByText('商用账户控制')).toBeInTheDocument()
     expect(screen.getByText(/档案用量：活跃 2 \/ 100，总量 4 \/ 1000；状态：已暂停/)).toBeInTheDocument()
-    expect(screen.getByText(/在途任务 2 个 · 已预留 1200.00 积分/)).toBeInTheDocument()
+    expect(screen.getByText(/计算中任务 2 个 · 暂扣 1200.00 积分/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '恢复商用' })).toBeInTheDocument()
   })
 

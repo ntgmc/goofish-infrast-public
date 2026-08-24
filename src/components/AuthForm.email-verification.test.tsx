@@ -19,12 +19,12 @@ describe('AuthForm email verification', () => {
       .mockResolvedValueOnce(jsonResponse({
         accepted: true,
         verification_required: true,
-        message: '如果账号符合条件，请按照发送至注册邮箱的验证说明完成注册。',
+        message: '如果可以注册，我们会向这个邮箱发送验证邮件，请按邮件提示完成注册。',
         resend_after_seconds: 1,
       }, 202))
       .mockResolvedValueOnce(jsonResponse({
         accepted: true,
-        message: '如果账号符合条件，请按照发送至注册邮箱的验证说明完成注册。',
+        message: '如果可以注册，我们会向这个邮箱发送验证邮件，请按邮件提示完成注册。',
         resend_after_seconds: 300,
       }, 202))
     vi.stubGlobal('fetch', fetchMock)
@@ -37,13 +37,13 @@ describe('AuthForm email verification', () => {
     await user.type(screen.getByLabelText('密码'), 'password123')
     await user.click(screen.getByRole('button', { name: '创建账号' }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('如果账号符合条件')
+    expect(await screen.findByRole('status')).toHaveTextContent('如果可以注册')
     expect(onAuthenticated).not.toHaveBeenCalled()
     const coolingButton = screen.getByRole('button', { name: '1 秒后可重新发送' })
     expect(coolingButton).toBeDisabled()
     await act(async () => { await new Promise((resolve) => window.setTimeout(resolve, 1_050)) })
     await user.click(screen.getByRole('button', { name: '重新发送验证邮件' }))
-    expect(await screen.findByText(/如果账号符合条件/)).toBeInTheDocument()
+    expect(await screen.findByText(/如果可以注册/)).toBeInTheDocument()
     expect(fetchMock).toHaveBeenLastCalledWith('/api/auth/resend-verification', expect.objectContaining({ method: 'POST' }))
   })
 
@@ -68,14 +68,14 @@ describe('AuthForm email verification', () => {
   })
 
   it('offers resend when login is rejected as unverified', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: '请先验证邮箱后再登录。', code: 'email_not_verified' }, 403)))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: '请先完成邮箱验证；没有收到邮件时，可以重新发送。', code: 'email_not_verified' }, 403)))
     const user = userEvent.setup()
     render(<AuthForm onAuthenticated={vi.fn()} />)
     await user.type(screen.getByLabelText('邮箱'), 'pending@example.com')
     await user.type(screen.getByLabelText('密码'), 'password123')
     const loginButtons = screen.getAllByRole('button', { name: '登录' })
     await user.click(loginButtons[loginButtons.length - 1])
-    expect(await screen.findByRole('alert')).toHaveTextContent('请先验证邮箱')
+    expect(await screen.findByRole('alert')).toHaveTextContent('请先完成邮箱验证')
     expect(screen.getByRole('button', { name: '重新发送验证邮件' })).toBeInTheDocument()
   })
 

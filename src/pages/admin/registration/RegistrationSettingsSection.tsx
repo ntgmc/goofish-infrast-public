@@ -290,7 +290,7 @@ export default function RegistrationSettingsSection() {
             />
           </div>
           <p className={`mt-3 text-sm ${!reservesInRange || !reserveTotalValid ? 'text-error' : 'text-ink-muted'}`} role="status" aria-live="polite">
-            已预留 {settings.admin_invite_email_reserve + settings.password_reset_email_reserve} / {emailStats.daily_limit} 封
+            已保留 {settings.admin_invite_email_reserve + settings.password_reset_email_reserve} / {emailStats.daily_limit} 封
           </p>
           {(!reservesInRange || !reserveTotalValid) && (
             <p id="registration-reserve-error" className="mt-2 text-sm text-error" role="alert">

@@ -294,9 +294,9 @@ export async function assertInvitationGiftVersionCanBeRetired(client: PoolClient
 export async function validateInvitationCode(value: unknown): Promise<ValidatedInvitationCode | null> {
   if (value === undefined || value === null || value === '') return null
   const code = normalizeInvitationCode(value)
-  if (!code) throw new InvitationCodeError('invalid_invite_code', '邀请码无效。')
+  if (!code) throw new InvitationCodeError('invalid_invite_code', '邀请码无效，请检查后重试。')
   const settings = await getInvitationSettings()
-  if (!settings.enabled) throw new InvitationCodeError('invitation_campaign_paused', '邀请活动已暂停，请稍后再试。')
+  if (!settings.enabled) throw new InvitationCodeError('invitation_campaign_paused', '邀请活动暂时暂停，请稍后再试。')
   await ensureSchema()
   const result = await query<{ user_id: string }>(
     `select code.user_id
@@ -312,7 +312,7 @@ export async function validateInvitationCode(value: unknown): Promise<ValidatedI
     [code],
   )
   const row = result.rows[0]
-  if (!row) throw new InvitationCodeError('invalid_invite_code', '邀请码无效或邀请人当前不可参与活动。')
+  if (!row) throw new InvitationCodeError('invalid_invite_code', '这个邀请码当前无法使用，请联系分享者获取新的邀请链接。')
   return { code, inviter_user_id: row.user_id }
 }
 
@@ -325,7 +325,7 @@ export async function saveRegistrationWithInvitation(user: UserAccountRecord, in
 }
 
 export async function saveInvitationInTransaction(client: PoolClient, inviteeUserId: string, invitation: ValidatedInvitationCode): Promise<void> {
-  if (invitation.inviter_user_id === inviteeUserId) throw new InvitationCodeError('invalid_invite_code', '不能使用自己的邀请码。')
+  if (invitation.inviter_user_id === inviteeUserId) throw new InvitationCodeError('invalid_invite_code', '不能使用自己的邀请码，请填写好友的邀请码。')
   const now = new Date().toISOString()
   await client.query(
     `insert into invitations
@@ -337,7 +337,7 @@ export async function saveInvitationInTransaction(client: PoolClient, inviteeUse
 
 export async function ensureInvitationCode(userId: string): Promise<string> {
   await ensureSchema()
-  if (!(await userCanInvite(userId))) throw new InvitationCodeError('invalid_invite_code', '完成账号激活后才能生成邀请码。')
+  if (!(await userCanInvite(userId))) throw new InvitationCodeError('invalid_invite_code', '请先兑换 CDK，或绑定森空岛并激活免费档案，再生成邀请链接。')
   return withTransaction(async (client) => {
     const existing = await client.query<{ code: string }>('select code from invitation_codes where user_id = $1 for update', [userId])
     if (existing.rows[0]) return existing.rows[0].code
@@ -367,7 +367,7 @@ export async function manageInvitationCode(
 ): Promise<{ code: string; status: 'active' | 'paused' }> {
   await ensureSchema()
   if (action !== 'pause' && !(await userCanInvite(userId))) {
-    throw new InvitationCodeError('invalid_invite_code', '完成账号激活后才能管理邀请码。')
+    throw new InvitationCodeError('invalid_invite_code', '请先兑换 CDK，或绑定森空岛并激活免费档案，再管理邀请码。')
   }
   return withTransaction(async (client) => {
     const currentResult = await client.query<{
@@ -376,7 +376,7 @@ export async function manageInvitationCode(
       rotated_at: string | null
     }>('select code, status, rotated_at::text from invitation_codes where user_id = $1 for update', [userId])
     const current = currentResult.rows[0]
-    if (!current) throw new InvitationCodeError('invalid_invite_code', '请先生成邀请码。')
+    if (!current) throw new InvitationCodeError('invalid_invite_code', '还没有邀请码，请先生成邀请链接。')
     const nowIso = now.toISOString()
     if (action === 'pause' || action === 'resume') {
       const status = action === 'pause' ? 'paused' : 'active'
@@ -394,7 +394,7 @@ export async function manageInvitationCode(
       return { code: current.code, status }
     }
     if (current.rotated_at && now.getTime() - Date.parse(current.rotated_at) < INVITE_CODE_ROTATION_COOLDOWN_MS) {
-      throw new InvitationCodeError('rotation_cooldown', '邀请码每 24 小时最多轮换一次。')
+      throw new InvitationCodeError('rotation_cooldown', '每 24 小时只能更换一次邀请码，请稍后再试。')
     }
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const nextCode = createInviteCode()
@@ -420,7 +420,7 @@ export async function manageInvitationCode(
         return { code: nextCode, status: 'active' }
       }
     }
-    throw new Error('轮换邀请码失败，请稍后重试。')
+    throw new Error('更换邀请码失败，请稍后重试。')
   })
 }
 
@@ -558,7 +558,7 @@ export async function activateInvitationForUser(userId: string): Promise<boolean
     )
     const invitation = invitationResult.rows[0]
     if (!invitation || invitation.status !== 'registered') return false
-    if (!(await userHasActiveProfile(client, userId))) return false
+    if (!(await userHasActiveSklandProfile(client, userId))) return false
     const snapshot = await getInvitationSettingsInTransaction(client)
     const activatedAt = new Date().toISOString()
     await client.query(
@@ -978,6 +978,17 @@ async function userHasActiveProfile(client: PoolClient, userId: string): Promise
   return active.rows[0]?.active === true
 }
 
+async function userHasActiveSklandProfile(client: PoolClient, userId: string): Promise<boolean> {
+  const active = await client.query<{ active: boolean }>(
+    `select exists (select 1 from user_game_accounts
+      where user_id = $1 and status = 'active'
+        and coalesce(record_json->>'kind', 'cdk') in ('cdk', 'free_preview')
+        and record_json->'skland_binding' is not null) as active`,
+    [userId],
+  )
+  return active.rows[0]?.active === true
+}
+
 function previewRewards(
   rewards: InvitationRewardRule[],
   catalog: InvitationRewardCatalogItem[],
@@ -990,7 +1001,7 @@ function previewRewards(
       recipient: reward.recipient,
       item_code: reward.item_code,
       name: item?.name ?? reward.item_code,
-      description: item?.description ?? '奖励配置暂不可用。',
+      description: item?.description ?? '暂时无法读取该奖励的说明。',
       kind: item?.kind ?? 'consumable',
       icon_key: item?.icon_key ?? 'placeholder',
       quantity: reward.quantity,
@@ -1041,7 +1052,7 @@ function invitationRecord(
     .map(({ recipient: _recipient, ...item }) => item)
   return {
     id: row.id,
-    invitee_label: `受邀用户 #${row.id.replaceAll('-', '').slice(0, 6).toUpperCase()}`,
+    invitee_label: `受邀好友 #${row.id.replaceAll('-', '').slice(0, 6).toUpperCase()}`,
     registered_at: row.registered_at,
     activated_at: row.activated_at,
     status: row.status,
@@ -1295,7 +1306,7 @@ function decodeCursor(value: string | null | undefined): { registered_at: string
       || typeof decoded.id !== 'string' || decoded.id.length < 1 || decoded.id.length > 128) throw new Error('invalid')
     return { registered_at: decoded.registered_at, id: decoded.id }
   } catch {
-    throw new InvitationCodeError('invalid_cursor', '邀请记录游标无效。')
+    throw new InvitationCodeError('invalid_cursor', '邀请记录已更新，请刷新页面后重试。')
   }
 }
 

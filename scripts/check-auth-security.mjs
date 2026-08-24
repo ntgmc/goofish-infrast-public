@@ -324,7 +324,7 @@ async function assertRegistrationBrevoQuotaPolicies() {
   assert.deepEqual(unsupportedProvider, {
     ok: false,
     status: 400,
-    message: '注册仅支持常用公共邮箱，不支持企业、自建或临时邮箱。',
+    message: '请使用常用公共邮箱注册，暂不支持企业、自建或临时邮箱。',
     code: 'email_provider_not_allowed',
   })
   assert.equal(globalThis.__authSecurityEmailReserveCalls, 0)
@@ -336,7 +336,7 @@ async function assertRegistrationBrevoQuotaPolicies() {
   assert.deepEqual(aliasAddress, {
     ok: false,
     status: 400,
-    message: '注册不支持邮箱别名。请移除“+”；Gmail 请同时移除用户名中的“.”并使用 gmail.com。',
+    message: '请使用不含别名的邮箱地址：移除“+”及其后内容；Gmail 地址还需去掉用户名中的“.”。',
     code: 'email_alias_not_allowed',
   })
   assert.equal(globalThis.__authSecurityEmailReserveCalls, 0)
@@ -348,7 +348,7 @@ async function assertRegistrationBrevoQuotaPolicies() {
   assert.deepEqual(typoAddress, {
     ok: false,
     status: 400,
-    message: '邮箱域名可能有误，请使用建议地址。',
+    message: '邮箱域名可能拼错了，请确认或使用建议地址。',
     code: 'email_domain_typo',
     suggestedEmail: 'correct@gmail.com',
   })
@@ -362,7 +362,7 @@ async function assertRegistrationBrevoQuotaPolicies() {
   assert.deepEqual(inviteRequired, {
     ok: false,
     status: 400,
-    message: '当前仅限管理员邀请注册，请输入管理员邀请码。',
+    message: '当前需要管理员邀请码才能注册，请输入收到的邀请码。',
     code: 'invite_code_required',
   })
   assert.equal(globalThis.__authSecurityEmailReserveCalls, 0)
@@ -373,7 +373,7 @@ async function assertRegistrationBrevoQuotaPolicies() {
   assert.deepEqual(paused, {
     ok: false,
     status: 503,
-    message: '今日邮件发送额度已用尽，注册已暂停，请明日再试。',
+    message: '今天的验证邮件额度已用完，暂时无法注册，请明天再试。',
     code: 'brevo_daily_limit_reached',
     retryAfterSeconds: 3_600,
   })
@@ -494,7 +494,7 @@ async function assertResendVerificationEnumerationSafety() {
   assert(results.every((result) => JSON.stringify(result) === JSON.stringify(results[0])))
   assert.deepEqual(results[0], {
     ok: true,
-    message: '如果账号符合条件，请按照发送至注册邮箱的验证说明完成注册。',
+    message: '如果可以注册，我们会向这个邮箱发送验证邮件，请按邮件提示完成注册。',
   })
 }
 
@@ -775,7 +775,7 @@ async function assertAtomicPasswordResetHandler() {
   assert.deepEqual(concurrentFailure, {
     ok: false,
     status: 400,
-    message: '重置链接无效或已过期。',
+    message: '重置链接无效或已过期，请重新申请重置邮件。',
   })
   assert.equal(globalThis.__authSecurityResetCalls.length, 2)
 
@@ -809,7 +809,7 @@ async function assertAtomicPasswordResetHandler() {
   assert.deepEqual(expiredDuringHash, {
     ok: false,
     status: 400,
-    message: '重置链接无效或已过期。',
+    message: '重置链接无效或已过期，请重新申请重置邮件。',
   })
   assert.deepEqual(globalThis.__authSecurityResetSequence, ['token-preflight', 'user-preflight', 'hash', 'transaction'])
 
@@ -821,7 +821,7 @@ async function assertAtomicPasswordResetHandler() {
   assert.deepEqual(frozenAdminReset, {
     ok: false,
     status: 409,
-    message: '账号状态或密码已发生变化，请刷新后重试。',
+    message: '账号信息已更新，请刷新页面后重新提交。',
     code: 'password_update_conflict',
   })
   assert.deepEqual(globalThis.__authSecurityResetSequence, [])
@@ -834,7 +834,7 @@ async function assertAtomicPasswordResetHandler() {
   assert.deepEqual(concurrentAdminReset, {
     ok: false,
     status: 409,
-    message: '账号状态或密码已发生变化，请刷新后重试。',
+    message: '账号信息已更新，请刷新页面后重新提交。',
     code: 'password_update_conflict',
   })
   assert.deepEqual(globalThis.__authSecurityResetSequence, ['hash', 'transaction'])
@@ -1063,7 +1063,7 @@ async function assertUserLoginRateLimits() {
   }))
   assert.equal(unsupportedProvider.status, 400)
   assert.deepEqual(await unsupportedProvider.json(), {
-    error: '注册仅支持常用公共邮箱，不支持企业、自建或临时邮箱。',
+    error: '请使用常用公共邮箱注册，暂不支持企业、自建或临时邮箱。',
     code: 'email_provider_not_allowed',
   })
 
@@ -1074,7 +1074,7 @@ async function assertUserLoginRateLimits() {
   }))
   assert.equal(aliasAddress.status, 400)
   assert.deepEqual(await aliasAddress.json(), {
-    error: '注册不支持邮箱别名。请移除“+”；Gmail 请同时移除用户名中的“.”并使用 gmail.com。',
+    error: '请使用不含别名的邮箱地址：移除“+”及其后内容；Gmail 地址还需去掉用户名中的“.”。',
     code: 'email_alias_not_allowed',
   })
 
@@ -1085,7 +1085,7 @@ async function assertUserLoginRateLimits() {
   }))
   assert.equal(typoAddress.status, 400)
   assert.deepEqual(await typoAddress.json(), {
-    error: '邮箱域名可能有误，请使用建议地址。',
+    error: '邮箱域名可能拼错了，请确认或使用建议地址。',
     code: 'email_domain_typo',
     suggested_email: 'correct@gmail.com',
   })
@@ -1108,7 +1108,7 @@ async function assertUserLoginRateLimits() {
   assert.deepEqual(await registrationAccepted.json(), {
     accepted: true,
     verification_required: true,
-    message: '如果账号符合注册条件，请按照发送至该邮箱的验证说明完成注册。',
+    message: '如果可以注册，我们会向这个邮箱发送验证邮件，请按邮件提示完成注册。',
     resend_after_seconds: 300,
   })
   assert.equal(globalThis.__authSecurityRegisterCalls, 1)
@@ -1116,7 +1116,7 @@ async function assertUserLoginRateLimits() {
   globalThis.__authSecurityRegisterResult = {
     ok: false,
     status: 503,
-    message: '今日邮件发送额度已用尽，注册已暂停，请明日再试。',
+    message: '今天的验证邮件额度已用完，暂时无法注册，请明天再试。',
     code: 'brevo_daily_limit_reached',
     retryAfterSeconds: 7_200,
   }
@@ -1128,7 +1128,7 @@ async function assertUserLoginRateLimits() {
   assert.equal(registrationQuotaLimited.status, 503)
   assert.equal(registrationQuotaLimited.headers.get('Retry-After'), '7200')
   assert.deepEqual(await registrationQuotaLimited.json(), {
-    error: '今日邮件发送额度已用尽，注册已暂停，请明日再试。',
+    error: '今天的验证邮件额度已用完，暂时无法注册，请明天再试。',
     code: 'brevo_daily_limit_reached',
     retry_after_seconds: 7_200,
   })
@@ -1154,7 +1154,7 @@ async function assertUserLoginRateLimits() {
     status: 202,
     body: {
       accepted: true,
-      message: '如果账号符合条件，请按照发送至注册邮箱的说明操作。',
+      message: '如果该邮箱已注册，我们会发送操作邮件，请检查收件箱和垃圾邮件。',
       resend_after_seconds: 300,
     },
   })

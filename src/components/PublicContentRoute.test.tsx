@@ -27,9 +27,9 @@ describe('PublicContentRoute', () => {
         </Routes>
       </MemoryRouter>,
     )
-    expect(screen.getByText('正在加载最新站点内容，当前暂时显示内置内容。')).toBeInTheDocument()
+    expect(screen.getByText('最新页面内容正在加载，部分信息可能稍后更新。')).toBeInTheDocument()
     await act(async () => resolveRequest(cloneDefaultPublicContentSettings()))
-    expect(screen.queryByText('正在加载最新站点内容，当前暂时显示内置内容。')).not.toBeInTheDocument()
+    expect(screen.queryByText('最新页面内容正在加载，部分信息可能稍后更新。')).not.toBeInTheDocument()
   })
 
   it('shows bundled-content fallback feedback and retries', async () => {
@@ -44,10 +44,10 @@ describe('PublicContentRoute', () => {
         </Routes>
       </MemoryRouter>,
     )
-    expect(await screen.findByText(/当前显示内置默认内容/)).toBeInTheDocument()
+    expect(await screen.findByText(/最新页面内容暂时无法加载/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '重新加载' }))
     expect(await screen.findByText('pricing')).toBeInTheDocument()
-    expect(screen.queryByText(/当前显示内置默认内容/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/最新页面内容暂时无法加载/)).not.toBeInTheDocument()
   })
 
   it('shows cached-content feedback and retains remote content when refresh fails', async () => {
@@ -66,7 +66,7 @@ describe('PublicContentRoute', () => {
     )
     expect(await screen.findByText('123456789')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'refresh content' }))
-    expect(await screen.findByText('刷新失败，当前显示上次成功加载的内容。')).toBeInTheDocument()
+    expect(await screen.findByText('页面内容暂时无法更新，当前信息可继续查看。')).toBeInTheDocument()
     expect(screen.getByText('123456789')).toBeInTheDocument()
   })
 })

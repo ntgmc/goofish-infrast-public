@@ -22,7 +22,7 @@ const summary: InvitationSummary = {
   daily_limit: { used: 1, limit: 10, remaining: 9, reset_at: '2026-07-26T16:00:00.000Z' },
   records: [{
     id: 'invite-1',
-    invitee_label: '受邀用户 #A1B2C3',
+    invitee_label: '受邀好友 #A1B2C3',
     registered_at: '2026-07-25T01:00:00.000Z',
     activated_at: '2026-07-25T02:00:00.000Z',
     status: 'settled',
@@ -47,14 +47,21 @@ describe('InvitationsSection', () => {
     render(<InvitationsSection />)
 
     expect(await screen.findByRole('heading', { name: '邀请好友绑定森空岛，领取活动奖励' })).toBeInTheDocument()
-    expect(screen.getByText(/还需要绑定森空岛并成功激活有效档案/)).toBeInTheDocument()
+    expect(screen.getByText(/绑定森空岛成功激活有效档案后，邀请即完成/)).toBeInTheDocument()
     expect(screen.getByText('奖励发放后，可前往背包查看数量、有效期和使用方式。')).toBeInTheDocument()
     expect(await screen.findAllByText(/优先计算券/)).not.toHaveLength(0)
     expect(screen.getByText('优先排队')).toBeInTheDocument()
     expect(screen.getByText(/方案扩容证/)).toBeInTheDocument()
     expect(screen.getByText('增加槽位')).toBeInTheDocument()
     expect(screen.getAllByText('1 / 10')).not.toHaveLength(0)
-    expect(screen.getAllByText('受邀用户 #A1B2C3')).not.toHaveLength(0)
+    expect(screen.getByText('已注册好友')).toBeInTheDocument()
+    expect(screen.getByText('已完成邀请')).toBeInTheDocument()
+    expect(screen.getByText('已发奖邀请')).toBeInTheDocument()
+    expect(screen.getAllByText('今日奖励名额')).not.toHaveLength(0)
+    expect(screen.getByText(/今天还可获得 9 次邀请奖励/)).toBeInTheDocument()
+    expect(screen.getAllByText('受邀好友 #A1B2C3')).not.toHaveLength(0)
+    expect(screen.getAllByText('邀请已完成')).not.toHaveLength(0)
+    expect(screen.getAllByText('奖励已发放')).not.toHaveLength(0)
     expect(screen.getAllByText(/上海时间/)).not.toHaveLength(0)
     expect(apiJson).toHaveBeenCalledTimes(1)
     expect(apiJson).toHaveBeenCalledWith('/api/user/invitations')

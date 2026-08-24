@@ -59,10 +59,10 @@ describe('DepotValuePage', () => {
     expect(mocks.apiJson).toHaveBeenNthCalledWith(1, '/api/depot-value', expect.objectContaining({
       json: { source: 'skland', profile_id: 'profile-1', sample_consent: true },
     }))
-    expect(await screen.findByText(/新鲜快照/, { selector: 'dd' })).toBeInTheDocument()
+    expect(await screen.findByText(/当前价格数据/, { selector: 'dd' })).toBeInTheDocument()
     expect(screen.getByText('snapshot-abcdef1')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('checkbox', { name: /默认同意贡献假名化聚合样本/ }))
+    await user.click(screen.getByRole('checkbox', { name: /默认勾选贡献处理后的统计样本/ }))
     await user.click(screen.getByRole('button', { name: '使用森空岛库存' }))
     expect(mocks.apiJson).toHaveBeenNthCalledWith(2, '/api/depot-value', expect.objectContaining({
       json: { source: 'skland', profile_id: 'profile-1', sample_consent: false },

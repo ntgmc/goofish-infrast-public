@@ -13,7 +13,7 @@ afterEach(() => {
 describe('AuthForm feedback spacing', () => {
   it('does not reserve an empty feedback block before the email field', () => {
     const { container } = render(<AuthForm onAuthenticated={vi.fn()} compact />)
-    const modeSwitcher = screen.getByRole('group', { name: '登录方式' })
+    const modeSwitcher = screen.getByRole('group', { name: '登录或注册' })
     const feedback = container.querySelector<HTMLElement>('.auth-feedback-slot')
     const emailField = screen.getByLabelText('邮箱').closest('label')
 

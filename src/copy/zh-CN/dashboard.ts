@@ -1,12 +1,12 @@
 export const dashboardCopy = {
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
-  pages_tool_dashboard_AnnouncementsSection_001: "加载公告失败，请稍后重试",
+  pages_tool_dashboard_AnnouncementsSection_001: "暂时无法加载公告，请稍后重试。",
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
-  pages_tool_dashboard_AnnouncementsSection_002: "标记公告失败",
+  pages_tool_dashboard_AnnouncementsSection_002: "暂时无法更新阅读状态，请稍后重试。",
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
   pages_tool_dashboard_AnnouncementsSection_003: "近期通知会保留在公告列表中，方便随时回看。",
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
-  pages_tool_dashboard_AnnouncementsSection_004: "处理中...",
+  pages_tool_dashboard_AnnouncementsSection_004: "正在标记...",
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
   pages_tool_dashboard_AnnouncementsSection_005: "全部设为已读",
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
@@ -22,155 +22,114 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
   pages_tool_dashboard_AnnouncementsSection_011: "标为已读",
   // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_001: "生成邀请码失败，请稍后重试",
+  pages_tool_dashboard_InvitationsSection_001: "暂时无法生成邀请链接，请稍后重试。",
   // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_002: "邀请链接已生成。",
+  pages_tool_dashboard_InvitationsSection_002: "邀请链接已生成，可以分享给好友了。",
   // src/pages/tool/dashboard/InvitationsSection.tsx
   pages_tool_dashboard_InvitationsSection_003: "已复制。",
   // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_004: "复制失败，请手动选择并复制。",
+  pages_tool_dashboard_InvitationsSection_004: "复制失败，请手动选中内容后复制。",
   // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_005: "正在载入邀请信息...",
+  pages_tool_dashboard_InvitationsSection_005: "正在加载邀请信息...",
   // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_006: "邀请奖励",
+  pages_tool_dashboard_InvitationsSection_006: "邀请有礼",
   // src/pages/tool/dashboard/InvitationsSection.tsx
   pages_tool_dashboard_InvitationsSection_007: "邀请好友绑定森空岛，领取活动奖励",
   // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_008: "好友注册时填写你的邀请码后，还需要绑定森空岛并成功激活有效档案，邀请才算完成，奖励会自动发放。",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_009: "优先计算券是什么？",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_010: "每张券可用于一次账号档案的主排班计算。提交前手动勾选后，该任务会进入最高优先队列，排在普通付费和免费任务之前；券只提升排队顺序，不会改变计算结果。",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_011: "入队失败不会扣券；服务端执行失败或最终超时会自动退回一张等效券。不适用于升级建议、情景实验或调序检查。",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_012: "邀请活动当前暂停。",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_013: "完成 CDK 兑换或森空岛免费档案激活后，即可生成邀请链接。",
+  pages_tool_dashboard_InvitationsSection_013: "先兑换 CDK，或绑定森空岛并激活免费档案，即可生成邀请链接。",
   // src/pages/tool/dashboard/InvitationsSection.tsx
   pages_tool_dashboard_InvitationsSection_014: "邀请码",
   // src/pages/tool/dashboard/InvitationsSection.tsx
   pages_tool_dashboard_InvitationsSection_015: "邀请码",
   // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_016: "分享链接",
+  pages_tool_dashboard_InvitationsSection_016: "邀请链接",
   // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_017: "分享链接",
+  pages_tool_dashboard_InvitationsSection_017: "邀请链接",
   // src/pages/tool/dashboard/InvitationsSection.tsx
   pages_tool_dashboard_InvitationsSection_018: "正在生成...",
   // src/pages/tool/dashboard/InvitationsSection.tsx
   pages_tool_dashboard_InvitationsSection_019: "生成邀请链接",
   // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_020: "邀请数据",
+  pages_tool_dashboard_InvitationsSection_020: "邀请概况",
   // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_021: "已注册",
+  pages_tool_dashboard_InvitationsSection_021: "已注册好友",
   // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_022: "已激活",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_023: "累计获得优先券",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_024: " 张",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_025: "可用优先券",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_026: " 张",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_027: "当前活动规则",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_028: "邀请人每次可获得 ",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_029: " 张优先计算券；新用户完成激活后可获得 ",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_030: " 张优先计算券。",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_031: "每位邀请人每天最多结算 ",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_032: " 次邀请人奖励。",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_033: "；每张券可让一次主排班任务进入最高优先队列。",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_034: "最近到期时间：",
+  pages_tool_dashboard_InvitationsSection_022: "已完成邀请",
   // src/pages/tool/dashboard/InvitationsSection.tsx
   pages_tool_dashboard_InvitationsSection_035: "复制",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_036: "奖励券自发放起 ",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_037: " 天内有效",
-  // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_038: "奖励券永久有效",
-  pages_tool_dashboard_InvitationsSection_039: "邀请奖励一览",
-  pages_tool_dashboard_InvitationsSection_040: "好友注册时填写你的邀请码后，还需要绑定森空岛并成功激活有效档案，邀请才算完成并发放奖励；邀请人奖励受每日名额限制。",
-  pages_tool_dashboard_InvitationsSection_041: "活动已暂停；已激活且待处理的邀请会在活动恢复后继续结算。",
-  pages_tool_dashboard_InvitationsSection_042: "你可获得",
-  pages_tool_dashboard_InvitationsSection_043: "新用户可获得",
-  pages_tool_dashboard_InvitationsSection_044: "本次活动未配置该方奖励。",
+  pages_tool_dashboard_InvitationsSection_039: "双方可获得的奖励",
+  pages_tool_dashboard_InvitationsSection_040: "好友注册时填写你的邀请码，并绑定森空岛成功激活有效档案后，邀请即完成，双方奖励会自动发放。你的奖励受每日名额限制。",
+  pages_tool_dashboard_InvitationsSection_041: "邀请活动暂时暂停。已经完成的邀请会在活动恢复后自动发放奖励。",
+  pages_tool_dashboard_InvitationsSection_042: "邀请成功后，你可获得",
+  pages_tool_dashboard_InvitationsSection_043: "邀请成功后，好友可获得",
+  pages_tool_dashboard_InvitationsSection_044: "本次活动暂无奖励。",
   pages_tool_dashboard_InvitationsSection_045: "永久有效",
   pages_tool_dashboard_InvitationsSection_046: "领取后 ",
   pages_tool_dashboard_InvitationsSection_047: " 天内有效",
-  pages_tool_dashboard_InvitationsSection_048: "奖励配置暂不可用",
-  pages_tool_dashboard_InvitationsSection_049: "累计获奖邀请",
-  pages_tool_dashboard_InvitationsSection_050: "今日名额",
-  pages_tool_dashboard_InvitationsSection_051: "剩余 ",
-  pages_tool_dashboard_InvitationsSection_052: " 个名额，下次重置：",
-  pages_tool_dashboard_InvitationsSection_053: "今日名额已用完；后续激活不会补发你的邀请奖励，但新用户奖励仍会正常发放。",
-  pages_tool_dashboard_InvitationsSection_054: "最近邀请",
-  pages_tool_dashboard_InvitationsSection_055: "还没有邀请记录。分享邀请链接后，可在邀请列表中查看注册与激活进度。",
-  pages_tool_dashboard_InvitationsSection_056: "受邀用户",
+  pages_tool_dashboard_InvitationsSection_048: "该奖励暂时无法发放",
+  pages_tool_dashboard_InvitationsSection_049: "已发奖邀请",
+  pages_tool_dashboard_InvitationsSection_050: "今日奖励名额",
+  pages_tool_dashboard_InvitationsSection_051: "今天还可获得 ",
+  pages_tool_dashboard_InvitationsSection_052: " 次邀请奖励，名额重置时间：",
+  pages_tool_dashboard_InvitationsSection_053: "今天你的奖励名额已用完。好友仍可正常获得奖励，但今天后续完成的邀请不会再为你发放奖励。",
+  pages_tool_dashboard_InvitationsSection_054: "好友邀请记录",
+  pages_tool_dashboard_InvitationsSection_055: "还没有邀请记录。把邀请链接分享给好友后，这里会显示注册、森空岛绑定和奖励发放进度。",
+  pages_tool_dashboard_InvitationsSection_056: "受邀好友",
   pages_tool_dashboard_InvitationsSection_057: "注册时间",
-  pages_tool_dashboard_InvitationsSection_058: "激活时间",
-  pages_tool_dashboard_InvitationsSection_059: "邀请进度",
+  pages_tool_dashboard_InvitationsSection_058: "邀请完成时间",
+  pages_tool_dashboard_InvitationsSection_059: "邀请状态",
   pages_tool_dashboard_InvitationsSection_060: "我的奖励",
-  pages_tool_dashboard_InvitationsSection_061: "未激活",
-  pages_tool_dashboard_InvitationsSection_062: "已激活",
-  pages_tool_dashboard_InvitationsSection_063: "已结算",
-  pages_tool_dashboard_InvitationsSection_064: "等待激活",
-  pages_tool_dashboard_InvitationsSection_065: "等待活动恢复",
-  pages_tool_dashboard_InvitationsSection_066: "正在结算",
-  pages_tool_dashboard_InvitationsSection_067: "已发放",
-  pages_tool_dashboard_InvitationsSection_068: "当日名额已满",
-  pages_tool_dashboard_InvitationsSection_069: "邀请人已不符合资格",
-  pages_tool_dashboard_InvitationsSection_070: "未配置奖励",
-  pages_tool_dashboard_InvitationsSection_071: "尚未激活",
-  pages_tool_dashboard_InvitationsSection_072: "加载更多",
+  pages_tool_dashboard_InvitationsSection_061: "等待好友绑定森空岛",
+  pages_tool_dashboard_InvitationsSection_062: "等待发放奖励",
+  pages_tool_dashboard_InvitationsSection_063: "邀请已完成",
+  pages_tool_dashboard_InvitationsSection_064: "等待好友绑定森空岛",
+  pages_tool_dashboard_InvitationsSection_065: "活动恢复后自动发放",
+  pages_tool_dashboard_InvitationsSection_066: "正在发放",
+  pages_tool_dashboard_InvitationsSection_067: "奖励已发放",
+  pages_tool_dashboard_InvitationsSection_068: "今日奖励名额已满",
+  pages_tool_dashboard_InvitationsSection_069: "你当前无法获得奖励",
+  pages_tool_dashboard_InvitationsSection_070: "本次活动未设置你的奖励",
+  pages_tool_dashboard_InvitationsSection_072: "查看更多邀请",
   pages_tool_dashboard_InvitationsSection_073: "正在加载...",
-  pages_tool_dashboard_InvitationsSection_074: "加载邀请记录失败",
-  pages_tool_dashboard_InvitationsSection_075: "暂无",
-  pages_tool_dashboard_InvitationsSection_076: "礼包 v",
+  pages_tool_dashboard_InvitationsSection_074: "暂时无法加载邀请记录，请稍后重试。",
+  pages_tool_dashboard_InvitationsSection_075: "尚未完成",
+  pages_tool_dashboard_InvitationsSection_076: "礼包版本 ",
   pages_tool_dashboard_InvitationsSection_077: "奖励发放后，可前往背包查看数量、有效期和使用方式。",
-  pages_tool_dashboard_InvitationsSection_078: "轮换后旧邀请码将立即失效，历史邀请记录会保留。确认继续吗？",
-  pages_tool_dashboard_InvitationsSection_079: "更新邀请码失败。",
-  pages_tool_dashboard_InvitationsSection_080: "邀请码已暂停。",
-  pages_tool_dashboard_InvitationsSection_081: "邀请码已恢复。",
-  pages_tool_dashboard_InvitationsSection_082: "邀请码已轮换。",
-  pages_tool_dashboard_InvitationsSection_083: "刷新中...",
-  pages_tool_dashboard_InvitationsSection_084: "刷新状态",
-  pages_tool_dashboard_InvitationsSection_085: "当前邀请码已暂停，旧链接暂不可注册。",
+  pages_tool_dashboard_InvitationsSection_078: "更换邀请码后，当前邀请码和邀请链接会立即失效，历史邀请记录不受影响。确定更换吗？",
+  pages_tool_dashboard_InvitationsSection_079: "暂时无法更新邀请码，请稍后重试。",
+  pages_tool_dashboard_InvitationsSection_080: "邀请码已暂停，当前邀请链接暂时无法使用。",
+  pages_tool_dashboard_InvitationsSection_081: "邀请码已恢复，可以继续分享。",
+  pages_tool_dashboard_InvitationsSection_082: "邀请码已更换，请分享新的邀请链接。",
+  pages_tool_dashboard_InvitationsSection_083: "正在刷新...",
+  pages_tool_dashboard_InvitationsSection_084: "刷新邀请信息",
+  pages_tool_dashboard_InvitationsSection_085: "邀请码已暂停，当前邀请链接暂时无法注册。",
   pages_tool_dashboard_InvitationsSection_086: "恢复邀请码",
   pages_tool_dashboard_InvitationsSection_087: "暂停邀请码",
-  pages_tool_dashboard_InvitationsSection_088: "轮换邀请码",
-  pages_tool_dashboard_InvitationsSection_089: "结算异常",
-  pages_tool_dashboard_InvitationsSection_090: "结算失败，等待自动重试",
-  pages_tool_dashboard_InvitationsSection_091: "结算失败，请联系客服",
-  pages_tool_dashboard_InvitationsSection_092: " 上海时间",
+  pages_tool_dashboard_InvitationsSection_088: "更换邀请码",
+  pages_tool_dashboard_InvitationsSection_089: "奖励发放遇到问题",
+  pages_tool_dashboard_InvitationsSection_090: "发放失败，系统将自动重试",
+  pages_tool_dashboard_InvitationsSection_091: "多次发放失败，请联系客服",
+  pages_tool_dashboard_InvitationsSection_092: "（上海时间）",
   // src/pages/tool/dashboard/ProfilesSection.tsx
   pages_tool_dashboard_ProfilesSection_001: "还没有添加游戏账号",
   // src/pages/tool/dashboard/ProfilesSection.tsx
-  pages_tool_dashboard_ProfilesSection_002: "可以在“添加账号”里创建免费预览，或输入未使用的 CDK 添加正式游戏账号。",
+  pages_tool_dashboard_ProfilesSection_002: "前往“添加账号”，可以通过森空岛领取免费档案，或使用 CDK 创建正式档案。",
   // src/pages/tool/dashboard/ProfilesSection.tsx
   pages_tool_dashboard_ProfilesSection_003: "账号 ",
   // src/pages/tool/dashboard/ProfilesSection.tsx
-  pages_tool_dashboard_ProfilesSection_004: "保存失败，请稍后重试",
+  pages_tool_dashboard_ProfilesSection_004: "暂时无法保存档案信息，请稍后重试。",
   // src/pages/tool/dashboard/ProfilesSection.tsx
-  pages_tool_dashboard_ProfilesSection_005: "保存失败，请稍后重试",
+  pages_tool_dashboard_ProfilesSection_005: "暂时无法保存档案信息，请稍后重试。",
   // src/pages/tool/dashboard/ProfilesSection.tsx
-  pages_tool_dashboard_ProfilesSection_006: "免费个人排班支持查看完整游戏内轮换；导出和高级分析随高级权限开放。",
+  pages_tool_dashboard_ProfilesSection_006: "免费个人排班可查看完整游戏内轮换；MAA 导出和高级分析需要高级权限。",
   // src/pages/tool/dashboard/ProfilesSection.tsx
   pages_tool_dashboard_ProfilesSection_007: "暂无备注",
   // src/pages/tool/dashboard/ProfilesSection.tsx
-  pages_tool_dashboard_ProfilesSection_008: " 名干员 · 更新 ",
+  pages_tool_dashboard_ProfilesSection_008: " 名干员 · 数据更新于 ",
   // src/pages/tool/dashboard/ProfilesSection.tsx
   pages_tool_dashboard_ProfilesSection_009: "正在准备...",
   // src/pages/tool/dashboard/ProfilesSection.tsx
-  pages_tool_dashboard_ProfilesSection_010: "准备这个账号",
+  pages_tool_dashboard_ProfilesSection_010: "打开账号并准备数据",
   // src/pages/tool/dashboard/ProfilesSection.tsx
   pages_tool_dashboard_ProfilesSection_011: "修改名称和备注",
   // src/pages/tool/dashboard/ProfilesSection.tsx
@@ -186,19 +145,19 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/ProfilesSection.tsx
   pages_tool_dashboard_ProfilesSection_017: (expiresAt: string) => `档案有效期至 ${expiresAt}`,
   // src/pages/tool/dashboard/RedeemSection.tsx
-  pages_tool_dashboard_RedeemSection_001: "CDK 兑换失败，请稍后重试",
+  pages_tool_dashboard_RedeemSection_001: "暂时无法兑换 CDK，请检查输入或稍后重试。",
   // src/pages/tool/dashboard/RedeemSection.tsx
-  pages_tool_dashboard_RedeemSection_002: "新增账号档案",
+  pages_tool_dashboard_RedeemSection_002: "添加游戏账号",
   // src/pages/tool/dashboard/RedeemSection.tsx
-  pages_tool_dashboard_RedeemSection_003: "CDK 用于解锁正式档案；免费档案需通过森空岛确认游戏 UID 后领取。",
+  pages_tool_dashboard_RedeemSection_003: "使用 CDK 可创建正式档案；没有 CDK 时，也可以通过森空岛确认游戏 UID 后领取免费档案。",
   // src/pages/tool/dashboard/RedeemSection.tsx
-  pages_tool_dashboard_RedeemSection_004: "新增档案方式",
+  pages_tool_dashboard_RedeemSection_004: "添加账号方式",
   // src/pages/tool/dashboard/RedeemSection.tsx
-  pages_tool_dashboard_RedeemSection_005: "CDK 解锁",
+  pages_tool_dashboard_RedeemSection_005: "使用 CDK",
   // src/pages/tool/dashboard/RedeemSection.tsx
   pages_tool_dashboard_RedeemSection_006: "免费个人排班",
   // src/pages/tool/dashboard/RedeemSection.tsx
-  pages_tool_dashboard_RedeemSection_007: "免费个人排班支持查看完整游戏内轮换队列；MAA JSON 下载、原始数据、高级分析、批量导出和商用授权随高级权限开放。活动期间首次绑定森空岛后会赠送一张限时 CDK 道具，需在背包主动使用，高级权限于 2026 年 8 月 20 日 00:00 结束。",
+  pages_tool_dashboard_RedeemSection_007: "免费个人排班可查看完整游戏内轮换队列；MAA JSON 下载、原始数据、高级分析、批量导出和商用授权需要高级权限。",
   // src/pages/tool/dashboard/RedeemSection.tsx
   pages_tool_dashboard_RedeemSection_008: "档案名称",
   // src/pages/tool/dashboard/RedeemSection.tsx
@@ -210,7 +169,7 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/RedeemSection.tsx
   pages_tool_dashboard_RedeemSection_012: "可填写账号用途、区服或其他备注",
   // src/pages/tool/dashboard/RedeemSection.tsx
-  pages_tool_dashboard_RedeemSection_013: "处理中...",
+  pages_tool_dashboard_RedeemSection_013: "正在添加账号...",
   // src/pages/tool/dashboard/RedeemSection.tsx
   pages_tool_dashboard_RedeemSection_014: "通过森空岛领取免费个人排班",
   // src/pages/tool/dashboard/RedeemSection.tsx
@@ -222,21 +181,21 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_003: "两次输入的新密码不一致。",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_004: "修改失败，请稍后重试",
+  pages_tool_dashboard_SettingsSection_004: "暂时无法修改密码，请稍后重试。",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_005: "密码已更新。",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_008: "清除森空岛凭据",
+  pages_tool_dashboard_SettingsSection_008: "清除森空岛授权信息",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_011: "确定要",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_012: "吗？此操作可能影响后续导入。",
+  pages_tool_dashboard_SettingsSection_012: "吗？清除后需要重新授权才能继续导入数据。",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_013: "失败，请稍后重试。",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_014: "注销请求会立即退出登录，并在 7 天后永久删除个人数据。确定继续吗？",
+  pages_tool_dashboard_SettingsSection_014: "提交注销申请后会立即退出登录。你可以在 7 天内通过邮件撤销；到期后账号和个人数据将永久删除。确定继续吗？",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_015: "注销请求提交失败，请检查邮箱和密码后重试。",
+  pages_tool_dashboard_SettingsSection_015: "暂时无法提交注销申请，请确认邮箱和当前密码后重试。",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_016: "修改登录密码",
   // src/pages/tool/dashboard/SettingsSection.tsx
@@ -252,65 +211,65 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_022: "数据与隐私",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_023: "服务保存登录资料、游戏档案、工作区、使用记录和仓库分析时默认贡献的假名化聚合样本。注销后进入 7 天冷静期，期满删除常规账号、工作区与关联仓库样本；HMAC 行为风控证据最长保留 90 天，个人使用声明确认记录按账号存续期加注销后一年保留。详情见隐私政策。",
+  pages_tool_dashboard_SettingsSection_023: "网站会保存登录资料、游戏档案、工作区和使用记录。仓库分析中的汇总样本会与网站档案关联，以便随账号一起删除。注销后有 7 天撤销期；到期后删除账号、工作区和关联样本。用于安全风控的去标识记录最长保留 90 天，个人使用声明记录在注销后最长保留一年。详情见隐私政策。",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_026: "清除凭据",
+  pages_tool_dashboard_SettingsSection_026: "清除授权信息",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_029: "注销账号",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_030: "提交后会退出登录并发送撤销链接。7 天内可撤销；到期后将永久擦除账户、档案、凭据、样本、任务和常规使用记录。限期保留的 HMAC 行为风控证据及个人使用声明确认记录将按隐私政策所列期限到期删除。",
+  pages_tool_dashboard_SettingsSection_030: "提交后会立即退出登录，并向你的邮箱发送撤销链接。7 天内可以撤销；到期后将永久删除账号、档案、授权信息、仓库样本、任务和常规使用记录。用于安全风控和法律留存的少量记录会按隐私政策所列期限自动删除。",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_031: "确认邮箱",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_032: "当前密码",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_033: "正在提交...",
+  pages_tool_dashboard_SettingsSection_033: "正在提交注销申请...",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_034: "发起注销请求",
+  pages_tool_dashboard_SettingsSection_034: "申请注销账号",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_035: "清除凭据只会撤销森空岛授权，不会解除游戏账号绑定；重新授权时必须使用相同的森空岛 UID。",
-  pages_tool_dashboard_SettingsSection_036: "森空岛凭据已清除。游戏账号身份仍保留。",
-  pages_tool_dashboard_SettingsSection_037: "凭据已清除，但刷新账户状态失败；重新载入页面即可同步最新状态。",
-  pages_tool_dashboard_SettingsSection_038: "森空岛凭据已清除；需要再次导入时请重新授权相同 UID。",
+  pages_tool_dashboard_SettingsSection_035: "清除授权信息不会删除游戏账号。再次导入数据时，需要使用相同的森空岛 UID 重新授权。",
+  pages_tool_dashboard_SettingsSection_036: "森空岛授权信息已清除，游戏账号仍然保留。",
+  pages_tool_dashboard_SettingsSection_037: "授权信息已清除，但页面状态未能刷新；重新加载页面即可查看最新状态。",
+  pages_tool_dashboard_SettingsSection_038: "森空岛授权信息已清除。再次导入数据时，请使用相同 UID 重新授权。",
   // src/pages/tool/dashboard/ToolsSection.tsx
-  pages_tool_dashboard_ToolsSection_001: "仓库价值分析器",
+  pages_tool_dashboard_ToolsSection_001: "仓库价值分析",
   // src/pages/tool/dashboard/ToolsSection.tsx
-  pages_tool_dashboard_ToolsSection_002: "粘贴 MAA 仓库识别导出的 JSON，生成仓库资产估值和可下载截图；不会读取或覆盖当前账号保存的数据。",
+  pages_tool_dashboard_ToolsSection_002: "粘贴 MAA 仓库识别导出的 JSON，即可估算仓库价值并下载结果图片。此工具不会读取或修改当前账号中保存的数据。",
   // src/pages/tool/dashboard/ToolsSection.tsx
-  pages_tool_dashboard_ToolsSection_003: "打开独立页面",
+  pages_tool_dashboard_ToolsSection_003: "开始分析",
   // src/pages/tool/AccountDashboard.tsx
-  pages_tool_AccountDashboard_tour_001: "使用导览",
+  pages_tool_AccountDashboard_tour_001: "查看使用引导",
   pages_tool_AccountDashboard_tour_002: "管理游戏账号",
-  pages_tool_AccountDashboard_tour_003: "查看正式档案和免费预览档案，然后进入干员与基建配置准备流程。",
-  pages_tool_AccountDashboard_tour_004: "独立实用工具",
-  pages_tool_AccountDashboard_tour_005: "仓库价值分析使用独立页面，不会覆盖当前账号保存的工作区。",
-  pages_tool_AccountDashboard_tour_006: "添加账号档案",
-  pages_tool_AccountDashboard_tour_007: "使用 CDK 创建正式档案；没有 CDK 时也可以领取免费个人排班。",
+  pages_tool_AccountDashboard_tour_003: "查看正式档案和免费档案，选择账号后即可准备干员与基建数据。",
+  pages_tool_AccountDashboard_tour_004: "仓库分析工具",
+  pages_tool_AccountDashboard_tour_005: "仓库价值分析在独立页面运行，不会修改当前账号保存的数据。",
+  pages_tool_AccountDashboard_tour_006: "添加游戏账号",
+  pages_tool_AccountDashboard_tour_007: "使用 CDK 创建正式档案；没有 CDK 时，也可以通过森空岛领取免费个人排班。",
   pages_tool_AccountDashboard_tour_008: "邀请奖励",
-  pages_tool_AccountDashboard_tour_009: "查看邀请链接、好友激活进度，以及可用于提升排队优先级的计算券。",
+  pages_tool_AccountDashboard_tour_009: "查看邀请链接、好友绑定森空岛后的邀请进度，以及双方可获得的道具奖励。",
   pages_tool_AccountDashboard_tour_010: "公告与设置",
-  pages_tool_AccountDashboard_tour_011: "公告用于了解服务变更；设置中可以管理密码、森空岛凭据和个人数据。",
+  pages_tool_AccountDashboard_tour_011: "在公告中查看服务变化，在设置中管理密码、森空岛授权和个人数据。",
   // src/pages/tool/dashboard/RedeemSection.tsx
-  pages_tool_dashboard_RedeemSection_tour_001: "选择新增方式",
-  pages_tool_dashboard_RedeemSection_tour_002: "CDK 解锁正式档案；免费个人排班通过森空岛确认游戏 UID 后创建，两者的导出和高级功能范围不同。",
+  pages_tool_dashboard_RedeemSection_tour_001: "选择添加账号的方式",
+  pages_tool_dashboard_RedeemSection_tour_002: "使用 CDK 可创建正式档案；也可以通过森空岛确认游戏 UID 后领取免费个人排班。两类档案可使用的导出和高级功能不同。",
   pages_tool_dashboard_RedeemSection_tour_003: "兑换 CDK",
-  pages_tool_dashboard_RedeemSection_tour_004: "输入未使用的 CDK，并可填写档案名称与备注。兑换成功后会创建正式游戏档案。",
+  pages_tool_dashboard_RedeemSection_tour_004: "输入未使用的 CDK，可以同时填写档案名称和备注。兑换成功后会创建正式游戏档案。",
   pages_tool_dashboard_RedeemSection_tour_005: "领取免费个人排班",
-  pages_tool_dashboard_RedeemSection_tour_006: "点击领取后会打开森空岛确认流程；确认游戏 UID 后才会创建免费档案。导览不会替你发起授权。",
+  pages_tool_dashboard_RedeemSection_tour_006: "点击领取后会打开森空岛授权流程。确认游戏 UID 后，系统才会创建免费档案。",
   // src/pages/tool/ProfileUpgradePrompt.tsx
-  pages_tool_ProfileUpgradePrompt_001: "背包里有可用的档案升级券",
+  pages_tool_ProfileUpgradePrompt_001: "背包中有档案升级道具",
   // src/pages/tool/ProfileUpgradePrompt.tsx
-  pages_tool_ProfileUpgradePrompt_002: "当前免费预览档案可以使用限时 CDK，立即开启高级版限时体验。",
+  pages_tool_ProfileUpgradePrompt_002: "背包中有一张限时 CDK，请前往背包查看有效期和当前可用状态。",
   // src/pages/tool/ProfileUpgradePrompt.tsx
-  pages_tool_ProfileUpgradePrompt_003: "背包中同时有可用于当前免费预览档案的限时 CDK 和终身版兑换 CDK。",
+  pages_tool_ProfileUpgradePrompt_003: "背包中有多种档案升级道具，请前往背包查看用途和有效期。",
   // src/pages/tool/ProfileUpgradePrompt.tsx
-  pages_tool_ProfileUpgradePrompt_004: "当前免费预览档案可以使用终身版兑换 CDK，升级为长期高级档案。",
+  pages_tool_ProfileUpgradePrompt_004: "当前免费档案可以使用终身版兑换 CDK，升级为长期高级档案。",
   // src/pages/tool/ProfileUpgradePrompt.tsx
-  pages_tool_ProfileUpgradePrompt_005: "前往背包选择对应档案升级券；只有升级成功后才会消耗道具。",
+  pages_tool_ProfileUpgradePrompt_005: "前往背包查看可用道具。只有档案升级成功后，才会消耗对应道具。",
   // src/pages/tool/ProfileUpgradePrompt.tsx
   pages_tool_ProfileUpgradePrompt_006: "不再提示",
   // src/pages/tool/ProfileUpgradePrompt.tsx
-  pages_tool_ProfileUpgradePrompt_007: "暂时关闭升级提示",
+  pages_tool_ProfileUpgradePrompt_007: "本次关闭提示",
   // src/pages/tool/ProfileUpgradePrompt.tsx
-  pages_tool_ProfileUpgradePrompt_008: "前往背包升级",
+  pages_tool_ProfileUpgradePrompt_008: "前往背包查看",
 } as const

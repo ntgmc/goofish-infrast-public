@@ -93,18 +93,18 @@ export function validateRegistrationSettingsPatch(value: unknown): RegistrationS
   const adminInviteReserve = validateReserve(
     source.admin_invite_email_reserve,
     'admin_invite_email_reserve',
-    '管理员邀请邮件预留',
+    '管理员邀请邮件保留额度',
     issues,
   )
   const passwordResetReserve = validateReserve(
     source.password_reset_email_reserve,
     'password_reset_email_reserve',
-    '密码重置邮件预留',
+    '密码重置邮件保留额度',
     issues,
   )
   if (adminInviteReserve !== null && passwordResetReserve !== null
     && adminInviteReserve + passwordResetReserve > 300) {
-    issues.push({ path: 'password_reset_email_reserve', message: '两类邮件预留总和不能超过 300。' })
+    issues.push({ path: 'password_reset_email_reserve', message: '两项保留额度总和不能超过 300。' })
   }
   if (issues.length > 0) throw new RegistrationSettingsValidationError(issues)
   return {

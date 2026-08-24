@@ -60,7 +60,7 @@ describe('StatusPage', () => {
     })
 
     expect(screen.getAllByText('运行正常').length).toBeGreaterThan(0)
-    expect(screen.getByRole('alert')).toHaveTextContent('无法连接到状态接口')
+    expect(screen.getByRole('alert')).toHaveTextContent('暂时无法获取服务状态')
   })
 
   it('does not report an outage when the initial status request fails', async () => {
@@ -89,7 +89,7 @@ describe('StatusPage', () => {
     await act(async () => { await Promise.resolve() })
 
     expect(screen.getAllByText('弹性处理中').length).toBeGreaterThan(0)
-    expect(screen.getByText('自动扩缩容正在消化排队任务，服务保持可用。')).toBeInTheDocument()
+    expect(screen.getByText('系统正在增加计算能力并处理等待任务，服务仍可正常使用。')).toBeInTheDocument()
   })
 
   it('renders the Skland import status independently from optimization', async () => {

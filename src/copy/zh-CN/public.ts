@@ -264,7 +264,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_018: "我们处理的信息",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_019: "为提供账号登录、CDK 关联和排班服务，MaaTool 官方会处理你的邮箱、密码哈希、会话标识、CDK 及订单的哈希信息。服务不会以明文保存你的登录密码。",
+  pages_PublicInfoPage_019: "为提供账号登录、CDK 关联和排班服务，MaaTool 官方会处理你的邮箱、登录凭证、会话信息，以及 CDK 和订单的安全标识。登录密码会经过不可逆处理后保存，不会保存明文。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_020: "当你选择添加游戏账号或通过森空岛导入时，服务会处理游戏 UID、昵称、区服或渠道信息、干员与养成库存、基建配置、排班结果和必要的授权状态。用于持续导入的森空岛凭据会在服务端加密保存。",
   // src/pages/PublicInfoPage.tsx
@@ -274,11 +274,11 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_023: "上述信息仅用于提供登录、账号管理、排班计算、结果保存、客服排障和服务安全。MaaTool 官方不会出售你的个人信息，也不会将游戏数据用于与本服务无关的广告投放。",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_024: "森空岛授权和数据导入会向鹰角网络或森空岛的相关接口发起请求。密码重置邮件会通过邮件服务商发送。我们仅在实现对应功能所必需的范围内向这些服务传输信息。",
+  pages_PublicInfoPage_024: "森空岛授权和数据导入需要连接鹰角网络或森空岛服务，密码重置邮件会通过邮件服务商发送。我们仅会传输完成对应功能所需的信息。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_025: "存储、安全与权利",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_026: "数据保存在服务运行所需的数据库与基础设施中。我们采用访问控制、密码哈希、会话保护和传输安全措施降低未经授权访问的风险，但任何网络服务均无法保证绝对安全。",
+  pages_PublicInfoPage_026: "数据保存在提供服务所需的系统中。我们通过访问控制、密码安全存储、登录保护和加密传输降低未经授权访问的风险，但任何网络服务均无法保证绝对安全。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_027: "你可以通过 QQ 群联系 MaaTool 官方，咨询、更正或申请删除账号及相关工作台数据。为保护账号安全，处理前可能需要完成必要的身份核验。",
   // src/pages/PublicInfoPage.tsx
@@ -286,11 +286,11 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_029: "MaaTool 是用于生成《明日方舟》基建排班建议和 MAA 配置文件的辅助工具。你使用本服务，即表示同意遵守本协议、隐私政策及页面展示的相关规则。",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_030: "当前公开 SKU、价格、权益与限制以价格与权益页为准。服务可依法或因必要的产品调整更新规则；已开通授权的实时可用状态仍以工作台显示为准。",
+  pages_PublicInfoPage_030: "当前价格、权益与使用限制请查看价格与权益页。服务可能依法或因必要的产品调整更新规则；已开通档案的当前可用功能可在工作台查看。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_031: "用户义务",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_032: "你应对自己的账号、CDK、游戏数据和操作行为负责，仅使用自己有权处理的数据，不得共享、转售、破解、干扰或以其他方式滥用本服务。免费预览与个人按次档案仅限本人非商业使用；商用账户可使用商用档案处理数据权利人已授权的多个 UID，按成功主排班计费，但不得转售 MaaTool 账号或 CDK，账号、档案和积分均不可转让。",
+  pages_PublicInfoPage_032: "你应对自己的账号、CDK、游戏数据和操作行为负责，仅使用自己有权处理的数据，不得共享、转售、破解、干扰或以其他方式滥用本服务。免费预览与个人按次档案仅限本人非商业使用；商用账户可使用商用档案处理数据权利人已授权的多个 UID，仅在排班结果成功生成后计费。不得转售 MaaTool 账号或 CDK，账号、档案和积分均不可转让。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_033: "请妥善保管密码、CDK 与森空岛授权信息。因用户主动泄露、设备失控或违反本协议造成的损失，应由用户自行承担。",
   // src/pages/PublicInfoPage.tsx
@@ -304,7 +304,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_038: "排班、收益、等效理智、练度建议和仓库估值均基于导入数据与规则参数计算，仅作为辅助参考。使用前请自行核对实际游戏状态、MAA 配置和版本兼容性。",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_039: "因游戏版本变更、第三方接口异常、数据不完整、配置差异、自动化执行或其他不可控因素造成的结果偏差或损失，MaaTool 官方不承担保证责任。",
+  pages_PublicInfoPage_039: "因游戏版本变更、第三方服务异常、数据不完整、配置差异、自动化执行或其他不可控因素造成的结果偏差或损失，MaaTool 官方不承担保证责任。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_040: "第三方与知识产权",
   // src/pages/PublicInfoPage.tsx
@@ -386,13 +386,13 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_101: "行为风控与保留期限",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_102: "为识别批量代办、活动权益滥用等异常使用，服务会关联注册或激活、绑定档案、提交与完成生成、完整 MAA JSON 导出、成功登录、工作区保存、干员数据与已确认基线的异常差异，以及不含完整网址和参数的粗粒度页面类别与时间。风险模型和每次生成还会记录对应版本。",
+  pages_PublicInfoPage_102: "为识别批量代办、活动权益滥用等异常使用，服务会记录注册与激活、档案绑定、排班生成与导出、登录、工作区保存等必要操作，以及干员数据的异常变化。页面访问记录只包含大致页面类别和时间，不保存完整网址或参数。",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_103: "浏览器随机实例标识、会话、网络地址、浏览器 User-Agent 和游戏 UID 仅以服务端 HMAC 标识进入行为风控库；不会在该库长期保存它们的原始值，也不会采集硬件指纹。输出证据仅包含下载文件 SHA-256、生成或下载次数，以及不含干员、房间名称和完整 JSON 的排班结构摘要。干员数据异常证据只记录异常类型、拥有数量和规范化快照 SHA-256，不把干员名称、干员 ID 或完整干员列表写入行为风控库。",
+  pages_PublicInfoPage_103: "浏览器标识、会话、网络地址、浏览器信息和游戏 UID 在进入异常使用记录前会转换为不能直接还原原值的安全标识，也不会采集硬件指纹。排班与干员异常记录只保存判断所需的摘要和次数，不保存完整 JSON、干员名称、干员 ID 或完整干员列表。",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_104: "异常信号采用多项评分并进入人工复核；共用同一 IP、一次快速操作或一次导出高峰不会单独构成强风险结论。待复核状态、分数和证据由管理员人工处理；确认并实施限制后，账号或档案会显示中性的不可用与联系客服提示。",
+  pages_PublicInfoPage_104: "系统会综合多项异常信号并由管理员人工复核；共用同一网络、一次快速操作或一次导出高峰，不会单独作为限制账号的依据。确认存在异常使用后，相关账号或档案可能被限制，并会显示联系客服提示。",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_105: "上述行为风控事件、关联复核单和可关联审计证据最长保留 90 天，到期删除。账号注销冷静期结束后，常规账户和工作区数据会删除，但尚未到期的 HMAC 风控证据仍按该 90 天上限到期删除。个人使用声明确认记录属于独立的法律与争议处理记录，其中包含确认时客户端 IP，按账号存续期加注销后一年保留，不适用行为风控库的 90 天期限。",
+  pages_PublicInfoPage_105: "异常使用记录及相关复核材料最长保留 90 天，到期删除。账号注销冷静期结束后，常规账号和工作区数据会删除；尚未到期的异常使用记录仍会在 90 天期限届满后删除。个人使用声明的确认记录用于争议处理，会记录确认时的网络地址，在账号存续期间及注销后一年内保留。",
   // src/pages/PricingPage.tsx
   pages_PricingPage_001: "价格与权益",
   // src/pages/PricingPage.tsx
@@ -450,7 +450,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_089: "游戏数据变化后，排班会自动实时更新吗？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_090: "不会把游戏中的每次变化自动同步为新排班。计算使用工作台最近一次成功导入的数据；干员练度、库存或基建配置变化后，请先重新导入或刷新森空岛数据，核对账号与更新时间，再重新计算。已有结果仍是生成时数据快照下的参考。",
+  pages_PublicInfoPage_090: "不会把游戏中的每次变化自动更新为新排班。计算使用工作台最近一次成功导入的数据；干员练度、库存或基建配置变化后，请先重新导入或刷新森空岛数据，核对账号与更新时间，再重新计算。已有结果仍以生成时的数据为准。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_091: "为什么结果页没有 MAA JSON 下载？",
   // src/pages/PublicInfoPage.tsx
@@ -466,7 +466,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_097: "MaaTool 如何保护账号和授权数据？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_098: "MaaTool 登录密码以哈希形式保存，不保存明文；用于持续导入的森空岛凭据会在服务端加密保存。服务不会出售个人信息，也不会将游戏数据用于与服务无关的广告投放。任何网络服务都无法保证绝对安全，请勿共享密码、完整 CDK、二维码、Cookie 或授权凭据。",
+  pages_PublicInfoPage_098: "MaaTool 登录密码经过不可逆处理后保存，不会保存明文；用于持续导入的森空岛凭据会加密保存。服务不会出售个人信息，也不会将游戏数据用于与服务无关的广告投放。任何网络服务都无法保证绝对安全，请勿共享密码、完整 CDK、二维码、Cookie 或授权凭据。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_099: "联系客服时需要提供哪些信息？",
   // src/pages/PublicInfoPage.tsx

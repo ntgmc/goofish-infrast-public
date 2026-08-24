@@ -227,7 +227,7 @@ export function CdkDistributionPanel({ items }: { items: UsageCdkDistributionIte
 }
 
 export function CdkRecordDistributionPanel({ summary }: { summary: CdkOpsSummary }) {
-  const typeLabels = { profile: '档案兑换', balance: '余额兑换', item: '道具（预留）' } as const
+  const typeLabels = { profile: '档案兑换', balance: '余额兑换', item: '道具' } as const
   return (
     <section className="tool-panel p-5">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">

@@ -22,7 +22,7 @@ describe('AuthForm invitation code', () => {
     const user = userEvent.setup()
     render(<AuthForm onAuthenticated={vi.fn()} />)
     await user.click(screen.getByRole('button', { name: '注册' }))
-    const input = screen.getByPlaceholderText('10 位推荐码或 16 位管理员邀请码')
+    const input = screen.getByPlaceholderText('输入 10 位好友邀请码或 16 位管理员邀请码')
     expect(input).toHaveValue('12AB34CD5E6F7G8H')
     expect(input).not.toHaveAttribute('aria-describedby')
     await user.clear(input)
@@ -49,10 +49,10 @@ describe('AuthForm invitation code', () => {
     await user.click(screen.getByRole('button', { name: '注册' }))
     await user.type(screen.getByLabelText('邮箱'), 'new@qq.com')
     await user.type(screen.getByLabelText('密码'), 'password123')
-    const input = screen.getByPlaceholderText('10 位推荐码或 16 位管理员邀请码')
+    const input = screen.getByPlaceholderText('输入 10 位好友邀请码或 16 位管理员邀请码')
     await user.type(input, 'INVALID')
     await user.click(screen.getByRole('button', { name: '创建账号' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('请输入有效的 10 位推荐码或 16 位管理员邀请码')
+    expect(await screen.findByRole('alert')).toHaveTextContent('好友邀请码为 10 位，管理员邀请码为 16 位')
     expect(input).toHaveAttribute('aria-describedby', 'auth-invite-code-error')
   })
 
@@ -65,7 +65,7 @@ describe('AuthForm invitation code', () => {
     render(<AuthForm onAuthenticated={vi.fn()} />)
     await user.click(screen.getByRole('button', { name: '注册' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('注册失败')
+    expect(await screen.findByRole('alert')).toHaveTextContent('暂时无法注册')
     expect(screen.getByRole('button', { name: '创建账号' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: '重试' }))
 

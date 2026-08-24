@@ -102,13 +102,13 @@ export async function createAdminRegistrationInvitation(input: {
     const existing = replay.rows[0]
     if (existing) {
       if (existing.request_hash !== requestHash) {
-        throw new AdminRegistrationInvitationOperationError('idempotency_conflict', '幂等键已被不同的签发请求使用。')
+        throw new AdminRegistrationInvitationOperationError('idempotency_conflict', '签发内容已发生变化，请刷新列表后重新操作。')
       }
       if (!existing.code_ciphertext || !existing.code_iv || !existing.code_auth_tag
         || !existing.code_recoverable_until || Date.parse(existing.code_recoverable_until) <= now.getTime()) {
         throw new AdminRegistrationInvitationOperationError(
           'idempotency_response_expired',
-          '原签发响应的安全恢复窗口已过期，请先检查列表后使用新的幂等键。',
+          '本次签发结果已无法恢复，请先检查列表，再重新签发。',
         )
       }
       return {

@@ -346,7 +346,7 @@ async function handleList(req: Request): Promise<Response> {
     const detailCodeHash = url.searchParams.get('code_hash')
     if (detailCodeHash) {
       if (!/^[a-f0-9]{64}$/i.test(detailCodeHash)) {
-        return jsonResponse({ error: 'Invalid CDK identifier.' }, 400)
+        return jsonResponse({ error: 'CDK 标识无效，请刷新列表后重试。' }, 400)
       }
       const store = await getCdkRecordStore()
       const record = await store.get(`cdk/${detailCodeHash}.json`)
@@ -415,7 +415,7 @@ async function handlePatch(req: Request): Promise<Response> {
       return jsonResponse({ results, succeeded, failed: results.length - succeeded })
     }
     if (!code_hash || !/^[a-f0-9]{64}$/i.test(code_hash)) {
-      return jsonResponse({ error: 'Invalid CDK identifier.' }, 400)
+      return jsonResponse({ error: 'CDK 标识无效，请刷新列表后重试。' }, 400)
     }
 
     const store = await getCdkRecordStore()
@@ -605,7 +605,7 @@ async function handleDelete(req: Request): Promise<Response> {
     })
     if (!authentication.ok) return authentication.response
     if (!code_hash || !/^[a-f0-9]{64}$/i.test(code_hash)) {
-      return jsonResponse({ error: 'Invalid CDK identifier.' }, 400)
+      return jsonResponse({ error: 'CDK 标识无效，请刷新列表后重试。' }, 400)
     }
 
     const store = await getCdkRecordStore()

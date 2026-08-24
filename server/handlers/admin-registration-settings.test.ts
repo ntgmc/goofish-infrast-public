@@ -52,7 +52,7 @@ describe('admin registration settings handler', () => {
       code: 'invalid_registration_settings',
       issues: [{
         path: 'password_reset_email_reserve',
-        message: '两类邮件预留总和不能超过 300。',
+        message: '两项保留额度总和不能超过 300。',
       }],
     })
     expect(settingsStore.saveRegistrationSettings).not.toHaveBeenCalled()

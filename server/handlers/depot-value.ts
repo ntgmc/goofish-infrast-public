@@ -508,7 +508,7 @@ async function readSklandInventory(
 ): Promise<SklandDepotRead> {
   const auth = await requireUserSession(req)
   if (!auth) throw createError('请先登录。', 401)
-  if (typeof profileId !== 'string' || !profileId.trim()) throw createError('缺少 profile_id。', 400)
+  if (typeof profileId !== 'string' || !profileId.trim()) throw createError('请先选择游戏账号。', 400)
   const profile = auth.profiles.find((item) => item.id === profileId.trim())
   if (!profile) throw createError('账号档案不存在。', 404)
   if (profile.status !== 'active') throw createError('账号档案状态不可用。', 400)

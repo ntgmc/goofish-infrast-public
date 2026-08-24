@@ -150,7 +150,7 @@ describe('public information pages', () => {
   it('states the current risk-data retention policy without rollout details', async () => {
     render(<MemoryRouter initialEntries={['/privacy']}><App /></MemoryRouter>)
 
-    expect(await screen.findByText(/行为风控事件、关联复核单和可关联审计证据最长保留 90 天/)).toBeInTheDocument()
+    expect(await screen.findByText(/异常使用记录及相关复核材料最长保留 90 天/)).toBeInTheDocument()
     expect(screen.queryByText(/不回填上线前历史/)).not.toBeInTheDocument()
   })
 })

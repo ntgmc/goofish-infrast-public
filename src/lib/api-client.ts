@@ -1,4 +1,5 @@
 import { recordDebugApiEvent, type DebugApiOutcome } from './debug-diagnostics'
+import { copy } from '../copy/index'
 
 export class ApiError extends Error {
   readonly status: number
@@ -16,7 +17,7 @@ export class ApiError extends Error {
     url: string,
     retryAfterSeconds: number | null = null,
   ) {
-    super(message)
+    super(toUserFriendlyApiErrorMessage(message, data))
     this.name = 'ApiError'
     this.status = status
     this.data = data
@@ -26,6 +27,32 @@ export class ApiError extends Error {
     this.issues = readValidationIssues(data)
     this.retryAfterSeconds = retryAfterSeconds ?? readRetryAfterSecondsFromData(data)
   }
+}
+
+function toUserFriendlyApiErrorMessage(message: string, data: unknown): string {
+  const normalized = message.trim()
+  const code = readApiErrorCode(data)
+  if (code === 'idempotency_conflict') return copy.common.lib_api_client_changed_submission
+  if (code === 'result_cursor_invalid') return copy.common.lib_api_client_invalid_result_cursor
+  if (/^Method not allowed\.?$/i.test(normalized)) return copy.common.lib_api_client_method_not_allowed
+  if (/^Internal server error\.?$/i.test(normalized)) return copy.common.lib_api_client_internal_error
+  if (/^API route not found\.?$/i.test(normalized)) return copy.common.lib_api_client_route_not_found
+  if (/^Request failed: \d+\.?$/i.test(normalized)) return copy.common.lib_api_client_request_failed
+  if (/^(Expected a JSON response|Response body contains invalid JSON)/i.test(normalized)) return copy.common.lib_api_client_invalid_response
+  if (/^Request timed out\.?$/i.test(normalized)) return copy.common.lib_api_client_timeout
+  if (/^Request was cancelled\.?$/i.test(normalized)) return copy.common.lib_api_client_cancelled
+  if (/^Network request failed\.?$/i.test(normalized)) return copy.common.lib_api_client_network_error
+  if (/^Invalid CDK identifier\.?$/i.test(normalized)) return copy.common.lib_api_client_invalid_cdk
+  if (/^Invalid cursor\.?$/i.test(normalized)) return copy.common.lib_api_client_invalid_cursor
+  if (/^Invalid limit\.?$/i.test(normalized)) return copy.common.lib_api_client_invalid_limit
+  if (/^Missing scan_id\.?$/i.test(normalized)) return copy.common.lib_api_client_invalid_scan
+  if (/^Missing selection_id\.?$/i.test(normalized)) return copy.common.lib_api_client_missing_selection
+  if (/^Missing (pending_id|confirmation_id)\.?$/i.test(normalized)) return copy.common.lib_api_client_expired_operation
+  if (/^Missing idempotency_key\.?$/i.test(normalized)) return copy.common.lib_api_client_incomplete_submission
+  if (/^Missing [A-Za-z0-9_.-]+\.?$/i.test(normalized)) return copy.common.lib_api_client_missing_input
+  if (/^Invalid [A-Za-z0-9_. -]+\.?$/i.test(normalized)) return copy.common.lib_api_client_invalid_input
+  if (/^Unsupported [A-Za-z0-9_. -]+\.?$/i.test(normalized)) return copy.common.lib_api_client_method_not_allowed
+  return message
 }
 
 export type ApiValidationIssue = { path: string; code: string }

@@ -64,7 +64,9 @@ export async function consumeInventoryItemImmediately(input: {
       [input.userId, input.idempotencyKey],
     )
     if (existing.rows[0]) {
-      if (existing.rows[0].request_hash !== input.requestHash) throw new InventoryError('idempotency_conflict', '幂等键已被其他请求使用。', 409)
+      if (existing.rows[0].request_hash !== input.requestHash) {
+        throw new InventoryError('idempotency_conflict', '提交内容已发生变化，请刷新页面后重新操作。', 409)
+      }
       if (!existing.rows[0].response_json) throw new InventoryError('operation_in_progress', '道具操作正在处理中。', 409)
       return existing.rows[0].response_json
     }
@@ -131,7 +133,7 @@ export async function createLifetimeProfileForJsonImport(input: {
       )
       const previous = existing.rows[0]
       if (!previous || previous.request_hash !== requestHash) {
-        throw new InventoryError('idempotency_conflict', '幂等键已被其他请求使用。', 409)
+        throw new InventoryError('idempotency_conflict', '提交内容已发生变化，请刷新页面后重新操作。', 409)
       }
       if (!previous.response_json || typeof previous.response_json.profile_id !== 'string') {
         throw new InventoryError('operation_in_progress', '终身版档案正在创建中。', 409)
@@ -698,7 +700,9 @@ export async function useInventoryItem(userId: string, input: ItemUseRequest, op
       [userId, input.idempotency_key],
     )
     if (existing.rows[0]) {
-      if (existing.rows[0].request_hash !== requestHash) throw new InventoryError('idempotency_conflict', '幂等键已被其他请求使用。', 409)
+      if (existing.rows[0].request_hash !== requestHash) {
+        throw new InventoryError('idempotency_conflict', '提交内容已发生变化，请刷新页面后重新操作。', 409)
+      }
       if (!existing.rows[0].response_json) throw new InventoryError('operation_in_progress', '道具操作正在处理中。', 409)
       return existing.rows[0].response_json
     }
@@ -913,7 +917,9 @@ export async function claimOnboardingTask(userId: string, taskCode: OnboardingTa
       [userId, idempotencyKey],
     )
     if (existingOperation.rows[0]) {
-      if (existingOperation.rows[0].request_hash !== requestHash) throw new InventoryError('idempotency_conflict', '幂等键已被其他请求使用。', 409)
+      if (existingOperation.rows[0].request_hash !== requestHash) {
+        throw new InventoryError('idempotency_conflict', '提交内容已发生变化，请刷新页面后重新操作。', 409)
+      }
       if (!existingOperation.rows[0].response_json) throw new InventoryError('operation_in_progress', '任务领取正在处理中。', 409)
       return existingOperation.rows[0].response_json
     }

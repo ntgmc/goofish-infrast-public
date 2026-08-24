@@ -65,7 +65,7 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
             <option value="all">全部类型</option>
             <option value="profile">档案兑换</option>
             <option value="balance">余额兑换</option>
-            <option value="item">道具（预留）</option>
+            <option value="item">道具</option>
           </select>
         </label>
         <label className="block">

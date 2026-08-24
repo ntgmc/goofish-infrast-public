@@ -412,7 +412,7 @@ describe('admin user password reset', () => {
     mocks.resetUserPasswordByAdmin.mockResolvedValue({
       ok: false,
       status: 409,
-      message: '账号状态或密码已发生变化，请刷新后重试。',
+      message: '账号信息已更新，请刷新页面后重新提交。',
       code: 'password_update_conflict',
     })
 
@@ -429,7 +429,7 @@ describe('admin user password reset', () => {
 
     expect(response.status).toBe(409)
     await expect(response.json()).resolves.toEqual({
-      error: '账号状态或密码已发生变化，请刷新后重试。',
+      error: '账号信息已更新，请刷新页面后重新提交。',
       code: 'password_update_conflict',
     })
   })

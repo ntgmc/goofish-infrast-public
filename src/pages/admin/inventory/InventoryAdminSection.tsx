@@ -296,7 +296,7 @@ export default function InventoryAdminSection() {
         action: 'create_campaign', item_code: itemCode, quantity, validity_days: validityDays, target_mode: targetMode,
         ...(giftVersionId && { gift_pack_version_id: giftVersionId }),
         ...(targetMode === 'user_ids' ? { user_ids: userIds } : { root_password: rootPassword, confirmation: 'DISTRIBUTE TO ALL USERS' }), reason,
-      }, '发放活动已进入队列。', { idempotencyScope: 'create_campaign' }) }}>
+      }, '发放任务已创建，系统正在处理。', { idempotencyScope: 'create_campaign' }) }}>
         <h3 className="text-base font-semibold text-ink-primary">批量与全站发放</h3>
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <div>
@@ -325,7 +325,7 @@ export default function InventoryAdminSection() {
           <div className="mt-3 flex flex-wrap gap-2">
             {(campaign.status === 'queued' || campaign.status === 'running') && <><CampaignAction action="pause_campaign" label="暂停" campaign={campaign} run={run} rootPassword={rootPassword} /><CampaignAction action="cancel_campaign" label="取消" campaign={campaign} run={run} rootPassword={rootPassword} /></>}
             {campaign.status === 'paused' && <CampaignAction action="resume_campaign" label="恢复" campaign={campaign} run={run} rootPassword={rootPassword} />}
-            {campaign.status === 'completed_with_failures' && <button type="button" className="tool-secondary-action" onClick={() => void run('/api/admin/inventory', { action: 'retry_campaign_failures', campaign_id: campaign.id, reason: '管理员重试失败收件人' }, '失败收件人已重新入队。', { confirmation: `确认重试活动 ${campaign.id} 的 ${campaign.failed_count} 个失败收件人？` })}>重试失败收件人</button>}
+            {campaign.status === 'completed_with_failures' && <button type="button" className="tool-secondary-action" onClick={() => void run('/api/admin/inventory', { action: 'retry_campaign_failures', campaign_id: campaign.id, reason: '管理员重试失败收件人' }, '失败记录已重新提交处理。', { confirmation: `确认重试活动 ${campaign.id} 的 ${campaign.failed_count} 个失败收件人？` })}>重试失败收件人</button>}
             {(campaign.status === 'completed' || campaign.status === 'completed_with_failures') && <CampaignAction action="reverse_campaign" label="撤回未消费余额" campaign={campaign} run={run} rootPassword={rootPassword} />}
           </div>
         </article>)}</div>
@@ -465,8 +465,8 @@ function itemKindLabel(kind: ItemDefinition['kind']): string {
   if (kind === 'consumable') return '消耗券'
   if (kind === 'capacity_upgrade') return '档案扩容'
   if (kind === 'gift_pack') return '礼包'
-  if (kind === 'cosmetic') return '主题装扮（预留）'
-  if (kind === 'badge') return '成就勋章（预留）'
+  if (kind === 'cosmetic') return '主题装扮（暂未开放）'
+  if (kind === 'badge') return '成就勋章（暂未开放）'
   if (kind === 'license_voucher') return '授权凭证'
   return assertNever(kind)
 }

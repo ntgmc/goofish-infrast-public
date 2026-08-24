@@ -38,7 +38,7 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
     return response
   }
   const idempotencyKey = normalizeIdempotencyKey(req.headers.get('Idempotency-Key'))
-  if (!idempotencyKey) return jsonResponse({ error: '缺少或无效的 Idempotency-Key。', code: 'idempotency_key_required' }, 400)
+  if (!idempotencyKey) return jsonResponse({ error: '本次提交信息不完整，请重新操作。', code: 'idempotency_key_required' }, 400)
 
   try {
     const body = await getValidatedJson(req, requestSchemas.reorderCheck) as CreateReorderCheckRequest
@@ -48,7 +48,7 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
     const activeProfileId = typeof body.profileId === 'string' ? body.profileId.trim() : ''
     if (!activeProfileId || !body.config) {
       await recordReorderCheckEvent('failure', 'validation_failed', startedAt)
-      return jsonResponse({ error: '缺少档案 ID 或配置。' }, 400)
+      return jsonResponse({ error: '请先选择游戏账号并完成排班设置。' }, 400)
     }
     profileIdForUsage = activeProfileId
 
