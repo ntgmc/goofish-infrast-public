@@ -38,7 +38,20 @@ export default function EcsCostControlPanel({
         <span className="tool-status">{currentWorkerState}</span>
       </div>
 
-      <div className="mt-5 grid gap-4 md:grid-cols-2">
+      <div className="mt-5 grid gap-4 md:grid-cols-3">
+        <label className="block text-sm text-ink-secondary">
+          <span className="mb-2 block">{copy.status.pages_AdminEcsCost_059}</span>
+          <input
+            className="tool-field"
+            type="number"
+            min="0"
+            step="0.0001"
+            value={config.resident_hourly_price_cny ?? ''}
+            placeholder={copy.status.pages_AdminEcsCost_006}
+            onChange={(event) => onChange({ ...config, resident_hourly_price_cny: event.currentTarget.value === '' ? null : Math.max(0, Number(event.currentTarget.value) || 0) })}
+          />
+          <span className="mt-1 block text-xs text-ink-muted">{copy.status.pages_AdminEcsCost_054}</span>
+        </label>
         <label className="block text-sm text-ink-secondary">
           <span className="mb-2 block">{copy.status.pages_AdminEcsCost_005}</span>
           <input

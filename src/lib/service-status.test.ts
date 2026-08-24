@@ -88,11 +88,11 @@ describe('service status rules', () => {
   it('calculates ECS instance hours from a peak and valley schedule', () => {
     const config = { ...createDefaultServiceStatusCostConfig(), schedule_enabled: true, valley_worker_instances: 1, peak_windows: [{ start: '09:00', end: '18:00', worker_instances: 3 }] }
     expect(calculatePlannedDailyWorkerHours(config)).toBe(42)
-    expect(calculateServiceStatusCostEstimate({ ...config, hourly_price_cny: 0.5 }, []).estimated_monthly_cost_cny).toBe(630)
+    expect(calculateServiceStatusCostEstimate({ ...config, resident_hourly_price_cny: 0.2, hourly_price_cny: 0.5 }, []).estimated_monthly_cost_cny).toBe(774)
   })
 
   it('keeps observed cost windows bounded when recent hourly samples are sparse', () => {
-    const config = { ...createDefaultServiceStatusCostConfig(), hourly_price_cny: 0.5 }
+    const config = { ...createDefaultServiceStatusCostConfig(), resident_hourly_price_cny: 0.2, hourly_price_cny: 0.5 }
     const buckets = Array.from({ length: 26 }, (_, index) => ({
       component_id: 'optimization' as const,
       bucket_start: new Date(Date.UTC(2026, 7, 1, index)).toISOString(),
@@ -114,7 +114,37 @@ describe('service status rules', () => {
     const estimate = calculateServiceStatusCostEstimate(config, buckets)
     expect(estimate.observed_24h_worker_hours).toBe(1)
     expect(estimate.observed_24h_sample_hours).toBe(1)
-    expect(estimate.observed_24h_cost_cny).toBe(0.5)
+    expect(estimate.observed_24h_cost_cny).toBe(0.7)
+  })
+
+  it('uses separate resident and burst prices and compares savings with both machines always running', () => {
+    const config = { ...createDefaultServiceStatusCostConfig(), resident_hourly_price_cny: 0.2, hourly_price_cny: 0.8 }
+    const buckets = Array.from({ length: 24 }, (_, index) => ({
+      component_id: 'optimization' as const,
+      bucket_start: new Date(Date.UTC(2026, 7, 1, index)).toISOString(),
+      status: 'available' as const,
+      sample_count: 12,
+      availability_percent: 100,
+      busy_samples: 0,
+      congested_samples: 0,
+      overloaded_samples: 0,
+      average_active_concurrency: 0,
+      average_provisioned_concurrency: 1,
+      average_worker_instances: 0.25,
+      average_utilization_percent: 0,
+      peak_queued: 0,
+      peak_running: 0,
+      peak_worker_instances: 1,
+      unavailable_samples: 0,
+    }))
+
+    const estimate = calculateServiceStatusCostEstimate(config, buckets)
+    expect(estimate).toMatchObject({
+      observed_24h_worker_hours: 6,
+      observed_24h_cost_cny: 9.6,
+      projected_monthly_cost_cny: 288,
+      observed_savings_cny: 14.4,
+    })
   })
 
   it('represents a final peak window with browser-compatible midnight', () => {

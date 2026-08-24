@@ -186,7 +186,7 @@ export async function getServiceStatusCostConfig(
 ): Promise<ServiceStatusCostConfig> {
   await ensureDatabaseSchema()
   const result = await query<ServiceStatusCostConfigRow>(
-    `select component_id, billing_model, currency, hourly_price_cny::text, timezone,
+    `select component_id, billing_model, currency, resident_hourly_price_cny::text, hourly_price_cny::text, timezone,
             schedule_enabled, valley_worker_instances, peak_windows_json, updated_at::text
        from service_status_cost_config
       where component_id = $1`,
@@ -198,6 +198,7 @@ export async function getServiceStatusCostConfig(
     component_id: row.component_id,
     billing_model: row.billing_model,
     currency: row.currency,
+    resident_hourly_price_cny: row.resident_hourly_price_cny === null ? null : Number(row.resident_hourly_price_cny),
     hourly_price_cny: row.hourly_price_cny === null ? null : Number(row.hourly_price_cny),
     timezone: row.timezone,
     schedule_enabled: row.schedule_enabled,
@@ -219,7 +220,7 @@ export async function saveServiceStatusCostConfig(
   await ensureDatabaseSchema()
   return withTransaction(async (client) => {
     const currentResult = await client.query<ServiceStatusCostConfigRow>(
-      `select component_id, billing_model, currency, hourly_price_cny::text, timezone,
+      `select component_id, billing_model, currency, resident_hourly_price_cny::text, hourly_price_cny::text, timezone,
               schedule_enabled, valley_worker_instances, peak_windows_json, updated_at::text
          from service_status_cost_config
         where component_id = $1
@@ -234,12 +235,13 @@ export async function saveServiceStatusCostConfig(
     const config = normalizeServiceStatusCostConfig({ ...input.config, updated_at: now }, input.config.component_id)
     await client.query(
       `insert into service_status_cost_config
-        (component_id, billing_model, currency, hourly_price_cny, timezone, schedule_enabled,
-         valley_worker_instances, peak_windows_json, updated_at, updated_by)
-       values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)
+        (component_id, billing_model, currency, resident_hourly_price_cny, hourly_price_cny, timezone,
+         schedule_enabled, valley_worker_instances, peak_windows_json, updated_at, updated_by)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11)
        on conflict (component_id) do update set
          billing_model = excluded.billing_model,
          currency = excluded.currency,
+         resident_hourly_price_cny = excluded.resident_hourly_price_cny,
          hourly_price_cny = excluded.hourly_price_cny,
          timezone = excluded.timezone,
          schedule_enabled = excluded.schedule_enabled,
@@ -247,16 +249,16 @@ export async function saveServiceStatusCostConfig(
          peak_windows_json = excluded.peak_windows_json,
          updated_at = excluded.updated_at,
          updated_by = excluded.updated_by`,
-      [config.component_id, config.billing_model, config.currency, config.hourly_price_cny, config.timezone, config.schedule_enabled,
-        config.valley_worker_instances, JSON.stringify(config.peak_windows), now, input.audit.actorUsername],
+      [config.component_id, config.billing_model, config.currency, config.resident_hourly_price_cny, config.hourly_price_cny,
+        config.timezone, config.schedule_enabled, config.valley_worker_instances, JSON.stringify(config.peak_windows), now, input.audit.actorUsername],
     )
     await recordAdminOperationAuditInTransaction(client, {
       ...input.audit,
       action: 'service_status_cost_config.update',
       targetType: 'service_status_cost_config',
       targetId: config.component_id,
-      before: current ? { hourly_price_cny: current.hourly_price_cny, schedule_enabled: current.schedule_enabled, valley_worker_instances: current.valley_worker_instances, peak_windows: current.peak_windows_json } : null,
-      after: { hourly_price_cny: config.hourly_price_cny, schedule_enabled: config.schedule_enabled, valley_worker_instances: config.valley_worker_instances, peak_windows: config.peak_windows },
+      before: current ? { resident_hourly_price_cny: current.resident_hourly_price_cny, hourly_price_cny: current.hourly_price_cny, schedule_enabled: current.schedule_enabled, valley_worker_instances: current.valley_worker_instances, peak_windows: current.peak_windows_json } : null,
+      after: { resident_hourly_price_cny: config.resident_hourly_price_cny, hourly_price_cny: config.hourly_price_cny, schedule_enabled: config.schedule_enabled, valley_worker_instances: config.valley_worker_instances, peak_windows: config.peak_windows },
     })
     return config
   })
@@ -462,6 +464,7 @@ interface ServiceStatusCostConfigRow extends QueryResultRow {
   component_id: ServiceStatusComponentId
   billing_model: string
   currency: string
+  resident_hourly_price_cny: string | null
   hourly_price_cny: string | null
   timezone: string
   schedule_enabled: boolean

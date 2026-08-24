@@ -200,6 +200,7 @@ export const requestSchemas = {
       component_id: z.literal('optimization'),
       billing_model: z.literal('ecs_payg'),
       currency: z.literal('CNY'),
+      resident_hourly_price_cny: z.number().finite().min(0).max(10000).nullable(),
       hourly_price_cny: z.number().finite().min(0).max(10000).nullable(),
       timezone: z.literal('Asia/Shanghai'),
       schedule_enabled: z.boolean(),

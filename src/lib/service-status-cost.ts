@@ -25,17 +25,23 @@ export function calculateServiceStatusCostEstimate(
   buckets: AdminServiceStatusHistoryBucket[],
 ): ServiceStatusCostEstimate {
   const plannedDaily = calculatePlannedDailyWorkerHours(config)
-  const price = config.hourly_price_cny
+  const residentPrice = Number.isFinite(config.resident_hourly_price_cny) ? config.resident_hourly_price_cny : null
+  const burstPrice = Number.isFinite(config.hourly_price_cny) ? config.hourly_price_cny : null
+  const pricesConfigured = residentPrice !== null && burstPrice !== null
   const observed24 = observedWorkerHours(buckets, 24)
   const observed30d = observedWorkerHours(buckets, HOURS_PER_MONTH)
-  const observed24Cost = price === null || observed24 === null ? null : roundMoney(observed24.workerHours * price)
-  const observed30dCost = price === null || observed30d === null ? null : roundMoney(observed30d.workerHours * price)
-  const projectedMonthly = price === null || observed24 === null || observed24.sampleHours === 0
+  const observed24Cost = !pricesConfigured || observed24 === null ? null : observedCost(observed24, residentPrice, burstPrice)
+  const observed30dCost = !pricesConfigured || observed30d === null ? null : observedCost(observed30d, residentPrice, burstPrice)
+  const projectedMonthly = !pricesConfigured || observed24 === null || observed24.sampleHours === 0
     ? null
-    : roundMoney((observed24.workerHours / observed24.sampleHours) * HOURS_PER_MONTH * price)
-  const observedSavings = price === null || observed30d === null
+    : roundMoney((residentPrice + (observed24.workerHours / observed24.sampleHours) * burstPrice) * HOURS_PER_MONTH)
+  const observedSavings = !pricesConfigured || observed30d === null
     ? null
-    : roundMoney(Math.max(0, observed30d.sampleHours - observed30d.workerHours) * price)
+    : roundMoney(Math.max(0,
+      observed30d.sampleHours * (residentPrice + burstPrice)
+      - observed30d.sampleHours * residentPrice
+      - observed30d.workerHours * burstPrice,
+    ))
   return {
     observed_24h_worker_hours: observed24?.workerHours ?? null,
     observed_30d_worker_hours: observed30d?.workerHours ?? null,
@@ -47,9 +53,17 @@ export function calculateServiceStatusCostEstimate(
     observed_savings_cny: observedSavings,
     planned_daily_worker_hours: plannedDaily,
     planned_monthly_worker_hours: roundHours(plannedDaily * 30),
-    estimated_daily_cost_cny: price === null ? null : roundMoney(plannedDaily * price),
-    estimated_monthly_cost_cny: price === null ? null : roundMoney(plannedDaily * 30 * price),
+    estimated_daily_cost_cny: !pricesConfigured ? null : roundMoney(24 * residentPrice + plannedDaily * burstPrice),
+    estimated_monthly_cost_cny: !pricesConfigured ? null : roundMoney((24 * residentPrice + plannedDaily * burstPrice) * 30),
   }
+}
+
+function observedCost(
+  observed: { workerHours: number; sampleHours: number },
+  residentPrice: number,
+  burstPrice: number,
+): number {
+  return roundMoney(observed.sampleHours * residentPrice + observed.workerHours * burstPrice)
 }
 
 export function recommendServiceStatusCostPlan(
