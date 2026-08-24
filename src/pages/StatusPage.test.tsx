@@ -30,6 +30,8 @@ describe('StatusPage', () => {
     const componentSection = screen.getByText('服务组件', { selector: 'p' }).closest('section')
     expect(componentSection).not.toBeNull()
     expect(componentSection).toHaveTextContent('正常')
+    expect(componentSection).toHaveTextContent('森空岛导入')
+    expect(componentSection).toHaveTextContent('干员、仓库数据导入服务')
     expect(componentSection).not.toHaveTextContent('等待任务')
     expect(componentSection).not.toHaveTextContent('运行中')
     expect(componentSection).not.toHaveTextContent('并发容量')
@@ -90,6 +92,16 @@ describe('StatusPage', () => {
     expect(screen.getByText('自动扩缩容正在消化排队任务，服务保持可用。')).toBeInTheDocument()
   })
 
+  it('renders the Skland import status independently from optimization', async () => {
+    vi.mocked(fetch).mockResolvedValue(response(200, payload('available', { queued: 0, running: 1 }, 'unavailable')))
+    render(<MemoryRouter><StatusPage /></MemoryRouter>)
+    await act(async () => { await Promise.resolve() })
+
+    const sklandComponent = screen.getByRole('heading', { name: '森空岛导入' }).closest('article')
+    expect(sklandComponent).toHaveTextContent('不可用')
+    expect(screen.getByRole('heading', { name: '当前服务运行正常。' })).toBeInTheDocument()
+  })
+
   it('renders a 7-day hourly history grid and incident updates', async () => {
     const body = payload('available', { queued: 0, running: 1 }) as Record<string, unknown>
     body.history = {
@@ -148,12 +160,12 @@ function response(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
-function payload(status: ServiceStatusLevel, queue: { queued: number; running: number } | null) {
+function payload(status: ServiceStatusLevel, queue: { queued: number; running: number } | null, sklandStatus: ServiceStatusLevel = 'available') {
   return {
     generated_at: '2026-08-08T09:00:00.000Z',
     status,
     queue: queue ? { ...queue, queue_limit: 200, worker_concurrency: 3, worker_instances: 1 } : null,
-    components: [{ id: 'optimization', status }],
+    components: [{ id: 'optimization', status }, { id: 'skland_import', status: sklandStatus }],
     thresholds: { queue_congested_at: 5, queue_overloaded_at: 20 },
   }
 }

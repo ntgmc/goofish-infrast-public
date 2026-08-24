@@ -1,16 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { getQueueSnapshot, isServiceReady, getHistory, listIncidents, autoscalingConfig } = vi.hoisted(() => ({
+const { getQueueSnapshot, isServiceReady, getHistory, listIncidents, autoscalingConfig, ensureSklandConfiguration } = vi.hoisted(() => ({
   getQueueSnapshot: vi.fn(),
   isServiceReady: vi.fn(),
   getHistory: vi.fn(),
   listIncidents: vi.fn(),
   autoscalingConfig: vi.fn(),
+  ensureSklandConfiguration: vi.fn(),
 }))
 
 vi.mock('../storage/optimize-job-store', () => ({ getAdminOptimizationQueueSnapshot: getQueueSnapshot }))
 vi.mock('../storage/service-status-store', () => ({ getServiceStatusHistory: getHistory, listPublicServiceStatusIncidents: listIncidents }))
 vi.mock('../lifecycle', () => ({ isServiceReady }))
+vi.mock('../skland-config', () => ({ ensureSklandServiceConfiguration: ensureSklandConfiguration }))
 vi.mock('../optimize-job-config', () => ({
   getOptimizeStatusQueuePickupGraceMs: () => 5_000,
   getOptimizeWorkerAutoscalingConfiguration: autoscalingConfig,
@@ -22,6 +24,7 @@ describe('service status handler', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     isServiceReady.mockReturnValue(true)
+    ensureSklandConfiguration.mockReturnValue(undefined)
     autoscalingConfig.mockReturnValue({ enabled: false, scaleUpQueueThreshold: 4, scaleDownQueueThreshold: 1, scaleDownIdleMs: 600000, intervalMs: 30000 })
     getQueueSnapshot.mockResolvedValue(snapshot({ queued: 0, running: 1, workerConcurrency: 3, workerInstances: 1 }))
     getHistory.mockResolvedValue({ from: '2026-07-09T09:00:00.000Z', to: '2026-08-08T09:00:00.000Z', buckets: [{ component_id: 'optimization', bucket_start: '2026-08-08T08:00:00.000Z', status: 'available', sample_count: 12, availability_percent: 100 }] })
@@ -37,7 +40,10 @@ describe('service status handler', () => {
     await expect(response.json()).resolves.toEqual(expect.objectContaining({
       status: 'available',
       queue: expect.objectContaining({ queued: 0, running: 1, worker_concurrency: 3 }),
-      components: [{ id: 'optimization', status: 'available' }],
+      components: [
+        { id: 'optimization', status: 'available' },
+        { id: 'skland_import', status: 'available' },
+      ],
       history: expect.objectContaining({ interval: 'hour', complete: true, buckets: expect.any(Array) }),
       incidents: expect.arrayContaining([expect.objectContaining({ id: 'incident-1', status: 'resolved' })]),
     }))
@@ -84,7 +90,10 @@ describe('service status handler', () => {
     const response = await serviceStatusHandler(new Request('http://localhost/api/status'))
 
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({ status: 'scaling', components: [{ id: 'optimization', status: 'scaling' }] })
+    await expect(response.json()).resolves.toMatchObject({ status: 'scaling', components: [
+      { id: 'optimization', status: 'scaling' },
+      { id: 'skland_import', status: 'available' },
+    ] })
   })
 
   it('reports orange overload above twenty queued jobs', async () => {
@@ -102,7 +111,21 @@ describe('service status handler', () => {
     isServiceReady.mockReturnValue(false)
     const response = await serviceStatusHandler(new Request('http://localhost/api/status'))
     expect(response.status).toBe(503)
-    await expect(response.json()).resolves.toMatchObject({ status: 'unavailable' })
+    await expect(response.json()).resolves.toMatchObject({ status: 'unavailable', components: [
+      { id: 'optimization', status: 'unavailable' },
+      { id: 'skland_import', status: 'unavailable' },
+    ] })
+  })
+
+  it('reports the Skland import component unavailable when its service configuration is invalid', async () => {
+    ensureSklandConfiguration.mockImplementation(() => { throw new Error('invalid configuration') })
+    const response = await serviceStatusHandler(new Request('http://localhost/api/status'))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ status: 'available', components: [
+      { id: 'optimization', status: 'available' },
+      { id: 'skland_import', status: 'unavailable' },
+    ] })
   })
 
   it('does not expose storage errors', async () => {

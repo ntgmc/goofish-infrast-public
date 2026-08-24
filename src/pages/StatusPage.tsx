@@ -89,7 +89,8 @@ export default function StatusPage() {
   }, [loadStatus])
 
   const currentStatus = status ?? UNAVAILABLE_STATUS
-  const optimizationStatus = status?.components[0]?.status ?? status?.status
+  const optimizationStatus = status?.components.find((component) => component.id === 'optimization')?.status ?? status?.status
+  const sklandStatus = status?.components.find((component) => component.id === 'skland_import')?.status
   const statusMessage = status ? statusMessageFor(status.status) : error ? copy.status.pages_StatusPage_021 : copy.status.pages_StatusPage_024
   const updatedAt = status ? formatUpdatedAt(status.generated_at) : error ? copy.status.pages_StatusPage_072 : copy.status.pages_StatusPage_024
 
@@ -144,7 +145,7 @@ export default function StatusPage() {
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="public-kicker">{copy.status.pages_StatusPage_008}</p>
-                <h2 id="status-components-title" className="mt-2 text-2xl font-semibold text-ink-primary">{copy.status.pages_StatusPage_009}</h2>
+                <h2 id="status-components-title" className="mt-2 text-2xl font-semibold text-ink-primary">{copy.status.pages_StatusPage_008}</h2>
               </div>
               <span className="text-sm text-ink-muted">{updatedAt}</span>
             </div>
@@ -155,6 +156,15 @@ export default function StatusPage() {
                   <p className="mt-2 max-w-2xl text-sm leading-7 text-ink-secondary">{copy.status.pages_StatusPage_010}</p>
                 </div>
                 {optimizationStatus ? <ServiceStatusBadge level={optimizationStatus} compact /> : <span className="tool-status">{error ? copy.status.pages_StatusPage_071 : copy.status.pages_StatusPage_024}</span>}
+              </div>
+            </article>
+            <article className="border-b border-surface-3 py-5" aria-labelledby="skland-component-title">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <h3 id="skland-component-title" className="text-lg font-semibold text-ink-primary">{copy.status.pages_StatusPage_075}</h3>
+                  <p className="mt-2 max-w-2xl text-sm leading-7 text-ink-secondary">{copy.status.pages_StatusPage_076}</p>
+                </div>
+                {sklandStatus ? <ServiceStatusBadge level={sklandStatus} compact /> : <span className="tool-status">{error ? copy.status.pages_StatusPage_071 : copy.status.pages_StatusPage_024}</span>}
               </div>
             </article>
           </section>
