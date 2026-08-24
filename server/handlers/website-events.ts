@@ -44,14 +44,14 @@ export default async function websiteEventsHandler(req: Request): Promise<Respon
   const cursor = url.searchParams.get('cursor')
   if (cursor === null || (cursor !== 'latest' && !isValidCursor(cursor))) {
     return websiteIntegrationResponse(
-      { error: 'Invalid cursor', code: 'invalid_cursor' },
+      { error: '活动记录加载位置已失效，请重新打开页面。', code: 'invalid_cursor' },
       400,
     )
   }
   const limit = parseLimit(url.searchParams.get('limit'))
   if (limit === null) {
     return websiteIntegrationResponse(
-      { error: 'Invalid limit', code: 'invalid_limit' },
+      { error: '活动记录数量设置无效，请刷新后重试。', code: 'invalid_limit' },
       400,
     )
   }

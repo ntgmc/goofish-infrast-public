@@ -36,12 +36,12 @@ describe('admin service status handler', () => {
     mocks.authenticate.mockResolvedValue({ ok: true, username: 'ops', capabilities: ['optimization_view', 'optimization_manage'] })
     mocks.autoscalingConfig.mockReturnValue({ enabled: false, scaleUpQueueThreshold: 4, scaleDownQueueThreshold: 1, scaleDownIdleMs: 600000, intervalMs: 30000 })
     mocks.getHistory.mockResolvedValue({ from: '2026-07-09T00:00:00.000Z', to: '2026-08-08T00:00:00.000Z', buckets: [] })
-    mocks.getCost.mockResolvedValue({ component_id: 'optimization', billing_model: 'ecs_payg', currency: 'CNY', hourly_price_cny: null, timezone: 'Asia/Shanghai', schedule_enabled: false, valley_worker_instances: 0, peak_windows: [], updated_at: null })
+    mocks.getCost.mockResolvedValue({ component_id: 'optimization', billing_model: 'ecs_payg', currency: 'CNY', resident_hourly_price_cny: null, hourly_price_cny: null, timezone: 'Asia/Shanghai', schedule_enabled: false, valley_worker_instances: 0, peak_windows: [], updated_at: null })
     mocks.listIncidents.mockResolvedValue([])
     mocks.getSnapshot.mockResolvedValue({ snapshot_at: '2026-08-08T09:00:00.000Z', capacity: { queue_limit: 200, worker_concurrency: 3, worker_instances: 1 }, counts: { queued: 0, ready_queued: 0, oldest_ready_wait_ms: null, running: 0 } })
     mocks.createIncident.mockResolvedValue({ id: 'incident-1', status: 'investigating' })
     mocks.appendUpdate.mockResolvedValue({ id: 'incident-1', status: 'resolved' })
-    mocks.saveCost.mockResolvedValue({ component_id: 'optimization', billing_model: 'ecs_payg', currency: 'CNY', hourly_price_cny: 0.8, timezone: 'Asia/Shanghai', schedule_enabled: true, valley_worker_instances: 1, peak_windows: [{ start: '09:00', end: '18:00', worker_instances: 3 }], updated_at: '2026-08-08T10:00:00.000Z' })
+    mocks.saveCost.mockResolvedValue({ component_id: 'optimization', billing_model: 'ecs_payg', currency: 'CNY', resident_hourly_price_cny: 0.2, hourly_price_cny: 0.8, timezone: 'Asia/Shanghai', schedule_enabled: true, valley_worker_instances: 1, peak_windows: [{ start: '09:00', end: '18:00', worker_instances: 3 }], updated_at: '2026-08-08T10:00:00.000Z' })
   })
 
   it('requires an authenticated viewer for history', async () => {
@@ -94,10 +94,10 @@ describe('admin service status handler', () => {
   it('saves ECS cost planning with manage capability and recent login', async () => {
     const response = await adminServiceStatusHandler(new Request('http://localhost/api/admin/service-status', {
       method: 'POST',
-      body: JSON.stringify({ action: 'save_cost_config', component_id: 'optimization', billing_model: 'ecs_payg', currency: 'CNY', hourly_price_cny: 0.8, timezone: 'Asia/Shanghai', schedule_enabled: true, valley_worker_instances: 1, peak_windows: [{ start: '09:00', end: '18:00', worker_instances: 3 }], expected_updated_at: null, reason: '更新成本计划' }),
+      body: JSON.stringify({ action: 'save_cost_config', component_id: 'optimization', billing_model: 'ecs_payg', currency: 'CNY', resident_hourly_price_cny: 0.2, hourly_price_cny: 0.8, timezone: 'Asia/Shanghai', schedule_enabled: true, valley_worker_instances: 1, peak_windows: [{ start: '09:00', end: '18:00', worker_instances: 3 }], expected_updated_at: null, reason: '更新成本计划' }),
       headers: { 'Content-Type': 'application/json' },
     }))
     expect(response.status).toBe(200)
-    expect(mocks.saveCost).toHaveBeenCalledWith(expect.objectContaining({ expectedUpdatedAt: null, config: expect.objectContaining({ hourly_price_cny: 0.8, schedule_enabled: true }) }))
+    expect(mocks.saveCost).toHaveBeenCalledWith(expect.objectContaining({ expectedUpdatedAt: null, config: expect.objectContaining({ resident_hourly_price_cny: 0.2, hourly_price_cny: 0.8, schedule_enabled: true }) }))
   })
 })

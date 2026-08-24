@@ -42,7 +42,7 @@ export async function prepareOptimizeJob(
     isScenarioComparison = body.kind === 'scenario_comparison';
     const rawBody = body as unknown as Record<string, unknown>;
     if ('use_priority_coupon' in rawBody && typeof rawBody.use_priority_coupon !== 'boolean') {
-      return fail({ error: 'use_priority_coupon 必须是布尔值。', code: 'priority_coupon_not_applicable' }, 400);
+      return fail({ error: '优先计算券选项无效，请重新选择。', code: 'priority_coupon_not_applicable' }, 400);
     }
     if (!body.identity || body.identity.type !== 'profile' || typeof body.identity.profileId !== 'string' || !body.identity.profileId) {
       scheduleUsage = scheduleFailure('validation_failed', { source: 'account_profile' });
@@ -77,7 +77,7 @@ export async function prepareOptimizeJob(
 
     if (!operators || !config) {
       scheduleUsage = scheduleFailure('validation_failed');
-      return fail({ error: 'Missing operators or config' }, 400);
+      return fail({ error: '请先填写干员数据和排班设置。' }, 400);
     }
 
     const auth = await requireUserSession(req);
@@ -97,7 +97,7 @@ export async function prepareOptimizeJob(
       activeProfileId = profile_id;
       if (!activeProfileId) {
         scheduleUsage = scheduleFailure('auth_profile_missing', { source: 'account_profile' });
-        return fail({ error: 'Please select a CDK profile first.' }, 400);
+        return fail({ error: '请先选择游戏账号。' }, 400);
       }
       const profile = await getProfileForUser(auth.user.id, activeProfileId);
       if (!profile) {

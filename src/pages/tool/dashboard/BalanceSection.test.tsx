@@ -91,15 +91,15 @@ describe('BalanceSection', () => {
     expect(await screen.findByText('12.30')).toBeInTheDocument()
     expect(screen.getByText('+12.30')).toBeInTheDocument()
     expect(screen.getByText('12000')).toBeInTheDocument()
-    expect(screen.getByText('1000 积分/成功主排班')).toBeInTheDocument()
-    expect(screen.getByText('Lv1 · 1350 积分/成功主排班')).toBeInTheDocument()
+    expect(screen.getByText('1000 积分/每次成功生成')).toBeInTheDocument()
+    expect(screen.getByText('Lv1 · 1350 积分/每次成功生成')).toBeInTheDocument()
     expect(screen.getByText('还差 38000 积分（门槛 50000）')).toBeInTheDocument()
     expect(screen.queryByText(/\.00/)).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: '加载更多' }))
+    await user.click(screen.getByRole('button', { name: '查看更多记录' }))
 
     await waitFor(() => expect(mocks.apiJson).toHaveBeenNthCalledWith(2, '/api/user/balance?cursor=next%20page'))
     expect(await screen.findByText('-2')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '加载更多' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '查看更多记录' })).not.toBeInTheDocument()
   })
 
   it('shows pending recovery only when the account has debt', async () => {
@@ -108,7 +108,7 @@ describe('BalanceSection', () => {
     const { unmount } = render(<BalanceSection redemptionEnabled />)
 
     await screen.findByText('12.30')
-    expect(screen.queryByText('待追偿')).not.toBeInTheDocument()
+    expect(screen.queryByText('待补扣积分')).not.toBeInTheDocument()
     unmount()
 
     mocks.apiJson.mockResolvedValueOnce({
@@ -122,9 +122,9 @@ describe('BalanceSection', () => {
     })
     render(<BalanceSection redemptionEnabled />)
 
-    expect(await screen.findByText('待追偿')).toBeInTheDocument()
+    expect(await screen.findByText('待补扣积分')).toBeInTheDocument()
     expect(screen.getByText('25')).toBeInTheDocument()
-    expect(screen.getByText('Lv1 · 已暂停，待追偿 25 积分')).toBeInTheDocument()
+    expect(screen.getByText('Lv1 · 已暂停，待补扣 25 积分')).toBeInTheDocument()
   })
 
   it('reuses the idempotency key after an unknown result and refreshes after success', async () => {
@@ -146,7 +146,7 @@ describe('BalanceSection', () => {
     const user = userEvent.setup()
     render(<BalanceSection redemptionEnabled />)
     await screen.findByText('+12.30')
-    const input = screen.getByPlaceholderText('输入余额 CDK')
+    const input = screen.getByPlaceholderText('输入积分 CDK')
     await user.type(input, 'balance-code')
     await user.click(screen.getByRole('button', { name: '确认兑换' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('网络结果未知')
@@ -174,7 +174,7 @@ describe('BalanceSection', () => {
     render(<BalanceSection redemptionEnabled />)
     await screen.findByText('+12.30')
 
-    await user.type(screen.getByPlaceholderText('输入余额 CDK'), 'account-code')
+    await user.type(screen.getByPlaceholderText('输入积分 CDK'), 'account-code')
     await user.click(screen.getByRole('button', { name: '确认兑换' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('该 CDK 应在账号兑换页使用')

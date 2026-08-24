@@ -46,6 +46,7 @@ export interface ServiceStatusCostConfig {
   component_id: ServiceStatusComponentId
   billing_model: ServiceStatusCostBillingModel
   currency: 'CNY'
+  resident_hourly_price_cny: number | null
   hourly_price_cny: number | null
   timezone: typeof SERVICE_STATUS_COST_TIMEZONE
   schedule_enabled: boolean
@@ -93,7 +94,7 @@ export interface ServiceStatusResponse {
   status: ServiceStatusLevel
   queue: ServiceStatusQueueSnapshot | null
   components: Array<{
-    id: ServiceStatusComponentId
+    id: ServiceStatusComponentId | 'skland_import'
     status: ServiceStatusLevel
   }>
   thresholds: {
@@ -358,6 +359,7 @@ export function createDefaultServiceStatusCostConfig(
     component_id: componentId,
     billing_model: 'ecs_payg',
     currency: 'CNY',
+    resident_hourly_price_cny: null,
     hourly_price_cny: null,
     timezone: SERVICE_STATUS_COST_TIMEZONE,
     schedule_enabled: false,
@@ -382,16 +384,22 @@ export function normalizeServiceStatusCostConfig(
       }))
       .slice(0, 24)
     : fallback.peak_windows
-  const price = value?.hourly_price_cny
+  const residentPrice = value?.resident_hourly_price_cny
+  const burstPrice = value?.hourly_price_cny
   return {
     component_id: componentId,
     billing_model: 'ecs_payg',
     currency: 'CNY',
-    hourly_price_cny: price === null || price === undefined || !Number.isFinite(Number(price)) ? null : Math.max(0, Number(price)),
+    resident_hourly_price_cny: normalizeHourlyPrice(residentPrice),
+    hourly_price_cny: normalizeHourlyPrice(burstPrice),
     timezone: SERVICE_STATUS_COST_TIMEZONE,
     schedule_enabled: value?.schedule_enabled === true,
     valley_worker_instances: Number.isFinite(Number(value?.valley_worker_instances)) ? Math.max(0, Math.floor(Number(value?.valley_worker_instances))) : fallback.valley_worker_instances,
     peak_windows: windows,
     updated_at: typeof value?.updated_at === 'string' ? value.updated_at : null,
   }
+}
+
+function normalizeHourlyPrice(value: number | null | undefined): number | null {
+  return value === null || value === undefined || !Number.isFinite(Number(value)) ? null : Math.max(0, Number(value))
 }

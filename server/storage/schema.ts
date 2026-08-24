@@ -406,6 +406,7 @@ CREATE TABLE IF NOT EXISTS service_status_cost_config (
   component_id TEXT PRIMARY KEY,
   billing_model TEXT NOT NULL DEFAULT 'ecs_payg',
   currency TEXT NOT NULL DEFAULT 'CNY',
+  resident_hourly_price_cny NUMERIC(12,4),
   hourly_price_cny NUMERIC(12,4),
   timezone TEXT NOT NULL DEFAULT 'Asia/Shanghai',
   schedule_enabled BOOLEAN NOT NULL DEFAULT FALSE,
@@ -416,8 +417,13 @@ CREATE TABLE IF NOT EXISTS service_status_cost_config (
   CONSTRAINT service_status_cost_component_check CHECK (component_id IN ('optimization')),
   CONSTRAINT service_status_cost_billing_model_check CHECK (billing_model IN ('ecs_payg')),
   CONSTRAINT service_status_cost_currency_check CHECK (currency = 'CNY'),
+  CONSTRAINT service_status_cost_resident_hourly_price_check CHECK (resident_hourly_price_cny IS NULL OR resident_hourly_price_cny >= 0),
   CONSTRAINT service_status_cost_hourly_price_check CHECK (hourly_price_cny IS NULL OR hourly_price_cny >= 0)
 );
+
+ALTER TABLE service_status_cost_config ADD COLUMN IF NOT EXISTS resident_hourly_price_cny NUMERIC(12,4);
+ALTER TABLE service_status_cost_config DROP CONSTRAINT IF EXISTS service_status_cost_resident_hourly_price_check;
+ALTER TABLE service_status_cost_config ADD CONSTRAINT service_status_cost_resident_hourly_price_check CHECK (resident_hourly_price_cny IS NULL OR resident_hourly_price_cny >= 0);
 
 CREATE TABLE IF NOT EXISTS service_status_incidents (
   id TEXT PRIMARY KEY,

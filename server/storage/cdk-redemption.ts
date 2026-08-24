@@ -106,7 +106,9 @@ export async function redeemCdkAtomically<T>(options: {
           [options.idempotencyScope, options.idempotencyKey],
         )
         const row = existing.rows[0]
-        if (!row || row.request_hash !== options.requestHash) throw new IdempotencyConflictError('Idempotency-Key is already used for a different request.')
+        if (!row || row.request_hash !== options.requestHash) {
+          throw new IdempotencyConflictError('这次兑换与之前的提交不一致，请刷新页面后重试。')
+        }
         if (row.status === 'completed' && row.response_json) return { response: row.response_json, replayed: true }
         throw new CdkAlreadyRedeemedError('CDK redemption is already in progress.')
       }

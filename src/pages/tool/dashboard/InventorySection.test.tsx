@@ -142,8 +142,8 @@ describe('InventorySection idempotent item use', () => {
     render(<InventorySection onPayload={vi.fn()} />)
 
     expect(await screen.findByRole('list', { name: '认识网站奖励' })).toHaveTextContent('优先计算券 × 2 · 永久')
-    expect(screen.getByRole('heading', { name: '最近资产变动' })).toBeInTheDocument()
-    expect(screen.getByText('到账 × 2')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '最近道具记录' })).toBeInTheDocument()
+    expect(screen.getByText('已获得 × 2')).toBeInTheDocument()
   })
 
   it('loads inventory without requesting onboarding tasks when the feature is disabled', async () => {
@@ -278,7 +278,7 @@ describe('InventorySection idempotent item use', () => {
         display_name: 'JSON 终身档案',
         note: '手动导入',
       },
-      fallbackMessage: '使用终身版兑换 CDK 创建档案失败。',
+      fallbackMessage: '暂时无法使用终身版兑换 CDK 创建档案，请稍后重试。',
     }))
     expect(onPayload).toHaveBeenCalledWith(payload)
     expect(onLifetimeProfileCreated).toHaveBeenCalledOnce()

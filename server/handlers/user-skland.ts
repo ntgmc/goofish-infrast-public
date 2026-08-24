@@ -66,7 +66,7 @@ import {
   type SklandBindingSummary,
   type SklandImportSummary,
 } from './skland-client'
-import { buildAuthPayload, jsonResponse, requireUserSession } from './user-auth'
+import { buildAuthPayload, jsonResponse, requireUserSession, scheduleInvitationSettlement } from './user-auth'
 import { recordUsageEvent } from './usage-stats'
 import type { UsageReasonCode } from '../storage/usage-store'
 import { CURRENT_PERSONAL_USE_DECLARATION, isCurrentPersonalUseDeclarationEffective } from '../personal-use-declaration'
@@ -85,6 +85,7 @@ import {
   lockSklandUidProfilesInTransaction,
   recordSklandUidMismatchInTransaction,
 } from '../storage/skland-binding-store'
+import { resolveProfileAuthorization } from './profile-authorization'
 import {
   ensureSklandServiceConfiguration,
   getFreePreviewUidHashSecret,
@@ -166,7 +167,7 @@ export default async (req: Request): Promise<Response> => {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
       const body = await readJsonBody(req)
       if (typeof body.pending_id !== 'string' || !body.pending_id.trim()) {
-        return jsonResponse({ error: 'Missing pending_id.' }, 400)
+        return jsonResponse({ error: '本次操作已失效，请重新开始。', code: 'operation_expired' }, 400)
       }
       await deleteLifetimeVoucherPendingBinding(auth.user.id, body.pending_id.trim())
       return jsonResponse(null, 204)
@@ -176,7 +177,7 @@ export default async (req: Request): Promise<Response> => {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
       const body = await readJsonBody(req)
       if (typeof body.pending_id !== 'string' || !body.pending_id.trim()) {
-        return jsonResponse({ error: 'Missing pending_id.' }, 400)
+        return jsonResponse({ error: '本次操作已失效，请重新开始。', code: 'operation_expired' }, 400)
       }
       await deleteFreePreviewPendingClaim(auth.user.id, body.pending_id.trim())
       return jsonResponse(null, 204)
@@ -187,7 +188,7 @@ export default async (req: Request): Promise<Response> => {
       const body = await readJsonBody(req)
       const profile = await requireProfile(auth.user.id, body.profile_id)
       if (typeof body.pending_id !== 'string' || !body.pending_id.trim()) {
-        return jsonResponse({ error: 'Missing pending_id.' }, 400)
+        return jsonResponse({ error: '本次操作已失效，请重新开始。', code: 'operation_expired' }, 400)
       }
       await clearProfileSklandPendingBinding(auth.user.id, profile.id, body.pending_id.trim())
       return jsonResponse(null, 204)
@@ -211,7 +212,9 @@ export default async (req: Request): Promise<Response> => {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
       ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
-      if (typeof body.scan_id !== 'string' || !body.scan_id.trim()) return jsonResponse({ error: 'Missing scan_id.' }, 400)
+      if (typeof body.scan_id !== 'string' || !body.scan_id.trim()) {
+        return jsonResponse({ error: '扫码信息已失效，请重新生成二维码。', code: 'scan_expired' }, 400)
+      }
       const scanCode = await getScanCode(body.scan_id.trim())
       if (!scanCode) return jsonResponse({ status: 'pending' }, 202)
       const accountToken = await getHypergryphTokenByScanCode(scanCode)
@@ -231,7 +234,9 @@ export default async (req: Request): Promise<Response> => {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
       ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
-      if (typeof body.selection_id !== 'string' || !body.selection_id.trim()) return jsonResponse({ error: '缺少 selection_id。' }, 400)
+      if (typeof body.selection_id !== 'string' || !body.selection_id.trim()) {
+        return jsonResponse({ error: '账号选择信息已失效，请重新读取森空岛账号。', code: 'account_selection_expired' }, 400)
+      }
       if (typeof body.uid !== 'string' || !body.uid.trim()) return jsonResponse({ error: '请选择要导入的森空岛账号。' }, 400)
       return await selectLifetimeVoucherAccount(auth.user, body.selection_id.trim(), body.uid.trim())
     }
@@ -240,8 +245,12 @@ export default async (req: Request): Promise<Response> => {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
       ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
-      if (typeof body.confirmation_id !== 'string' || !body.confirmation_id.trim()) return jsonResponse({ error: 'Missing confirmation_id.' }, 400)
-      if (typeof body.idempotency_key !== 'string' || !body.idempotency_key.trim()) return jsonResponse({ error: 'Missing idempotency_key.' }, 400)
+      if (typeof body.confirmation_id !== 'string' || !body.confirmation_id.trim()) {
+        return jsonResponse({ error: '本次操作已失效，请重新开始。', code: 'operation_expired' }, 400)
+      }
+      if (typeof body.idempotency_key !== 'string' || !body.idempotency_key.trim()) {
+        return jsonResponse({ error: '本次提交信息不完整，请重新操作。', code: 'submission_incomplete' }, 400)
+      }
       return await confirmLifetimeVoucherBinding(auth.user, body.confirmation_id.trim(), body.idempotency_key.trim(), req, auth.tokenHash)
     }
 
@@ -266,7 +275,7 @@ export default async (req: Request): Promise<Response> => {
       ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
       if (typeof body.scan_id !== 'string' || !body.scan_id.trim()) {
-        return jsonResponse({ error: 'Missing scan_id.' }, 400)
+        return jsonResponse({ error: '扫码信息已失效，请重新生成二维码。', code: 'scan_expired' }, 400)
       }
       const scanCode = await getScanCode(body.scan_id.trim())
       if (!scanCode) return jsonResponse({ status: 'pending' }, 202)
@@ -291,7 +300,7 @@ export default async (req: Request): Promise<Response> => {
       ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
       if (typeof body.selection_id !== 'string' || !body.selection_id.trim()) {
-        return jsonResponse({ error: '缺少 selection_id。' }, 400)
+        return jsonResponse({ error: '账号选择信息已失效，请重新读取森空岛账号。', code: 'account_selection_expired' }, 400)
       }
       if (typeof body.uid !== 'string' || !body.uid.trim()) {
         return jsonResponse({ error: '请选择要导入的森空岛账号。' }, 400)
@@ -304,10 +313,10 @@ export default async (req: Request): Promise<Response> => {
       ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
       if (typeof body.confirmation_id !== 'string' || !body.confirmation_id.trim()) {
-        return jsonResponse({ error: 'Missing confirmation_id.' }, 400)
+        return jsonResponse({ error: '本次操作已失效，请重新开始。', code: 'operation_expired' }, 400)
       }
       if (typeof body.idempotency_key !== 'string' || !body.idempotency_key.trim()) {
-        return jsonResponse({ error: 'Missing idempotency_key.' }, 400)
+        return jsonResponse({ error: '本次提交信息不完整，请重新操作。', code: 'submission_incomplete' }, 400)
       }
       return await confirmFreePreviewClaim(
         auth.user,
@@ -342,7 +351,7 @@ export default async (req: Request): Promise<Response> => {
       const body = await readJsonBody(req)
       const profile = await requireActiveProfile(auth.user.id, body.profile_id)
       if (typeof body.scan_id !== 'string' || !body.scan_id.trim()) {
-        return jsonResponse({ error: 'Missing scan_id.' }, 400)
+        return jsonResponse({ error: '扫码信息已失效，请重新生成二维码。', code: 'scan_expired' }, 400)
       }
       const scanCode = await getScanCode(body.scan_id.trim())
       if (!scanCode) return jsonResponse({ status: 'pending' }, 202)
@@ -369,7 +378,7 @@ export default async (req: Request): Promise<Response> => {
       const body = await readJsonBody(req)
       const profile = await requireActiveProfile(auth.user.id, body.profile_id)
       if (typeof body.selection_id !== 'string' || !body.selection_id.trim()) {
-        return jsonResponse({ error: '缺少 selection_id。' }, 400)
+        return jsonResponse({ error: '账号选择信息已失效，请重新读取森空岛账号。', code: 'account_selection_expired' }, 400)
       }
       if (typeof body.uid !== 'string' || !body.uid.trim()) {
         return jsonResponse({ error: '请选择要导入的森空岛账号。' }, 400)
@@ -389,10 +398,10 @@ export default async (req: Request): Promise<Response> => {
       const body = await readJsonBody(req)
       const profile = await requireProfile(auth.user.id, body.profile_id)
       if (typeof body.confirmation_id !== 'string' || !body.confirmation_id.trim()) {
-        return jsonResponse({ error: '缺少 confirmation_id。' }, 400)
+        return jsonResponse({ error: '本次操作已失效，请重新开始。', code: 'operation_expired' }, 400)
       }
       if (typeof body.idempotency_key !== 'string' || !body.idempotency_key.trim()) {
-        return jsonResponse({ error: '缺少 idempotency_key。' }, 400)
+        return jsonResponse({ error: '本次提交信息不完整，请重新操作。', code: 'submission_incomplete' }, 400)
       }
       return await confirmProfileSklandBinding({
         user: auth.user,
@@ -567,7 +576,7 @@ async function getSklandConfirmationReplay(
   const row = replay.rows[0]
   if (!row) return null
   if (row.request_hash !== requestHash) {
-    throw new SklandHttpError('idempotency_conflict', '幂等键已被其他请求使用。', 409)
+    throw new SklandHttpError('idempotency_conflict', '提交内容已发生变化，请刷新页面后重新操作。', 409)
   }
   if (!row.response_json) {
     throw new SklandHttpError('operation_in_progress', '森空岛绑定正在处理中。', 409, 'retry')
@@ -747,6 +756,7 @@ async function runSklandImportPostCommit(
   for (const result of results) {
     if (result.status === 'rejected') console.warn('skland import post-commit task skipped:', result.reason)
   }
+  if (hasDatabaseUrl()) scheduleInvitationSettlement(userId)
 }
 
 async function recordSklandOperatorFingerprint(
@@ -956,7 +966,9 @@ async function confirmLifetimeVoucherBinding(
     [user.id, idempotencyKey],
   )
   if (replay.rows[0]) {
-    if (replay.rows[0].request_hash !== requestHash) return jsonResponse({ error: '幂等键已被其他请求使用。', code: 'idempotency_conflict' }, 409)
+    if (replay.rows[0].request_hash !== requestHash) {
+      return jsonResponse({ error: '提交内容已发生变化，请刷新页面后重新操作。', code: 'idempotency_conflict' }, 409)
+    }
     if (!replay.rows[0].response_json) return jsonResponse({ error: '终身版绑定正在处理中。', code: 'operation_in_progress' }, 409)
     const previous = replay.rows[0].response_json
     return jsonResponse({ ...(await buildPayloadWithImport(user, previous.profile_id, previous.imported)), replayed: true })
@@ -1051,6 +1063,7 @@ async function confirmLifetimeVoucherBinding(
   for (const task of postCommitTasks) {
     if (task.status === 'rejected') console.warn('lifetime voucher post-commit task skipped:', task.reason)
   }
+  scheduleInvitationSettlement(user.id)
   return jsonResponse({ ...(await buildPayloadWithImport(user, result.profile_id, result.imported)), replayed: false })
 }
 
@@ -1542,6 +1555,14 @@ async function handleAccountMismatch(
   preview: SklandPreview,
   requestContext?: SklandRequestContext,
 ): Promise<Response> {
+  const authorization = await resolveProfileAuthorization(profile)
+  if (authorization.ok && authorization.permission === 'ultimate') {
+    return jsonResponse({
+      status: 'account_mismatch',
+      skland_preview: preview,
+      warning: '该账号与当前绑定账号不一致，请确认是否登录错账号。',
+    })
+  }
   const now = new Date().toISOString()
   const nextProfile = await withTransaction((client) => recordSklandUidMismatchInTransaction(client, {
     userId: user.id,
@@ -1713,7 +1734,7 @@ async function requireActiveProfile(userId: string, profileId: unknown): Promise
 
 async function requireProfile(userId: string, profileId: unknown): Promise<UserGameAccountRecord> {
   if (typeof profileId !== 'string' || !profileId.trim()) {
-    throw new SklandHttpError('invalid_request', '缺少 profile_id。', 400)
+    throw new SklandHttpError('invalid_request', '请先选择游戏账号。', 400)
   }
   const profile = await getProfileForUser(userId, profileId.trim())
   if (!profile) throw new SklandHttpError('profile_not_found', '账号档案不存在。', 404)

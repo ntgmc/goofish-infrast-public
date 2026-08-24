@@ -56,8 +56,8 @@ describe('ScheduleProgress motion', () => {
     const panel = screen.getByLabelText('排班生成任务状态')
     expect(panel).toHaveAttribute('data-status', 'cancelled')
     expect(screen.getByText('任务已取消')).toBeInTheDocument()
-    expect(screen.getByText('任务已从等待队列中取消，不会继续执行。')).toBeInTheDocument()
-    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuetext', expect.stringContaining('已离开队列'))
+    expect(screen.getByText('任务已在开始计算前取消，不会继续执行。')).toBeInTheDocument()
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuetext', expect.stringContaining('已取消'))
     expect(screen.getByText('Cancelled')).toBeInTheDocument()
     expect(screen.queryByText('正在取消任务')).not.toBeInTheDocument()
   })
@@ -72,13 +72,13 @@ describe('ScheduleProgress motion', () => {
       charge: '1000.00',
     }
     const { rerender } = render(<ScheduleProgress progress={createProgress({ billing: { ...billing, status: 'reserved' } })} />)
-    expect(screen.getByText('已预留 1000.00 积分')).toBeInTheDocument()
+    expect(screen.getByText('计算中暂扣 1000.00 积分')).toBeInTheDocument()
 
     rerender(<ScheduleProgress progress={createProgress({ completedAt: NOW, estimatePhase: 'completed', billing: { ...billing, status: 'settled' } })} />)
     expect(screen.getByText('已扣除 1000.00 积分')).toBeInTheDocument()
 
     rerender(<ScheduleProgress progress={createProgress({ estimatePhase: 'failed', billing: { ...billing, status: 'released' } })} />)
-    expect(screen.getByText('预留已释放：1000.00 积分')).toBeInTheDocument()
+    expect(screen.getByText('已退回 1000.00 积分')).toBeInTheDocument()
     expect(screen.getByText('任务未完成')).toBeInTheDocument()
   })
 
@@ -123,7 +123,7 @@ describe('ScheduleProgress motion', () => {
 
     expect(screen.getByText('正在计算 MAA 对比基准')).toBeInTheDocument()
     expect(screen.getByText('计算优化建议').closest('[data-state]')).toHaveAttribute('data-state', 'active')
-    expect(screen.getByText('持久化结果').closest('[data-state]')).toHaveAttribute('data-state', 'pending')
+    expect(screen.getByText('保存结果').closest('[data-state]')).toHaveAttribute('data-state', 'pending')
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '86')
 
     await act(async () => vi.advanceTimersByTimeAsync(10_000))
@@ -215,7 +215,7 @@ describe('ScheduleProgress motion', () => {
 
     expect(screen.getByText('排班方案已就绪')).toBeInTheDocument()
     expect(screen.getByText('计算优化建议').closest('[data-state]')).toHaveAttribute('data-state', 'failed')
-    expect(screen.getByText('持久化结果').closest('[data-state]')).toHaveAttribute('data-state', 'done')
+    expect(screen.getByText('保存结果').closest('[data-state]')).toHaveAttribute('data-state', 'done')
   })
 
   it('marks a partial suggestion stage as completed because verified results were preserved', () => {
@@ -231,7 +231,7 @@ describe('ScheduleProgress motion', () => {
     })} />)
 
     expect(screen.getByText('计算优化建议').closest('[data-state]')).toHaveAttribute('data-state', 'done')
-    expect(screen.getByText('持久化结果').closest('[data-state]')).toHaveAttribute('data-state', 'done')
+    expect(screen.getByText('保存结果').closest('[data-state]')).toHaveAttribute('data-state', 'done')
   })
 })
 

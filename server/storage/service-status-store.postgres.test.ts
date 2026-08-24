@@ -51,12 +51,13 @@ describe('PostgreSQL service status history', () => {
 
   it('persists ECS cost planning with optimistic concurrency', async () => {
     const initial = await getServiceStatusCostConfig()
-    expect(initial).toMatchObject({ component_id: 'optimization', billing_model: 'ecs_payg', hourly_price_cny: null })
+    expect(initial).toMatchObject({ component_id: 'optimization', billing_model: 'ecs_payg', resident_hourly_price_cny: null, hourly_price_cny: null })
     const saved = await saveServiceStatusCostConfig({
-      config: { ...initial, hourly_price_cny: 0.82, schedule_enabled: true, valley_worker_instances: 1, peak_windows: [{ start: '09:00', end: '18:00', worker_instances: 3 }] },
+      config: { ...initial, resident_hourly_price_cny: 0.28, hourly_price_cny: 0.82, schedule_enabled: true, valley_worker_instances: 1, peak_windows: [{ start: '09:00', end: '18:00', worker_instances: 3 }] },
       expectedUpdatedAt: initial.updated_at,
       audit: { actorUsername: 'postgres-test', reason: '测试 ECS 成本计划', requestId: randomUUID() },
     })
+    expect(saved.resident_hourly_price_cny).toBe(0.28)
     expect(saved.hourly_price_cny).toBe(0.82)
     await expect(saveServiceStatusCostConfig({
       config: saved,

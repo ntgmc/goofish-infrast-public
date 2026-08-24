@@ -557,6 +557,6 @@ function decodeCursor(value: string | null | undefined): { createdAt: string; id
     if (typeof parsed.createdAt !== 'string' || Number.isNaN(Date.parse(parsed.createdAt)) || typeof parsed.id !== 'string' || !parsed.id) throw new Error()
     return { createdAt: parsed.createdAt, id: parsed.id }
   } catch {
-    throw new MeteredProfileError('invalid_cursor', '商用档案分页游标无效。', 400)
+    throw new MeteredProfileError('invalid_cursor', '商用档案列表加载位置已失效，请重新打开列表。', 400)
   }
 }

@@ -126,7 +126,7 @@ describe('InventoryAdminSection', () => {
     await user.selectOptions(screen.getByLabelText('选择要添加的道具'), 'newcomer_supply_pack')
     await user.click(screen.getByRole('button', { name: '添加道具' }))
     expect(screen.getByText('保存时固定 v1')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: '发布任务配置' }))
+    await user.click(screen.getByRole('button', { name: '发布停用版本' }))
 
     await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/items', expect.objectContaining({
       method: 'POST',
@@ -143,6 +143,40 @@ describe('InventoryAdminSection', () => {
     await user.selectOptions(screen.getByLabelText('任务'), 'welcome_inventory')
     expect(screen.getByLabelText('优先计算券数量')).toHaveValue(1)
     expect(screen.queryByLabelText('方案扩容证数量')).not.toBeInTheDocument()
+  })
+
+  it('publishes an enabled onboarding task version and refreshes its status', async () => {
+    let published = false
+    adminApiJson.mockImplementation(async (_url: string, options?: { json?: Record<string, unknown> }) => {
+      if (options) {
+        published = true
+        return {}
+      }
+      return {
+        ...overview,
+        tasks: overview.tasks.map((task) => task.task_code === 'bind_skland' && published
+          ? { ...task, version: 2, enabled: true }
+          : task),
+      }
+    })
+    const user = userEvent.setup()
+    render(<InventoryAdminSection />)
+    await user.click(await screen.findByRole('tab', { name: /新人任务/ }))
+    await user.selectOptions(screen.getByLabelText('任务'), 'bind_skland')
+
+    expect(screen.getByText('当前 v1 已停用。启用新版本前必须配置奖励。')).toBeInTheDocument()
+    await user.click(screen.getByRole('checkbox', { name: '新版本启用' }))
+    await user.click(screen.getByRole('button', { name: '发布并启用' }))
+
+    await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/items', expect.objectContaining({
+      method: 'POST',
+      json: expect.objectContaining({
+        action: 'configure_onboarding_task',
+        task_code: 'bind_skland',
+        enabled: true,
+      }),
+    })))
+    expect(await screen.findByText('当前 v2 已启用。启用新版本前必须配置奖励。')).toBeInTheDocument()
   })
 
   it('does not offer nested gift packs inside gift pack contents', async () => {

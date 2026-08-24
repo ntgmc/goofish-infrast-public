@@ -105,6 +105,13 @@ describe('useAdminController announcement drafts', () => {
     vi.unstubAllGlobals()
   })
 
+  it('defaults profile CDK generation to advanced permission', () => {
+    const { result } = renderHook(() => useAdminController())
+
+    expect(result.current.cdkType).toBe('profile')
+    expect(result.current.permission).toBe('advanced')
+  })
+
   it('flushes the latest edit before session reset and restores it after login', async () => {
     const { result } = renderHook(() => useAdminController())
     await waitForHydration(result)

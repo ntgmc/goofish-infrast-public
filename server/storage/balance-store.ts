@@ -375,7 +375,7 @@ export async function reserveScheduleBalanceInTransaction(
     const row = normalizeReservation(existing.rows[0])
     if (row.user_id !== input.userId || row.profile_id !== input.profileId
       || row.amount !== input.quote.charge || row.pricing_version !== input.quote.pricing_version) {
-      throw new BalanceError('reservation_conflict', '当前任务已关联其他积分预留。', 409)
+      throw new BalanceError('reservation_conflict', '当前任务已关联其他暂扣积分。', 409)
     }
     return row
   }
@@ -418,7 +418,7 @@ export async function settleScheduleBalanceInTransaction(
   )
   const reservation = result.rows[0] ? normalizeReservation(result.rows[0]) : null
   if (!reservation || reservation.status === 'consumed') return reservation
-  if (reservation.status === 'released') throw new BalanceError('reservation_conflict', '已释放的积分预留不能结算。', 409)
+  if (reservation.status === 'released') throw new BalanceError('reservation_conflict', '已退回的暂扣积分不能结算。', 409)
   const account = await client.query<{ available: string }>(
     `update user_balance_accounts
         set available = available - $2::numeric, reserved = reserved - $2::numeric, updated_at = $3
@@ -426,7 +426,7 @@ export async function settleScheduleBalanceInTransaction(
       returning available::text`,
     [reservation.user_id, reservation.amount, now],
   )
-  if (!account.rowCount) throw new BalanceError('reservation_conflict', '积分预留与账户余额不一致。', 409)
+  if (!account.rowCount) throw new BalanceError('reservation_conflict', '暂扣积分与账户余额不一致。', 409)
   const transaction = await client.query(
     `insert into user_balance_transactions
       (id, user_id, kind, amount, balance_after, reference_type, reference_id, idempotency_key,
@@ -462,7 +462,7 @@ export async function releaseScheduleBalanceInTransaction(
       where user_id = $1 and reserved >= $2::numeric`,
     [reservation.user_id, reservation.amount, now],
   )
-  if (!released.rowCount) throw new BalanceError('reservation_conflict', '积分预留与账户余额不一致。', 409)
+  if (!released.rowCount) throw new BalanceError('reservation_conflict', '暂扣积分与账户余额不一致。', 409)
   await client.query(
     `update user_balance_reservations set status = 'released', settled_at = $2
       where job_id = $1 and status = 'reserved'`,
@@ -659,7 +659,7 @@ function decodeCursor(value: string | null | undefined): { createdAt: string; id
     if (typeof parsed.createdAt !== 'string' || Number.isNaN(Date.parse(parsed.createdAt)) || typeof parsed.id !== 'string' || !parsed.id) throw new Error('invalid cursor')
     return { createdAt: parsed.createdAt, id: parsed.id }
   } catch {
-    throw new BalanceError('invalid_cursor', '积分流水游标无效。', 400)
+    throw new BalanceError('invalid_cursor', '积分明细加载位置已失效，请重新打开列表。', 400)
   }
 }
 

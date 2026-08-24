@@ -852,7 +852,7 @@ async function getAnnouncementUnreadCount(userId: string): Promise<number> {
   }
 }
 
-function scheduleInvitationSettlement(userId: string): void {
+export function scheduleInvitationSettlement(userId: string): void {
   void activateInvitationForUser(userId).catch((error) => {
     console.warn('invitation activation deferred:', safeErrorName(error))
   })

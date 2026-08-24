@@ -38,7 +38,7 @@ describe('AccountSafetyPage lifecycle controls', () => {
     await user.click(screen.getByRole('button', { name: '申请注销' }))
 
     expect(await screen.findByText('注销申请已受理')).toBeInTheDocument()
-    expect(screen.getByText(/撤销邮件已进入投递队列/)).toBeInTheDocument()
+    expect(screen.getByText(/撤销邮件正在发送/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '申请注销' })).not.toBeInTheDocument()
   })
 })

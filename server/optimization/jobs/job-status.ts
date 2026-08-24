@@ -34,7 +34,7 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
     return response
   }
   const idempotencyKey = normalizeIdempotencyKey(req.headers.get('Idempotency-Key'));
-  if (!idempotencyKey) return jsonResponse({ error: '缺少或无效的 Idempotency-Key。', code: 'idempotency_key_required' }, 400);
+  if (!idempotencyKey) return jsonResponse({ error: '本次提交信息不完整，请重新操作。', code: 'idempotency_key_required' }, 400);
   const rawRequestBody = await req.clone().text()
   const requestHash = hashOptimizationRequest(rawRequestBody)
   const legacyRequestHash = createHash('sha256').update(rawRequestBody).digest('hex')
@@ -206,13 +206,13 @@ export async function listOptimizationJobs(req: Request): Promise<Response> {
   if (!auth) return jsonResponse({ error: '请先登录后查看任务列表。' }, 401)
   const url = new URL(req.url)
   const profileId = url.searchParams.get('profile_id')?.trim() ?? ''
-  if (!profileId) return jsonResponse({ error: '缺少 profile_id。' }, 400)
+  if (!profileId) return jsonResponse({ error: '请先选择游戏账号。', code: 'profile_id_invalid' }, 400)
   const profile = await getProfileForUser(auth.user.id, profileId)
   if (!profile) return jsonResponse({ error: '无权查看该任务列表。' }, 403)
   const limit = Math.max(1, Math.min(100, Number(url.searchParams.get('limit') ?? 50) || 50))
   const rawBefore = url.searchParams.get('before')?.trim() || null
   const before = rawBefore ? decodeOptimizationJobCursor(rawBefore) : null
-  if (rawBefore && !before) return jsonResponse({ error: '无效的任务分页游标。', code: 'invalid_cursor' }, 400)
+  if (rawBefore && !before) return jsonResponse({ error: '任务列表加载位置已失效，请重新打开列表。', code: 'invalid_cursor' }, 400)
   const store = getOptimizeJobStore()
   const jobs = await store.listJobsByProfile(profileId, limit + 1, before)
   const page = jobs.slice(0, limit)

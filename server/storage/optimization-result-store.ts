@@ -47,7 +47,7 @@ export class OptimizationResultCursorError extends Error {
   readonly status = 400
 
   constructor() {
-    super('结果列表游标无效，请刷新后重试。')
+    super('结果列表加载位置已失效，请重新打开列表。')
     this.name = 'OptimizationResultCursorError'
   }
 }

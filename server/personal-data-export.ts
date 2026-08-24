@@ -40,7 +40,7 @@ export const PERSONAL_DATA_EXPORT_COVERAGE = {
   user_balance_reservations: { disposition: 'export', field: 'balance.reservations' },
   user_balance_operations: {
     disposition: 'exclude',
-    reason: '积分管理请求的幂等键、请求哈希与响应快照属于内部防重放状态，最终积分流水已通过余额交易明细导出。',
+    reason: '积分操作的重复提交保护记录不属于账户内容，积分变动已在余额交易明细中导出。',
   },
   commercial_account_limits: { disposition: 'export', field: 'commercial_account' },
   commercial_account_audit: {
@@ -49,11 +49,11 @@ export const PERSONAL_DATA_EXPORT_COVERAGE = {
   },
   commercial_profile_operations: {
     disposition: 'exclude',
-    reason: '商用档案操作的请求哈希与响应快照属于内部幂等控制状态，档案本身已通过 profiles 字段导出。',
+    reason: '商用档案的重复提交保护记录不属于档案内容，档案信息已在游戏账号数据中导出。',
   },
   metered_billing_quotes: {
     disposition: 'exclude',
-    reason: '计量计费报价与确认状态属于内部计费流程数据，最终费用已通过余额预留和交易明细导出。',
+    reason: '计量计费报价与确认状态属于内部计费流程数据，最终费用和计算中暂扣金额已在余额与交易明细中导出。',
   },
   billing_reconciliation_cases: {
     disposition: 'exclude',

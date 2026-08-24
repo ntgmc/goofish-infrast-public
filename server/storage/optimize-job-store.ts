@@ -313,7 +313,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         const existing = duplicate.rows[0]
         if (existing) {
           if (existing.request_hash !== input.request_hash && existing.request_hash !== input.legacy_request_hash) {
-            throw new OptimizeJobAdmissionError('idempotency_conflict', 409, 'Idempotency-Key is already used for a different request.')
+            throw new OptimizeJobAdmissionError('idempotency_conflict', 409, '提交内容已发生变化，请刷新页面后重新操作。')
           }
           if (!existing.job_id || existing.status !== 'accepted') {
             throw new OptimizeJobAdmissionError('idempotency_in_progress', 409, '优化请求正在处理中。')
@@ -566,7 +566,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       const existing = result.rows[0]
       if (!existing) return null
       if (existing.request_hash !== requestHash && existing.request_hash !== legacyRequestHash) {
-        throw new OptimizeJobAdmissionError('idempotency_conflict', 409, 'Idempotency-Key is already used for a different request.')
+        throw new OptimizeJobAdmissionError('idempotency_conflict', 409, '提交内容已发生变化，请刷新页面后重新操作。')
       }
       if (existing.status !== 'accepted' || !existing.job_id || !existing.job) {
         throw new OptimizeJobAdmissionError('idempotency_in_progress', 409, '优化请求正在处理中。')
@@ -1053,7 +1053,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       return withTransaction(async (client) => {
         const expired = await client.query<{ id: string; payload_json: unknown }>(
           `update optimize_jobs
-           set status = 'failed', error_message = '任务排队超时，已释放预留权益，请重新提交。',
+           set status = 'failed', error_message = '任务排队超时，暂扣的积分和道具已退回，请重新提交。',
                failure_kind = 'queue_expired', public_error_code = 'queue_expired',
                next_attempt_at = null, expires_at = null, finished_at = $1, updated_at = $1
            where status = 'queued' and attempt_count = 0 and expires_at is not null and expires_at < $1
@@ -1289,7 +1289,7 @@ export function createMemoryOptimizeJobStore(
       const duplicate = idempotency.get(key)
       if (duplicate) {
         if (duplicate.requestHash !== input.request_hash && duplicate.requestHash !== input.legacy_request_hash) {
-          throw new OptimizeJobAdmissionError('idempotency_conflict', 409, 'Idempotency-Key is already used for a different request.')
+          throw new OptimizeJobAdmissionError('idempotency_conflict', 409, '提交内容已发生变化，请刷新页面后重新操作。')
         }
         const job = records.get(duplicate.jobId)
         if (!job) throw new OptimizeJobAdmissionError('idempotency_in_progress', 409, '优化请求正在处理中。')
@@ -1381,7 +1381,7 @@ export function createMemoryOptimizeJobStore(
       const duplicate = idempotency.get(`${ownerKey}:${idempotencyKey}`)
       if (!duplicate) return null
       if (duplicate.requestHash !== requestHash && duplicate.requestHash !== legacyRequestHash) {
-        throw new OptimizeJobAdmissionError('idempotency_conflict', 409, 'Idempotency-Key is already used for a different request.')
+        throw new OptimizeJobAdmissionError('idempotency_conflict', 409, '提交内容已发生变化，请刷新页面后重新操作。')
       }
       const job = records.get(duplicate.jobId)
       if (!job) throw new OptimizeJobAdmissionError('idempotency_in_progress', 409, '优化请求正在处理中。')
@@ -1725,7 +1725,7 @@ export function createMemoryOptimizeJobStore(
         if (job.status !== 'queued' || job.attempt_count !== 0 || !job.expires_at || Date.parse(job.expires_at) >= Date.parse(nowIso)) continue
         expired += 1
         job.status = 'failed'
-        job.error_message = '任务排队超时，已释放预留权益，请重新提交。'
+        job.error_message = '任务排队超时，暂扣的积分和道具已退回，请重新提交。'
         job.failure_kind = 'queue_expired'
         job.public_error_code = 'queue_expired'
         job.next_attempt_at = null

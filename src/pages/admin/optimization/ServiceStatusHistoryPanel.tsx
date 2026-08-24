@@ -48,9 +48,10 @@ export default function ServiceStatusHistoryPanel() {
         method: 'POST',
         json: {
           action: 'save_cost_config', component_id: costDraft.component_id, billing_model: costDraft.billing_model,
-          currency: costDraft.currency, hourly_price_cny: costDraft.hourly_price_cny, timezone: costDraft.timezone,
+          currency: costDraft.currency, resident_hourly_price_cny: costDraft.resident_hourly_price_cny,
+          hourly_price_cny: costDraft.hourly_price_cny, timezone: costDraft.timezone,
           schedule_enabled: false, valley_worker_instances: 0,
-          peak_windows: [], expected_updated_at: data.cost.config.updated_at, reason: '更新 Worker ECS 自动启停计费单价',
+          peak_windows: [], expected_updated_at: data.cost.config.updated_at, reason: '更新 Worker ECS 计费单价',
         },
       })
       setError(null)

@@ -4,10 +4,12 @@ import {
   createEmptyServiceStatusHistory,
   resolveOptimizationServiceStatus,
   type ServiceStatusHistoryResponse,
+  type ServiceStatusLevel,
   type ServiceStatusResponse,
 } from '../../src/lib/service-status'
 import { isServiceReady } from '../lifecycle'
 import { getOptimizeStatusQueuePickupGraceMs, getOptimizeWorkerAutoscalingConfiguration } from '../optimize-job-config'
+import { ensureSklandServiceConfiguration } from '../skland-config'
 import { getAdminOptimizationQueueSnapshot } from '../storage/optimize-job-store'
 import { getServiceStatusHistory, listPublicServiceStatusIncidents } from '../storage/service-status-store'
 import { jsonResponse } from './user-auth'
@@ -20,8 +22,9 @@ export default async function serviceStatusHandler(req: Request): Promise<Respon
   try {
     const snapshot = await getAdminOptimizationQueueSnapshot(undefined, 1)
     const autoscaling = getOptimizeWorkerAutoscalingConfiguration()
+    const serviceReady = isServiceReady()
     const status = resolveOptimizationServiceStatus({
-      serviceReady: isServiceReady(),
+      serviceReady,
       queued: snapshot.counts.queued,
       readyQueued: snapshot.counts.ready_queued,
       oldestReadyQueuedWaitMs: snapshot.counts.oldest_ready_wait_ms,
@@ -59,7 +62,10 @@ export default async function serviceStatusHandler(req: Request): Promise<Respon
         worker_instances: snapshot.capacity.worker_instances,
         billable_worker_instances: snapshot.capacity.billable_worker_instances,
       },
-      components: [{ id: 'optimization', status }],
+      components: [
+        { id: 'optimization', status },
+        { id: 'skland_import', status: resolveSklandImportStatus(serviceReady) },
+      ],
       thresholds: { queue_congested_at: QUEUE_CONGESTION_THRESHOLD, queue_overloaded_at: QUEUE_OVERLOAD_THRESHOLD },
       history,
       incidents,
@@ -76,9 +82,22 @@ function unavailablePayload(): ServiceStatusResponse {
     generated_at: new Date().toISOString(),
     status: 'unavailable',
     queue: null,
-    components: [{ id: 'optimization', status: 'unavailable' }],
+    components: [
+      { id: 'optimization', status: 'unavailable' },
+      { id: 'skland_import', status: resolveSklandImportStatus(isServiceReady()) },
+    ],
     thresholds: { queue_congested_at: QUEUE_CONGESTION_THRESHOLD, queue_overloaded_at: QUEUE_OVERLOAD_THRESHOLD },
     history: createEmptyServiceStatusHistory(),
     incidents: [],
+  }
+}
+
+function resolveSklandImportStatus(serviceReady: boolean): ServiceStatusLevel {
+  if (!serviceReady) return 'unavailable'
+  try {
+    ensureSklandServiceConfiguration()
+    return 'available'
+  } catch {
+    return 'unavailable'
   }
 }

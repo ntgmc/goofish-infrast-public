@@ -68,7 +68,7 @@ export default async function userResultsHandler(req: Request): Promise<Response
         if (limit === false) return jsonResponse({ error: '结果列表数量无效。', code: 'result_limit_invalid' }, 400)
         const cursor = url.searchParams.get('cursor')
         if (cursor && cursor.length > 512) {
-          return jsonResponse({ error: '结果列表游标无效。', code: 'result_cursor_invalid' }, 400)
+          return jsonResponse({ error: '结果列表加载位置已失效，请重新打开列表。', code: 'result_cursor_invalid' }, 400)
         }
         return jsonResponse(await listProfileOptimizationResults(profile.id, scope, { cursor, limit }))
       }
@@ -216,7 +216,7 @@ export default async function userResultsHandler(req: Request): Promise<Response
       )
       if (existing.rows[0]) {
         if (existing.rows[0].request_hash !== requestHash) {
-          throw new InventoryError('idempotency_conflict', '幂等键已被其他请求使用。', 409)
+          throw new InventoryError('idempotency_conflict', '提交内容已发生变化，请刷新页面后重新操作。', 409)
         }
         if (!existing.rows[0].response_json) {
           throw new InventoryError('operation_in_progress', '结果操作正在处理中。', 409)

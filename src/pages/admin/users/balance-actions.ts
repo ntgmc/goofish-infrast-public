@@ -84,7 +84,7 @@ export function createAdminUserBalanceActions(options: {
   ): Promise<boolean> => {
     if (!options.detail) return false
     if (operation === 'debit' && !window.confirm(`确认从该用户余额扣减 ${amount} 积分？余额不足时服务端会拒绝本次操作。`)) return false
-    if (operation === 'reverse_credit' && !window.confirm(`确认冲正原入账 ${originalTransactionId} 的 ${amount} 积分？该操作会降低商用资格，余额不足部分形成待追偿。`)) return false
+    if (operation === 'reverse_credit' && !window.confirm(`确认撤销交易 ${originalTransactionId} 发放的 ${amount} 积分？该操作可能降低商用资格，余额不足部分会记为待补扣积分。`)) return false
     options.setBusyAction(`user-balance:${options.detail.user.id}`)
     options.setError(null)
     options.setNotice(null)

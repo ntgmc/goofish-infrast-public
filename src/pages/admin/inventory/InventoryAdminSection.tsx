@@ -136,6 +136,11 @@ export default function InventoryAdminSection() {
   )
   const selectedItem = data?.definitions.find((item) => item.code === itemCode)
   const userIds = [...new Set(targetUsers.split(/[\s,]+/).filter(Boolean))]
+  const selectedTask = data?.tasks.find((task) => task.task_code === taskCode)
+  const selectedTaskDraft = taskDrafts[taskCode] ?? {
+    enabled: selectedTask?.enabled ?? false,
+    rewards: selectedTask?.rewards_json ?? [],
+  }
 
   if (!data) return <div className="tool-panel p-6 text-sm text-ink-secondary" role={error ? 'alert' : 'status'}>
     <p>{error ?? '正在加载道具管理…'}</p>
@@ -235,27 +240,29 @@ export default function InventoryAdminSection() {
 
       {activeTab === 'onboarding' && <form id="inventory-admin-panel-onboarding" role="tabpanel" aria-labelledby="inventory-admin-tab-onboarding" className="tool-panel p-5 sm:p-6" onSubmit={(event) => {
         event.preventDefault()
-        const draft = taskDrafts[taskCode] ?? { enabled: false, rewards: [] }
-        void run('/api/admin/items', { action: 'configure_onboarding_task', task_code: taskCode, enabled: draft.enabled, rewards: draft.rewards }, '新人任务配置版本已发布。')
+        void run('/api/admin/items', { action: 'configure_onboarding_task', task_code: taskCode, enabled: selectedTaskDraft.enabled, rewards: selectedTaskDraft.rewards }, '新人任务配置版本已发布。')
       }}>
         <h3 className="text-base font-semibold text-ink-primary">固定新人任务</h3>
         <div className="mt-4 grid gap-4 lg:grid-cols-[240px_auto]">
           <div>
             <Field label="任务"><select className="tool-field mt-2 w-full" value={taskCode} onChange={(event) => setTaskCode(event.currentTarget.value as OnboardingTaskCode)}>{Object.entries(TASK_LABELS).map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></Field>
-            <label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={taskDrafts[taskCode]?.enabled ?? false} onChange={(event) => setTaskDrafts((current) => ({ ...current, [taskCode]: { enabled: event.currentTarget.checked, rewards: current[taskCode]?.rewards ?? [] } }))} />启用新版本</label>
-            <p className="mt-3 text-xs text-ink-muted">当前版本：{data.tasks.find((task) => task.task_code === taskCode)?.version ?? '—'}；默认任务保持停用，奖励内容非空后才能启用。</p>
+            <label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={selectedTaskDraft.enabled} onChange={(event) => {
+              const enabled = event.currentTarget.checked
+              setTaskDrafts((current) => ({ ...current, [taskCode]: { enabled, rewards: current[taskCode]?.rewards ?? selectedTaskDraft.rewards } }))
+            }} />新版本启用</label>
+            <p className="mt-3 text-xs text-ink-muted">当前 v{selectedTask?.version ?? '—'} {selectedTask?.enabled ? '已启用' : '已停用'}。启用新版本前必须配置奖励。</p>
           </div>
           <RewardListEditor
             id={`task-rewards-${taskCode}`}
             label={`${TASK_LABELS[taskCode]}奖励`}
-            value={taskDrafts[taskCode]?.rewards ?? []}
+            value={selectedTaskDraft.rewards}
             definitions={data.definitions}
             versions={data.gift_pack_versions}
             allowGiftPacks
-            onChange={(rewards) => setTaskDrafts((current) => ({ ...current, [taskCode]: { enabled: current[taskCode]?.enabled ?? false, rewards } }))}
+            onChange={(rewards) => setTaskDrafts((current) => ({ ...current, [taskCode]: { enabled: current[taskCode]?.enabled ?? selectedTaskDraft.enabled, rewards } }))}
           />
         </div>
-        <button className="tool-primary-action mt-4" disabled={busy || (taskDrafts[taskCode]?.rewards.length ?? 0) === 0}>发布任务配置</button>
+        <button className="tool-primary-action mt-4" disabled={busy || selectedTaskDraft.rewards.length === 0}>{selectedTaskDraft.enabled ? '发布并启用' : '发布停用版本'}</button>
       </form>}
 
       {activeTab === 'distribution' && <div id="inventory-admin-panel-distribution" role="tabpanel" aria-labelledby="inventory-admin-tab-distribution" className="space-y-6">
@@ -289,7 +296,7 @@ export default function InventoryAdminSection() {
         action: 'create_campaign', item_code: itemCode, quantity, validity_days: validityDays, target_mode: targetMode,
         ...(giftVersionId && { gift_pack_version_id: giftVersionId }),
         ...(targetMode === 'user_ids' ? { user_ids: userIds } : { root_password: rootPassword, confirmation: 'DISTRIBUTE TO ALL USERS' }), reason,
-      }, '发放活动已进入队列。', { idempotencyScope: 'create_campaign' }) }}>
+      }, '发放任务已创建，系统正在处理。', { idempotencyScope: 'create_campaign' }) }}>
         <h3 className="text-base font-semibold text-ink-primary">批量与全站发放</h3>
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <div>
@@ -318,7 +325,7 @@ export default function InventoryAdminSection() {
           <div className="mt-3 flex flex-wrap gap-2">
             {(campaign.status === 'queued' || campaign.status === 'running') && <><CampaignAction action="pause_campaign" label="暂停" campaign={campaign} run={run} rootPassword={rootPassword} /><CampaignAction action="cancel_campaign" label="取消" campaign={campaign} run={run} rootPassword={rootPassword} /></>}
             {campaign.status === 'paused' && <CampaignAction action="resume_campaign" label="恢复" campaign={campaign} run={run} rootPassword={rootPassword} />}
-            {campaign.status === 'completed_with_failures' && <button type="button" className="tool-secondary-action" onClick={() => void run('/api/admin/inventory', { action: 'retry_campaign_failures', campaign_id: campaign.id, reason: '管理员重试失败收件人' }, '失败收件人已重新入队。', { confirmation: `确认重试活动 ${campaign.id} 的 ${campaign.failed_count} 个失败收件人？` })}>重试失败收件人</button>}
+            {campaign.status === 'completed_with_failures' && <button type="button" className="tool-secondary-action" onClick={() => void run('/api/admin/inventory', { action: 'retry_campaign_failures', campaign_id: campaign.id, reason: '管理员重试失败收件人' }, '失败记录已重新提交处理。', { confirmation: `确认重试活动 ${campaign.id} 的 ${campaign.failed_count} 个失败收件人？` })}>重试失败收件人</button>}
             {(campaign.status === 'completed' || campaign.status === 'completed_with_failures') && <CampaignAction action="reverse_campaign" label="撤回未消费余额" campaign={campaign} run={run} rootPassword={rootPassword} />}
           </div>
         </article>)}</div>
@@ -458,8 +465,8 @@ function itemKindLabel(kind: ItemDefinition['kind']): string {
   if (kind === 'consumable') return '消耗券'
   if (kind === 'capacity_upgrade') return '档案扩容'
   if (kind === 'gift_pack') return '礼包'
-  if (kind === 'cosmetic') return '主题装扮（预留）'
-  if (kind === 'badge') return '成就勋章（预留）'
+  if (kind === 'cosmetic') return '主题装扮（暂未开放）'
+  if (kind === 'badge') return '成就勋章（暂未开放）'
   if (kind === 'license_voucher') return '授权凭证'
   return assertNever(kind)
 }

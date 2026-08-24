@@ -84,7 +84,7 @@ describe('ToolPage route guards', () => {
       refreshProfileWorkspace,
     })
 
-    await user.click((await screen.findAllByRole('button', { name: '准备这个账号' }))[1])
+    await user.click((await screen.findAllByRole('button', { name: '打开账号并准备数据' }))[1])
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/tool/setup/operators'))
     expect(router.state.location.search).toBe('?profile_id=profile-2')
@@ -121,7 +121,7 @@ describe('ToolPage route guards', () => {
     const user = userEvent.setup()
     renderToolRoute('/tool/profiles', { authStatus: 'error', retryAuth })
 
-    expect(await screen.findByRole('heading', { name: '认证服务暂时不可用' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '暂时无法确认登录状态' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'MAA 基建排班工作台' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '重新确认登录状态' }))
     expect(retryAuth).toHaveBeenCalledOnce()
@@ -210,10 +210,10 @@ describe('ToolPage route guards', () => {
       license: { operators: [], config: {}, order_hash: 'order' },
     })
 
-    await user.click(await screen.findByRole('button', { name: '前往背包升级' }))
+    await user.click(await screen.findByRole('button', { name: '前往背包查看' }))
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/tool/inventory'))
-    expect(screen.queryByRole('dialog', { name: '背包里有可用的档案升级券' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: '背包中有档案升级道具' })).not.toBeInTheDocument()
   })
 })
 

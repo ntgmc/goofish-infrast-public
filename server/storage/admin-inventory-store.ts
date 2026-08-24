@@ -683,7 +683,7 @@ async function beginAdminOperation(
   operationType: string,
   request: unknown,
 ): Promise<{ id: string; replayedResponse: Record<string, unknown> | null }> {
-  const key = requireString(idempotencyKey, 1, 200, '幂等键')
+  const key = requireString(idempotencyKey, 1, 200, '本次提交信息')
   const requestHash = createHash('sha256').update(JSON.stringify(request)).digest('hex')
   const operationId = randomUUID()
   const now = new Date().toISOString()
@@ -704,7 +704,7 @@ async function beginAdminOperation(
   )
   const row = existing.rows[0]
   if (!row || row.operation_type !== operationType || row.request_hash !== requestHash) {
-    throw new InventoryError('idempotency_conflict', '幂等键已被其他管理员请求使用。', 409)
+    throw new InventoryError('idempotency_conflict', '提交内容已发生变化，请刷新页面后重新操作。', 409)
   }
   if (!row.response_json) throw new InventoryError('operation_in_progress', '管理员操作正在处理中。', 409)
   return { id: row.id, replayedResponse: row.response_json }

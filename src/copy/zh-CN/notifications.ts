@@ -19,9 +19,9 @@ export const notificationsCopy = {
   itemGrantSingleBody: (name: string, quantity: number) => `${name} ×${quantity}`,
   itemGrantMultipleBody: (count: number) => `本次共获得 ${count} 种道具`,
   apiLoginRequired: '请先登录。',
-  apiMethodNotAllowed: 'Method not allowed',
-  apiInternalError: 'Internal server error',
+  apiMethodNotAllowed: '当前操作不受支持。',
+  apiInternalError: '通知服务暂时不可用，请稍后重试。',
   apiInvalidLimit: '通知数量必须是 1 到 50 之间的整数。',
-  apiInvalidCursor: '通知游标无效。',
+  apiInvalidCursor: '加载位置已失效，请重新打开通知列表。',
   apiNotFound: '通知不存在。',
 } as const

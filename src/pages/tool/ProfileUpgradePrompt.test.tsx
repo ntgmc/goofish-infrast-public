@@ -37,7 +37,7 @@ describe('ProfileUpgradePrompt', () => {
     renderPrompt()
 
     expect(await screen.findByRole('dialog')).toHaveTextContent('限时 CDK')
-    expect(screen.getByRole('button', { name: '前往背包升级' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '前往背包查看' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '不再提示' })).toBeInTheDocument()
   })
 
@@ -52,7 +52,7 @@ describe('ProfileUpgradePrompt', () => {
       'lifetime_profile_voucher', 'bind',
     ))
     renderPrompt({ userId: 'combined-user' })
-    expect(await screen.findByRole('dialog')).toHaveTextContent('限时 CDK 和终身版兑换 CDK')
+    expect(await screen.findByRole('dialog')).toHaveTextContent('背包中有多种档案升级道具，请前往背包查看用途和有效期。')
   })
 
   it.each([
@@ -105,7 +105,7 @@ describe('ProfileUpgradePrompt', () => {
     const onOpenInventory = vi.fn()
     renderPrompt({ onOpenInventory, userId: 'navigate-user' })
 
-    await userEvent.setup().click(await screen.findByRole('button', { name: '前往背包升级' }))
+    await userEvent.setup().click(await screen.findByRole('button', { name: '前往背包查看' }))
     expect(onOpenInventory).toHaveBeenCalledOnce()
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
@@ -131,7 +131,7 @@ describe('ProfileUpgradePrompt', () => {
     apiJson.mockResolvedValue(inventoryWith('limited_profile_voucher', 'use'))
     const user = userEvent.setup()
     renderPrompt({ userId: 'session-user' })
-    await user.click(await screen.findByRole('button', { name: '暂时关闭升级提示' }))
+    await user.click(await screen.findByRole('button', { name: '本次关闭提示' }))
     expect(window.localStorage.getItem(profileUpgradePromptStorageKey('session-user'))).toBeNull()
     cleanup()
 
@@ -176,9 +176,9 @@ describe('ProfileUpgradePrompt', () => {
     const user = userEvent.setup()
     render(<Harness />)
     await waitFor(() => expect(screen.getByRole('dialog', { name: '公告' })).toBeInTheDocument())
-    expect(screen.queryByText('背包里有可用的档案升级券')).not.toBeInTheDocument()
+    expect(screen.queryByText('背包中有档案升级道具')).not.toBeInTheDocument()
     await user.click(within(screen.getByRole('dialog', { name: '公告' })).getByRole('button', { name: '关闭公告' }))
-    expect(await screen.findByRole('dialog', { name: '背包里有可用的档案升级券' })).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: '背包中有档案升级道具' })).toBeInTheDocument()
   })
 
   it('discards inventory results from a previous profile', async () => {

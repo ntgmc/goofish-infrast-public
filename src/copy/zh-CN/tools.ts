@@ -68,7 +68,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_034: "绑定森空岛并分析仓库",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_035: "统计样本属于假名化数据而非匿名数据：它不含仓库/干员明细、昵称、UID 明文或凭据，但会关联本网站档案，以支持导出和账户删除。",
+  pages_DepotValuePage_035: "用于排名的统计样本经过安全处理，不包含仓库或干员明细、昵称、完整 UID 和森空岛凭据；样本仍与本站档案关联，以便你导出数据或注销账号时一并删除，因此并非完全匿名。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_036: "估值说明",
   // src/pages/DepotValuePage.tsx
@@ -78,7 +78,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_039: "材料价格优先参考一图流/企鹅物流的物品价值。模组数据块、数据增补仪、数据增补条、家具零件不会参与计算。",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_040: "默认贡献已开启，分析前可以取消；价格快照有效且覆盖率达标的当前样本与兼容迁移样本会进入排名。样本保存后不支持单独撤回，账户注销时仍会删除关联数据。",
+  pages_DepotValuePage_040: "默认勾选贡献统计样本，你可以在分析前取消。只有价格数据有效且覆盖足够物品时，样本才会进入排名；保存后不能单独撤回，但注销账号时会一并删除。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_041: "分析完成",
   // src/pages/DepotValuePage.tsx
@@ -164,17 +164,17 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_084: " 字节",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_085: "请求上限为 1 MiB、20,000 类物品；数量必须是 0 到 10 亿之间的整数。",
+  pages_DepotValuePage_085: "上传内容最大为 1 MiB，最多包含 20,000 类物品；每类物品数量必须是 0 到 10 亿之间的整数。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_086: "重试登录状态",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_087: "默认同意贡献假名化聚合样本，用于改进仓库排名；如不同意，请在分析前取消勾选。样本保存总值、价格快照/覆盖率、账号等级和干员聚合计数，并关联本网站档案以支持导出和账户删除；保存后不支持单独撤回，账户注销时删除。",
+  pages_DepotValuePage_087: "默认勾选贡献处理后的统计样本，用于改进仓库排名；如不同意，请在分析前取消。样本仅保存仓库总值、价格数据质量、账号等级和干员数量汇总，不保存仓库或干员明细、昵称、完整 UID 和森空岛凭据。样本会关联本站档案，保存后不能单独撤回，注销账号时会一并删除。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_090: "估值口径",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_091: "材料价格",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_092: "价格快照",
+  pages_DepotValuePage_092: "价格数据版本",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_093: "无",
   // src/pages/DepotValuePage.tsx
@@ -188,27 +188,27 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_098: "（按价值排序的前 12 类）",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_099: "仓库 JSON 超过 1 MiB 请求上限，请缩减后重试。",
+  pages_DepotValuePage_099: "仓库 JSON 超过 1 MiB，请缩减后重试。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_100: "物品数量必须是 0 到 10 亿之间的整数。",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_101: "新鲜快照",
+  pages_DepotValuePage_101: "当前价格数据",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_102: "有效期内历史快照",
+  pages_DepotValuePage_102: "有效期内的历史价格",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_103: "不可用",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_104: "无效响应",
+  pages_DepotValuePage_104: "返回数据无法识别",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_105: "已保存",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_106: "未同意",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_107: "因价格质量不足跳过",
+  pages_DepotValuePage_107: "价格数据不足，未保存",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_108: "上传数据不适用",
+  pages_DepotValuePage_108: "本次上传不参与样本",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_109: "保存服务不可用",
+  pages_DepotValuePage_109: "暂时无法保存样本",
   // src/pages/tool/profile-redemption.ts
   pages_tool_profile_redemption_001: "当前 CDK 不能用于升级档案。",
 } as const

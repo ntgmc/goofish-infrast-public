@@ -116,11 +116,11 @@ describe('RegistrationSettingsSection', () => {
   it('blocks reserve totals above the daily limit before sending the update', async () => {
     const user = userEvent.setup()
     render(<RegistrationSettingsSection />)
-    const adminReserve = await screen.findByLabelText('管理员邀请验证预留')
+    const adminReserve = await screen.findByLabelText('为管理员邀请验证保留')
     await user.clear(adminReserve)
     await user.type(adminReserve, '295')
     await user.click(screen.getByRole('button', { name: '保存注册设置' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('两类邮件预留总和不能超过 300')
+    expect(await screen.findByRole('alert')).toHaveTextContent('两项保留额度总和不能超过 300')
     expect(adminApiJson.mock.calls.some(([, options]) => options?.method === 'PUT')).toBe(false)
   })
 

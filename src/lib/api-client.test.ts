@@ -80,6 +80,46 @@ describe('API client boundary', () => {
     })])
   })
 
+  it('turns generic server errors into user-friendly messages without changing diagnostics', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      error: 'Internal server error',
+      code: 'internal_error',
+      request_id: 'request-friendly',
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })))
+
+    await expect(apiJson('/api/test')).rejects.toMatchObject({
+      message: '服务暂时不可用，请稍后重试。',
+      status: 500,
+      code: 'internal_error',
+      requestId: 'request-friendly',
+    })
+  })
+
+  it('uses stable error codes for user-friendly conflict and result-list messages', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: 'legacy conflict message',
+        code: 'idempotency_conflict',
+      }), { status: 409, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: 'legacy cursor message',
+        code: 'result_cursor_invalid',
+      }), { status: 400, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(apiJson('/api/conflict')).rejects.toMatchObject({
+      message: '提交内容已发生变化，请刷新页面后重新操作。',
+      code: 'idempotency_conflict',
+    })
+    await expect(apiJson('/api/results')).rejects.toMatchObject({
+      message: '结果列表加载位置已失效，请重新打开列表。',
+      code: 'result_cursor_invalid',
+    })
+  })
+
   it('maps a deadline abort to request_timeout', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('fetch', abortableFetch())

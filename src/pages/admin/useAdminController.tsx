@@ -97,7 +97,7 @@ export function useAdminController() {
 
   const [riskSettings, setRiskSettings] = useState<RiskControlSettings>(DEFAULT_RISK_SETTINGS)
 
-  const [permission, setPermission] = useState<GeneratedPermission>('growth')
+  const [permission, setPermission] = useState<GeneratedPermission>('advanced')
   const [cdkType, setCdkType] = useState<CdkType>('profile')
   const [balanceAmount, setBalanceAmount] = useState('100.00')
 

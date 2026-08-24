@@ -24,7 +24,7 @@ export const optimizeCopy = {
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_022: "查看解释",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_023: "内部得分变化",
+  components_UpgradeSuggestions_023: "排班得分变化",
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_024: "每日合成玉",
   // src/components/UpgradeSuggestions.tsx
@@ -138,7 +138,7 @@ export const optimizeCopy = {
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_079: "成本不完整",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_080: "无快照",
+  components_UpgradeSuggestions_080: "暂无来源信息",
   // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_001: "工作区输入",
   // src/pages/tool/optimize/ConfigSection.tsx
@@ -214,7 +214,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/GenerateControlBar.tsx
   pages_tool_optimize_GenerateControlBar_022: "查看优先计算券说明",
   // src/pages/tool/optimize/GenerateControlBar.tsx
-  pages_tool_optimize_GenerateControlBar_023: "本次主排班任务将进入最高优先队列，排在普通付费和免费任务之前。券只影响排队顺序；入队失败不扣券，服务端执行失败或最终超时会自动退回。",
+  pages_tool_optimize_GenerateControlBar_023: "本次排班会优先开始计算，排在普通付费和免费任务之前。道具只影响等待顺序；提交失败、计算失败或最终超时时会自动退回。",
   // src/pages/tool/optimize/GenerateControlBar.tsx
   pages_tool_optimize_GenerateControlBar_024: "\n                当前可用 ",
   // src/pages/tool/optimize/GenerateControlBar.tsx
@@ -482,7 +482,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ResultSection.tsx
   pages_tool_optimize_ResultSection_009: "排班和优化建议均已完成，本次没有发现可推荐的升级项。",
   // src/pages/tool/optimize/ResultSection.tsx
-  pages_tool_optimize_ResultSection_010: "排班已完成，但优化建议计算失败。主排班结果已保留，可重新生成后再试。",
+  pages_tool_optimize_ResultSection_010: "排班已完成，但优化建议计算失败。排班结果已保留，可重新生成后再试。",
   // src/pages/tool/optimize/ResultSection.tsx
   pages_tool_optimize_ResultSection_011: "排班已完成，当前权益不包含优化建议。",
   // src/pages/tool/optimize/ResultSection.tsx
@@ -620,9 +620,9 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/job-progress.ts
   pages_tool_optimize_job_progress_003: "任务已开始，预计用时已重新校准",
   // src/pages/tool/optimize/job-progress.ts
-  pages_tool_optimize_job_progress_004: "队列发生变化，预计已延长",
+  pages_tool_optimize_job_progress_004: "等待任务增加，预计时间已延长",
   // src/pages/tool/optimize/job-progress.ts
-  pages_tool_optimize_job_progress_005: "队列推进中，预计已缩短",
+  pages_tool_optimize_job_progress_005: "等待任务减少，预计时间已缩短",
   // src/pages/tool/optimize/job-progress.ts
   pages_tool_optimize_job_progress_006: "排班已完成，已进入练度建议阶段",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
@@ -862,7 +862,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_001: "请先绑定森空岛后再检测。",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_002: "请先生成一次个人排班作为检测基线。",
+  pages_tool_optimize_useOptimizeWorkflow_002: "请先生成一次个人排班，作为后续检查的对比依据。",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_003: "干员数据同步中，稍后再检测。",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
@@ -1005,9 +1005,9 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_072: "个人增量重算",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_073: "绑定最近一次成功结果，用于练度提高或新增干员后的重新优化。当前版本会重新执行排班计算，暂未复用底层计算缓存。",
+  pages_tool_optimize_OverviewSection_073: "使用最近一次成功结果，在练度提高或新增干员后重新计算排班。",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_074: (charge: string) => `${charge} 积分/次 · 仅成功后结算`,
+  pages_tool_optimize_OverviewSection_074: (charge: string) => `${charge} 积分/次 · 仅成功生成后扣除`,
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_075: "终身卡包含此能力",
   // src/pages/tool/optimize/OverviewSection.tsx
@@ -1021,13 +1021,13 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_056: "积分余额不足。",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
-  pages_tool_optimize_ScenarioLabSection_057: "提交成功后才会结算场景对比费用。",
+  pages_tool_optimize_ScenarioLabSection_057: "对比结果成功生成后才会扣除积分。",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_058: "重新获取报价",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_024: "个人增量重算必须先有一份成功主排班结果。",
+  pages_tool_optimize_useOptimizeWorkflow_024: "请先生成一份排班结果，再使用增量重算。",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_025: "当前干员与配置数据没有变化，无需提交增量重算。",
+  pages_tool_optimize_useOptimizeWorkflow_025: "当前干员和配置没有变化，无需重新计算。",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
   pages_tool_optimize_scenario_lab_ScenarioFactors_033: (count: number, maximum: number) => `额外配置 ${count} / ${maximum}；每次场景对比最多比较 ${maximum} 个额外基建配置。`,
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx

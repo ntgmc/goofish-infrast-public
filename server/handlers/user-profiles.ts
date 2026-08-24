@@ -72,7 +72,7 @@ export default async (req: Request): Promise<Response> => {
     if (req.method === 'PATCH') {
       const body = await getValidatedJson(req, requestSchemas.profilePatch)
       if (typeof body.profile_id !== 'string' || !body.profile_id) {
-        return jsonResponse({ error: '缺少 profile_id。' }, 400)
+        return jsonResponse({ error: '请先选择游戏账号。', code: 'profile_id_invalid' }, 400)
       }
       const profile = await getProfileForUser(auth.user.id, body.profile_id)
       if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)

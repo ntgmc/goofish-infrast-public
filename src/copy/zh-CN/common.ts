@@ -330,31 +330,31 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_006: "已等待",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_007: "同步",
+  components_ScheduleProgress_007: "状态更新",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_008: "提交请求",
+  components_ScheduleProgress_008: "检查请求",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_009: "校验授权、配置和风控结果。",
+  components_ScheduleProgress_009: "检查账号权限和当前配置。",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_010: "进入队列",
+  components_ScheduleProgress_010: "等待计算",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_011: "按优先级等待 worker 领取。",
+  components_ScheduleProgress_011: "正在等待系统开始计算。",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_012: "计算当前排班",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_013: "搜索当前基建的最优排班。",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_014: "持久化结果",
+  components_ScheduleProgress_014: "保存结果",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_015: "整理方案、效率和历史记录。",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_016: "提交建议",
+  components_ScheduleProgress_016: "检查建议请求",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_017: "确认练度任务和当前配置。",
+  components_ScheduleProgress_017: "检查当前配置是否可用于练度建议。",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_018: "进入队列",
+  components_ScheduleProgress_018: "等待计算",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_019: "等待后台领取重新计算。",
+  components_ScheduleProgress_019: "正在等待系统开始重新计算。",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_020: "重新计算",
   // src/components/ScheduleProgress.tsx
@@ -364,21 +364,21 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_023: "整理可下载结果和效率对比。",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_024: "校验组合",
+  components_ScheduleProgress_024: "检查对比条件",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_025: "检查账号权限、场景因子和运行上限。",
+  components_ScheduleProgress_025: "检查账号权限、对比条件和可用次数。",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_026: "进入队列",
+  components_ScheduleProgress_026: "等待分析",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_027: "等待高级分析 worker 领取任务。",
+  components_ScheduleProgress_027: "正在等待系统开始分析。",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_028: "快速筛选",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_029: "计算全部场景；自动非固定模式同时选择班次数组。",
+  components_ScheduleProgress_029: "计算所有可用组合，并为自动模式选择合适班次。",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_030: "场景复核",
+  components_ScheduleProgress_030: "整理对比结果",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_031: "按实际操作成本分组，冻结候选班次后生成 Pareto 前沿。",
+  components_ScheduleProgress_031: "按操作成本整理结果，并筛选更合适的方案组合。",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_032: "优先计算券",
   // src/components/ScheduleProgress.tsx
@@ -386,7 +386,7 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_034: "高级分析",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_035: "普通队列",
+  components_ScheduleProgress_035: "普通任务",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_036: "任务 #",
   // src/components/ScheduleProgress.tsx
@@ -398,7 +398,7 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_040: " 次重连",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_041: "等待同步",
+  components_ScheduleProgress_041: "更新状态",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_042: "不会重复提交任务；当前任务完成后仍会自动展示结果。",
   // src/components/ScheduleProgress.tsx
@@ -406,7 +406,7 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_044: "优先计算券",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_045: "优先队列",
+  components_ScheduleProgress_045: "优先计算",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_046: "页面可保持打开，结果完成后会自动展示。",
   // src/components/ScheduleProgress.tsx
@@ -432,7 +432,7 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_057: "正在重新计算",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_058: "已加入队列",
+  components_ScheduleProgress_058: "正在等待计算",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_059: "正在提交任务",
   // src/components/ScheduleProgress.tsx
@@ -446,23 +446,23 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_064: "，会随实际耗时自动校准。",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_065: "优先计算券队列",
+  components_ScheduleProgress_065: "优先计算",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_066: "付费优先队列",
+  components_ScheduleProgress_066: "付费任务",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_067: "高级分析队列",
+  components_ScheduleProgress_067: "场景分析",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_068: "普通队列",
+  components_ScheduleProgress_068: "普通任务",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_069: "，预计还需 ",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_070: "正在提交优化请求，完成校验后会进入后台队列。",
+  components_ScheduleProgress_070: "正在检查本次请求，完成后会开始等待计算。",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_071: "任务已开始执行",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_072: "结果已返回",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_073: "等待队列同步",
+  components_ScheduleProgress_073: "正在确认等待进度",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_074: "等待提交",
   // src/components/ScheduleProgress.tsx
@@ -682,7 +682,7 @@ export const commonCopy = {
   // src/pages/ToolPage.tsx
   pages_ToolPage_002: "正在载入排班工具...",
   // src/pages/ToolPage.tsx
-  pages_ToolPage_003: "认证服务暂时不可用",
+  pages_ToolPage_003: "暂时无法确认登录状态",
   // src/pages/ToolPage.tsx
   pages_ToolPage_004: "暂时无法确认登录状态。为保护账号数据，页面不会切换到登录状态，请稍后重试。",
   // src/pages/ToolPage.tsx
@@ -738,25 +738,25 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_102: "自动重试等待中",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_103: "已收到取消请求，正在等待执行器安全停止并结算。",
+  components_ScheduleProgress_103: "已收到取消请求，正在安全停止任务并确认最终状态。",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_104: "任务执行异常，系统将在退避后自动开始第 ",
+  components_ScheduleProgress_104: "任务暂时中断，系统稍后将自动开始第 ",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_105: " 次尝试。",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_106: "任务已取消",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_107: "任务已从等待队列中取消，不会继续执行。",
+  components_ScheduleProgress_107: "任务已在开始计算前取消，不会继续执行。",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_108: "已取消",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_109: "已离开队列",
+  components_ScheduleProgress_109: "已取消",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_110: "任务已取消，可重新提交。",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_111: "计算优化建议",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_112: "生成潜力排班、模拟升级并补全训练成本。",
+  components_ScheduleProgress_112: "生成优化建议，并估算升级收益和养成成本。",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_113: "正在计算当前排班",
   // src/components/ScheduleProgress.tsx
@@ -789,4 +789,26 @@ export const commonCopy = {
   lib_admin_operation_reason_004: "确认并继续",
   // src/lib/admin-operation-reason.ts
   lib_admin_operation_reason_005: "操作原因必须为 2–500 个字符。",
+  // src/lib/api-client.ts
+  lib_api_client_method_not_allowed: "当前操作不受支持。",
+  lib_api_client_internal_error: "服务暂时不可用，请稍后重试。",
+  lib_api_client_route_not_found: "请求的服务地址不存在。",
+  lib_api_client_request_failed: "请求未完成，请稍后重试。",
+  lib_api_client_invalid_response: "服务返回的数据暂时无法识别，请稍后重试。",
+  lib_api_client_timeout: "请求超时，请稍后重试。",
+  lib_api_client_cancelled: "请求已取消。",
+  lib_api_client_network_error: "无法连接服务，请检查网络后重试。",
+  lib_api_client_invalid_cdk: "CDK 标识无效。",
+  lib_api_client_invalid_cursor: "加载位置已失效，请重新打开列表。",
+  lib_api_client_invalid_limit: "加载数量不正确，请刷新后重试。",
+  lib_api_client_invalid_scan: "扫码信息已失效，请重新生成二维码。",
+  lib_api_client_missing_selection: "请选择要导入的森空岛账号。",
+  lib_api_client_expired_operation: "本次操作已失效，请重新开始。",
+  lib_api_client_incomplete_submission: "本次提交信息不完整，请重新操作。",
+  lib_api_client_missing_profile: "请先选择游戏账号。",
+  lib_api_client_missing_history: "请选择一条历史结果。",
+  lib_api_client_changed_submission: "提交内容已发生变化，请刷新页面后重新操作。",
+  lib_api_client_invalid_result_cursor: "结果列表加载位置已失效，请重新打开列表。",
+  lib_api_client_missing_input: "提交信息不完整，请刷新页面后重试。",
+  lib_api_client_invalid_input: "提交内容不正确，请检查后重试。",
 } as const
