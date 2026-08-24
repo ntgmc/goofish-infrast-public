@@ -85,6 +85,7 @@ import {
   lockSklandUidProfilesInTransaction,
   recordSklandUidMismatchInTransaction,
 } from '../storage/skland-binding-store'
+import { resolveProfileAuthorization } from './profile-authorization'
 import {
   ensureSklandServiceConfiguration,
   getFreePreviewUidHashSecret,
@@ -1542,6 +1543,14 @@ async function handleAccountMismatch(
   preview: SklandPreview,
   requestContext?: SklandRequestContext,
 ): Promise<Response> {
+  const authorization = await resolveProfileAuthorization(profile)
+  if (authorization.ok && authorization.permission === 'ultimate') {
+    return jsonResponse({
+      status: 'account_mismatch',
+      skland_preview: preview,
+      warning: '该账号与当前绑定账号不一致，请确认是否登录错账号。',
+    })
+  }
   const now = new Date().toISOString()
   const nextProfile = await withTransaction((client) => recordSklandUidMismatchInTransaction(client, {
     userId: user.id,

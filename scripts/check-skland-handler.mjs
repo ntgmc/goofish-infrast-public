@@ -46,6 +46,7 @@ await assertRefreshCredentialInvalid()
 await assertMatchingRebindResetsRisk()
 await assertMismatchedRebindDoesNotLeakRiskCount()
 await assertRepeatedMismatchFreezesProfile()
+await assertAdminMismatchDoesNotTriggerRisk()
 await assertSchemaChangeError()
 await assertUnbindRouteRemoved()
 await assertFreePreviewScanClaim()
@@ -773,6 +774,32 @@ async function assertRepeatedMismatchFreezesProfile() {
   }
 }
 
+async function assertAdminMismatchDoesNotTriggerRisk() {
+  seedProfile({ id: 'admin-profile', status: 'active', permission: 'ultimate' })
+  const profile = store.profiles.get('admin-profile')
+  store.profiles.set('admin-profile', {
+    ...profile,
+    skland_binding: { uid: '12345678' },
+  })
+  setFetchMode('mismatch')
+  const behaviorRiskEventCountBefore = store.requestBehaviorEvents.length
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const result = await callSkland('/api/user/skland/login/complete', { profile_id: 'admin-profile', scan_id: 'scan-1' })
+    if (result.status !== 200 || result.body.status !== 'account_mismatch') {
+      throw new Error(`admin mismatch: expected account_mismatch, got ${result.status}`)
+    }
+  }
+  const updatedProfile = store.profiles.get('admin-profile')
+  if (
+    updatedProfile?.status !== 'active'
+    || updatedProfile.skland_binding?.uid !== '12345678'
+    || updatedProfile.skland_risk !== null
+    || store.requestBehaviorEvents.length !== behaviorRiskEventCountBefore
+  ) {
+    throw new Error('admin mismatch: should preserve the bound account without risk counting, audit, or freezing')
+  }
+}
+
 async function assertSchemaChangeError() {
   seedProfile({ id: 'schema-profile', status: 'active' })
   setFetchMode('complete')
@@ -1027,7 +1054,7 @@ async function callSkland(path, body, init = {}) {
   return { status: response.status, body: await response.json() }
 }
 
-function seedProfile({ id, status, archivedAt = null }) {
+function seedProfile({ id, status, archivedAt = null, permission = 'advanced' }) {
   const now = '2026-01-01T00:00:00.000Z'
   const cdkKey = `cdk/${id}`
   store.profiles.set(id, {
@@ -1037,7 +1064,7 @@ function seedProfile({ id, status, archivedAt = null }) {
     cdk_key: cdkKey,
     cdk_code_hash: `hash-${id}`,
     cdk_order_hash: null,
-    permission: 'advanced',
+    permission,
     kind: 'cdk',
     status,
     archived_at: archivedAt,
@@ -1051,7 +1078,7 @@ function seedProfile({ id, status, archivedAt = null }) {
   })
   store.cdks.set(cdkKey, {
     code_hash: id,
-    permission: 'advanced',
+    permission,
     status: 'used',
   })
   store.workspaces.set(id, {
@@ -1291,6 +1318,7 @@ function createMemoryStore() {
     },
     personalUseDeclarationUsageEvents: [],
     behaviorRiskEvents: [],
+    requestBehaviorEvents: [],
     fetchCalls: [],
   }
 }
@@ -1551,7 +1579,11 @@ function memoryBehaviorRiskServiceModule() {
   return `
     const store = globalThis.__sklandHandlerSmokeStore
     export async function recordAuthenticatedRequestBehaviorEvent() { return false }
-    export async function recordRequestBehaviorEvent() { return false }
+    export async function recordRequestBehaviorEvent(input) {
+      const { req: _req, ...event } = input
+      store.requestBehaviorEvents.push(event)
+      return true
+    }
     export async function recordRequestBehaviorEventInTransaction(_client, input) {
       const { req: _req, ...event } = input
       store.behaviorRiskEvents.push(event)
@@ -1803,6 +1835,8 @@ function memoryLicenseUtilsModuleFixed() {
         ? record.profile_duration
         : 'lifetime'
     }
+    export function getCdkProfileExpiresAt() { return null }
+    export function formatRiskFreezeMessage(message) { return message }
     export function getCdkScheduleQuotaLimit() { return null }
     export function getCdkScenarioQuotaLimit() { return null }
     export function getCdkType(record) {
