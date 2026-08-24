@@ -66,7 +66,7 @@ import {
   type SklandBindingSummary,
   type SklandImportSummary,
 } from './skland-client'
-import { buildAuthPayload, jsonResponse, requireUserSession } from './user-auth'
+import { buildAuthPayload, jsonResponse, requireUserSession, scheduleInvitationSettlement } from './user-auth'
 import { recordUsageEvent } from './usage-stats'
 import type { UsageReasonCode } from '../storage/usage-store'
 import { CURRENT_PERSONAL_USE_DECLARATION, isCurrentPersonalUseDeclarationEffective } from '../personal-use-declaration'
@@ -756,6 +756,7 @@ async function runSklandImportPostCommit(
   for (const result of results) {
     if (result.status === 'rejected') console.warn('skland import post-commit task skipped:', result.reason)
   }
+  if (hasDatabaseUrl()) scheduleInvitationSettlement(userId)
 }
 
 async function recordSklandOperatorFingerprint(
@@ -1062,6 +1063,7 @@ async function confirmLifetimeVoucherBinding(
   for (const task of postCommitTasks) {
     if (task.status === 'rejected') console.warn('lifetime voucher post-commit task skipped:', task.reason)
   }
+  scheduleInvitationSettlement(user.id)
   return jsonResponse({ ...(await buildPayloadWithImport(user, result.profile_id, result.imported)), replayed: false })
 }
 

@@ -1707,6 +1707,7 @@ function memoryUserAuthModule() {
       if (!req.headers.get('cookie')?.includes('maa_session=test-session')) return null
       return { user: store.user, session: {}, tokenHash: 'test', profiles: [...store.profiles.values()], activeProfile: store.profiles.get('profile-1') ?? null, cdkRecord: null }
     }
+    export function scheduleInvitationSettlement() {}
     export async function buildAuthPayload(user, activeProfileId) {
       const records = [...store.profiles.values()]
       const active = records.find((profile) => profile.id === activeProfileId) ?? records[0] ?? null

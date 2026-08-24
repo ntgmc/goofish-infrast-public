@@ -485,6 +485,9 @@ describe('PostgreSQL optimization job admission', () => {
         { recipient: 'invitee', item_code: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'relative_days', days: 30 }, gift_pack_version_id: null },
       ],
     })
+    await expect(activateInvitationForUser(invitee)).resolves.toBe(false)
+    expect((await query<{ status: string }>('select status from invitations where invitee_user_id = $1', [invitee])).rows[0]?.status).toBe('registered')
+    await bindProfileToSkland(inviteeProfileId)
     await Promise.all(Array.from({ length: 4 }, () => activateInvitationForUser(invitee)))
     expect((await query<{ status: string }>('select status from invitations where invitee_user_id = $1', [invitee])).rows[0]?.status).toBe('activated')
     await expect(processInvitationSettlementBatch(10)).resolves.toBeGreaterThanOrEqual(1)
@@ -534,7 +537,7 @@ describe('PostgreSQL optimization job admission', () => {
     const inviterProfileId = await seedProfile()
     const inviter = (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [inviterProfileId])).rows[0]!.user_id
     const code = await ensureInvitationCode(inviter)
-    const invitees = await Promise.all([seedProfile(), seedProfile()])
+    const invitees = await Promise.all([seedSklandBoundProfile(), seedSklandBoundProfile()])
     const inviteeUsers = await Promise.all(invitees.map(async (profileId) => (
       (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [profileId])).rows[0]!.user_id
     )))
@@ -581,7 +584,7 @@ describe('PostgreSQL optimization job admission', () => {
     const inviterProfileId = await seedProfile()
     const inviter = (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [inviterProfileId])).rows[0]!.user_id
     const code = await ensureInvitationCode(inviter)
-    const inviteeProfileId = await seedProfile()
+    const inviteeProfileId = await seedSklandBoundProfile()
     const invitee = (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [inviteeProfileId])).rows[0]!.user_id
     await saveTestInvitationSettings({
       enabled: false,
@@ -613,13 +616,13 @@ describe('PostgreSQL optimization job admission', () => {
     expect((await query<{ status: string }>('select status from invitations where id = $1', [invitationId])).rows[0]?.status).toBe('settled')
   })
 
-  it('reconciles a registered invitation when the invitee already has an active profile', async () => {
+  it('reconciles a registered invitation when the invitee already has an active Skland-bound profile', async () => {
     const inviterProfileId = await seedProfile()
     const inviter = (await query<{ user_id: string }>(
       'select user_id from user_game_accounts where id = $1', [inviterProfileId],
     )).rows[0]!.user_id
     const code = await ensureInvitationCode(inviter)
-    const inviteeProfileId = await seedProfile()
+    const inviteeProfileId = await seedSklandBoundProfile()
     const invitee = (await query<{ user_id: string }>(
       'select user_id from user_game_accounts where id = $1', [inviteeProfileId],
     )).rows[0]!.user_id
@@ -651,7 +654,7 @@ describe('PostgreSQL optimization job admission', () => {
       'select user_id from user_game_accounts where id = $1', [inviterProfileId],
     )).rows[0]!.user_id
     const code = await ensureInvitationCode(inviter)
-    const inviteeProfileIds = await Promise.all([seedProfile(), seedProfile()])
+    const inviteeProfileIds = await Promise.all([seedSklandBoundProfile(), seedSklandBoundProfile()])
     const invitees = await Promise.all(inviteeProfileIds.map(async (profileId) => (
       (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [profileId])).rows[0]!.user_id
     )))
@@ -1622,6 +1625,32 @@ async function seedProfile(): Promise<string> {
     [profileId, userId, JSON.stringify({ id: profileId, user_id: userId })],
   )
   return profileId
+}
+
+async function seedSklandBoundProfile(): Promise<string> {
+  const profileId = await seedProfile()
+  await bindProfileToSkland(profileId)
+  return profileId
+}
+
+async function bindProfileToSkland(profileId: string): Promise<void> {
+  const now = new Date().toISOString()
+  await query(
+    `update user_game_accounts
+        set record_json = jsonb_set(record_json, '{skland_binding}', $2::jsonb, true), updated_at = $3
+      where id = $1`,
+    [profileId, JSON.stringify({
+      uid: profileId,
+      nickname: 'Invitee',
+      channel_name: 'official',
+      bound_at: now,
+      last_imported_at: now,
+      encrypted_cred: 'test-credential',
+      credential_status: 'available',
+      credential_invalid_at: null,
+      credential_invalid_reason: null,
+    }), now],
+  )
 }
 
 function formalOperators() {
