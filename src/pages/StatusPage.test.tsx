@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ServiceStatusLevel } from '../lib/service-status'
@@ -35,13 +35,41 @@ describe('StatusPage', () => {
     expect(componentSection).not.toHaveTextContent('并发容量')
   })
 
-  it('renders an unavailable state and exposes a retry path on a 503', async () => {
+  it('renders a server-reported unavailable state without a connection error', async () => {
     vi.mocked(fetch).mockResolvedValue(response(503, payload('unavailable', null)))
     render(<MemoryRouter><StatusPage /></MemoryRouter>)
     await act(async () => { await Promise.resolve() })
 
     expect(screen.getAllByText('暂不可用').length).toBeGreaterThan(0)
-    expect(screen.getByRole('button', { name: '重新检查' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '刷新状态' })).toBeInTheDocument()
+  })
+
+  it('keeps the last known status when a refresh cannot reach the status endpoint', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(response(200, payload('available', { queued: 0, running: 1 })))
+      .mockRejectedValueOnce(new TypeError('network error'))
+    render(<MemoryRouter><StatusPage /></MemoryRouter>)
+    await act(async () => { await Promise.resolve() })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '刷新状态' }))
+      await Promise.resolve()
+    })
+
+    expect(screen.getAllByText('运行正常').length).toBeGreaterThan(0)
+    expect(screen.getByRole('alert')).toHaveTextContent('无法连接到状态接口')
+  })
+
+  it('does not report an outage when the initial status request fails', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('network error'))
+    render(<MemoryRouter><StatusPage /></MemoryRouter>)
+    await act(async () => { await Promise.resolve() })
+
+    const overall = screen.getByRole('heading', { name: '状态暂时无法获取' }).closest('section')
+    expect(overall).toHaveTextContent('状态未知')
+    expect(overall).toHaveTextContent('暂无可用更新时间')
+    expect(overall).not.toHaveTextContent('暂不可用')
   })
 
   it('renders orange when the queue exceeds twenty jobs', async () => {
@@ -50,7 +78,7 @@ describe('StatusPage', () => {
     await act(async () => { await Promise.resolve() })
 
     expect(screen.getAllByText('排队过多').length).toBeGreaterThan(0)
-    expect(screen.getByText('服务排队超过 20 个，处理等待明显增加。')).toBeInTheDocument()
+    expect(screen.getAllByText('服务排队超过 20 个，处理等待明显增加。').length).toBeGreaterThan(0)
   })
 
   it('renders elastic processing while autoscaling consumes the queue', async () => {
@@ -87,6 +115,8 @@ describe('StatusPage', () => {
     expect(screen.getByLabelText(/弹性处理中/)).toBeInTheDocument()
     expect(screen.getByText('队列延迟')).toBeInTheDocument()
     expect(screen.getByText('已恢复。')).toBeInTheDocument()
+    expect(screen.getAllByRole('gridcell').every((cell) => !cell.hasAttribute('tabindex'))).toBe(true)
+    expect(document.querySelector('.service-status-history-axis')).toHaveTextContent('17时')
   })
 })
 

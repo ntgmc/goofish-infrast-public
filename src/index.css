@@ -509,6 +509,7 @@ body {
     gap: 0.25rem;
   }
 
+  .service-status-history-axis,
   .service-status-history-row {
     display: grid;
     grid-template-columns: 3.25rem repeat(24, minmax(0, 1fr));
@@ -516,7 +517,18 @@ body {
     align-items: center;
   }
 
+  .service-status-history-axis {
+    color: var(--theme-ink-muted);
+    font-size: 0.625rem;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+  }
+
   .service-status-history-day {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--theme-surface-1);
     color: var(--theme-ink-muted);
     font-size: 0.6875rem;
     font-variant-numeric: tabular-nums;
@@ -534,7 +546,6 @@ body {
 
   .service-status-history-cell { min-height: 1.1rem; }
   .service-status-history-swatch { width: 0.7rem; height: 0.7rem; flex: none; }
-  .service-status-history-cell:focus-visible { outline: 2px solid var(--theme-brand-500); outline-offset: 2px; }
   .service-status-history-cell--available { background: color-mix(in oklch, #0b6b3a 88%, var(--theme-surface-1)); }
   .service-status-history-cell--busy { background: color-mix(in oklch, #2ca35a 88%, var(--theme-surface-1)); }
   .service-status-history-cell--scaling { background: color-mix(in oklch, #2563eb 88%, var(--theme-surface-1)); }
