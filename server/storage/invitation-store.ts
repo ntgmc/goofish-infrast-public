@@ -29,9 +29,6 @@ const MAX_SETTLEMENT_ATTEMPTS = 5
 const SETTLEMENT_LEASE_MS = 5 * 60 * 1000
 const INVITE_CODE_ROTATION_COOLDOWN_MS = 24 * 60 * 60 * 1000
 const CROCKFORD_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
-const INVITEE_ELIGIBLE_PROFILE_SQL = `profile.status = 'active'
-  and coalesce(profile.kind, profile.record_json->>'kind', 'cdk') in ('cdk', 'free_preview')
-  and profile.record_json->'skland_binding' is not null`
 
 export type InvitationSettingsPatch = Partial<Pick<InvitationSettings, 'enabled' | 'daily_inviter_reward_limit' | 'rewards'>>
 
@@ -666,7 +663,9 @@ async function reconcileRegisteredInvitations(limit: number): Promise<number> {
             and exists (
               select 1 from user_game_accounts profile
                where profile.user_id = invitation.invitee_user_id
-                 and ${INVITEE_ELIGIBLE_PROFILE_SQL}
+                 and profile.status = 'active'
+                 and coalesce(profile.kind, profile.record_json->>'kind', 'cdk') in ('cdk', 'free_preview')
+                 and profile.record_json->'skland_binding' is not null
             )
           order by invitation.registered_at asc, invitation.id asc
           for update skip locked
@@ -984,7 +983,9 @@ async function userHasActiveSklandProfile(client: PoolClient, userId: string): P
   const active = await client.query<{ active: boolean }>(
     `select exists (select 1 from user_game_accounts profile
       where profile.user_id = $1
-        and ${INVITEE_ELIGIBLE_PROFILE_SQL}) as active`,
+        and profile.status = 'active'
+        and coalesce(profile.kind, profile.record_json->>'kind', 'cdk') in ('cdk', 'free_preview')
+        and profile.record_json->'skland_binding' is not null) as active`,
     [userId],
   )
   return active.rows[0]?.active === true
