@@ -492,8 +492,8 @@ export default async (req: Request): Promise<Response> => {
         return jsonResponse({ error: error.message, code: 'skland_credential_invalid', recovery_action: 'rebind' }, 400)
       }
       return jsonResponse({
-        error: '鹰角或森空岛服务暂不可用，请稍后重试。',
-        code: 'skland_upstream_failed',
+        error: error.message || '鹰角或森空岛服务暂不可用，请稍后重试。',
+        code: error.publicCode || 'skland_upstream_failed',
         recovery_action: 'retry',
       }, 502)
     }

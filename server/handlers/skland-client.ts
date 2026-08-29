@@ -8,12 +8,18 @@ const REQUEST_TIMEOUT_MS = 25000
 const SKLAND_USER_AGENT = 'Skland/1.21.0 (com.hypergryph.skland; build:102100065; iOS 17.6.0; ) Alamofire/5.7.1'
 
 export type SklandClientErrorCode = 'credential_invalid' | 'credential_format_invalid' | 'request_failed'
+export type SklandClientPublicErrorCode =
+  | 'skland_account_data_failed'
+  | 'skland_player_data_failed'
+  | 'skland_player_data_invalid'
+  | 'skland_upstream_http_error'
 
 export class SklandClientError extends Error {
   constructor(
     readonly code: SklandClientErrorCode,
     message: string,
     readonly httpStatus?: number,
+    readonly publicCode?: SklandClientPublicErrorCode,
   ) {
     super(message)
     this.name = 'SklandClientError'
@@ -217,7 +223,12 @@ export function convertSklandCharactersToOperators(gamePlayerInfo: unknown): Lic
   const chars = getNestedArray(gamePlayerInfo, ['data', 'chars'])
   const charInfoMap = getNestedRecord(gamePlayerInfo, ['data', 'charInfoMap'])
   if (!chars || chars.length === 0) {
-    throw new SklandClientError('request_failed', '森空岛返回的干员数据为空，请确认账号已绑定明日方舟角色。')
+    throw new SklandClientError(
+      'request_failed',
+      '森空岛返回的干员数据为空，请确认该角色已绑定明日方舟并可在森空岛查看角色资料。',
+      undefined,
+      'skland_player_data_invalid',
+    )
   }
 
   const operators: LicenseOperator[] = []
@@ -243,7 +254,12 @@ export function convertSklandCharactersToOperators(gamePlayerInfo: unknown): Lic
 
   const uniqueOperators = dedupeSklandOperators(operators)
   if (uniqueOperators.length === 0) {
-    throw new SklandClientError('request_failed', '森空岛干员数据无法转换为当前系统格式，请稍后重试。')
+    throw new SklandClientError(
+      'request_failed',
+      '森空岛返回了该角色的数据，但未包含可识别的干员；请先在森空岛打开角色资料并确认数据已同步。',
+      undefined,
+      'skland_player_data_invalid',
+    )
   }
   return uniqueOperators.sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'))
 }
@@ -325,8 +341,16 @@ export class SklandClient {
 
   async getArknightsBindings(): Promise<SklandAccountOption[]> {
     const data = await this.getSigned<ApiEnvelope>('/api/v1/game/player/binding')
+    if (isCredentialInvalidEnvelope(data)) {
+      throw new SklandClientError('credential_invalid', '森空岛凭据已失效，请重新扫码绑定。')
+    }
     if (data.code !== 0 || data.message !== 'OK' || !isRecord(data.data) || !Array.isArray(data.data.list)) {
-      throw new SklandClientError('request_failed', '读取森空岛绑定角色失败，请重新扫码绑定。')
+      throw new SklandClientError(
+        'request_failed',
+        '读取森空岛绑定角色失败，请确认森空岛内已绑定明日方舟角色后重试。',
+        undefined,
+        'skland_account_data_failed',
+      )
     }
     const accounts: SklandAccountOption[] = []
     const seenUids = new Set<string>()
@@ -355,14 +379,27 @@ export class SklandClient {
         .sort((left, right) => Number(right.account.is_default) - Number(left.account.is_default) || left.index - right.index)
         .map(({ account }) => account)
     }
-    throw new SklandClientError('request_failed', '森空岛账号未找到已绑定的明日方舟角色。')
+    throw new SklandClientError(
+      'request_failed',
+      '森空岛账号未找到已绑定的明日方舟角色，请先在森空岛完成角色绑定。',
+      undefined,
+      'skland_account_data_failed',
+    )
   }
 
   async getGamePlayerInfo(uid: string): Promise<unknown> {
     const query = `uid=${encodeURIComponent(uid)}`
     const data = await this.getSigned<ApiEnvelope>('/api/v1/game/player/info', query)
+    if (isCredentialInvalidEnvelope(data)) {
+      throw new SklandClientError('credential_invalid', '森空岛凭据已失效，请重新扫码绑定。')
+    }
     if (data.code !== 0 || data.message !== 'OK') {
-      throw new SklandClientError('request_failed', '读取森空岛干员数据失败，请稍后重试。')
+      throw new SklandClientError(
+        'request_failed',
+        '森空岛未返回该角色的干员数据，请确认该角色可在森空岛正常查看后重试。',
+        undefined,
+        'skland_player_data_failed',
+      )
     }
     return data
   }
@@ -400,14 +437,21 @@ export class SklandClient {
     const timestamp = this.timestamp || `${Math.floor(Date.now() / 1000)}`
     const sign = generateSklandSign(this.token, path, query, timestamp)
     const url = `${SKLAND_BASE}${path}${query ? `?${query}` : ''}`
-    return fetchJson<T>(url, {
-      method: 'GET',
-      headers: {
-        ...this.baseHeaders(timestamp, sign),
-        cred: this.cred,
-        token: this.token,
-      },
-    })
+    try {
+      return await fetchJson<T>(url, {
+        method: 'GET',
+        headers: {
+          ...this.baseHeaders(timestamp, sign),
+          cred: this.cred,
+          token: this.token,
+        },
+      })
+    } catch (error) {
+      if (error instanceof SklandClientError && (error.httpStatus === 401 || error.httpStatus === 403)) {
+        throw new SklandClientError('credential_invalid', '森空岛凭据已失效，请重新扫码绑定。')
+      }
+      throw error
+    }
   }
 
   private baseHeaders(timestamp: string, sign: string): Record<string, string> {
@@ -462,7 +506,12 @@ async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {
     data = null
   }
   if (!response.ok) {
-    throw new SklandClientError('request_failed', `鹰角或森空岛接口请求失败: HTTP ${response.status}`, response.status)
+    throw new SklandClientError(
+      'request_failed',
+      `鹰角或森空岛接口返回 HTTP ${response.status}，请稍后重试。`,
+      response.status,
+      'skland_upstream_http_error',
+    )
   }
   return data as T
 }
