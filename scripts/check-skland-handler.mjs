@@ -43,6 +43,7 @@ await assertDepotValueConfirmDoesNotWriteWorkspace()
 await assertRefreshImport()
 await assertRefreshTransientFailurePreservesBinding()
 await assertRefreshCredentialInvalid()
+await assertRefreshPlayerCredentialInvalid()
 await assertMatchingRebindResetsRisk()
 await assertMismatchedRebindDoesNotLeakRiskCount()
 await assertRepeatedMismatchFreezesProfile()
@@ -680,7 +681,12 @@ async function assertRefreshTransientFailurePreservesBinding() {
   setFetchMode('temporary-fail')
   const result = await callSkland('/api/user/skland/import/refresh', { profile_id: 'profile-1' })
   assertNoSecretLeak(result.body, 'refresh transient failure response')
-  if (result.status !== 502 || result.body.code !== 'skland_upstream_failed' || result.body.recovery_action !== 'retry') {
+  if (
+    result.status !== 502
+    || result.body.code !== 'skland_player_data_failed'
+    || !String(result.body.error).includes('未返回该角色的干员数据')
+    || result.body.recovery_action !== 'retry'
+  ) {
     throw new Error(`refresh transient failure: expected retry error, got ${result.status}`)
   }
   const binding = store.profiles.get('profile-1')?.skland_binding
@@ -706,6 +712,25 @@ async function assertRefreshCredentialInvalid() {
   const storedBinding = store.profiles.get('profile-1')?.skland_binding
   if (storedBinding?.credential_status !== 'invalid' || storedBinding.credential_invalid_reason !== 'expired_or_revoked') {
     throw new Error('refresh invalid credential: stored binding should be marked invalid')
+  }
+}
+
+async function assertRefreshPlayerCredentialInvalid() {
+  const profile = store.profiles.get('profile-1')
+  store.profiles.set('profile-1', {
+    ...profile,
+    skland_binding: {
+      ...profile.skland_binding,
+      credential_status: 'available',
+      credential_invalid_at: null,
+      credential_invalid_reason: null,
+    },
+  })
+  setFetchMode('player-expired')
+  const result = await callSkland('/api/user/skland/import/refresh', { profile_id: 'profile-1' })
+  assertNoSecretLeak(result.body, 'refresh player credential invalid response')
+  if (result.status !== 400 || result.body.code !== 'skland_credential_invalid' || result.body.recovery_action !== 'rebind') {
+    throw new Error(`refresh player credential invalid: expected rebind error, got ${result.status}`)
   }
 }
 
@@ -811,7 +836,12 @@ async function assertSchemaChangeError() {
   })
   setFetchMode('bad-info')
   const result = await callSkland('/api/user/skland/import/refresh', { profile_id: 'schema-profile' })
-  if (result.status !== 502 || result.body.code !== 'skland_upstream_failed' || result.body.recovery_action !== 'retry') {
+  if (
+    result.status !== 502
+    || result.body.code !== 'skland_player_data_invalid'
+    || !String(result.body.error).includes('未包含可识别的干员')
+    || result.body.recovery_action !== 'retry'
+  ) {
     throw new Error(`schema change: expected retryable upstream error, got ${result.status}`)
   }
 }
@@ -1204,6 +1234,9 @@ function setFetchMode(mode) {
       })
     }
     if (textUrl.includes('/api/v1/game/player/info')) {
+      if (mode === 'player-expired') {
+        return jsonResponse({ code: 10001, message: 'CREDENTIAL_EXPIRED', data: null })
+      }
       if (mode === 'temporary-fail') {
         return jsonResponse({ code: 1, message: 'TEMPORARY_UNAVAILABLE', data: null })
       }
