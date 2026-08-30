@@ -477,7 +477,7 @@ const PERSONAL_USE_ACTION_LABELS: Record<AdminUserDetail['personal_use_declarati
   metered_personal_create: '创建/转换个人按次档案',
   generated_result_export: '导出生成结果',
   optimization_generate: '生成排班结果',
-  reorder_check: '调序检查',
+  reorder_check: '变化影响预判',
 }
 
 export function personalUseActionLabel(action: AdminUserDetail['personal_use_declarations'][number]['action']): string {

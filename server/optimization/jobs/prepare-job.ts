@@ -1,21 +1,20 @@
 import type { LicenseFile } from "../../../src/lib/types";
 import type { CreateOptimizationJobRequest } from "../../../src/lib/optimization-contracts";
-import { canUseUpgradeFeatures, evaluateOperatorRisk, formatOperatorRiskBlockMessage, recordOperatorFingerprint, recordSoftBlockedRiskEvent, getPermissionMode, getRiskControlSettings, getCdkProfileDuration, isProfileCdkRecord, type CdkRecord, normalizePermissionMode, resolveConfigForPermission, resolveFreePreviewConfig } from "../../handlers/license-utils";
+import { canUseUpgradeFeatures, evaluateOperatorRisk, formatOperatorRiskBlockMessage, recordOperatorFingerprint, recordSoftBlockedRiskEvent, getPermissionMode, getRiskControlSettings, isProfileCdkRecord, type CdkRecord, normalizePermissionMode, resolveConfigForPermission, resolveFreePreviewConfig } from "../../handlers/license-utils";
 import { resolveProfileAuthorization } from '../../handlers/profile-authorization';
-import { getWorkspace, emptyWorkspace, getProfileForUser, isDepotValueProfile, isFreePreviewProfile, normalizeProfileKind, updateProfileWorkspaceAtomically } from "../../storage/user-store";
+import { getProfileForUser, isDepotValueProfile, isFreePreviewProfile, normalizeProfileKind } from "../../storage/user-store";
 import { getProfileOptimizationResult } from '../../storage/optimization-result-store';
 import { requireUserSession } from "../../handlers/user-auth";
 import { type OptimizeJobPriority } from "../../storage/optimize-job-store";
-import type { ScheduleUsageContext, OptimizeJobSource, PreparedOptimizeJob, OptimizeConfigPermission, FreeScheduleGenerateDecision } from './shared';
+import type { ScheduleUsageContext, OptimizeJobSource, PreparedOptimizeJob, OptimizeConfigPermission } from './shared';
 import { createPersistedOptimizeJobPayload } from './shared';
 import { sanitizeConfigForPublicOptimize, jsonResponse } from './http-core';
-import { recordScheduleGenerate, scheduleFailure, resolveFreeScheduleGenerateDecision } from './entitlements';
+import { recordScheduleGenerate, scheduleFailure } from './entitlements';
 import { getOptimizeEstimateBucket, getEstimateScheduleMode, isEstimateFiammettaEnabled, resolveOptimizeDurationEstimate } from './job-status';
 import { buildScenarioComparisonEstimate } from './job-status';
 import { expandScenarioComparison } from '../../../src/lib/scenario-comparison';
 import { isFreePreviewTrialActive } from '../../free-preview-trial';
 import { hasCapability } from '../../../src/lib/product-catalog';
-import { getFreeScheduleEntitlement } from '../../storage/reorder-admission';
 import { requestSchemas } from '../../security/request-policy';
 import { getValidatedJson } from '../../security/request-validation';
 import { formatOptimizeJobHardTimeout, getOptimizeJobHardTimeoutMs } from '../../optimize-job-config';
@@ -65,7 +64,7 @@ export async function prepareOptimizeJob(
     if (rawBody.use_priority_coupon === true) requestedItems.add('priority_compute_coupon');
     const usePriorityCoupon = requestedItems.has('priority_compute_coupon');
     const allowedItems = body.kind === 'schedule'
-      ? new Set(['priority_compute_coupon', 'training_diagnosis_coupon', 'additional_recompute_coupon'])
+      ? new Set(['priority_compute_coupon', 'training_diagnosis_coupon'])
       : new Set(['scenario_simulation_coupon']);
     if ([...requestedItems].some((item) => !allowedItems.has(item))) {
       return fail({ error: '所选道具不能用于当前计算类型。', code: 'item_not_applicable' }, 400);
@@ -157,14 +156,13 @@ export async function prepareOptimizeJob(
       isPreviewProfile = isFreePreviewProfile(profile);
       activeProfileUid = profile.skland_binding?.uid ?? null;
       isPreviewTrial = isFreePreviewTrialActive(profile);
-      const unlimitedService = Boolean(checkedCdkRecord && isProfileCdkRecord(checkedCdkRecord)
-        && getCdkProfileDuration(checkedCdkRecord) === 'lifetime');
+      const includedCdkService = includesCdkIncrementalRecompute(checkedCdkRecord);
       const hasBillingQuoteFields = Boolean(body.billing_quote_id || body.pricing_version || body.accepted_max_points);
       if (billingOperation === 'scenario_comparison' && profileKind === 'cdk' && hasBillingQuoteFields) {
         return fail({ error: '周期卡场景对比使用卡内次数，不需要 300 积分报价。', code: 'billing_not_applicable' }, 409);
       }
-      if (billingOperation === 'incremental_recompute' && unlimitedService && hasBillingQuoteFields) {
-        return fail({ error: '终身卡已包含无限个人增量重算，不需要 700 积分报价。', code: 'billing_not_applicable' }, 409);
+      if (billingOperation === 'incremental_recompute' && includedCdkService && hasBillingQuoteFields) {
+        return fail({ error: '当前 CDK 已包含不限次数的个人增量重算，无需积分报价。', code: 'billing_not_applicable' }, 409);
       }
       if (billingOperation !== 'main_schedule' && !meteredBilling) {
         const accepted = normalizePointsAmount(body.accepted_max_points);
@@ -183,7 +181,7 @@ export async function prepareOptimizeJob(
       }
       if (billingOperation === 'incremental_recompute') {
         if (isPreviewProfile) {
-          return fail({ error: '免费预览档案不能使用个人增量重算，请使用免费修订或追加重算券。', code: 'operation_not_available' }, 409);
+          return fail({ error: '免费预览可以直接重新生成完整排班，无需选择“增量重算”。', code: 'operation_not_available' }, 409);
         }
         if (!baselineHistoryId) {
           return fail({ error: '个人增量重算必须绑定一份已有成功结果。', code: 'baseline_required' }, 409);
@@ -192,7 +190,7 @@ export async function prepareOptimizeJob(
         if (!baseline || baseline.archived_at) {
           return fail({ error: '增量重算基线不存在或已归档，请先选择最新成功结果。', code: 'baseline_not_found' }, 409);
         }
-        if (!unlimitedService && !meteredBilling) {
+        if (!includedCdkService && !meteredBilling) {
           return fail({ error: '当前档案需要先确认 700 积分的增量重算报价。', code: 'pricing_changed' }, 409);
         }
       }
@@ -325,50 +323,6 @@ export async function prepareOptimizeJob(
       estimate_bucket: estimateBucket,
     });
     scheduleUsage = scheduleFailure('optimizer_runtime_error', scheduleUsageBase);
-    let previewWorkspaceForGeneration = auth && activeProfileId && isPreviewProfile
-      ? await getWorkspace(activeProfileId) ?? emptyWorkspace(activeProfileId)
-      : null;
-    let freeScheduleDecision: Extract<FreeScheduleGenerateDecision, { ok: true }> | null = null;
-    if (isPreviewProfile && !isPreviewTrial && activeProfileId && previewWorkspaceForGeneration) {
-      const entitlement = await getFreeScheduleEntitlement(
-        activeProfileId,
-        previewWorkspaceForGeneration.free_schedule_entitlement,
-      );
-      const decision = resolveFreeScheduleGenerateDecision(entitlement);
-      if (!decision.ok) {
-        const additionalCouponApplicable = requestedItems.has('additional_recompute_coupon')
-          && decision.entitlement.lock_reason === 'revision_limit'
-          && !decision.entitlement.confirmed_at
-          && Boolean(decision.entitlement.first_generated_at)
-          && Date.now() - Date.parse(decision.entitlement.first_generated_at!) < 24 * 60 * 60_000;
-        if (additionalCouponApplicable) {
-          freeScheduleDecision = {
-            ok: true,
-            mode: 'revision',
-            entitlement: { ...decision.entitlement, locked_at: null, lock_reason: null },
-          };
-        } else {
-        scheduleUsage = scheduleFailure('permission_denied', scheduleUsageBase);
-        if (decision.entitlement.locked_at !== previewWorkspaceForGeneration.free_schedule_entitlement?.locked_at
-          || decision.entitlement.lock_reason !== previewWorkspaceForGeneration.free_schedule_entitlement?.lock_reason) {
-          previewWorkspaceForGeneration = await updateProfileWorkspaceAtomically(activeProfileId, (currentWorkspace) => ({
-            ...(currentWorkspace ?? emptyWorkspace(activeProfileId)),
-            free_schedule_entitlement: decision.entitlement,
-            updated_at: new Date().toISOString(),
-          }));
-        }
-        return fail({ error: decision.message, free_schedule_entitlement: decision.entitlement }, decision.status);
-        }
-      } else {
-        if (requestedItems.has('additional_recompute_coupon')) {
-          return fail({ error: '当前仍有免费修订次数，无需使用追加重算券。', code: 'item_not_applicable' }, 409);
-        }
-        freeScheduleDecision = decision;
-      }
-    } else if (requestedItems.has('additional_recompute_coupon')) {
-      return fail({ error: '追加重算券只适用于仍在修订窗口内的免费预览档案。', code: 'item_not_applicable' }, 400);
-    }
-
     const source: OptimizeJobSource = isPreviewProfile ? 'free_preview' : 'account_profile';
     const priority: OptimizeJobPriority = usePriorityCoupon ? 'priority_coupon' : isPreviewProfile ? 'standard' : 'paid';
     const ownerKey = 'profile:' + activeProfileId;
@@ -386,7 +340,6 @@ export async function prepareOptimizeJob(
         usePriorityCoupon,
         rewardItemCodes: [
           ...(useTrainingCoupon ? ['training_diagnosis_coupon'] : []),
-          ...(requestedItems.has('additional_recompute_coupon') ? ['additional_recompute_coupon'] : []),
         ],
         behaviorIdentity: { userId: auth.user.id, sessionTokenHash: auth.tokenHash },
         personalUseAudit,
@@ -401,7 +354,7 @@ export async function prepareOptimizeJob(
           activeProfileId,
           isPreviewProfile,
           isPreviewTrial,
-          freeScheduleDecision,
+          freeScheduleDecision: null,
           estimate,
           request: {
             include_upgrade_suggestions: includeUpgradeSuggestions,
@@ -419,6 +372,10 @@ export async function prepareOptimizeJob(
     if (!isScenarioComparison) await recordScheduleGenerate(checkedCdkRecord, scheduleUsage, { submittedAt });
     return { ok: false, response: jsonResponse({ error: message }, 500) };
   }
+}
+
+export function includesCdkIncrementalRecompute(record: CdkRecord | null): boolean {
+  return Boolean(record && isProfileCdkRecord(record));
 }
 
 export function getScenarioComparisonQueuePriority(

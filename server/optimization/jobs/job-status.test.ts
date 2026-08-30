@@ -6,7 +6,6 @@ import {
   decodeOptimizationJobCursor,
   encodeOptimizationJobCursor,
   getOptimizeEstimateBucket,
-  shouldReserveFreeScheduleEntitlement,
   verifyOptimizeJobPollToken,
 } from './job-status'
 import { createPersistedOptimizeJobPayload } from './shared'
@@ -73,6 +72,7 @@ describe('queued runtime estimates', () => {
     const snapshot = await buildOptimizeJobAccepted(target)
 
     expect(snapshot.queuePosition).toBe(2)
+    expect(snapshot.priority).toEqual({ kind: 'standard', label: '免费排队' })
     expect(snapshot.estimate.remainingMs).toBe(35_000)
     expect(snapshot.estimate.totalMs).toBe(35_000)
   })
@@ -187,14 +187,5 @@ describe('persisted optimization payload', () => {
     expect(serialized).not.toContain('effectiveLicense')
     expect(serialized).not.toContain('checkedCdkRecord')
     expect(serialized).not.toContain('"sig"')
-  })
-})
-
-describe('free schedule admission during the preview trial', () => {
-  it('skips the full-schedule entitlement reservation only while the trial is active', () => {
-    expect(shouldReserveFreeScheduleEntitlement('free_preview', true)).toBe(false)
-    expect(shouldReserveFreeScheduleEntitlement('free_preview', false)).toBe(true)
-    expect(shouldReserveFreeScheduleEntitlement('free_preview', undefined)).toBe(true)
-    expect(shouldReserveFreeScheduleEntitlement('account_profile', true)).toBe(false)
   })
 })

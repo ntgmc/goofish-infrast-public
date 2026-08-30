@@ -12,10 +12,6 @@ export const FREE_PREVIEW_MODE = "full_rotation_without_export";
 
 export const INTERMEDIATE_PRODUCTS = ["Pure Gold", "Originium Shard"] as const;
 
-export const FREE_SCHEDULE_REVISION_LIMIT = 3;
-
-export const FREE_SCHEDULE_REVISION_WINDOW_HOURS = 24;
-
 export const SHANGHAI_TIMEZONE = "Asia/Shanghai" as const;
 
 export const SHANGHAI_UTC_OFFSET_MS = 8 * 60 * 60 * 1000;

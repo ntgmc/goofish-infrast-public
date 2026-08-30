@@ -5,7 +5,7 @@ export function resolveBaselineHistoryItem(
   baselineHistoryId: unknown,
 ): { ok: true; item: WorkspaceResultHistoryItem } | { ok: false; status: number; message: string } {
   if (!Array.isArray(history) || history.length === 0) {
-    return { ok: false, status: 409, message: '暂无可用于重排检测的历史排班。' }
+    return { ok: false, status: 409, message: '请先生成一份完整排班，再进行变化影响预判。' }
   }
   if (typeof baselineHistoryId === 'string' && baselineHistoryId.trim()) {
     const item = history.find((entry) => entry.id === baselineHistoryId.trim())

@@ -15,6 +15,7 @@ import {
   formatOptimizeJobHardTimeout,
   getOptimizeGlobalWorkerConcurrency,
   getOptimizeJobMaxAttempts,
+  getOptimizePaidPreemptGraceMs,
   getOptimizeQueuePollMs,
   getOptimizeWorkerClaimPriority,
   getOptimizeWorkerConfiguration,
@@ -179,7 +180,7 @@ async function spawnAvailableWorkers(): Promise<void> {
   while (accepting && activeAttempts.size < workerConcurrency()) {
     const lockToken = randomUUID()
     const job = await claimNext(store, lockToken)
-    if (!job) return
+    if (!job) break
     try {
       spawnClaimedWorker(job, lockToken)
     } catch (error) {
@@ -193,6 +194,50 @@ async function spawnAvailableWorkers(): Promise<void> {
       )
     }
   }
+  while (accepting && await preemptLocalFreeAttemptForPaid(store)) {
+    // Replace every local idle-class attempt needed by already-waiting paid work.
+  }
+}
+
+async function preemptLocalFreeAttemptForPaid(store: OptimizeJobStore): Promise<boolean> {
+  const candidateJobIds = [...activeAttempts.values()]
+    .filter((attempt) => !attempt.settling && attempt.job.priority <= 0)
+    .map((attempt) => attempt.job.id)
+  if (candidateJobIds.length === 0) return false
+  const lockToken = randomUUID()
+  const preemption = await store.preemptFreeJobForPaid({
+    workerId: processWorkerId,
+    candidateJobIds,
+    lockToken,
+    lockExpiresAt: lockExpiresAt(),
+    maxFailures: getOptimizeJobMaxAttempts(),
+    maxGlobalRunning: getOptimizeGlobalWorkerConcurrency(),
+    claimPriority: getOptimizeWorkerClaimPriority(),
+    graceMs: getOptimizePaidPreemptGraceMs(),
+  })
+  if (!preemption) return false
+
+  const victim = activeAttempts.get(preemption.interruptedJobId)
+  if (victim) {
+    victim.settling = true
+    stopAttemptLeaseRenewal(victim)
+    await victim.worker.terminate().catch(() => undefined)
+    finishAttempt(victim)
+  }
+  try {
+    spawnClaimedWorker(preemption.job, lockToken)
+  } catch (error) {
+    await retryAttempt(
+      store,
+      preemption.job.id,
+      preemption.job.attempt_count,
+      processWorkerId,
+      lockToken,
+      'worker_crash',
+      error instanceof Error ? error.message : String(error),
+    )
+  }
+  return true
 }
 
 async function processInlineQueue(): Promise<void> {

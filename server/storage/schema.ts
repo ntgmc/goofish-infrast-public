@@ -2405,10 +2405,10 @@ INSERT INTO item_definitions
   (code, kind, effect_code, name, description, icon_key, system_owned, issuance_enabled, created_at, updated_at)
 VALUES
   ('priority_compute_coupon', 'consumable', 'priority_compute', '优先计算券', '让一次主排班进入最高优先队列。', 'priority_compute_coupon', true, true, now(), now()),
-  ('reorder_check_coupon', 'consumable', 'reorder_check', '调序检查券', '免费调序检查配额用尽后增加一次检查。', 'reorder_check_coupon', true, true, now(), now()),
+  ('reorder_check_coupon', 'consumable', 'reorder_check', '变化预判券', '本月免费变化影响预判次数用尽后增加一次预判；不会生成完整排班。', 'reorder_check_coupon', true, true, now(), now()),
   ('scenario_simulation_coupon', 'consumable', 'scenario_simulation', '情景推演券', '运行一次情景比较实验。', 'scenario_simulation_coupon', true, true, now(), now()),
   ('training_diagnosis_coupon', 'consumable', 'training_diagnosis', '练度诊断券', '为一次主排班启用练度与升级诊断。', 'training_diagnosis_coupon', true, true, now(), now()),
-  ('additional_recompute_coupon', 'consumable', 'additional_recompute', '追加重算券', '在有效修订窗口内增加一次免费档案重算。', 'additional_recompute_coupon', true, true, now(), now()),
+  ('additional_recompute_coupon', 'consumable', 'additional_recompute', '追加重算券（历史）', '免费预览现可按页面规则重新生成完整排班，此历史道具无需再使用。', 'additional_recompute_coupon', true, false, now(), now()),
   ('plan_capacity_certificate', 'capacity_upgrade', 'plan_capacity', '方案扩容证', '指定档案的保存方案槽位永久增加 1。', 'plan_capacity_certificate', true, true, now(), now()),
   ('history_capacity_certificate', 'capacity_upgrade', 'history_capacity', '历史档案扩容证', '指定档案的滚动结果历史槽位永久增加 1。', 'history_capacity_certificate', true, true, now(), now()),
   ('result_archive_folder', 'capacity_upgrade', 'result_archive_capacity', '结果封存夹', '指定档案的结果封存区永久增加 1 个槽位。', 'result_archive_folder', true, true, now(), now()),
@@ -2417,6 +2417,24 @@ VALUES
   ('lifetime_profile_voucher', 'license_voucher', 'bind_lifetime_profile', '终身版兑换 CDK', '可通过 JSON 创建终身高级档案，或绑定森空岛账号后创建或升级；最终成功时才消耗。', 'lifetime_profile_voucher', true, true, now(), now()),
   ('limited_profile_voucher', 'license_voucher', 'activate_limited_profile', '限时 CDK', '用于已绑定森空岛的免费预览档案，高级权限持续至 2026 年 8 月 20 日 00:00。', 'limited_profile_voucher', true, true, now(), now())
 ON CONFLICT (code) DO NOTHING;
+
+UPDATE item_definitions
+SET name = '变化预判券',
+    description = '本月免费变化影响预判次数用尽后增加一次预判；不会生成完整排班。',
+    updated_at = now()
+WHERE code = 'reorder_check_coupon'
+  AND (name IS DISTINCT FROM '变化预判券'
+    OR description IS DISTINCT FROM '本月免费变化影响预判次数用尽后增加一次预判；不会生成完整排班。');
+
+UPDATE item_definitions
+SET name = '追加重算券（历史）',
+    description = '免费预览现可按页面规则重新生成完整排班，此历史道具无需再使用。',
+    issuance_enabled = false,
+    updated_at = now()
+WHERE code = 'additional_recompute_coupon'
+  AND (name IS DISTINCT FROM '追加重算券（历史）'
+    OR description IS DISTINCT FROM '免费预览现可按页面规则重新生成完整排班，此历史道具无需再使用。'
+    OR issuance_enabled IS DISTINCT FROM false);
 
 UPDATE item_definitions
 SET description = '可通过 JSON 创建终身高级档案，或绑定森空岛账号后创建或升级；最终成功时才消耗。',

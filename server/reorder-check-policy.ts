@@ -1,4 +1,6 @@
-export const REORDER_CHECK_MONTHLY_LIMIT = 2
+import { productPolicies } from '../src/lib/product-catalog'
+
+export const REORDER_CHECK_MONTHLY_LIMIT = productPolicies.free_preview.monthly_reorder_checks
 
 const SHANGHAI_UTC_OFFSET_MS = 8 * 60 * 60_000
 

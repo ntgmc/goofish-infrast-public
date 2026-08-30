@@ -21,7 +21,7 @@ export class CdkScheduleQuotaExceededError extends Error {
   readonly code = 'subscription_quota_exceeded' as const
 
   constructor(readonly limit: number) {
-    super(`当前周期卡的完整主排班额度已用完（${limit} 次），可购买增量重算包或升级长期方案。`)
+    super(`当前方案的完整排班次数已用完（${limit} 次），请查看可用方案。`)
     this.name = 'CdkScheduleQuotaExceededError'
   }
 }

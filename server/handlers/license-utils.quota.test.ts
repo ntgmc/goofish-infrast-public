@@ -8,11 +8,11 @@ import {
 
 describe('profile CDK schedule quotas', () => {
   it.each([
-    ['month', 2],
-    ['half_year', 4],
-    ['year', 8],
+    ['month', null],
+    ['half_year', null],
+    ['year', null],
     ['lifetime', null],
-  ] as const)('limits %s cards to the configured successful main schedules', (duration, expected) => {
+  ] as const)('keeps %s cards unlimited for successful main schedules', (duration, expected) => {
     expect(getCdkScheduleQuotaLimit(profileCdk(duration))).toBe(expected)
   })
 

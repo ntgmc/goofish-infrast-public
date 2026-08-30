@@ -4,6 +4,7 @@ import { createMemoryOptimizeJobStore, OptimizeJobAdmissionError, type MemoryWor
 
 afterEach(() => {
   vi.unstubAllEnvs()
+  vi.useRealTimers()
 })
 
 describe('optimization job attempt lifecycle', () => {
@@ -101,6 +102,64 @@ describe('optimization job attempt lifecycle', () => {
 
     const retried = await store.claimNextJob('worker-b', 'lock-b', future(), 2)
     expect(retried).toMatchObject({ status: 'running', attempt_count: 2, failure_count: 0 })
+  })
+
+  it('replaces only the youngest running idle-class attempt with waiting paid work', async () => {
+    const store = createMemoryOptimizeJobStore()
+    const olderFree = await store.createJob({ ...input(), priority: 0, source: 'free_preview', created_at: '2026-08-29T00:00:00.000Z' })
+    const newerFree = await store.createJob({ ...input(), priority: 0, source: 'free_preview', created_at: '2026-08-29T00:00:01.000Z' })
+    const olderClaim = await store.claimNextJob('worker-a', 'free-lock-older', future(), 2, 2)
+    const newerClaim = await store.claimNextJob('worker-a', 'free-lock-newer', future(), 2, 2)
+    expect(olderClaim?.id).toBe(olderFree.id)
+    expect(newerClaim?.id).toBe(newerFree.id)
+    store.records.get(olderFree.id)!.started_at = '2026-08-29T00:00:00.000Z'
+    store.records.get(newerFree.id)!.started_at = '2026-08-29T00:00:01.000Z'
+    const paid = await store.createJob({ ...input(), priority: 10, source: 'account_profile' })
+
+    const preemption = await store.preemptFreeJobForPaid({
+      workerId: 'worker-a',
+      candidateJobIds: [olderFree.id, newerFree.id],
+      lockToken: 'paid-lock',
+      lockExpiresAt: future(),
+      maxFailures: 2,
+      maxGlobalRunning: 2,
+      claimPriority: 0,
+      graceMs: 0,
+    })
+
+    expect(preemption).toMatchObject({ interruptedJobId: newerFree.id, job: { id: paid.id, status: 'running' } })
+    await expect(store.getJob(olderFree.id)).resolves.toMatchObject({ status: 'running' })
+    await expect(store.getJob(newerFree.id)).resolves.toMatchObject({
+      status: 'queued',
+      failure_count: 0,
+      started_at: null,
+    })
+  })
+
+  it('starts the paid preemption grace period when a retried job becomes runnable', async () => {
+    const store = createMemoryOptimizeJobStore()
+    const free = await store.createJob({ ...input(), priority: 0, source: 'free_preview' })
+    await store.claimNextJob('worker-a', 'free-lock', future(), 2, 1)
+    const paid = await store.createJob({ ...input(), priority: 10, source: 'account_profile' })
+    store.records.get(paid.id)!.created_at = new Date(Date.now() - 60_000).toISOString()
+    store.records.get(paid.id)!.next_attempt_at = new Date().toISOString()
+    const preemptionInput = {
+      workerId: 'worker-a',
+      candidateJobIds: [free.id],
+      lockToken: 'paid-lock',
+      lockExpiresAt: future(),
+      maxFailures: 2,
+      maxGlobalRunning: 1,
+      claimPriority: 0,
+      graceMs: 15_000,
+    }
+
+    await expect(store.preemptFreeJobForPaid(preemptionInput)).resolves.toBeNull()
+    store.records.get(paid.id)!.next_attempt_at = new Date(Date.now() - 16_000).toISOString()
+    await expect(store.preemptFreeJobForPaid(preemptionInput)).resolves.toMatchObject({
+      interruptedJobId: free.id,
+      job: { id: paid.id, status: 'running' },
+    })
   })
 
   it('recovers expired attempts and dead-letters after the configured failure budget', async () => {
@@ -302,6 +361,32 @@ describe('optimization job submission admission', () => {
         '当前账号的优化提交次数已达小时上限。请1小时后再试。',
       ),
     )
+  })
+
+  it('limits free previews to two submissions in a rolling six-hour window', async () => {
+    vi.useFakeTimers()
+    const startedAt = new Date('2026-08-29T00:00:00.000Z')
+    vi.setSystemTime(startedAt)
+    const store = createMemoryOptimizeJobStore()
+    const ownerKey = `license:${randomUUID()}`
+
+    const first = await store.admitJob(admissionInput(ownerKey, 'free_preview'))
+    store.records.get(first.job.id)!.status = 'succeeded'
+    vi.setSystemTime(new Date(startedAt.getTime() + 2 * 60 * 60_000))
+    const second = await store.admitJob(admissionInput(ownerKey, 'free_preview'))
+    store.records.get(second.job.id)!.status = 'succeeded'
+    vi.setSystemTime(new Date(startedAt.getTime() + 5 * 60 * 60_000))
+
+    await expect(store.admitJob(admissionInput(ownerKey, 'free_preview'))).rejects.toEqual(
+      new OptimizeJobAdmissionError(
+        'submission_rate_exceeded',
+        429,
+        '免费预览每 6 小时最多提交 2 次排班，请稍后再试。',
+      ),
+    )
+
+    vi.setSystemTime(new Date(startedAt.getTime() + 6 * 60 * 60_000 + 1))
+    await expect(store.admitJob(admissionInput(ownerKey, 'free_preview'))).resolves.toMatchObject({ replayed: false })
   })
 })
 

@@ -25,7 +25,6 @@ describe('useReorderJobRecovery', () => {
       setLoading: vi.fn(),
       setResult: vi.fn(),
       setError: vi.fn(),
-      setEntitlement: vi.fn(),
     }
 
     renderHook(
@@ -47,7 +46,6 @@ describe('useReorderJobRecovery', () => {
       setLoading: vi.fn(),
       setResult: vi.fn(),
       setError: vi.fn(),
-      setEntitlement: vi.fn(),
     }
     const { result, rerender } = renderHook(
       ({ profileId }) => useReorderJobRecovery(profileId, true, async () => undefined, setters, vi.fn()),

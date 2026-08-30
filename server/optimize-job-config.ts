@@ -4,6 +4,7 @@ export const DEFAULT_OPTIMIZE_GLOBAL_WORKER_CONCURRENCY = 3
 export const DEFAULT_OPTIMIZE_WORKER_CONCURRENCY = 1
 export const DEFAULT_OPTIMIZE_LOCAL_FALLBACK_CONCURRENCY = 1
 export const DEFAULT_OPTIMIZE_QUEUE_POLL_MS = 1_000
+export const DEFAULT_OPTIMIZE_PAID_PREEMPT_GRACE_MS = 15_000
 const OPTIMIZE_STATUS_QUEUE_PICKUP_GRACE_POLLS = 5
 export const MAX_OPTIMIZE_GLOBAL_WORKER_CONCURRENCY = 100
 export const MAX_OPTIMIZE_WORKER_CONCURRENCY = 32
@@ -14,6 +15,7 @@ export const DEFAULT_OPTIMIZE_WORKER_AUTOSCALE_INTERVAL_MS = 30_000
 const MAX_OPTIMIZE_WORKER_SCALE_UP_QUEUE_THRESHOLD = 1_000
 const MAX_OPTIMIZE_WORKER_SCALE_DOWN_IDLE_MS = 24 * 60 * 60_000
 const MAX_OPTIMIZE_WORKER_AUTOSCALE_INTERVAL_MS = 10 * 60_000
+const MAX_OPTIMIZE_PAID_PREEMPT_GRACE_MS = 5 * 60_000
 const MAX_OPTIMIZE_JOB_HARD_TIMEOUT_MS = 20 * 60_000
 export const DEFAULT_OPTIMIZE_JOB_HARD_TIMEOUT_MS = MAX_OPTIMIZE_JOB_HARD_TIMEOUT_MS
 export const DEFAULT_OPTIMIZE_JOB_MAX_ATTEMPTS = 2
@@ -54,6 +56,18 @@ export function getOptimizeQueuePollMs(
   return Number.isFinite(configured)
     ? Math.max(250, Math.floor(configured))
     : DEFAULT_OPTIMIZE_QUEUE_POLL_MS
+}
+
+export function getOptimizePaidPreemptGraceMs(
+  environment: Pick<NodeJS.ProcessEnv, 'OPTIMIZE_PAID_PREEMPT_GRACE_MS'> = process.env,
+): number {
+  return resolveInteger(
+    'OPTIMIZE_PAID_PREEMPT_GRACE_MS',
+    environment.OPTIMIZE_PAID_PREEMPT_GRACE_MS,
+    DEFAULT_OPTIMIZE_PAID_PREEMPT_GRACE_MS,
+    0,
+    MAX_OPTIMIZE_PAID_PREEMPT_GRACE_MS,
+  )
 }
 
 export function getOptimizeStatusQueuePickupGraceMs(
@@ -180,6 +194,7 @@ export function getOptimizeWorkerConfiguration(environment: NodeJS.ProcessEnv = 
   localConcurrency: number
   globalConcurrency: number
   maxAttempts: number
+  paidPreemptGraceMs: number
 } {
   const localConcurrency = getOptimizeWorkerRuntimeConcurrency(environment)
   const globalConcurrency = getOptimizeGlobalWorkerConcurrency(environment)
@@ -190,6 +205,7 @@ export function getOptimizeWorkerConfiguration(environment: NodeJS.ProcessEnv = 
     localConcurrency,
     globalConcurrency,
     maxAttempts: getOptimizeJobMaxAttempts(environment),
+    paidPreemptGraceMs: getOptimizePaidPreemptGraceMs(environment),
   }
 }
 

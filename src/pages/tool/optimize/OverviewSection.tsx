@@ -1,4 +1,4 @@
-import type { FreeScheduleEntitlement, LicenseConfig, PriorityCouponBalance, ReorderCheckResult, WorkspaceResultHistorySummary } from '../../../lib/types'
+import type { LicenseConfig, PriorityCouponBalance, ReorderCheckResult, WorkspaceResultHistorySummary } from '../../../lib/types'
 import type { IssuedMeteredScheduleQuote } from '../../../lib/metered-billing'
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
 import InfoTooltip from '../../../components/InfoTooltip'
@@ -24,11 +24,6 @@ type ReorderCheckViewState = {
 
 type FreeScheduleViewState = {
   visible: boolean;
-  entitlement: FreeScheduleEntitlement | null;
-  generateBlockedReason: string | null;
-  confirming: boolean;
-  confirmError: string | null;
-  onConfirm: () => void;
 }
 
 export default function OverviewSection({
@@ -121,7 +116,7 @@ export default function OverviewSection({
         error={error}
         priorityCoupon={priorityCoupon}
         additionalCoupons={additionalCoupons}
-        extraDisabledReason={generationDisabledReason ?? freeSchedule?.generateBlockedReason ?? null}
+        extraDisabledReason={generationDisabledReason ?? null}
         onGenerate={onGenerate}
         onReset={onReset}
         onOpenConfig={onOpenConfig}
@@ -147,7 +142,7 @@ export default function OverviewSection({
       )}
 
       {freeSchedule?.visible && (
-        <FreeScheduleEntitlementCard state={freeSchedule} />
+        <FreeIdleQueueCard />
       )}
 
       {reorderCheck?.visible && (
@@ -200,65 +195,27 @@ export default function OverviewSection({
   )
 }
 
-function FreeScheduleEntitlementCard({ state }: { state: FreeScheduleViewState }) {
-  const entitlement = state.entitlement
-  const remaining = entitlement
-    ? Math.max(0, entitlement.revision_limit - entitlement.revision_count)
-    : 3
-  const windowEndsAt = entitlement?.first_generated_at
-    ? new Date(Date.parse(entitlement.first_generated_at) + entitlement.revision_window_hours * 60 * 60 * 1000).toISOString()
-    : null
-  const locked = Boolean(state.generateBlockedReason)
-  const bonusAvailable = entitlement?.strong_reorder_bonus && !entitlement.strong_reorder_bonus.used_at
-
+function FreeIdleQueueCard() {
   return (
     <section className="tool-panel p-5 sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-brand-400">{copy.optimize.pages_tool_optimize_OverviewSection_021}</p>
           <div className="mt-1 flex items-center gap-2">
-            <h2 className="text-lg font-semibold text-ink-primary">{formatFreeScheduleTitle(entitlement, locked, Boolean(bonusAvailable))}</h2>
+            <h2 className="text-lg font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_OverviewSection_024}</h2>
             <InfoTooltip label={copy.optimize.pages_tool_optimize_OverviewSection_022} side="bottom">
               {copy.optimize.pages_tool_optimize_OverviewSection_023}</InfoTooltip>
           </div>
         </div>
-        {entitlement?.first_generated_at && !locked && !entitlement.confirmed_at && !entitlement.locked_at && (
-          <SmallActionButton onClick={state.onConfirm} disabled={state.confirming}>
-            {state.confirming ? copy.optimize.pages_tool_optimize_OverviewSection_024 : copy.optimize.pages_tool_optimize_OverviewSection_025}
-          </SmallActionButton>
-        )}
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_026} value={entitlement?.first_generated_at ? `${remaining}/${entitlement.revision_limit}` : '3/3'} />
-        <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_027} value={windowEndsAt ? formatWorkspaceDate(windowEndsAt) : copy.optimize.pages_tool_optimize_OverviewSection_028} />
-        <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_029} value={bonusAvailable ? copy.optimize.pages_tool_optimize_OverviewSection_030 : copy.optimize.pages_tool_optimize_OverviewSection_031} />
+        <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_026} value={copy.optimize.pages_tool_optimize_OverviewSection_027} />
+        <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_028} value={copy.optimize.pages_tool_optimize_OverviewSection_029} />
+        <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_030} value={copy.optimize.pages_tool_optimize_OverviewSection_031} />
       </div>
-
-      {state.generateBlockedReason && (
-        <div className="tool-alert tool-alert--warning mt-4">
-          {state.generateBlockedReason}
-        </div>
-      )}
-
-      {state.confirmError && (
-        <div role="alert" className="tool-alert tool-alert--error mt-4">
-          {state.confirmError}
-        </div>
-      )}
     </section>
   )
-}
-
-function formatFreeScheduleTitle(
-  entitlement: FreeScheduleEntitlement | null,
-  locked: boolean,
-  bonusAvailable: boolean,
-): string {
-  if (bonusAvailable) return copy.optimize.pages_tool_optimize_OverviewSection_032
-  if (!entitlement?.first_generated_at) return copy.optimize.pages_tool_optimize_OverviewSection_033
-  if (locked) return copy.optimize.pages_tool_optimize_OverviewSection_034
-  return copy.optimize.pages_tool_optimize_OverviewSection_035
 }
 
 function ReorderCheckCard({ state }: { state: ReorderCheckViewState }) {
