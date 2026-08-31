@@ -180,7 +180,7 @@ export type PreparedOptimizeJob = {
 
 export type OptimizeConfigPermission = PermissionMode | "free_preview";
 
-export type FreeScheduleGenerateDecision =
+type FreeScheduleGenerateDecision =
   | { ok: true; mode: "revision" | "strong_reorder_bonus"; entitlement: FreeScheduleEntitlement }
   | { ok: false; status: number; message: string; entitlement: FreeScheduleEntitlement };
 
