@@ -1,5 +1,35 @@
 import { describe, expect, it } from 'vitest'
-import { CONFIG_PRESETS, normalizeConfig, normalizeDormitoryRule, parseShiftHours, validateConfig } from './config'
+import { CONFIG_PRESETS, getRightFull252Variant, isRightFull252Config, normalizeConfig, normalizeDormitoryRule, parseShiftHours, resolveConfigLayout, validateConfig } from './config'
+import { licenseConfigSchema } from './workspace-validation'
+
+describe('layout normalization', () => {
+  it('accepts both right-full 252 variants while rejecting full-blood 252', () => {
+    for (const variant of ['252', '252-1'] as const) {
+      const config = normalizeConfig(CONFIG_PRESETS[variant])
+      expect(resolveConfigLayout(config)).toBe('2-5-2')
+      expect(getRightFull252Variant(config)).toBe(variant)
+      expect(isRightFull252Config(config)).toBe(true)
+      expect(licenseConfigSchema.safeParse(config).success).toBe(true)
+      expect(validateConfig(config)).toEqual({ ok: true })
+    }
+
+    expect(validateConfig({
+      ...CONFIG_PRESETS['252-1'],
+      manufacturing_station_levels: [3, 3, 3, 3, 3],
+    })).toEqual({
+      ok: false,
+      message: '当前支持 3 发电站布局和右满252；其他 2 发电站布局尚未开放。',
+    })
+
+    expect(validateConfig({
+      ...CONFIG_PRESETS['243'],
+      trading_station_levels: [3, 2],
+    })).toEqual({
+      ok: false,
+      message: '当前支持 3 发电站布局和右满252；其他 2 发电站布局尚未开放。',
+    })
+  })
+})
 
 describe('dormitory rule normalization', () => {
   it('uses fixed dormitories for new presets while preserving explicit autofill', () => {

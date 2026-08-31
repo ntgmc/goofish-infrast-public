@@ -136,8 +136,6 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_019: " 自定义配置",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_020: "恢复授权配置",
-  // src/components/ConfigEditor.tsx
   components_ConfigEditor_021: "基建配置",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_022: "已修改",
@@ -290,7 +288,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_093: "选择固定换班频率、自动变间隔换班或自定义班次。",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_094: "暂不支持 2 发电站。",
+  components_ConfigEditor_094: "当前支持右满252；其他 2 发电站布局尚未开放。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_095: "未安装或不想安装 MAA？可生成 MAA 排班表后，手动在游戏内设置队列，再定时执行全部轮换。",
   // src/components/ConfigEditor.tsx
@@ -301,6 +299,14 @@ export const commonCopy = {
   components_ConfigEditor_098: "导出的 MAA JSON 不指定生产技能依赖的宿舍干员，并过滤相关生产组合；可能损失部分产能。菲亚梅塔仍可执行换心情，完成后由 MAA 自动填入宿舍。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_101: "一天一换已停用，建议直接使用游戏内队列轮换。",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_102: "右满252（经验多）",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_103: "右满252（经验多）",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_104: "右满252（赤金多）",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_105: "右满252（赤金多）",
   // src/components/InputNumber.tsx
   components_InputNumber_001: "减少",
   // src/components/InputNumber.tsx

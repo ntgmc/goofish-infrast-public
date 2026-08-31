@@ -338,7 +338,7 @@ describe('ConfigEditor number inputs', () => {
     const productRegion = screen.getByRole('region', { name: '产物数量' })
     expect(roomRegion.parentElement).toBe(productRegion.parentElement)
     expect(productRegion).toHaveClass('lg:border-l')
-    expect(within(roomRegion).getByRole('note')).toHaveTextContent('暂不支持 2 发电站。')
+    expect(within(roomRegion).getByRole('note')).toHaveTextContent('当前支持右满252；其他 2 发电站布局尚未开放。')
   })
 
   it('uses InputNumber controls for room and product counts', async () => {
@@ -377,6 +377,117 @@ describe('ConfigEditor number inputs', () => {
 })
 
 describe('ConfigEditor preset actions', () => {
+  it('applies both right-full 252 variants and clears room levels when returning to 243', async () => {
+    const user = userEvent.setup()
+    const config = normalizeConfig(CONFIG_PRESETS['243'])
+    const onUpdate = vi.fn()
+    const view = render(
+      <ConfigEditor
+        config={config}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={onUpdate}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: '右满252（经验多）' }))
+    const apply252 = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
+    const rightFull252 = cloneConfig(config)
+    apply252?.(rightFull252)
+    expect(rightFull252).toMatchObject({
+      layout: '2-5-2',
+      desc: '右满252（经验多）',
+      trading_stations_count: 2,
+      manufacturing_stations_count: 5,
+      trading_station_levels: [3, 1],
+      manufacturing_station_levels: [2, 2, 3, 3, 2],
+    })
+
+    view.rerender(
+      <ConfigEditor
+        config={rightFull252}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={onUpdate}
+      />,
+    )
+    expect(screen.queryByRole('region', { name: '房间结构' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: '排班模式' })).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('MAA 排班表 · 2-5-2 · 右满252（经验多）')
+
+    await user.click(screen.getByRole('button', { name: '右满252（赤金多）' }))
+    const apply2521 = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
+    apply2521?.(rightFull252)
+    expect(rightFull252).toMatchObject({
+      layout: '2-5-2',
+      desc: '右满252（赤金多）',
+      trading_station_levels: [3, 2],
+      manufacturing_station_levels: [3, 2, 3, 2, 2],
+    })
+
+    view.rerender(
+      <ConfigEditor
+        config={rightFull252}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={onUpdate}
+      />,
+    )
+    expect(screen.queryByRole('region', { name: '房间结构' })).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('MAA 排班表 · 2-5-2 · 右满252（赤金多）')
+    await user.click(screen.getByRole('button', { name: '243 均衡' }))
+    const apply243 = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
+    apply243?.(rightFull252)
+    expect(rightFull252.layout).toBe('2-4-3')
+    expect(rightFull252.trading_station_levels).toBeUndefined()
+    expect(rightFull252.manufacturing_station_levels).toBeUndefined()
+
+    view.rerender(
+      <ConfigEditor
+        config={rightFull252}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={onUpdate}
+      />,
+    )
+    expect(screen.getByRole('region', { name: '房间结构' })).toBeInTheDocument()
+  })
+
+  it('keeps preset switching available after a limited editor selects right-full 252', async () => {
+    const user = userEvent.setup()
+    const config = normalizeConfig(CONFIG_PRESETS['243'])
+    const onUpdate = vi.fn()
+    const view = render(
+      <ConfigEditor
+        config={config}
+        canEdit={false}
+        canEditIntermediateInventory
+        canSelectPreset
+        validation={{ ok: true }}
+        onUpdate={onUpdate}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: '右满252（经验多）' }))
+    const apply252 = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
+    const rightFull252 = cloneConfig(config)
+    apply252?.(rightFull252)
+
+    view.rerender(
+      <ConfigEditor
+        config={rightFull252}
+        canEdit={false}
+        canEditIntermediateInventory
+        canSelectPreset
+        validation={{ ok: true }}
+        onUpdate={onUpdate}
+      />,
+    )
+    expect(screen.queryByText('按库存微调产物')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('MAA 排班表 · 2-5-2 · 右满252（经验多）')
+    expect(screen.getByRole('button', { name: '243 均衡' })).toBeInTheDocument()
+  })
+
   it('keeps intermediate inventory when applying a preset in auto-balance mode', async () => {
     const user = userEvent.setup()
     const config = normalizeConfig({

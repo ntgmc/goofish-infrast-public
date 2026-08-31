@@ -11,6 +11,10 @@ const DEFAULT_SHIFT_HOURS = [8, 8, 8]
 const MIN_MAA_SHIFT_COUNT = 3
 const MAX_MAA_SHIFT_COUNT = 6
 const FIXED_MAA_SHIFT_INTERVALS = [8, 12, 24]
+const RIGHT_FULL_252_LEVELS = {
+  '252': { trading: [3, 1], manufacturing: [2, 2, 3, 3, 2] },
+  '252-1': { trading: [3, 2], manufacturing: [3, 2, 3, 2, 2] },
+} as const
 
 export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
   '243': {
@@ -40,6 +44,38 @@ export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
     },
     Fiammetta: { enable: true },
     drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
+  },
+  '252': {
+    layout: '2-5-2',
+    desc: copy.domain.lib_config_039,
+    schedule_mode: 'maa',
+    dormitory_rule: 'fixed',
+    trading_stations_count: 2,
+    manufacturing_stations_count: 5,
+    trading_station_levels: [...RIGHT_FULL_252_LEVELS['252'].trading],
+    manufacturing_station_levels: [...RIGHT_FULL_252_LEVELS['252'].manufacturing],
+    product_requirements: {
+      trading_stations: { LMD: 2 },
+      manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 3 },
+    },
+    Fiammetta: { enable: true },
+    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'Battle Record'] },
+  },
+  '252-1': {
+    layout: '2-5-2',
+    desc: copy.domain.lib_config_040,
+    schedule_mode: 'maa',
+    dormitory_rule: 'fixed',
+    trading_stations_count: 2,
+    manufacturing_stations_count: 5,
+    trading_station_levels: [...RIGHT_FULL_252_LEVELS['252-1'].trading],
+    manufacturing_station_levels: [...RIGHT_FULL_252_LEVELS['252-1'].manufacturing],
+    product_requirements: {
+      trading_stations: { LMD: 2 },
+      manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 3 },
+    },
+    Fiammetta: { enable: true },
+    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'Battle Record'] },
   },
   '333': {
     layout: '3-3-3',
@@ -121,6 +157,30 @@ function sumCounts(counts: Record<string, number> | undefined): number {
   return Object.values(counts ?? {}).reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0)
 }
 
+function levelsMatch(actual: number[] | undefined, expected: readonly number[]): boolean {
+  return Array.isArray(actual) && actual.length === expected.length && actual.every((level, index) => level === expected[index])
+}
+
+export function getRightFull252Variant(config: Pick<LicenseConfig, 'trading_stations_count' | 'manufacturing_stations_count' | 'trading_station_levels' | 'manufacturing_station_levels'>): '252' | '252-1' | null {
+  if (config.trading_stations_count !== 2 || config.manufacturing_stations_count !== 5) return null
+  if (levelsMatch(config.trading_station_levels, RIGHT_FULL_252_LEVELS['252'].trading)
+    && levelsMatch(config.manufacturing_station_levels, RIGHT_FULL_252_LEVELS['252'].manufacturing)) return '252'
+  if (levelsMatch(config.trading_station_levels, RIGHT_FULL_252_LEVELS['252-1'].trading)
+    && levelsMatch(config.manufacturing_station_levels, RIGHT_FULL_252_LEVELS['252-1'].manufacturing)) return '252-1'
+  return null
+}
+
+export function isRightFull252Config(config: Pick<LicenseConfig, 'layout' | 'trading_stations_count' | 'manufacturing_stations_count' | 'trading_station_levels' | 'manufacturing_station_levels'>): boolean {
+  return String(config.layout ?? '').replace(/-/g, '') === '252'
+    && getRightFull252Variant(config) !== null
+}
+
+export function resolveConfigLayout(config: Pick<LicenseConfig, 'trading_stations_count' | 'manufacturing_stations_count' | 'trading_station_levels' | 'manufacturing_station_levels'>): string {
+  return getRightFull252Variant(config) !== null
+    ? '2-5-2'
+    : `${config.trading_stations_count}-${config.manufacturing_stations_count}-3`
+}
+
 export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   const next = cloneConfig(config)
   const parsedShiftHours = parseShiftHours(next.shift_hours)
@@ -135,7 +195,7 @@ export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   next.shift_hours = parsedShiftHours && isValidShiftHours(parsedShiftHours)
     ? parsedShiftHours
     : [...DEFAULT_SHIFT_HOURS]
-  next.layout = next.layout || `${next.trading_stations_count}-${next.manufacturing_stations_count}-3`
+  next.layout = next.layout || resolveConfigLayout(next)
   next.desc = next.desc || `${next.layout}${copy.domain.lib_config_027}`
   next.Fiammetta = next.Fiammetta ?? { enable: false }
   if (
@@ -160,10 +220,11 @@ export function validateConfig(config: LicenseConfig): { ok: true } | { ok: fals
   const rotationMode = normalizeScheduleMode(config.schedule_mode) === 'rotation'
   const tradingCount = config.trading_stations_count
   const manufacturingCount = config.manufacturing_stations_count
+  const hasFacilityLevels = config.trading_station_levels !== undefined || config.manufacturing_station_levels !== undefined
   if (!Number.isInteger(tradingCount) || !Number.isInteger(manufacturingCount)) {
     return { ok: false, message: copy.domain.lib_config_029 }
   }
-  if (tradingCount < 1 || manufacturingCount < 1 || tradingCount + manufacturingCount !== 6) {
+  if (tradingCount < 1 || manufacturingCount < 1 || (!isRightFull252Config(config) && (tradingCount + manufacturingCount !== 6 || hasFacilityLevels))) {
     return { ok: false, message: copy.domain.lib_config_030 }
   }
   const tradingTotal = sumCounts(config.product_requirements.trading_stations)

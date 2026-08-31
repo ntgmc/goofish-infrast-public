@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  getRightFull252Variant,
   isFiammettaShiftHoursSupported,
   isValidShiftHours,
   isVariableShiftScheduleEnabled,
@@ -7,6 +8,7 @@ import {
   normalizeDormitoryRule,
   normalizeScheduleMode,
   parseShiftHours,
+  resolveConfigLayout,
 } from '../lib/config'
 import { BASE_DAILY_SANITY_BUDGET, MONTHLY_CARD_DAILY_SANITY_BONUS, normalizeOrundumPlanning } from '../lib/orundum-economy'
 import type { IntermediateProduct, LicenseConfig, PermissionMode } from '../lib/types'
@@ -100,6 +102,38 @@ const CONFIG_PRESETS: Record<string, LicenseConfig> = {
     Fiammetta: { enable: true },
     drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
   },
+  '252': {
+    layout: '2-5-2',
+    desc: copy.common.components_ConfigEditor_102,
+    schedule_mode: 'maa',
+    dormitory_rule: 'fixed',
+    trading_stations_count: 2,
+    manufacturing_stations_count: 5,
+    trading_station_levels: [3, 1],
+    manufacturing_station_levels: [2, 2, 3, 3, 2],
+    product_requirements: {
+      trading_stations: { LMD: 2 },
+      manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 3 },
+    },
+    Fiammetta: { enable: true },
+    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'Battle Record'] },
+  },
+  '252-1': {
+    layout: '2-5-2',
+    desc: copy.common.components_ConfigEditor_104,
+    schedule_mode: 'maa',
+    dormitory_rule: 'fixed',
+    trading_stations_count: 2,
+    manufacturing_stations_count: 5,
+    trading_station_levels: [3, 2],
+    manufacturing_station_levels: [3, 2, 3, 2, 2],
+    product_requirements: {
+      trading_stations: { LMD: 2 },
+      manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 3 },
+    },
+    Fiammetta: { enable: true },
+    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'Battle Record'] },
+  },
   '333': {
     layout: '3-3-3',
     desc: copy.common.components_ConfigEditor_018,
@@ -117,8 +151,11 @@ const CONFIG_PRESETS: Record<string, LicenseConfig> = {
 }
 
 function applyCounts(config: LicenseConfig): LicenseConfig {
-  config.layout = `${config.trading_stations_count}-${config.manufacturing_stations_count}-3`
-  config.desc = `${config.layout}${copy.common.components_ConfigEditor_019}`
+  const rightFull252Variant = getRightFull252Variant(config)
+  config.layout = resolveConfigLayout(config)
+  config.desc = rightFull252Variant
+    ? rightFull252Variant === '252' ? copy.common.components_ConfigEditor_102 : copy.common.components_ConfigEditor_104
+    : `${config.layout}${copy.common.components_ConfigEditor_019}`
   return config
 }
 
@@ -171,8 +208,6 @@ interface ConfigEditorProps {
   permission?: PermissionMode;
   validation: { ok: true } | { ok: false; message: string };
   onUpdate: (mutate: (config: LicenseConfig) => void) => void;
-  onReset?: () => void;
-  resetLabel?: string;
   note?: string;
   embedded?: boolean;
   hideHeader?: boolean;
@@ -188,8 +223,6 @@ export default function ConfigEditor({
   permission,
   validation,
   onUpdate,
-  onReset,
-  resetLabel = copy.common.components_ConfigEditor_020,
   note,
   embedded = false,
   hideHeader = false,
@@ -197,6 +230,7 @@ export default function ConfigEditor({
 }: ConfigEditorProps) {
   const canUseIntermediateInventory = canEdit || Boolean(canEditIntermediateInventory)
   const autoInventoryOnly = !canEdit && canUseIntermediateInventory
+  const rightFull252PresetSelected = getRightFull252Variant(config) !== null
   const tradingProducts = uniqueProducts(TRADING_PRODUCTS, config.product_requirements.trading_stations)
   const manufacturingProducts = uniqueProducts(MANUFACTURING_PRODUCTS, config.product_requirements.manufacturing_stations)
   const droneTargets = formatDroneTargetsInput(config.drones?.targets ?? [])
@@ -223,6 +257,8 @@ export default function ConfigEditor({
         next.auto_balance_source === 'intermediate_inventory' ||
         next.auto_balance_source === 'limited_config'
       const copy = normalizeConfig(preset)
+      delete next.trading_station_levels
+      delete next.manufacturing_station_levels
       Object.assign(next, copy)
       next.intermediate_inventory = intermediateInventory
       if (autoBalanceEnabled) {
@@ -235,6 +271,8 @@ export default function ConfigEditor({
     onUpdate((next) => {
       next.trading_stations_count = tradingCount
       next.manufacturing_stations_count = manufacturingCount
+      delete next.trading_station_levels
+      delete next.manufacturing_station_levels
       next.product_requirements.trading_stations = fitProductCounts(
         next.product_requirements.trading_stations,
         tradingProducts,
@@ -311,27 +349,27 @@ export default function ConfigEditor({
                 : `${copy.common.components_ConfigEditor_027}${permission ? PERMISSION_LABELS[permission] : copy.common.components_ConfigEditor_029}${copy.common.components_ConfigEditor_028}`)}
           </p>
         </div>
-          {!hidePresetActions && (canEdit || (canSelectPreset && !autoInventoryOnly)) && (
+          {!hidePresetActions && (canEdit || (canSelectPreset && (!autoInventoryOnly || rightFull252PresetSelected))) && (
           <div className="flex flex-wrap gap-2" data-tour-target="config-preset-actions">
             <PresetButton label={copy.common.components_ConfigEditor_030} onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
             <PresetButton label={copy.common.components_ConfigEditor_031} onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
+            <PresetButton label={copy.common.components_ConfigEditor_103} onClick={() => applyPreset(CONFIG_PRESETS['252'])} />
+            <PresetButton label={copy.common.components_ConfigEditor_105} onClick={() => applyPreset(CONFIG_PRESETS['252-1'])} />
             <PresetButton label={copy.common.components_ConfigEditor_032} onClick={() => applyPreset(CONFIG_PRESETS['333'])} />
-            {onReset && (
-              <button
-                type="button"
-                onClick={onReset}
-                disabled={!changed}
-                className="tool-secondary-action px-3 py-2 text-sm"
-              >
-                {resetLabel}
-              </button>
-            )}
           </div>
         )}
       </div>
       )}
 
-      {autoInventoryOnly ? (
+      {rightFull252PresetSelected ? (
+        <div className="pt-5">
+          <div className="tool-inset bg-surface-2/60 p-4" role="status">
+            <p className="text-sm leading-6 text-ink-secondary">
+              {SCHEDULE_MODE_LABELS[scheduleMode]} · {config.layout} · {config.desc}
+            </p>
+          </div>
+        </div>
+      ) : autoInventoryOnly ? (
         <div className="pt-5">
           <div className="tool-inset p-4">
             <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_033}</h3>
@@ -341,6 +379,8 @@ export default function ConfigEditor({
               <div className="mt-4 flex flex-wrap gap-2" data-tour-target="config-preset-actions">
                 <PresetButton label={copy.common.components_ConfigEditor_035} onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
                 <PresetButton label={copy.common.components_ConfigEditor_036} onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
+                <PresetButton label={copy.common.components_ConfigEditor_103} onClick={() => applyPreset(CONFIG_PRESETS['252'])} />
+                <PresetButton label={copy.common.components_ConfigEditor_105} onClick={() => applyPreset(CONFIG_PRESETS['252-1'])} />
                 <PresetButton label={copy.common.components_ConfigEditor_037} onClick={() => applyPreset(CONFIG_PRESETS['333'])} />
               </div>
             )}

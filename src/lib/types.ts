@@ -20,6 +20,8 @@ export interface LicenseConfig {
   shift_hours?: number[] | string;
   trading_stations_count: number;
   manufacturing_stations_count: number;
+  trading_station_levels?: number[];
+  manufacturing_station_levels?: number[];
   product_requirements: {
     trading_stations: Record<string, number>;
     manufacturing_stations: Record<string, number>;

@@ -47,6 +47,8 @@ describe('PricingPage', () => {
     const supportPageLink = contactLinks.find((link) => link.getAttribute('href') === '/support')
     expect(supportPageLink).toHaveClass('hidden', 'items-center', 'sm:inline-flex')
     const table = screen.getByRole('table', { name: '功能对比' })
+    expect(within(table).getAllByText('支持右满252')).toHaveLength(2)
+    expect(within(table).queryByText(/31\/22332|32\/32322|32\/33333/)).not.toBeInTheDocument()
     expect(within(table).getAllByText('支持，可绑定并保存到同一账号工作区')).toHaveLength(1)
     expect(within(table).getByText('更换游戏账号')).toBeInTheDocument()
     expect(within(table).getAllByText('不支持自行更换；需人工核验')).toHaveLength(1)

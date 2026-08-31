@@ -17,6 +17,7 @@ import {
 } from '../../src/lib/product-catalog'
 import { createPostgresCdkRecordStore } from '../storage/cdk-store'
 import { licenseConfigSchema, licenseOperatorsSchema } from '../../src/lib/workspace-validation'
+import { isRightFull252Config } from '../../src/lib/config'
 import {
   createPostgresRiskControlSettingsStore,
   DEFAULT_RISK_CONTROL_SETTINGS,
@@ -82,6 +83,38 @@ const PRESET_CONFIGS: LicenseConfig[] = [
     },
     Fiammetta: { enable: true },
     drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
+  },
+  {
+    layout: '2-5-2',
+    desc: '右满252（经验多）',
+    schedule_mode: 'maa',
+    dormitory_rule: 'fixed',
+    trading_stations_count: 2,
+    manufacturing_stations_count: 5,
+    trading_station_levels: [3, 1],
+    manufacturing_station_levels: [2, 2, 3, 3, 2],
+    product_requirements: {
+      trading_stations: { LMD: 2 },
+      manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 3 },
+    },
+    Fiammetta: { enable: true },
+    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'Battle Record'] },
+  },
+  {
+    layout: '2-5-2',
+    desc: '右满252（赤金多）',
+    schedule_mode: 'maa',
+    dormitory_rule: 'fixed',
+    trading_stations_count: 2,
+    manufacturing_stations_count: 5,
+    trading_station_levels: [3, 2],
+    manufacturing_station_levels: [3, 2, 3, 2, 2],
+    product_requirements: {
+      trading_stations: { LMD: 2 },
+      manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 3 },
+    },
+    Fiammetta: { enable: true },
+    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'Battle Record'] },
   },
   {
     layout: '2-4-3',
@@ -420,7 +453,7 @@ export function resolveConfigForPermission(
   }
   const preset = PRESET_CONFIGS.find((item) => isPresetConfigMatch(config, item))
   if (!preset) {
-    return { ok: false, message: '当前 CDK 版本仅支持 243 均衡、243 搓玉或 333 搓玉预设配置。' }
+    return { ok: false, message: '当前 CDK 版本仅支持 243 均衡、243 搓玉、333 搓玉和右满252预设配置。' }
   }
   return { ok: true, config: resolvePresetMode(config, preset) }
 }
@@ -438,7 +471,7 @@ export function resolveFreePreviewConfig(
     isPresetConfigMatch(config, item) || isLegacyFreePreviewMaaConfigMatch(config, item)
   )
   if (!preset) {
-    return { ok: false, message: '免费个人排班仅支持 243 均衡、243 搓玉和 333 搓玉预设。' }
+    return { ok: false, message: '免费个人排班仅支持 243 均衡、243 搓玉、333 搓玉和右满252预设。' }
   }
   return { ok: true, config: resolveFreePreviewPresetMode(config, preset) }
 }
@@ -501,6 +534,8 @@ function isPresetConfigMatch(config: LicenseConfig, preset: LicenseConfig): bool
     && scheduleMatches
     && config.trading_stations_count === preset.trading_stations_count
     && config.manufacturing_stations_count === preset.manufacturing_stations_count
+    && JSON.stringify(config.trading_station_levels ?? null) === JSON.stringify(preset.trading_station_levels ?? null)
+    && JSON.stringify(config.manufacturing_station_levels ?? null) === JSON.stringify(preset.manufacturing_station_levels ?? null)
     && countsMatch(config.product_requirements?.trading_stations, preset.product_requirements.trading_stations, TRADING_PRODUCTS)
     && countsMatch(config.product_requirements?.manufacturing_stations, preset.product_requirements.manufacturing_stations, MANUFACTURING_PRODUCTS)
     && (scheduleMode === 'rotation' || Boolean(config.Fiammetta?.enable) === Boolean(preset.Fiammetta?.enable))
@@ -869,8 +904,9 @@ export function validateConfig(value: unknown): { ok: true; config: LicenseConfi
   if (config.trading_stations_count < 1 || config.manufacturing_stations_count < 1) {
     return { ok: false, message: '贸易站和制造站数量必须大于 0。' }
   }
-  if (config.trading_stations_count + config.manufacturing_stations_count !== 6) {
-    return { ok: false, message: '贸易站 + 制造站需要等于 6。' }
+  const hasFacilityLevels = config.trading_station_levels !== undefined || config.manufacturing_station_levels !== undefined
+  if (!isRightFull252Config(config) && (config.trading_stations_count + config.manufacturing_stations_count !== 6 || hasFacilityLevels)) {
+    return { ok: false, message: '当前支持 3 发电站布局和右满252；其他 2 发电站布局尚未开放。' }
   }
   const trading = config.product_requirements.trading_stations
   const manufacturing = config.product_requirements.manufacturing_stations

@@ -154,8 +154,6 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_007: "基建配置",
   // src/pages/tool/optimize/ConfigSection.tsx
-  pages_tool_optimize_ConfigSection_008: "恢复已保存配置",
-  // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_009: "变化记录",
   // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_010: "当前配置与上次生成",
@@ -891,6 +889,10 @@ export const optimizeCopy = {
   pages_tool_optimize_workflow_utils_005: "已拦截",
   // src/pages/tool/optimize/workflow-utils.ts
   pages_tool_optimize_workflow_utils_006: "优化失败: ",
+  // src/pages/tool/optimize/workflow-utils.ts
+  pages_tool_optimize_workflow_utils_007: "右满252（经验多）",
+  // src/pages/tool/optimize/workflow-utils.ts
+  pages_tool_optimize_workflow_utils_008: "右满252（赤金多）",
   // src/pages/tool/optimize/optimization-job-events.ts
   pages_tool_optimize_optimization_job_events_001: "另一个页面正在提交同一账号的优化任务，请稍后重试。",
   pages_tool_optimize_optimization_job_events_002: "排班优化已完成",
