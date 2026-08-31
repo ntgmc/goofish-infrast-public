@@ -167,7 +167,7 @@ async function seedSession(userId: string, now: Date): Promise<string> {
     token_hash: createHash('sha256').update(token).digest('hex'),
     created_at: timestamp,
     last_seen_at: timestamp,
-    expires_at: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
   }
   await query(
     `insert into user_sessions
