@@ -4,7 +4,7 @@ import type { SystemItemCode } from '../../../lib/inventory-contracts'
 import { canEditConfig, canUseScenarioComparison, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../../../lib/license'
 import { canonicalJson } from '../../../lib/crypto'
 import { apiJson } from '../../../lib/api-client'
-import { normalizeConfig, validateConfig, normalizeScheduleMode, normalizeDormitoryRule } from '../../../lib/config'
+import { normalizeConfig, validateConfig, normalizeScheduleMode, normalizeDormitoryRule, resolveConfigLayout } from '../../../lib/config'
 import { type ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { describeConfigDiff } from '../../../lib/workspace-history'
 import { mergeOptimizeJobProgress, buildOptimizeJobStorageKey, writeActiveOptimizeJob, readActiveOptimizeJob, isActiveOptimizeJob, clearActiveOptimizeJob, clearLegacyOptimizeJobStorage, isOptimizeJobPollCancelled } from './job-progress'
@@ -299,7 +299,7 @@ export function useOptimizeWorkflow(props: Props) {
       if (!userCanApplyConfigOverride) return
       const draft = normalizeConfig(activeConfig)
       mutate(draft)
-      draft.layout = `${draft.trading_stations_count}-${draft.manufacturing_stations_count}-3`
+      draft.layout = resolveConfigLayout(draft)
       const next = normalizeAllowedConfigOverride(draft)
       setConfigOverride(next)
       const nextValidation = validateConfig(next)

@@ -408,7 +408,7 @@ export const domainCopy = {
   // src/lib/config.ts
   lib_config_029: "贸易站和制造站数量必须是整数。",
   // src/lib/config.ts
-  lib_config_030: "当前版本固定 3 个发电站，贸易站 + 制造站需要等于 6。",
+  lib_config_030: "当前支持 3 发电站布局和右满252；其他 2 发电站布局尚未开放。",
   // src/lib/config.ts
   lib_config_031: "贸易产物数量合计为 ",
   // src/lib/config.ts
@@ -425,6 +425,10 @@ export const domainCopy = {
   lib_config_037: "纯maa自动填满",
   // src/lib/config.ts
   lib_config_038: "纯自动填满",
+  // src/lib/config.ts
+  lib_config_039: "右满252（经验多）",
+  // src/lib/config.ts
+  lib_config_040: "右满252（赤金多）",
   // src/lib/production-sanity.ts
   lib_production_sanity_001: "制造 ",
   // src/lib/production-sanity.ts

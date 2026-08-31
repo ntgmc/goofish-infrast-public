@@ -97,6 +97,8 @@ const licenseConfigShape = {
   ]).optional(),
   trading_stations_count: z.number().int().min(1).max(5),
   manufacturing_stations_count: z.number().int().min(1).max(5),
+  trading_station_levels: z.array(z.number().int().min(1).max(3)).min(1).max(5).optional(),
+  manufacturing_station_levels: z.array(z.number().int().min(1).max(3)).min(1).max(5).optional(),
   product_requirements: z.strictObject({
     trading_stations: boundedCountRecord,
     manufacturing_stations: boundedCountRecord,

@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { LicenseConfig, OptimizeResult, WorkspaceResultHistoryItem, WorkspaceResultHistorySummary } from '../../../lib/types'
+import { CONFIG_PRESETS } from '../../../lib/config'
 import { getUpgradeSuggestionId } from '../../../lib/upgrade-suggestion-id'
-import { normalizeUpgradeSuggestions, resolveLatestHistoryConfig } from './workflow-utils'
+import { formatConfigPresetLabel, normalizeUpgradeSuggestions, resolveLatestHistoryConfig } from './workflow-utils'
+
+describe('formatConfigPresetLabel', () => {
+  it('labels both supported two-power layouts as right-full 252 variants', () => {
+    expect(formatConfigPresetLabel(CONFIG_PRESETS['252'])).toBe('右满252（经验多） 均衡')
+    expect(formatConfigPresetLabel(CONFIG_PRESETS['252-1'])).toBe('右满252（赤金多） 均衡')
+  })
+})
 
 describe('resolveLatestHistoryConfig', () => {
   it('returns null when the workspace has no result history', () => {

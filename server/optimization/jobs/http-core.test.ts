@@ -62,6 +62,15 @@ describe('sanitizeConfigForPublicOptimize layout cost policy', () => {
     expect(sanitized.optimizer_search).toEqual({ optimization_mode: 'fast', beam: false })
   })
 
+  it.each(['252', '252-1'] as const)('preserves %s facility levels while enforcing fast mode', (preset) => {
+    const sanitized = sanitizeConfigForPublicOptimize({ ...CONFIG_PRESETS[preset], optimization_mode: 'exact' }, 'advanced')
+
+    expect(sanitized.layout).toBe('2-5-2')
+    expect(sanitized.trading_station_levels).toEqual(CONFIG_PRESETS[preset].trading_station_levels)
+    expect(sanitized.manufacturing_station_levels).toEqual(CONFIG_PRESETS[preset].manufacturing_station_levels)
+    expect(sanitized.optimization_mode).toBe('fast')
+  })
+
   it('forces a 063 layout to fast beam mode', () => {
     const sanitized = sanitizeConfigForPublicOptimize({
       ...CONFIG_PRESETS['243'],
