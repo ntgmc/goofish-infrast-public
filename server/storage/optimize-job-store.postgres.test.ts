@@ -21,7 +21,6 @@ import {
   type InvitationSettingsPatch,
   validateInvitationCode,
 } from './invitation-store'
-import { confirmFreeScheduleEntitlement, getFreeScheduleEntitlement } from './reorder-admission'
 import { adjustBalance, getBalanceSummary, reverseQualificationCredit } from './balance-store'
 import { issueMeteredScheduleQuote } from './metered-billing-store'
 import { recordOperatorFingerprintInTransaction } from './cdk-store'
@@ -243,18 +242,45 @@ describe('PostgreSQL optimization job admission', () => {
     }
   })
 
-  it('allows exactly one concurrent free job and reserves its entitlement once', async () => {
+  it('allows exactly one concurrent free job without reserving a generation entitlement', async () => {
     const profileId = await seedProfile()
     const store = createPostgresOptimizeJobStore()
     const results = await Promise.allSettled(Array.from({ length: 8 }, () => store.admitJob(input({
       owner_key: `profile:${profileId}`,
       source: 'free_preview',
-      free_profile_id: profileId,
     }))))
     expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
     expect(results.filter((result) => result.status === 'rejected' && result.reason instanceof OptimizeJobAdmissionError)).toHaveLength(7)
     expect((await query<{ count: string }>("select count(*)::text as count from optimize_jobs where owner_key = $1", [`profile:${profileId}`])).rows[0]?.count).toBe('1')
-    expect((await query<{ count: string }>("select count(*)::text as count from entitlement_ledger where profile_id = $1 and entitlement_type = 'free_schedule'", [profileId])).rows[0]?.count).toBe('1')
+    expect((await query<{ count: string }>("select count(*)::text as count from entitlement_ledger where profile_id = $1 and entitlement_type = 'free_schedule'", [profileId])).rows[0]?.count).toBe('0')
+  })
+
+  it('admits monthly card schedules without reserving a generation quota', async () => {
+    const profileId = await seedProfile()
+    await query(
+      `update user_game_accounts
+          set kind = 'cdk', permission = 'advanced',
+              record_json = record_json || '{"kind":"cdk","permission":"advanced"}'::jsonb
+        where id = $1`,
+      [profileId],
+    )
+    const store = createPostgresOptimizeJobStore()
+    const admitted = await store.admitJob(input({
+      owner_key: `profile:${profileId}`,
+      profile_id: profileId,
+      source: 'account_profile',
+      payload_json: {
+        ...formalSchedulePayload(profileId),
+        cdkUsageRef: { code_hash: randomUUID().replaceAll('-', '') },
+      },
+    }))
+
+    expect(admitted.job.status).toBe('queued')
+    expect((await query<{ count: string }>(
+      "select count(*)::text as count from optimization_job_effects where job_id = $1 and effect_type = 'cdk_schedule_quota'",
+      [admitted.job.id],
+    )).rows[0]?.count).toBe('0')
+    await store.requestCancel(admitted.job.id)
   })
 
   it('atomically reserves reorder quota once and releases it when the queued job is cancelled', async () => {
@@ -304,7 +330,7 @@ describe('PostgreSQL optimization job admission', () => {
     await store.requestCancel(replacement.job.id)
   })
 
-  it('consumes reorder quota and grants the strong bonus in the successful attempt transaction', async () => {
+  it('consumes reorder quota without granting a schedule-generation bonus', async () => {
     const profileId = await seedProfile()
     const payload = formalReorderPayload(profileId)
     const store = createPostgresOptimizeJobStore()
@@ -337,20 +363,14 @@ describe('PostgreSQL optimization job admission', () => {
        where reference_type = 'optimization_job' and reference_id = $1 and entitlement_type = 'reorder_check'`,
       [admitted.job.id],
     )).rows[0]?.status).toBe('consumed')
-    expect((await query<{ strong_reorder_bonus_month: string | null }>(
-      'select strong_reorder_bonus_month from profile_entitlements where profile_id = $1',
-      [profileId],
-    )).rows[0]?.strong_reorder_bonus_month).toBe(shanghaiMonthKey(new Date().toISOString()))
     await expect(store.getJob(admitted.job.id)).resolves.toMatchObject({
       status: 'succeeded',
       result_json: {
         recommendation: 'strongly_recommended',
         quota: { limit: 2, used: 1, remaining: 1, timezone: 'Asia/Shanghai' },
-        free_schedule_entitlement: {
-          strong_reorder_bonus: { used_at: null },
-        },
       },
     })
+    expect((await store.getJob(admitted.job.id))?.result_json).not.toHaveProperty('free_schedule_entitlement')
     expect((await query<{ effect_type: string }>(
       `select effect_type from optimization_job_effects
        where job_id = $1 and effect_type = 'reorder_check_completion'`,
@@ -465,6 +485,23 @@ describe('PostgreSQL optimization job admission', () => {
       code: 'submission_rate_exceeded',
       status: 429,
       message: '当前账号的优化提交次数已达小时上限。请1小时后再试。',
+    })
+  })
+
+  it('limits free previews to two submissions in a rolling six-hour window', async () => {
+    const store = createPostgresOptimizeJobStore()
+    const owner = `license:${randomUUID()}`
+
+    const first = await store.admitJob(input({ owner_key: owner, source: 'free_preview' }))
+    await query("update optimize_jobs set status = 'succeeded', updated_at = now() where id = $1", [first.job.id])
+    await query("update optimization_submissions set created_at = now() - interval '5 hours' where owner_key = $1", [owner])
+    const second = await store.admitJob(input({ owner_key: owner, source: 'free_preview' }))
+    await query("update optimize_jobs set status = 'succeeded', updated_at = now() where id = $1", [second.job.id])
+
+    await expect(store.admitJob(input({ owner_key: owner, source: 'free_preview' }))).rejects.toMatchObject({
+      code: 'submission_rate_exceeded',
+      status: 429,
+      message: '免费预览每 6 小时最多提交 2 次排班，请稍后再试。',
     })
   })
 
@@ -762,6 +799,74 @@ describe('PostgreSQL optimization job admission', () => {
     )).rows[0]?.status).toBe('interrupted')
   })
 
+  it('atomically replaces the youngest local idle-class attempt with waiting paid work', async () => {
+    const store = createPostgresOptimizeJobStore()
+    const workerId = `preempt-worker-${randomUUID()}`
+    const olderFree = await store.createJob(input({ priority: 0, source: 'free_preview' }))
+    const newerFree = await store.createJob(input({ priority: 0, source: 'free_preview' }))
+    const paid = await store.createJob(input({ priority: 10, source: 'account_profile' }))
+    const olderLock = randomUUID()
+    const newerLock = randomUUID()
+    await query(
+      `update optimize_jobs
+       set status = 'running', attempt_count = 1, worker_id = $2, lock_token = $3,
+           heartbeat_at = now(), lock_expires_at = now() + interval '1 minute',
+           started_at = $4, expires_at = null, updated_at = now()
+       where id = $1`,
+      [olderFree.id, workerId, olderLock, '2026-08-29T00:00:00.000Z'],
+    )
+    await query(
+      `update optimize_jobs
+       set status = 'running', attempt_count = 1, worker_id = $2, lock_token = $3,
+           heartbeat_at = now(), lock_expires_at = now() + interval '1 minute',
+           started_at = $4, expires_at = null, updated_at = now()
+       where id = $1`,
+      [newerFree.id, workerId, newerLock, '2026-08-29T00:00:01.000Z'],
+    )
+    await query(
+      `insert into optimize_job_attempts
+        (job_id, attempt_no, worker_id, lock_token, status, started_at, heartbeat_at)
+       values ($1, 1, $3, $4, 'running', $5, now()),
+              ($2, 1, $3, $6, 'running', $7, now())`,
+      [olderFree.id, newerFree.id, workerId, olderLock, '2026-08-29T00:00:00.000Z', newerLock, '2026-08-29T00:00:01.000Z'],
+    )
+    const paidLock = randomUUID()
+    const retryReadyAt = new Date()
+    await query(
+      'update optimize_jobs set created_at = $2, next_attempt_at = $3 where id = $1',
+      [paid.id, new Date(retryReadyAt.getTime() - 60_000).toISOString(), retryReadyAt.toISOString()],
+    )
+    const preemptionInput = {
+      workerId,
+      candidateJobIds: [olderFree.id, newerFree.id],
+      lockToken: paidLock,
+      lockExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+      maxFailures: 2,
+      maxGlobalRunning: 2,
+      claimPriority: 1_000,
+      graceMs: 15_000,
+    }
+
+    await expect(store.preemptFreeJobForPaid(preemptionInput)).resolves.toBeNull()
+    await query(
+      'update optimize_jobs set next_attempt_at = $2 where id = $1',
+      [paid.id, new Date(Date.now() - 16_000).toISOString()],
+    )
+    const preemption = await store.preemptFreeJobForPaid(preemptionInput)
+
+    expect(preemption).toMatchObject({ interruptedJobId: newerFree.id, job: { id: paid.id, status: 'running' } })
+    await expect(store.getJob(olderFree.id)).resolves.toMatchObject({ status: 'running' })
+    await expect(store.getJob(newerFree.id)).resolves.toMatchObject({ status: 'queued', failure_count: 0, started_at: null })
+    expect((await query<{ status: string }>(
+      'select status from optimize_job_attempts where job_id = $1 and attempt_no = 1',
+      [newerFree.id],
+    )).rows[0]?.status).toBe('interrupted')
+
+    await store.failAttempt(olderFree.id, 1, workerId, olderLock, 'test cleanup')
+    await store.failAttempt(paid.id, preemption!.job.attempt_count, workerId, paidLock, 'test cleanup')
+    await store.requestCancel(newerFree.id)
+  })
+
   it('recovers expired attempts and schedules worker retries with timestamp parameters', async () => {
     const store = createPostgresOptimizeJobStore()
     const admitted = await store.admitJob(input({ priority: 150_000 }))
@@ -827,146 +932,6 @@ describe('PostgreSQL optimization job admission', () => {
     )).rows[0]).toEqual({ status: 'timed_out', failure_kind: 'timed_out' })
   })
 
-  it('expires never-started jobs and releases their reserved free entitlement', async () => {
-    const profileId = await seedProfile()
-    const store = createPostgresOptimizeJobStore()
-    const createdAt = new Date(Date.now() - 25 * 60 * 60_000).toISOString()
-    const admitted = await store.admitJob(input({
-      owner_key: `profile:${profileId}`,
-      source: 'free_preview',
-      free_profile_id: profileId,
-      created_at: createdAt,
-      payload_json: { freeScheduleDecision: { ok: true, mode: 'revision' } },
-    }))
-
-    await expect(store.expireQueuedJobs(new Date().toISOString())).resolves.toBeGreaterThanOrEqual(1)
-    await expect(store.getJob(admitted.job.id)).resolves.toMatchObject({ status: 'failed', attempt_count: 0 })
-    expect((await query<{ status: string }>(
-      "select status from entitlement_ledger where reference_type = 'optimization_job' and reference_id = $1",
-      [admitted.job.id],
-    )).rows[0]?.status).toBe('released')
-    expect((await query<{ free_revision_count: number }>(
-      'select free_revision_count from profile_entitlements where profile_id = $1',
-      [profileId],
-    )).rows[0]?.free_revision_count).toBe(0)
-  })
-
-  it('reads the authoritative free entitlement instead of a stale workspace snapshot', async () => {
-    const profileId = await seedProfile()
-    const lockedAt = new Date().toISOString()
-    await query(
-      `insert into profile_entitlements
-        (profile_id, first_generated_at, free_revision_count, locked_at, lock_reason, updated_at)
-       values ($1, $2, 3, $2, 'revision_limit', $2)`,
-      [profileId, lockedAt],
-    )
-
-    await expect(getFreeScheduleEntitlement(profileId, null)).resolves.toMatchObject({
-      first_generated_at: lockedAt,
-      revision_count: 3,
-      locked_at: lockedAt,
-      lock_reason: 'revision_limit',
-    })
-  })
-
-  it('rejects another free generation after an atomic schedule confirmation', async () => {
-    const profileId = await seedProfile()
-    const store = createPostgresOptimizeJobStore()
-    const admitted = await store.admitJob(input({
-      owner_key: `profile:${profileId}`,
-      source: 'free_preview',
-      free_profile_id: profileId,
-    }))
-    const createdAt = new Date().toISOString()
-    await query("update optimize_jobs set status = 'succeeded', finished_at = now(), updated_at = now() where id = $1", [admitted.job.id])
-    await query(
-      "update entitlement_ledger set status = 'consumed', settled_at = now() where reference_type = 'optimization_job' and reference_id = $1",
-      [admitted.job.id],
-    )
-    await withTransaction(async (client) => {
-      await insertProfileOptimizationResultInTransaction(client, profileId, {
-        id: admitted.job.id,
-        name: '首次免费方案',
-        created_at: createdAt,
-        config: formalConfig(),
-        result: formalScheduleResult('首次免费方案'),
-        operator_count: 1,
-        source: 'generated',
-      }, 5)
-    })
-
-    const confirmed = await confirmFreeScheduleEntitlement(profileId, admitted.job.id, createdAt)
-
-    expect(confirmed.free_schedule_entitlement).toMatchObject({
-      revision_count: 1,
-      confirmed_at: createdAt,
-      locked_at: createdAt,
-      lock_reason: 'confirmed',
-    })
-    expect((await query<{ confirmed_at: string | null; lock_reason: string | null }>(
-      'select confirmed_at, lock_reason from profile_entitlements where profile_id = $1',
-      [profileId],
-    )).rows[0]).toMatchObject({ confirmed_at: expect.anything(), lock_reason: 'confirmed' })
-    await expect(store.admitJob(input({
-      owner_key: `profile:${profileId}`,
-      source: 'free_preview',
-      free_profile_id: profileId,
-    }))).rejects.toMatchObject({ code: 'free_revision_limit_exceeded' })
-  })
-
-  it('releases a reserved free entitlement when a started job fails', async () => {
-    const profileId = await seedProfile()
-    const store = createPostgresOptimizeJobStore()
-    const admitted = await store.admitJob(input({
-      owner_key: `profile:${profileId}`,
-      source: 'free_preview',
-      free_profile_id: profileId,
-      payload_json: { freeScheduleDecision: { ok: true, mode: 'revision' } },
-    }))
-    const workerId = 'failed-free-worker'
-    const lockToken = randomUUID()
-    await query(
-      `update optimize_jobs
-       set status = 'running', attempt_count = 1, worker_id = $2, lock_token = $3,
-           started_at = now(), updated_at = now()
-       where id = $1`,
-      [admitted.job.id, workerId, lockToken],
-    )
-
-    await expect(store.failAttempt(admitted.job.id, 1, workerId, lockToken, 'optimizer failed')).resolves.toBe(true)
-    expect((await query<{ free_revision_count: number }>(
-      'select free_revision_count from profile_entitlements where profile_id = $1',
-      [profileId],
-    )).rows[0]?.free_revision_count).toBe(0)
-    expect((await query<{ status: string }>(
-      "select status from entitlement_ledger where reference_type = 'optimization_job' and reference_id = $1",
-      [admitted.job.id],
-    )).rows[0]?.status).toBe('released')
-  })
-
-  it('reconciles a free entitlement reserved by a legacy failed job', async () => {
-    const profileId = await seedProfile()
-    const store = createPostgresOptimizeJobStore()
-    const admitted = await store.admitJob(input({
-      owner_key: `profile:${profileId}`,
-      source: 'free_preview',
-      free_profile_id: profileId,
-      payload_json: { freeScheduleDecision: { ok: true, mode: 'revision' } },
-    }))
-    await query("update optimize_jobs set status = 'failed', finished_at = now(), updated_at = now() where id = $1", [admitted.job.id])
-
-    await expect(getFreeScheduleEntitlement(profileId, null)).resolves.toMatchObject({
-      first_generated_at: null,
-      revision_count: 0,
-      locked_at: null,
-      lock_reason: null,
-    })
-    expect((await query<{ status: string }>(
-      "select status from entitlement_ledger where reference_type = 'optimization_job' and reference_id = $1",
-      [admitted.job.id],
-    )).rows[0]?.status).toBe('released')
-  })
-
   it('refunds a priority coupon when its queued job expires before starting', async () => {
     const profileId = await seedProfile()
     const userId = (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [profileId])).rows[0]!.user_id
@@ -994,38 +959,6 @@ describe('PostgreSQL optimization job admission', () => {
       'select status from reward_consumptions where optimization_job_id = $1',
       [admitted.job.id],
     )).rows[0]?.status).toBe('refunded')
-  })
-
-  it('restores an unused strong reorder bonus when its queued job expires', async () => {
-    const profileId = await seedProfile()
-    const createdAt = new Date(Date.now() - 25 * 60 * 60_000).toISOString()
-    await query(
-      `insert into profile_entitlements (profile_id, free_revision_count, strong_reorder_bonus_month, updated_at)
-       values ($1, 0, $2, now())`,
-      [profileId, shanghaiMonthKey(createdAt)],
-    )
-    const store = createPostgresOptimizeJobStore()
-    const admitted = await store.admitJob(input({
-      owner_key: `profile:${profileId}`,
-      source: 'free_preview',
-      free_profile_id: profileId,
-      created_at: createdAt,
-      payload_json: { freeScheduleDecision: { ok: true, mode: 'strong_reorder_bonus' } },
-    }))
-
-    expect((await query<{ strong_reorder_bonus_used_at: string | null }>(
-      'select strong_reorder_bonus_used_at from profile_entitlements where profile_id = $1',
-      [profileId],
-    )).rows[0]?.strong_reorder_bonus_used_at).not.toBeNull()
-    await expect(store.expireQueuedJobs(new Date().toISOString())).resolves.toBeGreaterThanOrEqual(1)
-    expect((await query<{ status: string }>(
-      "select status from entitlement_ledger where reference_type = 'optimization_job' and reference_id = $1",
-      [admitted.job.id],
-    )).rows[0]?.status).toBe('released')
-    expect((await query<{ strong_reorder_bonus_used_at: string | null }>(
-      'select strong_reorder_bonus_used_at from profile_entitlements where profile_id = $1',
-      [profileId],
-    )).rows[0]?.strong_reorder_bonus_used_at).toBeNull()
   })
 
   it('serializes running jobs per owner while allowing other owners to run', async () => {

@@ -414,10 +414,6 @@ export const requestSchemas = {
     || body.elite_overrides !== undefined
     || body.saved_config_action !== undefined
   ), { message: 'At least one workspace mutation field is required.' }),
-  workspaceFreeScheduleConfirm: strict({
-    profile_id: shortString(128),
-    result_history_id: shortString(128),
-  }),
   behaviorRiskEngagement: strict({
     page_category: z.enum(['landing', 'auth', 'profiles', 'workspace', 'optimizer', 'result', 'account', 'public_info', 'other']),
   }),
@@ -716,7 +712,6 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/billing/quote', route({ GET: none() }, ['profile_id', 'operation'])],
   ['/api/user/status', route({ GET: none() }, ['profile_id'])],
   ['/api/user/workspace', route({ GET: none(), POST: json('compute', requestSchemas.userWorkspace), PATCH: json('compute', requestSchemas.userWorkspace) }, ['profile_id'])],
-  ['/api/user/workspace/free-schedule/confirm', route({ POST: json('standard', requestSchemas.workspaceFreeScheduleConfirm) })],
   ['/api/user/behavior-risk/engagement', route({ POST: json('standard', requestSchemas.behaviorRiskEngagement) })],
   ['/api/user/invitations', route({ GET: none() }, ['cursor', 'limit'])],
   ['/api/user/invitations/code', route({ POST: json('standard', requestSchemas.userInvitationCode) })],

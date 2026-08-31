@@ -18,7 +18,7 @@ export async function recordReorderCheckEvent(
       source: 'free_preview',
     }, idempotencyKey)
   } catch (error) {
-    console.warn('重排检测使用统计记录已跳过:', error)
+    console.warn('变化影响预判使用统计记录已跳过:', error)
   }
 }
 

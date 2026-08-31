@@ -32,7 +32,6 @@ import { getValidatedJson } from '../security/request-validation'
 import { getProfileCapacityLimits } from '../storage/inventory-store'
 import { hasDatabaseUrl, withTransaction } from '../storage/postgres'
 import { recordAuthenticatedRequestBehaviorEvent, recordOperatorDataAnomalyBehaviorEvent } from '../behavior-risk/service'
-import { confirmFreeScheduleEntitlement, FreeScheduleConfirmationError } from '../storage/reorder-admission'
 import { recordOperatorFingerprintInTransaction } from '../storage/cdk-store'
 import { getWorkspaceOptimizationResultOverview } from '../storage/optimization-result-store'
 
@@ -66,10 +65,7 @@ export default async (req: Request): Promise<Response> => {
       return jsonResponse({ error: '方法不允许。' }, 405)
     }
 
-    const isFreeScheduleConfirmRequest = url.pathname.endsWith('/free-schedule/confirm')
-    const body = isFreeScheduleConfirmRequest
-      ? await getValidatedJson(req, requestSchemas.workspaceFreeScheduleConfirm)
-      : await getValidatedJson(req, requestSchemas.userWorkspace)
+    const body = await getValidatedJson(req, requestSchemas.userWorkspace)
     if (typeof body.profile_id !== 'string' || !body.profile_id) {
       return jsonResponse({ error: '请先选择游戏账号。', code: 'profile_id_invalid' }, 400)
     }
@@ -87,21 +83,6 @@ export default async (req: Request): Promise<Response> => {
     const capacityLimits = await getWorkspaceCapacityLimits(profile.id)
     if (isPreviewProfile && !profile.skland_binding) {
       return jsonResponse({ error: '免费个人排班档案必须先绑定森空岛后才能保存工作区数据。' }, 403)
-    }
-
-    if (isFreeScheduleConfirmRequest) {
-      if (req.method !== 'POST') return jsonResponse({ error: '方法不允许。' }, 405)
-      if (!isRestrictedPreview) return jsonResponse({ error: '当前档案不需要确认免费方案。' }, 403)
-      if (!('result_history_id' in body)) {
-        return jsonResponse({ error: '请选择一条历史结果。', code: 'result_history_required' }, 400)
-      }
-      const next = await confirmFreeScheduleEntitlement(profile.id, body.result_history_id)
-      const overview = await getWorkspaceOptimizationResultOverview(profile.id)
-      await recordAuthenticatedRequestBehaviorEvent({ req, auth, eventType: 'workspace_save', profileId: profile.id })
-      return jsonResponse({
-        ...(await buildAuthPayload(auth.user, profile.id)),
-        workspace: toPublicWorkspace(next, capacityLimits, overview),
-      })
     }
 
     let operatorsValue: UserWorkspaceRecord['operators'] | undefined
@@ -192,7 +173,7 @@ export default async (req: Request): Promise<Response> => {
     await recordAuthenticatedRequestBehaviorEvent({ req, auth, eventType: 'workspace_save', profileId: profile.id })
     return jsonResponse(await buildAuthPayload(auth.user, profile.id))
   } catch (error) {
-    if (error instanceof WorkspaceMutationError || error instanceof FreeScheduleConfirmationError) {
+    if (error instanceof WorkspaceMutationError) {
       return jsonResponse({ error: error.message }, error.status)
     }
     console.error('user workspace error:', error)

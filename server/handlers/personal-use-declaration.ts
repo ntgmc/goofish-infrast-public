@@ -53,7 +53,7 @@ export default async function personalUseDeclarationHandler(req: Request): Promi
           return jsonResponse({ error: '该操作仅适用于免费预览或个人按次档案。' }, 403)
         }
         if (action === 'reorder_check' && !isFreePreviewProfile(profile)) {
-          return jsonResponse({ error: '调序检查仅适用于免费预览档案。' }, 403)
+          return jsonResponse({ error: '变化影响预判仅适用于免费预览档案。' }, 403)
         }
       }
       if (!isCurrentPersonalUseDeclarationEffective()) {

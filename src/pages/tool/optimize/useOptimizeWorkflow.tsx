@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef, type FormEvent } from 'react'
-import type { Announcement, AuthSuccessResponse, FreeScheduleEntitlement, LicenseConfig, LicenseFile, OptimizeResult, ReorderCheckResult, UpgradeSuggestion, UserGameAccount, UserWorkspace, WorkspaceResultHistoryItem } from '../../../lib/types'
+import type { Announcement, AuthSuccessResponse, LicenseConfig, LicenseFile, OptimizeResult, ReorderCheckResult, UpgradeSuggestion, UserGameAccount, UserWorkspace, WorkspaceResultHistoryItem } from '../../../lib/types'
 import type { SystemItemCode } from '../../../lib/inventory-contracts'
 import { canEditConfig, canUseScenarioComparison, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../../../lib/license'
 import { canonicalJson } from '../../../lib/crypto'
@@ -16,7 +16,7 @@ import { isFreePreviewProfile, isFreePreviewTrialActive } from '../tool-utils'
 import type { ConfigSyncStatus, WorkspacePatch } from '../useToolSession'
 import { useLicenseSync } from './useLicenseSync'
 import { useOptimizeWorkspace } from './useOptimizeWorkspace'
-import { buildOptimizeSignature, formatConfigPresetLabel, waitForProgressCompletion, formatOptimizeError, getFreeScheduleGenerateBlockedReason, normalizeUpgradeSuggestions, resolveLatestHistoryConfig } from './workflow-utils'
+import { buildOptimizeSignature, formatConfigPresetLabel, waitForProgressCompletion, formatOptimizeError, normalizeUpgradeSuggestions, resolveLatestHistoryConfig } from './workflow-utils'
 import { usePriorityCoupon as usePriorityCouponState } from './usePriorityCoupon'
 import { useInventoryBalances } from './useInventoryBalances'
 import { copy } from '../../../copy/index'
@@ -89,15 +89,12 @@ export function useOptimizeWorkflow(props: Props) {
   const [reorderCheckLoading, setReorderCheckLoading] = useState(false)
   const [reorderCheckResult, setReorderCheckResult] = useState<ReorderCheckResult | null>(null)
   const [reorderCheckError, setReorderCheckError] = useState<string | null>(null)
-  const [freeScheduleEntitlementOverride, setFreeScheduleEntitlementOverride] = useState<FreeScheduleEntitlement | null>(null)
-  const [freeScheduleConfirming, setFreeScheduleConfirming] = useState(false)
-  const [freeScheduleConfirmError, setFreeScheduleConfirmError] = useState<string | null>(null)
   const [configToast, setConfigToast] = useState<{ id: number; message: string } | null>(null)
   const [workspaceNotice, setWorkspaceNotice] = useState<string | null>(null)
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
   const [workspaceBusyAction, setWorkspaceBusyAction] = useState<string | null>(null)
   const { quote: billingQuote, loading: billingQuoteLoading, error: billingQuoteError, refresh: loadBillingQuote } = useMeteredBillingQuote(profile.kind, profileId)
-  const addOnQuoteRequired = profile.kind === 'metered_personal' || profile.kind === 'metered_commercial' || Boolean(profile.expires_at)
+  const addOnQuoteRequired = profile.kind === 'metered_personal' || profile.kind === 'metered_commercial'
   const scenarioQuoteRequired = profile.kind === 'metered_personal' || profile.kind === 'metered_commercial'
   const { quote: incrementalBillingQuote, loading: incrementalBillingQuoteLoading, error: incrementalBillingQuoteError, refresh: refreshIncrementalBillingQuote } = useMeteredBillingQuote(profile.kind, profileId, 'incremental_recompute', addOnQuoteRequired)
   const { quote: scenarioBillingQuote, loading: scenarioBillingQuoteLoading, error: scenarioBillingQuoteError, refresh: refreshScenarioBillingQuote } = useMeteredBillingQuote(profile.kind, profileId, 'scenario_comparison', scenarioQuoteRequired)
@@ -114,7 +111,6 @@ export function useOptimizeWorkflow(props: Props) {
   const { balance: priorityCouponBalance, selected: usePriorityCoupon, setSelected: setUsePriorityCoupon, loading: priorityCouponLoading, error: priorityCouponError, refresh: refreshRewardBalance } = usePriorityCouponState(profileId)
   const { balances: itemBalances, capacity: profileCapacity, reorderQuota, loaded: inventoryLoaded, loading: inventoryLoading, error: inventoryError, refresh: refreshInventory } = useInventoryBalances(profileId)
   const [useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon] = useState(false)
-  const [useAdditionalRecomputeCoupon, setUseAdditionalRecomputeCoupon] = useState(false)
   const [useReorderCheckCoupon, setUseReorderCheckCoupon] = useState(false)
 
   const [lastGeneratedSignature, setLastGeneratedSignature] = useState<string | null>(null)
@@ -187,29 +183,6 @@ export function useOptimizeWorkflow(props: Props) {
 
   const latestWorkspaceResult = workspace?.latest_result ?? resultHistory[0] ?? null
 
-  const freeScheduleEntitlement =
-      freeScheduleEntitlementOverride
-      ?? finalResult?.preview_limit?.free_schedule_entitlement
-      ?? reorderCheckResult?.free_schedule_entitlement
-      ?? workspace?.free_schedule_entitlement
-      ?? null
-
-  const freeScheduleGenerateBlockedReason = useMemo(
-      () => getFreeScheduleGenerateBlockedReason(isRestrictedPreview, freeScheduleEntitlement),
-      [freeScheduleEntitlement, isRestrictedPreview],
-    )
-
-  const additionalRecomputeCouponEligible = useMemo(() => {
-      if (!isRestrictedPreview || freeScheduleEntitlement?.lock_reason !== 'revision_limit') return false
-      if (freeScheduleEntitlement.confirmed_at || !freeScheduleEntitlement.first_generated_at) return false
-      const windowEndsAt = Date.parse(freeScheduleEntitlement.first_generated_at) + freeScheduleEntitlement.revision_window_hours * 60 * 60_000
-      return Date.now() < windowEndsAt && (itemBalances.additional_recompute_coupon ?? 0) > 0
-    }, [freeScheduleEntitlement, isRestrictedPreview, itemBalances.additional_recompute_coupon])
-
-  const effectiveFreeScheduleGenerateBlockedReason = useAdditionalRecomputeCoupon && additionalRecomputeCouponEligible
-    ? null
-    : freeScheduleGenerateBlockedReason
-
   const reorderCheckDisabledReason = useMemo(() => {
       if (!isRestrictedPreview) return null
       if (!profile.skland_binding) return copy.optimize.pages_tool_optimize_useOptimizeWorkflow_001
@@ -229,7 +202,7 @@ export function useOptimizeWorkflow(props: Props) {
     profileId,
     isRestrictedPreview,
     refreshInventory,
-    { setLoading: setReorderCheckLoading, setResult: setReorderCheckResult, setError: setReorderCheckError, setEntitlement: setFreeScheduleEntitlementOverride },
+    { setLoading: setReorderCheckLoading, setResult: setReorderCheckResult, setError: setReorderCheckError },
     () => setSection('overview'),
   )
   const configDiffRows = useMemo(
@@ -295,23 +268,18 @@ export function useOptimizeWorkflow(props: Props) {
       setReorderCheckLoading(false)
       setReorderCheckResult(null)
       setReorderCheckError(null)
-      setFreeScheduleEntitlementOverride(null)
-      setFreeScheduleConfirming(false)
-      setFreeScheduleConfirmError(null)
       setLastGeneratedSignature(null)
       upgradeRequestRef.current = null
       setUpgradeCdk('')
       setUpgradeError(null)
       setUseTrainingDiagnosisCoupon(false)
-      setUseAdditionalRecomputeCoupon(false)
       setUseReorderCheckCoupon(false)
   }, [profileId, workspace?.profile_id])
 
   useEffect(() => {
     if ((itemBalances.training_diagnosis_coupon ?? 0) < 1) setUseTrainingDiagnosisCoupon(false)
-    if (!additionalRecomputeCouponEligible) setUseAdditionalRecomputeCoupon(false)
     if (reorderQuota?.remaining !== 0 || (itemBalances.reorder_check_coupon ?? 0) < 1) setUseReorderCheckCoupon(false)
-  }, [additionalRecomputeCouponEligible, itemBalances.reorder_check_coupon, itemBalances.training_diagnosis_coupon, reorderQuota?.remaining])
+  }, [itemBalances.reorder_check_coupon, itemBalances.training_diagnosis_coupon, reorderQuota?.remaining])
 
   const mergedOperators = useMemo(
       () => mergeOperators(license.operators, eliteOverrides),
@@ -483,9 +451,6 @@ export function useOptimizeWorkflow(props: Props) {
             setFinalResult(null)
             setHistoryItem(null)
             setSuggestions(normalizeUpgradeSuggestions(result.upgrade_suggestions))
-            if (current.preview_limit?.free_schedule_entitlement) {
-              setFreeScheduleEntitlementOverride(current.preview_limit.free_schedule_entitlement)
-            }
             setPhase('suggestions')
           }
           setSection('result')
@@ -564,9 +529,6 @@ export function useOptimizeWorkflow(props: Props) {
           ...(useReorderCheckCoupon && { use_items: ['reorder_check_coupon'] }),
         }, copy.optimize.pages_tool_optimize_useOptimizeWorkflow_015, isReorderJobCancelled)
         setReorderCheckResult(data)
-        if (data.free_schedule_entitlement) {
-          setFreeScheduleEntitlementOverride(data.free_schedule_entitlement)
-        }
       } catch (error) {
         setReorderCheckError(isOptimizeJobPollCancelled(error) ? null : (error as Error).message)
       } finally {
@@ -577,27 +539,6 @@ export function useOptimizeWorkflow(props: Props) {
       })
     }, [activeConfig, guardPersonalUseDeclaration, isReorderJobCancelled, isRestrictedPreview, latestWorkspaceResult, loading, profileId, refreshInventory, reorderCheckDisabledReason, reorderCheckLoading, useReorderCheckCoupon])
 
-  const handleConfirmFreeSchedule = useCallback(async () => {
-      if (!isPreviewProfile || freeScheduleConfirming || !latestWorkspaceResult) return
-      setFreeScheduleConfirming(true)
-      setFreeScheduleConfirmError(null)
-      try {
-        const data = await apiJson<AuthSuccessResponse>('/api/user/workspace/free-schedule/confirm', {
-          method: 'POST',
-          json: {
-            profile_id: profileId,
-            result_history_id: latestWorkspaceResult.id,
-          },
-          fallbackMessage: copy.optimize.pages_tool_optimize_useOptimizeWorkflow_016,
-        })
-        setFreeScheduleEntitlementOverride(data.workspace?.free_schedule_entitlement ?? null)
-      } catch (error) {
-        setFreeScheduleConfirmError((error as Error).message)
-      } finally {
-        setFreeScheduleConfirming(false)
-      }
-    }, [freeScheduleConfirming, isPreviewProfile, latestWorkspaceResult, profileId])
-
   const executeGeneration = useCallback(async (billingOperation: 'main_schedule' | 'incremental_recompute') => {
       await guardPersonalUseDeclaration('optimization_generate', async () => {
       if (licenseSyncing || loading || optimizeInFlightRef.current) return
@@ -607,10 +548,6 @@ export function useOptimizeWorkflow(props: Props) {
       }
       if (hasResult && lastGeneratedSignature === optimizeSignature) {
         if (billingOperation === 'incremental_recompute') setInlineError({ scope: 'generate', message: copy.optimize.pages_tool_optimize_useOptimizeWorkflow_025 })
-        return
-      }
-      if (billingOperation === 'main_schedule' && effectiveFreeScheduleGenerateBlockedReason) {
-        setInlineError({ scope: 'generate', message: effectiveFreeScheduleGenerateBlockedReason })
         return
       }
       if (configValidationMessage) {
@@ -640,7 +577,6 @@ export function useOptimizeWorkflow(props: Props) {
       if (billingOperation === 'main_schedule') {
         if (usePriorityCoupon && (priorityCouponBalance?.available ?? 0) > 0) selectedItems.push('priority_compute_coupon')
         if (useTrainingDiagnosisCoupon && !userCanUseUpgradeFeatures && (itemBalances.training_diagnosis_coupon ?? 0) > 0) selectedItems.push('training_diagnosis_coupon')
-        if (useAdditionalRecomputeCoupon && additionalRecomputeCouponEligible) selectedItems.push('additional_recompute_coupon')
       }
       try {
         const current = await runOptimize(
@@ -649,9 +585,6 @@ export function useOptimizeWorkflow(props: Props) {
           billingOperation,
           billingOperation === 'incremental_recompute' ? latestWorkspaceResult?.id : undefined,
         )
-        if (current.preview_limit?.free_schedule_entitlement) {
-          setFreeScheduleEntitlementOverride(current.preview_limit.free_schedule_entitlement)
-        }
         setCurrentResult(current)
         const upgradeList = normalizeUpgradeSuggestions(current.upgrade_suggestions)
         completed = true
@@ -681,7 +614,6 @@ export function useOptimizeWorkflow(props: Props) {
       } finally {
         setUsePriorityCoupon(false)
         setUseTrainingDiagnosisCoupon(false)
-        setUseAdditionalRecomputeCoupon(false)
         await Promise.all([refreshRewardBalance(), refreshInventory()])
         optimizeInFlightRef.current = false
         setLoading(false)
@@ -693,7 +625,7 @@ export function useOptimizeWorkflow(props: Props) {
         }
       }
       })
-    }, [additionalRecomputeCouponEligible, configValidationMessage, effectiveFreeScheduleGenerateBlockedReason, flushConfigSave, flushPendingLicenseSync, guardPersonalUseDeclaration, hasResult, itemBalances.training_diagnosis_coupon, lastGeneratedSignature, latestWorkspaceResult, licenseSyncing, loading, optimizeSignature, priorityCouponBalance?.available, refreshInventory, refreshRewardBalance, refreshWorkspaceResults, runOptimize, showConfigValidationToast, useAdditionalRecomputeCoupon, usePriorityCoupon, useTrainingDiagnosisCoupon, userCanUseUpgradeFeatures])
+    }, [configValidationMessage, flushConfigSave, flushPendingLicenseSync, guardPersonalUseDeclaration, hasResult, itemBalances.training_diagnosis_coupon, lastGeneratedSignature, latestWorkspaceResult, licenseSyncing, loading, optimizeSignature, priorityCouponBalance?.available, refreshInventory, refreshRewardBalance, refreshWorkspaceResults, runOptimize, showConfigValidationToast, usePriorityCoupon, useTrainingDiagnosisCoupon, userCanUseUpgradeFeatures])
 
   const handleGenerate = useCallback(() => executeGeneration('main_schedule'), [executeGeneration])
   const handleIncrementalRecompute = useCallback(() => executeGeneration('incremental_recompute'), [executeGeneration])
@@ -741,5 +673,5 @@ export function useOptimizeWorkflow(props: Props) {
       }
     }, [isPreviewProfile, onProfileUpgraded, profileId, upgradeCdk, upgradeLoading])
 
-  return { license, progress, profile, onReset, announcement, redeemedNotice, permission, billingQuote, billingQuoteLoading, billingQuoteError, refreshBillingQuote: loadBillingQuote, addOnQuoteRequired, incrementalBillingQuote, incrementalBillingQuoteLoading, incrementalBillingQuoteError, refreshIncrementalBillingQuote, scenarioQuoteRequired, scenarioBillingQuote, scenarioBillingQuoteLoading, scenarioBillingQuoteError, refreshScenarioBillingQuote, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk: handleUpgradeCdkChange, upgradeLoading, upgradeError, priorityCouponBalance, priorityCouponLoading, priorityCouponError, refreshRewardBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, reorderQuota, inventoryLoaded, inventoryLoading, inventoryError, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, useAdditionalRecomputeCoupon, setUseAdditionalRecomputeCoupon, additionalRecomputeCouponEligible, useReorderCheckCoupon, setUseReorderCheckCoupon, refreshInventory, isPreviewProfile, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userCanDownloadFullResult, userCanViewFullData, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults, resultHistoryHasMore, archivedResultsHasMore, resultHistoryLoadingScope, resultHistoryError, loadMoreResultHistory, loadMoreArchivedResults, latestWorkspaceResult, freeScheduleGenerateBlockedReason: effectiveFreeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleReorderCheck, handleCancelReorderCheck, handleOpenReorderCheckResult, handleConfirmFreeSchedule, handleGenerate, handleIncrementalRecompute, handleDownloadMAA, handleDownloadFullResult, handleUpgradePreviewProfile, declarationDialog }
+  return { license, progress, profile, onReset, announcement, redeemedNotice, permission, billingQuote, billingQuoteLoading, billingQuoteError, refreshBillingQuote: loadBillingQuote, addOnQuoteRequired, incrementalBillingQuote, incrementalBillingQuoteLoading, incrementalBillingQuoteError, refreshIncrementalBillingQuote, scenarioQuoteRequired, scenarioBillingQuote, scenarioBillingQuoteLoading, scenarioBillingQuoteError, refreshScenarioBillingQuote, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk: handleUpgradeCdkChange, upgradeLoading, upgradeError, priorityCouponBalance, priorityCouponLoading, priorityCouponError, refreshRewardBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, reorderQuota, inventoryLoaded, inventoryLoading, inventoryError, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, useReorderCheckCoupon, setUseReorderCheckCoupon, refreshInventory, isPreviewProfile, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userCanDownloadFullResult, userCanViewFullData, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults, resultHistoryHasMore, archivedResultsHasMore, resultHistoryLoadingScope, resultHistoryError, loadMoreResultHistory, loadMoreArchivedResults, latestWorkspaceResult, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleReorderCheck, handleCancelReorderCheck, handleOpenReorderCheckResult, handleGenerate, handleIncrementalRecompute, handleDownloadMAA, handleDownloadFullResult, handleUpgradePreviewProfile, declarationDialog }
 }

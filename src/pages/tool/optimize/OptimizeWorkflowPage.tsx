@@ -27,7 +27,7 @@ export default function OptimizeWorkflowPage(props: Props) {
   const compactTaskCenterButtonRef = useRef<HTMLButtonElement>(null)
   const taskCenterTriggerRef = useRef(taskCenterButtonRef)
   const taskCenter = useOptimizationTaskCenter(props.profileId, taskCenterOpen)
-  const { license, progress, profile, onReset, announcement, redeemedNotice, permission, billingQuote, billingQuoteLoading, billingQuoteError, refreshBillingQuote, incrementalBillingQuote, incrementalBillingQuoteLoading, incrementalBillingQuoteError, scenarioQuoteRequired, scenarioBillingQuote, scenarioBillingQuoteLoading, scenarioBillingQuoteError, refreshScenarioBillingQuote, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, priorityCouponLoading, priorityCouponError, refreshRewardBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, reorderQuota, inventoryLoaded, inventoryLoading, inventoryError, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, useAdditionalRecomputeCoupon, setUseAdditionalRecomputeCoupon, additionalRecomputeCouponEligible, useReorderCheckCoupon, setUseReorderCheckCoupon, refreshInventory, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userCanDownloadFullResult, userCanViewFullData, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults, resultHistoryHasMore, archivedResultsHasMore, resultHistoryLoadingScope, resultHistoryError, loadMoreResultHistory, loadMoreArchivedResults, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleReorderCheck, handleCancelReorderCheck, handleOpenReorderCheckResult, handleConfirmFreeSchedule, handleGenerate, handleIncrementalRecompute, handleDownloadMAA, handleDownloadFullResult, handleUpgradePreviewProfile, declarationDialog } = useOptimizeWorkflow(props)
+  const { license, progress, profile, onReset, announcement, redeemedNotice, permission, billingQuote, billingQuoteLoading, billingQuoteError, refreshBillingQuote, incrementalBillingQuote, incrementalBillingQuoteLoading, incrementalBillingQuoteError, scenarioQuoteRequired, scenarioBillingQuote, scenarioBillingQuoteLoading, scenarioBillingQuoteError, refreshScenarioBillingQuote, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, priorityCouponLoading, priorityCouponError, refreshRewardBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, reorderQuota, inventoryLoaded, inventoryLoading, inventoryError, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, useReorderCheckCoupon, setUseReorderCheckCoupon, refreshInventory, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userCanDownloadFullResult, userCanViewFullData, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults, resultHistoryHasMore, archivedResultsHasMore, resultHistoryLoadingScope, resultHistoryError, loadMoreResultHistory, loadMoreArchivedResults, latestWorkspaceResult, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleReorderCheck, handleCancelReorderCheck, handleOpenReorderCheckResult, handleGenerate, handleIncrementalRecompute, handleDownloadMAA, handleDownloadFullResult, handleUpgradePreviewProfile, declarationDialog } = useOptimizeWorkflow(props)
   const isMetered = profile.kind === 'metered_personal' || profile.kind === 'metered_commercial'
   const generationDisabledReason = !features.schedule_generation
     ? copy.features.schedule_read_only
@@ -259,14 +259,6 @@ export default function OptimizeWorkflowPage(props: Props) {
                   selected: useTrainingDiagnosisCoupon,
                   onChange: setUseTrainingDiagnosisCoupon,
                 }] : []),
-                ...(additionalRecomputeCouponEligible ? [{
-                  id: 'use-additional-recompute-coupon',
-                  label: copy.inventory.recompute_coupon,
-                  help: copy.inventory.recompute_coupon_help,
-                  balance: itemBalances.additional_recompute_coupon ?? 0,
-                  selected: useAdditionalRecomputeCoupon,
-                  onChange: setUseAdditionalRecomputeCoupon,
-                }] : []),
               ]}
               savedConfigCount={savedConfigs.length}
               savedConfigLimit={profileCapacity?.plan_slots.limit}
@@ -276,11 +268,6 @@ export default function OptimizeWorkflowPage(props: Props) {
               generationDisabledReason={generationDisabledReason}
               freeSchedule={{
                 visible: isRestrictedPreview,
-                entitlement: freeScheduleEntitlement,
-                generateBlockedReason: generationDisabledReason ?? freeScheduleGenerateBlockedReason,
-                confirming: freeScheduleConfirming,
-                confirmError: freeScheduleConfirmError,
-                onConfirm: handleConfirmFreeSchedule,
               }}
               reorderCheck={{
                 visible: isRestrictedPreview,

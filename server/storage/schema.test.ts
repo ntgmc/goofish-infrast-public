@@ -96,6 +96,7 @@ describe('database schema ownership', () => {
     expect(combinedSchema).toMatch(/ADD COLUMN IF NOT EXISTS item_expires_at/)
     expect(combinedSchema).toMatch(/lifetime_profile_voucher/)
     expect(combinedSchema).toMatch(/limited_profile_voucher/)
+    expect(combinedSchema).toMatch(/变化预判券/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS lifetime_voucher_pending_bindings/)
     expect(combinedSchema).toMatch(/free-preview-limited-cdk-2026/)
     expect(combinedSchema).toMatch(/uq_user_balance_transactions_reference/)

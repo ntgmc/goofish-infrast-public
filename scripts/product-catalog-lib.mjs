@@ -45,11 +45,16 @@ export function validateCatalog(value) {
   if (metered?.pricing_version !== '2026-08-09-v4' || metered.personal?.label !== '积分单次排班' || metered.personal?.main_schedule_points !== '1000.00'
     || metered.personal?.incremental_recompute_points !== '700.00'
     || metered.personal?.scenario_comparison_points !== '300.00'
-    || JSON.stringify(metered.schedule_quotas) !== JSON.stringify({ month: 2, half_year: 4, year: 8, lifetime: null })
+    || JSON.stringify(metered.schedule_quotas) !== JSON.stringify({ month: null, half_year: null, year: null, lifetime: null })
     || JSON.stringify(metered.scenario_quotas) !== JSON.stringify({ month: 1, half_year: 3, year: 8, lifetime: null })
     || metered.commercial?.label !== '商用版积分单次'
     || metered.commercial?.list_price_points !== '1500.00') {
     throw new Error('积分按次计价策略无效。')
+  }
+  const freePreview = value.policies.free_preview
+  if (freePreview?.submission_window_hours !== 6 || freePreview?.max_submissions_per_window !== 2
+    || freePreview?.monthly_reorder_checks !== 2) {
+    throw new Error('免费预览权益必须为每 6 小时最多 2 次完整排班、每月 2 次变化影响预判。')
   }
   const tierSignature = (metered.commercial.tiers ?? [])
     .map((tier) => `${tier.level}:${tier.threshold_points}:${tier.discount_bps}:${tier.charge_points}`).join('|')
@@ -69,7 +74,6 @@ export function renderPrice(value) {
   const personalPoints = metered.personal.main_schedule_points
   const incrementalPoints = metered.personal.incremental_recompute_points
   const scenarioPoints = metered.personal.scenario_comparison_points
-  const scheduleQuotas = metered.schedule_quotas
   const scenarioQuotas = metered.scenario_quotas
   const commercialCharges = metered.commercial.tiers.map((tier) => tier.charge_points)
   const commercialLowest = commercialCharges.at(-1)
@@ -98,6 +102,12 @@ ${publicSkus.map(([, sku]) => `| ${tableCell(sku.label)} | ${tableCell(formatPub
 - 365 天年度维护卡：${annual.display_price}，适合全年维护同一 UID 的用户。
 - 终身卡：${lifetime.display_price}，长期使用和高频重新优化的用户更划算；所有个人维护方案都只绑定一个游戏 UID。
 
+## 权益口径
+
+- 完整个人排班：根据当前干员和配置生成一份可直接使用的新轮换方案。
+- 变化影响预判：对比当前数据与最近一次成功排班，只返回是否建议重新生成、预计收益区间、受影响设施和关键干员，不生成新排班。
+- 个人增量重算：绑定同一档案的已有成功结果，重新计算并生成一份完整的新排班；付费 CDK 已包含，个人按次档案按成功任务计费。
+
 ## 按次排班规则
 
 - ${metered.personal.label}档案每个网站账号终身最多 1 个，每次成功主排班扣除 ${metered.personal.main_schedule_points} 积分（约 10 元）。
@@ -111,15 +121,17 @@ ${publicSkus.map(([, sku]) => `| ${tableCell(sku.label)} | ${tableCell(formatPub
 ## 免费预览规则
 
 - ${value.skus.free_preview.account_scope}。
-- 首次领取后拥有 1 个免费完整排班权益；首次完整生成后进入 ${freePolicy.revision_window_hours} 小时确认期，确认期内最多生成 ${freePolicy.revision_limit} 次完整方案，总次数包含首次生成。
-- 权益锁定后仍可刷新同 UID 的森空岛干员数据、查看历史方案，并且每月可检测是否值得重排 ${freePolicy.monthly_reorder_checks} 次。
-- 检测结果为“强烈建议重排”时，当月额外允许 ${freePolicy.strong_reorder_bonus} 次完整免费生成；该生成不再开启新的确认期。
+- 每 ${freePolicy.submission_window_hours} 小时最多提交 ${freePolicy.max_submissions_per_window} 次完整个人排班；同一档案同时最多有 ${freePolicy.max_active_jobs_per_profile} 个排班正在等待或计算。
+- 系统有空闲资源时会自动开始免费排班；繁忙时会先处理付费排班，你的排班会继续等待。
+- 如果计算途中系统变得繁忙，你的排班会自动重新排队并重新计算，无需再次提交；完成时间可能会延后。
+- 已有成功排班后，每月可进行 ${freePolicy.monthly_reorder_checks} 次变化影响预判；预判不生成新排班，也不占用每 ${freePolicy.submission_window_hours} 小时 ${freePolicy.max_submissions_per_window} 次的完整排班提交次数。
+- 每月预判次数用尽后，可使用一张变化预判券增加 1 次；使用券仍只返回判断结果，不生成新排班。
 
 ## 单账号卡账号规则
 
-- 完整主排班额度：30 天卡 ${scheduleQuotas.month} 次、90 天卡 ${scheduleQuotas.half_year} 次、365 天卡 ${scheduleQuotas.year} 次；任务失败、取消、排队过期或进入死信不会占用额度，终身卡不设次数上限。
+- 完整个人排班：30 天、90 天和 365 天卡均可在有效期内不限次数生成，终身卡可长期不限次数生成。
+- 个人增量重算：所有有效付费 CDK 均已包含，绑定同一档案的已有成功结果后即可不限次数使用。
 - 场景对比额度：30 天卡 ${scenarioQuotas.month} 次、90 天卡 ${scenarioQuotas.half_year} 次、365 天卡 ${scenarioQuotas.year} 次，终身卡无限；每次最多提交 3 个额外基建配置。周期卡额度用完后不能继续提交场景对比，个人按次档案可购买 ${scenarioPoints} 积分场景对比包。
-- 30/90/365 天周期卡超出完整主排班额度后，可按 ${incrementalPoints} 积分购买个人增量重算；终身卡继续包含无限完整重算和场景对比。
 
 ${value.policies.public_disclosures.map((line) => `- ${line}`).join('\n')}
 - 人工核验材料齐全后，客服将在 ${support.first_response_business_days} 个工作日内首次响应；工作日按${support.business_day_definition}计算，最终核验与解冻时间视复杂度而定。

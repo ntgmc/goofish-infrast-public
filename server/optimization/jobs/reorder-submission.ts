@@ -55,7 +55,7 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
     const auth = await requireUserSession(req)
     if (!auth) {
       await recordReorderCheckEvent('failure', 'auth_required', startedAt, profileIdForUsage)
-      return jsonResponse({ error: '请先登录后再检测是否需要重排。' }, 401)
+      return jsonResponse({ error: '请先登录后再进行变化影响预判。' }, 401)
     }
     const profile = await getProfileForUser(auth.user.id, activeProfileId)
     if (!profile) {
@@ -70,7 +70,7 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
     if (replayed) return jsonResponse({ job: await buildOptimizeJobAccepted(replayed) }, 202)
     if (!isFreePreviewProfile(profile)) {
       await recordReorderCheckEvent('failure', 'permission_denied', startedAt, profileIdForUsage)
-      return jsonResponse({ error: '重排检测仅面向免费个人排班档案开放。' }, 403)
+      return jsonResponse({ error: '变化影响预判仅面向免费个人排班档案开放。' }, 403)
     }
     const isPreviewTrial = isFreePreviewTrialActive(profile)
     const authorization = await resolveProfileAuthorization(profile)
@@ -81,14 +81,14 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
     }
     if (!profile.skland_binding) {
       await recordReorderCheckEvent('failure', 'permission_denied', startedAt, profileIdForUsage)
-      return jsonResponse({ error: '免费个人排班档案必须先绑定森空岛后才能检测是否需要重排。' }, 403)
+      return jsonResponse({ error: '免费个人排班档案必须先绑定森空岛后才能进行变化影响预判。' }, 403)
     }
 
     const workspace = await getWorkspace(activeProfileId) ?? emptyWorkspace(activeProfileId)
     const operators = Array.isArray(workspace.operators) ? workspace.operators : []
     if (operators.length === 0) {
       await recordReorderCheckEvent('failure', 'validation_failed', startedAt, profileIdForUsage)
-      return jsonResponse({ error: '暂无可用于重排检测的森空岛干员数据。' }, 409)
+      return jsonResponse({ error: '暂无可用于变化影响预判的森空岛干员数据。' }, 409)
     }
     const storedBaselineItem = typeof body.baselineHistoryId === 'string' && body.baselineHistoryId.trim()
       ? await getProfileOptimizationResult(activeProfileId, body.baselineHistoryId.trim())
@@ -121,7 +121,7 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
       estimate,
     }
     if (useCoupon && isPreviewTrial) {
-      return jsonResponse({ error: '试用档案无需使用调序检查券。', code: 'item_not_applicable' }, 409)
+      return jsonResponse({ error: '试用档案已包含变化影响预判，无需使用变化预判券。', code: 'item_not_applicable' }, 409)
     }
     await recordPersonalUseDeclarationUsage({
       userId: auth.user.id,

@@ -119,7 +119,7 @@ export async function getProfileOptimizationResult(
   return getProfileOptimizationResultWithClient({ query }, profileId, resultId)
 }
 
-export async function getProfileOptimizationResultWithClient(
+async function getProfileOptimizationResultWithClient(
   client: QueryClient,
   profileId: string,
   resultId: string,

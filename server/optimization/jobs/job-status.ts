@@ -9,7 +9,7 @@ import { requireUserSession } from "../../handlers/user-auth";
 import { getOptimizeJobStore, OptimizeJobAdmissionError, type OptimizeJobPriority, type OptimizeJobQueueEstimate, type OptimizeJobRecord, type OptimizeJobStore } from "../../storage/optimize-job-store";
 import { requestOptimizeJobCancellation, requestOptimizeJobProcessing } from "../../optimize-job-signals";
 import { isOptimizeEstimateOverdue } from "../../optimize-estimate";
-import type { OptimizeDurationEstimate, OptimizeRuntimeEstimate, OptimizationJobPayload, OptimizeJobSource } from './shared';
+import type { OptimizeDurationEstimate, OptimizeRuntimeEstimate, OptimizationJobPayload } from './shared';
 import { OPTIMIZE_ESTIMATE_FALLBACK_MS, OPTIMIZE_ESTIMATE_MIN_MS, OPTIMIZE_ESTIMATE_MIN_SAMPLES, OPTIMIZE_ESTIMATE_HISTORY_DAYS } from './shared';
 import { jsonResponse } from './http-core';
 import { prepareOptimizeJob } from './prepare-job';
@@ -74,9 +74,6 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
       idempotency_key: idempotencyKey,
       request_hash: requestHash,
       legacy_request_hash: legacyRequestHash,
-      free_profile_id: shouldReserveFreeScheduleEntitlement(prepared.source, preparedPayload.isPreviewTrial)
-        ? preparedPayload.activeProfileId ?? null
-        : null,
       reward_user_id: prepared.rewardUserId ?? null,
       use_priority_coupon: prepared.usePriorityCoupon === true,
       reward_item_codes: prepared.rewardItemCodes ?? [],
@@ -169,13 +166,6 @@ function hashOptimizationRequest(rawRequestBody: string): string {
     // The request validation layer will return the stable malformed-body response.
   }
   return createHash('sha256').update(canonical).digest('hex')
-}
-
-export function shouldReserveFreeScheduleEntitlement(
-  source: OptimizeJobSource,
-  isPreviewTrial: boolean | undefined,
-): boolean {
-  return source === 'free_preview' && isPreviewTrial !== true;
 }
 
 function normalizeIdempotencyKey(value: string | null): string | null {
@@ -493,7 +483,7 @@ function signOptimizeJobPollToken(job: Pick<OptimizeJobRecord, 'id' | 'owner_key
 }
 
 function formatJobPriorityLabel(job: Pick<OptimizeJobRecord, 'priority'>): string {
-  return job.priority >= 20 ? '优先计算券' : job.priority >= 10 ? '付费优先' : job.priority > 0 ? '高级分析' : '普通队列';
+  return job.priority >= 20 ? '优先计算券' : job.priority >= 10 ? '付费优先' : job.priority > 0 ? '高级分析' : '免费排队';
 }
 
 function getOptimizeJobEstimate(job: OptimizeJobRecord): OptimizeDurationEstimate {

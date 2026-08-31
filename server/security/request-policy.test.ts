@@ -61,15 +61,6 @@ describe('workspace request policy', () => {
     }).success).toBe(false)
   })
 
-  it('requires an explicit result history id for free schedule confirmation', () => {
-    expect(requestSchemas.workspaceFreeScheduleConfirm.safeParse({
-      profile_id: 'profile-1',
-      result_history_id: 'result-1',
-    }).success).toBe(true)
-    expect(requestSchemas.workspaceFreeScheduleConfirm.safeParse({
-      profile_id: 'profile-1',
-    }).success).toBe(false)
-  })
 })
 
 describe('personal-use declaration request policy', () => {

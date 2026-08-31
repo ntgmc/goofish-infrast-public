@@ -83,7 +83,7 @@ describe('admin optimization dead-letter detail', () => {
       .mockResolvedValueOnce({ rows: [{ count: '2' }] })
 
     await expect(replayOptimizationDeadLetter('letter-1', resolution())).rejects.toEqual(
-      new OptimizeJobAdmissionError('reorder_check_quota_exceeded', 429, '本月重排检测次数已用完。'),
+      new OptimizeJobAdmissionError('reorder_check_quota_exceeded', 429, '本月变化影响预判次数已用完。'),
     )
     expect(clientQueryMock.mock.calls.some(([sql]) => String(sql).includes('insert into optimize_jobs'))).toBe(false)
   })

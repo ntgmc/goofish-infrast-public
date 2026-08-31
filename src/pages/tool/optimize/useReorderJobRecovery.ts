@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 import { copy } from '../../../copy/index'
-import type { FreeScheduleEntitlement, ReorderCheckResult } from '../../../lib/types'
+import type { ReorderCheckResult } from '../../../lib/types'
 import { isOptimizeJobPollCancelled } from './job-progress'
 import { cancelCurrentReorderCheckJob, resumeReorderCheckJob } from './reorder-job-progress'
 
@@ -8,7 +8,6 @@ interface ReorderRecoverySetters {
   setLoading: Dispatch<SetStateAction<boolean>>
   setResult: Dispatch<SetStateAction<ReorderCheckResult | null>>
   setError: Dispatch<SetStateAction<string | null>>
-  setEntitlement: Dispatch<SetStateAction<FreeScheduleEntitlement | null>>
 }
 
 export function useReorderJobRecovery(
@@ -53,7 +52,6 @@ export function useReorderJobRecovery(
       if (!data || cancelled || isCancelled()) return
       state.setResult(data)
       state.setError(null)
-      if (data.free_schedule_entitlement) state.setEntitlement(data.free_schedule_entitlement)
     }).catch((error) => {
       if (!cancelled && !isCancelled() && !isOptimizeJobPollCancelled(error)) {
         state.setError(error instanceof Error ? error.message : copy.optimize.pages_tool_optimize_useOptimizeWorkflow_015)
@@ -84,7 +82,6 @@ export function useReorderJobRecovery(
     const state = settersRef.current
     state.setError(null)
     state.setResult(result)
-    if (result.free_schedule_entitlement) state.setEntitlement(result.free_schedule_entitlement)
     onOpenResult()
   }, [onOpenResult])
 

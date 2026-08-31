@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   DEFAULT_OPTIMIZE_GLOBAL_WORKER_CONCURRENCY,
   DEFAULT_OPTIMIZE_LOCAL_FALLBACK_CONCURRENCY,
+  DEFAULT_OPTIMIZE_PAID_PREEMPT_GRACE_MS,
   DEFAULT_OPTIMIZE_QUEUE_POLL_MS,
   DEFAULT_OPTIMIZE_WORKER_AUTOSCALE_INTERVAL_MS,
   DEFAULT_OPTIMIZE_WORKER_SCALE_DOWN_IDLE_MS,
@@ -14,6 +15,7 @@ import {
   getOptimizeGlobalWorkerConcurrency,
   getOptimizeJobMaxAttempts,
   getOptimizeLocalFallbackConcurrency,
+  getOptimizePaidPreemptGraceMs,
   getOptimizeQueuePollMs,
   getOptimizeStatusQueuePickupGraceMs,
   getOptimizeWorkerAutoscalingConfiguration,
@@ -45,6 +47,13 @@ describe('optimization job configuration', () => {
     expect(getOptimizeStatusQueuePickupGraceMs({})).toBe(5_000)
     expect(getOptimizeQueuePollMs({ OPTIMIZE_QUEUE_POLL_MS: '2000' })).toBe(2_000)
     expect(getOptimizeStatusQueuePickupGraceMs({ OPTIMIZE_QUEUE_POLL_MS: '2000' })).toBe(10_000)
+  })
+
+  it('uses a bounded paid-task preemption grace period', () => {
+    expect(getOptimizePaidPreemptGraceMs({})).toBe(DEFAULT_OPTIMIZE_PAID_PREEMPT_GRACE_MS)
+    expect(getOptimizePaidPreemptGraceMs({ OPTIMIZE_PAID_PREEMPT_GRACE_MS: '0' })).toBe(0)
+    expect(getOptimizePaidPreemptGraceMs({ OPTIMIZE_PAID_PREEMPT_GRACE_MS: '30000' })).toBe(30_000)
+    expect(() => getOptimizePaidPreemptGraceMs({ OPTIMIZE_PAID_PREEMPT_GRACE_MS: '-1' })).toThrow(/integer between/)
   })
 
   it('defaults the global worker concurrency to the production capacity', () => {

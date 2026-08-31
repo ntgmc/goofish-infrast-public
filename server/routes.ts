@@ -122,7 +122,6 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/skland/import/refresh', userSklandHandler as unknown as ApiHandler],
   ['/api/user/status', userStatusHandler as unknown as ApiHandler],
   ['/api/user/workspace', userWorkspaceHandler as unknown as ApiHandler],
-  ['/api/user/workspace/free-schedule/confirm', userWorkspaceHandler as unknown as ApiHandler],
   ['/api/user/behavior-risk/engagement', userBehaviorRiskHandler as unknown as ApiHandler],
   ['/api/user/invitations', userInvitationsHandler as unknown as ApiHandler],
   ['/api/user/invitations/code', userInvitationsHandler as unknown as ApiHandler],

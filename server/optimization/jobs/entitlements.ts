@@ -1,19 +1,19 @@
-import type { FreeScheduleEntitlement, LicenseOperator, LicenseConfig, OptimizeResult } from "../../../src/lib/types";
+import type { LicenseOperator, LicenseConfig, OptimizeResult } from "../../../src/lib/types";
 import { canonicalJson, type CdkRecord, incrementCdkScheduleGenerateCount } from "../../handlers/license-utils";
 import { countSuccessfulUsageEventsForProfileInRange, recordUsageEvent } from "../../handlers/usage-stats";
 import type { UsageReasonCode } from "../../storage/usage-store";
 import { hasDatabaseUrl } from '../../storage/postgres';
 import { countReorderCheckQuota, countReorderCheckQuotas } from '../../storage/reorder-quota-store';
 import { settleCdkScheduleQuota } from '../../storage/cdk-store';
-import type { ReorderCheckQuota, ScheduleUsageContext, FreeScheduleGenerateDecision } from './shared';
-import { FREE_PREVIEW_MODE, FREE_SCHEDULE_REVISION_LIMIT, FREE_SCHEDULE_REVISION_WINDOW_HOURS, SHANGHAI_TIMEZONE, SHANGHAI_UTC_OFFSET_MS } from './shared';
+import type { ReorderCheckQuota, ScheduleUsageContext } from './shared';
+import { FREE_PREVIEW_MODE, SHANGHAI_TIMEZONE, SHANGHAI_UTC_OFFSET_MS } from './shared';
 import { REORDER_CHECK_MONTHLY_LIMIT } from '../../reorder-check-policy';
 
 export function getDownloadableHistoryResult(result: OptimizeResult): OptimizeResult {
   return result;
 }
 
-export function limitPreviewOptimizeResult(result: OptimizeResult, entitlement?: FreeScheduleEntitlement | null): OptimizeResult {
+export function limitPreviewOptimizeResult(result: OptimizeResult): OptimizeResult {
   const {
     daily_production,
     maa_default_comparison,
@@ -38,7 +38,6 @@ export function limitPreviewOptimizeResult(result: OptimizeResult, entitlement?:
       mode: FREE_PREVIEW_MODE,
       hidden_room_count: 0,
       notice: "免费个人排班可查看完整游戏内轮换队列，但不包含导出、原始数据和高级分析。",
-      ...(entitlement && { free_schedule_entitlement: entitlement }),
     },
   };
 }
@@ -187,114 +186,4 @@ export async function getReorderCheckQuotas(profileIds: string[]): Promise<Map<s
     profileId,
     buildReorderCheckQuota(usage.get(profileId) ?? 0, window.end_at),
   ]))
-}
-
-function createFreeScheduleEntitlement(): FreeScheduleEntitlement {
-  return {
-    first_generated_at: null,
-    revision_count: 0,
-    revision_limit: FREE_SCHEDULE_REVISION_LIMIT,
-    revision_window_hours: FREE_SCHEDULE_REVISION_WINDOW_HOURS,
-    confirmed_at: null,
-    locked_at: null,
-    lock_reason: null,
-    strong_reorder_bonus: null,
-  };
-}
-
-function normalizeFreeScheduleEntitlement(entitlement: FreeScheduleEntitlement | null | undefined): FreeScheduleEntitlement {
-  return {
-    ...createFreeScheduleEntitlement(),
-    ...(entitlement ?? {}),
-    revision_count: Math.max(0, Math.floor(Number(entitlement?.revision_count ?? 0))),
-    revision_limit: FREE_SCHEDULE_REVISION_LIMIT,
-    revision_window_hours: FREE_SCHEDULE_REVISION_WINDOW_HOURS,
-    strong_reorder_bonus: entitlement?.strong_reorder_bonus ?? null,
-  };
-}
-
-function hasUnusedStrongReorderBonus(entitlement: FreeScheduleEntitlement, now = new Date()): boolean {
-  const bonus = entitlement.strong_reorder_bonus;
-  return Boolean(bonus && bonus.month === getShanghaiMonthKey(now) && !bonus.used_at);
-}
-
-export function resolveFreeScheduleGenerateDecision(
-  entitlementValue: FreeScheduleEntitlement | null | undefined,
-  now = new Date(),
-): FreeScheduleGenerateDecision {
-  const entitlement = normalizeFreeScheduleEntitlement(entitlementValue);
-  if (hasUnusedStrongReorderBonus(entitlement, now)) {
-    return { ok: true, mode: "strong_reorder_bonus", entitlement };
-  }
-  if (!entitlement.first_generated_at) {
-    return { ok: true, mode: "revision", entitlement };
-  }
-
-  if (entitlement.confirmed_at || entitlement.locked_at) {
-    return {
-      ok: false,
-      status: 403,
-      message: "免费完整排班权益已锁定。可继续查看已生成方案，或使用每月 2 次重排检测；需要重新生成完整方案请升级单账号终身版 CDK。",
-      entitlement,
-    };
-  }
-
-  const firstGeneratedTime = Date.parse(entitlement.first_generated_at);
-  const windowMs = FREE_SCHEDULE_REVISION_WINDOW_HOURS * 60 * 60 * 1000;
-  if (!Number.isFinite(firstGeneratedTime) || now.getTime() - firstGeneratedTime >= windowMs) {
-    const locked = {
-      ...entitlement,
-      locked_at: now.toISOString(),
-      lock_reason: "window_expired" as const,
-    };
-    return {
-      ok: false,
-      status: 403,
-      message: "免费完整排班确认期已结束。可继续查看已生成方案，或使用每月 2 次重排检测；需要重新生成完整方案请升级单账号终身版 CDK。",
-      entitlement: locked,
-    };
-  }
-
-  if (entitlement.revision_count >= FREE_SCHEDULE_REVISION_LIMIT) {
-    const locked = {
-      ...entitlement,
-      locked_at: now.toISOString(),
-      lock_reason: "revision_limit" as const,
-    };
-    return {
-      ok: false,
-      status: 403,
-      message: "免费完整排班修正次数已用完。可继续查看已生成方案，或使用每月 2 次重排检测；需要重新生成完整方案请升级单账号终身版 CDK。",
-      entitlement: locked,
-    };
-  }
-
-  return { ok: true, mode: "revision", entitlement };
-}
-
-export function applySuccessfulFreeScheduleGeneration(
-  decision: Extract<FreeScheduleGenerateDecision, { ok: true }>,
-  now = new Date(),
-): FreeScheduleEntitlement {
-  const entitlement = normalizeFreeScheduleEntitlement(decision.entitlement);
-  const nowIso = now.toISOString();
-  if (decision.mode === "strong_reorder_bonus") {
-    return {
-      ...entitlement,
-      strong_reorder_bonus: entitlement.strong_reorder_bonus
-        ? { ...entitlement.strong_reorder_bonus, used_at: nowIso }
-        : null,
-    };
-  }
-
-  const nextCount = Math.max(0, entitlement.revision_count) + 1;
-  return {
-    ...entitlement,
-    first_generated_at: entitlement.first_generated_at ?? nowIso,
-    revision_count: nextCount,
-    ...(nextCount >= FREE_SCHEDULE_REVISION_LIMIT && {
-      locked_at: nowIso,
-      lock_reason: "revision_limit" as const,
-    }),
-  };
 }

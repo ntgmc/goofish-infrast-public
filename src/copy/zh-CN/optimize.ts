@@ -298,47 +298,37 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_020: "用此配置继续调整",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_021: "免费完整排班权益",
+  pages_tool_optimize_OverviewSection_021: "免费个人排班",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_022: "查看免费完整排班权益说明",
+  pages_tool_optimize_OverviewSection_022: "了解免费排班的等待方式",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_023: "首次生成后 24 小时内最多可修正生成 3 次；确认或次数用完后，只保留重排检测和历史查看。",
+  pages_tool_optimize_OverviewSection_023: "可按需再次生成。系统有空闲资源时会自动开始；繁忙时会先处理付费排班，你的排班会自动等待，无需再次提交。",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_024: "确认中",
+  pages_tool_optimize_OverviewSection_024: "需要时可再次生成",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_025: "确认使用此方案",
+  pages_tool_optimize_OverviewSection_026: "生成次数",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_026: "剩余修正",
+  pages_tool_optimize_OverviewSection_027: "可按需再次生成",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_027: "确认期截止",
+  pages_tool_optimize_OverviewSection_028: "开始计算",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_028: "首次生成后 24 小时",
+  pages_tool_optimize_OverviewSection_029: "有空闲资源时",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_029: "额外重排",
+  pages_tool_optimize_OverviewSection_030: "繁忙时",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_030: "本月可用 1 次",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_031: "暂无",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_032: "强烈建议重排，本月可额外生成 1 次完整免费方案",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_033: "可生成 1 套免费完整个人排班",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_034: "免费完整排班权益已锁定",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_035: "确认期内可修正生成",
+  pages_tool_optimize_OverviewSection_031: "自动排队等待",
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_036: "免费个人排班",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_037: "检测是否需要重排",
+  pages_tool_optimize_OverviewSection_037: "变化影响预判",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_038: "查看重排检测说明",
+  pages_tool_optimize_OverviewSection_038: "查看变化影响预判说明",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_039: "检测结果提供收益区间、影响设施和关键干员摘要；需要完整新方案时可继续生成。",
+  pages_tool_optimize_OverviewSection_039: "对比当前干员与最近一次成功排班，只提供重新生成建议、预计收益区间、受影响设施和关键干员；不会生成新排班。",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_040: "检测中",
+  pages_tool_optimize_OverviewSection_040: "正在预判",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_041: "检测是否需要重排",
+  pages_tool_optimize_OverviewSection_041: "预判是否值得重新生成",
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_042: "收益区间",
   // src/pages/tool/optimize/OverviewSection.tsx
@@ -350,7 +340,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_046: "不建议长期用",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_047: "本月剩余",
+  pages_tool_optimize_OverviewSection_047: "本月预判剩余",
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_048: "影响设施",
   // src/pages/tool/optimize/OverviewSection.tsx
@@ -362,11 +352,11 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_052: "生成完整个人排班",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_053: "强烈建议重排",
+  pages_tool_optimize_OverviewSection_053: "强烈建议重新生成",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_054: "建议重排",
+  pages_tool_optimize_OverviewSection_054: "建议重新生成",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_055: "无需重排",
+  pages_tool_optimize_OverviewSection_055: "当前无需重新生成",
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_056: "核心贸易/制造组合可能受影响，建议生成完整个人排班。",
   // src/pages/tool/optimize/OverviewSection.tsx
@@ -376,9 +366,9 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_059: "贸易站",
 
-  pages_tool_optimize_OverviewSection_069: "取消检查",
+  pages_tool_optimize_OverviewSection_069: "取消预判",
 
-  pages_tool_optimize_OverviewSection_070: "确认取消当前换班检查任务？",
+  pages_tool_optimize_OverviewSection_070: "确认取消当前变化影响预判任务？",
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_060: "制造站",
   // src/pages/tool/optimize/OverviewSection.tsx
@@ -394,7 +384,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_066: "办公室",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_067: "本月剩余 ",
+  pages_tool_optimize_OverviewSection_067: "本月预判剩余 ",
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_068: " 重置",
   // src/pages/tool/optimize/PlansSection.tsx
@@ -860,11 +850,11 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/useOptimizationJob.ts
   pages_tool_optimize_useOptimizationJob_003: "优化任务失败，请重试。",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_001: "请先绑定森空岛后再检测。",
+  pages_tool_optimize_useOptimizeWorkflow_001: "请先绑定森空岛后再进行变化影响预判。",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_002: "请先生成一次个人排班，作为后续检查的对比依据。",
+  pages_tool_optimize_useOptimizeWorkflow_002: "请先生成一次完整个人排班，作为变化影响预判的对比依据。",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_003: "干员数据同步中，稍后再检测。",
+  pages_tool_optimize_useOptimizeWorkflow_003: "干员数据同步中，稍后再进行变化影响预判。",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_010: "已应用实验场景，请确认配置后再生成排班。",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
@@ -876,7 +866,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_014: "练度建议请求失败。",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_015: "重排检测失败，请稍后重试",
+  pages_tool_optimize_useOptimizeWorkflow_015: "变化影响预判失败，请稍后重试",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_016: "确认免费排班失败，请稍后重试",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
@@ -901,12 +891,6 @@ export const optimizeCopy = {
   pages_tool_optimize_workflow_utils_005: "已拦截",
   // src/pages/tool/optimize/workflow-utils.ts
   pages_tool_optimize_workflow_utils_006: "优化失败: ",
-  // src/pages/tool/optimize/workflow-utils.ts
-  pages_tool_optimize_workflow_utils_007: "免费完整排班权益已锁定。可继续查看已生成方案，或使用每月 2 次重排检测；需要重新生成完整方案请升级单账号终身版 CDK。",
-  // src/pages/tool/optimize/workflow-utils.ts
-  pages_tool_optimize_workflow_utils_008: "免费完整排班确认期已结束。可继续查看已生成方案，或使用每月 2 次重排检测；需要重新生成完整方案请升级单账号终身版 CDK。",
-  // src/pages/tool/optimize/workflow-utils.ts
-  pages_tool_optimize_workflow_utils_009: "免费完整排班修正次数已用完。可继续查看已生成方案，或使用每月 2 次重排检测；需要重新生成完整方案请升级单账号终身版 CDK。",
   // src/pages/tool/optimize/optimization-job-events.ts
   pages_tool_optimize_optimization_job_events_001: "另一个页面正在提交同一账号的优化任务，请稍后重试。",
   pages_tool_optimize_optimization_job_events_002: "排班优化已完成",
@@ -914,7 +898,7 @@ export const optimizeCopy = {
   pages_tool_optimize_optimization_job_events_004: "练度建议已完成",
   pages_tool_optimize_optimization_job_events_005: "优化任务未完成",
   pages_tool_optimize_optimization_job_events_006: "点击返回任务中心查看详情。",
-  pages_tool_optimize_optimization_job_events_007: "重排检测已完成",
+  pages_tool_optimize_optimization_job_events_007: "变化影响预判已完成",
   // src/pages/tool/optimize/OptimizationTaskCenter.tsx
   pages_tool_optimize_OptimizationTaskCenter_001: "异步任务中心",
   pages_tool_optimize_OptimizationTaskCenter_002: "统一显示当前账号正在排队、执行和最近结束的优化任务。",
@@ -951,11 +935,11 @@ export const optimizeCopy = {
   pages_tool_optimize_OptimizationTaskCenter_033: "打开异步任务中心",
   pages_tool_optimize_OptimizationTaskCenter_034: "关闭",
   pages_tool_optimize_OptimizationTaskCenter_035: "个任务需要关注",
-  pages_tool_optimize_OptimizationTaskCenter_036: "重排检测",
+  pages_tool_optimize_OptimizationTaskCenter_036: "变化影响预判",
   pages_tool_optimize_OptimizationTaskCenter_037: "查看结果",
   pages_tool_optimize_OptimizationTaskCenter_038: "加载任务结果失败，请稍后重试。",
 
-  pages_tool_optimize_OptimizationTaskCenter_039: "返回换班检查",
+  pages_tool_optimize_OptimizationTaskCenter_039: "返回变化影响预判",
   // src/pages/tool/optimize/optimization-api.ts
   pages_tool_optimize_optimization_api_001: "加载优化任务列表失败。",
   pages_tool_optimize_optimization_api_002: "取消优化任务失败。",
@@ -1009,7 +993,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_074: (charge: string) => `${charge} 积分/次 · 仅成功生成后扣除`,
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_075: "终身卡包含此能力",
+  pages_tool_optimize_OverviewSection_075: "当前档案已包含此能力，可不限次数使用",
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_076: "正在提交增量重算…",
   // src/pages/tool/optimize/OverviewSection.tsx

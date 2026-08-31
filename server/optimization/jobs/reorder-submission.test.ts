@@ -188,7 +188,7 @@ describe('reorder check submission', () => {
 
   it('returns the monthly quota error before signaling the worker', async () => {
     mocks.admitJob.mockRejectedValueOnce(
-      new OptimizeJobAdmissionError('reorder_check_quota_exceeded', 429, '本月重排检测次数已用完。'),
+      new OptimizeJobAdmissionError('reorder_check_quota_exceeded', 429, '本月变化影响预判次数已用完。'),
     )
 
     const response = await submitReorderCheck(request())

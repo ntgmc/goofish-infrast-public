@@ -72,7 +72,7 @@
       "display_price": "0 元",
       "account_scope": "绑定森空岛 UID，一个游戏 UID 全站只能领取一次",
       "runtime_permission": "growth",
-      "summary": "领取 1 次免费完整个人排班权益，确认期内可修正，锁定后仍可按规则检测是否值得重排。",
+      "summary": "每 6 小时可提交 2 次完整个人排班。系统有空闲资源时会自动开始，繁忙时可能需要多等一会儿。",
       "audience": "想先试用、低频使用、不想研究复杂配置的普通玩家"
     },
     "single_account_monthly": {
@@ -85,7 +85,7 @@
       "duration_days": 30,
       "account_scope": "仅限一个游戏 UID，兑换后连续 30 天有效，不支持自行更换游戏账号",
       "runtime_permission": "advanced",
-      "summary": "30 天内维护同一游戏 UID，包含 2 次完整主排班；后续数据变化可购买 700 积分增量重算。",
+      "summary": "30 天内不限次数生成和增量重算，排班优先处理，并可使用 MAA JSON、完整数据和高级分析。",
       "audience": "近期会练度提升或想先验证完整能力的玩家"
     },
     "single_account_half_year": {
@@ -98,7 +98,7 @@
       "duration_days": 90,
       "account_scope": "仅限一个游戏 UID，兑换后连续 90 天有效，不支持自行更换游戏账号",
       "runtime_permission": "advanced",
-      "summary": "覆盖一个版本周期，包含 4 次完整主排班；适合抽到新干员或练度提升后继续优化。",
+      "summary": "90 天内不限次数生成和增量重算，排班优先处理，并可使用 MAA JSON、完整数据和高级分析。",
       "audience": "一个版本周期内会持续养成和调整方案的玩家"
     },
     "single_account_annual": {
@@ -111,7 +111,7 @@
       "duration_days": 365,
       "account_scope": "仅限一个游戏 UID，兑换后连续 365 天有效，不支持自行更换游戏账号",
       "runtime_permission": "advanced",
-      "summary": "全年维护同一游戏 UID，包含 8 次完整主排班；后续可按需购买增量重算。",
+      "summary": "365 天内不限次数生成和增量重算，排班优先处理，并可使用 MAA JSON、完整数据和高级分析。",
       "audience": "全年会持续养成、希望降低长期维护成本的玩家"
     },
     "single_account_lifetime": {
@@ -124,7 +124,7 @@
       "duration_days": null,
       "account_scope": "仅限长期维护同一个游戏 UID，不支持自行更换游戏账号",
       "runtime_permission": "advanced",
-      "summary": "一次购买即可长期使用完整高级能力，支持无限重新优化、配置切换、MAA JSON、完整数据下载、高级分析、练度建议和自定义配置。",
+      "summary": "一次购买即可长期不限次数生成和增量重算，排班优先处理，并支持配置切换、MAA JSON、完整数据下载、高级分析、练度建议和自定义配置。",
       "audience": "长期维护同一账号、会持续研究和重新优化基建方案的玩家"
     },
     "recommended_internal": { "label": "单次重置卡", "public": false, "price": null, "display_price": null, "account_scope": "内部发放", "runtime_permission": "recommended", "summary": "内部卡种", "audience": "内部使用" },
@@ -142,9 +142,9 @@
         "profile_limit": 1
       },
       "schedule_quotas": {
-        "month": 2,
-        "half_year": 4,
-        "year": 8,
+        "month": null,
+        "half_year": null,
+        "year": null,
         "lifetime": null
       },
       "scenario_quotas": {
@@ -170,10 +170,13 @@
       }
     },
     "free_preview": {
-      "revision_window_hours": 24,
-      "revision_limit": 3,
-      "monthly_reorder_checks": 2,
-      "strong_reorder_bonus": 1
+      "execution_mode": "idle_queue",
+      "repeat_generation": true,
+      "paid_jobs_strict_priority": true,
+      "max_active_jobs_per_profile": 1,
+      "submission_window_hours": 6,
+      "max_submissions_per_window": 2,
+      "monthly_reorder_checks": 2
     },
     "risk": {
       "operator_data_enabled_by_default": true,
@@ -195,16 +198,19 @@
       "干员归属、练度或干员池出现异常变化时可能先拦截；重复异常可能冻结档案。",
       "干员数据误拦截需要通过 MaaTool 官方 QQ 群人工核验。",
       "个人按次档案仅限本人非商业使用；商用档案仅可处理数据权利人已授权的数据。",
-      "商用主排班按成功任务计费；MaaTool 账号、CDK、档案和积分均不可转让或转售。"
+      "商用主排班按成功任务计费；MaaTool 账号、CDK、档案和积分均不可转让或转售。",
+      "30 天、90 天和 365 天 CDK 可在有效期内不限次数生成完整个人排班和使用个人增量重算，终身卡可长期不限次数使用。"
     ],
     "public_feature_comparison": [
       { "feature": "有效期", "free_preview": "免费预览权益，按页面规则使用", "single_account_monthly": "30 天", "single_account_half_year": "90 天", "single_account_annual": "365 天", "single_account_lifetime": "长期，不设到期日" },
       { "feature": "森空岛导入干员数据", "free_preview": "支持，必须绑定 UID", "single_account_monthly": "支持，可绑定并保存到同一账号工作区", "single_account_half_year": "支持，可绑定并保存到同一账号工作区", "single_account_annual": "支持，可绑定并保存到同一账号工作区", "single_account_lifetime": "支持，可绑定并保存到同一账号工作区" },
       { "feature": "MAA 干员识别文件导入", "free_preview": "不支持手动上传干员", "single_account_monthly": "支持，受干员数据风控规则约束", "single_account_half_year": "支持，受干员数据风控规则约束", "single_account_annual": "支持，受干员数据风控规则约束", "single_account_lifetime": "支持，受干员数据风控规则约束" },
-      { "feature": "完整个人游戏内轮换队列", "free_preview": "支持，受免费完整排班权益限制", "single_account_monthly": "支持，30 天内含 2 次完整主排班", "single_account_half_year": "支持，90 天内含 4 次完整主排班", "single_account_annual": "支持，365 天内含 8 次完整主排班", "single_account_lifetime": "支持，可长期无限重新生成" },
+      { "feature": "完整个人游戏内轮换队列", "free_preview": "每 6 小时可提交 2 次；繁忙时会自动排队等待", "single_account_monthly": "支持，30 天内不限次数生成", "single_account_half_year": "支持，90 天内不限次数生成", "single_account_annual": "支持，365 天内不限次数生成", "single_account_lifetime": "支持，可长期不限次数生成" },
+      { "feature": "个人增量重算", "free_preview": "数据变化后可重新生成完整排班", "single_account_monthly": "支持，30 天内不限次数使用", "single_account_half_year": "支持，90 天内不限次数使用", "single_account_annual": "支持，365 天内不限次数使用", "single_account_lifetime": "支持，可长期不限次数使用" },
+      { "feature": "排班等待", "free_preview": "有空闲资源时自动开始；繁忙时继续排队", "single_account_monthly": "优先处理", "single_account_half_year": "优先处理", "single_account_annual": "优先处理", "single_account_lifetime": "优先处理" },
       { "feature": "MAA JSON 下载", "free_preview": "高级体验期或导出体验券可用", "single_account_monthly": "支持，仅包含 MAA 执行所需排班数据", "single_account_half_year": "支持，仅包含 MAA 执行所需排班数据", "single_account_annual": "支持，仅包含 MAA 执行所需排班数据", "single_account_lifetime": "支持，仅包含 MAA 执行所需排班数据" },
       { "feature": "243 均衡 / 243 搓玉 / 333 搓玉预设", "free_preview": "支持", "single_account_monthly": "支持", "single_account_half_year": "支持", "single_account_annual": "支持", "single_account_lifetime": "支持" },
-      { "feature": "检测是否值得重排", "free_preview": "每月 2 次；强烈建议时当月额外 1 次完整免费生成", "single_account_monthly": "可直接重新生成并查看完整结果", "single_account_half_year": "可直接重新生成并查看完整结果", "single_account_annual": "可直接重新生成并查看完整结果", "single_account_lifetime": "可直接重新生成并查看完整结果" },
+      { "feature": "变化影响预判（不生成新排班）", "free_preview": "已有排班后每月 2 次，返回重新生成建议、收益区间和受影响项；变化预判券可增加 1 次", "single_account_monthly": "无需单独预判，可直接不限次数增量重算", "single_account_half_year": "无需单独预判，可直接不限次数增量重算", "single_account_annual": "无需单独预判，可直接不限次数增量重算", "single_account_lifetime": "无需单独预判，可直接不限次数增量重算" },
       { "feature": "练度提升建议与 ROI", "free_preview": "不支持", "single_account_monthly": "支持", "single_account_half_year": "支持", "single_account_annual": "支持", "single_account_lifetime": "支持" },
       { "feature": "完整数据与原始结果", "free_preview": "不支持", "single_account_monthly": "支持，可独立下载完整计算 JSON", "single_account_half_year": "支持，可独立下载完整计算 JSON", "single_account_annual": "支持，可独立下载完整计算 JSON", "single_account_lifetime": "支持，可独立下载完整计算 JSON" },
       { "feature": "自定义配置", "free_preview": "不支持", "single_account_monthly": "支持", "single_account_half_year": "支持", "single_account_annual": "支持", "single_account_lifetime": "支持" },

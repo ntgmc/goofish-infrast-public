@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
-import type { FreeScheduleEntitlement, OptimizeCalculationStage, OptimizeResult, ReorderCheckResult, WorkspaceResultHistoryItem } from '../../src/lib/types'
+import type { OptimizeCalculationStage, OptimizeResult, ReorderCheckResult, WorkspaceResultHistoryItem } from '../../src/lib/types'
 import { formatOptimizeJobHardTimeout, getOptimizeGlobalWorkerConcurrency, getOptimizeJobHardTimeoutMs } from '../optimize-job-config'
 import { query, withTransaction } from './postgres'
 import { recordAdminOperationAuditInTransaction } from './admin-operation-audit-store'
@@ -24,7 +24,8 @@ import { parseOptimizationJobResult } from '../optimization/jobs/runtime-contrac
 import { countReorderCheckQuotaInTransaction } from './reorder-quota-store'
 import { confirmMeteredQuoteInTransaction, MeteredBillingQuoteError } from './metered-billing-store'
 import { insertProfileOptimizationResultInTransaction } from './optimization-result-store'
-import { CdkScenarioQuotaExceededError, CdkScheduleQuotaExceededError, releaseCdkScenarioQuotaInTransaction, releaseCdkScheduleQuotaInTransaction, reserveCdkScenarioQuotaInTransaction, reserveCdkScheduleQuotaInTransaction, settleCdkScenarioQuotaInTransaction } from './cdk-store'
+import { CdkScenarioQuotaExceededError, releaseCdkScenarioQuotaInTransaction, releaseCdkScheduleQuotaInTransaction, reserveCdkScenarioQuotaInTransaction, settleCdkScenarioQuotaInTransaction } from './cdk-store'
+import { productPolicies } from '../../src/lib/product-catalog'
 
 export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered'
 export type OptimizeJobPriority = 'priority_coupon' | 'paid' | 'analysis' | 'standard'
@@ -101,7 +102,6 @@ interface AdmitOptimizeJobInput<TPayload = unknown> extends CreateOptimizeJobInp
   idempotency_key: string
   request_hash: string
   legacy_request_hash?: string
-  free_profile_id?: string | null
   reward_user_id?: string | null
   use_priority_coupon?: boolean
   reward_item_codes?: string[]
@@ -114,9 +114,25 @@ interface AdmitOptimizeJobInput<TPayload = unknown> extends CreateOptimizeJobInp
   billing?: { userId: string; operation: MeteredBillingOperation; billingKind: MeteredBillingKind; confirmation: MeteredQuoteConfirmation } | null
 }
 
+interface PreemptFreeJobForPaidInput {
+  workerId: string
+  candidateJobIds: string[]
+  lockToken: string
+  lockExpiresAt: string
+  maxFailures: number
+  maxGlobalRunning: number
+  claimPriority: number
+  graceMs: number
+}
+
+interface OptimizeJobPreemption {
+  interruptedJobId: string
+  job: OptimizeJobRecord
+}
+
 export class OptimizeJobAdmissionError extends Error {
   constructor(
-    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'commercial_queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'commercial_submission_rate_exceeded' | 'free_revision_limit_exceeded' | 'priority_coupon_unavailable' | 'item_unavailable' | 'item_not_applicable' | 'reorder_check_quota_exceeded' | 'insufficient_balance' | 'pricing_changed' | 'quote_already_used' | 'profile_not_found' | 'not_metered_profile' | 'profile_archived' | 'commercial_not_eligible' | 'commercial_suspended' | 'debt_outstanding' | 'subscription_quota_exceeded' | 'subscription_scenario_quota_exceeded',
+    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'commercial_queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'commercial_submission_rate_exceeded' | 'priority_coupon_unavailable' | 'item_unavailable' | 'item_not_applicable' | 'reorder_check_quota_exceeded' | 'insufficient_balance' | 'pricing_changed' | 'quote_already_used' | 'profile_not_found' | 'not_metered_profile' | 'profile_archived' | 'commercial_not_eligible' | 'commercial_suspended' | 'debt_outstanding' | 'subscription_scenario_quota_exceeded',
     readonly status: 404 | 409 | 429,
     message: string,
   ) {
@@ -135,6 +151,7 @@ export interface OptimizeJobStore {
   getQueuePosition: (id: string) => Promise<number | null>
   getQueueEstimate?: (id: string) => Promise<OptimizeJobQueueEstimate>
   claimNextJob: (workerId: string, lockToken: string, lockExpiresAt: string, maxFailures: number, maxGlobalRunning?: number, claimPriority?: number) => Promise<OptimizeJobRecord | null>
+  preemptFreeJobForPaid: (input: PreemptFreeJobForPaidInput) => Promise<OptimizeJobPreemption | null>
   heartbeatAttempt: (id: string, attemptNo: number, workerId: string, lockToken: string, lockExpiresAt: string) => Promise<boolean>
   ownsAttempt: (id: string, attemptNo: number, workerId: string, lockToken: string) => Promise<boolean>
   updateAttemptStage: (id: string, attemptNo: number, workerId: string, lockToken: string, stage: OptimizeCalculationStage) => Promise<boolean>
@@ -343,8 +360,13 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         }
 
         const limits = input.source === 'free_preview'
-          ? { running: 1, queued: 0, perHour: 2 }
-          : { running: 1, queued: 3, perHour: 12 }
+          ? {
+              running: 1,
+              queued: 0,
+              submissions: productPolicies.free_preview.max_submissions_per_window,
+              submissionWindowHours: productPolicies.free_preview.submission_window_hours,
+            }
+          : { running: 1, queued: 3, submissions: 12, submissionWindowHours: 1 }
         const current = await client.query<{ running: string; queued: string }>(
           `select count(*) filter (where status = 'running')::text as running,
                   count(*) filter (where status = 'queued')::text as queued
@@ -376,10 +398,14 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         }
         const submitted = await client.query<{ count: string }>(
           `select count(*)::text as count from optimization_submissions
-           where owner_key = $1 and created_at >= now() - interval '1 hour'`, [input.owner_key],
+           where owner_key = $1 and created_at >= now() - make_interval(hours => $2::int)`,
+          [input.owner_key, limits.submissionWindowHours],
         )
-        if (Number(submitted.rows[0]?.count ?? 0) >= limits.perHour) {
-          throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, '当前账号的优化提交次数已达小时上限。请1小时后再试。')
+        if (Number(submitted.rows[0]?.count ?? 0) >= limits.submissions) {
+          const message = input.source === 'free_preview'
+            ? `免费预览每 ${limits.submissionWindowHours} 小时最多提交 ${limits.submissions} 次排班，请稍后再试。`
+            : '当前账号的优化提交次数已达小时上限。请1小时后再试。'
+          throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, message)
         }
         if (confirmedBillingQuote?.billing_kind === 'metered_commercial') {
           const commercialPolicy = getMeteredBillingPolicy().commercial
@@ -408,51 +434,11 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
             input.reorderCheckQuota.windowKey,
           )
           if (input.reorderCheckQuota.useCoupon && used < input.reorderCheckQuota.limit) {
-            throw new OptimizeJobAdmissionError('item_not_applicable', 409, '本月免费调序检查配额尚未用完，不能消耗券。')
+            throw new OptimizeJobAdmissionError('item_not_applicable', 409, '本月免费变化影响预判次数尚未用完，不能使用变化预判券。')
           }
           if (!input.reorderCheckQuota.useCoupon && used >= input.reorderCheckQuota.limit) {
-            throw new OptimizeJobAdmissionError('reorder_check_quota_exceeded', 429, '本月重排检测次数已用完。')
+            throw new OptimizeJobAdmissionError('reorder_check_quota_exceeded', 429, '本月变化影响预判次数已用完。')
           }
-        }
-
-        if (input.free_profile_id) {
-          await client.query(
-            `insert into profile_entitlements (profile_id, free_revision_count, updated_at)
-             values ($1, 0, now()) on conflict (profile_id) do nothing`, [input.free_profile_id],
-          )
-          const entitlement = await client.query<{
-            first_generated_at: string | null; free_revision_count: number; confirmed_at: string | null; locked_at: string | null;
-            lock_reason: string | null;
-            strong_reorder_bonus_month: string | null; strong_reorder_bonus_used_at: string | null;
-          }>(`select first_generated_at, free_revision_count, confirmed_at, locked_at,
-                     lock_reason,
-                     strong_reorder_bonus_month, strong_reorder_bonus_used_at
-              from profile_entitlements where profile_id = $1 for update`, [input.free_profile_id])
-          const row = entitlement.rows[0]
-          const month = getShanghaiMonthKey(new Date(now))
-          const bonusAvailable = row?.strong_reorder_bonus_month === month && !row.strong_reorder_bonus_used_at
-          const windowExpired = row?.first_generated_at && Date.parse(row.first_generated_at) + 24 * 60 * 60_000 <= Date.parse(now)
-          const additionalRecompute = input.reward_item_codes?.includes('additional_recompute_coupon') === true
-          const canUseAdditionalRecompute = additionalRecompute && row?.lock_reason === 'revision_limit' && !windowExpired
-          if (!row || row.confirmed_at || (row.locked_at && !canUseAdditionalRecompute)
-            || (!bonusAvailable && (windowExpired || (Number(row.free_revision_count) >= 3 && !canUseAdditionalRecompute)))) {
-            throw new OptimizeJobAdmissionError('free_revision_limit_exceeded', 429, '免费排班次数已用完，请确认方案或稍后再试。')
-          }
-          await client.query(
-            bonusAvailable
-              ? `update profile_entitlements set strong_reorder_bonus_used_at = $2, updated_at = $2 where profile_id = $1`
-              : `update profile_entitlements
-                 set first_generated_at = coalesce(first_generated_at, $2), free_revision_count = free_revision_count + 1,
-                     locked_at = case when free_revision_count + 1 >= 3 then $2 else locked_at end,
-                     lock_reason = case when free_revision_count + 1 >= 3 then 'revision_limit' else lock_reason end,
-                     updated_at = $2 where profile_id = $1`,
-            [input.free_profile_id, now],
-          )
-          await client.query(
-            `insert into entitlement_ledger (id, profile_id, entitlement_type, status, reference_type, reference_id, window_key, created_at)
-             values ($1, $2, 'free_schedule', 'reserved', 'optimization_job', $3, $4, $5)`,
-            [randomUUID(), input.free_profile_id, input.id, month, now],
-          )
         }
 
         const rewardItemCodes = [...new Set([
@@ -480,24 +466,6 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           && typeof (payloadRecord.cdkUsageRef as Record<string, unknown>).code_hash === 'string'
           ? (payloadRecord.cdkUsageRef as { code_hash: string })
           : null
-        const payloadRequest = payloadRecord?.request && typeof payloadRecord.request === 'object'
-          ? payloadRecord.request as Record<string, unknown>
-          : null
-        const isIncrementalRecompute = payloadRequest?.billing_operation === 'incremental_recompute'
-        if (input.source === 'account_profile' && cdkUsageRef && !isIncrementalRecompute) {
-          try {
-            await reserveCdkScheduleQuotaInTransaction(client, {
-              jobId: input.id,
-              codeHash: cdkUsageRef.code_hash,
-              now,
-            })
-          } catch (error) {
-            if (error instanceof CdkScheduleQuotaExceededError) {
-              throw new OptimizeJobAdmissionError(error.code, 409, error.message)
-            }
-            throw error
-          }
-        }
         if (input.source === 'scenario_comparison' && cdkUsageRef) {
           try {
             await reserveCdkScenarioQuotaInTransaction(client, {
@@ -582,7 +550,9 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       await ensureSchema()
       const result = await query<OptimizeJobRow & { queue_position: string | null }>(
         `with queued_rank as (
-           select id, row_number() over (order by priority desc, created_at asc, id asc) as queue_position
+           select id, row_number() over (
+             order by (priority <= 0) asc, priority desc, created_at asc, id asc
+           ) as queue_position
            from optimize_jobs where status = 'queued'
          )
          select job.*, queued_rank.queue_position::text
@@ -622,8 +592,10 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       const result = await query<{ position: string }>([
         'select (count(*) + 1)::text position from optimize_jobs',
         'where status = $3',
-        'and (priority > $1 or (priority = $1 and (created_at < $2 or (created_at = $2 and id < $4))))',
-      ].join(' '), [row.priority, row.created_at, 'queued', row.id])
+        'and (($5::boolean and priority > 0)',
+        '  or ((priority <= 0) = $5::boolean',
+        '    and (priority > $1 or (priority = $1 and (created_at < $2 or (created_at = $2 and id < $4))))))',
+      ].join(' '), [row.priority, row.created_at, 'queued', row.id, row.priority <= 0])
       return Number(result.rows[0]?.position ?? 1)
     },
     getQueueEstimate: async (id) => {
@@ -660,7 +632,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         if (higherPriorityWorker.rows[0]?.has_higher_priority) return null
       const runningTotal = await client.query<{ count: string }>("select count(*)::text as count from optimize_jobs where status = 'running'")
       if (Number(runningTotal.rows[0]?.count ?? 0) >= maxGlobalRunning) return null
-      const waitingStandard = await client.query<{ count: string }>("select count(*)::text as count from optimize_jobs where status = 'queued' and priority < 10 and failure_count < $1", [maxFailures])
+      const waitingStandard = await client.query<{ count: string }>("select count(*)::text as count from optimize_jobs where status = 'queued' and priority > 0 and priority < 10 and failure_count < $1", [maxFailures])
       const forceStandard = Number(state.rows[0]?.prioritized_streak ?? 0) >= 3 && Number(waitingStandard.rows[0]?.count ?? 0) > 0
       const result = await client.query<OptimizeJobRow>([
         'with next_job as (',
@@ -669,8 +641,8 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         "  and not exists (select 1 from optimize_jobs running where running.owner_key = optimize_jobs.owner_key and running.status = 'running')",
         "  and (coalesce(billing_json->>'billing_kind', '') <> 'metered_commercial'",
         "       or (select count(*) from optimize_jobs account_running where account_running.billing_user_id = optimize_jobs.billing_user_id and account_running.status = 'running') < 2)",
-        forceStandard ? '  and priority < 10' : '',
-        '  order by priority desc, created_at asc, id asc',
+        forceStandard ? '  and priority > 0 and priority < 10' : '',
+        '  order by (priority <= 0) asc, priority desc, created_at asc, id asc',
         '  limit 1',
         '  for update skip locked',
         ')',
@@ -704,6 +676,127 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         await client.query('update optimize_dispatch_state set prioritized_streak = $1, updated_at = $2 where id = true', [nextStreak, now])
       }
       return claimed
+      })
+    },
+    preemptFreeJobForPaid: async (input) => {
+      if (input.candidateJobIds.length === 0) return null
+      await ensureSchema()
+      const now = new Date().toISOString()
+      const paidReadyBefore = new Date(Date.parse(now) - input.graceMs).toISOString()
+      return withTransaction(async (client) => {
+        const state = await client.query<{ prioritized_streak: number }>('select prioritized_streak from optimize_dispatch_state where id = true for update')
+        const higherPriorityWorker = await client.query<{ has_higher_priority: boolean }>(
+          `select exists (
+             select 1
+             from optimize_worker_registry peer
+             where peer.worker_id <> $1
+               and peer.draining = false
+               and peer.heartbeat_at is not null
+               and peer.heartbeat_at + peer.stale_after_ms * interval '1 millisecond' > transaction_timestamp()
+               and exists (
+                 select 1
+                 from unnest(peer.capabilities) as capability
+                 where capability like 'worker-claim-priority:%'
+                   and split_part(capability, ':', 2)::int > $2
+               )
+           ) as has_higher_priority`,
+          [input.workerId, input.claimPriority],
+        )
+        if (higherPriorityWorker.rows[0]?.has_higher_priority) return null
+
+        const capacity = (await client.query<{ running: string; registered_concurrency: string }>(
+          `select
+             (select count(*) from optimize_jobs where status = 'running')::text as running,
+             (select coalesce(sum(concurrency), 0) from optimize_worker_registry
+               where draining = false
+                 and heartbeat_at + stale_after_ms * interval '1 millisecond' > transaction_timestamp())::text
+               as registered_concurrency`,
+        )).rows[0]
+        const running = Number(capacity?.running ?? 0)
+        const registeredConcurrency = Number(capacity?.registered_concurrency ?? 0)
+        const effectiveCapacity = Math.min(
+          input.maxGlobalRunning,
+          registeredConcurrency > 0 ? registeredConcurrency : Math.max(1, running),
+        )
+        if (running < effectiveCapacity) return null
+
+        const paid = await client.query<OptimizeJobRow>(
+          `select candidate.* from optimize_jobs candidate
+           where candidate.status = 'queued'
+             and candidate.priority > 0
+             and candidate.cancel_requested_at is null
+             and candidate.failure_count < $1
+             and greatest(candidate.created_at, coalesce(candidate.next_attempt_at, candidate.created_at)) <= $2
+             and (candidate.next_attempt_at is null or candidate.next_attempt_at <= $3)
+             and not exists (
+               select 1 from optimize_jobs running
+               where running.owner_key = candidate.owner_key and running.status = 'running'
+             )
+             and (coalesce(candidate.billing_json->>'billing_kind', '') <> 'metered_commercial'
+               or (select count(*) from optimize_jobs account_running
+                   where account_running.billing_user_id = candidate.billing_user_id
+                     and account_running.status = 'running') < 2)
+           order by candidate.priority desc, candidate.created_at asc, candidate.id asc
+           limit 1 for update skip locked`,
+          [input.maxFailures, paidReadyBefore, now],
+        )
+        const paidRow = paid.rows[0]
+        if (!paidRow) return null
+
+        const victim = await client.query<OptimizeJobRow>(
+          `select * from optimize_jobs
+           where id = any($1::text[])
+             and worker_id = $2
+             and status = 'running'
+             and priority <= 0
+             and cancel_requested_at is null
+           order by started_at desc nulls last, created_at desc, id desc
+           limit 1 for update skip locked`,
+          [input.candidateJobIds, input.workerId],
+        )
+        const victimRow = victim.rows[0]
+        if (!victimRow) return null
+
+        await client.query(
+          `update optimize_jobs
+           set status = 'queued', error_message = null, worker_id = null, heartbeat_at = null,
+               lock_token = null, lock_expires_at = null, next_attempt_at = $2,
+               expires_at = null, execution_stage = null, stage_updated_at = null,
+               started_at = null, finished_at = null, updated_at = $2
+           where id = $1`,
+          [victimRow.id, now],
+        )
+        await client.query(
+          `update optimize_job_attempts
+           set status = 'interrupted', failure_kind = null, error_message = null,
+               finished_at = $2, heartbeat_at = $2
+           where job_id = $1 and attempt_no = $3 and status = 'running'`,
+          [victimRow.id, now, victimRow.attempt_count],
+        )
+
+        const claimed = await client.query<OptimizeJobRow>(
+          `update optimize_jobs
+           set status = 'running', attempt_count = attempt_count + 1,
+               worker_id = $2, lock_token = $3, heartbeat_at = $4, lock_expires_at = $5,
+               next_attempt_at = null, expires_at = null, execution_stage = 'starting',
+               stage_updated_at = $4, started_at = coalesce(started_at, $4),
+               finished_at = null, updated_at = $4
+           where id = $1 and status = 'queued'
+           returning *`,
+          [paidRow.id, input.workerId, input.lockToken, now, input.lockExpiresAt],
+        )
+        const claimedRow = claimed.rows[0]
+        if (!claimedRow) throw new Error('Paid optimization job could not claim the preempted slot.')
+        const claimedJob = fromRow(claimedRow)
+        await client.query(
+          `insert into optimize_job_attempts
+            (job_id, attempt_no, worker_id, lock_token, status, started_at, heartbeat_at)
+           values ($1, $2, $3, $4, 'running', $5, $5)`,
+          [claimedJob.id, claimedJob.attempt_count, input.workerId, input.lockToken, now],
+        )
+        const nextStreak = claimedJob.priority >= 10 ? Number(state.rows[0]?.prioritized_streak ?? 0) + 1 : 0
+        await client.query('update optimize_dispatch_state set prioritized_streak = $1, updated_at = $2 where id = true', [nextStreak, now])
+        return { interruptedJobId: victimRow.id, job: claimedJob }
       })
     },
     heartbeatAttempt: async (id, attemptNo, workerId, lockToken, lockExpiresAt) => {
@@ -1324,9 +1417,14 @@ export function createMemoryOptimizeJobStore(
         if (accountRecent.length >= 30) throw new OptimizeJobAdmissionError('commercial_submission_rate_exceeded', 429, '商用账户每小时最多接纳 30 个新任务。')
         commercialSubmission = { key: accountKey, recent: accountRecent }
       }
-      const recent = (submissions.get(input.owner_key) ?? []).filter((time) => time >= now - 60 * 60_000)
-      if (recent.length >= (free ? 2 : 12)) {
-        throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, '当前账号的优化提交次数已达小时上限。请1小时后再试。')
+      const submissionWindowHours = free ? productPolicies.free_preview.submission_window_hours : 1
+      const submissionLimit = free ? productPolicies.free_preview.max_submissions_per_window : 12
+      const recent = (submissions.get(input.owner_key) ?? []).filter((time) => time >= now - submissionWindowHours * 60 * 60_000)
+      if (recent.length >= submissionLimit) {
+        const message = free
+          ? `免费预览每 ${submissionWindowHours} 小时最多提交 ${submissionLimit} 次排班，请稍后再试。`
+          : '当前账号的优化提交次数已达小时上限。请1小时后再试。'
+        throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, message)
       }
       if (input.reorderCheckQuota) {
         const used = [...reorderReservations.values()].filter((reservation) =>
@@ -1334,10 +1432,10 @@ export function createMemoryOptimizeJobStore(
           && reservation.windowKey === input.reorderCheckQuota.windowKey
           && (reservation.status === 'reserved' || reservation.status === 'consumed')).length
         if (input.reorderCheckQuota.useCoupon && used < input.reorderCheckQuota.limit) {
-          throw new OptimizeJobAdmissionError('item_not_applicable', 409, '本月免费调序检查配额尚未用完，不能消耗券。')
+          throw new OptimizeJobAdmissionError('item_not_applicable', 409, '本月免费变化影响预判次数尚未用完，不能使用变化预判券。')
         }
         if (!input.reorderCheckQuota.useCoupon && used >= input.reorderCheckQuota.limit) {
-          throw new OptimizeJobAdmissionError('reorder_check_quota_exceeded', 429, '本月重排检测次数已用完。')
+          throw new OptimizeJobAdmissionError('reorder_check_quota_exceeded', 429, '本月变化影响预判次数已用完。')
         }
       }
       recent.push(now)
@@ -1410,12 +1508,7 @@ export function createMemoryOptimizeJobStore(
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0] ?? null,
     getQueuePosition: async (id) => {
       const job = records.get(id)
-      if (!job || job.status !== 'queued') return null
-      return [...records.values()].filter((candidate) => candidate.status === 'queued'
-        && (candidate.priority > job.priority
-          || (candidate.priority === job.priority
-            && (Date.parse(candidate.created_at) < Date.parse(job.created_at)
-              || (candidate.created_at === job.created_at && candidate.id < job.id))))).length + 1
+      return job ? memoryQueuePosition(records, job) : null
     },
     getQueueEstimate: async (id) => buildOptimizeQueueEstimates(
       [...records.values()].filter((job) => activeStatuses.has(job.status)),
@@ -1441,7 +1534,7 @@ export function createMemoryOptimizeJobStore(
           && !runningOwners.has(job.owner_key)
           && (job.billing_json?.billing_kind !== 'metered_commercial' || !job.billing_user_id || (commercialRunning.get(job.billing_user_id) ?? 0) < 2)
           && (!job.next_attempt_at || Date.parse(job.next_attempt_at) <= nowMs))
-        .sort((a, b) => b.priority - a.priority || Date.parse(a.created_at) - Date.parse(b.created_at) || a.id.localeCompare(b.id))[0]
+        .sort(compareQueuedJobs)[0]
       if (!next) return null
       const now = new Date().toISOString()
       next.status = 'running'
@@ -1459,6 +1552,77 @@ export function createMemoryOptimizeJobStore(
       next.updated_at = now
       attempts.set(`${next.id}:${next.attempt_count}`, { status: 'running', heartbeat_at: now, failure_kind: null })
       return clone(next)
+    },
+    preemptFreeJobForPaid: async (input) => {
+      if (input.candidateJobIds.length === 0) return null
+      const hasHigherPriorityWorker = [...workerRegistry.entries()].some(
+        ([candidateId, entry]) =>
+          candidateId !== input.workerId && (entry.priority ?? 0) > input.claimPriority && !entry.draining && !entry.stale,
+      )
+      if (hasHigherPriorityWorker) return null
+      const nowMs = Date.now()
+      const running = [...records.values()].filter((job) => job.status === 'running')
+      if (running.length < input.maxGlobalRunning) return null
+      const runningOwners = new Set(running.map((job) => job.owner_key))
+      const commercialRunning = new Map<string, number>()
+      for (const job of running) {
+        if (job.billing_json?.billing_kind === 'metered_commercial' && job.billing_user_id) {
+          commercialRunning.set(job.billing_user_id, (commercialRunning.get(job.billing_user_id) ?? 0) + 1)
+        }
+      }
+      const paid = [...records.values()]
+        .filter((job) => job.status === 'queued' && job.priority > 0 && !job.cancel_requested_at
+          && job.failure_count < input.maxFailures
+          && Math.max(Date.parse(job.created_at), Date.parse(job.next_attempt_at ?? job.created_at)) <= nowMs - input.graceMs
+          && !runningOwners.has(job.owner_key)
+          && (job.billing_json?.billing_kind !== 'metered_commercial' || !job.billing_user_id || (commercialRunning.get(job.billing_user_id) ?? 0) < 2)
+          && (!job.next_attempt_at || Date.parse(job.next_attempt_at) <= nowMs))
+        .sort(compareQueuedJobs)[0]
+      if (!paid) return null
+      const candidateIds = new Set(input.candidateJobIds)
+      const victim = running
+        .filter((job) => candidateIds.has(job.id) && job.worker_id === input.workerId
+          && job.priority <= 0 && !job.cancel_requested_at)
+        .sort((left, right) => Date.parse(right.started_at ?? right.created_at) - Date.parse(left.started_at ?? left.created_at)
+          || Date.parse(right.created_at) - Date.parse(left.created_at)
+          || right.id.localeCompare(left.id))[0]
+      if (!victim) return null
+
+      const now = new Date(nowMs).toISOString()
+      victim.status = 'queued'
+      victim.error_message = null
+      victim.worker_id = null
+      victim.heartbeat_at = null
+      victim.lock_token = null
+      victim.lock_expires_at = null
+      victim.next_attempt_at = now
+      victim.expires_at = null
+      victim.execution_stage = null
+      victim.stage_updated_at = null
+      victim.started_at = null
+      victim.finished_at = null
+      victim.updated_at = now
+      const victimAttempt = attempts.get(`${victim.id}:${victim.attempt_count}`)
+      if (victimAttempt) {
+        victimAttempt.status = 'interrupted'
+        victimAttempt.heartbeat_at = now
+      }
+
+      paid.status = 'running'
+      paid.attempt_count += 1
+      paid.worker_id = input.workerId
+      paid.heartbeat_at = now
+      paid.lock_token = input.lockToken
+      paid.lock_expires_at = input.lockExpiresAt
+      paid.next_attempt_at = null
+      paid.expires_at = null
+      paid.execution_stage = 'starting'
+      paid.stage_updated_at = now
+      paid.started_at ??= now
+      paid.finished_at = null
+      paid.updated_at = now
+      attempts.set(`${paid.id}:${paid.attempt_count}`, { status: 'running', heartbeat_at: now, failure_kind: null })
+      return { interruptedJobId: victim.id, job: clone(paid) }
     },
     heartbeatAttempt: async (id, attemptNo, workerId, lockToken, lockExpiresAt) => {
       const job = records.get(id)
@@ -1522,9 +1686,6 @@ export function createMemoryOptimizeJobStore(
         resultJson = {
           ...resultJson as ReorderCheckResult,
           quota: buildSettledReorderQuota(used, now),
-          ...(isStrongReorderRecommendation(resultJson)
-            ? { free_schedule_entitlement: buildMemoryStrongReorderBonus(now) }
-            : {}),
         }
       }
       job.result_json = clone(resultJson)
@@ -1901,9 +2062,7 @@ function createOptimizeQueueSchedule(
   // submissions must not push an already admitted job past its expiry time.
   const queuedJobs = activeJobs
     .filter((job) => job.status === 'queued')
-    .sort((left, right) => right.priority - left.priority
-      || Date.parse(left.created_at) - Date.parse(right.created_at)
-      || left.id.localeCompare(right.id))
+    .sort(compareQueuedJobs)
 
   for (const job of runningJobs) {
     const elapsedMs = Math.max(0, nowMs - parseQueueTimestamp(job.started_at, nowMs))
@@ -2081,6 +2240,7 @@ export async function getAdminOptimizationQueueSnapshot(
        where job.status in ('queued', 'running')
        order by
          case when job.status = 'queued' then 0 else 1 end,
+         case when job.status = 'queued' then (job.priority <= 0)::int end asc,
          case when job.status = 'queued' then job.priority end desc,
          case when job.status = 'queued' then job.created_at end asc,
          case when job.status = 'running' then job.started_at end asc,
@@ -2309,7 +2469,7 @@ export async function replayOptimizationDeadLetter(
         [original.profile_id, month],
       )
       if (Number(quota.rows[0]?.count ?? 0) >= REORDER_CHECK_MONTHLY_LIMIT) {
-        throw new OptimizeJobAdmissionError('reorder_check_quota_exceeded', 429, '本月重排检测次数已用完。')
+        throw new OptimizeJobAdmissionError('reorder_check_quota_exceeded', 429, '本月变化影响预判次数已用完。')
       }
     }
     const inserted = await client.query<OptimizeJobRow>(
@@ -2363,23 +2523,6 @@ export function isOptimizeJobAdmissionError(error: unknown): error is OptimizeJo
     && typeof candidate.code === 'string'
     && (candidate.status === 409 || candidate.status === 429)
     && typeof candidate.message === 'string'
-}
-
-function buildMemoryStrongReorderBonus(nowIso: string): FreeScheduleEntitlement {
-  return {
-    first_generated_at: null,
-    revision_count: 0,
-    revision_limit: 3,
-    revision_window_hours: 24,
-    confirmed_at: null,
-    locked_at: null,
-    lock_reason: null,
-    strong_reorder_bonus: {
-      month: getShanghaiMonthKey(new Date(nowIso)),
-      granted_at: nowIso,
-      used_at: null,
-    },
-  }
 }
 
 function isLegacyStandaloneSuggestionJob(source: string, payload: unknown): boolean {
@@ -2549,11 +2692,8 @@ async function persistScheduleCompletionInTransaction(
   nowIso: string,
 ): Promise<OptimizeResult> {
   const profileId = job.profile_id!
-  const entitlement = payload.isPreviewProfile
-    ? await readFreeScheduleEntitlementInTransaction(client, profileId)
-    : null
   const persistedResult = payload.isPreviewProfile && !payload.isPreviewTrial
-    ? limitPreviewOptimizeResult(result, entitlement)
+    ? limitPreviewOptimizeResult(result)
     : result
   const workspaceEffect = await client.query(
     `insert into optimization_job_effects (job_id, effect_type, metadata_json, applied_at)
@@ -2586,7 +2726,6 @@ async function persistScheduleCompletionInTransaction(
         ...workspace,
         operators: workspace.operators ?? payload.operators,
         config: workspace.config ?? payload.effectiveConfig,
-        free_schedule_entitlement: entitlement ?? workspace.free_schedule_entitlement,
         updated_at: nowIso,
       }
     })
@@ -2612,15 +2751,9 @@ async function persistReorderCompletionInTransaction(
     payload.activeProfileId,
     getShanghaiMonthKey(new Date(nowIso)),
   )
-  let persistedResult: ReorderCheckResult = {
+  const persistedResult: ReorderCheckResult = {
     ...result,
     quota: buildSettledReorderQuota(used, nowIso),
-  }
-  if (isStrongReorderRecommendation(persistedResult)) {
-    persistedResult = {
-      ...persistedResult,
-      free_schedule_entitlement: await grantStrongReorderBonusInTransaction(client, payload.activeProfileId, nowIso),
-    }
   }
   await client.query(
     `insert into optimization_job_effects (job_id, effect_type, metadata_json, applied_at)
@@ -2640,19 +2773,6 @@ function buildSettledReorderQuota(used: number, nowIso: string): ReorderCheckRes
     reset_at: getShanghaiNextMonthStart(new Date(nowIso)),
     timezone: 'Asia/Shanghai',
   }
-}
-
-async function readFreeScheduleEntitlementInTransaction(
-  client: PoolClient,
-  profileId: string,
-): Promise<FreeScheduleEntitlement | null> {
-  const result = await client.query<FreeScheduleEntitlementRow>(
-    `select first_generated_at, free_revision_count, confirmed_at, locked_at, lock_reason,
-            strong_reorder_bonus_month, strong_reorder_bonus_granted_at, strong_reorder_bonus_used_at
-     from profile_entitlements where profile_id = $1`,
-    [profileId],
-  )
-  return result.rows[0] ? freeScheduleEntitlementFromRow(result.rows[0]) : null
 }
 
 async function failInvalidCompletionInTransaction(
@@ -2718,77 +2838,23 @@ function formatShanghaiHistoryTime(value: string): string {
 function memoryQueuePosition(records: Map<string, OptimizeJobRecord>, job: OptimizeJobRecord): number | null {
   if (job.status !== 'queued') return null
   return [...records.values()].filter((candidate) => candidate.status === 'queued'
-    && (candidate.priority > job.priority
-      || (candidate.priority === job.priority
-        && (Date.parse(candidate.created_at) < Date.parse(job.created_at)
-          || (candidate.created_at === job.created_at && candidate.id < job.id))))).length + 1
+    && compareQueuedJobs(candidate, job) < 0).length + 1
+}
+
+function compareQueuedJobs(
+  left: Pick<OptimizeJobRecord, 'priority' | 'created_at' | 'id'>,
+  right: Pick<OptimizeJobRecord, 'priority' | 'created_at' | 'id'>,
+): number {
+  const serviceClass = Number(left.priority <= 0) - Number(right.priority <= 0)
+  return serviceClass
+    || right.priority - left.priority
+    || Date.parse(left.created_at) - Date.parse(right.created_at)
+    || left.id.localeCompare(right.id)
 }
 
 function isReorderCheckPayload(value: unknown): boolean {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value)
     && (value as Record<string, unknown>).kind === 'reorder_check')
-}
-
-function isStrongReorderRecommendation(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value)
-    && (value as Record<string, unknown>).recommendation === 'strongly_recommended')
-}
-
-async function grantStrongReorderBonusInTransaction(
-  client: PoolClient,
-  profileId: string,
-  nowIso: string,
-): Promise<FreeScheduleEntitlement> {
-  const month = getShanghaiMonthKey(new Date(nowIso))
-  await client.query(
-    `insert into profile_entitlements (profile_id, free_revision_count, updated_at)
-     values ($1, 0, $2) on conflict (profile_id) do nothing`,
-    [profileId, nowIso],
-  )
-  const result = await client.query<FreeScheduleEntitlementRow>(
-    `update profile_entitlements
-     set strong_reorder_bonus_month = case when strong_reorder_bonus_month = $2 then strong_reorder_bonus_month else $2 end,
-         strong_reorder_bonus_granted_at = case when strong_reorder_bonus_month = $2 then strong_reorder_bonus_granted_at else $3 end,
-         strong_reorder_bonus_used_at = case when strong_reorder_bonus_month = $2 then strong_reorder_bonus_used_at else null end,
-         updated_at = $3
-     where profile_id = $1
-     returning first_generated_at, free_revision_count, confirmed_at, locked_at, lock_reason,
-               strong_reorder_bonus_month, strong_reorder_bonus_granted_at, strong_reorder_bonus_used_at`,
-    [profileId, month, nowIso],
-  )
-  return freeScheduleEntitlementFromRow(result.rows[0])
-}
-
-type FreeScheduleEntitlementRow = {
-  first_generated_at: string | Date | null
-  free_revision_count: number
-  confirmed_at: string | Date | null
-  locked_at: string | Date | null
-  lock_reason: string | null
-  strong_reorder_bonus_month: string | null
-  strong_reorder_bonus_granted_at: string | Date | null
-  strong_reorder_bonus_used_at: string | Date | null
-}
-
-function freeScheduleEntitlementFromRow(row: FreeScheduleEntitlementRow | undefined): FreeScheduleEntitlement {
-  return {
-    first_generated_at: normalizeTimestamp(row?.first_generated_at),
-    revision_count: Number(row?.free_revision_count ?? 0),
-    revision_limit: 3,
-    revision_window_hours: 24,
-    confirmed_at: normalizeTimestamp(row?.confirmed_at),
-    locked_at: normalizeTimestamp(row?.locked_at),
-    lock_reason: row?.lock_reason === 'confirmed' || row?.lock_reason === 'revision_limit' || row?.lock_reason === 'window_expired'
-      ? row.lock_reason
-      : null,
-    strong_reorder_bonus: row?.strong_reorder_bonus_month && row.strong_reorder_bonus_granted_at
-      ? {
-          month: row.strong_reorder_bonus_month,
-          granted_at: normalizeTimestamp(row.strong_reorder_bonus_granted_at)!,
-          used_at: normalizeTimestamp(row.strong_reorder_bonus_used_at),
-        }
-      : null,
-  }
 }
 
 function readFreeScheduleMode(payload: unknown): string | null {

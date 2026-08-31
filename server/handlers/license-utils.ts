@@ -44,12 +44,6 @@ export interface OperatorFingerprint {
   operators: Record<string, { name: string; own: boolean; elite: number; rarity: number }>;
 }
 
-export function getCdkScheduleQuotaLimit(record: CdkRecord): number | null {
-  if (!isProfileCdkRecord(record)) return null
-  const duration = getCdkProfileDuration(record)
-  return productPolicies.metered_billing.schedule_quotas[duration]
-}
-
 export function getCdkScenarioQuotaLimit(record: CdkRecord): number | null {
   if (!isProfileCdkRecord(record)) return null
   const duration = getCdkProfileDuration(record)

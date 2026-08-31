@@ -1,27 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  getCdkScheduleQuotaLimit,
   getCdkScenarioQuotaLimit,
   type LegacyProfileCdkRecord,
   type ProfileCdkDuration,
 } from './license-utils'
-
-describe('profile CDK schedule quotas', () => {
-  it.each([
-    ['month', 2],
-    ['half_year', 4],
-    ['year', 8],
-    ['lifetime', null],
-  ] as const)('limits %s cards to the configured successful main schedules', (duration, expected) => {
-    expect(getCdkScheduleQuotaLimit(profileCdk(duration))).toBe(expected)
-  })
-
-  it('keeps legacy profile CDKs unlimited', () => {
-    const record = profileCdk('lifetime')
-    delete record.profile_duration
-    expect(getCdkScheduleQuotaLimit(record)).toBeNull()
-  })
-})
 
 describe('profile CDK scenario quotas', () => {
   it.each([

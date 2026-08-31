@@ -218,6 +218,53 @@ describe('optimization dispatcher startup recovery', () => {
     delete process.env.OPTIMIZE_WORKER_ENTRY_FOR_TESTING
     delete process.env.OPTIMIZE_JOB_HARD_TIMEOUT_MS
   })
+
+  it('uses configured shared concurrency and preempts the youngest free attempts for all waiting paid work', async () => {
+    await shutdownOptimizeJobProcessing(1_000)
+    const store = createMemoryOptimizeJobStore()
+    globalThis.__maaOptimizeJobStoreForTesting = store
+    process.env.OPTIMIZE_FORCE_WORKER_THREADS_FOR_TESTING = '1'
+    process.env.OPTIMIZE_WORKER_ENTRY_FOR_TESTING = resolve('server/test-fixtures/optimize-busy-worker.mjs')
+    process.env.OPTIMIZE_WORKER_CONCURRENCY = '3'
+    process.env.OPTIMIZE_GLOBAL_WORKER_CONCURRENCY = '3'
+    process.env.OPTIMIZE_PAID_PREEMPT_GRACE_MS = '0'
+    process.env.OPTIMIZE_JOB_HARD_TIMEOUT_MS = '10000'
+    const olderFree = await store.createJob({ ...input(), priority: 0, source: 'free_preview', payload_json: { busyMs: 5_000 } })
+    try {
+      await initializeOptimizeJobProcessing()
+      requestOptimizeJobProcessing()
+      await waitFor(async () => (await store.getJob(olderFree.id))?.status === 'running')
+
+      const newerFree = await store.createJob({ ...input(), priority: 0, source: 'free_preview', payload_json: { busyMs: 5_000 } })
+      requestOptimizeJobProcessing()
+      await waitFor(async () => (await store.getJob(newerFree.id))?.status === 'running')
+      const newestFree = await store.createJob({ ...input(), priority: 0, source: 'free_preview', payload_json: { busyMs: 5_000 } })
+      requestOptimizeJobProcessing()
+      await waitFor(async () => (await store.getJob(newestFree.id))?.status === 'running')
+      store.records.get(olderFree.id)!.started_at = '2026-08-29T00:00:00.000Z'
+      store.records.get(newerFree.id)!.started_at = '2026-08-29T00:00:01.000Z'
+      store.records.get(newestFree.id)!.started_at = '2026-08-29T00:00:02.000Z'
+
+      const firstPaid = await store.createJob({ ...input(), priority: 10, source: 'account_profile', payload_json: { busyMs: 5_000 } })
+      const secondPaid = await store.createJob({ ...input(), priority: 10, source: 'account_profile', payload_json: { busyMs: 5_000 } })
+      requestOptimizeJobProcessing()
+      await waitFor(async () => (await store.getJob(firstPaid.id))?.status === 'running'
+        && (await store.getJob(secondPaid.id))?.status === 'running')
+
+      await expect(store.getJob(olderFree.id)).resolves.toMatchObject({ status: 'running' })
+      await expect(store.getJob(newerFree.id)).resolves.toMatchObject({ status: 'queued', failure_count: 0, started_at: null })
+      await expect(store.getJob(newestFree.id)).resolves.toMatchObject({ status: 'queued', failure_count: 0, started_at: null })
+      expect(getOptimizeJobProcessingState().activeAttempts).toBe(3)
+    } finally {
+      await shutdownOptimizeJobProcessing(0)
+      delete process.env.OPTIMIZE_FORCE_WORKER_THREADS_FOR_TESTING
+      delete process.env.OPTIMIZE_WORKER_ENTRY_FOR_TESTING
+      delete process.env.OPTIMIZE_WORKER_CONCURRENCY
+      delete process.env.OPTIMIZE_GLOBAL_WORKER_CONCURRENCY
+      delete process.env.OPTIMIZE_PAID_PREEMPT_GRACE_MS
+      delete process.env.OPTIMIZE_JOB_HARD_TIMEOUT_MS
+    }
+  })
 })
 
 function input(id = randomUUID()) {
