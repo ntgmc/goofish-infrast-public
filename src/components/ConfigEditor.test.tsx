@@ -413,6 +413,7 @@ describe('ConfigEditor preset actions', () => {
     )
     expect(screen.queryByRole('region', { name: '房间结构' })).not.toBeInTheDocument()
     expect(screen.queryByRole('group', { name: '排班模式' })).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('MAA 排班表 · 2-5-2 · 右满252（经验多）')
 
     await user.click(screen.getByRole('button', { name: '右满252（赤金多）' }))
     const apply2521 = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
@@ -433,6 +434,7 @@ describe('ConfigEditor preset actions', () => {
       />,
     )
     expect(screen.queryByRole('region', { name: '房间结构' })).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('MAA 排班表 · 2-5-2 · 右满252（赤金多）')
     await user.click(screen.getByRole('button', { name: '243 均衡' }))
     const apply243 = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
     apply243?.(rightFull252)
@@ -482,6 +484,7 @@ describe('ConfigEditor preset actions', () => {
       />,
     )
     expect(screen.queryByText('按库存微调产物')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('MAA 排班表 · 2-5-2 · 右满252（经验多）')
     expect(screen.getByRole('button', { name: '243 均衡' })).toBeInTheDocument()
   })
 

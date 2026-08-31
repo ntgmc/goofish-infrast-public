@@ -375,7 +375,15 @@ export default function ConfigEditor({
       </div>
       )}
 
-      {!rightFull252PresetSelected && (autoInventoryOnly ? (
+      {rightFull252PresetSelected ? (
+        <div className="pt-5">
+          <div className="tool-inset bg-surface-2/60 p-4" role="status">
+            <p className="text-sm leading-6 text-ink-secondary">
+              {SCHEDULE_MODE_LABELS[scheduleMode]} · {config.layout} · {config.desc}
+            </p>
+          </div>
+        </div>
+      ) : autoInventoryOnly ? (
         <div className="pt-5">
           <div className="tool-inset p-4">
             <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_033}</h3>
@@ -767,7 +775,7 @@ export default function ConfigEditor({
           </div>
         </div>
       </div>
-      ))}
+      )}
       {validationMessage && (
         <p className="tool-alert tool-alert--warning mt-4" role="alert">{validationMessage}</p>
       )}
