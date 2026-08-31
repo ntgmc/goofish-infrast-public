@@ -5,7 +5,6 @@ import {
   getCdkBalanceAmount,
   getCdkItemCode,
   getCdkItemExpiresAt,
-  getCdkScheduleQuotaLimit,
   getCdkScenarioQuotaLimit,
   getCdkType,
   isProfileCdkRecord,
@@ -17,15 +16,6 @@ import { normalizeRuntimePermission } from '../../src/lib/product-catalog'
 
 let schemaReady: Promise<void> | null = null
 
-export class CdkScheduleQuotaExceededError extends Error {
-  readonly code = 'subscription_quota_exceeded' as const
-
-  constructor(readonly limit: number) {
-    super(`当前方案的完整排班次数已用完（${limit} 次），请查看可用方案。`)
-    this.name = 'CdkScheduleQuotaExceededError'
-  }
-}
-
 export class CdkScenarioQuotaExceededError extends Error {
   readonly code = 'subscription_scenario_quota_exceeded' as const
 
@@ -33,35 +23,6 @@ export class CdkScenarioQuotaExceededError extends Error {
     super(`当前周期卡的场景对比额度已用完（${limit} 次），请升级方案。`)
     this.name = 'CdkScenarioQuotaExceededError'
   }
-}
-
-export async function reserveCdkScheduleQuotaInTransaction(
-  client: PoolClient,
-  input: { jobId: string; codeHash: string; now?: string },
-): Promise<boolean> {
-  const key = `cdk/${input.codeHash}.json`
-  const selected = await client.query<{ record_json: CdkRecord }>(
-    `select record_json from cdk_records where key = $1 and status = 'used' for update`,
-    [key],
-  )
-  const record = selected.rows[0]?.record_json
-  if (!record) throw new Error('CDK schedule quota record is missing.')
-  const limit = getCdkScheduleQuotaLimit(record)
-  if (limit === null) return false
-  const generated = Math.max(0, Math.floor(record?.schedule_generate_count ?? 0))
-  const reserved = Math.max(0, Math.floor((record as CdkRecord & { schedule_generate_reserved_count?: number })?.schedule_generate_reserved_count ?? 0))
-  if (generated + reserved >= limit) throw new CdkScheduleQuotaExceededError(limit)
-  const effect = await client.query(
-    `insert into optimization_job_effects (job_id, effect_type, metadata_json, applied_at)
-     values ($1, 'cdk_schedule_quota', $2::jsonb, $3)
-     on conflict (job_id, effect_type) do nothing
-     returning job_id`,
-    [input.jobId, JSON.stringify({ key, limit, status: 'reserved' }), input.now ?? new Date().toISOString()],
-  )
-  if (!effect.rowCount) return true
-  const next = { ...record, schedule_generate_reserved_count: reserved + 1 }
-  await updateStoredCdkRecordInTransaction(client, key, next)
-  return true
 }
 
 export async function settleCdkScheduleQuota(jobId: string, now = new Date().toISOString()): Promise<boolean> {

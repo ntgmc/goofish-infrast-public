@@ -255,6 +255,34 @@ describe('PostgreSQL optimization job admission', () => {
     expect((await query<{ count: string }>("select count(*)::text as count from entitlement_ledger where profile_id = $1 and entitlement_type = 'free_schedule'", [profileId])).rows[0]?.count).toBe('0')
   })
 
+  it('admits monthly card schedules without reserving a generation quota', async () => {
+    const profileId = await seedProfile()
+    await query(
+      `update user_game_accounts
+          set kind = 'cdk', permission = 'advanced',
+              record_json = record_json || '{"kind":"cdk","permission":"advanced"}'::jsonb
+        where id = $1`,
+      [profileId],
+    )
+    const store = createPostgresOptimizeJobStore()
+    const admitted = await store.admitJob(input({
+      owner_key: `profile:${profileId}`,
+      profile_id: profileId,
+      source: 'account_profile',
+      payload_json: {
+        ...formalSchedulePayload(profileId),
+        cdkUsageRef: { code_hash: randomUUID().replaceAll('-', '') },
+      },
+    }))
+
+    expect(admitted.job.status).toBe('queued')
+    expect((await query<{ count: string }>(
+      "select count(*)::text as count from optimization_job_effects where job_id = $1 and effect_type = 'cdk_schedule_quota'",
+      [admitted.job.id],
+    )).rows[0]?.count).toBe('0')
+    await store.requestCancel(admitted.job.id)
+  })
+
   it('atomically reserves reorder quota once and releases it when the queued job is cancelled', async () => {
     const profileId = await seedProfile()
     const store = createPostgresOptimizeJobStore()

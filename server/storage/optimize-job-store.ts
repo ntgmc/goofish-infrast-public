@@ -24,7 +24,7 @@ import { parseOptimizationJobResult } from '../optimization/jobs/runtime-contrac
 import { countReorderCheckQuotaInTransaction } from './reorder-quota-store'
 import { confirmMeteredQuoteInTransaction, MeteredBillingQuoteError } from './metered-billing-store'
 import { insertProfileOptimizationResultInTransaction } from './optimization-result-store'
-import { CdkScenarioQuotaExceededError, CdkScheduleQuotaExceededError, releaseCdkScenarioQuotaInTransaction, releaseCdkScheduleQuotaInTransaction, reserveCdkScenarioQuotaInTransaction, reserveCdkScheduleQuotaInTransaction, settleCdkScenarioQuotaInTransaction } from './cdk-store'
+import { CdkScenarioQuotaExceededError, releaseCdkScenarioQuotaInTransaction, releaseCdkScheduleQuotaInTransaction, reserveCdkScenarioQuotaInTransaction, settleCdkScenarioQuotaInTransaction } from './cdk-store'
 import { productPolicies } from '../../src/lib/product-catalog'
 
 export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered'
@@ -132,7 +132,7 @@ interface OptimizeJobPreemption {
 
 export class OptimizeJobAdmissionError extends Error {
   constructor(
-    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'commercial_queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'commercial_submission_rate_exceeded' | 'priority_coupon_unavailable' | 'item_unavailable' | 'item_not_applicable' | 'reorder_check_quota_exceeded' | 'insufficient_balance' | 'pricing_changed' | 'quote_already_used' | 'profile_not_found' | 'not_metered_profile' | 'profile_archived' | 'commercial_not_eligible' | 'commercial_suspended' | 'debt_outstanding' | 'subscription_quota_exceeded' | 'subscription_scenario_quota_exceeded',
+    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'commercial_queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'commercial_submission_rate_exceeded' | 'priority_coupon_unavailable' | 'item_unavailable' | 'item_not_applicable' | 'reorder_check_quota_exceeded' | 'insufficient_balance' | 'pricing_changed' | 'quote_already_used' | 'profile_not_found' | 'not_metered_profile' | 'profile_archived' | 'commercial_not_eligible' | 'commercial_suspended' | 'debt_outstanding' | 'subscription_scenario_quota_exceeded',
     readonly status: 404 | 409 | 429,
     message: string,
   ) {
@@ -466,24 +466,6 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           && typeof (payloadRecord.cdkUsageRef as Record<string, unknown>).code_hash === 'string'
           ? (payloadRecord.cdkUsageRef as { code_hash: string })
           : null
-        const payloadRequest = payloadRecord?.request && typeof payloadRecord.request === 'object'
-          ? payloadRecord.request as Record<string, unknown>
-          : null
-        const isIncrementalRecompute = payloadRequest?.billing_operation === 'incremental_recompute'
-        if (input.source === 'account_profile' && cdkUsageRef && !isIncrementalRecompute) {
-          try {
-            await reserveCdkScheduleQuotaInTransaction(client, {
-              jobId: input.id,
-              codeHash: cdkUsageRef.code_hash,
-              now,
-            })
-          } catch (error) {
-            if (error instanceof CdkScheduleQuotaExceededError) {
-              throw new OptimizeJobAdmissionError(error.code, 409, error.message)
-            }
-            throw error
-          }
-        }
         if (input.source === 'scenario_comparison' && cdkUsageRef) {
           try {
             await reserveCdkScenarioQuotaInTransaction(client, {
