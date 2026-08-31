@@ -22,7 +22,6 @@ export default function ConfigSection({
   latestResult,
   diffRows,
   updateConfig,
-  resetConfig,
   retryConfigSave,
 }: {
   activeConfig: LicenseConfig
@@ -36,7 +35,6 @@ export default function ConfigSection({
   latestResult: WorkspaceResultHistorySummary | null
   diffRows: ConfigDiffItem[]
   updateConfig: (mutate: (config: LicenseConfig) => void) => void
-  resetConfig: () => void
   retryConfigSave: () => void
 }) {
   const description = `${SCHEDULE_MODE_LABELS[normalizeScheduleMode(activeConfig.schedule_mode)]} · ${userCanEditConfig ? `${activeConfig.layout} · ${activeConfig.desc}` : configPresetLabel}`
@@ -59,8 +57,6 @@ export default function ConfigSection({
             <h2 id="config-section-title" className="mt-2 text-base font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_ConfigSection_007}</h2>
             <p className="mt-1 text-sm leading-6 text-ink-secondary">{description}</p>
           </div>
-          <button type="button" onClick={resetConfig} disabled={!configChanged} className="tool-secondary-action shrink-0">
-            {copy.optimize.pages_tool_optimize_ConfigSection_008}</button>
         </div>
         <div className="p-4 sm:p-5">
           <Suspense fallback={<ResultFallback />}>
@@ -72,7 +68,6 @@ export default function ConfigSection({
               changed={configChanged}
               validation={configValidation}
               onUpdate={updateConfig}
-              onReset={resetConfig}
               embedded
             />
           </Suspense>

@@ -208,8 +208,6 @@ interface ConfigEditorProps {
   permission?: PermissionMode;
   validation: { ok: true } | { ok: false; message: string };
   onUpdate: (mutate: (config: LicenseConfig) => void) => void;
-  onReset?: () => void;
-  resetLabel?: string;
   note?: string;
   embedded?: boolean;
   hideHeader?: boolean;
@@ -225,8 +223,6 @@ export default function ConfigEditor({
   permission,
   validation,
   onUpdate,
-  onReset,
-  resetLabel = copy.common.components_ConfigEditor_020,
   note,
   embedded = false,
   hideHeader = false,
@@ -360,16 +356,6 @@ export default function ConfigEditor({
             <PresetButton label={copy.common.components_ConfigEditor_103} onClick={() => applyPreset(CONFIG_PRESETS['252'])} />
             <PresetButton label={copy.common.components_ConfigEditor_105} onClick={() => applyPreset(CONFIG_PRESETS['252-1'])} />
             <PresetButton label={copy.common.components_ConfigEditor_032} onClick={() => applyPreset(CONFIG_PRESETS['333'])} />
-            {onReset && (
-              <button
-                type="button"
-                onClick={onReset}
-                disabled={!changed}
-                className="tool-secondary-action px-3 py-2 text-sm"
-              >
-                {resetLabel}
-              </button>
-            )}
           </div>
         )}
       </div>

@@ -136,8 +136,6 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_019: " 自定义配置",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_020: "恢复授权配置",
-  // src/components/ConfigEditor.tsx
   components_ConfigEditor_021: "基建配置",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_022: "已修改",

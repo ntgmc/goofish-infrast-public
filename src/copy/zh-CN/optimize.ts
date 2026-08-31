@@ -154,8 +154,6 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_007: "基建配置",
   // src/pages/tool/optimize/ConfigSection.tsx
-  pages_tool_optimize_ConfigSection_008: "恢复已保存配置",
-  // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_009: "变化记录",
   // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_010: "当前配置与上次生成",
