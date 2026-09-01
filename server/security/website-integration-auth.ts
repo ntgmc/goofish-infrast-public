@@ -6,7 +6,7 @@ export type WebsiteIntegrationTokenName =
   | 'WEBSITE_RELEASE_CONFIRMATION_TOKEN'
 
 export type WebsiteIntegrationAuthentication =
-  | { ok: true }
+  | { ok: true; token: string }
   | { ok: false; response: Response }
 
 const NO_STORE_HEADERS = Object.freeze({
@@ -65,7 +65,7 @@ export function authenticateWebsiteIntegrationRequest(
       ),
     }
   }
-  return { ok: true }
+  return { ok: true, token: configuredToken }
 }
 
 function tokensMatch(expected: string, presented: string): boolean {

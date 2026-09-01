@@ -213,6 +213,7 @@ describe('account data Skland controls', () => {
       }
       if (statement.includes('from invitation_codes')) return { rows: [{ code: 'ABCDEFGH' }] }
       if (statement.includes('from invitations')) return { rows: [{ id: 'invitation-1', role: 'inviter' }] }
+      if (statement.includes('from qqbot_registration_qualifications')) return { rows: [{ qq_number: '123456789' }] }
       if (statement.includes('from user_workspaces')) return { rows: [{ record_json: { version: 1 } }] }
       return { rows: [] }
     })
@@ -234,6 +235,7 @@ describe('account data Skland controls', () => {
     expect(body.optimization_idempotency[0]).toMatchObject({ request_hash: 'request-hash' })
     expect(body.invitation_code).toEqual({ code: 'ABCDEFGH' })
     expect(body.invitations).toEqual([{ id: 'invitation-1', role: 'inviter' }])
+    expect(body.qqbot_registration).toEqual({ qq_number: '123456789' })
     expect(body.legacy_workspace).toEqual({ version: 1 })
     expect(body.coverage.optimization_submissions).toEqual({
       disposition: 'export',

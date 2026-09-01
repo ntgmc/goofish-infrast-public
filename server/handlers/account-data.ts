@@ -79,6 +79,7 @@ async function exportData(userId: string): Promise<Response> {
     personalUseUsageEvents,
     invitationCode,
     invitations,
+    qqBotRegistration,
     profileEntitlements,
     entitlementLedger,
     meteredPersonalClaim,
@@ -168,6 +169,12 @@ async function exportData(userId: string): Promise<Response> {
          from invitations
         where inviter_user_id = $1 or invitee_user_id = $1
         order by registered_at asc`,
+      [userId],
+    ),
+    query(
+      `select qq_number, created_at, updated_at
+         from qqbot_registration_qualifications
+        where bound_user_id = $1`,
       [userId],
     ),
     query(
@@ -271,6 +278,7 @@ async function exportData(userId: string): Promise<Response> {
     depot_samples: samples.rows,
     invitation_code: invitationCode.rows[0] ?? null,
     invitations: invitations.rows,
+    qqbot_registration: qqBotRegistration.rows[0] ?? null,
     profile_entitlements: profileEntitlements.rows,
     entitlement_ledger: entitlementLedger.rows,
     metered_personal_claim: meteredPersonalClaim.rows[0] ?? null,

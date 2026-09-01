@@ -898,6 +898,14 @@ CREATE INDEX IF NOT EXISTS idx_admin_registration_invitations_created
 CREATE INDEX IF NOT EXISTS idx_admin_registration_invitations_status
   ON admin_registration_invitations(consumed_at, revoked_at, expires_at, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS qqbot_registration_qualifications (
+  qq_number TEXT PRIMARY KEY CHECK (qq_number ~ '^[1-9][0-9]{4,11}$'),
+  invitation_id TEXT NOT NULL UNIQUE REFERENCES admin_registration_invitations(id) ON DELETE CASCADE,
+  bound_user_id TEXT UNIQUE REFERENCES user_accounts(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS admin_registration_invitation_audit (
   id TEXT PRIMARY KEY,
   invitation_id TEXT NOT NULL,
@@ -2506,6 +2514,7 @@ const API_ONLY_RUNTIME_TABLES = new Set([
   'feature_settings',
   'public_content_settings',
   'website_notification_events',
+  'qqbot_registration_qualifications',
   'personal_use_declaration_versions',
   'personal_use_declaration_acceptances',
   'personal_use_declaration_usage_events',

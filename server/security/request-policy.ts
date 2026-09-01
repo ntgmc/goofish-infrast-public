@@ -346,6 +346,9 @@ export const requestSchemas = {
   releaseConfirmation: strict({
     version: z.string().trim().min(1).max(120).regex(/^[0-9A-Za-z][0-9A-Za-z._+-]*$/),
   }),
+  qqBotRegistrationInvitation: strict({
+    qq_number: z.string().trim().regex(/^[1-9][0-9]{4,11}$/),
+  }),
   usageStats: strict({
     event: shortString(64),
     announcement_id: optionalString(120),
@@ -693,6 +696,9 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/announcement', route({ GET: none() }, ['admin'])],
   ['/api/admin/announcement', route({ GET: none(), PUT: json('admin', requestSchemas.announcement) }, ['admin'])],
   ['/api/integrations/qqbot/events', route({ GET: none() }, ['cursor', 'limit'])],
+  ['/api/integrations/qqbot/registration-invitations', route({
+    POST: json('standard', requestSchemas.qqBotRegistrationInvitation),
+  })],
   ['/api/internal/releases/confirm', route({ POST: json('standard', requestSchemas.releaseConfirmation) })],
   ['/api/usage-stats', route({ POST: json('standard', requestSchemas.usageStats) }, ['admin'])],
   ['/api/admin/usage-stats', route({ GET: none() }, ['admin', 'format', 'from', 'to', 'range'])],

@@ -1201,6 +1201,7 @@ export interface PersonalDataExportV4 {
   depot_samples: PersonalDataExportRecord[];
   invitation_code: PersonalDataExportRecord | null;
   invitations: PersonalDataExportRecord[];
+  qqbot_registration: PersonalDataExportRecord | null;
   profile_entitlements: PersonalDataExportRecord[];
   entitlement_ledger: PersonalDataExportRecord[];
   metered_personal_claim: PersonalDataExportRecord | null;

@@ -96,7 +96,7 @@ export default async (req: Request): Promise<Response> => {
           occurredAt: new Date(startedAt),
         })
       }
-      return registrationAcceptedResponse(registered.verificationRequired)
+      return registrationAcceptedResponse(registered.verificationRequired, registered.qqBotRegistration === true)
     }
 
     if (pathname.endsWith('/login')) {
@@ -227,11 +227,13 @@ export default async (req: Request): Promise<Response> => {
   }
 }
 
-function registrationAcceptedResponse(verificationRequired: boolean): Response {
+function registrationAcceptedResponse(verificationRequired: boolean, qqBotRegistration = false): Response {
   const response: RegistrationAcceptedResponse = {
     accepted: true,
     verification_required: verificationRequired,
-    message: verificationRequired ? authCopy.api_registration_accepted : authCopy.api_registration_completed,
+    message: verificationRequired
+      ? qqBotRegistration ? authCopy.api_registration_accepted_qqbot : authCopy.api_registration_accepted
+      : qqBotRegistration ? authCopy.api_registration_completed_qqbot : authCopy.api_registration_completed,
     resend_after_seconds: verificationRequired ? AUTH_RESEND_COOLDOWN_SECONDS : null,
   }
   return jsonResponse(response, 202)

@@ -51,9 +51,9 @@ WEBSITE_RELEASE_CONFIRMATION_TOKEN=<different random value of at least 32 bytes>
 
 `USAGE_VISITOR_SECRET` 用于签名匿名 usage visitor cookie，必须在所有 API 实例间保持一致。轮换时先配置新值，并将旧值放入 `USAGE_VISITOR_SECRET_PREVIOUS`；至少保留一个 visitor cookie 有效期（当前为 180 天）后再移除旧值。为兼容旧部署，服务端在未配置专用值时会回退到管理员签名密钥，但生产环境应使用独立 secret，避免不同安全域共用密钥。
 
-### 网站公告与正式版本事件流
+### QQ Bot 网站集成与正式版本事件流
 
-QQ Bot 通过只读接口定时拉取公告和正式版本事件：
+QQ Bot 使用 `WEBSITE_EVENTS_TOKEN` 拉取公告和正式版本事件：
 
 ```http
 GET /api/integrations/qqbot/events?cursor={cursor|latest}&limit=100
@@ -61,6 +61,20 @@ Authorization: Bearer <WEBSITE_EVENTS_TOKEN>
 ```
 
 首次注册消费者时使用 `cursor=latest`，响应只返回当前高水位游标，不回放历史事件；之后把每次响应的 `next_cursor` 原样保存并继续拉取。接口最多返回 100 条，按数据库 `sequence` 严格升序，响应设置 `Cache-Control: private, no-store`。Token 缺失或错误返回 401，使用仅具发布权限的有效 Token 返回 403，超过宽松的持久化限流窗口返回带 `Retry-After` 的 429。
+
+Bot 实时确认用户仍在指定 QQ 群后，可以复用同一个 Token 按 QQ 签发个人一次性注册邀请码：
+
+```http
+POST /api/integrations/qqbot/registration-invitations
+Authorization: Bearer <WEBSITE_EVENTS_TOKEN>
+Content-Type: application/json
+
+{"qq_number":"123456789"}
+```
+
+首次签发返回 `created`，有效期内重复请求返回 `active` 和原邀请码，过期后返回 `renewed` 和新邀请码，已经绑定则只返回 `bound`。注册链接形如 `https://maatool.com/tool/profiles#invite=...`；页面自动填入邀请码后立即清除片段，不会把邀请码作为普通查询参数发送给服务端。邀请码有效期为 24 小时，数据库只保存哈希和由 `WEBSITE_EVENTS_TOKEN` 派生密钥加密的密文。轮换 `WEBSITE_EVENTS_TOKEN` 后，同一 QQ 再次请求会换发邀请码，Bot 应始终把最新响应发送给用户。
+
+该接口只接受 QQ 号，不接受邮箱、密码、道具代码或数量。内测道具继续通过网站新人任务配置和领取，Bot 不参与奖励参数或发放状态管理。由于 `WEBSITE_EVENTS_TOKEN` 同时具备事件读取和邀请码签发权限，必须仅注入受控 Bot 运行环境，不得写入日志或仓库。
 
 公告从未启用状态首次保存为启用状态时，公告文档和 `announcement.published` 事件在同一 PostgreSQL 事务中提交；再次编辑已发布公告不会产生新事件。部署此功能前必须先运行 `npm run migrate:database`，创建 append-only 的 `website_notification_events` 表。
 
