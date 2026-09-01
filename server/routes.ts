@@ -15,6 +15,7 @@ import adminBalanceHandler from './handlers/admin-balance'
 import adminCommercialHandler from './handlers/admin-commercial'
 import announcementHandler from './handlers/announcement'
 import websiteEventsHandler from './handlers/website-events'
+import qqBotRegistrationInvitationsHandler from './handlers/qqbot-registration-invitations'
 import releaseConfirmationHandler from './handlers/release-confirmation'
 import authHandler from './handlers/auth'
 import { EFFICIENCY_DATA, EFFICIENCY_DATA_METADATA } from './handlers/data'
@@ -90,6 +91,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/announcement', announcementHandler as unknown as ApiHandler],
   ['/api/admin/announcement', announcementHandler as unknown as ApiHandler],
   ['/api/integrations/qqbot/events', websiteEventsHandler as unknown as ApiHandler],
+  ['/api/integrations/qqbot/registration-invitations', qqBotRegistrationInvitationsHandler as unknown as ApiHandler],
   ['/api/internal/releases/confirm', releaseConfirmationHandler as unknown as ApiHandler],
   ['/api/usage-stats', usageStatsHandler as unknown as ApiHandler],
   ['/api/admin/usage-stats', usageStatsHandler as unknown as ApiHandler],

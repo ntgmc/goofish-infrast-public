@@ -17,6 +17,15 @@ afterEach(() => {
 })
 
 describe('AuthForm invitation code', () => {
+  it('prefills a fragment invitation without leaving it in the address bar', async () => {
+    window.history.replaceState({}, '', '/tool/profiles#invite=12AB34CD5E6F7G8H')
+
+    render(<AuthForm onAuthenticated={vi.fn()} />)
+
+    expect(screen.getByLabelText('邀请码（可选）')).toHaveValue('12AB34CD5E6F7G8H')
+    await waitFor(() => expect(window.location.hash).toBe(''))
+  })
+
   it('prefills the code from the share URL and allows clearing it', async () => {
     window.history.replaceState({}, '', '/tool/profiles?invite=12AB34CD5E6F7G8H')
     const user = userEvent.setup()

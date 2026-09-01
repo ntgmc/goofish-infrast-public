@@ -148,8 +148,8 @@ export async function registerUser(
   idempotencyKey?: string | null,
   inviteCodeValue?: unknown,
 ): Promise<
-  | { ok: true; user: UserAccountRecord | null; verificationRequired: false }
-  | { ok: true; user: UserAccountRecord | null; verificationRequired: true; message: string; resendAfterSeconds: number }
+  | { ok: true; user: UserAccountRecord | null; verificationRequired: false; qqBotRegistration?: boolean }
+  | { ok: true; user: UserAccountRecord | null; verificationRequired: true; message: string; resendAfterSeconds: number; qqBotRegistration?: boolean }
   | { ok: false; status: number; message: string; code?: string; retryAfterSeconds?: number; suggestedEmail?: string }
 > {
   const emailCheck = validateRegistrationEmailForRegistration(emailValue)
@@ -177,6 +177,7 @@ export async function registerUser(
     }
     throw error
   }
+  const qqBotRegistration = adminInvitation?.source === 'qqbot'
   let verificationRequired = registrationSettings.email_verification_required
   let emailReservation: EmailDeliveryReservation | null = null
 
@@ -274,10 +275,10 @@ export async function registerUser(
       } catch (error) {
         console.warn('registration verification email delivery failed:', safeErrorName(error))
       }
-      return acceptedRegistrationResult(user, true)
+      return { ...acceptedRegistrationResult(user, true), qqBotRegistration }
     }
 
-    return { ok: true, user, verificationRequired: false }
+    return { ok: true, user, verificationRequired: false, qqBotRegistration }
   } finally {
     if (emailReservation) await safelyReleaseEmailReservation(emailReservation)
   }

@@ -11,6 +11,7 @@ const expectedRoutes = [
   '/api/admin/usage-stats',
   '/api/announcement',
   '/api/integrations/qqbot/events',
+  '/api/integrations/qqbot/registration-invitations',
   '/api/internal/releases/confirm',
   '/api/auth/login',
   '/api/auth/logout',

@@ -910,75 +910,117 @@ async function lockInventoryItemInTransaction(client: PoolClient, userId: string
 
 export async function claimOnboardingTask(userId: string, taskCode: OnboardingTaskCode, idempotencyKey: string): Promise<Record<string, unknown>> {
   await ensureSchema()
-  return withTransaction(async (client) => {
-    const requestHash = createHash('sha256').update(JSON.stringify({ task_code: taskCode })).digest('hex')
-    const existingOperation = await client.query<{ request_hash: string; response_json: Record<string, unknown> | null }>(
-      'select request_hash, response_json from inventory_operations where user_id = $1 and idempotency_key = $2 for update',
-      [userId, idempotencyKey],
-    )
-    if (existingOperation.rows[0]) {
-      if (existingOperation.rows[0].request_hash !== requestHash) {
-        throw new InventoryError('idempotency_conflict', '提交内容已发生变化，请刷新页面后重新操作。', 409)
-      }
-      if (!existingOperation.rows[0].response_json) throw new InventoryError('operation_in_progress', '任务领取正在处理中。', 409)
-      return existingOperation.rows[0].response_json
+  return withTransaction((client) => claimOnboardingTaskInTransaction(client, userId, taskCode, idempotencyKey))
+}
+
+async function claimOnboardingTaskInTransaction(
+  client: PoolClient,
+  userId: string,
+  taskCode: OnboardingTaskCode,
+  idempotencyKey: string,
+  operationNow = new Date(),
+): Promise<Record<string, unknown>> {
+  const requestHash = createHash('sha256').update(JSON.stringify({ task_code: taskCode })).digest('hex')
+  const existingOperation = await client.query<{ request_hash: string; response_json: Record<string, unknown> | null }>(
+    'select request_hash, response_json from inventory_operations where user_id = $1 and idempotency_key = $2 for update',
+    [userId, idempotencyKey],
+  )
+  if (existingOperation.rows[0]) {
+    if (existingOperation.rows[0].request_hash !== requestHash) {
+      throw new InventoryError('idempotency_conflict', '提交内容已发生变化，请刷新页面后重新操作。', 409)
     }
-    const operationId = randomUUID()
-    const operationStartedAt = new Date().toISOString()
-    await client.query(
-      `insert into inventory_operations (id, user_id, idempotency_key, operation_type, request_hash, created_at)
-       values ($1, $2, $3, 'onboarding_claim', $4, $5)`,
-      [operationId, userId, idempotencyKey, requestHash, operationStartedAt],
-    )
-    const progress = await client.query<{
-      version_id: string; completed_at: string; claimed_at: string | null; rewards_json: GiftPackContentInput[]; enabled: boolean
-    }>(
-      `select progress.version_id, progress.completed_at, progress.claimed_at, version.rewards_json, version.enabled
-         from user_onboarding_tasks progress
-         join onboarding_task_versions version on version.id = progress.version_id
-        where progress.user_id = $1 and progress.task_code = $2 for update`,
-      [userId, taskCode],
-    )
-    const row = progress.rows[0]
-    if (!row || !row.enabled) throw new InventoryError('task_not_claimable', '任务尚未完成或未启用。', 409)
-    if (row.claimed_at) {
-      const response = { claimed: true, replayed: true, task_code: taskCode }
-      await client.query(
-        'update inventory_operations set response_json = $3::jsonb, completed_at = $4 where id = $1 and user_id = $2',
-        [operationId, userId, JSON.stringify(response), operationStartedAt],
-      )
-      return response
-    }
-    if (!Array.isArray(row.rewards_json) || row.rewards_json.length === 0) throw new InventoryError('task_rewards_missing', '任务奖励尚未配置。', 409)
-    const now = new Date().toISOString()
-    const grants: Array<{ item_code: string; quantity: number }> = []
-    for (const reward of row.rewards_json) {
-      const grantId = await grantItemInTransaction(client, {
-        userId,
-        itemCode: reward.item_code,
-        quantity: reward.quantity,
-        expiry: reward.expiry,
-        sourceType: 'onboarding_task',
-        sourceId: `${taskCode}:${row.version_id}`,
-        recipientRole: 'participant',
-        giftPackVersionId: reward.gift_pack_version_id ?? null,
-        metadata: { task_code: taskCode, idempotency_key: idempotencyKey },
-        now,
-      })
-      if (grantId) grants.push({ item_code: reward.item_code, quantity: reward.quantity })
-    }
-    await client.query(
-      `update user_onboarding_tasks set claimed_at = $3, claim_operation_id = $4
-        where user_id = $1 and task_code = $2 and claimed_at is null`,
-      [userId, taskCode, now, operationId],
-    )
-    const response = { claimed: true, replayed: false, task_code: taskCode, rewards: grants }
+    if (!existingOperation.rows[0].response_json) throw new InventoryError('operation_in_progress', '任务领取正在处理中。', 409)
+    return existingOperation.rows[0].response_json
+  }
+  const operationId = randomUUID()
+  const operationStartedAt = operationNow.toISOString()
+  await client.query(
+    `insert into inventory_operations (id, user_id, idempotency_key, operation_type, request_hash, created_at)
+     values ($1, $2, $3, 'onboarding_claim', $4, $5)`,
+    [operationId, userId, idempotencyKey, requestHash, operationStartedAt],
+  )
+  const progress = await client.query<{
+    version_id: string; completed_at: string; claimed_at: string | null; rewards_json: GiftPackContentInput[]; enabled: boolean
+  }>(
+    `select progress.version_id, progress.completed_at, progress.claimed_at, version.rewards_json, version.enabled
+       from user_onboarding_tasks progress
+       join onboarding_task_versions version on version.id = progress.version_id
+      where progress.user_id = $1 and progress.task_code = $2 for update`,
+    [userId, taskCode],
+  )
+  const row = progress.rows[0]
+  if (!row || !row.enabled) throw new InventoryError('task_not_claimable', '任务尚未完成或未启用。', 409)
+  if (row.claimed_at) {
+    const response = { claimed: true, replayed: true, task_code: taskCode }
     await client.query(
       'update inventory_operations set response_json = $3::jsonb, completed_at = $4 where id = $1 and user_id = $2',
-      [operationId, userId, JSON.stringify(response), now],
+      [operationId, userId, JSON.stringify(response), operationStartedAt],
     )
     return response
-  })
+  }
+  if (!Array.isArray(row.rewards_json) || row.rewards_json.length === 0) throw new InventoryError('task_rewards_missing', '任务奖励尚未配置。', 409)
+  const now = operationNow.toISOString()
+  const grants: Array<{ item_code: string; quantity: number }> = []
+  for (const reward of row.rewards_json) {
+    const grantId = await grantItemInTransaction(client, {
+      userId,
+      itemCode: reward.item_code,
+      quantity: reward.quantity,
+      expiry: reward.expiry,
+      sourceType: 'onboarding_task',
+      sourceId: `${taskCode}:${row.version_id}`,
+      recipientRole: 'participant',
+      giftPackVersionId: reward.gift_pack_version_id ?? null,
+      metadata: { task_code: taskCode, idempotency_key: idempotencyKey },
+      now,
+    })
+    if (grantId) grants.push({ item_code: reward.item_code, quantity: reward.quantity })
+  }
+  await client.query(
+    `update user_onboarding_tasks set claimed_at = $3, claim_operation_id = $4
+      where user_id = $1 and task_code = $2 and claimed_at is null`,
+    [userId, taskCode, now, operationId],
+  )
+  const response = { claimed: true, replayed: false, task_code: taskCode, rewards: grants }
+  await client.query(
+    'update inventory_operations set response_json = $3::jsonb, completed_at = $4 where id = $1 and user_id = $2',
+    [operationId, userId, JSON.stringify(response), now],
+  )
+  return response
+}
+
+export async function claimWelcomeOnboardingTaskForRegistrationInTransaction(
+  client: PoolClient,
+  userId: string,
+  idempotencyKey: string,
+  operationNow = new Date(),
+): Promise<Record<string, unknown> | null> {
+  const current = await client.query<{
+    task_code: OnboardingTaskCode
+    version_id: string
+    enabled: boolean
+    rewards_json: GiftPackContentInput[]
+  }>(
+    `select current.task_code, current.version_id, version.enabled, version.rewards_json
+       from onboarding_task_current current
+       join onboarding_task_versions version on version.id = current.version_id
+      where current.task_code = 'welcome_inventory'`,
+  )
+  const version = current.rows[0]
+  if (!version?.enabled || !Array.isArray(version.rewards_json) || version.rewards_json.length === 0) return null
+  await client.query(
+    `insert into user_onboarding_tasks (user_id, task_code, version_id, completed_at)
+     values ($1, 'welcome_inventory', $2, $3)
+     on conflict (user_id, task_code) do nothing`,
+    [userId, version.version_id, operationNow.toISOString()],
+  )
+  return claimOnboardingTaskInTransaction(
+    client,
+    userId,
+    'welcome_inventory',
+    idempotencyKey,
+    operationNow,
+  )
 }
 
 async function getProfileCapacities(userId: string): Promise<ProfileCapacitySummary[]> {

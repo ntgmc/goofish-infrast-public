@@ -35,13 +35,16 @@ export default function AuthForm({
   submitClassName,
 }: AuthFormProps) {
   const { features } = useSiteFeatures()
-  const [mode, setMode] = useState<AuthMode>(() => new URLSearchParams(window.location.search).get('recovery') === '1'
-    ? 'forgot'
-    : features.login ? 'login' : features.registration ? 'register' : 'forgot')
+  const [initialInviteCode] = useState(readInitialInviteCode)
+  const [mode, setMode] = useState<AuthMode>(() => initialInviteCode && features.registration
+    ? 'register'
+    : new URLSearchParams(window.location.search).get('recovery') === '1'
+      ? 'forgot'
+      : features.login ? 'login' : features.registration ? 'register' : 'forgot')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [cdk, setCdk] = useState('')
-  const [inviteCode, setInviteCode] = useState(() => new URLSearchParams(window.location.search).get('invite')?.trim().toUpperCase() ?? '')
+  const [inviteCode, setInviteCode] = useState(initialInviteCode)
   const [inviteCodeRequired, setInviteCodeRequired] = useState<boolean | null>(null)
   const [registrationSettingsLoading, setRegistrationSettingsLoading] = useState(false)
   const [registrationSettingsError, setRegistrationSettingsError] = useState<string | null>(null)
@@ -53,6 +56,8 @@ export default function AuthForm({
   const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null)
   const [showVerificationResend, setShowVerificationResend] = useState(false)
   const [resendCooldownSeconds, setResendCooldownSeconds] = useState(0)
+
+  useEffect(clearInviteFragment, [])
 
   useEffect(() => {
     if (mode !== 'register' || inviteCodeRequired !== null) return
@@ -374,6 +379,23 @@ export default function AuthForm({
         {loading ? copy.auth.components_AuthForm_019 : mode === 'login' ? copy.auth.components_AuthForm_020 : mode === 'register' ? copy.auth.components_AuthForm_021 : copy.auth.components_AuthForm_022}
       </button>
     </form>
+  )
+}
+
+function readInitialInviteCode(): string {
+  const hashInvite = new URLSearchParams(window.location.hash.slice(1)).get('invite')
+  return (hashInvite ?? new URLSearchParams(window.location.search).get('invite'))?.trim().toUpperCase() ?? ''
+}
+
+function clearInviteFragment(): void {
+  const params = new URLSearchParams(window.location.hash.slice(1))
+  if (!params.has('invite')) return
+  params.delete('invite')
+  const hash = params.toString()
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${window.location.pathname}${window.location.search}${hash ? `#${hash}` : ''}`,
   )
 }
 

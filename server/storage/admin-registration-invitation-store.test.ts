@@ -20,7 +20,7 @@ describe('administrator registration invitation store', () => {
 
   it('uses the caller clock when consuming an invitation in the registration transaction', async () => {
     const client = {
-      query: vi.fn().mockResolvedValue({ rowCount: 1 }),
+      query: vi.fn().mockResolvedValue({ rowCount: 1, rows: [] }),
     } as unknown as PoolClient
     postgresMocks.withTransaction.mockImplementation(async (work: (transactionClient: PoolClient) => Promise<void>) => {
       await work(client)

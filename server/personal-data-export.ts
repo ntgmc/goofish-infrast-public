@@ -25,6 +25,7 @@ export const PERSONAL_DATA_EXPORT_COVERAGE = {
     reason: '邀请码轮换与暂停审计属于安全控制记录，账户删除时通过外键级联清理。',
   },
   invitations: { disposition: 'export', field: 'invitations' },
+  qqbot_registration_qualifications: { disposition: 'export', field: 'qqbot_registration' },
   reward_grants: { disposition: 'export', field: 'inventory.grants' },
   reward_consumptions: { disposition: 'export', field: 'inventory.consumptions' },
   inventory_ledger: { disposition: 'export', field: 'inventory.ledger' },

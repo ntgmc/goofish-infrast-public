@@ -96,6 +96,14 @@ describe('personal-use declaration request policy', () => {
   })
 })
 
+describe('QQ Bot registration request policy', () => {
+  it('accepts only canonical QQ numbers', () => {
+    expect(requestSchemas.qqBotRegistrationInvitation.safeParse({ qq_number: '123456789' }).success).toBe(true)
+    expect(requestSchemas.qqBotRegistrationInvitation.safeParse({ qq_number: '1234' }).success).toBe(false)
+    expect(requestSchemas.qqBotRegistrationInvitation.safeParse({ qq_number: '123456789', quantity: 99 }).success).toBe(false)
+  })
+})
+
 describe('admin CDK baseline request policy', () => {
   it('accepts the new baseline action and all trusted sources', () => {
     for (const baselineSource of ['latest', 'workspace', 'next_import']) {

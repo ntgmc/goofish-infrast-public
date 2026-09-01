@@ -5,6 +5,8 @@ export const authCopy = {
   api_internal_error: "服务暂时不可用，请稍后重试。",
   api_registration_accepted: "如果可以注册，我们会向这个邮箱发送验证邮件，请按邮件提示完成注册。",
   api_registration_completed: "注册成功，请使用邮箱和密码登录。",
+  api_registration_accepted_qqbot: "注册申请已受理，QQ 已绑定，内测道具已发放；请按邮件提示完成验证后登录。",
+  api_registration_completed_qqbot: "注册成功，QQ 已绑定，内测道具已发放，请使用邮箱和密码登录。",
   api_registration_brevo_limit_reached: "今天的验证邮件额度已用完，暂时无法注册，请明天再试。",
   api_registration_brevo_reserve_reached: "今天可用于注册的验证邮件额度已用完，暂时无法注册，请明天再试。",
   api_invite_code_required: "当前需要管理员邀请码才能注册，请输入收到的邀请码。",
