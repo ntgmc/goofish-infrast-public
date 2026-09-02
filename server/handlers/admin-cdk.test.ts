@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import adminCdkHandler from './admin-cdk'
 
 const mocks = vi.hoisted(() => ({
@@ -108,6 +108,8 @@ beforeEach(() => {
     latest_operator_fingerprint: options.fingerprint ?? current.latest_operator_fingerprint,
   }))
 })
+
+afterEach(() => vi.useRealTimers())
 
 describe('admin CDK operator baseline controls', () => {
   it('returns availability metadata for all trusted baseline sources', async () => {
@@ -232,6 +234,8 @@ describe('admin item CDK generation', () => {
   })
 
   it('creates a limited item CDK with an absolute expiry date', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-31T00:00:00.000Z'))
     mocks.getCdk.mockResolvedValue(null)
     const response = await adminCdkHandler(createRequest({
       cdk_type: 'item',

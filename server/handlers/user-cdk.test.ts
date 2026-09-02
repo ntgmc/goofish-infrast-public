@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   buildAuthPayload: vi.fn(),
@@ -65,6 +65,8 @@ beforeEach(() => {
   mocks.grantItemInTransaction.mockResolvedValue('grant-1')
 })
 
+afterEach(() => vi.useRealTimers())
+
 describe('user CDK redemption', () => {
   it('routes balance CDKs to the points page without claiming them', async () => {
     mocks.findCdkRecordByCode.mockResolvedValue({ key: 'cdk/balance.json', codeHash: 'b'.repeat(64), record: { cdk_type: 'balance' } })
@@ -125,6 +127,8 @@ describe('user CDK redemption', () => {
   })
 
   it('passes a limited item CDK expiry through to the inventory grant', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-31T00:00:00.000Z'))
     const limitedRecord = { ...itemRecord, item_code: 'limited_profile_voucher', item_expires_at: '2026-09-01T15:59:59.000Z' }
     mocks.findCdkRecordByCode.mockResolvedValue({ key: 'cdk/item.json', codeHash: itemRecord.code_hash, record: limitedRecord })
     mocks.redeemCdkAtomically.mockImplementation(async (options) => {
