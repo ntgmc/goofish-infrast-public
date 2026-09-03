@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomUUID } from 'node:crypto'
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto'
 import type { LicenseOperator } from '../../src/lib/types'
 
 const APP_CODE = '4ca99fa6b56cc2ba'
@@ -113,17 +113,11 @@ export async function getCredByHypergryphToken(token: string): Promise<string> {
     throw new SklandClientError('request_failed', '鹰角授权换取森空岛 code 失败，请重新扫码。')
   }
 
-  const cred = await fetchJson<ApiEnvelope>(`${SKLAND_BASE}/web/v1/user/auth/generate_cred_by_code`, {
+  const cred = await fetchJson<ApiEnvelope>(`${SKLAND_BASE}/api/v1/user/auth/generate_cred_by_code`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
-      Referer: 'https://www.skland.com/',
-      Origin: 'https://www.skland.com',
-      dId: randomUUID(),
-      platform: '3',
-      timestamp: `${Math.floor(Date.now() / 1000)}`,
-      vName: '1.0.0',
+      'User-Agent': SKLAND_USER_AGENT,
     },
     body: JSON.stringify({ kind: 1, code: oauth.data.code }),
   })

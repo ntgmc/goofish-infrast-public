@@ -89,7 +89,7 @@ globalThis.fetch = async (url, init) => {
   if (String(url).endsWith('/user/oauth2/v2/grant')) {
     return jsonResponse({ msg: 'OK', data: { code: 'oauth-code' } })
   }
-  if (String(url).endsWith('/web/v1/user/auth/generate_cred_by_code')) {
+  if (String(url).endsWith('/api/v1/user/auth/generate_cred_by_code')) {
     return jsonResponse({ message: 'OK', data: { cred: 'skland-cred' } })
   }
   if (String(url).endsWith('/api/v1/auth/refresh')) {
@@ -207,6 +207,10 @@ if (await skland.getScanCode('scan-1') !== 'scan-code-1') {
 const accountToken = await skland.getHypergryphTokenByScanCode('scan-code-1')
 const cred = await skland.getCredByHypergryphToken(accountToken)
 if (cred !== 'skland-cred') throw new Error('cred exchange failed')
+const credentialCall = calls.find((call) => String(call.url).endsWith('/api/v1/user/auth/generate_cred_by_code'))
+if (!credentialCall || Object.keys(credentialCall.init?.headers ?? {}).some((name) => name.toLowerCase() === 'did')) {
+  throw new Error('cred exchange must use the app endpoint without a web device id')
+}
 const cultivateCallsBeforeDefaultImport = calls.filter((call) => String(call.url).includes('/api/v1/game/cultivate/')).length
 const imported = await skland.importSklandOperatorsByCred(cred, { uid: '12345678' })
 if (imported.binding.uid !== '12345678' || imported.operators.length !== 1) {

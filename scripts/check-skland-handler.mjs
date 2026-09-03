@@ -1156,7 +1156,7 @@ function setFetchMode(mode) {
     if (textUrl.endsWith('/user/oauth2/v2/grant')) {
       return jsonResponse({ msg: 'OK', data: { code: 'oauth-code' } })
     }
-    if (textUrl.endsWith('/web/v1/user/auth/generate_cred_by_code')) {
+    if (textUrl.endsWith('/api/v1/user/auth/generate_cred_by_code')) {
       return jsonResponse({ message: 'OK', data: { cred: mode === 'mismatch' ? 'mismatch-cred' : 'skland-cred' } })
     }
     if (textUrl.endsWith('/api/v1/auth/refresh')) {
