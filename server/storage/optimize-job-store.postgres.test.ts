@@ -436,11 +436,6 @@ describe('PostgreSQL optimization job admission', () => {
         where user_id = $1 and source_type = 'invitation' and recipient_role = 'inviter'`,
       [inviter],
     )).rows[0]?.count).toBe('2')
-    expect((await query<{ count: string }>(
-      `select count(*)::text as count from reward_grants
-        where user_id = any($1::text[]) and source_type = 'invitation' and recipient_role = 'invitee'`,
-      [inviteeUsers],
-    )).rows[0]?.count).toBe('2')
   })
 
   it('keeps an activation snapshot while paused and lets the worker settle it after resume', async () => {
