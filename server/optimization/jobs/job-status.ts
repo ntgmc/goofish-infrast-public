@@ -179,7 +179,7 @@ export async function getOptimizationJob(req: Request, rawJobId: string): Promis
 
   const store = getOptimizeJobStore();
   const job = await store.getJob(jobId);
-  if (!job) return jsonResponse({ error: '任务不存在。' }, 404);
+  if (!job || isRemovedOptimizationJob(job)) return jsonResponse({ error: '任务不存在。' }, 404);
 
   const access = await canReadOptimizeJob(req, job);
   if (!access.ok) return jsonResponse({ error: access.message }, access.status);
@@ -234,7 +234,7 @@ export async function cancelOptimizationJob(req: Request, rawJobId: string): Pro
   if (!jobId) return jsonResponse({ error: '缺少任务 ID。' }, 400)
   const store = getOptimizeJobStore()
   const current = await store.getJob(jobId)
-  if (!current) return jsonResponse({ error: '任务不存在。' }, 404)
+  if (!current || isRemovedOptimizationJob(current)) return jsonResponse({ error: '任务不存在。' }, 404)
   const access = await canReadOptimizeJob(req, current)
   if (!access.ok) return jsonResponse({ error: access.message }, access.status)
   if (current.status !== 'queued' && current.status !== 'running') {
@@ -403,11 +403,16 @@ function getUpgradeSuggestionIntent(job: OptimizeJobRecord): { requested: boolea
   }
 }
 
-function getOptimizeJobKind(job: OptimizeJobRecord): 'schedule' | 'scenario_comparison' | 'reorder_check' {
+function getOptimizeJobKind(job: OptimizeJobRecord): 'schedule' | 'scenario_comparison' {
   const payload = job.payload_json && typeof job.payload_json === 'object' ? job.payload_json as Record<string, unknown> : {}
   if (payload.kind === 'scenario_comparison') return 'scenario_comparison'
-  if (payload.kind === 'reorder_check') return 'reorder_check'
   return 'schedule'
+}
+
+function isRemovedOptimizationJob(job: OptimizeJobRecord): boolean {
+  if (job.source === 'reorder_check') return true
+  return Boolean(job.payload_json && typeof job.payload_json === 'object'
+    && (job.payload_json as Record<string, unknown>).kind === 'reorder_check')
 }
 
 function getOptimizeExecutionPhase(job: OptimizeJobRecord): 'initial_queue' | 'retry_wait' | 'executing' | 'settling' | 'terminal' {

@@ -70,7 +70,6 @@ describe('personal-use declaration request policy', () => {
       'metered_personal_create',
       'generated_result_export',
       'optimization_generate',
-      'reorder_check',
     ]) {
       expect(requestSchemas.personalUseDeclarationConfirmation.safeParse({
         action,
@@ -78,6 +77,11 @@ describe('personal-use declaration request policy', () => {
         content_hash: declarationHash,
       }).success).toBe(true)
     }
+    expect(requestSchemas.personalUseDeclarationConfirmation.safeParse({
+      action: 'reorder_check',
+      declaration_id: 'personal_use_v1_1',
+      content_hash: declarationHash,
+    }).success).toBe(false)
     expect(requestSchemas.personalUseDeclarationConfirmation.safeParse({
       action: 'optimization_generate',
       declaration_id: 'personal_use_v1_1',

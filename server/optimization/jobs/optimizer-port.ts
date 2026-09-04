@@ -2,11 +2,9 @@ import type { ScenarioComparisonResult } from '../../../src/lib/scenario-compari
 import type {
   OptimizeCalculationStage,
   OptimizeResult,
-  ReorderCheckResult,
 } from '../../../src/lib/types'
 import type {
   OptimizeJobPayload,
-  ReorderCheckJobPayload,
   ScenarioComparisonJobPayload,
 } from './shared'
 
@@ -43,10 +41,6 @@ export interface OptimizerPort {
     payload: ScenarioComparisonJobPayload,
     context: OptimizeExecutionContext,
   ): Promise<ScenarioComparisonResult>
-  executeReorderCheck(
-    payload: ReorderCheckJobPayload,
-    context: OptimizeExecutionContext,
-  ): Promise<ReorderCheckResult>
 }
 
 export class OptimizerPortNotRegisteredError extends Error {
@@ -117,7 +111,7 @@ export function assertCompatibleOptimizerPort(value: unknown): asserts value is 
       `Unsupported OptimizerPort version: ${String(candidate.version ?? 'missing')}. Expected ${OPTIMIZER_PORT_VERSION}.`,
     )
   }
-  for (const method of ['executeSchedule', 'executeScenarioComparison', 'executeReorderCheck'] as const) {
+  for (const method of ['executeSchedule', 'executeScenarioComparison'] as const) {
     if (typeof candidate[method] !== 'function') {
       throw new OptimizerPortConfigurationError(`OptimizerPort.${method} must be a function.`)
     }

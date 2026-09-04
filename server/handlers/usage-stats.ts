@@ -395,26 +395,6 @@ async function getUsageEventStore(): Promise<UsageEventStore> {
   return createPostgresUsageEventStore()
 }
 
-export async function countSuccessfulUsageEventsForProfileInRange(
-  event: UsageEventName,
-  profileId: string,
-  startAt: string,
-  endAt: string,
-): Promise<number> {
-  const store = await getUsageEventStore()
-  if (store.countSuccessfulByProfileInRange) {
-    return store.countSuccessfulByProfileInRange(event, profileId, startAt, endAt)
-  }
-  const events = await store.list(EVENT_PREFIX)
-  return events.filter((record) => (
-    record.event === event
-    && record.profile_id === profileId
-    && record.status === 'success'
-    && record.created_at >= startAt
-    && record.created_at < endAt
-  )).length
-}
-
 export async function getScheduleGenerateDurationStatsByBucket(
   bucket: string,
   startAt: string,

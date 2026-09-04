@@ -137,8 +137,6 @@ async function notifyTerminalJob(jobId: string, status: OptimizationJobSnapshot<
   const title = status === 'succeeded'
     ? kind === 'scenario_comparison'
       ? copy.optimize.pages_tool_optimize_optimization_job_events_003
-      : kind === 'reorder_check'
-        ? copy.optimize.pages_tool_optimize_optimization_job_events_007
       : copy.optimize.pages_tool_optimize_optimization_job_events_002
     : copy.optimize.pages_tool_optimize_optimization_job_events_005
   if (document.visibilityState === 'hidden') {

@@ -248,7 +248,7 @@ function activeTrial() {
 }
 
 function emptyInventory(): InventoryResponse {
-  return { stacks: [], capacities: [], reorder_quotas: [], recent_events: [] }
+  return { stacks: [], capacities: [], recent_events: [] }
 }
 
 function inventoryWith(...values: Array<'limited_profile_voucher' | 'lifetime_profile_voucher' | 'use' | 'bind'>): InventoryResponse {

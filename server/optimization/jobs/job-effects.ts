@@ -5,11 +5,10 @@ import { hasDatabaseUrl, query } from '../../storage/postgres'
 import { applyScheduleGenerateEffects } from './entitlements'
 import { normalizePersistedOptimizationJobPayload } from './shared'
 import { parseOptimizationJobResult } from './runtime-contracts'
-import { applyReorderCheckSuccessEffect } from './reorder-telemetry'
 
 type PendingScheduleEffectRow = {
   job_id: string
-  effect_type: 'schedule_completion' | 'reorder_check_completion'
+  effect_type: 'schedule_completion'
   payload_json: unknown
   result_json: unknown
   profile_id: string | null
@@ -26,7 +25,7 @@ export async function processPendingOptimizationJobEffects(jobId?: string): Prom
      from optimization_job_effects effect
      join optimize_jobs job on job.id = effect.job_id
      left join user_game_accounts profile on profile.id = job.profile_id
-     where effect.effect_type in ('schedule_completion', 'reorder_check_completion')
+     where effect.effect_type = 'schedule_completion'
        and coalesce(effect.metadata_json->>'status', 'pending') = 'pending'
        and job.status = 'succeeded'
        and ($1::text is null or effect.job_id = $1)
@@ -37,11 +36,7 @@ export async function processPendingOptimizationJobEffects(jobId?: string): Prom
   let applied = 0
   for (const row of pending.rows) {
     try {
-      if (row.effect_type === 'schedule_completion') {
-        await applyScheduleCompletionEffect(row)
-      } else {
-        await applyReorderCompletionEffect(row)
-      }
+      await applyScheduleCompletionEffect(row)
       await query(
         `update optimization_job_effects
          set metadata_json = metadata_json || $3::jsonb, applied_at = $2
@@ -66,18 +61,6 @@ export async function processPendingOptimizationJobEffects(jobId?: string): Prom
     }
   }
   return applied
-}
-
-async function applyReorderCompletionEffect(row: PendingScheduleEffectRow): Promise<void> {
-  const payload = normalizePersistedOptimizationJobPayload(row.payload_json)
-  if (!('kind' in payload) || payload.kind !== 'reorder_check') {
-    throw new Error('Unexpected reorder-check completion effect payload.')
-  }
-  if (!row.profile_id || payload.activeProfileId !== row.profile_id) {
-    throw new Error('Reorder-check effect is missing its profile owner.')
-  }
-  parseOptimizationJobResult(payload, row.result_json)
-  await applyReorderCheckSuccessEffect(row.profile_id, payload.submittedAt, row.job_id)
 }
 
 async function applyScheduleCompletionEffect(row: PendingScheduleEffectRow): Promise<void> {

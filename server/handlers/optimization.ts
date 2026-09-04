@@ -2,14 +2,12 @@ import {
   cancelOptimizationJob,
   getOptimizationJob,
   listOptimizationJobs,
-  submitReorderCheck,
   submitOptimizationJob,
 } from '../optimization/jobs/service'
 export { sanitizeConfigForPublicOptimize } from '../optimization/jobs/service'
 
 
 const JOBS_PATH = '/api/optimization/jobs'
-const REORDER_CHECKS_PATH = '/api/optimization/reorder-checks'
 
 export default async function optimizationHandler(req: Request): Promise<Response> {
 
@@ -19,11 +17,6 @@ export default async function optimizationHandler(req: Request): Promise<Respons
     if (req.method === 'GET') return noStoreResponse(await listOptimizationJobs(req))
     return methodNotAllowed()
   }
-  if (pathname === REORDER_CHECKS_PATH) {
-    if (req.method !== 'POST') return methodNotAllowed()
-    return submitReorderCheck(req)
-  }
-
   const jobRoute = matchJobRoute(pathname)
   if (jobRoute !== null) {
     if (jobRoute.action === 'cancel') {

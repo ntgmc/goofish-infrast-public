@@ -16,7 +16,6 @@ export type UsageEventName =
   | 'cdk_redeem'
   | 'schedule_generate'
   | 'metered_billing'
-  | 'reorder_check'
   | 'skland_import'
   | 'announcement_impression'
   | 'announcement_read'
@@ -40,7 +39,6 @@ export type UsageReasonCode =
   | 'permission_denied'
   | 'optimizer_runtime_error'
   | 'workspace_save_failed'
-  | 'monthly_quota_exceeded'
   | 'insufficient_balance'
   | 'commercial_queue_capacity_exceeded'
   | 'commercial_submission_rate_exceeded'
@@ -253,7 +251,6 @@ export interface UsageEventStore {
   set: (key: string, record: UsageEventRecord) => Promise<void>
   getStats: (dates: string[]) => Promise<UsageStats>
   list: (prefix: string) => Promise<UsageEventRecord[]>
-  countSuccessfulByProfileInRange?: (event: UsageEventName, profileId: string, startAt: string, endAt: string) => Promise<number>
   getScheduleGenerateDurationStatsByBucket?: (bucket: string, startAt: string, endAt: string) => Promise<{ p95_ms: number; sample_count: number }>
 }
 
@@ -319,21 +316,6 @@ export function createPostgresUsageEventStore(): UsageEventStore {
     }))
   }
 
-  const countSuccessfulByProfileInRange = async (event: UsageEventName, profileId: string, startAt: string, endAt: string) => {
-    const result = await query<{ count: string }>(
-      `select count(*)::text as count
-       from usage_events
-       where event = $1
-         and created_at >= $2
-         and created_at < $3
-         and record_json->>'profile_id' = $4
-         and record_json->>'status' = 'success'
-         and expires_at > now()`,
-      [event, startAt, endAt, profileId],
-    )
-    return Number(result.rows[0]?.count ?? 0)
-  }
-
   const getScheduleGenerateDurationStatsByBucket = async (bucket: string, startAt: string, endAt: string) => {
     const result = await query<{ compute_duration_ms: string | number | null }>(
       `select record_json->>'compute_duration_ms' as compute_duration_ms
@@ -394,7 +376,6 @@ export function createPostgresUsageEventStore(): UsageEventStore {
       })
     },
     list,
-    countSuccessfulByProfileInRange,
     getScheduleGenerateDurationStatsByBucket,
   }
 }

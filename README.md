@@ -187,11 +187,10 @@ PostgreSQL 集成测试使用 Testcontainers，需要可用的 Docker daemon。
 
 ## OptimizerPort
 
-当前公开协议版本为 v1，机器可读版本位于 [optimizer-port-contract.json](optimizer-port-contract.json)。端口包含三类执行方法：
+当前公开协议版本为 v1，机器可读版本位于 [optimizer-port-contract.json](optimizer-port-contract.json)。端口包含两类执行方法：
 
 - schedule
 - scenario comparison
-- reorder check
 
 任务可靠性来自 PostgreSQL 队列。进程内 signals 只用于即时唤醒，不承担持久化投递。
 

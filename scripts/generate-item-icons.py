@@ -74,15 +74,6 @@ ICON_SPECS = (
         avoid_extra="写实纸张、古代羊皮卷轴、魔法卷轴、纸币、银行卡、登机牌、复杂电路板、微小装饰、密集线条、华丽符文、星星、皇冠、翅膀、火焰、闪电爆炸、速度线背景、厚重 3D 倒角、方形底板。",
     ),
     IconSpec(
-        code="reorder_check_coupon",
-        filename="reorder-check-coupon.png",
-        asset_type="website backpack game UI consumable item icon",
-        primary_request="为网页背包系统绘制一枚“变化预判券”游戏道具图标，作用是在免费月度变化影响预判次数用尽后额外执行一次预判。第一视觉含义是“变化趋势 + 检查验证”。",
-        subject="画面中只有一张独立的现代科技票券：完整矩形轮廓、四角略微切角、两侧简洁半圆票根缺口、边缘略厚。票券中央放置两条粗壮、简洁、彼此交叉或上下交换方向的箭头，形成清晰的顺序调整含义；箭头旁边保留一个小型但可辨认的圆形检查徽记，徽记内是简化勾选符号。箭头周围只可保留极少量简化科技线路节点。",
-        focus_rule="重新排序箭头必须是最强视觉焦点，圆形检查徽记只能作为第二视觉层级。",
-        avoid_extra="写实纸张、古代羊皮卷轴、魔法卷轴、纸币、银行卡、登机牌、复杂流程图、密集网格、表格、复杂电路板、微小装饰、华丽符文、星星、皇冠、翅膀、火焰、闪电爆炸、速度线背景、厚重 3D 倒角、方形底板。",
-    ),
-    IconSpec(
         code="scenario_simulation_coupon",
         filename="scenario-simulation-coupon.png",
         asset_type="website backpack game UI consumable item icon",

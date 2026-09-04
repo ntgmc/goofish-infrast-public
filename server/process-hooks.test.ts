@@ -101,7 +101,6 @@ const optimizerPort: OptimizerPort = {
   version: OPTIMIZER_PORT_VERSION,
   executeSchedule: vi.fn(async () => ({} as never)),
   executeScenarioComparison: vi.fn(async () => ({} as never)),
-  executeReorderCheck: vi.fn(async () => ({} as never)),
 }
 
 describe('API process hook compositions', () => {

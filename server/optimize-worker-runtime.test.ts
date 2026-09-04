@@ -70,7 +70,6 @@ function fakePort(executeSchedule: OptimizerPort['executeSchedule']): OptimizerP
     version: OPTIMIZER_PORT_VERSION,
     executeSchedule,
     executeScenarioComparison: vi.fn(async () => ({} as never)),
-    executeReorderCheck: vi.fn(async () => ({} as never)),
   }
 }
 

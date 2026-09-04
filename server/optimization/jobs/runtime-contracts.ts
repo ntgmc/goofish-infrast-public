@@ -6,7 +6,7 @@ import {
   scenarioComparisonResultSchema,
 } from '../../../src/lib/scenario-comparison-validation'
 export { scenarioComparisonFactorsSchema } from '../../../src/lib/scenario-comparison-validation'
-import type { OptimizeResult, ReorderCheckResult } from '../../../src/lib/types'
+import type { OptimizeResult } from '../../../src/lib/types'
 import {
   extensibleLicenseConfigSchema,
   extensibleLicenseOperatorsSchema,
@@ -14,13 +14,11 @@ import {
 import type {
   OptimizationJobPayload,
   OptimizeJobPayload,
-  ReorderCheckJobPayload,
   ScenarioComparisonJobPayload,
 } from './shared'
 
 const finiteNumber = z.number().finite()
 const boundedString = (maximum: number) => z.string().min(1).max(maximum)
-const nullableFiniteNumber = finiteNumber.nullable()
 const roomEfficiencySchema = z.union([
   finiteNumber,
   z.record(boundedString(128), finiteNumber),
@@ -105,51 +103,6 @@ const optimizeResultSchema: z.ZodType<OptimizeResult> = z.object({
   build_meta: appBuildMetaSchema.optional(),
 }).passthrough().superRefine(assertJsonSafe) as z.ZodType<OptimizeResult>
 
-const reorderCheckResultSchema: z.ZodType<ReorderCheckResult> = z.object({
-  recommendation: z.enum(['no_need', 'recommended', 'strongly_recommended']),
-  estimated_gain_range: z.strictObject({
-    min: nullableFiniteNumber,
-    max: nullableFiniteNumber,
-    unit: z.enum(['equivalent_sanity_per_day', 'room_change_only']),
-    label: z.string().max(2_000),
-  }),
-  changed_room_count: z.number().int().min(0).max(100),
-  affected_facility_types: z.array(z.string().max(128)).max(100),
-  key_operators: z.array(z.strictObject({
-    id: z.string().max(128).optional(),
-    name: boundedString(256),
-    reason: z.enum(['newly_used', 'core_combo_changed']),
-    occurrence_count: z.number().int().min(0).max(1_000_000),
-  })).max(1_000),
-  current_plan_usable: z.boolean(),
-  quota: z.strictObject({
-    limit: z.literal(2),
-    used: z.number().int().min(0),
-    remaining: z.number().int().min(0),
-    reset_at: boundedString(128),
-    timezone: z.literal('Asia/Shanghai'),
-  }),
-  baseline: z.strictObject({
-    history_id: boundedString(128),
-    created_at: boundedString(128),
-    name: boundedString(1_000),
-  }),
-  free_schedule_entitlement: freeScheduleEntitlementSchema.optional(),
-  reasons: z.array(z.string().max(2_000)).max(1_000),
-  build_meta: appBuildMetaSchema.optional(),
-}).passthrough().superRefine(assertJsonSafe) as z.ZodType<ReorderCheckResult>
-
-const workspaceHistoryItemSchema = z.strictObject({
-  id: boundedString(128),
-  job_id: boundedString(128).optional(),
-  name: boundedString(1_000),
-  created_at: boundedString(128),
-  config: extensibleLicenseConfigSchema.nullable(),
-  result: optimizeResultSchema,
-  operator_count: z.number().int().min(0).max(500),
-  source: z.enum(['generated', 'applied_suggestions', 'legacy']),
-})
-
 const schedulePayloadSchema: z.ZodType<OptimizeJobPayload> = z.strictObject({
   version: z.literal(3),
   submittedAt: z.number().int().nonnegative(),
@@ -184,21 +137,8 @@ const scenarioPayloadSchema: z.ZodType<ScenarioComparisonJobPayload> = z.strictO
   estimate: optimizeDurationEstimateSchema,
 })
 
-const reorderPayloadSchema: z.ZodType<ReorderCheckJobPayload> = z.strictObject({
-  version: z.literal(3),
-  kind: z.literal('reorder_check'),
-  submittedAt: z.number().int().nonnegative(),
-  operators: extensibleLicenseOperatorsSchema,
-  effectiveConfig: extensibleLicenseConfigSchema,
-  activeProfileId: boundedString(128),
-  isPreviewTrial: z.boolean(),
-  baseline: workspaceHistoryItemSchema,
-  estimate: optimizeDurationEstimateSchema,
-})
-
 export const optimizationJobPayloadSchema: z.ZodType<OptimizationJobPayload> = z.union([
   scenarioPayloadSchema,
-  reorderPayloadSchema,
   schedulePayloadSchema,
 ])
 
@@ -209,31 +149,8 @@ export function parseOptimizeResult(value: unknown): OptimizeResult {
 export function parseOptimizationJobResult(
   payload: OptimizationJobPayload,
   value: unknown,
-): OptimizeResult | ScenarioComparisonResult | ReorderCheckResult {
+): OptimizeResult | ScenarioComparisonResult {
   if ('kind' in payload && payload.kind === 'scenario_comparison') return scenarioComparisonResultSchema.parse(value)
-  if ('kind' in payload && payload.kind === 'reorder_check') {
-    const result = reorderCheckResultSchema.parse(value)
-    if (result.baseline.history_id !== payload.baseline.id
-      || result.baseline.created_at !== payload.baseline.created_at
-      || result.baseline.name !== payload.baseline.name) {
-      throw new Error('换班结果基线与任务冻结基线不一致。')
-    }
-    if (result.estimated_gain_range.min !== null
-      && result.estimated_gain_range.max !== null
-      && result.estimated_gain_range.min > result.estimated_gain_range.max) {
-      throw new Error('换班结果收益区间上下界无效。')
-    }
-    if (result.quota.used + result.quota.remaining !== result.quota.limit) {
-      throw new Error('换班结果额度字段不一致。')
-    }
-    if (result.recommendation === 'strongly_recommended'
-      && result.reasons.length === 0
-      && result.changed_room_count === 0
-      && result.key_operators.length === 0) {
-      throw new Error('强烈建议换班的结果缺少推荐证据。')
-    }
-    return result
-  }
   return parseOptimizeResult(value)
 }
 

@@ -250,7 +250,7 @@ export interface OptimizeJobStatusResponse {
   recovery_action?: 'retry' | 'review_input' | 'reauthorize' | 'contact_support' | 'none';
   support_reference?: string;
   failure_kind?: string;
-  job_kind?: 'schedule' | 'scenario_comparison' | 'reorder_check';
+  job_kind?: 'schedule' | 'scenario_comparison';
   source?: string;
   execution_phase?: 'initial_queue' | 'retry_wait' | 'executing' | 'settling' | 'terminal';
   attempt_count?: number;
@@ -414,42 +414,6 @@ export interface FreeScheduleEntitlement {
     granted_at: string;
     used_at: string | null;
   } | null;
-}
-
-type ReorderCheckRecommendation = 'no_need' | 'recommended' | 'strongly_recommended';
-
-export interface ReorderCheckResult {
-  recommendation: ReorderCheckRecommendation;
-  estimated_gain_range: {
-    min: number | null;
-    max: number | null;
-    unit: 'equivalent_sanity_per_day' | 'room_change_only';
-    label: string;
-  };
-  changed_room_count: number;
-  affected_facility_types: string[];
-  key_operators: {
-    id?: string;
-    name: string;
-    reason: 'newly_used' | 'core_combo_changed';
-    occurrence_count: number;
-  }[];
-  current_plan_usable: boolean;
-  quota: {
-    limit: 2;
-    used: number;
-    remaining: number;
-    reset_at: string;
-    timezone: 'Asia/Shanghai';
-  };
-  baseline: {
-    history_id: string;
-    created_at: string;
-    name: string;
-  };
-  free_schedule_entitlement?: FreeScheduleEntitlement;
-  reasons: string[];
-  build_meta?: AppBuildMeta;
 }
 
 export interface UpgradeTrainingMaterial {

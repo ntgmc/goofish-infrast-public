@@ -52,9 +52,8 @@ export function validateCatalog(value) {
     throw new Error('积分按次计价策略无效。')
   }
   const freePreview = value.policies.free_preview
-  if (freePreview?.submission_window_hours !== 6 || freePreview?.max_submissions_per_window !== 2
-    || freePreview?.monthly_reorder_checks !== 2) {
-    throw new Error('免费预览权益必须为每 6 小时最多 2 次完整排班、每月 2 次变化影响预判。')
+  if (freePreview?.submission_window_hours !== 6 || freePreview?.max_submissions_per_window !== 2) {
+    throw new Error('免费预览权益必须为每 6 小时最多 2 次完整排班。')
   }
   const tierSignature = (metered.commercial.tiers ?? [])
     .map((tier) => `${tier.level}:${tier.threshold_points}:${tier.discount_bps}:${tier.charge_points}`).join('|')
@@ -105,7 +104,6 @@ ${publicSkus.map(([, sku]) => `| ${tableCell(sku.label)} | ${tableCell(formatPub
 ## 权益口径
 
 - 完整个人排班：根据当前干员和配置生成一份可直接使用的新轮换方案。
-- 变化影响预判：对比当前数据与最近一次成功排班，只返回是否建议重新生成、预计收益区间、受影响设施和关键干员，不生成新排班。
 - 个人增量重算：绑定同一档案的已有成功结果，重新计算并生成一份完整的新排班；付费 CDK 已包含，个人按次档案按成功任务计费。
 
 ## 按次排班规则
@@ -124,8 +122,6 @@ ${publicSkus.map(([, sku]) => `| ${tableCell(sku.label)} | ${tableCell(formatPub
 - 每 ${freePolicy.submission_window_hours} 小时最多提交 ${freePolicy.max_submissions_per_window} 次完整个人排班；同一档案同时最多有 ${freePolicy.max_active_jobs_per_profile} 个排班正在等待或计算。
 - 系统有空闲资源时会自动开始免费排班；繁忙时会先处理付费排班，你的排班会继续等待。
 - 如果计算途中系统变得繁忙，你的排班会自动重新排队并重新计算，无需再次提交；完成时间可能会延后。
-- 已有成功排班后，每月可进行 ${freePolicy.monthly_reorder_checks} 次变化影响预判；预判不生成新排班，也不占用每 ${freePolicy.submission_window_hours} 小时 ${freePolicy.max_submissions_per_window} 次的完整排班提交次数。
-- 每月预判次数用尽后，可使用一张变化预判券增加 1 次；使用券仍只返回判断结果，不生成新排班。
 
 ## 单账号卡账号规则
 

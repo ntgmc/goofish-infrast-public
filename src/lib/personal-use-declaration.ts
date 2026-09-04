@@ -5,7 +5,6 @@ export const PERSONAL_USE_DECLARATION_ACTIONS = [
   'metered_personal_create',
   'generated_result_export',
   'optimization_generate',
-  'reorder_check',
 ] as const
 
 export type PersonalUseDeclarationAction = typeof PERSONAL_USE_DECLARATION_ACTIONS[number]

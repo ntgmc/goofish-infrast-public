@@ -60,7 +60,6 @@ for (const filename of [
   'server/api-process-hooks.ts',
   'server/optimize-queue-maintenance.ts',
   'server/optimization/jobs/job-status.ts',
-  'server/optimization/jobs/reorder-submission.ts',
 ]) {
   const source = await readFile(filename, 'utf8')
   if (source.includes('optimize-job-runner')) {
@@ -72,15 +71,9 @@ for (const filename of [
   if (source.includes('optimization/engine/')) {
     failures.push(`${filename}: public API process boundary imports optimizer engine directly`)
   }
-  if (source.includes('reorder-analysis')) {
-    failures.push(`${filename}: public API process boundary imports reorder analysis directly`)
-  }
-  if (source.includes('reorder-executor')) {
-    failures.push(`${filename}: public API process boundary imports reorder worker executor directly`)
-  }
 }
 
-const privateOptimizerImportPattern = /from\s+['"][^'"]*(?:optimization\/jobs\/(?:executor|reorder-executor|reorder-analysis|result-formatting)|optimization\/scenario-comparison\/service|optimization\/(?:engine|candidates|domain|economics|formatting|rules|solvers)\/)/
+const privateOptimizerImportPattern = /from\s+['"][^'"]*(?:optimization\/jobs\/(?:executor|result-formatting)|optimization\/scenario-comparison\/service|optimization\/(?:engine|candidates|domain|economics|formatting|rules|solvers)\/)/
 for (const filename of [
   'server/optimize-job-runner.ts',
   'server/optimize-worker-process.ts',

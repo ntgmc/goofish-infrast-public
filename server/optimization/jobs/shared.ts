@@ -1,4 +1,4 @@
-import type { FreeScheduleEntitlement, LicenseOperator, LicenseConfig, OptimizeEstimateBucket, PermissionMode, ReorderCheckResult, WorkspaceResultHistoryItem } from "../../../src/lib/types"
+import type { FreeScheduleEntitlement, LicenseOperator, LicenseConfig, OptimizeEstimateBucket, PermissionMode } from "../../../src/lib/types"
 import { type CdkRecord } from "../../handlers/license-utils"
 import type { UsageReasonCode } from "../../storage/usage-store";
 import { type OptimizeJobPriority } from "../../storage/optimize-job-store"
@@ -16,12 +16,6 @@ export const SHANGHAI_TIMEZONE = "Asia/Shanghai" as const;
 
 export const SHANGHAI_UTC_OFFSET_MS = 8 * 60 * 60 * 1000;
 
-export type ReorderCheckQuota = ReorderCheckResult["quota"];
-
-export type ReorderCheckRecommendation = ReorderCheckResult["recommendation"];
-
-export type ReorderOperatorImpact = ReorderCheckResult["key_operators"][number];
-
 export type ScheduleUsageContext = {
   status: "success" | "failure";
   reason_code: UsageReasonCode;
@@ -34,7 +28,7 @@ export type ScheduleUsageContext = {
   estimate_bucket?: OptimizeEstimateBucket;
 };
 
-export type OptimizeJobSource = "free_preview" | "account_profile" | "scenario_comparison" | "reorder_check";
+export type OptimizeJobSource = "free_preview" | "account_profile" | "scenario_comparison";
 
 type OptimizeEstimateSource = "history_p95" | "fallback_p95";
 
@@ -111,19 +105,7 @@ export type ScenarioComparisonJobPayload = {
   estimate: OptimizeDurationEstimate;
 };
 
-export type ReorderCheckJobPayload = {
-  version: 3;
-  kind: 'reorder_check';
-  submittedAt: number;
-  operators: LicenseOperator[];
-  effectiveConfig: LicenseConfig;
-  activeProfileId: string;
-  isPreviewTrial: boolean;
-  baseline: WorkspaceResultHistoryItem;
-  estimate: OptimizeDurationEstimate;
-};
-
-export type OptimizationJobPayload = OptimizeJobPayload | ScenarioComparisonJobPayload | ReorderCheckJobPayload;
+export type OptimizationJobPayload = OptimizeJobPayload | ScenarioComparisonJobPayload;
 
 export class UnsupportedOptimizationJobPayloadError extends Error {
   constructor(readonly payloadVersion: unknown, readonly details?: string) {
@@ -149,8 +131,7 @@ export function normalizePersistedOptimizationJobPayload(value: unknown): Optimi
     throw new UnsupportedOptimizationJobPayloadError(record.version)
   }
   if ('kind' in record
-    && record.kind !== 'scenario_comparison'
-    && record.kind !== 'reorder_check') {
+    && record.kind !== 'scenario_comparison') {
     throw new UnsupportedOptimizationJobPayloadError(record.version)
   }
   const parsed = optimizationJobPayloadSchema.safeParse(value)
@@ -183,26 +164,3 @@ export type OptimizeConfigPermission = PermissionMode | "free_preview";
 type FreeScheduleGenerateDecision =
   | { ok: true; mode: "revision" | "strong_reorder_bonus"; entitlement: FreeScheduleEntitlement }
   | { ok: false; status: number; message: string; entitlement: FreeScheduleEntitlement };
-
-export type NormalizedRoomOperator = {
-  id?: string;
-  name: string;
-  key: string;
-};
-
-export type ReorderRoomSnapshot = {
-  key: string;
-  roomType: string;
-  roomIndex: number;
-  product: string;
-  operators: NormalizedRoomOperator[];
-  operatorKeySet: Set<string>;
-  signature: string;
-};
-
-export type ReorderPlanComparison = {
-  changed_room_count: number;
-  affected_facility_types: string[];
-  core_combo_changed: boolean;
-  key_operators: ReorderOperatorImpact[];
-};

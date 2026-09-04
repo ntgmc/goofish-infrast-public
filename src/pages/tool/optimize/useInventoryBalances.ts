@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { copy } from '../../../copy/index'
 import { apiJson } from '../../../lib/api-client'
-import type { InventoryResponse, ProfileCapacitySummary, ProfileReorderQuotaSummary, SystemItemCode } from '../../../lib/inventory-contracts'
+import type { InventoryResponse, ProfileCapacitySummary, SystemItemCode } from '../../../lib/inventory-contracts'
 
 const EMPTY_INVENTORY: InventoryResponse = {
   stacks: [],
   capacities: [],
-  reorder_quotas: [],
   recent_events: [],
 }
 
@@ -44,10 +43,5 @@ export function useInventoryBalances(profileId: string) {
     () => inventory.capacities.find((entry) => entry.profile_id === profileId) ?? null,
     [inventory.capacities, profileId],
   )
-  const reorderQuota: ProfileReorderQuotaSummary | null = useMemo(
-    () => inventory.reorder_quotas.find((entry) => entry.profile_id === profileId) ?? null,
-    [inventory.reorder_quotas, profileId],
-  )
-
-  return { balances, capacity, reorderQuota, loaded, loading, error, refresh }
+  return { balances, capacity, loaded, loading, error, refresh }
 }

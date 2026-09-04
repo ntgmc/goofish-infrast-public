@@ -4,7 +4,6 @@ const PRIVATE_OPTIMIZER_EXACT_PATHS = Object.freeze([
   'server/all.ts',
   'server/worker.ts',
   'server/optimize-worker.ts',
-  'server/optimization/jobs/reorder-analysis.ts',
   'server/optimization/jobs/result-formatting.ts',
 ])
 
@@ -18,7 +17,6 @@ const PRIVATE_OPTIMIZER_PATH_PREFIXES = Object.freeze([
   'server/optimization/scenario-comparison/',
   'server/optimization/solvers/',
   'server/optimization/jobs/executor',
-  'server/optimization/jobs/reorder-executor',
 ])
 
 export function isPrivateOptimizerSource(path) {

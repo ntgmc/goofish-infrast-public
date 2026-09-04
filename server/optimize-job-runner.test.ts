@@ -328,7 +328,6 @@ function fakePort(): OptimizerPort {
     version: OPTIMIZER_PORT_VERSION,
     executeSchedule: async (_payload, context) => executeSchedule(context) as Promise<never>,
     executeScenarioComparison: async () => ({} as never),
-    executeReorderCheck: async () => ({} as never),
   }
 }
 

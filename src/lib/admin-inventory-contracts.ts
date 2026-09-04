@@ -16,7 +16,7 @@ const itemDefinitionSchema = z.object({
   code: z.string().min(1),
   kind: z.enum(['consumable', 'capacity_upgrade', 'gift_pack', 'cosmetic', 'badge', 'license_voucher']),
   effect_code: z.enum([
-    'priority_compute', 'reorder_check', 'scenario_simulation', 'training_diagnosis',
+    'priority_compute', 'scenario_simulation', 'training_diagnosis',
     'additional_recompute', 'plan_capacity', 'history_capacity', 'result_archive_capacity',
     'maa_export_trial', 'open_gift_pack', 'bind_lifetime_profile', 'activate_limited_profile',
   ]).nullable(),

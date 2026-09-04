@@ -14,7 +14,7 @@ const MIGRATION_ADVISORY_LOCK_KEY = 774_006_153
 const MIGRATION_STATEMENT_TIMEOUT_MS = 300_000
 export const DATABASE_SCHEMA_VERSION = databaseSchemaContract.version
 export const DATABASE_SCHEMA_MINIMUM_APP_VERSION = databaseSchemaContract.minimum_app_version
-const PERSONAL_USE_DECLARATION_ACTION_SQL = PERSONAL_USE_DECLARATION_ACTIONS
+const PERSONAL_USE_DECLARATION_ACTION_SQL = [...PERSONAL_USE_DECLARATION_ACTIONS, 'reorder_check']
   .map((action) => `'${action}'`)
   .join(', ')
 
@@ -2413,7 +2413,6 @@ INSERT INTO item_definitions
   (code, kind, effect_code, name, description, icon_key, system_owned, issuance_enabled, created_at, updated_at)
 VALUES
   ('priority_compute_coupon', 'consumable', 'priority_compute', '优先计算券', '让一次主排班进入最高优先队列。', 'priority_compute_coupon', true, true, now(), now()),
-  ('reorder_check_coupon', 'consumable', 'reorder_check', '变化预判券', '本月免费变化影响预判次数用尽后增加一次预判；不会生成完整排班。', 'reorder_check_coupon', true, true, now(), now()),
   ('scenario_simulation_coupon', 'consumable', 'scenario_simulation', '情景推演券', '运行一次情景比较实验。', 'scenario_simulation_coupon', true, true, now(), now()),
   ('training_diagnosis_coupon', 'consumable', 'training_diagnosis', '练度诊断券', '为一次主排班启用练度与升级诊断。', 'training_diagnosis_coupon', true, true, now(), now()),
   ('additional_recompute_coupon', 'consumable', 'additional_recompute', '追加重算券（历史）', '免费预览现可按页面规则重新生成完整排班，此历史道具无需再使用。', 'additional_recompute_coupon', true, false, now(), now()),
@@ -2427,12 +2426,16 @@ VALUES
 ON CONFLICT (code) DO NOTHING;
 
 UPDATE item_definitions
-SET name = '变化预判券',
-    description = '本月免费变化影响预判次数用尽后增加一次预判；不会生成完整排班。',
+SET name = '已停用道具',
+    description = '该道具已停用。',
+    icon_key = 'placeholder',
+    issuance_enabled = false,
     updated_at = now()
 WHERE code = 'reorder_check_coupon'
-  AND (name IS DISTINCT FROM '变化预判券'
-    OR description IS DISTINCT FROM '本月免费变化影响预判次数用尽后增加一次预判；不会生成完整排班。');
+  AND (name IS DISTINCT FROM '已停用道具'
+    OR description IS DISTINCT FROM '该道具已停用。'
+    OR icon_key IS DISTINCT FROM 'placeholder'
+    OR issuance_enabled IS DISTINCT FROM false);
 
 UPDATE item_definitions
 SET name = '追加重算券（历史）',

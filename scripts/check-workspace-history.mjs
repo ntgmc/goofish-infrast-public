@@ -12,10 +12,6 @@ const store = createMemoryStore()
 globalThis.__workspaceHistorySmokeStore = store
 const optimizeJobStoreModule = await bundleHandler('server/storage/optimize-job-store.ts')
 const optimizeJobStore = optimizeJobStoreModule.createMemoryOptimizeJobStore()
-const atomicAdmitOptimizeJob = optimizeJobStore.admitJob.bind(optimizeJobStore)
-optimizeJobStore.admitJob = async (input) => input.source === 'reorder_check'
-  ? atomicAdmitOptimizeJob(input)
-  : { job: await optimizeJobStore.createJob(input), replayed: false }
 globalThis.__maaOptimizeJobStoreForTesting = optimizeJobStore
 
 const workspaceHandler = await bundleHandler('server/handlers/user-workspace.ts')
@@ -403,36 +399,6 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
 
   const beforeHistoryCount = getProfileResults(preview.id).length
 
-  const unboundReorder = await call(optimizeHandler, '/api/optimize/reorder-check', {
-    profile_id: unboundPreview.id,
-    config: free333OrundumConfig,
-  })
-  if (unboundReorder.status !== 403) {
-    throw new Error(`免费档案未绑定变化影响预判：预期 403，实际 ${unboundReorder.status}`)
-  }
-
-  const cdkReorder = await call(optimizeHandler, '/api/optimize/reorder-check', {
-    profile_id: 'profile-1',
-    config: free333OrundumConfig,
-  })
-  if (cdkReorder.status !== 403) {
-    throw new Error(`CDK 档案变化影响预判：预期 403，实际 ${cdkReorder.status}`)
-  }
-
-  const noBaselinePreview = seedFreePreviewProfile('preview-reorder-no-baseline', { bound: true })
-  store.workspaces.set(noBaselinePreview.id, {
-    ...emptyWorkspace(noBaselinePreview.id),
-    operators: sampleOperators,
-    config: free333OrundumConfig,
-  })
-  const noBaselineReorder = await call(optimizeHandler, '/api/optimize/reorder-check', {
-    profile_id: noBaselinePreview.id,
-    config: free333OrundumConfig,
-  })
-  if (noBaselineReorder.status !== 409) {
-    throw new Error(`免费档案无历史基线变化影响预判：预期 409，实际 ${noBaselineReorder.status}`)
-  }
-
   const generated = await call(optimizeHandler, '/api/optimize', {
     profile_id: preview.id,
     license: null,
@@ -454,35 +420,6 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
     throw new Error('免费档案生成：预期受限结果写入历史')
   }
   assertFreePreviewResult(history[0].result, '免费档案保存的历史结果')
-
-  const reorderBeforeHistoryCount = history.length
-  const reorderBeforeLatestResult = history[0]
-  const noNeedReorder = await call(optimizeHandler, '/api/optimize/reorder-check', {
-    profile_id: preview.id,
-    config: free333OrundumConfig,
-    baseline_history_id: history[0].id,
-  })
-  if (noNeedReorder.status !== 200 || noNeedReorder.body?.recommendation !== 'no_need') {
-    throw new Error(`免费档案无变化影响预判：预期 200 no_need，实际 ${noNeedReorder.status}: ${JSON.stringify(noNeedReorder.body)}`)
-  }
-  assertReorderCheckResult(noNeedReorder.body, '免费档案无变化影响预判')
-  const reorderHistory = getProfileResults(preview.id)
-  if (reorderHistory.length !== reorderBeforeHistoryCount || reorderHistory[0] !== reorderBeforeLatestResult) {
-    throw new Error('免费档案变化影响预判：不应写入排班历史')
-  }
-
-  const invalidConfigReorder = await call(optimizeHandler, '/api/optimize/reorder-check', {
-    profile_id: preview.id,
-    config: { ...free333OrundumConfig, trading_stations_count: 4 },
-    baseline_history_id: history[0].id,
-  })
-  if (invalidConfigReorder.status !== 403) {
-    throw new Error(`免费档案非法配置变化影响预判：预期 403，实际 ${invalidConfigReorder.status}`)
-  }
-
-  await assertReorderRecommendationFromBaseline('preview-reorder-recommended', cloneWithRoomOperator(history[0].result, 'power', 0, { id: 'old-power', name: 'Old Power' }), 'recommended')
-  await assertReorderRecommendationFromBaseline('preview-reorder-strong', cloneWithRoomOperator(history[0].result, 'trading', 0, { id: 'old-trade', name: 'Old Trader' }), 'strongly_recommended')
-  await assertReorderQuotaLimit(history[0].result)
 
   const previewEvents = store.usageEvents.filter((event) => event.profile_id === preview.id)
   if (!previewEvents.some((event) => event.event === 'schedule_generate' && event.status === 'success')) {
@@ -614,14 +551,14 @@ async function assertFreeIdleQueueIgnoresLegacyEntitlement() {
     }),
   })
 
-  for (let index = 1; index <= 4; index += 1) {
+  for (let index = 1; index <= 2; index += 1) {
     const generated = await generateFreeSchedule(profile.id)
     if (generated.status !== 200) {
       throw new Error(`免费闲时排班第 ${index} 次生成：预期 200，实际 ${generated.status}`)
     }
   }
-  if (getProfileResults(profile.id).length !== 4) {
-    throw new Error(`免费闲时排班多次生成：预期 4 条历史，实际 ${getProfileResults(profile.id).length}`)
+  if (getProfileResults(profile.id).length !== 2) {
+    throw new Error(`免费闲时排班生成：预期 2 条历史，实际 ${getProfileResults(profile.id).length}`)
   }
 }
 
@@ -804,92 +741,6 @@ function assertFreePreviewResult(result, label) {
   }
 }
 
-function assertReorderCheckResult(result, label) {
-  if (!result || typeof result !== 'object') {
-    throw new Error(`${label}: missing result`)
-  }
-  if (!['no_need', 'recommended', 'strongly_recommended'].includes(result.recommendation)) {
-    throw new Error(`${label}: invalid recommendation`)
-  }
-  if (!result.estimated_gain_range || !['equivalent_sanity_per_day', 'room_change_only'].includes(result.estimated_gain_range.unit)) {
-    throw new Error(`${label}: invalid gain range`)
-  }
-  if (!result.quota || result.quota.limit !== 2 || result.quota.timezone !== 'Asia/Shanghai') {
-    throw new Error(`${label}: invalid quota`)
-  }
-  if (!result.baseline?.history_id || !result.baseline.created_at) {
-    throw new Error(`${label}: missing baseline metadata`)
-  }
-  for (const key of ['plans', 'raw_results', 'assignment_detail', 'daily_production', 'upgrade_suggestions', 'maa_default_comparison', 'current_result', 'upgrade_task_payload']) {
-    if (key in result) {
-      throw new Error(`${label}: leaked ${key}`)
-    }
-  }
-}
-
-async function assertReorderRecommendationFromBaseline(profileId, baselineResult, expectedRecommendation) {
-  const profile = seedFreePreviewProfile(profileId, { bound: true })
-  const historyItem = createHistoryItem(profileId, baselineResult)
-  store.workspaces.set(profile.id, {
-    ...emptyWorkspace(profile.id),
-    operators: sampleOperators,
-    config: free333OrundumConfig,
-  })
-  setProfileResults(profile.id, [historyItem])
-  const checked = await call(optimizeHandler, '/api/optimize/reorder-check', {
-    profile_id: profile.id,
-    config: free333OrundumConfig,
-    baseline_history_id: historyItem.id,
-  })
-  if (checked.status !== 200 || checked.body?.recommendation !== expectedRecommendation) {
-    throw new Error(`免费档案变化影响预判 ${expectedRecommendation}：预期 200 ${expectedRecommendation}，实际 ${checked.status}: ${JSON.stringify(checked.body)}`)
-  }
-  assertReorderCheckResult(checked.body, `免费档案变化影响预判 ${expectedRecommendation}`)
-  if (checked.body?.free_schedule_entitlement) {
-    throw new Error(`免费档案变化影响预判 ${expectedRecommendation}：不应返回旧的生成次数权益`)
-  }
-}
-
-async function assertReorderQuotaLimit(baselineResult) {
-  const profile = seedFreePreviewProfile('preview-reorder-quota', { bound: true })
-  const historyItem = createHistoryItem(profile.id, baselineResult)
-  store.workspaces.set(profile.id, {
-    ...emptyWorkspace(profile.id),
-    operators: sampleOperators,
-    config: free333OrundumConfig,
-  })
-  setProfileResults(profile.id, [historyItem])
-
-  const failedBeforeQuota = await call(optimizeHandler, '/api/optimize/reorder-check', {
-    profile_id: profile.id,
-    config: { ...free333OrundumConfig, optimizer_search: { max_iterations: 999 } },
-    baseline_history_id: historyItem.id,
-  })
-  if (failedBeforeQuota.status !== 403) {
-    throw new Error(`免费档案变化影响预判额度预检失败：预期 403，实际 ${failedBeforeQuota.status}`)
-  }
-
-  for (let index = 0; index < 2; index++) {
-    const checked = await call(optimizeHandler, '/api/optimize/reorder-check', {
-      profile_id: profile.id,
-      config: free333OrundumConfig,
-      baseline_history_id: historyItem.id,
-    })
-    if (checked.status !== 200 || checked.body?.quota?.used !== index + 1) {
-      throw new Error(`免费档案变化影响预判额度成功 ${index + 1}：预期已用 ${index + 1}，实际 ${checked.status}`)
-    }
-  }
-
-  const exceeded = await call(optimizeHandler, '/api/optimize/reorder-check', {
-    profile_id: profile.id,
-    config: free333OrundumConfig,
-    baseline_history_id: historyItem.id,
-  })
-  if (exceeded.status !== 429 || exceeded.body?.code !== 'reorder_check_quota_exceeded' || exceeded.body?.quota?.remaining !== 0) {
-    throw new Error(`免费档案变化影响预判额度耗尽：预期 429 且包含额度信息，实际 ${exceeded.status}`)
-  }
-}
-
 function createHistoryItem(profileId, result) {
   const now = new Date().toISOString()
   return {
@@ -914,14 +765,6 @@ function setProfileResults(profileId, items) {
   })))
 }
 
-function cloneWithRoomOperator(result, roomType, roomIndex, operator) {
-  const cloned = JSON.parse(JSON.stringify(result))
-  const room = cloned?.plans?.[0]?.rooms?.[roomType]?.[roomIndex]
-  if (!room) throw new Error(`test baseline missing ${roomType} room ${roomIndex}`)
-  room.operators = [typeof operator === 'string' ? operator : operator.name ?? operator.id]
-  return cloned
-}
-
 function countVisibleRooms(plans) {
   if (!Array.isArray(plans)) return 0
   let count = 0
@@ -937,20 +780,16 @@ function countVisibleRooms(plans) {
 async function call(handler, path, body = {}, init = {}) {
   const requestPath = path === '/api/optimize'
     ? '/api/optimization/jobs'
-    : path === '/api/optimize/reorder-check'
-      ? '/api/optimization/reorder-checks'
-      : path
+    : path
   const requestBody = path === '/api/optimize'
     ? toOptimizationRequest(body)
-    : path === '/api/optimize/reorder-check'
-      ? { profileId: body.profile_id, config: body.config, baselineHistoryId: body.baseline_history_id }
-      : body
+    : body
   const method = init.method ?? 'POST'
   const requestInit = {
     method,
     headers: {
       'Content-Type': 'application/json',
-      ...(requestPath === '/api/optimization/jobs' || requestPath === '/api/optimization/reorder-checks'
+      ...(requestPath === '/api/optimization/jobs'
         ? { 'Idempotency-Key': `workspace-history-${randomUUID()}` }
         : {}),
       cookie: init.auth === false ? '' : 'maa_session=test-session',
@@ -965,9 +804,7 @@ async function call(handler, path, body = {}, init = {}) {
   if (parsed?.error && typeof parsed.error === 'object') {
     parsed = { ...(parsed.error.details ?? {}), code: parsed.error.code, error: parsed.error.message }
   }
-  if (path === '/api/optimize/reorder-check' && parsed?.result) parsed = parsed.result
-  if ((path === '/api/optimize' || path === '/api/optimize/reorder-check')
-    && response.status === 202 && parsed?.job?.id) {
+  if (path === '/api/optimize' && response.status === 202 && parsed?.job?.id) {
     return await waitForOptimizeJob(handler, parsed.job.id)
   }
   return { status: response.status, body: parsed }
@@ -1093,15 +930,6 @@ function memoryUsageStatsModule() {
       const now = new Date().toISOString()
       globalThis.__workspaceHistorySmokeStore.usageEvents.push({ id: 'usage-' + globalThis.__workspaceHistorySmokeStore.usageEvents.length, event, created_at: now, date: now.slice(0, 10), ...payload })
     }
-export async function countSuccessfulUsageEventsForProfileInRange(event, profileId, startAt, endAt) {
-  return globalThis.__workspaceHistorySmokeStore.usageEvents.filter((record) =>
-    record.event === event &&
-    record.profile_id === profileId &&
-    record.status !== 'failure' &&
-    record.created_at >= startAt &&
-    record.created_at < endAt
-  ).length
-}
 export async function getScheduleGenerateDurationStatsByBucket(bucket, startAt, endAt) {
   const durations = globalThis.__workspaceHistorySmokeStore.usageEvents
     .filter((record) =>
@@ -1707,73 +1535,6 @@ function memoryOptimizerPortModule() {
       store.usageEvents.push({ event: 'schedule_generate', status: 'success', profile_id: profileId, created_at: now })
       if (payload.isPreviewProfile) store.usageEvents.push({ event: 'free_preview', status: 'success', profile_id: profileId, created_at: now })
     }
-    function roomOperators(result, type, index) {
-      return result?.plans?.[0]?.rooms?.[type]?.[index]?.operators ?? []
-    }
-    function operatorsMatch(left, right) {
-      const key = (operator) => typeof operator === 'string' ? operator : operator.id ?? operator.name
-      return JSON.stringify(left.map(key)) === JSON.stringify(right.map(key))
-    }
-    function createReorderResult(payload) {
-      const store = globalThis.__workspaceHistorySmokeStore
-      const baselineResult = payload.baseline?.result
-      const tradingChanged = previewRooms.trading.some((room, index) => !operatorsMatch(roomOperators(baselineResult, 'trading', index), room.operators))
-      const otherChanged = ['manufacture', 'power', 'dormitory'].some((type) =>
-        previewRooms[type].some((room, index) => !operatorsMatch(roomOperators(baselineResult, type, index), room.operators)))
-      const recommendation = tradingChanged ? 'strongly_recommended' : otherChanged ? 'recommended' : 'no_need'
-      const changedRoomCount = tradingChanged || otherChanged ? 1 : 0
-      const now = new Date().toISOString()
-      const previousUsage = store.usageEvents.filter((event) =>
-        event.event === 'reorder_check' && event.status === 'success' && event.profile_id === payload.activeProfileId).length
-      const used = payload.isPreviewTrial ? 0 : Math.min(2, previousUsage + 1)
-      store.usageEvents.push({ event: 'reorder_check', status: 'success', profile_id: payload.activeProfileId, created_at: now })
-      if (recommendation === 'strongly_recommended') {
-        const workspace = store.workspaces.get(payload.activeProfileId)
-        if (workspace) {
-          const month = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 7)
-          const current = workspace.free_schedule_entitlement ?? {
-            first_generated_at: null,
-            revision_count: 0,
-            revision_limit: 3,
-            revision_window_hours: 24,
-            confirmed_at: null,
-            locked_at: null,
-            lock_reason: null,
-            strong_reorder_bonus: null,
-          }
-          workspace.free_schedule_entitlement = {
-            ...current,
-            strong_reorder_bonus: { month, granted_at: now, used_at: null },
-          }
-        }
-      }
-      return {
-        recommendation,
-        estimated_gain_range: {
-          min: null,
-          max: null,
-          unit: 'room_change_only',
-          label: changedRoomCount ? 'test room change' : 'no material change',
-        },
-        changed_room_count: changedRoomCount,
-        affected_facility_types: tradingChanged ? ['trading'] : otherChanged ? ['power'] : [],
-        key_operators: [],
-        current_plan_usable: recommendation === 'no_need',
-        quota: {
-          limit: 2,
-          used,
-          remaining: 2 - used,
-          reset_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          timezone: 'Asia/Shanghai',
-        },
-        baseline: {
-          history_id: payload.baseline.id,
-          created_at: payload.baseline.created_at,
-          name: payload.baseline.name,
-        },
-        reasons: [recommendation],
-      }
-    }
     export const optimizerPort = {
       version: 1,
       async executeSchedule(payload) {
@@ -1782,7 +1543,6 @@ function memoryOptimizerPortModule() {
         return result
       },
       async executeScenarioComparison() { throw new Error('scenario comparison is outside this smoke test') },
-      async executeReorderCheck(payload) { return createReorderResult(payload) },
     }
   `
 }

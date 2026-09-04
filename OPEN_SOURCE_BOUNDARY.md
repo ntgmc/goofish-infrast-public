@@ -9,7 +9,7 @@
 - Process-local job signals, runner, worker process lifecycle, worker-thread
   messaging, combined hooks, and health-state primitives.
 - OptimizerPort v1, payload validation, and exhaustive job dispatch.
-- Schedule, scenario-comparison, and reorder-check public request/result types.
+- Schedule and scenario-comparison public request/result types.
 
 ## Not included
 
@@ -18,7 +18,7 @@
 - Optimization rules and dynamic rule execution.
 - Assignment solvers and search strategies.
 - Economic objective implementation.
-- Scenario-comparison and reorder-check calculation services.
+- Scenario-comparison calculation services.
 - Private result formatting, optimizer benchmarks, fixtures, and diagnostics.
 
 ## Runtime behavior

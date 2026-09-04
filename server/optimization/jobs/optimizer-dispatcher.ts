@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { ScenarioComparisonResult } from '../../../src/lib/scenario-comparison'
-import type { OptimizeResult, ReorderCheckResult } from '../../../src/lib/types'
+import type { OptimizeResult } from '../../../src/lib/types'
 import { attachTrainingCostsToUpgradeSuggestions } from '../../handlers/training-cost'
 import type { OptimizeJobRecord } from '../../storage/optimize-job-store'
 import { getProfileById } from '../../storage/user-store'
@@ -16,7 +16,7 @@ import {
 } from './shared'
 import { parseOptimizationJobResult } from './runtime-contracts'
 
-export type OptimizationJobExecutionResult = OptimizeResult | ScenarioComparisonResult | ReorderCheckResult
+export type OptimizationJobExecutionResult = OptimizeResult | ScenarioComparisonResult
 
 export async function executeOptimizationJobWithPort(
   job: OptimizeJobRecord,
@@ -123,7 +123,5 @@ function dispatchOptimizationJobPayload(
   switch (payload.kind) {
     case 'scenario_comparison':
       return port.executeScenarioComparison(payload, context)
-    case 'reorder_check':
-      return port.executeReorderCheck(payload, context)
   }
 }
