@@ -2,6 +2,25 @@ import { describe, expect, it } from 'vitest'
 import { CONFIG_PRESETS, getRightFull252Variant, isRightFull252Config, normalizeConfig, normalizeDormitoryRule, parseShiftHours, resolveConfigLayout, validateConfig } from './config'
 import { licenseConfigSchema } from './workspace-validation'
 
+describe('preset configs', () => {
+  it('defines 333 pure LMD with three LMD trading stations and three Pure Gold factories', () => {
+    const config = normalizeConfig(CONFIG_PRESETS['333-lmd'])
+
+    expect(config).toMatchObject({
+      layout: '3-3-3',
+      desc: '333 纯钱流',
+      trading_stations_count: 3,
+      manufacturing_stations_count: 3,
+      product_requirements: {
+        trading_stations: { LMD: 3 },
+        manufacturing_stations: { 'Pure Gold': 3 },
+      },
+    })
+    expect(licenseConfigSchema.safeParse(config).success).toBe(true)
+    expect(validateConfig(config)).toEqual({ ok: true })
+  })
+})
+
 describe('layout normalization', () => {
   it('accepts both right-full 252 variants while rejecting full-blood 252', () => {
     for (const variant of ['252', '252-1'] as const) {

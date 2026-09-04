@@ -1,9 +1,21 @@
 import { describe, expect, it } from 'vitest'
+import { CONFIG_PRESETS } from '../../src/lib/config'
 import {
   getCdkScenarioQuotaLimit,
+  resolveConfigForPermission,
+  resolveFreePreviewConfig,
   type LegacyProfileCdkRecord,
   type ProfileCdkDuration,
 } from './license-utils'
+
+describe('restricted profile presets', () => {
+  it('accepts the 333 pure money preset', () => {
+    const config = CONFIG_PRESETS['333-lmd']
+
+    expect(resolveConfigForPermission('recommended', config)).toMatchObject({ ok: true })
+    expect(resolveFreePreviewConfig(config)).toMatchObject({ ok: true })
+  })
+})
 
 describe('profile CDK scenario quotas', () => {
   it.each([

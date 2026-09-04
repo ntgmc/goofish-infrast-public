@@ -307,6 +307,10 @@ export const commonCopy = {
   components_ConfigEditor_104: "右满252（赤金多）",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_105: "右满252（赤金多）",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_106: "333 纯钱流",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_107: "333 纯钱",
   // src/components/InputNumber.tsx
   components_InputNumber_001: "减少",
   // src/components/InputNumber.tsx

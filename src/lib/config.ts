@@ -77,6 +77,20 @@ export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
     Fiammetta: { enable: true },
     drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'Battle Record'] },
   },
+  '333-lmd': {
+    layout: '3-3-3',
+    desc: copy.domain.lib_config_041,
+    schedule_mode: 'maa',
+    dormitory_rule: 'fixed',
+    trading_stations_count: 3,
+    manufacturing_stations_count: 3,
+    product_requirements: {
+      trading_stations: { LMD: 3 },
+      manufacturing_stations: { 'Pure Gold': 3 },
+    },
+    Fiammetta: { enable: true },
+    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
+  },
   '333': {
     layout: '3-3-3',
     desc: copy.domain.lib_config_018,
