@@ -49,7 +49,6 @@ export default function OptimizationTaskCenterDialog({
   onClose,
   onRetrySchedule,
   onOpenScenario,
-  onOpenReorder,
   onOpenResult = () => undefined,
   retryEnabled = true,
 }: {
@@ -58,7 +57,6 @@ export default function OptimizationTaskCenterDialog({
   onClose: () => void;
   onRetrySchedule: () => void;
   onOpenScenario: (job: OptimizationJobListItem) => void;
-  onOpenReorder: (job: OptimizationJobListItem) => void;
   onOpenResult?: (job: OptimizationJobListItem) => void;
   retryEnabled?: boolean;
 }) {
@@ -128,7 +126,6 @@ export default function OptimizationTaskCenterDialog({
                 onCancel={() => void controller.cancel(job)}
                 onRetrySchedule={onRetrySchedule}
                 onOpenScenario={() => onOpenScenario(job)}
-                onOpenReorder={() => onOpenReorder(job)}
                 onOpenResult={() => onOpenResult(job)}
                 retryEnabled={retryEnabled}
               />
@@ -145,13 +142,12 @@ export default function OptimizationTaskCenterDialog({
   )
 }
 
-function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario, onOpenReorder, onOpenResult, retryEnabled }: {
+function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario, onOpenResult, retryEnabled }: {
   job: OptimizationJobListItem;
   busy: boolean;
   onCancel: () => void;
   onRetrySchedule: () => void;
   onOpenScenario: () => void;
-  onOpenReorder: () => void;
   onOpenResult: () => void;
   retryEnabled: boolean;
 }) {
@@ -181,7 +177,6 @@ function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario, onOpenRe
           )}
           {retryEnabled && job.canRetry && job.kind === 'schedule' && <button type="button" onClick={onRetrySchedule} className="tool-primary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_022}</button>}
           {retryEnabled && job.canRetry && job.kind === 'scenario_comparison' && <button type="button" onClick={onOpenScenario} className="tool-primary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_023}</button>}
-          {retryEnabled && job.canRetry && job.kind === 'reorder_check' && <button type="button" onClick={onOpenReorder} className="tool-primary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_039}</button>}
         </div>
       </div>
     </article>
@@ -206,6 +201,5 @@ function statusClass(status: OptimizationJobListItem['status']): string {
 
 function kindLabel(kind: OptimizationJobListItem['kind']): string {
   if (kind === 'scenario_comparison') return copy.optimize.pages_tool_optimize_OptimizationTaskCenter_019
-  if (kind === 'reorder_check') return copy.optimize.pages_tool_optimize_OptimizationTaskCenter_036
   return copy.optimize.pages_tool_optimize_OptimizationTaskCenter_017
 }

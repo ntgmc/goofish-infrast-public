@@ -1,4 +1,4 @@
-import type { LicenseConfig, PriorityCouponBalance, ReorderCheckResult, WorkspaceResultHistorySummary } from '../../../lib/types'
+import type { LicenseConfig, PriorityCouponBalance, WorkspaceResultHistorySummary } from '../../../lib/types'
 import type { IssuedMeteredScheduleQuote } from '../../../lib/metered-billing'
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
 import InfoTooltip from '../../../components/InfoTooltip'
@@ -9,18 +9,6 @@ import { SmallActionButton } from './feedback'
 import type { ValidationState } from './types'
 import { copy } from '../../../copy/index'
 
-
-type ReorderCheckViewState = {
-  visible: boolean;
-  disabledReason: string | null;
-  loading: boolean;
-  error: string | null;
-  result: ReorderCheckResult | null;
-  onCheck: () => void;
-  onCancel: () => void;
-  onGenerate: () => void;
-  coupon?: { visible: boolean; balance: number; selected: boolean; onChange: (selected: boolean) => void };
-}
 
 type FreeScheduleViewState = {
   visible: boolean;
@@ -48,7 +36,6 @@ export default function OverviewSection({
   latestResult,
   generationDisabledReason,
   freeSchedule,
-  reorderCheck,
   onGenerate,
   incrementalRecompute,
   onReset,
@@ -80,7 +67,6 @@ export default function OverviewSection({
   latestResult: WorkspaceResultHistorySummary | null;
   generationDisabledReason?: string | null;
   freeSchedule?: FreeScheduleViewState;
-  reorderCheck?: ReorderCheckViewState;
   onGenerate: () => void;
   incrementalRecompute?: {
     visible: boolean;
@@ -143,10 +129,6 @@ export default function OverviewSection({
 
       {freeSchedule?.visible && (
         <FreeIdleQueueCard />
-      )}
-
-      {reorderCheck?.visible && (
-        <ReorderCheckCard state={reorderCheck} />
       )}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
@@ -216,159 +198,4 @@ function FreeIdleQueueCard() {
       </div>
     </section>
   )
-}
-
-function ReorderCheckCard({ state }: { state: ReorderCheckViewState }) {
-  const result = state.result
-  const disabled = state.loading || Boolean(state.disabledReason)
-  return (
-    <section className="tool-panel border-brand-600/25 p-5 shadow-sm shadow-brand-950/10 sm:p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-brand-400">{copy.optimize.pages_tool_optimize_OverviewSection_036}</p>
-          <div className="mt-1 flex items-center gap-2">
-            <h2 className="text-lg font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_OverviewSection_037}</h2>
-            <InfoTooltip label={copy.optimize.pages_tool_optimize_OverviewSection_038} side="bottom">
-              {copy.optimize.pages_tool_optimize_OverviewSection_039}</InfoTooltip>
-          </div>
-        </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
-          {state.loading && <button type="button" onClick={state.onCancel} className="tool-secondary-action">
-            {copy.optimize.pages_tool_optimize_OverviewSection_069}
-          </button>}
-          <button
-            type="button"
-            onClick={state.onCheck}
-            disabled={disabled}
-            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-400 disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-ink-muted"
-          >
-            {state.loading ? copy.optimize.pages_tool_optimize_OverviewSection_040 : copy.optimize.pages_tool_optimize_OverviewSection_041}
-          </button>
-        </div>
-      </div>
-
-      {state.coupon?.visible && (
-        <label className="tool-inset mt-4 flex cursor-pointer items-start gap-3 px-4 py-3 text-sm text-ink-secondary">
-          <input
-            type="checkbox"
-            checked={state.coupon.selected}
-            disabled={state.loading || state.coupon.balance < 1}
-            onChange={(event) => state.coupon?.onChange(event.currentTarget.checked)}
-            className="mt-0.5 h-4 w-4 accent-brand-600"
-          />
-          <span>
-            <span className="block font-semibold text-ink-primary">{copy.inventory.reorder_coupon}</span>
-            <span className="mt-1 block text-xs leading-5">{copy.inventory.reorder_coupon_help} {copy.inventory.coupon_available}{state.coupon.balance}</span>
-          </span>
-        </label>
-      )}
-
-      {state.disabledReason && (
-        <div className="tool-inset mt-4 px-4 py-3 text-sm leading-6 text-ink-secondary">
-          {state.disabledReason}
-        </div>
-      )}
-
-      {state.error && (
-        <div role="alert" className="tool-alert tool-alert--error mt-4">
-          {state.error}
-        </div>
-      )}
-
-      {result && (
-        <div className="mt-5 space-y-4">
-          <div className={`tool-inset px-4 py-3 ${getRecommendationTone(result.recommendation)}`}>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold">{formatRecommendationTitle(result.recommendation)}</p>
-                <p className="mt-1 text-sm leading-6">{formatRecommendationSummary(result.recommendation)}</p>
-              </div>
-              <span className="inline-flex w-fit rounded-md bg-surface-1/80 px-2.5 py-1 text-xs font-semibold text-ink-secondary">
-                {formatReorderQuota(result)}
-              </span>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_042} value={result.estimated_gain_range.label} />
-            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_043} value={`${result.changed_room_count}`} />
-            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_044} value={result.current_plan_usable ? copy.optimize.pages_tool_optimize_OverviewSection_045 : copy.optimize.pages_tool_optimize_OverviewSection_046} />
-            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_047} value={`${result.quota.remaining}/${result.quota.limit}`} />
-          </div>
-
-          <div className="grid gap-3 lg:grid-cols-2">
-            <SummaryBlock
-              label={copy.optimize.pages_tool_optimize_OverviewSection_048}
-              value={result.affected_facility_types.length > 0
-                ? result.affected_facility_types.map(formatFacilityType).join(' / ')
-                : copy.optimize.pages_tool_optimize_OverviewSection_049}
-            />
-            <SummaryBlock
-              label={copy.optimize.pages_tool_optimize_OverviewSection_050}
-              value={result.key_operators.length > 0
-                ? result.key_operators.map((operator) => `${operator.name} x${operator.occurrence_count}`).join(' / ')
-                : copy.optimize.pages_tool_optimize_OverviewSection_051}
-            />
-          </div>
-
-          {result.reasons.length > 0 && (
-            <div className="tool-inset px-4 py-3 text-sm leading-6 text-ink-secondary">
-              {result.reasons.join(' ')}
-            </div>
-          )}
-
-          {result.recommendation === 'strongly_recommended' && (
-            <div>
-              <SmallActionButton onClick={state.onGenerate} tone="primary">{copy.optimize.pages_tool_optimize_OverviewSection_052}</SmallActionButton>
-            </div>
-          )}
-        </div>
-      )}
-    </section>
-  )
-}
-
-function SummaryBlock({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="tool-inset px-4 py-3">
-      <p className="text-xs font-semibold text-ink-muted">{label}</p>
-      <p className="mt-1 break-words text-sm leading-6 text-ink-primary">{value}</p>
-    </div>
-  )
-}
-
-function formatRecommendationTitle(recommendation: ReorderCheckResult['recommendation']): string {
-  if (recommendation === 'strongly_recommended') return copy.optimize.pages_tool_optimize_OverviewSection_053
-  if (recommendation === 'recommended') return copy.optimize.pages_tool_optimize_OverviewSection_054
-  return copy.optimize.pages_tool_optimize_OverviewSection_055
-}
-
-function formatRecommendationSummary(recommendation: ReorderCheckResult['recommendation']): string {
-  if (recommendation === 'strongly_recommended') return copy.optimize.pages_tool_optimize_OverviewSection_056
-  if (recommendation === 'recommended') return copy.optimize.pages_tool_optimize_OverviewSection_057
-  return copy.optimize.pages_tool_optimize_OverviewSection_058
-}
-
-function getRecommendationTone(recommendation: ReorderCheckResult['recommendation']): string {
-  if (recommendation === 'strongly_recommended') return 'border-error/40 bg-error/10 text-error'
-  if (recommendation === 'recommended') return 'border-warning/40 bg-warning/10 text-warning'
-  return 'border-success/40 bg-success/10 text-success'
-}
-
-function formatFacilityType(type: string): string {
-  const labels: Record<string, string> = {
-    trading: copy.optimize.pages_tool_optimize_OverviewSection_059,
-    manufacture: copy.optimize.pages_tool_optimize_OverviewSection_060,
-    manufacturing: copy.optimize.pages_tool_optimize_OverviewSection_061,
-    power: copy.optimize.pages_tool_optimize_OverviewSection_062,
-    meeting: copy.optimize.pages_tool_optimize_OverviewSection_063,
-    control: copy.optimize.pages_tool_optimize_OverviewSection_064,
-    dormitory: copy.optimize.pages_tool_optimize_OverviewSection_065,
-    office: copy.optimize.pages_tool_optimize_OverviewSection_066,
-  }
-  return labels[type] ?? type
-}
-
-function formatReorderQuota(result: ReorderCheckResult): string {
-  return `${copy.optimize.pages_tool_optimize_OverviewSection_067}${result.quota.remaining}/${result.quota.limit} · ${formatWorkspaceDate(result.quota.reset_at)}${copy.optimize.pages_tool_optimize_OverviewSection_068}`
 }

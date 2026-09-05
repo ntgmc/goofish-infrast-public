@@ -132,6 +132,20 @@ const PRESET_CONFIGS: LicenseConfig[] = [
   },
   {
     layout: '3-3-3',
+    desc: '333 纯钱流',
+    schedule_mode: 'maa',
+    dormitory_rule: 'fixed',
+    trading_stations_count: 3,
+    manufacturing_stations_count: 3,
+    product_requirements: {
+      trading_stations: { LMD: 3 },
+      manufacturing_stations: { 'Pure Gold': 3 },
+    },
+    Fiammetta: { enable: true },
+    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
+  },
+  {
+    layout: '3-3-3',
     desc: '333 搓玉流',
     schedule_mode: 'maa',
     dormitory_rule: 'fixed',
@@ -453,7 +467,7 @@ export function resolveConfigForPermission(
   }
   const preset = PRESET_CONFIGS.find((item) => isPresetConfigMatch(config, item))
   if (!preset) {
-    return { ok: false, message: '当前 CDK 版本仅支持 243 均衡、243 搓玉、333 搓玉和右满252预设配置。' }
+    return { ok: false, message: '当前 CDK 版本仅支持 243 均衡、243 搓玉、333 纯钱、333 搓玉和右满252预设配置。' }
   }
   return { ok: true, config: resolvePresetMode(config, preset) }
 }
@@ -471,7 +485,7 @@ export function resolveFreePreviewConfig(
     isPresetConfigMatch(config, item) || isLegacyFreePreviewMaaConfigMatch(config, item)
   )
   if (!preset) {
-    return { ok: false, message: '免费个人排班仅支持 243 均衡、243 搓玉、333 搓玉和右满252预设。' }
+    return { ok: false, message: '免费个人排班仅支持 243 均衡、243 搓玉、333 纯钱、333 搓玉和右满252预设。' }
   }
   return { ok: true, config: resolveFreePreviewPresetMode(config, preset) }
 }

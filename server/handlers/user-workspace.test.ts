@@ -125,6 +125,19 @@ describe('saved workspace configuration limit', () => {
     expect(workspace.saved_configs[0]?.name).toBe('配置 4')
   })
 
+  it('allows an expired trial configuration to be deleted while it remains read-only', async () => {
+    workspace = createWorkspace([{ ...savedConfig(1), read_only: true }])
+    mocks.getValidatedJson.mockResolvedValue({
+      profile_id: 'profile-1',
+      saved_config_action: { type: 'delete', id: 'config-1' },
+    })
+
+    const response = await workspaceHandler(patchRequest())
+
+    expect(response.status).toBe(200)
+    expect(workspace.saved_configs).toEqual([])
+  })
+
   it('uses expanded profile capacity when saving through PATCH', async () => {
     mocks.getProfileCapacityLimits.mockResolvedValue({ plan: 4, history: 6, archive: 1 })
     mocks.getValidatedJson.mockResolvedValue(savePayload('配置 4'))

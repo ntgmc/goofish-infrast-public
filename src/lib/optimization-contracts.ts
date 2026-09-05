@@ -6,7 +6,6 @@ import type {
   OptimizeEstimateSource,
   OptimizeJobPriority,
   OptimizeResult,
-  ReorderCheckResult,
 } from './types'
 import type { ScenarioComparisonFactors, ScenarioComparisonResult } from './scenario-comparison'
 import type { SystemItemCode } from './inventory-contracts'
@@ -43,13 +42,6 @@ export type CreateOptimizationJobRequest =
       accepted_max_points?: string;
     })
 
-export interface CreateReorderCheckRequest {
-  profileId: string;
-  config: LicenseConfig;
-  baselineHistoryId: string;
-  use_items?: SystemItemCode[];
-}
-
 interface ApiContractError {
   code: string;
   message: string;
@@ -71,7 +63,7 @@ interface OptimizationTimestamps {
 }
 
 type OptimizationEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed' | 'cancelled'
-export type OptimizationJobKind = CreateOptimizationJobRequest['kind'] | 'reorder_check'
+export type OptimizationJobKind = CreateOptimizationJobRequest['kind']
 type OptimizationExecutionPhase = 'initial_queue' | 'retry_wait' | 'executing' | 'settling' | 'terminal'
 type OptimizationRecoveryAction = 'retry' | 'review_input' | 'reauthorize' | 'contact_support' | 'none'
 
@@ -159,12 +151,6 @@ export interface CreateOptimizationJobResponse<TResult = OptimizeResult> {
 
 export type ScenarioComparisonJobSnapshot = OptimizationJobSnapshot<ScenarioComparisonResult>
 export type CreateScenarioComparisonJobResponse = CreateOptimizationJobResponse<ScenarioComparisonResult>
-
-export type ReorderCheckJobSnapshot = OptimizationJobSnapshot<ReorderCheckResult>
-export interface CreateReorderCheckJobResponse {
-  job: ReorderCheckJobSnapshot;
-  pollToken?: string;
-}
 
 export function isOptimizationJobTerminal(
   job: OptimizationJobSnapshot,

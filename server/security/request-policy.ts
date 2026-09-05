@@ -466,7 +466,7 @@ export const requestSchemas = {
       includeUpgradeSuggestions: z.boolean(),
       use_priority_coupon: z.boolean().optional(),
       use_items: z.array(z.enum([
-        'priority_compute_coupon', 'reorder_check_coupon', 'scenario_simulation_coupon',
+        'priority_compute_coupon', 'scenario_simulation_coupon',
         'training_diagnosis_coupon', 'additional_recompute_coupon', 'plan_capacity_certificate',
         'history_capacity_certificate', 'result_archive_folder', 'maa_export_trial_coupon',
         'newcomer_supply_pack',
@@ -488,17 +488,13 @@ export const requestSchemas = {
       pricing_version: optionalString(64),
       accepted_max_points: optionalString(32),
       use_items: z.array(z.enum([
-        'priority_compute_coupon', 'reorder_check_coupon', 'scenario_simulation_coupon',
+        'priority_compute_coupon', 'scenario_simulation_coupon',
         'training_diagnosis_coupon', 'additional_recompute_coupon', 'plan_capacity_certificate',
         'history_capacity_certificate', 'result_archive_folder', 'maa_export_trial_coupon',
         'newcomer_supply_pack',
       ])).max(1).optional(),
     }),
   ]),
-  reorderCheck: strict({
-    profileId: shortString(128), config: licenseConfigSchema, baselineHistoryId: optionalString(128),
-    use_items: z.array(z.literal('reorder_check_coupon')).max(1).optional(),
-  }),
   inventoryUse: strict({
     item_code: shortString(128),
     quantity: z.literal(1),
@@ -737,7 +733,6 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/admin/inventory', route({ GET: none(), POST: json('admin', requestSchemas.adminInventory), PATCH: json('admin', requestSchemas.adminInventory) }, ['campaign_id'])],
   ['/api/user/personal-use-declaration', route({ GET: none(), POST: json('standard', requestSchemas.personalUseDeclarationConfirmation) }, ['profile_id'])],
   ['/api/optimization/jobs', route({ GET: none(), POST: json('compute', requestSchemas.optimizationJob) }, ['profile_id', 'limit', 'before'])],
-  ['/api/optimization/reorder-checks', route({ POST: json('compute', requestSchemas.reorderCheck) })],
   ['/api/user/skland/free-preview/login/start', route({ POST: none() })],
   ['/api/user/skland/lifetime-voucher/login/start', route({ POST: none() })],
   ...Object.entries(SKLAND_PATHS).map(([path, schema]) => [path, route({ POST: json('credential', schema) })] as [string, RoutePolicy]),

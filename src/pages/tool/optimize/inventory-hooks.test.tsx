@@ -82,7 +82,6 @@ function inventorySnapshot(): InventoryResponse {
       actions: ['context_only'],
     }],
     capacities: [],
-    reorder_quotas: [],
     recent_events: [],
   }
 }

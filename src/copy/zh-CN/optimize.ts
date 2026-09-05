@@ -317,74 +317,6 @@ export const optimizeCopy = {
   pages_tool_optimize_OverviewSection_031: "自动排队等待",
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_036: "免费个人排班",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_037: "变化影响预判",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_038: "查看变化影响预判说明",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_039: "对比当前干员与最近一次成功排班，只提供重新生成建议、预计收益区间、受影响设施和关键干员；不会生成新排班。",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_040: "正在预判",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_041: "预判是否值得重新生成",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_042: "收益区间",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_043: "变化房间",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_044: "当前方案",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_045: "可继续用",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_046: "不建议长期用",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_047: "本月预判剩余",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_048: "影响设施",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_049: "无明显变化",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_050: "可能受益干员",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_051: "无新增关键干员",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_052: "生成完整个人排班",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_053: "强烈建议重新生成",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_054: "建议重新生成",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_055: "当前无需重新生成",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_056: "核心贸易/制造组合可能受影响，建议生成完整个人排班。",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_057: "新干员或新练度可能改变部分房间，方便时可以重新生成。",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_058: "预计收益提升很小，继续用当前方案即可。",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_059: "贸易站",
-
-  pages_tool_optimize_OverviewSection_069: "取消预判",
-
-  pages_tool_optimize_OverviewSection_070: "确认取消当前变化影响预判任务？",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_060: "制造站",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_061: "制造站",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_062: "发电站",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_063: "会客室",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_064: "控制中枢",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_065: "宿舍",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_066: "办公室",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_067: "本月预判剩余 ",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_068: " 重置",
   // src/pages/tool/optimize/PlansSection.tsx
   pages_tool_optimize_PlansSection_001: "配置库",
   // src/pages/tool/optimize/PlansSection.tsx
@@ -848,12 +780,6 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/useOptimizationJob.ts
   pages_tool_optimize_useOptimizationJob_003: "优化任务失败，请重试。",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_001: "请先绑定森空岛后再进行变化影响预判。",
-  // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_002: "请先生成一次完整个人排班，作为变化影响预判的对比依据。",
-  // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_003: "干员数据同步中，稍后再进行变化影响预判。",
-  // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_010: "已应用实验场景，请确认配置后再生成排班。",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_011: "优化失败，请稍后重试",
@@ -863,8 +789,6 @@ export const optimizeCopy = {
   pages_tool_optimize_useOptimizeWorkflow_013: "优化请求失败，请稍后重试",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_014: "练度建议请求失败。",
-  // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_015: "变化影响预判失败，请稍后重试",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_016: "确认免费排班失败，请稍后重试",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
@@ -900,7 +824,6 @@ export const optimizeCopy = {
   pages_tool_optimize_optimization_job_events_004: "练度建议已完成",
   pages_tool_optimize_optimization_job_events_005: "优化任务未完成",
   pages_tool_optimize_optimization_job_events_006: "点击返回任务中心查看详情。",
-  pages_tool_optimize_optimization_job_events_007: "变化影响预判已完成",
   // src/pages/tool/optimize/OptimizationTaskCenter.tsx
   pages_tool_optimize_OptimizationTaskCenter_001: "异步任务中心",
   pages_tool_optimize_OptimizationTaskCenter_002: "统一显示当前账号正在排队、执行和最近结束的优化任务。",
@@ -937,11 +860,8 @@ export const optimizeCopy = {
   pages_tool_optimize_OptimizationTaskCenter_033: "打开异步任务中心",
   pages_tool_optimize_OptimizationTaskCenter_034: "关闭",
   pages_tool_optimize_OptimizationTaskCenter_035: "个任务需要关注",
-  pages_tool_optimize_OptimizationTaskCenter_036: "变化影响预判",
   pages_tool_optimize_OptimizationTaskCenter_037: "查看结果",
   pages_tool_optimize_OptimizationTaskCenter_038: "加载任务结果失败，请稍后重试。",
-
-  pages_tool_optimize_OptimizationTaskCenter_039: "返回变化影响预判",
   // src/pages/tool/optimize/optimization-api.ts
   pages_tool_optimize_optimization_api_001: "加载优化任务列表失败。",
   pages_tool_optimize_optimization_api_002: "取消优化任务失败。",

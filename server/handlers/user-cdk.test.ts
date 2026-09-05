@@ -61,7 +61,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.requireUserSession.mockResolvedValue({ user: { id: 'user-1', email: 'user@example.test' } })
   mocks.getValidatedJson.mockResolvedValue({ cdk: 'item-code', idempotency_key: 'request-1' })
-  mocks.listInventory.mockResolvedValue({ stacks: [], capacities: [], reorder_quotas: [], recent_events: [] })
+  mocks.listInventory.mockResolvedValue({ stacks: [], capacities: [], recent_events: [] })
   mocks.grantItemInTransaction.mockResolvedValue('grant-1')
 })
 

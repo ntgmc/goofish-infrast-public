@@ -223,8 +223,8 @@ function applySavedConfigAction(
 
   const actionId = typeof rawAction.id === 'string' ? rawAction.id : null
   const readOnlyTarget = actionId ? workspace.saved_configs.find((item) => item.id === actionId) : null
-  if (readOnlyTarget?.read_only) {
-    return { ok: false, message: '体验期保存的高级配置已只读，不能修改、删除或再次套用。', status: 403 }
+  if (readOnlyTarget?.read_only && rawAction.type !== 'delete') {
+    return { ok: false, message: '体验期保存的高级配置已只读，不能修改或再次套用。', status: 403 }
   }
 
   if (rawAction.type === 'save') {

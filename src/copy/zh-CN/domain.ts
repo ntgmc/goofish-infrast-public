@@ -429,6 +429,8 @@ export const domainCopy = {
   lib_config_039: "右满252（经验多）",
   // src/lib/config.ts
   lib_config_040: "右满252（赤金多）",
+  // src/lib/config.ts
+  lib_config_041: "333 纯钱流",
   // src/lib/production-sanity.ts
   lib_production_sanity_001: "制造 ",
   // src/lib/production-sanity.ts

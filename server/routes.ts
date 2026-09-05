@@ -140,7 +140,6 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/result-archive', userResultsHandler as unknown as ApiHandler],
   ['/api/user/personal-use-declaration', personalUseDeclarationHandler as unknown as ApiHandler],
   ['/api/optimization/jobs', optimizationHandler as unknown as ApiHandler],
-  ['/api/optimization/reorder-checks', optimizationHandler as unknown as ApiHandler],
 ])
 
 export async function routeRequest(req: Request): Promise<Response> {

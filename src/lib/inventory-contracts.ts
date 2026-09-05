@@ -1,6 +1,5 @@
 const SYSTEM_ITEM_CODES = [
   'priority_compute_coupon',
-  'reorder_check_coupon',
   'scenario_simulation_coupon',
   'training_diagnosis_coupon',
   'additional_recompute_coupon',
@@ -17,7 +16,6 @@ export type SystemItemCode = typeof SYSTEM_ITEM_CODES[number]
 type ItemKind = 'consumable' | 'capacity_upgrade' | 'gift_pack' | 'cosmetic' | 'badge' | 'license_voucher'
 type ItemEffectCode =
   | 'priority_compute'
-  | 'reorder_check'
   | 'scenario_simulation'
   | 'training_diagnosis'
   | 'additional_recompute'
@@ -70,19 +68,9 @@ export interface ProfileCapacitySummary {
   archive_slots: { used: number; limit: number; maximum: number }
 }
 
-export interface ProfileReorderQuotaSummary {
-  profile_id: string
-  limit: number
-  used: number
-  remaining: number
-  reset_at: string
-  timezone: 'Asia/Shanghai'
-}
-
 export interface InventoryResponse {
   stacks: InventoryStack[]
   capacities: ProfileCapacitySummary[]
-  reorder_quotas: ProfileReorderQuotaSummary[]
   recent_events: InventoryLedgerEvent[]
 }
 
@@ -147,7 +135,6 @@ export interface OnboardingTaskView {
 export const ITEM_ICON_PATHS: Record<string, string> = {
   placeholder: '/assets/items/item-placeholder.svg',
   priority_compute_coupon: '/assets/items/priority-compute-coupon.png',
-  reorder_check_coupon: '/assets/items/reorder-check-coupon.png',
   scenario_simulation_coupon: '/assets/items/scenario-simulation-coupon.png',
   training_diagnosis_coupon: '/assets/items/training-diagnosis-coupon.png',
   additional_recompute_coupon: '/assets/items/additional-recompute-coupon.png',

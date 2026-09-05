@@ -7,8 +7,8 @@ const entries = [
   'server/handlers/user-status.ts',
 ]
 
-const forbiddenInput = /(?:^|\/)(?:all|worker|optimize-worker)\.ts$|optimization\/(?:engine|candidates|domain|economics|formatting|rules|solvers|scenario-comparison)\/|optimization\/jobs\/(?:executor|reorder-executor|reorder-analysis|result-formatting)\.ts$/
-const forbiddenContent = /OptimizerEngine|optimization\/jobs\/(?:executor|reorder-executor|reorder-analysis|result-formatting)|optimization\/(?:engine|candidates|domain|economics|formatting|rules|solvers|scenario-comparison)\//
+const forbiddenInput = /(?:^|\/)(?:all|worker|optimize-worker)\.ts$|optimization\/(?:engine|candidates|domain|economics|formatting|rules|solvers|scenario-comparison)\/|optimization\/jobs\/(?:executor|result-formatting)\.ts$/
+const forbiddenContent = /OptimizerEngine|optimization\/jobs\/(?:executor|result-formatting)|optimization\/(?:engine|candidates|domain|economics|formatting|rules|solvers|scenario-comparison)\//
 
 for (const entryPoint of entries) {
   const result = await esbuild.build({

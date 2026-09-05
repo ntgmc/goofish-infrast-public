@@ -159,11 +159,11 @@ function isPrivatePublicMapReference(value) {
   return /(?:^|\/)(?:all|worker|optimize-worker|optimize-job-runner)\.ts$/.test(normalized)
     || /optimization\/(?:candidates|domain|economics|engine|formatting|rules|solvers)\//.test(normalized)
     || /optimization\/scenario-comparison\/service\.ts$/.test(normalized)
-    || /optimization\/jobs\/(?:executor(?:-[^/]*)?|reorder-executor|reorder-analysis|result-formatting)\.ts$/.test(normalized)
+    || /optimization\/jobs\/(?:executor(?:-[^/]*)?|result-formatting)\.ts$/.test(normalized)
 }
 
 function containsPrivateImport(content) {
-  return /(?:from\s+|import\s*\()['"][^'"]*(?:optimize-job-runner|optimization\/jobs\/(?:executor|reorder-executor|reorder-analysis|result-formatting)|optimization\/scenario-comparison\/service|optimization\/(?:candidates|domain|economics|engine|formatting|rules|solvers)\/)/.test(content)
+  return /(?:from\s+|import\s*\()['"][^'"]*(?:optimize-job-runner|optimization\/jobs\/(?:executor|result-formatting)|optimization\/scenario-comparison\/service|optimization\/(?:candidates|domain|economics|engine|formatting|rules|solvers)\/)/.test(content)
 }
 
 async function readChangelogEnvelope(releaseRoot, targetSha, buildMeta) {

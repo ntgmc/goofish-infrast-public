@@ -472,16 +472,15 @@ function PersonalUseDeclarations({ declarations }: { declarations: AdminUserDeta
   )
 }
 
-const PERSONAL_USE_ACTION_LABELS: Record<AdminUserDetail['personal_use_declarations'][number]['action'], string> = {
+const PERSONAL_USE_ACTION_LABELS: Record<string, string> = {
   free_preview_claim: '领取免费权益',
   metered_personal_create: '创建/转换个人按次档案',
   generated_result_export: '导出生成结果',
   optimization_generate: '生成排班结果',
-  reorder_check: '变化影响预判',
 }
 
-export function personalUseActionLabel(action: AdminUserDetail['personal_use_declarations'][number]['action']): string {
-  return PERSONAL_USE_ACTION_LABELS[action] ?? action
+export function personalUseActionLabel(action: string): string {
+  return PERSONAL_USE_ACTION_LABELS[action] ?? '历史操作'
 }
 
 function ProfileDetailCard({

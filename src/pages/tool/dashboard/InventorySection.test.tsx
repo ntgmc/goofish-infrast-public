@@ -41,7 +41,6 @@ const inventory: InventoryResponse = {
     actions: ['use'],
   }],
   capacities: [],
-  reorder_quotas: [],
   recent_events: [],
 }
 

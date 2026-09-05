@@ -249,6 +249,7 @@ export async function listInventory(userId: string, now = new Date()): Promise<I
          from reward_grants grants
          join item_definitions definition on definition.code = grants.reward_type
         where grants.user_id = $1 and grants.remaining_quantity > 0
+          and grants.reward_type <> 'reorder_check_coupon'
           and (grants.expires_at is null or grants.expires_at > $2)
         group by grants.reward_type, grants.gift_pack_version_id, definition.code`,
       [userId, nowIso],
@@ -263,7 +264,8 @@ export async function listInventory(userId: string, now = new Date()): Promise<I
               definition.name as item_name, definition.icon_key
          from inventory_ledger ledger
          join item_definitions definition on definition.code = ledger.item_code
-        where ledger.user_id = $1 order by ledger.created_at desc limit 30`,
+        where ledger.user_id = $1 and ledger.item_code <> 'reorder_check_coupon'
+        order by ledger.created_at desc limit 30`,
       [userId],
     ),
     getProfileCapacities(userId),
@@ -294,7 +296,6 @@ export async function listInventory(userId: string, now = new Date()): Promise<I
   return {
     stacks,
     capacities,
-    reorder_quotas: [],
     recent_events: events.rows.map((event) => ({
       id: event.id,
       item_code: event.item_code,

@@ -29,7 +29,6 @@ vi.mock('../storage/inventory-store', () => ({
   useInventoryItem: mocks.useInventoryItem,
 }))
 
-vi.mock('../optimization/jobs/entitlements', () => ({ getReorderCheckQuota: vi.fn() }))
 vi.mock('../security/request-validation', () => ({
   getValidatedJson: (req: Request) => req.json(),
 }))

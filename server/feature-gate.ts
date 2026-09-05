@@ -62,7 +62,6 @@ function requiredFeatures(pathname: string, method: string): SiteFeatureKey[] {
   if (pathname.startsWith('/api/user/skland/lifetime-voucher/')) return ['inventory', 'skland']
   if (pathname.startsWith('/api/user/skland/')) return ['skland']
 
-  if (pathname === '/api/optimization/reorder-checks') return method === 'POST' ? ['schedule_generation'] : ['profiles']
   if (pathname === '/api/optimization/jobs') return method === 'POST' ? ['schedule_generation'] : ['profiles']
   if (pathname.startsWith('/api/optimization/jobs/')) return ['profiles']
   return []

@@ -134,6 +134,20 @@ const CONFIG_PRESETS: Record<string, LicenseConfig> = {
     Fiammetta: { enable: true },
     drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'Battle Record'] },
   },
+  '333-lmd': {
+    layout: '3-3-3',
+    desc: copy.common.components_ConfigEditor_106,
+    schedule_mode: 'maa',
+    dormitory_rule: 'fixed',
+    trading_stations_count: 3,
+    manufacturing_stations_count: 3,
+    product_requirements: {
+      trading_stations: { LMD: 3 },
+      manufacturing_stations: { 'Pure Gold': 3 },
+    },
+    Fiammetta: { enable: true },
+    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
+  },
   '333': {
     layout: '3-3-3',
     desc: copy.common.components_ConfigEditor_018,
@@ -355,6 +369,7 @@ export default function ConfigEditor({
             <PresetButton label={copy.common.components_ConfigEditor_031} onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
             <PresetButton label={copy.common.components_ConfigEditor_103} onClick={() => applyPreset(CONFIG_PRESETS['252'])} />
             <PresetButton label={copy.common.components_ConfigEditor_105} onClick={() => applyPreset(CONFIG_PRESETS['252-1'])} />
+            <PresetButton label={copy.common.components_ConfigEditor_107} onClick={() => applyPreset(CONFIG_PRESETS['333-lmd'])} />
             <PresetButton label={copy.common.components_ConfigEditor_032} onClick={() => applyPreset(CONFIG_PRESETS['333'])} />
           </div>
         )}
@@ -381,6 +396,7 @@ export default function ConfigEditor({
                 <PresetButton label={copy.common.components_ConfigEditor_036} onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
                 <PresetButton label={copy.common.components_ConfigEditor_103} onClick={() => applyPreset(CONFIG_PRESETS['252'])} />
                 <PresetButton label={copy.common.components_ConfigEditor_105} onClick={() => applyPreset(CONFIG_PRESETS['252-1'])} />
+                <PresetButton label={copy.common.components_ConfigEditor_107} onClick={() => applyPreset(CONFIG_PRESETS['333-lmd'])} />
                 <PresetButton label={copy.common.components_ConfigEditor_037} onClick={() => applyPreset(CONFIG_PRESETS['333'])} />
               </div>
             )}

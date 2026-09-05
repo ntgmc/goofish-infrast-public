@@ -11,7 +11,7 @@ vi.mock('./postgres', () => ({
   withTransaction: vi.fn(async (work: (client: { query: typeof clientQueryMock }) => Promise<unknown>) => work({ query: clientQueryMock })),
 }))
 
-import { discardAllOptimizationDeadLetters, getOptimizationDeadLetterDetail, OptimizeJobAdmissionError, replayOptimizationDeadLetter } from './optimize-job-store'
+import { discardAllOptimizationDeadLetters, getOptimizationDeadLetterDetail, replayOptimizationDeadLetter } from './optimize-job-store'
 
 describe('admin optimization dead-letter detail', () => {
   beforeEach(() => {
@@ -46,45 +46,14 @@ describe('admin optimization dead-letter detail', () => {
   it.each([
     ['the historical source', 'optimize_suggestions', { version: 3, request: {} }],
     ['the legacy payload marker', 'account_profile', { version: 3, request: { suggestions_only: true } }],
-  ])('does not replay standalone suggestion jobs identified by %s', async (_case, source, payloadJson) => {
+    ['the removed reorder check', 'reorder_check', { version: 3, kind: 'reorder_check' }],
+  ])('does not replay removed jobs identified by %s', async (_case, source, payloadJson) => {
     clientQueryMock
       .mockResolvedValueOnce({ rows: [deadLetterDetailRow()] })
       .mockResolvedValueOnce({ rows: [deadLetteredJobRow(source, payloadJson)] })
 
     await expect(replayOptimizationDeadLetter('letter-1', resolution())).resolves.toBeNull()
     expect(clientQueryMock).toHaveBeenCalledTimes(2)
-    expect(clientQueryMock.mock.calls.some(([sql]) => String(sql).includes('insert into optimize_jobs'))).toBe(false)
-  })
-
-  it('checks current-month quota and reserves it when replaying a reorder job', async () => {
-    clientQueryMock.mockImplementation(async (sql: unknown) => {
-      const text = String(sql)
-      if (text.includes('from optimization_dead_letters')) return { rows: [deadLetterDetailRow()] }
-      if (text.includes('select * from optimize_jobs')) return { rows: [deadLetteredJobRow('reorder_check', { version: 3, kind: 'reorder_check' })] }
-      if (text.includes('select count(*)::text as count from entitlement_ledger')) return { rows: [{ count: '0' }] }
-      if (text.includes('insert into optimize_jobs')) {
-        return { rows: [{ ...deadLetteredJobRow('reorder_check', { version: 3, kind: 'reorder_check' }), id: 'job-replayed', status: 'queued' }] }
-      }
-      return { rows: [] }
-    })
-
-    await expect(replayOptimizationDeadLetter('letter-1', resolution())).resolves.toMatchObject({
-      id: 'job-replayed',
-      status: 'queued',
-    })
-    expect(clientQueryMock.mock.calls.some(([sql]) => String(sql).includes("'reorder_check', 'reserved', 'optimization_job'"))).toBe(true)
-    expect(clientQueryMock.mock.calls.some(([sql]) => String(sql).includes('insert into admin_operation_audit'))).toBe(true)
-  })
-
-  it('rejects reorder dead-letter replay when the current-month quota is full', async () => {
-    clientQueryMock
-      .mockResolvedValueOnce({ rows: [deadLetterDetailRow()] })
-      .mockResolvedValueOnce({ rows: [deadLetteredJobRow('reorder_check', { version: 3, kind: 'reorder_check' })] })
-      .mockResolvedValueOnce({ rows: [{ count: '2' }] })
-
-    await expect(replayOptimizationDeadLetter('letter-1', resolution())).rejects.toEqual(
-      new OptimizeJobAdmissionError('reorder_check_quota_exceeded', 429, '本月变化影响预判次数已用完。'),
-    )
     expect(clientQueryMock.mock.calls.some(([sql]) => String(sql).includes('insert into optimize_jobs'))).toBe(false)
   })
 

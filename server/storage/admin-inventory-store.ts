@@ -23,7 +23,7 @@ const CAMPAIGN_MAX_ATTEMPTS = 3
 export async function getAdminInventoryOverview(): Promise<Record<string, unknown>> {
   await ensureDatabaseSchema()
   const [definitions, versions, tasks, campaigns, audits, users] = await Promise.all([
-    query<ItemDefinition>('select * from item_definitions order by system_owned desc, created_at asc, code asc'),
+    query<ItemDefinition>("select * from item_definitions where code <> 'reorder_check_coupon' order by system_owned desc, created_at asc, code asc"),
     query<{ id: string; item_code: string; version: number; status: GiftPackVersion['status']; created_at: string; published_at: string | null; contents: GiftPackContentInput[] }>(
       `select version.id, version.item_code, version.version, version.status, version.created_at, version.published_at,
               coalesce(jsonb_agg(jsonb_build_object(

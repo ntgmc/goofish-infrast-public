@@ -1,5 +1,5 @@
 import { apiJson } from '../../../lib/api-client'
-import type { CreateOptimizationJobRequest, CreateOptimizationJobResponse, CreateReorderCheckJobResponse, CreateReorderCheckRequest, OptimizationJobListResponse, OptimizationJobMutationResponse, OptimizationJobSnapshot } from '../../../lib/optimization-contracts'
+import type { CreateOptimizationJobRequest, CreateOptimizationJobResponse, OptimizationJobListResponse, OptimizationJobMutationResponse, OptimizationJobSnapshot } from '../../../lib/optimization-contracts'
 import type {
   OptimizeJobAccepted,
   OptimizeJobStatusResponse,
@@ -101,20 +101,6 @@ export async function cancelOptimizationJob(jobId: string): Promise<Optimization
     { method: 'POST', fallbackMessage: copy.optimize.pages_tool_optimize_optimization_api_002 },
   )
   return response.job
-}
-
-export async function submitReorderCheckJob(
-  request: CreateReorderCheckRequest,
-  fallbackMessage: string,
-  idempotencyKey: string = crypto.randomUUID(),
-): Promise<CreateReorderCheckJobResponse> {
-  return await apiJson<CreateReorderCheckJobResponse>('/api/optimization/reorder-checks', {
-    method: 'POST',
-    headers: { 'Idempotency-Key': idempotencyKey },
-    json: request,
-    signal: AbortSignal.timeout(OPTIMIZE_SUBMIT_TIMEOUT_MS),
-    fallbackMessage,
-  })
 }
 
 export interface MaaExportResponse {

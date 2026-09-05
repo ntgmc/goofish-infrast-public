@@ -377,6 +377,36 @@ describe('ConfigEditor number inputs', () => {
 })
 
 describe('ConfigEditor preset actions', () => {
+  it('applies the 333 pure money preset', async () => {
+    const user = userEvent.setup()
+    const config = normalizeConfig(CONFIG_PRESETS['243'])
+    const onUpdate = vi.fn()
+    render(
+      <ConfigEditor
+        config={config}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={onUpdate}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: '333 纯钱' }))
+    const mutate = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
+    const next = cloneConfig(config)
+    mutate?.(next)
+
+    expect(next).toMatchObject({
+      layout: '3-3-3',
+      desc: '333 纯钱流',
+      trading_stations_count: 3,
+      manufacturing_stations_count: 3,
+      product_requirements: {
+        trading_stations: { LMD: 3 },
+        manufacturing_stations: { 'Pure Gold': 3 },
+      },
+    })
+  })
+
   it('applies both right-full 252 variants and clears room levels when returning to 243', async () => {
     const user = userEvent.setup()
     const config = normalizeConfig(CONFIG_PRESETS['243'])

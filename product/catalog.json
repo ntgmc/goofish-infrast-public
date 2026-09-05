@@ -175,8 +175,7 @@
       "paid_jobs_strict_priority": true,
       "max_active_jobs_per_profile": 1,
       "submission_window_hours": 6,
-      "max_submissions_per_window": 2,
-      "monthly_reorder_checks": 2
+      "max_submissions_per_window": 2
     },
     "risk": {
       "operator_data_enabled_by_default": true,
@@ -210,7 +209,6 @@
       { "feature": "排班等待", "free_preview": "有空闲资源时自动开始；繁忙时继续排队", "single_account_monthly": "优先处理", "single_account_half_year": "优先处理", "single_account_annual": "优先处理", "single_account_lifetime": "优先处理" },
       { "feature": "MAA JSON 下载", "free_preview": "高级体验期或导出体验券可用", "single_account_monthly": "支持，仅包含 MAA 执行所需排班数据", "single_account_half_year": "支持，仅包含 MAA 执行所需排班数据", "single_account_annual": "支持，仅包含 MAA 执行所需排班数据", "single_account_lifetime": "支持，仅包含 MAA 执行所需排班数据" },
       { "feature": "基建预设", "free_preview": "支持右满252", "single_account_monthly": "支持右满252", "single_account_half_year": "支持右满252", "single_account_annual": "支持右满252", "single_account_lifetime": "支持右满252" },
-      { "feature": "变化影响预判（不生成新排班）", "free_preview": "已有排班后每月 2 次，返回重新生成建议、收益区间和受影响项；变化预判券可增加 1 次", "single_account_monthly": "无需单独预判，可直接不限次数增量重算", "single_account_half_year": "无需单独预判，可直接不限次数增量重算", "single_account_annual": "无需单独预判，可直接不限次数增量重算", "single_account_lifetime": "无需单独预判，可直接不限次数增量重算" },
       { "feature": "练度提升建议与 ROI", "free_preview": "不支持", "single_account_monthly": "支持", "single_account_half_year": "支持", "single_account_annual": "支持", "single_account_lifetime": "支持" },
       { "feature": "完整数据与原始结果", "free_preview": "不支持", "single_account_monthly": "支持，可独立下载完整计算 JSON", "single_account_half_year": "支持，可独立下载完整计算 JSON", "single_account_annual": "支持，可独立下载完整计算 JSON", "single_account_lifetime": "支持，可独立下载完整计算 JSON" },
       { "feature": "自定义配置", "free_preview": "不支持", "single_account_monthly": "支持", "single_account_half_year": "支持", "single_account_annual": "支持", "single_account_lifetime": "支持" },

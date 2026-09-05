@@ -59,6 +59,22 @@ describe('PlansSection', () => {
     expect(screen.queryByRole('button', { name: '下载完整计算数据' })).not.toBeInTheDocument()
   })
 
+  it('allows deleting a read-only trial configuration', async () => {
+    const user = userEvent.setup()
+    const saved = { ...savedConfig(1), read_only: true }
+    const onDeleteSavedConfig = vi.fn().mockResolvedValue(undefined)
+
+    renderSection({ savedConfigs: [saved], onDeleteSavedConfig })
+
+    expect(screen.getByRole('button', { name: '载入到配置编辑器' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '重命名方案' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '删除方案' })).toBeEnabled()
+
+    await user.click(screen.getByRole('button', { name: '删除方案' }))
+
+    expect(onDeleteSavedConfig).toHaveBeenCalledWith(saved)
+  })
+
   it('keeps full calculation downloads out of history shortcuts', () => {
     const rotation = historyItem(2, 'rotation')
     renderSection({ resultHistory: [historyItem(1)], archivedResults: [rotation], archiveLimit: 1 })

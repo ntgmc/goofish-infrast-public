@@ -9,7 +9,6 @@ import {
 } from '../storage/inventory-store'
 import { getValidatedJson } from '../security/request-validation'
 import { requestSchemas } from '../security/request-policy'
-import { getReorderCheckQuotas } from '../optimization/jobs/entitlements'
 import { buildAuthPayload, jsonResponse, requireUserSession } from './user-auth'
 
 export default async function userInventoryHandler(req: Request): Promise<Response> {
@@ -20,13 +19,7 @@ export default async function userInventoryHandler(req: Request): Promise<Respon
 
     if (path === '/api/user/inventory') {
       if (req.method === 'GET') {
-        const inventory = await listInventory(auth.user.id)
-        const quotas = await getReorderCheckQuotas(inventory.capacities.map((profile) => profile.profile_id))
-        const reorderQuotas = inventory.capacities.map((profile) => ({
-          profile_id: profile.profile_id,
-          ...quotas.get(profile.profile_id)!,
-        }))
-        return jsonResponse({ ...inventory, reorder_quotas: reorderQuotas })
+        return jsonResponse(await listInventory(auth.user.id))
       }
       if (req.method !== 'POST') return jsonResponse({ error: '方法不允许。' }, 405)
       const body = await getValidatedJson(req, requestSchemas.inventoryUse) as ItemUseRequest

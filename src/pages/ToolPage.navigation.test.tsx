@@ -321,7 +321,6 @@ function createUpgradeInventory(): InventoryResponse {
       actions: ['bind'],
     }],
     capacities: [],
-    reorder_quotas: [],
     recent_events: [],
   }
 }
