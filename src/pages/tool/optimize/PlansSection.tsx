@@ -147,7 +147,7 @@ export default function PlansSection({
                   <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
                     <SmallActionButton onClick={() => onUseSavedConfig(item)} disabled={item.read_only || busyAction === `touch:${item.id}`} tone="primary">{copy.optimize.pages_tool_optimize_PlansSection_025}</SmallActionButton>
                     <SmallActionButton onClick={() => void onRenameSavedConfig(item)} disabled={item.read_only || busyAction === `rename:${item.id}`}>{copy.optimize.pages_tool_optimize_PlansSection_026}</SmallActionButton>
-                    <SmallActionButton onClick={() => void onDeleteSavedConfig(item)} disabled={item.read_only || busyAction === `delete:${item.id}`} tone="danger">{copy.optimize.pages_tool_optimize_PlansSection_027}</SmallActionButton>
+                    <SmallActionButton onClick={() => void onDeleteSavedConfig(item)} disabled={busyAction === `delete:${item.id}`} tone="danger">{copy.optimize.pages_tool_optimize_PlansSection_027}</SmallActionButton>
                   </div>
                 </div>
               </div>
