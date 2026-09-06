@@ -42,6 +42,9 @@ export async function resolveProfileAuthorization(
   }
 
   if (!profile.cdk_key) {
+    if (profile.authorization_source === 'admin_grant') {
+      return resolvePermission(profile.permission, null)
+    }
     if (!profile.kind || profile.kind === 'cdk') {
       return { ok: false, status: 403, code: 'license_unavailable', message: '账号授权记录缺失，请联系支持人员。' }
     }

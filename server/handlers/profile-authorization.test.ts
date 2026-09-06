@@ -63,6 +63,22 @@ describe('authoritative profile authorization', () => {
     }))).resolves.toMatchObject({ ok: false, code: 'profile_frozen' })
     expect(mocks.getCdk).not.toHaveBeenCalled()
   })
+
+  it('authorizes an explicit admin grant without accepting an unlinked CDK profile', async () => {
+    await expect(resolveProfileAuthorization(profile({
+      authorization_source: 'admin_grant',
+      cdk_key: null,
+      cdk_code_hash: null,
+      cdk_order_hash: null,
+      permission: 'ultimate',
+    }))).resolves.toMatchObject({ ok: true, permission: 'ultimate', cdkRecord: null })
+    await expect(resolveProfileAuthorization(profile({
+      cdk_key: null,
+      cdk_code_hash: null,
+      cdk_order_hash: null,
+    }))).resolves.toMatchObject({ ok: false, code: 'license_unavailable' })
+    expect(mocks.getCdk).not.toHaveBeenCalled()
+  })
 })
 
 function profile(overrides: Partial<UserGameAccountRecord> = {}): UserGameAccountRecord {

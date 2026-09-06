@@ -61,6 +61,7 @@ export interface UserGameAccountRecord {
   id: string
   user_id: string
   kind?: UserGameAccountKind
+  authorization_source?: 'admin_grant'
   cdk_key: string | null
   cdk_code_hash: string | null
   cdk_order_hash: string | null
