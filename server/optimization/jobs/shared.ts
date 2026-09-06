@@ -12,10 +12,6 @@ export const FREE_PREVIEW_MODE = "full_rotation_without_export";
 
 export const INTERMEDIATE_PRODUCTS = ["Pure Gold", "Originium Shard"] as const;
 
-export const SHANGHAI_TIMEZONE = "Asia/Shanghai" as const;
-
-export const SHANGHAI_UTC_OFFSET_MS = 8 * 60 * 60 * 1000;
-
 export type ScheduleUsageContext = {
   status: "success" | "failure";
   reason_code: UsageReasonCode;
