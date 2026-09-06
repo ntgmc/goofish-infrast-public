@@ -228,6 +228,7 @@ export default async (req: Request): Promise<Response> => {
           if (!permission) return jsonResponse({ error: '档案权限必须是 recommended、growth、advanced 或 ultimate。' }, 400)
           const updated = await saveProfilePatch(profile, {
             kind: 'cdk',
+            authorization_source: 'admin_grant',
             permission,
             cdk_key: null,
             cdk_code_hash: null,
