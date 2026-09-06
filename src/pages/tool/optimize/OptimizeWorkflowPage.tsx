@@ -337,6 +337,7 @@ export default function OptimizeWorkflowPage(props: Props) {
               loading={loading}
               progress={progress}
               previewProfile={isRestrictedPreview}
+              canViewUpgradeSuggestions={userCanUseUpgradeFeatures}
               upgradeCdk={upgradeCdk}
               upgradeLoading={upgradeLoading}
               upgradeError={upgradeError}
