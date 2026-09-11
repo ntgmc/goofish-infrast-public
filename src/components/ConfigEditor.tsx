@@ -346,9 +346,9 @@ export default function ConfigEditor({
   }
 
   return (
-    <section className={embedded ? '' : 'tool-panel p-5 sm:p-6'}>
+<section className={`config-editor ${embedded ? '' : 'tool-panel p-5 sm:p-6'}`}>
       {!hideHeader && (
-      <div className="flex flex-col gap-4 border-b border-surface-3/60 pb-5 lg:flex-row lg:items-start lg:justify-between">
+<div className="config-editor-header flex flex-col gap-4 border-b border-surface-3/60 pb-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold text-ink-primary">{copy.common.components_ConfigEditor_021}</h2>
@@ -366,7 +366,7 @@ export default function ConfigEditor({
           </p>
         </div>
           {!hidePresetActions && (canEdit || (canSelectPreset && (!autoInventoryOnly || rightFull252PresetSelected))) && (
-          <div className="flex flex-wrap gap-2" data-tour-target="config-preset-actions">
+<div className="config-preset-actions flex flex-wrap gap-2" data-tour-target="config-preset-actions">
             <PresetButton label={copy.common.components_ConfigEditor_030} onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
             <PresetButton label={copy.common.components_ConfigEditor_031} onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
             <PresetButton label={copy.common.components_ConfigEditor_103} onClick={() => applyPreset(CONFIG_PRESETS['252'])} />

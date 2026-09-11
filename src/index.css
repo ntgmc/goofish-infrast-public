@@ -200,6 +200,57 @@ body {
     margin: 0 auto;
   }
 
+  .workspace-setup-page {
+    position: relative;
+  }
+
+  .workspace-setup-page::before {
+    content: "";
+    position: absolute;
+    inset: 0.75rem 0.75rem auto;
+    height: 15rem;
+    pointer-events: none;
+    border-top: 1px solid color-mix(in oklch, var(--theme-brand-400) 18%, transparent);
+    background: linear-gradient(180deg, color-mix(in oklch, var(--theme-brand-500) 5%, transparent), transparent 72%);
+    opacity: 0.7;
+  }
+
+  .workspace-setup-grid,
+  .workspace-setup-page > * {
+    position: relative;
+  }
+
+  .workspace-summary-panel {
+    background: color-mix(in oklch, var(--theme-surface-1) 92%, var(--theme-brand-500));
+  }
+
+  .workspace-save-action {
+    min-height: 3.25rem;
+    box-shadow: 0 12px 28px color-mix(in oklch, var(--theme-brand-700) 22%, transparent);
+  }
+
+  .config-editor {
+    overflow: clip;
+  }
+
+  .config-editor-header h2 {
+    letter-spacing: -0.01em;
+  }
+
+  .config-preset-actions {
+    padding: 0.625rem;
+    border: 1px solid color-mix(in oklch, var(--theme-brand-400) 20%, var(--border));
+    border-radius: 0.75rem;
+    background: color-mix(in oklch, var(--theme-brand-500) 5%, var(--theme-surface-2));
+  }
+
+  @media (min-width: 1280px) {
+    .workspace-summary-panel {
+      position: sticky;
+      top: 1.25rem;
+    }
+  }
+
   .session-loader {
     display: flex;
     width: 6.25rem;
