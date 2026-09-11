@@ -313,6 +313,7 @@ export default function OptimizeWorkflowPage(props: Props) {
                 activeConfig={activeConfig}
                 permission={permission}
                 userCanEditConfig={userCanEditConfig}
+                canEditFixedShiftHours={isRestrictedPreview}
                 userCanUseIntermediateAutoConfig={userCanUseIntermediateAutoConfig}
                 configChanged={configChanged}
                 configPresetLabel={configPresetLabel}

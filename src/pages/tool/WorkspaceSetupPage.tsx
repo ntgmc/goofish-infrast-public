@@ -381,6 +381,7 @@ export default function WorkspaceSetupPage({
                             canEdit={canEditConfig}
                             canEditIntermediateInventory={canEditLimitedConfig}
                             canSelectPreset
+                            canEditFixedShiftHours={isPreviewProfile}
                             changed={configChanged}
                             permission={profile.permission}
                             validation={configValidation}

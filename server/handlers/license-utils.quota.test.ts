@@ -9,6 +9,20 @@ import {
 } from './license-utils'
 
 describe('restricted profile presets', () => {
+  it.each([8, 12])('preserves the free-preview %s-hour interval', (hours) => {
+    expect(resolveFreePreviewConfig({
+      ...CONFIG_PRESETS['243'],
+      shift_hours: [hours, hours, hours],
+    })).toMatchObject({ ok: true, config: { shift_hours: [hours, hours, hours] } })
+  })
+
+  it.each([[24, 24, 24], [12, 6, 6], [8, 8], [6, 6, 6, 6]])('rejects unsupported free-preview intervals %j', (...hours) => {
+    expect(resolveFreePreviewConfig({
+      ...CONFIG_PRESETS['243'],
+      shift_hours: hours,
+    })).toMatchObject({ ok: false })
+  })
+
   it('accepts the 333 pure money preset', () => {
     const config = CONFIG_PRESETS['333-lmd']
 

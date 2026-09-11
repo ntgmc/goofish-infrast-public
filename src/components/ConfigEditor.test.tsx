@@ -8,6 +8,25 @@ import ConfigEditor from './ConfigEditor'
 afterEach(cleanup)
 
 describe('ConfigEditor shift patterns', () => {
+  it.each([8, 12])('allows restricted profiles to select the %s-hour preset only', async (hours) => {
+    const user = userEvent.setup()
+    const config = normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: hours === 8 ? [12, 12, 12] : [8, 8, 8] })
+    const onUpdate = vi.fn()
+    render(
+      <ConfigEditor config={config} canEdit={false} canEditFixedShiftHours validation={{ ok: true }} onUpdate={onUpdate} />,
+    )
+
+    expect(screen.getByRole('button', { name: '一天3换（8小时一换）' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '一天2换（12小时一换）' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '一天1换（24小时一换）' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '自动变间隔换班' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '自定义' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: hours === 8 ? '一天3换（8小时一换）' : '一天2换（12小时一换）' }))
+    const next = cloneConfig(config)
+    onUpdate.mock.calls[0][0](next)
+    expect(next.shift_hours).toEqual([hours, hours, hours])
+  })
+
   it('defaults to fixed dormitories while keeping both autofill choices available', async () => {
     const user = userEvent.setup()
     const config = normalizeConfig(CONFIG_PRESETS['243'])

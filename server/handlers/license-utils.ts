@@ -17,7 +17,7 @@ import {
 } from '../../src/lib/product-catalog'
 import { createPostgresCdkRecordStore } from '../storage/cdk-store'
 import { licenseConfigSchema, licenseOperatorsSchema } from '../../src/lib/workspace-validation'
-import { isRightFull252Config } from '../../src/lib/config'
+import { isRightFull252Config, parseShiftHours } from '../../src/lib/config'
 import {
   createPostgresRiskControlSettingsStore,
   DEFAULT_RISK_CONTROL_SETTINGS,
@@ -475,6 +475,11 @@ export function resolveConfigForPermission(
 export function resolveFreePreviewConfig(
   config: LicenseConfig,
 ): { ok: true; config: LicenseConfig } | { ok: false; message: string } {
+  const shiftHours = config.shift_hours === undefined ? [8, 8, 8] : parseShiftHours(config.shift_hours)
+  if (!shiftHours || shiftHours.length !== 3
+    || ![8, 12].some((hours) => shiftHours.every((value) => value === hours))) {
+    return { ok: false, message: '免费个人排班支持一天3换（8小时一换）或一天2换（12小时一换）。' }
+  }
   if (config.optimizer_search) {
     return { ok: false, message: '免费个人排班不允许设置 optimizer_search。' }
   }
@@ -487,7 +492,7 @@ export function resolveFreePreviewConfig(
   if (!preset) {
     return { ok: false, message: '免费个人排班仅支持 243 均衡、243 搓玉、333 纯钱、333 搓玉和右满252预设。' }
   }
-  return { ok: true, config: resolveFreePreviewPresetMode(config, preset) }
+  return { ok: true, config: { ...resolveFreePreviewPresetMode(config, preset), shift_hours: shiftHours } }
 }
 
 function cloneConfig(config: LicenseConfig): LicenseConfig {
