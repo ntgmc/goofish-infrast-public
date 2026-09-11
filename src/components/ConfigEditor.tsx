@@ -841,6 +841,8 @@ function parseDroneTargetsInput(value: string): string[] {
   return value.split(/[，,]/).map(parseProductName).filter(Boolean)
 }
 
+const DRONE_TARGET_OPTIONS = ['LMD', 'Orundum', 'Pure Gold', 'Battle Record', 'Originium Shard']
+
 function formatStockValue(value: number | null): string {
   return value === null ? '' : String(value)
 }
@@ -1110,9 +1112,11 @@ function DroneTargetsInput({
   }
 
   return (
-    <input
+    <>
+      <input
       id={id}
       type="text"
+      list={`${id}-options`}
       value={draftValue}
       disabled={disabled}
       onChange={(event) => setDraftValue(event.currentTarget.value)}
@@ -1124,7 +1128,13 @@ function DroneTargetsInput({
       }}
       placeholder={copy.common.components_ConfigEditor_085}
       className="tool-field placeholder:text-ink-muted disabled:text-ink-muted"
-    />
+      />
+      <datalist id={`${id}-options`}>
+        {DRONE_TARGET_OPTIONS.map((product) => (
+          <option key={product} value={formatProductName(product)} />
+        ))}
+      </datalist>
+    </>
   )
 }
 
