@@ -135,7 +135,7 @@ describe('ResultSection locked upgrade suggestions', () => {
       </MemoryRouter>,
     )
 
-    await user.click(await screen.findByRole('tab', { name: '练度建议' }))
+    await user.click(await screen.findByRole('tab', { name: '建议' }))
 
     expect(await screen.findByRole('heading', { name: '解锁完整练度建议' })).toBeInTheDocument()
     expect(screen.getByText('需要高级版 CDK 权限')).toBeInTheDocument()
