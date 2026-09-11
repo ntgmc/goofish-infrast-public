@@ -8,6 +8,7 @@ type WorkspaceConfigSectionProps = {
   canEdit: boolean
   canEditIntermediateInventory: boolean
   canSelectPreset: boolean
+  canEditFixedShiftHours?: boolean
   changed: boolean
   permission: PermissionMode
   validation: { ok: true } | { ok: false; message: string }
@@ -19,6 +20,7 @@ export default function WorkspaceConfigSection({
   canEdit,
   canEditIntermediateInventory,
   canSelectPreset,
+  canEditFixedShiftHours,
   changed,
   permission,
   validation,
@@ -30,6 +32,7 @@ export default function WorkspaceConfigSection({
       canEdit={canEdit}
       canEditIntermediateInventory={canEditIntermediateInventory}
       canSelectPreset={canSelectPreset}
+      canEditFixedShiftHours={canEditFixedShiftHours}
       changed={changed}
       permission={permission}
       validation={validation}

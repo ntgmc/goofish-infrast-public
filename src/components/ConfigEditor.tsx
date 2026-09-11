@@ -218,6 +218,7 @@ interface ConfigEditorProps {
   canEdit: boolean;
   canEditIntermediateInventory?: boolean;
   canSelectPreset?: boolean;
+  canEditFixedShiftHours?: boolean;
   changed?: boolean;
   permission?: PermissionMode;
   validation: { ok: true } | { ok: false; message: string };
@@ -233,6 +234,7 @@ export default function ConfigEditor({
   canEdit,
   canEditIntermediateInventory,
   canSelectPreset = false,
+  canEditFixedShiftHours = false,
   changed = false,
   permission,
   validation,
@@ -344,9 +346,9 @@ export default function ConfigEditor({
   }
 
   return (
-    <section className={embedded ? '' : 'tool-panel p-5 sm:p-6'}>
+<section className={`config-editor ${embedded ? '' : 'tool-panel p-5 sm:p-6'}`}>
       {!hideHeader && (
-      <div className="flex flex-col gap-4 border-b border-surface-3/60 pb-5 lg:flex-row lg:items-start lg:justify-between">
+<div className="config-editor-header flex flex-col gap-4 border-b border-surface-3/60 pb-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold text-ink-primary">{copy.common.components_ConfigEditor_021}</h2>
@@ -364,7 +366,7 @@ export default function ConfigEditor({
           </p>
         </div>
           {!hidePresetActions && (canEdit || (canSelectPreset && (!autoInventoryOnly || rightFull252PresetSelected))) && (
-          <div className="flex flex-wrap gap-2" data-tour-target="config-preset-actions">
+<div className="config-preset-actions flex flex-wrap gap-2" data-tour-target="config-preset-actions">
             <PresetButton label={copy.common.components_ConfigEditor_030} onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
             <PresetButton label={copy.common.components_ConfigEditor_031} onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
             <PresetButton label={copy.common.components_ConfigEditor_103} onClick={() => applyPreset(CONFIG_PRESETS['252'])} />
@@ -624,6 +626,7 @@ export default function ConfigEditor({
                 value={config.shift_hours}
                 variableMode={variableShiftMode}
                 canEdit={canEdit}
+                canEditFixedShiftHours={canEditFixedShiftHours}
                 onSelectVariable={() => onUpdate((next) => {
                   next.schedule_mode = 'variable'
                   next.shift_hours = [8, 8, 8]
@@ -953,12 +956,14 @@ function ShiftHoursEditor({
   value,
   variableMode,
   canEdit,
+  canEditFixedShiftHours,
   onSelectVariable,
   onChange,
 }: {
   value: LicenseConfig['shift_hours'];
   variableMode: boolean;
   canEdit: boolean;
+  canEditFixedShiftHours: boolean;
   onSelectVariable: () => void;
   onChange: (hours: number[]) => void;
 }) {
@@ -996,7 +1001,7 @@ function ShiftHoursEditor({
   }
 
   const selectChoice = (choice: typeof SHIFT_SCHEDULE_OPTIONS[number]) => {
-    if (!canEdit || ('disabled' in choice && choice.disabled)) return
+    if ((!canEdit && !(canEditFixedShiftHours && 'hours' in choice)) || ('disabled' in choice && choice.disabled)) return
     if (choice.id === 'custom') {
       setCustomSelected(true)
       return
@@ -1018,7 +1023,7 @@ function ShiftHoursEditor({
             key={choice.id}
             type="button"
             aria-pressed={selectedChoice === choice.id}
-            disabled={!canEdit || ('disabled' in choice && choice.disabled)}
+            disabled={(!canEdit && !(canEditFixedShiftHours && 'hours' in choice)) || ('disabled' in choice && choice.disabled)}
             onClick={() => selectChoice(choice)}
             className={`tool-secondary-action min-h-11 whitespace-normal px-2 py-2 text-xs leading-5 disabled:cursor-not-allowed disabled:text-ink-muted sm:text-sm ${
               selectedChoice === choice.id

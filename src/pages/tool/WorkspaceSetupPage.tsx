@@ -318,7 +318,7 @@ export default function WorkspaceSetupPage({
           </div>
         </header>
 
-        <div className="mx-auto max-w-7xl space-y-4 px-5 py-6 sm:px-8">
+<div className="workspace-setup-page mx-auto max-w-7xl space-y-4 px-5 py-6 sm:px-8">
           <AnnouncementBanner announcement={announcement} />
           <AnimatedPresenceRegion motionKey={activeSection}>
             {activeSection === 'cdk' ? (
@@ -330,7 +330,7 @@ export default function WorkspaceSetupPage({
               />
             ) : (
               <form onSubmit={handleSave}>
-                <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
+<div className="workspace-setup-grid grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
                   <div className="space-y-5">
                     {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
                     {status && <div className="tool-alert tool-alert--success" role="status" aria-live="polite">{status}</div>}
@@ -381,6 +381,7 @@ export default function WorkspaceSetupPage({
                             canEdit={canEditConfig}
                             canEditIntermediateInventory={canEditLimitedConfig}
                             canSelectPreset
+                            canEditFixedShiftHours={isPreviewProfile}
                             changed={configChanged}
                             permission={profile.permission}
                             validation={configValidation}
@@ -392,7 +393,7 @@ export default function WorkspaceSetupPage({
                   </div>
 
                   <aside className="space-y-5">
-                    <section className="tool-panel p-5">
+<section className="workspace-summary-panel tool-panel p-5">
                       <h2 className="text-base font-semibold text-ink-primary">{copy.workspace.pages_tool_WorkspaceSetupPage_035}</h2>
                       <dl className="mt-4 space-y-3 text-sm">
                         <InfoRow label={copy.workspace.pages_tool_WorkspaceSetupPage_036} value={getProfileAccessLabel(profile)} />
@@ -404,7 +405,7 @@ export default function WorkspaceSetupPage({
                         </div>
                       </dl>
                     </section>
-                    <button type="submit" disabled={saving || freePreviewNeedsBinding || !operators || !configValidation.ok} className="tool-primary-action w-full" data-tour-target="workspace-start-scheduling">
+<button type="submit" disabled={saving || freePreviewNeedsBinding || !operators || !configValidation.ok} className="workspace-save-action tool-primary-action w-full" data-tour-target="workspace-start-scheduling">
                       {saving ? copy.workspace.pages_tool_WorkspaceSetupPage_046 : copy.workspace.pages_tool_WorkspaceSetupPage_047}
                     </button>
                   </aside>

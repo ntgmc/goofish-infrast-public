@@ -14,6 +14,7 @@ export default function ConfigSection({
   activeConfig,
   permission,
   userCanEditConfig,
+  canEditFixedShiftHours,
   userCanUseIntermediateAutoConfig,
   configChanged,
   configPresetLabel,
@@ -27,6 +28,7 @@ export default function ConfigSection({
   activeConfig: LicenseConfig
   permission: PermissionMode
   userCanEditConfig: boolean
+  canEditFixedShiftHours?: boolean
   userCanUseIntermediateAutoConfig: boolean
   configChanged: boolean
   configPresetLabel: string
@@ -64,6 +66,7 @@ export default function ConfigSection({
               config={activeConfig}
               permission={permission}
               canEdit={userCanEditConfig}
+              canEditFixedShiftHours={canEditFixedShiftHours}
               canEditIntermediateInventory={userCanUseIntermediateAutoConfig}
               changed={configChanged}
               validation={configValidation}
