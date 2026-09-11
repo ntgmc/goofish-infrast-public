@@ -1,7 +1,11 @@
 import { Component, lazy, Suspense, type ErrorInfo, type FormEvent, type ReactNode } from 'react'
+import { Link } from 'react-router'
 import type { LicenseOperator, OptimizeResult, UpgradeSuggestion, WorkspaceResultHistoryItem } from '../../../lib/types'
 import ScheduleProgress, { type ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { isMaaJsonDownloadable } from '../../../lib/workspace-history'
+import { dashboardPath } from '../../../lib/app-routes'
+import { resolveActivePurchaseChannel } from '../../../lib/purchase'
+import { usePublicContent } from '../../../lib/public-content-context'
 import { ResultFallback } from './feedback'
 import type { OptimizePhase } from './types'
 import { copy } from '../../../copy/index'
@@ -21,6 +25,7 @@ export default function ResultSection({
   loading,
   progress,
   previewProfile,
+  canViewUpgradeSuggestions,
   upgradeCdk,
   upgradeLoading,
   upgradeError,
@@ -41,6 +46,7 @@ export default function ResultSection({
   loading: boolean;
   progress: ScheduleProgressState | null;
   previewProfile: boolean;
+  canViewUpgradeSuggestions: boolean;
   upgradeCdk: string;
   upgradeLoading: boolean;
   upgradeError: string | null;
@@ -52,6 +58,16 @@ export default function ResultSection({
   fullResultDownloadBusy?: boolean;
   fullDataAvailable?: boolean;
 }) {
+  const { content, isFallback } = usePublicContent()
+  const purchaseHref = isFallback ? undefined : resolveActivePurchaseChannel(content.cdk_purchase.xianyu_url)?.href ?? undefined
+  const suggestionsSlot = suggestions.length > 0 ? (
+    <Suspense fallback={<ResultFallback />}>
+      <UpgradeSuggestions suggestions={suggestions} embedded />
+    </Suspense>
+  ) : !canViewUpgradeSuggestions ? (
+    <LockedUpgradeSuggestions purchaseHref={purchaseHref} />
+  ) : null
+
   return (
     <section className="min-w-0" data-tour-target="optimize-result-content">
       {phase === 'idle' && loading && progress && (
@@ -84,14 +100,7 @@ export default function ResultSection({
             downloadBusy={maaDownloadBusy}
             fullResultDownloadBusy={fullResultDownloadBusy}
             fullDataAvailable={fullDataAvailable}
-            suggestionsSlot={!previewProfile && suggestions.length > 0 ? (
-              <Suspense fallback={<ResultFallback />}>
-                <UpgradeSuggestions
-                  suggestions={suggestions}
-                  embedded
-                />
-              </Suspense>
-            ) : null}
+            suggestionsSlot={suggestionsSlot}
           />
           {previewProfile && <PreviewUpgradePanel cdk={upgradeCdk} loading={upgradeLoading} error={upgradeError} onCdkChange={onUpgradeCdkChange} onSubmit={onUpgradePreviewProfile} />}
         </Suspense>
@@ -109,14 +118,7 @@ export default function ResultSection({
             downloadBusy={maaDownloadBusy}
             fullResultDownloadBusy={fullResultDownloadBusy}
             fullDataAvailable={fullDataAvailable}
-            suggestionsSlot={!previewProfile && suggestions.length > 0 ? (
-              <Suspense fallback={<ResultFallback />}>
-                <UpgradeSuggestions
-                  suggestions={suggestions}
-                  embedded
-                />
-              </Suspense>
-            ) : null}
+            suggestionsSlot={suggestionsSlot}
           />
           {previewProfile && <PreviewUpgradePanel cdk={upgradeCdk} loading={upgradeLoading} error={upgradeError} onCdkChange={onUpgradeCdkChange} onSubmit={onUpgradePreviewProfile} />}
         </Suspense>
@@ -133,6 +135,7 @@ export default function ResultSection({
             downloadBusy={maaDownloadBusy}
             fullResultDownloadBusy={fullResultDownloadBusy}
             fullDataAvailable={fullDataAvailable}
+            suggestionsSlot={suggestionsSlot}
           />
           {previewProfile && <PreviewUpgradePanel cdk={upgradeCdk} loading={upgradeLoading} error={upgradeError} onCdkChange={onUpgradeCdkChange} onSubmit={onUpgradePreviewProfile} />}
         </Suspense>
@@ -140,6 +143,56 @@ export default function ResultSection({
       </div>
       </ResultErrorBoundary>
     </section>
+  )
+}
+
+function LockedUpgradeSuggestions({ purchaseHref }: { purchaseHref?: string }) {
+  return (
+    <div className="relative min-h-80 overflow-hidden rounded-xl">
+      <div className="space-y-4 select-none opacity-50 blur-[3px]" aria-hidden="true" data-locked-suggestions-preview>
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="space-y-2">
+            <div className="h-5 w-32 rounded bg-surface-3" />
+            <div className="h-4 w-72 max-w-full rounded bg-surface-2" />
+          </div>
+          <div className="h-11 w-64 max-w-full rounded-lg bg-surface-3" />
+        </div>
+        {[0, 1].map((index) => (
+          <div key={index} className="tool-panel grid gap-4 p-4 lg:grid-cols-[auto_1fr]">
+            <div className="h-12 w-12 rounded-lg bg-surface-3" />
+            <div className="space-y-3">
+              <div className="h-5 w-48 max-w-full rounded bg-surface-3" />
+              <div className="grid gap-2 sm:grid-cols-3">
+                <div className="h-16 rounded-lg bg-surface-2" />
+                <div className="h-16 rounded-lg bg-surface-2" />
+                <div className="h-16 rounded-lg bg-surface-2" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="absolute inset-0 flex items-center justify-center bg-surface-1/70 p-4 backdrop-blur-[2px]">
+        <div className="tool-panel max-w-lg p-5 text-center shadow-lg sm:p-6">
+          <span className="tool-status">{copy.optimize.pages_tool_optimize_ResultSection_015}</span>
+          <h3 className="mt-3 text-lg font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_ResultSection_016}</h3>
+          <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.optimize.pages_tool_optimize_ResultSection_017}</p>
+          <div className="mt-5 flex flex-col justify-center gap-3 sm:flex-row">
+            {purchaseHref ? (
+              <a href={purchaseHref} target="_blank" rel="noopener noreferrer" className="tool-primary-action">
+                {copy.optimize.pages_tool_optimize_ResultSection_018}
+              </a>
+            ) : (
+              <Link to="/pricing" className="tool-primary-action">
+                {copy.optimize.pages_tool_optimize_ResultSection_018}
+              </Link>
+            )}
+            <Link to={dashboardPath('redeem')} className="tool-secondary-action">
+              {copy.optimize.pages_tool_optimize_ResultSection_019}
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 

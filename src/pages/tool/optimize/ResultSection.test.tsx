@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { OptimizeResult } from '../../../lib/types'
 import ResultSection, { UpgradeSuggestionStatusNotice } from './ResultSection'
@@ -74,6 +76,7 @@ describe('ResultSection compatibility fallback', () => {
         loading={false}
         progress={null}
         previewProfile={false}
+        canViewUpgradeSuggestions
         upgradeCdk=""
         upgradeLoading={false}
         upgradeError={null}
@@ -89,5 +92,55 @@ describe('ResultSection compatibility fallback', () => {
       type: 'react_error',
       context: 'result_render',
     }))
+  })
+})
+
+describe('ResultSection locked upgrade suggestions', () => {
+  it('shows a blurred framework with purchase and redemption paths for profiles without permission', async () => {
+    const user = userEvent.setup()
+    const result = {
+      author: 'test',
+      title: '免费预览结果',
+      description: 'test',
+      buildingType: 243,
+      planTimes: '单班',
+      plans: [],
+      raw_results: [],
+      upgrade_suggestions_status: 'not_allowed',
+      preview_limit: {
+        hidden_room_count: 1,
+        notice: '当前展示预览结果。',
+      },
+    } as OptimizeResult
+
+    render(
+      <MemoryRouter>
+        <ResultSection
+          phase="suggestions"
+          historyItem={null}
+          currentResult={result}
+          finalResult={null}
+          operators={[]}
+          suggestions={[]}
+          loading={false}
+          progress={null}
+          previewProfile
+          canViewUpgradeSuggestions={false}
+          upgradeCdk=""
+          upgradeLoading={false}
+          upgradeError={null}
+          onUpgradeCdkChange={vi.fn()}
+          onUpgradePreviewProfile={vi.fn()}
+        />
+      </MemoryRouter>,
+    )
+
+    await user.click(await screen.findByRole('tab', { name: '建议' }))
+
+    expect(await screen.findByRole('heading', { name: '解锁完整练度建议' })).toBeInTheDocument()
+    expect(screen.getByText('需要高级版 CDK 权限')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '购买高级版 CDK' })).toHaveAttribute('href', '/pricing')
+    expect(screen.getByRole('link', { name: '兑换 CDK' })).toHaveAttribute('href', '/tool/redeem')
+    expect(document.querySelector('[data-locked-suggestions-preview]')).toHaveAttribute('aria-hidden', 'true')
   })
 })

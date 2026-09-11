@@ -73,14 +73,14 @@ export default function ResultPanel({
     { id: 'detail', label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_018 : copy.domain.components_result_panel_ResultPanel_019 },
     ...(!isPreview && fullDataAvailable ? [{ id: 'data' as const, label: copy.domain.components_result_panel_ResultPanel_020 }] : []),
     ...(!isPreview ? [{ id: 'import' as const, label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_021 : copy.domain.components_result_panel_ResultPanel_022 }] : []),
-    ...(!isPreview && suggestionsSlot ? [{ id: 'suggestions' as const, label: copy.domain.components_result_panel_ResultPanel_023 }] : []),
+    ...(suggestionsSlot ? [{ id: 'suggestions' as const, label: copy.domain.components_result_panel_ResultPanel_023 }] : []),
   ] as const
   const [activeTab, setActiveTab] = useState<ResultTabId>(
     detailDefaultOpen ? 'detail' : 'board',
   )
   const selectedTab = (isPreview || !fullDataAvailable) && activeTab === 'data'
     ? 'board'
-    : isPreview && (activeTab === 'import' || activeTab === 'suggestions')
+    : isPreview && activeTab === 'import'
       ? 'board'
     : activeTab === 'suggestions' && !suggestionsSlot
       ? fullDataAvailable ? 'data' : 'board'

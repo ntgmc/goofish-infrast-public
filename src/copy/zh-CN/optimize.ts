@@ -411,6 +411,16 @@ export const optimizeCopy = {
   pages_tool_optimize_ResultSection_013: "排班已完成；优化建议已完整验证 {evaluated}/{candidate} 个候选，其余候选因时间预算不足尚未模拟。",
   // src/pages/tool/optimize/ResultSection.tsx
   pages_tool_optimize_ResultSection_014: "排班已完成；优化建议已完整验证 {evaluated}/{candidate} 个候选，其余候选达到本次完整模拟上限，尚未验证。",
+  // src/pages/tool/optimize/ResultSection.tsx
+  pages_tool_optimize_ResultSection_015: "需要高级版 CDK 权限",
+  // src/pages/tool/optimize/ResultSection.tsx
+  pages_tool_optimize_ResultSection_016: "解锁完整练度建议",
+  // src/pages/tool/optimize/ResultSection.tsx
+  pages_tool_optimize_ResultSection_017: "兑换高级版 CDK 后，可根据实际干员、库存与当前排班查看培养优先级、预计收益、培养成本和回本周期。",
+  // src/pages/tool/optimize/ResultSection.tsx
+  pages_tool_optimize_ResultSection_018: "购买高级版 CDK",
+  // src/pages/tool/optimize/ResultSection.tsx
+  pages_tool_optimize_ResultSection_019: "兑换 CDK",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_001: "组合网格",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
