@@ -133,7 +133,7 @@ export function prepareResult(
         return {
           key: `${planIndex}-${roomType}-${index}`,
           label: ROOM_LABELS[roomType] || roomType,
-          indexLabel: rooms.length > 1 ? String(index + 1) : '',
+          indexLabel: [rooms.length > 1 ? String(index + 1) : '', room.level === undefined ? '' : `Lv.${room.level}`].filter(Boolean).join(' · '),
           roomType,
           roomIndex: index,
           queueLabel,

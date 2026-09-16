@@ -1,0 +1,19 @@
+.config-editor {
+  --station-trading: #00b0ff;
+  --station-manufacturing: #ffcf00;
+}
+
+.config-station {
+  min-width: 0;
+  padding: 0.75rem;
+  border-left: 3px solid var(--station-color);
+  background: color-mix(in srgb, var(--station-color) 9%, var(--theme-surface-1));
+}
+
+.config-station--trading {
+  --station-color: var(--station-trading);
+}
+
+.config-station--manufacturing {
+  --station-color: var(--station-manufacturing);
+}

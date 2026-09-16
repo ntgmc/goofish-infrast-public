@@ -7,6 +7,59 @@ import ConfigEditor from './ConfigEditor'
 
 afterEach(cleanup)
 
+describe('ConfigEditor strategy layout', () => {
+  it.each([true, false])('uses station colors and local product icons with canEdit=%s', (canEdit) => {
+    const config = normalizeConfig(CONFIG_PRESETS['243-1'])
+    config.product_requirements.trading_stations = { Orundum: 2 }
+    const { container } = render(
+      <ConfigEditor config={config} canEdit={canEdit} validation={{ ok: true }} onUpdate={vi.fn()} />,
+    )
+    for (const name of ['房间结构', '产物数量']) {
+      const region = screen.getByRole('region', { name })
+      expect(region.querySelector('.config-station--trading')).toBeInTheDocument()
+      expect(region.querySelector('.config-station--manufacturing')).toBeInTheDocument()
+    }
+    const productRegion = screen.getByRole('region', { name: '产物数量' })
+    for (const icon of ['GOLD', 'DIAMOND_SHD', 'MTL_GOLD3', 'sprite_exp_card_t3', 'MTL_DIAMOND_SHD']) {
+      expect(productRegion.querySelector(`img[src="/assets/products/${icon}.png"]`)).toHaveAttribute('alt', '')
+    }
+    const inventoryImages = container.querySelectorAll('label img')
+    expect(Array.from(inventoryImages, (image) => image.getAttribute('src'))).toEqual([
+      '/assets/products/MTL_DIAMOND_SHD.png',
+      '/assets/products/MTL_GOLD3.png',
+      '/assets/products/MTL_SL_G2.png',
+    ])
+  })
+
+  it('keeps related controls in named, visually distinct sections', () => {
+    render(
+      <ConfigEditor
+        config={normalizeConfig(CONFIG_PRESETS['243-1'])}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={vi.fn()}
+      />,
+    )
+
+    const schedule = screen.getByRole('region', { name: '排班模式' })
+    const dormitory = screen.getByRole('region', { name: '宿舍规则' })
+    const fiammetta = screen.getByRole('region', { name: '菲亚梅塔' })
+    const drones = screen.getByRole('region', { name: '无人机' })
+    expect(schedule).toHaveClass('border-brand-500/60')
+    expect(dormitory).toHaveClass('border-success/60')
+    expect(fiammetta).toHaveClass('border-error/60')
+    expect(drones).toHaveClass('border-warning/60')
+    expect(within(schedule).getByRole('group', { name: '排班模式' })).toBeInTheDocument()
+    expect(within(schedule).getByRole('button', { name: '一天3换（8小时一换）' })).toBeInTheDocument()
+    expect(within(dormitory).getByRole('group', { name: '宿舍规则' })).toBeInTheDocument()
+    expect(within(fiammetta).getByRole('checkbox', { name: '菲亚梅塔' })).toBeEnabled()
+    expect(within(drones).getByRole('checkbox', { name: '无人机' })).toBeEnabled()
+    expect(within(drones).getByRole('checkbox', { name: '无人机自动配置' })).toBeInTheDocument()
+    expect(within(drones).getByLabelText('无人机顺序')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: '搓玉理智预算' })).getByRole('checkbox', { name: '月卡' })).toBeInTheDocument()
+  })
+})
+
 describe('ConfigEditor shift patterns', () => {
   it.each([8, 12])('allows restricted profiles to select the %s-hour preset only', async (hours) => {
     const user = userEvent.setup()
@@ -460,9 +513,14 @@ describe('ConfigEditor preset actions', () => {
         onUpdate={onUpdate}
       />,
     )
-    expect(screen.queryByRole('region', { name: '房间结构' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('group', { name: '排班模式' })).not.toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('MAA 排班表 · 2-5-2 · 右满252（经验多）')
+    expect(screen.getByRole('region', { name: '房间结构' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: '排班模式' })).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: '房间结构' })).queryByRole('spinbutton')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: '产物数量' })).queryByRole('spinbutton')).not.toBeInTheDocument()
+    onUpdate.mockImplementationOnce((mutate: (value: typeof config) => void) => mutate(rightFull252))
+    await user.click(screen.getByRole('checkbox', { name: '无人机' }))
+    expect(rightFull252.drones?.enable).toBe(false)
+    expect(rightFull252.trading_station_levels).toEqual([3, 1])
 
     await user.click(screen.getByRole('button', { name: '右满252（赤金多）' }))
     const apply2521 = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
@@ -482,8 +540,9 @@ describe('ConfigEditor preset actions', () => {
         onUpdate={onUpdate}
       />,
     )
-    expect(screen.queryByRole('region', { name: '房间结构' })).not.toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('MAA 排班表 · 2-5-2 · 右满252（赤金多）')
+    expect(screen.getByRole('region', { name: '房间结构' })).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: '房间结构' })).queryByRole('spinbutton')).not.toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: '无人机' })).toBeEnabled()
     await user.click(screen.getByRole('button', { name: '243 均衡' }))
     const apply243 = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
     apply243?.(rightFull252)

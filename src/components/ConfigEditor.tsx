@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { BedDouble, CalendarClock, Flame, Gem, Zap } from 'lucide-react'
 import {
   getRightFull252Variant,
   isFiammettaShiftHoursSupported,
@@ -14,12 +15,21 @@ import { BASE_DAILY_SANITY_BUDGET, MONTHLY_CARD_DAILY_SANITY_BONUS, normalizeOru
 import type { IntermediateProduct, LicenseConfig, PermissionMode } from '../lib/types'
 import { copy } from '../copy/index'
 import InputNumber from './InputNumber'
+import './ConfigEditor.css'
 
 
 type ProductGroup = 'trading_stations' | 'manufacturing_stations'
 
 const TRADING_PRODUCTS = ['LMD', 'Orundum']
 const MANUFACTURING_PRODUCTS = ['Pure Gold', 'Battle Record', 'Originium Shard']
+const PRODUCT_ICONS: Record<string, string> = {
+  LMD: 'GOLD',
+  Orundum: 'DIAMOND_SHD',
+  'Pure Gold': 'MTL_GOLD3',
+  'Battle Record': 'sprite_exp_card_t3',
+  'Originium Shard': 'MTL_DIAMOND_SHD',
+  'Orirock Cube': 'MTL_SL_G2',
+}
 
 const PRODUCT_LABELS: Record<string, string> = {
   LMD: copy.common.components_ConfigEditor_001,
@@ -378,7 +388,7 @@ export default function ConfigEditor({
       </div>
       )}
 
-      {rightFull252PresetSelected ? (
+      {rightFull252PresetSelected && !canEdit ? (
         <div className="pt-5">
           <div className="tool-inset bg-surface-2/60 p-4" role="status">
             <p className="text-sm leading-6 text-ink-secondary">
@@ -480,7 +490,7 @@ export default function ConfigEditor({
         </div>
       ) : (
       <div className="space-y-5 pt-5">
-        <div className="tool-inset bg-surface-2/60 p-4">
+        <div className="border-b border-surface-3/60 pb-6">
           <div className="grid gap-5 lg:grid-cols-[minmax(14rem,0.85fr)_minmax(0,2.15fr)]">
             <section aria-labelledby="config-room-layout-heading">
               <div className="mb-4">
@@ -490,9 +500,10 @@ export default function ConfigEditor({
                   {copy.common.components_ConfigEditor_094}
                 </p>
               </div>
-              {canEdit ? (
+              {canEdit && !rightFull252PresetSelected ? (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
                   <CounterField
+                    station="trading"
                     id="trading-stations-count"
                     label={copy.common.components_ConfigEditor_044}
                     value={config.trading_stations_count}
@@ -501,6 +512,7 @@ export default function ConfigEditor({
                     onChange={(value) => setStationCounts(value, 6 - value)}
                   />
                   <CounterField
+                    station="manufacturing"
                     id="manufacturing-stations-count"
                     label={copy.common.components_ConfigEditor_045}
                     value={config.manufacturing_stations_count}
@@ -511,8 +523,8 @@ export default function ConfigEditor({
                 </div>
               ) : (
                 <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-1">
-                  <ReadOnlyMetric label={copy.common.components_ConfigEditor_046} value={config.trading_stations_count} />
-                  <ReadOnlyMetric label={copy.common.components_ConfigEditor_047} value={config.manufacturing_stations_count} />
+                  <ReadOnlyMetric station="trading" label={copy.common.components_ConfigEditor_046} value={config.trading_stations_count} />
+                  <ReadOnlyMetric station="manufacturing" label={copy.common.components_ConfigEditor_047} value={config.manufacturing_stations_count} />
                 </dl>
               )}
             </section>
@@ -524,17 +536,19 @@ export default function ConfigEditor({
               <h3 id="config-product-counts-heading" className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_048}</h3>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <ProductGroupEditor
+                  station="trading"
                   label={copy.common.components_ConfigEditor_049}
                   products={tradingProducts}
                   counts={config.product_requirements.trading_stations}
-                  canEdit={canEdit}
+                  canEdit={canEdit && !rightFull252PresetSelected}
                   onChange={(product, value) => setProductCount('trading_stations', product, value)}
                 />
                 <ProductGroupEditor
+                  station="manufacturing"
                   label={copy.common.components_ConfigEditor_050}
                   products={manufacturingProducts}
                   counts={config.product_requirements.manufacturing_stations}
-                  canEdit={canEdit}
+                  canEdit={canEdit && !rightFull252PresetSelected}
                   onChange={(product, value) => setProductCount('manufacturing_stations', product, value)}
                 />
               </div>
@@ -551,13 +565,16 @@ export default function ConfigEditor({
           </div>
         </div>
 
-        <div className="tool-inset bg-surface-2/60 p-4">
+        <div>
           <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_051}</h3>
-          <div className="mt-4 space-y-4">
+          <div className="mt-5 space-y-6">
             {showOrundumPlanning && (
-              <div className="tool-inset px-4 py-3">
+              <section aria-labelledby="config-orundum-heading" className="min-w-0 border-l-2 border-brand-300/60 bg-brand-500/5 px-4 py-4 sm:px-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm font-medium text-ink-primary">{copy.common.components_ConfigEditor_052}</p>
+                  <h4 id="config-orundum-heading" className="flex items-center gap-2 text-sm font-semibold text-ink-primary">
+                    <Gem aria-hidden="true" className="h-4 w-4 shrink-0 text-brand-300" />
+                    {copy.common.components_ConfigEditor_052}
+                  </h4>
                   <label className="flex min-h-11 items-center justify-between gap-3 text-sm text-ink-secondary sm:min-w-36">
                     <span>{copy.common.components_ConfigEditor_056}</span>
                     <input
@@ -590,71 +607,79 @@ export default function ConfigEditor({
                     <p>{copy.common.components_ConfigEditor_058}{orundumPlanning.total_daily_sanity_budget}{copy.common.components_ConfigEditor_059}</p>
                   </div>
                 </details>
-              </div>
+              </section>
             )}
+            <section aria-labelledby="config-schedule-heading" className="min-w-0 space-y-5 border-l-2 border-brand-500/60 bg-brand-500/5 px-4 py-4 sm:px-5">
               <div>
-              <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_060}</p>
-              <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label={copy.common.components_ConfigEditor_061}>
-                {(['maa', 'rotation'] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    aria-pressed={isScheduleModeSelected(mode)}
-                    disabled={false}
-                    onClick={() => onUpdate((next) => {
-                      next.schedule_mode = mode
-                      applyCounts(next)
-                    })}
-                    className={`tool-secondary-action min-h-11 px-3 text-sm ${
-                      isScheduleModeSelected(mode)
-                        ? 'tool-option-selected'
-                        : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'
-                    }`}
-                  >
-                    {SCHEDULE_MODE_LABELS[mode]}
-                  </button>
-                ))}
+                <h4 id="config-schedule-heading" className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-primary">
+                  <CalendarClock aria-hidden="true" className="h-4 w-4 shrink-0 text-brand-500" />
+                  {copy.common.components_ConfigEditor_060}
+                </h4>
+                <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label={copy.common.components_ConfigEditor_061}>
+                  {(['maa', 'rotation'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      aria-pressed={isScheduleModeSelected(mode)}
+                      disabled={false}
+                      onClick={() => onUpdate((next) => {
+                        next.schedule_mode = mode
+                        applyCounts(next)
+                      })}
+                      className={`tool-secondary-action min-h-11 px-3 text-sm ${
+                        isScheduleModeSelected(mode)
+                          ? 'tool-option-selected'
+                          : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'
+                      }`}
+                    >
+                      {SCHEDULE_MODE_LABELS[mode]}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs leading-5 text-ink-muted">
+                  {rotationMode
+                    ? copy.common.components_ConfigEditor_062
+                    : copy.common.components_ConfigEditor_095}
+                </p>
               </div>
-              <p className="mt-2 text-xs leading-5 text-ink-muted">
-                {rotationMode
-                  ? copy.common.components_ConfigEditor_062
-                  : copy.common.components_ConfigEditor_095}
-              </p>
-            </div>
-            {!rotationMode && (
-              <ShiftHoursEditor
-                value={config.shift_hours}
-                variableMode={variableShiftMode}
-                canEdit={canEdit}
-                canEditFixedShiftHours={canEditFixedShiftHours}
-                onSelectVariable={() => onUpdate((next) => {
-                  next.schedule_mode = 'variable'
-                  next.shift_hours = [8, 8, 8]
-                  next.Fiammetta = { ...(next.Fiammetta ?? { enable: false }), enable: false }
-                  next.variable_shift_schedule = {
-                    ...(next.variable_shift_schedule ?? {}),
-                    ...VARIABLE_SHIFT_SCHEDULE_DEFAULTS,
-                  }
-                  applyCounts(next)
-                })}
-                onChange={(hours) => onUpdate((next) => {
-                  next.schedule_mode = 'maa'
-                  next.shift_hours = hours
-                  if (!isFiammettaShiftHoursSupported(hours)) {
+              {!rotationMode && (
+                <ShiftHoursEditor
+                  value={config.shift_hours}
+                  variableMode={variableShiftMode}
+                  canEdit={canEdit}
+                  canEditFixedShiftHours={canEditFixedShiftHours}
+                  onSelectVariable={() => onUpdate((next) => {
+                    next.schedule_mode = 'variable'
+                    next.shift_hours = [8, 8, 8]
                     next.Fiammetta = { ...(next.Fiammetta ?? { enable: false }), enable: false }
-                  }
-                  next.variable_shift_schedule = {
-                    ...(next.variable_shift_schedule ?? {}),
-                    enable: false,
-                    enabled: false,
-                  }
-                  applyCounts(next)
-                })}
-              />
+                    next.variable_shift_schedule = {
+                      ...(next.variable_shift_schedule ?? {}),
+                      ...VARIABLE_SHIFT_SCHEDULE_DEFAULTS,
+                    }
+                    applyCounts(next)
+                  })}
+                  onChange={(hours) => onUpdate((next) => {
+                    next.schedule_mode = 'maa'
+                    next.shift_hours = hours
+                    if (!isFiammettaShiftHoursSupported(hours)) {
+                      next.Fiammetta = { ...(next.Fiammetta ?? { enable: false }), enable: false }
+                    }
+                    next.variable_shift_schedule = {
+                      ...(next.variable_shift_schedule ?? {}),
+                      enable: false,
+                      enabled: false,
+                    }
+                    applyCounts(next)
+                  })}
+                />
             )}
-            <div>
-              <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_063}</p>
-              <div className="tool-inset grid gap-2 p-1 sm:grid-cols-3" role="group" aria-label={copy.common.components_ConfigEditor_064}>
+            </section>
+            <section aria-labelledby="config-dormitory-heading" className="min-w-0 border-l-2 border-success/60 bg-success/5 px-4 py-4 sm:px-5">
+              <h4 id="config-dormitory-heading" className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-primary">
+                <BedDouble aria-hidden="true" className="h-4 w-4 shrink-0 text-success" />
+                {copy.common.components_ConfigEditor_063}
+              </h4>
+              <div className="tool-inset grid gap-2 p-1 lg:grid-cols-3" role="group" aria-label={copy.common.components_ConfigEditor_064}>
                 {DORMITORY_RULE_OPTIONS.map((rule) => (
                   <button
                     key={rule}
@@ -687,96 +712,110 @@ export default function ConfigEditor({
                       ? copy.common.components_ConfigEditor_066
                       : copy.common.components_ConfigEditor_067}
               </p>
-            </div>
-          <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
-            <span>{copy.common.components_ConfigEditor_068}</span>
-              <input
-                type="checkbox"
-                checked={!rotationMode && fiammettaShiftHoursSupported && (config.Fiammetta?.enable ?? false)}
-                disabled={!canEdit || rotationMode || !fiammettaShiftHoursSupported}
-                onChange={(event) => onUpdate((next) => {
-                  next.Fiammetta = { enable: event.currentTarget.checked }
-                  applyCounts(next)
-                })}
-                className="h-4 w-4 accent-brand-500"
-              />
-            </label>
-            {rotationMode ? (
-              <p className="tool-inset px-3 py-2 text-xs leading-5 text-ink-muted">
-                {copy.common.components_ConfigEditor_069}</p>
-            ) : (!fiammettaShiftHoursSupported || config.Fiammetta?.enable) && (
-              <p className="tool-alert tool-alert--warning px-3 py-2 text-xs leading-5">
-                {copy.common.components_ConfigEditor_070(fiammettaShiftInterval)}</p>
-            )}
-            <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
-              <span>{copy.common.components_ConfigEditor_071}</span>
-              <input
-                type="checkbox"
-                  checked={!rotationMode && (config.drones?.enable ?? false)}
-                  disabled={!canEdit || rotationMode}
-                onChange={(event) => onUpdate((next) => {
-                  next.drones = {
-                    ...(next.drones ?? { order: 'pre', targets: [] }),
-                    enable: event.currentTarget.checked,
-                    auto: next.drones?.auto ?? true,
-                  }
-                  applyCounts(next)
-                })}
-                className="h-4 w-4 accent-brand-500"
-              />
-            </label>
-            <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
-              <span>{copy.common.components_ConfigEditor_072}</span>
-              <input
-                type="checkbox"
-                  checked={!rotationMode && (config.drones?.auto ?? false)}
-                  disabled={!canEdit || rotationMode || !config.drones?.enable}
-                onChange={(event) => onUpdate((next) => {
-                  next.drones = {
-                    ...(next.drones ?? { enable: true, order: 'pre', targets: [] }),
-                    auto: event.currentTarget.checked,
-                  }
-                  applyCounts(next)
-                })}
-                className="h-4 w-4 accent-brand-500"
-              />
-            </label>
-            <div>
-              <label className="mb-2 block text-xs font-medium text-ink-muted" htmlFor="drone-order">
-                {copy.common.components_ConfigEditor_073}</label>
-              <select
-                id="drone-order"
-                value={config.drones?.order ?? 'pre'}
-                disabled={!canEdit || rotationMode || !config.drones?.enable}
-                onChange={(event) => onUpdate((next) => {
-                  next.drones = {
-                    ...(next.drones ?? { enable: true, targets: [] }),
-                    order: event.currentTarget.value,
-                  }
-                  applyCounts(next)
-                })}
-                className="tool-field disabled:text-ink-muted"
-              >
-                <option value="pre">{copy.common.components_ConfigEditor_074}</option>
-                <option value="post">{copy.common.components_ConfigEditor_075}</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-2 block text-xs font-medium text-ink-muted" htmlFor="drone-targets">
-                {copy.common.components_ConfigEditor_076}</label>
-                <DroneTargetsInput
-                  id="drone-targets"
-                  value={droneTargets}
-                disabled={!canEdit || rotationMode || !config.drones?.enable || Boolean(config.drones?.auto)}
-                  onChange={(value) => onUpdate((next) => {
+            </section>
+            <section aria-labelledby="config-fiammetta-heading" className="min-w-0 space-y-3 border-l-2 border-error/60 bg-error/5 px-4 py-4 sm:px-5">
+              <div className="flex min-h-11 items-center justify-between gap-3">
+                <h4 id="config-fiammetta-heading" className="flex items-center gap-2 text-sm font-semibold text-ink-primary">
+                  <Flame aria-hidden="true" className="h-4 w-4 shrink-0 text-error" />
+                  <label htmlFor="config-fiammetta-enabled">{copy.common.components_ConfigEditor_068}</label>
+                </h4>
+                <input
+                  id="config-fiammetta-enabled"
+                  type="checkbox"
+                  checked={!rotationMode && fiammettaShiftHoursSupported && (config.Fiammetta?.enable ?? false)}
+                  disabled={!canEdit || rotationMode || !fiammettaShiftHoursSupported}
+                  onChange={(event) => onUpdate((next) => {
+                    next.Fiammetta = { enable: event.currentTarget.checked }
+                    applyCounts(next)
+                  })}
+                  className="h-4 w-4 accent-brand-500"
+                />
+              </div>
+              {rotationMode ? (
+                <p className="tool-inset px-3 py-2 text-xs leading-5 text-ink-muted">
+                  {copy.common.components_ConfigEditor_069}</p>
+              ) : (!fiammettaShiftHoursSupported || config.Fiammetta?.enable) && (
+                <p className="tool-alert tool-alert--warning px-3 py-2 text-xs leading-5">
+                  {copy.common.components_ConfigEditor_070(fiammettaShiftInterval)}</p>
+              )}
+            </section>
+            <section aria-labelledby="config-drones-heading" className="min-w-0 space-y-4 border-l-2 border-warning/60 bg-warning/5 px-4 py-4 sm:px-5">
+              <div className="flex min-h-11 items-center justify-between gap-3">
+                <h4 id="config-drones-heading" className="flex items-center gap-2 text-sm font-semibold text-ink-primary">
+                  <Zap aria-hidden="true" className="h-4 w-4 shrink-0 text-warning" />
+                  <label htmlFor="config-drones-enabled">{copy.common.components_ConfigEditor_071}</label>
+                </h4>
+                <input
+                  id="config-drones-enabled"
+                  type="checkbox"
+                    checked={!rotationMode && (config.drones?.enable ?? false)}
+                    disabled={!canEdit || rotationMode}
+                  onChange={(event) => onUpdate((next) => {
                     next.drones = {
-                      ...(next.drones ?? { enable: true, order: 'pre' }),
-                    targets: parseDroneTargetsInput(value),
+                      ...(next.drones ?? { order: 'pre', targets: [] }),
+                      enable: event.currentTarget.checked,
+                      auto: next.drones?.auto ?? true,
                     }
                     applyCounts(next)
                   })}
+                  className="h-4 w-4 accent-brand-500"
                 />
-            </div>
+              </div>
+              <label className="flex min-h-11 items-center justify-between gap-3 border-t border-surface-3/60 pt-3 text-sm text-ink-secondary">
+                <span>{copy.common.components_ConfigEditor_072}</span>
+                <input
+                  type="checkbox"
+                    checked={!rotationMode && (config.drones?.auto ?? false)}
+                    disabled={!canEdit || rotationMode || !config.drones?.enable}
+                  onChange={(event) => onUpdate((next) => {
+                    next.drones = {
+                      ...(next.drones ?? { enable: true, order: 'pre', targets: [] }),
+                      auto: event.currentTarget.checked,
+                    }
+                    applyCounts(next)
+                  })}
+                  className="h-4 w-4 accent-brand-500"
+                />
+              </label>
+              <div className="grid min-w-0 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-ink-muted" htmlFor="drone-order">
+                    {copy.common.components_ConfigEditor_073}</label>
+                  <select
+                    id="drone-order"
+                    value={config.drones?.order ?? 'pre'}
+                    disabled={!canEdit || rotationMode || !config.drones?.enable}
+                    onChange={(event) => onUpdate((next) => {
+                      next.drones = {
+                        ...(next.drones ?? { enable: true, targets: [] }),
+                        order: event.currentTarget.value,
+                      }
+                      applyCounts(next)
+                    })}
+                    className="tool-field disabled:text-ink-muted"
+                  >
+                    <option value="pre">{copy.common.components_ConfigEditor_074}</option>
+                    <option value="post">{copy.common.components_ConfigEditor_075}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-ink-muted" htmlFor="drone-targets">
+                    {copy.common.components_ConfigEditor_076}</label>
+                    <DroneTargetsInput
+                      id="drone-targets"
+                      value={droneTargets}
+                    disabled={!canEdit || rotationMode || !config.drones?.enable || Boolean(config.drones?.auto)}
+                      onChange={(value) => onUpdate((next) => {
+                        next.drones = {
+                          ...(next.drones ?? { enable: true, order: 'pre' }),
+                        targets: parseDroneTargetsInput(value),
+                        }
+                        applyCounts(next)
+                      })}
+                    />
+                </div>
+              </div>
+            </section>
           </div>
         </div>
       </div>
@@ -925,7 +964,10 @@ function IntermediateInventoryField({
   return (
     <label className="tool-inset block px-3 py-3 text-sm">
       <span className="flex items-center justify-between gap-3">
-        <span className="text-ink-secondary">{label}</span>
+        <span className="flex min-w-0 items-center gap-2 text-ink-secondary">
+          <ProductIcon product={product} />
+          <span>{label}</span>
+        </span>
         <input
           type="number"
           min={0}
@@ -1017,7 +1059,7 @@ function ShiftHoursEditor({
   return (
     <div>
       <p id="config-shift-schedule-label" className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_086}</p>
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-5" role="group" aria-labelledby="config-shift-schedule-label">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5" role="group" aria-labelledby="config-shift-schedule-label">
         {SHIFT_SCHEDULE_OPTIONS.map((choice) => (
           <button
             key={choice.id}
@@ -1144,6 +1186,7 @@ function DroneTargetsInput({
 }
 
 function CounterField({
+  station,
   id,
   label,
   value,
@@ -1151,6 +1194,7 @@ function CounterField({
   max,
   onChange,
 }: {
+  station: 'trading' | 'manufacturing';
   id: string;
   label: string;
   value: number;
@@ -1159,7 +1203,7 @@ function CounterField({
   onChange: (value: number) => void;
 }) {
   return (
-    <div>
+    <div className={`config-station config-station--${station}`}>
       <label htmlFor={id} className="mb-2 block text-xs font-medium text-ink-muted">{label}</label>
       <InputNumber
         id={id}
@@ -1174,9 +1218,9 @@ function CounterField({
   )
 }
 
-function ReadOnlyMetric({ label, value }: { label: string; value: number }) {
+function ReadOnlyMetric({ station, label, value }: { station: 'trading' | 'manufacturing'; label: string; value: number }) {
   return (
-    <div className="tool-inset px-3 py-2">
+    <div className={`config-station config-station--${station}`}>
       <dt className="text-xs text-ink-muted">{label}</dt>
       <dd className="mt-1 font-semibold text-ink-primary">{value}</dd>
     </div>
@@ -1184,12 +1228,14 @@ function ReadOnlyMetric({ label, value }: { label: string; value: number }) {
 }
 
 function ProductGroupEditor({
+  station,
   label,
   products,
   counts,
   canEdit,
   onChange,
 }: {
+  station: 'trading' | 'manufacturing';
   label: string;
   products: string[];
   counts: Record<string, number>;
@@ -1197,12 +1243,15 @@ function ProductGroupEditor({
   onChange: (product: string, value: number) => void;
 }) {
   return (
-    <div>
+    <div className={`config-station config-station--${station}`}>
       <p className="mb-2 text-xs font-medium text-ink-muted">{label}</p>
       <div className="grid gap-2">
         {products.map((product) => (
         <div key={product} className="tool-inset flex items-center justify-between gap-3 px-3 py-2 text-sm">
-          <span className="text-ink-secondary">{PRODUCT_LABELS[product] ?? product}</span>
+            <span className="flex min-w-0 items-center gap-2 text-ink-secondary">
+              <ProductIcon product={product} />
+              <span className="break-words">{PRODUCT_LABELS[product] ?? product}</span>
+            </span>
           {canEdit ? (
             <ProductCountInput
               label={PRODUCT_LABELS[product] ?? product}
@@ -1217,6 +1266,12 @@ function ProductGroupEditor({
       </div>
     </div>
   )
+}
+
+function ProductIcon({ product }: { product: string }) {
+  const icon = PRODUCT_ICONS[product]
+  if (!icon) return null
+  return <img src={`/assets/products/${icon}.png`} alt="" aria-hidden="true" width={32} height={32} className="h-8 w-8 shrink-0 object-contain" />
 }
 
 function ProductCountInput({
