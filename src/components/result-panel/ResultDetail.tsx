@@ -112,11 +112,11 @@ function MaaRoomRow({ row }: { row: RoomRow }) {
             {row.detail && <span className="mt-1 block text-xs text-ink-muted">{row.detail}</span>}
           </div>
         ) : (
-          <OperatorAvatarStrip operators={row.operators} fallbackText={row.operatorText} compact />
+          <OperatorAvatarStrip operators={row.operators} fallbackText={row.operatorText} compact showFullNames />
         )}
       </div>
       <div className="mt-3 md:mt-0 md:text-right">
-        {!row.isAutofill && (
+        {!row.isAutofill && row.roomType !== 'dormitory' && row.roomType !== 'processing' && (
           <>
             <div className="tool-status tool-status--current font-mono">
               {row.efficiency}
@@ -162,7 +162,7 @@ function RotationRoomGrid({ groups }: { groups: RotationRoomGroup[] }) {
                   <span className="text-xs font-medium text-ink-muted">{copy.domain.components_result_panel_ResultDetail_015}</span>
                 </div>
                 <div className="mt-2">
-                  <OperatorAvatarStrip operators={row.operators} fallbackText={row.operatorText} compact />
+                  <OperatorAvatarStrip operators={row.operators} fallbackText={row.operatorText} compact showFullNames />
                 </div>
                 <EfficiencyDisclosure row={row} compact />
               </div>
@@ -175,6 +175,7 @@ function RotationRoomGrid({ groups }: { groups: RotationRoomGroup[] }) {
 }
 
 function EfficiencyDisclosure({ row, compact = false }: { row: RoomRow; compact?: boolean }) {
+  if (row.roomType === 'dormitory' || row.roomType === 'processing') return null
   const detailItems = row.detailItems.length > 0 ? row.detailItems : [copy.domain.components_result_panel_ResultDetail_016]
 
   return (

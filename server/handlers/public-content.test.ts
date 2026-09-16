@@ -12,6 +12,33 @@ import siteHandler from './site-public-content'
 import { SettingsConflictError } from '../storage/settings-conflict'
 
 describe('public content handlers', () => {
+  it('accepts per-plan purchase links and exposes them in public content', async () => {
+    const draft = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
+    draft.pricing.plans.single_account_monthly.purchase_url = ' https://example.com/month '
+    draft.pricing.plans.single_account_lifetime.purchase_url = 'https://example.com/lifetime'
+    const response = await adminHandler(new Request('http://localhost/api/admin/public-content', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...draft, expected_revision: 3 }),
+    }))
+    expect(response.status).toBe(200)
+    expect(store.savePublicContentSettings).toHaveBeenCalledWith(expect.objectContaining({
+      pricing: expect.objectContaining({
+        plans: expect.objectContaining({
+          single_account_monthly: expect.objectContaining({ purchase_url: 'https://example.com/month' }),
+          single_account_lifetime: expect.objectContaining({ purchase_url: 'https://example.com/lifetime' }),
+        }),
+      }),
+    }), 3)
+    store.getPublicContentSettings.mockResolvedValue({
+      ...cloneDefaultPublicContentSettings(), ...store.savePublicContentSettings.mock.calls[0][0], revision: 4,
+    })
+    const publicResponse = await siteHandler(new Request('http://localhost/api/site/public-content'))
+    const body = await publicResponse.json()
+    expect(body.pricing.plans.single_account_monthly.purchase_url).toBe('https://example.com/month')
+    expect(body.pricing.plans.single_account_lifetime.purchase_url).toBe('https://example.com/lifetime')
+  })
+
   beforeEach(() => {
     const settings = cloneDefaultPublicContentSettings()
     auth.authenticateAdminRequest.mockReset().mockResolvedValue({ ok: true })

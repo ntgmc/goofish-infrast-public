@@ -51,6 +51,7 @@ const pricingPriceLabel = z.string().trim().max(40).regex(/^\d+(?:\.\d{1,2})?\s*
 const pricingDiscountFold = z.number().int().min(1).max(10)
 
 const pricingPlanSchema = z.strictObject({
+  purchase_url: optionalHttpsUrl,
   label: text(80),
   badge: text(40),
   display_price: text(40),
@@ -61,6 +62,7 @@ const pricingPlanSchema = z.strictObject({
 })
 
 const pricingPlanInputSchema = z.strictObject({
+  purchase_url: optionalHttpsUrl,
   label: text(80),
   badge: text(40),
   display_price: text(40).optional(),
@@ -84,6 +86,7 @@ const singleAccountLifetime = getSku('single_account_lifetime') as PublicPricing
 
 const defaultPricingPlans = {
   free_preview: {
+    purchase_url: '',
     label: freePreview.label,
     badge: copy.public.pages_PricingPage_005,
     display_price: freePreview.display_price!,
@@ -93,6 +96,7 @@ const defaultPricingPlans = {
     account_scope: freePreview.account_scope,
   },
   single_account_monthly: {
+    purchase_url: '',
     label: singleAccountMonthly.label,
     badge: copy.publicContent.default_pricing_badge_monthly,
     display_price: singleAccountMonthly.display_price!,
@@ -102,6 +106,7 @@ const defaultPricingPlans = {
     account_scope: singleAccountMonthly.account_scope,
   },
   single_account_half_year: {
+    purchase_url: '',
     label: singleAccountHalfYear.label,
     badge: copy.publicContent.default_pricing_badge_half_year,
     display_price: singleAccountHalfYear.display_price!,
@@ -111,6 +116,7 @@ const defaultPricingPlans = {
     account_scope: singleAccountHalfYear.account_scope,
   },
   single_account_annual: {
+    purchase_url: '',
     label: singleAccountAnnual.label,
     badge: copy.publicContent.default_pricing_badge_annual,
     display_price: singleAccountAnnual.display_price!,
@@ -120,6 +126,7 @@ const defaultPricingPlans = {
     account_scope: singleAccountAnnual.account_scope,
   },
   single_account_lifetime: {
+    purchase_url: '',
     label: singleAccountLifetime.label,
     badge: copy.publicContent.default_pricing_badge_lifetime,
     display_price: singleAccountLifetime.display_price!,
