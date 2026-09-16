@@ -370,6 +370,8 @@ export interface OptimizeResult {
   optimization_mode?: 'fast' | 'exact' | 'exhaustive' | string;
   optimality?: 'global_within_candidate_set' | 'bounded_candidate_optimum' | 'approximate' | string;
   search_nodes?: number;
+  /** Observed search-state visits, including intermediate and repeated states. */
+  searched_state_count?: number;
   pruned_nodes?: number;
   candidate_count?: number;
   elapsed_ms?: number;

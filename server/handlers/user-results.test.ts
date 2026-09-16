@@ -242,6 +242,7 @@ describe('result history reads', () => {
     expect(response.status).toBe(200)
     const body = await response.json() as { item: { result: Record<string, unknown> } }
     expect(body.item.result.raw_results).toEqual([])
+    expect(body.item.result.searched_state_count).toBe(123456)
     expect(body.item.result).not.toHaveProperty('daily_production')
     expect(mocks.getProfileOptimizationResult).toHaveBeenCalledWith('profile-1', 'result-1')
   })
@@ -575,6 +576,7 @@ function profile(kind: 'cdk' | 'free_preview' | 'metered_personal', permission: 
 
 function optimizerResult() {
   return {
+    searched_state_count: 123456,
     author: '开发者',
     title: '测试排班',
     description: '测试说明',

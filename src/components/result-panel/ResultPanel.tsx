@@ -7,7 +7,7 @@ import ResultBoard from './ResultBoard'
 import ResultDetail from './ResultDetail'
 import ResultMetrics from './ResultMetrics'
 import type { ResultPanelProps, ResultTabId } from './types'
-import { copy } from '../../copy/index'
+import { copy, CURRENT_LOCALE } from '../../copy/index'
 
 
 export default function ResultPanel({
@@ -31,6 +31,9 @@ export default function ResultPanel({
   )
   const { detailStats } = prepared
   const isPreview = Boolean(previewLimit)
+  const searchedStateCount = result.searched_state_count
+  const showSearchedStateCount = typeof searchedStateCount === 'number'
+    && Number.isSafeInteger(searchedStateCount) && searchedStateCount >= 0
 
   const shiftPattern = result.shift_pattern ?? result.shift_hours?.map((hour) => `${hour}h`).join('-') ?? result.planTimes
   const totalScheduleHours = result.total_schedule_hours ?? result.daily_production?.hours
@@ -134,6 +137,14 @@ export default function ResultPanel({
         )}
         <div className="border-b border-surface-3/60 px-5 py-3 sm:px-6">
           <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-ink-muted">
+            {showSearchedStateCount && (
+              <span className="inline-flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-1">
+                <span>{copy.domain.components_result_panel_ResultPanel_045}</span>
+                <span className="font-semibold text-ink-primary">
+                  {searchedStateCount.toLocaleString(CURRENT_LOCALE)} {copy.domain.components_result_panel_ResultPanel_046}
+                </span>
+              </span>
+            )}
             {contextItems.map((item) => (
               <span key={item.label} className="inline-flex items-center gap-1.5 whitespace-nowrap">
                 <span>{item.label}</span>

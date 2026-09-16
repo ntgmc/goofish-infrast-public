@@ -9,6 +9,27 @@ import ResultPanel from './ResultPanel'
 afterEach(cleanup)
 
 describe('ResultPanel tabs', () => {
+  it.each(['maa', 'rotation', 'variable'] as const)('shows search states outside restricted tabs in %s mode', (scheduleMode) => {
+    render(<ResultPanel
+      result={{ ...createResult(), schedule_mode: scheduleMode, searched_state_count: 123456 }}
+      fullDataAvailable={false}
+      previewLimit={{ mode: 'full_rotation_without_export', hidden_room_count: 0, notice: 'Preview' }}
+    />)
+    expect(screen.getByText('已记录搜索状态：')).toBeInTheDocument()
+    expect(screen.getByText('123,456 次')).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: '数据' })).not.toBeInTheDocument()
+  })
+
+  it.each([0, 1234567890123])('shows the full recorded integer %s', (count) => {
+    render(<ResultPanel result={{ ...createResult(), searched_state_count: count }} />)
+    expect(screen.getByText(`${count.toLocaleString('zh-CN')} 次`)).toBeInTheDocument()
+  })
+
+  it.each([undefined, -1, 1.5, NaN, Infinity])('omits unavailable or invalid search count %s', (count) => {
+    render(<ResultPanel result={{ ...createResult(), searched_state_count: count, search_nodes: 42 }} />)
+    expect(screen.queryByText('已记录搜索状态：')).not.toBeInTheDocument()
+  })
+
   it('places office cards before dormitory cards in the preview', () => {
     render(<ResultPanel result={createPreviewOrderResult()} />)
 
