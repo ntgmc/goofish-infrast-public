@@ -36,6 +36,17 @@ describe('sanitizeConfigForPublicOptimize layout cost policy', () => {
     expect(sanitized.optimizer_search).toEqual({ optimization_mode: 'exact', beam: true })
   })
 
+  it('replaces fast mode restored from a 252 history item when switching to 243', () => {
+    const restored = sanitizeConfigForPublicOptimize(CONFIG_PRESETS['252'], 'advanced')
+    Object.assign(restored, structuredClone(CONFIG_PRESETS['243']))
+
+    const sanitized = sanitizeConfigForPublicOptimize(restored, 'advanced')
+
+    expect(sanitized.optimization_mode).toBeUndefined()
+    expect(sanitized.optimizer_search).toEqual({ optimization_mode: 'exact', beam: true })
+    expect(sanitized.Fiammetta?.candidate_mode).toBeUndefined()
+  })
+
   it('uses station counts instead of a stale layout label', () => {
     const sanitized = sanitizeConfigForPublicOptimize({
       ...CONFIG_PRESETS['243'],

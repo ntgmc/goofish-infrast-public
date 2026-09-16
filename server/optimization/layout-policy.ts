@@ -13,17 +13,28 @@ export function supportsExactOptimizationLayout(config: LayoutCounts): boolean {
 }
 
 export function enforceLayoutOptimizationMode(config: LicenseConfig): boolean {
-  if (supportsExactOptimizationLayout(config)) return false
-
-  config.optimization_mode = 'fast'
+  const layoutCostConstrained = !supportsExactOptimizationLayout(config)
+  const optimizationMode = layoutCostConstrained ? 'fast' : 'exact'
+  if (layoutCostConstrained) config.optimization_mode = 'fast'
+  else if (config.optimization_mode !== 'exact') delete config.optimization_mode
   const optimizerSearch = config.optimizer_search && typeof config.optimizer_search === 'object' && !Array.isArray(config.optimizer_search)
     ? config.optimizer_search
-    : {}
-  config.optimizer_search = {
-    ...optimizerSearch,
-    optimization_mode: 'fast',
-    beam: optimizerSearch.beam !== false,
+    : null
+  if (optimizerSearch) {
+    config.optimizer_search = {
+      ...optimizerSearch,
+      optimization_mode: optimizationMode,
+      ...(layoutCostConstrained && { beam: optimizerSearch.beam !== false }),
+    }
+  } else if (layoutCostConstrained) {
+    config.optimizer_search = { optimization_mode: 'fast', beam: true }
+  } else {
+    delete config.optimizer_search
   }
-  if (config.Fiammetta) config.Fiammetta = { ...config.Fiammetta, candidate_mode: 'fast' }
-  return true
+  if (config.Fiammetta) {
+    config.Fiammetta = { ...config.Fiammetta }
+    if (layoutCostConstrained) config.Fiammetta.candidate_mode = 'fast'
+    else delete config.Fiammetta.candidate_mode
+  }
+  return layoutCostConstrained
 }

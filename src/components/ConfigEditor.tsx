@@ -285,6 +285,8 @@ export default function ConfigEditor({
       const copy = normalizeConfig(preset)
       delete next.trading_station_levels
       delete next.manufacturing_station_levels
+      delete next.optimization_mode
+      delete next.optimizer_search
       Object.assign(next, copy)
       next.intermediate_inventory = intermediateInventory
       if (autoBalanceEnabled) {

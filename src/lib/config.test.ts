@@ -48,6 +48,19 @@ describe('layout normalization', () => {
       message: '当前支持 3 发电站布局和右满252；其他 2 发电站布局尚未开放。',
     })
   })
+
+  it('removes internal optimizer policy restored from history', () => {
+    const config = normalizeConfig({
+      ...CONFIG_PRESETS['243'],
+      optimization_mode: 'fast',
+      optimizer_search: { optimization_mode: 'fast', beam: true },
+      Fiammetta: { enable: true, candidate_mode: 'fast' },
+    })
+
+    expect(config.optimization_mode).toBeUndefined()
+    expect(config.optimizer_search).toBeUndefined()
+    expect(config.Fiammetta?.candidate_mode).toBeUndefined()
+  })
 })
 
 describe('dormitory rule normalization', () => {

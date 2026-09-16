@@ -197,6 +197,9 @@ export function resolveConfigLayout(config: Pick<LicenseConfig, 'trading_station
 
 export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   const next = cloneConfig(config)
+  delete next.optimization_mode
+  delete next.optimizer_search
+  if (next.Fiammetta) delete next.Fiammetta.candidate_mode
   const parsedShiftHours = parseShiftHours(next.shift_hours)
   next.product_requirements = {
     trading_stations: { ...(next.product_requirements?.trading_stations ?? {}) },

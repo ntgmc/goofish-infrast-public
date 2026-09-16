@@ -58,6 +58,27 @@ describe('ConfigEditor strategy layout', () => {
     expect(within(drones).getByLabelText('无人机顺序')).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: '搓玉理智预算' })).getByRole('checkbox', { name: '月卡' })).toBeInTheDocument()
   })
+
+  it('clears restored optimizer policy when applying a preset', async () => {
+    const user = userEvent.setup()
+    const config = {
+      ...cloneConfig(CONFIG_PRESETS['252']),
+      optimization_mode: 'fast',
+      optimizer_search: { optimization_mode: 'fast', beam: true },
+    }
+    const onUpdate = vi.fn()
+    render(
+      <ConfigEditor config={config} canEdit validation={{ ok: true }} onUpdate={onUpdate} />,
+    )
+
+    await user.click(screen.getByRole('button', { name: '243 均衡' }))
+    const next = cloneConfig(config)
+    onUpdate.mock.calls[0][0](next)
+
+    expect(next.layout).toBe('2-4-3')
+    expect(next.optimization_mode).toBeUndefined()
+    expect(next.optimizer_search).toBeUndefined()
+  })
 })
 
 describe('ConfigEditor shift patterns', () => {
