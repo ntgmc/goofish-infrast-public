@@ -251,6 +251,8 @@ export const domainCopy = {
   components_result_panel_ResultPanel_043: "已启用但无目标",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_044: "优化器未找到收益达到阈值的换心情目标",
+  components_result_panel_ResultPanel_045: "已记录搜索状态：",
+  components_result_panel_ResultPanel_046: "次",
   // src/components/result-panel/formatters.ts
   components_result_panel_formatters_001: "按每队列 ",
   // src/components/result-panel/formatters.ts

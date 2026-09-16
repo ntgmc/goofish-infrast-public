@@ -3,6 +3,12 @@ import type { OptimizeResult } from './types'
 import { projectOptimizeResultForCapabilities } from './optimize-result-projection'
 
 describe('projectOptimizeResultForCapabilities', () => {
+  it('preserves recorded search states in free preview and JSON history round trips', () => {
+    const stored = JSON.parse(JSON.stringify(result())) as OptimizeResult
+    const projected = projectOptimizeResultForCapabilities(stored, { kind: 'free_preview' })
+    expect(projected.searched_state_count).toBe(123456)
+    expect(projected).not.toHaveProperty('search_nodes')
+  })
   it('removes full data, raw results, diagnostics, and suggestions for recommended profiles', () => {
     const projected = projectOptimizeResultForCapabilities(result(), {
       kind: 'cdk',
@@ -13,6 +19,7 @@ describe('projectOptimizeResultForCapabilities', () => {
     expect(projected).not.toHaveProperty('daily_production')
     expect(projected).not.toHaveProperty('total_efficiency')
     expect(projected).not.toHaveProperty('search_nodes')
+    expect(projected.searched_state_count).toBe(123456)
     expect(projected).not.toHaveProperty('build_meta')
     expect(projected).not.toHaveProperty('upgrade_suggestions')
   })
@@ -40,6 +47,7 @@ describe('projectOptimizeResultForCapabilities', () => {
     expect(projected.raw_results).toHaveLength(1)
     expect(projected.daily_production).toBeDefined()
     expect(projected.build_meta).toBeDefined()
+    expect(projected.searched_state_count).toBe(123456)
   })
 })
 
@@ -55,6 +63,7 @@ function result(): OptimizeResult {
     daily_production: { manufacturing: { LMD: 1000 } },
     total_efficiency: 100,
     search_nodes: 42,
+    searched_state_count: 123456,
     upgrade_suggestions: [{ type: 'single', name: '测试建议', current: 1, target: 2, gain: 10 }],
     upgrade_suggestions_status: 'completed',
     build_meta: {
