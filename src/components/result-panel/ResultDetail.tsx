@@ -116,7 +116,7 @@ function MaaRoomRow({ row }: { row: RoomRow }) {
         )}
       </div>
       <div className="mt-3 md:mt-0 md:text-right">
-        {!row.isAutofill && (
+        {!row.isAutofill && row.roomType !== 'dormitory' && row.roomType !== 'processing' && (
           <>
             <div className="tool-status tool-status--current font-mono">
               {row.efficiency}
@@ -175,6 +175,7 @@ function RotationRoomGrid({ groups }: { groups: RotationRoomGroup[] }) {
 }
 
 function EfficiencyDisclosure({ row, compact = false }: { row: RoomRow; compact?: boolean }) {
+  if (row.roomType === 'dormitory' || row.roomType === 'processing') return null
   const detailItems = row.detailItems.length > 0 ? row.detailItems : [copy.domain.components_result_panel_ResultDetail_016]
 
   return (

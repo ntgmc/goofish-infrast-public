@@ -33,7 +33,7 @@ export default function DroneSummary({ drones }: { drones: DroneAssignment }) {
             <p className="text-sm font-semibold text-brand-400">{formatPercent(drones.display_efficiency)}</p>
           )}
           <p className="text-xs text-ink-muted">
-            {drones.order}
+            {drones.order === 'pre' ? copy.common.lib_workspace_history_010 : drones.order === 'post' ? copy.common.lib_workspace_history_011 : drones.order}
             {typeof drones.efficiency === 'number' && drones.efficiency !== drones.display_efficiency
               ? `${copy.domain.components_result_panel_DroneSummary_005}${formatPercent(drones.efficiency)}`
               : ''}
