@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../../../lib/api-client'
-import { PUBLIC_CONTENT_LIMITS, cloneDefaultPublicContentSettings } from '../../../lib/public-content'
+import { PUBLIC_CONTENT_LIMITS, PUBLIC_PRICING_PLAN_IDS, cloneDefaultPublicContentSettings } from '../../../lib/public-content'
 
 const { adminApiJson } = vi.hoisted(() => ({ adminApiJson: vi.fn() }))
 vi.mock('../../../lib/admin-api-client', () => ({ adminApiJson }))
@@ -11,6 +11,63 @@ vi.mock('../../../lib/admin-api-client', () => ({ adminApiJson }))
 import PublicContentSettingsSection from './PublicContentSettingsSection'
 
 describe('PublicContentSettingsSection', () => {
+  it('publishes independent plan purchase URLs and allows clearing a link', async () => {
+    const user = userEvent.setup()
+    render(<PublicContentSettingsSection />)
+    await screen.findByRole('heading', { name: '公开内容管理' })
+    await user.click(screen.getByRole('tab', { name: '价格与权益' }))
+    const inputs = screen.getAllByLabelText('购买链接')
+    const ids = PUBLIC_PRICING_PLAN_IDS.filter((id) => id !== 'free_preview')
+    expect(inputs).toHaveLength(4)
+    expect(within(screen.getByRole('group', { name: '免费预览' })).queryByLabelText('购买链接')).not.toBeInTheDocument()
+    for (const [index, input] of inputs.entries()) {
+      expect(input).not.toBeRequired()
+      await user.click(input)
+      await user.paste(` https://example.com/${ids[index]} `)
+    }
+    adminApiJson.mockImplementation(async (_url: string, init: { json: Record<string, unknown> }) => ({
+      settings: { ...cloneDefaultPublicContentSettings(), ...init.json, revision: 4 },
+    }))
+    await user.click(screen.getByRole('button', { name: '保存并发布' }))
+    await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/public-content', expect.objectContaining({
+      method: 'PUT',
+      json: expect.objectContaining({
+        pricing: expect.objectContaining({
+          plans: expect.objectContaining(Object.fromEntries(ids.map((id) => [id, expect.objectContaining({ purchase_url: `https://example.com/${id}` })]))),
+        }),
+      }),
+    })))
+    await waitFor(() => expect(screen.getByRole('button', { name: '保存并发布' })).toBeEnabled())
+    expect(screen.getAllByLabelText('购买链接')[0]).toHaveValue('https://example.com/single_account_monthly')
+    await user.clear(screen.getAllByLabelText('购买链接')[0])
+    await user.click(screen.getByRole('button', { name: '保存并发布' }))
+    await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/public-content', expect.objectContaining({
+      method: 'PUT',
+      json: expect.objectContaining({
+        pricing: expect.objectContaining({
+          plans: expect.objectContaining({
+            single_account_monthly: expect.objectContaining({ purchase_url: '' }),
+            single_account_lifetime: expect.objectContaining({ purchase_url: 'https://example.com/single_account_lifetime' }),
+          }),
+        }),
+      }),
+    })))
+  })
+
+  it('focuses the invalid purchase link in the corresponding plan', async () => {
+    const user = userEvent.setup()
+    render(<PublicContentSettingsSection />)
+    await screen.findByRole('heading', { name: '公开内容管理' })
+    await user.click(screen.getByRole('tab', { name: '价格与权益' }))
+    const link = within(screen.getByRole('group', { name: '单账号终身卡 CDK' })).getByLabelText('购买链接')
+    await user.click(link)
+    await user.paste('http://example.com/buy')
+    await user.click(screen.getByRole('button', { name: '保存并发布' }))
+    expect(link).toHaveAttribute('aria-invalid', 'true')
+    expect(link).toHaveFocus()
+    expect(adminApiJson).toHaveBeenCalledTimes(1)
+  })
+
   beforeEach(() => {
     adminApiJson.mockReset().mockImplementation(async (_url: string, init?: { method?: string }) => ({
       settings: { ...cloneDefaultPublicContentSettings(), revision: init?.method === 'PUT' ? 4 : 3, updated_at: init?.method === 'PUT' ? '2026-07-22T00:00:00.000Z' : null },

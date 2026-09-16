@@ -123,6 +123,7 @@ export const publicContentCopy = {
   admin_plan_label: '方案名称',
   admin_plan_badge: '方案徽标',
   admin_plan_original_price: '原价（含单位和有效期）',
+  admin_plan_purchase_url: '购买链接',
   admin_plan_discount_fold: '折扣（折）',
   admin_plan_effective_price: '当前折后展示价',
   admin_plan_summary: '方案摘要',

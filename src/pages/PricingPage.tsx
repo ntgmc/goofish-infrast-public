@@ -12,9 +12,8 @@ import { useSiteFeatures } from '../lib/site-feature-context'
 export default function PricingPage() {
   const { content } = usePublicContent()
   const pricing = content.pricing
-  const plans = PUBLIC_PRICING_PLAN_IDS.map((id) => ({ id, ...pricing.plans[id] }))
-  const freePlan = plans[0]!
-  const cdkPlans = plans.slice(1)
+  const freePlan = pricing.plans.free_preview
+  const cdkPlans = PUBLIC_PRICING_PLAN_IDS.filter((id) => id !== 'free_preview').map((id) => ({ id, ...pricing.plans[id] }))
   const featureState = useSiteFeatures()
   const metered = getMeteredBillingPolicy()
   const commercialTiers = metered.commercial.tiers.map((tier) => ({
@@ -70,40 +69,44 @@ export default function PricingPage() {
           <p className="public-kicker">{pricing.eyebrow}</p>
           <h1 id="pricing-title" className="display-title mt-3 text-3xl text-ink-primary sm:text-4xl">{pricing.title}</h1>
           <p className="mt-4 max-w-3xl whitespace-pre-line text-base leading-7 text-ink-secondary">{pricing.intro}</p>
-          <div className="mt-10 grid gap-5 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-            <article className="tool-panel flex h-full flex-col p-5 sm:p-6" aria-labelledby="free-preview-pricing-title">
-              <div className="flex items-start justify-between gap-4">
-                <h2 id="free-preview-pricing-title" className="text-xl font-semibold text-ink-primary">{freePlan.label}</h2>
-                <span className="tool-status tool-status--current">{freePlan.badge}</span>
-              </div>
-              <p className="mt-5 text-4xl font-semibold tracking-tight text-brand-400 tabular-nums">{freePlan.display_price}</p>
-              <p className="mt-4 whitespace-pre-line text-sm leading-7 text-ink-secondary">{freePlan.summary}</p>
-              <p className="mt-4 whitespace-pre-line border-t border-surface-3 pt-4 text-sm leading-6 text-ink-muted">{freePlan.account_scope}</p>
-            </article>
-
-            <article className="tool-panel flex h-full flex-col p-5 sm:p-6" aria-labelledby="single-account-pricing-title">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <h2 id="single-account-pricing-title" className="text-xl font-semibold text-ink-primary">{copy.public.pages_PricingPage_012}</h2>
-                  <p className="mt-1 text-sm text-ink-secondary">{copy.public.pages_PricingPage_013}</p>
-                </div>
-                <span className="tool-status tool-status--current">{copy.public.pages_PricingPage_004}</span>
-              </div>
-              <p className="mt-5 text-sm leading-7 text-ink-secondary">{copy.public.pages_PricingPage_014}</p>
-              <h3 className="mt-5 text-sm font-semibold text-ink-primary">{copy.public.pages_PricingPage_015}</h3>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2" role="list" aria-label={copy.public.pages_PricingPage_015}>
+          <div className="mt-10 flex flex-col gap-8">
+            <section aria-labelledby="single-account-pricing-title">
+              <h2 id="single-account-pricing-title" className="text-xl font-semibold text-ink-primary">{copy.public.pages_PricingPage_012}</h2>
+              <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
                 {cdkPlans.map((plan) => (
-                  <div key={plan.id} role="listitem" className="tool-inset p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="font-medium text-ink-primary">{formatPlanTerm(plan.label)}</p>
-                      <span className="text-xs text-ink-muted">{plan.badge}</span>
-                    </div>
-                    <p className="mt-3 text-2xl font-semibold tracking-tight text-brand-400 tabular-nums">{plan.display_price}</p>
+                  <article key={plan.id} className="tool-panel flex min-w-0 flex-col p-5" aria-labelledby={`${plan.id}-title`}>
+                    <span className="text-xs text-ink-muted">{plan.badge}</span>
+                    <h3 id={`${plan.id}-title`} className="mt-2 break-words text-lg font-semibold text-ink-primary">{formatPlanTerm(plan.label)}</h3>
+                    <p className="mt-5 break-words text-xl font-semibold text-brand-400 tabular-nums">{plan.display_price}</p>
                     {plan.discount_fold < 10 && <p className="mt-1 text-xs text-ink-muted">{copy.public.pages_PricingPage_017(plan.original_price, plan.discount_fold)}</p>}
-                  </div>
+                    <p className="mt-4 whitespace-pre-line text-sm leading-7 text-ink-secondary">{plan.summary}</p>
+                    <p className="mt-4 whitespace-pre-line border-t border-surface-3 pt-4 text-sm leading-6 text-ink-muted">{plan.account_scope}</p>
+                    <div className="mt-auto pt-5">
+                      {plan.purchase_url ? (
+                        <a href={plan.purchase_url} target="_blank" rel="noopener noreferrer" className="tool-primary-action flex w-full items-center justify-center whitespace-nowrap">
+                          {copy.public.pricing_purchase_labels[plan.id]}
+                        </a>
+                      ) : (
+                        <button type="button" disabled className="tool-primary-action w-full whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50">{copy.public.pricing_purchase_unavailable}</button>
+                      )}
+                    </div>
+                  </article>
                 ))}
               </div>
               <p className="mt-5 border-t border-surface-3 pt-4 text-sm leading-6 text-ink-muted">{copy.public.pages_PricingPage_016}</p>
+            </section>
+            <article className="border-t border-surface-3 pt-6 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:gap-8" aria-labelledby="free-preview-pricing-title">
+              <div>
+                <div className="flex items-start justify-between gap-4">
+                  <h2 id="free-preview-pricing-title" className="text-xl font-semibold text-ink-primary">{freePlan.label}</h2>
+                  <span className="tool-status tool-status--current">{freePlan.badge}</span>
+                </div>
+                <p className="mt-5 text-xl font-semibold text-brand-400 tabular-nums">{freePlan.display_price}</p>
+              </div>
+              <div>
+                <p className="mt-4 whitespace-pre-line text-sm leading-7 text-ink-secondary sm:mt-0">{freePlan.summary}</p>
+                <p className="mt-4 whitespace-pre-line border-t border-surface-3 pt-4 text-sm leading-6 text-ink-muted">{freePlan.account_scope}</p>
+              </div>
             </article>
           </div>
         </section>

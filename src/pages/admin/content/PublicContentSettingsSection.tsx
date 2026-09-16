@@ -404,6 +404,7 @@ function PricingEditor({ settings, edit }: { settings: PublicContentSettingsV1; 
                       </p>
                     </div>
                   </div>
+                  {planId !== 'free_preview' && <TextField path={`pricing.plans.${planId}.purchase_url`} id={`${planId}-purchase-url`} label={copy.publicContent.admin_plan_purchase_url} value={plan.purchase_url} maxLength={2048} type="url" required={false} onChange={(value) => edit((next) => { next.pricing.plans[planId].purchase_url = value })} />}
                   <TextareaField path={`pricing.plans.${planId}.summary`} id={`${planId}-summary`} label={copy.publicContent.admin_plan_summary} value={plan.summary} maxLength={1000} onChange={(value) => edit((next) => { next.pricing.plans[planId].summary = value })} />
                   <TextareaField path={`pricing.plans.${planId}.account_scope`} id={`${planId}-scope`} label={copy.publicContent.admin_plan_scope} value={plan.account_scope} maxLength={500} onChange={(value) => edit((next) => { next.pricing.plans[planId].account_scope = value })} />
                 </div>

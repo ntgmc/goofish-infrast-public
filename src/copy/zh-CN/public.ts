@@ -400,8 +400,6 @@ export const publicCopy = {
   // src/pages/PricingPage.tsx
   pages_PricingPage_003: "按使用频率选择个人方案：30 天尝鲜维护包、90 天版本维护卡、365 天年度维护卡或终身卡；另有个人和商用积分单次排班。所有个人方案只绑定一个游戏 UID。",
   // src/pages/PricingPage.tsx
-  pages_PricingPage_004: "一次性付费",
-  // src/pages/PricingPage.tsx
   pages_PricingPage_005: "免费",
   // src/pages/PricingPage.tsx
   pages_PricingPage_006: "账号与更新规则",
@@ -417,12 +415,13 @@ export const publicCopy = {
   pages_PricingPage_011: "返回首页",
   // src/pages/PricingPage.tsx
   pages_PricingPage_012: "个人维护方案",
-  // src/pages/PricingPage.tsx
-  pages_PricingPage_013: "完整高级权益 · 按使用周期选择",
-  // src/pages/PricingPage.tsx
-  pages_PricingPage_014: "短期、版本周期、年度和长期方案共享完整高级能力，差异在有效期与价格。",
-  // src/pages/PricingPage.tsx
-  pages_PricingPage_015: "选择有效期",
+  pricing_purchase_labels: {
+    single_account_monthly: "购买 30 天",
+    single_account_half_year: "购买 90 天",
+    single_account_annual: "购买 365 天",
+    single_account_lifetime: "购买终身卡",
+  },
+  pricing_purchase_unavailable: "暂未开放购买",
   // src/pages/PricingPage.tsx
   pages_PricingPage_016: "仅限一个游戏 UID；按所选期限有效，不支持自行更换游戏账号。",
   // src/pages/PricingPage.tsx

@@ -11,6 +11,20 @@ import { getPublicContentSettings, savePublicContentSettings } from './public-co
 import { SettingsConflictError } from './settings-conflict'
 
 describe('public content settings store', () => {
+  it('persists and reads independent plan purchase links', async () => {
+    const draft = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
+    draft.pricing.plans.single_account_monthly.purchase_url = 'https://example.com/month'
+    draft.pricing.plans.single_account_lifetime.purchase_url = 'https://example.com/lifetime'
+    queryMock.mockResolvedValueOnce({ rows: [{ revision: 1 }] })
+    const saved = await savePublicContentSettings(draft, 0)
+    const record = JSON.parse(queryMock.mock.calls[0][1][1])
+    expect(record.pricing.plans.single_account_monthly.purchase_url).toBe('https://example.com/month')
+    expect(record.pricing.plans.single_account_lifetime.purchase_url).toBe('https://example.com/lifetime')
+    queryMock.mockResolvedValueOnce({ rows: [{ record_json: record, revision: 1 }] })
+    const loaded = await getPublicContentSettings()
+    expect(loaded.pricing.plans).toEqual(saved.pricing.plans)
+  })
+
   beforeEach(() => {
     queryMock.mockReset()
     ensureDatabaseSchema.mockReset().mockResolvedValue(undefined)

@@ -5,9 +5,42 @@ import {
   normalizePublicContentSettings,
   parsePublicContentDraft,
   resolvePublicContentSettings,
+  PUBLIC_PRICING_PLAN_IDS,
 } from './public-content'
 
 describe('public content settings', () => {
+  it('defaults missing purchase URLs to empty without changing legacy prices', () => {
+    const legacy = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
+    for (const id of PUBLIC_PRICING_PLAN_IDS) {
+      Reflect.deleteProperty(legacy.pricing.plans[id], 'purchase_url')
+    }
+    const parsed = parsePublicContentDraft(legacy)
+    for (const id of PUBLIC_PRICING_PLAN_IDS) {
+      expect(parsed.pricing.plans[id].purchase_url).toBe('')
+      expect(parsed.pricing.plans[id].display_price).toBe(DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.plans[id].display_price)
+    }
+    expect(resolvePublicContentSettings({ ...cloneDefaultPublicContentSettings(), ...legacy }).isFallback).toBe(false)
+  })
+
+  it('preserves independent trimmed purchase URLs through normalization', () => {
+    const draft = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
+    for (const id of PUBLIC_PRICING_PLAN_IDS.slice(1)) {
+      draft.pricing.plans[id].purchase_url = `  https://example.com/${id}  `
+    }
+    const parsed = parsePublicContentDraft(draft)
+    const resolved = resolvePublicContentSettings({ ...cloneDefaultPublicContentSettings(), ...parsed })
+    expect(resolved.isFallback).toBe(false)
+    for (const id of PUBLIC_PRICING_PLAN_IDS.slice(1)) {
+      expect(resolved.content.pricing.plans[id].purchase_url).toBe(`https://example.com/${id}`)
+    }
+  })
+
+  it.each(['http://example.com/buy', 'javascript:alert(1)', 'not-a-url'])('rejects unsafe purchase URL %s', (url) => {
+    const draft = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
+    draft.pricing.plans.single_account_monthly.purchase_url = url
+    expect(() => parsePublicContentDraft(draft)).toThrow()
+  })
+
   it('provides a valid editable default with the CDK purchase link, QQ group, and nineteen FAQ items', () => {
     const parsed = parsePublicContentDraft(DEFAULT_PUBLIC_CONTENT_DRAFT)
     expect(parsed.cdk_purchase.xianyu_url).toMatch(/^https:\/\//)
