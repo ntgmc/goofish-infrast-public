@@ -7,6 +7,36 @@ import ConfigEditor from './ConfigEditor'
 
 afterEach(cleanup)
 
+describe('ConfigEditor strategy layout', () => {
+  it('keeps related controls in named, visually distinct sections', () => {
+    render(
+      <ConfigEditor
+        config={normalizeConfig(CONFIG_PRESETS['243-1'])}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={vi.fn()}
+      />,
+    )
+
+    const schedule = screen.getByRole('region', { name: '排班模式' })
+    const dormitory = screen.getByRole('region', { name: '宿舍规则' })
+    const fiammetta = screen.getByRole('region', { name: '菲亚梅塔' })
+    const drones = screen.getByRole('region', { name: '无人机' })
+    expect(schedule).toHaveClass('border-brand-500/60')
+    expect(dormitory).toHaveClass('border-success/60')
+    expect(fiammetta).toHaveClass('border-error/60')
+    expect(drones).toHaveClass('border-warning/60')
+    expect(within(schedule).getByRole('group', { name: '排班模式' })).toBeInTheDocument()
+    expect(within(schedule).getByRole('button', { name: '一天3换（8小时一换）' })).toBeInTheDocument()
+    expect(within(dormitory).getByRole('group', { name: '宿舍规则' })).toBeInTheDocument()
+    expect(within(fiammetta).getByRole('checkbox', { name: '菲亚梅塔' })).toBeEnabled()
+    expect(within(drones).getByRole('checkbox', { name: '无人机' })).toBeEnabled()
+    expect(within(drones).getByRole('checkbox', { name: '无人机自动配置' })).toBeInTheDocument()
+    expect(within(drones).getByLabelText('无人机顺序')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: '搓玉理智预算' })).getByRole('checkbox', { name: '月卡' })).toBeInTheDocument()
+  })
+})
+
 describe('ConfigEditor shift patterns', () => {
   it.each([8, 12])('allows restricted profiles to select the %s-hour preset only', async (hours) => {
     const user = userEvent.setup()
