@@ -15,12 +15,21 @@ import { BASE_DAILY_SANITY_BUDGET, MONTHLY_CARD_DAILY_SANITY_BONUS, normalizeOru
 import type { IntermediateProduct, LicenseConfig, PermissionMode } from '../lib/types'
 import { copy } from '../copy/index'
 import InputNumber from './InputNumber'
+import './ConfigEditor.css'
 
 
 type ProductGroup = 'trading_stations' | 'manufacturing_stations'
 
 const TRADING_PRODUCTS = ['LMD', 'Orundum']
 const MANUFACTURING_PRODUCTS = ['Pure Gold', 'Battle Record', 'Originium Shard']
+const PRODUCT_ICONS: Record<string, string> = {
+  LMD: 'GOLD',
+  Orundum: 'DIAMOND_SHD',
+  'Pure Gold': 'MTL_GOLD3',
+  'Battle Record': 'sprite_exp_card_t3',
+  'Originium Shard': 'MTL_DIAMOND_SHD',
+  'Orirock Cube': 'MTL_SL_G2',
+}
 
 const PRODUCT_LABELS: Record<string, string> = {
   LMD: copy.common.components_ConfigEditor_001,
@@ -494,6 +503,7 @@ export default function ConfigEditor({
               {canEdit && !rightFull252PresetSelected ? (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
                   <CounterField
+                    station="trading"
                     id="trading-stations-count"
                     label={copy.common.components_ConfigEditor_044}
                     value={config.trading_stations_count}
@@ -502,6 +512,7 @@ export default function ConfigEditor({
                     onChange={(value) => setStationCounts(value, 6 - value)}
                   />
                   <CounterField
+                    station="manufacturing"
                     id="manufacturing-stations-count"
                     label={copy.common.components_ConfigEditor_045}
                     value={config.manufacturing_stations_count}
@@ -512,8 +523,8 @@ export default function ConfigEditor({
                 </div>
               ) : (
                 <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-1">
-                  <ReadOnlyMetric label={copy.common.components_ConfigEditor_046} value={config.trading_stations_count} />
-                  <ReadOnlyMetric label={copy.common.components_ConfigEditor_047} value={config.manufacturing_stations_count} />
+                  <ReadOnlyMetric station="trading" label={copy.common.components_ConfigEditor_046} value={config.trading_stations_count} />
+                  <ReadOnlyMetric station="manufacturing" label={copy.common.components_ConfigEditor_047} value={config.manufacturing_stations_count} />
                 </dl>
               )}
             </section>
@@ -525,6 +536,7 @@ export default function ConfigEditor({
               <h3 id="config-product-counts-heading" className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_048}</h3>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <ProductGroupEditor
+                  station="trading"
                   label={copy.common.components_ConfigEditor_049}
                   products={tradingProducts}
                   counts={config.product_requirements.trading_stations}
@@ -532,6 +544,7 @@ export default function ConfigEditor({
                   onChange={(product, value) => setProductCount('trading_stations', product, value)}
                 />
                 <ProductGroupEditor
+                  station="manufacturing"
                   label={copy.common.components_ConfigEditor_050}
                   products={manufacturingProducts}
                   counts={config.product_requirements.manufacturing_stations}
@@ -951,7 +964,10 @@ function IntermediateInventoryField({
   return (
     <label className="tool-inset block px-3 py-3 text-sm">
       <span className="flex items-center justify-between gap-3">
-        <span className="text-ink-secondary">{label}</span>
+        <span className="flex min-w-0 items-center gap-2 text-ink-secondary">
+          <ProductIcon product={product} />
+          <span>{label}</span>
+        </span>
         <input
           type="number"
           min={0}
@@ -1170,6 +1186,7 @@ function DroneTargetsInput({
 }
 
 function CounterField({
+  station,
   id,
   label,
   value,
@@ -1177,6 +1194,7 @@ function CounterField({
   max,
   onChange,
 }: {
+  station: 'trading' | 'manufacturing';
   id: string;
   label: string;
   value: number;
@@ -1185,7 +1203,7 @@ function CounterField({
   onChange: (value: number) => void;
 }) {
   return (
-    <div>
+    <div className={`config-station config-station--${station}`}>
       <label htmlFor={id} className="mb-2 block text-xs font-medium text-ink-muted">{label}</label>
       <InputNumber
         id={id}
@@ -1200,9 +1218,9 @@ function CounterField({
   )
 }
 
-function ReadOnlyMetric({ label, value }: { label: string; value: number }) {
+function ReadOnlyMetric({ station, label, value }: { station: 'trading' | 'manufacturing'; label: string; value: number }) {
   return (
-    <div className="tool-inset px-3 py-2">
+    <div className={`config-station config-station--${station}`}>
       <dt className="text-xs text-ink-muted">{label}</dt>
       <dd className="mt-1 font-semibold text-ink-primary">{value}</dd>
     </div>
@@ -1210,12 +1228,14 @@ function ReadOnlyMetric({ label, value }: { label: string; value: number }) {
 }
 
 function ProductGroupEditor({
+  station,
   label,
   products,
   counts,
   canEdit,
   onChange,
 }: {
+  station: 'trading' | 'manufacturing';
   label: string;
   products: string[];
   counts: Record<string, number>;
@@ -1223,12 +1243,15 @@ function ProductGroupEditor({
   onChange: (product: string, value: number) => void;
 }) {
   return (
-    <div>
+    <div className={`config-station config-station--${station}`}>
       <p className="mb-2 text-xs font-medium text-ink-muted">{label}</p>
       <div className="grid gap-2">
         {products.map((product) => (
         <div key={product} className="tool-inset flex items-center justify-between gap-3 px-3 py-2 text-sm">
-          <span className="text-ink-secondary">{PRODUCT_LABELS[product] ?? product}</span>
+            <span className="flex min-w-0 items-center gap-2 text-ink-secondary">
+              <ProductIcon product={product} />
+              <span className="break-words">{PRODUCT_LABELS[product] ?? product}</span>
+            </span>
           {canEdit ? (
             <ProductCountInput
               label={PRODUCT_LABELS[product] ?? product}
@@ -1243,6 +1266,12 @@ function ProductGroupEditor({
       </div>
     </div>
   )
+}
+
+function ProductIcon({ product }: { product: string }) {
+  const icon = PRODUCT_ICONS[product]
+  if (!icon) return null
+  return <img src={`/assets/products/${icon}.png`} alt="" aria-hidden="true" width={32} height={32} className="h-8 w-8 shrink-0 object-contain" />
 }
 
 function ProductCountInput({

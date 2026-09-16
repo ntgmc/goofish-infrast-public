@@ -8,6 +8,29 @@ import ConfigEditor from './ConfigEditor'
 afterEach(cleanup)
 
 describe('ConfigEditor strategy layout', () => {
+  it.each([true, false])('uses station colors and local product icons with canEdit=%s', (canEdit) => {
+    const config = normalizeConfig(CONFIG_PRESETS['243-1'])
+    config.product_requirements.trading_stations = { Orundum: 2 }
+    const { container } = render(
+      <ConfigEditor config={config} canEdit={canEdit} validation={{ ok: true }} onUpdate={vi.fn()} />,
+    )
+    for (const name of ['房间结构', '产物数量']) {
+      const region = screen.getByRole('region', { name })
+      expect(region.querySelector('.config-station--trading')).toBeInTheDocument()
+      expect(region.querySelector('.config-station--manufacturing')).toBeInTheDocument()
+    }
+    const productRegion = screen.getByRole('region', { name: '产物数量' })
+    for (const icon of ['GOLD', 'DIAMOND_SHD', 'MTL_GOLD3', 'sprite_exp_card_t3', 'MTL_DIAMOND_SHD']) {
+      expect(productRegion.querySelector(`img[src="/assets/products/${icon}.png"]`)).toHaveAttribute('alt', '')
+    }
+    const inventoryImages = container.querySelectorAll('label img')
+    expect(Array.from(inventoryImages, (image) => image.getAttribute('src'))).toEqual([
+      '/assets/products/MTL_DIAMOND_SHD.png',
+      '/assets/products/MTL_GOLD3.png',
+      '/assets/products/MTL_SL_G2.png',
+    ])
+  })
+
   it('keeps related controls in named, visually distinct sections', () => {
     render(
       <ConfigEditor
