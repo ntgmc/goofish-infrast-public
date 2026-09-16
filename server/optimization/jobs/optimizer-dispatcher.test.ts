@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
+import { CONFIG_PRESETS } from '../../../src/lib/config'
+import type { OptimizeResult } from '../../../src/lib/types'
 import { executeOptimizationJobWithPort } from './optimizer-dispatcher'
 import {
   OPTIMIZER_PORT_VERSION,
@@ -17,6 +19,21 @@ const context: OptimizeExecutionContext = {
 }
 
 describe('optimization job dispatcher', () => {
+  it.each(['252', '252-1'])('includes %s room levels in schedule result data', async (preset) => {
+    const payload = schedulePayload()
+    payload.effectiveConfig = structuredClone(CONFIG_PRESETS[preset])
+    const result = {
+      ...scheduleResult(),
+      plans: [{ name: 'Plan 1', rooms: {
+        trading: Array.from({ length: 2 }, () => ({ operators: ['Operator'] })),
+        manufacture: Array.from({ length: 5 }, () => ({ operators: ['Operator'] })),
+      } }],
+    }
+    const port = fakePort({ executeSchedule: vi.fn(async () => result) })
+    const actual = await executeOptimizationJobWithPort(job(payload), context, port) as OptimizeResult
+    expect(actual.plans[0].rooms.trading.map((room) => room.level)).toEqual(payload.effectiveConfig.trading_station_levels)
+    expect(actual.plans[0].rooms.manufacture.map((room) => room.level)).toEqual(payload.effectiveConfig.manufacturing_station_levels)
+  })
   it('dispatches schedule payloads without a kind', async () => {
     const port = fakePort()
     const payload = schedulePayload()

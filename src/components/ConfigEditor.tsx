@@ -378,7 +378,7 @@ export default function ConfigEditor({
       </div>
       )}
 
-      {rightFull252PresetSelected ? (
+      {rightFull252PresetSelected && !canEdit ? (
         <div className="pt-5">
           <div className="tool-inset bg-surface-2/60 p-4" role="status">
             <p className="text-sm leading-6 text-ink-secondary">
@@ -490,7 +490,7 @@ export default function ConfigEditor({
                   {copy.common.components_ConfigEditor_094}
                 </p>
               </div>
-              {canEdit ? (
+              {canEdit && !rightFull252PresetSelected ? (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
                   <CounterField
                     id="trading-stations-count"
@@ -527,14 +527,14 @@ export default function ConfigEditor({
                   label={copy.common.components_ConfigEditor_049}
                   products={tradingProducts}
                   counts={config.product_requirements.trading_stations}
-                  canEdit={canEdit}
+                  canEdit={canEdit && !rightFull252PresetSelected}
                   onChange={(product, value) => setProductCount('trading_stations', product, value)}
                 />
                 <ProductGroupEditor
                   label={copy.common.components_ConfigEditor_050}
                   products={manufacturingProducts}
                   counts={config.product_requirements.manufacturing_stations}
-                  canEdit={canEdit}
+                  canEdit={canEdit && !rightFull252PresetSelected}
                   onChange={(product, value) => setProductCount('manufacturing_stations', product, value)}
                 />
               </div>

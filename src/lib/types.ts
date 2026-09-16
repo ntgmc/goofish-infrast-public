@@ -553,6 +553,7 @@ interface RoomOverflow {
 }
 
 export interface ShiftRoom {
+  level?: number;
   operators?: string[];
   product?: string;
   efficiency?: number | Record<string, number>;

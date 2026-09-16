@@ -9,6 +9,21 @@ import ResultPanel from './ResultPanel'
 afterEach(cleanup)
 
 describe('ResultPanel tabs', () => {
+  it.each(['maa', 'rotation'])('shows room levels in preview and data in %s mode', async (scheduleMode) => {
+    const user = userEvent.setup()
+    const result = createResult()
+    result.schedule_mode = scheduleMode
+    result.plans = [{ name: 'Plan 1', rooms: {
+      trading: [{ operators: ['贸易干员'], level: 1 }],
+      manufacture: [{ operators: ['制造干员'], level: 2 }],
+    } }]
+    render(<ResultPanel result={result} />)
+    expect(screen.getByRole('heading', { name: /贸易站.*Lv\.1/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /制造站.*Lv\.2/ })).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: '数据' }))
+    expect(screen.getAllByText('Lv.1').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Lv.2').length).toBeGreaterThan(0)
+  })
   it.each(['maa', 'rotation', 'variable'] as const)('shows search states outside restricted tabs in %s mode', (scheduleMode) => {
     render(<ResultPanel
       result={{ ...createResult(), schedule_mode: scheduleMode, searched_state_count: 123456 }}

@@ -114,12 +114,26 @@ export async function executeRegisteredOptimizationJob(
   return executeOptimizationJobWithPort(job, context, requireRegisteredOptimizerPort())
 }
 
-function dispatchOptimizationJobPayload(
+async function dispatchOptimizationJobPayload(
   payload: OptimizationJobPayload,
   context: OptimizeExecutionContext,
   port: OptimizerPort,
 ): Promise<OptimizationJobExecutionResult> {
-  if (!('kind' in payload)) return port.executeSchedule(payload, context)
+  if (!('kind' in payload)) {
+    const result = await port.executeSchedule(payload, context)
+    for (const plan of result.plans) {
+      for (const [roomType, levels] of [
+        ['trading', payload.effectiveConfig.trading_station_levels],
+        ['manufacture', payload.effectiveConfig.manufacturing_station_levels],
+      ] as const) {
+        if (!levels) continue
+        for (const [index, room] of (plan.rooms[roomType] ?? []).entries()) {
+          if (levels[index] !== undefined) room.level = levels[index]
+        }
+      }
+    }
+    return result
+  }
   switch (payload.kind) {
     case 'scenario_comparison':
       return port.executeScenarioComparison(payload, context)

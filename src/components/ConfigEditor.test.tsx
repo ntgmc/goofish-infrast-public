@@ -460,9 +460,14 @@ describe('ConfigEditor preset actions', () => {
         onUpdate={onUpdate}
       />,
     )
-    expect(screen.queryByRole('region', { name: '房间结构' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('group', { name: '排班模式' })).not.toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('MAA 排班表 · 2-5-2 · 右满252（经验多）')
+    expect(screen.getByRole('region', { name: '房间结构' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: '排班模式' })).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: '房间结构' })).queryByRole('spinbutton')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: '产物数量' })).queryByRole('spinbutton')).not.toBeInTheDocument()
+    onUpdate.mockImplementationOnce((mutate: (value: typeof config) => void) => mutate(rightFull252))
+    await user.click(screen.getByRole('checkbox', { name: '无人机' }))
+    expect(rightFull252.drones?.enable).toBe(false)
+    expect(rightFull252.trading_station_levels).toEqual([3, 1])
 
     await user.click(screen.getByRole('button', { name: '右满252（赤金多）' }))
     const apply2521 = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
@@ -482,8 +487,9 @@ describe('ConfigEditor preset actions', () => {
         onUpdate={onUpdate}
       />,
     )
-    expect(screen.queryByRole('region', { name: '房间结构' })).not.toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('MAA 排班表 · 2-5-2 · 右满252（赤金多）')
+    expect(screen.getByRole('region', { name: '房间结构' })).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: '房间结构' })).queryByRole('spinbutton')).not.toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: '无人机' })).toBeEnabled()
     await user.click(screen.getByRole('button', { name: '243 均衡' }))
     const apply243 = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
     apply243?.(rightFull252)
