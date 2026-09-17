@@ -11,6 +11,14 @@ import {
 } from './product-catalog'
 
 describe('product catalog', () => {
+  it('uses a duration-neutral permission label for all single-account plans', () => {
+    for (const id of ['single_account_monthly', 'single_account_half_year', 'single_account_annual', 'single_account_lifetime'] as const) {
+      expect(getPermissionProfile(resolveRuntimePermission(getSku(id).runtime_permission)).label).toBe('单账号高级版')
+    }
+    expect(getPermissionProfile('premium').label).toBe('单账号高级版')
+    expect(getSku('single_account_lifetime').label).toBe('单账号终身卡 CDK')
+  })
+
   it('publishes free preview and four duration-based single-account SKUs', () => {
     expect(listPublicSkus().map((sku) => sku.id)).toEqual([
       'free_preview',

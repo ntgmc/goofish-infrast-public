@@ -34,7 +34,7 @@
       "capabilities": ["generate_full_schedule", "view_upgrade_suggestions", "view_upgrade_roi", "edit_limited_config", "use_intermediate_auto_config"]
     },
     "advanced": {
-      "label": "单账号终身卡",
+      "label": "单账号高级版",
       "admin_rank": 2,
       "admin_issuable": true,
       "public": false,

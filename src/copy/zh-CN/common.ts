@@ -122,7 +122,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_012: "练度提升卡",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_013: "单账号终身卡",
+  components_ConfigEditor_013: "单账号高级版",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_014: "Admin卡",
   // src/components/ConfigEditor.tsx

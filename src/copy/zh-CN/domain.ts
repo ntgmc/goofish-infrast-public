@@ -376,7 +376,7 @@ export const domainCopy = {
   // src/lib/config.ts
   lib_config_012: "练度提升卡",
   // src/lib/config.ts
-  lib_config_013: "单账号终身卡",
+  lib_config_013: "单账号高级版",
   // src/lib/config.ts
   lib_config_014: "Admin卡",
   // src/lib/config.ts

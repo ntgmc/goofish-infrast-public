@@ -464,7 +464,7 @@ export const workspaceCopy = {
   // src/pages/tool/tool-utils.ts
   pages_tool_tool_utils_004: "练度提升卡",
   // src/pages/tool/tool-utils.ts
-  pages_tool_tool_utils_005: "单账号终身卡",
+  pages_tool_tool_utils_005: "单账号高级版",
   // src/pages/tool/tool-utils.ts
   pages_tool_tool_utils_006: "Admin卡",
   // src/pages/tool/tool-utils.ts
