@@ -164,6 +164,7 @@ export function isValidShiftHours(hours: number[]): boolean {
 export function isFiammettaShiftHoursSupported(value: unknown): boolean {
   const hours = parseShiftHours(value)
   if (!hours || hours.length !== 3) return false
+  if (hours[0] === 12 && hours[1] === 6 && hours[2] === 6) return true
   return [8, 12].some((interval) => hours.every((hour) => Math.abs(hour - interval) <= 0.0001))
 }
 
