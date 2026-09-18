@@ -101,7 +101,7 @@ describe('sanitizeConfigForPublicOptimize layout cost policy', () => {
     [[12, 12, 12], true],
     [[6, 6, 6, 6], false],
     [[24, 24, 24], false],
-    [[12, 6, 6], false],
+    [[12, 6, 6], true],
   ] as const)('enforces Fiammetta availability for %j', (shiftHours, enabled) => {
     const sanitized = sanitizeConfigForPublicOptimize({
       ...CONFIG_PRESETS['243'],
