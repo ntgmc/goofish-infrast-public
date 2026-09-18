@@ -164,8 +164,11 @@ export function isValidShiftHours(hours: number[]): boolean {
 export function isFiammettaShiftHoursSupported(value: unknown): boolean {
   const hours = parseShiftHours(value)
   if (!hours || hours.length !== 3) return false
-  if (hours[0] === 12 && hours[1] === 6 && hours[2] === 6) return true
-  return [8, 12].some((interval) => hours.every((hour) => Math.abs(hour - interval) <= 0.0001))
+  const total = hours.reduce((sum, hour) => sum + hour, 0)
+  if (hours.every((hour) => Math.abs(hour - 12) <= 0.0001)) return true
+  return Math.abs(total - 24) <= 0.0001 && (
+    Math.abs(Math.max(...hours) - 12) <= 0.0001 || hours.every((hour) => Math.abs(hour - 8) <= 0.0001)
+  )
 }
 
 function sumCounts(counts: Record<string, number> | undefined): number {
