@@ -345,7 +345,8 @@ export default function WorkspaceSetupPage({
                           {operators && <span className="tool-status tool-status--success">{copy.workspace.pages_tool_WorkspaceSetupPage_026}</span>}
                         </div>
 
-                        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                      {!canManualEditOperators && <p className="mt-4 text-sm leading-6 text-ink-secondary">{copy.optimize.paid_preview.import_detail}</p>}
+                      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
                           <label className="tool-secondary-action inline-flex cursor-pointer items-center justify-center">
                             {operatorFileName ? `${copy.workspace.pages_tool_WorkspaceSetupPage_027}${operatorFileName}` : operators ? `${copy.workspace.pages_tool_WorkspaceSetupPage_028}${ownedOperatorCount}${copy.workspace.pages_tool_WorkspaceSetupPage_029}` : copy.workspace.pages_tool_WorkspaceSetupPage_030}
                             <input type="file" accept=".json,.txt,application/json,text/plain" onChange={handleOperatorsFile} disabled={!canManualEditOperators || operatorUploading} className="hidden" />

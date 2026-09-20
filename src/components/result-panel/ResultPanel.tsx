@@ -74,16 +74,14 @@ export default function ResultPanel({
   const tabs: Array<{ id: ResultTabId; label: string }> = [
     { id: 'board', label: copy.domain.components_result_panel_ResultPanel_017 },
     { id: 'detail', label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_018 : copy.domain.components_result_panel_ResultPanel_019 },
-    ...(!isPreview && fullDataAvailable ? [{ id: 'data' as const, label: copy.domain.components_result_panel_ResultPanel_020 }] : []),
+    { id: 'data' as const, label: copy.domain.components_result_panel_ResultPanel_020 },
     ...(!isPreview ? [{ id: 'import' as const, label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_021 : copy.domain.components_result_panel_ResultPanel_022 }] : []),
     ...(suggestionsSlot ? [{ id: 'suggestions' as const, label: copy.domain.components_result_panel_ResultPanel_023 }] : []),
   ] as const
   const [activeTab, setActiveTab] = useState<ResultTabId>(
     detailDefaultOpen ? 'detail' : 'board',
   )
-  const selectedTab = (isPreview || !fullDataAvailable) && activeTab === 'data'
-    ? 'board'
-    : isPreview && activeTab === 'import'
+  const selectedTab = isPreview && activeTab === 'import'
       ? 'board'
     : activeTab === 'suggestions' && !suggestionsSlot
       ? fullDataAvailable ? 'data' : 'board'
@@ -195,7 +193,20 @@ export default function ResultPanel({
         labelledBy={`result-${selectedTab}-tab`}
       >
         {selectedTab === 'board' && <ResultBoard isRotationMode={isRotationMode} prepared={prepared} planTimes={result.planTimes} />}
-        {selectedTab === 'data' && (
+        {selectedTab === 'data' && (isPreview || !fullDataAvailable) && (
+          <section className="tool-panel space-y-4 p-5" aria-label={copy.optimize.paid_preview.exports}>
+            <h3 className="font-medium text-ink-primary">{copy.optimize.paid_preview.exports}</h3>
+            <p className="text-sm leading-6 text-ink-secondary">{copy.optimize.paid_preview.exports_detail}</p>
+            <dl className="tool-inset grid gap-4 p-4 sm:grid-cols-2">
+              {[copy.domain.components_result_panel_ResultMetrics_017, copy.domain.components_result_panel_ResultMetrics_020].map((label) => (
+                <div key={label}><dt className="text-sm text-ink-secondary">{label}</dt><dd className="mt-2 text-sm text-ink-muted">{copy.optimize.paid_preview.result_pending}</dd></div>
+              ))}
+            </dl>
+            <button type="button" disabled className="tool-secondary-action">{copy.optimize.paid_preview.export_action}</button>
+            <a href="/pricing" className="block text-sm text-brand-200 underline">{copy.optimize.paid_preview.compare}</a>
+          </section>
+        )}
+        {selectedTab === 'data' && !isPreview && fullDataAvailable && (
           <div className="space-y-4">
             <ResultMetrics isRotationMode={isRotationMode} prepared={prepared} />
             {onDownloadFullResult && <FullResultExportDisclosure onDownload={onDownloadFullResult} busy={fullResultDownloadBusy} />}

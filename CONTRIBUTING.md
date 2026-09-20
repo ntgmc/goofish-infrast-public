@@ -13,6 +13,13 @@ or OptimizerPort contract.
 
 Contributions are submitted under Apache License 2.0.
 
+## Product copy
+
+For user-facing product copy, free/paid comparisons, and upgrade previews, follow
+[Product copy and paid capability previews](docs/product-copy.md). Verify claims
+against the product catalog and runtime entitlements, keep free actions available,
+and test every preview destination.
+
 ## Public/private boundary
 
 Do not submit production optimizer source, private fixtures, benchmarks, or

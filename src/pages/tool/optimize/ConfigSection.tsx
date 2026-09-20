@@ -6,6 +6,7 @@ import type { ConfigSyncStatus } from '../useToolSession'
 import { ResultFallback } from './feedback'
 import type { ValidationState } from './types'
 import { copy } from '../../../copy/index'
+import ConfigCapabilityPreview from '../../../components/ConfigCapabilityPreview'
 
 
 const ConfigEditor = lazy(() => import('../../../components/ConfigEditor'))
@@ -62,17 +63,20 @@ export default function ConfigSection({
         </div>
         <div className="p-4 sm:p-5">
           <Suspense fallback={<ResultFallback />}>
+            <ConfigCapabilityPreview config={activeConfig} enabled={!userCanEditConfig}>
             <ConfigEditor
               config={activeConfig}
               permission={permission}
               canEdit={userCanEditConfig}
               canEditFixedShiftHours={canEditFixedShiftHours}
               canEditIntermediateInventory={userCanUseIntermediateAutoConfig}
+              canSelectPreset={userCanUseIntermediateAutoConfig}
               changed={configChanged}
               validation={configValidation}
               onUpdate={updateConfig}
               embedded
             />
+            </ConfigCapabilityPreview>
           </Suspense>
         </div>
       </section>

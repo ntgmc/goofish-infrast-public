@@ -32,7 +32,7 @@ describe('ResultPanel tabs', () => {
     />)
     expect(screen.getByText('已记录搜索状态：')).toBeInTheDocument()
     expect(screen.getByText('123,456 次')).toBeInTheDocument()
-    expect(screen.queryByRole('tab', { name: '数据' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: '数据' })).toBeInTheDocument()
   })
 
   it.each([0, 1234567890123])('shows the full recorded integer %s', (count) => {
@@ -144,10 +144,12 @@ describe('ResultPanel tabs', () => {
     expect(onDownloadFullResult).toHaveBeenCalledTimes(1)
   })
 
-  it('hides the full-data tab when the profile lacks the view capability', () => {
+  it('shows a read-only data preview when the profile lacks the view capability', async () => {
     render(<ResultPanel result={createResult()} fullDataAvailable={false} />)
-
-    expect(screen.queryByRole('tab', { name: '产出数据' })).not.toBeInTheDocument()
+    await userEvent.setup().click(screen.getByRole('tab', { name: '数据' }))
+    expect(screen.getByRole('button', { name: '下载完整计算 JSON' })).toBeDisabled()
+    expect(screen.getAllByText('生成并完成分析后可查看实际数值')).toHaveLength(2)
+    expect(screen.getByRole('link', { name: '比较价格与权益' })).toHaveAttribute('href', '/pricing')
     expect(screen.getByRole('tab', { name: '导入' })).toBeInTheDocument()
   })
 
