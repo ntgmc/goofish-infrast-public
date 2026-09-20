@@ -150,15 +150,19 @@ export const publicCopy = {
   // src/pages/LandingPage.tsx
   pages_LandingPage_021: "进入工作台",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_022: "为当前干员池生成可执行排班",
+  pages_LandingPage_022: "为使用 MAA 的明日方舟玩家准备",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_023: "生成排班，确认收益，下载 JSON。",
+  pages_LandingPage_023: "用现有干员，排出更合适的基建班表。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_024: "导入干员与库存，确认基建配置，获得适配当前账号的 MAA 基建排班和透明的收益建议。",
+  pages_LandingPage_024: "从森空岛或 MAA 导入干员，生成适配你的基建排班。看清预计产出与培养成本，再将方案导入 MAA 使用。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_025: "不要求游戏账号密码。绑定森空岛前会先展示昵称与 UID，由你确认后才保存和导入数据。",
+  pages_LandingPage_025: "无需提供游戏密码；森空岛账号由你确认昵称与 UID 后再导入。",
   // src/pages/LandingPage.tsx
   pages_LandingPage_026: "开始准备排班",
+  landing_view_results: "先看排班结果",
+  landing_result_preview: "排班结果 · 实际界面",
+  landing_result_context: "示例账号的计算结果，实际收益取决于你的干员与基建配置。",
+  landing_more_tools: "更多工具与服务",
   // src/pages/LandingPage.tsx
   pages_LandingPage_027: "免费仓库估值",
   // src/pages/LandingPage.tsx

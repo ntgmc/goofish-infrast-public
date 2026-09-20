@@ -9,15 +9,15 @@
 
 :root,
 .light {
-  --color-paper: oklch(0.985 0.008 285);
-  --color-paper-2: oklch(0.958 0.012 285);
-  --color-paper-3: oklch(0.925 0.014 285);
-  --color-paper-4: oklch(0.865 0.016 285);
+  --color-paper: oklch(0.992 0.002 285);
+  --color-paper-2: oklch(1 0 0);
+  --color-paper-3: oklch(0.977 0.004 285);
+  --color-paper-4: oklch(0.952 0.006 285);
   --color-ink: oklch(0.205 0.018 285);
   --color-ink-2: oklch(0.390 0.016 285);
   --color-muted: oklch(0.455 0.018 285);
-  --color-rule: oklch(0.820 0.016 285);
-  --color-rule-2: oklch(0.885 0.014 285);
+  --color-rule: oklch(0.875 0.006 285);
+  --color-rule-2: oklch(0.930 0.004 285);
   --color-accent: oklch(0.470 0.185 285);
   --color-accent-hover: oklch(0.420 0.175 285);
   --color-accent-ink: oklch(0.985 0.008 285);
@@ -38,7 +38,7 @@
   --color-positive: oklch(0.430 0.125 153);
   --color-negative: oklch(0.470 0.185 27);
   --color-caution: oklch(0.420 0.115 78);
-  --menu-shadow: oklch(0.205 0.018 285 / 0.14);
+  --menu-shadow: oklch(0.205 0.018 285 / 0.09);
   --tour-scrim: oklch(0.145 0.014 285 / 0.72);
 
   --share-bg-start: oklch(0.270 0.055 235);
@@ -54,7 +54,7 @@
   --share-panel-subtle: oklch(0.965 0.010 285 / 0.075);
 
   --font-display: "Noto Sans SC Variable", "Microsoft YaHei", sans-serif;
-  --font-body: "Geist Variable", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-body: "Geist Variable", "Noto Sans SC Variable", "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 
   --space-3xs: 0.25rem;

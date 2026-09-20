@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
@@ -27,6 +27,35 @@ const pages: Array<[PublicInfoPageKind, string]> = [
 ]
 
 describe('public information pages', () => {
+  it('guides visitors from the hero to the workbench or result details', async () => {
+    vi.spyOn(siteFeatureContext, 'useSiteFeatures').mockReturnValue({
+      status: 'ready',
+      features: DEFAULT_SITE_FEATURES,
+      updatedAt: null,
+      retry: vi.fn(),
+    })
+    mockPublicContent('https://example.com/xianyu-listing')
+    const onStart = vi.fn()
+    const user = userEvent.setup()
+    render(<ThemeProvider><MemoryRouter><LandingPage onStart={onStart} /></MemoryRouter></ThemeProvider>)
+
+    const heading = screen.getByRole('heading', { level: 1, name: '用现有干员，排出更合适的基建班表。' })
+    const hero = heading.closest('.landing-workbench-hero') as HTMLElement
+    expect(within(hero).getAllByRole('button')).toHaveLength(1)
+    await user.click(within(hero).getByRole('button', { name: '开始准备排班' }))
+    expect(onStart).toHaveBeenCalledOnce()
+    const resultLink = within(hero).getByRole('link', { name: '先看排班结果' })
+    expect(resultLink).toHaveAttribute('href', '#results')
+    expect(screen.getByRole('region', { name: '一份方案，同时说明它为什么值得采用。' })).toHaveAttribute('id', 'results')
+    expect(within(hero).queryByRole('link', { name: '获取 CDK' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '获取 CDK' })).toBeInTheDocument()
+    const preview = within(hero).getByRole('img', { name: /排班结果页/ })
+    expect(preview).toHaveAttribute('loading', 'eager')
+    expect(preview).toHaveAttribute('fetchpriority', 'high')
+    expect(preview).toHaveAttribute('height', '1050')
+    expect(screen.getByRole('img', { name: /导入/ })).toHaveAttribute('loading', 'lazy')
+  })
+
   it.each(pages)('renders the %s route with homepage and support navigation', async (page, heading) => {
     render(<MemoryRouter initialEntries={[`/${page}`]}><App /></MemoryRouter>)
 
@@ -86,6 +115,7 @@ describe('public information pages', () => {
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/privacy']}><App /></MemoryRouter>)
 
+    await waitFor(() => expect(screen.getByRole('main')).toHaveFocus())
     await user.click(await screen.findByRole('button', { name: '更多操作' }))
     const menu = screen.getByRole('menu')
     expect(within(menu).getByRole('menuitem', { name: 'FAQ' })).toHaveAttribute('href', '/faq')
