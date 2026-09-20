@@ -60,8 +60,8 @@
   --theme-surface-0: var(--color-paper);
   --theme-surface-1: var(--color-paper-2);
   --theme-surface-2: var(--color-paper-3);
-  --theme-surface-3: var(--color-rule-2);
-  --theme-surface-4: var(--color-rule);
+  --theme-surface-3: var(--color-paper-4);
+  --theme-surface-4: var(--color-rule-2);
 
   --theme-ink-primary: var(--color-ink);
   --theme-ink-secondary: var(--color-ink-2);
@@ -86,8 +86,8 @@
   --accent: var(--theme-surface-3);
   --accent-foreground: var(--theme-ink-primary);
   --destructive: var(--theme-error);
-  --border: color-mix(in oklch, var(--theme-ink-primary) 14%, transparent);
-  --input: color-mix(in oklch, var(--theme-ink-primary) 18%, transparent);
+  --border: var(--color-rule-2);
+  --input: var(--color-rule);
   --ring: var(--color-focus);
   --chart-1: var(--theme-brand-600);
   --chart-2: var(--theme-success);
@@ -113,6 +113,9 @@
 
 .dark {
   color-scheme: dark;
+
+  --theme-surface-3: var(--color-rule-2);
+  --theme-surface-4: var(--color-rule);
 
   --background: var(--theme-surface-0);
   --foreground: var(--theme-ink-primary);
@@ -712,7 +715,7 @@ body {
     border: 1px solid var(--color-rule);
     border-radius: var(--radius-card);
     background: var(--color-paper-2);
-    box-shadow: 0 2rem 5rem -3.5rem color-mix(in oklch, var(--color-ink) 42%, transparent);
+    box-shadow: 0 1rem 3rem -1.5rem var(--menu-shadow);
   }
 
   .landing-preview-window {
@@ -761,12 +764,10 @@ body {
 
   .landing-workbench-hero {
     display: grid;
-    grid-template-columns: minmax(0, 0.78fr) minmax(28rem, 1.22fr);
-    gap: clamp(3rem, 7vw, 7rem);
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+    gap: clamp(2rem, 4vw, 4rem);
     align-items: center;
-    min-height: min(45rem, calc(100dvh - var(--nav-height)));
-    padding-block-start: clamp(3rem, 5vw, 5rem);
-    padding-block-end: clamp(5rem, 8vw, 7rem);
+    padding-block: clamp(2rem, 5vw, 4rem);
   }
 
   .landing-fact-strip {

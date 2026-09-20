@@ -582,7 +582,7 @@ describe('ConfigEditor preset actions', () => {
     expect(screen.getByRole('region', { name: '房间结构' })).toBeInTheDocument()
   })
 
-  it('keeps preset switching available after a limited editor selects right-full 252', async () => {
+  it('keeps limited configuration options available after selecting right-full 252', async () => {
     const user = userEvent.setup()
     const config = normalizeConfig(CONFIG_PRESETS['243'])
     const onUpdate = vi.fn()
@@ -612,9 +612,17 @@ describe('ConfigEditor preset actions', () => {
         onUpdate={onUpdate}
       />,
     )
-    expect(screen.queryByText('按库存微调产物')).not.toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('MAA 排班表 · 2-5-2 · 右满252（经验多）')
+    expect(screen.getByText('按库存微调产物')).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: '排班模式' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: '宿舍规则' })).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '243 均衡' })).toBeInTheDocument()
+
+    onUpdate.mockImplementationOnce((mutate: (value: typeof config) => void) => mutate(rightFull252))
+    await user.click(screen.getByRole('button', { name: '游戏内轮换' }))
+    expect(rightFull252.schedule_mode).toBe('rotation')
+    expect(rightFull252.trading_station_levels).toEqual([3, 1])
+    expect(rightFull252.manufacturing_station_levels).toEqual([2, 2, 3, 3, 2])
   })
 
   it('keeps intermediate inventory when applying a preset in auto-balance mode', async () => {

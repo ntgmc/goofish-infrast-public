@@ -19,6 +19,7 @@ import SessionLoader from '../../../components/SessionLoader'
 import { restoreScenarioComparisonJob } from './scenario-lab/useScenarioComparison'
 
 
+import PaidCapabilityPreview, { LockedScenarioPreview } from './PaidCapabilityPreview'
 export default function OptimizeWorkflowPage(props: Props) {
   const { features } = useSiteFeatures()
   const [taskCenterOpen, setTaskCenterOpen] = useState(false)
@@ -99,10 +100,10 @@ export default function OptimizeWorkflowPage(props: Props) {
   }
 
   useEffect(() => {
-    if (section === 'lab' && inventoryLoaded && !userCanUseScenarioLab) setSection('overview')
-  }, [inventoryLoaded, section, setSection, userCanUseScenarioLab])
+    if (section === 'lab' && inventoryLoaded && !userCanUseScenarioLab && !isRestrictedPreview) setSection('overview')
+  }, [inventoryLoaded, section, setSection, userCanUseScenarioLab, isRestrictedPreview])
 
-  if (section === 'lab' && !userHasScenarioLabCapability && !inventoryLoaded) {
+  if (section === 'lab' && !isRestrictedPreview && !userHasScenarioLabCapability && !inventoryLoaded) {
     return <SessionLoader label={copy.inventory.loading} />
   }
 
@@ -112,7 +113,7 @@ export default function OptimizeWorkflowPage(props: Props) {
         profileId={profile.id}
         profileLabel={profile.display_name}
         permissionLabel={getProfileAccessLabel(profile)}
-        showScenarioLab={userCanUseScenarioLab && features.schedule_generation}
+        showScenarioLab={(userCanUseScenarioLab || isRestrictedPreview) && features.schedule_generation}
         badges={{ result: hasResult ? copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_001 : undefined }}
         headerActions={(
           <OptimizationTaskCenterButton
@@ -221,6 +222,7 @@ export default function OptimizeWorkflowPage(props: Props) {
                 {priorityCouponError && <button type="button" className="tool-secondary-action" disabled={priorityCouponLoading} onClick={() => void refreshRewardBalance()}>{priorityCouponLoading ? copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_005 : copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_007}</button>}
               </div>
             </div>}
+            {isRestrictedPreview && <PaidCapabilityPreview onOpen={(target) => setSection(target)} showScenarioLab={features.schedule_generation} />}
             <OverviewSection
               activeConfig={activeConfig}
               configChanged={configChanged}
@@ -352,6 +354,7 @@ export default function OptimizeWorkflowPage(props: Props) {
             />
           )}
 
+          {section === 'lab' && isRestrictedPreview && !userCanUseScenarioLab && features.schedule_generation && <LockedScenarioPreview />}
           {section === 'lab' && userCanUseScenarioLab && features.schedule_generation && (
             <ScenarioLabSection
               profileId={props.profileId}

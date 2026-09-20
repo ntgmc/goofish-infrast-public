@@ -69,36 +69,46 @@ export default function LandingPage({ onStart }: Props) {
         <div className="landing-workbench-hero">
           <div className="max-w-2xl">
             <p className="public-kicker">{copy.public.pages_LandingPage_022}</p>
-            <h1 className="display-title mt-5 text-4xl leading-[1.08] text-ink-primary sm:text-5xl lg:text-6xl">
+            <h1 className="display-title mt-4 text-[2rem] leading-[1.18] text-ink-primary sm:mt-5 sm:text-5xl sm:leading-[1.08] lg:text-6xl">
               {copy.public.pages_LandingPage_023}</h1>
-            <p className="mt-6 max-w-xl text-base leading-7 text-ink-secondary sm:text-lg sm:leading-8">
+            <p className="mt-4 max-w-xl text-base leading-7 text-ink-secondary sm:mt-6 sm:text-lg sm:leading-8">
               {copy.public.pages_LandingPage_024}</p>
-            <p className="mt-4 max-w-xl text-sm leading-6 text-ink-muted">
-              {copy.public.pages_LandingPage_025}</p>
-
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-6 flex flex-wrap items-center gap-3 sm:mt-8">
               <button type="button" onClick={onStart} disabled={!productAvailable} className="tool-primary-action inline-flex items-center justify-center">
                 {productAvailable ? copy.public.pages_LandingPage_026 : copy.features.paused}</button>
-              {depotAvailable ? (
-                <Link to="/tools/depot-value" className="tool-secondary-action inline-flex items-center justify-center">{copy.public.pages_LandingPage_027}</Link>
-              ) : <span className="tool-secondary-action inline-flex items-center justify-center opacity-60">{copy.features.paused}</span>}
-              {purchaseHref && (
-                <a href={purchaseHref} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-center px-3 text-sm font-medium text-ink-secondary transition-colors hover:text-ink-primary">
-                  {copy.public.pages_LandingPage_028}</a>
-              )}
+              <a href="#results" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-secondary underline underline-offset-4 transition-colors hover:text-ink-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-400">
+                {copy.public.landing_view_results}<span aria-hidden="true">↓</span>
+              </a>
             </div>
 
-            {announcementsAvailable && <Link to="/announcements" className="mt-6 inline-flex min-h-11 items-center text-sm font-medium text-ink-secondary underline decoration-surface-4 underline-offset-4 transition-colors hover:text-ink-primary">
-              {copy.public.pages_LandingPage_020}</Link>}
+            <p className="mt-4 max-w-xl text-sm leading-6 text-ink-secondary">
+              {copy.public.pages_LandingPage_025}</p>
 
-            <dl className="landing-fact-strip mt-10">
+            <dl className="landing-fact-strip mt-8 hidden sm:grid">
               <Fact label={copy.public.pages_LandingPage_029} value={copy.public.pages_LandingPage_030} />
               <Fact label={copy.public.pages_LandingPage_031} value={copy.public.pages_LandingPage_032} />
               <Fact label={copy.public.pages_LandingPage_033} value={copy.public.pages_LandingPage_034} />
             </dl>
           </div>
 
-          <ProductPreview />
+          <figure className="landing-preview min-w-0 overflow-hidden">
+            <div className="landing-preview-window px-4 py-3">
+              <p className="text-sm font-semibold text-ink-primary">{copy.public.landing_result_preview}</p>
+              <p className="mt-1 text-xs leading-5 text-ink-secondary">{copy.public.landing_result_context}</p>
+            </div>
+            <img
+              src={`/assets/previews/optimize-result-${resolvedTheme}.png`}
+              alt={copy.public.pages_LandingPage_038}
+              width={resolvedTheme === 'dark' ? 1702 : 1703}
+              height={1050}
+              fetchPriority="high"
+              loading="eager"
+              className="block h-auto w-full"
+            />
+            <figcaption className="border-t border-surface-3 px-4 py-3 text-xs leading-5 text-ink-secondary">
+              {copy.public.pages_LandingPage_039}
+            </figcaption>
+          </figure>
         </div>
       </section>
 
@@ -117,29 +127,19 @@ export default function LandingPage({ onStart }: Props) {
         </div>
       </section>
 
-      <section className="public-shell grid gap-10 py-16 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)] lg:py-24">
-        <figure className="overflow-hidden rounded-[var(--radius-card)] border border-surface-4 bg-surface-1">
-          <picture>
-            <img
-              src={`/assets/previews/optimize-result-${resolvedTheme}.png`}
-              alt={copy.public.pages_LandingPage_038}
-              className="block aspect-[16/10] w-full object-cover object-top"
-              loading="lazy"
-            />
-          </picture>
-          <figcaption className="border-t border-surface-3 px-4 py-3 text-xs leading-5 text-ink-muted sm:px-5">
-            {copy.public.pages_LandingPage_039}</figcaption>
-        </figure>
+      <section id="results" tabIndex={-1} aria-labelledby="results-title" className="public-shell scroll-mt-6 grid gap-10 py-16 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)] lg:py-24">
+        <ProductPreview />
 
         <div className="lg:py-4">
           <p className="section-index">02 / {copy.public.pages_LandingPage_040}</p>
-          <h2 className="display-title mt-4 text-3xl text-ink-primary sm:text-4xl">
+          <h2 id="results-title" className="display-title mt-4 text-3xl text-ink-primary sm:text-4xl">
             {copy.public.pages_LandingPage_041}</h2>
           <p className="mt-4 text-base leading-7 text-ink-secondary">
             {copy.public.pages_LandingPage_042}</p>
           <div className="landing-metric-list mt-8">
             {metrics.map(({ id, ...metric }) => <MetricTile key={id} {...metric} />)}
           </div>
+          <p className="mt-4 text-xs leading-5 text-ink-secondary">{copy.public.landing_result_context}</p>
         </div>
       </section>
 
@@ -157,6 +157,11 @@ export default function LandingPage({ onStart }: Props) {
         </div>
       </section>
 
+      <nav aria-label={copy.public.landing_more_tools} className="public-shell mb-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink-secondary">
+        {depotAvailable && <Link to="/tools/depot-value" className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink-primary">{copy.public.pages_LandingPage_027}</Link>}
+        {purchaseHref && <a href={purchaseHref} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink-primary">{copy.public.pages_LandingPage_028}</a>}
+        {announcementsAvailable && <Link to="/announcements" className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink-primary">{copy.public.pages_LandingPage_020}</Link>}
+      </nav>
       <PublicFooter />
     </main>
   )
@@ -180,6 +185,9 @@ function ProductPreview() {
             <img
               src={`/assets/previews/upload-entry-${resolvedTheme}.png`}
               alt={copy.public.pages_LandingPage_051}
+              loading="lazy"
+              width={resolvedTheme === 'dark' ? 1686 : 1687}
+              height={resolvedTheme === 'dark' ? 1051 : 1050}
               className="block aspect-[16/9] w-full object-cover object-top"
             />
           </picture>

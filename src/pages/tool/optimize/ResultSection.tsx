@@ -9,6 +9,7 @@ import { usePublicContent } from '../../../lib/public-content-context'
 import { ResultFallback } from './feedback'
 import type { OptimizePhase } from './types'
 import { copy } from '../../../copy/index'
+import { LockedResultPreview } from './PaidCapabilityPreview'
 import { recordDebugError } from '../../../lib/debug-diagnostics'
 
 
@@ -70,6 +71,7 @@ export default function ResultSection({
 
   return (
     <section className="min-w-0" data-tour-target="optimize-result-content">
+      {previewProfile && phase === 'idle' && !loading && <LockedResultPreview />}
       {phase === 'idle' && loading && progress && (
         <ScheduleProgress progress={progress} variant="focus" />
       )}

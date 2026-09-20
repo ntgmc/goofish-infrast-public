@@ -8,6 +8,7 @@ import GenerateControlBar, { DashboardMiniStat } from './GenerateControlBar'
 import { SmallActionButton } from './feedback'
 import type { ValidationState } from './types'
 import { copy } from '../../../copy/index'
+import { Link } from 'react-router'
 
 
 type FreeScheduleViewState = {
@@ -127,9 +128,19 @@ export default function OverviewSection({
         </section>
       )}
 
-      {freeSchedule?.visible && (
-        <FreeIdleQueueCard />
-      )}
+          {freeSchedule?.visible && (
+            <>
+              <FreeIdleQueueCard />
+              <section className="tool-panel p-5" aria-label={copy.optimize.paid_preview.recompute}>
+                <h2 className="font-medium text-ink-primary">{copy.optimize.paid_preview.recompute}</h2>
+                <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.optimize.paid_preview.recompute_detail}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <button type="button" disabled className="tool-secondary-action">{copy.optimize.paid_preview.recompute_action}</button>
+                  <Link to="/pricing" className="text-sm text-brand-200 underline">{copy.optimize.paid_preview.compare}</Link>
+                </div>
+              </section>
+            </>
+          )}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <section className="tool-panel p-5 sm:p-6" data-tour-target="optimize-overview-workspace">

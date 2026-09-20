@@ -3,6 +3,7 @@ import { isRetryableOptimizePollStatus } from '../../../lib/optimize-poll'
 import type { OptimizeJobAccepted, OptimizeJobStatusResponse } from '../../../lib/types'
 import type { OptimizationJobSnapshot } from '../../../lib/optimization-contracts'
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
+import { getScheduleProgressPercent } from '../../../components/schedule-progress-model'
 import { fetchOptimizationJob, fetchOptimizationJobSnapshot } from './optimization-api'
 import { copy } from '../../../copy/index'
 
@@ -127,7 +128,7 @@ export function mergeOptimizeJobProgress(
   const estimatePhase = getStableOptimizeEstimatePhase(current, next, observedRunning)
   const estimatedRemainingMs = getStableOptimizeRemainingMs(current, next, now, observedRunning)
   const estimatedTotalMs = getStableOptimizeTotalMs(current, next, estimatedRemainingMs, startedAt, now, observedRunning)
-  const previousPercentFloor = sameJob && current ? Math.max(current.percentFloor ?? 0, getOptimizeProgressPercent(current, now)) : 0
+  const previousPercentFloor = sameJob && current ? getScheduleProgressPercent(current, now) : 0
 
   return {
     mode: sameJob ? current?.mode ?? mode : mode,
@@ -138,7 +139,7 @@ export function mergeOptimizeJobProgress(
     jobId: next.job_id,
     historyResultId: next.history_result_id,
     observedRunning,
-    percentFloor: Math.max(0, Math.min(96, previousPercentFloor)),
+    percentFloor: Math.max(0, Math.min(99, previousPercentFloor)),
     estimatedDurationMs: next.estimated_duration_ms,
     estimatedRemainingMs,
     estimatedTotalMs,
@@ -295,21 +296,6 @@ function getProjectedOptimizeRemainingMs(progress: ScheduleProgressState, now: n
   const updatedAt = parseOptimizeEstimateUpdatedAt(progress)
   const elapsedSinceUpdate = updatedAt === null ? 0 : Math.max(0, now - updatedAt)
   return Math.max(0, progress.estimatedRemainingMs - elapsedSinceUpdate)
-}
-
-function getOptimizeProgressPercent(progress: ScheduleProgressState, now: number): number {
-  const elapsed = Math.max(0, now - progress.startedAt)
-  const estimatedTotalMs = getOptimizeProgressTotalMs(progress, now)
-  return Math.min(96, (elapsed / estimatedTotalMs) * 96)
-}
-
-function getOptimizeProgressTotalMs(progress: ScheduleProgressState, now: number): number {
-  if (typeof progress.estimatedTotalMs === 'number' && Number.isFinite(progress.estimatedTotalMs) && progress.estimatedTotalMs > 0) {
-    return progress.estimatedTotalMs
-  }
-  const fallback = progress.estimatedDurationMs ?? 28_000
-  if (progress.estimatePhase === 'overdue') return Math.max(fallback, Math.max(1_000, now - progress.startedAt))
-  return Math.max(1_000, fallback)
 }
 
 function getOptimizeJobStartedAt(job: OptimizeJobAccepted | OptimizeJobStatusResponse): string | null | undefined {

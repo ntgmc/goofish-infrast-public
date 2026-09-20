@@ -377,7 +377,7 @@ export default function ConfigEditor({
                 : `${copy.common.components_ConfigEditor_027}${permission ? PERMISSION_LABELS[permission] : copy.common.components_ConfigEditor_029}${copy.common.components_ConfigEditor_028}`)}
           </p>
         </div>
-          {!hidePresetActions && (canEdit || (canSelectPreset && (!autoInventoryOnly || rightFull252PresetSelected))) && (
+          {!hidePresetActions && (canEdit || (canSelectPreset && !autoInventoryOnly)) && (
 <div className="config-preset-actions flex flex-wrap gap-2" data-tour-target="config-preset-actions">
             <PresetButton label={copy.common.components_ConfigEditor_030} onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
             <PresetButton label={copy.common.components_ConfigEditor_031} onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
@@ -390,7 +390,7 @@ export default function ConfigEditor({
       </div>
       )}
 
-      {rightFull252PresetSelected && !canEdit ? (
+      {rightFull252PresetSelected && !canEdit && !autoInventoryOnly ? (
         <div className="pt-5">
           <div className="tool-inset bg-surface-2/60 p-4" role="status">
             <p className="text-sm leading-6 text-ink-secondary">

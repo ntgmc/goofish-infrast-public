@@ -1,4 +1,7 @@
 export const commonCopy = {
+  scheduleProgressEstimated: "预计进度",
+  scheduleProgressCompleted: "已完成",
+  scheduleProgressStopped: "已停止",
   // src/components/ThemeSwitcher.tsx
   components_ThemeSwitcher_001: "选择主题",
   // src/components/ThemeSwitcher.tsx
