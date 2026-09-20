@@ -17,9 +17,33 @@ afterEach(() => {
 })
 
 describe('ScheduleProgress motion', () => {
+  it.each(['failed', 'cancelled'] as const)('freezes the displayed percentage when %s', async (estimatePhase) => {
+    const progress = createProgress({ queueStatus: 'running', observedRunning: true, startedAt: NOW - 5_000 })
+    const { rerender } = render(<ScheduleProgress progress={progress} />)
+    const before = screen.getByRole('progressbar').getAttribute('aria-valuenow')
+    rerender(<ScheduleProgress progress={{ ...progress, estimatePhase, lastUpdatedAt: NOW }} />)
+    await act(async () => vi.advanceTimersByTimeAsync(10_000))
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', before)
+  })
+
+  it('reaches 100 and shows completion when only the completed phase arrives', async () => {
+    const progress = createProgress({ observedRunning: true, estimatedRemainingMs: 0 })
+    const { rerender } = render(<ScheduleProgress progress={progress} />)
+    rerender(<ScheduleProgress progress={{ ...progress, estimatePhase: 'completed' }} />)
+    await act(async () => vi.advanceTimersByTimeAsync(1_000))
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100')
+    expect(screen.getByRole('status')).toHaveTextContent('排班方案已就绪')
+  })
+
+  it('resets the meter for a different job', () => {
+    const { rerender } = render(<ScheduleProgress progress={createProgress({ jobId: 'first', percentFloor: 90 })} />)
+    rerender(<ScheduleProgress progress={createProgress({ jobId: 'second' })} />)
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0')
+  })
+
   it.each([
     ['start', 0, { startedAt: NOW, estimatedDurationMs: 10_000 }],
-    ['running', 48, { startedAt: NOW - 5_000, estimatedDurationMs: 10_000, queueStatus: 'running', observedRunning: true }],
+    ['running', 39, { startedAt: NOW - 5_000, estimatedDurationMs: 10_000, queueStatus: 'running', observedRunning: true }],
     ['complete', 100, { startedAt: NOW - 10_000, completedAt: NOW - 500, estimatedDurationMs: 10_000, estimatePhase: 'completed' }],
   ] as const)('reports a stable %s progress value', (_label, expected, patch) => {
     render(<ScheduleProgress progress={createProgress(patch)} />)
@@ -29,12 +53,12 @@ describe('ScheduleProgress motion', () => {
     expect(progressbar.firstElementChild).toHaveClass('origin-left')
   })
 
-  it('refreshes active progress before the previous 260 ms cadence', async () => {
+  it('paces updates while keeping preparation below the running milestone', async () => {
     render(<ScheduleProgress progress={createProgress({ startedAt: NOW, estimatedDurationMs: 10_000 })} />)
 
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0')
 
-    await act(async () => vi.advanceTimersByTimeAsync(120))
+    await act(async () => vi.advanceTimersByTimeAsync(1_000))
 
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1')
   })
@@ -58,7 +82,7 @@ describe('ScheduleProgress motion', () => {
     expect(screen.getByText('任务已取消')).toBeInTheDocument()
     expect(screen.getByText('任务已在开始计算前取消，不会继续执行。')).toBeInTheDocument()
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuetext', expect.stringContaining('已取消'))
-    expect(screen.getByText('Cancelled')).toBeInTheDocument()
+    expect(screen.getByText('已停止')).toBeInTheDocument()
     expect(screen.queryByText('正在取消任务')).not.toBeInTheDocument()
   })
 
@@ -101,7 +125,7 @@ describe('ScheduleProgress motion', () => {
     expect(screen.getByText('正在模拟优化建议')).toBeInTheDocument()
     expect(screen.getByText('计算优化建议')).toBeInTheDocument()
     expect(screen.getAllByRole('listitem')).toHaveLength(5)
-    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '67')
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '66')
     expect(screen.queryByText('即将完成')).not.toBeInTheDocument()
   })
 
@@ -130,7 +154,7 @@ describe('ScheduleProgress motion', () => {
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '88')
 
     await act(async () => vi.advanceTimersByTimeAsync(10_000))
-    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '90')
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '89')
   })
 
   it('changes speed without jumping to the next stage percentage', async () => {
@@ -149,7 +173,7 @@ describe('ScheduleProgress motion', () => {
       upgradeSuggestionsAllowed: true,
     })
     const { rerender } = render(<ScheduleProgress progress={simulating} />)
-    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '67')
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '66')
 
     rerender(<ScheduleProgress progress={{
       ...simulating,
@@ -157,13 +181,13 @@ describe('ScheduleProgress motion', () => {
       calculationStageUpdatedAt: new Date(NOW).toISOString(),
     }} />)
 
-    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '67')
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '66')
 
     await act(async () => vi.advanceTimersByTimeAsync(1_000))
-    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '68')
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '78')
   })
 
-  it('does not move backwards when a running stage starts below queued progress', () => {
+  it('reserves calculation progress after a long queue and transitions without a jump', () => {
     const queued = createProgress({
       startedAt: NOW - 20_000,
       jobId: 'queued-job',
@@ -172,7 +196,7 @@ describe('ScheduleProgress motion', () => {
       estimatePhase: 'queued',
     })
     const { rerender } = render(<ScheduleProgress progress={queued} />)
-    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '48')
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '5')
 
     rerender(<ScheduleProgress progress={{
       ...queued,
@@ -182,7 +206,7 @@ describe('ScheduleProgress motion', () => {
       calculationStage: 'starting',
     }} />)
 
-    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '48')
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '5')
   })
 
   it('omits the suggestion step when the merged job only computes a schedule', () => {

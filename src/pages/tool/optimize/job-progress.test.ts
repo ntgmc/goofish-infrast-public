@@ -62,6 +62,29 @@ describe('optimization job persistence', () => {
 })
 
 describe('optimization progress mapping', () => {
+  it('preserves stage progress through polling and storage without counting queue time as calculation', () => {
+    const now = Date.parse(accepted.submitted_at)
+    const queued = mergeOptimizeJobProgress(null, accepted, 'generate', now)
+    const queuedLater = mergeOptimizeJobProgress(queued, accepted, 'generate', now + 60_000)
+    expect(queuedLater.percentFloor).toBeLessThan(8)
+    const runningJob = {
+      ...accepted,
+      status: 'running' as const,
+      estimate_phase: 'running' as const,
+      calculation_stage: 'generating_schedule' as const,
+      calculation_stage_updated_at: new Date(now + 60_000).toISOString(),
+    }
+    const running = mergeOptimizeJobProgress(queuedLater, runningJob, 'generate', now + 60_000)
+    const updated = mergeOptimizeJobProgress(running, runningJob, 'generate', now + 90_000)
+    expect(updated.percentFloor).toBeGreaterThan(18)
+    expect(updated.percentFloor).toBeLessThan(68)
+    const key = buildOptimizeJobStorageKey('profile', '', 'signature', 'generate')
+    writeActiveOptimizeJob(key, runningJob, updated)
+    const restored = readActiveOptimizeJob(key)!
+    const resumed = mergeOptimizeJobProgress(restored.progress, runningJob, 'generate', now + 90_000)
+    expect(resumed.percentFloor).toBe(updated.percentFloor)
+  })
+
   it('uses a slow-network timeout and bounded retry jitter', () => {
     expect(OPTIMIZE_POLL_REQUEST_TIMEOUT_MS).toBe(20_000)
     expect(getOptimizePollRetryDelayMs(1, () => 0)).toBe(800)

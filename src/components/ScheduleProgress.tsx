@@ -4,6 +4,9 @@ import { AnimatedValue } from './MotionPrimitives'
 import type { OptimizeCalculationStage, OptimizeJobPriority, OptimizeResult } from '../lib/types'
 import type { OptimizationBillingSnapshot } from '../lib/optimization-contracts'
 import { copy } from '../copy/index'
+import { getScheduleProgressPercent, isScheduleProgressPaused } from './schedule-progress-model'
+
+export { SCHEDULE_PROGRESS_COMPLETION_DURATION_MS } from './schedule-progress-model'
 
 
 type ScheduleEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed' | 'cancelled'
@@ -56,10 +59,10 @@ export default function ScheduleProgress({ progress, className = '', variant = '
   const progressKey = `${progress.jobId ?? 'local'}:${progress.startedAt}`
   const [progressFrame, setProgressFrame] = useState(() => {
     const now = Date.now()
-    return { key: progressKey, value: getTargetPercent(progress, now), now }
+    return { key: progressKey, value: getScheduleProgressPercent(progress, now), now }
   })
   const now = progressFrame.now
-  const targetPercent = getTargetPercent(progress, now)
+  const targetPercent = getScheduleProgressPercent(progress, now)
   const rawPercent = progressFrame.key === progressKey ? progressFrame.value : targetPercent
   const percent = Math.max(0, Math.min(100, Math.round(rawPercent)))
   const task = useMemo(() => getTaskView(progress, rawPercent, now), [progress, rawPercent, now])
@@ -71,14 +74,17 @@ export default function ScheduleProgress({ progress, className = '', variant = '
     const tick = () => {
       const nextNow = Date.now()
       setProgressFrame((current) => {
-        const nextTarget = getTargetPercent(progress, nextNow)
+        const nextTarget = getScheduleProgressPercent(progress, nextNow)
         if (current.key !== progressKey) return { key: progressKey, value: nextTarget, now: nextNow }
         const elapsedMs = Math.max(0, nextNow - current.now)
-        const nextValue = getBufferedPercent(current.value, nextTarget, progress, nextNow, elapsedMs)
+        const completed = progress.completedAt !== undefined || progress.estimatePhase === 'completed'
+        const nextValue = completed ? Math.max(current.value, nextTarget) : isScheduleProgressPaused(progress)
+          ? current.value
+          : Math.max(current.value, Math.min(nextTarget, current.value + elapsedMs * 0.02))
         if (nextValue === current.value && current.now === nextNow) return current
         return { key: progressKey, value: nextValue, now: nextNow }
       })
-      if (progress.estimatePhase !== 'cancelled' && (getTimedPercent(progress, nextNow) < 100 || !progress.completedAt)) {
+      if (progress.estimatePhase !== 'cancelled' && progress.estimatePhase !== 'failed' && getScheduleProgressPercent(progress, nextNow) < 100) {
         timer = window.setTimeout(tick, PROGRESS_REFRESH_INTERVAL_MS)
       }
     }
@@ -90,7 +96,6 @@ export default function ScheduleProgress({ progress, className = '', variant = '
     <section
       className={`tool-panel ${compact ? 'p-4' : 'p-5 sm:p-6'} ${className}`}
       data-status={task.status}
-      aria-live="polite"
       aria-label={progress.mode === 'generate' ? copy.common.components_ScheduleProgress_001 : progress.mode === 'scenario' ? copy.common.components_ScheduleProgress_002 : copy.common.components_ScheduleProgress_003}
     >
       <div className="flex flex-col gap-4">
@@ -101,7 +106,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
               <span className={`tool-status ${task.priorityClass}`}>{task.priorityLabel}</span>
               {task.jobLabel && <span className="tool-status">{task.jobLabel}</span>}
             </div>
-            <h3 className={`${compact ? 'mt-2 text-base' : 'mt-3 text-lg'} font-semibold text-ink-primary`}>{task.title}</h3>
+            <h3 role="status" aria-live="polite" aria-atomic="true" className={`${compact ? 'mt-2 text-base' : 'mt-3 text-lg'} font-semibold text-ink-primary`}>{task.title}</h3>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-secondary">{task.detail}</p>
             {task.adjustmentLabel && <p className="mt-3 tool-status tool-status--current max-w-full">{task.adjustmentLabel}</p>}
             {progress.billing && <p className={`mt-3 tool-status max-w-full ${progress.billing.status === 'settled' ? 'tool-status--current' : progress.billing.status === 'released' ? 'tool-status--warning' : ''}`}>
@@ -117,6 +122,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
         <div
           className="h-2 overflow-hidden rounded-full bg-surface-3"
           role="progressbar"
+          aria-label={task.title}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={percent}
@@ -126,13 +132,13 @@ export default function ScheduleProgress({ progress, className = '', variant = '
             className={`schedule-progress-fill h-full origin-left rounded-full ${task.status === 'cancelled' ? 'bg-surface-4' : task.status === 'failed' ? 'bg-error' : 'bg-brand-500'}`}
             initial={false}
             animate={{ scaleX: Math.max(0, Math.min(1, rawPercent / 100)) }}
-            transition={reduceMotion ? { duration: 0 } : { duration: 0.18, ease: 'linear' }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.25, ease: 'linear' }}
           />
         </div>
 
-        <ol className="grid gap-2 sm:grid-cols-4" aria-label={copy.common.components_ScheduleProgress_004}>
+        <ol className={`grid gap-2 sm:grid-cols-2 ${task.steps.length === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`} aria-label={copy.common.components_ScheduleProgress_004}>
           {task.steps.map((step, index) => (
-            <li key={step.label}>
+            <li key={step.role} aria-current={getStepState(progress, task.status, index, task.steps) === 'active' ? 'step' : undefined}>
               <TaskStep label={step.label} detail={step.detail} state={getStepState(progress, task.status, index, task.steps)} />
             </li>
           ))}
@@ -187,10 +193,7 @@ function CheckIcon() {
 }
 
 const ESTIMATED_DURATION_MS = 10_000
-export const SCHEDULE_PROGRESS_COMPLETION_DURATION_MS = 420
-const PROGRESS_REFRESH_INTERVAL_MS = 1000 / 60
-const MAX_WAITING_PERCENT = 96
-type StageProgressBounds = [minimum: number, maximum: number, pacingMs: number]
+const PROGRESS_REFRESH_INTERVAL_MS = 250
 
 const TASK_STEPS: Record<Exclude<ScheduleProgressState['mode'], 'generate'>, TaskStepDefinition[]> = {
   apply: [
@@ -221,115 +224,10 @@ function getTaskSteps(progress: ScheduleProgressState): TaskStepDefinition[] {
   return steps
 }
 
-function getTimedPercent(progress: ScheduleProgressState, now: number): number {
-  const estimatedTotalMs = getEstimatedTotalMs(progress, now)
-  const waitingPercent = getWaitingPercent(progress.startedAt, now, estimatedTotalMs)
-  if (!progress.completedAt) return waitingPercent
-  const percentAtCompletion = getWaitingPercent(progress.startedAt, progress.completedAt, estimatedTotalMs)
-  const completionElapsed = Math.max(0, now - progress.completedAt)
-  const completionRatio = Math.min(1, completionElapsed / SCHEDULE_PROGRESS_COMPLETION_DURATION_MS)
-  const easedCompletion = 1 - Math.pow(1 - completionRatio, 3)
-  return percentAtCompletion + (100 - percentAtCompletion) * easedCompletion
-}
-
-function getEstimatedTotalMs(progress: ScheduleProgressState, now: number): number {
-  const fallback = progress.estimatedDurationMs ?? ESTIMATED_DURATION_MS
-  if (typeof progress.estimatedTotalMs === 'number' && Number.isFinite(progress.estimatedTotalMs) && progress.estimatedTotalMs > 0) {
-    return progress.estimatedTotalMs
-  }
-  if (progress.estimatePhase === 'overdue') {
-    return Math.max(fallback, now - progress.startedAt)
-  }
-  return fallback
-}
-
-function getWaitingPercent(startedAt: number, now: number, estimatedDurationMs: number): number {
-  const elapsed = Math.max(0, now - startedAt)
-  const safeDuration = Math.max(1_000, estimatedDurationMs)
-  const ratio = Math.min(1, elapsed / safeDuration)
-  return ratio * MAX_WAITING_PERCENT
-}
-
-function getTargetPercent(progress: ScheduleProgressState, now: number): number {
-  const calculatedPercent = getStageBoundedPercent(progress, getTimedPercent(progress, now), now)
-  const progressFloor = getStageBoundedPercent(progress, progress.percentFloor ?? 0, now)
-  return Math.max(calculatedPercent, progressFloor)
-}
-
-function getStageBoundedPercent(progress: ScheduleProgressState, percent: number, now: number): number {
-  if (progress.completedAt || progress.estimatePhase === 'completed') return percent
-  const bounds = getStageProgressBounds(progress)
-  if (!bounds) return percent
-
-  const [minimum, maximum, pacingMs] = bounds
-  const stageStartedAt = Date.parse(progress.calculationStageUpdatedAt ?? '')
-  if (!Number.isFinite(stageStartedAt)) return Math.max(minimum, Math.min(maximum, percent))
-
-  const stageElapsedMs = Math.max(0, now - stageStartedAt)
-  const stageRatio = Math.min(1, stageElapsedMs / pacingMs)
-  const activeMaximum = Math.max(minimum, maximum - 0.51)
-  const stageCeiling = minimum + (activeMaximum - minimum) * stageRatio
-  return Math.max(minimum, Math.min(stageCeiling, percent))
-}
-
-function getBufferedPercent(
-  current: number,
-  target: number,
-  progress: ScheduleProgressState,
-  now: number,
-  elapsedMs: number,
-): number {
-  if (target <= current || elapsedMs <= 0 || progress.estimatePhase === 'cancelled') return current
-  const speedPerMs = getProgressSpeedPerMs(progress, now)
-  return Math.min(target, current + speedPerMs * elapsedMs)
-}
-
-function getProgressSpeedPerMs(progress: ScheduleProgressState, now: number): number {
-  if (progress.completedAt || progress.estimatePhase === 'completed') {
-    return 100 / SCHEDULE_PROGRESS_COMPLETION_DURATION_MS
-  }
-
-  const bounds = getStageProgressBounds(progress)
-  if (bounds) {
-    const [minimum, maximum, pacingMs] = bounds
-    return (maximum - minimum) / pacingMs
-  }
-
-  return MAX_WAITING_PERCENT / getEstimatedTotalMs(progress, now)
-}
-
-function getStageProgressBounds(progress: ScheduleProgressState): StageProgressBounds | null {
-  const stage = progress.calculationStage
-  if (!stage || stage === 'completed') return null
-
-  const includesSuggestions = Boolean(progress.upgradeSuggestionsRequested && progress.upgradeSuggestionsAllowed)
-  const bounds = includesSuggestions
-    ? {
-        starting: [8, 16, 4_000],
-        generating_schedule: [16, 48, 30_000],
-        generating_potential_schedule: [48, 62, 15_000],
-        simulating_upgrades: [62, 78, 30_000],
-        enriching_training_costs: [78, 86, 15_000],
-        simulating_maa_baseline: [86, 91, 20_000],
-        formatting_result: [91, 94, 5_000],
-        persisting_result: [94, MAX_WAITING_PERCENT, 10_000],
-      } satisfies Record<Exclude<OptimizeCalculationStage, 'completed'>, StageProgressBounds>
-    : {
-        starting: [8, 18, 4_000],
-        generating_schedule: [18, 68, 30_000],
-        generating_potential_schedule: [68, 72, 15_000],
-        simulating_upgrades: [72, 80, 30_000],
-        enriching_training_costs: [80, 84, 15_000],
-        simulating_maa_baseline: [68, 88, 20_000],
-        formatting_result: [88, 93, 5_000],
-        persisting_result: [93, MAX_WAITING_PERCENT, 10_000],
-      } satisfies Record<Exclude<OptimizeCalculationStage, 'completed'>, StageProgressBounds>
-  return bounds[stage]
-}
-
 function getTaskView(progress: ScheduleProgressState, percent: number, now: number) {
   const status = getTaskStatus(progress, percent, now)
   const reconnecting = progress.connectionStatus === 'reconnecting'
+    && status !== 'completed' && status !== 'failed' && status !== 'cancelled'
   const aheadCount = typeof progress.queuePosition === 'number' ? Math.max(0, progress.queuePosition - 1) : null
   const queueLabel = getQueueLabel(progress, aheadCount)
   const priorityLabel = progress.priority === 'priority_coupon' ? copy.common.components_ScheduleProgress_032 : progress.priority === 'paid' ? copy.common.components_ScheduleProgress_033 : progress.priority === 'analysis' ? copy.common.components_ScheduleProgress_034 : copy.common.components_ScheduleProgress_035
@@ -378,15 +276,14 @@ function getTaskView(progress: ScheduleProgressState, percent: number, now: numb
 function getTaskStatus(progress: ScheduleProgressState, percent: number, now: number): TaskStatus {
   if (progress.estimatePhase === 'cancelled') return 'cancelled'
   if (progress.estimatePhase === 'failed') return 'failed'
+  if (progress.completedAt || percent >= 100 || progress.estimatePhase === 'completed') return 'completed'
   if (progress.cancellationRequested) return 'cancelling'
   if (progress.executionPhase === 'retry_wait') return 'retrying'
-  if (!progress.completedAt && progress.observedRunning && getCurrentRemainingMs(progress, now) === 0) return 'overdue'
-  if (progress.completedAt || percent >= 100 || progress.estimatePhase === 'completed') return 'completed'
+  if (progress.observedRunning && getCurrentRemainingMs(progress, now) === 0) return 'overdue'
   if (progress.estimatePhase === 'overdue') return 'overdue'
   const isRunning = progress.observedRunning || progress.queueStatus === 'running' || progress.estimatePhase === 'running'
   if (isRunning && (progress.calculationStage === 'formatting_result' || progress.calculationStage === 'persisting_result')) return 'finishing'
   if (isRunning && progress.calculationStage) return 'running'
-  if (isRunning && percent >= 92) return 'finishing'
   if (isRunning) return 'running'
   if (progress.queueStatus === 'queued' || progress.estimatePhase === 'queued') return 'queued'
   return 'preparing'
@@ -448,8 +345,8 @@ function getStatusDetail(
 function getQueueLabel(progress: ScheduleProgressState, aheadCount: number | null): string {
   if (progress.estimatePhase === 'cancelled') return copy.common.components_ScheduleProgress_109
   if (progress.estimatePhase === 'failed') return copy.metered.progress.ended
-  if (progress.observedRunning || progress.queueStatus === 'running') return copy.common.components_ScheduleProgress_071
   if (progress.completedAt || progress.estimatePhase === 'completed') return copy.common.components_ScheduleProgress_072
+  if (progress.observedRunning || progress.queueStatus === 'running') return copy.common.components_ScheduleProgress_071
   if (aheadCount === null) return progress.queueStatus === 'queued' ? copy.common.components_ScheduleProgress_073 : copy.common.components_ScheduleProgress_074
   if (aheadCount <= 0) return copy.common.components_ScheduleProgress_075
   return `${copy.common.components_ScheduleProgress_076}${aheadCount}${copy.common.components_ScheduleProgress_077}`
@@ -472,9 +369,11 @@ function getAdjustmentLabel(progress: ScheduleProgressState, status: TaskStatus)
 function getRemainingLabel(progress: ScheduleProgressState, status: TaskStatus, now: number): string {
   if (status === 'cancelled' || progress.estimatePhase === 'cancelled' || status === 'failed') return copy.common.components_ScheduleProgress_108
   if (progress.completedAt || progress.estimatePhase === 'completed') return copy.common.components_ScheduleProgress_081
+  if (isScheduleProgressPaused(progress)) return copy.common.components_ScheduleProgress_082
   if (status === 'overdue' || progress.estimatePhase === 'overdue' || progress.estimatedRemainingMs === null) return copy.common.components_ScheduleProgress_082
   if (status === 'finishing') return copy.common.components_ScheduleProgress_083
   const currentRemainingMs = getCurrentRemainingMs(progress, now)
+  if (currentRemainingMs === 0) return copy.common.components_ScheduleProgress_082
   if (currentRemainingMs !== null) return `${copy.common.components_ScheduleProgress_084}${formatDuration(currentRemainingMs, 'ceil')}`
   const fallbackRemainingMs = Math.max(0, (progress.estimatedDurationMs ?? ESTIMATED_DURATION_MS) - Math.max(0, now - progress.startedAt))
   return `${copy.common.components_ScheduleProgress_085}${formatDuration(fallbackRemainingMs, 'ceil')}`
@@ -506,16 +405,9 @@ function getRemainingAriaLabel(progress: ScheduleProgressState, remainingLabel: 
 }
 
 function getMeterLabel(status: TaskStatus): string {
-  if (status === 'cancelled') return 'Cancelled'
-  if (status === 'failed') return 'Failed'
-  if (status === 'retrying') return 'Retry'
-  if (status === 'cancelling') return 'Cancel'
-  if (status === 'queued') return 'Queued'
-  if (status === 'running') return 'Running'
-  if (status === 'overdue') return 'Calibrate'
-  if (status === 'finishing') return 'Final'
-  if (status === 'completed') return 'Done'
-  return 'Init'
+  if (status === 'completed') return copy.common.scheduleProgressCompleted
+  if (status === 'cancelled' || status === 'failed') return copy.common.scheduleProgressStopped
+  return copy.common.scheduleProgressEstimated
 }
 
 function getStepState(progress: ScheduleProgressState, status: TaskStatus, index: number, steps: TaskStepDefinition[]): StepVisualState {
