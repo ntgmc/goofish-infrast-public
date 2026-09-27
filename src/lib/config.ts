@@ -11,6 +11,7 @@ const DEFAULT_SHIFT_HOURS = [8, 8, 8]
 const MIN_MAA_SHIFT_COUNT = 3
 const MAX_MAA_SHIFT_COUNT = 6
 const FIXED_MAA_SHIFT_INTERVALS = [8, 12, 24]
+const FULL_BLOOD_252_LEVELS = { trading: [3, 2], manufacturing: [3, 3, 3, 3, 3] }
 const RIGHT_FULL_252_LEVELS = {
   '252': { trading: [3, 1], manufacturing: [2, 2, 3, 3, 2] },
   '252-1': { trading: [3, 2], manufacturing: [3, 2, 3, 2, 2] },
@@ -54,6 +55,22 @@ export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
     manufacturing_stations_count: 5,
     trading_station_levels: [...RIGHT_FULL_252_LEVELS['252'].trading],
     manufacturing_station_levels: [...RIGHT_FULL_252_LEVELS['252'].manufacturing],
+    product_requirements: {
+      trading_stations: { LMD: 2 },
+      manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 3 },
+    },
+    Fiammetta: { enable: true },
+    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'Battle Record'] },
+  },
+  '252-full': {
+    layout: '2-5-2',
+    desc: copy.domain.lib_config_042,
+    schedule_mode: 'maa',
+    dormitory_rule: 'fixed',
+    trading_stations_count: 2,
+    manufacturing_stations_count: 5,
+    trading_station_levels: [...FULL_BLOOD_252_LEVELS.trading],
+    manufacturing_station_levels: [...FULL_BLOOD_252_LEVELS.manufacturing],
     product_requirements: {
       trading_stations: { LMD: 2 },
       manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 3 },
@@ -188,6 +205,14 @@ export function getRightFull252Variant(config: Pick<LicenseConfig, 'trading_stat
   return null
 }
 
+export function isFullBlood252Config(config: Pick<LicenseConfig, 'layout' | 'trading_stations_count' | 'manufacturing_stations_count' | 'trading_station_levels' | 'manufacturing_station_levels'>): boolean {
+  return String(config.layout ?? '').replace(/-/g, '') === '252'
+    && config.trading_stations_count === 2
+    && config.manufacturing_stations_count === 5
+    && levelsMatch(config.trading_station_levels, FULL_BLOOD_252_LEVELS.trading)
+    && levelsMatch(config.manufacturing_station_levels, FULL_BLOOD_252_LEVELS.manufacturing)
+}
+
 export function isRightFull252Config(config: Pick<LicenseConfig, 'layout' | 'trading_stations_count' | 'manufacturing_stations_count' | 'trading_station_levels' | 'manufacturing_station_levels'>): boolean {
   return String(config.layout ?? '').replace(/-/g, '') === '252'
     && getRightFull252Variant(config) !== null
@@ -195,6 +220,9 @@ export function isRightFull252Config(config: Pick<LicenseConfig, 'layout' | 'tra
 
 export function resolveConfigLayout(config: Pick<LicenseConfig, 'trading_stations_count' | 'manufacturing_stations_count' | 'trading_station_levels' | 'manufacturing_station_levels'>): string {
   return getRightFull252Variant(config) !== null
+    || (config.trading_stations_count === 2 && config.manufacturing_stations_count === 5
+      && levelsMatch(config.trading_station_levels, FULL_BLOOD_252_LEVELS.trading)
+      && levelsMatch(config.manufacturing_station_levels, FULL_BLOOD_252_LEVELS.manufacturing))
     ? '2-5-2'
     : `${config.trading_stations_count}-${config.manufacturing_stations_count}-3`
 }
@@ -245,7 +273,7 @@ export function validateConfig(config: LicenseConfig): { ok: true } | { ok: fals
   if (!Number.isInteger(tradingCount) || !Number.isInteger(manufacturingCount)) {
     return { ok: false, message: copy.domain.lib_config_029 }
   }
-  if (tradingCount < 1 || manufacturingCount < 1 || (!isRightFull252Config(config) && (tradingCount + manufacturingCount !== 6 || hasFacilityLevels))) {
+  if (tradingCount < 1 || manufacturingCount < 1 || (!isRightFull252Config(config) && !isFullBlood252Config(config) && (tradingCount + manufacturingCount !== 6 || hasFacilityLevels))) {
     return { ok: false, message: copy.domain.lib_config_030 }
   }
   const tradingTotal = sumCounts(config.product_requirements.trading_stations)

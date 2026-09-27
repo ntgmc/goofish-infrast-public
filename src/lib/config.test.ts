@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CONFIG_PRESETS, getRightFull252Variant, isRightFull252Config, normalizeConfig, normalizeDormitoryRule, parseShiftHours, resolveConfigLayout, validateConfig } from './config'
+import { CONFIG_PRESETS, getRightFull252Variant, isFullBlood252Config, isRightFull252Config, normalizeConfig, normalizeDormitoryRule, parseShiftHours, resolveConfigLayout, validateConfig } from './config'
 import { licenseConfigSchema } from './workspace-validation'
 
 describe('preset configs', () => {
@@ -22,7 +22,7 @@ describe('preset configs', () => {
 })
 
 describe('layout normalization', () => {
-  it('accepts both right-full 252 variants while rejecting full-blood 252', () => {
+  it('accepts both right-full 252 variants and full-blood 252', () => {
     for (const variant of ['252', '252-1'] as const) {
       const config = normalizeConfig(CONFIG_PRESETS[variant])
       expect(resolveConfigLayout(config)).toBe('2-5-2')
@@ -32,20 +32,25 @@ describe('layout normalization', () => {
       expect(validateConfig(config)).toEqual({ ok: true })
     }
 
-    expect(validateConfig({
+    const fullBlood = normalizeConfig(CONFIG_PRESETS['252-full'])
+    expect(isFullBlood252Config(fullBlood)).toBe(true)
+    expect(isRightFull252Config(fullBlood)).toBe(false)
+    expect(getRightFull252Variant(fullBlood)).toBeNull()
+    expect(resolveConfigLayout(fullBlood)).toBe('2-5-2')
+    expect(licenseConfigSchema.safeParse(fullBlood).success).toBe(true)
+    expect(validateConfig(fullBlood)).toEqual({ ok: true })
+    expect(fullBlood.product_requirements.manufacturing_stations).toEqual({ 'Pure Gold': 2, 'Battle Record': 3 })
+    expect(validateConfig(normalizeConfig({
       ...CONFIG_PRESETS['252-1'],
       manufacturing_station_levels: [3, 3, 3, 3, 3],
-    })).toEqual({
-      ok: false,
-      message: '当前支持 3 发电站布局和右满252；其他 2 发电站布局尚未开放。',
-    })
+    }))).toEqual({ ok: true })
 
     expect(validateConfig({
       ...CONFIG_PRESETS['243'],
       trading_station_levels: [3, 2],
     })).toEqual({
       ok: false,
-      message: '当前支持 3 发电站布局和右满252；其他 2 发电站布局尚未开放。',
+      message: '当前支持 3 发电站布局、右满252和满血252；其他 2 发电站布局尚未开放。',
     })
   })
 

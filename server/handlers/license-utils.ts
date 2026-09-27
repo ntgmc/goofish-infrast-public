@@ -17,7 +17,7 @@ import {
 } from '../../src/lib/product-catalog'
 import { createPostgresCdkRecordStore } from '../storage/cdk-store'
 import { licenseConfigSchema, licenseOperatorsSchema } from '../../src/lib/workspace-validation'
-import { isRightFull252Config, parseShiftHours } from '../../src/lib/config'
+import { isFullBlood252Config, isRightFull252Config, parseShiftHours } from '../../src/lib/config'
 import {
   createPostgresRiskControlSettingsStore,
   DEFAULT_RISK_CONTROL_SETTINGS,
@@ -100,6 +100,23 @@ const PRESET_CONFIGS: LicenseConfig[] = [
     Fiammetta: { enable: true },
     drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'Battle Record'] },
   },
+  {
+    layout: '2-5-2',
+    desc: '满血252',
+    schedule_mode: 'maa',
+    dormitory_rule: 'fixed',
+    trading_stations_count: 2,
+    manufacturing_stations_count: 5,
+    trading_station_levels: [3, 2],
+    manufacturing_station_levels: [3, 3, 3, 3, 3],
+    product_requirements: {
+      trading_stations: { LMD: 2 },
+      manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 3 },
+    },
+    Fiammetta: { enable: true },
+    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'Battle Record'] },
+  },
+
   {
     layout: '2-5-2',
     desc: '右满252（赤金多）',
@@ -467,7 +484,7 @@ export function resolveConfigForPermission(
   }
   const preset = PRESET_CONFIGS.find((item) => isPresetConfigMatch(config, item))
   if (!preset) {
-    return { ok: false, message: '当前 CDK 版本仅支持 243 均衡、243 搓玉、333 纯钱、333 搓玉和右满252预设配置。' }
+    return { ok: false, message: '当前 CDK 版本仅支持 243 均衡、243 搓玉、333 纯钱、333 搓玉、右满252和满血252预设配置。' }
   }
   return { ok: true, config: resolvePresetMode(config, preset) }
 }
@@ -490,7 +507,7 @@ export function resolveFreePreviewConfig(
     isPresetConfigMatch(config, item) || isLegacyFreePreviewMaaConfigMatch(config, item)
   )
   if (!preset) {
-    return { ok: false, message: '免费个人排班仅支持 243 均衡、243 搓玉、333 纯钱、333 搓玉和右满252预设。' }
+    return { ok: false, message: '免费个人排班仅支持 243 均衡、243 搓玉、333 纯钱、333 搓玉、右满252和满血252预设。' }
   }
   return { ok: true, config: { ...resolveFreePreviewPresetMode(config, preset), shift_hours: shiftHours } }
 }
@@ -924,8 +941,8 @@ export function validateConfig(value: unknown): { ok: true; config: LicenseConfi
     return { ok: false, message: '贸易站和制造站数量必须大于 0。' }
   }
   const hasFacilityLevels = config.trading_station_levels !== undefined || config.manufacturing_station_levels !== undefined
-  if (!isRightFull252Config(config) && (config.trading_stations_count + config.manufacturing_stations_count !== 6 || hasFacilityLevels)) {
-    return { ok: false, message: '当前支持 3 发电站布局和右满252；其他 2 发电站布局尚未开放。' }
+  if (!isRightFull252Config(config) && !isFullBlood252Config(config) && (config.trading_stations_count + config.manufacturing_stations_count !== 6 || hasFacilityLevels)) {
+    return { ok: false, message: '当前支持 3 发电站布局、右满252和满血252；其他 2 发电站布局尚未开放。' }
   }
   const trading = config.product_requirements.trading_stations
   const manufacturing = config.product_requirements.manufacturing_stations

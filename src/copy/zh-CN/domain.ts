@@ -410,7 +410,7 @@ export const domainCopy = {
   // src/lib/config.ts
   lib_config_029: "贸易站和制造站数量必须是整数。",
   // src/lib/config.ts
-  lib_config_030: "当前支持 3 发电站布局和右满252；其他 2 发电站布局尚未开放。",
+  lib_config_030: "当前支持 3 发电站布局、右满252和满血252；其他 2 发电站布局尚未开放。",
   // src/lib/config.ts
   lib_config_031: "贸易产物数量合计为 ",
   // src/lib/config.ts
@@ -433,6 +433,8 @@ export const domainCopy = {
   lib_config_040: "右满252（赤金多）",
   // src/lib/config.ts
   lib_config_041: "333 纯钱流",
+  // src/lib/config.ts
+  lib_config_042: "满血252",
   // src/lib/production-sanity.ts
   lib_production_sanity_001: "制造 ",
   // src/lib/production-sanity.ts

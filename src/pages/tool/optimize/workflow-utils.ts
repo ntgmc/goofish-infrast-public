@@ -2,7 +2,7 @@ import type { LicenseConfig, LicenseOperator, OptimizeResult, UpgradeSuggestion,
 import { canonicalJson } from '../../../lib/crypto'
 import { SCHEDULE_PROGRESS_COMPLETION_DURATION_MS } from '../../../components/ScheduleProgress'
 import { copy } from '../../../copy/index'
-import { getRightFull252Variant } from '../../../lib/config'
+import { getRightFull252Variant, isFullBlood252Config } from '../../../lib/config'
 
 
 export function buildOptimizeSignature(operators: LicenseOperator[], config: LicenseConfig): string {
@@ -13,7 +13,9 @@ export function formatConfigPresetLabel(config: LicenseConfig): string {
   const layout = String(config.layout || `${config.trading_stations_count}-${config.manufacturing_stations_count}-3`)
   const compactLayout = layout.replace(/-/g, '')
   const rightFull252Variant = getRightFull252Variant(config)
-  const presetLayout = rightFull252Variant
+  const presetLayout = isFullBlood252Config(config)
+    ? copy.optimize.pages_tool_optimize_workflow_utils_009
+    : rightFull252Variant
     ? rightFull252Variant === '252'
       ? copy.optimize.pages_tool_optimize_workflow_utils_007
       : copy.optimize.pages_tool_optimize_workflow_utils_008

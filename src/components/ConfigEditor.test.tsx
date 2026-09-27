@@ -431,7 +431,7 @@ describe('ConfigEditor number inputs', () => {
     const productRegion = screen.getByRole('region', { name: '产物数量' })
     expect(roomRegion.parentElement).toBe(productRegion.parentElement)
     expect(productRegion).toHaveClass('lg:border-l')
-    expect(within(roomRegion).getByRole('note')).toHaveTextContent('当前支持右满252；其他 2 发电站布局尚未开放。')
+    expect(within(roomRegion).getByRole('note')).toHaveTextContent('当前支持右满252和满血252；其他 2 发电站布局尚未开放。')
   })
 
   it('uses InputNumber controls for room and product counts', async () => {
@@ -580,6 +580,33 @@ describe('ConfigEditor preset actions', () => {
       />,
     )
     expect(screen.getByRole('region', { name: '房间结构' })).toBeInTheDocument()
+  })
+
+  it('applies full-blood 252 and explains its irreversible right-side levels', async () => {
+    const user = userEvent.setup()
+    const config = normalizeConfig(CONFIG_PRESETS['243'])
+    const onUpdate = vi.fn()
+    const view = render(<ConfigEditor config={config} canEdit validation={{ ok: true }} onUpdate={onUpdate} />)
+    await user.click(screen.getByRole('button', { name: '满血252' }))
+    const next = cloneConfig(config)
+    onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0](next)
+    expect(next).toMatchObject({
+      layout: '2-5-2',
+      desc: '满血252',
+      trading_station_levels: [3, 2],
+      manufacturing_station_levels: [3, 3, 3, 3, 3],
+      product_requirements: {
+        trading_stations: { LMD: 2 },
+        manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 3 },
+      },
+    })
+    view.rerender(<ConfigEditor config={next} canEdit validation={{ ok: true }} onUpdate={onUpdate} />)
+    expect(screen.getByText(/右侧会客室、加工站、办公室、训练室依次为 1\/3\/1\/3/)).toHaveTextContent('游戏内这些设施无法降级')
+    expect(within(screen.getByRole('region', { name: '房间结构' })).queryByRole('spinbutton')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '243 均衡' }))
+    onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0](next)
+    expect(next.trading_station_levels).toBeUndefined()
+    expect(next.manufacturing_station_levels).toBeUndefined()
   })
 
   it('keeps limited configuration options available after selecting right-full 252', async () => {
