@@ -8,6 +8,73 @@ import ConfigEditor from './ConfigEditor'
 afterEach(cleanup)
 
 describe('ConfigEditor strategy layout', () => {
+  it('groups presets by power stations', () => {
+    render(
+      <ConfigEditor
+        config={normalizeConfig(CONFIG_PRESETS['243'])}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={vi.fn()}
+      />,
+    )
+
+    const threePower = screen.getByRole('group', { name: '3 发电站' })
+    const twoPower = screen.getByRole('group', { name: '2 发电站' })
+    expect(within(threePower).getByRole('button', { name: '243 均衡' })).toBeInTheDocument()
+    expect(within(threePower).getByRole('button', { name: '333 纯钱' })).toBeInTheDocument()
+    expect(within(twoPower).getByRole('button', { name: '满血252' })).toBeInTheDocument()
+    expect(within(twoPower).getByRole('button', { name: '右满252（经验多）' })).toBeInTheDocument()
+    expect(screen.queryByText(/满血252需要右侧会客室/)).not.toBeInTheDocument()
+  })
+
+  it.each(['252', '252-1', '252-full'])('shows the 252 explanation only while %s is selected', (preset) => {
+    const view = render(
+      <ConfigEditor
+        config={normalizeConfig(CONFIG_PRESETS['243'])}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={vi.fn()}
+      />,
+    )
+    expect(screen.queryByText(/满血252需要右侧会客室/)).not.toBeInTheDocument()
+
+    view.rerender(
+      <ConfigEditor
+        config={normalizeConfig(CONFIG_PRESETS[preset])}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={vi.fn()}
+      />,
+    )
+    expect(screen.getByText(/满血252需要右侧会客室、加工站、办公室、训练室依次为 1\/3\/1\/3 级/)).toHaveAttribute('role', 'note')
+
+    view.rerender(
+      <ConfigEditor
+        config={normalizeConfig(CONFIG_PRESETS['243'])}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={vi.fn()}
+      />,
+    )
+    expect(screen.queryByText(/满血252需要右侧会客室/)).not.toBeInTheDocument()
+  })
+
+  it('keeps product labels together and lets the count control wrap in narrow columns', () => {
+    render(
+      <ConfigEditor
+        config={normalizeConfig(CONFIG_PRESETS['243-1'])}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={vi.fn()}
+      />,
+    )
+
+    const productRegion = screen.getByRole('region', { name: '产物数量' })
+    const label = within(productRegion).getByText('源石碎片')
+    expect(label).toHaveClass('whitespace-nowrap')
+    expect(label.closest('.tool-inset')).toHaveClass('flex-wrap')
+    expect(within(productRegion).getByRole('spinbutton', { name: '源石碎片' }).parentElement).toHaveClass('ml-auto')
+  })
   it.each([true, false])('uses station colors and local product icons with canEdit=%s', (canEdit) => {
     const config = normalizeConfig(CONFIG_PRESETS['243-1'])
     config.product_requirements.trading_stations = { Orundum: 2 }

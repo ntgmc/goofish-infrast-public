@@ -313,7 +313,9 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_108: "满血252",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_109: "与右满252的区别：满血252右侧会客室、加工站、办公室、训练室依次为 1/3/1/3 级；游戏内这些设施无法降级，会客室和办公室须保持 1 级，不能升级。贸易站 3/2 级，制造站均为 3 级，默认 3 作战记录、2 赤金。",
+  components_ConfigEditor_109: "满血252需要右侧会客室、加工站、办公室、训练室依次为 1/3/1/3 级；游戏内这些设施无法降级，会客室和办公室须保持 1 级。贸易站为 3/2 级，制造站均为 3 级，默认 3 作战记录、2 赤金。右满252适用于右侧设施已升级的情况。",
+  components_ConfigEditor_110: "3 发电站",
+  components_ConfigEditor_111: "2 发电站",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_106: "333 纯钱流",
   // src/components/ConfigEditor.tsx
