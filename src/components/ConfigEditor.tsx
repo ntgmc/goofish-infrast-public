@@ -397,20 +397,16 @@ export default function ConfigEditor({
           </p>
         </div>
           {!hidePresetActions && (canEdit || (canSelectPreset && !autoInventoryOnly)) && (
-<div className="config-preset-actions flex flex-wrap gap-2" data-tour-target="config-preset-actions">
-            <PresetButton label={copy.common.components_ConfigEditor_030} onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
-            <PresetButton label={copy.common.components_ConfigEditor_031} onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
-            <PresetButton label={copy.common.components_ConfigEditor_103} onClick={() => applyPreset(CONFIG_PRESETS['252'])} />
-            <PresetButton label={copy.common.components_ConfigEditor_105} onClick={() => applyPreset(CONFIG_PRESETS['252-1'])} />
-            <PresetButton label={copy.common.components_ConfigEditor_108} onClick={() => applyPreset(CONFIG_PRESETS['252-full'])} />
-            <PresetButton label={copy.common.components_ConfigEditor_107} onClick={() => applyPreset(CONFIG_PRESETS['333-lmd'])} />
-            <PresetButton label={copy.common.components_ConfigEditor_032} onClick={() => applyPreset(CONFIG_PRESETS['333'])} />
-          </div>
+<PresetActions onSelect={applyPreset} />
         )}
       </div>
       )}
 
-      <p className="mt-3 text-xs leading-5 text-ink-secondary">{copy.common.components_ConfigEditor_109}</p>
+      {supported252PresetSelected && (
+        <p className="tool-alert tool-alert--warning mt-3 px-3 py-2 text-xs leading-5" role="note">
+          {copy.common.components_ConfigEditor_109}
+        </p>
+      )}
 
       {supported252PresetSelected && !canEdit && !autoInventoryOnly ? (
         <div className="pt-5">
@@ -427,15 +423,7 @@ export default function ConfigEditor({
             <p className="mt-1 text-sm leading-6 text-ink-secondary">
               {copy.common.components_ConfigEditor_034}</p>
             {!hidePresetActions && canSelectPreset && (
-              <div className="mt-4 flex flex-wrap gap-2" data-tour-target="config-preset-actions">
-                <PresetButton label={copy.common.components_ConfigEditor_035} onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
-                <PresetButton label={copy.common.components_ConfigEditor_036} onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
-                <PresetButton label={copy.common.components_ConfigEditor_103} onClick={() => applyPreset(CONFIG_PRESETS['252'])} />
-                <PresetButton label={copy.common.components_ConfigEditor_105} onClick={() => applyPreset(CONFIG_PRESETS['252-1'])} />
-                <PresetButton label={copy.common.components_ConfigEditor_108} onClick={() => applyPreset(CONFIG_PRESETS['252-full'])} />
-                <PresetButton label={copy.common.components_ConfigEditor_107} onClick={() => applyPreset(CONFIG_PRESETS['333-lmd'])} />
-                <PresetButton label={copy.common.components_ConfigEditor_037} onClick={() => applyPreset(CONFIG_PRESETS['333'])} />
-              </div>
+              <PresetActions onSelect={applyPreset} autoInventoryOnly className="mt-4" />
             )}
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
@@ -849,6 +837,49 @@ export default function ConfigEditor({
         <p className="tool-alert tool-alert--warning mt-4" role="alert">{validationMessage}</p>
       )}
     </section>
+  )
+}
+
+function PresetActions({
+  onSelect,
+  autoInventoryOnly = false,
+  className = '',
+}: {
+  onSelect: (preset: LicenseConfig) => void;
+  autoInventoryOnly?: boolean;
+  className?: string;
+}) {
+  const groups = [
+    {
+      label: copy.common.components_ConfigEditor_110,
+      presets: [
+        ['243', autoInventoryOnly ? copy.common.components_ConfigEditor_035 : copy.common.components_ConfigEditor_030],
+        ['243-1', autoInventoryOnly ? copy.common.components_ConfigEditor_036 : copy.common.components_ConfigEditor_031],
+        ['333-lmd', copy.common.components_ConfigEditor_107],
+        ['333', autoInventoryOnly ? copy.common.components_ConfigEditor_037 : copy.common.components_ConfigEditor_032],
+      ],
+    },
+    {
+      label: copy.common.components_ConfigEditor_111,
+      presets: [
+        ['252', copy.common.components_ConfigEditor_103],
+        ['252-1', copy.common.components_ConfigEditor_105],
+        ['252-full', copy.common.components_ConfigEditor_108],
+      ],
+    },
+  ] as const
+
+  return (
+    <div className={`config-preset-actions flex min-w-0 flex-col gap-2 ${className}`} data-tour-target="config-preset-actions">
+      {groups.map((group) => (
+        <div key={group.label} role="group" aria-label={group.label} className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-xs font-medium text-ink-muted">{group.label}</span>
+          {group.presets.map(([id, label]) => (
+            <PresetButton key={id} label={label} onClick={() => onSelect(CONFIG_PRESETS[id])} />
+          ))}
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -1272,10 +1303,10 @@ function ProductGroupEditor({
       <p className="mb-2 text-xs font-medium text-ink-muted">{label}</p>
       <div className="grid gap-2">
         {products.map((product) => (
-        <div key={product} className="tool-inset flex items-center justify-between gap-3 px-3 py-2 text-sm">
-            <span className="flex min-w-0 items-center gap-2 text-ink-secondary">
+          <div key={product} className="tool-inset flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+            <span className="flex items-center gap-2 text-ink-secondary">
               <ProductIcon product={product} />
-              <span className="break-words">{PRODUCT_LABELS[product] ?? product}</span>
+              <span className="whitespace-nowrap">{PRODUCT_LABELS[product] ?? product}</span>
             </span>
           {canEdit ? (
             <ProductCountInput
@@ -1315,7 +1346,7 @@ function ProductCountInput({
       min={0}
       max={6}
       onChange={onChange}
-      className="w-36 max-w-full shrink-0"
+      className="ml-auto w-36 max-w-full shrink-0"
     />
   )
 }
