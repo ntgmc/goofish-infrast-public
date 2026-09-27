@@ -5,9 +5,10 @@ import { getUpgradeSuggestionId } from '../../../lib/upgrade-suggestion-id'
 import { formatConfigPresetLabel, normalizeUpgradeSuggestions, resolveLatestHistoryConfig } from './workflow-utils'
 
 describe('formatConfigPresetLabel', () => {
-  it('labels both supported two-power layouts as right-full 252 variants', () => {
+  it('labels right-full and full-blood 252 presets distinctly', () => {
     expect(formatConfigPresetLabel(CONFIG_PRESETS['252'])).toBe('右满252（经验多） 均衡')
     expect(formatConfigPresetLabel(CONFIG_PRESETS['252-1'])).toBe('右满252（赤金多） 均衡')
+    expect(formatConfigPresetLabel(CONFIG_PRESETS['252-full'])).toBe('满血252 均衡')
   })
 })
 

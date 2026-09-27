@@ -4,11 +4,31 @@ import {
   getCdkScenarioQuotaLimit,
   resolveConfigForPermission,
   resolveFreePreviewConfig,
+  validateConfig,
   type LegacyProfileCdkRecord,
   type ProfileCdkDuration,
 } from './license-utils'
 
 describe('restricted profile presets', () => {
+  it('accepts full-blood 252 for restricted profiles and free preview', () => {
+    const config = CONFIG_PRESETS['252-full']
+    for (const result of [
+      validateConfig(config),
+      resolveConfigForPermission('recommended', config),
+      resolveFreePreviewConfig(config),
+    ]) {
+      expect(result).toMatchObject({
+        ok: true,
+        config: {
+          layout: '2-5-2',
+          trading_station_levels: [3, 2],
+          manufacturing_station_levels: [3, 3, 3, 3, 3],
+          product_requirements: { manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 3 } },
+        },
+      })
+    }
+    expect(validateConfig({ ...config, trading_station_levels: [3, 3] })).toMatchObject({ ok: false })
+  })
   it.each([8, 12])('preserves the free-preview %s-hour interval', (hours) => {
     expect(resolveFreePreviewConfig({
       ...CONFIG_PRESETS['243'],

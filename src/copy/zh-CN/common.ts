@@ -291,7 +291,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_093: "选择固定换班频率、自动变间隔换班或自定义班次。",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_094: "当前支持右满252；其他 2 发电站布局尚未开放。",
+  components_ConfigEditor_094: "当前支持右满252和满血252；其他 2 发电站布局尚未开放。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_095: "未安装或不想安装 MAA？可生成 MAA 排班表后，手动在游戏内设置队列，再定时执行全部轮换。",
   // src/components/ConfigEditor.tsx
@@ -310,6 +310,10 @@ export const commonCopy = {
   components_ConfigEditor_104: "右满252（赤金多）",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_105: "右满252（赤金多）",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_108: "满血252",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_109: "与右满252的区别：满血252右侧会客室、加工站、办公室、训练室依次为 1/3/1/3 级；游戏内这些设施无法降级，会客室和办公室须保持 1 级，不能升级。贸易站 3/2 级，制造站均为 3 级，默认 3 作战记录、2 赤金。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_106: "333 纯钱流",
   // src/components/ConfigEditor.tsx

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { BedDouble, CalendarClock, Flame, Gem, Zap } from 'lucide-react'
 import {
   getRightFull252Variant,
+  isFullBlood252Config,
   isFiammettaShiftHoursSupported,
   isValidShiftHours,
   isVariableShiftScheduleEnabled,
@@ -144,6 +145,22 @@ const CONFIG_PRESETS: Record<string, LicenseConfig> = {
     Fiammetta: { enable: true },
     drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'Battle Record'] },
   },
+  '252-full': {
+    layout: '2-5-2',
+    desc: copy.common.components_ConfigEditor_108,
+    schedule_mode: 'maa',
+    dormitory_rule: 'fixed',
+    trading_stations_count: 2,
+    manufacturing_stations_count: 5,
+    trading_station_levels: [3, 2],
+    manufacturing_station_levels: [3, 3, 3, 3, 3],
+    product_requirements: {
+      trading_stations: { LMD: 2 },
+      manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 3 },
+    },
+    Fiammetta: { enable: true },
+    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'Battle Record'] },
+  },
   '333-lmd': {
     layout: '3-3-3',
     desc: copy.common.components_ConfigEditor_106,
@@ -177,7 +194,9 @@ const CONFIG_PRESETS: Record<string, LicenseConfig> = {
 function applyCounts(config: LicenseConfig): LicenseConfig {
   const rightFull252Variant = getRightFull252Variant(config)
   config.layout = resolveConfigLayout(config)
-  config.desc = rightFull252Variant
+  config.desc = isFullBlood252Config(config)
+    ? copy.common.components_ConfigEditor_108
+    : rightFull252Variant
     ? rightFull252Variant === '252' ? copy.common.components_ConfigEditor_102 : copy.common.components_ConfigEditor_104
     : `${config.layout}${copy.common.components_ConfigEditor_019}`
   return config
@@ -256,7 +275,7 @@ export default function ConfigEditor({
 }: ConfigEditorProps) {
   const canUseIntermediateInventory = canEdit || Boolean(canEditIntermediateInventory)
   const autoInventoryOnly = !canEdit && canUseIntermediateInventory
-  const rightFull252PresetSelected = getRightFull252Variant(config) !== null
+  const supported252PresetSelected = getRightFull252Variant(config) !== null || isFullBlood252Config(config)
   const tradingProducts = uniqueProducts(TRADING_PRODUCTS, config.product_requirements.trading_stations)
   const manufacturingProducts = uniqueProducts(MANUFACTURING_PRODUCTS, config.product_requirements.manufacturing_stations)
   const droneTargets = formatDroneTargetsInput(config.drones?.targets ?? [])
@@ -383,6 +402,7 @@ export default function ConfigEditor({
             <PresetButton label={copy.common.components_ConfigEditor_031} onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
             <PresetButton label={copy.common.components_ConfigEditor_103} onClick={() => applyPreset(CONFIG_PRESETS['252'])} />
             <PresetButton label={copy.common.components_ConfigEditor_105} onClick={() => applyPreset(CONFIG_PRESETS['252-1'])} />
+            <PresetButton label={copy.common.components_ConfigEditor_108} onClick={() => applyPreset(CONFIG_PRESETS['252-full'])} />
             <PresetButton label={copy.common.components_ConfigEditor_107} onClick={() => applyPreset(CONFIG_PRESETS['333-lmd'])} />
             <PresetButton label={copy.common.components_ConfigEditor_032} onClick={() => applyPreset(CONFIG_PRESETS['333'])} />
           </div>
@@ -390,7 +410,9 @@ export default function ConfigEditor({
       </div>
       )}
 
-      {rightFull252PresetSelected && !canEdit && !autoInventoryOnly ? (
+      <p className="mt-3 text-xs leading-5 text-ink-secondary">{copy.common.components_ConfigEditor_109}</p>
+
+      {supported252PresetSelected && !canEdit && !autoInventoryOnly ? (
         <div className="pt-5">
           <div className="tool-inset bg-surface-2/60 p-4" role="status">
             <p className="text-sm leading-6 text-ink-secondary">
@@ -410,6 +432,7 @@ export default function ConfigEditor({
                 <PresetButton label={copy.common.components_ConfigEditor_036} onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
                 <PresetButton label={copy.common.components_ConfigEditor_103} onClick={() => applyPreset(CONFIG_PRESETS['252'])} />
                 <PresetButton label={copy.common.components_ConfigEditor_105} onClick={() => applyPreset(CONFIG_PRESETS['252-1'])} />
+                <PresetButton label={copy.common.components_ConfigEditor_108} onClick={() => applyPreset(CONFIG_PRESETS['252-full'])} />
                 <PresetButton label={copy.common.components_ConfigEditor_107} onClick={() => applyPreset(CONFIG_PRESETS['333-lmd'])} />
                 <PresetButton label={copy.common.components_ConfigEditor_037} onClick={() => applyPreset(CONFIG_PRESETS['333'])} />
               </div>
@@ -502,7 +525,7 @@ export default function ConfigEditor({
                   {copy.common.components_ConfigEditor_094}
                 </p>
               </div>
-              {canEdit && !rightFull252PresetSelected ? (
+              {canEdit && !supported252PresetSelected ? (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
                   <CounterField
                     station="trading"
@@ -542,7 +565,7 @@ export default function ConfigEditor({
                   label={copy.common.components_ConfigEditor_049}
                   products={tradingProducts}
                   counts={config.product_requirements.trading_stations}
-                  canEdit={canEdit && !rightFull252PresetSelected}
+                  canEdit={canEdit && !supported252PresetSelected}
                   onChange={(product, value) => setProductCount('trading_stations', product, value)}
                 />
                 <ProductGroupEditor
@@ -550,7 +573,7 @@ export default function ConfigEditor({
                   label={copy.common.components_ConfigEditor_050}
                   products={manufacturingProducts}
                   counts={config.product_requirements.manufacturing_stations}
-                  canEdit={canEdit && !rightFull252PresetSelected}
+                  canEdit={canEdit && !supported252PresetSelected}
                   onChange={(product, value) => setProductCount('manufacturing_stations', product, value)}
                 />
               </div>
