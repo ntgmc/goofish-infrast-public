@@ -135,6 +135,52 @@ describe('buildMaaExportPayload', () => {
       dormitory: 1,
     });
   });
+
+  it('sorts mixed-level trading and manufacture rooms for every shift and adjusts drone indexes', () => {
+    const input = richResult();
+    input.plans = [0, 1].map((shift) => ({
+      name: `第${shift + 1}班`,
+      rooms: {
+        trading: [
+          { operators: [`低级贸易${shift}`], level: 2 },
+          { operators: [`高级贸易${shift}`], level: 3 },
+        ],
+        manufacture: [
+          { operators: [`低级制造${shift}`], facility_level: 1 },
+          { operators: [`高级制造甲${shift}`], facility_level: 3 },
+          { operators: [`中级制造${shift}`], facility_level: 2 },
+          { operators: [`高级制造乙${shift}`], facility_level: 3 },
+        ],
+      },
+      drones: { enable: true, room: shift === 0 ? 'manufacture' : 'trading', index: 1, order: 'post' },
+    })) as OptimizeResult['plans'];
+    const original = structuredClone(input);
+
+    const exported = buildMaaExportPayload(input);
+    for (const [shift, plan] of exported.plans.entries()) {
+      expect(plan.rooms.trading?.map((room) => room.operators[0])).toEqual([
+        `高级贸易${shift}`, `低级贸易${shift}`,
+      ]);
+      expect(plan.rooms.manufacture?.map((room) => room.operators[0])).toEqual([
+        `高级制造甲${shift}`, `高级制造乙${shift}`, `中级制造${shift}`, `低级制造${shift}`,
+      ]);
+      expect(plan.drones?.index).toBe(shift === 0 ? 4 : 2);
+    }
+    expect(input).toEqual(original);
+  });
+
+  it('preserves original order for equal or unknown room levels', () => {
+    const input = richResult();
+    input.plans[0].rooms.manufacture = [
+      { operators: ['未知等级'] },
+      { operators: ['三级'], level: 3 },
+      { operators: ['另一个三级'], facility_level: 3 },
+      { operators: ['另一个未知等级'] },
+    ];
+
+    expect(buildMaaExportPayload(input).plans[0].rooms.manufacture?.map((room) => room.operators[0]))
+      .toEqual(['三级', '另一个三级', '未知等级', '另一个未知等级']);
+  });
 });
 
 function richResult(): OptimizeResult {
