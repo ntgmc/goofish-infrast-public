@@ -498,7 +498,29 @@ describe('ConfigEditor number inputs', () => {
     const productRegion = screen.getByRole('region', { name: '产物数量' })
     expect(roomRegion.parentElement).toBe(productRegion.parentElement)
     expect(productRegion).toHaveClass('lg:border-l')
-    expect(within(roomRegion).getByRole('note')).toHaveTextContent('当前支持右满252和满血252；其他 2 发电站布局尚未开放。')
+    expect(within(roomRegion).queryByText(/其他 2 发电站布局尚未开放/)).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['243', '3', true],
+    ['252-full', '2', true],
+    ['252-1', '2', true],
+    ['243', '3', false],
+  ] as const)('shows the preset power station count as read-only for %s', (preset, count, canEdit) => {
+    render(
+      <ConfigEditor
+        config={normalizeConfig(CONFIG_PRESETS[preset])}
+        canEdit={canEdit}
+        validation={{ ok: true }}
+        onUpdate={vi.fn()}
+      />,
+    )
+
+    const roomRegion = screen.getByRole('region', { name: '房间结构' })
+    const powerStation = within(roomRegion).getByText('发电站').closest('.config-station--power')
+    expect(powerStation).toHaveTextContent(count)
+    expect(powerStation?.querySelector('dd')).toHaveTextContent(count)
+    expect(within(roomRegion).queryByRole('spinbutton', { name: '发电站' })).not.toBeInTheDocument()
   })
 
   it('uses InputNumber controls for room and product counts', async () => {

@@ -291,7 +291,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_093: "选择固定换班频率、自动变间隔换班或自定义班次。",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_094: "当前支持右满252和满血252；其他 2 发电站布局尚未开放。",
+  components_ConfigEditor_094: "发电站",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_095: "未安装或不想安装 MAA？可生成 MAA 排班表后，手动在游戏内设置队列，再定时执行全部轮换。",
   // src/components/ConfigEditor.tsx

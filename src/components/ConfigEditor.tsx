@@ -509,9 +509,6 @@ export default function ConfigEditor({
               <div className="mb-4">
                 <h3 id="config-room-layout-heading" className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_042}</h3>
                 <p className="mt-1 text-xs text-ink-muted">{copy.common.components_ConfigEditor_043}{config.layout}</p>
-                <p className="tool-alert tool-alert--warning mt-3 px-3 py-2 text-xs leading-5" role="note">
-                  {copy.common.components_ConfigEditor_094}
-                </p>
               </div>
               {canEdit && !supported252PresetSelected ? (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
@@ -540,6 +537,9 @@ export default function ConfigEditor({
                   <ReadOnlyMetric station="manufacturing" label={copy.common.components_ConfigEditor_047} value={config.manufacturing_stations_count} />
                 </dl>
               )}
+              <dl className="mt-3 text-sm">
+                <ReadOnlyMetric station="power" label={copy.common.components_ConfigEditor_094} value={config.layout.split('-')[2]} />
+              </dl>
             </section>
 
             <section
@@ -1274,7 +1274,7 @@ function CounterField({
   )
 }
 
-function ReadOnlyMetric({ station, label, value }: { station: 'trading' | 'manufacturing'; label: string; value: number }) {
+function ReadOnlyMetric({ station, label, value }: { station: 'trading' | 'manufacturing' | 'power'; label: string; value: number | string }) {
   return (
     <div className={`config-station config-station--${station}`}>
       <dt className="text-xs text-ink-muted">{label}</dt>

@@ -17,3 +17,7 @@
 .config-station--manufacturing {
   --station-color: var(--station-manufacturing);
 }
+
+.config-station--power {
+  --station-color: var(--theme-success);
+}
