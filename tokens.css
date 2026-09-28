@@ -92,34 +92,34 @@
 }
 
 .dark {
-  --color-paper: oklch(0.145 0.014 285);
-  --color-paper-2: oklch(0.180 0.016 285);
-  --color-paper-3: oklch(0.225 0.018 285);
-  --color-paper-4: oklch(0.300 0.020 285);
-  --color-ink: oklch(0.940 0.010 285);
-  --color-ink-2: oklch(0.760 0.016 285);
-  --color-muted: oklch(0.650 0.018 285);
-  --color-rule: oklch(0.340 0.020 285);
-  --color-rule-2: oklch(0.270 0.018 285);
-  --color-accent: oklch(0.740 0.155 285);
-  --color-accent-hover: oklch(0.790 0.145 285);
-  --color-accent-ink: oklch(0.180 0.025 285);
-  --color-focus: oklch(0.790 0.190 285);
+  --color-paper: #0d1117;
+  --color-paper-2: #161b22;
+  --color-paper-3: #21262d;
+  --color-paper-4: #292f38;
+  --color-ink: #e6edf3;
+  --color-ink-2: #b1bac4;
+  --color-muted: #9da7b3;
+  --color-rule: #3d444d;
+  --color-rule-2: #30363d;
+  --color-accent: oklch(0.760 0.115 285);
+  --color-accent-hover: oklch(0.800 0.100 285);
+  --color-accent-ink: #161b22;
+  --color-focus: oklch(0.800 0.120 285);
 
   --palette-brand-50: oklch(0.950 0.018 285);
   --palette-brand-100: oklch(0.900 0.035 285);
-  --palette-brand-200: oklch(0.845 0.070 285);
-  --palette-brand-300: oklch(0.805 0.105 285);
-  --palette-brand-400: oklch(0.770 0.135 285);
+  --palette-brand-200: oklch(0.845 0.060 285);
+  --palette-brand-300: oklch(0.815 0.080 285);
+  --palette-brand-400: oklch(0.790 0.100 285);
   --palette-brand-500: var(--color-accent);
-  --palette-brand-600: oklch(0.650 0.155 285);
-  --palette-brand-700: oklch(0.560 0.145 285);
-  --palette-brand-800: oklch(0.440 0.115 285);
-  --palette-brand-900: oklch(0.315 0.075 285);
-  --palette-brand-950: oklch(0.205 0.045 285);
+  --palette-brand-600: oklch(0.650 0.120 285);
+  --palette-brand-700: oklch(0.560 0.110 285);
+  --palette-brand-800: oklch(0.440 0.090 285);
+  --palette-brand-900: oklch(0.315 0.060 285);
+  --palette-brand-950: oklch(0.205 0.035 285);
 
-  --color-positive: oklch(0.720 0.130 153);
-  --color-negative: oklch(0.720 0.165 27);
-  --color-caution: oklch(0.790 0.130 78);
-  --menu-shadow: oklch(0.050 0.012 285 / 0.36);
+  --color-positive: #56d364;
+  --color-negative: #ff7b72;
+  --color-caution: #e3b341;
+  --menu-shadow: rgb(0 0 0 / 0.4);
 }

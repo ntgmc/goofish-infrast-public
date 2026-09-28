@@ -31,6 +31,13 @@ describe('buildMaaExportPayload', () => {
           training: [{ operators: ['梅尔'], skip: false, sort: false, autofill: false }],
         },
       }],
+      scheduleType: {
+        planTimes: 1,
+        trading: 1,
+        manufacture: 0,
+        power: 0,
+        dormitory: 1,
+      },
     });
     expect(input).toEqual(original);
   });
@@ -83,6 +90,50 @@ describe('buildMaaExportPayload', () => {
 
     expect(() => buildMaaExportPayload(input)).toThrow(MaaExportValidationError);
     expect(() => buildMaaExportPayload(input)).toThrow(/plans\.0\.rooms\.trading\.0/);
+  });
+
+  it('exports the facility counts and shift count for a three-shift 252 layout', () => {
+    const input = richResult();
+    input.buildingType = 252;
+    input.planTimes = '3班';
+    input.plans = Array.from({ length: 3 }, (_, index) => ({
+      name: `第${index + 1}班`,
+      rooms: {
+        trading: [{}, {}],
+        manufacture: [{}, {}, {}, {}, {}],
+        power: [{}, {}],
+        dormitory: [{}, {}, {}, {}],
+      },
+    })) as OptimizeResult['plans'];
+
+    const exported = buildMaaExportPayload(input);
+    expect(exported.scheduleType).toEqual({
+      planTimes: 3,
+      trading: 2,
+      manufacture: 5,
+      power: 2,
+      dormitory: 4,
+    });
+    expect(Object.keys(exported).at(-1)).toBe('scheduleType');
+  });
+
+  it('counts rooms available across shifts when room lists differ', () => {
+    const input = richResult();
+    input.plans.push({
+      name: '第2班',
+      rooms: {
+        manufacture: [{ product: 'Gold' }],
+        power: [{ operators: [] }],
+      },
+    } as OptimizeResult['plans'][number]);
+
+    expect(buildMaaExportPayload(input).scheduleType).toEqual({
+      planTimes: 2,
+      trading: 1,
+      manufacture: 1,
+      power: 1,
+      dormitory: 1,
+    });
   });
 });
 

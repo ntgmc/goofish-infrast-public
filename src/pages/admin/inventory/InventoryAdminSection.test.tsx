@@ -66,10 +66,14 @@ describe('InventoryAdminSection', () => {
     render(<InventoryAdminSection />)
 
     expect(await screen.findByRole('tabpanel', { name: '道具目录' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /道具目录/ })).toHaveClass('bg-brand-500', 'text-primary-foreground')
+    expect(screen.getByText('维护系统道具的展示信息和发放状态')).toHaveClass('text-primary-foreground/80')
     expect(screen.queryByText('创建自定义礼包')).not.toBeInTheDocument()
     expect(screen.queryByText('单用户发放')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('tab', { name: /礼包管理/ }))
+    expect(screen.getByRole('tab', { name: /道具目录/ })).not.toHaveClass('bg-brand-500')
+    expect(screen.getByRole('tab', { name: /礼包管理/ })).toHaveClass('bg-brand-500', 'text-primary-foreground')
     expect(screen.getByRole('tabpanel', { name: '礼包管理' })).toBeInTheDocument()
     expect(screen.getByText('创建自定义礼包')).toBeInTheDocument()
     expect(screen.queryByText(/内容 JSON|奖励 JSON/)).not.toBeInTheDocument()

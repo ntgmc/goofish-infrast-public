@@ -50,6 +50,13 @@ export interface MaaExportPayload {
   title: string;
   description: string;
   plans: MaaExportPlan[];
+  scheduleType: {
+    planTimes: number;
+    trading: number;
+    manufacture: number;
+    power: number;
+    dormitory: number;
+  };
 }
 
 export class MaaExportValidationError extends Error {
@@ -73,37 +80,49 @@ export function buildMaaExportPayload(result: OptimizeResult): MaaExportPayload 
   if (!validated.title.trim()) throw new MaaExportValidationError('排班结果无法导出：title 不能为空。')
   if (validated.plans.length === 0) throw new MaaExportValidationError('排班结果无法导出：plans 不能为空。')
 
+  const plans = validated.plans.map((planValue, planIndex) => {
+    const plan = planValue as unknown as Record<string, unknown>;
+    const roomsValue = isRecord(plan.rooms) ? plan.rooms : {};
+    const rooms: MaaExportPlan['rooms'] = {};
+
+    for (const roomType of MAA_EXPORT_ROOM_TYPES) {
+      const roomList = roomsValue[roomType];
+      if (!Array.isArray(roomList)) continue;
+      rooms[roomType] = roomList.map(projectRoom);
+    }
+
+    if (Object.keys(rooms).length === 0) {
+      throw new MaaExportValidationError(`排班结果无法导出：plans.${planIndex}.rooms 不包含可执行房间。`)
+    }
+
+    const projected: MaaExportPlan = {
+      name: typeof plan.name === 'string' ? plan.name : '',
+      description: typeof plan.description === 'string' ? plan.description : '',
+      rooms,
+    };
+    if (typeof plan.description_post === 'string') projected.description_post = plan.description_post;
+
+    const fiammetta = projectFiammetta(plan.Fiammetta);
+    if (fiammetta) projected.Fiammetta = fiammetta;
+    const drones = projectDrones(plan.drones);
+    if (drones) projected.drones = drones;
+    return projected;
+  });
+
+  const roomCount = (roomType: 'trading' | 'manufacture' | 'power' | 'dormitory') =>
+    Math.max(...plans.map((plan) => plan.rooms[roomType]?.length ?? 0));
+
   return {
     title: validated.title,
     description: validated.description,
-    plans: validated.plans.map((planValue, planIndex) => {
-      const plan = planValue as unknown as Record<string, unknown>;
-      const roomsValue = isRecord(plan.rooms) ? plan.rooms : {};
-      const rooms: MaaExportPlan['rooms'] = {};
-
-      for (const roomType of MAA_EXPORT_ROOM_TYPES) {
-        const roomList = roomsValue[roomType];
-        if (!Array.isArray(roomList)) continue;
-        rooms[roomType] = roomList.map(projectRoom);
-      }
-
-      if (Object.keys(rooms).length === 0) {
-        throw new MaaExportValidationError(`排班结果无法导出：plans.${planIndex}.rooms 不包含可执行房间。`)
-      }
-
-      const projected: MaaExportPlan = {
-        name: typeof plan.name === 'string' ? plan.name : '',
-        description: typeof plan.description === 'string' ? plan.description : '',
-        rooms,
-      };
-      if (typeof plan.description_post === 'string') projected.description_post = plan.description_post;
-
-      const fiammetta = projectFiammetta(plan.Fiammetta);
-      if (fiammetta) projected.Fiammetta = fiammetta;
-      const drones = projectDrones(plan.drones);
-      if (drones) projected.drones = drones;
-      return projected;
-    }),
+    plans,
+    scheduleType: {
+      planTimes: plans.length,
+      trading: roomCount('trading'),
+      manufacture: roomCount('manufacture'),
+      power: roomCount('power'),
+      dormitory: roomCount('dormitory'),
+    },
   };
 }
 
