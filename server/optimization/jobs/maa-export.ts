@@ -84,11 +84,19 @@ export function buildMaaExportPayload(result: OptimizeResult): MaaExportPayload 
     const plan = planValue as unknown as Record<string, unknown>;
     const roomsValue = isRecord(plan.rooms) ? plan.rooms : {};
     const rooms: MaaExportPlan['rooms'] = {};
+    const sortedRoomIndexes: Partial<Record<'trading' | 'manufacture', number[]>> = {};
 
     for (const roomType of MAA_EXPORT_ROOM_TYPES) {
       const roomList = roomsValue[roomType];
       if (!Array.isArray(roomList)) continue;
-      rooms[roomType] = roomList.map(projectRoom);
+      if (roomType === 'trading' || roomType === 'manufacture') {
+        const indexes = roomList.map((_, index) => index);
+        indexes.sort((left, right) => roomLevel(roomList[right]) - roomLevel(roomList[left]) || left - right);
+        sortedRoomIndexes[roomType] = indexes;
+        rooms[roomType] = indexes.map((index) => projectRoom(roomList[index]));
+      } else {
+        rooms[roomType] = roomList.map(projectRoom);
+      }
     }
 
     if (Object.keys(rooms).length === 0) {
@@ -105,7 +113,13 @@ export function buildMaaExportPayload(result: OptimizeResult): MaaExportPayload 
     const fiammetta = projectFiammetta(plan.Fiammetta);
     if (fiammetta) projected.Fiammetta = fiammetta;
     const drones = projectDrones(plan.drones);
-    if (drones) projected.drones = drones;
+    if (drones) {
+      const indexes = drones.room === 'trading' || drones.room === 'manufacture'
+        ? sortedRoomIndexes[drones.room]
+        : undefined;
+      const newIndex = indexes?.indexOf(drones.index - 1) ?? -1;
+      projected.drones = newIndex < 0 ? drones : { ...drones, index: newIndex + 1 };
+    }
     return projected;
   });
 
@@ -124,6 +138,12 @@ export function buildMaaExportPayload(result: OptimizeResult): MaaExportPayload 
       dormitory: roomCount('dormitory'),
     },
   };
+}
+
+function roomLevel(value: unknown): number {
+  if (!isRecord(value)) return 0;
+  const level = value.level ?? value.facility_level;
+  return typeof level === 'number' && Number.isFinite(level) ? level : 0;
 }
 
 function projectRoom(value: unknown): MaaExportRoom {
