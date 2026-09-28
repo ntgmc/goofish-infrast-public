@@ -166,11 +166,11 @@ export default function InventoryAdminSection() {
             role="tab"
             aria-selected={activeTab === tab.id}
             aria-controls={`inventory-admin-panel-${tab.id}`}
-            className={`min-w-32 rounded-xl px-4 py-3 text-left transition ${activeTab === tab.id ? 'bg-accent-500 text-white shadow-sm' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}
+            className={`min-w-32 rounded-xl px-4 py-3 text-left transition ${activeTab === tab.id ? 'bg-brand-500 text-primary-foreground shadow-sm' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}
             onClick={() => setActiveTab(tab.id)}
           >
             <span className="block text-sm font-semibold">{tab.label}</span>
-            <span aria-hidden="true" className={`mt-1 hidden text-xs sm:block ${activeTab === tab.id ? 'text-white/80' : 'text-ink-muted'}`}>{tab.description}</span>
+            <span aria-hidden="true" className={`mt-1 hidden text-xs sm:block ${activeTab === tab.id ? 'text-primary-foreground/80' : 'text-ink-muted'}`}>{tab.description}</span>
           </button>)}
         </div>
       </nav>
