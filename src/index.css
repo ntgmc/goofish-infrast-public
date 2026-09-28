@@ -114,8 +114,8 @@
 .dark {
   color-scheme: dark;
 
-  --theme-surface-3: var(--color-rule-2);
-  --theme-surface-4: var(--color-rule);
+  --theme-surface-3: var(--color-paper-4);
+  --theme-surface-4: var(--color-rule-2);
 
   --background: var(--theme-surface-0);
   --foreground: var(--theme-ink-primary);
@@ -132,8 +132,8 @@
   --accent: var(--theme-surface-3);
   --accent-foreground: var(--theme-ink-primary);
   --destructive: var(--theme-error);
-  --border: color-mix(in oklch, var(--theme-ink-primary) 11%, transparent);
-  --input: color-mix(in oklch, var(--theme-ink-primary) 14%, transparent);
+  --border: var(--color-rule-2);
+  --input: #687482;
   --ring: var(--color-focus);
   --chart-1: var(--theme-brand-400);
   --chart-2: var(--theme-success);
