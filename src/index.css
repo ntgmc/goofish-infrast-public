@@ -371,8 +371,9 @@ body {
 
   .tool-alert--warning {
     border-color: color-mix(in oklch, var(--theme-warning) 42%, var(--border));
+    border-inline-start: 3px solid var(--theme-warning);
     background: color-mix(in oklch, var(--theme-warning) 10%, var(--theme-surface-1));
-    color: var(--theme-warning);
+    color: var(--theme-ink-primary);
   }
 
   .tool-shell {
