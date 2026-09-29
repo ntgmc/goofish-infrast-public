@@ -244,6 +244,7 @@ function markIntermediateInventoryForOptimizer(config: LicenseConfig): void {
 }
 
 interface ConfigEditorProps {
+  profileId?: string;
   config: LicenseConfig;
   canEdit: boolean;
   canEditIntermediateInventory?: boolean;
@@ -260,6 +261,7 @@ interface ConfigEditorProps {
 }
 
 export default function ConfigEditor({
+  profileId,
   config,
   canEdit,
   canEditIntermediateInventory,
@@ -405,7 +407,7 @@ export default function ConfigEditor({
       )}
 
       {supported252PresetSelected && (
-        <FacilityLayoutEditor key={JSON.stringify([config.trading_station_levels, config.manufacturing_station_levels])} config={config} onUpdate={onUpdate} />
+        <FacilityLayoutEditor key={JSON.stringify([profileId, config.trading_station_levels, config.manufacturing_station_levels])} profileId={profileId} config={config} onUpdate={onUpdate} />
       )}
       {supported252PresetSelected && (
         <p className="tool-alert tool-alert--warning mt-3 px-3 py-2 text-xs leading-5" role="note">

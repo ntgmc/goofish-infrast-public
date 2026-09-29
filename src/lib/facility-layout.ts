@@ -1,6 +1,11 @@
 import { z } from 'zod'
 import { copy } from '../copy'
 
+export const facilityRoomsSchema = z.array(z.object({
+  type: z.enum(['trading', 'manufacture', 'power']),
+  level: z.number().int().min(1).max(3),
+})).length(9)
+
 // Positions follow the game's overview: left to right, then top to bottom.
 export const FACILITY_IDS = [
   'trading_1', 'trading_2', 'manufacture_1',

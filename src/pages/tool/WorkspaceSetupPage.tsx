@@ -378,6 +378,7 @@ export default function WorkspaceSetupPage({
                       <div data-tour-target="workspace-config-editor">
                         <Suspense fallback={<SectionFallback />}>
                           <WorkspaceConfigSection
+                            profileId={profile.id}
                             config={normalizedConfig}
                             canEdit={canEditConfig}
                             canEditIntermediateInventory={canEditLimitedConfig}

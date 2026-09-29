@@ -5,6 +5,7 @@ import { copy } from '../../../copy/index'
 
 
 type WorkspaceConfigSectionProps = {
+  profileId?: string
   config: LicenseConfig
   canEdit: boolean
   canEditIntermediateInventory: boolean
@@ -17,6 +18,7 @@ type WorkspaceConfigSectionProps = {
 }
 
 export default function WorkspaceConfigSection({
+  profileId,
   config,
   canEdit,
   canEditIntermediateInventory,
@@ -30,6 +32,7 @@ export default function WorkspaceConfigSection({
   return (
     <ConfigCapabilityPreview config={config} enabled={!canEdit}>
     <ConfigEditor
+      profileId={profileId}
       config={config}
       canEdit={canEdit}
       canEditIntermediateInventory={canEditIntermediateInventory}

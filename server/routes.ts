@@ -122,6 +122,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/skland/lifetime-voucher/credential/preview', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/lifetime-voucher/account/select', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/import/refresh', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/facilities', userSklandHandler as unknown as ApiHandler],
   ['/api/user/status', userStatusHandler as unknown as ApiHandler],
   ['/api/user/workspace', userWorkspaceHandler as unknown as ApiHandler],
   ['/api/user/behavior-risk/engagement', userBehaviorRiskHandler as unknown as ApiHandler],

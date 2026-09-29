@@ -12,6 +12,7 @@ import ConfigCapabilityPreview from '../../../components/ConfigCapabilityPreview
 const ConfigEditor = lazy(() => import('../../../components/ConfigEditor'))
 
 export default function ConfigSection({
+  profileId,
   activeConfig,
   permission,
   isPreviewProfile = false,
@@ -27,6 +28,7 @@ export default function ConfigSection({
   updateConfig,
   retryConfigSave,
 }: {
+  profileId?: string
   activeConfig: LicenseConfig
   permission: PermissionMode
   isPreviewProfile?: boolean
@@ -67,6 +69,7 @@ export default function ConfigSection({
           <Suspense fallback={<ResultFallback />}>
             <ConfigCapabilityPreview config={activeConfig} enabled={!userCanEditConfig}>
             <ConfigEditor
+              profileId={profileId}
               config={activeConfig}
               permission={permission}
               note={isPreviewProfile && !userCanEditConfig

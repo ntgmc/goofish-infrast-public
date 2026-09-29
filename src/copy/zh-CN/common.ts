@@ -1,5 +1,9 @@
 export const commonCopy = {
   facilityLayoutTitle: "设施位置与等级",
+  facilityLayoutRead: "从森空岛读取设施",
+  facilityLayoutReading: "正在读取设施…",
+  facilityLayoutReadFailed: "读取设施失败，请稍后重试。",
+  facilityLayoutReadSuccess: "已读取设施位置与等级。请核对游戏内布局，完成确认后再生成排班。",
   facilityLayoutHelp: "按游戏内位置摆放设施：点击卡片更换类型，下方选择等级。可以先自由调整，完成后确认布局，再生成排班。",
   facilityLayoutSaved: "已确认",
   facilityLayoutDraft: "待确认",

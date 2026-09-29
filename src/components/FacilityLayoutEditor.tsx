@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, ChevronDown, Factory, Store, Zap } from 'lucide-react'
 import { copy } from '../copy'
-import { FACILITY_IDS, facilityLayoutSchema } from '../lib/facility-layout'
+import { FACILITY_IDS, facilityLayoutSchema, facilityRoomsSchema } from '../lib/facility-layout'
+import { apiJson } from '../lib/api-client'
 import type { LicenseConfig } from '../lib/types'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
 import './FacilityLayoutEditor.css'
@@ -16,7 +17,8 @@ type Room = { type: FacilityType; level: number }
 const TYPES = Object.keys(FACILITIES) as FacilityType[]
 const positionLabel = (position: number) => `B${Math.floor(position / 3) + 1} · ${copy.common.facilityLayoutColumns[position % 3]}`
 
-export default function FacilityLayoutEditor({ config, onUpdate }: {
+export default function FacilityLayoutEditor({ config, onUpdate, profileId }: {
+  profileId?: string
   config: LicenseConfig
   onUpdate: (mutate: (config: LicenseConfig) => void) => void
 }) {
@@ -34,10 +36,43 @@ export default function FacilityLayoutEditor({ config, onUpdate }: {
   const [rooms, setRooms] = useState(() => (parsed.success ? parsed.data : FACILITY_IDS).map(roomFor))
   const [selectedPosition, setSelectedPosition] = useState<number | null>(null)
   const [errors, setErrors] = useState<string[]>([])
+  const [reading, setReading] = useState(false)
+  const [readNotice, setReadNotice] = useState('')
+  const requestRef = useRef<AbortController | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const statusRef = useRef<HTMLDivElement | null>(null)
   const expected = FACILITY_IDS.map(roomFor)
   const expectedSignature = JSON.stringify(expected)
+  useEffect(() => () => requestRef.current?.abort(), [])
+
+  const readFacilities = async () => {
+    if (!profileId || reading) return
+    const controller = new AbortController()
+    requestRef.current = controller
+    setReading(true)
+    setReadNotice('')
+    try {
+      const response = await apiJson<{ rooms: unknown }>('/api/user/skland/facilities', {
+        method: 'POST',
+        json: { profile_id: profileId },
+        signal: controller.signal,
+        fallbackMessage: copy.common.facilityLayoutReadFailed,
+      })
+      const imported = facilityRoomsSchema.safeParse(response.rooms)
+      if (!imported.success) throw new Error(copy.common.facilityLayoutReadFailed)
+      if (controller.signal.aborted) return
+      setRooms(imported.data)
+      setEditing(true)
+      setReviewed(false)
+      setErrors([])
+      onUpdate((next) => { delete next.facility_layout })
+      setReadNotice(copy.common.facilityLayoutReadSuccess)
+    } catch (error) {
+      if (!controller.signal.aborted) setReadNotice(error instanceof Error ? error.message : copy.common.facilityLayoutReadFailed)
+    } finally {
+      if (!controller.signal.aborted) setReading(false)
+    }
+  }
 
   useEffect(() => {
     if (savedLayout) {
@@ -93,6 +128,13 @@ export default function FacilityLayoutEditor({ config, onUpdate }: {
           {savedLayout ? copy.common.facilityLayoutSaved : copy.common.facilityLayoutDraft}
         </span>
       </div>
+      {profileId && (
+        <button type="button" disabled={reading} onClick={() => { void readFacilities() }} className="tool-secondary-action mt-3 min-h-11 px-3">
+          {reading ? copy.common.facilityLayoutReading : copy.common.facilityLayoutRead}
+        </button>
+      )}
+      {readNotice && <p role="status" className="tool-alert mt-3">{readNotice}</p>}
+      <fieldset disabled={reading} className="min-w-0 border-0 p-0" aria-busy={reading}>
       {collapsed ? (
         <div className="tool-inset mt-3 flex flex-wrap items-center justify-between gap-3 p-4">
           <div role="status">
@@ -157,6 +199,7 @@ export default function FacilityLayoutEditor({ config, onUpdate }: {
       )}
       </div>
       )}
+      </fieldset>
       <Dialog open={selectedPosition !== null} onOpenChange={(open) => { if (!open) setSelectedPosition(null) }}>
         <DialogContent showCloseButton closeLabel={copy.common.facilityLayoutClose}
           onCloseAutoFocus={(event) => { event.preventDefault(); triggerRef.current?.focus() }}>

@@ -634,6 +634,7 @@ const SKLAND_PATHS: Record<string, z.ZodType> = {
   '/api/user/skland/credential/preview': requestSchemas.sklandCredential,
   '/api/user/skland/account/select': requestSchemas.sklandSelection,
   '/api/user/skland/import/refresh': requestSchemas.sklandProfile,
+  '/api/user/skland/facilities': requestSchemas.sklandProfile,
   '/api/user/skland/free-preview/login/complete': requestSchemas.freePreviewScanComplete,
   '/api/user/skland/free-preview/login/confirm': requestSchemas.freePreviewConfirmation,
   '/api/user/skland/free-preview/credential/preview': requestSchemas.freePreviewCredential,

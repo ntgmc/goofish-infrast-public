@@ -41,6 +41,7 @@ await assertNoConfigImportCreatesDefaultConfig()
 await assertInventoryFailureStillImportsOperators()
 await assertDepotValueConfirmDoesNotWriteWorkspace()
 await assertRefreshImport()
+await assertFacilityRead()
 await assertRefreshTransientFailurePreservesBinding()
 await assertRefreshCredentialInvalid()
 await assertRefreshPlayerCredentialInvalid()
@@ -645,6 +646,29 @@ async function assertDepotValueConfirmDoesNotWriteWorkspace() {
   }
 }
 
+async function assertFacilityRead() {
+  setFetchMode('refresh')
+  const before = JSON.stringify(store.workspaces.get('profile-1'))
+  const result = await callSkland('/api/user/skland/facilities', { profile_id: 'profile-1' })
+  assertNoSecretLeak(result.body, 'facility read response')
+  if (result.status !== 200 || result.body.rooms?.length !== 9
+    || result.body.rooms[0].type !== 'trading' || result.body.rooms[1].level !== 1
+    || result.body.rooms[8].type !== 'power') {
+    throw new Error(`facility read: invalid response ${result.status}`)
+  }
+  if (JSON.stringify(store.workspaces.get('profile-1')) !== before) {
+    throw new Error('facility read must not mutate the workspace')
+  }
+  seedProfile({ id: 'facility-unbound', status: 'active' })
+  const unbound = await callSkland('/api/user/skland/facilities', { profile_id: 'facility-unbound' })
+  if (unbound.status !== 400 || unbound.body.code !== 'skland_not_bound') throw new Error('facility read must require a binding')
+  const missing = await callSkland('/api/user/skland/facilities', { profile_id: 'missing-profile' })
+  if (missing.status !== 404) throw new Error('facility read must require an owned profile')
+  setFetchMode('player-expired')
+  const expired = await callSkland('/api/user/skland/facilities', { profile_id: 'profile-1' })
+  if (expired.status !== 400 || expired.body.code !== 'skland_credential_invalid') throw new Error('facility read must reject expired credentials')
+}
+
 async function assertRefreshImport() {
   setFetchMode('refresh')
   const result = await callSkland('/api/user/skland/import/refresh', { profile_id: 'profile-1' })
@@ -1247,6 +1271,11 @@ function setFetchMode(mode) {
         code: 0,
         message: 'OK',
       data: {
+        building: {
+          tradings: [{ slotId: 'slot_25', level: 1 }, { slotId: 'slot_24', level: 3 }],
+          manufactures: ['slot_5', 'slot_14', 'slot_15', 'slot_16', 'slot_26'].map((slotId) => ({ slotId, level: 2 })),
+          powers: [{ slotId: 'slot_7', level: 3 }, { slotId: 'slot_6', level: 3 }],
+        },
         chars: mode === 'refresh'
           ? [{ charId: 'char_002_amiya', name: '阿米娅', evolvePhase: 2, level: 80, potentialRank: 5, rarity: 0 }]
           : [
