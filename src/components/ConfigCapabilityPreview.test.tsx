@@ -9,7 +9,7 @@ import ConfigCapabilityPreview from './ConfigCapabilityPreview'
 
 afterEach(cleanup)
 
-it('shows the full configuration without allowing edits and preserves free controls', async () => {
+it('opens on free configuration and previews full configuration without allowing edits', async () => {
   const user = userEvent.setup()
   const config = normalizeConfig(CONFIG_PRESETS['252'])
   const before = structuredClone(config)
@@ -17,6 +17,16 @@ it('shows the full configuration without allowing edits and preserves free contr
   render(<MemoryRouter><ConfigCapabilityPreview config={config} enabled>
     <button onClick={onFreeAction}>免费配置操作</button>
   </ConfigCapabilityPreview></MemoryRouter>)
+  const freeButton = screen.getByRole('button', { name: '当前免费配置' })
+  const previewButton = screen.getByRole('button', { name: '自定义基建 · 只读预览' })
+  expect(freeButton).toHaveAttribute('aria-pressed', 'true')
+  expect(freeButton).toHaveClass('tool-option-selected')
+  expect(previewButton).toHaveAttribute('aria-pressed', 'false')
+  expect(screen.queryByRole('group', { name: '高级配置只读预览' })).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: '免费配置操作' }))
+  expect(onFreeAction).toHaveBeenCalledOnce()
+  await user.click(previewButton)
+  expect(previewButton).toHaveAttribute('aria-pressed', 'true')
   const preview = screen.getByRole('group', { name: '高级配置只读预览' })
   expect(within(preview).getByRole('region', { name: '排班模式' })).toBeInTheDocument()
   expect(within(preview).getByRole('region', { name: '产物数量' })).toBeInTheDocument()
@@ -27,9 +37,8 @@ it('shows the full configuration without allowing edits and preserves free contr
   if (input) fireEvent.change(input, { target: { value: '99' } })
   expect(config).toEqual(before)
   expect(screen.getByRole('link', { name: '比较价格与权益' })).toHaveAttribute('href', '/pricing')
-  await user.click(screen.getByRole('button', { name: '当前免费配置' }))
-  await user.click(screen.getByRole('button', { name: '免费配置操作' }))
-  expect(onFreeAction).toHaveBeenCalledOnce()
+  await user.click(freeButton)
+  expect(freeButton).toHaveAttribute('aria-pressed', 'true')
   expect(screen.queryByRole('group', { name: '高级配置只读预览' })).not.toBeInTheDocument()
 })
 
