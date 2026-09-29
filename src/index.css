@@ -157,6 +157,17 @@ html {
   text-rendering: optimizeLegibility;
 }
 
+@supports (scrollbar-gutter: stable) {
+  html {
+    scrollbar-gutter: stable;
+  }
+
+  /* The root gutter already reserves the space that Radix's scroll lock compensates. */
+  html body[data-scroll-locked] {
+    margin-right: 0 !important;
+  }
+}
+
 body {
   min-width: 320px;
   background: var(--theme-surface-0);
