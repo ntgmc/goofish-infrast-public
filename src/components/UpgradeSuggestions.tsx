@@ -9,6 +9,7 @@ import type {
 } from '../lib/types'
 import { getUpgradeSuggestionId } from '../lib/upgrade-suggestion-id'
 import { copy, CURRENT_LOCALE } from '../copy/index'
+import { PRODUCT_LABELS } from './result-panel/labels'
 
 
 interface Props {
@@ -383,7 +384,7 @@ function ImpactRoomRow({ room }: { room: UpgradeImpactRoom }) {
     <div className="tool-inset px-3 py-2">
       <p className="text-sm font-semibold text-ink-primary">{room.room_name || room.room_type}</p>
       <p className="mt-1 text-xs leading-5 text-ink-secondary">
-        {room.product || copy.optimize.components_UpgradeSuggestions_052} · {room.rule_description || copy.optimize.components_UpgradeSuggestions_053}
+        {(room.product && (PRODUCT_LABELS[room.product] ?? room.product)) || copy.optimize.components_UpgradeSuggestions_052} · {room.rule_description || copy.optimize.components_UpgradeSuggestions_053}
       </p>
       <p className="mt-1 text-xs leading-5 text-ink-muted">{copy.optimize.components_UpgradeSuggestions_054}{operators}{copy.optimize.components_UpgradeSuggestions_055}{missing}</p>
     </div>
@@ -460,6 +461,9 @@ function getStockLabel(cost?: UpgradeTrainingCost): string {
   if (cost.status === 'partial' || cost.operators.some((operator) => operator.status !== 'complete')) {
     return copy.optimize.components_UpgradeSuggestions_079
   }
+  if (isStockEnough(cost) && cost.available && cost.totals.materials.some((item) =>
+    item.count > (cost.available?.materials.find((available) => available.id === item.id)?.count ?? 0)
+  )) return copy.optimize.components_UpgradeSuggestions_081
   return isStockEnough(cost) ? copy.optimize.components_UpgradeSuggestions_062 : copy.optimize.components_UpgradeSuggestions_063
 }
 

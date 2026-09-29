@@ -183,6 +183,8 @@ export const optimizeCopy = {
   components_UpgradeSuggestions_079: "成本不完整",
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_080: "暂无来源信息",
+  // src/components/UpgradeSuggestions.tsx
+  components_UpgradeSuggestions_081: "材料可合成",
   // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_001: "工作区输入",
   // src/pages/tool/optimize/ConfigSection.tsx
