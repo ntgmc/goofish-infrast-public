@@ -83,6 +83,66 @@ type BucketSanityResult = {
   unpricedItems: MaterialAmount[]
 }
 
+// ArknightsGameData zh_CN/gamedata/excel/building_data.json: workshopFormulas (F_EVOLVE, F_SKILL, F_ASC).
+const WORKSHOP_RECIPES: Record<string, [number, Record<string, number>]> = {
+  '30165': [1, { '31094': 2, '31084': 1, '31074': 1 }],
+  '30155': [1, { '31064': 1, '31054': 1, '31044': 2 }],
+  '30145': [1, { '31034': 1, '31014': 2, '31024': 1 }],
+  '30135': [1, { '30084': 1, '30094': 1, '30104': 1 }],
+  '30125': [1, { '30064': 1, '30074': 2 }],
+  '30115': [1, { '30014': 1, '30044': 1, '30054': 1 }],
+  '31114': [1, { '30063': 1, '31103': 1, '31113': 1 }],
+  '31104': [1, { '30053': 1, '31093': 1, '31103': 1 }],
+  '31094': [1, { '31093': 1, '31083': 1, '30023': 1 }],
+  '31084': [1, { '31083': 1, '31073': 1, '31063': 1 }],
+  '31074': [1, { '31073': 1, '30033': 2, '30013': 1 }],
+  '31064': [1, { '31063': 1, '31043': 1, '30023': 1 }],
+  '31044': [1, { '31043': 1, '31053': 1, '31013': 1 }],
+  '31054': [1, { '31053': 1, '31033': 1, '30103': 1 }],
+  '31034': [1, { '31033': 2, '31013': 1, '31023': 1 }],
+  '31024': [1, { '30063': 1, '30093': 1, '31023': 1 }],
+  '31014': [1, { '30043': 1, '31013': 1, '31023': 1 }],
+  '30104': [1, { '30103': 1, '30013': 2, '30053': 1 }],
+  '30094': [1, { '30093': 1, '30043': 1, '30063': 1 }],
+  '30084': [1, { '30083': 2, '30033': 1, '30073': 1 }],
+  '30074': [1, { '30073': 1, '30023': 1, '30103': 1 }],
+  '30062': [1, { '30061': 3 }],
+  '30063': [1, { '30062': 4 }],
+  '30064': [1, { '30063': 1, '30013': 2, '30093': 1 }],
+  '30052': [1, { '30051': 3 }],
+  '30053': [1, { '30052': 4 }],
+  '30054': [1, { '30053': 2, '30023': 1, '30083': 1 }],
+  '30042': [1, { '30041': 3 }],
+  '30043': [1, { '30042': 4 }],
+  '30044': [1, { '30043': 2, '30063': 1, '30033': 1 }],
+  '30032': [1, { '30031': 3 }],
+  '30033': [1, { '30032': 4 }],
+  '30034': [1, { '30033': 2, '30053': 1, '30073': 1 }],
+  '30022': [1, { '30021': 3 }],
+  '30023': [1, { '30022': 4 }],
+  '30024': [1, { '30023': 2, '30043': 1, '30083': 1 }],
+  '30012': [1, { '30011': 3 }],
+  '30013': [1, { '30012': 5 }],
+  '3302': [1, { '3301': 3 }],
+  '3303': [1, { '3302': 3 }],
+  '3231': [2, { '3261': 3 }],
+  '3261': [2, { '3231': 3 }],
+  '3241': [2, { '3251': 3 }],
+  '3251': [2, { '3241': 3 }],
+  '3211': [2, { '3271': 3 }],
+  '3271': [2, { '3211': 3 }],
+  '3221': [2, { '3281': 3 }],
+  '3281': [2, { '3221': 3 }],
+  '3232': [2, { '3262': 3 }],
+  '3262': [2, { '3232': 3 }],
+  '3242': [2, { '3252': 3 }],
+  '3252': [2, { '3242': 3 }],
+  '3212': [2, { '3272': 3 }],
+  '3272': [2, { '3212': 3 }],
+  '3222': [2, { '3282': 3 }],
+  '3282': [2, { '3222': 3 }],
+}
+
 export async function attachTrainingCostsToUpgradeSuggestions({
   suggestions,
   operators,
@@ -150,7 +210,7 @@ export function calculateEliteTrainingCostForTest(params: {
     const pricing = params.pricing ?? unavailablePricingState()
     return aggregateOperatorCosts([
       createOperatorUnavailableCost(params.target, '当前工作区未找到该干员。'),
-    ], pricing)
+    ], pricing, context.playerItems, context.itemMeta)
   }
   const playerCharacter = findPlayerCharacter(context.playerCharacters, params.target.id)
   const operatorCost = calculateOperatorCost(
@@ -161,7 +221,7 @@ export function calculateEliteTrainingCostForTest(params: {
     context,
     params.pricing ?? unavailablePricingState(),
   )
-  return aggregateOperatorCosts([operatorCost], params.pricing ?? unavailablePricingState())
+  return aggregateOperatorCosts([operatorCost], params.pricing ?? unavailablePricingState(), context.playerItems, context.itemMeta)
 }
 
 async function calculateSuggestionTrainingCost(
@@ -202,7 +262,7 @@ async function calculateSuggestionTrainingCost(
     ))
   }
 
-  return aggregateOperatorCosts(operatorCosts, pricing)
+  return aggregateOperatorCosts(operatorCosts, pricing, context.playerItems, context.itemMeta)
 }
 
 function calculateOperatorCost(
@@ -291,7 +351,7 @@ function calculateOperatorCost(
   }
 
   totals.equivalent_sanity = calculateBucketSanity(totals, pricing).value
-  const missing = calculateMissingBucket(totals, context.playerItems, pricing)
+  const missing = calculateMissingBucket(totals, context.playerItems, context.itemMeta, pricing)
 
   return {
     status,
@@ -308,25 +368,25 @@ function calculateOperatorCost(
   }
 }
 
-function aggregateOperatorCosts(operatorCosts: OperatorCost[], pricing: PricingState): UpgradeTrainingCost {
+function aggregateOperatorCosts(
+  operatorCosts: OperatorCost[],
+  pricing: PricingState,
+  inventory: InventoryItem[],
+  itemMeta: Record<string, unknown>,
+): UpgradeTrainingCost {
   const totals = emptyBucket()
-  const missing = emptyBucket()
   const warnings = operatorCosts.flatMap((cost) => cost.warnings)
 
   for (const cost of operatorCosts) {
     totals.cash += cost.totals.cash
     totals.exp += cost.totals.exp
-    missing.cash += cost.missing.cash
-    missing.exp += cost.missing.exp
     mergeMaterialAmounts(totals.materials, cost.totals.materials)
-    mergeMaterialAmounts(missing.materials, cost.missing.materials)
   }
 
+  const missing = calculateMissingBucket(totals, inventory, itemMeta, pricing)
   const totalSanity = calculateBucketSanity(totals, pricing)
   totals.equivalent_sanity = totalSanity.value
-  const missingSanity = calculateBucketSanity(missing, pricing)
-  missing.equivalent_sanity = missingSanity.value
-  const available = calculateAvailableBucket(totals, missing, pricing)
+  const available = calculateAvailableBucket(totals, missing, inventory, pricing)
 
   const unpricedItems = totalSanity.unpricedItems
   const unavailableOperatorCount = operatorCosts.filter((cost) => cost.status === 'unavailable').length
@@ -368,13 +428,13 @@ function aggregateOperatorCosts(operatorCosts: OperatorCost[], pricing: PricingS
   }
 }
 
-function calculateAvailableBucket(totals: CostBucket, missing: CostBucket, pricing: PricingState): CostBucket {
+function calculateAvailableBucket(totals: CostBucket, missing: CostBucket, inventory: InventoryItem[], pricing: PricingState): CostBucket {
   const available = emptyBucket()
   available.cash = Math.max(0, totals.cash - missing.cash)
   available.exp = Math.max(0, totals.exp - missing.exp)
+  const stock = new Map(inventory.map((item) => [item.id, item.count]))
   for (const totalMaterial of totals.materials) {
-    const missingMaterial = missing.materials.find((item) => item.id === totalMaterial.id)
-    const count = Math.max(0, totalMaterial.count - (missingMaterial?.count ?? 0))
+    const count = Math.min(totalMaterial.count, stock.get(totalMaterial.id) ?? 0)
     if (count > 0) {
       available.materials.push({ ...totalMaterial, count })
     }
@@ -383,7 +443,12 @@ function calculateAvailableBucket(totals: CostBucket, missing: CostBucket, prici
   return available
 }
 
-function calculateMissingBucket(totals: CostBucket, inventory: InventoryItem[], pricing: PricingState): CostBucket {
+function calculateMissingBucket(
+  totals: CostBucket,
+  inventory: InventoryItem[],
+  itemMeta: Record<string, unknown>,
+  pricing: PricingState,
+): CostBucket {
   const byId = new Map(inventory.map((item) => [item.id, item.count]))
   const totalCash = byId.get('4001') ?? 0
   let totalExp = 0
@@ -393,9 +458,32 @@ function calculateMissingBucket(totals: CostBucket, inventory: InventoryItem[], 
   const missing = emptyBucket()
   missing.cash = Math.max(0, totals.cash - totalCash)
   missing.exp = Math.max(0, totals.exp - totalExp)
-  for (const material of totals.materials) {
-    const lackCount = Math.max(0, material.count - (byId.get(material.id) ?? 0))
-    if (lackCount > 0) missing.materials.push({ ...material, count: lackCount })
+  const remaining = totals.materials.map((material) => {
+    const stocked = Math.min(material.count, byId.get(material.id) ?? 0)
+    byId.set(material.id, (byId.get(material.id) ?? 0) - stocked)
+    return { ...material, count: material.count - stocked }
+  })
+  const consume = (id: string, count: number, seen: Set<string>): void => {
+    const stocked = Math.min(count, byId.get(id) ?? 0)
+    byId.set(id, (byId.get(id) ?? 0) - stocked)
+    const shortage = count - stocked
+    if (shortage === 0) return
+    const recipe = WORKSHOP_RECIPES[id]
+    if (recipe && !seen.has(id)) {
+      const [output, ingredients] = recipe
+      const batches = Math.ceil(shortage / output)
+      // Two-way chip conversions need the input chips in stock; otherwise they can loop into each other.
+      if (output === 1 || Object.entries(ingredients).every(([ingredient, amount]) => (byId.get(ingredient) ?? 0) >= amount * batches)) {
+        byId.set(id, (byId.get(id) ?? 0) + batches * output - shortage)
+        const next = new Set(seen).add(id)
+        for (const [ingredient, amount] of Object.entries(ingredients)) consume(ingredient, amount * batches, next)
+        return
+      }
+    }
+    mergeMaterials(missing.materials, [{ id, count: shortage, name: totals.materials.find((item) => item.id === id)?.name }], itemMeta)
+  }
+  for (const material of remaining) {
+    consume(material.id, material.count, new Set())
   }
   missing.equivalent_sanity = calculateBucketSanity(missing, pricing).value
   return missing

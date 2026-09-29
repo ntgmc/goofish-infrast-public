@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { OptimizeResult } from '../../../src/lib/types';
+import { FACILITY_IDS } from '../../../src/lib/facility-layout';
 import { buildMaaExportPayload, MaaExportValidationError } from './maa-export';
 
 describe('buildMaaExportPayload', () => {
@@ -95,6 +96,7 @@ describe('buildMaaExportPayload', () => {
   it('exports the facility counts and shift count for a three-shift 252 layout', () => {
     const input = richResult();
     input.buildingType = 252;
+    input.facility_layout = [...FACILITY_IDS];
     input.planTimes = '3班';
     input.plans = Array.from({ length: 3 }, (_, index) => ({
       name: `第${index + 1}班`,
@@ -115,6 +117,8 @@ describe('buildMaaExportPayload', () => {
       dormitory: 4,
     });
     expect(Object.keys(exported).at(-1)).toBe('scheduleType');
+    delete input.facility_layout;
+    expect(() => buildMaaExportPayload(input)).toThrow(/缺少设施位置/);
   });
 
   it('counts rooms available across shifts when room lists differ', () => {
@@ -136,9 +140,10 @@ describe('buildMaaExportPayload', () => {
     });
   });
 
-  it('sorts mixed-level trading and manufacture rooms for every shift and adjusts drone indexes', () => {
+  it('uses saved positions for every shift and adjusts drone indexes', () => {
     const input = richResult();
-    input.plans = [0, 1].map((shift) => ({
+    input.facility_layout = ['manufacture_3', 'trading_2', 'power_2', 'manufacture_1', 'manufacture_4', 'trading_1', 'power_1', 'manufacture_5', 'manufacture_2'];
+    input.plans = [0, 1, 2].map((shift) => ({
       name: `第${shift + 1}班`,
       rooms: {
         trading: [
@@ -150,9 +155,11 @@ describe('buildMaaExportPayload', () => {
           { operators: [`高级制造甲${shift}`], facility_level: 3 },
           { operators: [`中级制造${shift}`], facility_level: 2 },
           { operators: [`高级制造乙${shift}`], facility_level: 3 },
+          { operators: [`另一个制造${shift}`], facility_level: 2 },
         ],
+        power: [{ operators: ['发电甲'] }, { operators: ['发电乙'] }],
       },
-      drones: { enable: true, room: shift === 0 ? 'manufacture' : 'trading', index: 1, order: 'post' },
+      drones: { enable: true, room: ['manufacture', 'trading', 'power'][shift], index: 1, order: 'post' },
     })) as OptimizeResult['plans'];
     const original = structuredClone(input);
 
@@ -162,14 +169,15 @@ describe('buildMaaExportPayload', () => {
         `高级贸易${shift}`, `低级贸易${shift}`,
       ]);
       expect(plan.rooms.manufacture?.map((room) => room.operators[0])).toEqual([
-        `高级制造甲${shift}`, `高级制造乙${shift}`, `中级制造${shift}`, `低级制造${shift}`,
+        `中级制造${shift}`, `低级制造${shift}`, `高级制造乙${shift}`, `另一个制造${shift}`, `高级制造甲${shift}`,
       ]);
-      expect(plan.drones?.index).toBe(shift === 0 ? 4 : 2);
+      expect(plan.drones?.index).toBe(2);
+      expect(plan.rooms.power?.map((room) => room.operators[0])).toEqual(['发电乙', '发电甲']);
     }
     expect(input).toEqual(original);
   });
 
-  it('preserves original order for equal or unknown room levels', () => {
+  it('preserves original order without saved positions regardless of levels', () => {
     const input = richResult();
     input.plans[0].rooms.manufacture = [
       { operators: ['未知等级'] },
@@ -179,7 +187,21 @@ describe('buildMaaExportPayload', () => {
     ];
 
     expect(buildMaaExportPayload(input).plans[0].rooms.manufacture?.map((room) => room.operators[0]))
-      .toEqual(['三级', '另一个三级', '未知等级', '另一个未知等级']);
+      .toEqual(['未知等级', '三级', '另一个三级', '另一个未知等级']);
+  });
+
+  it('rejects mixed-level legacy results without facility positions', () => {
+    const input = richResult();
+    input.plans[0].rooms.trading = [{ level: 3 }, { level: 2 }];
+    expect(() => buildMaaExportPayload(input)).toThrow(/缺少设施位置/);
+  });
+
+  it('rejects invalid positions and room counts that do not match the saved layout', () => {
+    const input = richResult();
+    input.facility_layout = Array(9).fill('trading_1');
+    expect(() => buildMaaExportPayload(input)).toThrow(MaaExportValidationError);
+    input.facility_layout = ['trading_1', 'trading_2', 'manufacture_1', 'manufacture_2', 'manufacture_3', 'manufacture_4', 'manufacture_5', 'power_1', 'power_2'];
+    expect(() => buildMaaExportPayload(input)).toThrow(/与设施布局不一致/);
   });
 });
 

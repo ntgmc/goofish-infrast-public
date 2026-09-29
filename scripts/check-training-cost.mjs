@@ -147,6 +147,56 @@ if (enough.missing.equivalent_sanity !== 0) {
   throw new Error('fully stocked inventory should keep missing equivalent sanity at zero')
 }
 
+const craftCost = { evolvePhaseCost: [{ items: [
+  { id: '30013', count: 1 },
+  { id: '30012', count: 1 },
+] }] }
+const craftInfo = { items: {
+  '30013': { name: '源岩', sortId: 1 },
+  '30012': { name: '固源岩', sortId: 2 },
+  '30011': { name: '源岩碎片', sortId: 3 },
+} }
+const craft = (baseCount) => training.calculateEliteTrainingCostForTest({
+  target: { id: 'char_test_a', name: '测试干员A', currentElite: 0, targetElite: 1 },
+  operators,
+  calInfo: craftInfo,
+  calPlayer: {
+    items: [
+      { id: '4001', count: 999999 },
+      { id: '2004', count: 999999 },
+      { id: '30012', count: 5 },
+      { id: '30011', count: baseCount },
+    ],
+    characters: [{ id: 'char_test_a', evolvePhase: 0, level: 1, rarity: 2 }],
+  },
+  characterCost: craftCost,
+  pricing: priced,
+})
+const craftable = craft(3)
+if (craftable.missing.materials.length !== 0 || craftable.available?.materials.some((item) => item.id === '30013')) {
+  throw new Error('reserve directly needed materials, then craft from remaining inventory without claiming crafted materials are stocked')
+}
+const insufficient = craft(2)
+if (insufficient.missing.materials.length !== 1 || insufficient.missing.materials[0]?.id !== '30011' || insufficient.missing.materials[0]?.count !== 1) {
+  throw new Error('report only the ingredient shortage after recursive synthesis')
+}
+
+const chipCost = { evolvePhaseCost: [{ items: [{ id: '3231', count: 1 }] }] }
+const convertedChip = (chipCount) => training.calculateEliteTrainingCostForTest({
+  target: { id: 'char_test_a', name: '测试干员A', currentElite: 0, targetElite: 1 },
+  operators,
+  calInfo: { items: { '3231': { name: '芯片A' }, '3261': { name: '芯片B' } } },
+  calPlayer: {
+    items: [{ id: '3261', count: chipCount }, { id: '4001', count: 999999 }, { id: '2004', count: 999999 }],
+    characters: [{ id: 'char_test_a', evolvePhase: 0, level: 1, rarity: 2 }],
+  },
+  characterCost: chipCost,
+  pricing: priced,
+})
+if (convertedChip(3).missing.materials.length !== 0 || convertedChip(2).missing.materials[0]?.id !== '3231') {
+  throw new Error('two-way chip conversion requires enough stocked input chips')
+}
+
 const secondPromotion = training.calculateEliteTrainingCostForTest({
   target: { id: 'char_test_b', name: '测试干员B', currentElite: 1, targetElite: 2 },
   operators,

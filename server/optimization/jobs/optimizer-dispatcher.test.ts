@@ -22,6 +22,7 @@ describe('optimization job dispatcher', () => {
   it.each(['252', '252-1'])('includes %s room levels in schedule result data', async (preset) => {
     const payload = schedulePayload()
     payload.effectiveConfig = structuredClone(CONFIG_PRESETS[preset])
+    payload.effectiveConfig.facility_layout = ['manufacture_3', 'trading_2', 'power_2', 'manufacture_1', 'manufacture_4', 'trading_1', 'power_1', 'manufacture_5', 'manufacture_2']
     const result = {
       ...scheduleResult(),
       plans: [{ name: 'Plan 1', rooms: {
@@ -31,6 +32,8 @@ describe('optimization job dispatcher', () => {
     }
     const port = fakePort({ executeSchedule: vi.fn(async () => result) })
     const actual = await executeOptimizationJobWithPort(job(payload), context, port) as OptimizeResult
+    expect(actual.facility_layout).toEqual(payload.effectiveConfig.facility_layout)
+    expect(actual.facility_layout).not.toBe(payload.effectiveConfig.facility_layout)
     expect(actual.plans[0].rooms.trading.map((room) => room.level)).toEqual(payload.effectiveConfig.trading_station_levels)
     expect(actual.plans[0].rooms.manufacture.map((room) => room.level)).toEqual(payload.effectiveConfig.manufacturing_station_levels)
   })

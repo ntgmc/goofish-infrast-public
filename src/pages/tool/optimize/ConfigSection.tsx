@@ -12,8 +12,10 @@ import ConfigCapabilityPreview from '../../../components/ConfigCapabilityPreview
 const ConfigEditor = lazy(() => import('../../../components/ConfigEditor'))
 
 export default function ConfigSection({
+  profileId,
   activeConfig,
   permission,
+  isPreviewProfile = false,
   userCanEditConfig,
   canEditFixedShiftHours,
   userCanUseIntermediateAutoConfig,
@@ -26,8 +28,10 @@ export default function ConfigSection({
   updateConfig,
   retryConfigSave,
 }: {
+  profileId?: string
   activeConfig: LicenseConfig
   permission: PermissionMode
+  isPreviewProfile?: boolean
   userCanEditConfig: boolean
   canEditFixedShiftHours?: boolean
   userCanUseIntermediateAutoConfig: boolean
@@ -65,8 +69,12 @@ export default function ConfigSection({
           <Suspense fallback={<ResultFallback />}>
             <ConfigCapabilityPreview config={activeConfig} enabled={!userCanEditConfig}>
             <ConfigEditor
+              profileId={profileId}
               config={activeConfig}
               permission={permission}
+              note={isPreviewProfile && !userCanEditConfig
+                ? `${copy.common.components_ConfigEditor_024}${copy.workspace.pages_tool_tool_utils_002}${copy.common.components_ConfigEditor_025}`
+                : undefined}
               canEdit={userCanEditConfig}
               canEditFixedShiftHours={canEditFixedShiftHours}
               canEditIntermediateInventory={userCanUseIntermediateAutoConfig}

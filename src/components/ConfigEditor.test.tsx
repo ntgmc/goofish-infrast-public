@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CONFIG_PRESETS, cloneConfig, normalizeConfig } from '../lib/config'
 import ConfigEditor from './ConfigEditor'
@@ -8,6 +9,107 @@ import ConfigEditor from './ConfigEditor'
 afterEach(cleanup)
 
 describe('ConfigEditor strategy layout', () => {
+  it('loads confirmed layouts collapsed and requires review again after editing', async () => {
+    const config = normalizeConfig(CONFIG_PRESETS['252'])
+    config.facility_layout = ['trading_1', 'trading_2', 'manufacture_1', 'manufacture_2', 'manufacture_3', 'manufacture_4', 'manufacture_5', 'power_1', 'power_2']
+    const onUpdate = vi.fn((mutate: (next: typeof config) => void) => mutate(config))
+    render(<ConfigEditor config={config} canEdit validation={{ ok: true }} onUpdate={onUpdate} />)
+    expect(screen.getByText('布局已确认', { exact: true })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '确认布局' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '修改布局' }))
+    expect(config.facility_layout).toBeUndefined()
+    await userEvent.click(screen.getByRole('button', { name: '确认布局' }))
+    expect(screen.getByRole('button', { name: '确认并收起' })).toBeInTheDocument()
+    await userEvent.click(within(screen.getByRole('group', { name: 'B1 · 左 · 设施等级' })).getByRole('button', { name: '2级' }))
+    expect(screen.queryByRole('button', { name: '确认并收起' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '确认布局' }))
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(config.facility_layout).toBeUndefined()
+  })
+  it('invalidates a confirmed layout while preserving the draft through parent updates', async () => {
+    function Editor() {
+      const [config, setConfig] = useState(normalizeConfig(CONFIG_PRESETS['252']))
+      return <ConfigEditor config={config} canEdit validation={{ ok: true }} onUpdate={(mutate) => setConfig((current) => {
+        const next = structuredClone(current)
+        mutate(next)
+        return next
+      })} />
+    }
+    render(<Editor />)
+    await userEvent.click(screen.getByRole('button', { name: '确认布局' }))
+    expect(screen.getByText('待确认', { exact: true })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('数量与等级检查通过')
+    await userEvent.click(screen.getByRole('button', { name: '确认并收起' }))
+    expect(screen.getByText('已确认', { exact: true })).toBeInTheDocument()
+    expect(screen.getByText('布局已确认', { exact: true })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '确认布局' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'B1 · 左 · 设施等级' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '修改布局' }))
+    expect(screen.getByText('待确认', { exact: true })).toBeInTheDocument()
+    await userEvent.click(within(screen.getByRole('group', { name: 'B1 · 左 · 设施等级' })).getByRole('button', { name: '2级' }))
+    expect(screen.getByText('待确认', { exact: true })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'B1 · 左 · 贸易站 · 2级' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '确认布局' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('需要 1/3 级')
+    expect(screen.getByText('待确认', { exact: true })).toBeInTheDocument()
+    await userEvent.click(within(screen.getByRole('group', { name: 'B1 · 左 · 设施等级' })).getByRole('button', { name: '3级' }))
+    await userEvent.click(screen.getByRole('button', { name: '确认布局' }))
+    await userEvent.click(screen.getByRole('button', { name: '确认并收起' }))
+    expect(screen.getByText('已确认', { exact: true })).toBeInTheDocument()
+  })
+  it.each(['252', '252-1', '252-full'])('allows invalid draft levels and checks the %s layout on confirmation', async (preset) => {
+    const config = normalizeConfig(CONFIG_PRESETS[preset])
+    const onUpdate = vi.fn((mutate: (next: typeof config) => void) => mutate(config))
+    render(<ConfigEditor config={config} canEdit={false} validation={{ ok: true }} onUpdate={onUpdate} />)
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    const levels = screen.getByRole('group', { name: 'B1 · 左 · 设施等级' })
+    expect(within(levels).getByRole('button', { name: '3级' })).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(within(levels).getByRole('button', { name: `${config.trading_station_levels![1]}级` }))
+    expect(config.facility_layout).toBeUndefined()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '确认布局' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('贸易站')
+    expect(config.facility_layout).toBeUndefined()
+    await userEvent.click(within(screen.getByRole('group', { name: 'B1 · 中 · 设施等级' })).getByRole('button', { name: '3级' }))
+    await userEvent.click(screen.getByRole('button', { name: '确认布局' }))
+    expect(config.facility_layout).toBeUndefined()
+    await userEvent.click(screen.getByRole('button', { name: '确认并收起' }))
+    expect(config.facility_layout?.slice(0, 2)).toEqual(['trading_2', 'trading_1'])
+    expect(new Set(config.facility_layout).size).toBe(9)
+  })
+  it('selects a facility in the dialog and restores focus to its card', async () => {
+    const config = normalizeConfig(CONFIG_PRESETS['252'])
+    const onUpdate = vi.fn((mutate: (next: typeof config) => void) => mutate(config))
+    const view = render(<ConfigEditor config={config} canEdit={false} validation={{ ok: true }} onUpdate={onUpdate} />)
+    const card = screen.getByRole('button', { name: 'B1 · 左 · 贸易站 · 3级' })
+    await userEvent.click(card)
+    const dialog = screen.getByRole('dialog', { name: '选择设施 · B1 · 左' })
+    expect(within(dialog).getByRole('button', { name: '贸易站' })).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(within(dialog).getByRole('button', { name: '制造站' }))
+    expect(config.facility_layout).toBeUndefined()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(card).toHaveFocus()
+    view.rerender(<ConfigEditor config={config} canEdit={false} validation={{ ok: true }} onUpdate={onUpdate} />)
+    expect(screen.getByRole('button', { name: 'B1 · 左 · 制造站 · 3级' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'B1 · 右 · 制造站 · 2级' })).toBeInTheDocument()
+    const levels = screen.getByRole('group', { name: 'B1 · 左 · 设施等级' })
+    expect(within(levels).getByRole('button', { name: '1级' })).toBeEnabled()
+    await userEvent.click(within(levels).getByRole('button', { name: '1级' }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '确认布局' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('制造站')
+    expect(config.facility_layout).toBeUndefined()
+  })
+  it('dismisses the facility dialog without changing positions', async () => {
+    const onUpdate = vi.fn()
+    render(<ConfigEditor config={normalizeConfig(CONFIG_PRESETS['252'])} canEdit validation={{ ok: true }} onUpdate={onUpdate} />)
+    const card = screen.getByRole('button', { name: 'B1 · 左 · 贸易站 · 3级' })
+    await userEvent.click(card)
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(card).toHaveFocus()
+    expect(onUpdate).not.toHaveBeenCalled()
+  })
   it('groups presets by power stations', () => {
     render(
       <ConfigEditor

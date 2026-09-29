@@ -10,6 +10,17 @@ import {
 } from './license-utils'
 
 describe('restricted profile presets', () => {
+  it('preserves facility positions for restricted profiles and free preview', () => {
+    const config = {
+      ...CONFIG_PRESETS['252-full'],
+      facility_layout: ['manufacture_3', 'trading_2', 'power_2', 'manufacture_1', 'manufacture_4', 'trading_1', 'power_1', 'manufacture_5', 'manufacture_2'],
+    }
+    for (const result of [validateConfig(config), resolveConfigForPermission('recommended', config), resolveFreePreviewConfig(config)]) {
+      expect(result).toMatchObject({ ok: true, config: { facility_layout: config.facility_layout } })
+    }
+    expect(validateConfig({ ...config, facility_layout: Array(9).fill('trading_1') })).toMatchObject({ ok: false })
+    expect(validateConfig({ ...config, facility_layout: [...config.facility_layout.slice(1), 'manufacture_6'] })).toMatchObject({ ok: false })
+  })
   it('accepts full-blood 252 for restricted profiles and free preview', () => {
     const config = CONFIG_PRESETS['252-full']
     for (const result of [

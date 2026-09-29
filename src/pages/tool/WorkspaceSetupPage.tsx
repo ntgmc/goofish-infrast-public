@@ -10,7 +10,7 @@ import ThemeSwitcher from '../../components/ThemeSwitcher'
 import ToolBreadcrumbs from '../../components/ToolBreadcrumbs'
 import SklandBindingDialog, { type SklandPayload } from '../../components/SklandBindingDialog'
 import { ApiError, apiJson } from '../../lib/api-client'
-import { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../../lib/config'
+import { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateScheduleConfig } from '../../lib/config'
 import { canonicalJson } from '../../lib/crypto'
 import { resolveActivePurchaseChannel } from '../../lib/purchase'
 import { dashboardPath, profileScopedPath, workspaceSetupPath, type WorkspaceSetupSection } from '../../lib/app-routes'
@@ -86,7 +86,7 @@ export default function WorkspaceSetupPage({
   const [sklandRefreshNotice, setSklandRefreshNotice] = useState<SklandRefreshNotice | null>(null)
 
   const normalizedConfig = useMemo(() => normalizeConfig(config), [config])
-  const configValidation = useMemo(() => validateConfig(normalizedConfig), [normalizedConfig])
+  const configValidation = useMemo(() => validateScheduleConfig(normalizedConfig), [normalizedConfig])
   const isPreviewProfile = isFreePreviewProfile(profile)
   const effectivePermission = getEffectiveProfilePermission(profile)
   const canEditConfig = hasCapability({ permission: effectivePermission }, 'edit_full_config')
@@ -378,6 +378,7 @@ export default function WorkspaceSetupPage({
                       <div data-tour-target="workspace-config-editor">
                         <Suspense fallback={<SectionFallback />}>
                           <WorkspaceConfigSection
+                            profileId={profile.id}
                             config={normalizedConfig}
                             canEdit={canEditConfig}
                             canEditIntermediateInventory={canEditLimitedConfig}
@@ -406,7 +407,8 @@ export default function WorkspaceSetupPage({
                         </div>
                       </dl>
                     </section>
-<button type="submit" disabled={saving || freePreviewNeedsBinding || !operators || !configValidation.ok} className="workspace-save-action tool-primary-action w-full" data-tour-target="workspace-start-scheduling">
+                    {!configValidation.ok && <p id="workspace-config-validation" className="tool-alert tool-alert--warning" role="status">{configValidation.message}</p>}
+                    <button type="submit" disabled={saving || freePreviewNeedsBinding || !operators || !configValidation.ok} aria-describedby={!configValidation.ok ? 'workspace-config-validation' : undefined} className="workspace-save-action tool-primary-action w-full" data-tour-target="workspace-start-scheduling">
                       {saving ? copy.workspace.pages_tool_WorkspaceSetupPage_046 : copy.workspace.pages_tool_WorkspaceSetupPage_047}
                     </button>
                   </aside>

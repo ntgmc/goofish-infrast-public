@@ -4,7 +4,7 @@ import type { SystemItemCode } from '../../../lib/inventory-contracts'
 import { canEditConfig, canUseScenarioComparison, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../../../lib/license'
 import { canonicalJson } from '../../../lib/crypto'
 import { apiJson } from '../../../lib/api-client'
-import { normalizeConfig, validateConfig, normalizeScheduleMode, normalizeDormitoryRule, resolveConfigLayout } from '../../../lib/config'
+import { normalizeConfig, validateConfig, validateScheduleConfig, normalizeScheduleMode, normalizeDormitoryRule, resolveConfigLayout } from '../../../lib/config'
 import { type ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { describeConfigDiff } from '../../../lib/workspace-history'
 import { mergeOptimizeJobProgress, buildOptimizeJobStorageKey, writeActiveOptimizeJob, readActiveOptimizeJob, isActiveOptimizeJob, clearActiveOptimizeJob, clearLegacyOptimizeJobStorage, isOptimizeJobPollCancelled } from './job-progress'
@@ -156,7 +156,7 @@ export function useOptimizeWorkflow(props: Props) {
       [activeConfig, baseConfig]
     )
 
-  const configValidation = useMemo(() => validateConfig(activeConfig), [activeConfig])
+  const configValidation = useMemo(() => validateScheduleConfig(activeConfig), [activeConfig])
 
   const configValidationMessage = configValidation.ok === false ? configValidation.message : null
 
@@ -190,6 +190,7 @@ export function useOptimizeWorkflow(props: Props) {
       if (userCanEditConfig) return next
   
       const limited = normalizeConfig(baseConfig)
+    if (limited.layout === '2-5-2') limited.facility_layout = next.facility_layout?.slice()
       limited.schedule_mode = normalizeScheduleMode(next.schedule_mode)
       limited.dormitory_rule = normalizeDormitoryRule(next.dormitory_rule)
       if (limited.schedule_mode !== 'rotation' && userCanUseIntermediateAutoConfig && (next.auto_balance_source === 'intermediate_inventory' || next.auto_balance_source === 'limited_config')) {

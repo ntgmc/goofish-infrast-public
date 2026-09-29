@@ -22,6 +22,7 @@ export interface LicenseConfig {
   manufacturing_stations_count: number;
   trading_station_levels?: number[];
   manufacturing_station_levels?: number[];
+  facility_layout?: string[];
   product_requirements: {
     trading_stations: Record<string, number>;
     manufacturing_stations: Record<string, number>;
@@ -340,6 +341,7 @@ interface AssignmentDetail {
 }
 
 export interface OptimizeResult {
+  facility_layout?: string[];
   author: string;
   title: string;
   description: string;

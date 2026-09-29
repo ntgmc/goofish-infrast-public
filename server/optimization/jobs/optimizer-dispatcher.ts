@@ -121,6 +121,11 @@ async function dispatchOptimizationJobPayload(
 ): Promise<OptimizationJobExecutionResult> {
   if (!('kind' in payload)) {
     const result = await port.executeSchedule(payload, context)
+    if (payload.effectiveConfig.layout === '2-5-2' && payload.effectiveConfig.facility_layout) {
+      result.facility_layout = [...payload.effectiveConfig.facility_layout]
+    } else {
+      delete result.facility_layout
+    }
     for (const plan of result.plans) {
       for (const [roomType, levels] of [
         ['trading', payload.effectiveConfig.trading_station_levels],

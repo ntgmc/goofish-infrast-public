@@ -1,0 +1,53 @@
+.facility-layout-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.facility-card--trading { --facility-color: var(--station-trading, var(--theme-brand-500)); }
+.facility-card--manufacture { --facility-color: var(--station-manufacturing, var(--theme-warning)); }
+.facility-card--power { --facility-color: var(--theme-success); }
+
+.facility-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--theme-surface-3);
+  border-top: 3px solid var(--facility-color);
+  border-radius: 8px;
+  background: var(--theme-surface-1);
+}
+
+.facility-card-select {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px 14px;
+  cursor: pointer;
+}
+
+.facility-card-select:hover { background: var(--theme-surface-2); }
+.facility-card-position { display: flex; width: 100%; align-items: center; justify-content: space-between; color: var(--theme-ink-muted); font-size: 11px; }
+.facility-card-icon { width: 26px; height: 26px; color: var(--facility-color); }
+.facility-card-name { color: var(--theme-ink-primary); font-size: 14px; font-weight: 600; }
+.facility-card-levels { display: flex; gap: 2px; padding: 4px; border-top: 1px solid var(--theme-surface-3); background: var(--theme-surface-2); }
+.facility-card-levels button { min-width: 0; min-height: 44px; flex: 1; border-radius: 4px; color: var(--theme-ink-secondary); cursor: pointer; }
+.facility-card-levels button span { margin-left: 2px; font-size: 10px; }
+.facility-card-levels button:hover { background: var(--theme-surface-1); }
+.facility-card-levels button[aria-pressed="true"] { background: var(--theme-surface-1); color: var(--theme-ink-primary); box-shadow: inset 0 0 0 1px var(--theme-surface-3); font-weight: 700; }
+.facility-layout button:focus-visible,
+.facility-picker button:focus-visible { outline: 2px solid var(--theme-brand-500); outline-offset: -3px; }
+.facility-layout-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
+.facility-layout-counts { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--theme-ink-secondary); font-size: 12px; }
+.facility-layout-counts strong { color: var(--theme-ink-primary); font-variant-numeric: tabular-nums; }
+.facility-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.facility-picker-option { min-height: 128px; flex-direction: column; gap: 10px; padding: 12px 4px; }
+.facility-picker-check { display: flex; height: 16px; }
+
+@media (min-width: 640px) {
+  .facility-layout-grid { gap: 12px; }
+  .facility-card-select { gap: 12px; padding: 12px 16px 16px; }
+  .facility-card-icon { width: 30px; height: 30px; }
+}

@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto'
 import type { LicenseOperator } from '../../src/lib/types'
+import { readSklandFacilityRooms } from './skland-facilities'
 
 const APP_CODE = '4ca99fa6b56cc2ba'
 const HYPERGRYPH_BASE = 'https://as.hypergryph.com'
@@ -125,6 +126,20 @@ export async function getCredByHypergryphToken(token: string): Promise<string> {
     throw new SklandClientError('request_failed', '森空岛凭据生成失败，请重新扫码。')
   }
   return cred.data.cred
+}
+
+export async function readSklandFacilitiesByCred(cred: string, uid: string) {
+  const client = new SklandClient(cred)
+  const bindings = await client.getArknightsBindings()
+  if (!bindings.some((binding) => binding.uid === uid)) {
+    throw new SklandClientError('credential_invalid', '绑定账号已不在森空岛授权列表中，请重新绑定。')
+  }
+  const playerInfo = await client.getGamePlayerInfo(uid)
+  try {
+    return readSklandFacilityRooms(playerInfo)
+  } catch {
+    throw new SklandClientError('request_failed', '森空岛未返回完整的设施位置与等级，请稍后重试或手动填写。')
+  }
 }
 
 export async function listSklandArknightsBindingsByCred(cred: string): Promise<SklandAccountOption[]> {

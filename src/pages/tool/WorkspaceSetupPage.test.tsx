@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Announcement, AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
 import AccountDashboard from './AccountDashboard'
 import WorkspaceSetupPage from './WorkspaceSetupPage'
+import { CONFIG_PRESETS } from '../../lib/config'
 import { tourStorageKey } from '../../components/GuidedTour'
 import { cloneDefaultPublicContentSettings } from '../../lib/public-content'
 import * as publicContentContext from '../../lib/public-content-context'
@@ -34,6 +35,24 @@ afterEach(() => {
 })
 
 describe('WorkspaceSetupPage CDK paths', () => {
+  it.each(['252', '252-1', '252-full'])('blocks scheduling until %s facility confirmation is complete', async (preset) => {
+    const user = userEvent.setup()
+    renderWorkspace({
+      profile: createAdvancedProfile(),
+      workspace: { ...createAdvancedWorkspace(), config: structuredClone(CONFIG_PRESETS[preset]) },
+    })
+    const proceed = screen.getByRole('button', { name: '保存工作区并开始排班' })
+    expect(proceed).toBeDisabled()
+    await user.click(proceed)
+    expect(apiJsonMock).not.toHaveBeenCalled()
+    await user.click(within(screen.getByRole('navigation', { name: '工作区设置' })).getByRole('button', { name: /基建配置/ }))
+    await user.click(await screen.findByRole('button', { name: '确认布局' }))
+    expect(screen.getByRole('button', { name: '保存工作区并开始排班' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: '确认并收起' }))
+    expect(screen.getByRole('button', { name: '保存工作区并开始排班' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: '修改布局' }))
+    expect(screen.getByRole('button', { name: '保存工作区并开始排班' })).toBeDisabled()
+  })
   it('renders announcement banners in the main content flow', () => {
     renderWorkspace({
       announcement: {

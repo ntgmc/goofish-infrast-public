@@ -312,8 +312,10 @@ export default function OptimizeWorkflowPage(props: Props) {
           {section === 'config' && (
             <div className="space-y-4">
               <ConfigSection
+                profileId={profile.id}
                 activeConfig={activeConfig}
                 permission={permission}
+                isPreviewProfile={profile.kind === 'free_preview'}
                 userCanEditConfig={userCanEditConfig}
                 canEditFixedShiftHours={isRestrictedPreview}
                 userCanUseIntermediateAutoConfig={userCanUseIntermediateAutoConfig}

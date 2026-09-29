@@ -58,6 +58,7 @@ import {
   getHypergryphTokenByScanCode,
   getScanCode,
   importSklandOperatorsByCred,
+  readSklandFacilitiesByCred,
   isSklandCredentialCurrent,
   listSklandArknightsBindingsByCred,
   SklandClientError,
@@ -412,6 +413,19 @@ export default async (req: Request): Promise<Response> => {
         auth,
         startedAt,
       })
+    }
+
+    if (pathname.endsWith('/facilities')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      ensureSklandServiceConfiguration()
+      const body = await readJsonBody(req)
+      const profile = await requireActiveProfile(auth.user.id, body.profile_id)
+      const binding = profile.skland_binding
+      if (!binding?.encrypted_cred || !binding.uid) {
+        return jsonResponse({ error: '请先为当前档案绑定森空岛账号。', code: 'skland_not_bound' }, 400)
+      }
+      const rooms = await readSklandFacilitiesByCred(decryptSklandCredential(binding.encrypted_cred), binding.uid)
+      return jsonResponse({ rooms }, 200, { 'Cache-Control': 'no-store' })
     }
 
     if (pathname.endsWith('/import/refresh')) {

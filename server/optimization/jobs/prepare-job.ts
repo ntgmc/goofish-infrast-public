@@ -49,6 +49,9 @@ export async function prepareOptimizeJob(
     }
     const operators = body.operators;
     const config = body.config;
+    if (body.kind === 'schedule' && config.layout === '2-5-2' && !config.facility_layout) {
+      return fail({ error: '请先按游戏内布局选择并确认设施位置与等级，再生成排班。' }, 400);
+    }
     const profile_id = body.identity.profileId;
     const includeUpgradeSuggestions = body.kind === 'schedule' && body.includeUpgradeSuggestions;
     const history_source = body.kind === 'schedule' ? body.historySource : undefined;

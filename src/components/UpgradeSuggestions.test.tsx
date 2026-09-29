@@ -37,6 +37,69 @@ describe('UpgradeSuggestions', () => {
     expect(screen.getByRole('checkbox', { name: '只看单人提升' })).toBeInTheDocument()
   })
 
+  it('distinguishes craftable materials from remaining shortages', () => {
+    const base = suggestion('upgrade-a', '干员 A')
+    const material = { id: '30013', name: '源岩', count: 1 }
+    const cost: NonNullable<UpgradeSuggestion['training_cost']> = {
+      status: 'available',
+      totals: { ...emptyBucket(), materials: [material] },
+      available: emptyBucket(),
+      missing: emptyBucket(),
+      equivalent_sanity: 0,
+      unpriced_items: [],
+      sources: {
+        skland: 'ok', yituliu: 'fresh', pricing_snapshot_id: null,
+        pricing_fetched_at: null, pricing_age_ms: null, valuation_version: null,
+        lmd_exp: 'fixed_lmd_trade_gold_net_exp_36_per_10000',
+      },
+      warnings: [],
+      operators: [],
+    }
+    const { rerender } = renderComponent([{ ...base, training_cost: cost }])
+    expect(screen.getAllByText('材料可合成')).toHaveLength(2)
+    rerender(<UpgradeSuggestions suggestions={[{ ...base, training_cost: {
+      ...cost, missing: { ...emptyBucket(), materials: [material] },
+    } }]} />)
+    expect(screen.getAllByText('仍有缺口')).toHaveLength(2)
+  })
+
+  it('keeps optimizer scores out of suggestion metrics and partial outcomes', async () => {
+    const user = userEvent.setup()
+    renderComponent([{
+      type: 'bundle',
+      name: '组合建议',
+      gain: 37,
+      ops: [{ name: '干员 A' }, { name: '干员 B' }],
+      roi: { efficiency_gain: 37, daily_sanity_gain: 4, payback_days: 10, payback_basis: 'missing_sanity' },
+      impact: { rooms: [{
+        room_name: '制造站',
+        room_type: 'manufacture',
+        product: 'Battle Record',
+        rule_description: '测试规则',
+        operators: ['干员 A'],
+        missing_operators: ['干员 B'],
+        estimated_gain: 38,
+      }] },
+      partial_outcomes: [{
+        missing_operator: { name: '干员 B' },
+        remaining_ops: [{ name: '干员 A' }],
+        efficiency_gain: 37,
+        daily_sanity_gain: 2,
+        has_benefit: true,
+        rooms: '制造站',
+      }],
+    }])
+
+    expect(screen.queryByText('排班得分变化')).not.toBeInTheDocument()
+    expect(screen.getByText('每日理智收益')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '查看解释' }))
+    expect(screen.getByText(/作战记录 · 测试规则/)).toBeInTheDocument()
+    expect(screen.queryByText(/Battle Record/)).not.toBeInTheDocument()
+    expect(screen.getByText(/剩余.*\+2/)).toBeInTheDocument()
+    expect(screen.queryByText(/\+37%/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/\+38%/)).not.toBeInTheDocument()
+  })
+
   it('prunes expanded ids when suggestions are replaced', async () => {
     const user = userEvent.setup()
     const props = baseProps()

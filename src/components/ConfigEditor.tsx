@@ -16,6 +16,7 @@ import { BASE_DAILY_SANITY_BUDGET, MONTHLY_CARD_DAILY_SANITY_BONUS, normalizeOru
 import type { IntermediateProduct, LicenseConfig, PermissionMode } from '../lib/types'
 import { copy } from '../copy/index'
 import InputNumber from './InputNumber'
+import FacilityLayoutEditor from './FacilityLayoutEditor'
 import './ConfigEditor.css'
 
 
@@ -243,6 +244,7 @@ function markIntermediateInventoryForOptimizer(config: LicenseConfig): void {
 }
 
 interface ConfigEditorProps {
+  profileId?: string;
   config: LicenseConfig;
   canEdit: boolean;
   canEditIntermediateInventory?: boolean;
@@ -259,6 +261,7 @@ interface ConfigEditorProps {
 }
 
 export default function ConfigEditor({
+  profileId,
   config,
   canEdit,
   canEditIntermediateInventory,
@@ -304,6 +307,7 @@ export default function ConfigEditor({
       const copy = normalizeConfig(preset)
       delete next.trading_station_levels
       delete next.manufacturing_station_levels
+      delete next.facility_layout
       delete next.optimization_mode
       delete next.optimizer_search
       Object.assign(next, copy)
@@ -402,6 +406,9 @@ export default function ConfigEditor({
       </div>
       )}
 
+      {supported252PresetSelected && (
+        <FacilityLayoutEditor key={JSON.stringify([profileId, config.trading_station_levels, config.manufacturing_station_levels])} profileId={profileId} config={config} onUpdate={onUpdate} />
+      )}
       {supported252PresetSelected && (
         <p className="tool-alert tool-alert--warning mt-3 px-3 py-2 text-xs leading-5" role="note">
           {copy.common.components_ConfigEditor_109}
