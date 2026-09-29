@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { facilityLayoutSchema } from '../../../src/lib/facility-layout'
 import { appBuildMetaSchema } from '../../../src/lib/app-build-meta-validation'
 import type { ScenarioComparisonResult } from '../../../src/lib/scenario-comparison'
 import {
@@ -73,6 +74,7 @@ const freeScheduleDecisionSchema = z.strictObject({
 }).nullable()
 
 const optimizeResultSchema: z.ZodType<OptimizeResult> = z.object({
+  facility_layout: facilityLayoutSchema.optional(),
   author: z.string().max(1_000),
   title: z.string().max(1_000),
   description: z.string().max(20_000),

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { facilityLayoutSchema } from './facility-layout'
 import { copy } from '../copy/index'
 
 const WORKSPACE_OPERATOR_LIMIT = 500
@@ -99,6 +100,7 @@ const licenseConfigShape = {
   manufacturing_stations_count: z.number().int().min(1).max(5),
   trading_station_levels: z.array(z.number().int().min(1).max(3)).min(1).max(5).optional(),
   manufacturing_station_levels: z.array(z.number().int().min(1).max(3)).min(1).max(5).optional(),
+  facility_layout: facilityLayoutSchema.optional(),
   product_requirements: z.strictObject({
     trading_stations: boundedCountRecord,
     manufacturing_stations: boundedCountRecord,

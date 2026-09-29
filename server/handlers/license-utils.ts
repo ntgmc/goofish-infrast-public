@@ -518,6 +518,7 @@ function cloneConfig(config: LicenseConfig): LicenseConfig {
 
 function resolvePresetMode(config: LicenseConfig, preset: LicenseConfig): LicenseConfig {
   const resolved = cloneConfig(preset)
+  if (resolved.layout === '2-5-2') resolved.facility_layout = config.facility_layout?.slice()
   resolved.dormitory_rule = normalizeDormitoryRule(config.dormitory_rule)
   if (normalizeScheduleMode(config.schedule_mode) === 'rotation') {
     resolved.schedule_mode = 'rotation'
@@ -531,6 +532,7 @@ function resolvePresetMode(config: LicenseConfig, preset: LicenseConfig): Licens
 
 function resolveFreePreviewPresetMode(config: LicenseConfig, preset: LicenseConfig): LicenseConfig {
   const resolved = cloneConfig(preset)
+  if (resolved.layout === '2-5-2') resolved.facility_layout = config.facility_layout?.slice()
   resolved.dormitory_rule = normalizeDormitoryRule(config.dormitory_rule)
   delete resolved.optimizer_search
   if (normalizeScheduleMode(config.schedule_mode) === 'rotation') {

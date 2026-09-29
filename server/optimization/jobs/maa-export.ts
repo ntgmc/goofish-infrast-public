@@ -83,16 +83,31 @@ export function buildMaaExportPayload(result: OptimizeResult): MaaExportPayload 
   const plans = validated.plans.map((planValue, planIndex) => {
     const plan = planValue as unknown as Record<string, unknown>;
     const roomsValue = isRecord(plan.rooms) ? plan.rooms : {};
+    if (!validated.facility_layout && Array.isArray(roomsValue.trading) && roomsValue.trading.length === 2
+      && Array.isArray(roomsValue.manufacture) && roomsValue.manufacture.length === 5) {
+      throw new MaaExportValidationError('排班结果缺少设施位置，请按游戏内布局确认设施位置与等级后重新生成排班。');
+    }
     const rooms: MaaExportPlan['rooms'] = {};
-    const sortedRoomIndexes: Partial<Record<'trading' | 'manufacture', number[]>> = {};
+    const roomIndexes: Partial<Record<MaaExportRoomType, number[]>> = {};
 
     for (const roomType of MAA_EXPORT_ROOM_TYPES) {
       const roomList = roomsValue[roomType];
       if (!Array.isArray(roomList)) continue;
-      if (roomType === 'trading' || roomType === 'manufacture') {
-        const indexes = roomList.map((_, index) => index);
-        indexes.sort((left, right) => roomLevel(roomList[right]) - roomLevel(roomList[left]) || left - right);
-        sortedRoomIndexes[roomType] = indexes;
+      if (!validated.facility_layout && (roomType === 'trading' || roomType === 'manufacture')) {
+        const levels = roomList.map((room) => isRecord(room) ? room.level ?? room.facility_level : undefined)
+          .filter((level) => typeof level === 'number');
+        if (new Set(levels).size > 1) {
+          throw new MaaExportValidationError('排班结果缺少设施位置，请按游戏内布局确认设施位置与等级后重新生成排班。');
+        }
+      }
+      if (validated.facility_layout && (roomType === 'trading' || roomType === 'manufacture' || roomType === 'power')) {
+        const indexes = validated.facility_layout
+          .filter((id) => id.startsWith(`${roomType}_`))
+          .map((id) => Number(id.split('_')[1]) - 1);
+        if (indexes.length !== roomList.length) {
+          throw new MaaExportValidationError(`排班结果无法导出：plans.${planIndex}.rooms.${roomType} 与设施布局不一致，请重新生成排班。`);
+        }
+        roomIndexes[roomType] = indexes;
         rooms[roomType] = indexes.map((index) => projectRoom(roomList[index]));
       } else {
         rooms[roomType] = roomList.map(projectRoom);
@@ -114,8 +129,8 @@ export function buildMaaExportPayload(result: OptimizeResult): MaaExportPayload 
     if (fiammetta) projected.Fiammetta = fiammetta;
     const drones = projectDrones(plan.drones);
     if (drones) {
-      const indexes = drones.room === 'trading' || drones.room === 'manufacture'
-        ? sortedRoomIndexes[drones.room]
+      const indexes = drones.room === 'trading' || drones.room === 'manufacture' || drones.room === 'power'
+        ? roomIndexes[drones.room]
         : undefined;
       const newIndex = indexes?.indexOf(drones.index - 1) ?? -1;
       projected.drones = newIndex < 0 ? drones : { ...drones, index: newIndex + 1 };
@@ -138,12 +153,6 @@ export function buildMaaExportPayload(result: OptimizeResult): MaaExportPayload 
       dormitory: roomCount('dormitory'),
     },
   };
-}
-
-function roomLevel(value: unknown): number {
-  if (!isRecord(value)) return 0;
-  const level = value.level ?? value.facility_level;
-  return typeof level === 'number' && Number.isFinite(level) ? level : 0;
 }
 
 function projectRoom(value: unknown): MaaExportRoom {
