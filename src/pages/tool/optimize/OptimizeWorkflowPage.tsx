@@ -314,6 +314,7 @@ export default function OptimizeWorkflowPage(props: Props) {
               <ConfigSection
                 activeConfig={activeConfig}
                 permission={permission}
+                isPreviewProfile={profile.kind === 'free_preview'}
                 userCanEditConfig={userCanEditConfig}
                 canEditFixedShiftHours={isRestrictedPreview}
                 userCanUseIntermediateAutoConfig={userCanUseIntermediateAutoConfig}

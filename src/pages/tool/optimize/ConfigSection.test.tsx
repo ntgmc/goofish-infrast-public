@@ -40,7 +40,8 @@ describe('ConfigSection', () => {
       <MemoryRouter>
         <ConfigSection
           activeConfig={CONFIG_PRESETS['243']}
-          permission="recommended"
+          permission="growth"
+          isPreviewProfile
           userCanEditConfig={false}
           userCanUseIntermediateAutoConfig
           configChanged={false}
@@ -55,6 +56,8 @@ describe('ConfigSection', () => {
       </MemoryRouter>,
     )
 
+    expect(await screen.findByText(/当前为 免费预览 权限，可通过中间产物库存自动调整推荐配置/)).toBeInTheDocument()
+    expect(screen.queryByText(/当前为 练度提升卡 权限/)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '当前免费配置' }))
     await user.click(await screen.findByRole('button', { name: '右满252（经验多）' }))
 
