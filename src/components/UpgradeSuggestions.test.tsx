@@ -37,6 +37,41 @@ describe('UpgradeSuggestions', () => {
     expect(screen.getByRole('checkbox', { name: '只看单人提升' })).toBeInTheDocument()
   })
 
+  it('keeps optimizer scores out of suggestion metrics and partial outcomes', async () => {
+    const user = userEvent.setup()
+    renderComponent([{
+      type: 'bundle',
+      name: '组合建议',
+      gain: 37,
+      ops: [{ name: '干员 A' }, { name: '干员 B' }],
+      roi: { efficiency_gain: 37, daily_sanity_gain: 4, payback_days: 10, payback_basis: 'missing_sanity' },
+      impact: { rooms: [{
+        room_name: '制造站',
+        room_type: 'manufacture',
+        product: '赤金',
+        rule_description: '测试规则',
+        operators: ['干员 A'],
+        missing_operators: ['干员 B'],
+        estimated_gain: 38,
+      }] },
+      partial_outcomes: [{
+        missing_operator: { name: '干员 B' },
+        remaining_ops: [{ name: '干员 A' }],
+        efficiency_gain: 37,
+        daily_sanity_gain: 2,
+        has_benefit: true,
+        rooms: '制造站',
+      }],
+    }])
+
+    expect(screen.queryByText('排班得分变化')).not.toBeInTheDocument()
+    expect(screen.getByText('每日理智收益')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '查看解释' }))
+    expect(screen.getByText(/剩余.*\+2/)).toBeInTheDocument()
+    expect(screen.queryByText(/\+37%/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/\+38%/)).not.toBeInTheDocument()
+  })
+
   it('prunes expanded ids when suggestions are replaced', async () => {
     const user = userEvent.setup()
     const props = baseProps()

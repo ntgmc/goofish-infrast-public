@@ -226,7 +226,6 @@ function MetricGrid({ suggestion, cost }: { suggestion: UpgradeSuggestion; cost?
   const totalSanity = cost?.totals.equivalent_sanity ?? cost?.equivalent_sanity ?? null
   const missingSanity = cost?.missing.equivalent_sanity ?? null
   const metrics = [
-    { label: copy.optimize.components_UpgradeSuggestions_023, value: formatSignedAmount(roi?.efficiency_gain ?? suggestion.gain), tone: 'brand' as const },
     orundumRoi
       ? { label: copy.optimize.components_UpgradeSuggestions_024, value: formatSignedAmount(orundumRoi.daily_orundum_gain), tone: 'success' as const }
       : { label: copy.optimize.components_UpgradeSuggestions_025, value: formatSignedSanity(roi?.daily_sanity_gain), tone: 'success' as const },
@@ -239,7 +238,7 @@ function MetricGrid({ suggestion, cost }: { suggestion: UpgradeSuggestion; cost?
   ]
 
   return (
-    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
       {metrics.map((metric) => (
         <div key={metric.label} className="tool-inset min-h-20 px-3 py-2">
           <p className="text-xs font-medium text-ink-muted">{metric.label}</p>
@@ -382,10 +381,7 @@ function ImpactRoomRow({ room }: { room: UpgradeImpactRoom }) {
   const missing = room.missing_operators.join(' + ') || '-'
   return (
     <div className="tool-inset px-3 py-2">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm font-semibold text-ink-primary">{room.room_name || room.room_type}</p>
-        <p className="text-xs font-semibold text-brand-300">+{formatCostNumber(room.estimated_gain)}%</p>
-      </div>
+      <p className="text-sm font-semibold text-ink-primary">{room.room_name || room.room_type}</p>
       <p className="mt-1 text-xs leading-5 text-ink-secondary">
         {room.product || copy.optimize.components_UpgradeSuggestions_052} · {room.rule_description || copy.optimize.components_UpgradeSuggestions_053}
       </p>
@@ -404,7 +400,7 @@ function PartialOutcomeRow({ outcome }: { outcome: UpgradePartialOutcome }) {
         </p>
       </div>
       <p className="mt-1 text-xs leading-5 text-ink-secondary">
-        {copy.optimize.components_UpgradeSuggestions_059}{outcome.remaining_ops.map((op) => op.name).join(' + ') || '-'} · +{formatCostNumber(outcome.efficiency_gain)}% · {formatSignedSanity(outcome.daily_sanity_gain)}
+        {copy.optimize.components_UpgradeSuggestions_059}{outcome.remaining_ops.map((op) => op.name).join(' + ') || '-'} · {formatSignedSanity(outcome.daily_sanity_gain)}
       </p>
       {outcome.rooms && <p className="mt-1 text-xs text-ink-muted">{copy.optimize.components_UpgradeSuggestions_060}{outcome.rooms}</p>}
     </div>

@@ -69,7 +69,6 @@ export const optimizeCopy = {
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_022: "查看解释",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_023: "排班得分变化",
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_024: "每日合成玉",
   // src/components/UpgradeSuggestions.tsx
