@@ -20,7 +20,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_010: "仓库价值分析器",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_011: "上传 MAA 仓库 JSON，按等效理智估算资产，并生成适合贴吧和 QQ 群分享的结果图。",
+  pages_DepotValuePage_011: "上传 MAA 仓库 JSON，用等效理智估算库存价值，再下载结果图分享到贴吧或 QQ 群。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_012: "返回首页",
   // src/pages/DepotValuePage.tsx
@@ -48,7 +48,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_024: "森空岛快捷导入",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_025: "使用森空岛导入会读取养成库存做本次估值；统计样本仅在你明确同意且价格覆盖达标时保存。",
+  pages_DepotValuePage_025: "导入森空岛养成库存，估算仓库价值。你同意贡献样本且物品价格覆盖达标时，才会保存统计样本。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_026: "已登录",
   // src/pages/DepotValuePage.tsx
@@ -68,13 +68,13 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_034: "绑定森空岛并分析仓库",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_035: "用于排名的统计样本经过安全处理，不包含仓库或干员明细、昵称、完整 UID 和森空岛凭据；样本仍与本站档案关联，以便你导出数据或注销账号时一并删除，因此并非完全匿名。",
+  pages_DepotValuePage_035: "排名样本不包含仓库或干员明细、昵称、完整 UID 和森空岛凭据。样本仍关联本站档案，属于可关联数据，导出个人数据时会包含这些样本，注销账号时会一并删除。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_036: "估值说明",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_037: "怎么算的",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_038: "作战记录会先换算成经验，再折成大致理智；龙门币和材料也会尽量换算成同一个理智数。",
+  pages_DepotValuePage_038: "作战记录先换算为经验，再估算对应理智。龙门币和材料也按等效理智估值，方便比较。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_039: "材料价格优先参考一图流/企鹅物流的物品价值。模组数据块、数据增补仪、数据增补条、家具零件不会参与计算。",
   // src/pages/DepotValuePage.tsx
@@ -170,7 +170,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_087: "默认勾选贡献处理后的统计样本，用于改进仓库排名；如不同意，请在分析前取消。样本仅保存仓库总值、价格数据质量、账号等级和干员数量汇总，不保存仓库或干员明细、昵称、完整 UID 和森空岛凭据。样本会关联本站档案，保存后不能单独撤回，注销账号时会一并删除。",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_090: "估值口径",
+  pages_DepotValuePage_090: "估值方式",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_091: "材料价格",
   // src/pages/DepotValuePage.tsx

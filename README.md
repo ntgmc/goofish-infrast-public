@@ -1,8 +1,8 @@
 # goofish-infrast-v1
 
-面向《明日方舟》玩家的 MAA 基建排班 Web 应用。仓库包含 React 前端、Node.js API、PostgreSQL 任务队列、任务生命周期、取消/重试/死信处理以及公开的 `OptimizerPort` 契约。
+面向《明日方舟》玩家的 MAA 基建排班 Web 应用。本仓库提供 React 前端、Node.js API 和 PostgreSQL 任务队列，处理任务提交、取消、重试与死信，并定义公开的 `OptimizerPort` 契约。
 
-生产优化器实现不在本仓库中。候选生成、规则执行、求解器、经济目标和场景/重排计算通过外部 `OptimizerPort` 实现完成，详见 [OPEN_SOURCE_BOUNDARY.md](OPEN_SOURCE_BOUNDARY.md)。
+排班计算由外部 `OptimizerPort` 实现负责，包括候选生成、规则执行、求解器、经济目标和场景与重排计算。生产优化器源码由私有仓库维护，公开内容范围见 [OPEN_SOURCE_BOUNDARY.md](OPEN_SOURCE_BOUNDARY.md)。
 
 ## 技术栈
 
@@ -18,7 +18,7 @@ npm install
 npm run dev
 ```
 
-开发命令会生成前后端共享的静态效率数据。规则数据属于公共数据边界，不包含私有求解算法。
+开发命令会生成前后端共享的静态效率数据。这些公开规则数据与私有求解算法分开维护。
 
 ## API-only 后端
 
@@ -26,7 +26,7 @@ npm run dev
 npm run start:server
 ```
 
-`start:server` 会构建并启动 `server/dist/index.js`，其行为与 `start:api` 相同：
+`start:server` 构建后启动 `server/dist/index.js`；`start:api` 直接启动该入口。API 进程负责：
 
 - 处理 HTTP API、鉴权、档案和工作区数据。
 - 校验并提交优化任务到 PostgreSQL。
@@ -34,7 +34,7 @@ npm run start:server
 - 执行队列恢复和过期维护。
 - 不注册优化器、不 claim 任务，也不在 API 进程中计算排班。
 
-本地至少需要：
+本地运行至少需要以下配置：
 
 ```text
 DATABASE_URL=postgresql://<user>:<password>@127.0.0.1:5432/<database>
@@ -88,7 +88,7 @@ PUBLIC_APP_URL=https://maatool.com npm run release:confirm-production
 
 服务端只接受与当前前后端构建版本完全一致、且已经出现在公开 changelog 中的版本，并从公开 changelog 自行生成 `release.published` 内容。相同版本重复确认返回幂等成功；同一事件 ID 的不同内容返回 409。`WEBSITE_EVENTS_TOKEN` 与 `WEBSITE_RELEASE_CONFIRMATION_TOKEN` 必须分别生成并放入密钥管理系统，不能复用或提交到仓库。部署任务不得启用 shell xtrace，也不得输出确认 Token；现有质量检查 workflow 只负责构建和验证工件，不得用于触发生产通知。
 
-PostgreSQL 新连接默认最多等待 10 秒；可通过 `POSTGRES_CONNECTION_TIMEOUT_MS` 覆盖，允许范围为 1000–60000 毫秒。有限连接超时可以避免 API 或外部 worker 在数据库不可达时无限停留在启动阶段。
+PostgreSQL 新连接默认最多等待 10 秒。可通过 `POSTGRES_CONNECTION_TIMEOUT_MS` 设置为 1000 到 60000 毫秒，避免 API 或外部 worker 在数据库不可达时一直停留在启动阶段。
 
 ### 事务邮件服务
 
@@ -121,7 +121,7 @@ AWS_SES_CONFIGURATION_SET_NAME=<optional configuration set>
 
 SES 模板数据沿用现有事务邮件参数：验证模板接收 `verification_url`、`expires_hours`；重置模板接收 `reset_url`、`expires_minutes`；注销取消模板接收 `cancel_url`、`expires_days`；注销回执模板接收 `receipt_id`。
 
-API-only 构建没有外部 worker 时，已提交任务会可靠保留在 PostgreSQL 队列中，直到兼容的 `OptimizerPort` worker 消费。仓库不提供 fake optimizer，避免生成看似成功但并非真实优化结果的数据。
+没有外部 worker 时，已提交任务保存在 PostgreSQL 队列中，等待兼容的 `OptimizerPort` worker 处理。公共开发环境同样需要真实优化器才能生成结果，仓库不提供返回模拟成功数据的 fake optimizer。
 
 私有组合构建可在服务机使用 `APP_ROLE=all` 开启阿里云 ECS worker 自动伸缩。启用后，combined 进程始终把本机计算并发限制为 1：远端实例停止时由本机继续消费；排队数严格超过扩容阈值时启动指定 ECS；排队数连续 10 分钟不超过 1 且没有运行中的任务时，以 `StopCharging` 模式停止远端实例。自动伸缩默认关闭，所需配置如下：
 
@@ -192,7 +192,7 @@ PostgreSQL 集成测试使用 Testcontainers，需要可用的 Docker daemon。
 - schedule
 - scenario comparison
 
-任务可靠性来自 PostgreSQL 队列。进程内 signals 只用于即时唤醒，不承担持久化投递。
+PostgreSQL 队列负责持久化投递。进程内 signals 用于即时唤醒进程。
 
 新增任务类型时必须同步更新：
 
@@ -222,7 +222,7 @@ goofish-public-<sha>
 - `goofish-static-files.conf`：静态资源缓存、SPA fallback 与 dotfile 拒绝规则。
 - `goofish-server-hardening.conf`：server 级协议与请求约束。
 
-这些文件只是公开的安全基线示例，不包含域名、主机、凭据、槽位或真实生产拓扑。部署方仍需根据自身基础设施完成 TLS 证书、反向代理、网络访问控制和日志策略。
+这些安全基线示例不含域名、主机、凭据、槽位或真实生产拓扑。部署方需按自身基础设施配置 TLS 证书、反向代理、网络访问控制和日志策略。
 
 ## 贡献与安全报告
 

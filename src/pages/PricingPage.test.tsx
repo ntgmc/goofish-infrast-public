@@ -66,7 +66,7 @@ describe('PricingPage', () => {
 
   it.each([
     ['loading', '正在确认按次计费开放状态…'],
-    ['error', '暂时无法确认按次计费开放状态'],
+    ['error', '暂时无法确认按次排班是否开放，请稍后重试。'],
   ] as const)('fails closed while feature state is %s', (status, message) => {
     featureState.status = status
     render(<MemoryRouter><PricingPage /></MemoryRouter>)

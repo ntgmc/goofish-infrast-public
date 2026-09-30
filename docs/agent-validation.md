@@ -1,9 +1,8 @@
-# Agent Validation
+# Agent validation
 
-This document is the on-demand validation guide routed from the project
-`AGENTS.md`. It maps changed file areas to the smallest relevant tests and then
-to the broader checks that protect build, HTTP, public-export, database, and
-release boundaries.
+Use this guide when changing repository files, as required by `AGENTS.md`.
+Choose the targeted tests for each changed area, then run the required build,
+HTTP, public-export, database, and release checks.
 
 ## Required sequence
 

@@ -5,7 +5,7 @@ export const personalUseCopy = {
   confirmation_effective_date: '生效日期：',
   confirmation_intro: '本人确认，本次及后续使用本服务所生成的全部内容（包括排班方案、分析报告、可执行文件等），仅服务于本人绑定的游戏账号，用于个人非商业参考。',
   confirmation_commitment: '本人承诺不会以收费接单、代注册、代领取、代生成、批量导出、转售文件或其他商业方式，向任何第三方提供本服务的访问资格或生成成果。',
-  confirmation_consequence: '违反上述承诺时，本人理解平台有权限制相关权益。',
+  confirmation_consequence: '本人理解，违反上述承诺时，平台有权限制相关权益。',
   confirmation_checkbox: '我已阅读并确认上述个人使用承诺。',
   confirmation_view_terms: '查看完整《个人使用声明》',
   confirmation_cancel: '取消',
@@ -16,7 +16,7 @@ export const personalUseCopy = {
   confirmation_version_changed: '个人使用声明已更新，请阅读当前版本后重新确认。',
   privacy_acceptance_notice: '当你领取免费预览权益、创建或转换个人按次档案、生成或调整排班、导出个人档案结果时，平台会记录你确认的声明版本和时间、相关账号与档案、操作类型和当时的网络地址。记录仅用于证明你已确认声明、处理异常使用和争议；账号存续期间保留，注销后再保留一年，随后删除或移除可识别信息。',
   terms_personal_use_heading: '个人使用声明',
-  terms_personal_use_intro: '免费预览、个人按次档案及其生成成果适用下列《个人使用声明》（V1.1 / 生效日期：2026-07-31）；商用档案不适用本声明，改为遵守服务条款中的商用账户规则。该声明仅自该日起适用于之后发生的使用行为，不以新条款单独追溯此前行为。',
+  terms_personal_use_intro: '免费预览、个人按次档案及其生成成果适用《个人使用声明》（V1.1 / 生效日期：2026-07-31）。商用档案遵守服务条款中的商用账户规则，不适用本声明。本声明适用于生效日起发生的使用行为，不以新条款单独追溯此前行为。',
   sections: [
     {
       id: 'personal-use-scope',

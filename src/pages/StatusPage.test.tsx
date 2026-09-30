@@ -80,7 +80,7 @@ describe('StatusPage', () => {
     await act(async () => { await Promise.resolve() })
 
     expect(screen.getAllByText('排队过多').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('服务排队超过 20 个，处理等待明显增加。').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('已有超过 20 个任务等待处理，等待时间明显增加。').length).toBeGreaterThan(0)
   })
 
   it('renders elastic processing while autoscaling consumes the queue', async () => {
@@ -88,7 +88,7 @@ describe('StatusPage', () => {
     render(<MemoryRouter><StatusPage /></MemoryRouter>)
     await act(async () => { await Promise.resolve() })
 
-    expect(screen.getAllByText('弹性处理中').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('正在增加计算能力').length).toBeGreaterThan(0)
     expect(screen.getByText('系统正在增加计算能力并处理等待任务，服务仍可正常使用。')).toBeInTheDocument()
   })
 
@@ -124,7 +124,7 @@ describe('StatusPage', () => {
     expect(screen.getAllByRole('gridcell')).toHaveLength(7 * 24)
     expect(screen.getByLabelText(/排队过多/)).toBeInTheDocument()
     expect(screen.getByLabelText(/服务繁忙/)).toBeInTheDocument()
-    expect(screen.getByLabelText(/弹性处理中/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/正在增加计算能力/)).toBeInTheDocument()
     expect(screen.getByText('队列延迟')).toBeInTheDocument()
     expect(screen.getByText('已恢复。')).toBeInTheDocument()
     expect(screen.getAllByRole('gridcell').every((cell) => !cell.hasAttribute('tabindex'))).toBe(true)

@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for contributing to the public web application, API, queue runtime,
+Contributions can change the public web application, API, queue runtime,
 or OptimizerPort contract.
 
 ## Development
@@ -15,7 +15,7 @@ Contributions are submitted under Apache License 2.0.
 
 ## Product copy
 
-For user-facing product copy, free/paid comparisons, and upgrade previews, follow
+When editing product copy, free/paid comparisons, or upgrade previews, follow
 [Product copy and paid capability previews](docs/product-copy.md). Verify claims
 against the product catalog and runtime entitlements, keep free actions available,
 and test every preview destination.
@@ -24,8 +24,8 @@ and test every preview destination.
 
 Do not submit production optimizer source, private fixtures, benchmarks, or
 algorithm diagnostics. The public repository may discuss the OptimizerPort
-contract and observable job behavior, but the private implementation is out of
-scope.
+contract and observable job behavior. Keep private implementations in the
+private repository.
 
 Adding an optimization job kind requires updating the public payload union,
 OptimizerPort interface, exhaustive dispatcher, snapshots, UI labels, and

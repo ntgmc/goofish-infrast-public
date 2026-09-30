@@ -72,8 +72,8 @@
       "display_price": "0 元",
       "account_scope": "绑定森空岛 UID，一个游戏 UID 全站只能领取一次",
       "runtime_permission": "growth",
-      "summary": "每 6 小时可提交 2 次完整个人排班。系统有空闲资源时会自动开始，繁忙时可能需要多等一会儿。",
-      "audience": "想先试用、低频使用、不想研究复杂配置的普通玩家"
+      "summary": "每 6 小时可提交 2 次完整个人排班。空闲时自动开始，繁忙时排队等待。",
+      "audience": "想先试用，或偶尔需要重新排班的玩家"
     },
     "single_account_monthly": {
       "label": "30 天尝鲜维护包 CDK",
@@ -85,8 +85,8 @@
       "duration_days": 30,
       "account_scope": "仅限一个游戏 UID，兑换后连续 30 天有效，不支持自行更换游戏账号",
       "runtime_permission": "advanced",
-      "summary": "30 天内不限次数生成和增量重算，排班优先处理，并可使用 MAA JSON、完整数据和高级分析。",
-      "audience": "近期会练度提升或想先验证完整能力的玩家"
+      "summary": "30 天内不限次数生成排班和增量重算，任务优先处理。支持 MAA JSON 导出、完整计算数据下载和高级分析。",
+      "audience": "近期会培养干员，或想先试用高级功能的玩家"
     },
     "single_account_half_year": {
       "label": "90 天版本维护卡 CDK",
@@ -98,8 +98,8 @@
       "duration_days": 90,
       "account_scope": "仅限一个游戏 UID，兑换后连续 90 天有效，不支持自行更换游戏账号",
       "runtime_permission": "advanced",
-      "summary": "90 天内不限次数生成和增量重算，排班优先处理，并可使用 MAA JSON、完整数据和高级分析。",
-      "audience": "一个版本周期内会持续养成和调整方案的玩家"
+      "summary": "90 天内不限次数生成排班和增量重算，任务优先处理。支持 MAA JSON 导出、完整计算数据下载和高级分析。",
+      "audience": "一个版本周期内会持续培养干员、调整排班的玩家"
     },
     "single_account_annual": {
       "label": "365 天年度维护卡 CDK",
@@ -111,8 +111,8 @@
       "duration_days": 365,
       "account_scope": "仅限一个游戏 UID，兑换后连续 365 天有效，不支持自行更换游戏账号",
       "runtime_permission": "advanced",
-      "summary": "365 天内不限次数生成和增量重算，排班优先处理，并可使用 MAA JSON、完整数据和高级分析。",
-      "audience": "全年会持续养成、希望降低长期维护成本的玩家"
+      "summary": "365 天内不限次数生成排班和增量重算，任务优先处理。支持 MAA JSON 导出、完整计算数据下载和高级分析。",
+      "audience": "全年持续培养干员，希望降低排班维护成本的玩家"
     },
     "single_account_lifetime": {
       "label": "单账号终身卡 CDK",
@@ -124,8 +124,8 @@
       "duration_days": null,
       "account_scope": "仅限长期维护同一个游戏 UID，不支持自行更换游戏账号",
       "runtime_permission": "advanced",
-      "summary": "一次购买即可长期不限次数生成和增量重算，排班优先处理，并支持配置切换、MAA JSON、完整数据下载、高级分析、练度建议和自定义配置。",
-      "audience": "长期维护同一账号、会持续研究和重新优化基建方案的玩家"
+      "summary": "长期不限次数生成排班和增量重算，任务优先处理。支持配置切换、MAA JSON 导出、完整计算数据下载、高级分析、练度建议和自定义配置。",
+      "audience": "长期维护同一游戏账号、经常调整基建方案的玩家"
     },
     "recommended_internal": { "label": "单次重置卡", "public": false, "price": null, "display_price": null, "account_scope": "内部发放", "runtime_permission": "recommended", "summary": "内部卡种", "audience": "内部使用" },
     "growth_internal": { "label": "练度提升卡", "public": false, "price": null, "display_price": null, "account_scope": "内部发放", "runtime_permission": "growth", "summary": "内部卡种", "audience": "内部使用" },
@@ -186,7 +186,7 @@
       "channel": "MaaTool 官方 QQ 群",
       "first_response_business_days": 2,
       "business_day_definition": "中国大陆法定工作日",
-      "sla_statement": "材料齐全后 2 个工作日内首次响应；工作日按中国大陆法定工作日计算，核验和解冻完成时间视复杂度而定，不承诺固定完成时限。",
+      "sla_statement": "材料齐全后 2 个工作日内首次回复，按中国大陆法定工作日计算。核验和解冻所需时间取决于问题复杂度，无法承诺固定完成时间。",
       "required_information": ["账号标识", "订单或 CDK 的安全标识", "报错时间", "不含敏感信息的错误描述和操作步骤"],
       "forbidden_information": ["密码", "完整 CDK", "二维码", "Cookie", "森空岛凭据"]
     },

@@ -48,7 +48,7 @@ export const publicCopy = {
   // src/pages/ChangelogPage.tsx
   pages_ChangelogPage_002: "更新日志",
   // src/pages/ChangelogPage.tsx
-  pages_ChangelogPage_003: "按版本记录 MaaTool 的功能更新、体验优化与问题修复。",
+  pages_ChangelogPage_003: "查看各版本新增的功能、使用体验调整和问题修复。",
   // src/pages/ChangelogPage.tsx
   pages_ChangelogPage_004: "前端 v",
   // src/pages/ChangelogPage.tsx
@@ -60,7 +60,7 @@ export const publicCopy = {
   // src/lib/changelog.ts
   pages_ChangelogPage_008: "自动安排办公室干员，并调整预览中的办公室与宿舍展示顺序。",
   // src/lib/changelog.ts
-  pages_ChangelogPage_009: "修正 Jaye 的精英化门槛与效率规则，提升排班结果准确性。",
+  pages_ChangelogPage_009: "修正 Jaye 的精英化要求和效率规则。",
   // src/lib/changelog.ts
   pages_ChangelogPage_010: "平滑排班阶段进度显示，并在优化计算超过十五分钟时及时终止异常任务。",
   // src/lib/changelog.ts
@@ -70,17 +70,17 @@ export const publicCopy = {
   // src/lib/changelog.ts
   pages_ChangelogPage_013: "免费权益使用前新增个人用途确认，明确使用边界。",
   // src/lib/changelog.ts
-  pages_ChangelogPage_014: "个人用途确认提示改用盾牌图标，增强安全提示的识别性。",
+  pages_ChangelogPage_014: "个人用途确认提示改用盾牌图标，便于识别。",
   // src/lib/changelog.ts
   pages_ChangelogPage_015: "工作区体验",
   // src/lib/changelog.ts
-  pages_ChangelogPage_016: "优化优化器工作区的保留策略，改善方案与结果的持续访问体验。",
+  pages_ChangelogPage_016: "调整排班工作区的保留规则，方便继续查看方案和结果。",
   // src/pages/ChangelogPage.tsx
   pages_ChangelogPage_018: "提交 ",
   // src/pages/ChangelogPage.tsx
   pages_ChangelogPage_019: "这是首个公开更新日志版本；后续版本将记录自上一正式发布以来面向用户的改动。",
   // src/pages/ChangelogPage.tsx
-  pages_ChangelogPage_020: "本次发布未检测到面向用户的更新内容。",
+  pages_ChangelogPage_020: "本次发布暂无面向用户的更新记录。",
   // src/pages/ChangelogPage.tsx
   pages_ChangelogPage_021: "新功能",
   // src/pages/ChangelogPage.tsx
@@ -96,7 +96,7 @@ export const publicCopy = {
   // src/pages/AnnouncementsPage.tsx
   pages_AnnouncementsPage_003: "公告",
   // src/pages/AnnouncementsPage.tsx
-  pages_AnnouncementsPage_004: "集中查看近期通知，方便你随时回看。",
+  pages_AnnouncementsPage_004: "查看近期通知和历史公告。",
   // src/pages/AnnouncementsPage.tsx
   pages_AnnouncementsPage_005: "返回工具",
   // src/pages/AnnouncementsPage.tsx
@@ -108,17 +108,17 @@ export const publicCopy = {
   // src/pages/AnnouncementsPage.tsx
   pages_AnnouncementsPage_009: "弹出式公告",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_001: "确认数据来源",
+  pages_LandingPage_001: "导入干员数据",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_002: "添加游戏账号后，先预览森空岛昵称和 UID；也可导入 MAA 干员识别文件。",
+  pages_LandingPage_002: "添加游戏账号，核对森空岛昵称和 UID 后导入数据。也可以上传 MAA 干员识别文件。",
   // src/pages/LandingPage.tsx
   pages_LandingPage_003: "检查基建配置",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_004: "只填写计算需要的房间和规则；系统会标出无法生成结果的缺项。",
+  pages_LandingPage_004: "填写基建房间和排班规则。缺少必要配置时，页面会提示你补齐。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_005: "带走可执行结果",
+  pages_LandingPage_005: "下载排班方案",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_006: "查看收益和练度建议后，下载可导入 MAA 的排班 JSON。",
+  pages_LandingPage_006: "查看预计收益和练度建议，下载排班 JSON 并导入 MAA。",
   // src/pages/LandingPage.tsx
   pages_LandingPage_007: "预计总效率",
   // src/pages/LandingPage.tsx
@@ -140,7 +140,7 @@ export const publicCopy = {
   // src/pages/LandingPage.tsx
   pages_LandingPage_016: "337.1 / 日",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_017: "收益与培养成本统一标准对比",
+  pages_LandingPage_017: "用同一标准比较收益和培养成本",
   // src/pages/LandingPage.tsx
   pages_LandingPage_018: "MAA 基建排班优化器",
   // src/pages/LandingPage.tsx
@@ -152,13 +152,13 @@ export const publicCopy = {
   // src/pages/LandingPage.tsx
   pages_LandingPage_022: "为使用 MAA 的明日方舟玩家准备",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_023: "用现有干员，排出更合适的基建班表。",
+  pages_LandingPage_023: "按你的干员和练度安排基建。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_024: "从森空岛或 MAA 导入干员，生成适配你的基建排班。看清预计产出与培养成本，再将方案导入 MAA 使用。",
+  pages_LandingPage_024: "从森空岛或 MAA 导入干员数据，按你的基建配置生成排班。查看预计产出和培养成本，选好方案后导入 MAA 使用。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_025: "无需提供游戏密码；森空岛账号由你确认昵称与 UID 后再导入。",
+  pages_LandingPage_025: "导入时先核对森空岛昵称和 UID，无需提供游戏密码。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_026: "开始准备排班",
+  pages_LandingPage_026: "开始排班",
   landing_view_results: "先看排班结果",
   landing_result_preview: "排班结果 · 实际界面",
   landing_result_context: "示例账号的计算结果，实际收益取决于你的干员与基建配置。",
@@ -172,47 +172,47 @@ export const publicCopy = {
   // src/pages/LandingPage.tsx
   pages_LandingPage_030: "森空岛 / MAA",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_031: "核心输出",
+  pages_LandingPage_031: "排班文件",
   // src/pages/LandingPage.tsx
   pages_LandingPage_032: "排班 JSON",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_033: "决策依据",
+  pages_LandingPage_033: "收益参考",
   // src/pages/LandingPage.tsx
   pages_LandingPage_034: "等效理智",
   // src/pages/LandingPage.tsx
   pages_LandingPage_035: "三步完成",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_036: "聚焦核心流程，不设多余步骤。",
+  pages_LandingPage_036: "导入数据，检查配置，然后生成排班。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_037: "工具不设每日任务或挽留弹窗。生成结果后，你可以直接下载排班方案或结束会话。",
+  pages_LandingPage_037: "生成结果后，可以直接下载排班方案或退出登录。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_038: "排班结果页，展示 JSON 下载、等效理智、效率指标和练度成本。",
+  pages_LandingPage_038: "排班结果页：下载 JSON，查看等效理智、效率指标和练度成本。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_039: "结果页优先呈现可下载方案与关键收益；算法依据和房间明细按需展开。",
+  pages_LandingPage_039: "先查看方案和预计收益，需要了解计算依据或房间安排时再展开明细。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_040: "结果优先",
+  pages_LandingPage_040: "查看排班收益",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_041: "一份方案，同时说明它为什么值得采用。",
+  pages_LandingPage_041: "培养成本和预计收益，一起看。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_042: "除了排班 JSON，结果会清楚展示日产出、等效理智、练度成本和回本依据，让培养决策能够被复核。",
+  pages_LandingPage_042: "结果包含排班 JSON、预计日产出和等效理智。查看练度成本和预计回本时间，再决定是否培养干员。",
   // src/pages/LandingPage.tsx
   pages_LandingPage_043: "准备开始",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_044: "用当前账号数据，生成下一份可执行的排班。",
+  pages_LandingPage_044: "导入当前账号数据，生成排班方案。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_045: "工作区会自动保存；你可以随时返回账号列表、下载结果或退出登录。每一步操作和数据去向都保持透明。",
+  pages_LandingPage_045: "工作区会自动保存。你可以随时返回账号列表、下载结果或退出登录。",
   // src/pages/LandingPage.tsx
   pages_LandingPage_046: "打开工作台",
   // src/pages/LandingPage.tsx
   pages_LandingPage_047: "排班生成结果示意",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_048: "排班方案已就绪",
+  pages_LandingPage_048: "排班已生成",
   // src/pages/LandingPage.tsx
   pages_LandingPage_049: "基于当前干员、库存与基建配置",
   // src/pages/LandingPage.tsx
   pages_LandingPage_050: "可下载",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_051: "工作台包含森空岛导入、干员数据、基建配置与生成入口。",
+  pages_LandingPage_051: "在工作台导入森空岛数据、检查干员和基建配置，然后生成排班。",
   // src/pages/LandingPage.tsx
   pages_LandingPage_052: "生成状态",
   // src/pages/LandingPage.tsx
@@ -240,7 +240,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_004: "CDK 和游戏账号有什么关系？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_005: "CDK 不是登录密码，也不代表游戏账号本身。它用于开通正式游戏账号档案及对应功能权限；兑换后仍需导入你有权处理的游戏数据。请勿向他人发送完整 CDK 或订单信息。",
+  pages_PublicInfoPage_005: "CDK 用于开通正式游戏账号档案和对应功能，不能用于登录，也不是游戏账号。兑换后，请导入你有权处理的游戏数据。不要向他人发送完整 CDK 或订单信息。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_006: "森空岛导入会读取什么数据？",
   // src/pages/PublicInfoPage.tsx
@@ -252,11 +252,11 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_010: "为什么结果与实际收益不同？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_011: "结果是基于最近一次成功导入的数据、基建配置和规则参数得到的测算建议，不是收益保证。游戏版本、干员状态、订单波动、心情、实际换班时间和 MAA 配置都会造成偏差；等效理智也只是统一比较不同产出的参考口径，并非游戏实际发放的理智。",
+  pages_PublicInfoPage_011: "结果按最近一次成功导入的数据、基建配置和规则参数测算，不保证实际收益。游戏版本、干员状态、订单波动、心情、实际换班时间和 MAA 配置都可能造成偏差。等效理智用于比较不同产出，不是游戏实际发放的理智。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_012: "免费仓库估值和排班功能有什么区别？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_013: "免费仓库估值用于查看库存价值和等效理智参考；个人排班会结合干员、房间、生产目标和策略计算排班及相关指标；轻量 MAA JSON 按现有档案权益、体验期或体验券规则导出，完整计算 JSON 则是高级版独立的分析与排障下载。",
+  pages_PublicInfoPage_013: "仓库估值用等效理智估算库存价值。个人排班根据干员、房间、生产目标和策略生成方案及相关指标。MAA JSON 按档案权益、体验期或体验券规则导出；完整计算 JSON 是高级版单独提供的分析与排障文件。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_014: "授权或导入失败怎么办？",
   // src/pages/PublicInfoPage.tsx
@@ -268,7 +268,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_018: "我们处理的信息",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_019: "为提供账号登录、CDK 关联和排班服务，MaaTool 官方会处理你的邮箱、登录凭证、会话信息，以及 CDK 和订单的安全标识。登录密码会经过不可逆处理后保存，不会保存明文。",
+  pages_PublicInfoPage_019: "使用账号登录、CDK 关联和排班服务时，MaaTool 会处理邮箱、登录凭证、会话信息，以及 CDK 和订单的安全标识。登录密码经过不可逆处理后保存，不保存明文。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_020: "当你选择添加游戏账号或通过森空岛导入时，服务会处理游戏 UID、昵称、区服或渠道信息、干员与养成库存、基建配置、排班结果和必要的授权状态。用于持续导入的森空岛凭据会在服务端加密保存。",
   // src/pages/PublicInfoPage.tsx
@@ -290,7 +290,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_029: "MaaTool 是用于生成《明日方舟》基建排班建议和 MAA 配置文件的辅助工具。你使用本服务，即表示同意遵守本协议、隐私政策及页面展示的相关规则。",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_030: "当前价格、权益与使用限制请查看价格与权益页。服务可能依法或因必要的产品调整更新规则；已开通档案的当前可用功能可在工作台查看。",
+  pages_PublicInfoPage_030: "价格、权益和使用限制请查看价格与权益页，已开通档案的可用功能可在工作台查看。服务可能依法或因必要的产品调整更新规则。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_031: "用户义务",
   // src/pages/PublicInfoPage.tsx
@@ -300,7 +300,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_034: "服务限制",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_035: "本服务提供的是计算与配置辅助，不保证任何排班方案在所有版本、所有账号或所有运行环境下都可用，也不承诺特定收益、效率或游戏内结果。",
+  pages_PublicInfoPage_035: "本服务辅助计算排班和准备配置。方案能否使用取决于版本、账号和运行环境，我们不保证所有方案都适用，也不承诺特定收益、效率或游戏内结果。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_036: "如发现异常使用、安全风险或违反本协议的行为，MaaTool 官方可采取限制功能、暂停服务或删除相关数据等必要措施。",
   // src/pages/PublicInfoPage.tsx
@@ -314,13 +314,13 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_041: "《明日方舟》、森空岛及相关名称、角色、数据和素材的权利归各自权利人所有。MAA 及其相关名称和项目内容归其各自权利人或社区所有。",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_042: "MaaTool 是独立工具，不代表、未获授权代表，也不与鹰角网络、森空岛或 MAA 项目建立官方隶属关系。除另有说明外，本站原创代码、界面和文字内容受相关法律保护。",
+  pages_PublicInfoPage_042: "MaaTool 是独立工具，与鹰角网络、森空岛及 MAA 项目没有官方隶属关系，不代表这些服务与项目，也未获授权代表它们。除另有说明外，本站原创代码、界面和文字内容受相关法律保护。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_043: "常见问题",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_044: "使用帮助",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_045: "集中解答账号与 CDK、森空岛授权、数据导入、排班结果、MAA JSON、隐私安全和售后处理等常见问题。",
+  pages_PublicInfoPage_045: "查找账号、CDK、森空岛导入和 MAA JSON 的使用说明，以及隐私与售后问题的处理方式。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_046: "联系客服",
   // src/pages/PublicInfoPage.tsx
@@ -332,7 +332,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_050: "MaaTool 官方",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_051: "本政策说明 MaaTool 为提供排班服务而处理的信息及你的相关权利。",
+  pages_PublicInfoPage_051: "了解 MaaTool 会处理哪些信息，以及如何查询、更正或申请删除数据。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_052: "用户服务协议",
   // src/pages/PublicInfoPage.tsx
@@ -344,7 +344,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_056: "MaaTool 官方",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_057: "请了解排班建议、第三方服务与知识产权相关的使用边界。",
+  pages_PublicInfoPage_057: "使用前请了解排班结果的适用范围、第三方服务关系和知识产权归属。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_058: "MAA 基建排班优化器",
   // src/pages/PublicInfoPage.tsx
@@ -358,15 +358,15 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_063: "生效日期：",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_064: "FAQ 列表",
+  pages_PublicInfoPage_064: "常见问题列表",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_065: "仍未解决？",
+  pages_PublicInfoPage_065: "需要帮助？",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_066: "请带上问题描述、复现步骤和不含敏感信息的截图到交流群反馈。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_067: "加入 MaaTool 交流群",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_068: "在群内可以反馈使用问题、查看公告或申请删除账号与工作台数据。请先阅读 FAQ，并尽量提供可复现的操作步骤。",
+  pages_PublicInfoPage_068: "可以在群内反馈问题、查看公告或申请删除账号和工作台数据。反馈前请查看常见问题，并准备好出错时的操作步骤。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_069: "反馈前请准备",
   // src/pages/PublicInfoPage.tsx
@@ -386,7 +386,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_077: "联系我们",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_078: "如对本页面内容或数据处理有疑问，请通过 MaaTool QQ 群联系官方。",
+  pages_PublicInfoPage_078: "对页面内容或数据处理有疑问时，请通过 MaaTool QQ 群联系我们。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_101: "行为风控与保留期限",
   // src/pages/PublicInfoPage.tsx
@@ -402,7 +402,7 @@ export const publicCopy = {
   // src/pages/PricingPage.tsx
   pages_PricingPage_002: "Pricing",
   // src/pages/PricingPage.tsx
-  pages_PricingPage_003: "按使用频率选择个人方案：30 天尝鲜维护包、90 天版本维护卡、365 天年度维护卡或终身卡；另有个人和商用积分单次排班。所有个人方案只绑定一个游戏 UID。",
+  pages_PricingPage_003: "个人维护方案有 30 天、90 天、365 天和终身卡可选，每份方案绑定一个游戏 UID。偶尔使用或需要商用时，也可以选择积分单次排班。",
   // src/pages/PricingPage.tsx
   pages_PricingPage_005: "免费",
   // src/pages/PricingPage.tsx

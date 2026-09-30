@@ -1,48 +1,48 @@
 export const optimizeCopy = {
   paid_preview: {
-    title: '免费版够用，高级版更高效：按需解锁排班增强能力',
-    description: '你当前使用免费版，可继续生成基础排班。高级版提供更灵活的基建布局、变化后的重算、收益分析和文件导出，帮助你按自己的需求维护排班。',
+    title: '按需选择自定义配置、收益分析和导出功能',
+    description: '免费版可生成基础排班。需要调整基建布局、数据变化后重算、分析收益或导出文件时，可查看高级版权益。',
     advanced: '高级版能力',
     trial_export: 'MAA 导出可用体验权益',
     trial_export_detail: '免费档案在高级体验期或使用导出体验券时，也可导出 MAA 文件；完整计算 JSON 需对应高级权益。',
-    conclusion: '免费版可继续使用基础排班；有定制、效率或深度分析需求时，可比较高级版方案。',
+    conclusion: '需要自定义配置、重新优化或分析收益时，可以比较高级版方案。',
     recompute_preview: '干员或库存变化后，可在概览页使用增量重算。维护卡有效期内不限次数生成并优先处理；免费版仍可重新生成完整排班。',
-    import_preview: '在档案的干员数据页上传 MAA 干员识别文件，校验后用于排班。免费版继续使用森空岛导入，基础导入不受影响。',
+    import_preview: '高级版可在干员数据页上传 MAA 干员识别文件，校验后用于排班。免费版通过森空岛导入。',
     lab_unavailable: '场景对比当前暂停开放，可先了解方案权益，恢复后再使用。',
     readonly_action: '高级版可用',
     config_views: '配置查看方式',
     current_config: '当前免费配置',
     custom_config: '自定义基建 · 只读预览',
     config_title: '让排班适配你的基建布局',
-    config_description: '高级版可调整房间、产物数量、班次、宿舍和无人机策略。下面按当前配置展示可调整的项目；预览不会修改已保存的方案。切回当前免费配置可继续排班。',
+    config_description: '高级版可调整房间、产物数量、班次、宿舍和无人机策略。可以先按当前配置查看这些选项，预览会保留已保存的方案。切回免费配置即可继续排班。',
     readonly: '高级配置只读预览',
     compare: '比较价格与权益',
     config: '自定义基建与班次',
-    config_detail: '按你的房间、产物和轮班规则定制排班，适合调整基建布局或有特殊轮班需求的玩家。',
+    config_detail: '按实际房间、产物和轮班规则调整排班，适合更换基建布局或自定义轮班时间时使用。',
     recompute: '增量重算与优先处理',
-    recompute_detail: '干员或库存变化后重新优化方案，持续维护排班更方便。维护卡有效期内不限次数生成，并优先处理你的排班任务。',
+    recompute_detail: '干员或库存变化后，重新优化排班。维护卡有效期内不限次数生成，任务会优先处理，繁忙时仍需等待。',
     exports: 'MAA JSON 与完整计算数据',
     exports_benefit: 'MAA 排班模式可导出执行文件，用于自动化排班；完整计算 JSON 可用于分析、复盘和排障。',
     exports_detail: 'MAA 排班模式可导出执行文件，用于自动化排班；完整计算 JSON 可用于分析、复盘和排障。免费档案可通过高级体验期或导出体验券使用 MAA 导出。',
     analysis: '练度建议与收益回本',
-    analysis_detail: '结合培养成本、每日收益提升和回本周期，帮助你判断优先培养谁，让资源投入更有依据。',
+    analysis_detail: '比较培养成本、预计每日收益提升和回本时间，再决定先培养谁。',
     lab: '场景对比实验室',
-    lab_detail: '把当前方案与最多 3 个额外配置放在一起比较，查看收益差异与取舍，选出更适合你的布局。可用次数随购买方案而定。',
+    lab_detail: '比较当前方案和最多 3 个额外配置的预计收益，选择布局和策略。可用次数随购买方案而定。',
     open: '查看功能',
     lab_title: '先了解不同配置如何比较',
-    lab_description: '高级版可在同一批干员数据下比较多个方案。下面是只读的对比设置；实际收益在运行后计算。',
+    lab_description: '高级版可用同一份干员数据比较多个方案。先查看对比设置，运行后可查看测算收益。',
     baseline: '当前方案',
     alternative: '额外配置',
     add: '添加对比配置',
     run: '运行场景对比',
     quotas: (month: number | null, quarter: number | null, year: number | null) => `30 天含 ${month} 次；90 天含 ${quarter} 次；365 天含 ${year} 次；终身卡不限次数。`,
-    pending: '运行后可查看收益差异与 Pareto 分析',
+    pending: '运行后可比较收益和换班次数',
     export_action: '下载完整计算 JSON',
     roi: '培养成本 / 每日产出提升 / 回本周期',
-    result_pending: '生成并完成分析后可查看实际数值',
+    result_pending: '生成并完成分析后可查看测算数值',
     recompute_action: '增量重算',
     import: 'MAA 干员识别文件导入',
-    import_detail: '已有 MAA 干员识别文件时，可直接上传并按档案规则校验，省去重新整理数据的步骤；免费版继续使用森空岛导入。',
+    import_detail: '直接上传 MAA 干员识别文件，校验后用于排班。免费版通过森空岛导入。',
   },
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_001: "最快回本",
@@ -53,7 +53,7 @@ export const optimizeCopy = {
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_004: "练度优化建议",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_005: "建议仅供练度规划；完成训练并刷新干员数据后，后续计算会自动使用最新练度。缺口与回本估算使用森空岛养成库存。",
+  components_UpgradeSuggestions_005: "建议供培养规划参考，材料缺口和回本时间按森空岛养成库存估算。完成培养后请刷新干员数据，后续计算会使用最新练度。",
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_006: "建议排序",
   // src/components/UpgradeSuggestions.tsx
@@ -112,11 +112,11 @@ export const optimizeCopy = {
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_044: "另有 ",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_045: " 条影响已折叠到收益估算中。",
+  components_UpgradeSuggestions_045: " 条影响已计入收益估算。",
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_046: "影响 ",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_047: "暂无结构化影响说明",
+  components_UpgradeSuggestions_047: "暂无具体影响说明",
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_048: "组合拆分收益",
   // src/components/UpgradeSuggestions.tsx
@@ -186,7 +186,7 @@ export const optimizeCopy = {
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_081: "材料可合成",
   // src/pages/tool/optimize/ConfigSection.tsx
-  pages_tool_optimize_ConfigSection_001: "工作区输入",
+  pages_tool_optimize_ConfigSection_001: "排班配置",
   // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_002: "已修改",
   // src/pages/tool/optimize/ConfigSection.tsx
@@ -232,15 +232,15 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/GenerateControlBar.tsx
   pages_tool_optimize_GenerateControlBar_009: "配置已调整",
   // src/pages/tool/optimize/GenerateControlBar.tsx
-  pages_tool_optimize_GenerateControlBar_010: "当前结果已匹配工作区",
+  pages_tool_optimize_GenerateControlBar_010: "当前结果与干员和配置一致",
   // src/pages/tool/optimize/GenerateControlBar.tsx
   pages_tool_optimize_GenerateControlBar_011: "准备生成排班方案",
   // src/pages/tool/optimize/GenerateControlBar.tsx
   pages_tool_optimize_GenerateControlBar_012: "查看排班计算说明",
   // src/pages/tool/optimize/GenerateControlBar.tsx
-  pages_tool_optimize_GenerateControlBar_013: "计算会使用当前干员数据和基建配置。MAA JSON 仅包含可直接导入 MAA 的轻量执行配置；数据页签会展示效率与生产明细。",
+  pages_tool_optimize_GenerateControlBar_013: "按当前干员数据和基建配置计算。MAA JSON 可导入 MAA 执行排班，效率和生产明细可在数据页查看。",
   // src/pages/tool/optimize/GenerateControlBar.tsx
-  pages_tool_optimize_GenerateControlBar_014: "当前生成输入",
+  pages_tool_optimize_GenerateControlBar_014: "本次计算使用的数据",
   // src/pages/tool/optimize/GenerateControlBar.tsx
   pages_tool_optimize_GenerateControlBar_015: "干员数据",
   // src/pages/tool/optimize/GenerateControlBar.tsx
@@ -258,7 +258,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/GenerateControlBar.tsx
   pages_tool_optimize_GenerateControlBar_022: "查看优先计算券说明",
   // src/pages/tool/optimize/GenerateControlBar.tsx
-  pages_tool_optimize_GenerateControlBar_023: "本次排班会优先开始计算，排在普通付费和免费任务之前。道具只影响等待顺序；提交失败、计算失败或最终超时时会自动退回。",
+  pages_tool_optimize_GenerateControlBar_023: "本次排班会排在普通付费和免费任务之前处理，繁忙时仍需等待。道具只改变等待顺序，提交失败、计算失败或最终超时时会自动退回。",
   // src/pages/tool/optimize/GenerateControlBar.tsx
   pages_tool_optimize_GenerateControlBar_024: "\n                当前可用 ",
   // src/pages/tool/optimize/GenerateControlBar.tsx
@@ -282,9 +282,9 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/OptimizeShell.tsx
   pages_tool_optimize_OptimizeShell_002: "排班工作台分区",
   // src/pages/tool/optimize/OptimizeShell.tsx
-  pages_tool_optimize_OptimizeShell_003: "返回数据空间",
+  pages_tool_optimize_OptimizeShell_003: "返回工作区",
   // src/pages/tool/optimize/OptimizeShell.tsx
-  pages_tool_optimize_OptimizeShell_005: "返回数据空间",
+  pages_tool_optimize_OptimizeShell_005: "返回工作区",
   // src/pages/tool/optimize/OptimizeShell.tsx
   pages_tool_optimize_OptimizeShell_006: "移动端排班工作台分区",
   // src/pages/tool/optimize/OptimizeWorkflowPage.tsx
@@ -368,7 +368,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/PlansSection.tsx
   pages_tool_optimize_PlansSection_002: "保存并复用配置",
   // src/pages/tool/optimize/PlansSection.tsx
-  pages_tool_optimize_PlansSection_003: "保存的是下一次计算使用的配置，不会自动开始新的排班。",
+  pages_tool_optimize_PlansSection_003: "保存配置供下次计算使用。开始排班时，需要另行点击生成。",
   // src/pages/tool/optimize/PlansSection.tsx
   pages_tool_optimize_PlansSection_004: "方案名称",
   // src/pages/tool/optimize/PlansSection.tsx
@@ -432,7 +432,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ResultSection.tsx
   pages_tool_optimize_ResultSection_001: "生成后即可查看排班结果",
   // src/pages/tool/optimize/ResultSection.tsx
-  pages_tool_optimize_ResultSection_002: "确认总览状态并点击生成，结果会按数据、详情、导入和建议分区展示。",
+  pages_tool_optimize_ResultSection_002: "在总览中检查配置并点击生成，完成后可查看数据、排班详情、导入方式和培养建议。",
   // src/pages/tool/optimize/ResultSection.tsx
   pages_tool_optimize_ResultSection_003: "解锁这个账号",
   // src/pages/tool/optimize/ResultSection.tsx
@@ -454,9 +454,9 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ResultSection.tsx
   pages_tool_optimize_ResultSection_012: "排班已完成，本次未请求优化建议。",
   // src/pages/tool/optimize/ResultSection.tsx
-  pages_tool_optimize_ResultSection_013: "排班已完成；优化建议已完整验证 {evaluated}/{candidate} 个候选，其余候选因时间预算不足尚未模拟。",
+  pages_tool_optimize_ResultSection_013: "排班已完成。已完整验证 {evaluated}/{candidate} 项培养建议，其余建议因计算时间不足尚未模拟。",
   // src/pages/tool/optimize/ResultSection.tsx
-  pages_tool_optimize_ResultSection_014: "排班已完成；优化建议已完整验证 {evaluated}/{candidate} 个候选，其余候选达到本次完整模拟上限，尚未验证。",
+  pages_tool_optimize_ResultSection_014: "排班已完成。已完整验证 {evaluated}/{candidate} 项培养建议，本次完整模拟次数已用完，其余建议尚未验证。",
   // src/pages/tool/optimize/ResultSection.tsx
   pages_tool_optimize_ResultSection_015: "需要高级版 CDK 权限",
   // src/pages/tool/optimize/ResultSection.tsx
@@ -494,7 +494,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_013: "配置组合后运行实验",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
-  pages_tool_optimize_ScenarioLabSection_014: "自动非固定模式先选择班次数组，再复核每个实际操作成本档位的前三名；243/333 使用精确模式，其他布局使用快速模式。",
+  pages_tool_optimize_ScenarioLabSection_014: "自动模式先选定换班间隔，再复核相同操作次数下的前三个方案。243/333 使用精确计算，其他布局使用快速计算。",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_015: "有效场景",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
@@ -514,7 +514,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_023: "产量与操作成本",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
-  pages_tool_optimize_ScenarioLabSection_024: "横轴使用实际班次数；自动模式在快速阶段选型并冻结后按布局复核。前沿仅使用复核结果。",
+  pages_tool_optimize_ScenarioLabSection_024: "横轴表示实际换班次数。自动模式先快速选定换班间隔，再按布局复核；前沿只包含复核后的结果。",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_025: "全部场景",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
@@ -534,7 +534,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_033: "自动搜索未发现可靠提升，已回退到 8-8-8。",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
-  pages_tool_optimize_ScenarioLabSection_034: "应用后会冻结当前班次数组，不会在普通生成时重新搜索。",
+  pages_tool_optimize_ScenarioLabSection_034: "应用后使用当前换班间隔，普通排班生成时会保留这些间隔。",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_035: "合成玉 长期/短期",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
@@ -602,7 +602,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/job-progress.ts
   pages_tool_optimize_job_progress_006: "排班已完成，已进入练度建议阶段",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
-  pages_tool_optimize_scenario_lab_ScenarioFactors_001: "MAA 自动非固定间隔（3–4 班）",
+  pages_tool_optimize_scenario_lab_ScenarioFactors_001: "MAA 自动非固定间隔（3 到 4 班）",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
   pages_tool_optimize_scenario_lab_ScenarioFactors_002: "MAA 8 小时 × 3",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
@@ -632,7 +632,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
   pages_tool_optimize_scenario_lab_ScenarioFactors_015: "游戏内轮换 12 小时 × 2",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
-  pages_tool_optimize_scenario_lab_ScenarioFactors_016: "自动模式先快速选择实际间隔，再冻结该数组按布局复核；243/333 使用精确模式，其他布局使用快速模式。轮换不随无人机策略重复展开。",
+  pages_tool_optimize_scenario_lab_ScenarioFactors_016: "自动模式先快速选定换班间隔，再按布局复核。243/333 使用精确计算，其他布局使用快速计算。游戏内轮换每组只比较一次，无人机策略不增加轮换组合。",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
   pages_tool_optimize_scenario_lab_ScenarioFactors_017: "MAA 无人机策略",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
@@ -883,8 +883,8 @@ export const optimizeCopy = {
   pages_tool_optimize_optimization_job_events_005: "优化任务未完成",
   pages_tool_optimize_optimization_job_events_006: "点击返回任务中心查看详情。",
   // src/pages/tool/optimize/OptimizationTaskCenter.tsx
-  pages_tool_optimize_OptimizationTaskCenter_001: "异步任务中心",
-  pages_tool_optimize_OptimizationTaskCenter_002: "统一显示当前账号正在排队、执行和最近结束的优化任务。",
+  pages_tool_optimize_OptimizationTaskCenter_001: "任务中心",
+  pages_tool_optimize_OptimizationTaskCenter_002: "查看当前账号等待中、计算中和最近结束的任务。",
   pages_tool_optimize_OptimizationTaskCenter_003: "刷新",
   pages_tool_optimize_OptimizationTaskCenter_004: "加载任务列表中…",
   pages_tool_optimize_OptimizationTaskCenter_005: "暂时没有优化任务。",
@@ -903,7 +903,7 @@ export const optimizeCopy = {
   pages_tool_optimize_OptimizationTaskCenter_018: "练度建议",
   pages_tool_optimize_OptimizationTaskCenter_019: "场景分析",
   pages_tool_optimize_OptimizationTaskCenter_020: "取消任务",
-  pages_tool_optimize_OptimizationTaskCenter_021: "取消请求已提交，执行中的任务会在安全点停止。",
+  pages_tool_optimize_OptimizationTaskCenter_021: "取消请求已提交，正在计算的任务会稍后停止，请等待状态更新。",
   pages_tool_optimize_OptimizationTaskCenter_022: "按当前配置重新生成",
   pages_tool_optimize_OptimizationTaskCenter_023: "打开场景实验室",
   pages_tool_optimize_OptimizationTaskCenter_024: "查看更多",
@@ -913,9 +913,9 @@ export const optimizeCopy = {
   pages_tool_optimize_OptimizationTaskCenter_028: "任务列表更新失败，请稍后重试。",
   pages_tool_optimize_OptimizationTaskCenter_029: "任务取消失败，请稍后重试。",
   pages_tool_optimize_OptimizationTaskCenter_030: "个进行中",
-  pages_tool_optimize_OptimizationTaskCenter_031: "确认取消这个优化任务？已开始的任务会在下一个安全点停止。",
+  pages_tool_optimize_OptimizationTaskCenter_031: "确认取消这个任务？正在计算的任务需要稍等片刻才能停止。",
   pages_tool_optimize_OptimizationTaskCenter_032: "任务",
-  pages_tool_optimize_OptimizationTaskCenter_033: "打开异步任务中心",
+  pages_tool_optimize_OptimizationTaskCenter_033: "打开任务中心",
   pages_tool_optimize_OptimizationTaskCenter_034: "关闭",
   pages_tool_optimize_OptimizationTaskCenter_035: "个任务需要关注",
   pages_tool_optimize_OptimizationTaskCenter_037: "查看结果",
@@ -957,7 +957,7 @@ export const optimizeCopy = {
   pages_tool_optimize_tour_028: "阅读排班结果",
   pages_tool_optimize_tour_029: "查看当前或选中的历史结果，包括房间安排、轮换与相关分析。",
   pages_tool_optimize_tour_030: "继续使用结果",
-  pages_tool_optimize_tour_031: "权限允许时可下载轻量 MAA JSON、应用升级建议；完整计算数据仅收在数据页签底部的开发者与排障区域。",
+  pages_tool_optimize_tour_031: "按当前档案权益下载 MAA JSON 或应用培养建议。完整计算数据位于数据页底部的“开发者与排障”区域。",
   pages_tool_optimize_tour_032: "选择实验因素",
   pages_tool_optimize_tour_033: "设置要比较的班次、策略等因素，并先检查页面计算出的有效组合数量。",
   pages_tool_optimize_tour_034: "开始情景对比",

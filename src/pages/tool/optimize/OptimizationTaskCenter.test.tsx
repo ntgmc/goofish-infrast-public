@@ -20,11 +20,11 @@ describe('OptimizationTaskCenter', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.queryByText('暂时没有优化任务。')).not.toBeInTheDocument()
 
-    const trigger = screen.getByRole('button', { name: '打开异步任务中心' })
+    const trigger = screen.getByRole('button', { name: '打开任务中心' })
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
     await user.click(trigger)
 
-    const dialog = screen.getByRole('dialog', { name: '异步任务中心' })
+    const dialog = screen.getByRole('dialog', { name: '任务中心' })
     expect(dialog).toHaveAttribute('aria-modal', 'true')
     expect(dialog).toHaveAttribute('data-slot', 'dialog-content')
     expect(dialog).toHaveClass('block', 'max-w-3xl')
@@ -38,7 +38,7 @@ describe('OptimizationTaskCenter', () => {
     render(<Harness controller={controller({ activeCount: 2, attentionCount: 1 })} />)
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '打开异步任务中心，2 个进行中，1 个任务需要关注' })).toHaveClass('h-11', 'py-0')
+    expect(screen.getByRole('button', { name: '打开任务中心，2 个进行中，1 个任务需要关注' })).toHaveClass('h-11', 'py-0')
     expect(screen.getByText('2')).toBeInTheDocument()
     expect(screen.getByText('!')).toBeInTheDocument()
   })
@@ -55,7 +55,7 @@ describe('OptimizationTaskCenter', () => {
       />,
     )
 
-    const trigger = screen.getByRole('button', { name: '打开异步任务中心，2 个进行中，1 个任务需要关注' })
+    const trigger = screen.getByRole('button', { name: '打开任务中心，2 个进行中，1 个任务需要关注' })
     expect(trigger).toHaveClass('h-11', 'w-11', 'px-0')
     expect(trigger).not.toHaveTextContent('任务中心')
     expect(trigger).toHaveTextContent('2!')
@@ -64,7 +64,7 @@ describe('OptimizationTaskCenter', () => {
   it('closes on Escape and restores focus to the toolbar trigger', async () => {
     const user = userEvent.setup()
     render(<Harness controller={controller()} />)
-    const trigger = screen.getByRole('button', { name: '打开异步任务中心' })
+    const trigger = screen.getByRole('button', { name: '打开任务中心' })
     await user.click(trigger)
     await waitFor(() => expect(screen.getByRole('button', { name: '关闭' })).toHaveFocus())
 
@@ -79,7 +79,7 @@ describe('OptimizationTaskCenter', () => {
     const user = userEvent.setup()
     const onRetry = vi.fn()
     render(<Harness controller={controller({ jobs: [failedScheduleJob()], attentionCount: 1 })} onRetry={onRetry} />)
-    await user.click(screen.getByRole('button', { name: '打开异步任务中心，1 个任务需要关注' }))
+    await user.click(screen.getByRole('button', { name: '打开任务中心，1 个任务需要关注' }))
 
     await user.click(screen.getByRole('button', { name: '按当前配置重新生成' }))
 
@@ -91,7 +91,7 @@ describe('OptimizationTaskCenter', () => {
     const user = userEvent.setup()
     const onOpenResult = vi.fn()
     render(<Harness controller={controller({ jobs: [successfulScheduleJob()] })} onOpenResult={onOpenResult} />)
-    await user.click(screen.getByRole('button', { name: '打开异步任务中心' }))
+    await user.click(screen.getByRole('button', { name: '打开任务中心' }))
 
     await user.click(screen.getByRole('button', { name: '查看结果' }))
 

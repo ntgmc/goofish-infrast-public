@@ -1,6 +1,6 @@
 export const debugCopy = {
   title: '调试模式',
-  description: '开启后会在当前浏览器中记录最近 200 条低敏感诊断事件，记录最长保留 7 天，用于复现问题后交给开发者排查。',
+  description: '开启后，当前浏览器会保留最近 200 条低敏感诊断事件，最长 7 天。复现问题后可导出记录，交给开发者排查。',
   privacy: '调试数据只保存在本机，不会自动上传，也不会记录请求或响应内容、查询参数、Cookie、账号凭据、控制台参数或错误堆栈。',
   disabled_status: '调试模式未开启。',
   enabled_status: '调试模式已开启。请复现问题后导出调试数据。',
@@ -12,7 +12,7 @@ export const debugCopy = {
   disable: '关闭并清空',
   clear_confirm: '确定清空当前浏览器中已记录的调试数据吗？调试模式会保持开启。',
   enabled_notice: '调试模式已开启。',
-  export_success: '调试数据已导出；调试模式会继续记录，直到你手动关闭。',
+  export_success: '调试数据已导出。手动关闭调试模式前，浏览器会继续记录。',
   cleared_notice: '已清空调试数据，调试模式仍保持开启。',
   disabled_notice: '调试模式已关闭，本机调试数据已清空。',
   storage_unavailable: '当前浏览器无法使用本地存储，不能开启调试模式。请检查隐私或存储设置后重试。',

@@ -148,7 +148,7 @@ export default function BehaviorRiskPanel() {
       <div className="tool-panel-header flex flex-wrap items-center justify-between gap-3 p-4">
         <div>
           <h2 className="text-base font-semibold text-ink-primary">全站行为风控复核</h2>
-          <p className="mt-1 text-sm text-ink-muted">按关联账号组展示去身份化证据、规则解释和不可变复核审计。系统只建单，不自动限制用户。</p>
+          <p className="mt-1 text-sm text-ink-muted">按关联账号查看去身份化证据、规则说明和不可修改的复核记录。系统自动建单，限制用户前需人工复核。</p>
         </div>
         <label className="flex items-center gap-2 text-sm text-ink-secondary">
           状态
@@ -187,7 +187,7 @@ export default function BehaviorRiskPanel() {
                   <span className={`tool-status ${caseStatusClass(riskCase.status)}`}>{statusLabel(riskCase.status)}</span>
                 </div>
                 <p className="mt-2 text-xs text-ink-muted">
-                  证据窗口 {formatDate(riskCase.first_seen_at)} — {formatDate(riskCase.last_seen_at)} · 模型 {riskCase.model_version} · 到期 {formatDate(riskCase.expires_at)}
+                  证据时间 {formatDate(riskCase.first_seen_at)} 至 {formatDate(riskCase.last_seen_at)} · 模型 {riskCase.model_version} · 到期 {formatDate(riskCase.expires_at)}
                 </p>
               </div>
               <div className="text-xs text-ink-muted">{riskCase.members.length} 个关联账号 · {riskCase.categories.map(categoryLabel).join(' / ')}</div>
@@ -289,7 +289,7 @@ export default function BehaviorRiskPanel() {
                 </div>
               </div>
             ) : riskCase.status === 'pending' ? (
-              <p className="text-xs text-ink-muted">当前账号仅有查看权限；复核与限制操作需要 risk_review 能力。</p>
+              <p className="text-xs text-ink-muted">当前账号可查看记录。复核和限制操作需要风险复核权限（risk_review）。</p>
             ) : (
               <p className="text-xs text-ink-muted">复核：{riskCase.reviewed_by ?? '未知管理员'} · {formatDate(riskCase.reviewed_at)}</p>
             )}

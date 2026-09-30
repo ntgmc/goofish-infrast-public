@@ -1,7 +1,7 @@
-# Design — Goofish Infrastructure
+# Goofish Infrastructure design
 
-Locked multi-page design system. Future Hallmark runs read this file first;
-pages defer to it. Amend intentionally — this file is the rule.
+All pages follow this design system. Read it before a Hallmark run and update
+it deliberately when changing the shared design.
 
 ## System
 
@@ -49,7 +49,7 @@ pages defer to it. Amend intentionally — this file is the rule.
 - One primary containment layer. `.tool-panel` is primary; `.tool-inset` is a ruled region, never a second card.
 - Public pages lead with real product evidence. Avoid three-equal-column feature grids and generic SaaS section sequences.
 - App and admin pages preserve route ownership and side-rail information architecture while using open data regions.
-- Content pages use a 60–65ch reading measure, 1.65+ line height, and whitespace instead of card stacks.
+- Content pages use a reading width of 60 to 65ch, a line height of at least 1.65, and whitespace instead of card stacks.
 - Display headings use `overflow-wrap: anywhere` and `min-width: 0`; document copy stays left aligned.
 - Accent is a signal only: primary action, active state, focus, and compact status marks.
 
@@ -73,9 +73,8 @@ pages defer to it. Amend intentionally — this file is the rule.
 
 ## Exports
 
-`tokens.css` in this project is the runtime source of truth. The following
-portable exports mirror its light-mode core roles; dark values remain under
-`.dark` in `tokens.css`.
+Runtime styles use `tokens.css`. The portable exports below mirror its light
+theme; dark theme values are defined under `.dark` in `tokens.css`.
 
 ### Tailwind v4
 

@@ -210,9 +210,9 @@ export const authCopy = {
   // src/pages/tool/AuthPage.tsx
   pages_tool_AuthPage_002: "MAA 基建排班工作台",
   // src/pages/tool/AuthPage.tsx
-  pages_tool_AuthPage_003: "登录后，开始生成下一份排班。",
+  pages_tool_AuthPage_003: "登录后添加账号，准备基建排班。",
   // src/pages/tool/AuthPage.tsx
-  pages_tool_AuthPage_004: "登录后添加游戏账号，选择森空岛或 MAA 数据，即可按你的干员情况生成可导入的基建排班 JSON。",
+  pages_tool_AuthPage_004: "添加游戏账号，导入森空岛或 MAA 干员数据，按实际基建配置生成排班。支持导出的档案可下载 MAA JSON。",
   // src/pages/tool/AuthPage.tsx
   pages_tool_AuthPage_005: "账号确认",
   // src/pages/tool/AuthPage.tsx

@@ -46,7 +46,7 @@ describe('NotificationCenter', () => {
 
     await user.click(await screen.findByRole('button', { name: '通知，120 条未读' }))
     expect(screen.getByText('99+')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: '全部已读' }))
+    await user.click(screen.getByRole('button', { name: '全部设为已读' }))
     await waitFor(() => expect(screen.getByRole('button', { name: '通知，无未读消息' })).toBeInTheDocument())
   })
 

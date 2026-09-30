@@ -193,7 +193,7 @@ describe('public content settings', () => {
       defaults_revision: 7,
       pricing: {
         eyebrow: 'Pricing',
-        intro: '按使用频率选择个人方案：30 天尝鲜维护包、90 天版本维护卡、365 天年度维护卡或终身卡；另有个人和商用积分单次排班。所有个人方案只绑定一个游戏 UID。',
+        intro: '个人维护方案有 30 天、90 天、365 天和终身卡可选，每份方案绑定一个游戏 UID。偶尔使用或需要商用时，也可以选择积分单次排班。',
       },
     })
 

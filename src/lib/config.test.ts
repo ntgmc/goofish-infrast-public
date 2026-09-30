@@ -109,7 +109,7 @@ describe('shift hour normalization', () => {
     expect(normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: [12, 12] }).shift_hours).toEqual([8, 8, 8])
     expect(validateConfig({ ...CONFIG_PRESETS['243'], shift_hours: [12, 12] })).toEqual({
       ok: false,
-      message: 'MAA 排班表需要 3–6 班；非等长间隔需覆盖 24 小时，等长间隔支持每 8、12 或 24 小时换班。',
+      message: 'MAA 排班表需要 3 到 6 班。间隔不同时须覆盖 24 小时，等长间隔支持每 8、12 或 24 小时换班。',
     })
   })
 

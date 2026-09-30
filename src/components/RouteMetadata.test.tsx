@@ -15,7 +15,7 @@ describe('RouteMetadata', () => {
     render(<RouterProvider router={router} />)
 
     await waitFor(() => expect(document.title).toBe('MAA 基建排班优化器 | MaaTool'))
-    expect(metaByName('description')).toBe('基于森空岛或 MAA 数据，为明日方舟生成适配当前干员的基建排班，查看日产出、等效理智、练度建议与仓库估值。')
+    expect(metaByName('description')).toBe('导入森空岛或 MAA 干员数据，生成明日方舟基建排班，查看预计日产出、等效理智、培养建议和仓库估值。')
     expect(document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href).toBe(currentUrl('/'))
 
     await act(async () => router.navigate('/tools/depot-value?source=homepage'))
@@ -42,13 +42,13 @@ describe('RouteMetadata', () => {
 
     await act(async () => router.navigate('/changelog'))
     expect(document.title).toBe('更新日志 | MaaTool')
-    expect(metaByName('description')).toBe('查看 MaaTool 各版本的功能更新、体验优化与问题修复。')
+    expect(metaByName('description')).toBe('查看 MaaTool 各版本新增的功能、使用体验调整和问题修复。')
     expect(metaByName('robots')).toBe('index, follow')
     expect(metaByProperty('og:url')).toBe(currentUrl('/changelog'))
 
     await act(async () => router.navigate('/status'))
     expect(document.title).toBe('服务状态 | MaaTool')
-    expect(metaByName('description')).toBe('查看 MaaTool 网站与排班计算服务的实时状态、繁忙程度和预计可用情况。')
+    expect(metaByName('description')).toBe('查看 MaaTool 网站和排班计算服务是否可用、当前是否繁忙，以及历史服务状态。')
     expect(metaByName('robots')).toBe('index, follow')
 
     await act(async () => router.navigate('/tool/profiles'))

@@ -254,7 +254,7 @@ describe('ConfigEditor shift patterns', () => {
     await user.type(input, '12-12')
     await user.click(screen.getByRole('button', { name: '应用间隔' }))
 
-    expect(screen.getByRole('alert')).toHaveTextContent('请输入 3–6 班；非等长间隔需总计 24 小时，等长间隔支持 8 或 12 小时。')
+    expect(screen.getByRole('alert')).toHaveTextContent('请输入 3 到 6 班。间隔不同时须合计 24 小时，等长间隔支持 8 或 12 小时。')
     expect(onUpdate).not.toHaveBeenCalled()
   })
 

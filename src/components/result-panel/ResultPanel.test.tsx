@@ -148,7 +148,7 @@ describe('ResultPanel tabs', () => {
     render(<ResultPanel result={createResult()} fullDataAvailable={false} />)
     await userEvent.setup().click(screen.getByRole('tab', { name: '数据' }))
     expect(screen.getByRole('button', { name: '下载完整计算 JSON' })).toBeDisabled()
-    expect(screen.getAllByText('生成并完成分析后可查看实际数值')).toHaveLength(2)
+    expect(screen.getAllByText('生成并完成分析后可查看测算数值')).toHaveLength(2)
     expect(screen.getByRole('link', { name: '比较价格与权益' })).toHaveAttribute('href', '/pricing')
     expect(screen.getByRole('tab', { name: '导入' })).toBeInTheDocument()
   })

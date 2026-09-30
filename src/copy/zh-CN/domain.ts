@@ -56,7 +56,7 @@ export const domainCopy = {
   // src/components/result-panel/ResultBoard.tsx
   components_result_panel_ResultBoard_005: "班次",
   // src/components/result-panel/ResultBoard.tsx
-  components_result_panel_ResultBoard_006: "按房间聚合展示，头像为主、名称辅助；详细效率数据请在详情页展开查看。",
+  components_result_panel_ResultBoard_006: "查看各房间的干员安排，展开详情可查看效率数据。",
   // src/components/result-panel/ResultBoard.tsx
   components_result_panel_ResultBoard_007: " 个房间",
   // src/components/result-panel/ResultBoard.tsx
@@ -198,7 +198,7 @@ export const domainCopy = {
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_015: "MAA 自动填满（保留技能依赖）",
   // src/components/result-panel/ResultPanel.tsx
-  components_result_panel_ResultPanel_016: "排班表写死",
+  components_result_panel_ResultPanel_016: "排班表固定",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_017: "总览图",
   // src/components/result-panel/ResultPanel.tsx
@@ -220,11 +220,11 @@ export const domainCopy = {
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_027: "排班方案已就绪",
   // src/components/result-panel/ResultPanel.tsx
-  components_result_panel_ResultPanel_028: "这是按正常流程生成的免费个人排班结果，可照着设置完整游戏内轮换，但不包含导出和高级分析。",
+  components_result_panel_ResultPanel_028: "按下方结果设置完整的游戏内轮换。免费个人排班不包含导出和高级分析。",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_030: "按下方预设队列在游戏内逐个设施设置，平时使用队列轮换的快速切换按钮。",
   // src/components/result-panel/ResultPanel.tsx
-  components_result_panel_ResultPanel_031: "MAA JSON 是可直接导入 MAA 的轻量执行配置；账号空间会保留本次结果和配置。",
+  components_result_panel_ResultPanel_031: "下载 MAA JSON 并导入 MAA 执行排班。本次结果和配置会保存在账号工作区。",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_032: "下载 MAA JSON",
   // src/components/result-panel/ResultPanel.tsx
@@ -264,9 +264,9 @@ export const domainCopy = {
   // src/components/result-panel/formatters.ts
   components_result_panel_formatters_005: "宿舍由 MAA 自动填满",
   // src/components/result-panel/formatters.ts
-  components_result_panel_formatters_006: "导出的 MAA JSON 不写死宿舍干员",
+  components_result_panel_formatters_006: "导出的 MAA JSON 由 MAA 自动安排宿舍干员",
   // src/components/result-panel/formatters.ts
-  components_result_panel_formatters_007: "导出的 MAA JSON 不写死宿舍干员",
+  components_result_panel_formatters_007: "导出的 MAA JSON 由 MAA 自动安排宿舍干员",
   // src/components/result-panel/formatters.ts
   components_result_panel_formatters_008: "房间效率",
   // src/components/result-panel/formatters.ts
@@ -368,7 +368,7 @@ export const domainCopy = {
   // src/lib/config.ts
   lib_config_008: "MAA 自动非固定",
   // src/lib/config.ts
-  lib_config_009: "排班表写死",
+  lib_config_009: "排班表固定",
   // src/lib/config.ts
   lib_config_010: "MAA 自动填满",
   // src/lib/config.ts
@@ -420,7 +420,7 @@ export const domainCopy = {
   // src/lib/config.ts
   lib_config_034: "，需要等于 ",
   // src/lib/config.ts
-  lib_config_035: "MAA 排班表需要 3–6 班；非等长间隔需覆盖 24 小时，等长间隔支持每 8、12 或 24 小时换班。",
+  lib_config_035: "MAA 排班表需要 3 到 6 班。间隔不同时须覆盖 24 小时，等长间隔支持每 8、12 或 24 小时换班。",
   // src/lib/config.ts
   lib_config_036: "启用无人机时至少需要一个加速目标。",
   // src/lib/config.ts

@@ -57,7 +57,7 @@ describe('AdminRegistrationInvitationsPanel', () => {
     await user.type(screen.getByLabelText('操作原因'), 'test issuance')
     await user.type(screen.getByLabelText('Root 口令'), 'root-secret')
     await user.click(screen.getByRole('button', { name: '生成邀请码' }))
-    expect(await screen.findByText(/明文邀请码仅在创建时提供/)).toBeInTheDocument()
+    expect(await screen.findByText(/完整邀请码只在生成时显示/)).toBeInTheDocument()
     expect(adminApiJson).toHaveBeenCalledWith('/api/admin/registration-invitations', expect.objectContaining({
       method: 'POST',
       json: {
