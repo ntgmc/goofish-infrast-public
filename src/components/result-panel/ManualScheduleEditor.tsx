@@ -9,6 +9,7 @@ import ResultBoardV2, { type BoardRoom } from './ResultBoardV2'
 import OperatorAvatarStrip, { OperatorAvatarTile } from './OperatorAvatarStrip'
 import { prepareResult } from './formatters'
 import { ROOM_LABELS } from './labels'
+import { operatorBuildingSkills } from './building-skills'
 import {
   changeManualDrone, changeManualOperator, createManualPlans, lockedManualOperators, manualResult,
   manualSourceKey, parseManualDraft, readManualDraft, saveManualDraft, type ManualDraft, type ManualPlan,
@@ -176,7 +177,11 @@ export default function ManualScheduleEditor({ source, profileId, operators }: {
       </div>
       {board}
       <Dialog open={Boolean(room)} onOpenChange={(open) => { if (!open) setRoom(null) }}>
-        <DialogContent className="max-w-3xl ease-[ease-out] will-change-[transform,opacity]" showCloseButton closeLabel={label.close}>
+        <DialogContent className="max-w-3xl ease-[ease-out] will-change-[transform,opacity]" showCloseButton closeLabel={label.close}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault()
+            if (event.target instanceof HTMLElement) event.target.focus({ preventScroll: true })
+          }}>
           <DialogTitle>{room ? label.edit_room(`${room.label} ${room.indexLabel}`) : label.picker}</DialogTitle>
           <DialogDescription>{label.move_hint}</DialogDescription>
           <div className="flex flex-wrap gap-2">
@@ -186,13 +191,13 @@ export default function ManualScheduleEditor({ source, profileId, operators }: {
                 className={`relative rounded-md border p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 ${slot === index ? 'border-brand-400 bg-brand-500/10' : 'border-surface-3 hover:bg-surface-2'} disabled:cursor-not-allowed disabled:opacity-70`}
                 onClick={() => setSlot(index)}>
                 <OperatorAvatarTile key={name || index} operator={name ? operators.find((operator) => operator.name === name) ?? { name } : undefined}
-                  placeholder={label.empty_slot(index + 1)} large showFullNames />
+                  placeholder={label.empty_slot(index + 1)} large showFullNames buttonChild />
                 {locked.has(name) && <LockKeyhole size={14} className="absolute right-1 top-1 rounded-sm bg-surface-1 text-warning" aria-hidden="true" />}
               </button>
             ))}
           </div>
           {locked.has(selectedName) ? <p className="text-sm text-warning">{label.lock_operator}</p> : (
-            <ManualOperatorPicker key={room?.key} operators={operators} locked={locked} rooms={plans[activePlan].rooms}
+            <ManualOperatorPicker key={room?.key} operators={operators} locked={locked} rooms={plans[activePlan].rooms} roomType={room?.roomType ?? ''}
               selectedName={selectedName} onChoose={chooseOperator} />
           )}
           <DialogClose className="tool-primary-action">{label.done}</DialogClose>
@@ -212,10 +217,11 @@ export default function ManualScheduleEditor({ source, profileId, operators }: {
   )
 }
 
-function ManualOperatorPicker({ operators, locked, rooms, selectedName, onChoose }: {
+function ManualOperatorPicker({ operators, locked, rooms, roomType, selectedName, onChoose }: {
   operators: LicenseOperator[];
   locked: Set<string>;
   rooms: ManualPlan['rooms'];
+  roomType: string;
   selectedName: string;
   onChoose: (name: string) => void;
 }) {
@@ -224,6 +230,8 @@ function ManualOperatorPicker({ operators, locked, rooms, selectedName, onChoose
   const [query, setQuery] = useState('')
   const [composing, setComposing] = useState(false)
   const [visibleCount, setVisibleCount] = useState(30)
+  const [facility, setFacility] = useState(roomType)
+  const [skillName, setSkillName] = useState('')
   const grid = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -236,9 +244,22 @@ function ManualOperatorPicker({ operators, locked, rooms, selectedName, onChoose
     return () => window.clearTimeout(timer)
   }, [search, composing, query])
 
-  const matches = useMemo(() => operators
-    .filter((operator) => operator.own && !locked.has(operator.name) && (!query || PinyinMatch.match(operator.name, query))),
-  [operators, locked, query])
+  const available = useMemo(() => operators
+    .filter((operator) => operator.own && !locked.has(operator.name))
+    .map((operator) => {
+      const skills = operatorBuildingSkills(operator)
+      return { operator, known: skills.length > 0, skills: skills.filter((skill) => skill.state === 'active') }
+    }),
+  [operators, locked])
+  const skillNames = useMemo(() => [...new Set(available.flatMap(({ skills }) => skills
+    .filter((skill) => !facility || skill.room === facility).map((skill) => skill.name)))].sort((a, b) => a.localeCompare(b, 'zh-CN')),
+  [available, facility])
+  const matches = useMemo(() => available
+    .filter(({ operator, known, skills }) => (!query || PinyinMatch.match(operator.name, query))
+      && (!facility && !skillName || !known && !skillName || skills.some((skill) => (!facility || skill.room === facility) && (!skillName || skill.name === skillName))))
+    .map(({ operator }) => operator),
+  [available, facility, skillName, query])
+  const resetScroll = () => { setVisibleCount(30); if (grid.current) grid.current.scrollTop = 0 }
   const candidates = useDeferredValue(matches, [])
   // ponytail: keep scrolled batches mounted; window rows if inventories grow to thousands.
   const showMore = useCallback(() => setVisibleCount((count) => Math.min(count + 30, matches.length)), [matches.length])
@@ -252,7 +273,7 @@ function ManualOperatorPicker({ operators, locked, rooms, selectedName, onChoose
           className={`rounded-md border p-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 ${selectedName === operator.name ? 'border-brand-400 bg-brand-500/10' : 'border-surface-3 hover:bg-surface-2'}`}
           onFocus={index === visibleCount - 1 ? showMore : undefined}
           onClick={() => onChoose(operator.name)}>
-          <OperatorAvatarStrip operators={[operator]} fallbackText={operator.name} compact showFullNames />
+          <OperatorAvatarStrip operators={[operator]} fallbackText={operator.name} compact showFullNames buttonChild />
         </button>
       )
     }), [candidates, visibleCount, rooms, selectedName, onChoose, label, showMore])
@@ -266,14 +287,36 @@ function ManualOperatorPicker({ operators, locked, rooms, selectedName, onChoose
           placeholder={label.search} aria-label={label.search} style={{ outline: 'none' }}
           className="min-h-11 min-w-0 w-full bg-transparent text-sm text-ink-primary placeholder:text-ink-muted" />
       </label>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="min-w-0 space-y-1 text-xs text-ink-muted">
+          <span>{copy.domain.building_skills.facility}</span>
+          <select aria-label={copy.domain.building_skills.facility} value={facility}
+            className="min-h-11 w-full rounded-md border border-surface-3 bg-surface-1 px-3 text-sm text-ink-primary"
+            onChange={(event) => { setFacility(event.target.value); setSkillName(''); resetScroll() }}>
+            <option value="">{copy.domain.building_skills.all_facilities}</option>
+            {Object.entries(ROOM_LABELS).map(([type, name]) => <option key={type} value={type}>{name}</option>)}
+            <option value="training">{copy.domain.building_skills.training}</option>
+          </select>
+        </label>
+        <label className="min-w-0 space-y-1 text-xs text-ink-muted">
+          <span>{copy.domain.building_skills.filter}</span>
+          <select aria-label={copy.domain.building_skills.filter} value={skillName}
+            className="min-h-11 w-full rounded-md border border-surface-3 bg-surface-1 px-3 text-sm text-ink-primary"
+            onChange={(event) => { setSkillName(event.target.value); resetScroll() }}>
+            <option value="">{copy.domain.building_skills.all_skills}</option>
+            {skillNames.map((name) => <option key={name} value={name}>{name}</option>)}
+          </select>
+        </label>
+      </div>
+      <p className="text-xs leading-5 text-ink-muted">{copy.domain.building_skills.filter_hint}</p>
       <button type="button" className="tool-secondary-action" disabled={!selectedName} onClick={() => onChoose('')}>{label.clear}</button>
-      <div ref={grid} className="grid max-h-72 grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-5" aria-label={label.picker}
+      <div ref={grid} className="grid max-h-52 grid-cols-3 gap-2 overflow-y-auto sm:max-h-72 sm:grid-cols-5" aria-label={label.picker}
         aria-busy={matches !== candidates || composing || query !== search.trim()} onScroll={(event) => {
           const element = event.currentTarget
           if (element.scrollHeight - element.scrollTop - element.clientHeight < 120) showMore()
         }}>
         {choices.length > 0 ? choices : matches.length > 0
-          ? <div className="col-span-full h-72 rounded-md bg-surface-2" aria-hidden="true" />
+          ? <div className="col-span-full h-52 rounded-md bg-surface-2 sm:h-72" aria-hidden="true" />
           : <p className="col-span-full py-6 text-center text-sm text-ink-muted">{label.no_matches}</p>}
       </div>
     </>

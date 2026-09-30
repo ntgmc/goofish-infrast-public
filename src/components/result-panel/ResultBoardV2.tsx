@@ -221,7 +221,7 @@ function RoomCard({ room, drones, editing, className = '' }: { room: BoardRoom; 
                   title={locked ? copy.domain.manual_schedule.lock_operator : undefined}
                   className="relative rounded-md p-1 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 disabled:cursor-not-allowed disabled:opacity-70"
                   onClick={() => editing.onEditRoom(room, slot)}>
-                  <OperatorAvatarTile key={name || slot} operator={operator} placeholder={copy.domain.manual_schedule.empty_slot(slot + 1)} large showFullNames />
+                  <OperatorAvatarTile key={name || slot} operator={operator} placeholder={copy.domain.manual_schedule.empty_slot(slot + 1)} large showFullNames buttonChild />
                   {locked && <LockKeyhole size={14} className="absolute right-0 top-0 rounded-sm bg-surface-1 text-warning" aria-label={copy.domain.manual_schedule.lock_operator} />}
                 </button>
               )

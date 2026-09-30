@@ -6,6 +6,7 @@ import { formatCompactNumber, prepareResult } from './formatters'
 import { MaaImportGuide, RotationManualGuide } from './Guides'
 import ResultBoard from './ResultBoard'
 import ResultBoardV2 from './ResultBoardV2'
+import OperatorSkillPreview from './OperatorSkillPreview'
 import ResultDetail from './ResultDetail'
 import ResultMetrics from './ResultMetrics'
 import type { ResultPanelProps, ResultTabId } from './types'
@@ -126,6 +127,7 @@ export default function ResultPanel({
   }
 
   return (
+    <OperatorSkillPreview>
     <div className="space-y-4">
       <div className="tool-panel overflow-hidden">
         <div className="tool-panel-header flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
@@ -288,6 +290,7 @@ export default function ResultPanel({
         {selectedTab === 'suggestions' && suggestionsSlot && <section className="tool-panel overflow-hidden p-5 sm:p-6">{suggestionsSlot}</section>}
       </AnimatedPresenceRegion>}
     </div>
+    </OperatorSkillPreview>
   )
 }
 

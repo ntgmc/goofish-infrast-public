@@ -9,6 +9,7 @@ export default function OperatorAvatarStrip({
   micro = false,
   showFullNames = false,
   large = false,
+  buttonChild = false,
 }: {
   operators: RoomOperator[];
   fallbackText: string;
@@ -16,6 +17,7 @@ export default function OperatorAvatarStrip({
   micro?: boolean;
   showFullNames?: boolean;
   large?: boolean;
+  buttonChild?: boolean;
 }) {
   if (operators.length === 0) {
     return <p className="text-sm leading-6 text-ink-secondary">{fallbackText}</p>
@@ -33,6 +35,7 @@ export default function OperatorAvatarStrip({
           micro={micro}
           showFullNames={showFullNames}
           large={large}
+          buttonChild={buttonChild}
         />
       ))}
     </div>
@@ -46,6 +49,7 @@ export function OperatorAvatarTile({
   micro = false,
   showFullNames = false,
   large = false,
+  buttonChild = false,
 }: {
   operator?: RoomOperator;
   placeholder?: string;
@@ -53,6 +57,7 @@ export function OperatorAvatarTile({
   micro?: boolean;
   showFullNames?: boolean;
   large?: boolean;
+  buttonChild?: boolean;
 }) {
   const [imageFailed, setImageFailed] = useState(false)
   const canLoadImage = Boolean(operator?.id && !imageFailed)
@@ -67,7 +72,10 @@ export function OperatorAvatarTile({
   const initial = name.trim().slice(0, 1) || '?'
 
   return (
-    <div className={`${tileWidth} min-w-0 text-center`} title={name}>
+    <div className={`${tileWidth} min-w-0 text-center`} title={operator ? undefined : name}
+      data-operator-name={operator?.name} data-operator-id={operator?.id}
+      data-operator-elite={operator?.elite} data-operator-level={operator?.level}
+      tabIndex={operator && !buttonChild ? 0 : undefined}>
       <div className={`mx-auto overflow-hidden rounded-md border border-surface-3 bg-surface-2 ${operator ? '' : 'border-dashed'} ${avatarSize}`}>
         {canLoadImage ? (
           <img

@@ -9,6 +9,60 @@ import ResultPanel from './ResultPanel'
 afterEach(cleanup)
 
 describe('manual schedule access and recovery', () => {
+  it('uses unlocked skill upgrades for hover and filtering while preserving locked assignments', async () => {
+    const user = userEvent.setup()
+    const result = createThreeShiftResult()
+    result.plans[0].rooms.trading[0].operators = ['能天使', '德克萨斯']
+    result.plans[0].Fiammetta = { enable: true, target: '德克萨斯', order: 'pre' }
+    const operators = [
+      { id: 'char_103_angel', name: '能天使', elite: 0, level: 40 },
+      { id: 'char_102_texas', name: '德克萨斯', elite: 2, level: 90 },
+      { id: 'char_002_amiya', name: '阿米娅', elite: 2, level: 80 },
+      { id: 'char_285_medic2', name: 'Lancet-2', elite: 0, level: 20 },
+      { id: 'char_151_myrtle', name: '桃金娘', elite: 2, level: 80 },
+    ].map((operator) => ({ ...operator, own: true, rarity: 6 }))
+    const props = { result, operators, manualEditProfile: { id: 'skills', kind: 'cdk' as const, permission: 'advanced' as const } }
+    const view = render(<ResultPanel {...props} />)
+    await user.click(screen.getByRole('tab', { name: '手动排班' }))
+    const editor = within(await screen.findByRole('region', { name: '手动调整排班' }))
+    await user.hover(editor.getByRole('button', { name: /编辑 贸易站.*能天使/ }).querySelector('[data-operator-name]')!)
+    const preview = await screen.findByRole('tooltip')
+    expect(within(preview).getByText('企鹅物流·α')).toBeInTheDocument()
+    expect(within(preview).getByText(/订单获取效率\+20%/)).toBeInTheDocument()
+    expect(within(preview).getByText(/未解锁/)).toBeInTheDocument()
+    await user.click(editor.getByRole('button', { name: /编辑 贸易站.*空位 3/ }))
+    const dialog = within(screen.getByRole('dialog'))
+    const grid = within(dialog.getByLabelText('选择进驻干员'))
+    const filter = dialog.getByRole('combobox', { name: '按基建技能筛选' })
+    await user.selectOptions(filter, '企鹅物流·α')
+    expect(await grid.findByRole('button', { name: '能天使' })).toBeInTheDocument()
+    expect(grid.queryByRole('button', { name: '德克萨斯' })).not.toBeInTheDocument()
+    expect(grid.queryByRole('button', { name: '阿米娅' })).not.toBeInTheDocument()
+    view.rerender(<ResultPanel {...props} operators={operators.map((operator) => operator.name === '能天使' ? { ...operator, elite: 2 } : operator)} />)
+    await user.selectOptions(filter, '物流专家')
+    expect(await grid.findByRole('button', { name: '能天使' })).toBeInTheDocument()
+    expect(within(filter).queryByRole('option', { name: '企鹅物流·α' })).not.toBeInTheDocument()
+    const candidate = grid.getByRole('button', { name: '能天使' })
+    act(() => candidate.focus())
+    fireEvent.pointerOut(candidate, { relatedTarget: document.body, pointerType: 'mouse' })
+    expect(within(await screen.findByRole('tooltip')).getByText('物流专家')).toBeInTheDocument()
+    expect(candidate).toHaveAttribute('aria-describedby', screen.getByRole('tooltip').id)
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    await user.selectOptions(dialog.getByRole('combobox', { name: '技能适用设施' }), 'dormitory')
+    expect(await grid.findByRole('button', { name: '阿米娅' })).toBeInTheDocument()
+    expect(grid.queryByRole('button', { name: 'Lancet-2' })).not.toBeInTheDocument()
+    await user.selectOptions(dialog.getByRole('combobox', { name: '技能适用设施' }), '')
+    await user.selectOptions(filter, '全部技能')
+    expect(await grid.findByRole('button', { name: 'Lancet-2' })).toBeInTheDocument()
+    await user.click(grid.getByRole('button', { name: '阿米娅' }))
+    await user.click(dialog.getByRole('button', { name: '完成' }))
+    await user.click(editor.getByRole('button', { name: '保存本地草稿' }))
+    expect(JSON.parse(localStorage.getItem('manual-schedule:skills')!).plans[0].rooms.trading[0]).toEqual(['能天使', '德克萨斯', '阿米娅'])
+    expect(result.plans[0].rooms.trading[0].operators).toEqual(['能天使', '德克萨斯'])
+    localStorage.removeItem('manual-schedule:skills')
+  })
+
   it('keeps later candidates reachable by keyboard, scrolling and search and saves their assignment', async () => {
     const user = userEvent.setup()
     const result = createThreeShiftResult()
@@ -22,6 +76,7 @@ describe('manual schedule access and recovery', () => {
     await user.click(editor.getByRole('button', { name: /编辑 贸易站.*空位 2/ }))
     const dialog = within(screen.getByRole('dialog'))
     const grid = dialog.getByLabelText('选择进驻干员')
+    await user.selectOptions(dialog.getByRole('combobox', { name: '技能适用设施' }), '')
     const visible = within(grid).getAllByRole('button')
     const lastVisible = visible[visible.length - 1]
     act(() => lastVisible.focus())
@@ -50,6 +105,7 @@ describe('manual schedule access and recovery', () => {
     await user.click(within(editor).getByRole('button', { name: /编辑 贸易站.*空位 2/ }))
     const dialog = within(screen.getByRole('dialog'))
     const input = dialog.getByRole('searchbox')
+    await user.selectOptions(dialog.getByRole('combobox', { name: '技能适用设施' }), '')
     vi.useFakeTimers()
     try {
       fireEvent.change(input, { target: { value: 'n' } })

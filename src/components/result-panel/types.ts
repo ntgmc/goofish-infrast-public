@@ -19,6 +19,8 @@ export interface ResultPanelProps {
 export type RoomOperator = {
   name: string;
   id?: string;
+  elite?: number;
+  level?: number | string;
 }
 
 export type RoomRow = {
