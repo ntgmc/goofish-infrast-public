@@ -188,15 +188,9 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_001: "排班配置",
   // src/pages/tool/optimize/ConfigSection.tsx
-  pages_tool_optimize_ConfigSection_002: "已修改",
+  pages_tool_optimize_ConfigSection_002: "待重新生成",
   // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_003: "需处理",
-  // src/pages/tool/optimize/ConfigSection.tsx
-  pages_tool_optimize_ConfigSection_004: "待同步",
-  // src/pages/tool/optimize/ConfigSection.tsx
-  pages_tool_optimize_ConfigSection_005: "同步中",
-  // src/pages/tool/optimize/ConfigSection.tsx
-  pages_tool_optimize_ConfigSection_006: "同步失败，重试",
   // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_007: "基建配置",
   // src/pages/tool/optimize/ConfigSection.tsx

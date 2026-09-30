@@ -52,6 +52,15 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('ToolPage route guards', () => {
+  it.each([true, false])('returns to profiles only when configuration saving succeeds: %s', async (saved) => {
+    const user = userEvent.setup()
+    const flushConfigSave = vi.fn().mockResolvedValue(saved)
+    const router = renderToolRoute('/tool/setup/config', { activeProfile: createProfile(), flushConfigSave })
+    await user.click(screen.getByRole('button', { name: '返回账号列表' }))
+    expect(flushConfigSave).toHaveBeenCalledOnce()
+    await waitFor(() => expect(router.state.location.pathname).toBe(saved ? '/tool/profiles' : '/tool/setup/config'))
+  })
+
   it('shows the announcement banner after the /tool entry redirects to the dashboard', async () => {
     const router = renderToolRoute('/tool', {
       banner: {
@@ -245,6 +254,9 @@ function createSession(overrides: Record<string, unknown> = {}) {
     eliteOverrides: {},
     configOverride: null,
     setConfigOverride: vi.fn(),
+    configSyncStatus: 'idle',
+    retryConfigSave: vi.fn(),
+    flushConfigSave: vi.fn().mockResolvedValue(true),
     banner: null,
     popups: [],
     announcementUnreadCount: 0,

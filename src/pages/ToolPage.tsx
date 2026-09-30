@@ -119,6 +119,9 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
   }
   const navigateSetup = (section: WorkspaceSetupSection) => navigateToToolPath(profileScopedPath(workspaceSetupPath(section), activeProfile?.id))
   const navigateOptimize = (section: OptimizeSection) => navigateToToolPath(profileScopedPath(optimizePath(section), activeProfile?.id))
+  const navigateAfterConfigSave = async (path: string) => {
+    if (await flushConfigSave()) navigateToToolPath(path)
+  }
   const profileUpgradePrompt = (
     <ProfileUpgradePrompt
       userId={user.id}
@@ -178,16 +181,17 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
               user={user}
               profile={activeProfile}
               workspace={workspace}
+              configOverride={configOverride}
+              setConfigOverride={setConfigOverride}
+              configSyncStatus={configSyncStatus}
+              retryConfigSave={retryConfigSave}
               announcement={banner}
               activeSection={route.section}
               onSectionChange={navigateSetup}
-              onSaved={(payload) => {
-                applyAuthPayload(payload)
-                navigate(profileScopedPath(optimizePath('overview'), activeProfile.id))
-              }}
+              onProceed={() => navigate(profileScopedPath(optimizePath('overview'), activeProfile.id))}
               onSynced={applyAuthPayload}
-              onBack={() => navigate(dashboardPath('profiles'))}
-              onRedeemNewProfile={() => navigate(dashboardPath('redeem'))}
+              onBack={() => { void navigateAfterConfigSave(dashboardPath('profiles')) }}
+              onRedeemNewProfile={() => { void navigateAfterConfigSave(dashboardPath('redeem')) }}
               onLogout={handleLogout}
             />
           </NotificationCenterProvider>
@@ -226,7 +230,7 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
             onWorkspaceUpdated={applyWorkspaceSnapshot}
             section={route.section}
             onSectionChange={navigateOptimize}
-            onReset={() => navigate(profileScopedPath(workspaceSetupPath('operators'), activeProfile.id))}
+            onReset={() => { void navigateAfterConfigSave(profileScopedPath(workspaceSetupPath('operators'), activeProfile.id)) }}
             onLogout={handleLogout}
             announcement={banner}
             redeemedNotice={null}

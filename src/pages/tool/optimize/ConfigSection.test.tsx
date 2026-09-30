@@ -11,6 +11,49 @@ import ConfigSection from './ConfigSection'
 afterEach(cleanup)
 
 describe('ConfigSection', () => {
+  it('shows saved configuration separately from changes requiring a new result', () => {
+    render(
+      <ConfigSection
+        activeConfig={CONFIG_PRESETS['333']}
+        permission="advanced"
+        userCanEditConfig
+        userCanUseIntermediateAutoConfig={false}
+        configPresetLabel="333 搓玉"
+        configValidation={{ ok: true }}
+        configSyncStatus="idle"
+        latestResult={{ id: 'last-result', name: '上次排班', created_at: '', operator_count: 1, source: 'generated', archived: false, schedule_mode: 'maa', maa_exportable: true, has_config: true }}
+        diffRows={[{ label: '基建布局', before: '2-4-3', after: '3-3-3' }]}
+        updateConfig={vi.fn()}
+        retryConfigSave={vi.fn()}
+      />,
+    )
+    expect(screen.getByText('配置已保存')).toBeInTheDocument()
+    expect(screen.getByText('待重新生成')).toBeInTheDocument()
+    expect(screen.queryByText('已修改')).not.toBeInTheDocument()
+  })
+
+  it('offers the same save retry action as workspace preparation', async () => {
+    const retryConfigSave = vi.fn()
+    render(
+      <ConfigSection
+        activeConfig={CONFIG_PRESETS['243']}
+        permission="advanced"
+        userCanEditConfig
+        userCanUseIntermediateAutoConfig={false}
+        configPresetLabel="243 均衡"
+        configValidation={{ ok: true }}
+        configSyncStatus="failed"
+        latestResult={null}
+        diffRows={[]}
+        updateConfig={vi.fn()}
+        retryConfigSave={retryConfigSave}
+      />,
+    )
+    await userEvent.setup().click(screen.getByRole('button', { name: '配置保存失败，点击重试' }))
+    expect(retryConfigSave).toHaveBeenCalledOnce()
+    expect(screen.queryByText('配置已保存')).not.toBeInTheDocument()
+  })
+
   it('does not expose the obsolete configuration restore action', async () => {
     render(
       <ConfigSection
@@ -18,7 +61,6 @@ describe('ConfigSection', () => {
         permission="advanced"
         userCanEditConfig
         userCanUseIntermediateAutoConfig={false}
-        configChanged
         configPresetLabel="243 均衡"
         configValidation={{ ok: true }}
         configSyncStatus="idle"
@@ -44,7 +86,6 @@ describe('ConfigSection', () => {
           isPreviewProfile
           userCanEditConfig={false}
           userCanUseIntermediateAutoConfig
-          configChanged={false}
           configPresetLabel="243 均衡"
           configValidation={{ ok: true }}
           configSyncStatus="idle"

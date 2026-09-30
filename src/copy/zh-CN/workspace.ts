@@ -254,10 +254,6 @@ export const workspaceCopy = {
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_010: "请先为免费档案绑定森空岛，再保存工作区。",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_011: "保存失败，请稍后重试",
-  // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_012: "保存失败，请稍后重试",
-  // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_013: "MAA 工作台",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_014: "工作区设置",
@@ -320,15 +316,11 @@ export const workspaceCopy = {
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_042: "基建配置",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_043: "已修改",
-  // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_044: "已保存",
+  pages_tool_WorkspaceSetupPage_044: "配置有效",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_045: "请检查",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_046: "正在保存...",
-  // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_047: "保存工作区并开始排班",
+  pages_tool_WorkspaceSetupPage_047: "进入排班",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_048: "免费档案升级失败，请稍后重试",
   // src/pages/tool/WorkspaceSetupPage.tsx
@@ -492,7 +484,15 @@ export const workspaceCopy = {
   // src/pages/tool/tool-utils.ts
   pages_tool_tool_utils_018: "密码不能超过 128 位",
   // src/pages/tool/workspace/WorkspaceConfigSection.tsx
-  pages_tool_workspace_WorkspaceConfigSection_001: "保存后，下次打开这个账号会自动带上这套配置。",
+  pages_tool_workspace_WorkspaceConfigSection_001: "工作区与排班页共用此账号的基建配置，修改会自动保存。点击「生成排班」后用于新结果，已有结果保持不变。",
+  // src/pages/tool/workspace/ConfigSaveStatus.tsx
+  config_not_saved: "配置尚未保存",
+  config_save_pending: "更改待保存",
+  config_saving: "正在保存配置…",
+  config_saved: "配置已保存",
+  config_save_failed: "配置保存失败，点击重试",
+  // src/pages/tool/WorkspaceSetupPage.tsx
+  workspace_proceed_note: "进入排班页后，点击「生成排班」开始计算。",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_tour_001: "使用导览",
   pages_tool_WorkspaceSetupPage_tour_002: "完成排班准备",
@@ -500,7 +500,7 @@ export const workspaceCopy = {
   pages_tool_WorkspaceSetupPage_tour_004: "先选择基建配置",
   pages_tool_WorkspaceSetupPage_tour_005: "请选择与你游戏内基建布局一致的预设，再开始排班。导览只会切换到本页，不会替你更改配置。",
   pages_tool_WorkspaceSetupPage_tour_006: "检查并调整配置",
-  pages_tool_WorkspaceSetupPage_tour_007: "按当前档案权益调整房间、产物和库存。配置有误时，请先按页面提示修正。",
-  pages_tool_WorkspaceSetupPage_tour_008: "保存并开始排班",
-  pages_tool_WorkspaceSetupPage_tour_009: "检查干员和配置状态，按钮可用后点击保存，进入优化总览。导览只介绍操作，提交需由你确认。",
+  pages_tool_WorkspaceSetupPage_tour_007: "按当前档案权益调整房间、产物和库存，修改会自动保存。配置有误时，请先按页面提示修正。",
+  pages_tool_WorkspaceSetupPage_tour_008: "进入排班",
+  pages_tool_WorkspaceSetupPage_tour_009: "干员和配置准备好、配置保存成功后，点击「进入排班」前往排班总览，再点击「生成排班」开始计算。",
 } as const

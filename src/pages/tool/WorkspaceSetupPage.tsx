@@ -10,8 +10,7 @@ import ThemeSwitcher from '../../components/ThemeSwitcher'
 import ToolBreadcrumbs from '../../components/ToolBreadcrumbs'
 import SklandBindingDialog, { type SklandPayload } from '../../components/SklandBindingDialog'
 import { ApiError, apiJson } from '../../lib/api-client'
-import { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateScheduleConfig } from '../../lib/config'
-import { canonicalJson } from '../../lib/crypto'
+import { CONFIG_PRESETS, normalizeConfig, validateScheduleConfig } from '../../lib/config'
 import { resolveActivePurchaseChannel } from '../../lib/purchase'
 import { dashboardPath, profileScopedPath, workspaceSetupPath, type WorkspaceSetupSection } from '../../lib/app-routes'
 import { countOwnedOperators, formatDate, getEffectiveProfilePermission, getProfileAccessLabel, isFreePreviewProfile, parseOperatorsText, sortOperatorsForPreview } from './tool-utils'
@@ -21,6 +20,8 @@ import { useSiteFeatures } from '../../lib/site-feature-context'
 import { usePublicContent } from '../../lib/public-content-context'
 import { NotificationBell } from '../../components/NotificationCenter'
 import { upgradeProfileWithCdk } from './profile-redemption'
+import type { ConfigSyncStatus } from './useToolSession'
+import ConfigSaveStatus from './workspace/ConfigSaveStatus'
 
 
 const WorkspaceConfigSection = lazy(() => import('./workspace/WorkspaceConfigSection'))
@@ -36,10 +37,14 @@ export default function WorkspaceSetupPage({
   user,
   profile,
   workspace,
+  configOverride,
+  setConfigOverride,
+  configSyncStatus,
+  retryConfigSave,
   announcement,
   activeSection,
   onSectionChange,
-  onSaved,
+  onProceed,
   onSynced,
   onBack,
   onRedeemNewProfile,
@@ -48,10 +53,14 @@ export default function WorkspaceSetupPage({
   user: AuthUser
   profile: UserGameAccount
   workspace: UserWorkspace | null
+  configOverride: LicenseConfig | null
+  setConfigOverride: (config: LicenseConfig | null) => void
+  configSyncStatus: ConfigSyncStatus
+  retryConfigSave: () => void
   announcement: Announcement | null
   activeSection: WorkspaceSetupSection
   onSectionChange: (section: WorkspaceSetupSection) => void
-  onSaved: (payload: AuthSuccessResponse) => void
+  onProceed: () => void
   onSynced: (payload: AuthSuccessResponse) => void
   onBack: () => void
   onRedeemNewProfile: () => void
@@ -76,16 +85,14 @@ export default function WorkspaceSetupPage({
   const [operators, setOperators] = useState<LicenseOperator[] | null>(workspace?.operators ?? null)
   const [operatorFileName, setOperatorFileName] = useState<string | null>(null)
   const [operatorSearch, setOperatorSearch] = useState('')
-  const [config, setConfig] = useState<LicenseConfig>(() => normalizeConfig(workspace?.config ?? cloneConfig(CONFIG_PRESETS['243'])))
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [operatorUploading, setOperatorUploading] = useState(false)
-  const [saving, setSaving] = useState(false)
   const [sklandDialogOpen, setSklandDialogOpen] = useState(false)
   const [sklandRefreshing, setSklandRefreshing] = useState(false)
   const [sklandRefreshNotice, setSklandRefreshNotice] = useState<SklandRefreshNotice | null>(null)
 
-  const normalizedConfig = useMemo(() => normalizeConfig(config), [config])
+  const normalizedConfig = useMemo(() => normalizeConfig(configOverride ?? workspace?.config ?? CONFIG_PRESETS['243']), [configOverride, workspace?.config])
   const configValidation = useMemo(() => validateScheduleConfig(normalizedConfig), [normalizedConfig])
   const isPreviewProfile = isFreePreviewProfile(profile)
   const effectivePermission = getEffectiveProfilePermission(profile)
@@ -94,7 +101,13 @@ export default function WorkspaceSetupPage({
   const freePreviewNeedsBinding = isPreviewProfile && !profile.skland_binding
   const canManualEditOperators = !isPreviewProfile
   const ownedOperatorCount = useMemo(() => countOwnedOperators(operators), [operators])
-  const configChanged = workspace?.config ? canonicalJson(normalizedConfig) !== canonicalJson(workspace.config) : true
+  const configSaved = Boolean(workspace?.config) && configSyncStatus === 'idle' && !configOverride
+
+  useEffect(() => {
+    if (!workspace?.config && !configOverride && !freePreviewNeedsBinding) {
+      setConfigOverride(normalizedConfig)
+    }
+  }, [configOverride, freePreviewNeedsBinding, normalizedConfig, setConfigOverride, workspace?.config])
   const filteredOperators = useMemo(() => {
     const keyword = operatorSearch.trim().toLowerCase()
     const source = sortOperatorsForPreview((operators ?? []).filter((operator) => operator.own !== false))
@@ -107,10 +120,14 @@ export default function WorkspaceSetupPage({
   ]
 
   const updateConfig = useCallback((mutate: (config: LicenseConfig) => void) => {
+    if (freePreviewNeedsBinding) {
+      setError(copy.workspace.pages_tool_WorkspaceSetupPage_010)
+      return
+    }
     const next = normalizeConfig(normalizedConfig)
     mutate(next)
-    setConfig(next)
-  }, [normalizedConfig])
+    setConfigOverride(next)
+  }, [freePreviewNeedsBinding, normalizedConfig, setConfigOverride])
 
   const handleOperatorsFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget
@@ -150,7 +167,6 @@ export default function WorkspaceSetupPage({
   const applySklandPayload = useCallback((data: SklandPayload) => {
     if (!data.user) return
     setOperators(data.workspace?.operators ?? null)
-    if (data.workspace?.config) setConfig(normalizeConfig(data.workspace.config))
     setOperatorFileName(null)
     setError(null)
     setStatus(null)
@@ -190,7 +206,7 @@ export default function WorkspaceSetupPage({
     }
   }, [applySklandPayload, onSynced, profile.id])
 
-  const handleSave = async (event: React.FormEvent) => {
+  const handleProceed = (event: React.FormEvent) => {
     event.preventDefault()
     if (!operators) {
       setError(copy.workspace.pages_tool_WorkspaceSetupPage_009)
@@ -204,28 +220,7 @@ export default function WorkspaceSetupPage({
       setError(configValidation.message)
       return
     }
-    setSaving(true)
-    setError(null)
-    setStatus(null)
-    setSklandRefreshNotice(null)
-    try {
-      const data = await apiJson<AuthSuccessResponse>('/api/user/workspace', {
-        method: 'PATCH',
-        json: {
-          profile_id: profile.id,
-          ...(!isPreviewProfile ? { operators } : {}),
-          config: normalizedConfig,
-          elite_overrides: workspace?.elite_overrides ?? {},
-        },
-        fallbackMessage: copy.workspace.pages_tool_WorkspaceSetupPage_011,
-      })
-      if (!data.user) throw new Error(copy.workspace.pages_tool_WorkspaceSetupPage_012)
-      onSaved(data)
-    } catch (caught) {
-      setError((caught as Error).message)
-    } finally {
-      setSaving(false)
-    }
+    if (configSaved) onProceed()
   }
 
   return (
@@ -329,7 +324,7 @@ export default function WorkspaceSetupPage({
                 onRedeemNewProfile={onRedeemNewProfile}
               />
             ) : (
-              <form onSubmit={handleSave}>
+              <form onSubmit={handleProceed}>
 <div className="workspace-setup-grid grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
                   <div className="space-y-5">
                     {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
@@ -384,7 +379,6 @@ export default function WorkspaceSetupPage({
                             canEditIntermediateInventory={canEditLimitedConfig}
                             canSelectPreset
                             canEditFixedShiftHours={isPreviewProfile}
-                            changed={configChanged}
                             permission={profile.permission}
                             validation={configValidation}
                             onUpdate={updateConfig}
@@ -403,14 +397,18 @@ export default function WorkspaceSetupPage({
                         <InfoRow label={copy.workspace.pages_tool_WorkspaceSetupPage_040} value={operators ? `${ownedOperatorCount}${copy.workspace.pages_tool_WorkspaceSetupPage_041}` : '-'} />
                         <div className="flex items-center justify-between gap-4">
                           <dt className="text-ink-muted">{copy.workspace.pages_tool_WorkspaceSetupPage_042}</dt>
-                          <dd className={`font-medium ${configValidation.ok ? 'text-success' : 'text-error'}`}>{configValidation.ok ? (configChanged ? copy.workspace.pages_tool_WorkspaceSetupPage_043 : copy.workspace.pages_tool_WorkspaceSetupPage_044) : copy.workspace.pages_tool_WorkspaceSetupPage_045}</dd>
+                          <dd className={`font-medium ${configValidation.ok ? 'text-success' : 'text-error'}`}>{configValidation.ok ? copy.workspace.pages_tool_WorkspaceSetupPage_044 : copy.workspace.pages_tool_WorkspaceSetupPage_045}</dd>
                         </div>
                       </dl>
                     </section>
                     {!configValidation.ok && <p id="workspace-config-validation" className="tool-alert tool-alert--warning" role="status">{configValidation.message}</p>}
-                    <button type="submit" disabled={saving || freePreviewNeedsBinding || !operators || !configValidation.ok} aria-describedby={!configValidation.ok ? 'workspace-config-validation' : undefined} className="workspace-save-action tool-primary-action w-full" data-tour-target="workspace-start-scheduling">
-                      {saving ? copy.workspace.pages_tool_WorkspaceSetupPage_046 : copy.workspace.pages_tool_WorkspaceSetupPage_047}
+                    <div id="workspace-config-save-status">
+                      <ConfigSaveStatus status={workspace?.config || configOverride ? configSyncStatus : null} onRetry={retryConfigSave} />
+                    </div>
+                    <button type="submit" disabled={!configSaved || freePreviewNeedsBinding || !operators || !configValidation.ok} aria-describedby={!configValidation.ok ? 'workspace-config-validation' : 'workspace-config-save-status'} className="workspace-save-action tool-primary-action w-full" data-tour-target="workspace-start-scheduling">
+                      {copy.workspace.pages_tool_WorkspaceSetupPage_047}
                     </button>
+                    <p className="text-xs leading-5 text-ink-muted">{copy.workspace.workspace_proceed_note}</p>
                   </aside>
                 </div>
               </form>

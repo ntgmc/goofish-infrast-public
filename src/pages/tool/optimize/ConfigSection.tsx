@@ -7,6 +7,7 @@ import { ResultFallback } from './feedback'
 import type { ValidationState } from './types'
 import { copy } from '../../../copy/index'
 import ConfigCapabilityPreview from '../../../components/ConfigCapabilityPreview'
+import ConfigSaveStatus from '../workspace/ConfigSaveStatus'
 
 
 const ConfigEditor = lazy(() => import('../../../components/ConfigEditor'))
@@ -19,7 +20,6 @@ export default function ConfigSection({
   userCanEditConfig,
   canEditFixedShiftHours,
   userCanUseIntermediateAutoConfig,
-  configChanged,
   configPresetLabel,
   configValidation,
   configSyncStatus,
@@ -35,7 +35,6 @@ export default function ConfigSection({
   userCanEditConfig: boolean
   canEditFixedShiftHours?: boolean
   userCanUseIntermediateAutoConfig: boolean
-  configChanged: boolean
   configPresetLabel: string
   configValidation: ValidationState
   configSyncStatus: ConfigSyncStatus
@@ -53,16 +52,13 @@ export default function ConfigSection({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <p className="tool-eyebrow">{copy.optimize.pages_tool_optimize_ConfigSection_001}</p>
-              {configChanged && <span className="tool-status tool-status--warning">{copy.optimize.pages_tool_optimize_ConfigSection_002}</span>}
+              {latestResult && diffRows.length > 0 && <span className="tool-status tool-status--warning">{copy.optimize.pages_tool_optimize_ConfigSection_002}</span>}
               {!configValidation.ok && <span className="tool-status tool-status--error">{copy.optimize.pages_tool_optimize_ConfigSection_003}</span>}
-              {configSyncStatus === 'pending' && <span className="tool-status tool-status--warning">{copy.optimize.pages_tool_optimize_ConfigSection_004}</span>}
-              {configSyncStatus === 'saving' && <span className="tool-status">{copy.optimize.pages_tool_optimize_ConfigSection_005}</span>}
-              {configSyncStatus === 'failed' && (
-                <button type="button" onClick={retryConfigSave} className="tool-status tool-status--error">{copy.optimize.pages_tool_optimize_ConfigSection_006}</button>
-              )}
+              <ConfigSaveStatus status={configSyncStatus} onRetry={retryConfigSave} />
             </div>
             <h2 id="config-section-title" className="mt-2 text-base font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_ConfigSection_007}</h2>
             <p className="mt-1 text-sm leading-6 text-ink-secondary">{description}</p>
+            <p className="mt-2 text-xs leading-5 text-ink-muted">{copy.workspace.pages_tool_workspace_WorkspaceConfigSection_001}</p>
           </div>
         </div>
         <div className="p-4 sm:p-5">
@@ -79,7 +75,6 @@ export default function ConfigSection({
               canEditFixedShiftHours={canEditFixedShiftHours}
               canEditIntermediateInventory={userCanUseIntermediateAutoConfig}
               canSelectPreset={userCanUseIntermediateAutoConfig}
-              changed={configChanged}
               validation={configValidation}
               onUpdate={updateConfig}
               embedded
