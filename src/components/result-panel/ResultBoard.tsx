@@ -3,6 +3,7 @@ import OperatorAvatarStrip from './OperatorAvatarStrip'
 import { RevealItem, StaggeredReveal } from '../MotionPrimitives'
 import type { PreparedPlan, RoomRow } from './types'
 import { copy } from '../../copy/index'
+import DroneMarker, { isDroneTarget } from './DroneMarker'
 
 
 type BoardRoomGroup = {
@@ -83,7 +84,12 @@ export default function ResultBoard({
             {groups.map((group) => (
               <RevealItem key={group.key}>
               <article className={`tool-inset h-full overflow-hidden ${ROOM_TONE[group.roomType] ?? DEFAULT_ROOM_TONE}`}>
-                <div className="border-b border-surface-3/50 px-3 py-2 text-center">
+                <div className="relative border-b border-surface-3/50 px-9 py-2 text-center">
+                  <span className="absolute right-2 top-2">
+                    <DroneMarker labels={prepared.plans.flatMap((plan, index) =>
+                      isDroneTarget(plan.drones, group.roomType, group.rows[0].roomIndex)
+                        ? [plan.name || copy.domain.result_board_v2.shift(index + 1)] : [])} />
+                  </span>
                   <h3 className="truncate text-sm font-semibold text-ink-primary">
                     {group.label}
                     {group.indexLabel && <span className="ml-1 text-ink-muted">{group.indexLabel}</span>}
@@ -139,7 +145,7 @@ function buildFiammettaTargets(plans: PreparedPlan[]): FiammettaTarget[] {
   })
 }
 
-function buildBoardRoomGroups(plans: PreparedPlan[], isRotationMode: boolean): BoardRoomGroup[] {
+export function buildBoardRoomGroups(plans: PreparedPlan[], isRotationMode: boolean): BoardRoomGroup[] {
   const groups = new Map<string, BoardRoomGroup>()
 
   for (const plan of plans) {
@@ -167,7 +173,7 @@ function buildBoardRoomGroups(plans: PreparedPlan[], isRotationMode: boolean): B
   return [...groups.values()]
 }
 
-function buildBoardSlots(rows: RoomRow[], minimumSlotCount: number, isRotationMode: boolean): BoardSlot[] {
+export function buildBoardSlots(rows: RoomRow[], minimumSlotCount: number, isRotationMode: boolean): BoardSlot[] {
   const occupied = new Map<number, RoomRow>()
   const overflowRows: RoomRow[] = []
   let nextSequentialSlot = 1

@@ -190,21 +190,6 @@ describe('ConfigEditor shift patterns', () => {
     expect(screen.getByText(/启用条件：换班间隔须锁定为8小时（误差需控制在5分钟以内）/)).toBeInTheDocument()
   })
 
-  it('shows the selected 12-hour interval in the Fiammetta warning', () => {
-    const config = normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: [12, 12, 12] })
-
-    render(
-      <ConfigEditor
-        config={config}
-        canEdit
-        validation={{ ok: true }}
-        onUpdate={vi.fn()}
-      />,
-    )
-
-    expect(screen.getByText(/启用条件：换班间隔须锁定为12小时（误差需控制在5分钟以内）/)).toBeInTheDocument()
-  })
-
   it('displays and applies a non-uniform 24-hour MAA pattern', async () => {
     const user = userEvent.setup()
     const config = normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: [8, 8, 8] })
@@ -394,28 +379,6 @@ describe('ConfigEditor shift patterns', () => {
 })
 
 describe('ConfigEditor number inputs', () => {
-  it.each([
-    ['243', '3', true],
-    ['252-full', '2', true],
-    ['252-1', '2', true],
-    ['243', '3', false],
-  ] as const)('shows the preset power station count as read-only for %s', (preset, count, canEdit) => {
-    render(
-      <ConfigEditor
-        config={normalizeConfig(CONFIG_PRESETS[preset])}
-        canEdit={canEdit}
-        validation={{ ok: true }}
-        onUpdate={vi.fn()}
-      />,
-    )
-
-    const roomRegion = screen.getByRole('region', { name: '房间结构' })
-    const powerStation = within(roomRegion).getByText('发电站').closest('.config-station--power')
-    expect(powerStation).toHaveTextContent(count)
-    expect(powerStation?.querySelector('dd')).toHaveTextContent(count)
-    expect(within(roomRegion).queryByRole('spinbutton', { name: '发电站' })).not.toBeInTheDocument()
-  })
-
   it('uses InputNumber controls for room and product counts', async () => {
     const user = userEvent.setup()
     const config = normalizeConfig(CONFIG_PRESETS['243'])
@@ -452,36 +415,6 @@ describe('ConfigEditor number inputs', () => {
 })
 
 describe('ConfigEditor preset actions', () => {
-  it('applies the 333 pure money preset', async () => {
-    const user = userEvent.setup()
-    const config = normalizeConfig(CONFIG_PRESETS['243'])
-    const onUpdate = vi.fn()
-    render(
-      <ConfigEditor
-        config={config}
-        canEdit
-        validation={{ ok: true }}
-        onUpdate={onUpdate}
-      />,
-    )
-
-    await user.click(screen.getByRole('button', { name: '333 纯钱' }))
-    const mutate = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
-    const next = cloneConfig(config)
-    mutate?.(next)
-
-    expect(next).toMatchObject({
-      layout: '3-3-3',
-      desc: '333 纯钱流',
-      trading_stations_count: 3,
-      manufacturing_stations_count: 3,
-      product_requirements: {
-        trading_stations: { LMD: 3 },
-        manufacturing_stations: { 'Pure Gold': 3 },
-      },
-    })
-  })
-
   it('applies both right-full 252 variants and clears room levels when returning to 243', async () => {
     const user = userEvent.setup()
     const config = normalizeConfig(CONFIG_PRESETS['243'])

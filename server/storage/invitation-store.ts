@@ -2,6 +2,8 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { z } from 'zod'
 import type {
+  AdminInvitationSettingsResponse,
+  AdminInvitationStats,
   InvitationExpiryPolicy,
   InvitationGiftPackSummary,
   InvitationRecordSummary,
@@ -216,14 +218,47 @@ async function getInvitationRewardCatalogInTransaction(client: PoolClient): Prom
   return result.rows.map(catalogRow)
 }
 
-export async function getAdminInvitationSettingsOverview(): Promise<{
-  settings: InvitationSettings
-  catalog: InvitationRewardCatalogItem[]
-  configured_gift_pack_versions: InvitationGiftPackSummary[]
-}> {
-  const [settings, catalog] = await Promise.all([getInvitationSettings(), getInvitationRewardCatalog()])
+async function getAdminInvitationStats(): Promise<AdminInvitationStats> {
+  await ensureSchema()
+  const asOf = new Date().toISOString()
+  const result = await query<Record<Exclude<keyof AdminInvitationStats, 'as_of'>, string>>(
+    `select count(*)::text as registered,
+            count(*) filter (where activated_at is not null)::text as activated,
+            count(*) filter (where inviter_rewarded_at is not null
+              or settlement_json #>> '{rewards,invitee,status}' = 'granted')::text as rewarded_invitations,
+            count(*) filter (where status in ('activated', 'processing'))::text as pending_rewards,
+            count(*) filter (where status = 'failed')::text as retrying_rewards,
+            count(*) filter (where status = 'dead_letter')::text as failed_rewards,
+            count(*) filter (where (registered_at at time zone 'Asia/Shanghai')::date
+              = ($1::timestamptz at time zone 'Asia/Shanghai')::date)::text as today_registered,
+            count(*) filter (where (activated_at at time zone 'Asia/Shanghai')::date
+              = ($1::timestamptz at time zone 'Asia/Shanghai')::date)::text as today_activated,
+            count(*) filter (where (inviter_rewarded_at is not null
+              or settlement_json #>> '{rewards,invitee,status}' = 'granted')
+              and (settled_at at time zone 'Asia/Shanghai')::date
+              = ($1::timestamptz at time zone 'Asia/Shanghai')::date)::text as today_rewarded
+       from invitations`,
+    [asOf],
+  )
+  const stats = result.rows[0]
+  return {
+    as_of: asOf,
+    registered: Number(stats?.registered ?? 0),
+    activated: Number(stats?.activated ?? 0),
+    rewarded_invitations: Number(stats?.rewarded_invitations ?? 0),
+    pending_rewards: Number(stats?.pending_rewards ?? 0),
+    retrying_rewards: Number(stats?.retrying_rewards ?? 0),
+    failed_rewards: Number(stats?.failed_rewards ?? 0),
+    today_registered: Number(stats?.today_registered ?? 0),
+    today_activated: Number(stats?.today_activated ?? 0),
+    today_rewarded: Number(stats?.today_rewarded ?? 0),
+  }
+}
+
+export async function getAdminInvitationSettingsOverview(): Promise<AdminInvitationSettingsResponse> {
+  const [settings, catalog, stats] = await Promise.all([getInvitationSettings(), getInvitationRewardCatalog(), getAdminInvitationStats()])
   const configuredGiftPackVersions = await loadGiftPackSummaries(settings.rewards.flatMap((reward) => reward.gift_pack_version_id ? [reward.gift_pack_version_id] : []))
-  return { settings, catalog, configured_gift_pack_versions: [...configuredGiftPackVersions.values()] }
+  return { settings, catalog, configured_gift_pack_versions: [...configuredGiftPackVersions.values()], stats }
 }
 
 export async function saveInvitationSettings(

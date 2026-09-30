@@ -479,7 +479,7 @@ const PERSONAL_USE_ACTION_LABELS: Record<string, string> = {
   optimization_generate: '生成排班结果',
 }
 
-export function personalUseActionLabel(action: string): string {
+function personalUseActionLabel(action: string): string {
   return PERSONAL_USE_ACTION_LABELS[action] ?? '历史操作'
 }
 

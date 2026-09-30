@@ -352,6 +352,7 @@ export default function OptimizeWorkflowPage(props: Props) {
               maaDownloadBusy={workspaceBusyAction?.startsWith('download:') === true}
               fullResultDownloadBusy={workspaceBusyAction?.startsWith('download-full:') === true}
               fullDataAvailable={userCanViewFullData}
+              manualEditProfile={{ id: profile.id, kind: profile.kind, permission }}
             />
           )}
 

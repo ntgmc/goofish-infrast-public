@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { LicenseOperator, OptimizeResult } from '../../lib/types'
+import type { LicenseOperator, OptimizeResult, RawPermissionMode, UserGameAccountKind } from '../../lib/types'
 
 export interface ResultPanelProps {
   result: OptimizeResult;
@@ -13,11 +13,14 @@ export interface ResultPanelProps {
   detailDefaultOpen?: boolean;
   suggestionsSlot?: ReactNode;
   previewLimit?: OptimizeResult['preview_limit'];
+  manualEditProfile?: { id: string; kind: UserGameAccountKind; permission: RawPermissionMode };
 }
 
 export type RoomOperator = {
   name: string;
   id?: string;
+  elite?: number;
+  level?: number | string;
 }
 
 export type RoomRow = {
@@ -42,4 +45,4 @@ export type PreparedPlan = OptimizeResult['plans'][number] & {
   rows: RoomRow[];
 }
 
-export type ResultTabId = 'board' | 'board-v2' | 'data' | 'detail' | 'import' | 'suggestions'
+export type ResultTabId = 'board' | 'board-v2' | 'manual' | 'data' | 'detail' | 'import' | 'suggestions'

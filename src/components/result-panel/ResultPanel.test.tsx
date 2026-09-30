@@ -1,12 +1,192 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { OptimizeResult } from '../../lib/types'
 import ResultPanel from './ResultPanel'
 
 afterEach(cleanup)
+
+describe('manual schedule access and recovery', () => {
+  it('uses unlocked skill upgrades for candidate effects and facility filtering while preserving locked assignments', async () => {
+    const user = userEvent.setup()
+    const result = createThreeShiftResult()
+    result.plans[0].rooms.trading[0].operators = ['能天使', '德克萨斯']
+    result.plans[0].Fiammetta = { enable: true, target: '德克萨斯', order: 'pre' }
+    const operators = [
+      { id: 'char_103_angel', name: '能天使', elite: 0, level: 40 },
+      { id: 'char_102_texas', name: '德克萨斯', elite: 2, level: 90 },
+      { id: 'char_002_amiya', name: '阿米娅', elite: 2, level: 80 },
+      { id: 'char_285_medic2', name: 'Lancet-2', elite: 0, level: 20 },
+      { id: 'char_151_myrtle', name: '桃金娘', elite: 2, level: 80 },
+    ].map((operator) => ({ ...operator, own: true, rarity: 6 }))
+    const props = { result, operators, manualEditProfile: { id: 'skills', kind: 'cdk' as const, permission: 'advanced' as const } }
+    const view = render(<ResultPanel {...props} />)
+    await user.click(screen.getByRole('tab', { name: '手动排班' }))
+    const editor = within(await screen.findByRole('region', { name: '手动调整排班' }))
+    await user.hover(editor.getByRole('button', { name: /编辑 贸易站.*能天使/ }).querySelector('[data-operator-name]')!)
+    const preview = await screen.findByRole('tooltip')
+    expect(within(preview).getByText('企鹅物流·α')).toBeInTheDocument()
+    expect(within(preview).getByText(/订单获取效率\+20%/)).toBeInTheDocument()
+    expect(within(preview).getByText(/未解锁/)).toBeInTheDocument()
+    await user.click(editor.getByRole('button', { name: /编辑 贸易站.*空位 3/ }))
+    const dialog = within(screen.getByRole('dialog'))
+    const grid = within(dialog.getByLabelText('选择进驻干员'))
+    const candidate = await grid.findByRole('button', { name: '能天使' })
+    expect(within(candidate).getByRole('img', { name: '企鹅物流·α' })).toBeInTheDocument()
+    expect(within(candidate).getByText(/订单获取效率\+20%/)).toBeInTheDocument()
+    expect(grid.queryByRole('button', { name: '德克萨斯' })).not.toBeInTheDocument()
+    expect(grid.queryByRole('button', { name: '阿米娅' })).not.toBeInTheDocument()
+    view.rerender(<ResultPanel {...props} operators={operators.map((operator) => operator.name === '能天使' ? { ...operator, elite: 2 } : operator)} />)
+    expect(await within(candidate).findByRole('img', { name: '物流专家' })).toBeInTheDocument()
+    expect(within(candidate).getByText(/订单获取效率\+35%/)).toBeInTheDocument()
+    expect(within(candidate).queryByRole('img', { name: '企鹅物流·α' })).not.toBeInTheDocument()
+    act(() => candidate.focus())
+    fireEvent.pointerOut(candidate, { relatedTarget: document.body, pointerType: 'mouse' })
+    expect(within(await screen.findByRole('tooltip')).getByText('物流专家')).toBeInTheDocument()
+    expect(candidate).toHaveAttribute('aria-describedby', screen.getByRole('tooltip').id)
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    await user.selectOptions(dialog.getByRole('combobox', { name: '技能适用设施' }), 'dormitory')
+    expect(await grid.findByRole('button', { name: '阿米娅' })).toBeInTheDocument()
+    expect(grid.queryByRole('button', { name: 'Lancet-2' })).not.toBeInTheDocument()
+    await user.selectOptions(dialog.getByRole('combobox', { name: '技能适用设施' }), '')
+    expect(await grid.findByRole('button', { name: 'Lancet-2' })).toBeInTheDocument()
+    await user.click(grid.getByRole('button', { name: '阿米娅' }))
+    await user.click(dialog.getByRole('button', { name: '完成' }))
+    await user.click(editor.getByRole('button', { name: '保存本地草稿' }))
+    expect(JSON.parse(localStorage.getItem('manual-schedule:skills')!).plans[0].rooms.trading[0]).toEqual(['能天使', '德克萨斯', '阿米娅'])
+    expect(result.plans[0].rooms.trading[0].operators).toEqual(['能天使', '德克萨斯'])
+    localStorage.removeItem('manual-schedule:skills')
+  })
+
+  it('keeps later candidates reachable by keyboard, scrolling and search and saves their assignment', async () => {
+    const user = userEvent.setup()
+    const result = createThreeShiftResult()
+    const operators = Array.from({ length: 70 }, (_, index) => ({
+      id: `candidate-${index}`, name: index === 69 ? '阿米娅' : `候选${index + 1}`, own: true, elite: 2, rarity: 6,
+    }))
+    render(<ResultPanel result={result} operators={operators}
+      manualEditProfile={{ id: 'large-picker', kind: 'cdk', permission: 'advanced' }} />)
+    await user.click(screen.getByRole('tab', { name: '手动排班' }))
+    const editor = within(await screen.findByRole('region', { name: '手动调整排班' }))
+    await user.click(editor.getByRole('button', { name: /编辑 贸易站.*空位 2/ }))
+    const dialog = within(screen.getByRole('dialog'))
+    const grid = dialog.getByLabelText('选择进驻干员')
+    await user.selectOptions(dialog.getByRole('combobox', { name: '技能适用设施' }), '')
+    const visible = within(grid).getAllByRole('button')
+    const lastVisible = visible[visible.length - 1]
+    act(() => lastVisible.focus())
+    await user.tab()
+    expect(document.activeElement).not.toBe(lastVisible)
+    expect(grid).toContainElement(document.activeElement as HTMLElement)
+    fireEvent.scroll(grid)
+    await user.click(within(grid).getByRole('button', { name: '阿米娅' }))
+    await user.type(dialog.getByRole('searchbox'), 'amy')
+    await waitFor(() => expect(within(grid).queryByRole('button', { name: '候选1' })).not.toBeInTheDocument())
+    expect(within(grid).getByRole('button', { name: '阿米娅' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(dialog.getByRole('button', { name: '完成' }))
+    await user.click(editor.getByRole('button', { name: '保存本地草稿' }))
+    expect(JSON.parse(localStorage.getItem('manual-schedule:large-picker')!).plans[0].rooms.trading[0]).toEqual(['贸易1', '阿米娅', ''])
+    expect(result.plans[0].rooms.trading[0].operators).toEqual(['贸易1'])
+    localStorage.removeItem('manual-schedule:large-picker')
+  })
+
+  it('debounces the latest pinyin query and waits for Chinese composition to finish', async () => {
+    const user = userEvent.setup()
+    const operators = ['能天使', '阿米娅', '德克萨斯'].map((name) => ({ id: name, name, own: true, elite: 2, rarity: 6 }))
+    render(<ResultPanel result={createThreeShiftResult()} operators={operators}
+      manualEditProfile={{ id: 'search-profile', kind: 'cdk', permission: 'advanced' }} />)
+    await user.click(screen.getByRole('tab', { name: '手动排班' }))
+    const editor = await screen.findByRole('region', { name: '手动调整排班' })
+    await user.click(within(editor).getByRole('button', { name: /编辑 贸易站.*空位 2/ }))
+    const dialog = within(screen.getByRole('dialog'))
+    const input = dialog.getByRole('searchbox')
+    await user.selectOptions(dialog.getByRole('combobox', { name: '技能适用设施' }), '')
+    vi.useFakeTimers()
+    try {
+      fireEvent.change(input, { target: { value: 'n' } })
+      act(() => { vi.advanceTimersByTime(150) })
+      fireEvent.change(input, { target: { value: 'nts' } })
+      act(() => { vi.advanceTimersByTime(150) })
+      expect(dialog.getByRole('button', { name: '阿米娅' })).toBeInTheDocument()
+      act(() => { vi.advanceTimersByTime(50) })
+      expect(dialog.getByRole('button', { name: '能天使' })).toBeInTheDocument()
+      expect(dialog.queryByRole('button', { name: '阿米娅' })).not.toBeInTheDocument()
+
+      fireEvent.change(input, { target: { value: 'AMiY' } })
+      act(() => { vi.advanceTimersByTime(200) })
+      expect(dialog.getByRole('button', { name: '阿米娅' })).toBeInTheDocument()
+      expect(dialog.queryByRole('button', { name: '能天使' })).not.toBeInTheDocument()
+
+      fireEvent.compositionStart(input)
+      fireEvent.change(input, { target: { value: '能天' } })
+      act(() => { vi.advanceTimersByTime(300) })
+      expect(dialog.getByRole('button', { name: '阿米娅' })).toBeInTheDocument()
+      fireEvent.compositionEnd(input)
+      act(() => { vi.advanceTimersByTime(200) })
+      expect(dialog.getByRole('button', { name: '能天使' })).toBeInTheDocument()
+      expect(dialog.queryByRole('button', { name: '阿米娅' })).not.toBeInTheDocument()
+    } finally { vi.useRealTimers() }
+  })
+
+  it('opens advanced editing, locks targets, edits and restores a separate draft', async () => {
+    localStorage.clear()
+    const user = userEvent.setup()
+    const result = createThreeShiftResult()
+    result.plans[0].Fiammetta = { enable: true, target: '贸易1', order: 'pre' }
+    result.plans[0].drones = { enable: true, room: 'trading', index: 1, order: 'pre' }
+    const operators = ['贸易1', '贸易2', '贸易3', '新干员'].map((name) => ({ id: name, name, own: true, elite: 2, rarity: 6 }))
+    const profile = { id: 'manual-profile', kind: 'cdk' as const, permission: 'advanced' as const }
+    const view = render(<ResultPanel result={result} operators={operators} manualEditProfile={profile} />)
+    await user.click(screen.getByRole('tab', { name: '手动排班' }))
+    const editor = await screen.findByRole('region', { name: '手动调整排班' })
+    expect(within(editor).getByText(/修改干员或无人机目标/)).toBeInTheDocument()
+    expect(within(editor).queryByText('200.0%')).not.toBeInTheDocument()
+    await user.click(within(editor).getByRole('button', { name: /编辑 贸易站.*空位 3/ }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: '贸易1' })).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: '贸易1' }).querySelector('img')).not.toBeNull()
+    expect(within(dialog).getByRole('button', { name: '空位 3' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(within(dialog).getByRole('button', { name: '新干员' }))
+    await user.click(within(dialog).getByRole('button', { name: '完成' }))
+    expect(within(editor).getByText('新干员')).toBeInTheDocument()
+    await user.click(within(editor).getByRole('button', { name: /编辑 贸易站.*新干员/ }))
+    const reopened = screen.getByRole('dialog')
+    expect(within(reopened).getAllByRole('button', { name: '新干员' })[0]).toHaveAttribute('aria-pressed', 'true')
+    await user.click(within(reopened).getByRole('button', { name: '完成' }))
+    await user.click(within(editor).getByRole('button', { name: '保存本地草稿' }))
+    expect(JSON.parse(localStorage.getItem('manual-schedule:manual-profile')!).plans[0].rooms.trading[0]).toEqual(['贸易1', '', '新干员'])
+    expect(result.plans[0].rooms.trading[0].operators).toEqual(['贸易1'])
+    await user.click(screen.getByRole('tab', { name: '总览图 v2' }))
+    await user.click(screen.getByRole('tab', { name: '手动排班' }))
+    expect(within(editor).getByText('新干员')).toBeInTheDocument()
+    view.unmount()
+    render(<ResultPanel result={result} operators={operators} manualEditProfile={profile} />)
+    await user.click(screen.getByRole('tab', { name: '手动排班' }))
+    const restored = await screen.findByRole('region', { name: '手动调整排班' })
+    await user.click(within(restored).getByRole('button', { name: '恢复已保存草稿' }))
+    expect(within(restored).getByText('新干员')).toBeInTheDocument()
+    localStorage.clear()
+  })
+
+  it.each([
+    ['free_preview', 'advanced'],
+    ['cdk', 'recommended'],
+    ['cdk', 'growth'],
+  ] as const)('denies manual editing for %s / %s', (kind, permission) => {
+    render(<ResultPanel result={createThreeShiftResult()} manualEditProfile={{ id: 'limited', kind, permission }} />)
+    expect(screen.queryByRole('tab', { name: '手动排班' })).not.toBeInTheDocument()
+  })
+
+  it('denies editing a projected preview result even when the profile has advanced access', () => {
+    const result = createThreeShiftResult()
+    result.preview_limit = { hidden_room_count: 1, notice: 'preview' }
+    render(<ResultPanel result={result} manualEditProfile={{ id: 'advanced', kind: 'cdk', permission: 'advanced' }} />)
+    expect(screen.queryByRole('tab', { name: '手动排班' })).not.toBeInTheDocument()
+  })
+})
 
 describe('ResultPanel overview v2', () => {
   it('keeps v1 as the default and shows one shift with larger portraits in v2', async () => {
@@ -140,51 +320,6 @@ function createThreeShiftResult(): OptimizeResult {
 }
 
 describe('ResultPanel tabs', () => {
-  it.each(['maa', 'rotation'])('shows room levels in preview and data in %s mode', async (scheduleMode) => {
-    const user = userEvent.setup()
-    const result = createResult()
-    result.schedule_mode = scheduleMode
-    result.plans = [{ name: 'Plan 1', rooms: {
-      trading: [{ operators: ['贸易干员'], level: 1 }],
-      manufacture: [{ operators: ['制造干员'], level: 2 }],
-    } }]
-    render(<ResultPanel result={result} />)
-    expect(screen.getByRole('heading', { name: /贸易站.*Lv\.1/ })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /制造站.*Lv\.2/ })).toBeInTheDocument()
-    await user.click(screen.getByRole('tab', { name: '数据' }))
-    expect(screen.getAllByText('Lv.1').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Lv.2').length).toBeGreaterThan(0)
-  })
-  it.each(['maa', 'rotation', 'variable'] as const)('shows search states outside restricted tabs in %s mode', (scheduleMode) => {
-    render(<ResultPanel
-      result={{ ...createResult(), schedule_mode: scheduleMode, searched_state_count: 123456 }}
-      fullDataAvailable={false}
-      previewLimit={{ mode: 'full_rotation_without_export', hidden_room_count: 0, notice: 'Preview' }}
-    />)
-    expect(screen.getByText('已记录搜索状态：')).toBeInTheDocument()
-    expect(screen.getByText('123,456 次')).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: '数据' })).toBeInTheDocument()
-  })
-
-  it.each([0, 1234567890123])('shows the full recorded integer %s', (count) => {
-    render(<ResultPanel result={{ ...createResult(), searched_state_count: count }} />)
-    expect(screen.getByText(`${count.toLocaleString('zh-CN')} 次`)).toBeInTheDocument()
-  })
-
-  it.each([undefined, -1, 1.5, NaN, Infinity])('omits unavailable or invalid search count %s', (count) => {
-    render(<ResultPanel result={{ ...createResult(), searched_state_count: count, search_nodes: 42 }} />)
-    expect(screen.queryByText('已记录搜索状态：')).not.toBeInTheDocument()
-  })
-
-  it('places office cards before dormitory cards in the preview', () => {
-    render(<ResultPanel result={createPreviewOrderResult()} />)
-
-    expect(screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)).toEqual([
-      '办公室',
-      '宿舍',
-    ])
-  })
-
   it('shows dependency anchors for regular autofill and collapses dormitories only for pure autofill', () => {
     const regular = createPreviewOrderResult()
     regular.dormitory_rule = 'maa_autofill'

@@ -23,6 +23,7 @@
     "public/theme-init.js",
     "scripts/import-postgres.mjs",
     "scripts/rekey-skland-credentials.mjs",
+    "scripts/sync-building-skills.mjs",
     "server/test-fixtures/optimize-busy-worker.mjs",
     "server/test-fixtures/optimize-progress-worker.mjs",
     "server/test-fixtures/optimize-heap-probe-worker.mjs",

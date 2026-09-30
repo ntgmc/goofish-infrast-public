@@ -1,15 +1,20 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useRef, useState } from 'react'
+import { Download } from 'lucide-react'
 import { LayoutGroup } from 'motion/react'
 import { AnimatedPresenceRegion, MotionNavIndicator } from '../MotionPrimitives'
 import { formatCompactNumber, prepareResult } from './formatters'
 import { MaaImportGuide, RotationManualGuide } from './Guides'
 import ResultBoard from './ResultBoard'
 import ResultBoardV2 from './ResultBoardV2'
+import OperatorSkillPreview from './OperatorSkillPreview'
 import ResultDetail from './ResultDetail'
 import ResultMetrics from './ResultMetrics'
 import type { ResultPanelProps, ResultTabId } from './types'
 import { copy, CURRENT_LOCALE } from '../../copy/index'
+import { hasCapability } from '../../lib/product-catalog'
+import { manualSourceKey } from './manual-schedule'
 
+const ManualScheduleEditor = lazy(() => import('./ManualScheduleEditor'))
 
 export default function ResultPanel({
   result,
@@ -23,6 +28,7 @@ export default function ResultPanel({
   detailDefaultOpen = false,
   suggestionsSlot,
   previewLimit,
+  manualEditProfile,
 }: ResultPanelProps) {
   const isRotationMode = result.schedule_mode === 'rotation'
   const isPureMaaDormitoryAutofill = !isRotationMode && result.dormitory_rule === 'maa_pure_autofill'
@@ -32,6 +38,9 @@ export default function ResultPanel({
   )
   const { detailStats } = prepared
   const isPreview = Boolean(previewLimit)
+  const canEditManual = Boolean(manualEditProfile && manualEditProfile.kind !== 'free_preview'
+    && !isPreview && !result.preview_limit && hasCapability(manualEditProfile, 'edit_full_config') && result.plans.length > 0)
+  const manualKey = useMemo(() => manualSourceKey(result), [result])
   const searchedStateCount = result.searched_state_count
   const showSearchedStateCount = typeof searchedStateCount === 'number'
     && Number.isSafeInteger(searchedStateCount) && searchedStateCount >= 0
@@ -75,6 +84,7 @@ export default function ResultPanel({
   const tabs: Array<{ id: ResultTabId; label: string }> = [
     { id: 'board', label: copy.domain.components_result_panel_ResultPanel_017 },
     { id: 'board-v2', label: copy.domain.result_board_v2.tab },
+    ...(canEditManual ? [{ id: 'manual' as const, label: copy.domain.manual_schedule.tab }] : []),
     { id: 'detail', label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_018 : copy.domain.components_result_panel_ResultPanel_019 },
     { id: 'data' as const, label: copy.domain.components_result_panel_ResultPanel_020 },
     ...(!isPreview ? [{ id: 'import' as const, label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_021 : copy.domain.components_result_panel_ResultPanel_022 }] : []),
@@ -83,30 +93,58 @@ export default function ResultPanel({
   const [activeTab, setActiveTab] = useState<ResultTabId>(
     detailDefaultOpen ? 'detail' : 'board',
   )
-  const selectedTab = isPreview && activeTab === 'import'
+  const [manualOpened, setManualOpened] = useState(false)
+  const selectedTab = (isPreview && activeTab === 'import') || (activeTab === 'manual' && !canEditManual)
       ? 'board'
     : activeTab === 'suggestions' && !suggestionsSlot
       ? fullDataAvailable ? 'data' : 'board'
       : activeTab
+  const [activePlan, setActivePlan] = useState(0)
+  const [imageExporting, setImageExporting] = useState(false)
+  const [imageExportError, setImageExportError] = useState<string | null>(null)
+  const imageExportLock = useRef(false)
+  const selectedPlan = activePlan < prepared.plans.length ? activePlan : 0
+  const imageCopy = copy.domain.result_image
+
+  async function handleImageExport(allPlans: boolean) {
+    if (imageExportLock.current) return
+    imageExportLock.current = true
+    setImageExporting(true)
+    setImageExportError(null)
+    try {
+      const { downloadScheduleImage } = await import('./schedule-image')
+      await downloadScheduleImage({
+        prepared, isRotationMode, shiftHours: result.shift_hours, title: result.title,
+        version: selectedTab === 'board-v2' ? 'v2' : 'v1',
+        planIndex: allPlans ? undefined : selectedPlan,
+      })
+    } catch {
+      setImageExportError(imageCopy.failed)
+    } finally {
+      imageExportLock.current = false
+      setImageExporting(false)
+    }
+  }
 
   return (
+    <OperatorSkillPreview>
     <div className="space-y-4">
       <div className="tool-panel overflow-hidden">
         <div className="tool-panel-header flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <p className="tool-eyebrow">{copy.domain.components_result_panel_ResultPanel_024}</p>
             <h2 className="text-lg font-semibold text-ink-primary">
-              {isPreview ? copy.domain.components_result_panel_ResultPanel_025 : copy.domain.components_result_panel_ResultPanel_027}
+              {selectedTab === 'manual' ? copy.domain.manual_schedule.title : isPreview ? copy.domain.components_result_panel_ResultPanel_025 : copy.domain.components_result_panel_ResultPanel_027}
             </h2>
             <p className="mt-1 text-sm text-ink-secondary">
-              {isPreview
+              {selectedTab === 'manual' ? copy.domain.manual_schedule.pending : isPreview
                 ? copy.domain.components_result_panel_ResultPanel_028
                 : isRotationMode
                   ? copy.domain.components_result_panel_ResultPanel_030
                   : copy.domain.components_result_panel_ResultPanel_031}
             </p>
           </div>
-          {(onDownload || onSaveWorkfile) && (
+          {selectedTab !== 'manual' && (onDownload || onSaveWorkfile) && (
             <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">
               {!isRotationMode && onDownload && (
                 <button
@@ -172,7 +210,7 @@ export default function ResultPanel({
                   role="tab"
                   aria-selected={selectedTab === tab.id}
                   aria-controls={`result-${tab.id}-panel`}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => { setActiveTab(tab.id); if (tab.id === 'manual') setManualOpened(true) }}
                   className={`relative inline-flex min-h-11 w-max shrink-0 border-b-2 px-4 py-2 text-sm font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 ${
                     selectedTab === tab.id
                       ? 'border-transparent text-ink-primary'
@@ -188,14 +226,42 @@ export default function ResultPanel({
         </div>
       </div>
 
-      <AnimatedPresenceRegion
+      {(selectedTab === 'board' || selectedTab === 'board-v2') && (
+        <div className="space-y-2">
+          <div className="flex flex-wrap justify-end gap-2" aria-busy={imageExporting}>
+            {selectedTab === 'board-v2' && (
+              <button type="button" className="tool-secondary-action" disabled={imageExporting || prepared.plans.length === 0}
+                onClick={() => void handleImageExport(false)}>
+                <Download size={16} aria-hidden="true" />{imageCopy.current}
+              </button>
+            )}
+            <button type="button" className="tool-secondary-action" disabled={imageExporting || prepared.plans.length === 0}
+              onClick={() => void handleImageExport(true)}>
+              <Download size={16} aria-hidden="true" />
+              {selectedTab === 'board-v2' ? imageCopy.all : imageCopy.long}
+            </button>
+            {imageExporting && <span className="self-center text-sm text-ink-muted" role="status">{imageCopy.busy}</span>}
+          </div>
+          {imageExportError && <p className="tool-alert tool-alert--warning text-sm" role="alert">{imageExportError}</p>}
+        </div>
+      )}
+
+      {canEditManual && manualOpened && manualEditProfile && (
+        <div id="result-manual-panel" role="tabpanel" aria-labelledby="result-manual-tab" hidden={selectedTab !== 'manual'}>
+          <Suspense fallback={<p className="p-5 text-sm text-ink-muted">{copy.domain.manual_schedule.title}</p>}>
+            <ManualScheduleEditor key={`${manualEditProfile.id}:${manualKey}`} source={result} profileId={manualEditProfile.id} operators={operators} />
+          </Suspense>
+        </div>
+      )}
+
+      {selectedTab !== 'manual' && <AnimatedPresenceRegion
         motionKey={selectedTab}
         id={`result-${selectedTab}-panel`}
         role="tabpanel"
         labelledBy={`result-${selectedTab}-tab`}
       >
         {selectedTab === 'board' && <ResultBoard isRotationMode={isRotationMode} prepared={prepared} planTimes={result.planTimes} />}
-        {selectedTab === 'board-v2' && <ResultBoardV2 isRotationMode={isRotationMode} prepared={prepared} shiftHours={result.shift_hours} />}
+        {selectedTab === 'board-v2' && <ResultBoardV2 isRotationMode={isRotationMode} prepared={prepared} shiftHours={result.shift_hours} activePlan={selectedPlan} onPlanChange={setActivePlan} />}
         {selectedTab === 'data' && (isPreview || !fullDataAvailable) && (
           <section className="tool-panel space-y-4 p-5" aria-label={copy.optimize.paid_preview.exports}>
             <h3 className="font-medium text-ink-primary">{copy.optimize.paid_preview.exports}</h3>
@@ -222,8 +288,9 @@ export default function ResultPanel({
           </section>
         )}
         {selectedTab === 'suggestions' && suggestionsSlot && <section className="tool-panel overflow-hidden p-5 sm:p-6">{suggestionsSlot}</section>}
-      </AnimatedPresenceRegion>
+      </AnimatedPresenceRegion>}
     </div>
+    </OperatorSkillPreview>
   )
 }
 

@@ -233,7 +233,8 @@ function resolveRoomOperators(names: string[], lookup: Map<string, LicenseOperat
   return names.map((name) => {
     const operator = lookup.get(name) ?? lookup.get(name.trim())
     const id = typeof operator?.id === 'string' && operator.id ? operator.id : undefined
-    return { name, id }
+    const level = typeof operator?.level === 'number' || typeof operator?.level === 'string' ? operator.level : undefined
+    return { name, id, elite: operator?.elite, level }
   })
 }
 
