@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { Download } from 'lucide-react'
 import { LayoutGroup } from 'motion/react'
 import { AnimatedPresenceRegion, MotionNavIndicator } from '../MotionPrimitives'
 import { formatCompactNumber, prepareResult } from './formatters'
@@ -88,6 +89,32 @@ export default function ResultPanel({
     : activeTab === 'suggestions' && !suggestionsSlot
       ? fullDataAvailable ? 'data' : 'board'
       : activeTab
+  const [activePlan, setActivePlan] = useState(0)
+  const [imageExporting, setImageExporting] = useState(false)
+  const [imageExportError, setImageExportError] = useState<string | null>(null)
+  const imageExportLock = useRef(false)
+  const selectedPlan = activePlan < prepared.plans.length ? activePlan : 0
+  const imageCopy = copy.domain.result_image
+
+  async function handleImageExport(allPlans: boolean) {
+    if (imageExportLock.current) return
+    imageExportLock.current = true
+    setImageExporting(true)
+    setImageExportError(null)
+    try {
+      const { downloadScheduleImage } = await import('./schedule-image')
+      await downloadScheduleImage({
+        prepared, isRotationMode, shiftHours: result.shift_hours, title: result.title,
+        version: selectedTab === 'board-v2' ? 'v2' : 'v1',
+        planIndex: allPlans ? undefined : selectedPlan,
+      })
+    } catch {
+      setImageExportError(imageCopy.failed)
+    } finally {
+      imageExportLock.current = false
+      setImageExporting(false)
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -188,6 +215,26 @@ export default function ResultPanel({
         </div>
       </div>
 
+      {(selectedTab === 'board' || selectedTab === 'board-v2') && (
+        <div className="space-y-2">
+          <div className="flex flex-wrap justify-end gap-2" aria-busy={imageExporting}>
+            {selectedTab === 'board-v2' && (
+              <button type="button" className="tool-secondary-action" disabled={imageExporting || prepared.plans.length === 0}
+                onClick={() => void handleImageExport(false)}>
+                <Download size={16} aria-hidden="true" />{imageCopy.current}
+              </button>
+            )}
+            <button type="button" className="tool-secondary-action" disabled={imageExporting || prepared.plans.length === 0}
+              onClick={() => void handleImageExport(true)}>
+              <Download size={16} aria-hidden="true" />
+              {selectedTab === 'board-v2' ? imageCopy.all : imageCopy.long}
+            </button>
+            {imageExporting && <span className="self-center text-sm text-ink-muted" role="status">{imageCopy.busy}</span>}
+          </div>
+          {imageExportError && <p className="tool-alert tool-alert--warning text-sm" role="alert">{imageExportError}</p>}
+        </div>
+      )}
+
       <AnimatedPresenceRegion
         motionKey={selectedTab}
         id={`result-${selectedTab}-panel`}
@@ -195,7 +242,7 @@ export default function ResultPanel({
         labelledBy={`result-${selectedTab}-tab`}
       >
         {selectedTab === 'board' && <ResultBoard isRotationMode={isRotationMode} prepared={prepared} planTimes={result.planTimes} />}
-        {selectedTab === 'board-v2' && <ResultBoardV2 isRotationMode={isRotationMode} prepared={prepared} shiftHours={result.shift_hours} />}
+        {selectedTab === 'board-v2' && <ResultBoardV2 isRotationMode={isRotationMode} prepared={prepared} shiftHours={result.shift_hours} activePlan={selectedPlan} onPlanChange={setActivePlan} />}
         {selectedTab === 'data' && (isPreview || !fullDataAvailable) && (
           <section className="tool-panel space-y-4 p-5" aria-label={copy.optimize.paid_preview.exports}>
             <h3 className="font-medium text-ink-primary">{copy.optimize.paid_preview.exports}</h3>

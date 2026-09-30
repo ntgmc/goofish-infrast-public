@@ -1,4 +1,14 @@
 export const domainCopy = {
+  result_image: {
+    long: "导出总览长图",
+    current: "导出当前班次",
+    all: "导出全部班次长图",
+    busy: "正在生成图片…",
+    failed: "图片导出失败，请重试。",
+    title: "排班总览",
+    all_shifts: "全部班次",
+    footer: "MaaTool · 基建排班",
+  },
   result_board_v2: {
     tab: "总览图 v2",
     shifts: "切换班次",

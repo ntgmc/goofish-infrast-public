@@ -1,13 +1,13 @@
-import { useId, useState, type KeyboardEvent } from 'react'
+import { useId, type KeyboardEvent } from 'react'
 import { BedDouble, Building2, Factory, HandCoins, Users, Wrench, Zap, type LucideIcon } from 'lucide-react'
 import { copy } from '../../copy/index'
 import DroneSummary from './DroneSummary'
 import { formatCompactNumber, formatProduct, type PreparedResult } from './formatters'
 import { ROOM_LABELS } from './labels'
 import OperatorAvatarStrip from './OperatorAvatarStrip'
-import type { RoomRow } from './types'
+import type { PreparedPlan, RoomRow } from './types'
 
-const PRODUCTION_TYPES = ['control', 'trading', 'manufacture', 'power']
+export const PRODUCTION_TYPES = ['control', 'trading', 'manufacture', 'power']
 const ROOM_STYLES: Record<string, { icon: LucideIcon; tone: string }> = {
   control: { icon: Building2, tone: 'text-brand-400' },
   trading: { icon: HandCoins, tone: 'text-brand-400' },
@@ -27,34 +27,17 @@ type BoardRoom = {
   row?: RoomRow;
 }
 
-export default function ResultBoardV2({ prepared, isRotationMode, shiftHours }: {
+export default function ResultBoardV2({ prepared, isRotationMode, shiftHours, activePlan, onPlanChange }: {
   prepared: PreparedResult;
   isRotationMode: boolean;
   shiftHours?: number[];
+  activePlan: number;
+  onPlanChange: (index: number) => void;
 }) {
   const id = useId()
-  const [activePlan, setActivePlan] = useState(0)
   const selectedIndex = activePlan < prepared.plans.length ? activePlan : 0
   const plan = prepared.plans[selectedIndex]
-  const rooms: BoardRoom[] = Object.entries(plan?.rooms ?? {}).flatMap(([roomType, entries]) => {
-    if (!Array.isArray(entries) || (isRotationMode && roomType === 'dormitory')) return []
-    const autofill = plan.rows.find((row) => row.roomType === roomType && row.isAutofill)
-    return entries.flatMap((room, index) => {
-      if (autofill && index > 0) return []
-      const row = plan.rows.find((item) => item.roomType === roomType && item.roomIndex === index)
-      return [{
-        key: `${roomType}-${index}`,
-        roomType,
-        label: row?.label ?? ROOM_LABELS[roomType] ?? roomType,
-        indexLabel: row?.indexLabel ?? [
-          entries.length > 1 ? String(index + 1) : '',
-          room.level === undefined ? '' : `Lv.${room.level}`,
-        ].filter(Boolean).join(' · '),
-        product: row?.product ?? formatProduct(room.product),
-        row,
-      }]
-    })
-  })
+  const rooms = buildBoardV2Rooms(plan, isRotationMode)
   const productionRooms = rooms.filter((room) => PRODUCTION_TYPES.includes(room.roomType))
   const supportRooms = rooms.filter((room) => !PRODUCTION_TYPES.includes(room.roomType))
     .sort((a, b) => Number(a.roomType === 'dormitory') - Number(b.roomType === 'dormitory'))
@@ -70,7 +53,7 @@ export default function ResultBoardV2({ prepared, isRotationMode, shiftHours }: 
     else if (event.key === 'End') nextIndex = prepared.plans.length - 1
     else return
     event.preventDefault()
-    setActivePlan(nextIndex)
+    onPlanChange(nextIndex)
     event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[nextIndex]?.focus()
   }
 
@@ -95,7 +78,7 @@ export default function ResultBoardV2({ prepared, isRotationMode, shiftHours }: 
                 <button key={index} id={`${id}-shift-${index}-tab`} type="button" role="tab"
                   aria-selected={selectedIndex === index} aria-controls={`${id}-shift-panel`}
                   tabIndex={selectedIndex === index ? 0 : -1}
-                  onClick={() => setActivePlan(index)} onKeyDown={(event) => handleTabKeyDown(event, index)}
+                  onClick={() => onPlanChange(index)} onKeyDown={(event) => handleTabKeyDown(event, index)}
                   className={`inline-flex min-h-11 flex-1 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 ${
                     selectedIndex === index
                       ? 'bg-surface-1 text-brand-400 shadow-sm ring-1 ring-surface-3'
@@ -151,6 +134,29 @@ export default function ResultBoardV2({ prepared, isRotationMode, shiftHours }: 
       ) : <p className="p-5 text-sm text-ink-muted">{copy.domain.components_result_panel_ResultBoard_008}</p>}
     </section>
   )
+}
+
+export function buildBoardV2Rooms(plan: PreparedPlan | undefined, isRotationMode: boolean): BoardRoom[] {
+  if (!plan) return []
+  return Object.entries(plan.rooms ?? {}).flatMap(([roomType, entries]) => {
+    if (!Array.isArray(entries) || (isRotationMode && roomType === 'dormitory')) return []
+    const autofill = plan.rows.find((row) => row.roomType === roomType && row.isAutofill)
+    return entries.flatMap((room, index) => {
+      if (autofill && index > 0) return []
+      const row = plan.rows.find((item) => item.roomType === roomType && item.roomIndex === index)
+      return [{
+        key: `${roomType}-${index}`,
+        roomType,
+        label: row?.label ?? ROOM_LABELS[roomType] ?? roomType,
+        indexLabel: row?.indexLabel ?? [
+          entries.length > 1 ? String(index + 1) : '',
+          room.level === undefined ? '' : `Lv.${room.level}`,
+        ].filter(Boolean).join(' · '),
+        product: row?.product ?? formatProduct(room.product),
+        row,
+      }]
+    })
+  })
 }
 
 function RoomCard({ room, className = '' }: { room: BoardRoom; className?: string }) {

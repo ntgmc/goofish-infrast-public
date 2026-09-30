@@ -139,7 +139,7 @@ function buildFiammettaTargets(plans: PreparedPlan[]): FiammettaTarget[] {
   })
 }
 
-function buildBoardRoomGroups(plans: PreparedPlan[], isRotationMode: boolean): BoardRoomGroup[] {
+export function buildBoardRoomGroups(plans: PreparedPlan[], isRotationMode: boolean): BoardRoomGroup[] {
   const groups = new Map<string, BoardRoomGroup>()
 
   for (const plan of plans) {
@@ -167,7 +167,7 @@ function buildBoardRoomGroups(plans: PreparedPlan[], isRotationMode: boolean): B
   return [...groups.values()]
 }
 
-function buildBoardSlots(rows: RoomRow[], minimumSlotCount: number, isRotationMode: boolean): BoardSlot[] {
+export function buildBoardSlots(rows: RoomRow[], minimumSlotCount: number, isRotationMode: boolean): BoardSlot[] {
   const occupied = new Map<number, RoomRow>()
   const overflowRows: RoomRow[] = []
   let nextSequentialSlot = 1
