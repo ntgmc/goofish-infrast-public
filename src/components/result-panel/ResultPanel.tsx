@@ -4,6 +4,7 @@ import { AnimatedPresenceRegion, MotionNavIndicator } from '../MotionPrimitives'
 import { formatCompactNumber, prepareResult } from './formatters'
 import { MaaImportGuide, RotationManualGuide } from './Guides'
 import ResultBoard from './ResultBoard'
+import ResultBoardV2 from './ResultBoardV2'
 import ResultDetail from './ResultDetail'
 import ResultMetrics from './ResultMetrics'
 import type { ResultPanelProps, ResultTabId } from './types'
@@ -73,6 +74,7 @@ export default function ResultPanel({
   ]
   const tabs: Array<{ id: ResultTabId; label: string }> = [
     { id: 'board', label: copy.domain.components_result_panel_ResultPanel_017 },
+    { id: 'board-v2', label: copy.domain.result_board_v2.tab },
     { id: 'detail', label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_018 : copy.domain.components_result_panel_ResultPanel_019 },
     { id: 'data' as const, label: copy.domain.components_result_panel_ResultPanel_020 },
     ...(!isPreview ? [{ id: 'import' as const, label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_021 : copy.domain.components_result_panel_ResultPanel_022 }] : []),
@@ -193,6 +195,7 @@ export default function ResultPanel({
         labelledBy={`result-${selectedTab}-tab`}
       >
         {selectedTab === 'board' && <ResultBoard isRotationMode={isRotationMode} prepared={prepared} planTimes={result.planTimes} />}
+        {selectedTab === 'board-v2' && <ResultBoardV2 isRotationMode={isRotationMode} prepared={prepared} shiftHours={result.shift_hours} />}
         {selectedTab === 'data' && (isPreview || !fullDataAvailable) && (
           <section className="tool-panel space-y-4 p-5" aria-label={copy.optimize.paid_preview.exports}>
             <h3 className="font-medium text-ink-primary">{copy.optimize.paid_preview.exports}</h3>

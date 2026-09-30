@@ -24,10 +24,10 @@ npm ci --omit=dev
 node scripts/check-release-runtime.mjs .
 ```
 
-`build-manifest.json` records `deployable: false` when the public fallback
-efficiency dataset was used. Such an archive is a reproducible demo/SDK build,
-not a production deployment candidate, even when its hashes and attestation
-are valid.
+When a build uses the public fallback efficiency dataset,
+`build-manifest.json` records `deployable: false`. The archive can be used for
+a reproducible demo or SDK build. Do not deploy it to production, even if its
+hashes and attestation are valid.
 
 After the verified artifact is deployed, the public changelog is reachable,
 traffic has switched, and the production readiness endpoint succeeds, run the

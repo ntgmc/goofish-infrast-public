@@ -99,7 +99,7 @@ export default function DeadLetterPanel() {
     if (pendingCount === 0) return
     const reason = await requestAdminOperationReason({
       title: '确认丢弃全部待处理死信',
-      description: '所有当前仍处于待处理状态的异步优化死信都会被标记为丢弃，不能再次重放。请输入本次批量丢弃原因。',
+      description: '全部待处理优化死信将被丢弃，之后无法重放。请填写本次批量丢弃原因。',
       confirmLabel: '确认全部丢弃',
     })
     if (!reason) return
@@ -141,7 +141,7 @@ export default function DeadLetterPanel() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="optimization-dlq-title" className="text-base font-semibold text-ink-primary">异步优化死信队列</h2>
-          <p className="mt-1 text-sm text-ink-muted">列表展示诊断摘要，可按需查看原始申请配置、干员数据，并下载完整任务载荷。重放为管理员无偿覆盖，不扣用户额度。</p>
+          <p className="mt-1 text-sm text-ink-muted">查看诊断摘要、原始配置和干员数据，或下载完整任务载荷。管理员重放任务不扣用户额度。</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className={`tool-status ${pendingCount > 0 ? 'tool-status--warning' : 'tool-status--current'}`}>待处理 {pendingCount}</span>

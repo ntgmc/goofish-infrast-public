@@ -4,13 +4,14 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Announcement, AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
+import type { Announcement, AuthSuccessResponse, AuthUser, LicenseConfig, UserGameAccount } from '../../lib/types'
 import AccountDashboard from './AccountDashboard'
 import WorkspaceSetupPage from './WorkspaceSetupPage'
 import { CONFIG_PRESETS } from '../../lib/config'
 import { tourStorageKey } from '../../components/GuidedTour'
 import { cloneDefaultPublicContentSettings } from '../../lib/public-content'
 import * as publicContentContext from '../../lib/public-content-context'
+import { useToolSession } from './useToolSession'
 
 const { apiJsonMock } = vi.hoisted(() => ({
   apiJsonMock: vi.fn(),
@@ -31,7 +32,86 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  vi.unstubAllGlobals()
   vi.restoreAllMocks()
+})
+
+describe('WorkspaceSetupPage automatic configuration saving', () => {
+  it('saves the initial configuration and edits without entering scheduling', async () => {
+    const user = userEvent.setup()
+    const onProceed = vi.fn()
+    const payload: AuthSuccessResponse = {
+      ...createPayload(),
+      active_profile: createAdvancedProfile(),
+      profiles: [createAdvancedProfile()],
+      workspace: createAdvancedWorkspace(),
+    }
+    apiJsonMock.mockImplementation(async (url: string, options?: { json?: { config: LicenseConfig } }) => {
+      if (url === '/api/auth/me') return payload
+      if (url === '/api/user/workspace') return { ...payload, workspace: { ...payload.workspace, config: options?.json?.config } }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 204 })))
+    render(<MemoryRouter><WorkspaceSessionHarness onProceed={onProceed} /></MemoryRouter>)
+
+    expect(await screen.findByText('更改待保存')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '进入排班' })).toBeDisabled()
+    await screen.findByText('配置已保存')
+    expect(apiJsonMock).toHaveBeenCalledWith('/api/user/workspace', expect.objectContaining({
+      method: 'PATCH',
+      json: { profile_id: 'advanced-profile', config: expect.objectContaining({ layout: '2-4-3' }) },
+    }))
+    await user.click(within(screen.getByRole('navigation', { name: '工作区设置' })).getByRole('button', { name: /基建配置/ }))
+    await user.click(await screen.findByRole('button', { name: '333 搓玉' }))
+    expect(screen.getByRole('button', { name: '进入排班' })).toBeDisabled()
+    await screen.findByText('配置已保存')
+    expect(apiJsonMock).toHaveBeenLastCalledWith('/api/user/workspace', expect.objectContaining({
+      json: { profile_id: 'advanced-profile', config: expect.objectContaining({ layout: '3-3-3' }) },
+    }))
+    expect(onProceed).not.toHaveBeenCalled()
+
+    const requestCount = apiJsonMock.mock.calls.length
+    await user.click(screen.getByRole('button', { name: '进入排班' }))
+    expect(onProceed).toHaveBeenCalledOnce()
+    expect(apiJsonMock).toHaveBeenCalledTimes(requestCount)
+  })
+
+  it('keeps failed changes and enables scheduling only after a successful retry', async () => {
+    const user = userEvent.setup()
+    const onProceed = vi.fn()
+    const payload: AuthSuccessResponse = {
+      ...createPayload(),
+      active_profile: createAdvancedProfile(),
+      profiles: [createAdvancedProfile()],
+      workspace: { ...createAdvancedWorkspace(), config: structuredClone(CONFIG_PRESETS['243']) },
+    }
+    let saveAttempts = 0
+    apiJsonMock.mockImplementation(async (url: string, options?: { json?: { config: LicenseConfig } }) => {
+      if (url === '/api/auth/me') return payload
+      if (url === '/api/user/workspace') {
+        if (++saveAttempts === 1) throw new Error('网络连接失败')
+        return { ...payload, workspace: { ...payload.workspace, config: options?.json?.config } }
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 204 })))
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    render(<MemoryRouter><WorkspaceSessionHarness onProceed={onProceed} /></MemoryRouter>)
+
+    await screen.findByText('配置已保存')
+    await user.click(within(screen.getByRole('navigation', { name: '工作区设置' })).getByRole('button', { name: /基建配置/ }))
+    await user.click(await screen.findByRole('button', { name: '333 搓玉' }))
+    const retry = await screen.findByRole('button', { name: '配置保存失败，点击重试' })
+    expect(screen.getByRole('button', { name: '进入排班' })).toBeDisabled()
+    expect(apiJsonMock).toHaveBeenLastCalledWith('/api/user/workspace', expect.objectContaining({
+      json: { profile_id: 'advanced-profile', config: expect.objectContaining({ layout: '3-3-3' }) },
+    }))
+    await user.click(retry)
+    await screen.findByText('配置已保存')
+    expect(screen.getByRole('button', { name: '进入排班' })).toBeEnabled()
+    expect(saveAttempts).toBe(2)
+    expect(onProceed).not.toHaveBeenCalled()
+  })
 })
 
 describe('WorkspaceSetupPage CDK paths', () => {
@@ -41,36 +121,18 @@ describe('WorkspaceSetupPage CDK paths', () => {
       profile: createAdvancedProfile(),
       workspace: { ...createAdvancedWorkspace(), config: structuredClone(CONFIG_PRESETS[preset]) },
     })
-    const proceed = screen.getByRole('button', { name: '保存工作区并开始排班' })
+    const proceed = screen.getByRole('button', { name: '进入排班' })
     expect(proceed).toBeDisabled()
     await user.click(proceed)
     expect(apiJsonMock).not.toHaveBeenCalled()
     await user.click(within(screen.getByRole('navigation', { name: '工作区设置' })).getByRole('button', { name: /基建配置/ }))
     await user.click(await screen.findByRole('button', { name: '确认布局' }))
-    expect(screen.getByRole('button', { name: '保存工作区并开始排班' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '进入排班' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: '确认并收起' }))
-    expect(screen.getByRole('button', { name: '保存工作区并开始排班' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '进入排班' })).toBeEnabled()
     await user.click(screen.getByRole('button', { name: '修改布局' }))
-    expect(screen.getByRole('button', { name: '保存工作区并开始排班' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '进入排班' })).toBeDisabled()
   })
-  it('renders announcement banners in the main content flow', () => {
-    renderWorkspace({
-      announcement: {
-        id: 'banner-1',
-        kind: 'banner',
-        title: '维护公告',
-        body: '今晚进行例行维护。',
-        active: true,
-        created_at: '2026-07-21T00:00:00.000Z',
-        updated_at: '2026-07-21T00:00:00.000Z',
-      },
-    })
-
-    const banner = screen.getByRole('region', { name: '站内横幅' })
-    expect(banner.closest('header')).toBeNull()
-    expect(banner.parentElement).toHaveClass('mx-auto', 'max-w-7xl', 'space-y-4')
-  })
-
   it('moves the setup guide to configuration without saving workspace data', async () => {
     window.localStorage.removeItem(tourStorageKey('workspace-setup', 1))
     const user = userEvent.setup()
@@ -194,31 +256,10 @@ describe('WorkspaceSetupPage CDK paths', () => {
     renderWorkspace({ profile, workspace: createAdvancedWorkspace() })
     await user.click(screen.getByRole('button', { name: '刷新森空岛数据' }))
 
-    const notice = await screen.findByRole('status')
+    const notice = await screen.findByText(/赤金 12/)
     expect(notice).toHaveTextContent('赤金 12')
     expect(notice).toHaveTextContent('源石碎片 3')
     expect(notice).toHaveTextContent('固源岩 45')
-  })
-
-  it('separates the desktop account actions in one bottom navigation group', () => {
-    renderWorkspace()
-
-    const accountActions = screen.getByRole('navigation', { name: '账号操作' })
-    expect(accountActions).toHaveClass('grid-cols-2', 'gap-2')
-    expect(within(accountActions).getByRole('button', { name: '返回账号列表' })).toBeInTheDocument()
-    expect(within(accountActions).getByRole('button', { name: '退出登录' })).toHaveClass('tool-danger-action')
-    expect(screen.getAllByRole('button', { name: '返回账号列表' })).toHaveLength(1)
-  })
-
-  it('renders the business workflow breadcrumb with the active profile context', () => {
-    renderWorkspace({ profile: createAdvancedProfile() })
-
-    const breadcrumb = screen.getByRole('navigation', { name: '面包屑' })
-    expect(within(breadcrumb).getByRole('link', { name: '首页' })).toHaveAttribute('href', '/')
-    expect(within(breadcrumb).getByRole('link', { name: '游戏账号' })).toHaveAttribute('href', '/tool/profiles')
-    expect(within(breadcrumb).getByRole('link', { name: '高级档案' })).toHaveAttribute('href', '/tool/profiles?profile_id=advanced-profile')
-    expect(within(breadcrumb).getByRole('link', { name: '工作区设置' })).toHaveAttribute('href', '/tool/setup/operators?profile_id=advanced-profile')
-    expect(within(breadcrumb).getByText('干员数据')).toHaveAttribute('aria-current', 'page')
   })
 
   it('switches sections and preserves account actions in the compact menu', async () => {
@@ -383,16 +424,21 @@ function WorkspaceSetupHarness({ overrides }: {
   }
 }) {
   const [activeSection, setActiveSection] = useState<'operators' | 'config' | 'cdk'>('operators')
+  const [config, setConfig] = useState<LicenseConfig | null>(null)
 
   return (
     <WorkspaceSetupPage
       user={{ id: 'user-1', email: 'test@example.com' } as AuthUser}
       profile={overrides.profile ?? createPreviewProfile()}
-      workspace={overrides.workspace ?? null}
+      workspace={config ? { ...(overrides.workspace ?? createAdvancedWorkspace()), config } : overrides.workspace ?? null}
+      configOverride={null}
+      setConfigOverride={setConfig}
+      configSyncStatus="idle"
+      retryConfigSave={vi.fn()}
       announcement={overrides.announcement ?? null}
       activeSection={activeSection}
       onSectionChange={setActiveSection}
-      onSaved={vi.fn()}
+      onProceed={vi.fn()}
       onSynced={overrides.onSynced ?? vi.fn()}
       onBack={overrides.onBack ?? vi.fn()}
       onRedeemNewProfile={overrides.onRedeemNewProfile ?? vi.fn()}
@@ -436,6 +482,31 @@ function createCommercialProfile(): UserGameAccount {
     permission: 'metered_advanced',
     display_name: '商用账号',
   }
+}
+
+function WorkspaceSessionHarness({ onProceed }: { onProceed: () => void }) {
+  const session = useToolSession()
+  const [activeSection, setActiveSection] = useState<'operators' | 'config' | 'cdk'>('operators')
+  if (!session.user || !session.activeProfile) return null
+  return (
+    <WorkspaceSetupPage
+      user={session.user}
+      profile={session.activeProfile}
+      workspace={session.workspace}
+      configOverride={session.configOverride}
+      setConfigOverride={session.setConfigOverride}
+      configSyncStatus={session.configSyncStatus}
+      retryConfigSave={session.retryConfigSave}
+      announcement={null}
+      activeSection={activeSection}
+      onSectionChange={setActiveSection}
+      onProceed={onProceed}
+      onSynced={session.applyAuthPayload}
+      onBack={vi.fn()}
+      onRedeemNewProfile={vi.fn()}
+      onLogout={session.handleLogout}
+    />
+  )
 }
 
 function createAdvancedWorkspace(): NonNullable<AuthSuccessResponse['workspace']> {

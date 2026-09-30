@@ -1,10 +1,10 @@
-# Production Disaster Recovery
+# Production disaster recovery
 
 Production has a 24-hour RPO and a four-hour RTO. The source of truth is the
 encrypted S3-compatible backup bucket; a local PostgreSQL disk is never a
 backup target.
 
-## Backup Setup
+## Backup setup
 
 Install `age`, `rclone`, PostgreSQL client tools, GNU tar, and the repository's
 `deploy/systemd/goofish-backup.*` units on the production server. Create an
@@ -58,7 +58,7 @@ to 24 hours and alert after 26 hours. Treat any failed unit, invalid signature,
 missed heartbeat, or backup older than 24 hours as P0 until a new verified set
 exists.
 
-## Restore Drill
+## Restore drill
 
 Perform a full isolated drill quarterly and before retiring a key. Provision a
 clean PostgreSQL database and a disposable application host. Reconstruct the
@@ -97,7 +97,7 @@ Validate a historical CDK, a historical signed license, a current free-preview
 claim, a stored depot sample removal path, and a stored Skland credential. Do
 not log decrypted credentials or restored secret values.
 
-## Key Rotation
+## Key rotation
 
 `CDK_HASH_SECRET_PREVIOUS` and `MAA_ADMIN_SECRET_PREVIOUS` provide one previous
 key slot. New CDKs and signatures use the current value; reads accept current
@@ -164,7 +164,7 @@ secret. Record `BEHAVIOR_RISK_HMAC_KEY_VERSION` with each rotation; signals
 written under different key versions intentionally stop linking, while the old
 HMAC-only evidence expires under the 90-day behavior-risk retention policy.
 
-## Hangzhou Worker or WireGuard Outage
+## Hangzhou worker or WireGuard outage
 
 The Seoul API remains the queue authority when the Hangzhou worker or the
 WireGuard tunnel is unavailable. It continues to accept, query, cancel, expire,

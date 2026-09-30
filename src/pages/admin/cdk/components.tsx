@@ -239,7 +239,7 @@ function CdkDetailPanel({
                 </select>
               </label>
               <p className="mt-2 text-xs leading-5 text-ink-muted">
-                选择快照会同步更新初始和最近基线；选择等待下次导入会清空旧基线。冻结授权在人工应用后会一并恢复。
+                选择快照后，会同时更新初始和最近基线；选择等待下次导入，会清空旧基线。人工应用后，冻结的授权也会恢复。
               </p>
               <div className="mt-3">
                 <SmallButton
@@ -313,7 +313,7 @@ export function RiskSettingsPanel({
       <div className="tool-panel-header flex flex-wrap items-center justify-between gap-3 p-4">
         <div>
           <h2 className="text-base font-semibold text-ink-primary">风控开关</h2>
-          <p className="mt-1 text-sm text-ink-muted">控制账号档案的干员数据异常检测；异常提交会被软拦截并进入全站行为评分，不会自动冻结授权。</p>
+          <p className="mt-1 text-sm text-ink-muted">设置档案是否检测干员数据异常。异常提交会被暂时拦截并计入全站行为评分，授权会保留，冻结需另行复核。</p>
           {!settings.can_configure && <p className="mt-1 text-xs text-ink-muted">当前账号仅有查看权限；修改开关需要 risk_config 能力。</p>}
         </div>
         <span className="text-xs text-ink-muted" role="status" aria-live="polite">{saving ? '保存中...' : `revision ${settings.revision} · 更新 ${formatDate(settings.updated_at)}`}</span>

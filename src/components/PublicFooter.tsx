@@ -1,11 +1,8 @@
 import { Link } from 'react-router'
 import { copy } from '../copy/index'
-import { DEFAULT_PUBLIC_CONTENT_SETTINGS } from '../lib/public-content'
 import { usePublicContent } from '../lib/public-content-context'
 
-
-export const GITHUB_REPOSITORY_URL = 'https://github.com/ntgmc/goofish-infrast-public'
-export const SUPPORT_QQ_GROUP_URL = DEFAULT_PUBLIC_CONTENT_SETTINGS.qq_group.join_url
+const GITHUB_REPOSITORY_URL = 'https://github.com/ntgmc/goofish-infrast-public'
 
 const footerLinks = [
   { to: '/status', label: copy.status.pages_StatusPage_002 },

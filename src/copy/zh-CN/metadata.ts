@@ -1,6 +1,6 @@
 export const metadataCopy = {
   // src/components/RouteMetadata.tsx
-  components_RouteMetadata_001: "基于森空岛或 MAA 数据，为明日方舟生成适配当前干员的基建排班，查看日产出、等效理智、练度建议与仓库估值。",
+  components_RouteMetadata_001: "导入森空岛或 MAA 干员数据，生成明日方舟基建排班，查看预计日产出、等效理智、培养建议和仓库估值。",
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_002: "MAA 基建排班优化器 | MaaTool",
   // src/components/RouteMetadata.tsx
@@ -18,7 +18,7 @@ export const metadataCopy = {
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_009: "隐私政策 | MaaTool",
   // src/components/RouteMetadata.tsx
-  components_RouteMetadata_010: "了解 MaaTool 为提供排班服务而处理的信息及你的相关权利。",
+  components_RouteMetadata_010: "了解 MaaTool 会处理哪些信息，以及如何查询、更正或申请删除数据。",
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_011: "用户服务协议 | MaaTool",
   // src/components/RouteMetadata.tsx
@@ -26,7 +26,7 @@ export const metadataCopy = {
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_013: "免责声明 | MaaTool",
   // src/components/RouteMetadata.tsx
-  components_RouteMetadata_014: "了解 MaaTool 排班建议、第三方服务与知识产权相关的使用边界。",
+  components_RouteMetadata_014: "了解排班结果的适用范围、第三方服务关系和知识产权归属。",
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_017: "仓库价值分析器 | MaaTool",
   // src/components/RouteMetadata.tsx
@@ -42,13 +42,13 @@ export const metadataCopy = {
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_023: "致谢 | MaaTool",
   // src/components/RouteMetadata.tsx
-  components_RouteMetadata_024: "感谢为 MaaTool 提供数据参考、格式基础以及开发与测试协助的项目和参与者。",
+  components_RouteMetadata_024: "认识 MaaTool 参考的开源项目和社区资料，以及参与开发、测试和反馈的协助者。",
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_025: "更新日志 | MaaTool",
   // src/components/RouteMetadata.tsx
-  components_RouteMetadata_026: "查看 MaaTool 各版本的功能更新、体验优化与问题修复。",
+  components_RouteMetadata_026: "查看 MaaTool 各版本新增的功能、使用体验调整和问题修复。",
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_027: "服务状态 | MaaTool",
   // src/components/RouteMetadata.tsx
-  components_RouteMetadata_028: "查看 MaaTool 网站与排班计算服务的实时状态、繁忙程度和预计可用情况。",
+  components_RouteMetadata_028: "查看 MaaTool 网站和排班计算服务是否可用、当前是否繁忙，以及历史服务状态。",
 } as const

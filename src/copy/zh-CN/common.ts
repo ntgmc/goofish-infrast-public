@@ -4,7 +4,7 @@ export const commonCopy = {
   facilityLayoutReading: "正在读取设施…",
   facilityLayoutReadFailed: "读取设施失败，请稍后重试。",
   facilityLayoutReadSuccess: "已读取设施位置与等级。请核对游戏内布局，完成确认后再生成排班。",
-  facilityLayoutHelp: "按游戏内位置摆放设施：点击卡片更换类型，下方选择等级。可以先自由调整，完成后确认布局，再生成排班。",
+  facilityLayoutHelp: "按游戏内位置摆放设施，点击卡片更换类型，在下方选择等级。调整完毕后确认布局，即可生成排班。",
   facilityLayoutSaved: "已确认",
   facilityLayoutDraft: "待确认",
   facilityLayoutCounts: "设施数量",
@@ -13,7 +13,7 @@ export const commonCopy = {
   facilityLayoutChoose: "选择设施",
   facilityLayoutLevelLabel: "设施等级",
   facilityLayoutClose: "关闭设施选择",
-  facilityLayoutDialogHelp: "选择此位置的设施类型，其他位置保持不变。等级可在卡片下方调整，数量与等级在确认布局时检查。",
+  facilityLayoutDialogHelp: "为此位置选择设施类型，在卡片下方调整等级。确认布局时会检查设施数量和等级，其他位置的设置会保留。",
   facilityLayoutTrading: "贸易站",
   facilityLayoutManufacture: "制造站",
   facilityLayoutPower: "发电站",
@@ -81,7 +81,7 @@ export const commonCopy = {
   // src/components/NotFoundPage.tsx
   components_NotFoundPage_002: "这个链接暂时没有对应页面",
   // src/components/NotFoundPage.tsx
-  components_NotFoundPage_003: "请检查地址是否完整，或从下面的入口继续访问。原请求路径已保留，便于核对失效链接。",
+  components_NotFoundPage_003: "请核对下方显示的地址，或使用页面导航继续访问。",
   // src/components/NotFoundPage.tsx
   components_NotFoundPage_004: "页面导航",
   // src/components/NotFoundPage.tsx
@@ -121,7 +121,7 @@ export const commonCopy = {
   // src/components/DeploymentUpdatePrompt.tsx
   components_DeploymentUpdatePrompt_002: "新版本已发布",
   // src/components/DeploymentUpdatePrompt.tsx
-  components_DeploymentUpdatePrompt_003: "当前页面仍在运行旧版本。继续使用可能出现功能或数据不一致，请刷新页面完成更新。",
+  components_DeploymentUpdatePrompt_003: "请刷新页面使用新版本。旧页面的功能或数据可能与当前服务不一致。",
   // src/components/DeploymentUpdatePrompt.tsx
   components_DeploymentUpdatePrompt_004: "当前版本",
   // src/components/DeploymentUpdatePrompt.tsx
@@ -251,7 +251,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_061: "排班模式",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_062: "游戏内轮换会生成两个设施预设队列，按游戏内“队列轮换/快速切换”使用；不会生成 MAA 排班 JSON。",
+  components_ConfigEditor_062: "生成两组设施预设队列，在游戏内通过“队列轮换/快速切换”使用。此模式不生成 MAA 排班 JSON。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_063: "宿舍规则",
   // src/components/ConfigEditor.tsx
@@ -261,7 +261,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_066: "导出的 MAA JSON 仅固定生产技能必需的宿舍干员，其余空位由 MAA 自动填满；可保留依赖宿舍的高效组合。",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_067: "导出的 MAA JSON 会固定宿舍干员，和当前行为一致。",
+  components_ConfigEditor_067: "导出的 MAA JSON 会固定宿舍干员。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_099: "小时",
   // src/components/ConfigEditor.tsx
@@ -293,7 +293,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_080: "固源岩",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_081: "请输入 3–6 班；非等长间隔需总计 24 小时，等长间隔支持 8 或 12 小时。",
+  components_ConfigEditor_081: "请输入 3 到 6 班。间隔不同时须合计 24 小时，等长间隔支持 8 或 12 小时。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_082: "MAA 换班间隔",
   // src/components/ConfigEditor.tsx
@@ -315,7 +315,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_091: "自定义",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_092: "自动搜索 3–4 班的实际间隔；生成结果后会固定为可复现的班次数组。",
+  components_ConfigEditor_092: "自动选择 3 到 4 班的换班间隔，生成结果后按选定的间隔执行。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_093: "选择固定换班频率、自动变间隔换班或自定义班次。",
   // src/components/ConfigEditor.tsx
@@ -389,7 +389,7 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_012: "计算当前排班",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_013: "搜索当前基建的最优排班。",
+  components_ScheduleProgress_013: "按当前基建配置搜索排班方案。",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_014: "保存结果",
   // src/components/ScheduleProgress.tsx
@@ -447,7 +447,7 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_041: "更新状态",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_042: "不会重复提交任务；当前任务完成后仍会自动展示结果。",
+  components_ScheduleProgress_042: "无需重新提交，任务完成后会自动显示结果。",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_043: "已生效；不会中断正在运行的任务。",
   // src/components/ScheduleProgress.tsx
@@ -465,7 +465,7 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_050: "排班方案已就绪",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_051: "场景前沿已就绪",
+  components_ScheduleProgress_051: "场景对比已完成",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_052: "最终方案已就绪",
   // src/components/ScheduleProgress.tsx
@@ -587,7 +587,7 @@ export const commonCopy = {
   // src/lib/workspace-history.ts
   lib_workspace_history_007: "游戏内轮换",
   // src/lib/workspace-history.ts
-  lib_workspace_history_008: "排班表写死",
+  lib_workspace_history_008: "排班表固定",
   // src/lib/workspace-history.ts
   lib_workspace_history_009: "MAA 自动填满（保留技能依赖）",
   // src/lib/workspace-history.ts
@@ -829,13 +829,13 @@ export const commonCopy = {
   // src/lib/admin-operation-reason.ts
   lib_admin_operation_reason_001: "操作原因或工单号",
   // src/lib/admin-operation-reason.ts
-  lib_admin_operation_reason_002: "请填写 2–500 个字符，审计记录将永久保留此原因。",
+  lib_admin_operation_reason_002: "请填写 2 到 500 个字符，操作原因会永久保存在审计记录中。",
   // src/lib/admin-operation-reason.ts
   lib_admin_operation_reason_003: "取消",
   // src/lib/admin-operation-reason.ts
   lib_admin_operation_reason_004: "确认并继续",
   // src/lib/admin-operation-reason.ts
-  lib_admin_operation_reason_005: "操作原因必须为 2–500 个字符。",
+  lib_admin_operation_reason_005: "操作原因须为 2 到 500 个字符。",
   // src/lib/api-client.ts
   lib_api_client_method_not_allowed: "当前操作不受支持。",
   lib_api_client_internal_error: "服务暂时不可用，请稍后重试。",

@@ -44,7 +44,7 @@ describe('OptimizeShell compact navigation', () => {
     expect(within(breadcrumb).getByRole('link', { name: '排班工作台' })).toHaveAttribute('href', '/tool/optimize/overview?profile_id=profile-1')
     expect(within(breadcrumb).getByText('总览')).toHaveAttribute('aria-current', 'page')
     const accountActions = screen.getByRole('navigation', { name: '账号操作' })
-    expect(within(accountActions).getByRole('button', { name: '返回数据空间' })).not.toHaveClass('tool-danger-action')
+    expect(within(accountActions).getByRole('button', { name: '返回工作区' })).not.toHaveClass('tool-danger-action')
     expect(within(accountActions).getByRole('button', { name: '退出登录' })).toHaveClass('tool-danger-action')
     await user.click(screen.getByRole('button', { name: '打开栏目菜单' }))
     expect(screen.getByRole('menuitem', { name: /排班结果.*已有结果/ })).toBeInTheDocument()
@@ -56,7 +56,7 @@ describe('OptimizeShell compact navigation', () => {
     expect(onOpenTour).toHaveBeenCalledOnce()
 
     await user.click(screen.getByRole('button', { name: '打开栏目菜单' }))
-    const reset = screen.getByRole('menuitem', { name: '返回数据空间' })
+    const reset = screen.getByRole('menuitem', { name: '返回工作区' })
     expect(reset).not.toHaveClass('text-error')
     await user.click(reset)
     expect(onReset).toHaveBeenCalledOnce()

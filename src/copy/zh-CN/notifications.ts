@@ -2,7 +2,7 @@ export const notificationsCopy = {
   title: '通知',
   triggerLabel: (count: number) => count > 0 ? `通知，${count} 条未读` : '通知，无未读消息',
   unreadLive: (count: number) => count > 0 ? `当前有 ${count} 条未读通知` : '所有通知均已读',
-  markAllRead: '全部已读',
+  markAllRead: '全部设为已读',
   markingAllRead: '正在标记',
   loading: '正在加载通知…',
   empty: '暂时没有通知。',

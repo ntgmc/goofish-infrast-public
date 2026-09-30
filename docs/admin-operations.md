@@ -1,10 +1,9 @@
-# Management-Console Mutations
+# Management-console mutations
 
 Management-console profile mutations use optimistic concurrency. The client
 sends `expected_updated_at`, the handler checks it against the current profile,
 and the storage transaction checks it again while holding the profile row lock.
-Both checks are required to prevent an administrator from overwriting a newer
-change.
+Keep both checks so an administrator cannot overwrite a newer change.
 
 ## Timestamp ownership
 
@@ -28,6 +27,6 @@ assert that the request is accepted.
 
 ## Conflict behavior
 
-A genuine concurrent profile or workspace change must remain a `409` response
-with the refresh-and-retry message. Do not remove the handler pre-check or the
-transactional row-lock check merely to make the UI accept stale data.
+A concurrent profile or workspace change must return `409` with a message
+asking the administrator to refresh and retry. Keep the handler pre-check and
+the transactional row-lock check; stale data must be rejected.

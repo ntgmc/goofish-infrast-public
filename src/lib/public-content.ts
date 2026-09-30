@@ -323,7 +323,7 @@ export const DEFAULT_PUBLIC_CONTENT_DRAFT: PublicContentDraftV1 = {
   },
 }
 
-export const DEFAULT_PUBLIC_CONTENT_SETTINGS: PublicContentSettingsV1 = {
+const DEFAULT_PUBLIC_CONTENT_SETTINGS: PublicContentSettingsV1 = {
   version: PUBLIC_CONTENT_VERSION,
   defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION,
   ...DEFAULT_PUBLIC_CONTENT_DRAFT,

@@ -49,7 +49,7 @@ export function useToolSession(requestedProfileId?: string | null) {
   const licenseRef = useRef<LicenseFile | null>(null)
   const configGenerationRef = useRef(0)
   const configSaveTimerRef = useRef<number | null>(null)
-  const configSaveInFlightRef = useRef(false)
+  const configSaveInFlightRef = useRef<Promise<void> | null>(null)
   const pendingConfigRef = useRef<{ profileId: string; generation: number; config: LicenseConfig } | null>(null)
 
   activeProfileRef.current = activeProfile
@@ -89,7 +89,9 @@ export function useToolSession(requestedProfileId?: string | null) {
   }, [cancelPendingConfigSave])
 
   const applyAuthPayload = useCallback((payload: AuthSuccessResponse | null) => {
-    applyAuthPayloadInternal(payload)
+    applyAuthPayloadInternal(payload, {
+      preserveConfigDraft: Boolean(payload?.active_profile && pendingConfigRef.current?.profileId === payload.active_profile.id),
+    })
     setAuthError(null)
     setAuthStatus(payload ? 'authenticated' : 'anonymous')
   }, [applyAuthPayloadInternal])
@@ -179,41 +181,45 @@ export function useToolSession(requestedProfileId?: string | null) {
     return request
   }, [applyAuthPayloadInternal])
 
-  const runPendingConfigSave = useCallback(async () => {
-    if (configSaveInFlightRef.current) return
+  const runPendingConfigSave = useCallback((): Promise<void> => {
+    if (configSaveInFlightRef.current) return configSaveInFlightRef.current
     const pending = pendingConfigRef.current
-    if (!pending) return
-    configSaveInFlightRef.current = true
-    setConfigSyncStatus('saving')
-    try {
-      const save = () => apiJson<AuthSuccessResponse>('/api/user/workspace', {
+    if (!pending) return Promise.resolve()
+    const savePending = async () => {
+      setConfigSyncStatus('saving')
+      try {
+        const save = () => apiJson<AuthSuccessResponse>('/api/user/workspace', {
           method: 'PATCH',
           json: { config: pending.config, profile_id: pending.profileId },
           fallbackMessage: copy.common.pages_tool_useToolSession_006,
         })
-      const request = workspacePatchQueueRef.current.then(save, save)
-      workspacePatchQueueRef.current = request.then(() => undefined, () => undefined)
-      const data = await request
-      const latest = pendingConfigRef.current
-      if (latest?.profileId === pending.profileId && latest.generation === pending.generation) {
-        applyAuthPayloadInternal(data, { preserveConfigDraft: true })
-        pendingConfigRef.current = null
-        setConfigOverrideState(null)
-        setConfigSyncStatus('idle')
-      }
-    } catch (error) {
-      const latest = pendingConfigRef.current
-      if (latest?.profileId === pending.profileId && latest.generation === pending.generation) {
-        setConfigSyncStatus('failed')
-      }
-      console.error(error)
-    } finally {
-      configSaveInFlightRef.current = false
-      const latest = pendingConfigRef.current
-      if (latest && latest.generation !== pending.generation) {
-        void runPendingConfigSave()
+        const request = workspacePatchQueueRef.current.then(save, save)
+        workspacePatchQueueRef.current = request.then(() => undefined, () => undefined)
+        const data = await request
+        if (!data.user) throw new Error(copy.common.pages_tool_useToolSession_006)
+        const latest = pendingConfigRef.current
+        if (latest?.profileId === pending.profileId && latest.generation === pending.generation) {
+          applyAuthPayloadInternal(data, { preserveConfigDraft: true })
+          pendingConfigRef.current = null
+          setConfigOverrideState(null)
+          setConfigSyncStatus('idle')
+        }
+      } catch (error) {
+        const latest = pendingConfigRef.current
+        if (latest?.profileId === pending.profileId && latest.generation === pending.generation) {
+          setConfigSyncStatus('failed')
+        }
+        console.error(error)
+      } finally {
+        configSaveInFlightRef.current = null
+        const latest = pendingConfigRef.current
+        if (latest && latest.generation !== pending.generation) {
+          await runPendingConfigSave()
+        }
       }
     }
+    configSaveInFlightRef.current = savePending()
+    return configSaveInFlightRef.current
   }, [applyAuthPayloadInternal])
 
   const applyWorkspaceSnapshot = useCallback((profileId: string, nextWorkspace: UserWorkspace) => {
@@ -241,25 +247,27 @@ export function useToolSession(requestedProfileId?: string | null) {
     }, CONFIG_SAVE_DEBOUNCE_MS)
   }, [runPendingConfigSave])
 
-  const flushConfigSave = useCallback(() => {
+  const flushConfigSave = useCallback(async () => {
     if (configSaveTimerRef.current !== null) {
       window.clearTimeout(configSaveTimerRef.current)
       configSaveTimerRef.current = null
     }
-    void runPendingConfigSave()
+    await runPendingConfigSave()
+    return !pendingConfigRef.current
   }, [runPendingConfigSave])
 
   const retryConfigSave = useCallback(() => {
     if (!pendingConfigRef.current) return
     setConfigSyncStatus('pending')
-    flushConfigSave()
+    void flushConfigSave()
   }, [flushConfigSave])
 
   const handleLogout = useCallback(async () => {
+    if (!await flushConfigSave()) return
     cancelPendingConfigSave()
     await apiVoid('/api/auth/logout', { method: 'POST' })
     applyAuthPayload(null)
-  }, [applyAuthPayload, cancelPendingConfigSave])
+  }, [applyAuthPayload, cancelPendingConfigSave, flushConfigSave])
 
   const cdkProfiles = useMemo(() => profiles.filter(isSchedulableProfile), [profiles])
   const activeCdkProfile = activeProfile && isSchedulableProfile(activeProfile) ? activeProfile : cdkProfiles[0] ?? null

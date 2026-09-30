@@ -206,6 +206,99 @@ describe('useToolSession config synchronization', () => {
     expect(workspaceRequests).toEqual([first, latest])
   })
 
+  it('preserves pending configuration edits when the same profile data is refreshed', async () => {
+    const workspaceRequests: LicenseConfig[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url === '/api/announcement') return new Response(null, { status: 204 })
+      if (url === '/api/auth/me') return jsonResponse(authPayload(baseConfig))
+      const body = JSON.parse(String(init?.body)) as { config: LicenseConfig }
+      workspaceRequests.push(body.config)
+      return jsonResponse(authPayload(body.config))
+    }))
+    const { result } = renderHook(() => useToolSession())
+    await waitFor(() => expect(result.current.authLoading).toBe(false))
+    vi.useFakeTimers()
+    const latest = { ...baseConfig, desc: 'unsaved edit' }
+    act(() => {
+      result.current.setConfigOverride(latest)
+      result.current.applyAuthPayload(authPayload(baseConfig))
+    })
+    expect(result.current.configOverride).toEqual(latest)
+    expect(result.current.configSyncStatus).toBe('pending')
+    await act(async () => { vi.advanceTimersByTime(600) })
+    expect(workspaceRequests).toEqual([latest])
+    expect(result.current.workspace?.config).toEqual(latest)
+    expect(result.current.configSyncStatus).toBe('idle')
+  })
+
+  it('keeps configuration edits when a save response omits the user', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === '/api/announcement') return new Response(null, { status: 204 })
+      if (url === '/api/auth/me') return jsonResponse(authPayload(baseConfig))
+      return jsonResponse({ workspace: { config: baseConfig } })
+    }))
+    const { result } = renderHook(() => useToolSession())
+    await waitFor(() => expect(result.current.authLoading).toBe(false))
+    vi.useFakeTimers()
+    const latest = { ...baseConfig, desc: 'unsaved edit' }
+    act(() => { result.current.setConfigOverride(latest) })
+    await act(async () => { vi.advanceTimersByTime(600) })
+    expect(result.current.configSyncStatus).toBe('failed')
+    expect(result.current.configOverride).toEqual(latest)
+    expect(result.current.workspace?.config).toEqual(baseConfig)
+    let saved: boolean | undefined
+    await act(async () => { saved = await result.current.flushConfigSave() })
+    expect(saved).toBe(false)
+    await act(async () => { await result.current.handleLogout() })
+    expect(result.current.user).not.toBeNull()
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url) === '/api/auth/logout')).toBe(false)
+  })
+
+  it('waits for the latest in-flight configuration before logging out', async () => {
+    let resolveFirst!: (response: Response) => void
+    const firstSave = new Promise<Response>((resolve) => { resolveFirst = resolve })
+    const requests: string[] = []
+    const savedConfigs: LicenseConfig[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url === '/api/announcement') return new Response(null, { status: 204 })
+      if (url === '/api/auth/me') return jsonResponse(authPayload(baseConfig))
+      requests.push(url)
+      if (url === '/api/auth/logout') return new Response(null, { status: 204 })
+      const body = JSON.parse(String(init?.body)) as { config: LicenseConfig }
+      savedConfigs.push(body.config)
+      return savedConfigs.length === 1 ? firstSave : jsonResponse(authPayload(body.config))
+    }))
+    const { result } = renderHook(() => useToolSession())
+    await waitFor(() => expect(result.current.authLoading).toBe(false))
+    vi.useFakeTimers()
+    const first = { ...baseConfig, desc: 'first' }
+    const latest = { ...baseConfig, desc: 'latest' }
+    act(() => { result.current.setConfigOverride(first) })
+    let flush!: Promise<boolean>
+    await act(async () => {
+      flush = result.current.flushConfigSave()
+      await Promise.resolve()
+    })
+    act(() => { result.current.setConfigOverride(latest) })
+    let logout!: Promise<void>
+    await act(async () => {
+      logout = result.current.handleLogout()
+      await Promise.resolve()
+    })
+    expect(requests).toEqual(['/api/user/workspace'])
+    await act(async () => {
+      resolveFirst(jsonResponse(authPayload(first)))
+      await logout
+    })
+    expect(await flush).toBe(true)
+    expect(savedConfigs).toEqual([first, latest])
+    expect(requests).toEqual(['/api/user/workspace', '/api/user/workspace', '/api/auth/logout'])
+    expect(result.current.user).toBeNull()
+  })
+
   it('ignores a workspace mutation response after switching profiles', async () => {
     let resolveWorkspacePatch!: (response: Response) => void
     const delayedWorkspacePatch = new Promise<Response>((resolve) => { resolveWorkspacePatch = resolve })

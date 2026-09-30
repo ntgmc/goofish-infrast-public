@@ -152,7 +152,7 @@ export default function InventoryAdminSection() {
       <section className="tool-panel p-5 sm:p-6">
         <p className="tool-eyebrow">统一道具系统</p>
         <h2 className="mt-2 text-xl font-semibold text-ink-primary">道具与礼包</h2>
-        <p className="mt-2 max-w-4xl text-sm leading-6 text-ink-secondary">系统效果代码不可编辑；礼包和新人任务发布后形成不可变版本。图标目前全部使用受控占位图，后续只需替换图标键映射。</p>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-ink-secondary">系统效果代码不可编辑，礼包和新人任务发布后会保留固定版本。当前图标使用受控占位图，更换图标时需更新图标键映射。</p>
         {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error}</div>}
         {notice && <AdminToast message={notice} onDismiss={() => setNotice(null)} />}
       </section>

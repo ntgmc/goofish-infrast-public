@@ -7,12 +7,14 @@ export default function OperatorAvatarStrip({
   compact = false,
   micro = false,
   showFullNames = false,
+  large = false,
 }: {
   operators: RoomOperator[];
   fallbackText: string;
   compact?: boolean;
   micro?: boolean;
   showFullNames?: boolean;
+  large?: boolean;
 }) {
   if (operators.length === 0) {
     return <p className="text-sm leading-6 text-ink-secondary">{fallbackText}</p>
@@ -29,6 +31,7 @@ export default function OperatorAvatarStrip({
           compact={compact}
           micro={micro}
           showFullNames={showFullNames}
+          large={large}
         />
       ))}
     </div>
@@ -40,18 +43,20 @@ function OperatorAvatarTile({
   compact = false,
   micro = false,
   showFullNames = false,
+  large = false,
 }: {
   operator: RoomOperator;
   compact?: boolean;
   micro?: boolean;
   showFullNames?: boolean;
+  large?: boolean;
 }) {
   const [imageFailed, setImageFailed] = useState(false)
   const canLoadImage = Boolean(operator.id && !imageFailed)
-  const avatarSize = micro ? 'h-8 w-8' : compact ? 'h-10 w-10' : 'h-11 w-11'
-  const tileWidth = micro ? showFullNames ? 'w-14' : 'w-9' : compact ? 'w-12' : 'w-[3.25rem]'
+  const avatarSize = large ? 'h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem]' : micro ? 'h-8 w-8' : compact ? 'h-10 w-10' : 'h-11 w-11'
+  const tileWidth = large ? 'w-16 sm:w-[4.5rem]' : micro ? showFullNames ? 'w-14' : 'w-9' : compact ? 'w-12' : 'w-[3.25rem]'
   const labelClassName = [
-    micro ? 'mt-0.5 text-[10px] leading-3' : 'mt-1 text-[11px] leading-4',
+    large ? 'mt-1.5 text-xs leading-4' : micro ? 'mt-0.5 text-[10px] leading-3' : 'mt-1 text-[11px] leading-4',
     showFullNames ? 'whitespace-normal break-words' : 'truncate',
     'block font-medium text-ink-secondary',
   ].join(' ')
@@ -64,8 +69,8 @@ function OperatorAvatarTile({
           <img
             src={`/webp96/${operator.id}.webp`}
             alt=""
-            width={micro ? 32 : compact ? 40 : 44}
-            height={micro ? 32 : compact ? 40 : 44}
+            width={large ? 72 : micro ? 32 : compact ? 40 : 44}
+            height={large ? 72 : micro ? 32 : compact ? 40 : 44}
             loading="lazy"
             decoding="async"
             className="h-full w-full object-cover"

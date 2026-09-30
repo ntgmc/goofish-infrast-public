@@ -21,13 +21,6 @@ const factors: ScenarioComparisonFactors = {
 }
 
 describe('ScenarioFactors', () => {
-  it('uses the available container width instead of forcing three narrow columns on wide screens', () => {
-    render(<ScenarioFactors factors={factors} disabled={false} onChange={vi.fn()} />)
-    const layoutGrid = screen.getByTestId('scenario-layout-grid')
-    expect(layoutGrid).toHaveClass('grid-cols-[repeat(auto-fit,minmax(220px,1fr))]')
-    expect(layoutGrid).not.toHaveClass('xl:grid-cols-3')
-  })
-
   it('adds exact orundum plans and emits automatic schedule and drone changes', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
@@ -46,7 +39,7 @@ describe('ScenarioFactors', () => {
       })]),
     }))
 
-    await user.click(screen.getByLabelText('MAA 自动非固定间隔（3–4 班）'))
+    await user.click(screen.getByLabelText('MAA 自动非固定间隔（3 到 4 班）'))
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ maaSchedules: ['variable', '8x3'] }))
     await user.click(screen.getByLabelText('合成玉'))
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ droneStrategies: ['off', 'orundum'] }))

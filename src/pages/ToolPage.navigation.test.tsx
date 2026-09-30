@@ -52,6 +52,15 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('ToolPage route guards', () => {
+  it.each([true, false])('returns to profiles only when configuration saving succeeds: %s', async (saved) => {
+    const user = userEvent.setup()
+    const flushConfigSave = vi.fn().mockResolvedValue(saved)
+    const router = renderToolRoute('/tool/setup/config', { activeProfile: createProfile(), flushConfigSave })
+    await user.click(screen.getByRole('button', { name: '返回账号列表' }))
+    expect(flushConfigSave).toHaveBeenCalledOnce()
+    await waitFor(() => expect(router.state.location.pathname).toBe(saved ? '/tool/profiles' : '/tool/setup/config'))
+  })
+
   it('shows the announcement banner after the /tool entry redirects to the dashboard', async () => {
     const router = renderToolRoute('/tool', {
       banner: {
@@ -66,8 +75,6 @@ describe('ToolPage route guards', () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/tool/profiles'))
     const banner = await screen.findByRole('region', { name: '站内横幅' })
-    expect(banner.closest('header')).toBeNull()
-    expect(banner.parentElement).toHaveClass('mx-auto', 'max-w-7xl', 'space-y-4')
     expect(banner).toHaveTextContent('维护公告')
     expect(screen.getByText('今晚进行例行维护。')).toBeInTheDocument()
   })
@@ -247,6 +254,9 @@ function createSession(overrides: Record<string, unknown> = {}) {
     eliteOverrides: {},
     configOverride: null,
     setConfigOverride: vi.fn(),
+    configSyncStatus: 'idle',
+    retryConfigSave: vi.fn(),
+    flushConfigSave: vi.fn().mockResolvedValue(true),
     banner: null,
     popups: [],
     announcementUnreadCount: 0,

@@ -18,7 +18,7 @@ describe('administrator operation reason dialog', () => {
 
     fireEvent.change(textbox, { target: { value: 'x' } })
     fireEvent.click(screen.getByRole('button', { name: '确认并继续' }))
-    expect(screen.getByRole('alert')).toHaveTextContent('操作原因必须为 2–500 个字符。')
+    expect(screen.getByRole('alert')).toHaveTextContent('操作原因须为 2 到 500 个字符。')
 
     fireEvent.change(textbox, { target: { value: '  工单 OPS-200 冻结异常账号  ' } })
     fireEvent.click(screen.getByRole('button', { name: '确认并继续' }))

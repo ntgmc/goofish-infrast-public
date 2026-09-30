@@ -1,6 +1,6 @@
 # 森空岛绑定角色接口 `defaultUid` 兼容方案
 
-本文记录森空岛绑定角色接口在不同账号数据下的返回差异、常见踩坑原因，以及一套可迁移到其他项目的解析方案。
+森空岛绑定角色接口的 `defaultUid` 可能为空。读取明日方舟 UID 时，需要同时检查 `bindingList`，并排除终末地角色。
 
 适用接口：
 
@@ -74,14 +74,14 @@ GET https://zonai.skland.com/api/v1/game/player/binding
 
 ## 根因
 
-很多项目会写出类似逻辑：
+以下写法无法处理空字符串：
 
 ```ts
 const first = item.bindingList.find(isRecord)
 const uid = stringValue(item.defaultUid ?? first?.uid)
 ```
 
-这段代码的问题是：`??` 只会在左侧为 `null` 或 `undefined` 时回退。森空岛返回 `defaultUid: ""` 时，空字符串不是 `null`/`undefined`，所以不会回退到 `bindingList[0].uid`。
+`??` 只在左侧为 `null` 或 `undefined` 时回退。森空岛返回 `defaultUid: ""` 时，这段代码会保留空字符串，无法取到 `bindingList[0].uid`。
 
 结果是：
 

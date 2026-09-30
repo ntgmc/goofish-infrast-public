@@ -1,7 +1,7 @@
-# Product Icons
+# Product icons
 
 Game artwork belongs to Hypergryph / the respective rights holders.
-These unmodified PNGs are sourced from `yuanyan3060/ArknightsGameResource`,
+The unmodified PNGs come from `yuanyan3060/ArknightsGameResource`,
 revision `57ef5385c1ab1315fe4f2094f399b5c803bd71fc`, under `item/`.
 
 Source: https://github.com/yuanyan3060/ArknightsGameResource/tree/57ef5385c1ab1315fe4f2094f399b5c803bd71fc/item

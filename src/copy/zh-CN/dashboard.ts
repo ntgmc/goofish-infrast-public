@@ -4,7 +4,7 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
   pages_tool_dashboard_AnnouncementsSection_002: "暂时无法更新阅读状态，请稍后重试。",
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
-  pages_tool_dashboard_AnnouncementsSection_003: "近期通知会保留在公告列表中，方便随时回看。",
+  pages_tool_dashboard_AnnouncementsSection_003: "可以在公告列表中回看近期通知。",
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
   pages_tool_dashboard_AnnouncementsSection_004: "正在标记...",
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
@@ -251,11 +251,11 @@ export const dashboardCopy = {
   pages_tool_AccountDashboard_tour_011: "在公告中查看服务变化，在设置中管理密码、森空岛授权和个人数据。",
   // src/pages/tool/dashboard/RedeemSection.tsx
   pages_tool_dashboard_RedeemSection_tour_001: "选择添加账号的方式",
-  pages_tool_dashboard_RedeemSection_tour_002: "使用 CDK 可创建正式档案；也可以通过森空岛确认游戏 UID 后领取免费个人排班。两类档案可使用的导出和高级功能不同。",
+  pages_tool_dashboard_RedeemSection_tour_002: "用 CDK 创建正式档案，或通过森空岛确认游戏 UID 后领取免费个人排班。各类档案的导出和高级功能请查看价格与权益。",
   pages_tool_dashboard_RedeemSection_tour_003: "兑换 CDK",
   pages_tool_dashboard_RedeemSection_tour_004: "输入未使用的 CDK，可以同时填写档案名称和备注。兑换成功后会创建正式游戏档案。",
   pages_tool_dashboard_RedeemSection_tour_005: "领取免费个人排班",
-  pages_tool_dashboard_RedeemSection_tour_006: "点击领取后会打开森空岛授权流程。确认游戏 UID 后，系统才会创建免费档案。",
+  pages_tool_dashboard_RedeemSection_tour_006: "点击领取，完成森空岛授权并确认游戏 UID 后，即可创建免费档案。",
   // src/pages/tool/ProfileUpgradePrompt.tsx
   pages_tool_ProfileUpgradePrompt_001: "背包中有档案升级道具",
   // src/pages/tool/ProfileUpgradePrompt.tsx
@@ -265,7 +265,7 @@ export const dashboardCopy = {
   // src/pages/tool/ProfileUpgradePrompt.tsx
   pages_tool_ProfileUpgradePrompt_004: "当前免费档案可以使用终身版兑换 CDK，升级为长期高级档案。",
   // src/pages/tool/ProfileUpgradePrompt.tsx
-  pages_tool_ProfileUpgradePrompt_005: "前往背包查看可用道具。只有档案升级成功后，才会消耗对应道具。",
+  pages_tool_ProfileUpgradePrompt_005: "到背包查看可用道具。档案升级成功后才会消耗道具。",
   // src/pages/tool/ProfileUpgradePrompt.tsx
   pages_tool_ProfileUpgradePrompt_006: "不再提示",
   // src/pages/tool/ProfileUpgradePrompt.tsx

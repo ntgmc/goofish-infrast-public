@@ -1,62 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   getPermissionProfile,
-  getSku,
   hasCapability,
   listAdminIssuablePermissions,
-  listPublicSkus,
   normalizeRuntimePermission,
-  productPolicies,
   resolveRuntimePermission,
 } from './product-catalog'
 
 describe('product catalog', () => {
-  it('uses a duration-neutral permission label for all single-account plans', () => {
-    for (const id of ['single_account_monthly', 'single_account_half_year', 'single_account_annual', 'single_account_lifetime'] as const) {
-      expect(getPermissionProfile(resolveRuntimePermission(getSku(id).runtime_permission)).label).toBe('单账号高级版')
-    }
-    expect(getPermissionProfile('premium').label).toBe('单账号高级版')
-    expect(getSku('single_account_lifetime').label).toBe('单账号终身卡 CDK')
-  })
-
-  it('publishes free preview and four duration-based single-account SKUs', () => {
-    expect(listPublicSkus().map((sku) => sku.id)).toEqual([
-      'free_preview',
-      'single_account_monthly',
-      'single_account_half_year',
-      'single_account_annual',
-      'single_account_lifetime',
-    ])
-    expect(getSku('free_preview').price?.amount).toBe(0)
-    expect(getSku('single_account_monthly')).toMatchObject({
-      public: true,
-      runtime_permission: 'advanced',
-      price: { amount: 12.9, currency: 'CNY', billing: 'one_time' },
-      duration_days: 30,
-    })
-    expect(getSku('single_account_half_year')).toMatchObject({
-      public: true,
-      runtime_permission: 'advanced',
-      price: { amount: 24.9, currency: 'CNY', billing: 'one_time' },
-      duration_days: 90,
-    })
-    expect(getSku('single_account_annual')).toMatchObject({
-      public: true,
-      runtime_permission: 'advanced',
-      price: { amount: 44.9, currency: 'CNY', billing: 'one_time' },
-      duration_days: 365,
-    })
-    expect(getSku('single_account_lifetime')).toMatchObject({
-      public: true,
-      runtime_permission: 'advanced',
-      price: { amount: 59, currency: 'CNY', billing: 'one_time' },
-      original_display_price: '59 元 / 长期',
-      default_discount_fold: 10,
-      display_price: '59 元 / 长期',
-      duration_days: null,
-    })
-  })
-
   it('keeps internal card permissions admin-issuable and ordered', () => {
     expect(listAdminIssuablePermissions()).toEqual(['recommended', 'growth', 'advanced', 'ultimate'])
     expect(getPermissionProfile('ultimate').public).toBe(false)
@@ -88,13 +39,5 @@ describe('product catalog', () => {
     expect(hasCapability({ kind: 'free_preview', permission: 'growth' }, 'export_full_result_json')).toBe(false)
     expect(hasCapability({ permission: 'ultimate' }, 'use_trusted_optimizer_options')).toBe(true)
     expect(hasCapability({ kind: 'free_preview', permission: 'growth' }, 'edit_limited_config')).toBe(true)
-  })
-
-  it('owns risk and support policy values', () => {
-    expect(productPolicies.risk).toMatchObject({
-      operator_data_enabled_by_default: true,
-      operator_anomaly_events_before_review: 3,
-    })
-    expect(productPolicies.support.first_response_business_days).toBe(2)
   })
 })

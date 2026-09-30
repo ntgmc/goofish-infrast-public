@@ -27,8 +27,8 @@ describe('UpgradeSuggestionStatusNotice', () => {
   })
 
   it.each([
-    ['deadline_budget', '排班已完成；优化建议已完整验证 7/24 个候选，其余候选因时间预算不足尚未模拟。'],
-    ['simulation_limit', '排班已完成；优化建议已完整验证 24/30 个候选，其余候选达到本次完整模拟上限，尚未验证。'],
+    ['deadline_budget', '排班已完成。已完整验证 7/24 项培养建议，其余建议因计算时间不足尚未模拟。'],
+    ['simulation_limit', '排班已完成。已完整验证 24/30 项培养建议，本次完整模拟次数已用完，其余建议尚未验证。'],
   ] as const)('renders a partial result for %s', (reason, message) => {
     render(<UpgradeSuggestionStatusNotice result={{
       upgrade_suggestions_status: 'partial',

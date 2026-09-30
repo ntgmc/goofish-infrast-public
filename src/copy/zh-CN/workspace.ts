@@ -16,11 +16,11 @@ export const workspaceCopy = {
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_008: "先预览游戏昵称和 UID，确认后才会保存绑定并分析仓库。",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_009: "先确认游戏 UID，确认后才会创建免费档案并导入干员。",
+  components_SklandBindingDialog_009: "核对游戏 UID 后，创建免费档案并导入干员。",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_010: "先预览游戏昵称和 UID，确认后才会保存绑定并导入干员。",
   components_SklandBindingDialog_lifetime_title: "绑定终身版档案",
-  components_SklandBindingDialog_lifetime_description: "选择并确认森空岛账号。只有最终导入和档案保存成功后才会消耗终身版兑换 CDK。",
+  components_SklandBindingDialog_lifetime_description: "选择森空岛账号并核对信息。数据导入和档案保存成功后，才会消耗终身版兑换 CDK。",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_011: "关闭森空岛导入",
   // src/components/SklandBindingDialog.tsx
@@ -52,7 +52,7 @@ export const workspaceCopy = {
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_025: "扫码授权",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_026: "使用森空岛 App 扫码授权。授权后只会进入账号预览，需要再次确认才保存。",
+  components_SklandBindingDialog_026: "使用森空岛 App 扫码授权，再核对账号预览。确认后才会保存绑定。",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_027: "重新生成二维码",
   // src/components/SklandBindingDialog.tsx
@@ -124,11 +124,11 @@ export const workspaceCopy = {
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_061: "该账号与当前绑定 UID 不一致，没有保存任何变更。请重新登录正确账号。",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_062: "确认后才会保存森空岛绑定；请核对昵称和 UID 后继续。",
+  components_SklandBindingDialog_062: "请核对昵称和 UID。确认后会保存森空岛绑定。",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_063: "选择要导入的明日方舟账号",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_064: "每个档案只能绑定一个 UID，请主动选择并核对后继续。",
+  components_SklandBindingDialog_064: "每个档案只能绑定一个 UID，请选择账号并核对信息。",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_065: "默认账号",
   // src/components/SklandBindingDialog.tsx
@@ -178,7 +178,7 @@ export const workspaceCopy = {
   // src/hooks/useSklandBinding.ts
   hooks_useSklandBinding_018: "森空岛凭据读取失败",
   // src/hooks/useSklandBinding.ts
-  hooks_useSklandBinding_019: "森空岛凭据已读取，但未返回可确认账号。",
+  hooks_useSklandBinding_019: "已读取森空岛凭据，但没有找到可供确认的账号。",
   // src/hooks/useSklandBinding.ts
   hooks_useSklandBinding_020: "请重新获取凭据，或改用扫码授权。",
   // src/hooks/useSklandBinding.ts
@@ -186,7 +186,7 @@ export const workspaceCopy = {
   // src/hooks/useSklandBinding.ts
   hooks_useSklandBinding_022: "读取所选森空岛账号失败",
   // src/hooks/useSklandBinding.ts
-  hooks_useSklandBinding_023: "所选森空岛账号未返回可确认预览。",
+  hooks_useSklandBinding_023: "无法预览所选森空岛账号。",
   // src/hooks/useSklandBinding.ts
   hooks_useSklandBinding_024: "请重新授权后再选择账号。",
   // src/hooks/useSklandBinding.ts
@@ -252,11 +252,7 @@ export const workspaceCopy = {
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_009: "请先上传干员识别文件。",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_010: "免费个人排班档案必须先绑定森空岛后才能保存工作区数据。",
-  // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_011: "保存失败，请稍后重试",
-  // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_012: "保存失败，请稍后重试",
+  pages_tool_WorkspaceSetupPage_010: "请先为免费档案绑定森空岛，再保存工作区。",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_013: "MAA 工作台",
   // src/pages/tool/WorkspaceSetupPage.tsx
@@ -272,7 +268,7 @@ export const workspaceCopy = {
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_018_account_actions: "账号操作",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_019: "准备账号工作区",
+  pages_tool_WorkspaceSetupPage_019: "准备干员和基建数据",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_020: "上传干员识别文件并确认基建配置，保存后进入排班优化。",
   // src/pages/tool/WorkspaceSetupPage.tsx
@@ -320,23 +316,19 @@ export const workspaceCopy = {
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_042: "基建配置",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_043: "已修改",
-  // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_044: "已保存",
+  pages_tool_WorkspaceSetupPage_044: "配置有效",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_045: "请检查",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_046: "正在保存...",
-  // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_047: "保存工作区并开始排班",
+  pages_tool_WorkspaceSetupPage_047: "进入排班",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_048: "免费档案升级失败，请稍后重试",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_049: "档案与 CDK",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_050: "可以用 CDK 原地升级当前免费档案并保留工作区，也可以兑换为新的独立档案。",
+  pages_tool_WorkspaceSetupPage_050: "用 CDK 升级当前免费档案，可保留现有工作区。也可以兑换一个新的独立档案。",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_051: "当前档案已经使用正式授权；如需管理其他游戏账号，可以继续兑换新的独立档案。",
+  pages_tool_WorkspaceSetupPage_051: "当前档案已开通正式权益。管理其他游戏账号时，可以兑换新的独立档案。",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_052: "升级当前免费档案",
   // src/pages/tool/WorkspaceSetupPage.tsx
@@ -492,7 +484,15 @@ export const workspaceCopy = {
   // src/pages/tool/tool-utils.ts
   pages_tool_tool_utils_018: "密码不能超过 128 位",
   // src/pages/tool/workspace/WorkspaceConfigSection.tsx
-  pages_tool_workspace_WorkspaceConfigSection_001: "保存后，下次打开这个账号会自动带上这套配置。",
+  pages_tool_workspace_WorkspaceConfigSection_001: "工作区与排班页共用此账号的基建配置，修改会自动保存。点击「生成排班」后用于新结果，已有结果保持不变。",
+  // src/pages/tool/workspace/ConfigSaveStatus.tsx
+  config_not_saved: "配置尚未保存",
+  config_save_pending: "更改待保存",
+  config_saving: "正在保存配置…",
+  config_saved: "配置已保存",
+  config_save_failed: "配置保存失败，点击重试",
+  // src/pages/tool/WorkspaceSetupPage.tsx
+  workspace_proceed_note: "进入排班页后，点击「生成排班」开始计算。",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_tour_001: "使用导览",
   pages_tool_WorkspaceSetupPage_tour_002: "完成排班准备",
@@ -500,7 +500,7 @@ export const workspaceCopy = {
   pages_tool_WorkspaceSetupPage_tour_004: "先选择基建配置",
   pages_tool_WorkspaceSetupPage_tour_005: "请选择与你游戏内基建布局一致的预设，再开始排班。导览只会切换到本页，不会替你更改配置。",
   pages_tool_WorkspaceSetupPage_tour_006: "检查并调整配置",
-  pages_tool_WorkspaceSetupPage_tour_007: "权限允许时可继续调整房间、产物和库存；如果配置校验失败，需要先按页面提示修正。",
-  pages_tool_WorkspaceSetupPage_tour_008: "保存并开始排班",
-  pages_tool_WorkspaceSetupPage_tour_009: "准备摘要会显示干员和配置状态。按钮可用后，保存工作区并进入优化总览；导览不会替你提交。",
+  pages_tool_WorkspaceSetupPage_tour_007: "按当前档案权益调整房间、产物和库存，修改会自动保存。配置有误时，请先按页面提示修正。",
+  pages_tool_WorkspaceSetupPage_tour_008: "进入排班",
+  pages_tool_WorkspaceSetupPage_tour_009: "干员和配置准备好、配置保存成功后，点击「进入排班」前往排班总览，再点击「生成排班」开始计算。",
 } as const

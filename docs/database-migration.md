@@ -1,7 +1,7 @@
-# Database Migration Safety
+# Database migration safety
 
-This is the operational knowledge captured from the production failure where
-`goofish-database-migrate.service` stopped with:
+`goofish-database-migrate.service` stopped during a production migration with
+this error:
 
 ```text
 Database migration 2026-08-06.1 checksum does not match the current application.
