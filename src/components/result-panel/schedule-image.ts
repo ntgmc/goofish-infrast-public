@@ -4,6 +4,7 @@ import { buildBoardV2Rooms, PRODUCTION_TYPES } from './ResultBoardV2'
 import { formatCompactNumber, type PreparedResult } from './formatters'
 import { ROOM_LABELS } from './labels'
 import type { PreparedPlan, RoomRow } from './types'
+import { isDroneTarget } from './DroneMarker'
 
 type ImageOptions = {
   prepared: PreparedResult;
@@ -12,11 +13,13 @@ type ImageOptions = {
   title: string;
   planIndex?: number;
   shiftHours?: number[];
+  manual?: boolean;
 }
 type ImageCard = {
   title: string;
   product: string;
   roomType: string;
+  droneLabels: string[];
   slots: Array<{ label: string; row?: RoomRow }>;
 }
 
@@ -42,7 +45,7 @@ export async function downloadScheduleImage(options: ImageOptions): Promise<void
   }
 }
 
-export async function renderScheduleImage({ prepared, isRotationMode, version, title, planIndex, shiftHours }: ImageOptions): Promise<Blob> {
+export async function renderScheduleImage({ prepared, isRotationMode, version, title, planIndex, shiftHours, manual = false }: ImageOptions): Promise<Blob> {
   const canvas = document.createElement('canvas')
   const context = canvas.getContext('2d')
   if (!context) throw new Error('Canvas unavailable')
@@ -95,7 +98,7 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
   }
 
   function cardHeight(card: ImageCard): number {
-    return 40 + lines(card.title, CARD_WIDTH - 44, 16, 600).length * 22
+    return 40 + lines(card.title, CARD_WIDTH - 80, 16, 600).length * 22
       + (card.product === '-' ? 0 : lines(card.product, CARD_WIDTH - 32, 12).length * 18)
       + card.slots.reduce((height, slot) => height + slotHeight(slot), 0)
   }
@@ -120,6 +123,7 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
       title: `${group.label}${group.indexLabel ? ` ${group.indexLabel}` : ''}`,
       product: group.product,
       roomType: group.roomType,
+      droneLabels: plans.flatMap((plan, index) => isDroneTarget(plan.drones, group.roomType, group.rows[0].roomIndex) ? [planLabel(plan, index)] : []),
       slots: buildBoardSlots(group.rows, prepared.detailStats.planCount, isRotationMode),
     })),
   }] : plans.map((plan, index) => ({
@@ -135,6 +139,7 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
         title: `${room.label}${room.indexLabel ? ` ${room.indexLabel}` : ''}`,
         product: room.product,
         roomType: room.roomType,
+        droneLabels: isDroneTarget(plan.drones, room.roomType, room.roomIndex) ? [planLabel(plan, planIndex ?? index)] : [],
         slots: [{ label: '', row: room.row }],
       })),
   }))
@@ -142,7 +147,7 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
   const headings: Array<{ value: string; y: number; note: string }> = []
   const heading = `${copy.domain.result_image.title} ${version}`
   const mode = isRotationMode ? copy.domain.components_result_panel_ResultBoard_001 : copy.domain.components_result_panel_ResultBoard_002
-  const subtitle = `${title} · ${mode}`
+  const subtitle = `${title} · ${manual ? copy.domain.manual_schedule.pending : mode}`
   let y = 88 + lines(subtitle, WIDTH - MARGIN * 2).length * 20
   for (const section of sections) {
     headings.push({ value: section.title, note: section.note, y })
@@ -181,12 +186,28 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
     context.stroke()
     context.fillStyle = tone
     context.fillRect(x + 16, cardY + 16, 3, 20)
-    let rowY = cardY + 16 + text(card.title, x + 28, cardY + 16, CARD_WIDTH - 44, colors.text, 16, 600) + 8
+    let rowY = cardY + 16 + text(card.title, x + 28, cardY + 16, CARD_WIDTH - 80, colors.text, 16, 600) + 8
+    if (card.droneLabels.length > 0) {
+      context.strokeStyle = colors.brand
+      context.lineWidth = 2
+      const centerX = x + CARD_WIDTH - 28
+      const centerY = cardY + 28
+      for (const [dx, dy] of [[-8, -8], [8, -8], [-8, 8], [8, 8]]) {
+        context.beginPath()
+        context.moveTo(centerX, centerY)
+        context.lineTo(centerX + dx, centerY + dy)
+        context.stroke()
+        context.beginPath()
+        context.arc(centerX + dx, centerY + dy, 5, 0, Math.PI * 2)
+        context.stroke()
+      }
+      context.lineWidth = 1
+    }
     if (card.product !== '-') rowY += text(card.product, x + 16, rowY, CARD_WIDTH - 32, tone, 12) + 8
     for (const slot of card.slots) {
       const row = slot.row
       text(slot.label, x + 16, rowY, CARD_WIDTH - 140, colors.muted, 12)
-      if (row && !row.isAutofill && row.efficiency !== '-') text(row.efficiency, x + CARD_WIDTH - 112, rowY, 96, tone, 16, 600)
+      if (!manual && row && !row.isAutofill && row.efficiency !== '-') text(row.efficiency, x + CARD_WIDTH - 112, rowY, 96, tone, 16, 600)
       const startY = rowY
       rowY += 28
       if (!row || row.isAutofill || row.operators.length === 0) {

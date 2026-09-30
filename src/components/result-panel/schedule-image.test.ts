@@ -18,6 +18,7 @@ beforeEach(() => {
     fillText: drawnText, drawImage: drawnImage,
     scale: vi.fn(), fillRect: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(),
     fill: vi.fn(), stroke: vi.fn(), save: vi.fn(), clip: vi.fn(), restore: vi.fn(),
+    moveTo: vi.fn(), lineTo: vi.fn(), arc: vi.fn(),
   } as unknown as CanvasRenderingContext2D)
   vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (this: HTMLCanvasElement, callback) {
     dimensions = { width: this.width, height: this.height }

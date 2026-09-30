@@ -11,6 +11,7 @@ import type { OptimizePhase } from './types'
 import { copy } from '../../../copy/index'
 import { LockedResultPreview } from './PaidCapabilityPreview'
 import { recordDebugError } from '../../../lib/debug-diagnostics'
+import type { ResultPanelProps } from '../../../components/result-panel/types'
 
 
 const ResultPanel = lazy(() => import('../../../components/ResultPanel'))
@@ -37,6 +38,7 @@ export default function ResultSection({
   maaDownloadBusy = false,
   fullResultDownloadBusy = false,
   fullDataAvailable = true,
+  manualEditProfile,
 }: {
   phase: OptimizePhase;
   historyItem: WorkspaceResultHistoryItem | null;
@@ -58,6 +60,7 @@ export default function ResultSection({
   maaDownloadBusy?: boolean;
   fullResultDownloadBusy?: boolean;
   fullDataAvailable?: boolean;
+  manualEditProfile?: ResultPanelProps['manualEditProfile'];
 }) {
   const { content, isFallback } = usePublicContent()
   const purchaseHref = isFallback ? undefined : resolveActivePurchaseChannel(content.cdk_purchase.xianyu_url)?.href ?? undefined
@@ -102,6 +105,7 @@ export default function ResultSection({
             downloadBusy={maaDownloadBusy}
             fullResultDownloadBusy={fullResultDownloadBusy}
             fullDataAvailable={fullDataAvailable}
+            manualEditProfile={manualEditProfile}
             suggestionsSlot={suggestionsSlot}
           />
           {previewProfile && <PreviewUpgradePanel cdk={upgradeCdk} loading={upgradeLoading} error={upgradeError} onCdkChange={onUpgradeCdkChange} onSubmit={onUpgradePreviewProfile} />}
@@ -120,6 +124,7 @@ export default function ResultSection({
             downloadBusy={maaDownloadBusy}
             fullResultDownloadBusy={fullResultDownloadBusy}
             fullDataAvailable={fullDataAvailable}
+            manualEditProfile={manualEditProfile}
             suggestionsSlot={suggestionsSlot}
           />
           {previewProfile && <PreviewUpgradePanel cdk={upgradeCdk} loading={upgradeLoading} error={upgradeError} onCdkChange={onUpgradeCdkChange} onSubmit={onUpgradePreviewProfile} />}
@@ -137,6 +142,7 @@ export default function ResultSection({
             downloadBusy={maaDownloadBusy}
             fullResultDownloadBusy={fullResultDownloadBusy}
             fullDataAvailable={fullDataAvailable}
+            manualEditProfile={manualEditProfile}
             suggestionsSlot={suggestionsSlot}
           />
           {previewProfile && <PreviewUpgradePanel cdk={upgradeCdk} loading={upgradeLoading} error={upgradeError} onCdkChange={onUpgradeCdkChange} onSubmit={onUpgradePreviewProfile} />}

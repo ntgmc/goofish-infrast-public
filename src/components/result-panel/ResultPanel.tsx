@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useMemo, useRef, useState } from 'react'
 import { Download } from 'lucide-react'
 import { LayoutGroup } from 'motion/react'
 import { AnimatedPresenceRegion, MotionNavIndicator } from '../MotionPrimitives'
@@ -10,7 +10,10 @@ import ResultDetail from './ResultDetail'
 import ResultMetrics from './ResultMetrics'
 import type { ResultPanelProps, ResultTabId } from './types'
 import { copy, CURRENT_LOCALE } from '../../copy/index'
+import { hasCapability } from '../../lib/product-catalog'
+import { manualSourceKey } from './manual-schedule'
 
+const ManualScheduleEditor = lazy(() => import('./ManualScheduleEditor'))
 
 export default function ResultPanel({
   result,
@@ -24,6 +27,7 @@ export default function ResultPanel({
   detailDefaultOpen = false,
   suggestionsSlot,
   previewLimit,
+  manualEditProfile,
 }: ResultPanelProps) {
   const isRotationMode = result.schedule_mode === 'rotation'
   const isPureMaaDormitoryAutofill = !isRotationMode && result.dormitory_rule === 'maa_pure_autofill'
@@ -33,6 +37,9 @@ export default function ResultPanel({
   )
   const { detailStats } = prepared
   const isPreview = Boolean(previewLimit)
+  const canEditManual = Boolean(manualEditProfile && manualEditProfile.kind !== 'free_preview'
+    && !isPreview && !result.preview_limit && hasCapability(manualEditProfile, 'edit_full_config') && result.plans.length > 0)
+  const manualKey = useMemo(() => manualSourceKey(result), [result])
   const searchedStateCount = result.searched_state_count
   const showSearchedStateCount = typeof searchedStateCount === 'number'
     && Number.isSafeInteger(searchedStateCount) && searchedStateCount >= 0
@@ -76,6 +83,7 @@ export default function ResultPanel({
   const tabs: Array<{ id: ResultTabId; label: string }> = [
     { id: 'board', label: copy.domain.components_result_panel_ResultPanel_017 },
     { id: 'board-v2', label: copy.domain.result_board_v2.tab },
+    ...(canEditManual ? [{ id: 'manual' as const, label: copy.domain.manual_schedule.tab }] : []),
     { id: 'detail', label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_018 : copy.domain.components_result_panel_ResultPanel_019 },
     { id: 'data' as const, label: copy.domain.components_result_panel_ResultPanel_020 },
     ...(!isPreview ? [{ id: 'import' as const, label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_021 : copy.domain.components_result_panel_ResultPanel_022 }] : []),
@@ -84,7 +92,8 @@ export default function ResultPanel({
   const [activeTab, setActiveTab] = useState<ResultTabId>(
     detailDefaultOpen ? 'detail' : 'board',
   )
-  const selectedTab = isPreview && activeTab === 'import'
+  const [manualOpened, setManualOpened] = useState(false)
+  const selectedTab = (isPreview && activeTab === 'import') || (activeTab === 'manual' && !canEditManual)
       ? 'board'
     : activeTab === 'suggestions' && !suggestionsSlot
       ? fullDataAvailable ? 'data' : 'board'
@@ -123,17 +132,17 @@ export default function ResultPanel({
           <div className="min-w-0">
             <p className="tool-eyebrow">{copy.domain.components_result_panel_ResultPanel_024}</p>
             <h2 className="text-lg font-semibold text-ink-primary">
-              {isPreview ? copy.domain.components_result_panel_ResultPanel_025 : copy.domain.components_result_panel_ResultPanel_027}
+              {selectedTab === 'manual' ? copy.domain.manual_schedule.title : isPreview ? copy.domain.components_result_panel_ResultPanel_025 : copy.domain.components_result_panel_ResultPanel_027}
             </h2>
             <p className="mt-1 text-sm text-ink-secondary">
-              {isPreview
+              {selectedTab === 'manual' ? copy.domain.manual_schedule.pending : isPreview
                 ? copy.domain.components_result_panel_ResultPanel_028
                 : isRotationMode
                   ? copy.domain.components_result_panel_ResultPanel_030
                   : copy.domain.components_result_panel_ResultPanel_031}
             </p>
           </div>
-          {(onDownload || onSaveWorkfile) && (
+          {selectedTab !== 'manual' && (onDownload || onSaveWorkfile) && (
             <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">
               {!isRotationMode && onDownload && (
                 <button
@@ -199,7 +208,7 @@ export default function ResultPanel({
                   role="tab"
                   aria-selected={selectedTab === tab.id}
                   aria-controls={`result-${tab.id}-panel`}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => { setActiveTab(tab.id); if (tab.id === 'manual') setManualOpened(true) }}
                   className={`relative inline-flex min-h-11 w-max shrink-0 border-b-2 px-4 py-2 text-sm font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 ${
                     selectedTab === tab.id
                       ? 'border-transparent text-ink-primary'
@@ -235,7 +244,15 @@ export default function ResultPanel({
         </div>
       )}
 
-      <AnimatedPresenceRegion
+      {canEditManual && manualOpened && manualEditProfile && (
+        <div id="result-manual-panel" role="tabpanel" aria-labelledby="result-manual-tab" hidden={selectedTab !== 'manual'}>
+          <Suspense fallback={<p className="p-5 text-sm text-ink-muted">{copy.domain.manual_schedule.title}</p>}>
+            <ManualScheduleEditor key={`${manualEditProfile.id}:${manualKey}`} source={result} profileId={manualEditProfile.id} operators={operators} />
+          </Suspense>
+        </div>
+      )}
+
+      {selectedTab !== 'manual' && <AnimatedPresenceRegion
         motionKey={selectedTab}
         id={`result-${selectedTab}-panel`}
         role="tabpanel"
@@ -269,7 +286,7 @@ export default function ResultPanel({
           </section>
         )}
         {selectedTab === 'suggestions' && suggestionsSlot && <section className="tool-panel overflow-hidden p-5 sm:p-6">{suggestionsSlot}</section>}
-      </AnimatedPresenceRegion>
+      </AnimatedPresenceRegion>}
     </div>
   )
 }

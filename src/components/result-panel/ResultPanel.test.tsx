@@ -8,6 +8,58 @@ import ResultPanel from './ResultPanel'
 
 afterEach(cleanup)
 
+describe('manual schedule access and recovery', () => {
+  it('opens advanced editing, locks targets, edits and restores a separate draft', async () => {
+    localStorage.clear()
+    const user = userEvent.setup()
+    const result = createThreeShiftResult()
+    result.plans[0].Fiammetta = { enable: true, target: '贸易1', order: 'pre' }
+    result.plans[0].drones = { enable: true, room: 'trading', index: 1, order: 'pre' }
+    const operators = ['贸易1', '贸易2', '贸易3', '新干员'].map((name) => ({ id: name, name, own: true, elite: 2, rarity: 6 }))
+    const profile = { id: 'manual-profile', kind: 'cdk' as const, permission: 'advanced' as const }
+    const view = render(<ResultPanel result={result} operators={operators} manualEditProfile={profile} />)
+    await user.click(screen.getByRole('tab', { name: '手动排班' }))
+    const editor = await screen.findByRole('region', { name: '手动调整排班' })
+    expect(within(editor).getByText(/修改干员或无人机目标/)).toBeInTheDocument()
+    expect(within(editor).queryByText('200.0%')).not.toBeInTheDocument()
+    await user.click(within(editor).getByRole('button', { name: /编辑 贸易站.*干员/ }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: '贸易1' })).toBeDisabled()
+    await user.click(within(dialog).getByRole('button', { name: '新干员' }))
+    await user.click(within(dialog).getByRole('button', { name: '完成' }))
+    expect(within(editor).getByText('新干员')).toBeInTheDocument()
+    await user.click(within(editor).getByRole('button', { name: '保存本地草稿' }))
+    expect(JSON.parse(localStorage.getItem('manual-schedule:manual-profile')!).plans[0].rooms.trading[0]).toEqual(['贸易1', '新干员', ''])
+    expect(result.plans[0].rooms.trading[0].operators).toEqual(['贸易1'])
+    await user.click(screen.getByRole('tab', { name: '总览图 v2' }))
+    await user.click(screen.getByRole('tab', { name: '手动排班' }))
+    expect(within(editor).getByText('新干员')).toBeInTheDocument()
+    view.unmount()
+    render(<ResultPanel result={result} operators={operators} manualEditProfile={profile} />)
+    await user.click(screen.getByRole('tab', { name: '手动排班' }))
+    const restored = await screen.findByRole('region', { name: '手动调整排班' })
+    await user.click(within(restored).getByRole('button', { name: '恢复已保存草稿' }))
+    expect(within(restored).getByText('新干员')).toBeInTheDocument()
+    localStorage.clear()
+  })
+
+  it.each([
+    ['free_preview', 'advanced'],
+    ['cdk', 'recommended'],
+    ['cdk', 'growth'],
+  ] as const)('denies manual editing for %s / %s', (kind, permission) => {
+    render(<ResultPanel result={createThreeShiftResult()} manualEditProfile={{ id: 'limited', kind, permission }} />)
+    expect(screen.queryByRole('tab', { name: '手动排班' })).not.toBeInTheDocument()
+  })
+
+  it('denies editing a projected preview result even when the profile has advanced access', () => {
+    const result = createThreeShiftResult()
+    result.preview_limit = { hidden_room_count: 1, notice: 'preview' }
+    render(<ResultPanel result={result} manualEditProfile={{ id: 'advanced', kind: 'cdk', permission: 'advanced' }} />)
+    expect(screen.queryByRole('tab', { name: '手动排班' })).not.toBeInTheDocument()
+  })
+})
+
 describe('ResultPanel overview v2', () => {
   it('keeps v1 as the default and shows one shift with larger portraits in v2', async () => {
     const user = userEvent.setup()
