@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AdminInvitationSettingsResponse } from '../../../lib/types'
@@ -23,6 +23,18 @@ const overview: AdminInvitationSettingsResponse = {
     { item_code: 'plan_capacity_certificate', name: '方案扩容证', description: '增加方案槽位', kind: 'capacity_upgrade', icon_key: 'plan_capacity_certificate', issuance_enabled: true, selectable: true, unavailable_reason: null, latest_gift_pack_version: null },
   ],
   configured_gift_pack_versions: [],
+  stats: {
+    as_of: '2026-09-30T03:00:00.000Z',
+    registered: 20,
+    activated: 10,
+    rewarded_invitations: 7,
+    pending_rewards: 1,
+    retrying_rewards: 1,
+    failed_rewards: 1,
+    today_registered: 4,
+    today_activated: 3,
+    today_rewarded: 2,
+  },
 }
 
 beforeEach(() => {
@@ -33,6 +45,39 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('InvitationSettingsSection', () => {
+  it('shows invitation totals, activation rate, reward states and today counts', async () => {
+    render(<InvitationSettingsSection />)
+    const stats = within(await screen.findByRole('region', { name: '邀请统计' }))
+    for (const [label, value] of [
+      ['累计邀请注册', 20], ['累计激活', 10], ['累计已发奖', 7],
+      ['待发奖', 1], ['发奖重试中', 1], ['发奖失败', 1],
+      ['今日邀请注册', 4], ['今日激活', 3], ['今日已发奖', 2],
+    ] as const) {
+      expect(within(stats.getByText(label).parentElement!).getByText(String(value))).toBeInTheDocument()
+    }
+    expect(stats.getByText(/激活率 50.0%/)).toBeInTheDocument()
+    expect(stats.getByText(/至少一方收到奖励/)).toBeInTheDocument()
+    expect(stats.getByText(/上海时间/)).toBeInTheDocument()
+  })
+
+  it('handles empty invitation stats and refreshes them when reloading', async () => {
+    const user = userEvent.setup()
+    adminApiJson.mockResolvedValueOnce({
+      ...overview,
+      stats: {
+        ...overview.stats,
+        registered: 0, activated: 0, rewarded_invitations: 0,
+        pending_rewards: 0, retrying_rewards: 0, failed_rewards: 0,
+        today_registered: 0, today_activated: 0, today_rewarded: 0,
+      },
+    })
+    render(<InvitationSettingsSection />)
+    expect(await screen.findByText(/激活率 0.0%/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '重新载入' }))
+    expect(await screen.findByText(/激活率 50.0%/)).toBeInTheDocument()
+    expect(adminApiJson).toHaveBeenCalledTimes(2)
+  })
+
   it('adds any selectable inventory item to a recipient reward group', async () => {
     const user = userEvent.setup()
     render(<InvitationSettingsSection />)

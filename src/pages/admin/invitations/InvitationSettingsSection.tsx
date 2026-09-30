@@ -10,6 +10,7 @@ import { adminApiJson } from '../../../lib/admin-api-client'
 import { itemIconPath } from '../../../lib/inventory-contracts'
 import type {
   AdminInvitationSettingsResponse,
+  AdminInvitationStats,
   InvitationRewardCatalogItem,
   InvitationGiftPackSummary,
   InvitationRewardRecipient,
@@ -39,6 +40,7 @@ export default function InvitationSettingsSection() {
   const [savedSettings, setSavedSettings] = useState<InvitationSettings>(DEFAULT_SETTINGS)
   const [catalog, setCatalog] = useState<InvitationRewardCatalogItem[]>([])
   const [configuredGiftPackVersions, setConfiguredGiftPackVersions] = useState<InvitationGiftPackSummary[]>([])
+  const [stats, setStats] = useState<AdminInvitationStats | null>(null)
   const [addingFor, setAddingFor] = useState<InvitationRewardRecipient | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -56,6 +58,7 @@ export default function InvitationSettingsSection() {
       setSavedSettings(next)
       setCatalog(data.catalog ?? [])
       setConfiguredGiftPackVersions(data.configured_gift_pack_versions ?? [])
+      setStats(data.stats)
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
@@ -135,6 +138,33 @@ export default function InvitationSettingsSection() {
     <form onSubmit={submit} className="space-y-5" noValidate>
       {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
       {notice && <AdminToast message={notice} onDismiss={() => setNotice(null)} />}
+
+      {stats && (
+        <section className="tool-panel p-5 sm:p-6" aria-labelledby="admin-invitation-stats-title">
+          <h2 id="admin-invitation-stats-title" className="text-lg font-semibold text-ink-primary">邀请统计</h2>
+          <p className="mt-2 text-sm leading-6 text-ink-secondary">统计全部邀请记录；今日数据按上海时间计算。至少一方收到奖励即计为已发奖，同一次邀请只计一次。</p>
+          <dl className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {[
+              ['累计邀请注册', stats.registered, '通过用户邀请码完成注册的用户数'],
+              ['累计激活', stats.activated, `绑定森空岛并启用档案；激活率 ${stats.registered > 0 ? (stats.activated / stats.registered * 100).toFixed(1) : '0.0'}%`],
+              ['累计已发奖', stats.rewarded_invitations, '邀请人或新用户已收到奖励的邀请数'],
+              ['待发奖', stats.pending_rewards, '已激活，等待奖励发放'],
+              ['发奖重试中', stats.retrying_rewards, '系统会自动重试，无需重新邀请'],
+              ['发奖失败', stats.failed_rewards, '自动重试已停止，需要管理员处理'],
+              ['今日邀请注册', stats.today_registered, '今天通过用户邀请码完成注册'],
+              ['今日激活', stats.today_activated, '今天完成激活，含之前注册的用户'],
+              ['今日已发奖', stats.today_rewarded, '今天完成奖励发放的邀请数'],
+            ].map(([label, value, description]) => (
+              <div key={label} className="tool-inset p-4">
+                <dt className="text-sm text-ink-secondary">{label}</dt>
+                <dd className="mt-2 text-2xl font-semibold tabular-nums text-ink-primary">{value}</dd>
+                <dd className="mt-2 text-xs leading-5 text-ink-muted">{description}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-4 text-xs text-ink-muted">统计更新时间：{new Date(stats.as_of).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}；点击下方“重新载入”刷新。</p>
+        </section>
+      )}
 
       <section className="tool-panel p-5 sm:p-6" aria-labelledby="admin-invitation-title">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

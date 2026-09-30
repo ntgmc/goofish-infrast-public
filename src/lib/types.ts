@@ -1086,10 +1086,24 @@ export interface InvitationRewardCatalogItem {
   latest_gift_pack_version: InvitationGiftPackSummary | null;
 }
 
+export interface AdminInvitationStats {
+  as_of: string;
+  registered: number;
+  activated: number;
+  rewarded_invitations: number;
+  pending_rewards: number;
+  retrying_rewards: number;
+  failed_rewards: number;
+  today_registered: number;
+  today_activated: number;
+  today_rewarded: number;
+}
+
 export interface AdminInvitationSettingsResponse {
   settings: InvitationSettings;
   catalog: InvitationRewardCatalogItem[];
   configured_gift_pack_versions: InvitationGiftPackSummary[];
+  stats: AdminInvitationStats;
 }
 
 export interface InvitationRewardPreviewItem {
