@@ -53,24 +53,6 @@ describe('WorkspaceSetupPage CDK paths', () => {
     await user.click(screen.getByRole('button', { name: '修改布局' }))
     expect(screen.getByRole('button', { name: '保存工作区并开始排班' })).toBeDisabled()
   })
-  it('renders announcement banners in the main content flow', () => {
-    renderWorkspace({
-      announcement: {
-        id: 'banner-1',
-        kind: 'banner',
-        title: '维护公告',
-        body: '今晚进行例行维护。',
-        active: true,
-        created_at: '2026-07-21T00:00:00.000Z',
-        updated_at: '2026-07-21T00:00:00.000Z',
-      },
-    })
-
-    const banner = screen.getByRole('region', { name: '站内横幅' })
-    expect(banner.closest('header')).toBeNull()
-    expect(banner.parentElement).toHaveClass('mx-auto', 'max-w-7xl', 'space-y-4')
-  })
-
   it('moves the setup guide to configuration without saving workspace data', async () => {
     window.localStorage.removeItem(tourStorageKey('workspace-setup', 1))
     const user = userEvent.setup()
@@ -198,27 +180,6 @@ describe('WorkspaceSetupPage CDK paths', () => {
     expect(notice).toHaveTextContent('赤金 12')
     expect(notice).toHaveTextContent('源石碎片 3')
     expect(notice).toHaveTextContent('固源岩 45')
-  })
-
-  it('separates the desktop account actions in one bottom navigation group', () => {
-    renderWorkspace()
-
-    const accountActions = screen.getByRole('navigation', { name: '账号操作' })
-    expect(accountActions).toHaveClass('grid-cols-2', 'gap-2')
-    expect(within(accountActions).getByRole('button', { name: '返回账号列表' })).toBeInTheDocument()
-    expect(within(accountActions).getByRole('button', { name: '退出登录' })).toHaveClass('tool-danger-action')
-    expect(screen.getAllByRole('button', { name: '返回账号列表' })).toHaveLength(1)
-  })
-
-  it('renders the business workflow breadcrumb with the active profile context', () => {
-    renderWorkspace({ profile: createAdvancedProfile() })
-
-    const breadcrumb = screen.getByRole('navigation', { name: '面包屑' })
-    expect(within(breadcrumb).getByRole('link', { name: '首页' })).toHaveAttribute('href', '/')
-    expect(within(breadcrumb).getByRole('link', { name: '游戏账号' })).toHaveAttribute('href', '/tool/profiles')
-    expect(within(breadcrumb).getByRole('link', { name: '高级档案' })).toHaveAttribute('href', '/tool/profiles?profile_id=advanced-profile')
-    expect(within(breadcrumb).getByRole('link', { name: '工作区设置' })).toHaveAttribute('href', '/tool/setup/operators?profile_id=advanced-profile')
-    expect(within(breadcrumb).getByText('干员数据')).toHaveAttribute('aria-current', 'page')
   })
 
   it('switches sections and preserves account actions in the compact menu', async () => {

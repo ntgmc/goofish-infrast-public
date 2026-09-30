@@ -32,12 +32,6 @@ export function getPermissionProfile(permission: RawPermissionMode | null | unde
   return catalogJson.runtime_permissions[normalizeRuntimePermission(permission)]
 }
 
-export function listPublicSkus() {
-  return (Object.entries(catalogJson.skus) as Array<[SkuId, (typeof catalogJson.skus)[SkuId]]>)
-    .filter(([, sku]) => sku.public)
-    .map(([id, sku]) => ({ id, ...sku }))
-}
-
 export function listAdminIssuablePermissions(): ProductPermission[] {
   return (Object.entries(catalogJson.runtime_permissions) as Array<[RuntimePermission, (typeof catalogJson.runtime_permissions)[RuntimePermission]]>)
     .filter(([permission, profile]) => permission !== 'admin' && profile.admin_issuable)

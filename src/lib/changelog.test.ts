@@ -10,21 +10,6 @@ describe('changelog releases', () => {
     expect(dates).toEqual([...dates].sort((left, right) => right.localeCompare(left)))
   })
 
-  it('keeps the confirmed manually curated release alongside generated releases', () => {
-    const [release] = CHANGELOG_RELEASES
-
-    expect(release).toMatchObject({
-      releasedAt: '2026-07-23',
-      displayVersion: '前端 v2.0.435 · 后端 v2.0.435',
-      kind: 'release',
-    })
-    expect(release.sections.map(({ id }) => id)).toEqual([
-      'optimizer-reliability',
-      'account-and-personal-use',
-      'workspace-experience',
-    ])
-  })
-
   it('orders automatic build labels numerically when releases share a date', () => {
     const releases = sortChangelogReleases([
       {

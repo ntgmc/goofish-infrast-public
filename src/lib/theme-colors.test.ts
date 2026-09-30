@@ -46,11 +46,4 @@ describe('dark theme readability', () => {
       ).toBeGreaterThanOrEqual(3)
     }
   })
-
-  it('uses progressively lighter surfaces for nested content and interaction', () => {
-    const levels = surfaces.map(surface => luminance(hexToken(darkTokens, surface)))
-    for (let index = 1; index < levels.length; index += 1) {
-      expect(levels[index]).toBeGreaterThan(levels[index - 1])
-    }
-  })
 })

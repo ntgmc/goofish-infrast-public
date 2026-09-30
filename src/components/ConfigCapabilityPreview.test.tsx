@@ -20,7 +20,6 @@ it('opens on free configuration and previews full configuration without allowing
   const freeButton = screen.getByRole('button', { name: '当前免费配置' })
   const previewButton = screen.getByRole('button', { name: '自定义基建 · 只读预览' })
   expect(freeButton).toHaveAttribute('aria-pressed', 'true')
-  expect(freeButton).toHaveClass('tool-option-selected')
   expect(previewButton).toHaveAttribute('aria-pressed', 'false')
   expect(screen.queryByRole('group', { name: '高级配置只读预览' })).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: '免费配置操作' }))

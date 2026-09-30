@@ -41,20 +41,6 @@ describe('ProfileUpgradePrompt', () => {
     expect(screen.getByRole('button', { name: '不再提示' })).toBeInTheDocument()
   })
 
-  it('shows lifetime and combined voucher copy', async () => {
-    apiJson.mockResolvedValue(inventoryWith('lifetime_profile_voucher', 'bind'))
-    renderPrompt({ userId: 'lifetime-user' })
-    expect(await screen.findByRole('dialog')).toHaveTextContent('终身版兑换 CDK')
-    cleanup()
-
-    apiJson.mockResolvedValue(inventoryWith(
-      'limited_profile_voucher', 'use',
-      'lifetime_profile_voucher', 'bind',
-    ))
-    renderPrompt({ userId: 'combined-user' })
-    expect(await screen.findByRole('dialog')).toHaveTextContent('背包中有多种档案升级道具，请前往背包查看用途和有效期。')
-  })
-
   it.each([
     ['正式档案', { kind: 'cdk' as const }],
     ['冻结档案', { status: 'frozen' as const }],

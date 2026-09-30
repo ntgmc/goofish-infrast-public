@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, render, screen, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { cleanup, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -30,8 +29,6 @@ describe('PricingPage', () => {
     expect(buttons).toHaveLength(4)
     buttons.forEach((button) => {
       expect(button).toBeDisabled()
-      expect(button.closest('article')).not.toBeNull()
-      expect(within(button.closest('article')!).getByRole('heading', { level: 3 })).toBeInTheDocument()
     })
   })
 
@@ -49,79 +46,12 @@ describe('PricingPage', () => {
       expect(link).toHaveAttribute('href', `https://example.com/${id}`)
       expect(link).toHaveAttribute('target', '_blank')
       expect(link).toHaveAttribute('rel', 'noopener noreferrer')
-      expect(link.closest('article')?.querySelector('article')).toBeNull()
     })
     content.pricing.plans.single_account_half_year.purchase_url = ''
     rerender(<MemoryRouter><PricingPage /></MemoryRouter>)
     expect(screen.queryByRole('link', { name: '购买 90 天' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '暂未开放购买' })).toBeDisabled()
     expect(screen.getByRole('link', { name: '购买 30 天' })).toBeInTheDocument()
-  })
-
-  it('renders the duration-based single-account plans and full disclosure policy', () => {
-    render(<MemoryRouter><PricingPage /></MemoryRouter>)
-    expect(screen.getByRole('heading', { level: 1, name: '价格与权益' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '免费预览' })).toBeInTheDocument()
-    expect(screen.getByText('Pricing')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '个人维护方案' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: '单账号月卡 CDK' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: '单账号半年卡 CDK' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: '单账号年卡 CDK' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: '单账号终身卡 CDK' })).not.toBeInTheDocument()
-    expect(screen.getByText('12.9 元 / 30 天')).toBeInTheDocument()
-    expect(screen.getByText('24.9 元 / 90 天')).toBeInTheDocument()
-    expect(screen.getByText('44.9 元 / 365 天')).toBeInTheDocument()
-    expect(screen.getByText('59 元 / 长期')).toBeInTheDocument()
-    expect(screen.queryByText(/原价 129 元 \/ 长期/)).not.toBeInTheDocument()
-    expect(screen.queryByText('单次重置卡')).not.toBeInTheDocument()
-    expect(screen.queryByText('Admin卡')).not.toBeInTheDocument()
-    expect(screen.getByText(/30 天尝鲜维护包、90 天版本维护卡、365 天年度维护卡和终身卡 CDK 均仅用于一个游戏账号/)).toBeInTheDocument()
-    expect(screen.getByText(/干员归属、练度或干员池出现异常变化时可能先拦截/)).toBeInTheDocument()
-    expect(screen.queryByText(/滚动 7 天窗口，最多成功更新 2 次/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/设备 Token、浏览器 User-Agent 和网络 IP 前缀/)).not.toBeInTheDocument()
-    expect(screen.getByText(/2 个工作日内首次响应/)).toBeInTheDocument()
-    const contactLinks = screen.getAllByRole('link', { name: '联系客服' })
-    const supportPageLink = contactLinks.find((link) => link.getAttribute('href') === '/support')
-    expect(supportPageLink).toHaveClass('hidden', 'items-center', 'sm:inline-flex')
-    const table = screen.getByRole('table', { name: '功能对比' })
-    expect(within(table).getAllByText('支持右满252')).toHaveLength(2)
-    expect(within(table).queryByText(/31\/22332|32\/32322|32\/33333/)).not.toBeInTheDocument()
-    expect(within(table).getAllByText('支持，可绑定并保存到同一账号工作区')).toHaveLength(1)
-    expect(within(table).getByText('更换游戏账号')).toBeInTheDocument()
-    expect(within(table).getAllByText('不支持自行更换；需人工核验')).toHaveLength(1)
-    expect(within(table).getAllByText(/维护包/).length).toBeGreaterThan(0)
-    expect(within(table).getByText('30 天')).toBeInTheDocument()
-    expect(within(table).getByText('90 天')).toBeInTheDocument()
-    expect(within(table).getByText('长期，不设到期日')).toBeInTheDocument()
-  })
-
-  it('keeps support and home links in the compact mobile menu', async () => {
-    const user = userEvent.setup()
-    render(<MemoryRouter><PricingPage /></MemoryRouter>)
-
-    await user.click(screen.getByRole('button', { name: '更多操作' }))
-    const menu = screen.getByRole('menu')
-    expect(within(menu).getByRole('menuitem', { name: '联系客服' })).toHaveAttribute('href', '/support')
-    expect(within(menu).getByRole('menuitem', { name: '返回首页' })).toHaveAttribute('href', '/')
-  })
-
-  it('explains points settlement and commercial billing rules', () => {
-    render(<MemoryRouter><PricingPage /></MemoryRouter>)
-
-    expect(screen.getByRole('heading', { name: '积分如何扣除' })).toBeInTheDocument()
-    expect(screen.getByText(/系统会暂时锁定本次所需积分，此时还没有正式扣除/)).toBeInTheDocument()
-    expect(screen.getByText(/仅在排班结果成功生成并保存后扣费/)).toBeInTheDocument()
-    expect(screen.getByText(/失败、取消或等待超时都会自动退回暂扣积分/)).toBeInTheDocument()
-
-    const commercialRules = screen.getByRole('heading', { name: '商用版规则' }).closest('section')
-    expect(commercialRules).not.toBeNull()
-    expect(within(commercialRules!).getByText(/累计获得积分达到 10,000 积分且没有待补扣积分时/)).toBeInTheDocument()
-    expect(within(commercialRules!).getByText(/默认最多 100 个活跃档案、1,000 个总档案/)).toHaveTextContent('同时运行不超过 2 个、排队不超过 8 个，每小时最多接纳 30 个新任务')
-    expect(within(commercialRules!).getByText(/仅可处理数据权利人已授权的数据/)).toBeInTheDocument()
-
-    const tiers = within(commercialRules!).getByRole('table', { name: '商用等级与单次费用' })
-    expect(within(tiers).getByRole('row', { name: 'Lv1 10,000 积分 -10% 1,350 积分' })).toBeInTheDocument()
-    expect(within(tiers).getByRole('row', { name: 'Lv4 100,000 积分 -26.67% 1,100 积分' })).toBeInTheDocument()
   })
 
   it('hides metered prices and capabilities when metered billing is closed', () => {

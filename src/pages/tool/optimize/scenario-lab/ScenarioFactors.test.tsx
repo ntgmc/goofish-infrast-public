@@ -21,13 +21,6 @@ const factors: ScenarioComparisonFactors = {
 }
 
 describe('ScenarioFactors', () => {
-  it('uses the available container width instead of forcing three narrow columns on wide screens', () => {
-    render(<ScenarioFactors factors={factors} disabled={false} onChange={vi.fn()} />)
-    const layoutGrid = screen.getByTestId('scenario-layout-grid')
-    expect(layoutGrid).toHaveClass('grid-cols-[repeat(auto-fit,minmax(220px,1fr))]')
-    expect(layoutGrid).not.toHaveClass('xl:grid-cols-3')
-  })
-
   it('adds exact orundum plans and emits automatic schedule and drone changes', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()

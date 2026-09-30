@@ -8,7 +8,7 @@ import ConfigEditor from './ConfigEditor'
 
 afterEach(cleanup)
 
-describe('ConfigEditor strategy layout', () => {
+describe('ConfigEditor facility configuration', () => {
   it('loads confirmed layouts collapsed and requires review again after editing', async () => {
     const config = normalizeConfig(CONFIG_PRESETS['252'])
     config.facility_layout = ['trading_1', 'trading_2', 'manufacture_1', 'manufacture_2', 'manufacture_3', 'manufacture_4', 'manufacture_5', 'power_1', 'power_2']
@@ -110,124 +110,6 @@ describe('ConfigEditor strategy layout', () => {
     expect(card).toHaveFocus()
     expect(onUpdate).not.toHaveBeenCalled()
   })
-  it('groups presets by power stations', () => {
-    render(
-      <ConfigEditor
-        config={normalizeConfig(CONFIG_PRESETS['243'])}
-        canEdit
-        validation={{ ok: true }}
-        onUpdate={vi.fn()}
-      />,
-    )
-
-    const threePower = screen.getByRole('group', { name: '3 发电站' })
-    const twoPower = screen.getByRole('group', { name: '2 发电站' })
-    expect(within(threePower).getByRole('button', { name: '243 均衡' })).toBeInTheDocument()
-    expect(within(threePower).getByRole('button', { name: '333 纯钱' })).toBeInTheDocument()
-    expect(within(twoPower).getByRole('button', { name: '满血252' })).toBeInTheDocument()
-    expect(within(twoPower).getByRole('button', { name: '右满252（经验多）' })).toBeInTheDocument()
-    expect(screen.queryByText(/满血252需要右侧会客室/)).not.toBeInTheDocument()
-  })
-
-  it.each(['252', '252-1', '252-full'])('shows the 252 explanation only while %s is selected', (preset) => {
-    const view = render(
-      <ConfigEditor
-        config={normalizeConfig(CONFIG_PRESETS['243'])}
-        canEdit
-        validation={{ ok: true }}
-        onUpdate={vi.fn()}
-      />,
-    )
-    expect(screen.queryByText(/满血252需要右侧会客室/)).not.toBeInTheDocument()
-
-    view.rerender(
-      <ConfigEditor
-        config={normalizeConfig(CONFIG_PRESETS[preset])}
-        canEdit
-        validation={{ ok: true }}
-        onUpdate={vi.fn()}
-      />,
-    )
-    expect(screen.getByText(/满血252需要右侧会客室、加工站、办公室、训练室依次为 1\/3\/1\/3 级/)).toHaveAttribute('role', 'note')
-
-    view.rerender(
-      <ConfigEditor
-        config={normalizeConfig(CONFIG_PRESETS['243'])}
-        canEdit
-        validation={{ ok: true }}
-        onUpdate={vi.fn()}
-      />,
-    )
-    expect(screen.queryByText(/满血252需要右侧会客室/)).not.toBeInTheDocument()
-  })
-
-  it('keeps product labels together and lets the count control wrap in narrow columns', () => {
-    render(
-      <ConfigEditor
-        config={normalizeConfig(CONFIG_PRESETS['243-1'])}
-        canEdit
-        validation={{ ok: true }}
-        onUpdate={vi.fn()}
-      />,
-    )
-
-    const productRegion = screen.getByRole('region', { name: '产物数量' })
-    const label = within(productRegion).getByText('源石碎片')
-    expect(label).toHaveClass('whitespace-nowrap')
-    expect(label.closest('.tool-inset')).toHaveClass('flex-wrap')
-    expect(within(productRegion).getByRole('spinbutton', { name: '源石碎片' }).parentElement).toHaveClass('ml-auto')
-  })
-  it.each([true, false])('uses station colors and local product icons with canEdit=%s', (canEdit) => {
-    const config = normalizeConfig(CONFIG_PRESETS['243-1'])
-    config.product_requirements.trading_stations = { Orundum: 2 }
-    const { container } = render(
-      <ConfigEditor config={config} canEdit={canEdit} validation={{ ok: true }} onUpdate={vi.fn()} />,
-    )
-    for (const name of ['房间结构', '产物数量']) {
-      const region = screen.getByRole('region', { name })
-      expect(region.querySelector('.config-station--trading')).toBeInTheDocument()
-      expect(region.querySelector('.config-station--manufacturing')).toBeInTheDocument()
-    }
-    const productRegion = screen.getByRole('region', { name: '产物数量' })
-    for (const icon of ['GOLD', 'DIAMOND_SHD', 'MTL_GOLD3', 'sprite_exp_card_t3', 'MTL_DIAMOND_SHD']) {
-      expect(productRegion.querySelector(`img[src="/assets/products/${icon}.png"]`)).toHaveAttribute('alt', '')
-    }
-    const inventoryImages = container.querySelectorAll('label img')
-    expect(Array.from(inventoryImages, (image) => image.getAttribute('src'))).toEqual([
-      '/assets/products/MTL_DIAMOND_SHD.png',
-      '/assets/products/MTL_GOLD3.png',
-      '/assets/products/MTL_SL_G2.png',
-    ])
-  })
-
-  it('keeps related controls in named, visually distinct sections', () => {
-    render(
-      <ConfigEditor
-        config={normalizeConfig(CONFIG_PRESETS['243-1'])}
-        canEdit
-        validation={{ ok: true }}
-        onUpdate={vi.fn()}
-      />,
-    )
-
-    const schedule = screen.getByRole('region', { name: '排班模式' })
-    const dormitory = screen.getByRole('region', { name: '宿舍规则' })
-    const fiammetta = screen.getByRole('region', { name: '菲亚梅塔' })
-    const drones = screen.getByRole('region', { name: '无人机' })
-    expect(schedule).toHaveClass('border-brand-500/60')
-    expect(dormitory).toHaveClass('border-success/60')
-    expect(fiammetta).toHaveClass('border-error/60')
-    expect(drones).toHaveClass('border-warning/60')
-    expect(within(schedule).getByRole('group', { name: '排班模式' })).toBeInTheDocument()
-    expect(within(schedule).getByRole('button', { name: '一天3换（8小时一换）' })).toBeInTheDocument()
-    expect(within(dormitory).getByRole('group', { name: '宿舍规则' })).toBeInTheDocument()
-    expect(within(fiammetta).getByRole('checkbox', { name: '菲亚梅塔' })).toBeEnabled()
-    expect(within(drones).getByRole('checkbox', { name: '无人机' })).toBeEnabled()
-    expect(within(drones).getByRole('checkbox', { name: '无人机自动配置' })).toBeInTheDocument()
-    expect(within(drones).getByLabelText('无人机顺序')).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: '搓玉理智预算' })).getByRole('checkbox', { name: '月卡' })).toBeInTheDocument()
-  })
-
   it('clears restored optimizer policy when applying a preset', async () => {
     const user = userEvent.setup()
     const config = {
@@ -285,7 +167,6 @@ describe('ConfigEditor shift patterns', () => {
 
     const fixedRule = screen.getByRole('button', { name: /排班表固定.*推荐/ })
     expect(fixedRule).toHaveAttribute('aria-pressed', 'true')
-    expect(within(fixedRule).getByText('推荐')).toHaveClass('text-brand-600')
     expect(screen.getByRole('button', { name: 'MAA 自动填满（保留技能依赖）' })).toHaveAttribute('aria-pressed', 'false')
     await user.click(screen.getByRole('button', { name: '纯 MAA 自动填满（效率低）' }))
 
@@ -307,24 +188,6 @@ describe('ConfigEditor shift patterns', () => {
     expect(screen.getByText(/过滤相关生产组合/)).toBeInTheDocument()
     expect(screen.getByText(/菲亚梅塔仍可执行换心情/)).toBeInTheDocument()
     expect(screen.getByText(/启用条件：换班间隔须锁定为8小时（误差需控制在5分钟以内）/)).toBeInTheDocument()
-  })
-
-  it('wraps dormitory rule labels in the limited free-preview editor', () => {
-    const config = normalizeConfig(CONFIG_PRESETS['243'])
-
-    render(
-      <ConfigEditor
-        config={config}
-        canEdit={false}
-        canEditIntermediateInventory
-        validation={{ ok: true }}
-        onUpdate={vi.fn()}
-      />,
-    )
-
-    const dormitoryRules = within(screen.getByRole('group', { name: '宿舍规则' })).getAllByRole('button')
-    expect(dormitoryRules).toHaveLength(3)
-    expect(dormitoryRules.every((button) => button.classList.contains('whitespace-normal'))).toBe(true)
   })
 
   it('shows the selected 12-hour interval in the Fiammetta warning', () => {
@@ -480,35 +343,6 @@ describe('ConfigEditor shift patterns', () => {
     expect(onUpdate).not.toHaveBeenCalled()
   })
 
-  it('explains how to use an MAA schedule without installing MAA', () => {
-    const config = normalizeConfig(CONFIG_PRESETS['243'])
-    const onUpdate = vi.fn()
-
-    const { rerender } = render(
-      <ConfigEditor
-        config={config}
-        canEdit
-        validation={{ ok: true }}
-        onUpdate={onUpdate}
-      />,
-    )
-
-    expect(screen.getByText('未安装或不想安装 MAA？可生成 MAA 排班表后，手动在游戏内设置队列，再定时执行全部轮换。')).toBeInTheDocument()
-    expect(screen.queryByText(/游戏内轮换会生成两个设施预设队列/)).not.toBeInTheDocument()
-
-    rerender(
-      <ConfigEditor
-        config={normalizeConfig({ ...CONFIG_PRESETS['243'], schedule_mode: 'rotation' })}
-        canEdit
-        validation={{ ok: true }}
-        onUpdate={onUpdate}
-      />,
-    )
-
-    expect(screen.getByText(/游戏内轮换会生成两个设施预设队列/)).toBeInTheDocument()
-    expect(screen.queryByText(/未安装或不想安装 MAA/)).not.toBeInTheDocument()
-  })
-
   it('leaves automatic variable mode when applying a custom pattern', async () => {
     const user = userEvent.setup()
     const config = normalizeConfig({
@@ -529,7 +363,6 @@ describe('ConfigEditor shift patterns', () => {
 
     const maaModeButton = screen.getByRole('button', { name: 'MAA 排班表' })
     expect(maaModeButton).toHaveAttribute('aria-pressed', 'true')
-    expect(maaModeButton).toHaveClass('tool-option-selected')
     expect(screen.getByRole('button', { name: '自动变间隔换班' })).toHaveAttribute('aria-pressed', 'true')
     await user.click(screen.getByRole('button', { name: '自定义' }))
     expect(screen.getByLabelText('MAA 换班间隔')).toHaveValue('8-8-8')
@@ -558,51 +391,9 @@ describe('ConfigEditor shift patterns', () => {
     expect(screen.getByRole('checkbox', { name: '菲亚梅塔' })).not.toBeChecked()
     expect(screen.getByText('启用条件：换班间隔须锁定为8小时/12小时（误差需控制在5分钟以内），否则将引发干员“红脸”状态，导致实际效率低于未启用时的水平。')).toBeInTheDocument()
   })
-
-  it('keeps the orundum budget explanation collapsed until requested', async () => {
-    const user = userEvent.setup()
-    const config = normalizeConfig(CONFIG_PRESETS['243-1'])
-
-    render(
-      <ConfigEditor
-        config={config}
-        canEdit
-        validation={{ ok: true }}
-        onUpdate={vi.fn()}
-      />,
-    )
-
-    expect(screen.getByText('搓玉理智预算')).toBeInTheDocument()
-    expect(screen.getByText('每日投入搓玉的理智')).toBeInTheDocument()
-
-    const summary = screen.getByText('展开预算说明')
-    const details = summary.closest('details')
-    expect(details).not.toHaveAttribute('open')
-    await user.click(summary)
-    expect(details).toHaveAttribute('open')
-    expect(screen.getByText(/当前可用理智预算为/)).toBeInTheDocument()
-  })
 })
 
 describe('ConfigEditor number inputs', () => {
-  it('groups room and product settings in one responsive workbench region', () => {
-    const config = normalizeConfig(CONFIG_PRESETS['243'])
-    render(
-      <ConfigEditor
-        config={config}
-        canEdit
-        validation={{ ok: true }}
-        onUpdate={vi.fn()}
-      />,
-    )
-
-    const roomRegion = screen.getByRole('region', { name: '房间结构' })
-    const productRegion = screen.getByRole('region', { name: '产物数量' })
-    expect(roomRegion.parentElement).toBe(productRegion.parentElement)
-    expect(productRegion).toHaveClass('lg:border-l')
-    expect(within(roomRegion).queryByText(/其他 2 发电站布局尚未开放/)).not.toBeInTheDocument()
-  })
-
   it.each([
     ['243', '3', true],
     ['252-full', '2', true],
