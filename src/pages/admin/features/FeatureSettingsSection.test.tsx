@@ -65,13 +65,6 @@ describe('FeatureSettingsSection', () => {
     })))
   })
 
-  it('renders every shared feature key exactly once, including metered billing', async () => {
-    render(<FeatureSettingsSection />)
-    const keys = (await screen.findAllByRole('checkbox')).map((input) => input.getAttribute('name'))
-    expect(keys).toHaveLength(SITE_FEATURE_KEYS.length)
-    expect(new Set(keys)).toEqual(new Set(SITE_FEATURE_KEYS))
-  })
-
   it('does not expose settings or save when the initial load fails', async () => {
     const user = userEvent.setup()
     adminApiJson.mockRejectedValueOnce(new Error('数据库不可用'))

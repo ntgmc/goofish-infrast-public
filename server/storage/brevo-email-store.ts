@@ -301,7 +301,7 @@ export function getUtcDate(now = new Date()): string {
   return now.toISOString().slice(0, 10)
 }
 
-export function secondsUntilNextUtcDay(now = new Date()): number {
+function secondsUntilNextUtcDay(now = new Date()): number {
   const nextMidnightUtc = Date.UTC(
     now.getUTCFullYear(),
     now.getUTCMonth(),

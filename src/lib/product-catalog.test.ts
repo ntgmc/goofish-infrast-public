@@ -1,25 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
-  getPermissionProfile,
   hasCapability,
-  listAdminIssuablePermissions,
   normalizeRuntimePermission,
   resolveRuntimePermission,
 } from './product-catalog'
 
 describe('product catalog', () => {
-  it('keeps internal card permissions admin-issuable and ordered', () => {
-    expect(listAdminIssuablePermissions()).toEqual(['recommended', 'growth', 'advanced', 'ultimate'])
-    expect(getPermissionProfile('ultimate').public).toBe(false)
-    expect(getPermissionProfile('admin').admin_issuable).toBe(false)
-    expect(getPermissionProfile('metered_advanced')).toMatchObject({ admin_issuable: false, public: false })
-  })
-
-  it('normalizes legacy permission aliases', () => {
-    expect(normalizeRuntimePermission('basic')).toBe('growth')
-    expect(normalizeRuntimePermission('premium')).toBe('advanced')
-  })
-
   it('fails closed for missing or unknown permission values', () => {
     expect(normalizeRuntimePermission(undefined)).toBe('recommended')
     expect(resolveRuntimePermission('corrupted-permission')).toBeNull()

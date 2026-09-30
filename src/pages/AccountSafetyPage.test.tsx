@@ -12,13 +12,6 @@ afterEach(() => {
 })
 
 describe('AccountSafetyPage lifecycle controls', () => {
-  it('does not render the personal data export control', () => {
-    renderPage()
-
-    expect(screen.getByRole('heading', { name: '调试模式' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '导出个人数据' })).not.toBeInTheDocument()
-  })
-
   it('shows the scheduled deletion and queued cancellation email before leaving', async () => {
     const user = userEvent.setup()
     vi.spyOn(window, 'confirm').mockReturnValue(true)

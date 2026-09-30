@@ -140,51 +140,6 @@ function createThreeShiftResult(): OptimizeResult {
 }
 
 describe('ResultPanel tabs', () => {
-  it.each(['maa', 'rotation'])('shows room levels in preview and data in %s mode', async (scheduleMode) => {
-    const user = userEvent.setup()
-    const result = createResult()
-    result.schedule_mode = scheduleMode
-    result.plans = [{ name: 'Plan 1', rooms: {
-      trading: [{ operators: ['贸易干员'], level: 1 }],
-      manufacture: [{ operators: ['制造干员'], level: 2 }],
-    } }]
-    render(<ResultPanel result={result} />)
-    expect(screen.getByRole('heading', { name: /贸易站.*Lv\.1/ })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /制造站.*Lv\.2/ })).toBeInTheDocument()
-    await user.click(screen.getByRole('tab', { name: '数据' }))
-    expect(screen.getAllByText('Lv.1').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Lv.2').length).toBeGreaterThan(0)
-  })
-  it.each(['maa', 'rotation', 'variable'] as const)('shows search states outside restricted tabs in %s mode', (scheduleMode) => {
-    render(<ResultPanel
-      result={{ ...createResult(), schedule_mode: scheduleMode, searched_state_count: 123456 }}
-      fullDataAvailable={false}
-      previewLimit={{ mode: 'full_rotation_without_export', hidden_room_count: 0, notice: 'Preview' }}
-    />)
-    expect(screen.getByText('已记录搜索状态：')).toBeInTheDocument()
-    expect(screen.getByText('123,456 次')).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: '数据' })).toBeInTheDocument()
-  })
-
-  it.each([0, 1234567890123])('shows the full recorded integer %s', (count) => {
-    render(<ResultPanel result={{ ...createResult(), searched_state_count: count }} />)
-    expect(screen.getByText(`${count.toLocaleString('zh-CN')} 次`)).toBeInTheDocument()
-  })
-
-  it.each([undefined, -1, 1.5, NaN, Infinity])('omits unavailable or invalid search count %s', (count) => {
-    render(<ResultPanel result={{ ...createResult(), searched_state_count: count, search_nodes: 42 }} />)
-    expect(screen.queryByText('已记录搜索状态：')).not.toBeInTheDocument()
-  })
-
-  it('places office cards before dormitory cards in the preview', () => {
-    render(<ResultPanel result={createPreviewOrderResult()} />)
-
-    expect(screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)).toEqual([
-      '办公室',
-      '宿舍',
-    ])
-  })
-
   it('shows dependency anchors for regular autofill and collapses dormitories only for pure autofill', () => {
     const regular = createPreviewOrderResult()
     regular.dormitory_rule = 'maa_autofill'

@@ -4,6 +4,12 @@ Use this guide when changing repository files, as required by `AGENTS.md`.
 Choose the targeted tests for each changed area, then run the required build,
 HTTP, public-export, database, and release checks.
 
+## Test-writing policy
+
+- Do not add tests for simple, isolated, low-risk functionality, such as static UI or copy, straightforward local interactions, constants and mappings, formatting helpers, or thin forwarding wrappers. Do not add tests that merely restate the implementation.
+- Add or retain necessary tests for complex coupling or high-impact failures: cross-module or cross-layer workflows, asynchronous races, critical state transitions, authentication and authorization, billing, idempotency, data-loss prevention, revision conflicts, and database transactions. Assess coupling and failure consequences rather than function length.
+- Run relevant existing tests and the required checks below. For simple, isolated, low-risk changes without existing tests, use applicable build or static checks and focused manual verification; a missing test alone does not justify creating one.
+
 ## Required sequence
 
 1. Inspect the affected code and existing tests.

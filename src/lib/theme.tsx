@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 export type ThemePreference = 'system' | 'light' | 'dark'
 export type ResolvedTheme = Exclude<ThemePreference, 'system'>
 
-export const THEME_STORAGE_KEY = 'maatool-theme'
+const THEME_STORAGE_KEY = 'maatool-theme'
 const DARK_MODE_QUERY = '(prefers-color-scheme: dark)'
 
 interface ThemeContextValue {
@@ -18,7 +18,7 @@ function isThemePreference(value: unknown): value is ThemePreference {
   return value === 'system' || value === 'light' || value === 'dark'
 }
 
-export function readThemePreference(storage: Pick<Storage, 'getItem'> | undefined = getBrowserStorage()): ThemePreference {
+function readThemePreference(storage: Pick<Storage, 'getItem'> | undefined = getBrowserStorage()): ThemePreference {
   if (!storage) return 'system'
   try {
     const value = storage.getItem(THEME_STORAGE_KEY)
@@ -28,7 +28,7 @@ export function readThemePreference(storage: Pick<Storage, 'getItem'> | undefine
   }
 }
 
-export function resolveTheme(preference: ThemePreference, systemPrefersDark: boolean): ResolvedTheme {
+function resolveTheme(preference: ThemePreference, systemPrefersDark: boolean): ResolvedTheme {
   return preference === 'system' ? (systemPrefersDark ? 'dark' : 'light') : preference
 }
 
