@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { OptimizeResult } from '../../lib/types'
@@ -9,6 +9,74 @@ import ResultPanel from './ResultPanel'
 afterEach(cleanup)
 
 describe('manual schedule access and recovery', () => {
+  it('keeps later candidates reachable by keyboard, scrolling and search and saves their assignment', async () => {
+    const user = userEvent.setup()
+    const result = createThreeShiftResult()
+    const operators = Array.from({ length: 70 }, (_, index) => ({
+      id: `candidate-${index}`, name: index === 69 ? '阿米娅' : `候选${index + 1}`, own: true, elite: 2, rarity: 6,
+    }))
+    render(<ResultPanel result={result} operators={operators}
+      manualEditProfile={{ id: 'large-picker', kind: 'cdk', permission: 'advanced' }} />)
+    await user.click(screen.getByRole('tab', { name: '手动排班' }))
+    const editor = within(await screen.findByRole('region', { name: '手动调整排班' }))
+    await user.click(editor.getByRole('button', { name: /编辑 贸易站.*空位 2/ }))
+    const dialog = within(screen.getByRole('dialog'))
+    const grid = dialog.getByLabelText('选择进驻干员')
+    const visible = within(grid).getAllByRole('button')
+    const lastVisible = visible[visible.length - 1]
+    act(() => lastVisible.focus())
+    await user.tab()
+    expect(document.activeElement).not.toBe(lastVisible)
+    expect(grid).toContainElement(document.activeElement as HTMLElement)
+    fireEvent.scroll(grid)
+    await user.click(within(grid).getByRole('button', { name: '阿米娅' }))
+    await user.type(dialog.getByRole('searchbox'), 'amy')
+    await waitFor(() => expect(within(grid).queryByRole('button', { name: '候选1' })).not.toBeInTheDocument())
+    expect(within(grid).getByRole('button', { name: '阿米娅' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(dialog.getByRole('button', { name: '完成' }))
+    await user.click(editor.getByRole('button', { name: '保存本地草稿' }))
+    expect(JSON.parse(localStorage.getItem('manual-schedule:large-picker')!).plans[0].rooms.trading[0]).toEqual(['贸易1', '阿米娅', ''])
+    expect(result.plans[0].rooms.trading[0].operators).toEqual(['贸易1'])
+    localStorage.removeItem('manual-schedule:large-picker')
+  })
+
+  it('debounces the latest pinyin query and waits for Chinese composition to finish', async () => {
+    const user = userEvent.setup()
+    const operators = ['能天使', '阿米娅', '德克萨斯'].map((name) => ({ id: name, name, own: true, elite: 2, rarity: 6 }))
+    render(<ResultPanel result={createThreeShiftResult()} operators={operators}
+      manualEditProfile={{ id: 'search-profile', kind: 'cdk', permission: 'advanced' }} />)
+    await user.click(screen.getByRole('tab', { name: '手动排班' }))
+    const editor = await screen.findByRole('region', { name: '手动调整排班' })
+    await user.click(within(editor).getByRole('button', { name: /编辑 贸易站.*空位 2/ }))
+    const dialog = within(screen.getByRole('dialog'))
+    const input = dialog.getByRole('searchbox')
+    vi.useFakeTimers()
+    try {
+      fireEvent.change(input, { target: { value: 'n' } })
+      act(() => { vi.advanceTimersByTime(150) })
+      fireEvent.change(input, { target: { value: 'nts' } })
+      act(() => { vi.advanceTimersByTime(150) })
+      expect(dialog.getByRole('button', { name: '阿米娅' })).toBeInTheDocument()
+      act(() => { vi.advanceTimersByTime(50) })
+      expect(dialog.getByRole('button', { name: '能天使' })).toBeInTheDocument()
+      expect(dialog.queryByRole('button', { name: '阿米娅' })).not.toBeInTheDocument()
+
+      fireEvent.change(input, { target: { value: 'AMiY' } })
+      act(() => { vi.advanceTimersByTime(200) })
+      expect(dialog.getByRole('button', { name: '阿米娅' })).toBeInTheDocument()
+      expect(dialog.queryByRole('button', { name: '能天使' })).not.toBeInTheDocument()
+
+      fireEvent.compositionStart(input)
+      fireEvent.change(input, { target: { value: '能天' } })
+      act(() => { vi.advanceTimersByTime(300) })
+      expect(dialog.getByRole('button', { name: '阿米娅' })).toBeInTheDocument()
+      fireEvent.compositionEnd(input)
+      act(() => { vi.advanceTimersByTime(200) })
+      expect(dialog.getByRole('button', { name: '能天使' })).toBeInTheDocument()
+      expect(dialog.queryByRole('button', { name: '阿米娅' })).not.toBeInTheDocument()
+    } finally { vi.useRealTimers() }
+  })
+
   it('opens advanced editing, locks targets, edits and restores a separate draft', async () => {
     localStorage.clear()
     const user = userEvent.setup()
@@ -22,14 +90,20 @@ describe('manual schedule access and recovery', () => {
     const editor = await screen.findByRole('region', { name: '手动调整排班' })
     expect(within(editor).getByText(/修改干员或无人机目标/)).toBeInTheDocument()
     expect(within(editor).queryByText('200.0%')).not.toBeInTheDocument()
-    await user.click(within(editor).getByRole('button', { name: /编辑 贸易站.*干员/ }))
+    await user.click(within(editor).getByRole('button', { name: /编辑 贸易站.*空位 3/ }))
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByRole('button', { name: '贸易1' })).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: '贸易1' }).querySelector('img')).not.toBeNull()
+    expect(within(dialog).getByRole('button', { name: '空位 3' })).toHaveAttribute('aria-pressed', 'true')
     await user.click(within(dialog).getByRole('button', { name: '新干员' }))
     await user.click(within(dialog).getByRole('button', { name: '完成' }))
     expect(within(editor).getByText('新干员')).toBeInTheDocument()
+    await user.click(within(editor).getByRole('button', { name: /编辑 贸易站.*新干员/ }))
+    const reopened = screen.getByRole('dialog')
+    expect(within(reopened).getAllByRole('button', { name: '新干员' })[0]).toHaveAttribute('aria-pressed', 'true')
+    await user.click(within(reopened).getByRole('button', { name: '完成' }))
     await user.click(within(editor).getByRole('button', { name: '保存本地草稿' }))
-    expect(JSON.parse(localStorage.getItem('manual-schedule:manual-profile')!).plans[0].rooms.trading[0]).toEqual(['贸易1', '新干员', ''])
+    expect(JSON.parse(localStorage.getItem('manual-schedule:manual-profile')!).plans[0].rooms.trading[0]).toEqual(['贸易1', '', '新干员'])
     expect(result.plans[0].rooms.trading[0].operators).toEqual(['贸易1'])
     await user.click(screen.getByRole('tab', { name: '总览图 v2' }))
     await user.click(screen.getByRole('tab', { name: '手动排班' }))

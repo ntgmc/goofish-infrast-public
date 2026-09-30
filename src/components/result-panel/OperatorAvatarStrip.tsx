@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Plus } from 'lucide-react'
 import type { RoomOperator } from './types'
 
 export default function OperatorAvatarStrip({
@@ -38,21 +39,24 @@ export default function OperatorAvatarStrip({
   )
 }
 
-function OperatorAvatarTile({
+export function OperatorAvatarTile({
   operator,
+  placeholder = '',
   compact = false,
   micro = false,
   showFullNames = false,
   large = false,
 }: {
-  operator: RoomOperator;
+  operator?: RoomOperator;
+  placeholder?: string;
   compact?: boolean;
   micro?: boolean;
   showFullNames?: boolean;
   large?: boolean;
 }) {
   const [imageFailed, setImageFailed] = useState(false)
-  const canLoadImage = Boolean(operator.id && !imageFailed)
+  const canLoadImage = Boolean(operator?.id && !imageFailed)
+  const name = operator?.name ?? placeholder
   const avatarSize = large ? 'h-16 w-16 sm:h-[4.5rem] sm:w-[4.5rem]' : micro ? 'h-8 w-8' : compact ? 'h-10 w-10' : 'h-11 w-11'
   const tileWidth = large ? 'w-16 sm:w-[4.5rem]' : micro ? showFullNames ? 'w-14' : 'w-9' : compact ? 'w-12' : 'w-[3.25rem]'
   const labelClassName = [
@@ -60,14 +64,14 @@ function OperatorAvatarTile({
     showFullNames ? 'whitespace-normal break-words' : 'truncate',
     'block font-medium text-ink-secondary',
   ].join(' ')
-  const initial = operator.name.trim().slice(0, 1) || '?'
+  const initial = name.trim().slice(0, 1) || '?'
 
   return (
-    <div className={`${tileWidth} min-w-0 text-center`} title={operator.name}>
-      <div className={`mx-auto overflow-hidden rounded-md border border-surface-3 bg-surface-2 ${avatarSize}`}>
+    <div className={`${tileWidth} min-w-0 text-center`} title={name}>
+      <div className={`mx-auto overflow-hidden rounded-md border border-surface-3 bg-surface-2 ${operator ? '' : 'border-dashed'} ${avatarSize}`}>
         {canLoadImage ? (
           <img
-            src={`/webp96/${operator.id}.webp`}
+            src={`/webp96/${operator?.id}.webp`}
             alt=""
             width={large ? 72 : micro ? 32 : compact ? 40 : 44}
             height={large ? 72 : micro ? 32 : compact ? 40 : 44}
@@ -78,12 +82,12 @@ function OperatorAvatarTile({
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-ink-muted" aria-hidden="true">
-            {initial}
+            {operator ? initial : <Plus size={24} />}
           </div>
         )}
       </div>
       <span className={labelClassName}>
-        {operator.name}
+        {name}
       </span>
     </div>
   )

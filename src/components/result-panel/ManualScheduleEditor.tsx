@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Download, LockKeyhole, Search, Upload } from 'lucide-react'
+import PinyinMatch from 'pinyin-match'
 import type { LicenseOperator, OptimizeResult } from '../../lib/types'
 import { copy } from '../../copy/index'
 import { canonicalJson } from '../../lib/crypto'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '../ui/dialog'
 import ResultBoardV2, { type BoardRoom } from './ResultBoardV2'
-import OperatorAvatarStrip from './OperatorAvatarStrip'
+import OperatorAvatarStrip, { OperatorAvatarTile } from './OperatorAvatarStrip'
 import { prepareResult } from './formatters'
 import { ROOM_LABELS } from './labels'
 import {
@@ -25,7 +26,6 @@ export default function ManualScheduleEditor({ source, profileId, operators }: {
   const [activePlan, setActivePlan] = useState(0)
   const [room, setRoom] = useState<BoardRoom | null>(null)
   const [slot, setSlot] = useState(0)
-  const [search, setSearch] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -52,11 +52,11 @@ export default function ManualScheduleEditor({ source, profileId, operators }: {
     return () => window.removeEventListener('beforeunload', warn)
   }, [dirty])
 
-  function update(next: ManualPlan[]) {
+  const update = useCallback((next: ManualPlan[]) => {
     setPlans(next)
     setError(null)
     setNotice(null)
-  }
+  }, [])
 
   function chooseOperator(name: string) {
     if (!room) return
@@ -133,6 +133,19 @@ export default function ManualScheduleEditor({ source, profileId, operators }: {
     finally { setBusy(false); if (upload.current) upload.current.value = '' }
   }
 
+  const board = useMemo(() => (
+    <ResultBoardV2 prepared={prepared} isRotationMode={source.schedule_mode === 'rotation'} shiftHours={source.shift_hours}
+      activePlan={activePlan} onPlanChange={setActivePlan} editing={{
+        rooms: plans[activePlan].rooms,
+        lockedOperators: locked,
+        onEditRoom: (nextRoom, nextSlot) => { setRoom(nextRoom); setSlot(nextSlot) },
+        onDroneTarget: (target) => {
+          try { update(changeManualDrone(source, plans, operators, activePlan, target.roomType, target.roomIndex)) }
+          catch { setError(label.invalid_edit) }
+        },
+      }} />
+  ), [prepared, source, activePlan, plans, locked, operators, update, label])
+
   return (
     <section className="space-y-4" aria-label={label.title}>
       <div className="tool-alert tool-alert--warning space-y-2 p-4">
@@ -161,55 +174,26 @@ export default function ManualScheduleEditor({ source, profileId, operators }: {
           try { update(changeManualDrone(source, plans, operators, activePlan)) } catch { setError(label.invalid_edit) }
         }}>{label.no_drone}</button>
       </div>
-      <ResultBoardV2 prepared={prepared} isRotationMode={source.schedule_mode === 'rotation'} shiftHours={source.shift_hours}
-        activePlan={activePlan} onPlanChange={setActivePlan} editing={{
-          onEditRoom: (nextRoom) => {
-            setRoom(nextRoom)
-            setSlot(Math.max(0, plans[activePlan].rooms[nextRoom.roomType][nextRoom.roomIndex].findIndex((name) => !locked.has(name))))
-            setSearch('')
-          },
-          onDroneTarget: (target) => {
-            try { update(changeManualDrone(source, plans, operators, activePlan, target.roomType, target.roomIndex)) }
-            catch { setError(label.invalid_edit) }
-          },
-        }} />
+      {board}
       <Dialog open={Boolean(room)} onOpenChange={(open) => { if (!open) setRoom(null) }}>
-        <DialogContent className="max-w-3xl" showCloseButton closeLabel={label.close}>
+        <DialogContent className="max-w-3xl ease-[ease-out] will-change-[transform,opacity]" showCloseButton closeLabel={label.close}>
           <DialogTitle>{room ? label.edit_room(`${room.label} ${room.indexLabel}`) : label.picker}</DialogTitle>
           <DialogDescription>{label.move_hint}</DialogDescription>
           <div className="flex flex-wrap gap-2">
             {selectedRoom.map((name, index) => (
-              <button key={index} type="button" disabled={locked.has(name)} aria-pressed={slot === index}
+              <button key={index} type="button" disabled={locked.has(name)} aria-pressed={slot === index} aria-label={name || label.empty_slot(index + 1)}
                 title={locked.has(name) ? label.lock_operator : label.slot(index + 1)}
-                className={`min-h-11 rounded-md border px-3 py-2 text-sm ${slot === index ? 'border-brand-400 text-brand-400' : 'border-surface-3 text-ink-secondary'} disabled:opacity-70`}
+                className={`relative rounded-md border p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 ${slot === index ? 'border-brand-400 bg-brand-500/10' : 'border-surface-3 hover:bg-surface-2'} disabled:cursor-not-allowed disabled:opacity-70`}
                 onClick={() => setSlot(index)}>
-                {locked.has(name) && <LockKeyhole size={12} className="mr-1 inline" aria-hidden="true" />}
-                {name || label.empty_slot(index + 1)}
+                <OperatorAvatarTile key={name || index} operator={name ? operators.find((operator) => operator.name === name) ?? { name } : undefined}
+                  placeholder={label.empty_slot(index + 1)} large showFullNames />
+                {locked.has(name) && <LockKeyhole size={14} className="absolute right-1 top-1 rounded-sm bg-surface-1 text-warning" aria-hidden="true" />}
               </button>
             ))}
           </div>
           {locked.has(selectedName) ? <p className="text-sm text-warning">{label.lock_operator}</p> : (
-            <>
-              <label className="flex items-center gap-2 rounded-md border border-surface-3 px-3">
-                <Search size={16} aria-hidden="true" />
-                <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={label.search}
-                  aria-label={label.search} className="min-h-11 w-full bg-transparent text-sm outline-none" />
-              </label>
-              <button type="button" className="tool-secondary-action" disabled={!selectedName} onClick={() => chooseOperator('')}>{label.clear}</button>
-              <div className="grid max-h-72 grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-5" aria-label={label.picker}>
-                {operators.filter((operator) => operator.own && !locked.has(operator.name) && operator.name.includes(search.trim())).map((operator) => {
-                  const assigned = Object.entries(plans[activePlan].rooms).find(([, rooms]) => rooms.some((roomOperators) => roomOperators.includes(operator.name)))
-                  return (
-                    <button key={operator.id} type="button" aria-label={operator.name} aria-pressed={selectedName === operator.name}
-                      title={assigned ? label.assigned(ROOM_LABELS[assigned[0]] ?? assigned[0]) : operator.name}
-                      className={`rounded-md border p-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 ${selectedName === operator.name ? 'border-brand-400 bg-brand-500/10' : 'border-surface-3 hover:bg-surface-2'}`}
-                      onClick={() => chooseOperator(operator.name)}>
-                      <OperatorAvatarStrip operators={[operator]} fallbackText={operator.name} compact showFullNames />
-                    </button>
-                  )
-                })}
-              </div>
-            </>
+            <ManualOperatorPicker key={room?.key} operators={operators} locked={locked} rooms={plans[activePlan].rooms}
+              selectedName={selectedName} onChoose={chooseOperator} />
           )}
           <DialogClose className="tool-primary-action">{label.done}</DialogClose>
         </DialogContent>
@@ -225,5 +209,73 @@ export default function ManualScheduleEditor({ source, profileId, operators }: {
         </DialogContent>
       </Dialog>
     </section>
+  )
+}
+
+function ManualOperatorPicker({ operators, locked, rooms, selectedName, onChoose }: {
+  operators: LicenseOperator[];
+  locked: Set<string>;
+  rooms: ManualPlan['rooms'];
+  selectedName: string;
+  onChoose: (name: string) => void;
+}) {
+  const label = copy.domain.manual_schedule
+  const [search, setSearch] = useState('')
+  const [query, setQuery] = useState('')
+  const [composing, setComposing] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(30)
+  const grid = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (composing || search.trim() === query) return
+    const timer = window.setTimeout(() => {
+      setQuery(search.trim())
+      setVisibleCount(30)
+      if (grid.current) grid.current.scrollTop = 0
+    }, 200)
+    return () => window.clearTimeout(timer)
+  }, [search, composing, query])
+
+  const matches = useMemo(() => operators
+    .filter((operator) => operator.own && !locked.has(operator.name) && (!query || PinyinMatch.match(operator.name, query))),
+  [operators, locked, query])
+  const candidates = useDeferredValue(matches, [])
+  // ponytail: keep scrolled batches mounted; window rows if inventories grow to thousands.
+  const showMore = useCallback(() => setVisibleCount((count) => Math.min(count + 30, matches.length)), [matches.length])
+  const choices = useMemo(() => candidates
+    .slice(0, visibleCount)
+    .map((operator, index) => {
+      const assigned = Object.entries(rooms).find(([, entries]) => entries.some((room) => room.includes(operator.name)))
+      return (
+        <button key={operator.id} type="button" aria-label={operator.name} aria-pressed={selectedName === operator.name}
+          title={assigned ? label.assigned(ROOM_LABELS[assigned[0]] ?? assigned[0]) : operator.name}
+          className={`rounded-md border p-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 ${selectedName === operator.name ? 'border-brand-400 bg-brand-500/10' : 'border-surface-3 hover:bg-surface-2'}`}
+          onFocus={index === visibleCount - 1 ? showMore : undefined}
+          onClick={() => onChoose(operator.name)}>
+          <OperatorAvatarStrip operators={[operator]} fallbackText={operator.name} compact showFullNames />
+        </button>
+      )
+    }), [candidates, visibleCount, rooms, selectedName, onChoose, label, showMore])
+
+  return (
+    <>
+      <label className="flex items-center gap-2 rounded-md border border-surface-3 bg-surface-2/40 px-3 transition-[border-color,box-shadow] duration-150 focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-500/20">
+        <Search size={16} className="shrink-0 text-ink-muted" aria-hidden="true" />
+        <input type="search" value={search} onChange={(event) => setSearch(event.target.value)}
+          onCompositionStart={() => setComposing(true)} onCompositionEnd={() => setComposing(false)}
+          placeholder={label.search} aria-label={label.search} style={{ outline: 'none' }}
+          className="min-h-11 min-w-0 w-full bg-transparent text-sm text-ink-primary placeholder:text-ink-muted" />
+      </label>
+      <button type="button" className="tool-secondary-action" disabled={!selectedName} onClick={() => onChoose('')}>{label.clear}</button>
+      <div ref={grid} className="grid max-h-72 grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-5" aria-label={label.picker}
+        aria-busy={matches !== candidates || composing || query !== search.trim()} onScroll={(event) => {
+          const element = event.currentTarget
+          if (element.scrollHeight - element.scrollTop - element.clientHeight < 120) showMore()
+        }}>
+        {choices.length > 0 ? choices : matches.length > 0
+          ? <div className="col-span-full h-72 rounded-md bg-surface-2" aria-hidden="true" />
+          : <p className="col-span-full py-6 text-center text-sm text-ink-muted">{label.no_matches}</p>}
+      </div>
+    </>
   )
 }

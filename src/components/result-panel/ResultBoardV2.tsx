@@ -1,10 +1,10 @@
 import { useId, type KeyboardEvent } from 'react'
-import { BedDouble, Building2, Drone, Factory, HandCoins, Pencil, Users, Wrench, Zap, type LucideIcon } from 'lucide-react'
+import { BedDouble, Building2, Drone, Factory, HandCoins, LockKeyhole, Users, Wrench, Zap, type LucideIcon } from 'lucide-react'
 import { copy } from '../../copy/index'
 import DroneSummary from './DroneSummary'
 import { formatCompactNumber, formatProduct, type PreparedResult } from './formatters'
 import { ROOM_LABELS } from './labels'
-import OperatorAvatarStrip from './OperatorAvatarStrip'
+import OperatorAvatarStrip, { OperatorAvatarTile } from './OperatorAvatarStrip'
 import type { PreparedPlan, RoomRow } from './types'
 import type { DroneAssignment } from '../../lib/types'
 import DroneMarker, { isDroneTarget } from './DroneMarker'
@@ -31,7 +31,9 @@ export type BoardRoom = {
 }
 
 type BoardEditing = {
-  onEditRoom: (room: BoardRoom) => void;
+  rooms: Record<string, string[][]>;
+  lockedOperators: Set<string>;
+  onEditRoom: (room: BoardRoom, slot: number) => void;
   onDroneTarget: (room: BoardRoom) => void;
 }
 
@@ -179,26 +181,26 @@ function RoomCard({ room, drones, editing, className = '' }: { room: BoardRoom; 
   const { icon: Icon, tone } = ROOM_STYLES[room.roomType] ?? { icon: Building2, tone: 'text-ink-secondary' }
   const label = copy.domain.result_board_v2
   return (
-    <article className={`tool-inset relative min-w-0 overflow-hidden p-3.5 sm:p-4 ${className}`}>
-      <div className="absolute right-3 top-3">
-        {editing && ['trading', 'manufacture'].includes(room.roomType) ? (
-          <button type="button" onClick={() => editing.onDroneTarget(room)}
-            aria-label={copy.domain.manual_schedule.set_drone(`${room.label} ${room.indexLabel}`)}
-            aria-pressed={isDroneTarget(drones, room.roomType, room.roomIndex)}
-            className={`inline-flex min-h-9 min-w-9 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 ${
-              isDroneTarget(drones, room.roomType, room.roomIndex) ? 'bg-brand-500/15 text-brand-400' : 'text-ink-muted hover:bg-surface-2'
-            }`}>
-            <Drone size={20} aria-hidden="true" />
-          </button>
-        ) : <DroneMarker labels={isDroneTarget(drones, room.roomType, room.roomIndex) ? [room.label] : []} />}
-      </div>
-      <header className="flex flex-wrap items-start justify-between gap-2 pr-9">
+    <article className={`tool-inset min-w-0 overflow-hidden p-3.5 sm:p-4 ${className}`}>
+      <header className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-ink-primary">
           <Icon size={16} className={`shrink-0 ${tone}`} aria-hidden="true" />
           {room.label}
           {room.indexLabel && <span className="text-xs font-medium text-ink-muted">{room.indexLabel}</span>}
         </h4>
-        {room.product !== '-' && <span className={`text-xs font-medium ${tone}`}>{room.product}</span>}
+        <div className="ml-auto flex shrink-0 items-center justify-end gap-2">
+          {editing && ['trading', 'manufacture'].includes(room.roomType) ? (
+            <button type="button" onClick={() => editing.onDroneTarget(room)}
+              aria-label={copy.domain.manual_schedule.set_drone(`${room.label} ${room.indexLabel}`)}
+              aria-pressed={isDroneTarget(drones, room.roomType, room.roomIndex)}
+              className={`inline-flex min-h-9 min-w-9 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 ${
+                isDroneTarget(drones, room.roomType, room.roomIndex) ? 'bg-brand-500/15 text-brand-400' : 'text-ink-muted hover:bg-surface-2'
+              }`}>
+              <Drone size={20} aria-hidden="true" />
+            </button>
+          ) : <DroneMarker labels={isDroneTarget(drones, room.roomType, room.roomIndex) ? [room.label] : []} />}
+          {room.product !== '-' && <span className={`text-right text-xs font-medium ${tone}`}>{room.product}</span>}
+        </div>
       </header>
       {!editing && row && row.efficiency !== '-' && PRODUCTION_TYPES.includes(room.roomType) && room.roomType !== 'control' && (
         <p className={`mt-3 font-mono text-xl font-semibold ${tone}`}>
@@ -208,18 +210,30 @@ function RoomCard({ room, drones, editing, className = '' }: { room: BoardRoom; 
       <div className="mt-3">
         {row?.isAutofill ? (
           <p className="rounded-md border border-dashed border-surface-3 p-3 text-sm leading-6 text-ink-secondary">{row.operatorText}</p>
+        ) : editing ? (
+          <div className="flex flex-wrap gap-2.5">
+            {editing.rooms[room.roomType][room.roomIndex].map((name, slot) => {
+              const operator = row?.operators.find((item) => item.name === name) ?? (name ? { name } : undefined)
+              const locked = editing.lockedOperators.has(name)
+              return (
+                <button key={slot} type="button" disabled={locked}
+                  aria-label={`${copy.domain.manual_schedule.edit_room(`${room.label} ${room.indexLabel}`)} · ${name || copy.domain.manual_schedule.empty_slot(slot + 1)}`}
+                  title={locked ? copy.domain.manual_schedule.lock_operator : undefined}
+                  className="relative rounded-md p-1 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 disabled:cursor-not-allowed disabled:opacity-70"
+                  onClick={() => editing.onEditRoom(room, slot)}>
+                  <OperatorAvatarTile key={name || slot} operator={operator} placeholder={copy.domain.manual_schedule.empty_slot(slot + 1)} large showFullNames />
+                  {locked && <LockKeyhole size={14} className="absolute right-0 top-0 rounded-sm bg-surface-1 text-warning" aria-label={copy.domain.manual_schedule.lock_operator} />}
+                </button>
+              )
+            })}
+          </div>
         ) : row ? (
           <OperatorAvatarStrip operators={row.operators} fallbackText={row.operatorText} large showFullNames />
         ) : (
           <p className="rounded-md border border-dashed border-surface-3 p-3 text-sm leading-6 text-ink-muted">{label.empty_room}</p>
         )}
       </div>
-      {editing && !row?.isAutofill && (
-        <button type="button" className="tool-secondary-action mt-3 w-full" onClick={() => editing.onEditRoom(room)}>
-          <Pencil size={14} aria-hidden="true" />{copy.domain.manual_schedule.edit_room(`${room.label} ${room.indexLabel}`)}
-        </button>
-      )}
-      {!editing && row && !row.isAutofill && row.detailItems.length > 0 && (
+      {!editing && row && !row.isAutofill && !['processing', 'dormitory'].includes(room.roomType) && row.detailItems.length > 0 && (
         <details className="mt-3 border-t border-surface-3/60 pt-2">
           <summary className="min-h-6 cursor-pointer text-xs leading-6 text-ink-muted hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45">{label.details}</summary>
           <ul className="mt-2 space-y-1 text-xs leading-5 text-ink-secondary">
