@@ -42,4 +42,4 @@ export type PreparedPlan = OptimizeResult['plans'][number] & {
   rows: RoomRow[];
 }
 
-export type ResultTabId = 'board' | 'data' | 'detail' | 'import' | 'suggestions'
+export type ResultTabId = 'board' | 'board-v2' | 'data' | 'detail' | 'import' | 'suggestions'

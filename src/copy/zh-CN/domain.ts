@@ -1,4 +1,17 @@
 export const domainCopy = {
+  result_board_v2: {
+    tab: "总览图 v2",
+    shifts: "切换班次",
+    hint: "切换班次查看干员安排，展开房间详情查看效率和心情。",
+    shift: (index: number) => `第 ${index} 班`,
+    rooms: (count: number) => `${count} 个房间`,
+    operators: (count: number) => `${count} 位干员`,
+    production: "生产区",
+    support: "辅助区",
+    efficiency: "效率",
+    details: "房间详情",
+    empty_room: "本班暂无干员安排",
+  },
   // src/components/result-panel/DroneSummary.tsx
   components_result_panel_DroneSummary_001: "自动无人机",
   // src/components/result-panel/DroneSummary.tsx
