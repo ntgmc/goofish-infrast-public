@@ -60,7 +60,7 @@ export default function OperatorSkillPreview({ children }: { children: ReactNode
           {skills.map((skill) => (
             <div key={skill.id} className={`border-t border-surface-3 pt-2 ${skill.state === 'upgraded' ? 'opacity-55' : ''}`}>
               <div className="flex items-center gap-2">
-                <img src={`/building-skills/${encodeURIComponent(skill.icon)}.png`} alt="" width={32} height={32}
+                <img src={`/building-skills/${skill.icon}.png`} alt="" width={32} height={32}
                   className="h-8 w-8 shrink-0 rounded-md bg-slate-800 p-1" />
                 <div className="min-w-0">
                   <p className="font-semibold text-ink-primary">{skill.name}</p>

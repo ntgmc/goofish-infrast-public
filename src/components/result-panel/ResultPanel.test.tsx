@@ -9,7 +9,7 @@ import ResultPanel from './ResultPanel'
 afterEach(cleanup)
 
 describe('manual schedule access and recovery', () => {
-  it('uses unlocked skill upgrades for hover and filtering while preserving locked assignments', async () => {
+  it('uses unlocked skill upgrades for candidate effects and facility filtering while preserving locked assignments', async () => {
     const user = userEvent.setup()
     const result = createThreeShiftResult()
     result.plans[0].rooms.trading[0].operators = ['能天使', '德克萨斯']
@@ -33,16 +33,15 @@ describe('manual schedule access and recovery', () => {
     await user.click(editor.getByRole('button', { name: /编辑 贸易站.*空位 3/ }))
     const dialog = within(screen.getByRole('dialog'))
     const grid = within(dialog.getByLabelText('选择进驻干员'))
-    const filter = dialog.getByRole('combobox', { name: '按基建技能筛选' })
-    await user.selectOptions(filter, '企鹅物流·α')
-    expect(await grid.findByRole('button', { name: '能天使' })).toBeInTheDocument()
+    const candidate = await grid.findByRole('button', { name: '能天使' })
+    expect(within(candidate).getByRole('img', { name: '企鹅物流·α' })).toBeInTheDocument()
+    expect(within(candidate).getByText(/订单获取效率\+20%/)).toBeInTheDocument()
     expect(grid.queryByRole('button', { name: '德克萨斯' })).not.toBeInTheDocument()
     expect(grid.queryByRole('button', { name: '阿米娅' })).not.toBeInTheDocument()
     view.rerender(<ResultPanel {...props} operators={operators.map((operator) => operator.name === '能天使' ? { ...operator, elite: 2 } : operator)} />)
-    await user.selectOptions(filter, '物流专家')
-    expect(await grid.findByRole('button', { name: '能天使' })).toBeInTheDocument()
-    expect(within(filter).queryByRole('option', { name: '企鹅物流·α' })).not.toBeInTheDocument()
-    const candidate = grid.getByRole('button', { name: '能天使' })
+    expect(await within(candidate).findByRole('img', { name: '物流专家' })).toBeInTheDocument()
+    expect(within(candidate).getByText(/订单获取效率\+35%/)).toBeInTheDocument()
+    expect(within(candidate).queryByRole('img', { name: '企鹅物流·α' })).not.toBeInTheDocument()
     act(() => candidate.focus())
     fireEvent.pointerOut(candidate, { relatedTarget: document.body, pointerType: 'mouse' })
     expect(within(await screen.findByRole('tooltip')).getByText('物流专家')).toBeInTheDocument()
@@ -53,7 +52,6 @@ describe('manual schedule access and recovery', () => {
     expect(await grid.findByRole('button', { name: '阿米娅' })).toBeInTheDocument()
     expect(grid.queryByRole('button', { name: 'Lancet-2' })).not.toBeInTheDocument()
     await user.selectOptions(dialog.getByRole('combobox', { name: '技能适用设施' }), '')
-    await user.selectOptions(filter, '全部技能')
     expect(await grid.findByRole('button', { name: 'Lancet-2' })).toBeInTheDocument()
     await user.click(grid.getByRole('button', { name: '阿米娅' }))
     await user.click(dialog.getByRole('button', { name: '完成' }))

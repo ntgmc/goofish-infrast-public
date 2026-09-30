@@ -6,7 +6,7 @@ import { copy } from '../../copy/index'
 import { canonicalJson } from '../../lib/crypto'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '../ui/dialog'
 import ResultBoardV2, { type BoardRoom } from './ResultBoardV2'
-import OperatorAvatarStrip, { OperatorAvatarTile } from './OperatorAvatarStrip'
+import { OperatorAvatarTile } from './OperatorAvatarStrip'
 import { prepareResult } from './formatters'
 import { ROOM_LABELS } from './labels'
 import { operatorBuildingSkills } from './building-skills'
@@ -231,7 +231,6 @@ function ManualOperatorPicker({ operators, locked, rooms, roomType, selectedName
   const [composing, setComposing] = useState(false)
   const [visibleCount, setVisibleCount] = useState(30)
   const [facility, setFacility] = useState(roomType)
-  const [skillName, setSkillName] = useState('')
   const grid = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -251,32 +250,40 @@ function ManualOperatorPicker({ operators, locked, rooms, roomType, selectedName
       return { operator, known: skills.length > 0, skills: skills.filter((skill) => skill.state === 'active') }
     }),
   [operators, locked])
-  const skillNames = useMemo(() => [...new Set(available.flatMap(({ skills }) => skills
-    .filter((skill) => !facility || skill.room === facility).map((skill) => skill.name)))].sort((a, b) => a.localeCompare(b, 'zh-CN')),
-  [available, facility])
   const matches = useMemo(() => available
     .filter(({ operator, known, skills }) => (!query || PinyinMatch.match(operator.name, query))
-      && (!facility && !skillName || !known && !skillName || skills.some((skill) => (!facility || skill.room === facility) && (!skillName || skill.name === skillName))))
-    .map(({ operator }) => operator),
-  [available, facility, skillName, query])
+      && (!facility || !known || skills.some((skill) => skill.room === facility))),
+  [available, facility, query])
   const resetScroll = () => { setVisibleCount(30); if (grid.current) grid.current.scrollTop = 0 }
   const candidates = useDeferredValue(matches, [])
   // ponytail: keep scrolled batches mounted; window rows if inventories grow to thousands.
   const showMore = useCallback(() => setVisibleCount((count) => Math.min(count + 30, matches.length)), [matches.length])
   const choices = useMemo(() => candidates
     .slice(0, visibleCount)
-    .map((operator, index) => {
+    .map(({ operator, known, skills }, index) => {
       const assigned = Object.entries(rooms).find(([, entries]) => entries.some((room) => room.includes(operator.name)))
+      const displayedSkills = skills.filter((skill) => !facility || skill.room === facility)
       return (
         <button key={operator.id} type="button" aria-label={operator.name} aria-pressed={selectedName === operator.name}
           title={assigned ? label.assigned(ROOM_LABELS[assigned[0]] ?? assigned[0]) : operator.name}
-          className={`rounded-md border p-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 ${selectedName === operator.name ? 'border-brand-400 bg-brand-500/10' : 'border-surface-3 hover:bg-surface-2'}`}
+          className={`flex min-h-22 min-w-0 items-start gap-2.5 rounded-lg border p-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 ${selectedName === operator.name ? 'border-brand-400 bg-brand-500/10' : 'border-surface-3 hover:bg-surface-2'}`}
           onFocus={index === visibleCount - 1 ? showMore : undefined}
           onClick={() => onChoose(operator.name)}>
-          <OperatorAvatarStrip operators={[operator]} fallbackText={operator.name} compact showFullNames buttonChild />
+          <div className="shrink-0">
+            <OperatorAvatarTile operator={operator} compact showFullNames buttonChild />
+          </div>
+          <div className="min-w-0 flex-1 space-y-1.5">
+            {displayedSkills.length > 0 ? displayedSkills.map((skill) => (
+              <div key={skill.id} className="flex items-start gap-1.5">
+                <img src={`/building-skills/${skill.icon}.png`} alt={skill.name} width={20} height={20}
+                  loading="lazy" decoding="async" className="h-5 w-5 shrink-0 rounded bg-slate-800 p-0.5" />
+                <p className="line-clamp-2 min-w-0 text-[11px] leading-4 text-ink-secondary">{skill.description}</p>
+              </div>
+            )) : <p className="text-[11px] leading-4 text-ink-muted">{known ? copy.domain.building_skills.no_active_skills : copy.domain.building_skills.unknown}</p>}
+          </div>
         </button>
       )
-    }), [candidates, visibleCount, rooms, selectedName, onChoose, label, showMore])
+    }), [candidates, facility, visibleCount, rooms, selectedName, onChoose, label, showMore])
 
   return (
     <>
@@ -287,30 +294,19 @@ function ManualOperatorPicker({ operators, locked, rooms, roomType, selectedName
           placeholder={label.search} aria-label={label.search} style={{ outline: 'none' }}
           className="min-h-11 min-w-0 w-full bg-transparent text-sm text-ink-primary placeholder:text-ink-muted" />
       </label>
-      <div className="grid grid-cols-2 gap-2">
-        <label className="min-w-0 space-y-1 text-xs text-ink-muted">
-          <span>{copy.domain.building_skills.facility}</span>
-          <select aria-label={copy.domain.building_skills.facility} value={facility}
-            className="min-h-11 w-full rounded-md border border-surface-3 bg-surface-1 px-3 text-sm text-ink-primary"
-            onChange={(event) => { setFacility(event.target.value); setSkillName(''); resetScroll() }}>
-            <option value="">{copy.domain.building_skills.all_facilities}</option>
-            {Object.entries(ROOM_LABELS).map(([type, name]) => <option key={type} value={type}>{name}</option>)}
-            <option value="training">{copy.domain.building_skills.training}</option>
-          </select>
-        </label>
-        <label className="min-w-0 space-y-1 text-xs text-ink-muted">
-          <span>{copy.domain.building_skills.filter}</span>
-          <select aria-label={copy.domain.building_skills.filter} value={skillName}
-            className="min-h-11 w-full rounded-md border border-surface-3 bg-surface-1 px-3 text-sm text-ink-primary"
-            onChange={(event) => { setSkillName(event.target.value); resetScroll() }}>
-            <option value="">{copy.domain.building_skills.all_skills}</option>
-            {skillNames.map((name) => <option key={name} value={name}>{name}</option>)}
-          </select>
-        </label>
-      </div>
+      <label className="min-w-0 space-y-1 text-xs text-ink-muted">
+        <span>{copy.domain.building_skills.facility}</span>
+        <select aria-label={copy.domain.building_skills.facility} value={facility}
+          className="min-h-11 w-full rounded-md border border-surface-3 bg-surface-1 px-3 text-sm text-ink-primary"
+          onChange={(event) => { setFacility(event.target.value); resetScroll() }}>
+          <option value="">{copy.domain.building_skills.all_facilities}</option>
+          {Object.entries(ROOM_LABELS).map(([type, name]) => <option key={type} value={type}>{name}</option>)}
+          <option value="training">{copy.domain.building_skills.training}</option>
+        </select>
+      </label>
       <p className="text-xs leading-5 text-ink-muted">{copy.domain.building_skills.filter_hint}</p>
       <button type="button" className="tool-secondary-action" disabled={!selectedName} onClick={() => onChoose('')}>{label.clear}</button>
-      <div ref={grid} className="grid max-h-52 grid-cols-3 gap-2 overflow-y-auto sm:max-h-72 sm:grid-cols-5" aria-label={label.picker}
+      <div ref={grid} className="grid max-h-52 grid-cols-1 gap-2 overflow-y-auto sm:max-h-72 sm:grid-cols-2 lg:grid-cols-3" aria-label={label.picker}
         aria-busy={matches !== candidates || composing || query !== search.trim()} onScroll={(event) => {
           const element = event.currentTarget
           if (element.scrollHeight - element.scrollTop - element.clientHeight < 120) showMore()

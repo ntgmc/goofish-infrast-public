@@ -2,10 +2,10 @@ export const domainCopy = {
   building_skills: {
     title: "基建技能",
     facility: "技能适用设施",
-    filter: "按基建技能筛选",
     all_facilities: "全部设施",
-    all_skills: "全部技能",
-    filter_hint: "按当前精英阶段和等级已解锁的技能筛选；未知技能的干员可在全部技能中选择。",
+    filter_hint: "按设施查看已解锁的技能；悬停头像可查看完整效果与解锁条件。",
+    no_active_skills: "暂无已解锁的适用技能",
+    unknown: "暂无技能资料",
     active: "已解锁",
     locked: "未解锁",
     upgraded: "已被强化技能替换",
