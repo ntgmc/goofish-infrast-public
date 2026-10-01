@@ -484,7 +484,7 @@ export const workspaceCopy = {
   // src/pages/tool/tool-utils.ts
   pages_tool_tool_utils_018: "密码不能超过 128 位",
   // src/pages/tool/workspace/WorkspaceConfigSection.tsx
-  pages_tool_workspace_WorkspaceConfigSection_001: "工作区与排班页共用此账号的基建配置，修改会自动保存。点击「生成排班」后用于新结果，已有结果保持不变。",
+  pages_tool_workspace_WorkspaceConfigSection_001: "配置两页共用，修改自动保存；下次生成时生效，已有结果不变。",
   // src/pages/tool/workspace/ConfigSaveStatus.tsx
   config_not_saved: "配置尚未保存",
   config_save_pending: "更改待保存",
