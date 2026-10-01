@@ -7,12 +7,24 @@ import type { UserGameAccount } from '../../lib/types'
 import { isSchedulableProfile } from './tool-utils'
 
 const STORAGE_PREFIX = 'maatool:workspace-entry:v1:'
+const OBSERVATION_PREFIX = 'maatool:workspace-entry-observation:v1:'
+const DAY = 24 * 60 * 60 * 1000
 const REMINDER_DELAY = 7 * 24 * 60 * 60 * 1000
+// ponytail: quick repeated opens approximate friction; tune thresholds if suggestions are often dismissed.
+const OBSERVATION_PERIOD = 3 * DAY
+const OBSERVATION_WINDOW = 14 * DAY
+const QUICK_OPEN_WINDOW = 60 * 1000
+const MIN_OPEN_INTERVAL = 30 * 60 * 1000
 const DEFAULT_PREFERENCE: EntryPreference = { target: null, remindAfter: 0 }
 
 interface EntryPreference {
   target: string | null
   remindAfter: number | 'never'
+}
+
+interface EntryObservation {
+  target: string
+  opens: number[]
 }
 
 function singleGameAccount(profiles: UserGameAccount[], activeProfile: UserGameAccount | null) {
@@ -43,6 +55,21 @@ function readPreference(userId: string | null): EntryPreference {
   return DEFAULT_PREFERENCE
 }
 
+function readObservation(userId: string | null): EntryObservation | null {
+  if (!userId) return null
+  try {
+    const stored: unknown = JSON.parse(window.localStorage.getItem(`${OBSERVATION_PREFIX}${userId}`) ?? 'null')
+    if (stored && typeof stored === 'object' && 'target' in stored && typeof stored.target === 'string'
+      && 'opens' in stored && Array.isArray(stored.opens)
+      && stored.opens.every((value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0)) {
+      return { target: stored.target, opens: stored.opens.slice(-100).sort((left, right) => left - right) }
+    }
+  } catch {
+    // Observation is optional and must not interrupt opening a workspace.
+  }
+  return null
+}
+
 export function useWorkspaceEntryPreference(
   userId: string | null,
   profiles: UserGameAccount[],
@@ -53,13 +80,32 @@ export function useWorkspaceEntryPreference(
   const location = useLocation()
   const navigate = useNavigate()
   const [saved, setSaved] = useState(() => ({ userId, preference: readPreference(userId) }))
+  const [observed, setObserved] = useState(() => ({ userId, observation: readObservation(userId) }))
   const [storageError, setStorageError] = useState(false)
   const entryUserRef = useRef<string | null>(null)
+  const visitRef = useRef<{ key: string; enteredAt: number; recorded: boolean } | null>(null)
   const candidate = singleGameAccount(profiles, activeProfile)
   const preference = saved.userId === userId ? saved.preference : readPreference(userId)
+  const observation = observed.userId === userId ? observed.observation : readObservation(userId)
+  const now = Date.now()
+  const recentOpens = observation?.target === candidate?.target
+    ? observation?.opens.filter((openedAt) => openedAt >= now - OBSERVATION_WINDOW && openedAt <= now) ?? []
+    : []
+  const repeatedEntry = recentOpens.length >= 5 && now - recentOpens[0] >= OBSERVATION_PERIOD
+    && new Set(recentOpens.map((openedAt) => new Date(openedAt).toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' }))).size >= 3
   const enabled = Boolean(candidate && (preference.target === candidate.target
     || preference.target === `profile:${candidate.profile.id}`))
   const path = candidate ? profileScopedPath(workspaceSetupPath('operators'), candidate.profile.id) : null
+
+  useEffect(() => {
+    const query = new URLSearchParams(location.search)
+    if (!ready || !userId || location.pathname !== dashboardPath('profiles')
+      || query.has('profile_id') || query.has('recovery')) {
+      visitRef.current = null
+    } else if (visitRef.current?.key !== location.key) {
+      visitRef.current = { key: location.key, enteredAt: Date.now(), recorded: false }
+    }
+  }, [userId, ready, location.key, location.pathname, location.search])
 
   useEffect(() => {
     if (!userId) {
@@ -88,13 +134,35 @@ export function useWorkspaceEntryPreference(
     }
   }
 
+  function recordOpen(profile: UserGameAccount, openedAt: number) {
+    const visit = visitRef.current
+    if (!userId || !profilesEnabled || !candidate || enabled || preference.remindAfter === 'never'
+      || !visit || visit.key !== location.key || visit.recorded
+      || openedAt < visit.enteredAt || openedAt - visit.enteredAt > QUICK_OPEN_WINDOW
+      || (profile.id !== candidate.profile.id && `uid:${profile.skland_binding?.uid}` !== candidate.target)) return
+    const history = readObservation(userId)
+    const opens = history?.target === candidate.target
+      ? history.opens.filter((time) => time >= openedAt - OBSERVATION_WINDOW && time <= openedAt)
+      : []
+    visit.recorded = true
+    if (opens.length && openedAt - opens[opens.length - 1] < MIN_OPEN_INTERVAL) return
+    const next = { target: candidate.target, opens: [...opens, openedAt].slice(-100) }
+    try {
+      window.localStorage.setItem(`${OBSERVATION_PREFIX}${userId}`, JSON.stringify(next))
+      setObserved({ userId, observation: next })
+    } catch {
+      // A failed local observation must not interrupt the user's action.
+    }
+  }
+
   return {
     candidate,
     enabled,
     profilesEnabled,
     storageError,
-    showPrompt: Boolean(ready && userId && profilesEnabled && candidate && !enabled
+    showPrompt: Boolean(ready && userId && profilesEnabled && candidate && !enabled && repeatedEntry
       && preference.remindAfter !== 'never' && preference.remindAfter <= Date.now()),
+    recordOpen,
     enable: () => candidate && updatePreference({ target: candidate.target, remindAfter: 0 }),
     disable: () => updatePreference({ target: null, remindAfter: 'never' }),
     snooze: () => updatePreference({ target: null, remindAfter: Date.now() + REMINDER_DELAY }),

@@ -230,18 +230,122 @@ describe('ToolPage route guards', () => {
 
 describe('single game account workspace entry', () => {
   const storageKey = 'maatool:workspace-entry:v1:user-1'
+  const observationKey = 'maatool:workspace-entry-observation:v1:user-1'
+  const day = 24 * 60 * 60 * 1000
 
   function accountSession(profiles: UserGameAccount[]) {
-    return { activeProfile: profiles[0], activeCdkProfile: profiles[0], cdkProfiles: profiles }
+    return {
+      activeProfile: profiles[0], activeCdkProfile: profiles[0], cdkProfiles: profiles,
+      refreshProfileWorkspace: vi.fn().mockResolvedValue(undefined),
+    }
   }
 
   function enableStored(target: string) {
     window.localStorage.setItem(storageKey, JSON.stringify({ target, remindAfter: 0 }))
   }
 
+  function observeStored(target: string, userId = 'user-1', opens?: number[]) {
+    const now = Date.now()
+    window.localStorage.setItem(`maatool:workspace-entry-observation:v1:${userId}`, JSON.stringify({
+      target,
+      opens: opens ?? [now - 4 * day, now - 3 * day, now - 2 * day, now - day, now - day + 60 * 60 * 1000],
+    }))
+  }
+
+  it('does not suggest skipping the dashboard merely because an account is eligible', async () => {
+    const router = renderToolRoute('/tool/profiles', accountSession([createProfile()]))
+    expect(await screen.findByRole('heading', { name: '游戏账号' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '启用并进入工作区' })).not.toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/tool/profiles')
+    expect(window.localStorage.getItem(observationKey)).toBeNull()
+  })
+
+  it('observes successful quick manual opens across several days before suggesting the shortcut', async () => {
+    const user = userEvent.setup()
+    const start = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(start)
+    const session = accountSession([createProfile()])
+    for (const elapsed of [0, 45 * 60 * 1000, day, day + 45 * 60 * 1000, 2 * day]) {
+      clock.mockReturnValue(start + elapsed)
+      const router = renderToolRoute('/tool/profiles', session)
+      expect(screen.queryByRole('button', { name: '启用并进入工作区' })).not.toBeInTheDocument()
+      await user.click(await screen.findByRole('button', { name: '打开账号并准备数据' }))
+      await waitFor(() => expect(router.state.location.pathname).toBe('/tool/setup/operators'))
+      cleanup()
+    }
+    expect(JSON.parse(window.localStorage.getItem(observationKey)!).opens).toHaveLength(5)
+    clock.mockReturnValue(start + 2 * day + 60 * 60 * 1000)
+    renderToolRoute('/tool/profiles', session)
+    expect(await screen.findByRole('heading', { name: '游戏账号' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '启用并进入工作区' })).not.toBeInTheDocument()
+    cleanup()
+
+    clock.mockReturnValue(start + 3 * day)
+    const router = renderToolRoute('/tool/profiles', session)
+    expect(await screen.findByRole('button', { name: '启用并进入工作区' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/tool/profiles')
+  })
+
+  it.each(['one day', 'too few opens', 'stale history', 'different game account', 'invalid history'])('does not suggest a shortcut for %s', async (reason) => {
+    const now = Date.now()
+    const opens = reason === 'one day' ? [1, 2, 3, 4, 5].map((hour) => now - 4 * day + hour * 60 * 60 * 1000)
+      : reason === 'too few opens' ? [now - 4 * day, now - 2 * day, now - day]
+      : reason === 'stale history' ? [20, 19, 18, 17, 16].map((days) => now - days * day)
+      : reason === 'invalid history' ? ['invalid']
+      : undefined
+    if (reason === 'invalid history') {
+      window.localStorage.setItem(observationKey, JSON.stringify({ target: 'profile:profile-1', opens }))
+    } else {
+      observeStored(reason === 'different game account' ? 'uid:other' : 'profile:profile-1', 'user-1', opens as number[] | undefined)
+    }
+    renderToolRoute('/tool/profiles', accountSession([createProfile()]))
+    expect(await screen.findByRole('heading', { name: '游戏账号' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '启用并进入工作区' })).not.toBeInTheDocument()
+  })
+
+  it('ignores rapid repeated visits and time spent managing the dashboard', async () => {
+    const user = userEvent.setup()
+    const start = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(start)
+    const session = accountSession([createProfile()])
+    for (const elapsed of [0, 1000]) {
+      clock.mockReturnValue(start + elapsed)
+      const router = renderToolRoute('/tool/profiles', session)
+      await user.click(await screen.findByRole('button', { name: '打开账号并准备数据' }))
+      await waitFor(() => expect(router.state.location.pathname).toBe('/tool/setup/operators'))
+      cleanup()
+    }
+    expect(JSON.parse(window.localStorage.getItem(observationKey)!).opens).toHaveLength(1)
+
+    clock.mockReturnValue(start + day)
+    const router = renderToolRoute('/tool/profiles', session)
+    await screen.findByRole('button', { name: '打开账号并准备数据' })
+    clock.mockReturnValue(start + day + 61 * 1000)
+    await user.click(screen.getByRole('button', { name: '打开账号并准备数据' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/tool/setup/operators'))
+    expect(JSON.parse(window.localStorage.getItem(observationKey)!).opens).toHaveLength(1)
+  })
+
+  it('does not count failed opens or direct workspace visits', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const session = accountSession([createProfile()])
+    session.refreshProfileWorkspace.mockRejectedValue(new Error('Workspace unavailable'))
+    const router = renderToolRoute('/tool/profiles', session)
+    await user.click(await screen.findByRole('button', { name: '打开账号并准备数据' }))
+    await waitFor(() => expect(console.error).toHaveBeenCalledOnce())
+    expect(router.state.location.pathname).toBe('/tool/profiles')
+    expect(window.localStorage.getItem(observationKey)).toBeNull()
+    cleanup()
+    renderToolRoute('/tool/setup/operators?profile_id=profile-1', session)
+    expect(await screen.findByRole('button', { name: '返回账号列表' })).toBeInTheDocument()
+    expect(window.localStorage.getItem(observationKey)).toBeNull()
+  })
+
   it('asks before enabling, restores the default on entry, and allows returning to the dashboard', async () => {
     const user = userEvent.setup()
     const session = accountSession([createProfile()])
+    observeStored('profile:profile-1')
     const router = renderToolRoute('/tool/profiles', session)
     expect(await screen.findByRole('heading', { name: '下次直接进入这个游戏账号？' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/tool/profiles')
@@ -262,6 +366,7 @@ describe('single game account workspace entry', () => {
     const user = userEvent.setup()
     const free = createBoundFreePreviewProfile('user-1', 'free')
     const paid = { ...createProfile(), skland_binding: free.skland_binding }
+    observeStored('uid:skland-free')
     const router = renderToolRoute('/tool/profiles', accountSession([free, paid]))
     await user.click(await screen.findByRole('button', { name: '启用并进入工作区' }))
     await waitFor(() => expect(router.state.location.search).toBe('?profile_id=profile-1'))
@@ -303,6 +408,7 @@ describe('single game account workspace entry', () => {
     const now = Date.now()
     const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
     const session = accountSession([createProfile()])
+    observeStored('profile:profile-1')
     renderToolRoute('/tool/profiles', session)
     expect(await screen.findByRole('button', { name: '启用并进入工作区' })).toBeInTheDocument()
     cleanup()
@@ -346,14 +452,24 @@ describe('single game account workspace entry', () => {
     expect(screen.queryByRole('button', { name: '启用并进入工作区' })).not.toBeInTheDocument()
   })
 
-  it('keeps preferences separate for different users and requires consent for a different game account', async () => {
+  it('keeps observations separate for different users and observes a different game account afresh', async () => {
     enableStored('uid:old-account')
+    observeStored('uid:old-account')
     const router = renderToolRoute('/tool/profiles', accountSession([createProfile()]))
-    expect(await screen.findByRole('button', { name: '启用并进入工作区' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '游戏账号' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '启用并进入工作区' })).not.toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/tool/profiles')
     cleanup()
 
     enableStored('profile:profile-1')
+    renderToolRoute('/tool/profiles', {
+      ...accountSession([createProfile()]),
+      user: { id: 'user-2', email: 'other@example.com' } as AuthUser,
+    })
+    expect(await screen.findByRole('heading', { name: '游戏账号' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '启用并进入工作区' })).not.toBeInTheDocument()
+    cleanup()
+    observeStored('profile:profile-1', 'user-2')
     renderToolRoute('/tool/profiles', {
       ...accountSession([createProfile()]),
       user: { id: 'user-2', email: 'other@example.com' } as AuthUser,
@@ -363,6 +479,7 @@ describe('single game account workspace entry', () => {
 
   it('does not enable or navigate when browser storage rejects the preference', async () => {
     const user = userEvent.setup()
+    observeStored('profile:profile-1')
     const router = renderToolRoute('/tool/profiles', accountSession([createProfile()]))
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage denied') })
     await user.click(await screen.findByRole('button', { name: '启用并进入工作区' }))

@@ -157,8 +157,12 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
             onLogout={handleLogout}
             onPayload={applyAuthPayload}
             onOpenProfile={(profile) => {
+              const openedAt = Date.now()
               void refreshProfileWorkspace(profile)
-                .then(() => navigate(profileScopedPath(workspaceSetupPath('operators'), profile.id)))
+                .then(() => {
+                  workspaceEntry.recordOpen(profile, openedAt)
+                  return navigate(profileScopedPath(workspaceSetupPath('operators'), profile.id))
+                })
                 .catch(console.error)
             }}
             features={features}
