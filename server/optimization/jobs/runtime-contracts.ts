@@ -103,6 +103,13 @@ const optimizeResultSchema: z.ZodType<OptimizeResult> = z.object({
     }).passthrough()).max(5_000),
   }).passthrough()).max(1_000),
   build_meta: appBuildMetaSchema.optional(),
+  mood_simulation: z.strictObject({
+    valid: z.boolean(), daily_loop_stable: z.boolean(),
+    iterations: z.number().int().min(1).max(12),
+    degrading_operators: z.array(z.strictObject({
+      operator: boundedString(256), start: finiteNumber, end: finiteNumber,
+    })).max(12),
+  }).optional(),
 }).passthrough().superRefine(assertJsonSafe) as z.ZodType<OptimizeResult>
 
 const schedulePayloadSchema: z.ZodType<OptimizeJobPayload> = z.strictObject({
@@ -122,6 +129,7 @@ const schedulePayloadSchema: z.ZodType<OptimizeJobPayload> = z.strictObject({
     history_source: z.enum(['generated', 'applied_suggestions']).optional(),
     billing_operation: z.enum(['main_schedule', 'incremental_recompute']).optional(),
     baseline_history_id: boundedString(128).optional(),
+    manual_schedule: optimizeResultSchema.optional(),
   }),
   configPermission: z.enum(['recommended', 'growth', 'advanced', 'ultimate', 'metered_advanced', 'admin', 'free_preview']),
   cdkUsageRef: z.strictObject({ code_hash: boundedString(256) }).nullable().optional(),

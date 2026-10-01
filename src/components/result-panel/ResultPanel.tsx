@@ -12,7 +12,7 @@ import ResultMetrics from './ResultMetrics'
 import type { ResultPanelProps, ResultTabId } from './types'
 import { copy, CURRENT_LOCALE } from '../../copy/index'
 import { hasCapability } from '../../lib/product-catalog'
-import { manualSourceKey } from './manual-schedule'
+import { manualSourceKey } from '../../lib/manual-schedule'
 
 const ManualScheduleEditor = lazy(() => import('./ManualScheduleEditor'))
 
@@ -30,6 +30,7 @@ export default function ResultPanel({
   manualPreviewSlot,
   previewLimit,
   manualEditProfile,
+  manualSimulationBaseline,
 }: ResultPanelProps) {
   const isRotationMode = result.schedule_mode === 'rotation'
   const isPureMaaDormitoryAutofill = !isRotationMode && result.dormitory_rule === 'maa_pure_autofill'
@@ -138,7 +139,7 @@ export default function ResultPanel({
               {selectedTab === 'manual' ? copy.domain.manual_schedule.title : isPreview ? copy.domain.components_result_panel_ResultPanel_025 : copy.domain.components_result_panel_ResultPanel_027}
             </h2>
             <p className="mt-1 text-sm text-ink-secondary">
-              {selectedTab === 'manual' ? copy.domain.manual_schedule.pending : isPreview
+              {selectedTab === 'manual' ? copy.domain.manual_schedule.hint : isPreview
                 ? copy.domain.components_result_panel_ResultPanel_028
                 : isRotationMode
                   ? copy.domain.components_result_panel_ResultPanel_030
@@ -250,7 +251,7 @@ export default function ResultPanel({
       {canEditManual && manualOpened && manualEditProfile && (
         <div id="result-manual-panel" role="tabpanel" aria-labelledby="result-manual-tab" hidden={selectedTab !== 'manual'}>
           <Suspense fallback={<p className="p-5 text-sm text-ink-muted">{copy.domain.manual_schedule.title}</p>}>
-            <ManualScheduleEditor key={`${manualEditProfile.id}:${manualKey}`} source={result} profileId={manualEditProfile.id} operators={operators} />
+            <ManualScheduleEditor key={`${manualEditProfile.id}:${manualKey}`} source={result} profileId={manualEditProfile.id} operators={operators} simulationBaseline={manualSimulationBaseline} />
           </Suspense>
         </div>
       )}

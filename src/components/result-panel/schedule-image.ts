@@ -147,7 +147,9 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
   const headings: Array<{ value: string; y: number; note: string }> = []
   const heading = `${copy.domain.result_image.title} ${version}`
   const mode = isRotationMode ? copy.domain.components_result_panel_ResultBoard_001 : copy.domain.components_result_panel_ResultBoard_002
-  const subtitle = `${title} · ${manual ? copy.domain.manual_schedule.pending : mode}`
+  const subtitle = `${title} · ${manual
+    ? prepared.hasDailyProduction ? copy.domain.manual_schedule.simulation_image : copy.domain.manual_schedule.pending
+    : mode}`
   let y = 88 + lines(subtitle, WIDTH - MARGIN * 2).length * 20
   for (const section of sections) {
     headings.push({ value: section.title, note: section.note, y })

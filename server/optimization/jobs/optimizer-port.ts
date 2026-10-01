@@ -33,6 +33,7 @@ export type OptimizeExecutionContext = {
 
 export interface OptimizerPort {
   readonly version: typeof OPTIMIZER_PORT_VERSION
+  readonly supportsManualScheduleSimulation?: boolean
   executeSchedule(
     payload: OptimizeJobPayload,
     context: OptimizeExecutionContext,

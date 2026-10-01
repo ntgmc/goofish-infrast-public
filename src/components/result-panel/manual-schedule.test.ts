@@ -4,7 +4,7 @@ import type { LicenseOperator, OptimizeResult } from '../../lib/types'
 import {
   changeManualDrone, changeManualOperator, createManualPlans, manualResult, parseManualDraft,
   readManualDraft, saveManualDraft, validateManualPlans,
-} from './manual-schedule'
+} from '../../lib/manual-schedule'
 
 afterEach(() => localStorage.clear())
 

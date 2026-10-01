@@ -1,5 +1,16 @@
-import { canonicalJson } from '../../lib/crypto'
-import type { LicenseOperator, OptimizeResult, ShiftRoom } from '../../lib/types'
+import { z } from 'zod'
+import { canonicalJson } from './crypto'
+import type { LicenseOperator, OptimizeResult, ShiftRoom } from './types'
+
+export const manualPlansSchema = z.array(z.strictObject({
+  rooms: z.record(z.string().min(1).max(128), z.array(z.array(z.string().max(256)).max(5)).max(20)),
+  drones: z.strictObject({
+    enable: z.boolean(),
+    room: z.string().max(128),
+    index: z.number().int().min(1).max(20),
+    order: z.enum(['pre', 'post']),
+  }),
+})).min(1).max(24)
 
 export type ManualPlan = {
   rooms: Record<string, string[][]>;
@@ -114,7 +125,11 @@ export function manualResult(source: OptimizeResult, plans: ManualPlan[]): Optim
   return {
     author: source.author, title: source.title, description: source.description, buildingType: source.buildingType,
     planTimes: source.planTimes, schedule_mode: source.schedule_mode, dormitory_rule: source.dormitory_rule,
-    shift_hours: source.shift_hours, raw_results: [],
+    schedule_mode_name: source.schedule_mode_name, dormitory_rule_name: source.dormitory_rule_name,
+    rotation_mode: source.rotation_mode, facility_layout: source.facility_layout,
+    shift_hours: source.shift_hours, shift_pattern: source.shift_pattern,
+    total_schedule_hours: source.total_schedule_hours, fiammetta_target_slots: source.fiammetta_target_slots,
+    raw_results: [],
     plans: source.plans.map((plan, index) => ({
       name: plan.name, shift_hours: plan.shift_hours, Fiammetta: plan.Fiammetta,
       drones: {
