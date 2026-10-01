@@ -30,15 +30,54 @@ beforeEach(() => {
   mocks.submit.mockResolvedValue({ job_id: 'manual-job' })
 })
 afterEach(cleanup)
-async function editor() {
+async function editor(result = source) {
   const user = userEvent.setup()
-  render(<ResultPanel result={source} operators={[{ id: '芬', name: '芬', own: true, elite: 1, rarity: 3 }]}
+  render(<ResultPanel result={result} operators={['芬', '克洛丝', 'Castle-3'].map((name) => ({ id: name, name, own: true, elite: 1, rarity: 3 }))}
     manualEditProfile={{ id: 'manual-test', kind: 'cdk', permission: 'advanced' }}
     manualSimulationBaseline={{ id: 'history-1', config: CONFIG_PRESETS['243'] }} />)
   await user.click(screen.getByRole('tab', { name: '手动排班' }))
   return { user, scope: within(await screen.findByRole('region', { name: '手动调整排班' })) }
 }
 describe('manual simulation lifecycle', () => {
+  it('names mood shortfalls and fills suggested beds before remeasuring', async () => {
+    const baseline = structuredClone(source)
+    baseline.plans[0].rooms.dormitory = [{ operators: ['Castle-3'] }]
+    const measured: OptimizeResult = {
+      ...baseline,
+      plans: [{
+        ...baseline.plans[0],
+        rooms: {
+          ...baseline.plans[0].rooms,
+          manufacture: [{ ...baseline.plans[0].rooms.manufacture[0], mood: {
+            芬: { start: 3, consumed: 8, end: 0, red_face: true },
+          } }],
+        },
+      }],
+      mood_simulation: {
+        valid: false, daily_loop_stable: true, iterations: 2, degrading_operators: [],
+        dormitory_recovery: {
+          additions: [{ shift_index: 0, room_index: 0, operator: '克洛丝' }], unassigned: [],
+        },
+      },
+    }
+    const filled = structuredClone(measured)
+    filled.plans[0].rooms.dormitory[0].operators = ['Castle-3', '克洛丝']
+    filled.mood_simulation!.dormitory_recovery!.additions = []
+    mocks.snapshot.mockResolvedValueOnce({ status: 'succeeded', result: measured })
+      .mockResolvedValueOnce({ status: 'succeeded', result: filled })
+    const { user, scope } = await editor(baseline)
+    await user.click(scope.getByRole('button', { name: '模拟测算' }))
+    const mood = within(await scope.findByRole('region', { name: '干员心情测算' }))
+    expect(mood.getByText('需要调整的干员：芬')).toBeVisible()
+    expect(mood.getAllByText(/本班缺少 5 点心情/)[0]).toBeVisible()
+    expect(mood.getByRole('table')).toBeVisible()
+    expect(mood.getByText('Shift · 宿舍 1：克洛丝')).toBeVisible()
+    await user.click(mood.getByRole('button', { name: '补齐宿舍并重新测算' }))
+    expect(mocks.submit).toHaveBeenCalledTimes(2)
+    expect(mocks.submit.mock.calls[1][0].manualSchedule.plans[0].rooms.dormitory[0])
+      .toEqual(['Castle-3', '克洛丝', '', '', ''])
+    expect(await scope.findByRole('button', { name: '补齐宿舍并重新测算' })).toBeDisabled()
+  })
   it('submits the current plan and shows mood warnings only until the next edit', async () => {
     mocks.snapshot.mockResolvedValue({ status: 'succeeded', result: simulated })
     const { user, scope } = await editor()

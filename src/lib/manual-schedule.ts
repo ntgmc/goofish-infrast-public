@@ -74,6 +74,28 @@ export function changeManualOperator(source: OptimizeResult, plans: ManualPlan[]
   return next
 }
 
+export function fillManualDormitories(
+  source: OptimizeResult,
+  plans: ManualPlan[],
+  operators: LicenseOperator[],
+  additions: NonNullable<NonNullable<OptimizeResult['mood_simulation']>['dormitory_recovery']>['additions'],
+): ManualPlan[] {
+  validateManualPlans(source, plans, operators)
+  if (isFixedDormitory(source, 'dormitory')) throw new Error('Autofill is locked')
+  const next = structuredClone(plans)
+  for (const { shift_index, room_index, operator } of additions) {
+    const plan = next[shift_index]
+    const room = plan?.rooms.dormitory?.[room_index]
+    const slot = room?.indexOf('') ?? -1
+    if (!operator || slot < 0 || Object.values(plan.rooms).flat(2).includes(operator)) {
+      throw new Error('Invalid dormitory addition')
+    }
+    room[slot] = operator
+  }
+  validateManualPlans(source, next, operators)
+  return next
+}
+
 export function changeManualDrone(source: OptimizeResult, plans: ManualPlan[], operators: LicenseOperator[],
   planIndex: number, roomType?: string, roomIndex?: number): ManualPlan[] {
   const next = structuredClone(plans)

@@ -108,7 +108,18 @@ const optimizeResultSchema: z.ZodType<OptimizeResult> = z.object({
     iterations: z.number().int().min(1).max(12),
     degrading_operators: z.array(z.strictObject({
       operator: boundedString(256), start: finiteNumber, end: finiteNumber,
-    })).max(12),
+    })).max(500),
+    dormitory_recovery: z.strictObject({
+      additions: z.array(z.strictObject({
+        shift_index: z.number().int().min(0).max(23),
+        room_index: z.number().int().min(0).max(19),
+        operator: boundedString(256),
+      })).max(2_400),
+      unassigned: z.array(z.strictObject({
+        shift_index: z.number().int().min(0).max(23),
+        operator: boundedString(256),
+      })).max(12_000),
+    }).optional(),
   }).optional(),
 }).passthrough().superRefine(assertJsonSafe) as z.ZodType<OptimizeResult>
 

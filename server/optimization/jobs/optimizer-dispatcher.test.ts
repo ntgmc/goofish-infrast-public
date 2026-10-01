@@ -19,6 +19,26 @@ const context: OptimizeExecutionContext = {
 }
 
 describe('optimization job dispatcher', () => {
+  it('validates dormitory recovery suggestions and retains all degrading operators', async () => {
+    const result = {
+      ...scheduleResult(),
+      mood_simulation: {
+        valid: false, daily_loop_stable: false, iterations: 12,
+        degrading_operators: Array.from({ length: 13 }, (_, index) => ({ operator: `Operator ${index}`, start: 24, end: 20 })),
+        dormitory_recovery: {
+          additions: [{ shift_index: 0, room_index: 0, operator: 'Operator' }],
+          unassigned: [{ shift_index: 1, operator: 'Another operator' }],
+        },
+      },
+    }
+    await expect(executeOptimizationJobWithPort(job(schedulePayload()), context,
+      fakePort({ executeSchedule: vi.fn(async () => result) }))).resolves.toEqual(result)
+    result.mood_simulation.dormitory_recovery.additions[0].room_index = -1
+    await expect(executeOptimizationJobWithPort(job(schedulePayload()), context,
+      fakePort({ executeSchedule: vi.fn(async () => result) }))).rejects.toMatchObject({
+      failure: { code: 'invalid_optimizer_result', kind: 'validation' },
+    })
+  })
   it('requires explicit manual simulation support before dispatching fixed plans', async () => {
     const baseline = schedulePayload()
     const payload = { ...baseline, request: { ...baseline.request, manual_schedule: scheduleResult() } }
