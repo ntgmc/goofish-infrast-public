@@ -258,13 +258,6 @@ body {
     background: color-mix(in oklch, var(--theme-brand-500) 5%, var(--theme-surface-2));
   }
 
-  @media (min-width: 1280px) {
-    .workspace-summary-panel {
-      position: sticky;
-      top: 1.25rem;
-    }
-  }
-
   .session-loader {
     display: flex;
     width: 6.25rem;
