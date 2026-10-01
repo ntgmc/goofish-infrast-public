@@ -69,8 +69,19 @@ export default function ResultSection({
       <UpgradeSuggestions suggestions={suggestions} embedded />
     </Suspense>
   ) : !canViewUpgradeSuggestions ? (
-    <LockedUpgradeSuggestions purchaseHref={purchaseHref} />
+    <LockedCapabilityPreview
+      purchaseHref={purchaseHref}
+      title={copy.optimize.pages_tool_optimize_ResultSection_016}
+      description={copy.optimize.pages_tool_optimize_ResultSection_017}
+    />
   ) : null
+  const manualPreviewSlot = previewProfile ? (
+    <LockedCapabilityPreview
+      purchaseHref={purchaseHref}
+      title={copy.optimize.paid_preview.manual_title}
+      description={copy.optimize.paid_preview.manual_description}
+    />
+  ) : undefined
 
   return (
     <section className="min-w-0" data-tour-target="optimize-result-content">
@@ -106,6 +117,7 @@ export default function ResultSection({
             fullResultDownloadBusy={fullResultDownloadBusy}
             fullDataAvailable={fullDataAvailable}
             manualEditProfile={manualEditProfile}
+            manualPreviewSlot={manualPreviewSlot}
             suggestionsSlot={suggestionsSlot}
           />
           {previewProfile && <PreviewUpgradePanel cdk={upgradeCdk} loading={upgradeLoading} error={upgradeError} onCdkChange={onUpgradeCdkChange} onSubmit={onUpgradePreviewProfile} />}
@@ -125,6 +137,7 @@ export default function ResultSection({
             fullResultDownloadBusy={fullResultDownloadBusy}
             fullDataAvailable={fullDataAvailable}
             manualEditProfile={manualEditProfile}
+            manualPreviewSlot={manualPreviewSlot}
             suggestionsSlot={suggestionsSlot}
           />
           {previewProfile && <PreviewUpgradePanel cdk={upgradeCdk} loading={upgradeLoading} error={upgradeError} onCdkChange={onUpgradeCdkChange} onSubmit={onUpgradePreviewProfile} />}
@@ -143,6 +156,7 @@ export default function ResultSection({
             fullResultDownloadBusy={fullResultDownloadBusy}
             fullDataAvailable={fullDataAvailable}
             manualEditProfile={manualEditProfile}
+            manualPreviewSlot={manualPreviewSlot}
             suggestionsSlot={suggestionsSlot}
           />
           {previewProfile && <PreviewUpgradePanel cdk={upgradeCdk} loading={upgradeLoading} error={upgradeError} onCdkChange={onUpgradeCdkChange} onSubmit={onUpgradePreviewProfile} />}
@@ -154,10 +168,10 @@ export default function ResultSection({
   )
 }
 
-function LockedUpgradeSuggestions({ purchaseHref }: { purchaseHref?: string }) {
+function LockedCapabilityPreview({ purchaseHref, title, description }: { purchaseHref?: string; title: string; description: string }) {
   return (
     <div className="relative min-h-80 overflow-hidden rounded-xl">
-      <div className="space-y-4 select-none opacity-50 blur-[3px]" aria-hidden="true" data-locked-suggestions-preview>
+      <div className="space-y-4 select-none opacity-50 blur-[3px]" aria-hidden="true" data-locked-capability-preview>
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="space-y-2">
             <div className="h-5 w-32 rounded bg-surface-3" />
@@ -182,8 +196,8 @@ function LockedUpgradeSuggestions({ purchaseHref }: { purchaseHref?: string }) {
       <div className="absolute inset-0 flex items-center justify-center bg-surface-1/70 p-4 backdrop-blur-[2px]">
         <div className="tool-panel max-w-lg p-5 text-center shadow-lg sm:p-6">
           <span className="tool-status">{copy.optimize.pages_tool_optimize_ResultSection_015}</span>
-          <h3 className="mt-3 text-lg font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_ResultSection_016}</h3>
-          <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.optimize.pages_tool_optimize_ResultSection_017}</p>
+          <h3 className="mt-3 text-lg font-semibold text-ink-primary">{title}</h3>
+          <p className="mt-2 text-sm leading-6 text-ink-secondary">{description}</p>
           <div className="mt-5 flex flex-col justify-center gap-3 sm:flex-row">
             {purchaseHref ? (
               <a href={purchaseHref} target="_blank" rel="noopener noreferrer" className="tool-primary-action">

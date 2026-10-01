@@ -9,6 +9,33 @@ import {
 } from './public-content'
 
 describe('public content settings', () => {
+  it('updates legacy preset and manual schedule defaults while preserving custom comparison copy', () => {
+    const legacy = cloneDefaultPublicContentSettings()
+    const legacyRecord = legacy as unknown as { defaults_revision: number }
+    legacyRecord.defaults_revision = 7
+    const preset = legacy.pricing.comparison_rows.find((row) => row.feature === '基建预设')!
+    for (const planId of PUBLIC_PRICING_PLAN_IDS) preset[planId] = '支持右满252'
+    preset.single_account_annual = '管理员自定义预设说明'
+    legacy.pricing.comparison_rows = legacy.pricing.comparison_rows.filter((row) => row.feature !== '手动排班').reverse()
+    const roi = legacy.pricing.comparison_rows.find((row) => row.feature === '练度提升建议与 ROI')!
+    delete roi.single_account_monthly
+
+    const migrated = normalizePublicContentSettings(legacy)
+    expect(migrated.defaults_revision).toBe(8)
+    expect(migrated.pricing.comparison_rows.find((row) => row.feature === '基建预设')).toMatchObject({
+      id: preset.id,
+      free_preview: '支持右满252（经验多 / 赤金多）与满血252',
+      single_account_annual: '管理员自定义预设说明',
+    })
+    expect(migrated.pricing.comparison_rows.find((row) => row.feature === '练度提升建议与 ROI')?.single_account_monthly).toBe('支持')
+    expect(migrated.pricing.comparison_rows.filter((row) => row.feature === '手动排班')).toEqual([
+      DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.comparison_rows.find((row) => row.feature === '手动排班'),
+    ])
+    expect(normalizePublicContentSettings(migrated)).toEqual(migrated)
+    migrated.pricing.comparison_rows = migrated.pricing.comparison_rows.filter((row) => row.feature !== '手动排班')
+    expect(normalizePublicContentSettings(migrated).pricing.comparison_rows).toEqual(migrated.pricing.comparison_rows)
+  })
+
   it('defaults missing purchase URLs to empty without changing legacy prices', () => {
     const legacy = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
     for (const id of PUBLIC_PRICING_PLAN_IDS) {
@@ -170,7 +197,7 @@ describe('public content settings', () => {
     delete (intermediate as unknown as { defaults_revision?: number }).defaults_revision
     intermediate.thanks.sections[1].entries[0].avatar_url = 'https://avatars.githubusercontent.com/u/74061867?v=4'
     expect(normalizePublicContentSettings(intermediate)).toMatchObject({
-      defaults_revision: 7,
+      defaults_revision: 8,
       thanks: {
         sections: expect.arrayContaining([
           expect.objectContaining({
@@ -190,7 +217,7 @@ describe('public content settings', () => {
     legacy.pricing.intro = '先了解完整权益与限制，再选择适合自己的版本。现在提供月卡、半年卡、年卡、终身卡，以及个人和商用积分单次排班。'
 
     expect(normalizePublicContentSettings(legacy)).toMatchObject({
-      defaults_revision: 7,
+      defaults_revision: 8,
       pricing: {
         eyebrow: 'Pricing',
         intro: '个人维护方案有 30 天、90 天、365 天和终身卡可选，每份方案绑定一个游戏 UID。偶尔使用或需要商用时，也可以选择积分单次排班。',
@@ -239,7 +266,7 @@ describe('public content settings', () => {
     delete (legacy as unknown as { cdk_purchase?: unknown }).cdk_purchase
 
     const migrated = normalizePublicContentSettings(legacy)
-    expect(migrated.defaults_revision).toBe(7)
+    expect(migrated.defaults_revision).toBe(8)
     expect(migrated.qq_group.name).toBe('管理员自定义群名')
     expect(migrated.cdk_purchase.xianyu_url).toBe(DEFAULT_PUBLIC_CONTENT_DRAFT.cdk_purchase.xianyu_url)
 

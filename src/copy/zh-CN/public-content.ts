@@ -1,4 +1,7 @@
 export const publicContentCopy = {
+  pricing_comparison_presets: '基建预设',
+  pricing_comparison_manual: '手动排班',
+  legacy_pricing_preset_supported: '支持右满252',
   legacy_pricing_eyebrow: '公开 SKU',
   legacy_pricing_intro: '先了解完整权益与限制，再选择适合自己的版本。现在提供月卡、半年卡、年卡、终身卡，以及个人和商用积分单次排班。',
   legacy_pricing_plans: {

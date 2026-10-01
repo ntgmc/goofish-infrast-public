@@ -400,8 +400,8 @@ export default function ConfigEditor({
                 : `${copy.common.components_ConfigEditor_027}${permission ? PERMISSION_LABELS[permission] : copy.common.components_ConfigEditor_029}${copy.common.components_ConfigEditor_028}`)}
           </p>
         </div>
-          {!hidePresetActions && (canEdit || (canSelectPreset && !autoInventoryOnly)) && (
-<PresetActions onSelect={applyPreset} />
+        {!hidePresetActions && (canEdit || canSelectPreset) && (
+          <PresetActions onSelect={applyPreset} autoInventoryOnly={autoInventoryOnly} />
         )}
       </div>
       )}
@@ -429,9 +429,6 @@ export default function ConfigEditor({
             <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_033}</h3>
             <p className="mt-1 text-sm leading-6 text-ink-secondary">
               {copy.common.components_ConfigEditor_034}</p>
-            {!hidePresetActions && canSelectPreset && (
-              <PresetActions onSelect={applyPreset} autoInventoryOnly className="mt-4" />
-            )}
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
                 <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_038}</p>

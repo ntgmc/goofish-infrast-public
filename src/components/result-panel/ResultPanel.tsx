@@ -27,6 +27,7 @@ export default function ResultPanel({
   onSaveWorkfile,
   detailDefaultOpen = false,
   suggestionsSlot,
+  manualPreviewSlot,
   previewLimit,
   manualEditProfile,
 }: ResultPanelProps) {
@@ -84,7 +85,7 @@ export default function ResultPanel({
   const tabs: Array<{ id: ResultTabId; label: string }> = [
     { id: 'board', label: copy.domain.components_result_panel_ResultPanel_017 },
     { id: 'board-v2', label: copy.domain.result_board_v2.tab },
-    ...(canEditManual ? [{ id: 'manual' as const, label: copy.domain.manual_schedule.tab }] : []),
+    ...(canEditManual || manualPreviewSlot ? [{ id: 'manual' as const, label: copy.domain.manual_schedule.tab }] : []),
     { id: 'detail', label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_018 : copy.domain.components_result_panel_ResultPanel_019 },
     { id: 'data' as const, label: copy.domain.components_result_panel_ResultPanel_020 },
     ...(!isPreview ? [{ id: 'import' as const, label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_021 : copy.domain.components_result_panel_ResultPanel_022 }] : []),
@@ -94,7 +95,7 @@ export default function ResultPanel({
     detailDefaultOpen ? 'detail' : 'board',
   )
   const [manualOpened, setManualOpened] = useState(false)
-  const selectedTab = (isPreview && activeTab === 'import') || (activeTab === 'manual' && !canEditManual)
+  const selectedTab = (isPreview && activeTab === 'import') || (activeTab === 'manual' && !canEditManual && !manualPreviewSlot)
       ? 'board'
     : activeTab === 'suggestions' && !suggestionsSlot
       ? fullDataAvailable ? 'data' : 'board'
@@ -254,6 +255,11 @@ export default function ResultPanel({
         </div>
       )}
 
+      {selectedTab === 'manual' && !canEditManual && manualPreviewSlot && (
+        <section id="result-manual-panel" role="tabpanel" aria-labelledby="result-manual-tab" className="tool-panel p-5 sm:p-6">
+          {manualPreviewSlot}
+        </section>
+      )}
       {selectedTab !== 'manual' && <AnimatedPresenceRegion
         motionKey={selectedTab}
         id={`result-${selectedTab}-panel`}

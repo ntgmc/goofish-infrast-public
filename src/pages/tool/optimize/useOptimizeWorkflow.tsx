@@ -187,7 +187,7 @@ export function useOptimizeWorkflow(props: Props) {
 
   const normalizeAllowedConfigOverride = useCallback((nextConfig: LicenseConfig): LicenseConfig => {
       const next = normalizeConfig(nextConfig)
-      if (userCanEditConfig) return next
+      if (userCanEditConfig || isPreviewProfile) return next
   
       const limited = normalizeConfig(baseConfig)
     if (limited.layout === '2-5-2') limited.facility_layout = next.facility_layout?.slice()
@@ -200,7 +200,7 @@ export function useOptimizeWorkflow(props: Props) {
       }
   
       return limited
-    }, [baseConfig, userCanEditConfig, userCanUseIntermediateAutoConfig])
+    }, [baseConfig, isPreviewProfile, userCanEditConfig, userCanUseIntermediateAutoConfig])
 
   const clearConfigValidationToast = useCallback(() => {
       if (configToastTimerRef.current !== null) {

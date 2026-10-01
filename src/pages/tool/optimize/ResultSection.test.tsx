@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -95,8 +95,8 @@ describe('ResultSection compatibility fallback', () => {
   })
 })
 
-describe('ResultSection locked upgrade suggestions', () => {
-  it('shows a blurred framework with purchase and redemption paths for profiles without permission', async () => {
+describe('ResultSection locked capabilities', () => {
+  it.each(['suggestions', 'final', 'history'] as const)('gates manual editing and suggestions in %s results', async (phase) => {
     const user = userEvent.setup()
     const result = {
       author: 'test',
@@ -116,15 +116,19 @@ describe('ResultSection locked upgrade suggestions', () => {
     render(
       <MemoryRouter>
         <ResultSection
-          phase="suggestions"
-          historyItem={null}
+          phase={phase}
+          historyItem={phase === 'history' ? {
+            id: 'preview-history', name: result.title, created_at: '2026-10-01T00:00:00Z',
+            config: null, result, operator_count: 0, source: 'generated',
+          } : null}
           currentResult={result}
-          finalResult={null}
+          finalResult={result}
           operators={[]}
           suggestions={[]}
           loading={false}
           progress={null}
           previewProfile
+          manualEditProfile={{ id: 'preview', kind: 'free_preview', permission: 'advanced' }}
           canViewUpgradeSuggestions={false}
           upgradeCdk=""
           upgradeLoading={false}
@@ -141,6 +145,14 @@ describe('ResultSection locked upgrade suggestions', () => {
     expect(screen.getByText('需要高级版 CDK 权限')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '购买高级版 CDK' })).toHaveAttribute('href', '/pricing')
     expect(screen.getByRole('link', { name: '兑换 CDK' })).toHaveAttribute('href', '/tool/redeem')
-    expect(document.querySelector('[data-locked-suggestions-preview]')).toHaveAttribute('aria-hidden', 'true')
+    expect(document.querySelector('[data-locked-capability-preview]')).toHaveAttribute('aria-hidden', 'true')
+    await user.click(screen.getByRole('tab', { name: '手动排班' }))
+    const panel = within(screen.getByRole('tabpanel', { name: '手动排班' }))
+    expect(panel.getByRole('heading', { name: '解锁手动排班' })).toBeInTheDocument()
+    expect(panel.getByText('需要高级版 CDK 权限')).toBeInTheDocument()
+    expect(panel.getByRole('link', { name: '购买高级版 CDK' })).toHaveAttribute('href', '/pricing')
+    expect(panel.getByRole('link', { name: '兑换 CDK' })).toHaveAttribute('href', '/tool/redeem')
+    expect(panel.queryByRole('button', { name: '保存本地草稿' })).not.toBeInTheDocument()
+    expect(localStorage.getItem('manual-schedule:preview')).toBeNull()
   })
 })
