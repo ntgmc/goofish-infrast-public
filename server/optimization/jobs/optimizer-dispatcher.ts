@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { ScenarioComparisonResult } from '../../../src/lib/scenario-comparison'
 import type { OptimizeResult } from '../../../src/lib/types'
+import { getUpgradePaybackDays } from '../../../src/lib/upgrade-suggestion-roi'
 import { attachTrainingCostsToUpgradeSuggestions } from '../../handlers/training-cost'
 import type { OptimizeJobRecord } from '../../storage/optimize-job-store'
 import { getProfileById } from '../../storage/user-store'
@@ -80,7 +81,10 @@ async function enrichScheduleTrainingCosts(
   })
   return {
     ...resultWithSuggestionIds,
-    upgrade_suggestions: enriched as typeof suggestions,
+    upgrade_suggestions: (enriched as typeof suggestions).map((suggestion) => suggestion.roi ? {
+      ...suggestion,
+      roi: { ...suggestion.roi, payback_days: getUpgradePaybackDays(suggestion) },
+    } : suggestion),
   }
 }
 

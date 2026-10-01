@@ -8,6 +8,7 @@ import type {
   UpgradeTrainingMaterial,
 } from '../lib/types'
 import { getUpgradeSuggestionId } from '../lib/upgrade-suggestion-id'
+import { getUpgradePaybackDays } from '../lib/upgrade-suggestion-roi'
 import { copy, CURRENT_LOCALE } from '../copy/index'
 import { PRODUCT_LABELS } from './result-panel/labels'
 
@@ -232,7 +233,7 @@ function MetricGrid({ suggestion, cost }: { suggestion: UpgradeSuggestion; cost?
       : { label: copy.optimize.components_UpgradeSuggestions_025, value: formatSignedSanity(roi?.daily_sanity_gain), tone: 'success' as const },
     orundumRoi
       ? { label: copy.optimize.components_UpgradeSuggestions_026, value: `${formatSignedAmount(orundumRoi.opportunity_cost_delta)}${copy.optimize.components_UpgradeSuggestions_027}`, tone: 'warning' as const }
-      : { label: copy.optimize.components_UpgradeSuggestions_028, value: formatPayback(roi?.payback_days), tone: 'warning' as const },
+      : { label: copy.optimize.components_UpgradeSuggestions_028, value: formatPayback(getUpgradePaybackDays(suggestion)), tone: 'warning' as const },
     { label: copy.optimize.components_UpgradeSuggestions_029, value: formatSanity(totalSanity), tone: 'default' as const },
     { label: copy.optimize.components_UpgradeSuggestions_030, value: formatSanity(missingSanity), tone: 'default' as const },
     { label: copy.optimize.components_UpgradeSuggestions_031, value: getStockLabel(cost), tone: isStockEnough(cost) ? 'success' as const : 'default' as const },
@@ -416,10 +417,10 @@ function compareSuggestions(left: UpgradeSuggestion, right: UpgradeSuggestion, m
   if (mode === 'stock') {
     return Number(isStockEnough(right.training_cost)) - Number(isStockEnough(left.training_cost))
       || compareNullableAsc(left.training_cost?.missing.equivalent_sanity, right.training_cost?.missing.equivalent_sanity)
-      || compareNullableAsc(left.roi?.payback_days, right.roi?.payback_days)
+      || compareNullableAsc(getUpgradePaybackDays(left), getUpgradePaybackDays(right))
       || leftIndex - rightIndex
   }
-  return compareNullableAsc(left.roi?.payback_days, right.roi?.payback_days)
+  return compareNullableAsc(getUpgradePaybackDays(left), getUpgradePaybackDays(right))
     || compareEconomicGain(left, right)
     || leftIndex - rightIndex
 }

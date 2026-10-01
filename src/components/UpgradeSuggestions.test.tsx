@@ -3,7 +3,7 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { UpgradeSuggestion, UpgradeTrainingCostBucket } from '../lib/types'
+import type { UpgradeSuggestion, UpgradeTrainingCost, UpgradeTrainingCostBucket } from '../lib/types'
 import UpgradeSuggestions from './UpgradeSuggestions'
 
 const emptyBucket = (): UpgradeTrainingCostBucket => ({
@@ -16,6 +16,36 @@ const emptyBucket = (): UpgradeTrainingCostBucket => ({
 afterEach(cleanup)
 
 describe('UpgradeSuggestions', () => {
+  it.each([
+    ['available', 1727, 18.9, '约 91.4 天'],
+    ['available', 0, 18.9, '0 天'],
+    ['partial', 0, 18.9, '暂不可算'],
+    ['unavailable', 0, 18.9, '暂不可算'],
+    ['available', null, 18.9, '暂不可算'],
+    ['available', -1, 18.9, '暂不可算'],
+    ['available', 1727, 0, '暂不可算'],
+    ['available', 1727, -1, '暂不可算'],
+    ['available', 1727, null, '暂不可算'],
+    ['available', 1727, Number.POSITIVE_INFINITY, '暂不可算'],
+  ] as const)('recalculates payback for %s costs, %s missing sanity and %s daily gain', (status, missing, gain, expected) => {
+    const item = paybackSuggestion('巫恋 + 柏喙 + 龙舌兰', missing, gain)
+    item.training_cost!.status = status
+    renderComponent([item])
+    const metric = screen.getByText('预计回本').parentElement!
+    expect(within(metric).getByText(expected)).toBeInTheDocument()
+  })
+
+  it('sorts by recalculated payback instead of stale optimizer values', async () => {
+    const user = userEvent.setup()
+    const slow = paybackSuggestion('慢回本', 100, 10)
+    const fast = paybackSuggestion('快回本', 100, 20)
+    fast.roi!.payback_days = 99
+    renderComponent([slow, fast])
+    expect(within(screen.getAllByRole('article')[0]).getByText('快回本')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '材料已够' }))
+    expect(within(screen.getAllByRole('article')[0]).getByText('快回本')).toBeInTheDocument()
+  })
+
   it('shows partial warnings and never labels incomplete costs as stocked', async () => {
     const user = userEvent.setup()
     renderComponent([suggestion('upgrade-a', '干员 A', true)])
@@ -119,6 +149,28 @@ function renderComponent(suggestions: UpgradeSuggestion[]) {
 
 function baseProps() {
   return {}
+}
+
+function paybackSuggestion(name: string, missing: number | null, gain: number | null): UpgradeSuggestion {
+  const cost: UpgradeTrainingCost = {
+    status: 'available',
+    totals: { ...emptyBucket(), equivalent_sanity: 8912 },
+    available: { ...emptyBucket(), equivalent_sanity: 6591 },
+    missing: { ...emptyBucket(), equivalent_sanity: missing },
+    equivalent_sanity: 8912,
+    unpriced_items: [],
+    sources: {
+      skland: 'ok', yituliu: 'fresh', pricing_snapshot_id: null, pricing_fetched_at: null,
+      pricing_age_ms: null, valuation_version: null, lmd_exp: 'fixed_lmd_trade_gold_net_exp_36_per_10000',
+    },
+    warnings: [],
+    operators: [],
+  }
+  return {
+    ...suggestion(name, name),
+    training_cost: cost,
+    roi: { efficiency_gain: 1, daily_sanity_gain: gain, payback_days: 0, payback_basis: 'missing_sanity' },
+  }
 }
 
 function suggestion(id: string, name: string, partial = false): UpgradeSuggestion {
