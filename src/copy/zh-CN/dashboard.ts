@@ -1,4 +1,16 @@
 export const dashboardCopy = {
+  workspace_entry: {
+    prompt_title: "下次直接进入这个游戏账号？",
+    prompt_body: "你当前只使用一个游戏账号。启用后，进入工具时会直接打开工作区设置；仍可返回账号列表管理账号，也可在账户设置中关闭。",
+    enable: "启用并进入工作区",
+    snooze: "7 天内不再提醒",
+    never: "不再提示",
+    settings_title: "默认进入方式",
+    setting_label: "只有一个游戏账号时，直接进入工作区设置",
+    setting_help: "仅在能确定唯一游戏账号时生效，同一 UID 优先使用可用的付费档案。返回账号列表仍可管理账号。此设置仅保存在当前浏览器。",
+    unavailable: "有唯一且可用的游戏账号时，可以启用此设置；多个档案需全部绑定同一 UID。",
+    storage_error: "无法在当前浏览器保存设置，请允许网站存储后重试。",
+  },
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
   pages_tool_dashboard_AnnouncementsSection_001: "暂时无法加载公告，请稍后重试。",
   // src/pages/tool/dashboard/AnnouncementsSection.tsx

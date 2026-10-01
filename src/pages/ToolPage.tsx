@@ -16,6 +16,7 @@ import {
 import AccountDashboard from './tool/AccountDashboard'
 import AuthPage from './tool/AuthPage'
 import ProfileUpgradePrompt from './tool/ProfileUpgradePrompt'
+import { useWorkspaceEntryPreference, WorkspaceEntryPrompt } from './tool/WorkspaceEntryPreference'
 import WorkspaceSetupPage from './tool/WorkspaceSetupPage'
 import { isSchedulableProfile } from './tool/tool-utils'
 import { useToolSession } from './tool/useToolSession'
@@ -76,6 +77,9 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
     persistWorkspacePatch,
     handleLogout,
   } = useToolSession(requestedProfileId)
+  const workspaceEntry = useWorkspaceEntryPreference(
+    user?.id ?? null, cdkProfiles, activeProfile, authStatus === 'authenticated', features.profiles,
+  )
 
   if (!route) return <Navigate to={profileScopedPath(fallbackToolPath(location.pathname), requestedProfileId)} replace />
 
@@ -158,9 +162,11 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
                 .catch(console.error)
             }}
             features={features}
+            workspaceEntry={workspaceEntry}
           />
         </NotificationCenterProvider>
         {profileUpgradePrompt}
+        {route.section === 'profiles' && <WorkspaceEntryPrompt entry={workspaceEntry} />}
       </>
     )
   }
