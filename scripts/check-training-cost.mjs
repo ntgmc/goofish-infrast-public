@@ -301,6 +301,48 @@ if (eliteOutOfRange.status !== 'unavailable' || eliteOutOfRange.operators[0]?.er
   throw new Error('elite phase overflow must be unavailable instead of a zero-cost available result')
 }
 
+for (const characterCost of [{}, { evolvePhaseCost: [] }, { evolvePhaseCost: [{}] }]) {
+  for (const stocked of [false, true]) {
+    const cashOnlyPromotion = training.calculateEliteTrainingCostForTest({
+      target: { id: 'char_test_a', name: '测试干员A', currentElite: 0, targetElite: 1 },
+      operators,
+      calInfo,
+      calPlayer: {
+        items: stocked ? [{ id: '4001', count: 23947 }, { id: '2004', count: 9 }] : [],
+        characters: [{ id: 'char_test_a', evolvePhase: 0, level: 1 }],
+      },
+      characterCost,
+      pricing: priced,
+    })
+    if (cashOnlyPromotion.status !== 'available' || cashOnlyPromotion.operators[0]?.status !== 'complete'
+      || cashOnlyPromotion.operators[0]?.error_code || cashOnlyPromotion.warnings.length !== 0) {
+      throw new Error('three-star promotion without material details must have complete costs and no warnings')
+    }
+    if (cashOnlyPromotion.totals.cash !== 23947 || cashOnlyPromotion.totals.exp !== 16400
+      || cashOnlyPromotion.totals.materials.length !== 0) {
+      throw new Error('three-star E0 level 1 to E1 must include only leveling and promotion LMD/EXP costs')
+    }
+    if (cashOnlyPromotion.missing.cash !== (stocked ? 0 : 23947)
+      || cashOnlyPromotion.missing.exp !== (stocked ? 0 : 16400)
+      || cashOnlyPromotion.missing.materials.length !== 0) {
+      throw new Error('three-star promotion must deduct LMD/EXP inventory without requiring materials')
+    }
+  }
+}
+
+const missingFirstPromotionMaterials = training.calculateEliteTrainingCostForTest({
+  target: { id: 'char_test_a', name: '测试干员A', currentElite: 0, targetElite: 1 },
+  operators: [{ ...operators[0], rarity: 3 }],
+  calInfo,
+  calPlayer: { items: [], characters: [{ id: 'char_test_a', evolvePhase: 0, level: 1 }] },
+  characterCost: {},
+  pricing: priced,
+})
+if (missingFirstPromotionMaterials.status !== 'partial'
+  || missingFirstPromotionMaterials.operators[0]?.error_code !== 'missing_promotion_materials') {
+  throw new Error('four-star promotion without material details must keep the aggregate cost partial')
+}
+
 const missingPromotionMaterials = training.calculateEliteTrainingCostForTest({
   target: { id: 'char_test_b', name: '测试干员B', currentElite: 1, targetElite: 2 },
   operators,
