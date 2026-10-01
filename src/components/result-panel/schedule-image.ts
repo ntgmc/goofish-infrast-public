@@ -56,6 +56,7 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
   const avatarSize = version === 'v1' ? 48 : 72
   const tileWidth = avatarSize + 24
   const tilesPerRow = Math.floor((CARD_WIDTH - 32) / tileWidth)
+  const headerTextWidth = (CARD_WIDTH - 100) / 2
   const allText = plans.flatMap((plan) => plan.rows.map((row) => `${row.label} ${row.operatorText}`)).join(' ')
   if (document.fonts) await document.fonts.load(`500 ${FONT_SIZE}px ${fontFamily}`, `${title} ${allText}`)
   const images = new Map(await Promise.all([...new Set(plans.flatMap((plan) =>
@@ -76,10 +77,11 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
     return output
   }
 
-  function text(value: string, x: number, y: number, width: number, color: string, size = FONT_SIZE, weight = 500): number {
+  function text(value: string, x: number, y: number, width: number, color: string, size = FONT_SIZE, weight = 500, align: CanvasTextAlign = 'left'): number {
     const wrapped = lines(value, width, size, weight)
     context!.fillStyle = color
     context!.textBaseline = 'top'
+    context!.textAlign = align
     wrapped.forEach((line, index) => context!.fillText(line, x, y + index * (size + 6)))
     return wrapped.length * (size + 6)
   }
@@ -98,8 +100,8 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
   }
 
   function cardHeight(card: ImageCard): number {
-    return 40 + lines(card.title, CARD_WIDTH - 80, 16, 600).length * 22
-      + (card.product === '-' ? 0 : lines(card.product, CARD_WIDTH - 32, 12).length * 18)
+    return 40 + Math.max(lines(card.title, headerTextWidth, 16, 600).length,
+      card.product === '-' ? 0 : lines(card.product, headerTextWidth, 16, 600).length) * 22
       + card.slots.reduce((height, slot) => height + slotHeight(slot), 0)
   }
 
@@ -158,9 +160,9 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
     if (section.cards.length === 0) y += 36
     for (let index = 0; index < section.cards.length; index += 2) {
       const pair = section.cards.slice(index, index + 2)
-      const heights = pair.map(cardHeight)
-      pair.forEach((card, column) => placements.push({ card, x: MARGIN + column * (CARD_WIDTH + GAP), y, height: heights[column] }))
-      y += Math.max(...heights) + GAP
+      const cardSize = Math.max(...pair.map(cardHeight))
+      pair.forEach((card, column) => placements.push({ card, x: MARGIN + column * (CARD_WIDTH + GAP), y, height: cardSize }))
+      y += cardSize + GAP
     }
     y += 24
   }
@@ -188,7 +190,10 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
     context.stroke()
     context.fillStyle = tone
     context.fillRect(x + 16, cardY + 16, 3, 20)
-    let rowY = cardY + 16 + text(card.title, x + 28, cardY + 16, CARD_WIDTH - 80, colors.text, 16, 600) + 8
+    const titleHeight = text(card.title, x + 28, cardY + 16, headerTextWidth, colors.text, 16, 600)
+    const productHeight = card.product === '-' ? 0
+      : text(card.product, x + CARD_WIDTH - 16 - (card.droneLabels.length > 0 ? 40 : 0), cardY + 16, headerTextWidth, tone, 16, 600, 'right')
+    let rowY = cardY + 16 + Math.max(titleHeight, productHeight) + 8
     if (card.droneLabels.length > 0) {
       context.strokeStyle = colors.brand
       context.lineWidth = 2
@@ -205,11 +210,10 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
       }
       context.lineWidth = 1
     }
-    if (card.product !== '-') rowY += text(card.product, x + 16, rowY, CARD_WIDTH - 32, tone, 12) + 8
     for (const slot of card.slots) {
       const row = slot.row
       text(slot.label, x + 16, rowY, CARD_WIDTH - 140, colors.muted, 12)
-      if (!manual && row && !row.isAutofill && row.efficiency !== '-') text(row.efficiency, x + CARD_WIDTH - 112, rowY, 96, tone, 16, 600)
+      if (!manual && row && !row.isAutofill && row.efficiency !== '-') text(row.efficiency, x + CARD_WIDTH - 16, rowY, 96, tone, 16, 600, 'right')
       const startY = rowY
       rowY += 28
       if (!row || row.isAutofill || row.operators.length === 0) {
@@ -219,7 +223,8 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
           const operators = row.operators.slice(index, index + tilesPerRow)
           let nameHeight = 0
           operators.forEach((operator, column) => {
-            const tileX = x + 16 + column * tileWidth
+            const centerX = x + CARD_WIDTH / 2 + (column - (operators.length - 1) / 2) * tileWidth
+            const tileX = centerX - avatarSize / 2
             context.save()
             context.beginPath()
             context.roundRect(tileX, rowY, avatarSize, avatarSize, 6)
@@ -229,10 +234,10 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
             else {
               context.fillStyle = colors.background
               context.fillRect(tileX, rowY, avatarSize, avatarSize)
-              text(operator.name.trim().slice(0, 1) || '?', tileX + avatarSize / 3, rowY + avatarSize / 3, avatarSize, colors.muted, 20)
+              text(operator.name.trim().slice(0, 1) || '?', centerX, rowY + avatarSize / 3, avatarSize, colors.muted, 20, 500, 'center')
             }
             context.restore()
-            nameHeight = Math.max(nameHeight, text(operator.name, tileX, rowY + avatarSize + 8, tileWidth - 8, colors.text, 12))
+            nameHeight = Math.max(nameHeight, text(operator.name, centerX, rowY + avatarSize + 8, tileWidth - 8, colors.text, 12, 500, 'center'))
           })
           rowY += avatarSize + 8 + nameHeight + 12
         }

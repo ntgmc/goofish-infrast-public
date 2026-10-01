@@ -5,7 +5,9 @@ import { prepareResult } from './formatters'
 import { downloadScheduleImage, renderScheduleImage } from './schedule-image'
 
 const drawnText = vi.fn()
+const drawnTextStyle = vi.fn()
 const drawnImage = vi.fn()
+const drawnRoundRect = vi.fn()
 const encoded = vi.fn()
 let imageRequests: string[] = []
 let dimensions = { width: 0, height: 0 }
@@ -13,10 +15,13 @@ let dimensions = { width: 0, height: 0 }
 beforeEach(() => {
   vi.clearAllMocks()
   imageRequests = []
+  drawnText.mockImplementation(function (this: CanvasRenderingContext2D, value: string) {
+    drawnTextStyle(value, this.font, this.textAlign)
+  })
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
     measureText: (value: string) => ({ width: [...value].length * 8 }),
     fillText: drawnText, drawImage: drawnImage,
-    scale: vi.fn(), fillRect: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(),
+    scale: vi.fn(), fillRect: vi.fn(), beginPath: vi.fn(), roundRect: drawnRoundRect,
     fill: vi.fn(), stroke: vi.fn(), save: vi.fn(), clip: vi.fn(), restore: vi.fn(),
     moveTo: vi.fn(), lineTo: vi.fn(), arc: vi.fn(),
   } as unknown as CanvasRenderingContext2D)
@@ -62,6 +67,48 @@ describe('schedule image exports', () => {
     expect(dimensions.height).toBeGreaterThan(0)
     expect(dimensions.width * dimensions.height).toBeLessThanOrEqual(16_000_000)
     expect(prepared.plans).toHaveLength(3)
+  })
+
+  it.each(['v1', 'v2'] as const)('aligns production headers and efficiency with compact centered portraits in %s', async (version) => {
+    const { result, operators } = schedule()
+    result.plans = [{
+      name: 'day',
+      rooms: {
+        manufacture: [{ operators: ['shared', 'trade1', 'trade2'], product: 'Pure Gold', efficiency: 200 }],
+        power: [{ operators: ['shared'], efficiency: 20 }],
+      },
+    }]
+    const prepared = prepareResult(result, false, false, operators)
+    const manufacture = prepared.plans[0].rows.find((row) => row.roomType === 'manufacture')!
+    await renderScheduleImage({ prepared, version, title: result.title, isRotationMode: false })
+
+    const cards = drawnRoundRect.mock.calls.filter(([, , width]) => width > 100)
+    expect(cards).toHaveLength(2)
+    expect(cards[0][1]).toBe(cards[1][1])
+    expect(cards[0][3]).toBe(cards[1][3])
+    const title = drawnText.mock.calls.find(([value]) => value === manufacture.label)!
+    const product = drawnText.mock.calls.find(([value]) => value === manufacture.product)!
+    expect(product[2]).toBe(title[2])
+    expect(product[1]).toBeGreaterThan(title[1])
+    const productStyle = drawnTextStyle.mock.calls.find(([value]) => value === manufacture.product)!
+    expect(productStyle[1]).toContain('16px')
+    expect(productStyle[2]).toBe('right')
+
+    const efficiency = drawnText.mock.calls.find(([value]) => value === manufacture.efficiency)!
+    expect(efficiency[1]).toBe(cards[0][0] + cards[0][2] - 16)
+    expect(drawnTextStyle.mock.calls.find(([value]) => value === manufacture.efficiency)?.[2]).toBe('right')
+    const portraits = drawnImage.mock.calls.map(([, x, y, width]) => ({ center: x + width / 2, y }))
+    expect(portraits).toHaveLength(4)
+    expect(portraits.every((portrait) => portrait.y === portraits[0].y)).toBe(true)
+    expect(efficiency[2]).toBeLessThan(portraits[0].y)
+    expect(portraits[1].center - portraits[0].center).toBeCloseTo(portraits[2].center - portraits[1].center)
+    expect(portraits[1].center - portraits[0].center - drawnImage.mock.calls[0][3]).toBeLessThanOrEqual(24)
+    expect(portraits[1].center).toBe(cards[0][0] + cards[0][2] / 2)
+    expect(portraits[3].center).toBe(cards[1][0] + cards[1][2] / 2)
+    for (const [index, name] of ['shared', 'trade1', 'trade2'].entries()) {
+      expect(drawnText.mock.calls.find(([value]) => value === name)?.[1]).toBe(portraits[index].center)
+      expect(drawnTextStyle.mock.calls.find(([value]) => value === name)?.[2]).toBe('center')
+    }
   })
 
   it('retains names when portraits fail and excludes rotation dormitories and legacy Fiammetta targets', async () => {
