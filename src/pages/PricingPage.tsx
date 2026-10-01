@@ -72,9 +72,14 @@ export default function PricingPage() {
           <div className="mt-10 flex flex-col gap-8">
             <section aria-labelledby="single-account-pricing-title">
               <h2 id="single-account-pricing-title" className="text-xl font-semibold text-ink-primary">{copy.public.pages_PricingPage_012}</h2>
-              <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="mt-7 grid grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2 xl:grid-cols-4">
                 {cdkPlans.map((plan) => (
-                  <article key={plan.id} className="tool-panel flex min-w-0 flex-col p-5" aria-labelledby={`${plan.id}-title`}>
+                  <article key={plan.id} className="tool-panel relative flex min-w-0 flex-col p-5 pt-7" aria-labelledby={`${plan.id}-title`}>
+                    {(plan.id === 'single_account_monthly' || plan.id === 'single_account_lifetime') && (
+                      <span className={`absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-brand-500/50 px-3 py-1 text-xs font-semibold shadow-sm ${plan.id === 'single_account_lifetime' ? 'bg-brand-500 text-white' : 'bg-surface-1 text-brand-400'}`}>
+                        {plan.id === 'single_account_monthly' ? copy.public.pricing_recommendation_monthly : copy.public.pricing_recommendation_lifetime}
+                      </span>
+                    )}
                     <span className="text-xs text-ink-muted">{plan.badge}</span>
                     <h3 id={`${plan.id}-title`} className="mt-2 break-words text-lg font-semibold text-ink-primary">{formatPlanTerm(plan.label)}</h3>
                     <p className="mt-5 break-words text-xl font-semibold text-brand-400 tabular-nums">{plan.display_price}</p>
@@ -94,6 +99,19 @@ export default function PricingPage() {
                 ))}
               </div>
               <p className="mt-5 border-t border-surface-3 pt-4 text-sm leading-6 text-ink-muted">{copy.public.pages_PricingPage_016}</p>
+              <aside className="mt-5 rounded-lg border border-brand-500/25 bg-brand-500/5 p-5" aria-labelledby="lifetime-upgrade-title">
+                <h3 id="lifetime-upgrade-title" className="font-semibold text-ink-primary">{copy.public.pricing_upgrade_title}</h3>
+                <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.public.pricing_upgrade_description(pricing.lifetime_upgrade.service_fee)}</p>
+                <p className="mt-2 text-sm leading-6 text-ink-muted">{copy.public.pricing_upgrade_process}</p>
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                  <Link to="/support" className="tool-secondary-action justify-center">{copy.public.pricing_upgrade_contact}</Link>
+                  {pricing.lifetime_upgrade.purchase_url ? (
+                    <a href={pricing.lifetime_upgrade.purchase_url} target="_blank" rel="noopener noreferrer" className="tool-primary-action justify-center">{copy.public.pricing_upgrade_purchase}</a>
+                  ) : (
+                    <button type="button" disabled className="tool-primary-action justify-center disabled:cursor-not-allowed disabled:opacity-50">{copy.public.pricing_upgrade_unavailable}</button>
+                  )}
+                </div>
+              </aside>
             </section>
             <article className="border-t border-surface-3 pt-6 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:gap-8" aria-labelledby="free-preview-pricing-title">
               <div>

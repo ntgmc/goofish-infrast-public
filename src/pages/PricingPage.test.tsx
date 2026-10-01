@@ -23,6 +23,30 @@ afterEach(() => {
 })
 
 describe('PricingPage', () => {
+  it('uses the configured manual upgrade listing and disables it when cleared', () => {
+    const content = cloneDefaultPublicContentSettings()
+    content.pricing.lifetime_upgrade = { purchase_url: 'https://example.com/lifetime-upgrade', service_fee: '5 元' }
+    vi.spyOn(publicContentContext, 'usePublicContent').mockReturnValue({
+      content,
+      status: 'ready',
+      isFallback: false,
+      refresh: async () => undefined,
+    })
+
+    const { rerender } = render(<MemoryRouter><PricingPage /></MemoryRouter>)
+    const link = screen.getByRole('link', { name: '前往闲鱼补差价' })
+    expect(link).toHaveAttribute('href', 'https://example.com/lifetime-upgrade')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(screen.getByText(/另收 5 元手续费/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '联系客服确认补款' })).toHaveAttribute('href', '/support')
+
+    content.pricing.lifetime_upgrade.purchase_url = ''
+    rerender(<MemoryRouter><PricingPage /></MemoryRouter>)
+    expect(screen.queryByRole('link', { name: '前往闲鱼补差价' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '升级商品待上架' })).toBeDisabled()
+  })
+
   it('disables unconfigured purchases without using the global purchase URL', () => {
     render(<MemoryRouter><PricingPage /></MemoryRouter>)
     const buttons = screen.getAllByRole('button', { name: '暂未开放购买' })

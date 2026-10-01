@@ -426,6 +426,14 @@ export const publicCopy = {
     single_account_lifetime: "购买终身卡",
   },
   pricing_purchase_unavailable: "暂未开放购买",
+  pricing_recommendation_monthly: "尝鲜首选",
+  pricing_recommendation_lifetime: "最多人选",
+  pricing_upgrade_title: "补差价升级终身卡",
+  pricing_upgrade_description: (serviceFee: string) => `30 天、90 天和 365 天维护卡均可升级为同一游戏账号的终身卡。补款按终身卡当前售价减原订单实付金额计算，另收 ${serviceFee}手续费。`,
+  pricing_upgrade_process: "先联系客服核对原订单和补款金额，再到闲鱼拍下升级商品。付款后，客服会为原游戏账号升级权限。",
+  pricing_upgrade_contact: "联系客服确认补款",
+  pricing_upgrade_purchase: "前往闲鱼补差价",
+  pricing_upgrade_unavailable: "升级商品待上架",
   // src/pages/PricingPage.tsx
   pages_PricingPage_016: "仅限一个游戏 UID；按所选期限有效，不支持自行更换游戏账号。",
   // src/pages/PricingPage.tsx

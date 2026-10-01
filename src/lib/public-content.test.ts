@@ -9,6 +9,35 @@ import {
 } from './public-content'
 
 describe('public content settings', () => {
+  it('adds manual lifetime upgrade defaults to existing settings without replacing custom content', () => {
+    const legacy = cloneDefaultPublicContentSettings()
+    delete (legacy.pricing as Partial<typeof legacy.pricing>).lifetime_upgrade
+    legacy.qq_group.number = '123456789'
+
+    expect(resolvePublicContentSettings(legacy)).toMatchObject({
+      isFallback: false,
+      content: {
+        qq_group: { number: '123456789' },
+        pricing: { lifetime_upgrade: { purchase_url: '', service_fee: '3 元' } },
+      },
+    })
+  })
+
+  it('validates and trims the manual lifetime upgrade listing and fee', () => {
+    const draft = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
+    draft.pricing.lifetime_upgrade = { purchase_url: ' https://example.com/upgrade ', service_fee: ' 3.50 元 ' }
+    expect(parsePublicContentDraft(draft).pricing.lifetime_upgrade).toEqual({
+      purchase_url: 'https://example.com/upgrade',
+      service_fee: '3.50 元',
+    })
+
+    draft.pricing.lifetime_upgrade.purchase_url = 'javascript:alert(1)'
+    expect(() => parsePublicContentDraft(draft)).toThrow()
+    draft.pricing.lifetime_upgrade.purchase_url = ''
+    draft.pricing.lifetime_upgrade.service_fee = '-3 元'
+    expect(() => parsePublicContentDraft(draft)).toThrow()
+  })
+
   it('updates legacy preset and manual schedule defaults while preserving custom comparison copy', () => {
     const legacy = cloneDefaultPublicContentSettings()
     const legacyRecord = legacy as unknown as { defaults_revision: number }

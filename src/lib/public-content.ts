@@ -201,6 +201,10 @@ export const publicContentDraftSchema = z.strictObject({
     title: text(80),
     intro: text(1000),
     plans: pricingPlansSchema,
+    lifetime_upgrade: z.strictObject({
+      purchase_url: optionalHttpsUrl,
+      service_fee: pricingPriceLabel.default(copy.publicContent.default_lifetime_upgrade_fee),
+    }).default({ purchase_url: '', service_fee: copy.publicContent.default_lifetime_upgrade_fee }),
     policy_heading: text(120),
     disclosures: z.array(text(500)).max(PUBLIC_CONTENT_LIMITS.pricingDisclosures),
     comparison_heading: text(120),
@@ -275,6 +279,7 @@ export const DEFAULT_PUBLIC_CONTENT_DRAFT: PublicContentDraftV1 = {
       single_account_annual: { ...defaultPricingPlans.single_account_annual },
       single_account_lifetime: { ...defaultPricingPlans.single_account_lifetime },
     },
+    lifetime_upgrade: { purchase_url: '', service_fee: copy.publicContent.default_lifetime_upgrade_fee },
     policy_heading: copy.public.pages_PricingPage_006,
     disclosures: [...productPolicies.public_disclosures],
     comparison_heading: copy.public.pages_PricingPage_007,
