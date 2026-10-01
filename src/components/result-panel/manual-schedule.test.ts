@@ -2,13 +2,32 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { LicenseOperator, OptimizeResult } from '../../lib/types'
 import {
-  changeManualDrone, changeManualOperator, createManualPlans, manualResult, parseManualDraft,
+  changeManualDrone, changeManualOperator, createManualPlans, fillManualDormitories, manualResult, parseManualDraft,
   readManualDraft, saveManualDraft, validateManualPlans,
 } from '../../lib/manual-schedule'
 
 afterEach(() => localStorage.clear())
 
 describe('manual schedule validation and storage', () => {
+  it('fills empty dormitory slots while preserving occupants and rejecting conflicts', () => {
+    const withDorm = structuredClone(source)
+    withDorm.plans[0].rooms.dormitory = [{ operators: ['D'] }]
+    const base = createManualPlans(withDorm)
+    base[0].rooms.manufacture[0] = ['', '', '']
+    base[0].rooms.dormitory[0] = ['D', '', 'C', '', '']
+    const additions = [{ shift_index: 0, room_index: 0, operator: 'B' }]
+    const resting = changeManualOperator(withDorm, base, operators, 0, 'trading', 0, 1, '')
+    const filled = fillManualDormitories(withDorm, resting, operators, additions)
+    expect(filled[0].rooms.dormitory[0]).toEqual(['D', 'B', 'C', '', ''])
+    expect(resting[0].rooms.dormitory[0]).toEqual(['D', '', 'C', '', ''])
+    expect(filled[0].rooms.trading).toEqual(resting[0].rooms.trading)
+    expect(() => fillManualDormitories(withDorm, filled, operators, additions)).toThrow()
+    expect(() => fillManualDormitories(withDorm, resting, operators, [{ ...additions[0], operator: 'locked' }])).toThrow()
+    expect(() => fillManualDormitories(withDorm, resting, operators, [{ ...additions[0], operator: 'unowned' }])).toThrow()
+    expect(() => fillManualDormitories(withDorm, resting, operators, [{ ...additions[0], room_index: 9 }])).toThrow()
+    const automatic = { ...withDorm, dormitory_rule: 'maa_pure_autofill' }
+    expect(() => fillManualDormitories(automatic, createManualPlans(automatic), operators, additions)).toThrow()
+  })
   it('swaps assigned operators and moves into empty positions without modifying the source', () => {
     const original = JSON.stringify(source)
     const base = createManualPlans(source)

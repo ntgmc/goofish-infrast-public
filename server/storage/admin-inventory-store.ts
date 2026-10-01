@@ -3,6 +3,8 @@ import type { PoolClient } from 'pg'
 import {
   ITEM_ICON_PATHS,
   normalizeExpiryPolicy,
+  normalizeGiftPackOpeningRule,
+  type GiftPackOpeningRule,
   type GiftPackContentInput,
   type GiftPackVersion,
   type ItemDefinition,
@@ -25,7 +27,7 @@ export async function getAdminInventoryOverview(): Promise<Record<string, unknow
   const [definitions, versions, tasks, campaigns, audits, users] = await Promise.all([
     query<ItemDefinition>("select * from item_definitions where code <> 'reorder_check_coupon' order by system_owned desc, created_at asc, code asc"),
     query<{ id: string; item_code: string; version: number; status: GiftPackVersion['status']; created_at: string; published_at: string | null; contents: GiftPackContentInput[] }>(
-      `select version.id, version.item_code, version.version, version.status, version.created_at, version.published_at,
+      `select version.id, version.item_code, version.version, version.status, version.created_at, version.published_at, version.opening_rule,
               coalesce(jsonb_agg(jsonb_build_object(
                 'item_code', content.item_code,
                 'quantity', content.quantity,
@@ -80,16 +82,19 @@ export async function getAdminInventoryOverview(): Promise<Record<string, unknow
 
 export async function createCustomGiftPack(
   adminUsername: string,
-  input: { name: unknown; description: unknown; icon_key?: unknown; contents: unknown; idempotencyKey?: string },
+  input: { name: unknown; description: unknown; icon_key?: unknown; contents: unknown; opening_rule?: unknown; publish?: boolean; idempotencyKey?: string },
 ): Promise<Record<string, unknown>> {
   const name = requireString(input.name, 1, 80, '礼包名称')
   const description = requireString(input.description, 1, 500, '礼包描述')
   const iconKey = typeof input.icon_key === 'string' && input.icon_key.trim() ? input.icon_key.trim() : 'generic_gift_pack'
   if (!ITEM_ICON_PATHS[iconKey]) throw new InventoryError('icon_key_invalid', '只能选择受控的本地图标。', 400)
   const contents = normalizeContents(input.contents)
+  const openingRule = requireOpeningRule(input.opening_rule, contents.length)
   return withTransaction(async (client) => {
     const operation = await beginAdminOperation(client, adminUsername, input.idempotencyKey ?? randomUUID(), 'create_gift_pack', {
       name, description, icon_key: iconKey, contents,
+      ...(openingRule.mode !== 'all' && { opening_rule: openingRule }),
+      ...(input.publish && { publish: true }),
     })
     if (operation.replayedResponse) return operation.replayedResponse
     await assertGiftContents(client, contents)
@@ -108,8 +113,10 @@ export async function createCustomGiftPack(
       [versionId, itemCode, now],
     )
     await replaceGiftContents(client, versionId, contents)
-    await audit(client, adminUsername, 'create_gift_pack', 'item', itemCode, '创建自定义礼包草稿。', null, { name, description, version_id: versionId }, now)
-    const response = { item_code: itemCode, version_id: versionId, version: 1, status: 'draft' }
+    await saveGiftOpeningRule(client, versionId, openingRule, input.publish ?? false, now)
+    if (input.publish) await client.query('update item_definitions set issuance_enabled = true where code = $1', [itemCode])
+    await audit(client, adminUsername, 'create_gift_pack', 'item', itemCode, input.publish ? '创建并发布礼包或宝箱。' : '创建自定义礼包草稿。', null, { name, description, version_id: versionId, opening_rule: openingRule, status: input.publish ? 'published' : 'draft' }, now)
+    const response = { item_code: itemCode, version_id: versionId, version: 1, status: input.publish ? 'published' : 'draft' }
     await completeAdminOperation(client, operation.id, response, now)
     return response
   })
@@ -120,11 +127,15 @@ export async function createGiftPackDraft(
   itemCode: string,
   contentsValue: unknown,
   idempotencyKey = randomUUID(),
+  options: { opening_rule?: unknown; publish?: boolean } = {},
 ): Promise<Record<string, unknown>> {
   const contents = normalizeContents(contentsValue)
+  const openingRule = requireOpeningRule(options.opening_rule, contents.length)
   return withTransaction(async (client) => {
     const operation = await beginAdminOperation(client, adminUsername, idempotencyKey, 'create_gift_pack_version', {
       item_code: itemCode, contents,
+      ...(openingRule.mode !== 'all' && { opening_rule: openingRule }),
+      ...(options.publish && { publish: true }),
     })
     if (operation.replayedResponse) return operation.replayedResponse
     const item = await client.query<{ kind: string }>('select kind from item_definitions where code = $1 for update', [itemCode])
@@ -143,8 +154,10 @@ export async function createGiftPackDraft(
       [versionId, itemCode, nextVersion, now],
     )
     await replaceGiftContents(client, versionId, contents)
-    await audit(client, adminUsername, 'create_gift_pack_version', 'gift_pack_version', versionId, '创建礼包新版本草稿。', null, { item_code: itemCode, version: nextVersion }, now)
-    const response = { item_code: itemCode, version_id: versionId, version: nextVersion, status: 'draft' }
+    await saveGiftOpeningRule(client, versionId, openingRule, options.publish ?? false, now)
+    if (options.publish) await client.query('update item_definitions set issuance_enabled = true, updated_at = $2 where code = $1', [itemCode, now])
+    await audit(client, adminUsername, 'create_gift_pack_version', 'gift_pack_version', versionId, options.publish ? '创建并发布礼包或宝箱新版本。' : '创建礼包新版本草稿。', null, { item_code: itemCode, version: nextVersion, opening_rule: openingRule, status: options.publish ? 'published' : 'draft' }, now)
+    const response = { item_code: itemCode, version_id: versionId, version: nextVersion, status: options.publish ? 'published' : 'draft' }
     await completeAdminOperation(client, operation.id, response, now)
     return response
   })
@@ -583,6 +596,21 @@ async function reverseCampaignBatch(campaignId: string, limit: number): Promise<
     if (Number(left.rows[0]?.count ?? 0) === 0) await client.query("update inventory_distribution_campaigns set status = 'reversed', updated_at = $2 where id = $1", [campaignId, now])
     return recipients.rows.length
   })
+}
+
+function requireOpeningRule(value: unknown, contentCount: number): GiftPackOpeningRule {
+  const rule = normalizeGiftPackOpeningRule(value, contentCount)
+  if (!rule || contentCount === 0) throw new InventoryError('gift_pack_opening_invalid', '请添加奖励，并将领取项数设为 1 到奖励种类数之间的整数。', 400)
+  return rule
+}
+
+async function saveGiftOpeningRule(client: PoolClient, versionId: string, rule: GiftPackOpeningRule, publish: boolean, now: string): Promise<void> {
+  await client.query(
+    `update gift_pack_versions set opening_rule = $2::jsonb,
+       status = case when $3 then 'published' else 'draft' end,
+       published_at = case when $3 then $4::timestamptz else null end where id = $1`,
+    [versionId, JSON.stringify(rule), publish, now],
+  )
 }
 
 function normalizeContents(value: unknown): GiftPackContentInput[] {

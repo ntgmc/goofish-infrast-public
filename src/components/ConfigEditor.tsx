@@ -383,7 +383,7 @@ export default function ConfigEditor({
   return (
 <section className={`config-editor ${embedded ? '' : 'tool-panel p-5 sm:p-6'}`}>
       {!hideHeader && (
-<div className="config-editor-header flex flex-col gap-4 border-b border-surface-3/60 pb-5 lg:flex-row lg:items-start lg:justify-between">
+<div className="config-editor-header flex flex-col gap-4 border-b border-surface-3/60 pb-5">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold text-ink-primary">{copy.common.components_ConfigEditor_021}</h2>

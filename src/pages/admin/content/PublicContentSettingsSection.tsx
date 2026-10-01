@@ -413,6 +413,12 @@ function PricingEditor({ settings, edit }: { settings: PublicContentSettingsV1; 
           })}
         </div>
       </EditorPanel>
+      <EditorPanel title={copy.publicContent.admin_lifetime_upgrade} description={copy.publicContent.admin_lifetime_upgrade_description}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextField path="pricing.lifetime_upgrade.service_fee" id="lifetime-upgrade-service-fee" label={copy.publicContent.admin_lifetime_upgrade_service_fee} value={settings.pricing.lifetime_upgrade.service_fee} maxLength={40} onChange={(value) => edit((next) => { next.pricing.lifetime_upgrade.service_fee = value })} />
+          <TextField path="pricing.lifetime_upgrade.purchase_url" id="lifetime-upgrade-purchase-url" label={copy.publicContent.admin_lifetime_upgrade_purchase_url} value={settings.pricing.lifetime_upgrade.purchase_url} maxLength={2048} type="url" required={false} onChange={(value) => edit((next) => { next.pricing.lifetime_upgrade.purchase_url = value })} />
+        </div>
+      </EditorPanel>
       <EditorPanel title={copy.publicContent.admin_disclosures} description={copy.publicContent.admin_list_order_help} action={<CollectionAddAction path="pricing.disclosures" count={settings.pricing.disclosures.length} limit={PUBLIC_CONTENT_LIMITS.pricingDisclosures} label={copy.publicContent.admin_add_disclosure} onAdd={addDisclosure} />}>
         <TextField path="pricing.policy_heading" id="pricing-policy-heading" label={copy.publicContent.admin_policy_heading} value={settings.pricing.policy_heading} maxLength={120} onChange={(value) => edit((next) => { next.pricing.policy_heading = value })} />
         <div className="mt-4">

@@ -60,6 +60,7 @@ export default function InventorySection({
   const [category, setCategory] = useState<Category>('all')
   const [search, setSearch] = useState('')
   const [profileId, setProfileId] = useState('')
+  const [selectedRewardCodes, setSelectedRewardCodes] = useState<string[]>([])
   const [lifetimeDisplayName, setLifetimeDisplayName] = useState('')
   const [lifetimeNote, setLifetimeNote] = useState('')
   const [loading, setLoading] = useState(true)
@@ -70,6 +71,7 @@ export default function InventorySection({
   const [lifetimeDialogOpen, setLifetimeDialogOpen] = useState(false)
   const selectedTriggerRef = useRef<HTMLButtonElement | null>(null)
   const itemIdempotencyKeyRef = useRef(crypto.randomUUID())
+  const pendingItemKeysRef = useRef(new Map<string, string>())
   const { features } = useSiteFeatures()
 
   const load = useCallback(async () => {
@@ -101,6 +103,16 @@ export default function InventorySection({
 
   const runItemAction = async () => {
     if (!selected) return
+    const request = {
+      item_code: selected.item.code,
+      quantity: 1,
+      ...(profileId && { profile_id: profileId }),
+      ...(selected.gift_pack_version_id && { gift_pack_version_id: selected.gift_pack_version_id }),
+      ...(selected.gift_pack?.opening_rule.mode === 'choice' && { selected_item_codes: [...selectedRewardCodes].sort() }),
+    }
+    const requestJson = JSON.stringify(request)
+    const idempotencyKey = pendingItemKeysRef.current.get(requestJson) ?? crypto.randomUUID()
+    pendingItemKeysRef.current.set(requestJson, idempotencyKey)
     setBusy(true)
     setError(null)
     setNotice(null)
@@ -108,14 +120,11 @@ export default function InventorySection({
       const response = await apiJson<UseResponse>('/api/user/inventory', {
         method: 'POST',
         json: {
-          item_code: selected.item.code,
-          quantity: 1,
-          ...(profileId && { profile_id: profileId }),
-          ...(selected.gift_pack_version_id && { gift_pack_version_id: selected.gift_pack_version_id }),
-          idempotency_key: itemIdempotencyKeyRef.current,
+          ...request,
+          idempotency_key: idempotencyKey,
         },
       })
-      itemIdempotencyKeyRef.current = crypto.randomUUID()
+      pendingItemKeysRef.current.delete(requestJson)
       setRewards(response.rewards)
       if (isLimitedProfileUseResponse(response)) {
         const activatedProfile = response.auth.profiles.find((profile) => profile.id === response.profile_id)
@@ -192,7 +201,7 @@ export default function InventorySection({
   if (loading && !inventory) return <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.inventory.loading}</div>
 
   const selectedCapacity = selected ? capacityForItem(selected.item.code, profileId, inventory?.capacities ?? []) : null
-  const canUseSelected = selected?.item.kind === 'gift_pack'
+  const canUseSelected = (selected?.item.kind === 'gift_pack' && (selected.gift_pack?.opening_rule.mode !== 'choice' || selectedRewardCodes.length === selected.gift_pack.opening_rule.count))
     || selected?.actions.includes('bind')
     || (selected?.item.kind === 'license_voucher' && selected.actions.includes('use'))
     || (selected?.item.kind === 'capacity_upgrade' && Boolean(selectedCapacity) && selectedCapacity!.limit < selectedCapacity!.maximum)
@@ -267,7 +276,7 @@ export default function InventorySection({
         ) : (
           <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {filtered.map((stack) => (
-              <button key={stack.stack_id} type="button" onClick={(event) => { selectedTriggerRef.current = event.currentTarget; setSelected(stack); setProfileId(''); setLifetimeDisplayName(''); setLifetimeNote('') }} className="tool-inset min-w-0 p-4 text-left transition hover:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
+            <button key={stack.stack_id} type="button" onClick={(event) => { selectedTriggerRef.current = event.currentTarget; setSelected(stack); setSelectedRewardCodes([]); setProfileId(''); setLifetimeDisplayName(''); setLifetimeNote('') }} className="tool-inset min-w-0 p-4 text-left transition hover:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
                 <img src={itemIconPath(stack.item.icon_key)} onError={fallbackItemIcon} alt="" width={64} height={64} className="mx-auto h-16 w-16 object-contain" />
                 <strong className="mt-3 block truncate text-sm text-ink-primary">{stack.item.name}</strong>
                 <span className="mt-1 block text-xs text-ink-secondary">{copy.inventory.quantity} × {stack.quantity}</span>
@@ -305,7 +314,19 @@ export default function InventorySection({
                 </select>
                 {selectedCapacity && <div className="tool-inset mt-3 grid grid-cols-3 gap-2 p-3 text-center text-xs"><span>{copy.inventory.current}<strong className="mt-1 block text-sm">{selectedCapacity.limit}</strong></span><span>{copy.inventory.after_use}<strong className="mt-1 block text-sm">{Math.min(selectedCapacity.maximum, selectedCapacity.limit + 1)}</strong></span><span>{copy.inventory.maximum}<strong className="mt-1 block text-sm">{selectedCapacity.maximum}</strong></span></div>}
               </>}
-              {selected.actions.includes('context_only') && <div className="tool-alert mt-5">{copy.inventory.context_only}</div>}
+            {selected.gift_pack && <fieldset className="tool-inset mt-5 space-y-3 p-4" disabled={busy}>
+              <legend className="px-1 text-sm font-semibold text-ink-primary">{selected.gift_pack.opening_rule.mode === 'choice' ? copy.inventory.chest_choice(selected.gift_pack.opening_rule.count) : selected.gift_pack.opening_rule.mode === 'random' ? copy.inventory.chest_random(selected.gift_pack.opening_rule.count) : copy.inventory.chest_all}</legend>
+              {selected.gift_pack.contents.map((reward) => <label key={reward.item_code} className="flex items-center gap-3 text-sm text-ink-secondary">
+                {selected.gift_pack!.opening_rule.mode === 'choice' && <input type="checkbox" checked={selectedRewardCodes.includes(reward.item_code)} disabled={!selectedRewardCodes.includes(reward.item_code) && selectedRewardCodes.length >= selected.gift_pack!.opening_rule.count} onChange={(event) => {
+                  const checked = event.currentTarget.checked
+                  setSelectedRewardCodes((current) => checked ? [...current, reward.item_code] : current.filter((code) => code !== reward.item_code))
+                }} />}
+                <img src={itemIconPath(reward.icon_key)} onError={fallbackItemIcon} alt="" width={36} height={36} className="h-9 w-9 object-contain" />
+                <span>{reward.name} × {reward.quantity} · {reward.expiry.mode === 'never' ? copy.inventory.permanent : copy.inventory.chest_reward_expiry(reward.expiry.days)}</span>
+              </label>)}
+              {selected.gift_pack.opening_rule.mode === 'choice' && <p role="status" className="text-xs text-ink-muted">{copy.inventory.chest_selected(selectedRewardCodes.length, selected.gift_pack.opening_rule.count)}</p>}
+            </fieldset>}
+            {selected.actions.includes('context_only') && <div className="tool-alert mt-5">{copy.inventory.context_only}</div>}
               {selected.item.code === 'lifetime_profile_voucher' && <>
                 <div className="tool-alert mt-5">{copy.inventory.lifetime_use_help}</div>
                 <div className="tool-inset mt-4 space-y-3 p-4">
@@ -329,7 +350,7 @@ export default function InventorySection({
                 <button type="button" disabled={busy || !canUseSelected} onClick={() => { setSelected(null); setLifetimeDialogOpen(true) }} className="tool-primary-action">
                   {copy.inventory.bind_and_use}
                 </button>
-              </> : !selected.actions.includes('context_only') && <button type="button" disabled={busy || !canUseSelected} onClick={() => void runItemAction()} className="tool-primary-action">{busy ? copy.inventory.processing : selected.item.kind === 'gift_pack' ? copy.inventory.open : copy.inventory.use}</button>}
+              </> : !selected.actions.includes('context_only') && <button type="button" disabled={busy || !canUseSelected} onClick={() => void runItemAction()} className="tool-primary-action">{busy ? copy.inventory.processing : selected.item.kind === 'gift_pack' ? selected.gift_pack && selected.gift_pack.opening_rule.mode !== 'all' ? copy.inventory.open_chest : copy.inventory.open : copy.inventory.use}</button>}
             </div>
           </>}
         </DialogContent>

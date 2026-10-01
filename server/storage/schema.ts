@@ -1947,6 +1947,8 @@ CREATE TABLE IF NOT EXISTS gift_pack_versions (
   UNIQUE (item_code, version)
 );
 
+ALTER TABLE gift_pack_versions ADD COLUMN IF NOT EXISTS opening_rule JSONB NOT NULL DEFAULT '{"mode":"all"}'::jsonb;
+
 CREATE TABLE IF NOT EXISTS gift_pack_version_contents (
   gift_pack_version_id TEXT NOT NULL REFERENCES gift_pack_versions(id) ON DELETE CASCADE,
   item_code TEXT NOT NULL REFERENCES item_definitions(code) ON DELETE RESTRICT,

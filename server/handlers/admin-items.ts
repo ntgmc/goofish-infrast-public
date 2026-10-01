@@ -41,7 +41,7 @@ export default async function adminItemsHandler(req: Request): Promise<Response>
         }), 201)
       }
       if (body.action === 'create_gift_pack_version') {
-        return jsonResponse(await createGiftPackDraft(authentication.username, body.item_code, body.contents, body.idempotency_key), 201)
+        return jsonResponse(await createGiftPackDraft(authentication.username, body.item_code, body.contents, body.idempotency_key, body), 201)
       }
       if (body.action === 'publish_gift_pack_version') {
         await publishGiftPackVersion(authentication.username, requireValue(body.version_id, '缺少礼包版本。'))

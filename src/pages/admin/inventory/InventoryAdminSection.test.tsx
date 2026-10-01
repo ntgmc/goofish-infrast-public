@@ -61,6 +61,32 @@ afterEach(() => {
 })
 
 describe('InventoryAdminSection', () => {
+  it.each(['random', 'choice'])('publishes a %s chest with multiple rewards from one form', async (mode) => {
+    const user = userEvent.setup()
+    render(<InventoryAdminSection />)
+    await user.click(await screen.findByRole('tab', { name: /礼包管理/ }))
+    const form = screen.getByText('创建礼包或宝箱').closest('form') as HTMLFormElement
+    const fields = within(form)
+    await user.type(fields.getByLabelText('礼包名称'), '多选宝箱')
+    await user.type(fields.getByLabelText('说明'), '领取两种奖励')
+    await user.selectOptions(fields.getByLabelText('选择要添加的道具'), 'plan_capacity_certificate')
+    await user.click(fields.getByRole('button', { name: '添加道具' }))
+    await user.selectOptions(fields.getByLabelText('奖励方式'), mode)
+    const count = fields.getByRole('spinbutton', { name: /每次领取项数/ })
+    await user.clear(count)
+    await user.type(count, '3')
+    expect(fields.getByRole('button', { name: '创建并发布' })).toBeDisabled()
+    await user.clear(count)
+    await user.type(count, '2')
+    await user.click(fields.getByRole('button', { name: '创建并发布' }))
+    await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/items', expect.objectContaining({
+      json: expect.objectContaining({ action: 'create_gift_pack', opening_rule: { mode, count: 2 }, publish: true, contents: expect.arrayContaining([
+        expect.objectContaining({ item_code: 'priority_compute_coupon' }),
+        expect.objectContaining({ item_code: 'plan_capacity_certificate' }),
+      ]) }),
+    })))
+  })
+
   it('splits the management workflow into accessible tabs', async () => {
     const user = userEvent.setup()
     render(<InventoryAdminSection />)
@@ -68,14 +94,14 @@ describe('InventoryAdminSection', () => {
     expect(await screen.findByRole('tabpanel', { name: '道具目录' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /道具目录/ })).toHaveClass('bg-brand-500', 'text-primary-foreground')
     expect(screen.getByText('维护系统道具的展示信息和发放状态')).toHaveClass('text-primary-foreground/80')
-    expect(screen.queryByText('创建自定义礼包')).not.toBeInTheDocument()
+    expect(screen.queryByText('创建礼包或宝箱')).not.toBeInTheDocument()
     expect(screen.queryByText('单用户发放')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('tab', { name: /礼包管理/ }))
     expect(screen.getByRole('tab', { name: /道具目录/ })).not.toHaveClass('bg-brand-500')
     expect(screen.getByRole('tab', { name: /礼包管理/ })).toHaveClass('bg-brand-500', 'text-primary-foreground')
     expect(screen.getByRole('tabpanel', { name: '礼包管理' })).toBeInTheDocument()
-    expect(screen.getByText('创建自定义礼包')).toBeInTheDocument()
+    expect(screen.getByText('创建礼包或宝箱')).toBeInTheDocument()
     expect(screen.queryByText(/内容 JSON|奖励 JSON/)).not.toBeInTheDocument()
     expect(screen.queryByText('道具目录', { selector: 'h3' })).not.toBeInTheDocument()
   })
@@ -86,7 +112,7 @@ describe('InventoryAdminSection', () => {
     await screen.findByRole('tab', { name: /礼包管理/ })
     await user.click(screen.getByRole('tab', { name: /礼包管理/ }))
 
-    const createForm = screen.getByText('创建自定义礼包').closest('form')
+    const createForm = screen.getByText('创建礼包或宝箱').closest('form')
     expect(createForm).not.toBeNull()
     const form = within(createForm as HTMLFormElement)
     await user.type(form.getByLabelText('礼包名称'), '测试礼包')
@@ -189,7 +215,7 @@ describe('InventoryAdminSection', () => {
     await screen.findByRole('tab', { name: /礼包管理/ })
     await user.click(screen.getByRole('tab', { name: /礼包管理/ }))
 
-    const createForm = screen.getByText('创建自定义礼包').closest('form')
+    const createForm = screen.getByText('创建礼包或宝箱').closest('form')
     expect(createForm).not.toBeNull()
     const selector = within(createForm as HTMLFormElement).getByLabelText('选择要添加的道具')
     expect(within(selector).queryByRole('option', { name: /新人补给包/ })).not.toBeInTheDocument()

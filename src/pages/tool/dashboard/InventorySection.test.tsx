@@ -76,6 +76,47 @@ afterEach(() => {
 })
 
 describe('InventorySection idempotent item use', () => {
+  it('requires the configured number of choices and reuses the request after a lost chest response', async () => {
+    const chest: InventoryResponse = { ...inventory, stacks: [{
+      ...inventory.stacks[0],
+      stack_id: 'chest:chest-v1',
+      item: { ...inventory.stacks[0].item, code: 'chest', name: '自选宝箱', kind: 'gift_pack', effect_code: 'open_gift_pack' },
+      gift_pack_version_id: 'chest-v1',
+      actions: ['open'],
+      gift_pack: {
+        opening_rule: { mode: 'choice', count: 2 },
+        contents: [
+          { item_code: 'priority_compute_coupon', name: '优先计算券', icon_key: 'placeholder', quantity: 3, expiry: { mode: 'never' } },
+          { item_code: 'training_diagnosis_coupon', name: '培养诊断券', icon_key: 'placeholder', quantity: 2, expiry: { mode: 'relative_days', days: 7 } },
+          { item_code: 'plan_capacity_certificate', name: '方案扩容证', icon_key: 'placeholder', quantity: 1, expiry: { mode: 'never' } },
+        ],
+      },
+    }] }
+    const requests: ItemUseRequest[] = []
+    mocks.apiJson.mockImplementation(async (path: string, options?: { json?: ItemUseRequest }) => {
+      if (path === '/api/user/onboarding-tasks') return { tasks: [] }
+      if (!options?.json) return chest
+      requests.push(options.json)
+      if (requests.length === 1) throw new Error('response lost')
+      return { rewards: [] }
+    })
+    const user = userEvent.setup()
+    render(<InventorySection onPayload={vi.fn()} />)
+    await user.click(await screen.findByRole('button', { name: /自选宝箱/ }))
+    const open = screen.getByRole('button', { name: '开启宝箱' })
+    expect(open).toBeDisabled()
+    await user.click(screen.getByRole('checkbox', { name: /优先计算券/ }))
+    expect(open).toBeDisabled()
+    await user.click(screen.getByRole('checkbox', { name: /培养诊断券/ }))
+    expect(screen.getByRole('checkbox', { name: /方案扩容证/ })).toBeDisabled()
+    await user.click(open)
+    await screen.findByText('response lost')
+    await user.click(open)
+    await waitFor(() => expect(requests).toHaveLength(2))
+    expect(requests[0]).toEqual(requests[1])
+    expect(requests[0].selected_item_codes).toEqual(['priority_compute_coupon', 'training_diagnosis_coupon'])
+  })
+
   it('uses the local dialog contract and restores item focus on Escape', async () => {
     mocks.apiJson.mockImplementation(async (path: string) => {
       if (path === '/api/user/onboarding-tasks') return { tasks: [] }

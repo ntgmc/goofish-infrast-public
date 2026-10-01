@@ -12,11 +12,12 @@ import { ROOM_LABELS } from './labels'
 import { operatorBuildingSkills } from './building-skills'
 import ResultMetrics from './ResultMetrics'
 import ResultDetail from './ResultDetail'
+import ManualMoodSummary from './ManualMoodSummary'
 import { getOptimizePollRetryDelayMs } from '../../lib/optimize-poll'
 import { submitOptimizationJob } from '../../pages/tool/optimize/optimization-api'
 import { fetchOptimizeJobSnapshotStatus, isOptimizeJobPollCancelled, isRetryableOptimizePollError, waitForOptimizePoll } from '../../pages/tool/optimize/job-progress'
 import {
-  changeManualDrone, changeManualOperator, createManualPlans, lockedManualOperators, manualResult,
+  changeManualDrone, changeManualOperator, createManualPlans, fillManualDormitories, lockedManualOperators, manualResult,
   manualSourceKey, parseManualDraft, readManualDraft, saveManualDraft, type ManualDraft, type ManualPlan,
 } from '../../lib/manual-schedule'
 
@@ -76,11 +77,11 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
     setNotice(null)
   }, [operators])
 
-  async function simulate() {
+  async function simulate(submittedPlans = plans) {
     if (!simulationBaseline || simulationLock.current) return
     simulationLock.current = true
     const run = ++simulationRun.current
-    const submittedKey = canonicalJson({ plans, operators })
+    const submittedKey = canonicalJson({ plans: submittedPlans, operators })
     const isCancelled = () => simulationRun.current !== run
     setSimulating(true)
     setError(null)
@@ -89,7 +90,7 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
       const accepted = await submitOptimizationJob({
         kind: 'schedule', identity: { type: 'profile', profileId },
         operators, config: simulationBaseline.config, includeUpgradeSuggestions: false,
-        manualSchedule: { baselineHistoryId: simulationBaseline.id, plans },
+        manualSchedule: { baselineHistoryId: simulationBaseline.id, plans: submittedPlans },
       }, label.simulation_failed)
       let failures = 0
       while (!isCancelled()) {
@@ -118,6 +119,18 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
         simulationLock.current = false
         setSimulating(false)
       }
+    }
+  }
+
+  function fillDormitories() {
+    const additions = simulation?.mood_simulation?.dormitory_recovery?.additions
+    if (!additions?.length || simulationLock.current) return
+    try {
+      const next = fillManualDormitories(source, plans, operators, additions)
+      update(next)
+      void simulate(next)
+    } catch {
+      setError(label.invalid_edit)
     }
   }
 
@@ -228,14 +241,15 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
         </div>
         <p className="text-xs leading-5 text-ink-muted">{label.storage_hint}</p>
         {!simulationBaseline && <p className="text-sm text-ink-muted">{label.simulation_baseline_required}</p>}
+        {!simulation && source.schedule_mode !== 'rotation' && source.dormitory_rule !== 'maa_pure_autofill' &&
+          <p className="text-sm text-ink-muted">{label.dormitory_pending}</p>}
         {dirty && <p className="text-sm text-warning" role="status">{label.unsaved}</p>}
         {notice && <p className="text-sm text-success" role="status">{notice}</p>}
       </div>
       {error && <p className="tool-alert tool-alert--warning p-3 text-sm" role="alert">{error}</p>}
       {simulation && <ResultMetrics isRotationMode={source.schedule_mode === 'rotation'} prepared={prepared} />}
-      {simulation?.mood_simulation && <p className={`tool-alert p-4 text-sm ${simulation.mood_simulation.valid ? 'tool-alert--success' : 'tool-alert--warning'}`} role="status">
-        {simulation.mood_simulation.valid ? label.mood_stable : label.mood_warning}
-      </p>}
+      {simulation?.mood_simulation && <ManualMoodSummary result={simulation} activePlan={activePlan}
+        onPlanChange={setActivePlan} onFill={fillDormitories} filling={simulating || busy} />}
       {simulation && <details className="tool-panel p-4">
         <summary className="cursor-pointer text-sm font-semibold">{label.simulation_details}</summary>
         <ResultDetail isRotationMode={source.schedule_mode === 'rotation'} prepared={prepared} planTimes={source.planTimes} />

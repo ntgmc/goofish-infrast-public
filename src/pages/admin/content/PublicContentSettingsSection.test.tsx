@@ -11,6 +11,35 @@ vi.mock('../../../lib/admin-api-client', () => ({ adminApiJson }))
 import PublicContentSettingsSection from './PublicContentSettingsSection'
 
 describe('PublicContentSettingsSection', () => {
+  it('publishes the manual lifetime upgrade listing and service fee', async () => {
+    const user = userEvent.setup()
+    render(<PublicContentSettingsSection />)
+    await screen.findByRole('heading', { name: '公开内容管理' })
+    await user.click(screen.getByRole('tab', { name: '价格与权益' }))
+    await user.clear(screen.getByLabelText(/升级手续费/))
+    await user.type(screen.getByLabelText(/升级手续费/), '5 元')
+    const purchaseUrl = screen.getByLabelText('升级商品链接')
+    expect(purchaseUrl).not.toBeRequired()
+    await user.click(purchaseUrl)
+    await user.paste(' https://example.com/lifetime-upgrade ')
+    adminApiJson.mockImplementation(async (_url: string, init: { json: Record<string, unknown> }) => ({
+      settings: { ...cloneDefaultPublicContentSettings(), ...init.json, revision: 4 },
+    }))
+
+    await user.click(screen.getByRole('button', { name: '保存并发布' }))
+    await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/public-content', expect.objectContaining({
+      method: 'PUT',
+      json: expect.objectContaining({
+        expected_revision: 3,
+        pricing: expect.objectContaining({
+          lifetime_upgrade: { purchase_url: 'https://example.com/lifetime-upgrade', service_fee: '5 元' },
+        }),
+      }),
+    })))
+    expect(screen.getByLabelText('升级商品链接')).toHaveValue('https://example.com/lifetime-upgrade')
+    expect(screen.getByLabelText(/升级手续费/)).toHaveValue('5 元')
+  })
+
   it('publishes independent plan purchase URLs and allows clearing a link', async () => {
     const user = userEvent.setup()
     render(<PublicContentSettingsSection />)

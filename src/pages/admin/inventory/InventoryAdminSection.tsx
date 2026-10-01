@@ -8,7 +8,7 @@ import {
   type AdminInventoryOverview as Overview,
 } from '../../../lib/admin-inventory-contracts'
 import { itemIconPath } from '../../../lib/inventory-contracts'
-import type { ExpiryPolicy, GiftPackContentInput, ItemDefinition, OnboardingTaskCode } from '../../../lib/inventory-contracts'
+import type { ExpiryPolicy, GiftPackContentInput, GiftPackOpeningRule, ItemDefinition, OnboardingTaskCode } from '../../../lib/inventory-contracts'
 import { AdminToast } from '../shared/AdminToast'
 
 type AdminTab = 'catalog' | 'packs' | 'onboarding' | 'distribution' | 'audit'
@@ -20,7 +20,7 @@ const DEFAULT_CONTENTS: GiftPackContentInput[] = [
 
 const ADMIN_TABS: Array<{ id: AdminTab; label: string; description: string }> = [
   { id: 'catalog', label: '道具目录', description: '维护系统道具的展示信息和发放状态' },
-  { id: 'packs', label: '礼包管理', description: '创建礼包并管理不可变内容版本' },
+  { id: 'packs', label: '礼包管理', description: '配置礼包、随机宝箱和自选宝箱' },
   { id: 'onboarding', label: '新人任务', description: '配置三项固定引导任务及奖励' },
   { id: 'distribution', label: '发放中心', description: '单用户、批量发放与批次撤回' },
   { id: 'audit', label: '操作审计', description: '查看最近的后台道具操作' },
@@ -45,6 +45,7 @@ export default function InventoryAdminSection() {
   const [giftName, setGiftName] = useState('')
   const [giftDescription, setGiftDescription] = useState('')
   const [contents, setContents] = useState<GiftPackContentInput[]>(initialContents)
+  const [openingRule, setOpeningRule] = useState<GiftPackOpeningRule>({ mode: 'all' })
   const [taskCode, setTaskCode] = useState<OnboardingTaskCode>('welcome_inventory')
   const [taskDrafts, setTaskDrafts] = useState<Partial<Record<OnboardingTaskCode, TaskDraft>>>({})
   const [itemCode, setItemCode] = useState('priority_compute_coupon')
@@ -63,6 +64,7 @@ export default function InventoryAdminSection() {
   const [editItemIssuance, setEditItemIssuance] = useState(true)
   const [versionItemCode, setVersionItemCode] = useState('')
   const [versionContents, setVersionContents] = useState<GiftPackContentInput[]>(initialContents)
+  const [versionOpeningRule, setVersionOpeningRule] = useState<GiftPackOpeningRule>({ mode: 'all' })
   const [lastGrantId, setLastGrantId] = useState<string | null>(null)
   const pendingIdempotencyRef = useRef(new Map<string, { requestJson: string; key: string }>())
 
@@ -135,6 +137,11 @@ export default function InventoryAdminSection() {
     [data],
   )
   const selectedItem = data?.definitions.find((item) => item.code === itemCode)
+  useEffect(() => {
+    if (selectedItem?.kind !== 'gift_pack' || giftVersionId) return
+    const latest = publishedVersions.filter((version) => version.item_code === itemCode).sort((left, right) => right.version - left.version)[0]
+    if (latest) setGiftVersionId(latest.id)
+  }, [giftVersionId, itemCode, publishedVersions, selectedItem?.kind])
   const userIds = [...new Set(targetUsers.split(/[\s,]+/).filter(Boolean))]
   const selectedTask = data?.tasks.find((task) => task.task_code === taskCode)
   const selectedTaskDraft = taskDrafts[taskCode] ?? {
@@ -152,7 +159,7 @@ export default function InventoryAdminSection() {
       <section className="tool-panel p-5 sm:p-6">
         <p className="tool-eyebrow">统一道具系统</p>
         <h2 className="mt-2 text-xl font-semibold text-ink-primary">道具与礼包</h2>
-        <p className="mt-2 max-w-4xl text-sm leading-6 text-ink-secondary">系统效果代码不可编辑，礼包和新人任务发布后会保留固定版本。当前图标使用受控占位图，更换图标时需更新图标键映射。</p>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-ink-secondary">选择道具并设置数量、有效期即可发放。礼包支持全部领取，宝箱支持随机或自选多项奖励；发布后可用于邀请奖励和新人任务。</p>
         {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error}</div>}
         {notice && <AdminToast message={notice} onDismiss={() => setNotice(null)} />}
       </section>
@@ -179,8 +186,8 @@ export default function InventoryAdminSection() {
         <h3 className="text-base font-semibold text-ink-primary">道具目录</h3>
         <div className="mt-4 overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="text-ink-muted"><tr><th className="p-2">代码</th><th className="p-2">名称</th><th className="p-2">类型</th><th className="p-2">效果</th><th className="p-2">发放状态</th></tr></thead>
-            <tbody>{data.definitions.map((item) => <tr key={item.code} className="border-t border-surface-3"><td className="p-2 font-mono text-xs">{item.code}</td><td className="p-2">{item.name}</td><td className="p-2">{item.kind}</td><td className="p-2 font-mono text-xs">{item.effect_code}</td><td className="p-2">{item.issuance_enabled ? '允许' : '停用'}</td></tr>)}</tbody>
+            <thead className="text-ink-muted"><tr><th className="p-2">道具</th><th className="p-2">类型</th><th className="p-2">用途</th><th className="p-2">发放状态</th><th className="p-2">操作</th></tr></thead>
+            <tbody>{data.definitions.map((item) => <tr key={item.code} className="border-t border-surface-3"><td className="p-2">{item.name}</td><td className="p-2">{itemKindLabel(item.kind)}</td><td className="p-2">{item.description}</td><td className="p-2">{item.issuance_enabled ? '允许' : '停用'}</td><td className="p-2"><button type="button" className="tool-secondary-action" onClick={() => setEditItemCode(item.code)}>编辑</button></td></tr>)}</tbody>
           </table>
         </div>
         <form className="mt-5 grid gap-3 border-t border-surface-3 pt-5 lg:grid-cols-2" onSubmit={(event) => {
@@ -204,33 +211,50 @@ export default function InventoryAdminSection() {
       {activeTab === 'packs' && <section id="inventory-admin-panel-packs" role="tabpanel" aria-labelledby="inventory-admin-tab-packs" className="grid gap-5 xl:grid-cols-2">
         <form className="tool-panel p-5" onSubmit={(event) => {
           event.preventDefault()
+          const publish = (event.nativeEvent as SubmitEvent).submitter?.getAttribute('value') !== 'draft'
           void run('/api/admin/items', {
             action: 'create_gift_pack', name: giftName, description: giftDescription,
-            icon_key: 'generic_gift_pack', contents,
-          }, '礼包草稿已创建。', { idempotencyScope: 'create_gift_pack' })
+            icon_key: 'generic_gift_pack', contents, opening_rule: openingRule, publish,
+          }, publish ? '礼包或宝箱已发布，可直接配置为奖励。' : '礼包草稿已创建。', { idempotencyScope: 'create_gift_pack' })
         }}>
-          <h3 className="text-base font-semibold text-ink-primary">创建自定义礼包</h3>
+          <h3 className="text-base font-semibold text-ink-primary">创建礼包或宝箱</h3>
           <Field label="礼包名称"><input className="tool-field mt-2 w-full" value={giftName} onChange={(event) => setGiftName(event.currentTarget.value)} /></Field>
           <Field label="说明"><textarea className="tool-field mt-2 min-h-20 w-full" value={giftDescription} onChange={(event) => setGiftDescription(event.currentTarget.value)} /></Field>
           <RewardListEditor id="new-pack-contents" label="礼包内容" value={contents} definitions={data.definitions} versions={data.gift_pack_versions} allowGiftPacks={false} onChange={setContents} />
-          <button className="tool-primary-action mt-4" disabled={busy || contents.length === 0}>创建草稿</button>
+          <OpeningRuleFields rule={openingRule} contentCount={contents.length} onChange={setOpeningRule} />
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button className="tool-primary-action" disabled={busy || !validOpeningRule(openingRule, contents.length)}>创建并发布</button>
+            <button value="draft" className="tool-secondary-action" disabled={busy || !validOpeningRule(openingRule, contents.length)}>创建草稿</button>
+          </div>
         </form>
 
         <div className="tool-panel p-5">
           <h3 className="text-base font-semibold text-ink-primary">礼包版本</h3>
           <form className="mt-4 border-b border-surface-3 pb-4" onSubmit={(event) => {
             event.preventDefault()
-            void run('/api/admin/items', { action: 'create_gift_pack_version', item_code: versionItemCode, contents: versionContents }, '礼包新版本草稿已创建。', { idempotencyScope: 'create_gift_pack_version' })
+            const publish = (event.nativeEvent as SubmitEvent).submitter?.getAttribute('value') !== 'draft'
+            void run('/api/admin/items', { action: 'create_gift_pack_version', item_code: versionItemCode, contents: versionContents, opening_rule: versionOpeningRule, publish }, publish ? '新版本已发布。' : '礼包新版本草稿已创建。', { idempotencyScope: 'create_gift_pack_version' })
           }}>
-            <Field label="基于礼包创建新版本"><select className="tool-field mt-2 w-full" value={versionItemCode} onChange={(event) => setVersionItemCode(event.currentTarget.value)}><option value="">请选择礼包</option>{data.definitions.filter((item) => item.kind === 'gift_pack').map((item) => <option key={item.code} value={item.code}>{item.name} · {item.code}</option>)}</select></Field>
+            <Field label="基于礼包创建新版本"><select className="tool-field mt-2 w-full" value={versionItemCode} onChange={(event) => {
+              const code = event.currentTarget.value
+              setVersionItemCode(code)
+              const latest = data.gift_pack_versions.filter((version) => version.item_code === code).sort((left, right) => right.version - left.version)[0]
+              setVersionContents(latest?.contents.map((content) => ({ ...content, expiry: { ...content.expiry } })) ?? initialContents())
+              setVersionOpeningRule(latest?.opening_rule ?? { mode: 'all' })
+            }}><option value="">请选择礼包或宝箱</option>{data.definitions.filter((item) => item.kind === 'gift_pack').map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}</select></Field>
             <RewardListEditor id="new-version-contents" label="新版本内容" value={versionContents} definitions={data.definitions} versions={data.gift_pack_versions} allowGiftPacks={false} onChange={setVersionContents} />
-            <button className="tool-secondary-action mt-3" disabled={busy || !versionItemCode || versionContents.length === 0}>创建新版本草稿</button>
+            <OpeningRuleFields rule={versionOpeningRule} contentCount={versionContents.length} onChange={setVersionOpeningRule} />
+            <div className="mt-3 flex flex-wrap gap-3">
+              <button className="tool-primary-action" disabled={busy || !versionItemCode || !validOpeningRule(versionOpeningRule, versionContents.length)}>发布新版本</button>
+              <button value="draft" className="tool-secondary-action" disabled={busy || !versionItemCode || !validOpeningRule(versionOpeningRule, versionContents.length)}>创建新版本草稿</button>
+            </div>
           </form>
           <div className="mt-4 max-h-[32rem] space-y-3 overflow-y-auto">
             {data.gift_pack_versions.map((version) => <article className="tool-inset p-3" key={version.id}>
               <div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-sm text-ink-primary">{data.definitions.find((item) => item.code === version.item_code)?.name ?? version.item_code} · v{version.version}</strong><span className="text-xs text-ink-muted">{giftVersionStatusLabel(version.status)}</span></div>
               <p className="mt-1 break-all font-mono text-[11px] text-ink-muted">{version.item_code}</p>
               <RewardSummary contents={version.contents} definitions={data.definitions} />
+              <p className="mt-2 text-xs text-ink-secondary">{version.opening_rule.mode === 'all' ? '领取全部奖励' : `${version.opening_rule.mode === 'random' ? '随机获得' : '自行选择'} ${version.opening_rule.count} 项不同奖励`}</p>
               {version.status === 'draft' && <button type="button" className="tool-secondary-action mt-3" disabled={busy} onClick={() => void run('/api/admin/items', { action: 'publish_gift_pack_version', version_id: version.id }, '礼包版本已发布。')}>发布</button>}
               {version.status === 'published' && <button type="button" className="tool-secondary-action mt-3" disabled={busy} onClick={() => void run('/api/admin/items', { action: 'retire_gift_pack_version', version_id: version.id }, '礼包版本已退役。')}>退役</button>}
             </article>)}
@@ -341,6 +365,21 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="mt-3 block text-sm text-ink-secondary"><span className="font-medium">{label}</span>{children}</label>
 }
 
+function validOpeningRule(rule: GiftPackOpeningRule, contentCount: number): boolean {
+  return contentCount > 0 && (rule.mode === 'all' || (Number.isInteger(rule.count) && rule.count >= 1 && rule.count <= contentCount))
+}
+
+function OpeningRuleFields({ rule, contentCount, onChange }: { rule: GiftPackOpeningRule; contentCount: number; onChange: (rule: GiftPackOpeningRule) => void }) {
+  return <div className="mt-4 grid gap-3 sm:grid-cols-2">
+    <Field label="奖励方式"><select className="tool-field mt-2 w-full" value={rule.mode} onChange={(event) => {
+      const mode = event.currentTarget.value as GiftPackOpeningRule['mode']
+      onChange(mode === 'all' ? { mode } : { mode, count: rule.mode === 'all' ? 1 : rule.count })
+    }}><option value="all">礼包：领取全部奖励</option><option value="random">宝箱：随机多选奖励</option><option value="choice">宝箱：自选多选奖励</option></select></Field>
+    {rule.mode !== 'all' && <Field label="每次领取项数"><input className="tool-field mt-2 w-full" type="number" min={1} max={contentCount} value={rule.count} onChange={(event) => onChange({ ...rule, count: Number(event.currentTarget.value) })} /><span className="mt-2 block text-xs">从 {contentCount} 种奖励中领取，每项数量按奖励列表设置，同一项只领取一次。</span></Field>}
+    {!validOpeningRule(rule, contentCount) && <p className="text-xs text-warning-600" role="status">请添加奖励，并将领取项数设为 1 到奖励种类数之间的整数。</p>}
+  </div>
+}
+
 function ItemFields(props: {
   definitions: ItemDefinition[]; versions: GiftVersion[]; itemCode: string; setItemCode: (value: string) => void
   giftVersionId: string; setGiftVersionId: (value: string) => void; quantity: number; setQuantity: (value: number) => void
@@ -349,7 +388,7 @@ function ItemFields(props: {
   const gift = props.definitions.find((item) => item.code === props.itemCode)?.kind === 'gift_pack'
   return <>
     <Field label="道具"><select className="tool-field mt-2 w-full" value={props.itemCode} onChange={(event) => { props.setItemCode(event.currentTarget.value); props.setGiftVersionId('') }}>{props.definitions.filter((item) => item.issuance_enabled && item.kind !== 'cosmetic' && item.kind !== 'badge').map((item) => <option key={item.code} value={item.code}>{item.name} · {item.code}</option>)}</select></Field>
-    {gift && <Field label="礼包版本"><select className="tool-field mt-2 w-full" value={props.giftVersionId} onChange={(event) => props.setGiftVersionId(event.currentTarget.value)}><option value="">请选择已发布版本</option>{props.versions.filter((version) => version.item_code === props.itemCode).map((version) => <option key={version.id} value={version.id}>v{version.version}</option>)}</select></Field>}
+    {gift && <Field label="礼包版本"><select className="tool-field mt-2 w-full" value={props.giftVersionId} onChange={(event) => props.setGiftVersionId(event.currentTarget.value)}><option value="">自动使用最新已发布版本</option>{props.versions.filter((version) => version.item_code === props.itemCode).map((version) => <option key={version.id} value={version.id}>v{version.version}</option>)}</select></Field>}
     <div className="grid grid-cols-2 gap-3"><Field label="数量"><input type="number" min={1} max={10000} className="tool-field mt-2 w-full" value={props.quantity} onChange={(event) => props.setQuantity(Number(event.currentTarget.value))} /></Field><Field label="有效天数（0 永久）"><input type="number" min={0} max={3650} className="tool-field mt-2 w-full" value={props.validityDays} onChange={(event) => props.setValidityDays(Number(event.currentTarget.value))} /></Field></div>
   </>
 }
