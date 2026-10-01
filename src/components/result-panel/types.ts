@@ -15,6 +15,7 @@ export interface ResultPanelProps {
   manualPreviewSlot?: ReactNode;
   previewLimit?: OptimizeResult['preview_limit'];
   manualEditProfile?: { id: string; kind: UserGameAccountKind; permission: RawPermissionMode };
+  manualSimulationBaseline?: { id: string; config: import('../../lib/types').LicenseConfig };
 }
 
 export type RoomOperator = {

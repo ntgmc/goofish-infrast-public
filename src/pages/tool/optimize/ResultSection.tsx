@@ -39,6 +39,7 @@ export default function ResultSection({
   fullResultDownloadBusy = false,
   fullDataAvailable = true,
   manualEditProfile,
+  manualSimulationBaseline,
 }: {
   phase: OptimizePhase;
   historyItem: WorkspaceResultHistoryItem | null;
@@ -61,6 +62,7 @@ export default function ResultSection({
   fullResultDownloadBusy?: boolean;
   fullDataAvailable?: boolean;
   manualEditProfile?: ResultPanelProps['manualEditProfile'];
+  manualSimulationBaseline?: ResultPanelProps['manualSimulationBaseline'];
 }) {
   const { content, isFallback } = usePublicContent()
   const purchaseHref = isFallback ? undefined : resolveActivePurchaseChannel(content.cdk_purchase.xianyu_url)?.href ?? undefined
@@ -117,6 +119,7 @@ export default function ResultSection({
             fullResultDownloadBusy={fullResultDownloadBusy}
             fullDataAvailable={fullDataAvailable}
             manualEditProfile={manualEditProfile}
+            manualSimulationBaseline={historyItem.config ? { id: historyItem.id, config: historyItem.config } : undefined}
             manualPreviewSlot={manualPreviewSlot}
             suggestionsSlot={suggestionsSlot}
           />
@@ -138,6 +141,7 @@ export default function ResultSection({
             fullDataAvailable={fullDataAvailable}
             manualEditProfile={manualEditProfile}
             manualPreviewSlot={manualPreviewSlot}
+            manualSimulationBaseline={manualSimulationBaseline}
             suggestionsSlot={suggestionsSlot}
           />
           {previewProfile && <PreviewUpgradePanel cdk={upgradeCdk} loading={upgradeLoading} error={upgradeError} onCdkChange={onUpgradeCdkChange} onSubmit={onUpgradePreviewProfile} />}
@@ -156,6 +160,7 @@ export default function ResultSection({
             fullResultDownloadBusy={fullResultDownloadBusy}
             fullDataAvailable={fullDataAvailable}
             manualEditProfile={manualEditProfile}
+            manualSimulationBaseline={manualSimulationBaseline}
             manualPreviewSlot={manualPreviewSlot}
             suggestionsSlot={suggestionsSlot}
           />

@@ -10,6 +10,7 @@ import type {
 import type { ScenarioComparisonFactors, ScenarioComparisonResult } from './scenario-comparison'
 import type { SystemItemCode } from './inventory-contracts'
 import type { CommercialTierLevel, MeteredBillingKind, MeteredBillingOperation } from './metered-billing'
+import type { ManualPlan } from './manual-schedule'
 
 type OptimizationIdentity = { type: 'profile'; profileId: string }
 
@@ -31,6 +32,7 @@ export type CreateOptimizationJobRequest =
       accepted_max_points?: string;
       billing_operation?: MeteredBillingOperation;
       baseline_history_id?: string;
+      manualSchedule?: { baselineHistoryId: string; plans: ManualPlan[] };
     })
   | (Omit<OptimizationJobInput, 'identity'> & {
       kind: 'scenario_comparison';

@@ -1,4 +1,4 @@
-import type { LicenseFile } from "../../../src/lib/types";
+import type { LicenseConfig, LicenseFile, OptimizeResult } from "../../../src/lib/types";
 import type { CreateOptimizationJobRequest } from "../../../src/lib/optimization-contracts";
 import { canUseUpgradeFeatures, evaluateOperatorRisk, formatOperatorRiskBlockMessage, recordOperatorFingerprint, recordSoftBlockedRiskEvent, getPermissionMode, getRiskControlSettings, isProfileCdkRecord, type CdkRecord, normalizePermissionMode, resolveConfigForPermission, resolveFreePreviewConfig } from "../../handlers/license-utils";
 import { resolveProfileAuthorization } from '../../handlers/profile-authorization';
@@ -22,6 +22,7 @@ import { recordOperatorDataAnomalyBehaviorEvent } from '../../behavior-risk/serv
 import type { MeteredBillingKind, MeteredBillingOperation } from '../../../src/lib/metered-billing';
 import { normalizePointsAmount } from '../../../src/lib/balance-contracts';
 import { requireMeteredBillingFeature } from '../../feature-gate';
+import { manualResult, validateManualPlans } from '../../../src/lib/manual-schedule';
 
 export async function prepareOptimizeJob(
   req: Request,
@@ -49,7 +50,7 @@ export async function prepareOptimizeJob(
     }
     const operators = body.operators;
     const config = body.config;
-    if (body.kind === 'schedule' && config.layout === '2-5-2' && !config.facility_layout) {
+    if (body.kind === 'schedule' && !body.manualSchedule && config.layout === '2-5-2' && !config.facility_layout) {
       return fail({ error: '请先按游戏内布局选择并确认设施位置与等级，再生成排班。' }, 400);
     }
     const profile_id = body.identity.profileId;
@@ -93,6 +94,7 @@ export async function prepareOptimizeJob(
     let isPreviewProfile = false;
     let isPreviewTrial = false;
     let personalUseAudit: PreparedOptimizeJob['personalUseAudit'];
+    let manualSimulation: { source: OptimizeResult; config: LicenseConfig } | null = null;
     let meteredBilling: PreparedOptimizeJob['billing'] = null;
 
     {
@@ -136,11 +138,30 @@ export async function prepareOptimizeJob(
         return fail({ error: authorization.message, code: authorization.code }, authorization.status);
       }
       checkedCdkRecord = authorization.cdkRecord;
+      if (body.kind === 'schedule' && body.manualSchedule) {
+        if (profileKind === 'free_preview' || !hasCapability({ kind: profileKind, permission: authorization.permission }, 'edit_full_config')) {
+          return fail({ error: '当前档案无法模拟手动排班。', code: 'capability_not_available' }, 403);
+        }
+        if (requestedItems.size > 0 || includeUpgradeSuggestions || body.billing_operation || body.billing_quote_id ||
+          body.pricing_version || body.accepted_max_points || body.baseline_history_id || body.historySource) {
+          return fail({ error: '手动排班测算选项无效。', code: 'validation_failed' }, 400);
+        }
+        const baseline = await getProfileOptimizationResult(activeProfileId, body.manualSchedule.baselineHistoryId);
+        if (!baseline || baseline.archived_at || !baseline.config || baseline.result.preview_limit) {
+          return fail({ error: '原始排班不存在或已归档，请重新选择历史排班。', code: 'baseline_not_found' }, 409);
+        }
+        try {
+          validateManualPlans(baseline.result, body.manualSchedule.plans, operators);
+        } catch {
+          return fail({ error: '手动排班无效，请检查干员、设施和无人机安排。', code: 'validation_failed' }, 400);
+        }
+        manualSimulation = { source: manualResult(baseline.result, body.manualSchedule.plans), config: baseline.config };
+      }
       if (profileKind === 'free_preview' && isScenarioComparison) {
         scheduleUsage = scheduleFailure('permission_denied', { profile_id: activeProfileId, permission: profile.permission, source: 'account_profile' });
         return fail({ error: '免费预览档案不开放场景对比实验室。', code: 'capability_not_available' }, 403);
       }
-      if (profileKind === 'metered_personal' || profileKind === 'metered_commercial') {
+      if (!manualSimulation && (profileKind === 'metered_personal' || profileKind === 'metered_commercial')) {
         const accepted = normalizePointsAmount(body.accepted_max_points);
         if (!body.billing_quote_id || !body.pricing_version || !accepted) {
           return fail({ error: '缺少已确认的计费报价，请刷新报价后重新确认。', code: 'pricing_changed' }, 409);
@@ -260,6 +281,28 @@ export async function prepareOptimizeJob(
         }
         checkedCdkRecord = await recordOperatorFingerprint(checkedCdkRecord, operatorRisk.fingerprint);
       }
+    }
+
+    if (manualSimulation) {
+      const estimate = await resolveOptimizeDurationEstimate(manualSimulation.source.schedule_mode === 'rotation' ? 'rotation' : 'maa_plain');
+      return {
+        ok: true,
+        prepared: {
+          ownerKey: 'profile:' + activeProfileId, priority: 'paid', priorityValue: 10,
+          permission: optimizePermission, source: 'account_profile', personalUseAudit,
+          behaviorIdentity: { userId: auth.user.id, sessionTokenHash: auth.tokenHash },
+          payload: createPersistedOptimizeJobPayload({
+            submittedAt, operators, effectiveConfig: sanitizeConfigForPublicOptimize(manualSimulation.config, optimizePermission),
+            configPermission: optimizePermission,
+            activeProfileId, isPreviewProfile: false, isPreviewTrial: false,
+            freeScheduleDecision: null, estimate, scheduleUsageBase,
+            request: {
+              include_upgrade_suggestions: false, upgrade_suggestions_allowed: false,
+              manual_schedule: manualSimulation.source,
+            },
+          }),
+        },
+      };
     }
 
     const hasUpgradeCapability = (!isPreviewProfile || isPreviewTrial) && canUseUpgradeFeatures(effectiveLicense);

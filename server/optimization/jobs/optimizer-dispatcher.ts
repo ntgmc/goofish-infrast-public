@@ -120,6 +120,13 @@ async function dispatchOptimizationJobPayload(
   port: OptimizerPort,
 ): Promise<OptimizationJobExecutionResult> {
   if (!('kind' in payload)) {
+    if (payload.request.manual_schedule && !port.supportsManualScheduleSimulation) {
+      throw new OptimizerExecutionError({
+        code: 'manual_simulation_unavailable', kind: 'permanent', retryable: false,
+        publicMessage: '手动排班测算暂时不可用，请稍后重试。',
+        internalMessage: 'OptimizerPort does not support manual schedule simulation.',
+      })
+    }
     const result = await port.executeSchedule(payload, context)
     if (payload.effectiveConfig.layout === '2-5-2' && payload.effectiveConfig.facility_layout) {
       result.facility_layout = [...payload.effectiveConfig.facility_layout]

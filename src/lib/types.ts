@@ -369,6 +369,12 @@ export interface OptimizeResult {
   daily_production?: DailyProduction;
   total_efficiency?: number;
   raw_total_efficiency?: number;
+  mood_simulation?: {
+    valid: boolean;
+    daily_loop_stable: boolean;
+    iterations: number;
+    degrading_operators: { operator: string; start: number; end: number }[];
+  };
   optimization_mode?: 'fast' | 'exact' | 'exhaustive' | string;
   optimality?: 'global_within_candidate_set' | 'bounded_candidate_optimum' | 'approximate' | string;
   search_nodes?: number;

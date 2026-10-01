@@ -19,6 +19,16 @@ const context: OptimizeExecutionContext = {
 }
 
 describe('optimization job dispatcher', () => {
+  it('requires explicit manual simulation support before dispatching fixed plans', async () => {
+    const baseline = schedulePayload()
+    const payload = { ...baseline, request: { ...baseline.request, manual_schedule: scheduleResult() } }
+    const port = fakePort()
+    await expect(executeOptimizationJobWithPort(job(payload), context, port))
+      .rejects.toThrow('does not support manual schedule simulation')
+    expect(port.executeSchedule).not.toHaveBeenCalled()
+    await executeOptimizationJobWithPort(job(payload), context, { ...port, supportsManualScheduleSimulation: true })
+    expect(port.executeSchedule).toHaveBeenCalledWith(payload, context)
+  })
   it.each(['252', '252-1'])('includes %s room levels in schedule result data', async (preset) => {
     const payload = schedulePayload()
     payload.effectiveConfig = structuredClone(CONFIG_PRESETS[preset])

@@ -1,7 +1,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Download, Eraser, LockKeyhole, Search, Upload } from 'lucide-react'
 import PinyinMatch from 'pinyin-match'
-import type { LicenseOperator, OptimizeResult } from '../../lib/types'
+import type { LicenseConfig, LicenseOperator, OptimizeResult } from '../../lib/types'
 import { copy } from '../../copy/index'
 import { canonicalJson } from '../../lib/crypto'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '../ui/dialog'
@@ -10,15 +10,21 @@ import { OperatorAvatarTile } from './OperatorAvatarStrip'
 import { prepareResult } from './formatters'
 import { ROOM_LABELS } from './labels'
 import { operatorBuildingSkills } from './building-skills'
+import ResultMetrics from './ResultMetrics'
+import ResultDetail from './ResultDetail'
+import { getOptimizePollRetryDelayMs } from '../../lib/optimize-poll'
+import { submitOptimizationJob } from '../../pages/tool/optimize/optimization-api'
+import { fetchOptimizeJobSnapshotStatus, isOptimizeJobPollCancelled, isRetryableOptimizePollError, waitForOptimizePoll } from '../../pages/tool/optimize/job-progress'
 import {
   changeManualDrone, changeManualOperator, createManualPlans, lockedManualOperators, manualResult,
   manualSourceKey, parseManualDraft, readManualDraft, saveManualDraft, type ManualDraft, type ManualPlan,
-} from './manual-schedule'
+} from '../../lib/manual-schedule'
 
-export default function ManualScheduleEditor({ source, profileId, operators }: {
+export default function ManualScheduleEditor({ source, profileId, operators, simulationBaseline }: {
   source: OptimizeResult;
   profileId: string;
   operators: LicenseOperator[];
+  simulationBaseline?: { id: string; config: LicenseConfig };
 }) {
   const label = copy.domain.manual_schedule
   const [plans, setPlans] = useState<ManualPlan[]>(() => createManualPlans(source))
@@ -30,16 +36,25 @@ export default function ManualScheduleEditor({ source, profileId, operators }: {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [simulation, setSimulation] = useState<OptimizeResult | null>(null)
+  const [simulating, setSimulating] = useState(false)
+  const simulationRun = useRef(0)
+  const simulationLock = useRef(false)
+  const operatorsKey = canonicalJson(operators)
+  const currentInputKey = useRef(canonicalJson({ plans, operators }))
+  currentInputKey.current = canonicalJson({ plans, operators })
   const [confirmation, setConfirmation] = useState<'reset' | 'restore' | 'import' | null>(null)
   const [imported, setImported] = useState<ManualDraft | null>(null)
   const upload = useRef<HTMLInputElement>(null)
   const dirty = canonicalJson(plans) !== baseline
   const changed = canonicalJson(plans) !== canonicalJson(createManualPlans(source))
   const locked = useMemo(() => lockedManualOperators(source), [source])
-  const result = useMemo(() => manualResult(source, plans), [source, plans])
+  const result = useMemo(() => simulation ?? manualResult(source, plans), [source, plans, simulation])
   const prepared = useMemo(() => prepareResult(result, result.schedule_mode === 'rotation', result.dormitory_rule === 'maa_pure_autofill', operators), [result, operators])
   const selectedRoom = room ? plans[activePlan].rooms[room.roomType][room.roomIndex] : []
   const selectedName = selectedRoom[slot] ?? ''
+  useEffect(() => () => { simulationRun.current += 1 }, [])
+  useEffect(() => { setSimulation(null) }, [operatorsKey])
 
   useEffect(() => {
     try { setStored(readManualDraft(profileId, source, operators)) }
@@ -54,10 +69,57 @@ export default function ManualScheduleEditor({ source, profileId, operators }: {
   }, [dirty])
 
   const update = useCallback((next: ManualPlan[]) => {
+    currentInputKey.current = canonicalJson({ plans: next, operators })
     setPlans(next)
+    setSimulation(null)
     setError(null)
     setNotice(null)
-  }, [])
+  }, [operators])
+
+  async function simulate() {
+    if (!simulationBaseline || simulationLock.current) return
+    simulationLock.current = true
+    const run = ++simulationRun.current
+    const submittedKey = canonicalJson({ plans, operators })
+    const isCancelled = () => simulationRun.current !== run
+    setSimulating(true)
+    setError(null)
+    setSimulation(null)
+    try {
+      const accepted = await submitOptimizationJob({
+        kind: 'schedule', identity: { type: 'profile', profileId },
+        operators, config: simulationBaseline.config, includeUpgradeSuggestions: false,
+        manualSchedule: { baselineHistoryId: simulationBaseline.id, plans },
+      }, label.simulation_failed)
+      let failures = 0
+      while (!isCancelled()) {
+        try {
+          const job = await fetchOptimizeJobSnapshotStatus<OptimizeResult>(accepted.job_id, label.simulation_failed, accepted.poll_token, isCancelled)
+          if (isCancelled()) return
+          failures = 0
+          if (job.status === 'succeeded') {
+            if (currentInputKey.current === submittedKey) setSimulation(job.result)
+            return
+          }
+          if (job.status !== 'queued' && job.status !== 'running') throw new Error(job.error.message)
+          await waitForOptimizePoll(1000, isCancelled)
+        } catch (cause) {
+          if (isOptimizeJobPollCancelled(cause)) return
+          if (!isRetryableOptimizePollError(cause)) throw cause
+          await waitForOptimizePoll(getOptimizePollRetryDelayMs(++failures), isCancelled)
+        }
+      }
+    } catch (cause) {
+      if (!isCancelled() && !isOptimizeJobPollCancelled(cause)) {
+        setError(cause instanceof Error ? cause.message : label.simulation_failed)
+      }
+    } finally {
+      if (!isCancelled()) {
+        simulationLock.current = false
+        setSimulating(false)
+      }
+    }
+  }
 
   function chooseOperator(name: string) {
     if (!room) return
@@ -150,11 +212,12 @@ export default function ManualScheduleEditor({ source, profileId, operators }: {
   return (
     <section className="space-y-4" aria-label={label.title}>
       <div className="tool-alert tool-alert--warning space-y-2 p-4">
-        <p className="font-semibold">{label.warning}</p>
+        <p className="font-semibold" role="status">{simulating ? label.simulating : simulation ? label.simulated : label.warning}</p>
         <p className="text-sm"><LockKeyhole size={14} className="mr-1 inline" aria-hidden="true" />{label.locked}</p>
       </div>
       <div className="tool-panel space-y-3 p-4">
         <div className="flex flex-wrap gap-2">
+          <button type="button" className="tool-primary-action" disabled={!simulationBaseline || simulating} aria-busy={simulating} onClick={() => void simulate()}>{label.simulate}</button>
           <button type="button" className="tool-primary-action" disabled={!changed || busy} onClick={save}>{label.save}</button>
           <button type="button" className="tool-secondary-action" disabled={!stored || busy}
             onClick={() => dirty ? setConfirmation('restore') : stored && restore(stored)}>{label.restore}</button>
@@ -164,10 +227,19 @@ export default function ManualScheduleEditor({ source, profileId, operators }: {
           <input ref={upload} type="file" accept=".json,application/json" className="hidden" aria-label={label.import} onChange={(event) => void importBackup(event.target.files?.[0])} />
         </div>
         <p className="text-xs leading-5 text-ink-muted">{label.storage_hint}</p>
+        {!simulationBaseline && <p className="text-sm text-ink-muted">{label.simulation_baseline_required}</p>}
         {dirty && <p className="text-sm text-warning" role="status">{label.unsaved}</p>}
         {notice && <p className="text-sm text-success" role="status">{notice}</p>}
       </div>
       {error && <p className="tool-alert tool-alert--warning p-3 text-sm" role="alert">{error}</p>}
+      {simulation && <ResultMetrics isRotationMode={source.schedule_mode === 'rotation'} prepared={prepared} />}
+      {simulation?.mood_simulation && <p className={`tool-alert p-4 text-sm ${simulation.mood_simulation.valid ? 'tool-alert--success' : 'tool-alert--warning'}`} role="status">
+        {simulation.mood_simulation.valid ? label.mood_stable : label.mood_warning}
+      </p>}
+      {simulation && <details className="tool-panel p-4">
+        <summary className="cursor-pointer text-sm font-semibold">{label.simulation_details}</summary>
+        <ResultDetail isRotationMode={source.schedule_mode === 'rotation'} prepared={prepared} planTimes={source.planTimes} />
+      </details>}
       <div className="flex flex-wrap justify-end gap-2">
         <button type="button" className="tool-secondary-action" disabled={busy} onClick={() => void download('current')}><Download size={14} aria-hidden="true" />{copy.domain.result_image.current}</button>
         <button type="button" className="tool-secondary-action" disabled={busy} onClick={() => void download('all')}><Download size={14} aria-hidden="true" />{copy.domain.result_image.all}</button>
