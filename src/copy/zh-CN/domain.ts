@@ -40,7 +40,7 @@ export const domainCopy = {
     dormitory_fill: "补齐宿舍并重新测算",
     dormitory_suggestions: (count: number) => `可补入 ${count} 处休息安排`,
     dormitory_destination: (shift: string, room: number, name: string) => `${shift} · 宿舍 ${room}：${name}`,
-    dormitory_unassigned: "这些干员仍缺少休息位置，请调整宿舍或上班安排：",
+    dormitory_unassigned: "这些干员在以下上班班次仍有心情缺口，请调整此前的宿舍或上班安排：",
     dormitory_no_need: "当前没有需要补入空床位的干员。",
     dormitory_pending: "先模拟测算，即可查看缺少休息安排的干员并补齐宿舍。",
     tab: "手动排班",
