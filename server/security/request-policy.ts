@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { giftPackOpeningRuleSchema } from '../../src/lib/admin-inventory-contracts'
 import {
   MAX_DEPOT_ITEM_COUNT,
   MAX_DEPOT_ITEM_TYPES,
@@ -505,6 +506,7 @@ export const requestSchemas = {
     quantity: z.literal(1),
     profile_id: optionalString(128),
     gift_pack_version_id: optionalString(128),
+    selected_item_codes: z.array(shortString(128)).min(1).max(100).optional(),
     idempotency_key: shortString(200),
   }),
   balanceRedeem: strict({
@@ -561,12 +563,16 @@ export const requestSchemas = {
       description: shortString(500),
       icon_key: optionalString(128),
       contents: z.array(inventoryRewardSchema).min(1).max(100),
+      opening_rule: giftPackOpeningRuleSchema.optional(),
+      publish: z.boolean().optional(),
       idempotency_key: shortString(200),
     }),
     strict({
       action: z.literal('create_gift_pack_version'),
       item_code: shortString(128),
       contents: z.array(inventoryRewardSchema).min(1).max(100),
+      opening_rule: giftPackOpeningRuleSchema.optional(),
+      publish: z.boolean().optional(),
       idempotency_key: shortString(200),
     }),
     strict({ action: z.literal('publish_gift_pack_version'), version_id: shortString(128) }),

@@ -1069,6 +1069,7 @@ export interface PriorityCouponBalance {
 }
 
 export interface InvitationGiftPackSummary {
+  opening_rule?: import('./inventory-contracts').GiftPackOpeningRule;
   id: string;
   version: number;
   status: 'published' | 'retired';

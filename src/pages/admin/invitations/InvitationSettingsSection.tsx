@@ -209,7 +209,7 @@ export default function InvitationSettingsSection() {
         <div className="tool-inset mt-5 p-4 text-sm leading-6 text-ink-secondary">
           <p><span className="font-semibold text-ink-primary">邀请人：</span>{rewardSummary(settings.rewards.filter((reward) => reward.recipient === 'inviter'), catalogByCode)}</p>
           <p><span className="font-semibold text-ink-primary">新用户：</span>{rewardSummary(settings.rewards.filter((reward) => reward.recipient === 'invitee'), catalogByCode)}</p>
-          <p className="mt-2 text-xs text-ink-muted">礼包将在保存时固定最新已发布版本；暂停期间已经激活的邀请保留其激活快照。</p>
+          <p className="mt-2 text-xs text-ink-muted">可添加礼包、随机宝箱或自选宝箱；在“道具与礼包”中创建并发布后即可选择。保存时使用最新已发布版本，已经激活的邀请继续使用原奖励配置。</p>
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -251,6 +251,7 @@ function RewardGroup({ recipient, rewards, catalogByCode, giftPackVersionById, o
           {rewards.map((reward) => {
             const item = catalogByCode.get(reward.item_code)
             const configuredVersion = reward.gift_pack_version_id ? giftPackVersionById.get(reward.gift_pack_version_id) : null
+            const packVersion = configuredVersion ?? item?.latest_gift_pack_version
             return (
               <article key={reward.item_code} className="rounded-xl border border-surface-3 bg-surface-1 p-4">
                 <div className="flex items-start gap-3">
@@ -262,6 +263,7 @@ function RewardGroup({ recipient, rewards, catalogByCode, giftPackVersionById, o
                     </div>
                     {!item?.selectable && <p className="mt-2 text-xs font-medium text-danger-500">{item?.unavailable_reason ?? '道具当前不可用。'}</p>}
                     {(configuredVersion ?? item?.latest_gift_pack_version) && <p className="mt-2 text-xs text-ink-secondary">礼包版本 v{(configuredVersion ?? item!.latest_gift_pack_version)!.version} · {packContents((configuredVersion ?? item!.latest_gift_pack_version)!.contents)}</p>}
+                    {packVersion?.opening_rule && packVersion.opening_rule.mode !== 'all' && <p className="mt-2 text-xs text-ink-secondary">每个宝箱{packVersion.opening_rule.mode === 'random' ? '随机获得' : '自行选择'} {packVersion.opening_rule.count} 项不同奖励</p>}
                   </div>
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(6rem,.75fr)]">

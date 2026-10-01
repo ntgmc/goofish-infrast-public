@@ -29,12 +29,18 @@ const itemDefinitionSchema = z.object({
   updated_at: z.string().nullable(),
 })
 
+export const giftPackOpeningRuleSchema = z.discriminatedUnion('mode', [
+  z.strictObject({ mode: z.literal('all') }),
+  z.strictObject({ mode: z.enum(['random', 'choice']), count: z.number().int().min(1).max(100) }),
+])
+
 const giftVersionSchema = z.object({
   id: z.string().min(1),
   item_code: z.string().min(1),
   version: z.number().int().positive(),
   status: z.enum(['draft', 'published', 'retired']),
   contents: z.array(rewardContentSchema),
+  opening_rule: giftPackOpeningRuleSchema.default({ mode: 'all' }),
   created_at: z.string(),
   published_at: z.string().nullable(),
 })

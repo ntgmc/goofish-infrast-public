@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
@@ -27,6 +27,7 @@ import {
   useInventoryItem,
 } from './inventory-store'
 import { closePool, query, withTransaction } from './postgres'
+import { getAdminInvitationSettingsOverview } from './invitation-store'
 import { ensureDatabaseSchema } from './schema'
 import { buildAuthPayload } from '../handlers/user-auth'
 import type { UserAccountRecord } from './user-store'
@@ -49,6 +50,40 @@ afterAll(async () => {
 })
 
 describe('PostgreSQL unified inventory', () => {
+  it.each(['random', 'choice'] as const)('opens a published %s chest atomically and preserves its issued version', async (mode) => {
+    const { userId } = await seedUserProfile()
+    const contents = [
+      { item_code: 'priority_compute_coupon', quantity: 3, expiry: { mode: 'relative_days' as const, days: 7 } },
+      { item_code: 'training_diagnosis_coupon', quantity: 2, expiry: { mode: 'never' as const } },
+      { item_code: 'plan_capacity_certificate', quantity: 1, expiry: { mode: 'never' as const } },
+    ]
+    const pack = await createCustomGiftPack('root', {
+      name: '多选宝箱', description: '领取两种奖励', contents, opening_rule: { mode, count: 2 }, publish: true,
+    }) as { item_code: string; version_id: string; status: string }
+    expect(pack.status).toBe('published')
+    const invitationItem = (await getAdminInvitationSettingsOverview()).catalog.find((item) => item.item_code === pack.item_code)
+    expect(invitationItem).toMatchObject({
+      selectable: true, latest_gift_pack_version: { id: pack.version_id, opening_rule: { mode, count: 2 } },
+    })
+    await adminGrantItem('root', { userId, itemCode: pack.item_code, giftPackVersionId: pack.version_id, quantity: 2, validityDays: 0, reason: '测试宝箱' })
+    const stack = (await listInventory(userId)).stacks.find((entry) => entry.item.code === pack.item_code)!
+    expect(stack.gift_pack).toMatchObject({ opening_rule: { mode, count: 2 }, contents: expect.arrayContaining([expect.objectContaining({ item_code: 'priority_compute_coupon', quantity: 3 })]) })
+    await createGiftPackDraft('root', pack.item_code, contents, randomUUID(), { opening_rule: { mode: 'all' }, publish: true })
+    const request = { item_code: pack.item_code, quantity: 1 as const, gift_pack_version_id: pack.version_id, idempotency_key: randomUUID() }
+    if (mode === 'choice') {
+      await expect(useInventoryItem(userId, request)).rejects.toMatchObject({ code: 'gift_pack_selection_invalid' })
+      expect(await getItemBalance(userId, pack.item_code)).toBe(2)
+    }
+    const selected = mode === 'choice' ? { selected_item_codes: ['priority_compute_coupon', 'training_diagnosis_coupon'] } : {}
+    const result = await useInventoryItem(userId, { ...request, ...selected })
+    const rewards = result.rewards as Array<{ item_code: string; quantity: number }>
+    expect(rewards).toHaveLength(2)
+    expect(new Set(rewards.map((reward) => reward.item_code)).size).toBe(2)
+    for (const reward of rewards) expect(reward.quantity).toBe(contents.find((entry) => entry.item_code === reward.item_code)!.quantity)
+    expect(await useInventoryItem(userId, { ...request, ...selected })).toEqual(result)
+    expect(await getItemBalance(userId, pack.item_code)).toBe(1)
+  })
+
   it('lists an empty inventory for a scheduling profile without a workspace', async () => {
     const { userId, profileId } = await seedUserProfile()
 
@@ -456,9 +491,17 @@ describe('PostgreSQL unified inventory', () => {
     }
 
     const first = await createCustomGiftPack('root', input)
+    const operation = await query<{ request_hash: string }>(
+      'select request_hash from inventory_admin_operations where admin_username = $1 and idempotency_key = $2',
+      ['root', idempotencyKey],
+    )
+    expect(operation.rows[0].request_hash).toBe(createHash('sha256').update(JSON.stringify({
+      name: input.name, description: input.description, icon_key: 'generic_gift_pack', contents: input.contents,
+    })).digest('hex'))
     const replayed = await createCustomGiftPack('root', input)
 
     expect(replayed).toEqual(first)
+    expect(await createCustomGiftPack('root', { ...input, opening_rule: { mode: 'all' }, publish: false })).toEqual(first)
     const definitions = await query<{ count: string }>(
       "select count(*)::text as count from item_definitions where name = 'Idempotent pack'",
     )

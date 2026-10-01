@@ -1,7 +1,9 @@
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash, randomInt, randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import {
   ITEM_ICON_PATHS,
+  normalizeGiftPackOpeningRule,
+  type GiftPackOpeningRule,
   type ExpiryPolicy,
   type GiftPackContentInput,
   type InventoryLedgerEvent,
@@ -221,6 +223,7 @@ export async function listInventory(userId: string, now = new Date()): Promise<I
     query<{
       reward_type: string
       gift_pack_version_id: string | null
+      gift_pack: InventoryStack['gift_pack']
       quantity: string
       permanent: string
       next_expiry_at: string | null
@@ -229,6 +232,18 @@ export async function listInventory(userId: string, now = new Date()): Promise<I
     }>(
       `select grants.reward_type,
               grants.gift_pack_version_id,
+              case when version.id is not null then jsonb_build_object(
+                'opening_rule', version.opening_rule,
+                'contents', (select coalesce(jsonb_agg(jsonb_build_object(
+                  'item_code', content.item_code, 'name', reward.name, 'icon_key', reward.icon_key,
+                  'quantity', content.quantity,
+                  'expiry', case when content.validity_days = 0 then jsonb_build_object('mode', 'never')
+                    else jsonb_build_object('mode', 'relative_days', 'days', content.validity_days) end
+                ) order by content.item_code), '[]'::jsonb)
+                from gift_pack_version_contents content
+                join item_definitions reward on reward.code = content.item_code
+                where content.gift_pack_version_id = version.id)
+              ) end as gift_pack,
               sum(grants.remaining_quantity)::text as quantity,
               sum(grants.remaining_quantity) filter (where grants.expires_at is null)::text as permanent,
               min(grants.expires_at) filter (where grants.expires_at > $2) as next_expiry_at,
@@ -248,10 +263,11 @@ export async function listInventory(userId: string, now = new Date()): Promise<I
               ) as definition_json
          from reward_grants grants
          join item_definitions definition on definition.code = grants.reward_type
+         left join gift_pack_versions version on version.id = grants.gift_pack_version_id
         where grants.user_id = $1 and grants.remaining_quantity > 0
           and grants.reward_type <> 'reorder_check_coupon'
           and (grants.expires_at is null or grants.expires_at > $2)
-        group by grants.reward_type, grants.gift_pack_version_id, definition.code`,
+        group by grants.reward_type, grants.gift_pack_version_id, definition.code, version.id`,
       [userId, nowIso],
     ),
     query<{
@@ -277,6 +293,7 @@ export async function listInventory(userId: string, now = new Date()): Promise<I
       stack_id: stackId(row.reward_type, row.gift_pack_version_id),
       item,
       gift_pack_version_id: row.gift_pack_version_id,
+      ...(row.gift_pack && { gift_pack: row.gift_pack }),
       quantity: Number(row.quantity),
       permanent: Number(row.permanent),
       next_expiry_at: row.next_expiry_at,
@@ -1093,8 +1110,8 @@ async function openGiftPackInTransaction(
   const source = grant.rows[0]
   if (!source) throw new ItemUnavailableError(input.item_code)
   if (!source.gift_pack_version_id) throw new InventoryError('gift_pack_version_missing', '礼包没有绑定可开启的内容版本。', 409)
-  const contents = await client.query<{ item_code: string; quantity: number; validity_days: number; name: string; icon_key: string }>(
-    `select content.item_code, content.quantity, content.validity_days, definition.name, definition.icon_key
+  const contents = await client.query<{ item_code: string; quantity: number; validity_days: number; name: string; icon_key: string; opening_rule: GiftPackOpeningRule }>(
+    `select content.item_code, content.quantity, content.validity_days, definition.name, definition.icon_key, version.opening_rule
        from gift_pack_version_contents content
        join gift_pack_versions version on version.id = content.gift_pack_version_id
        join item_definitions definition on definition.code = content.item_code
@@ -1103,14 +1120,32 @@ async function openGiftPackInTransaction(
     [source.gift_pack_version_id, input.item_code],
   )
   if (contents.rows.length === 0) throw new InventoryError('gift_pack_empty', '礼包内容为空或版本不可用。', 409)
+  const rule = normalizeGiftPackOpeningRule(contents.rows[0].opening_rule, contents.rows.length)
+  if (!rule) throw new InventoryError('gift_pack_opening_invalid', '宝箱奖励配置无效，请联系管理员。', 409)
+  let chosenContents = contents.rows
+  if (rule.mode === 'choice') {
+    const selected = input.selected_item_codes ?? []
+    if (selected.length !== rule.count || new Set(selected).size !== rule.count
+      || selected.some((code) => !contents.rows.some((content) => content.item_code === code))) {
+      throw new InventoryError('gift_pack_selection_invalid', `请选择 ${rule.count} 项不同的宝箱奖励。`, 400)
+    }
+    chosenContents = contents.rows.filter((content) => selected.includes(content.item_code))
+  } else {
+    if (input.selected_item_codes !== undefined) throw new InventoryError('gift_pack_selection_invalid', '此礼包或宝箱自动发放奖励，请直接开启。', 400)
+    if (rule.mode === 'random') {
+      const pool = [...contents.rows]
+      chosenContents = []
+      for (let index = 0; index < rule.count; index++) chosenContents.push(...pool.splice(randomInt(pool.length), 1))
+    }
+  }
   await client.query('update reward_grants set remaining_quantity = remaining_quantity - 1 where id = $1', [source.id])
   await insertLedger(client, {
     userId, itemCode: input.item_code, eventType: 'gift_open', quantity: 1, grantId: source.id,
     referenceType: 'gift_opening', referenceId: operationId,
-    metadata: { gift_pack_version_id: source.gift_pack_version_id }, now,
+    metadata: { gift_pack_version_id: source.gift_pack_version_id, opening_rule: rule, selected_item_codes: chosenContents.map((content) => content.item_code) }, now,
   })
   const rewards: Array<{ item_code: string; name: string; icon_key: string; quantity: number; expires_at: string | null }> = []
-  for (const content of contents.rows) {
+  for (const content of chosenContents) {
     const expiry: ExpiryPolicy = content.validity_days > 0
       ? { mode: 'relative_days', days: content.validity_days }
       : { mode: 'never' }

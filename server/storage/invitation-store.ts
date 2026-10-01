@@ -930,9 +930,10 @@ async function describeRewardsInTransaction(
     id: string
     version: number
     status: 'published' | 'retired'
+    opening_rule?: InvitationGiftPackSummary['opening_rule']
     contents: InvitationGiftPackSummary['contents']
   }>(
-    `select version.id, version.version, version.status,
+    `select version.id, version.version, version.status, version.opening_rule,
             coalesce(jsonb_agg(jsonb_build_object(
               'item_code', content.item_code,
               'name', definition.name,
@@ -964,6 +965,7 @@ async function describeRewardsInTransaction(
         id: giftPackVersion.id,
         version: Number(giftPackVersion.version),
         status: giftPackVersion.status,
+        opening_rule: giftPackVersion.opening_rule,
         contents: Array.isArray(giftPackVersion.contents) ? giftPackVersion.contents : [],
       } : null,
       available: item.issuance_enabled,
@@ -1164,7 +1166,7 @@ function normalizeLegacyRewards(value: unknown): InvitationRewardRule[] {
 function catalogQuery(): string {
   return `select definition.code as item_code, definition.name, definition.description, definition.kind,
                  definition.icon_key, definition.issuance_enabled,
-                 version.id as version_id, version.version, version.status as version_status,
+                 version.id as version_id, version.version, version.status as version_status, version.opening_rule,
                  coalesce((select jsonb_agg(jsonb_build_object(
                    'item_code', content.item_code,
                    'name', content_definition.name,
@@ -1177,7 +1179,7 @@ function catalogQuery(): string {
                   where content.gift_pack_version_id = version.id), '[]'::jsonb) as contents
             from item_definitions definition
             left join lateral (
-              select id, version, status from gift_pack_versions
+              select id, version, status, opening_rule from gift_pack_versions
                where item_code = definition.code and status = 'published'
                order by version desc limit 1
             ) version on true
@@ -1196,6 +1198,7 @@ function catalogRow(row: {
   version_id: string | null
   version: number | null
   version_status: 'published' | null
+  opening_rule?: InvitationGiftPackSummary['opening_rule']
   contents: InvitationGiftPackSummary['contents'] | null
 }): InvitationRewardCatalogItem {
   const giftPackAvailable = row.kind !== 'gift_pack' || Boolean(row.version_id)
@@ -1213,6 +1216,7 @@ function catalogRow(row: {
       id: row.version_id,
       version: Number(row.version ?? 0),
       status: row.version_status ?? 'published',
+      opening_rule: row.opening_rule,
       contents: Array.isArray(row.contents) ? row.contents : [],
     } : null,
   }
@@ -1225,9 +1229,10 @@ async function loadGiftPackSummaries(versionIds: string[]): Promise<Map<string, 
     id: string
     version: number
     status: 'published' | 'retired'
+    opening_rule?: InvitationGiftPackSummary['opening_rule']
     contents: InvitationGiftPackSummary['contents']
   }>(
-    `select version.id, version.version, version.status,
+    `select version.id, version.version, version.status, version.opening_rule,
             coalesce(jsonb_agg(jsonb_build_object(
               'item_code', content.item_code,
               'name', definition.name,
@@ -1246,6 +1251,7 @@ async function loadGiftPackSummaries(versionIds: string[]): Promise<Map<string, 
     id: version.id,
     version: Number(version.version),
     status: version.status,
+    opening_rule: version.opening_rule,
     contents: Array.isArray(version.contents) ? version.contents : [],
   }]))
 }
@@ -1260,9 +1266,10 @@ async function loadGiftPackSummariesInTransaction(
     id: string
     version: number
     status: 'published' | 'retired'
+    opening_rule?: InvitationGiftPackSummary['opening_rule']
     contents: InvitationGiftPackSummary['contents']
   }>(
-    `select version.id, version.version, version.status,
+    `select version.id, version.version, version.status, version.opening_rule,
             coalesce(jsonb_agg(jsonb_build_object(
               'item_code', content.item_code,
               'name', definition.name,
@@ -1281,6 +1288,7 @@ async function loadGiftPackSummariesInTransaction(
     id: version.id,
     version: Number(version.version),
     status: version.status,
+    opening_rule: version.opening_rule,
     contents: Array.isArray(version.contents) ? version.contents : [],
   }]))
 }

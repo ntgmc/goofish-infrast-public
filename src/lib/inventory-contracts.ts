@@ -53,6 +53,7 @@ export interface InventoryStack {
   stack_id: string
   item: ItemDefinition
   gift_pack_version_id: string | null
+  gift_pack?: { opening_rule: GiftPackOpeningRule; contents: OnboardingTaskRewardView[] }
   quantity: number
   permanent: number
   next_expiry_at: string | null
@@ -92,6 +93,7 @@ export interface ItemUseRequest {
   quantity: 1
   profile_id?: string
   gift_pack_version_id?: string
+  selected_item_codes?: string[]
   idempotency_key: string
 }
 
@@ -100,6 +102,18 @@ export interface GiftPackContentInput {
   quantity: number
   expiry: ExpiryPolicy
   gift_pack_version_id?: string
+}
+
+export type GiftPackOpeningRule = { mode: 'all' } | { mode: 'random' | 'choice'; count: number }
+
+export function normalizeGiftPackOpeningRule(value: unknown, contentCount: number): GiftPackOpeningRule | null {
+  if (value === undefined) return { mode: 'all' }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const rule = value as Record<string, unknown>
+  if (rule.mode === 'all') return { mode: 'all' }
+  if ((rule.mode !== 'random' && rule.mode !== 'choice') || !Number.isInteger(rule.count)) return null
+  const count = Number(rule.count)
+  return count >= 1 && count <= contentCount ? { mode: rule.mode, count } : null
 }
 
 export interface OnboardingTaskRewardView extends GiftPackContentInput {
@@ -113,6 +127,7 @@ export interface GiftPackVersion {
   version: number
   status: 'draft' | 'published' | 'retired'
   contents: GiftPackContentInput[]
+  opening_rule?: GiftPackOpeningRule
   created_at: string
   published_at: string | null
 }
