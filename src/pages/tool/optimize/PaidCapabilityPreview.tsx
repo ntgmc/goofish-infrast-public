@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { useId, useState } from 'react'
+import { ArrowRight, ChevronDown, Sparkles } from 'lucide-react'
 import { copy } from '../../../copy'
 import { productPolicies } from '../../../lib/product-catalog'
 
@@ -8,33 +9,37 @@ export default function PaidCapabilityPreview({ onOpen, showScenarioLab }: { onO
   const [expanded, setExpanded] = useState<string | null>(null)
   const id = useId()
   return (
-    <details open className="tool-panel p-5">
-      <summary className="cursor-pointer font-medium text-ink-primary">{text.title}</summary>
+    <details open className="tool-panel group mb-4 p-4 sm:p-5">
+      <summary className="flex cursor-pointer list-none items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 [&::-webkit-details-marker]:hidden">
+        <Sparkles aria-hidden="true" className="size-5 shrink-0 text-brand-600 dark:text-brand-200" />
+        <span className="min-w-0 flex-1 text-sm font-semibold text-ink-primary">{text.title}</span>
+        <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-ink-muted transition-transform group-open:rotate-180" />
+      </summary>
       <p className="mt-3 text-sm leading-6 text-ink-secondary">{text.description}</p>
-      <dl className="mt-4 divide-y divide-surface-3">
+      <dl className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {[
           { title: text.config, detail: text.config_detail, target: 'config' as const },
           { title: text.recompute, detail: text.recompute_detail, preview: text.recompute_preview },
-          { title: text.exports, detail: text.exports_benefit, target: 'result' as const, trial: true },
+          { title: text.exports, detail: text.exports_benefit, target: 'result' as const },
           { title: text.analysis, detail: text.analysis_detail, target: 'result' as const },
           { title: text.lab, detail: text.lab_detail, target: showScenarioLab ? 'lab' as const : undefined, preview: text.lab_unavailable },
           { title: text.import, detail: text.import_detail, preview: text.import_preview },
-        ].map(({ title, detail, target, preview, trial }, index) => (
-          <div key={title} className="flex flex-wrap items-start justify-between gap-3 py-3">
+        ].map(({ title, detail, target, preview }, index) => (
+          <div key={title} className="flex min-w-0 flex-col gap-3 rounded-lg border border-surface-3/60 bg-surface-2/40 p-4">
             <div className="min-w-0 flex-1">
-              <dt className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink-primary">{title}<span className="tool-status">{text.advanced}</span></dt>
+              <dt className="text-sm font-semibold text-ink-primary">{title}</dt>
               <dd className="mt-1 text-sm leading-6 text-ink-secondary">{detail}</dd>
-              {trial && <dd className="mt-2 text-xs leading-5 text-ink-muted"><span className="font-medium">{text.trial_export}</span> · {text.trial_export_detail}</dd>}
               {!target && expanded === title && <dd id={`${id}-${index}`} className="tool-inset mt-3 space-y-3 p-3">
                 <p className="text-sm leading-6 text-ink-secondary">{preview}</p>
                 {title !== text.lab && <button type="button" disabled className="tool-secondary-action">{title} · {text.readonly_action}</button>}
               </dd>}
             </div>
-            <button type="button" className="tool-secondary-action shrink-0" onClick={() => target ? onOpen(target) : setExpanded(expanded === title ? null : title)} aria-label={`${text.open}：${title}`} aria-expanded={target ? undefined : expanded === title} aria-controls={!target && expanded === title ? `${id}-${index}` : undefined}>{text.open}</button>
+            <button type="button" className="inline-flex min-h-10 items-center gap-1.5 self-start text-sm font-medium text-brand-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 dark:text-brand-200" onClick={() => target ? onOpen(target) : setExpanded(expanded === title ? null : title)} aria-label={`${text.open}：${title}`} aria-expanded={target ? undefined : expanded === title} aria-controls={!target && expanded === title ? `${id}-${index}` : undefined}>{text.open}<ArrowRight aria-hidden="true" className="size-3.5" /></button>
           </div>
         ))}
       </dl>
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+      <p className="mt-4 text-xs leading-5 text-ink-muted"><span className="font-medium">{text.trial_export}</span> · {text.trial_export_detail}</p>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-surface-3/60 pt-4">
         <p className="text-sm leading-6 text-ink-secondary">{text.conclusion}</p>
         <Link to="/pricing" className="tool-primary-action">{text.compare}</Link>
       </div>

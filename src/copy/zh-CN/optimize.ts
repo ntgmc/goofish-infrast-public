@@ -16,6 +16,8 @@ export const optimizeCopy = {
     config_title: '让排班适配你的基建布局',
     config_description: '高级版可调整房间、产物数量、班次、宿舍和无人机策略。可以先按当前配置查看这些选项，预览会保留已保存的方案。切回免费配置即可继续排班。',
     readonly: '高级配置只读预览',
+    manual_title: '解锁手动排班',
+    manual_description: '高级版可调整各班次的进驻干员与无人机加速目标，保存本地草稿、导入导出草稿备份，并导出排班图片。',
     compare: '比较价格与权益',
     config: '自定义基建与班次',
     config_detail: '按实际房间、产物和轮班规则调整排班，适合更换基建布局或自定义轮班时间时使用。',

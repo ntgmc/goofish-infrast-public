@@ -12,6 +12,7 @@ export interface ResultPanelProps {
   onSaveWorkfile?: () => void;
   detailDefaultOpen?: boolean;
   suggestionsSlot?: ReactNode;
+  manualPreviewSlot?: ReactNode;
   previewLimit?: OptimizeResult['preview_limit'];
   manualEditProfile?: { id: string; kind: UserGameAccountKind; permission: RawPermissionMode };
 }

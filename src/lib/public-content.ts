@@ -3,7 +3,7 @@ import { copy } from '../copy/index'
 import { getSku, productPolicies } from './product-catalog'
 
 export const PUBLIC_CONTENT_VERSION = 1 as const
-export const PUBLIC_CONTENT_DEFAULTS_REVISION = 7 as const
+export const PUBLIC_CONTENT_DEFAULTS_REVISION = 8 as const
 export const PUBLIC_PRICING_PLAN_IDS = [
   'free_preview',
   'single_account_monthly',
@@ -358,7 +358,7 @@ export function resolvePublicContentSettings(value: unknown): { content: PublicC
   const storedDefaultsRevision = normalizeDefaultsRevision(source.defaults_revision)
   const normalizedDraft = normalizePricingComparisonDefaults(parsed.data)
   const migratedDraft = storedDefaultsRevision < PUBLIC_CONTENT_DEFAULTS_REVISION
-    ? migrateDefaultPricingPlans(migrateLegacyPricingCopy(migrateLegacyDefaultCredits(normalizedDraft)))
+    ? migrateDefaultPricingContent(migrateLegacyPricingCopy(migrateLegacyDefaultCredits(normalizedDraft)))
     : normalizedDraft
   return {
     content: {
@@ -418,8 +418,8 @@ function normalizePricingComparisonDefaults(draft: PublicContentDraftV1): Public
     ...draft,
     pricing: {
       ...draft.pricing,
-      comparison_rows: draft.pricing.comparison_rows.map((row, index) => {
-        const defaultRow = defaults[index]
+      comparison_rows: draft.pricing.comparison_rows.map((row) => {
+        const defaultRow = defaults.find((item) => item.feature === row.feature)
         if (!defaultRow) return row
         const next = { ...row } as Record<string, string | undefined>
         for (const planId of PUBLIC_PRICING_PLAN_IDS) {
@@ -437,7 +437,7 @@ function migrateLegacyPricingCopy(draft: PublicContentDraftV1): PublicContentDra
   return draft
 }
 
-function migrateDefaultPricingPlans(draft: PublicContentDraftV1): PublicContentDraftV1 {
+function migrateDefaultPricingContent(draft: PublicContentDraftV1): PublicContentDraftV1 {
   for (const planId of Object.keys(previousDefaultPricingPlans) as Array<keyof typeof previousDefaultPricingPlans>) {
     const plan = draft.pricing.plans[planId]
     const previous = previousDefaultPricingPlans[planId]
@@ -452,6 +452,19 @@ function migrateDefaultPricingPlans(draft: PublicContentDraftV1): PublicContentD
     for (const field of ['label', 'badge', 'summary', 'account_scope'] as const) {
       if (plan[field] === previous[field]) plan[field] = current[field]
     }
+  }
+  const presetDefault = DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.comparison_rows.find((row) => row.feature === copy.publicContent.pricing_comparison_presets)!
+  for (const row of draft.pricing.comparison_rows) {
+    if (row.feature !== presetDefault.feature) continue
+    for (const planId of PUBLIC_PRICING_PLAN_IDS) {
+      const value = presetDefault[planId]
+      if (value !== undefined && row[planId] === copy.publicContent.legacy_pricing_preset_supported) row[planId] = value
+    }
+  }
+  const manualDefault = DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.comparison_rows.find((row) => row.feature === copy.publicContent.pricing_comparison_manual)!
+  if (!draft.pricing.comparison_rows.some((row) => row.feature === manualDefault.feature || row.id === manualDefault.id)
+    && draft.pricing.comparison_rows.length < PUBLIC_CONTENT_LIMITS.pricingComparisonRows) {
+    draft.pricing.comparison_rows.push({ ...manualDefault })
   }
   return draft
 }
