@@ -198,7 +198,7 @@ export default function AdminDashboardView() {
                         type="button"
                         onClick={() => setUsageRange(range)}
                         aria-pressed={usageRange === range}
-                        className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-150 ${usageRange === range ? 'bg-brand-600 text-white' : 'bg-surface-2 text-ink-secondary hover:bg-surface-3 hover:text-ink-primary'}`}
+                        className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors duration-150 ${usageRange === range ? 'tool-option-selected' : 'border-transparent bg-surface-2 text-ink-secondary hover:bg-surface-3 hover:text-ink-primary'}`}
                       >
                         {range === '7d' ? '7 天' : range === '14d' ? '14 天' : '30 天'}
                       </button>
@@ -207,7 +207,7 @@ export default function AdminDashboardView() {
                       type="button"
                       onClick={() => setUsageRange('custom')}
                       aria-pressed={usageRange === 'custom'}
-                      className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-150 ${usageRange === 'custom' ? 'bg-brand-600 text-white' : 'bg-surface-2 text-ink-secondary hover:bg-surface-3 hover:text-ink-primary'}`}
+                      className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors duration-150 ${usageRange === 'custom' ? 'tool-option-selected' : 'border-transparent bg-surface-2 text-ink-secondary hover:bg-surface-3 hover:text-ink-primary'}`}
                     >
                       自定义
                     </button>

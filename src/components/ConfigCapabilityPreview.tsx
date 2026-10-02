@@ -24,7 +24,7 @@ export default function ConfigCapabilityPreview({ config, enabled, children }: {
           <div className="tool-inset mb-4 p-4">
             <p className="font-medium text-ink-primary">{text.config_title}</p>
             <p className="mt-1 text-sm leading-6 text-ink-secondary">{text.config_description}</p>
-            <Link to="/pricing" className="mt-2 inline-block text-sm text-brand-600 underline dark:text-brand-200">{text.compare}</Link>
+            <Link to="/pricing" className="mt-2 inline-block text-sm text-primary underline">{text.compare}</Link>
           </div>
           <fieldset disabled className="min-w-0" aria-label={text.readonly}>
             <ConfigEditor config={config} canEdit validation={{ ok: true }} onUpdate={() => {}} embedded note={text.readonly} />

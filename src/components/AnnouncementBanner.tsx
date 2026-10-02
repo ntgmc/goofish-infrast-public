@@ -13,7 +13,7 @@ export default function AnnouncementBanner({ announcement, className = '' }: Pro
 
   return (
     <section
-      className={`tool-alert border-brand-500/25 bg-brand-500/10 text-left ${className}`}
+      className={`tool-alert tool-announcement text-left ${className}`}
       aria-label={copy.public.components_AnnouncementBanner_001}
     >
       <div>

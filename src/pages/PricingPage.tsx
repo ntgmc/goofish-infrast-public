@@ -76,7 +76,7 @@ export default function PricingPage() {
                 {cdkPlans.map((plan) => (
                   <article key={plan.id} className="tool-panel relative flex min-w-0 flex-col p-5 pt-7" aria-labelledby={`${plan.id}-title`}>
                     {(plan.id === 'single_account_monthly' || plan.id === 'single_account_lifetime') && (
-                      <span className={`absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-brand-500/50 px-3 py-1 text-xs font-semibold shadow-sm ${plan.id === 'single_account_lifetime' ? 'bg-brand-500 text-white' : 'bg-surface-1 text-brand-400'}`}>
+                      <span className={`absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-brand-500/50 px-3 py-1 text-xs font-semibold shadow-sm ${plan.id === 'single_account_lifetime' ? 'bg-primary text-primary-foreground' : 'bg-surface-1 text-brand-400'}`}>
                         {plan.id === 'single_account_monthly' ? copy.public.pricing_recommendation_monthly : copy.public.pricing_recommendation_lifetime}
                       </span>
                     )}

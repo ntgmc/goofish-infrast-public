@@ -11,7 +11,7 @@ export default function PaidCapabilityPreview({ onOpen, showScenarioLab }: { onO
   return (
     <details open className="tool-panel group mb-4 p-4 sm:p-5">
       <summary className="flex cursor-pointer list-none items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 [&::-webkit-details-marker]:hidden">
-        <Sparkles aria-hidden="true" className="size-5 shrink-0 text-brand-600 dark:text-brand-200" />
+        <Sparkles aria-hidden="true" className="size-5 shrink-0 text-primary" />
         <span className="min-w-0 flex-1 text-sm font-semibold text-ink-primary">{text.title}</span>
         <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-ink-muted transition-transform group-open:rotate-180" />
       </summary>
@@ -34,7 +34,7 @@ export default function PaidCapabilityPreview({ onOpen, showScenarioLab }: { onO
                 {title !== text.lab && <button type="button" disabled className="tool-secondary-action">{title} · {text.readonly_action}</button>}
               </dd>}
             </div>
-            <button type="button" className="inline-flex min-h-10 items-center gap-1.5 self-start text-sm font-medium text-brand-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 dark:text-brand-200" onClick={() => target ? onOpen(target) : setExpanded(expanded === title ? null : title)} aria-label={`${text.open}：${title}`} aria-expanded={target ? undefined : expanded === title} aria-controls={!target && expanded === title ? `${id}-${index}` : undefined}>{text.open}<ArrowRight aria-hidden="true" className="size-3.5" /></button>
+            <button type="button" className="inline-flex min-h-10 items-center gap-1.5 self-start text-sm font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45" onClick={() => target ? onOpen(target) : setExpanded(expanded === title ? null : title)} aria-label={`${text.open}：${title}`} aria-expanded={target ? undefined : expanded === title} aria-controls={!target && expanded === title ? `${id}-${index}` : undefined}>{text.open}<ArrowRight aria-hidden="true" className="size-3.5" /></button>
           </div>
         ))}
       </dl>
@@ -62,7 +62,7 @@ export function LockedScenarioPreview() {
       <p className="tool-inset p-4 text-sm text-ink-muted">{text.pending}</p>
       <p className="text-sm text-ink-secondary">{text.lab_detail}</p>
       <p className="text-sm text-ink-secondary">{text.quotas(productPolicies.metered_billing.scenario_quotas.month, productPolicies.metered_billing.scenario_quotas.half_year, productPolicies.metered_billing.scenario_quotas.year)}</p>
-      <Link to="/pricing" className="inline-block text-sm text-brand-200 underline">{text.compare}</Link>
+      <Link to="/pricing" className="inline-block text-sm text-primary underline">{text.compare}</Link>
     </section>
   )
 }
@@ -77,7 +77,7 @@ export function LockedResultPreview() {
       <h3 className="font-medium text-ink-primary">{text.analysis}</h3>
       <p className="text-sm leading-6 text-ink-secondary">{text.analysis_detail}</p>
       <div className="tool-inset p-4 text-sm text-ink-muted"><p>{text.roi}</p><p className="mt-2">{text.result_pending}</p></div>
-      <Link to="/pricing" className="inline-block text-sm text-brand-200 underline">{text.compare}</Link>
+      <Link to="/pricing" className="inline-block text-sm text-primary underline">{text.compare}</Link>
     </section>
   )
 }

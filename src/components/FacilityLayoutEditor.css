@@ -5,14 +5,14 @@
   margin-top: 16px;
 }
 
-.facility-card--trading { --facility-color: var(--station-trading, var(--theme-brand-500)); }
-.facility-card--manufacture { --facility-color: var(--station-manufacturing, var(--theme-warning)); }
-.facility-card--power { --facility-color: var(--theme-success); }
+.facility-card--trading { --facility-color: var(--station-trading); }
+.facility-card--manufacture { --facility-color: var(--station-manufacturing); }
+.facility-card--power { --facility-color: var(--station-power); }
 
 .facility-card {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--theme-surface-3);
+  border: 1px solid var(--border);
   border-top: 3px solid var(--facility-color);
   border-radius: 8px;
   background: var(--theme-surface-1);
@@ -36,7 +36,7 @@
 .facility-card-levels button { min-width: 0; min-height: 44px; flex: 1; border-radius: 4px; color: var(--theme-ink-secondary); cursor: pointer; }
 .facility-card-levels button span { margin-left: 2px; font-size: 10px; }
 .facility-card-levels button:hover { background: var(--theme-surface-1); }
-.facility-card-levels button[aria-pressed="true"] { background: var(--theme-surface-1); color: var(--theme-ink-primary); box-shadow: inset 0 0 0 1px var(--theme-surface-3); font-weight: 700; }
+.facility-card-levels button[aria-pressed="true"] { background: var(--color-selected-bg); color: var(--color-selected-ink); box-shadow: inset 0 0 0 1px var(--color-selected-border); font-weight: 700; }
 .facility-layout button:focus-visible,
 .facility-picker button:focus-visible { outline: 2px solid var(--theme-brand-500); outline-offset: -3px; }
 .facility-layout-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }

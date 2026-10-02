@@ -97,7 +97,7 @@ export default function ConfigSection({
                   <dt className="text-sm font-medium text-ink-primary">{row.label}</dt>
                   <dd className="mt-2 grid gap-1 text-xs leading-5 sm:grid-cols-2">
                     <span className="text-ink-muted">{copy.optimize.pages_tool_optimize_ConfigSection_012}{row.before}</span>
-                    <span className="font-medium text-brand-200">{copy.optimize.pages_tool_optimize_ConfigSection_013}{row.after}</span>
+                    <span className="font-medium text-primary">{copy.optimize.pages_tool_optimize_ConfigSection_013}{row.after}</span>
                   </dd>
                 </div>
               ))}

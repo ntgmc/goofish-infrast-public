@@ -103,7 +103,7 @@ export default function RedeemSection({ onRedeemed, onInventoryRedeemed, tourRep
               setError(null)
             }}
             aria-pressed={mode === 'cdk'}
-            className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors duration-150 ${mode === 'cdk' ? 'bg-brand-600 text-white' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}
+            className={`rounded-md border px-3 py-2 text-sm font-semibold transition-colors duration-150 ${mode === 'cdk' ? 'tool-option-selected' : 'border-transparent text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}
           >
             {copy.dashboard.pages_tool_dashboard_RedeemSection_005}</button>}
           {features.free_preview && <button
@@ -113,7 +113,7 @@ export default function RedeemSection({ onRedeemed, onInventoryRedeemed, tourRep
               setError(null)
             }}
             aria-pressed={mode === 'preview'}
-            className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors duration-150 ${mode === 'preview' ? 'bg-brand-600 text-white' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}
+            className={`rounded-md border px-3 py-2 text-sm font-semibold transition-colors duration-150 ${mode === 'preview' ? 'tool-option-selected' : 'border-transparent text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}
           >
             {copy.dashboard.pages_tool_dashboard_RedeemSection_006}</button>}
         </div>

@@ -150,7 +150,7 @@ export default function OptimizeWorkflowPage(props: Props) {
               {licenseSyncing && <LicenseSyncPanel />}
   
               {licenseSyncStatus && (
-                <div className="tool-alert border-brand-600/30 bg-brand-600/10 text-brand-200" role="status" aria-live="polite">
+                <div className="tool-alert tool-alert--info" role="status" aria-live="polite">
                   {licenseSyncStatus}
                 </div>
               )}

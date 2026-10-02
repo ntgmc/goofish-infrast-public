@@ -125,7 +125,7 @@ export default function SklandBindingDialog({
               type="button"
               onClick={() => selectMode(mode)}
               aria-pressed={sklandLogin.mode === mode}
-              className={'min-h-11 rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-150 ' + (sklandLogin.mode === mode ? 'bg-brand-600 text-white' : 'bg-surface-2 text-ink-secondary hover:bg-surface-3 hover:text-ink-primary')}
+              className={'min-h-11 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors duration-150 ' + (sklandLogin.mode === mode ? 'tool-option-selected' : 'border-transparent bg-surface-2 text-ink-secondary hover:bg-surface-3 hover:text-ink-primary')}
             >
               {MODE_LABELS[mode]}
             </button>

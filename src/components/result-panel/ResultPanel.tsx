@@ -291,7 +291,7 @@ export default function ResultPanel({
               ))}
             </dl>
             <button type="button" disabled className="tool-secondary-action">{copy.optimize.paid_preview.export_action}</button>
-            <a href="/pricing" className="block text-sm text-brand-200 underline">{copy.optimize.paid_preview.compare}</a>
+            <a href="/pricing" className="block text-sm text-primary underline">{copy.optimize.paid_preview.compare}</a>
           </section>
         )}
         {selectedTab === 'data' && !isPreview && fullDataAvailable && (

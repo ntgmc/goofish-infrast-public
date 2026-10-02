@@ -252,7 +252,7 @@ function MetricTile({ label, value, detail }: { label: string; value: string; de
 function PreviewStep({ label, current = false }: { label: string; current?: boolean }) {
   return (
     <li className="flex items-center gap-3">
-      <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[11px] font-semibold ${current ? 'border-brand-400 bg-brand-500/15 text-brand-200' : 'border-success/45 bg-success/10 text-success'}`} aria-hidden="true">
+      <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[11px] font-semibold ${current ? 'tool-option-selected' : 'border-success/45 bg-success/10 text-success'}`} aria-hidden="true">
         {current ? '3' : '✓'}
       </span>
       <span>{label}</span>
