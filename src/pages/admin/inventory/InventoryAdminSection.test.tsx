@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ItemDefinition } from '../../../lib/inventory-contracts'
@@ -52,12 +52,13 @@ const overview = {
 
 beforeEach(() => {
   adminApiJson.mockReset()
-  adminApiJson.mockImplementation(async (_url: string, options?: unknown) => options ? {} : overview)
+  adminApiJson.mockImplementation(async (_url: string, options?: { method?: string }) => options?.method === 'POST' ? {} : overview)
 })
 
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
 describe('InventoryAdminSection', () => {
@@ -103,7 +104,7 @@ describe('InventoryAdminSection', () => {
     expect(screen.getByRole('tabpanel', { name: '礼包管理' })).toBeInTheDocument()
     expect(screen.getByText('创建礼包或宝箱')).toBeInTheDocument()
     expect(screen.queryByText(/内容 JSON|奖励 JSON/)).not.toBeInTheDocument()
-    expect(screen.queryByText('道具目录', { selector: 'h3' })).not.toBeInTheDocument()
+    expect(screen.getByText('道具目录', { selector: 'h3' })).not.toBeVisible()
   })
 
   it('creates a gift pack from structured reward rows', async () => {
@@ -116,6 +117,7 @@ describe('InventoryAdminSection', () => {
     expect(createForm).not.toBeNull()
     const form = within(createForm as HTMLFormElement)
     await user.type(form.getByLabelText('礼包名称'), '测试礼包')
+    await user.type(form.getByLabelText('说明'), '测试礼包说明')
     await user.selectOptions(form.getByLabelText('选择要添加的道具'), 'plan_capacity_certificate')
     await user.click(form.getByRole('button', { name: '添加道具' }))
     await user.clear(form.getByLabelText('方案扩容证数量'))
@@ -177,8 +179,8 @@ describe('InventoryAdminSection', () => {
 
   it('publishes an enabled onboarding task version and refreshes its status', async () => {
     let published = false
-    adminApiJson.mockImplementation(async (_url: string, options?: { json?: Record<string, unknown> }) => {
-      if (options) {
+    adminApiJson.mockImplementation(async (_url: string, options?: { method?: string; json?: Record<string, unknown> }) => {
+      if (options?.method === 'POST') {
         published = true
         return {}
       }
@@ -238,8 +240,8 @@ describe('InventoryAdminSection', () => {
   it('reuses an administrator idempotency key after an unknown grant result', async () => {
     const grantKeys: string[] = []
     let grantAttempt = 0
-    adminApiJson.mockImplementation(async (_url: string, options?: { json?: Record<string, unknown> }) => {
-      if (!options) return overview
+    adminApiJson.mockImplementation(async (_url: string, options?: { method?: string; json?: Record<string, unknown> }) => {
+      if (options?.method !== 'POST') return overview
       if (options.json?.action === 'grant') {
         grantKeys.push(String(options.json.idempotency_key))
         grantAttempt += 1
@@ -270,7 +272,7 @@ describe('InventoryAdminSection', () => {
     await user.selectOptions(screen.getByLabelText('选择要添加的道具'), 'lifetime_profile_voucher')
     await user.click(screen.getByRole('button', { name: '添加道具' }))
 
-    expect(screen.getByText('授权凭证')).toBeInTheDocument()
+    expect(within(screen.getByRole('tabpanel', { name: '新人任务' })).getByText('授权凭证')).toBeInTheDocument()
     expect(screen.queryByText('成就勋章（预留）')).not.toBeInTheDocument()
   })
 
@@ -292,7 +294,7 @@ describe('InventoryAdminSection', () => {
         failed_recipients: [],
       }],
     }
-    adminApiJson.mockImplementation(async (_url: string, options?: unknown) => options ? {} : allUsersOverview)
+    adminApiJson.mockImplementation(async (_url: string, options?: { method?: string }) => options?.method === 'POST' ? {} : allUsersOverview)
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const user = userEvent.setup()
     render(<InventoryAdminSection />)
@@ -314,5 +316,210 @@ describe('InventoryAdminSection', () => {
     })))
     expect(confirm).toHaveBeenCalledOnce()
     confirm.mockRestore()
+  })
+
+  it('preserves catalog and reward drafts across refreshes and tab changes', async () => {
+    const user = userEvent.setup()
+    render(<InventoryAdminSection />)
+    const catalog = await screen.findByRole('tabpanel', { name: '道具目录' })
+    await user.clear(within(catalog).getByLabelText('名称'))
+    await user.type(within(catalog).getByLabelText('名称'), '尚未保存的名称')
+    await user.click(screen.getByRole('tab', { name: /礼包管理/ }))
+    const pack = within(screen.getByText('创建礼包或宝箱').closest('form') as HTMLFormElement)
+    await user.type(pack.getByLabelText('礼包名称'), '尚未保存的礼包')
+    await user.selectOptions(pack.getByLabelText('优先计算券有效期'), 'relative_days')
+    await user.clear(pack.getByLabelText('优先计算券有效天数'))
+    await user.type(pack.getByLabelText('优先计算券有效天数'), '45')
+    await user.click(screen.getByRole('button', { name: '刷新道具数据' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '刷新道具数据' })).toBeEnabled())
+    await user.click(screen.getByRole('tab', { name: /道具目录/ }))
+    expect(within(catalog).getByLabelText('名称')).toHaveValue('尚未保存的名称')
+    await user.click(screen.getByRole('tab', { name: /礼包管理/ }))
+    expect(pack.getByLabelText('礼包名称')).toHaveValue('尚未保存的礼包')
+    expect(pack.getByLabelText('优先计算券有效天数')).toHaveValue(45)
+  })
+
+  it('allows publishing an empty disabled task but requires rewards before enabling it', async () => {
+    const user = userEvent.setup()
+    render(<InventoryAdminSection />)
+    await user.click(await screen.findByRole('tab', { name: /新人任务/ }))
+    await user.selectOptions(screen.getByLabelText('任务'), 'first_main_schedule')
+    expect(screen.getByRole('button', { name: '发布停用版本' })).toBeEnabled()
+    await user.click(screen.getByRole('checkbox', { name: '新版本启用' }))
+    expect(screen.getByRole('button', { name: '发布并启用' })).toBeDisabled()
+    await user.click(screen.getByRole('checkbox', { name: '新版本启用' }))
+    await user.click(screen.getByRole('button', { name: '发布停用版本' }))
+    await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/items', expect.objectContaining({
+      json: expect.objectContaining({ action: 'configure_onboarding_task', task_code: 'first_main_schedule', enabled: false, rewards: [] }),
+    })))
+  })
+
+  it('keeps grant, revocation and campaign inputs independent and confirms bulk issuance', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const user = userEvent.setup()
+    render(<InventoryAdminSection />)
+    await user.click(await screen.findByRole('tab', { name: /发放中心/ }))
+    const grant = within(screen.getByText('单用户发放').closest('form') as HTMLFormElement)
+    const revoke = within(screen.getByText('撤回发放批次').closest('form') as HTMLFormElement)
+    const campaign = within(screen.getByText('批量与全站发放').closest('form') as HTMLFormElement)
+    await user.type(grant.getByLabelText('发放原因'), '单独发放原因')
+    await user.clear(grant.getByLabelText('数量'))
+    await user.type(grant.getByLabelText('数量'), '7')
+    expect(campaign.getByLabelText('数量')).toHaveValue(1)
+    expect(campaign.getByLabelText('管理员备注')).toHaveValue('')
+    expect(revoke.getByLabelText('撤回原因')).toHaveValue('')
+    expect(revoke.getByRole('button', { name: '撤回余额' })).toBeDisabled()
+    await user.type(campaign.getByLabelText('用户 ID（逗号、空格或换行分隔）'), 'user-1，user-2 user-1')
+    await user.type(campaign.getByLabelText('管理员备注'), '批量发放原因')
+    await user.click(campaign.getByRole('button', { name: '创建发放活动' }))
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('2 位用户各发放 1 个道具，共 2 个'))
+    expect(adminApiJson.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false)
+    confirm.mockReturnValue(true)
+    await user.click(campaign.getByRole('button', { name: '创建发放活动' }))
+    await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/inventory', expect.objectContaining({
+      json: expect.objectContaining({ action: 'create_campaign', quantity: 1, reason: '批量发放原因', user_ids: ['user-1', 'user-2'] }),
+    })))
+  })
+
+  it('blocks concurrent submissions and preserves the retry key when a response is lost', async () => {
+    let rejectRequest!: (reason: Error) => void
+    adminApiJson.mockImplementation((_url: string, options?: { method?: string }) => options?.method === 'POST'
+      ? new Promise((_resolve, reject) => { rejectRequest = reject })
+      : Promise.resolve(overview))
+    const user = userEvent.setup()
+    render(<InventoryAdminSection />)
+    await user.click(await screen.findByRole('tab', { name: /发放中心/ }))
+    const form = screen.getByText('单用户发放').closest('form') as HTMLFormElement
+    await user.type(within(form).getByLabelText('用户 ID'), 'user-1')
+    await user.type(within(form).getByLabelText('发放原因'), '测试发放')
+    fireEvent.submit(form)
+    fireEvent.submit(form)
+    const requests = () => adminApiJson.mock.calls.filter(([, options]) => options?.method === 'POST')
+    expect(requests()).toHaveLength(1)
+    expect(within(form).getByRole('button', { name: '发放' })).toBeDisabled()
+    expect(screen.getByRole('tab', { name: /礼包管理/ })).toBeDisabled()
+    await act(async () => { rejectRequest(new Error('response lost')) })
+    expect(await screen.findByRole('alert')).toHaveTextContent('response lost')
+    fireEvent.submit(form)
+    expect(requests()).toHaveLength(2)
+    expect(requests()[1][1].json.idempotency_key).toBe(requests()[0][1].json.idempotency_key)
+    await act(async () => { rejectRequest(new Error('response lost again')) })
+  })
+
+  it('keeps successful issuance distinct from a failed overview refresh', async () => {
+    let reads = 0
+    adminApiJson.mockImplementation(async (_url: string, options?: { method?: string }) => {
+      if (options?.method === 'POST') return { grant_id: 'grant-confirmed' }
+      if (++reads === 1) return overview
+      throw new Error('refresh unavailable')
+    })
+    const user = userEvent.setup()
+    render(<InventoryAdminSection />)
+    await user.click(await screen.findByRole('tab', { name: /发放中心/ }))
+    await user.type(screen.getByLabelText('用户 ID'), 'user-1')
+    await user.type(screen.getByLabelText('发放原因'), '测试发放')
+    await user.click(screen.getByRole('button', { name: '发放' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('refresh unavailable')
+    expect(await screen.findByText(/最近发放批次 ID：grant-confirmed/)).toBeInTheDocument()
+    expect(screen.getByLabelText('发放批次 ID')).toHaveValue('grant-confirmed')
+    expect(adminApiJson.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(1)
+  })
+
+  it('excludes unavailable gift packs and clears a pinned version when switching items', async () => {
+    adminApiJson.mockImplementation(async (_url: string, options?: { method?: string }) => options?.method === 'POST' ? {} : {
+      ...overview,
+      definitions: [...definitions, { ...definitions[2], code: 'unpublished_pack', name: '未发布礼包' }],
+    })
+    const user = userEvent.setup()
+    render(<InventoryAdminSection />)
+    await user.click(await screen.findByRole('tab', { name: /发放中心/ }))
+    const form = within(screen.getByText('单用户发放').closest('form') as HTMLFormElement)
+    expect(within(form.getByLabelText('道具')).queryByRole('option', { name: /未发布礼包/ })).not.toBeInTheDocument()
+    await user.selectOptions(form.getByLabelText('道具'), 'newcomer_supply_pack')
+    await user.selectOptions(form.getByLabelText('礼包版本'), 'pack-version-1')
+    await user.selectOptions(form.getByLabelText('道具'), 'priority_compute_coupon')
+    await user.type(form.getByLabelText('用户 ID'), 'user-1')
+    await user.type(form.getByLabelText('发放原因'), '切换道具发放')
+    await user.click(form.getByRole('button', { name: '发放' }))
+    await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/inventory', expect.objectContaining({
+      json: expect.objectContaining({ item_code: 'priority_compute_coupon' }),
+    })))
+    const request = adminApiJson.mock.calls.find(([, options]) => options?.json?.action === 'grant')?.[1]
+    expect(request.json).not.toHaveProperty('gift_pack_version_id')
+  })
+
+  it('rejects invalid reward quantities and expiry before publishing', async () => {
+    const user = userEvent.setup()
+    render(<InventoryAdminSection />)
+    await user.click(await screen.findByRole('tab', { name: /礼包管理/ }))
+    const form = screen.getByText('创建礼包或宝箱').closest('form') as HTMLFormElement
+    const fields = within(form)
+    await user.type(fields.getByLabelText('礼包名称'), '有效性检查')
+    await user.type(fields.getByLabelText('说明'), '有效性检查礼包')
+    await user.selectOptions(fields.getByLabelText('优先计算券有效期'), 'relative_days')
+    await user.clear(fields.getByLabelText('优先计算券有效天数'))
+    expect(fields.getByLabelText('优先计算券有效天数')).toHaveValue(null)
+    expect(fields.getByRole('button', { name: '创建并发布' })).toBeDisabled()
+    for (const days of ['0', '3651', '1.5']) {
+      fireEvent.change(fields.getByLabelText('优先计算券有效天数'), { target: { value: days } })
+      expect(fields.getByRole('button', { name: '创建并发布' })).toBeDisabled()
+      fireEvent.submit(form)
+    }
+    fireEvent.change(fields.getByLabelText('优先计算券有效天数'), { target: { value: '3650' } })
+    fireEvent.change(fields.getByLabelText('优先计算券数量'), { target: { value: '10001' } })
+    expect(fields.getByRole('button', { name: '创建并发布' })).toBeDisabled()
+    fireEvent.submit(form)
+    expect(adminApiJson.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false)
+    await user.clear(fields.getByLabelText('优先计算券数量'))
+    expect(fields.getByLabelText('优先计算券数量')).toHaveValue(null)
+    expect(fields.getByRole('button', { name: '创建并发布' })).toBeDisabled()
+    fireEvent.change(fields.getByLabelText('优先计算券数量'), { target: { value: '10000' } })
+    expect(fields.getByRole('button', { name: '创建并发布' })).toBeEnabled()
+  })
+
+  it('switches tabs with the keyboard and maintains one tab stop', async () => {
+    const user = userEvent.setup()
+    render(<InventoryAdminSection />)
+    const catalog = await screen.findByRole('tab', { name: /道具目录/ })
+    catalog.focus()
+    await user.keyboard('{ArrowLeft}')
+    expect(screen.getByRole('tab', { name: /操作审计/ })).toHaveFocus()
+    expect(screen.getByRole('tabpanel', { name: '操作审计' })).toBeVisible()
+    await user.keyboard('{Home}{ArrowRight}')
+    expect(screen.getByRole('tab', { name: /礼包管理/ })).toHaveFocus()
+    expect(screen.getAllByRole('tab').filter((tab) => tab.tabIndex === 0)).toHaveLength(1)
+    expect(screen.getByRole('tabpanel', { name: '礼包管理' })).toBeVisible()
+  })
+
+  it('exports failed recipients as CSV without allowing spreadsheet formulas', async () => {
+    let exported!: Blob
+    const revokeObjectURL = vi.fn()
+    vi.stubGlobal('URL', class extends URL {
+      static createObjectURL(blob: Blob) { exported = blob; return 'blob:failures' }
+      static revokeObjectURL = revokeObjectURL
+    })
+    const download = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    adminApiJson.mockResolvedValue({
+      ...overview,
+      campaigns: [{
+        id: 'campaign-failed', item_code: 'priority_compute_coupon', target_mode: 'user_ids', status: 'completed_with_failures',
+        recipient_count: 1, granted_count: 0, failed_count: 1, pending_count: 0, processing_count: 0, skipped_count: 0, revoked_count: 0,
+        failed_recipients: [{ user_id: 'user-1', attempt_count: 2, processed_at: null, error_message: '=2+3,"failed"\nretry' }],
+      }],
+    })
+    const user = userEvent.setup()
+    render(<InventoryAdminSection />)
+    await user.click(await screen.findByRole('tab', { name: /发放中心/ }))
+    await user.click(screen.getByText('查看失败收件人与原因'))
+    await user.click(screen.getByRole('button', { name: '导出失败 CSV' }))
+    const csv = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result))
+      reader.onerror = () => reject(reader.error)
+      reader.readAsText(exported)
+    })
+    expect(csv).toContain('"user-1","2","","\'=2+3,""failed""\nretry"')
+    expect(download).toHaveBeenCalledOnce()
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:failures')
   })
 })
