@@ -126,6 +126,11 @@ export const domainCopy = {
     efficiency: "效率",
     details: "房间详情",
     empty_room: "本班暂无干员安排",
+    show_profession: "显示干员职业",
+    professions: {
+      WARRIOR: "近卫", SNIPER: "狙击", TANK: "重装", MEDIC: "医疗",
+      SUPPORT: "辅助", CASTER: "术师", SPECIAL: "特种", PIONEER: "先锋",
+    },
   },
   // src/components/result-panel/DroneSummary.tsx
   components_result_panel_DroneSummary_001: "自动无人机",

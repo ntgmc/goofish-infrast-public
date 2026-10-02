@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link2, Plus } from 'lucide-react'
 import { copy } from '../../copy'
 import type { RoomOperator } from './types'
-import { RECOVERY_SUPPORT_ICON_SRC } from './building-skills'
+import { operatorProfession, RECOVERY_SUPPORT_ICON_SRC } from './building-skills'
 
 export default function OperatorAvatarStrip({
   operators,
@@ -12,6 +12,7 @@ export default function OperatorAvatarStrip({
   showFullNames = false,
   large = false,
   buttonChild = false,
+  showProfession = false,
 }: {
   operators: RoomOperator[];
   fallbackText: string;
@@ -20,6 +21,7 @@ export default function OperatorAvatarStrip({
   showFullNames?: boolean;
   large?: boolean;
   buttonChild?: boolean;
+  showProfession?: boolean;
 }) {
   if (operators.length === 0) {
     return <p className="text-sm leading-6 text-ink-secondary">{fallbackText}</p>
@@ -38,6 +40,7 @@ export default function OperatorAvatarStrip({
           showFullNames={showFullNames}
           large={large}
           buttonChild={buttonChild}
+          showProfession={showProfession}
         />
       ))}
     </div>
@@ -52,6 +55,7 @@ export function OperatorAvatarTile({
   showFullNames = false,
   large = false,
   buttonChild = false,
+  showProfession = false,
 }: {
   operator?: RoomOperator;
   placeholder?: string;
@@ -60,6 +64,7 @@ export function OperatorAvatarTile({
   showFullNames?: boolean;
   large?: boolean;
   buttonChild?: boolean;
+  showProfession?: boolean;
 }) {
   const [imageFailed, setImageFailed] = useState(false)
   const canLoadImage = Boolean(operator?.id && !imageFailed)
@@ -72,6 +77,7 @@ export function OperatorAvatarTile({
     'block font-medium text-ink-secondary',
   ].join(' ')
   const initial = name.trim().slice(0, 1) || '?'
+  const profession = showProfession && operator ? operatorProfession(operator) : undefined
 
   return (
     <div className={`${tileWidth} min-w-0 text-center`} title={operator ? undefined : name}
@@ -94,6 +100,11 @@ export function OperatorAvatarTile({
           <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-ink-muted" aria-hidden="true">
             {operator ? initial : <Plus size={24} />}
           </div>
+        )}
+        {profession && (
+          <img src={`/operator-professions/${profession}.png`} alt={copy.domain.result_board_v2.professions[profession]}
+            title={copy.domain.result_board_v2.professions[profession]}
+            className={`absolute right-0 top-0 rounded-bl bg-zinc-950/85 p-0.5 ${large ? 'h-6 w-6' : micro ? 'h-3 w-3' : 'h-4 w-4'}`} />
         )}
         {operator?.crossStation && (
           <span

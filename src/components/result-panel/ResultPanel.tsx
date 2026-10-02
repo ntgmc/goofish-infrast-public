@@ -102,6 +102,7 @@ export default function ResultPanel({
       ? fullDataAvailable ? 'data' : 'board'
       : activeTab
   const [activePlan, setActivePlan] = useState(0)
+  const [showProfession, setShowProfession] = useState(false)
   const [imageExporting, setImageExporting] = useState(false)
   const [imageExportError, setImageExportError] = useState<string | null>(null)
   const imageExportLock = useRef(false)
@@ -118,6 +119,7 @@ export default function ResultPanel({
       await downloadScheduleImage({
         prepared, isRotationMode, shiftHours: result.shift_hours, title: result.title,
         version: selectedTab === 'board-v2' ? 'v2' : 'v1',
+        showProfession: selectedTab === 'board-v2' && showProfession,
         planIndex: allPlans ? undefined : selectedPlan,
       })
     } catch {
@@ -235,6 +237,13 @@ export default function ResultPanel({
         <div className="space-y-2">
           <div className="flex flex-wrap justify-end gap-2" aria-busy={imageExporting}>
             {selectedTab === 'board-v2' && (
+              <label className="mr-auto inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm text-ink-secondary">
+                <input type="checkbox" checked={showProfession} onChange={(event) => setShowProfession(event.target.checked)}
+                  className="h-4 w-4 accent-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45" />
+                {copy.domain.result_board_v2.show_profession}
+              </label>
+            )}
+            {selectedTab === 'board-v2' && (
               <button type="button" className="tool-secondary-action" disabled={imageExporting || prepared.plans.length === 0}
                 onClick={() => void handleImageExport(false)}>
                 <Download size={16} aria-hidden="true" />{imageCopy.current}
@@ -271,7 +280,7 @@ export default function ResultPanel({
         labelledBy={`result-${selectedTab}-tab`}
       >
         {selectedTab === 'board' && <ResultBoard isRotationMode={isRotationMode} prepared={prepared} planTimes={result.planTimes} />}
-        {selectedTab === 'board-v2' && <ResultBoardV2 isRotationMode={isRotationMode} prepared={prepared} shiftHours={result.shift_hours} activePlan={selectedPlan} onPlanChange={setActivePlan} />}
+        {selectedTab === 'board-v2' && <ResultBoardV2 isRotationMode={isRotationMode} prepared={prepared} shiftHours={result.shift_hours} activePlan={selectedPlan} onPlanChange={setActivePlan} showProfession={showProfession} />}
         {selectedTab === 'data' && (isPreview || !fullDataAvailable) && (
           <section className="tool-panel space-y-4 p-5" aria-label={copy.optimize.paid_preview.exports}>
             <h3 className="font-medium text-ink-primary">{copy.optimize.paid_preview.exports}</h3>

@@ -194,6 +194,44 @@ describe('manual schedule access and recovery', () => {
 })
 
 describe('ResultPanel overview v2', () => {
+  it('toggles profession badges across shifts and exports while leaving v1 unchanged', async () => {
+    const user = userEvent.setup()
+    const result = createThreeShiftResult()
+    result.plans[0].rooms.trading[0].operators = ['能天使', '德克萨斯', '未知干员']
+    result.plans[1].rooms.trading[0].operators = ['阿米娅']
+    const exporter = await import('./schedule-image')
+    const download = vi.spyOn(exporter, 'downloadScheduleImage').mockResolvedValue()
+    try {
+      render(<ResultPanel result={result} operators={[
+        { id: 'char_103_angel', name: '能天使', own: true, elite: 2, rarity: 6 },
+      ]} />)
+      await user.click(screen.getByRole('tab', { name: '总览图 v2' }))
+      const option = screen.getByRole('checkbox', { name: '显示干员职业' })
+      const board = within(screen.getByRole('region', { name: '总览图 v2' }))
+      expect(option).not.toBeChecked()
+      expect(board.queryByRole('img', { name: '狙击' })).not.toBeInTheDocument()
+      await user.click(option)
+      expect(board.getByRole('img', { name: '狙击' })).toHaveAttribute('src', '/operator-professions/SNIPER.png')
+      expect(board.getByRole('img', { name: '先锋' })).toHaveAttribute('src', '/operator-professions/PIONEER.png')
+      expect(board.getAllByRole('img')).toHaveLength(2)
+      await user.click(board.getByRole('tab', { name: /第2班/ }))
+      expect(board.getByRole('img', { name: '术师' })).toHaveAttribute('src', '/operator-professions/CASTER.png')
+      await user.click(screen.getByRole('button', { name: '导出当前班次' }))
+      await waitFor(() => expect(download).toHaveBeenLastCalledWith(expect.objectContaining({ version: 'v2', planIndex: 1, showProfession: true })))
+      await user.click(screen.getByRole('button', { name: '导出全部班次长图' }))
+      await waitFor(() => expect(download).toHaveBeenLastCalledWith(expect.objectContaining({ version: 'v2', planIndex: undefined, showProfession: true })))
+      await user.click(screen.getByRole('tab', { name: '总览图' }))
+      expect(screen.queryByRole('checkbox', { name: '显示干员职业' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('img', { name: '狙击' })).not.toBeInTheDocument()
+      await user.click(screen.getByRole('tab', { name: '总览图 v2' }))
+      expect(screen.getByRole('checkbox', { name: '显示干员职业' })).toBeChecked()
+      await user.click(screen.getByRole('checkbox', { name: '显示干员职业' }))
+      expect(screen.queryByRole('img', { name: '术师' })).not.toBeInTheDocument()
+    } finally {
+      download.mockRestore()
+    }
+  })
+
   it('shows both product icons beside the v1 label when a facility changes product between shifts', () => {
     const result = createThreeShiftResult()
     result.plans[1].rooms.trading[0].product = 'Orundum'
