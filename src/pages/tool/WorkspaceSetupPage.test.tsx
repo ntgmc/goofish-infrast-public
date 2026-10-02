@@ -36,6 +36,39 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+describe('WorkspaceSetupPage operator search', () => {
+  it('matches Chinese names, pinyin and initials while keeping only owned operators', async () => {
+    const user = userEvent.setup()
+    renderWorkspace({
+      profile: createAdvancedProfile(),
+      workspace: {
+        ...createAdvancedWorkspace(),
+        operators: [
+          { id: 'char_002_amiya', name: '阿米娅', own: true, elite: 2, rarity: 4 },
+          { id: 'char_103_angel', name: '能天使', own: true, elite: 2, rarity: 5 },
+          { id: 'char_010_chen', name: '陈', own: false, elite: 2, rarity: 5 },
+        ],
+      },
+    })
+    const input = screen.getByRole('textbox', { name: '搜索干员名称' })
+    for (const query of ['阿米', 'amiya', 'AMY', '  amy  ']) {
+      await user.clear(input)
+      await user.type(input, query)
+      expect(screen.getByText('阿米娅')).toBeInTheDocument()
+      expect(screen.queryByText('能天使')).not.toBeInTheDocument()
+    }
+    await user.clear(input)
+    await user.type(input, 'chen')
+    expect(screen.queryByText('陈')).not.toBeInTheDocument()
+    expect(screen.queryByText('阿米娅')).not.toBeInTheDocument()
+    expect(screen.queryByText('能天使')).not.toBeInTheDocument()
+    await user.clear(input)
+    expect(screen.getByText('阿米娅')).toBeInTheDocument()
+    expect(screen.getByText('能天使')).toBeInTheDocument()
+    expect(screen.queryByText('陈')).not.toBeInTheDocument()
+  })
+})
+
 describe('WorkspaceSetupPage automatic configuration saving', () => {
   it('saves the initial configuration and edits without entering scheduling', async () => {
     const user = userEvent.setup()
