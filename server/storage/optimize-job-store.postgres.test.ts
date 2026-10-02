@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { closePool, getPool, query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import {
@@ -840,13 +840,41 @@ describe('PostgreSQL optimization job admission', () => {
     }
   })
 
+  it('filters and cleans old terminal records while retaining active jobs and the seven-day boundary', async () => {
+    const store = createPostgresOptimizeJobStore()
+    const profileId = await seedProfile()
+    const nowMs = Date.now()
+    const cutoff = new Date(nowMs - 7 * 24 * 60 * 60_000).toISOString()
+    const old = new Date(Date.parse(cutoff) - 1).toISOString()
+    const retainedIds: string[] = []
+    for (const status of ['queued', 'running', 'succeeded', 'failed', 'cancelled', 'dead_lettered'] as const) {
+      const job = await store.createJob(input({ profile_id: profileId }))
+      await query('update optimize_jobs set status = $2, created_at = $3, finished_at = $4, updated_at = $3 where id = $1', [
+        job.id, status, old, status === 'queued' || status === 'running' ? null : old,
+      ])
+      if (status === 'queued' || status === 'running') retainedIds.push(job.id)
+    }
+    const boundary = await store.createJob(input({ profile_id: profileId }))
+    await query("update optimize_jobs set status = 'succeeded', finished_at = $2, updated_at = $3 where id = $1", [boundary.id, cutoff, old])
+    retainedIds.push(boundary.id)
+    vi.spyOn(Date, 'now').mockReturnValue(nowMs)
+    try {
+      expect((await store.listJobsByProfile(profileId)).map(({ job }) => job.id).sort()).toEqual([...retainedIds].sort())
+      await store.cleanupOldJobs(cutoff)
+      const remaining = await query<{ id: string }>('select id from optimize_jobs where profile_id = $1', [profileId])
+      expect(remaining.rows.map(({ id }) => id).sort()).toEqual([...retainedIds].sort())
+    } finally {
+      vi.restoreAllMocks()
+    }
+  })
+
   it('cleans terminal jobs together with submission and idempotency metadata', async () => {
     const store = createPostgresOptimizeJobStore()
     const admitted = await store.admitJob(input({ priority: 200_000 }))
     const claimed = await store.claimNextJob('cleanup-worker', 'cleanup-lock', new Date(Date.now() + 60_000).toISOString(), 2, 10)
     expect(claimed?.id).toBe(admitted.job.id)
     await store.failAttempt(claimed!.id, claimed!.attempt_count, 'cleanup-worker', 'cleanup-lock', 'cleanup test')
-    await query('update optimize_jobs set updated_at = $2 where id = $1', [admitted.job.id, '2020-01-01T00:00:00.000Z'])
+    await query('update optimize_jobs set finished_at = $2, updated_at = $2 where id = $1', [admitted.job.id, '2020-01-01T00:00:00.000Z'])
     await query('update optimization_idempotency set updated_at = $2 where job_id = $1', [admitted.job.id, '2020-01-01T00:00:00.000Z'])
     await query('update optimization_submissions set created_at = $2 where owner_key = $1', [admitted.job.owner_key, '2020-01-01T00:00:00.000Z'])
 
@@ -895,7 +923,7 @@ describe('PostgreSQL optimization job admission', () => {
     expect(await store.getJob(pending.job.id)).not.toBeNull()
     expect((await query<{ status: string }>('select status from user_balance_reservations where job_id = $1', [pending.job.id])).rows[0]?.status).toBe('reserved')
     await store.reconcileBilling?.()
-    await query("update optimize_jobs set updated_at = now() - interval '2 days' where id = $1", [pending.job.id])
+    await query("update optimize_jobs set finished_at = now() - interval '2 days', updated_at = now() - interval '2 days' where id = $1", [pending.job.id])
     await store.cleanupOldJobs(new Date(Date.now() - 24 * 60 * 60_000).toISOString())
     expect(await store.getJob(pending.job.id)).toBeNull()
   })
@@ -1235,6 +1263,18 @@ describe('PostgreSQL optimization job admission', () => {
       formalScheduleResult('duplicate'),
     )).resolves.toBe(false)
     expect((await listProfileOptimizationResults(profileId, 'active', { limit: 50 })).items).toHaveLength(6)
+    expect((await store.listJobsByProfile(profileId))[0].historyResultId).toBe(admitted.job.id)
+    await query('update optimization_result_history set archived_at = now() where profile_id = $1 and id = $2', [profileId, admitted.job.id])
+    expect((await store.listJobsByProfile(profileId))[0].historyResultId).toBe(admitted.job.id)
+    await query('delete from optimization_result_history where profile_id = $1 and id = $2', [profileId, admitted.job.id])
+    expect((await store.listJobsByProfile(profileId))[0].historyResultId).toBeNull()
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString()
+    await query("update optimize_jobs set finished_at = now() - interval '8 days' where id = $1", [admitted.job.id])
+    await store.cleanupOldJobs(cutoff)
+    expect(await store.getJob(admitted.job.id)).not.toBeNull()
+    await query("update optimization_job_effects set metadata_json = metadata_json || '{\"status\":\"applied\"}'::jsonb where job_id = $1", [admitted.job.id])
+    await store.cleanupOldJobs(cutoff)
+    expect(await store.getJob(admitted.job.id)).toBeNull()
   })
 
   it('rejects an invalid formal optimizer result without charging or persisting success effects', async () => {

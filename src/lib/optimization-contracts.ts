@@ -133,7 +133,7 @@ export type OptimizationJobSnapshot<TResult = OptimizeResult> =
 
 export type OptimizationJobListItem = OptimizationJobSnapshotBase & (
   | { status: 'queued' | 'running'; resultAvailable: false }
-  | { status: 'succeeded'; resultAvailable: true }
+  | { status: 'succeeded'; resultAvailable: boolean }
   | { status: 'failed' | 'cancelled' | 'dead_lettered'; resultAvailable: false; error: OptimizationFailureSnapshot }
 )
 

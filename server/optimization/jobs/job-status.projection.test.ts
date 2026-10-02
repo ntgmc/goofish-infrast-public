@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   getJob: vi.fn(),
+  listJobsByProfile: vi.fn(),
   getQueuePosition: vi.fn(),
   getProfileForUser: vi.fn(),
   requireUserSession: vi.fn(),
@@ -11,6 +12,7 @@ vi.mock('../../storage/optimize-job-store', () => ({
   OptimizeJobAdmissionError: class OptimizeJobAdmissionError extends Error {},
   getOptimizeJobStore: () => ({
     getJob: mocks.getJob,
+    listJobsByProfile: mocks.listJobsByProfile,
     getQueuePosition: mocks.getQueuePosition,
   }),
 }))
@@ -27,19 +29,30 @@ vi.mock('../../handlers/profile-authorization', () => ({
   })),
 }))
 
-import { getOptimizationJob } from './job-status'
+import { getOptimizationJob, listOptimizationJobs } from './job-status'
 
 describe('optimization job result projection', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.getJob.mockResolvedValue(jobRecord())
     mocks.getQueuePosition.mockResolvedValue(null)
+    mocks.listJobsByProfile.mockResolvedValue([{ job: jobRecord(), queuePosition: null }])
     mocks.requireUserSession.mockResolvedValue({ user: { id: 'user-1' } })
     mocks.getProfileForUser.mockResolvedValue({
       id: 'profile-1',
       kind: 'cdk',
       permission: 'recommended',
     })
+  })
+
+  it.each([null, 'job-1'])('reports schedule result availability from persisted history (%s)', async (historyResultId) => {
+    mocks.listJobsByProfile.mockResolvedValue([{ job: jobRecord(), queuePosition: null, historyResultId }])
+    const response = await listOptimizationJobs(new Request('http://localhost/api/optimization/jobs?profile_id=profile-1'))
+    expect(response.status).toBe(200)
+    const { jobs } = await response.json()
+    expect(jobs[0]).toMatchObject({ status: 'succeeded', resultAvailable: Boolean(historyResultId) })
+    expect(jobs[0].historyResultId).toBe(historyResultId ?? undefined)
+    expect(jobs[0]).not.toHaveProperty('result')
   })
 
   it('does not expose full or raw result data to a recommended profile owner', async () => {
