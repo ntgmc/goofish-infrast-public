@@ -1,4 +1,4 @@
-import { ListTodo } from 'lucide-react'
+import { Activity } from 'lucide-react'
 import { useEffect, useRef, type RefObject } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../../components/ui/dialog'
 import type { OptimizationJobListItem } from '../../../lib/optimization-contracts'
@@ -36,7 +36,8 @@ export function OptimizationTaskCenterButton({
       aria-label={ariaLabel}
       className={`tool-secondary-action relative inline-flex h-11 items-center gap-2 py-0 ${iconOnly ? 'w-11 justify-center px-0' : ''}`}
     >
-      {iconOnly ? <ListTodo aria-hidden="true" className="size-5" /> : <span>{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_032}</span>}
+      <Activity aria-hidden="true" className="size-5" />
+      {!iconOnly && <span>{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_032}</span>}
       {activeCount > 0 && <span className={`tool-status tool-status--current px-1.5 py-0.5 text-[11px] ${iconOnly ? 'absolute -right-1 -top-1 min-w-5 justify-center' : ''}`}>{activeCount}</span>}
       {attentionCount > 0 && <span className={`tool-status tool-status--error px-1.5 py-0.5 text-[11px] ${iconOnly ? 'absolute -bottom-1 -right-1 min-w-5 justify-center' : ''}`}>!</span>}
     </button>
@@ -62,6 +63,10 @@ export default function OptimizationTaskCenterDialog({
 }) {
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const { jobs, activeCount, attentionCount, loading, refreshing, loadingMore, error, notice, busyJobId, notificationsEnabled } = controller
+  const groups = [
+    { label: copy.optimize.pages_tool_optimize_OptimizationTaskCenter_039, jobs: jobs.filter((job) => job.status === 'queued' || job.status === 'running') },
+    { label: copy.optimize.pages_tool_optimize_OptimizationTaskCenter_040, jobs: jobs.filter((job) => job.status !== 'queued' && job.status !== 'running') },
+  ]
 
   useEffect(() => {
     if (!open) return
@@ -74,7 +79,7 @@ export default function OptimizationTaskCenterDialog({
         id="optimization-task-center-dialog"
         aria-labelledby="optimization-task-center-title"
         aria-describedby="optimization-task-center-description"
-        className="block max-w-3xl"
+        className="block max-h-[85dvh] max-w-3xl overflow-y-auto"
         onOpenAutoFocus={(event) => {
           event.preventDefault()
           closeButtonRef.current?.focus()
@@ -117,18 +122,25 @@ export default function OptimizationTaskCenterDialog({
         ) : jobs.length === 0 ? (
           <p className="mt-4 text-sm text-ink-muted">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_005}</p>
         ) : (
-          <div className="mt-4 space-y-2">
-            {jobs.map((job) => (
-              <JobRow
-                key={job.id}
-                job={job}
-                busy={busyJobId === job.id}
-                onCancel={() => void controller.cancel(job)}
-                onRetrySchedule={onRetrySchedule}
-                onOpenScenario={() => onOpenScenario(job)}
-                onOpenResult={() => onOpenResult(job)}
-                retryEnabled={retryEnabled}
-              />
+          <div className="mt-4 space-y-5">
+            {groups.filter((group) => group.jobs.length > 0).map((group) => (
+              <section key={group.label} aria-label={group.label}>
+                <h3 className="mb-2 text-sm font-medium text-ink-secondary">{group.label} · {group.jobs.length}</h3>
+                <div className="space-y-2">
+                  {group.jobs.map((job) => (
+                    <JobRow
+                      key={job.id}
+                      job={job}
+                      busy={busyJobId === job.id}
+                      onCancel={() => void controller.cancel(job)}
+                      onRetrySchedule={onRetrySchedule}
+                      onOpenScenario={() => onOpenScenario(job)}
+                      onOpenResult={() => onOpenResult(job)}
+                      retryEnabled={retryEnabled}
+                    />
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         )}
@@ -157,14 +169,19 @@ function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario, onOpenRe
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
+            <h4 className="text-sm font-medium text-ink-primary">{kindLabel(job.kind)}</h4>
             <span className={statusClass(job.status)}>{statusLabel(job)}</span>
-            <span className="tool-status">{kindLabel(job.kind)}</span>
-            <span className="tool-status font-mono">{job.id.slice(0, 8)}</span>
           </div>
           <p className="mt-2 text-xs leading-5 text-ink-muted">
             {new Date(job.timestamps.submittedAt).toLocaleString(CURRENT_LOCALE)} · {job.attemptCount} {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_025}
             {typeof job.queuePosition === 'number' ? ` · ${copy.optimize.pages_tool_optimize_OptimizationTaskCenter_026} ${job.queuePosition}` : ''}
           </p>
+          <p className="mt-1 text-xs text-ink-muted">
+            {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_042} <span className="font-mono">{job.id.slice(0, 8)}</span>
+          </p>
+          {job.status === 'succeeded' && !job.resultAvailable && (
+            <p className="mt-2 text-xs leading-5 text-ink-muted">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_041}</p>
+          )}
           {terminalFailure && <div className="mt-2 text-sm leading-6 text-ink-secondary">
             <p>{job.error.message}</p>
             <p className="mt-1 text-xs text-ink-muted">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_027}：{job.error.supportReference}</p>
@@ -173,7 +190,7 @@ function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario, onOpenRe
         <div className="flex shrink-0 flex-wrap gap-2">
           {job.canCancel && <button type="button" disabled={busy} onClick={onCancel} className="tool-secondary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_020}</button>}
           {job.status === 'succeeded' && job.resultAvailable && (job.kind !== 'schedule' || job.historyResultId) && (
-            <button type="button" onClick={onOpenResult} className="tool-primary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_037}</button>
+            <button type="button" onClick={onOpenResult} className="tool-secondary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_037}</button>
           )}
           {retryEnabled && job.canRetry && job.kind === 'schedule' && <button type="button" onClick={onRetrySchedule} className="tool-primary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_022}</button>}
           {retryEnabled && job.canRetry && job.kind === 'scenario_comparison' && <button type="button" onClick={onOpenScenario} className="tool-primary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_023}</button>}
