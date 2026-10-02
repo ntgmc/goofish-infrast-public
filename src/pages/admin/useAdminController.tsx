@@ -752,7 +752,7 @@ export function useAdminController() {
       downloadOperatorsJson(data)
       setNotice(`已开始下载 ${profile.display_name || '账号档案'} 的干员 JSON`)
     }
-  const handleDownloadUserWorkspaces = () => selectedUserDetail ? downloadAdminUserWorkspaces({ userId: selectedUserDetail.user.id, setBusyAction, setError, setNotice }) : Promise.resolve()
+  const handleDownloadUserWorkspaces = (profileIds?: string[]) => selectedUserDetail ? downloadAdminUserWorkspaces({ userId: selectedUserDetail.user.id, profileIds, setBusyAction, setError, setNotice }) : Promise.resolve(false)
   const requestOperationReason = (message: string) => requestAdminOperationReason({
       title: '确认管理员操作',
       description: message,

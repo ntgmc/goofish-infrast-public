@@ -231,7 +231,11 @@ describe('useAdminController announcement drafts', () => {
     }))
   })
 
-  it('downloads the selected user workspace export with isolated busy and notice state', async () => {
+  it.each([
+    { profileIds: undefined, query: '' },
+    { profileIds: ['profile-1'], query: '&profile_id=profile-1' },
+    { profileIds: ['profile-1', 'profile-2'], query: '&profile_id=profile-1&profile_id=profile-2' },
+  ])('downloads selected user workspace export with isolated busy and notice state ($query)', async ({ profileIds, query }) => {
     const createObjectURL = vi.fn(() => 'blob:workspace-export')
     const revokeObjectURL = vi.fn()
     let downloadedFilename = ''
@@ -247,13 +251,13 @@ describe('useAdminController announcement drafts', () => {
     await waitForHydration(result)
     act(() => result.current.setSelectedUserDetail({ user: { id: 'user-123456789' } } as AdminUserDetail))
 
-    let download!: Promise<void>
+    let download!: Promise<boolean>
     act(() => {
-      download = result.current.handleDownloadUserWorkspaces()
+      download = result.current.handleDownloadUserWorkspaces(profileIds)
     })
     expect(result.current.busyAction).toBe('user-workspaces-export:user-123456789')
     expect(adminApi.blob).toHaveBeenCalledWith(
-      '/api/admin/users?user_id=user-123456789&include=workspaces',
+      `/api/admin/users?user_id=user-123456789&include=workspaces${query}`,
       { fallbackMessage: '导出完整工作区数据失败' },
     )
 
@@ -283,6 +287,20 @@ describe('useAdminController announcement drafts', () => {
     expect(result.current.busyAction).toBeNull()
     expect(result.current.notice).toBeNull()
     expect(result.current.error).toBe('导出服务不可用')
+  })
+
+  it('rejects an empty workspace selection instead of exporting every account', async () => {
+    const { result } = renderHook(() => useAdminController())
+    await waitForHydration(result)
+    act(() => result.current.setSelectedUserDetail({ user: { id: 'user-1' } } as AdminUserDetail))
+
+    await act(async () => {
+      expect(await result.current.handleDownloadUserWorkspaces([])).toBe(false)
+    })
+
+    expect(adminApi.blob).not.toHaveBeenCalled()
+    expect(result.current.error).toBe('请至少选择一个账号。')
+    expect(result.current.busyAction).toBeNull()
   })
 
   it('revokes selected CDKs with one batch request', async () => {

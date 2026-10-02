@@ -137,6 +137,36 @@ beforeEach(() => {
 })
 
 describe('admin user workspace export', () => {
+  it.each([
+    ['profile-2'],
+    [profile.id, 'profile-2'],
+    ['profile-2', 'profile-2'],
+  ])('exports only selected profiles: %j', async (...profileIds: string[]) => {
+    const secondProfile = { ...profile, id: 'profile-2', display_name: '账号 C' }
+    mocks.listProfilesForUser.mockResolvedValue([profile, secondProfile, { ...profile, id: 'profile-3' }])
+    const url = new URL(workspaceExportRequest().url)
+    profileIds.forEach((id) => url.searchParams.append('profile_id', id))
+
+    const response = await adminUsersHandler(new Request(url))
+    const body = await response.json() as AdminUserWorkspaceExportV1
+    const expectedIds = [profile.id, secondProfile.id].filter((id) => profileIds.includes(id))
+
+    expect(response.status).toBe(200)
+    expect(body.profiles.map((item) => item.id)).toEqual(expectedIds)
+    expect(mocks.listProfileWorkspaces).toHaveBeenCalledWith(expectedIds)
+    expect(mocks.listOptimizationResultsForProfiles).toHaveBeenCalledWith(expectedIds)
+    expect(mocks.authenticateAdminRequest).toHaveBeenCalledWith(expect.any(Request), 'sensitive_data_view')
+  })
+
+  it.each(['', 'missing-profile', `${profile.id}&profile_id=another-users-profile`])('rejects invalid or foreign profile selections: %s', async (query) => {
+    const response = await adminUsersHandler(new Request(`${workspaceExportRequest().url}&profile_id=${query}`))
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toEqual({ error: '所选账号档案不存在或不属于该用户。' })
+    expect(mocks.listProfileWorkspaces).not.toHaveBeenCalled()
+    expect(mocks.listOptimizationResultsForProfiles).not.toHaveBeenCalled()
+  })
+
   it('exports every profile workspace with complete history through one batch query', async () => {
     const secondProfile = {
       ...profile,
