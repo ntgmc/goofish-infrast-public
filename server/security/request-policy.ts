@@ -552,12 +552,21 @@ export const requestSchemas = {
     result_id: shortString(128),
     idempotency_key: shortString(200),
   }),
-  resultArchive: strict({
-    profile_id: shortString(128),
-    result_id: shortString(128),
-    action: z.enum(['archive', 'unarchive', 'delete']),
-    idempotency_key: shortString(200),
-  }),
+  resultArchive: z.discriminatedUnion('action', [
+    strict({
+      profile_id: shortString(128),
+      result_id: shortString(128),
+      action: z.enum(['archive', 'unarchive', 'delete']),
+      idempotency_key: shortString(200),
+    }),
+    strict({
+      profile_id: shortString(128),
+      result_id: shortString(128),
+      action: z.literal('rename'),
+      name: z.string().trim().min(1).max(40),
+      idempotency_key: shortString(200),
+    }),
+  ]),
   adminItems: z.discriminatedUnion('action', [
     strict({
       action: z.literal('create_gift_pack'),

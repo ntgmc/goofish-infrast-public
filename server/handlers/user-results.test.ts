@@ -146,6 +146,7 @@ beforeEach(() => {
     operation_id: 'operation-1',
   }))
   mocks.getProfileCapacityLimitsInTransaction.mockResolvedValue({ plan: 3, history: 5, archive: 1 })
+  mocks.mutateProfileOptimizationResultInTransaction.mockResolvedValue(undefined)
   mocks.getWorkspaceOptimizationResultOverviewWithClient.mockResolvedValue({
     latest_result: historySummary(),
     result_history: { items: [historySummary()], next_cursor: null },
@@ -214,6 +215,42 @@ describe('result history mutations', () => {
 
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual(replay)
+    expect(mocks.mutateProfileOptimizationResultInTransaction).not.toHaveBeenCalled()
+  })
+})
+
+describe('result archive rename', () => {
+  it('passes the validated name and includes it in the idempotency hash', async () => {
+    mocks.getValidatedJson.mockResolvedValue({ ...exportBody, action: 'rename', name: '我的封存' })
+    const response = await userResultsHandler(exportRequest('result-archive'))
+    expect(response.status).toBe(200)
+    expect(mocks.mutateProfileOptimizationResultInTransaction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ profileId: 'profile-1', resultId: 'result-1', action: 'rename', name: '我的封存' }),
+    )
+    const hash = createHash('sha256').update(JSON.stringify({
+      profile_id: 'profile-1', result_id: 'result-1', action: 'rename', name: '我的封存',
+    })).digest('hex')
+    expect(mocks.clientQuery).toHaveBeenCalledWith(
+      expect.stringContaining('insert into inventory_operations'),
+      expect.arrayContaining([hash]),
+    )
+  })
+
+  it('rejects reusing a rename idempotency key with a different name', async () => {
+    mocks.getValidatedJson.mockResolvedValue({ ...exportBody, action: 'rename', name: '新名字' })
+    mocks.clientQuery.mockResolvedValueOnce({
+      rows: [{
+        request_hash: createHash('sha256').update(JSON.stringify({
+          profile_id: 'profile-1', result_id: 'result-1', action: 'rename', name: '旧名字',
+        })).digest('hex'),
+        response_json: { action: 'rename' },
+      }],
+      rowCount: 1,
+    })
+    const response = await userResultsHandler(exportRequest('result-archive'))
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({ code: 'idempotency_conflict' })
     expect(mocks.mutateProfileOptimizationResultInTransaction).not.toHaveBeenCalled()
   })
 })

@@ -81,8 +81,8 @@ describe('PlansSection', () => {
 
     const maaButtons = screen.getAllByRole('button', { name: '下载 MAA JSON' })
     expect(maaButtons).toHaveLength(2)
-    expect(maaButtons[0]).toBeEnabled()
-    expect(maaButtons[1]).toBeDisabled()
+    expect(maaButtons[0]).toBeDisabled()
+    expect(maaButtons[1]).toBeEnabled()
     expect(screen.queryByRole('button', { name: '下载完整计算数据' })).not.toBeInTheDocument()
   })
 
@@ -91,6 +91,47 @@ describe('PlansSection', () => {
 
     expect(screen.queryByRole('heading', { name: '结果封存区' })).not.toBeInTheDocument()
     expect(screen.queryByText('封存区暂无结果。')).not.toBeInTheDocument()
+  })
+  it('shows archives before history and keeps archive attempts enabled when full', async () => {
+    const user = userEvent.setup()
+    const onArchiveHistory = vi.fn().mockResolvedValue(undefined)
+    const onRenameArchivedHistory = vi.fn().mockResolvedValue(undefined)
+    const archived = { ...historyItem(2), archived: true }
+    renderSection({
+      resultHistory: [historyItem(1)],
+      archivedResults: [archived],
+      archiveLimit: 1,
+      archivedResultsUsed: 1,
+      onArchiveHistory,
+      onRenameArchivedHistory,
+    })
+    expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.id))
+      .toEqual(['saved-configs-title', 'archived-results-title', 'result-history-title'])
+    expect(screen.queryByText('封存区已满，请先取消封存或使用结果封存夹扩容。')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '封存' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: '封存' }))
+    expect(onArchiveHistory).toHaveBeenCalledWith(historyItem(1))
+    await user.click(screen.getByRole('button', { name: '修改封存名' }))
+    expect(onRenameArchivedHistory).toHaveBeenCalledWith(archived)
+  })
+
+  it('disables archiving without archive capacity', () => {
+    renderSection({ resultHistory: [historyItem(1)], archiveLimit: 0 })
+    expect(screen.getByRole('button', { name: '封存' })).toBeDisabled()
+  })
+
+  it('enables unarchiving when refreshed history capacity has a free slot', () => {
+    const options = {
+      activeConfig: config, savedConfigs: [], resultHistory: [], archivedResults: [{ ...historyItem(1), archived: true }],
+      archiveLimit: 1, selectedHistoryId: null, busyAction: null, notice: null, error: null,
+      onSaveCurrent: vi.fn(), onUseSavedConfig: vi.fn(), onRenameSavedConfig: vi.fn(), onDeleteSavedConfig: vi.fn(),
+      onViewHistory: vi.fn(), onUseHistoryConfig: vi.fn(), onDownloadHistory: vi.fn(),
+    }
+    const { rerender } = render(<PlansSection {...options} resultHistoryUsed={5} />)
+    expect(screen.getByRole('button', { name: '取消封存' })).toBeDisabled()
+    rerender(<PlansSection {...options} resultHistoryUsed={4} />)
+    expect(screen.getByRole('button', { name: '取消封存' })).toBeEnabled()
+    expect(screen.queryByText('普通历史记录已满，请先删除一条记录，再取消封存。')).not.toBeInTheDocument()
   })
 })
 

@@ -208,6 +208,7 @@ export default async function userResultsHandler(req: Request): Promise<Response
       profile_id: body.profile_id,
       result_id: body.result_id,
       action: body.action,
+      ...(body.action === 'rename' ? { name: body.name } : {}),
     })).digest('hex')
     const response = await withTransaction(async (client) => {
       const existing = await client.query<{ request_hash: string; response_json: Record<string, unknown> | null }>(
@@ -234,7 +235,7 @@ export default async function userResultsHandler(req: Request): Promise<Response
       await mutateProfileOptimizationResultInTransaction(client, {
         profileId: profile.id,
         resultId: body.result_id,
-        action: body.action,
+        ...(body.action === 'rename' ? { action: body.action, name: body.name } : { action: body.action }),
         historyLimit: limits.history,
         archiveLimit: limits.archive,
         now,

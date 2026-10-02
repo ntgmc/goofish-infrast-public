@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { act, renderHook } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, renderHook } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LicenseConfig, UserWorkspace, WorkspaceResultHistorySummary } from '../../../lib/types'
 import { useOptimizeWorkspace } from './useOptimizeWorkspace'
 
@@ -8,12 +8,17 @@ const mocks = vi.hoisted(() => ({ apiJson: vi.fn() }))
 
 vi.mock('../../../lib/api-client', () => ({ apiJson: mocks.apiJson }))
 
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
+
 describe('useOptimizeWorkspace history mutations', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    mocks.apiJson.mockReset()
   })
 
-  it('applies the workspace returned by the archive endpoint without an empty workspace patch', async () => {
+  it.each(['archive', 'unarchive', 'delete'] as const)('applies returned workspace and refreshes capacity after %s', async (action) => {
     const workspace = {
       profile_id: 'profile-1',
       operators: [],
@@ -31,12 +36,15 @@ describe('useOptimizeWorkspace history mutations', () => {
     mocks.apiJson.mockResolvedValue({ workspace })
     const onWorkspacePatch = vi.fn()
     const onWorkspaceUpdated = vi.fn()
+    const refreshInventory = vi.fn().mockResolvedValue(undefined)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
     const { result } = renderHook(() => useOptimizeWorkspace({
       profileId: 'profile-1',
       activeConfig: {} as LicenseConfig,
       normalizeAllowedConfigOverride: (config) => config,
       onWorkspacePatch,
       onWorkspaceUpdated,
+      refreshInventory,
       setConfigOverride: vi.fn(),
       setCurrentResult: vi.fn(),
       setFinalResult: vi.fn(),
@@ -53,12 +61,48 @@ describe('useOptimizeWorkspace history mutations', () => {
     }))
 
     await act(async () => {
-      await result.current.handleArchiveHistory(historyItem())
+      if (action === 'archive') await result.current.handleArchiveHistory(historyItem())
+      if (action === 'unarchive') await result.current.handleUnarchiveHistory(historyItem())
+      if (action === 'delete') await result.current.handleDeleteHistory(historyItem())
     })
 
     expect(mocks.apiJson).toHaveBeenCalledTimes(1)
     expect(onWorkspaceUpdated).toHaveBeenCalledWith('profile-1', workspace)
+    expect(refreshInventory).toHaveBeenCalledOnce()
     expect(onWorkspacePatch).not.toHaveBeenCalled()
+  })
+  it('trims and validates an archive name and updates the selected result', async () => {
+    const prompt = vi.spyOn(window, 'prompt').mockReturnValue('  我的封存  ')
+    const setHistoryItem = vi.fn()
+    const onWorkspaceUpdated = vi.fn()
+    const workspace = { archived_results: [{ ...historyItem(), name: '我的封存' }] }
+    mocks.apiJson.mockResolvedValue({ workspace })
+    const { result } = renderHook(() => useOptimizeWorkspace({
+      profileId: 'profile-1',
+      activeConfig: {} as LicenseConfig,
+      normalizeAllowedConfigOverride: (config) => config,
+      onWorkspacePatch: vi.fn(),
+      onWorkspaceUpdated,
+      refreshInventory: vi.fn(),
+      setConfigOverride: vi.fn(), setCurrentResult: vi.fn(), setFinalResult: vi.fn(), setHistoryItem,
+      setSuggestions: vi.fn(), setPhase: vi.fn(), setLastGeneratedSignature: vi.fn(), setInlineError: vi.fn(),
+      setWorkspaceNotice: vi.fn(), setWorkspaceError: vi.fn(), setWorkspaceBusyAction: vi.fn(), setSection: vi.fn(),
+      onDownloadMaaResult: vi.fn(),
+    }))
+    await act(async () => { await result.current.handleRenameArchivedHistory(historyItem()) })
+    expect(mocks.apiJson).toHaveBeenCalledWith('/api/user/result-archive', expect.objectContaining({
+      json: expect.objectContaining({ action: 'rename', name: '我的封存', result_id: 'result-1' }),
+    }))
+    expect(onWorkspaceUpdated).toHaveBeenCalledWith('profile-1', workspace)
+    const updateDetail = setHistoryItem.mock.calls[0]![0]
+    expect(updateDetail({ id: 'result-1', name: '旧名' })).toEqual({ id: 'result-1', name: '我的封存' })
+    expect(updateDetail(null)).toBeNull()
+    mocks.apiJson.mockClear()
+    for (const name of [null, ' ', 'x'.repeat(41), historyItem().name]) {
+      prompt.mockReturnValue(name)
+      await act(async () => { await result.current.handleRenameArchivedHistory(historyItem()) })
+    }
+    expect(mocks.apiJson).not.toHaveBeenCalled()
   })
 })
 

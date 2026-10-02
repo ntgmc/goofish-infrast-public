@@ -270,11 +270,10 @@ export async function mutateProfileOptimizationResultInTransaction(
   input: {
     profileId: string
     resultId: string
-    action: 'archive' | 'unarchive' | 'delete'
     historyLimit: number
     archiveLimit: number
     now: string
-  },
+  } & ({ action: 'archive' | 'unarchive' | 'delete' } | { action: 'rename'; name: string }),
 ): Promise<void> {
   await lockProfileResults(client, input.profileId)
   const selected = await client.query<{ archived_at: string | Date | null }>(
@@ -287,6 +286,16 @@ export async function mutateProfileOptimizationResultInTransaction(
   const row = selected.rows[0]
   if (!row) throw new OptimizationResultMutationError('排班结果不存在。', 404, 'result_not_found')
   const archived = row.archived_at !== null
+  if (input.action === 'rename') {
+    if (!archived) throw new OptimizationResultMutationError('封存区中不存在该结果。', 404, 'result_not_found')
+    await client.query(
+      `update optimization_result_history
+       set name = $3, updated_at = $4::timestamptz
+       where profile_id = $1 and id = $2`,
+      [input.profileId, input.resultId, input.name, input.now],
+    )
+    return
+  }
 
   if (input.action === 'archive') {
     if (archived) return

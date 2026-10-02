@@ -363,6 +363,45 @@ describe('PostgreSQL unified inventory', () => {
     expect(stored.rows[0]).toEqual({ history_count: 6, archive_count: 1 })
   })
 
+  it('keeps the renamed result after archiving and immediately unarchiving a full history', async () => {
+    const { userId, profileId } = await seedUserProfile()
+    const now = new Date().toISOString()
+    await withTransaction(async (client) => {
+      for (let index = 0; index < 5; index += 1) {
+        await insertProfileOptimizationResultInTransaction(client, profileId, historyItem(`history-${index}`), 5)
+      }
+    })
+    const input = { profileId, resultId: 'history-0', historyLimit: 5, archiveLimit: 1, now }
+    await query(
+      `insert into user_profile_workspaces
+       (profile_id, operators_json, config_json, elite_overrides_json, last_result_json, record_json, updated_at)
+       values ($1, null, null, '{}'::jsonb, null, '{}'::jsonb, $2)`,
+      [profileId, now],
+    )
+    await withTransaction((client) => mutateProfileOptimizationResultInTransaction(client, { ...input, action: 'archive' }))
+    const archivedCapacity = (await listInventory(userId)).capacities.find((entry) => entry.profile_id === profileId)!
+    expect(archivedCapacity.history_slots.used).toBe(4)
+    expect(archivedCapacity.archive_slots.used).toBe(1)
+    await expect(withTransaction((client) => mutateProfileOptimizationResultInTransaction(client, {
+      ...input, resultId: 'history-1', action: 'archive',
+    }))).rejects.toMatchObject({ code: 'result_archive_full' })
+    await withTransaction((client) => mutateProfileOptimizationResultInTransaction(client, {
+      ...input, action: 'rename', name: '保留的封存名',
+    }))
+    await withTransaction((client) => mutateProfileOptimizationResultInTransaction(client, { ...input, action: 'unarchive' }))
+    const row = await query<{ name: string; archived_at: string | null }>(
+      'select name, archived_at from optimization_result_history where profile_id = $1 and id = $2',
+      [profileId, input.resultId],
+    )
+    expect(row.rows[0]).toEqual({ name: '保留的封存名', archived_at: null })
+    const historyCapacity = (await listInventory(userId)).capacities.find((entry) => entry.profile_id === profileId)!
+    expect(historyCapacity.history_slots.used).toBe(5)
+    expect(historyCapacity.archive_slots.used).toBe(0)
+    await expect(withTransaction((client) => mutateProfileOptimizationResultInTransaction(client, {
+      ...input, action: 'rename', name: '非封存结果',
+    }))).rejects.toMatchObject({ code: 'result_not_found' })
+  })
+
   it('lists lifetime and limited vouchers with their dedicated actions and fixed expiry', async () => {
     const { userId } = await seedUserProfile()
     const now = new Date('2026-07-30T00:00:00.000Z')

@@ -4,6 +4,22 @@ import { requestSchemas } from './request-policy'
 
 const codeHash = 'a'.repeat(64)
 const declarationHash = 'b'.repeat(64)
+
+describe('result archive request policy', () => {
+  const mutation = { profile_id: 'profile-1', result_id: 'result-1', idempotency_key: 'rename-1' }
+
+  it('validates and trims names only for rename actions', () => {
+    expect(requestSchemas.resultArchive.parse({ ...mutation, action: 'rename', name: '  我的封存  ' }))
+      .toEqual({ ...mutation, action: 'rename', name: '我的封存' })
+    for (const name of [undefined, '', ' ', 'x'.repeat(41)]) {
+      expect(requestSchemas.resultArchive.safeParse({ ...mutation, action: 'rename', name }).success).toBe(false)
+    }
+    for (const action of ['archive', 'unarchive', 'delete']) {
+      expect(requestSchemas.resultArchive.safeParse({ ...mutation, action }).success).toBe(true)
+      expect(requestSchemas.resultArchive.safeParse({ ...mutation, action, name: '不应接受' }).success).toBe(false)
+    }
+  })
+})
 const workspaceConfig = {
   layout: '2-4-3',
   desc: '测试配置',
