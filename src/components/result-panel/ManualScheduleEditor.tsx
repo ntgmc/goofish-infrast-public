@@ -21,11 +21,12 @@ import {
   manualSourceKey, parseManualDraft, readManualDraft, saveManualDraft, type ManualDraft, type ManualPlan,
 } from '../../lib/manual-schedule'
 
-export default function ManualScheduleEditor({ source, profileId, operators, simulationBaseline }: {
+export default function ManualScheduleEditor({ source, profileId, operators, simulationBaseline, draftStorageKey = profileId }: {
   source: OptimizeResult;
   profileId: string;
   operators: LicenseOperator[];
-  simulationBaseline?: { id: string; config: LicenseConfig };
+  simulationBaseline?: { id?: string; config: LicenseConfig };
+  draftStorageKey?: string;
 }) {
   const label = copy.domain.manual_schedule
   const [plans, setPlans] = useState<ManualPlan[]>(() => createManualPlans(source))
@@ -58,9 +59,9 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
   useEffect(() => { setSimulation(null) }, [operatorsKey])
 
   useEffect(() => {
-    try { setStored(readManualDraft(profileId, source, operators)) }
+    try { setStored(readManualDraft(draftStorageKey, source, operators)) }
     catch { setError(label.invalid_draft) }
-  }, [profileId, source, operators, label.invalid_draft])
+  }, [draftStorageKey, source, operators, label.invalid_draft])
 
   useEffect(() => {
     if (!dirty) return
@@ -90,7 +91,9 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
       const accepted = await submitOptimizationJob({
         kind: 'schedule', identity: { type: 'profile', profileId },
         operators, config: simulationBaseline.config, includeUpgradeSuggestions: false,
-        manualSchedule: { baselineHistoryId: simulationBaseline.id, plans: submittedPlans },
+        manualSchedule: simulationBaseline.id
+          ? { baselineHistoryId: simulationBaseline.id, plans: submittedPlans }
+          : { source, plans: submittedPlans },
       }, label.simulation_failed)
       let failures = 0
       while (!isCancelled()) {
@@ -166,7 +169,7 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
 
   function save() {
     try {
-      const draft = saveManualDraft(profileId, source, plans, operators)
+      const draft = saveManualDraft(draftStorageKey, source, plans, operators)
       setStored(draft)
       setBaseline(canonicalJson(plans))
       setNotice(label.saved)

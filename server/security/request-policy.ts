@@ -23,6 +23,7 @@ import {
 } from '../../src/lib/workspace-validation'
 import { scenarioComparisonFactorsSchema } from '../optimization/jobs/runtime-contracts'
 import { manualPlansSchema } from '../../src/lib/manual-schedule'
+import { manualScheduleSourceSchema } from '../../src/lib/manual-schedule-tool'
 
 export const REQUEST_BODY_LIMITS = Object.freeze({
   none: 0,
@@ -479,10 +480,10 @@ export const requestSchemas = {
       accepted_max_points: optionalString(32),
       billing_operation: z.enum(['main_schedule', 'incremental_recompute']).optional(),
       baseline_history_id: optionalString(128),
-      manualSchedule: strict({
-        baselineHistoryId: shortString(128),
-        plans: manualPlansSchema,
-      }).optional(),
+      manualSchedule: z.union([
+        strict({ baselineHistoryId: shortString(128), plans: manualPlansSchema }),
+        strict({ source: manualScheduleSourceSchema, plans: manualPlansSchema }),
+      ]).optional(),
     }),
     strict({
       kind: z.literal('scenario_comparison'),

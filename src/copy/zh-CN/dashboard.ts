@@ -246,15 +246,13 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/ToolsSection.tsx
   pages_tool_dashboard_ToolsSection_001: "仓库价值分析",
   // src/pages/tool/dashboard/ToolsSection.tsx
-  pages_tool_dashboard_ToolsSection_002: "粘贴 MAA 仓库识别导出的 JSON，即可估算仓库价值并下载结果图片。此工具不会读取或修改当前账号中保存的数据。",
-  // src/pages/tool/dashboard/ToolsSection.tsx
-  pages_tool_dashboard_ToolsSection_003: "开始分析",
+  pages_tool_dashboard_ToolsSection_002: "导入 MAA 仓库 JSON 或森空岛库存，估算材料的等效理智价值并下载结果图片。",
   // src/pages/tool/AccountDashboard.tsx
   pages_tool_AccountDashboard_tour_001: "查看使用引导",
   pages_tool_AccountDashboard_tour_002: "管理游戏账号",
   pages_tool_AccountDashboard_tour_003: "查看正式档案和免费档案，选择账号后即可准备干员与基建数据。",
-  pages_tool_AccountDashboard_tour_004: "仓库分析工具",
-  pages_tool_AccountDashboard_tour_005: "仓库价值分析在独立页面运行，不会修改当前账号保存的数据。",
+  pages_tool_AccountDashboard_tour_004: "使用工具",
+  pages_tool_AccountDashboard_tour_005: "分析仓库价值并下载结果图片。手动排班模拟暂未开放，待功能完善后开放。",
   pages_tool_AccountDashboard_tour_006: "添加游戏账号",
   pages_tool_AccountDashboard_tour_007: "使用 CDK 创建正式档案；没有 CDK 时，也可以通过森空岛领取免费个人排班。",
   pages_tool_AccountDashboard_tour_008: "邀请奖励",

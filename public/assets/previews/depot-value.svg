@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
+  <rect width="800" height="450" fill="#f1f5f9"/>
+  <rect x="52" y="36" width="696" height="378" rx="20" fill="#fff" stroke="#e2e8f0"/>
+  <g font-family="sans-serif">
+    <text x="84" y="86" font-size="24" font-weight="700" fill="#0f172a">仓库价值分析</text>
+    <text x="84" y="115" font-size="14" fill="#64748b">材料库存 · 等效理智 · 库存分布</text>
+    <rect x="84" y="142" width="632" height="84" rx="12" fill="#ecfdf5"/>
+    <text x="108" y="172" font-size="14" fill="#047857">库存总价值</text>
+    <text x="108" y="207" font-size="28" font-weight="700" fill="#065f46">等效理智</text>
+    <g font-size="15" fill="#475569">
+      <text x="84" y="274">养成材料</text>
+      <text x="84" y="322">经验与龙门币</text>
+      <text x="84" y="370">其他库存</text>
+    </g>
+    <g fill="#f1f5f9">
+      <rect x="220" y="255" width="496" height="24" rx="6"/>
+      <rect x="220" y="303" width="496" height="24" rx="6"/>
+      <rect x="220" y="351" width="496" height="24" rx="6"/>
+    </g>
+    <rect x="220" y="255" width="416" height="24" rx="6" fill="#10b981"/>
+    <rect x="220" y="303" width="296" height="24" rx="6" fill="#38bdf8"/>
+    <rect x="220" y="351" width="168" height="24" rx="6" fill="#a78bfa"/>
+  </g>
+</svg>

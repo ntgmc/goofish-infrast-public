@@ -32,7 +32,7 @@ export type CreateOptimizationJobRequest =
       accepted_max_points?: string;
       billing_operation?: MeteredBillingOperation;
       baseline_history_id?: string;
-      manualSchedule?: { baselineHistoryId: string; plans: ManualPlan[] };
+      manualSchedule?: { baselineHistoryId: string; plans: ManualPlan[] } | { source: OptimizeResult; plans: ManualPlan[] };
     })
   | (Omit<OptimizationJobInput, 'identity'> & {
       kind: 'scenario_comparison';

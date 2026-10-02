@@ -28,7 +28,7 @@ function isFixedDormitory(source: OptimizeResult, type: string): boolean {
   return type === 'dormitory' && (source.schedule_mode === 'rotation' || source.dormitory_rule === 'maa_pure_autofill')
 }
 
-function roomCapacity(type: string, room: ShiftRoom): number {
+export function roomCapacity(type: string, room: ShiftRoom): number {
   if (type === 'trading' || type === 'manufacture') return Math.max(1, Math.min(3, room.level ?? 3))
   if (type === 'control') return Math.max(1, Math.min(5, room.level ?? 5))
   return ({ meeting: 2, hire: 1, power: 1, processing: 1, dormitory: 5 } as Record<string, number>)[type] ?? room.operators?.length ?? 0
