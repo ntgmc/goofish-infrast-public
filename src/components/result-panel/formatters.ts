@@ -140,6 +140,7 @@ export function prepareResult(
           product: formatProduct(room.product),
           operators: resolveRoomOperators(ops, operatorLookup).map((operator) => ({
             ...operator,
+            ...(room.cross_station_operators?.includes(operator.name) ? { crossStation: true } : {}),
             ...(roomType === 'dormitory' && room.recovery_support_operators?.includes(operator.name) && { recoverySupport: true }),
           })),
           operatorText: ops.join('、'),

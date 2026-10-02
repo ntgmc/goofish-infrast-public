@@ -331,6 +331,33 @@ describe('ResultPanel overview v2', () => {
     expect(board.queryByText('宿舍由 MAA 自动填满')).not.toBeInTheDocument()
   })
 
+  it('shows cross-station markers from optimizer fields in both overview boards', async () => {
+    const user = userEvent.setup()
+    const result = createPreviewOrderResult()
+    result.plans[0].rooms.hire = [{ operators: ['凯尔希·思衡托'], cross_station_operators: ['凯尔希·思衡托'] }]
+    result.plans[0].rooms.processing = [{ operators: ['煌'], cross_station_operators: ['煌'] }]
+    result.plans[0].rooms.dormitory = [{
+      operators: ['逻各斯', '乌尔比安'],
+      cross_station_operators: ['逻各斯', '乌尔比安'],
+      recovery_support_operators: ['逻各斯'],
+    }]
+    result.plans[0].rooms.trading = [{ operators: ['深巡', '能天使'], cross_station_operators: ['深巡'] }]
+    result.plans[0].rooms.control = [{ operators: ['阿米娅'] }]
+    render(<ResultPanel result={result} />)
+    for (const tab of ['总览图', '总览图 v2']) {
+      await user.click(screen.getByRole('tab', { name: tab }))
+      const board = within(screen.getByRole('tabpanel', { name: tab }))
+      expect(board.getAllByRole('img', { name: '跨站联动' })).toHaveLength(5)
+      for (const name of ['凯尔希·思衡托', '煌', '逻各斯', '乌尔比安', '深巡']) {
+        const tile = board.getByText(name, { selector: 'span' }).closest('[data-operator-name]')!
+        expect(within(tile as HTMLElement).getByRole('img', { name: '跨站联动' }))
+          .toHaveAttribute('title', '与其他房间的干员配合生效，换班时请一并保留配套安排')
+      }
+      const support = board.getByText('逻各斯').closest('[data-operator-name]')!
+      expect(within(support as HTMLElement).getByRole('img', { name: '恢复支援' })).toBeInTheDocument()
+    }
+  })
+
   it('falls back to the first shift for shorter results and handles empty results', async () => {
     const user = userEvent.setup()
     const view = render(<ResultPanel result={createThreeShiftResult()} />)

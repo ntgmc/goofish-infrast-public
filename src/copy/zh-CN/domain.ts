@@ -111,6 +111,8 @@ export const domainCopy = {
     footer: "MaaTool · 基建排班",
   },
   result_board_v2: {
+    cross_station: "跨站联动",
+    cross_station_hint: "与其他房间的干员配合生效，换班时请一并保留配套安排",
     recovery_support: "恢复支援",
     recovery_support_hint: "专门进驻宿舍，加速同宿舍干员恢复心情",
     tab: "总览图 v2",

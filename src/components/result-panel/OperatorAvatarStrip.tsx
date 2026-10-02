@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Link2, Plus } from 'lucide-react'
 import { copy } from '../../copy'
 import type { RoomOperator } from './types'
 import { RECOVERY_SUPPORT_ICON_SRC } from './building-skills'
@@ -94,6 +94,15 @@ export function OperatorAvatarTile({
           <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-ink-muted" aria-hidden="true">
             {operator ? initial : <Plus size={24} />}
           </div>
+        )}
+        {operator?.crossStation && (
+          <span
+            role="img"
+            aria-label={copy.domain.result_board_v2.cross_station}
+            title={copy.domain.result_board_v2.cross_station_hint}
+            className={`absolute left-0 top-0 flex items-center justify-center rounded-br bg-surface-1 text-brand-400 ${large ? 'h-5 w-5' : micro ? 'h-3 w-3' : 'h-4 w-4'}`}>
+            <Link2 size={large ? 16 : micro ? 10 : 12} aria-hidden="true" />
+          </span>
         )}
         {operator?.recoverySupport && (
           <img
