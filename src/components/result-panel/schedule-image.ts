@@ -56,8 +56,8 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
   const colors = readThemeColors()
   const avatarSize = version === 'v1' ? 48 : 72
   const tileWidth = avatarSize + 24
-  const tilesPerRow = Math.floor((CARD_WIDTH - 32) / tileWidth)
-  const headerTextWidth = (CARD_WIDTH - 100) / 2
+  const nameGap = version === 'v1' ? 8 : 4
+  const rowGap = version === 'v1' ? 12 : 8
   const allText = plans.flatMap((plan) => plan.rows.map((row) => `${row.label} ${row.operatorText}`)).join(' ')
   if (document.fonts) await document.fonts.load(`500 ${FONT_SIZE}px ${fontFamily}`, `${title} ${allText}`)
   const images = new Map(await Promise.all([...new Set(plans.flatMap((plan) =>
@@ -78,36 +78,57 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
     return output
   }
 
-  function text(value: string, x: number, y: number, width: number, color: string, size = FONT_SIZE, weight = 500, align: CanvasTextAlign = 'left'): number {
+  function text(value: string, x: number, y: number, width: number, color: string, size = FONT_SIZE, weight = 500, align: CanvasTextAlign = 'left', centered = false): number {
     const wrapped = lines(value, width, size, weight)
     context!.fillStyle = color
-    context!.textBaseline = 'top'
+    context!.textBaseline = centered ? 'alphabetic' : 'top'
     context!.textAlign = align
-    wrapped.forEach((line, index) => context!.fillText(line, x, y + index * (size + 6)))
+    wrapped.forEach((line, index) => {
+      const metrics = context!.measureText(line)
+      const offset = centered
+        ? (size + 6) / 2 + ((metrics.actualBoundingBoxAscent ?? size * 0.8) - (metrics.actualBoundingBoxDescent ?? size * 0.2)) / 2
+        : 0
+      context!.fillText(line, x, y + offset + index * (size + 6))
+    })
     return wrapped.length * (size + 6)
   }
 
-  function slotHeight(slot: ImageCard['slots'][number]): number {
+  function slotMetaHeight(slot: ImageCard['slots'][number]): number {
+    return version === 'v1' ? 28 : slot.label || hasEfficiency(slot.row) ? 24 : 0
+  }
+  function hasEfficiency(row?: RoomRow): boolean {
+    return !manual && Boolean(row && !row.isAutofill && row.efficiency !== '-'
+      && (version === 'v1' || (PRODUCTION_TYPES.includes(row.roomType) && row.roomType !== 'control')))
+  }
+  function tilesPerRow(width: number): number {
+    return Math.max(1, Math.floor((width - 32) / tileWidth))
+  }
+  function slotHeight(slot: ImageCard['slots'][number], width: number): number {
     const row = slot.row
     if (!row || row.isAutofill || row.operators.length === 0) {
-      return 28 + lines(row?.operatorText ?? copy.domain.result_board_v2.empty_room, CARD_WIDTH - 32).length * 20
+      return slotMetaHeight(slot) + lines(row?.operatorText ?? copy.domain.result_board_v2.empty_room, width - 32).length * 20 + (version === 'v1' ? 0 : rowGap)
     }
-    let height = 28
-    for (let index = 0; index < row.operators.length; index += tilesPerRow) {
-      const nameLines = Math.max(...row.operators.slice(index, index + tilesPerRow).map((operator) => lines(operator.name, tileWidth - 8, 12).length))
-      height += avatarSize + 8 + nameLines * 18 + 12
+    let height = slotMetaHeight(slot)
+    for (let index = 0; index < row.operators.length; index += tilesPerRow(width)) {
+      const nameLines = Math.max(...row.operators.slice(index, index + tilesPerRow(width)).map((operator) => lines(operator.name, tileWidth - 8, 12).length))
+      height += avatarSize + nameGap + nameLines * 18 + rowGap
     }
     return height
   }
 
-  function cardHeight(card: ImageCard): number {
-    return 40 + Math.max(lines(card.title, headerTextWidth, 16, 600).length,
-      card.product === '-' ? 0 : lines(card.product, productTextWidth(card), 16, 600).length) * 22
-      + card.slots.reduce((height, slot) => height + slotHeight(slot), 0)
+  function cardHeight(card: ImageCard, width: number): number {
+    return (version === 'v1' ? 40 : 32) + Math.max(lines(card.title, headerTextWidth(card, width), 16, 600).length,
+      card.product === '-' ? 0 : lines(card.product, productTextWidth(card, width), 16, 600).length) * 22
+      + card.slots.reduce((height, slot) => height + slotHeight(slot, width), 0)
   }
 
-  function productTextWidth(card: ImageCard): number {
-    return headerTextWidth - (productImages.get(card.product) ? 24 : 0)
+  function headerTextWidth(card: ImageCard, width: number): number {
+    return version === 'v2' && card.product === '-'
+      ? width - 44 - (card.droneLabels.length > 0 ? 40 : 0)
+      : (width - 100) / 2
+  }
+  function productTextWidth(card: ImageCard, width: number): number {
+    return (width - 100) / 2 - (productImages.get(card.product) ? 24 : 0)
   }
   function planLabel(plan: PreparedPlan, index: number): string {
     const hours = plan.shift_hours ?? shiftHours?.[index]
@@ -157,7 +178,7 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
       })
       .map(async ([product, src]) => [product, await loadImage(src)] as const),
   ))
-  const placements: Array<{ card: ImageCard; x: number; y: number; height: number }> = []
+  const placements: Array<{ card: ImageCard; x: number; y: number; width: number; height: number }> = []
   const headings: Array<{ value: string; y: number; note: string }> = []
   const heading = `${copy.domain.result_image.title} ${version}`
   const mode = isRotationMode ? copy.domain.components_result_panel_ResultBoard_001 : copy.domain.components_result_panel_ResultBoard_002
@@ -170,11 +191,35 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
     y += lines(section.title, WIDTH - MARGIN * 2, 20, 600).length * 26 + 16
     if (section.note) y += lines(section.note, WIDTH - MARGIN * 2).length * 20 + 12
     if (section.cards.length === 0) y += 36
-    for (let index = 0; index < section.cards.length; index += 2) {
-      const pair = section.cards.slice(index, index + 2)
-      const cardSize = Math.max(...pair.map(cardHeight))
-      pair.forEach((card, column) => placements.push({ card, x: MARGIN + column * (CARD_WIDTH + GAP), y, height: cardSize }))
-      y += cardSize + GAP
+    if (version === 'v1') {
+      for (let index = 0; index < section.cards.length; index += 2) {
+        const pair = section.cards.slice(index, index + 2)
+        const cardSize = Math.max(...pair.map((card) => cardHeight(card, CARD_WIDTH)))
+        pair.forEach((card, column) => placements.push({ card, x: MARGIN + column * (CARD_WIDTH + GAP), y, width: CARD_WIDTH, height: cardSize }))
+        y += cardSize + GAP
+      }
+    } else {
+      const columnWidth = (WIDTH - MARGIN * 2 + GAP) / 6
+      const pending = section.cards.map((card) => {
+        const count = Math.max(1, ...card.slots.map((slot) => slot.row?.operators.length ?? 0))
+        const span = Math.min(6, Math.max(card.product !== '-' || card.droneLabels.length > 0 ? 2 : 1, Math.ceil((count * tileWidth + 32 + GAP) / columnWidth)))
+        const width = span * columnWidth - GAP
+        return { card, span, width, height: cardHeight(card, width) }
+      })
+      // ponytail: first-fit rows; use masonry only if uneven text heights leave material gaps.
+      while (pending.length > 0) {
+        let column = 0
+        let rowHeight = 0
+        let index = pending.findIndex((item) => item.span <= 6 - column)
+        while (index !== -1) {
+          const [item] = pending.splice(index, 1)
+          placements.push({ card: item.card, x: MARGIN + column * columnWidth, y, width: item.width, height: item.height })
+          rowHeight = Math.max(rowHeight, item.height)
+          column += item.span
+          index = pending.findIndex((item) => item.span <= 6 - column)
+        }
+        y += rowHeight + GAP
+      }
     }
     y += 24
   }
@@ -192,30 +237,30 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
     const titleHeight = text(item.value, MARGIN, item.y, WIDTH - MARGIN * 2, colors.brand, 20, 600)
     if (item.note) text(item.note, MARGIN, item.y + titleHeight + 16, WIDTH - MARGIN * 2, colors.muted)
   }
-  for (const { card, x, y: cardY, height: cardSize } of placements) {
+  for (const { card, x, y: cardY, width, height: cardSize } of placements) {
     const tone = card.roomType === 'manufacture' ? colors.warning : ['power', 'dormitory'].includes(card.roomType) ? colors.success : colors.brand
     context.beginPath()
-    context.roundRect(x, cardY, CARD_WIDTH, cardSize, 12)
+    context.roundRect(x, cardY, width, cardSize, 12)
     context.fillStyle = colors.surface
     context.fill()
     context.strokeStyle = colors.border
     context.stroke()
     context.fillStyle = tone
     context.fillRect(x + 16, cardY + 16, 3, 20)
-    const titleHeight = text(card.title, x + 28, cardY + 16, headerTextWidth, colors.text, 16, 600)
-    const productRight = x + CARD_WIDTH - 16 - (card.droneLabels.length > 0 ? 40 : 0)
+    const titleHeight = text(card.title, x + 28, cardY + 16, headerTextWidth(card, width), colors.text, 16, 600)
+    const productRight = x + width - 16 - (card.droneLabels.length > 0 ? 40 : 0)
     const productImage = productImages.get(card.product)
     if (productImage) {
-      const [firstLine] = lines(card.product, productTextWidth(card), 16, 600)
-      context.drawImage(productImage, productRight - context.measureText(firstLine).width - 24, cardY + 16, 20, 20)
+      const [firstLine] = lines(card.product, productTextWidth(card, width), 16, 600)
+      context.drawImage(productImage, productRight - context.measureText(firstLine).width - 24, cardY + 17, 20, 20)
     }
     const productHeight = card.product === '-' ? 0
-      : text(card.product, productRight, cardY + 16, productTextWidth(card), tone, 16, 600, 'right')
+      : text(card.product, productRight, cardY + 16, productTextWidth(card, width), tone, 16, 600, 'right', version === 'v2')
     let rowY = cardY + 16 + Math.max(titleHeight, productHeight) + 8
     if (card.droneLabels.length > 0) {
       context.strokeStyle = colors.brand
       context.lineWidth = 2
-      const centerX = x + CARD_WIDTH - 28
+      const centerX = x + width - 28
       const centerY = cardY + 28
       for (const [dx, dy] of [[-8, -8], [8, -8], [-8, 8], [8, 8]]) {
         context.beginPath()
@@ -230,18 +275,20 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
     }
     for (const slot of card.slots) {
       const row = slot.row
-      text(slot.label, x + 16, rowY, CARD_WIDTH - 140, colors.muted, 12)
-      if (!manual && row && !row.isAutofill && row.efficiency !== '-') text(row.efficiency, x + CARD_WIDTH - 16, rowY, 96, tone, 16, 600, 'right')
+      if (slot.label) text(slot.label, x + 16, rowY, width - 140, colors.muted, 12)
+      if (hasEfficiency(row)) text(row!.efficiency, x + width - 16, rowY, 96, tone, 16, 600, 'right')
       const startY = rowY
-      rowY += 28
+      rowY += slotMetaHeight(slot)
       if (!row || row.isAutofill || row.operators.length === 0) {
-        text(row?.operatorText ?? copy.domain.result_board_v2.empty_room, x + 16, rowY, CARD_WIDTH - 32, colors.muted)
+        text(row?.operatorText ?? copy.domain.result_board_v2.empty_room, x + 16, rowY, width - 32, colors.muted)
       } else {
-        for (let index = 0; index < row.operators.length; index += tilesPerRow) {
-          const operators = row.operators.slice(index, index + tilesPerRow)
+        for (let index = 0; index < row.operators.length; index += tilesPerRow(width)) {
+          const operators = row.operators.slice(index, index + tilesPerRow(width))
           let nameHeight = 0
           operators.forEach((operator, column) => {
-            const centerX = x + CARD_WIDTH / 2 + (column - (operators.length - 1) / 2) * tileWidth
+            const centerX = version === 'v1'
+              ? x + width / 2 + (column - (operators.length - 1) / 2) * tileWidth
+              : x + 16 + tileWidth / 2 + column * tileWidth
             const tileX = centerX - avatarSize / 2
             context.save()
             context.beginPath()
@@ -255,12 +302,12 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
               text(operator.name.trim().slice(0, 1) || '?', centerX, rowY + avatarSize / 3, avatarSize, colors.muted, 20, 500, 'center')
             }
             context.restore()
-            nameHeight = Math.max(nameHeight, text(operator.name, centerX, rowY + avatarSize + 8, tileWidth - 8, colors.text, 12, 500, 'center'))
+            nameHeight = Math.max(nameHeight, text(operator.name, centerX, rowY + avatarSize + nameGap, tileWidth - 8, colors.text, 12, 500, 'center'))
           })
-          rowY += avatarSize + 8 + nameHeight + 12
+          rowY += avatarSize + nameGap + nameHeight + rowGap
         }
       }
-      rowY = startY + slotHeight(slot)
+      rowY = startY + slotHeight(slot, width)
     }
   }
   text(copy.domain.result_image.footer, MARGIN, height - 36, WIDTH - MARGIN * 2, colors.muted, 12)
