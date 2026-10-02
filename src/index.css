@@ -369,6 +369,22 @@ body {
     color: var(--theme-ink-primary);
   }
 
+  :root:not(.dark) .tool-alert--error {
+    border-color: oklch(0.85 0.065 27);
+    background: oklch(0.975 0.015 27);
+  }
+
+  :root:not(.dark) .tool-alert--success {
+    border-color: oklch(0.85 0.065 153);
+    background: oklch(0.975 0.02 153);
+  }
+
+  :root:not(.dark) .tool-alert--warning {
+    border-color: oklch(0.85 0.09 78);
+    border-inline-start-color: var(--theme-warning);
+    background: oklch(0.975 0.035 78);
+  }
+
   .tool-shell {
     min-height: 100vh;
     background: var(--theme-surface-0);
