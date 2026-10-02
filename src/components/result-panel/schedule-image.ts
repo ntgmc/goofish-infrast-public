@@ -19,6 +19,7 @@ type ImageOptions = {
 type ImageCard = {
   title: string;
   product: string;
+  products: string[];
   roomType: string;
   droneLabels: string[];
   slots: Array<{ label: string; row?: RoomRow }>;
@@ -128,7 +129,11 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
       : (width - 100) / 2
   }
   function productTextWidth(card: ImageCard, width: number): number {
-    return (width - 100) / 2 - (productImages.get(card.product) ? 24 : 0)
+    return (width - 100) / 2 - cardProductImages(card).length * 24
+  }
+  function cardProductImages(card: ImageCard): HTMLImageElement[] {
+    return card.products.map((product) => productImages.get(product))
+      .filter((image): image is HTMLImageElement => Boolean(image))
   }
   function planLabel(plan: PreparedPlan, index: number): string {
     const hours = plan.shift_hours ?? shiftHours?.[index]
@@ -149,6 +154,7 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
     cards: buildBoardRoomGroups(plans, isRotationMode).map((group): ImageCard => ({
       title: `${group.label}${group.indexLabel ? ` ${group.indexLabel}` : ''}`,
       product: group.product,
+      products: Array.from(new Set(group.rows.map((row) => row.product))),
       roomType: group.roomType,
       droneLabels: plans.flatMap((plan, index) => isDroneTarget(plan.drones, group.roomType, group.rows[0].roomIndex) ? [planLabel(plan, index)] : []),
       slots: buildBoardSlots(group.rows, prepared.detailStats.planCount, isRotationMode),
@@ -165,13 +171,14 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
       .map((room): ImageCard => ({
         title: `${room.label}${room.indexLabel ? ` ${room.indexLabel}` : ''}`,
         product: room.product,
+        products: [room.product],
         roomType: room.roomType,
         droneLabels: isDroneTarget(plan.drones, room.roomType, room.roomIndex) ? [planLabel(plan, planIndex ?? index)] : [],
         slots: [{ label: '', row: room.row }],
       })),
   }))
   const productImages = new Map(await Promise.all(
-    (version === 'v2' ? [...new Set(sections.flatMap((section) => section.cards.map((card) => card.product)))] : [])
+    [...new Set(sections.flatMap((section) => section.cards.flatMap((card) => card.products)))]
       .flatMap((product) => {
         const src = getProductIconSrc(product)
         return src ? [[product, src] as const] : []
@@ -246,13 +253,14 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
     context.fillRect(x + 16, cardY + 16, 3, 20)
     const titleHeight = text(card.title, x + 28, cardY + 16, headerTextWidth(card, width), colors.text, 16, 600)
     const productRight = x + width - 16 - (card.droneLabels.length > 0 ? 40 : 0)
-    const productImage = productImages.get(card.product)
-    if (productImage) {
+    const icons = cardProductImages(card)
+    if (icons.length > 0) {
       const [firstLine] = lines(card.product, productTextWidth(card, width), 16, 600)
-      context.drawImage(productImage, productRight - context.measureText(firstLine).width - 24, cardY + 17, 20, 20)
+      const iconLeft = productRight - context.measureText(firstLine).width - icons.length * 24
+      icons.forEach((image, index) => context.drawImage(image, iconLeft + index * 24, cardY + 17, 20, 20))
     }
     const productHeight = card.product === '-' ? 0
-      : text(card.product, productRight, cardY + 16, productTextWidth(card, width), tone, 16, 600, 'right', version === 'v2')
+      : text(card.product, productRight, cardY + 16, productTextWidth(card, width), tone, 16, 600, 'right', true)
     let rowY = cardY + 16 + Math.max(titleHeight, productHeight) + 8
     if (card.droneLabels.length > 0) {
       context.strokeStyle = colors.brand

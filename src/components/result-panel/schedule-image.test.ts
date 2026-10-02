@@ -64,7 +64,7 @@ describe('schedule image exports', () => {
     }
     expect(values).toContain('shared')
     expect(imageRequests.filter((url) => url.includes('avatar')).length).toBe(1)
-    expect(imageRequests.includes('/assets/products/GOLD.png')).toBe(version === 'v2')
+    expect(imageRequests).toContain('/assets/products/GOLD.png')
     expect(drawnImage).toHaveBeenCalled()
     expect(encoded).toHaveBeenCalledOnce()
     expect(dimensions.height).toBeGreaterThan(0)
@@ -91,7 +91,7 @@ describe('schedule image exports', () => {
     expect(cards[0][3]).toBe(cards[1][3])
     const title = drawnText.mock.calls.find(([value]) => value === manufacture.label)!
     const product = drawnText.mock.calls.find(([value]) => value === manufacture.product)!
-    expect(product[2]).toBe(title[2] + (version === 'v2' ? 15 : 0))
+    expect(product[2]).toBe(title[2] + 15)
     expect(product[1]).toBeGreaterThan(title[1])
     const productStyle = drawnTextStyle.mock.calls.find(([value]) => value === manufacture.product)!
     expect(productStyle[1]).toContain('16px')
@@ -121,7 +121,7 @@ describe('schedule image exports', () => {
     }
   })
 
-  it('keeps v2 product icons clear of wrapped room titles, drone markers and portraits', async () => {
+  it.each(['v1', 'v2'] as const)('keeps %s product icons clear of wrapped room titles, drone markers and portraits', async (version) => {
     const { result, operators } = schedule()
     result.plans = [{
       name: 'test',
@@ -132,7 +132,7 @@ describe('schedule image exports', () => {
     }]
     const prepared = prepareResult(result, false, false, operators)
     prepared.plans[0].rows[0].label = '制造站'.repeat(12)
-    await renderScheduleImage({ prepared, version: 'v2', title: result.title, isRotationMode: false })
+    await renderScheduleImage({ prepared, version, title: result.title, isRotationMode: false })
     const card = drawnRoundRect.mock.calls.find(([, , width]) => width > 100)!
     const [, iconX, iconY, iconWidth, iconHeight] = drawnImage.mock.calls.find(([, , , width]) => width === 20)!
     const product = drawnText.mock.calls.find(([value]) => value === '源石碎片')!
@@ -148,17 +148,41 @@ describe('schedule image exports', () => {
     }
     const efficiency = drawnText.mock.calls.find(([value]) => value === prepared.plans[0].rows[0].efficiency)!
     expect(iconY + iconHeight).toBeLessThanOrEqual(efficiency[2])
-    const portraits = drawnImage.mock.calls.filter(([, , , width]) => width === 72)
+    const portraits = drawnImage.mock.calls.filter(([, , , width]) => width > 20)
     expect(portraits).toHaveLength(3)
     expect(portraits.every(([, , y]) => y > titleLines[titleLines.length - 1][2] + 22)).toBe(true)
   })
 
-  it('exports complete product labels and names when a product icon fails to load', async () => {
+  it('exports the icons for every product in a v1 facility across shifts', async () => {
+    const { result, operators } = schedule()
+    const products = ['Pure Gold', 'Battle Record', 'Originium Shard']
+    result.plans.forEach((plan, index) => {
+      plan.rooms = { manufacture: [{ operators: ['shared'], product: products[index], efficiency: 200 }] }
+    })
+    await renderScheduleImage({
+      prepared: prepareResult(result, false, false, operators),
+      version: 'v1', title: result.title, isRotationMode: false,
+    })
+    expect(imageRequests).toEqual(expect.arrayContaining([
+      '/assets/products/MTL_GOLD3.png',
+      '/assets/products/sprite_exp_card_t3.png',
+      '/assets/products/MTL_DIAMOND_SHD.png',
+    ]))
+    const icons = drawnImage.mock.calls.filter(([, , , width]) => width === 20)
+    const product = drawnText.mock.calls.find(([value]) => value === '多产物')!
+    expect(icons).toHaveLength(3)
+    expect(icons[1][1] - icons[0][1]).toBe(24)
+    expect(icons[2][1] - icons[1][1]).toBe(24)
+    expect(icons[2][1] + 24).toBe(product[1] - '多产物'.length * 8)
+    expect(icons.every(([, , y]) => y + 10 === product[2] - (12 - 4) / 2)).toBe(true)
+  })
+
+  it.each(['v1', 'v2'] as const)('exports complete %s product labels and names when a product icon fails to load', async (version) => {
     const { result, operators } = schedule()
     failedImages = ['/assets/products/GOLD.png']
     await renderScheduleImage({
       prepared: prepareResult(result, false, false, operators),
-      version: 'v2', planIndex: 0, title: result.title, isRotationMode: false,
+      version, planIndex: 0, title: result.title, isRotationMode: false,
     })
     expect(imageRequests).toContain('/assets/products/GOLD.png')
     expect(drawnText.mock.calls.map(([value]) => value)).toEqual(expect.arrayContaining(['龙门币', 'shared', 'trade1']))

@@ -4,6 +4,7 @@ import { RevealItem, StaggeredReveal } from '../MotionPrimitives'
 import type { PreparedPlan, RoomRow } from './types'
 import { copy } from '../../copy/index'
 import DroneMarker, { isDroneTarget } from './DroneMarker'
+import ProductIcon from '../ProductIcon'
 
 
 type BoardRoomGroup = {
@@ -95,7 +96,12 @@ export default function ResultBoard({
                     {group.indexLabel && <span className="ml-1 text-ink-muted">{group.indexLabel}</span>}
                   </h3>
                   {group.product !== '-' && (
-                    <p className="mt-0.5 truncate text-[11px] font-medium text-ink-muted">{group.product}</p>
+                    <p className="mt-0.5 flex min-w-0 items-center justify-center gap-1 text-[11px] font-medium text-ink-muted">
+                      {Array.from(new Set(group.rows.map((row) => row.product))).map((product) => (
+                        <ProductIcon key={product} product={product} size={16} />
+                      ))}
+                      <span className="truncate">{group.product}</span>
+                    </p>
                   )}
                 </div>
                 <div className="space-y-2 px-3 py-2.5">

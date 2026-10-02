@@ -189,6 +189,21 @@ describe('manual schedule access and recovery', () => {
 })
 
 describe('ResultPanel overview v2', () => {
+  it('shows both product icons beside the v1 label when a facility changes product between shifts', () => {
+    const result = createThreeShiftResult()
+    result.plans[1].rooms.trading[0].product = 'Orundum'
+    render(<ResultPanel result={result} />)
+    const product = screen.getByText('龙门币 / 合成玉').parentElement!
+    const icons = product.querySelectorAll('img')
+    expect(icons).toHaveLength(2)
+    expect(icons[0]).toHaveAttribute('src', '/assets/products/GOLD.png')
+    expect(icons[1]).toHaveAttribute('src', '/assets/products/DIAMOND_SHD.png')
+    expect(icons[0]).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.getByText('贸易1')).toBeInTheDocument()
+    expect(screen.getByText('贸易2')).toBeInTheDocument()
+    expect(screen.getByText('贸易3')).toBeInTheDocument()
+  })
+
   it('keeps v1 as the default and shows one shift with larger portraits in v2', async () => {
     const user = userEvent.setup()
     const { container } = render(<ResultPanel result={createThreeShiftResult()} operators={[
@@ -197,7 +212,8 @@ describe('ResultPanel overview v2', () => {
     expect(screen.getByRole('tab', { name: '总览图' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByText('贸易2')).toBeInTheDocument()
     expect(screen.getByText('贸易3')).toBeInTheDocument()
-    expect(container.querySelector('img')).toHaveAttribute('width', '32')
+    expect(container.querySelector('img[src^="/webp96/"]')).toHaveAttribute('width', '32')
+    expect(container.querySelector('img[src="/assets/products/GOLD.png"]')).toHaveAttribute('width', '16')
 
     await user.click(screen.getByRole('tab', { name: '总览图 v2' }))
     const board = screen.getByRole('region', { name: '总览图 v2' })
