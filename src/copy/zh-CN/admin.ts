@@ -9,6 +9,8 @@ export const adminCopy = {
   registration_description: '设置新用户是否需要验证邮箱，以及是否需要管理员邀请码。',
   registration_toggle: '注册时要求验证邮箱',
   registration_invite_toggle: '仅邀请可注册',
+  registration_bot_toggle: '启用 Bot 注册',
+  registration_bot_help: '开启后，用户可以通过 QQ Bot 获取邀请码并注册。关闭后，Bot 停止发放注册邀请码，已发放的 Bot 邀请码也暂停用于注册；已有账号仍可正常使用。',
   registration_enabled_help: '开启后，新用户需要先验证邮箱。验证成功后会自动登录。',
   registration_disabled_help: '关闭后，新用户注册成功即可登录。已有未验证账号仍需完成验证。',
   registration_invite_help: '开启后，新用户必须填写有效的管理员邀请码，普通用户推荐码不能用于注册。关闭后，两类邀请码都可以不填。',

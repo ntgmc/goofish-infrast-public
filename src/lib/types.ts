@@ -1006,6 +1006,7 @@ export interface RegistrationSettings {
   version: 5;
   email_verification_required: boolean;
   invite_code_required: boolean;
+  bot_registration_enabled: boolean;
   email_provider_priority: EmailProviderPriority;
   brevo_quota_action: BrevoQuotaAction;
   admin_invite_email_reserve: number;

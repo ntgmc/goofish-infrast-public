@@ -57,6 +57,7 @@ export default function RegistrationSettingsSection() {
         json: {
           email_verification_required: settings.email_verification_required,
           invite_code_required: settings.invite_code_required,
+          bot_registration_enabled: settings.bot_registration_enabled,
           email_provider_priority: settings.email_provider_priority,
           brevo_quota_action: settings.brevo_quota_action,
           admin_invite_email_reserve: settings.admin_invite_email_reserve,
@@ -227,12 +228,25 @@ export default function RegistrationSettingsSection() {
               />
               {copy.admin.registration_invite_toggle}
             </label>
+            <label className="tool-inset flex min-h-11 cursor-pointer items-center gap-3 px-4 text-sm font-semibold text-ink-secondary">
+              <input
+                type="checkbox"
+                checked={settings.bot_registration_enabled}
+                onChange={(event) => {
+                  const enabled = event.currentTarget.checked
+                  setSettings((current) => current ? { ...current, bot_registration_enabled: enabled } : current)
+                }}
+                className="h-4 w-4 accent-brand-600"
+              />
+              {copy.admin.registration_bot_toggle}
+            </label>
           </div>
         </div>
         <div className="tool-inset mt-5 p-4 text-sm leading-6 text-ink-secondary">
           <p>{copy.admin.registration_enabled_help}</p>
           <p className="mt-2">{copy.admin.registration_disabled_help}</p>
           <p className="mt-2">{copy.admin.registration_invite_help}</p>
+          <p className="mt-2">{copy.admin.registration_bot_help}</p>
         </div>
         <fieldset className="mt-5 space-y-3">
           <legend className="text-sm font-semibold text-ink-primary">{copy.admin.registration_provider_priority_title}</legend>

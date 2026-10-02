@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   issueQqBotRegistrationInvitation: vi.fn(),
+  getRegistrationSettings: vi.fn(),
   reservePersistentRateLimit: vi.fn(),
   retain: vi.fn(),
 }))
@@ -15,6 +16,9 @@ vi.mock('../security/persistent-rate-limit', async (importOriginal) => ({
 }))
 
 import handler from './qqbot-registration-invitations'
+vi.mock('../storage/registration-settings-store', () => ({
+  getRegistrationSettings: mocks.getRegistrationSettings,
+}))
 
 const originalEventsToken = process.env.WEBSITE_EVENTS_TOKEN
 const originalReleaseToken = process.env.WEBSITE_RELEASE_CONFIRMATION_TOKEN
@@ -24,6 +28,7 @@ const releaseToken = 'release-confirmation-token-at-least-32-bytes'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.getRegistrationSettings.mockResolvedValue({ bot_registration_enabled: true })
   process.env.WEBSITE_EVENTS_TOKEN = eventsToken
   process.env.WEBSITE_RELEASE_CONFIRMATION_TOKEN = releaseToken
   process.env.PUBLIC_APP_URL = 'https://example.test/'
@@ -45,6 +50,15 @@ afterEach(() => {
 })
 
 describe('QQ Bot registration invitation handler', () => {
+  it('rejects issuance when Bot registration is disabled', async () => {
+    mocks.getRegistrationSettings.mockResolvedValueOnce({ bot_registration_enabled: false })
+    const response = await handler(request())
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toMatchObject({ code: 'bot_registration_disabled' })
+    expect(mocks.issueQqBotRegistrationInvitation).not.toHaveBeenCalled()
+    expect(mocks.reservePersistentRateLimit).not.toHaveBeenCalled()
+  })
+
   it('reuses the event-feed bearer token and returns a fragment registration URL', async () => {
     const response = await handler(request())
 
