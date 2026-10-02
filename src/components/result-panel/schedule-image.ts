@@ -200,26 +200,23 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
       }
     } else {
       const columnWidth = (WIDTH - MARGIN * 2 + GAP) / 6
-      const pending = section.cards.map((card) => {
+      let column = 0
+      let rowHeight = 0
+      for (const card of section.cards) {
         const count = Math.max(1, ...card.slots.map((slot) => slot.row?.operators.length ?? 0))
         const span = Math.min(6, Math.max(card.product !== '-' || card.droneLabels.length > 0 ? 2 : 1, Math.ceil((count * tileWidth + 32 + GAP) / columnWidth)))
         const width = span * columnWidth - GAP
-        return { card, span, width, height: cardHeight(card, width) }
-      })
-      // ponytail: first-fit rows; use masonry only if uneven text heights leave material gaps.
-      while (pending.length > 0) {
-        let column = 0
-        let rowHeight = 0
-        let index = pending.findIndex((item) => item.span <= 6 - column)
-        while (index !== -1) {
-          const [item] = pending.splice(index, 1)
-          placements.push({ card: item.card, x: MARGIN + column * columnWidth, y, width: item.width, height: item.height })
-          rowHeight = Math.max(rowHeight, item.height)
-          column += item.span
-          index = pending.findIndex((item) => item.span <= 6 - column)
+        const height = cardHeight(card, width)
+        if (column + span > 6) {
+          y += rowHeight + GAP
+          column = 0
+          rowHeight = 0
         }
-        y += rowHeight + GAP
+        placements.push({ card, x: MARGIN + column * columnWidth, y, width, height })
+        rowHeight = Math.max(rowHeight, height)
+        column += span
       }
+      y += rowHeight + GAP
     }
     y += 24
   }

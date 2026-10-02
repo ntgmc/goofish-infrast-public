@@ -166,7 +166,7 @@ describe('schedule image exports', () => {
     expect(encoded).toHaveBeenCalledOnce()
   })
 
-  it('packs five-, three- and one-operator facilities without overlapping cards or clipped names', async () => {
+  it('packs five-, three- and one-operator facilities in order without overlapping cards or clipped names', async () => {
     const { result, operators } = schedule()
     const longName = '长干员名'.repeat(8)
     operators.push({ id: 'avatar', name: longName, own: true, elite: 2, rarity: 6 })
@@ -190,11 +190,18 @@ describe('schedule image exports', () => {
     expect(cards).toHaveLength(6)
     expect(cards[0][2]).toBe(560)
     expect(cards[1][2]).toBe(368)
-    expect(cards[2][2]).toBe(176)
+    expect(cards[3][2]).toBe(176)
     expect(cards[0][3]).toBeGreaterThan(cards[1][3])
     expect(cards[0][1]).toBe(cards[1][1])
-    expect(cards[0][1]).toBe(cards[2][1])
-    expect(cards[2][0] + cards[2][2]).toBe(1168)
+    expect(cards[2][1]).toBeGreaterThan(cards[1][1])
+    const facilityNames = ['控制中枢', '制造站 1', '制造站 2', '发电站 1', '发电站 2', '发电站 3']
+    const facilityTitles = drawnText.mock.calls.filter(([value]) => facilityNames.includes(value))
+    expect(facilityTitles.map(([value]) => value)).toEqual(facilityNames)
+    for (let index = 1; index < facilityTitles.length; index += 1) {
+      const [, x, y] = facilityTitles[index]
+      const [, previousX, previousY] = facilityTitles[index - 1]
+      expect(y > previousY || (y === previousY && x > previousX)).toBe(true)
+    }
     const controlTitle = drawnText.mock.calls.find(([value]) => value === '控制中枢')!
     expect(drawnImage.mock.calls.find(([, , , width]) => width === 72)![2] - controlTitle[2]).toBe(30)
     for (const [index, [x, y, width, height]] of cards.entries()) {
