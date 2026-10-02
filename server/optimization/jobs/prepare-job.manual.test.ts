@@ -101,6 +101,29 @@ describe('manual schedule admission', () => {
     }))).ok).toBe(false)
   })
 
+  it('validates standalone Fiammetta against the submitted assignments and derives product and level settings', async () => {
+    const standalone = createBlankManualSchedule(normalizeConfig(config))
+    standalone.plans.forEach((plan) => {
+      plan.rooms.manufacture[0].level = 2
+      plan.rooms.manufacture[0].product = 'Originium Shard'
+    })
+    standalone.plans[0].Fiammetta = { enable: true, target: '芬', order: 'post' }
+    const plans = createManualPlans(standalone)
+    plans[0].rooms.manufacture[0] = ['', '芬']
+    const withFiammetta = [...operators, { id: 'char_300_phenxi', name: '菲亚梅塔', own: true, elite: 0, level: 1, rarity: 6 }]
+    const body = { operators: withFiammetta, manualSchedule: { source: standalone, plans } }
+    const result = await prepareOptimizeJob(request(body))
+    expect(result.ok).toBe(true)
+    if (!result.ok || 'kind' in result.prepared.payload) throw new Error('Expected standalone admission')
+    expect(result.prepared.payload.effectiveConfig.manufacturing_station_levels?.[0]).toBe(2)
+    expect(result.prepared.payload.effectiveConfig.product_requirements.manufacturing_stations['Originium Shard']).toBe(1)
+    expect(result.prepared.payload.request.manual_schedule?.plans[0].Fiammetta).toMatchObject({ target: '芬', order: 'post' })
+    plans[0].rooms.manufacture[0] = ['', '']
+    expect((await prepareOptimizeJob(request(body))).ok).toBe(false)
+    plans[0].rooms.manufacture[0] = ['', '芬']
+    expect((await prepareOptimizeJob(request({ ...body, operators }))).ok).toBe(false)
+  })
+
   it('derives fixed-plan input and configuration from the owned baseline without billing or workspace effects', async () => {
     const result = await prepareOptimizeJob(request())
     expect(result.ok).toBe(true)

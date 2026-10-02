@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { act, cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -85,6 +85,88 @@ describe('manual schedule tool', () => {
     expect(screen.getByRole('button', { name: '模拟测算' })).toBeEnabled()
   })
 
+  it('uses profile training and saves, restores and submits facility products and per-shift Fiammetta settings', async () => {
+    const user = userEvent.setup()
+    mocks.session.mockReturnValue({ ...session(), eliteOverrides: { f: 2 }, workspace: {
+      config, operators: [...workspace.operators, { id: 'char_300_phenxi', name: '菲亚梅塔', own: true, elite: 0, level: 1, rarity: 6 }],
+    } })
+    page()
+    const source = createBlankManualSchedule(config)
+    source.plans[0].rooms.manufacture[0].operators = ['芬']
+    const text = JSON.stringify(source)
+    const file = new File([text], 'schedule.json', { type: 'application/json' })
+    Object.defineProperty(file, 'text', { value: async () => text })
+    await user.upload(screen.getByLabelText('导入排班 JSON', { selector: 'input' }), file)
+    await user.selectOptions(await screen.findByLabelText('制造站 1 · 产物'), 'Originium Shard')
+    await user.selectOptions(screen.getByLabelText('制造站 1 · 设施等级'), '2')
+    await user.selectOptions(screen.getByLabelText('恢复心情对象'), '芬')
+    await user.selectOptions(screen.getByLabelText('使用时机'), 'post')
+    await user.click(screen.getByRole('button', { name: copy.domain.manual_schedule.save }))
+    const saved = JSON.parse(localStorage.getItem('manual-schedule:tool:manual-profile')!)
+    expect(saved.schedule.plans[0].rooms.manufacture[0]).toMatchObject({ level: 2, product: 'Originium Shard' })
+    expect(saved.schedule.plans[0].Fiammetta).toMatchObject({ enable: true, target: '芬', order: 'post' })
+    expect(saved.schedule.plans[1].Fiammetta).toBeUndefined()
+    await user.selectOptions(screen.getByLabelText('制造站 1 · 产物'), 'Battle Record')
+    await user.click(screen.getByRole('button', { name: '恢复已保存草稿' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: '完成' }))
+    expect(screen.getByLabelText('制造站 1 · 产物')).toHaveValue('Originium Shard')
+    await user.click(screen.getByRole('button', { name: '模拟测算' }))
+    const submitted = mocks.submit.mock.calls[0][0]
+    expect(submitted.operators.find((operator: { id: string }) => operator.id === 'f').elite).toBe(2)
+    expect(submitted.manualSchedule.source.plans.every((plan: typeof source.plans[number]) =>
+      plan.rooms.manufacture[0].product === 'Originium Shard' && plan.rooms.manufacture[0].level === 2)).toBe(true)
+    expect(submitted.manualSchedule.source.plans[0].Fiammetta).toMatchObject({ target: '芬', order: 'post' })
+    expect(await screen.findByText(copy.domain.manual_schedule.simulated)).toBeVisible()
+    await user.selectOptions(screen.getByLabelText('制造站 1 · 产物'), 'Battle Record')
+    expect(screen.queryByText(copy.domain.manual_schedule.simulated)).not.toBeInTheDocument()
+  })
+
+  it('keeps sparse assignments when settings change and prevents lowering capacity or using a removed Fiammetta target', async () => {
+    const user = userEvent.setup()
+    mocks.session.mockReturnValue({ ...session(), workspace: {
+      config, operators: [...workspace.operators, { id: 'char_300_phenxi', name: '菲亚梅塔', own: true, elite: 0, level: 1, rarity: 6 }],
+    } })
+    page()
+    const source = createBlankManualSchedule(config)
+    source.plans[0].rooms.manufacture[0].operators = ['', '', '芬']
+    const text = JSON.stringify(source)
+    const file = new File([text], 'schedule.json', { type: 'application/json' })
+    Object.defineProperty(file, 'text', { value: async () => text })
+    await user.upload(screen.getByLabelText('导入排班 JSON', { selector: 'input' }), file)
+    await user.selectOptions(await screen.findByLabelText('制造站 1 · 产物'), 'Battle Record')
+    await user.selectOptions(screen.getByLabelText('制造站 1 · 设施等级'), '2')
+    expect(await screen.findByText(copy.tools.manualSchedule.occupiedSlots)).toBeVisible()
+    expect(screen.getByLabelText('制造站 1 · 设施等级')).toHaveValue('3')
+    await user.selectOptions(screen.getByLabelText('恢复心情对象'), '芬')
+    await user.click(screen.getByRole('button', { name: '模拟测算' }))
+    expect(mocks.submit.mock.calls[0][0].manualSchedule.plans[0].rooms.manufacture[0]).toEqual(['', '', '芬'])
+    await screen.findByText(copy.domain.manual_schedule.simulated)
+    await user.click(screen.getByRole('button', { name: /编辑 制造站.*芬/ }))
+    await user.click(screen.getByRole('button', { name: '清空此位置' }))
+    await user.click(screen.getByRole('button', { name: '完成' }))
+    expect(screen.getByText(copy.tools.manualSchedule.fiammettaInvalid)).toBeVisible()
+    expect(screen.getByRole('button', { name: '模拟测算' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: copy.domain.manual_schedule.save }))
+    await user.selectOptions(screen.getByLabelText('恢复心情对象'), '')
+    expect(screen.getByRole('button', { name: '模拟测算' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: copy.domain.manual_schedule.restore }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: copy.domain.manual_schedule.done }))
+    expect(screen.getByLabelText('恢复心情对象')).toHaveValue('芬')
+    expect(screen.getByRole('button', { name: '模拟测算' })).toBeDisabled()
+  })
+
+  it('discards a simulation when facility settings change during the request', async () => {
+    let finish!: (value: unknown) => void
+    mocks.snapshot.mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+    const user = userEvent.setup()
+    page()
+    await user.click(screen.getByRole('button', { name: copy.tools.manualSchedule.start }))
+    await user.click(screen.getByRole('button', { name: copy.domain.manual_schedule.simulate }))
+    await user.selectOptions(screen.getByLabelText('制造站 1 · 产物'), 'Originium Shard')
+    await act(async () => { finish({ status: 'succeeded', result: createBlankManualSchedule(config) }) })
+    expect(screen.queryByText(copy.domain.manual_schedule.simulated)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: copy.domain.manual_schedule.simulate })).toBeEnabled()
+  })
   it('prevents starting before the selected profile has owned operators', () => {
     mocks.session.mockReturnValue({ ...session(), workspace: { config, operators: [] } })
     page()

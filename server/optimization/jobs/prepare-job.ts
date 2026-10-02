@@ -162,8 +162,8 @@ export async function prepareOptimizeJob(
           simulationConfig = baseline.config;
         }
         try {
-          if ('source' in body.manualSchedule) simulationConfig = resolveManualScheduleConfig(source, config, operators);
-          validateManualPlans(source, body.manualSchedule.plans, operators);
+          validateManualPlans(source, body.manualSchedule.plans, operators, !('source' in body.manualSchedule));
+          if ('source' in body.manualSchedule) simulationConfig = resolveManualScheduleConfig(manualResult(source, body.manualSchedule.plans), config, operators);
         } catch {
           return fail({ error: '手动排班无效，请检查干员、设施和无人机安排。', code: 'validation_failed' }, 400);
         }
