@@ -1,4 +1,13 @@
 export const dashboardCopy = {
+  profile_expiry: {
+    title: "限时 CDK 档案即将到期",
+    description: (name: string, expiresAt: string) => `请尽快保存「${name}」需要保留的数据，并在排班方案中将排班 JSON 导出到本地。档案将于 ${expiresAt}（北京时间）到期，到期后需续期才能继续使用。`,
+    trial_description: (name: string, expiresAt: string) => `请尽快保存「${name}」需要保留的数据，并在排班方案中将排班 JSON 导出到本地。高级版限时体验将于 ${expiresAt}（北京时间）结束，之后恢复免费预览权限。`,
+    unnamed: "限时 CDK 档案",
+    dismiss: "今天不再提醒",
+    close: "关闭到期提醒",
+    export: "前往保存与导出",
+  },
   behavior_observation: {
     title: "操作习惯记录",
     description: "当前浏览器会保留最近 30 天、最多 500 条页面访问、操作结果和耗时记录，供后续分析重复操作。记录仅保存在本机，不会自动上传；不包含 UID、昵称、输入内容、配置内容或账号凭据。导出时会替换档案标识。",
