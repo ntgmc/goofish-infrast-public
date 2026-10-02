@@ -9,15 +9,15 @@
 
 :root,
 .light {
-  --color-paper: oklch(0.992 0.002 285);
-  --color-paper-2: oklch(1 0 0);
-  --color-paper-3: oklch(0.977 0.004 285);
-  --color-paper-4: oklch(0.952 0.006 285);
+  --color-paper: oklch(0.955 0.006 85);
+  --color-paper-2: oklch(0.978 0.005 85);
+  --color-paper-3: oklch(0.937 0.007 85);
+  --color-paper-4: oklch(0.912 0.008 85);
   --color-ink: oklch(0.205 0.018 285);
   --color-ink-2: oklch(0.390 0.016 285);
   --color-muted: oklch(0.455 0.018 285);
-  --color-rule: oklch(0.875 0.006 285);
-  --color-rule-2: oklch(0.930 0.004 285);
+  --color-rule: oklch(0.850 0.008 85);
+  --color-rule-2: oklch(0.895 0.008 85);
   --color-accent: oklch(0.470 0.185 285);
   --color-accent-hover: oklch(0.420 0.175 285);
   --color-accent-ink: oklch(0.985 0.008 285);
