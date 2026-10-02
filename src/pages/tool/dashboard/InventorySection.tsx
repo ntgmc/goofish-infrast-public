@@ -415,13 +415,15 @@ export default function InventorySection({
           <div className="flex justify-end"><DialogClose className="tool-primary-action">{copy.inventory.close}</DialogClose></div>
         </DialogContent>
       </Dialog>
-      {(inventory?.recent_events.length ?? 0) > 0 && <section className="tool-panel p-5 sm:p-6" aria-labelledby="inventory-events-title">
-        <h3 id="inventory-events-title" className="text-base font-semibold text-ink-primary">{copy.inventory.recent_events}</h3>
+      {(inventory?.recent_events.length ?? 0) > 0 && <details className="tool-panel p-5 sm:p-6" aria-labelledby="inventory-events-title">
+        <summary className="min-h-11 cursor-pointer content-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45">
+          <h3 id="inventory-events-title" className="inline text-base font-semibold text-ink-primary">{copy.inventory.recent_events}</h3>
+        </summary>
         <ul className="mt-3 space-y-2">{inventory!.recent_events.map((event) => <li key={event.id} className="tool-inset flex items-center gap-3 p-3 text-sm text-ink-secondary">
           <img src={itemIconPath(event.icon_key ?? 'placeholder')} onError={fallbackItemIcon} alt="" width={36} height={36} className="h-9 w-9 object-contain" />
           <span className="min-w-0 flex-1"><strong className="text-ink-primary">{event.item_name ?? event.item_code}</strong><span className="ml-2">{ledgerEventLabel(event.event_type)} × {event.quantity}</span><span className="mt-1 block text-xs text-ink-muted">{formatShanghaiDateTime(event.created_at)}</span></span>
         </li>)}</ul>
-      </section>}
+      </details>}
       <SklandBindingDialog
         open={lifetimeDialogOpen}
         profile={null}

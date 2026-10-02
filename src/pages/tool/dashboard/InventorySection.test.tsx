@@ -298,8 +298,15 @@ describe('InventorySection idempotent item use', () => {
     render(<InventorySection onPayload={vi.fn()} />)
 
     expect(await screen.findByRole('list', { name: '认识网站奖励' })).toHaveTextContent('优先计算券 × 2 · 永久')
-    expect(screen.getByRole('heading', { name: '最近道具记录' })).toBeInTheDocument()
+    const user = userEvent.setup()
+    const historyToggle = screen.getByText('最近道具记录').closest('summary')!
+    const history = historyToggle.closest('details')!
+    expect(history).not.toHaveAttribute('open')
+    await user.click(historyToggle)
+    expect(history).toHaveAttribute('open')
     expect(screen.getByText('已获得 × 2')).toBeInTheDocument()
+    await user.click(historyToggle)
+    expect(history).not.toHaveAttribute('open')
   })
 
   it('loads inventory without requesting onboarding tasks when the feature is disabled', async () => {

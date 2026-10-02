@@ -68,8 +68,10 @@ export default function DebugModePanel() {
   }
 
   return (
-    <section className="tool-panel p-6" aria-labelledby="debug-mode-title">
-      <h2 id="debug-mode-title" className="text-lg font-semibold text-ink-primary">{copy.debug.title}</h2>
+    <details className="tool-panel p-6" aria-labelledby="debug-mode-title" open={snapshot.enabled || Boolean(error || notice)}>
+      <summary className="min-h-11 cursor-pointer content-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45">
+        <h2 id="debug-mode-title" className="inline text-lg font-semibold text-ink-primary">{copy.debug.title}</h2>
+      </summary>
       <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.debug.description}</p>
       <p className="mt-2 text-xs leading-5 text-ink-muted">{copy.debug.privacy}</p>
       {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error}</div>}
@@ -97,6 +99,6 @@ export default function DebugModePanel() {
           )}
         </div>
       </div>
-    </section>
+    </details>
   )
 }
