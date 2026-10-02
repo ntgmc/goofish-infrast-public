@@ -153,7 +153,7 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
   function confirm() {
     if (confirmation === 'reset') {
       try {
-        localStorage.removeItem(`manual-schedule:${profileId}`)
+        localStorage.removeItem(`manual-schedule:${draftStorageKey}`)
         const base = createManualPlans(source)
         update(base)
         setBaseline(canonicalJson(base))
@@ -232,17 +232,35 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
         <p className="text-sm"><LockKeyhole size={14} className="mr-1 inline" aria-hidden="true" />{label.locked}</p>
       </div>
       <div className="tool-panel space-y-3 p-4">
+        {draftStorageKey === profileId && <p className="text-sm leading-6 text-ink-secondary">{label.result_scope}</p>}
         <div className="flex flex-wrap gap-2">
           <button type="button" className="tool-primary-action" disabled={!simulationBaseline || simulating} aria-busy={simulating} onClick={() => void simulate()}>{label.simulate}</button>
           <button type="button" className="tool-primary-action" disabled={!changed || busy} onClick={save}>{label.save}</button>
           <button type="button" className="tool-secondary-action" disabled={!stored || busy}
             onClick={() => dirty ? setConfirmation('restore') : stored && restore(stored)}>{label.restore}</button>
-          <button type="button" className="tool-secondary-action" disabled={!changed || busy} onClick={() => setConfirmation('reset')}>{label.reset}</button>
+          <button type="button" className="tool-secondary-action" disabled={(!changed && !stored) || busy} onClick={() => setConfirmation('reset')}>{label.reset}</button>
           <button type="button" className="tool-secondary-action" disabled={busy} onClick={() => void download('backup')}><Download size={14} aria-hidden="true" />{label.backup}</button>
           <button type="button" className="tool-secondary-action" disabled={busy} onClick={() => upload.current?.click()}><Upload size={14} aria-hidden="true" />{label.import}</button>
           <input ref={upload} type="file" accept=".json,application/json" className="hidden" aria-label={label.import} onChange={(event) => void importBackup(event.target.files?.[0])} />
         </div>
         <p className="text-xs leading-5 text-ink-muted">{label.storage_hint}</p>
+        <details className="tool-inset overflow-hidden">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-ink-primary">{label.rules_title}</summary>
+          <dl className="space-y-3 border-t border-surface-3/60 p-4 text-sm leading-6">
+            {[
+              [label.save, label.save_rule],
+              [label.restore, label.restore_rule],
+              [label.reset, label.reset_rule],
+              [label.simulate, label.simulation_rule],
+              [label.export_rule_title, label.export_rule],
+            ].map(([title, description]) => (
+              <div key={title}>
+                <dt className="font-medium text-ink-primary">{title}</dt>
+                <dd className="text-ink-secondary">{description}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
         {!simulationBaseline && <p className="text-sm text-ink-muted">{label.simulation_baseline_required}</p>}
         {!simulation && source.schedule_mode !== 'rotation' && source.dormitory_rule !== 'maa_pure_autofill' &&
           <p className="text-sm text-ink-muted">{label.dormitory_pending}</p>}

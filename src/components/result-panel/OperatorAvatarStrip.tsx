@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { copy } from '../../copy'
 import type { RoomOperator } from './types'
+import { RECOVERY_SUPPORT_ICON_SRC } from './building-skills'
 
 export default function OperatorAvatarStrip({
   operators,
@@ -77,7 +78,7 @@ export function OperatorAvatarTile({
       data-operator-name={operator?.name} data-operator-id={operator?.id}
       data-operator-elite={operator?.elite} data-operator-level={operator?.level}
       tabIndex={operator && !buttonChild ? 0 : undefined}>
-      <div className={`mx-auto overflow-hidden rounded-md border border-surface-3 bg-surface-2 ${operator ? '' : 'border-dashed'} ${avatarSize}`}>
+      <div className={`relative mx-auto overflow-hidden rounded-md border border-surface-3 bg-surface-2 ${operator ? '' : 'border-dashed'} ${avatarSize}`}>
         {canLoadImage ? (
           <img
             src={`/webp96/${operator?.id}.webp`}
@@ -94,16 +95,18 @@ export function OperatorAvatarTile({
             {operator ? initial : <Plus size={24} />}
           </div>
         )}
+        {operator?.recoverySupport && (
+          <img
+            src={RECOVERY_SUPPORT_ICON_SRC}
+            alt={copy.domain.result_board_v2.recovery_support}
+            title={copy.domain.result_board_v2.recovery_support_hint}
+            className={`absolute bottom-0 right-0 ${large ? 'h-5 w-5' : micro ? 'h-3 w-3' : 'h-4 w-4'}`}
+          />
+        )}
       </div>
       <span className={labelClassName}>
         {name}
       </span>
-      {operator?.recoverySupport && (
-        <span className="mt-1 block rounded-sm bg-success/10 px-1 text-[10px] leading-4 text-success"
-          title={copy.domain.result_board_v2.recovery_support_hint}>
-          {copy.domain.result_board_v2.recovery_support}
-        </span>
-      )}
     </div>
   )
 }

@@ -1,6 +1,8 @@
 import catalog from '../../data/building-skills.json'
 import type { RoomOperator } from './types'
 
+export const RECOVERY_SUPPORT_ICON_SRC = '/building-skills/bskill_dorm_all&one1.png'
+
 type Skill = { name: string; room: string; icon: string; description: string }
 type Unlock = { id: string; slot: number; elite: number; level: number }
 type CatalogOperator = { name: string; skills: Unlock[] }

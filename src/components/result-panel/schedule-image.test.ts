@@ -57,7 +57,10 @@ describe('schedule image exports', () => {
     }]
     const prepared = prepareResult(result, false, false, operators)
     await renderScheduleImage({ prepared, version, planIndex: 0, title: result.title, isRotationMode: false })
-    expect(drawnText.mock.calls.map(([value]) => value).join('')).toContain('恢复支援')
+    expect(drawnText.mock.calls.map(([value]) => value).join('')).not.toContain('恢复支援')
+    expect(imageRequests).toContain('/building-skills/bskill_dorm_all&one1.png')
+    const badgeSize = version === 'v1' ? 16 : 24
+    expect(drawnImage.mock.calls.filter(([, , , width, height]) => width === badgeSize && height === badgeSize)).toHaveLength(1)
     expect(prepared.plans[0].rows.find((row) => row.roomType === 'dormitory')?.operators[0]).toMatchObject({
       name: '杜林', recoverySupport: true,
     })

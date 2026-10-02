@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CONFIG_PRESETS } from '../../lib/config'
 import type { OptimizeResult } from '../../lib/types'
 import ResultPanel from './ResultPanel'
+import ManualScheduleEditor from './ManualScheduleEditor'
+import { createManualPlans, saveManualDraft } from '../../lib/manual-schedule'
 
 const mocks = vi.hoisted(() => ({ submit: vi.fn(), snapshot: vi.fn() }))
 vi.mock('../../pages/tool/optimize/optimization-api', async (original) => ({
@@ -39,6 +41,31 @@ async function editor(result = source) {
   return { user, scope: within(await screen.findByRole('region', { name: '手动调整排班' })) }
 }
 describe('manual simulation lifecycle', () => {
+  it.each(['manual', 'tool:manual'])('clears only the draft at %s when resetting a reopened schedule', async (draftStorageKey) => {
+    const user = userEvent.setup()
+    const operators = ['芬', '克洛丝'].map((name) => ({ id: name, name, own: true, elite: 1, rarity: 3 }))
+    const plans = createManualPlans(source)
+    plans[0].rooms.manufacture[0][0] = '克洛丝'
+    const otherKey = draftStorageKey === 'manual' ? 'tool:manual' : 'manual'
+    saveManualDraft(draftStorageKey, source, plans, operators)
+    saveManualDraft(otherKey, source, plans, operators)
+    const otherDraft = localStorage.getItem(`manual-schedule:${otherKey}`)
+    try {
+      render(<ManualScheduleEditor source={source} profileId="manual" draftStorageKey={draftStorageKey} operators={operators} />)
+      expect(screen.getByRole('button', { name: '恢复已保存草稿' })).toBeEnabled()
+      await user.click(screen.getByRole('button', { name: '还原原始排班' }))
+      await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: '完成' }))
+      expect(localStorage.getItem(`manual-schedule:${draftStorageKey}`)).toBeNull()
+      expect(localStorage.getItem(`manual-schedule:${otherKey}`)).toBe(otherDraft)
+      expect(source.plans[0].rooms.manufacture[0].operators).toEqual(['芬'])
+      expect(screen.getByRole('button', { name: '恢复已保存草稿' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: '还原原始排班' })).toBeDisabled()
+    } finally {
+      localStorage.removeItem(`manual-schedule:${draftStorageKey}`)
+      localStorage.removeItem(`manual-schedule:${otherKey}`)
+    }
+  })
+
   it('names mood shortfalls and fills suggested beds before remeasuring', async () => {
     const baseline = structuredClone(source)
     baseline.plans[0].rooms.dormitory = [{ operators: ['Castle-3'] }]
@@ -87,6 +114,13 @@ describe('manual simulation lifecycle', () => {
       manualSchedule: expect.objectContaining({ baselineHistoryId: 'history-1' }),
       includeUpgradeSuggestions: false,
     }), expect.any(String))
+    expect(scope.getByText('175.00')).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: '数据' }))
+    const data = within(screen.getByRole('tabpanel'))
+    expect(data.queryByText('175.00')).not.toBeInTheDocument()
+    expect(data.getByText('0.00')).toBeInTheDocument()
+    expect(source.total_efficiency).toBeUndefined()
+    await user.click(screen.getByRole('tab', { name: '手动排班' }))
     await user.click(scope.getByRole('button', { name: /编辑 制造站.*芬/ }))
     await user.click(screen.getByRole('button', { name: '清空此位置' }))
     await user.click(screen.getByRole('button', { name: '完成' }))
