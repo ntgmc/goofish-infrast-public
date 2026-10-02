@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router'
 import { copy, CURRENT_LOCALE } from '../copy'
 import { apiJson, getApiErrorMessage } from '../lib/api-client'
 import { itemIconPath } from '../lib/inventory-contracts'
+import { markInventoryStale } from '../lib/inventory-refresh'
 import type { UserNotification, UserNotificationPage } from '../lib/types'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 
@@ -50,6 +51,7 @@ export function NotificationCenterProvider({ userId, children }: { userId: strin
   const mutationVersion = useRef(0)
   const currentUserId = useRef(userId)
   const hasLoaded = useRef(false)
+  const inventoryRevision = useRef<string | null>(null)
   currentUserId.current = userId
 
   const refresh = useCallback((): Promise<void> => {
@@ -69,6 +71,15 @@ export function NotificationCenterProvider({ userId, children }: { userId: strin
       setNextCursor(page.next_cursor)
       setError(null)
       hasLoaded.current = true
+      const nextInventoryRevision = page.notifications
+        .filter((notification) => notification.action?.kind === 'inventory')
+        .map((notification) => `${notification.id}:${notification.updated_at}`)
+        .sort()
+        .join('|')
+      if (inventoryRevision.current !== null && inventoryRevision.current !== nextInventoryRevision) {
+        markInventoryStale()
+      }
+      inventoryRevision.current = nextInventoryRevision
     }).catch((caught) => {
       if (currentUserId.current === requestedUserId && mutationVersion.current === requestedMutationVersion
         && !isAbortError(caught)) {
@@ -91,6 +102,7 @@ export function NotificationCenterProvider({ userId, children }: { userId: strin
     loadMoreAbort.current?.abort()
     mutationAbort.current?.abort()
     hasLoaded.current = false
+    inventoryRevision.current = null
     refreshInFlight.current = null
     setNotifications([])
     setUnreadCount(0)

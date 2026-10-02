@@ -1,11 +1,21 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { InventoryResponse, ItemUseRequest } from '../../../lib/inventory-contracts'
 import InventorySection from './InventorySection'
 
-const mocks = vi.hoisted(() => ({ apiJson: vi.fn(), onboardingTasksEnabled: true }))
+const mocks = vi.hoisted(() => ({
+  apiJson: vi.fn(),
+  onboardingTasksEnabled: true,
+  animate: vi.fn(async (_from: number, values: number[], options: { onUpdate: (value: number) => void }) => options.onUpdate(values[1])),
+}))
+
+vi.mock('motion/react', async (importOriginal) => ({
+  ...await importOriginal<typeof import('motion/react')>(),
+  useAnimate: () => [{ current: null }, mocks.animate],
+  useReducedMotion: () => false,
+}))
 
 vi.mock('../../../lib/api-client', () => ({
   apiJson: mocks.apiJson,
@@ -69,13 +79,119 @@ const lifetimeInventory: InventoryResponse = {
   }],
 }
 
+beforeEach(() => {
+  vi.stubGlobal('ResizeObserver', class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  })
+})
+
 afterEach(() => {
   cleanup()
+  vi.unstubAllGlobals()
   mocks.apiJson.mockReset()
+  mocks.animate.mockClear()
   mocks.onboardingTasksEnabled = true
 })
 
 describe('InventorySection idempotent item use', () => {
+  it('shows item descriptions and animates one reveal for a batch before opening the rewards dialog', async () => {
+    let finishReveal!: () => void
+    mocks.animate.mockImplementationOnce(async (_from, values, options) => {
+      options.onUpdate(values[1])
+      await new Promise<void>((resolve) => { finishReveal = resolve })
+    })
+    const chest: InventoryResponse = {
+      ...inventory,
+      stacks: [{
+        ...inventory.stacks[0],
+        item: { ...inventory.stacks[0].item, code: 'chest', name: '随机宝箱', kind: 'gift_pack', effect_code: 'open_gift_pack' },
+        quantity: 3,
+        actions: ['open'],
+        gift_pack_version_id: 'chest-v1',
+        gift_pack: {
+          opening_rule: { mode: 'random', count: 1 },
+          contents: [
+            { item_code: 'priority_compute_coupon', name: '优先计算券', description: '排班优先处理。', icon_key: 'placeholder', quantity: 1, expiry: { mode: 'never' } },
+            { item_code: 'training_diagnosis_coupon', name: '培养诊断券', description: '获取养成建议。', icon_key: 'placeholder', quantity: 1, expiry: { mode: 'never' } },
+          ],
+        },
+      }],
+    }
+    let opened = false
+    mocks.apiJson.mockImplementation(async (path: string, options?: { method?: string }) => {
+      if (path === '/api/user/onboarding-tasks') return { tasks: [] }
+      if (options?.method === 'POST') {
+        opened = true
+        return { rewards: [{ item_code: 'training_diagnosis_coupon', name: '培养诊断券', icon_key: 'placeholder', quantity: 2, expires_at: null }] }
+      }
+      return opened ? { ...chest, stacks: [] } : chest
+    })
+    const user = userEvent.setup()
+    render(<InventorySection onPayload={vi.fn()} />)
+    await user.click(await screen.findByRole('button', { name: /随机宝箱/ }))
+    await user.hover(screen.getByText('优先计算券 × 1'))
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('排班优先处理。')
+    const quantity = screen.getByRole('spinbutton', { name: '使用数量' })
+    await user.clear(quantity)
+    await user.type(quantity, '2')
+    await user.click(screen.getByRole('button', { name: '开启宝箱' }))
+    expect(await screen.findByText('正在揭晓奖励…')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: '获得的道具' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '关闭' })).toBeDisabled()
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('dialog', { name: '随机宝箱' })).toBeInTheDocument()
+    await act(async () => finishReveal())
+    const rewards = await screen.findByRole('dialog', { name: '获得的道具' })
+    expect(within(rewards).getByText('培养诊断券 × 2')).toBeInTheDocument()
+    expect(mocks.animate).toHaveBeenCalledOnce()
+    expect(mocks.animate).toHaveBeenCalledWith(0, [0, 7, 7], expect.objectContaining({ ease: ['easeInOut', 'linear'] }))
+    expect(mocks.apiJson).toHaveBeenCalledWith('/api/user/inventory', expect.objectContaining({
+      method: 'POST', json: expect.objectContaining({ quantity: 2 }),
+    }))
+    await user.click(within(rewards).getByRole('button', { name: '关闭' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '获得的道具' })).not.toBeInTheDocument())
+    expect(screen.getByRole('textbox', { name: '按道具名称筛选' })).toHaveFocus()
+  })
+
+  it('bounds batch capacity upgrades by stock and remaining capacity', async () => {
+    const folders: InventoryResponse = {
+      ...inventory,
+      stacks: [{
+        ...inventory.stacks[0],
+        item: { ...inventory.stacks[0].item, code: 'result_archive_folder', name: '结果封存夹', kind: 'capacity_upgrade', effect_code: 'result_archive_capacity' },
+        quantity: 5,
+      }],
+      capacities: [{
+        profile_id: 'profile-1', display_name: '我的档案',
+        plan_slots: { used: 0, limit: 3, maximum: 20 },
+        history_slots: { used: 0, limit: 5, maximum: 50 },
+        archive_slots: { used: 0, limit: 18, maximum: 20 },
+      }],
+    }
+    mocks.apiJson.mockImplementation(async (path: string, options?: { method?: string }) => {
+      if (path === '/api/user/onboarding-tasks') return { tasks: [] }
+      if (options?.method === 'POST') return { previous_limit: 18, next_limit: 20, maximum: 20 }
+      return folders
+    })
+    const user = userEvent.setup()
+    render(<InventorySection onPayload={vi.fn()} />)
+    await user.click(await screen.findByRole('button', { name: /结果封存夹/ }))
+    await user.selectOptions(screen.getByRole('combobox'), 'profile-1')
+    const quantity = screen.getByRole('spinbutton', { name: '使用数量' })
+    expect(quantity).toHaveAttribute('max', '2')
+    await user.clear(quantity)
+    await user.type(quantity, '3')
+    expect(screen.getByRole('button', { name: '使用道具' })).toBeDisabled()
+    await user.clear(quantity)
+    await user.type(quantity, '2')
+    await user.click(screen.getByRole('button', { name: '使用道具' }))
+    await waitFor(() => expect(mocks.apiJson).toHaveBeenCalledWith('/api/user/inventory', expect.objectContaining({
+      method: 'POST', json: expect.objectContaining({ item_code: 'result_archive_folder', quantity: 2, profile_id: 'profile-1' }),
+    })))
+  })
+
   it('requires the configured number of choices and reuses the request after a lost chest response', async () => {
     const chest: InventoryResponse = { ...inventory, stacks: [{
       ...inventory.stacks[0],

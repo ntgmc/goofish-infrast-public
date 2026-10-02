@@ -505,7 +505,7 @@ export const requestSchemas = {
   ]),
   inventoryUse: strict({
     item_code: shortString(128),
-    quantity: z.literal(1),
+    quantity: z.number().int().min(1).max(100),
     profile_id: optionalString(128),
     gift_pack_version_id: optionalString(128),
     selected_item_codes: z.array(shortString(128)).min(1).max(100).optional(),

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { InventoryResponse } from '../../../lib/inventory-contracts'
 import { useInventoryBalances } from './useInventoryBalances'
 import { usePriorityCoupon } from './usePriorityCoupon'
+import { markInventoryStale } from '../../../lib/inventory-refresh'
 
 const apiJson = vi.fn()
 
@@ -17,6 +18,22 @@ afterEach(() => {
 })
 
 describe('inventory optimization hooks', () => {
+  it('refreshes stale inventory and preserves invalidations received while loading', async () => {
+    let complete!: (inventory: InventoryResponse) => void
+    apiJson.mockResolvedValueOnce(inventorySnapshot())
+      .mockImplementationOnce(() => new Promise<InventoryResponse>((resolve) => { complete = resolve }))
+      .mockResolvedValueOnce({ ...inventorySnapshot(), stacks: [] })
+    const { result } = renderHook(() => useInventoryBalances('profile-1'))
+    await waitFor(() => expect(result.current.loaded).toBe(true))
+    act(() => markInventoryStale())
+    await waitFor(() => expect(apiJson).toHaveBeenCalledTimes(2))
+    act(() => markInventoryStale())
+    expect(apiJson).toHaveBeenCalledTimes(2)
+    await act(async () => complete(inventorySnapshot()))
+    await waitFor(() => expect(apiJson).toHaveBeenCalledTimes(3))
+    await waitFor(() => expect(result.current.balances).toEqual({}))
+  })
+
   it('keeps inventory unresolved and exposes the first load failure', async () => {
     apiJson.mockRejectedValue(new Error('inventory unavailable'))
 

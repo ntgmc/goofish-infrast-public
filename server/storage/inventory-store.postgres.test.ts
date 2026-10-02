@@ -50,6 +50,51 @@ afterAll(async () => {
 })
 
 describe('PostgreSQL unified inventory', () => {
+  it('uses archive folders in a single idempotent batch and rolls back insufficient stock or capacity', async () => {
+    const { userId, profileId } = await seedUserProfile()
+    await grantItem({
+      userId, itemCode: 'result_archive_folder', quantity: 5, expiry: { mode: 'never' },
+      sourceType: 'test', sourceId: 'batch-folders', recipientRole: 'test',
+    })
+    const request = { item_code: 'result_archive_folder', quantity: 3, profile_id: profileId, idempotency_key: randomUUID() }
+    const response = await useInventoryItem(userId, request)
+    expect(response).toMatchObject({ quantity: 3, previous_limit: 0, next_limit: 3 })
+    expect(await useInventoryItem(userId, request)).toEqual(response)
+    expect(await getItemBalance(userId, request.item_code)).toBe(2)
+    expect((await getProfileCapacityLimits(profileId)).archive).toBe(3)
+    await expect(useInventoryItem(userId, { ...request, idempotency_key: randomUUID() }))
+      .rejects.toMatchObject({ code: 'item_unavailable' })
+    expect(await getItemBalance(userId, request.item_code)).toBe(2)
+    expect((await getProfileCapacityLimits(profileId)).archive).toBe(3)
+    const maximum = (await listInventory(userId)).capacities.find((profile) => profile.profile_id === profileId)!.archive_slots.maximum
+    await query("update profile_entitlement_balances set units = $2 where profile_id = $1 and entitlement_type = 'archive_slots'", [profileId, maximum - 1])
+    await expect(useInventoryItem(userId, { ...request, quantity: 2, idempotency_key: randomUUID() }))
+      .rejects.toMatchObject({ code: 'capacity_limit_reached' })
+    expect(await getItemBalance(userId, request.item_code)).toBe(2)
+    expect((await getProfileCapacityLimits(profileId)).archive).toBe(maximum - 1)
+  })
+
+  it('rolls back an oversized chest batch and merges rewards after a successful retry', async () => {
+    const { userId } = await seedUserProfile()
+    const pack = await createCustomGiftPack('root', {
+      name: '批量宝箱', description: '测试批量开启', publish: true,
+      contents: [{ item_code: 'priority_compute_coupon', quantity: 2, expiry: { mode: 'never' } }],
+    }) as { item_code: string; version_id: string }
+    await grantItem({
+      userId, itemCode: pack.item_code, giftPackVersionId: pack.version_id, quantity: 2,
+      expiry: { mode: 'never' }, sourceType: 'test', sourceId: 'batch-chest', recipientRole: 'test',
+    })
+    const request = { item_code: pack.item_code, gift_pack_version_id: pack.version_id, quantity: 3, idempotency_key: randomUUID() }
+    await expect(useInventoryItem(userId, request)).rejects.toMatchObject({ code: 'item_unavailable' })
+    expect(await getItemBalance(userId, pack.item_code)).toBe(2)
+    expect(await getItemBalance(userId, 'priority_compute_coupon')).toBe(0)
+    const response = await useInventoryItem(userId, { ...request, quantity: 2 })
+    expect(response.rewards).toEqual([expect.objectContaining({ item_code: 'priority_compute_coupon', quantity: 4, description: expect.any(String) })])
+    expect(await useInventoryItem(userId, { ...request, quantity: 2 })).toEqual(response)
+    expect(await getItemBalance(userId, pack.item_code)).toBe(0)
+    expect(await getItemBalance(userId, 'priority_compute_coupon')).toBe(4)
+  })
+
   it.each(['random', 'choice'] as const)('opens a published %s chest atomically and preserves its issued version', async (mode) => {
     const { userId } = await seedUserProfile()
     const contents = [

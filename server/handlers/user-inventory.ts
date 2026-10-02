@@ -19,7 +19,7 @@ export default async function userInventoryHandler(req: Request): Promise<Respon
 
     if (path === '/api/user/inventory') {
       if (req.method === 'GET') {
-        return jsonResponse(await listInventory(auth.user.id))
+        return jsonResponse(await listInventory(auth.user.id), 200, { 'Cache-Control': 'no-store' })
       }
       if (req.method !== 'POST') return jsonResponse({ error: '方法不允许。' }, 405)
       const body = await getValidatedJson(req, requestSchemas.inventoryUse) as ItemUseRequest

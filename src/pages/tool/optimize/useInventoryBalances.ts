@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { copy } from '../../../copy/index'
 import { apiJson } from '../../../lib/api-client'
 import type { InventoryResponse, ProfileCapacitySummary, SystemItemCode } from '../../../lib/inventory-contracts'
+import { useInventoryRefresh } from '../../../lib/inventory-refresh'
 
 const EMPTY_INVENTORY: InventoryResponse = {
   stacks: [],
@@ -14,21 +15,25 @@ export function useInventoryBalances(profileId: string) {
   const [loaded, setLoaded] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const loadVersion = useRef(0)
 
   const refresh = useCallback(async () => {
+    const version = ++loadVersion.current
     setLoading(true)
     setError(null)
     try {
-      setInventory(await apiJson<InventoryResponse>('/api/user/inventory'))
+      const next = await apiJson<InventoryResponse>('/api/user/inventory', { cache: 'no-store' })
+      if (version !== loadVersion.current) return
+      setInventory(next)
       setLoaded(true)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : copy.inventory.balances_load_failed)
+      if (version === loadVersion.current) setError(caught instanceof Error ? caught.message : copy.inventory.balances_load_failed)
     } finally {
-      setLoading(false)
+      if (version === loadVersion.current) setLoading(false)
     }
   }, [])
 
-  useEffect(() => { void refresh() }, [profileId, refresh])
+  useInventoryRefresh(refresh, profileId)
 
   const balances = useMemo(() => {
     const result = {} as Partial<Record<SystemItemCode, number>>

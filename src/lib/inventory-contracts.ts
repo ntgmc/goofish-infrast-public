@@ -90,7 +90,7 @@ export interface InventoryLedgerEvent {
 
 export interface ItemUseRequest {
   item_code: string
-  quantity: 1
+  quantity: number
   profile_id?: string
   gift_pack_version_id?: string
   selected_item_codes?: string[]
@@ -119,6 +119,16 @@ export function normalizeGiftPackOpeningRule(value: unknown, contentCount: numbe
 export interface OnboardingTaskRewardView extends GiftPackContentInput {
   name: string
   icon_key: string
+  description?: string
+}
+
+export interface InventoryReward {
+  item_code: string
+  name: string
+  description?: string
+  icon_key: string
+  quantity: number
+  expires_at: string | null
 }
 
 export interface GiftPackVersion {
