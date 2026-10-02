@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { CONFIG_PRESETS, normalizeConfig } from './config'
-import { createManualPlans } from './manual-schedule'
-import { createBlankManualSchedule, isManualScheduleProfileAvailable, parseManualScheduleJson, resolveManualScheduleConfig } from './manual-schedule-tool'
+import { createManualPlans, manualResult, manualSourceKey, parseManualDraft } from './manual-schedule'
+import { changeManualFacility, createBlankManualSchedule, isManualScheduleProfileAvailable, parseManualScheduleJson, resolveManualScheduleConfig } from './manual-schedule-tool'
+import { FACILITY_IDS } from './facility-layout'
 import type { LicenseOperator, UserGameAccount } from './types'
 
 const config = normalizeConfig(CONFIG_PRESETS['243'])
@@ -81,5 +82,68 @@ describe('standalone manual schedules', () => {
     expect(resolved.manufacturing_stations_count).toBe(3)
     expect(resolved.shift_hours).toEqual([12, 12, 12])
     expect(resolved.product_requirements).toEqual(importedConfig.product_requirements)
+  })
+
+  it('preserves shift order and fills missing MAA levels and products from the matching configuration', () => {
+    const selected = { ...normalizeConfig(CONFIG_PRESETS['252']), facility_layout: [...FACILITY_IDS], shift_hours: [6, 12, 6] }
+    const source = createBlankManualSchedule(selected)
+    expect(source.shift_hours).toEqual([6, 12, 6])
+    const maa = { title: 'MAA', plans: source.plans.map(({ shift_hours: _hours, ...plan }) => ({
+      ...plan, rooms: Object.fromEntries(Object.entries(plan.rooms).map(([type, rooms]) => [
+        type, rooms.map(({ operators }) => ({ operators })),
+      ])),
+    })) }
+    const imported = parseManualScheduleJson(JSON.stringify(maa), selected, operators)
+    expect(imported.shift_hours).toEqual([6, 12, 6])
+    expect(imported.plans[0].rooms.trading.map((room) => room.level)).toEqual(selected.trading_station_levels)
+    expect(imported.plans[0].rooms.manufacture.map((room) => room.product)).toEqual(['Pure Gold', 'Pure Gold', 'Battle Record', 'Battle Record', 'Battle Record'])
+    expect(imported.facility_layout).toEqual(FACILITY_IDS)
+    expect(() => parseManualScheduleJson(JSON.stringify(maa), config, operators)).toThrow()
+    expect(() => createBlankManualSchedule({ ...selected, facility_layout: undefined })).toThrow()
+  })
+
+  it('synchronizes facility products and refuses lowering capacity with occupied slots', () => {
+    const source = createBlankManualSchedule(config)
+    source.plans[1].rooms.manufacture[0].operators = ['A', 'B', 'C']
+    expect(() => changeManualFacility(source, 'manufacture', 0, { level: 2 })).toThrow()
+    const changed = changeManualFacility(source, 'manufacture', 0, { product: 'Originium Shard' })
+    expect(changed.plans.every((plan) => plan.rooms.manufacture[0].product === 'Originium Shard')).toBe(true)
+    expect(source.plans[0].rooms.manufacture[0].product).toBe('Pure Gold')
+  })
+
+  it('validates Fiammetta ownership, active target and compatible shifts', () => {
+    const source = createBlankManualSchedule(config)
+    const withFiammetta = [...operators, { id: 'char_300_phenxi', name: '菲亚梅塔', own: true, elite: 0, level: 1, rarity: 6 }]
+    source.plans[0].rooms.manufacture[0].operators = ['芬']
+    source.plans[0].Fiammetta = { enable: true, target: '芬', order: 'post' }
+    expect(resolveManualScheduleConfig(source, config, withFiammetta).Fiammetta?.enable).toBe(true)
+    expect(() => resolveManualScheduleConfig(source, config, operators)).toThrow()
+    const noWork = structuredClone(source)
+    noWork.plans[0].rooms.manufacture[0].operators = []
+    expect(() => resolveManualScheduleConfig(noWork, config, withFiammetta)).toThrow()
+    const ownTarget = structuredClone(source)
+    ownTarget.plans[0].Fiammetta!.target = '菲亚梅塔'
+    expect(() => resolveManualScheduleConfig(ownTarget, config, withFiammetta)).toThrow()
+    const short = createBlankManualSchedule({ ...config, shift_hours: [6, 6, 6, 6] })
+    short.plans[0].Fiammetta = source.plans[0].Fiammetta
+    expect(() => resolveManualScheduleConfig(short, config, withFiammetta)).toThrow()
+  })
+
+  it('round-trips standalone settings with sparse operator slots and keeps historical settings locked', () => {
+    const initial = createBlankManualSchedule(config)
+    const changed = changeManualFacility(initial, 'manufacture', 0, { product: 'Battle Record', level: 2 })
+    const plans = createManualPlans(changed)
+    plans[0].rooms.manufacture[0] = ['', '芬']
+    changed.plans[0].Fiammetta = { enable: true, target: '芬', order: 'post' }
+    const backup = JSON.stringify({
+      version: 1, source: manualSourceKey(initial), savedAt: '2026-10-02',
+      plans, schedule: manualResult(changed, plans, true),
+    })
+    const restored = parseManualDraft(backup, initial, operators, true)
+    expect(restored.schedule?.plans[0].rooms.manufacture[0]).toMatchObject({ level: 2, product: 'Battle Record' })
+    expect(restored.plans[0].rooms.manufacture[0]).toEqual(['', '芬'])
+    expect(restored.schedule?.plans[0].rooms.manufacture[0].operators).toEqual(['', '芬'])
+    expect(restored.schedule?.plans[0].Fiammetta?.target).toBe('芬')
+    expect(() => parseManualDraft(backup, initial, operators)).toThrow()
   })
 })

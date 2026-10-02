@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import { isValidShiftHours, normalizeConfig, parseShiftHours, validateConfig } from './config'
+import { isFiammettaShiftHoursSupported, isValidShiftHours, normalizeConfig, validateScheduleConfig } from './config'
 import { facilityLayoutSchema } from './facility-layout'
-import { createManualPlans, manualResult, roomCapacity, validateManualPlans } from './manual-schedule'
+import { createManualPlans, roomCapacity, validateManualPlans } from './manual-schedule'
 import { hasCapability } from './product-catalog'
 import { copy } from '../copy/index'
 import type { LicenseConfig, LicenseOperator, OptimizeResult, UserGameAccount } from './types'
@@ -16,7 +16,7 @@ export const manualScheduleSourceSchema: z.ZodType<OptimizeResult> = z.object({
   buildingType: z.number().int().min(0).max(999).default(243),
   planTimes: z.string().max(2_000).default(''),
   schedule_mode: z.enum(['maa', 'rotation', 'variable']).optional(),
-  dormitory_rule: z.enum(['fixed', 'maa_pure_autofill']).optional(),
+  dormitory_rule: z.enum(['fixed', 'maa_autofill', 'maa_pure_autofill']).optional(),
   facility_layout: facilityLayoutSchema.optional(),
   shift_hours: z.array(hours).min(1).max(24).optional(),
   shift_pattern: z.string().max(200).optional(),
@@ -59,12 +59,12 @@ export function isManualScheduleProfileAvailable(profile: UserGameAccount, now =
 }
 
 export function createBlankManualSchedule(input: LicenseConfig): OptimizeResult {
-  const requestedHours = parseShiftHours(input.shift_hours)
+  const requestedHours = manualShiftHours(input.shift_hours)
   if (!requestedHours || !isValidShiftHours(requestedHours)) throw new Error(copy.domain.lib_config_035)
   const config = normalizeConfig({ ...input, schedule_mode: 'maa', dormitory_rule: 'fixed', Fiammetta: { enable: false } })
-  const validation = validateConfig(config)
+  const validation = validateScheduleConfig(config)
   if (!validation.ok) throw new Error(validation.message)
-  const shiftHours = parseShiftHours(config.shift_hours)!
+  const shiftHours = requestedHours
   const productionRooms = (type: 'trading' | 'manufacture') => {
     const products = Object.entries(type === 'trading'
       ? config.product_requirements.trading_stations : config.product_requirements.manufacturing_stations)
@@ -96,7 +96,7 @@ export function parseManualScheduleJson(text: string, config: LicenseConfig, ope
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid schedule')
   const data = value as Record<string, unknown>
   const source = manualScheduleSourceSchema.parse({ ...data, raw_results: [] })
-  const shiftHours = source.shift_hours ?? parseShiftHours(config.shift_hours)
+  const shiftHours = source.shift_hours ?? manualShiftHours(config.shift_hours)
   if (!shiftHours) throw new Error('Invalid shifts')
   source.plans.forEach((plan, index) => { plan.shift_hours ??= shiftHours[index % shiftHours.length] })
   source.shift_hours = source.plans.map((plan) => plan.shift_hours!)
@@ -104,11 +104,30 @@ export function parseManualScheduleJson(text: string, config: LicenseConfig, ope
   source.total_schedule_hours = source.shift_hours.reduce((total, hour) => total + hour, 0)
   source.schedule_mode ??= 'maa'
   source.dormitory_rule ??= source.plans.some((plan) => plan.rooms.dormitory?.some((room) => room.autofill)) ? 'maa_pure_autofill' : 'fixed'
+  for (const plan of source.plans) {
+    for (const [type, rooms] of Object.entries(plan.rooms)) {
+      const expectedCount = type === 'trading' ? config.trading_stations_count : config.manufacturing_stations_count
+      const levels = type === 'trading' ? config.trading_station_levels : config.manufacturing_station_levels
+      const products = Object.entries(type === 'trading'
+        ? config.product_requirements.trading_stations : config.product_requirements.manufacturing_stations)
+        .flatMap(([product, count]) => Array<string>(count).fill(product))
+      rooms.forEach((room, index) => {
+        if (type === 'trading' || type === 'manufacture') {
+          if ((room.level === undefined || room.product === undefined) && rooms.length !== expectedCount) throw new Error(copy.tools.manualSchedule.importLayoutMismatch)
+          room.level ??= levels?.[index] ?? 3
+          room.product ??= products[index]
+        } else room.level ??= type === 'control' || type === 'dormitory' ? 5 : 3
+      })
+    }
+  }
+  if (source.plans[0].rooms.trading?.length === 2 && source.plans[0].rooms.manufacture?.length === 5) {
+    source.facility_layout ??= config.layout === '2-5-2' ? config.facility_layout : undefined
+  }
   const resolved = resolveManualScheduleConfig(source, config, operators)
   source.buildingType = Number(resolved.layout.replace(/-/g, ''))
   const plans = createManualPlans(source)
   validateManualPlans(source, plans, operators)
-  return manualResult(source, plans)
+  return { ...source, schedule_source: 'manual' }
 }
 
 export function resolveManualScheduleConfig(source: OptimizeResult, input: LicenseConfig, operators: LicenseOperator[]): LicenseConfig {
@@ -117,11 +136,10 @@ export function resolveManualScheduleConfig(source: OptimizeResult, input: Licen
   const maximumRooms: Record<string, number> = { trading: 5, manufacture: 5, power: 3, dormitory: 4, control: 1, meeting: 1, hire: 1, processing: 1, training: 1 }
   for (const plan of source.plans) {
     if (Object.keys(plan.rooms).length === 0) throw new Error('Empty facilities')
-    if (plan.Fiammetta?.enable && !owned.has(plan.Fiammetta.target)) throw new Error('Invalid Fiammetta target')
     for (const [type, entries] of Object.entries(plan.rooms)) {
       if (entries.length > maximumRooms[type] || entries.length !== (rooms[type]?.length ?? 0)) throw new Error('Invalid facilities')
       entries.forEach((room, index) => {
-        if ((room.operators?.length ?? 0) > roomCapacity(type, room) ||
+        if (maximumRooms[type] === undefined || (room.operators?.length ?? 0) > roomCapacity(type, room) ||
           room.operators?.some((name) => name !== '' && !owned.has(name)) ||
           ((type === 'trading' || type === 'manufacture' || type === 'power') && (room.level ?? 3) > 3) ||
           room.product !== rooms[type][index].product || room.level !== rooms[type][index].level) throw new Error('Invalid room')
@@ -144,9 +162,25 @@ export function resolveManualScheduleConfig(source: OptimizeResult, input: Licen
   }
   const shiftHours = source.plans.map((plan, index) => plan.shift_hours ?? source.shift_hours?.[index])
   if (shiftHours.some((hour) => typeof hour !== 'number' || !Number.isFinite(hour) || hour <= 0 || hour > 24)) throw new Error('Invalid shifts')
+  if (source.schedule_mode !== 'rotation' && !isValidShiftHours(shiftHours as number[])) throw new Error(copy.domain.lib_config_035)
+  if (trading === 2 && manufacture === 5 && !facilityLayoutSchema.safeParse(source.facility_layout).success) {
+    throw new Error(copy.common.facilityLayoutRequired)
+  }
+  const fiammetta = operators.find((operator) => operator.own && (operator.id === 'char_300_phenxi' || operator.name === copy.tools.manualSchedule.fiammettaName))
+  for (const plan of source.plans) {
+    if (!plan.Fiammetta?.enable) continue
+    if (!fiammetta || source.schedule_mode === 'rotation' || source.schedule_mode === 'variable' ||
+      !isFiammettaShiftHoursSupported(shiftHours) ||
+      !owned.has(plan.Fiammetta.target) || plan.Fiammetta.target === fiammetta.name ||
+      !Object.entries(plan.rooms).some(([type, entries]) => type !== 'dormitory' && type !== 'training' &&
+        entries.some((room) => room.operators?.includes(plan.Fiammetta!.target)))) {
+      throw new Error(copy.tools.manualSchedule.fiammettaInvalid)
+    }
+  }
   return {
     ...input, layout: `${trading}-${manufacture}-${power}`,
     schedule_mode: source.schedule_mode ?? 'maa', dormitory_rule: source.dormitory_rule ?? 'fixed',
+    variable_shift_schedule: undefined,
     shift_hours: shiftHours as number[], facility_layout: source.facility_layout,
     trading_stations_count: trading, manufacturing_stations_count: manufacture,
     trading_station_levels: rooms.trading.map((room) => room.level ?? 3),
@@ -155,4 +189,23 @@ export function resolveManualScheduleConfig(source: OptimizeResult, input: Licen
     Fiammetta: { enable: source.plans.some((plan) => plan.Fiammetta?.enable) },
     drones: { enable: source.plans.some((plan) => plan.drones?.enable), auto: false, order: 'pre', targets: [] },
   }
+}
+
+function manualShiftHours(value: LicenseConfig['shift_hours']): number[] | null {
+  const hours = Array.isArray(value) ? value.slice() : typeof value === 'string'
+    ? value.trim().split(/[-,，]/).map((entry) => Number(entry.trim())) : null
+  return hours?.length && hours.every((hour) => Number.isFinite(hour) && hour > 0 && hour <= 24) ? hours : null
+}
+
+export function changeManualFacility(source: OptimizeResult, type: string, index: number, settings: { level?: number; product?: string }): OptimizeResult {
+  const next = structuredClone(source)
+  for (const plan of next.plans) {
+    const room = plan.rooms[type]?.[index]
+    if (!room) throw new Error(copy.tools.manualSchedule.invalidSettings)
+    Object.assign(room, settings)
+    const capacity = roomCapacity(type, room)
+    if (room.operators?.slice(capacity).some(Boolean)) throw new Error(copy.tools.manualSchedule.occupiedSlots)
+    room.operators = room.operators?.slice(0, capacity)
+  }
+  return next
 }

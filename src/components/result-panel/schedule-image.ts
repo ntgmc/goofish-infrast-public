@@ -6,7 +6,7 @@ import { ROOM_LABELS } from './labels'
 import type { PreparedPlan, RoomRow } from './types'
 import { isDroneTarget } from './DroneMarker'
 import { getProductIconSrc } from '../ProductIcon'
-import { RECOVERY_SUPPORT_ICON_SRC } from './building-skills'
+import { operatorProfession, RECOVERY_SUPPORT_ICON_SRC } from './building-skills'
 
 type ImageOptions = {
   prepared: PreparedResult;
@@ -16,6 +16,7 @@ type ImageOptions = {
   planIndex?: number;
   shiftHours?: number[];
   manual?: boolean;
+  showProfession?: boolean;
 }
 type ImageCard = {
   title: string;
@@ -48,7 +49,7 @@ export async function downloadScheduleImage(options: ImageOptions): Promise<void
   }
 }
 
-export async function renderScheduleImage({ prepared, isRotationMode, version, title, planIndex, shiftHours, manual = false }: ImageOptions): Promise<Blob> {
+export async function renderScheduleImage({ prepared, isRotationMode, version, title, planIndex, shiftHours, manual = false, showProfession = false }: ImageOptions): Promise<Blob> {
   const canvas = document.createElement('canvas')
   const context = canvas.getContext('2d')
   if (!context) throw new Error('Canvas unavailable')
@@ -68,6 +69,13 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
 
   const recoverySupportIcon = plans.some((plan) => plan.rows.some((row) => row.operators.some((operator) => operator.recoverySupport)))
     ? await loadImage(RECOVERY_SUPPORT_ICON_SRC) : null
+  const professions = version === 'v2' && showProfession
+    ? [...new Set(plans.flatMap((plan) => plan.rows.flatMap((row) => row.operators.flatMap((operator) => {
+      const profession = operatorProfession(operator)
+      return profession ? [profession] : []
+    }))))] : []
+  const professionIcons = new Map(await Promise.all(professions.map(async (profession) =>
+    [profession, await loadImage(`/operator-professions/${profession}.png`)] as const)))
 
   function lines(value: string, width: number, size = FONT_SIZE, weight = 500): string[] {
     context!.font = `${weight} ${size}px ${fontFamily}`
@@ -311,6 +319,14 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
               text(operator.name.trim().slice(0, 1) || '?', centerX, rowY + avatarSize / 3, avatarSize, colors.muted, 20, 500, 'center')
             }
             context.restore()
+            const profession = operatorProfession(operator)
+            const professionIcon = profession ? professionIcons.get(profession) : null
+            if (professionIcon) {
+              const size = avatarSize / 3
+              context.fillStyle = '#18181b'
+              context.fillRect(tileX + avatarSize - size, rowY, size, size)
+              context.drawImage(professionIcon, tileX + avatarSize - size + 2, rowY + 2, size - 4, size - 4)
+            }
             if (operator.recoverySupport && recoverySupportIcon) {
               const size = avatarSize / 3
               context.drawImage(recoverySupportIcon, tileX + avatarSize - size, rowY + avatarSize - size, size, size)

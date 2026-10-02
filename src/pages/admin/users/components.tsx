@@ -6,6 +6,7 @@ import { AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOpera
 import { AdminDetailDialog } from '../shared/AdminDetailDialog'
 import { DetailItem, StatusPill, UserStatusPill, SmallButton, formatDate, getAdminProfileAccessLabel, formatAdminProfileAccess, formatOperatorValue, getAppUserStatusLabel } from '../shared/helpers'
 import { adminApiJson } from '../../../lib/admin-api-client'
+import { WorkspaceExportDialog } from './WorkspaceExportDialog'
 
 export interface UserDetailPanelProps {
   detail: AdminUserDetail;
@@ -23,7 +24,7 @@ export interface UserDetailPanelProps {
   onClearWorkspace: (profile: AdminProfileSummary) => Promise<void>;
   onViewOperators: (profile: AdminProfileSummary) => Promise<void>;
   onDownloadOperators: (profile: AdminProfileSummary) => Promise<void>;
-  onDownloadWorkspaces: () => Promise<void>;
+  onDownloadWorkspaces: (profileIds: string[]) => Promise<boolean>;
   onLoadProfilePage: (page: number) => Promise<void>;
   onAdjustBalance: (operation: 'credit' | 'debit' | 'reverse_credit', amount: string, reason: string, idempotencyKey: string, rootPassword: string, originalTransactionId?: string) => Promise<boolean>;
   onLoadMoreBalance: () => Promise<void>;
@@ -64,11 +65,12 @@ function UserDetailPanel({
   onUnfreezeUser,
   onDeleteUser,
 }: UserDetailPanelProps) {
+  const [workspaceExportOpen, setWorkspaceExportOpen] = useState(false)
   const user = detail.user
   return (
     <section className="tool-panel overflow-hidden">
       <div className="tool-panel-header flex flex-col gap-3 p-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 id="admin-user-detail-title" className="break-all text-lg font-semibold text-ink-primary">{user.email}</h2>
             <UserStatusPill status={user.status} emailVerifiedAt={user.email_verified_at} />
@@ -76,9 +78,8 @@ function UserDetailPanel({
           </div>
           <p className="mt-2 break-all text-sm text-ink-muted">用户 ID：{user.id}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <SmallButton onClick={() => void onDownloadWorkspaces()} loading={busyAction === `user-workspaces-export:${user.id}`}>导出工作区</SmallButton>
-          <span className="text-xs text-ink-muted">导出的最近结果选用优化器排班；手动排班在完整历史中单独标注。</span>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <SmallButton onClick={() => setWorkspaceExportOpen(true)}>导出工作区</SmallButton>
           {user.status === 'active' && <SmallButton onClick={() => void onFreezeUser(user)} loading={busyAction === `app-user:freeze_account:${user.id}`}>冻结用户</SmallButton>}
           {user.status === 'frozen' && <SmallButton onClick={() => void onUnfreezeUser(user)} loading={busyAction === `app-user:unfreeze_account:${user.id}`} tone="success">解冻用户</SmallButton>}
           <SmallButton onClick={() => void onDeleteUser(user)} loading={busyAction === `app-user:delete_account:${user.id}`} tone="danger">删除用户</SmallButton>
@@ -148,6 +149,17 @@ function UserDetailPanel({
           ))}
         </div>
       </div>
+      {workspaceExportOpen && (
+        <WorkspaceExportDialog
+          key={user.id}
+          detail={detail}
+          busy={busyAction === `user-workspaces-export:${user.id}`}
+          pageLoading={busyAction === `user-profile-page:${user.id}` || busyAction === `user-detail:${user.id}`}
+          onClose={() => setWorkspaceExportOpen(false)}
+          onDownload={onDownloadWorkspaces}
+          onLoadProfilePage={onLoadProfilePage}
+        />
+      )}
     </section>
   )
 }

@@ -16,6 +16,7 @@ import {
 import AccountDashboard from './tool/AccountDashboard'
 import AuthPage from './tool/AuthPage'
 import ProfileUpgradePrompt from './tool/ProfileUpgradePrompt'
+import ProfileExpiryPrompt from './tool/ProfileExpiryPrompt'
 import { useWorkspaceEntryPreference, WorkspaceEntryPrompt } from './tool/WorkspaceEntryPreference'
 import WorkspaceSetupPage from './tool/WorkspaceSetupPage'
 import { isSchedulableProfile } from './tool/tool-utils'
@@ -129,14 +130,21 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
   const navigateAfterConfigSave = async (path: string) => {
     if (await flushConfigSave()) navigateToToolPath(path)
   }
-  const profileUpgradePrompt = (
-    <ProfileUpgradePrompt
-      userId={user.id}
-      profile={activeCdkProfile}
-      inventoryEnabled={features.inventory}
-      currentPath={location.pathname}
-      onOpenInventory={() => navigateDashboard('inventory')}
-    />
+  const profilePrompts = (
+    <>
+      {features.profiles && <ProfileExpiryPrompt
+        userId={user.id}
+        profiles={cdkProfiles}
+        onOpenExport={(profile) => { void navigateAfterConfigSave(profileScopedPath(optimizePath('plans'), profile.id)) }}
+      />}
+      <ProfileUpgradePrompt
+        userId={user.id}
+        profile={activeCdkProfile}
+        inventoryEnabled={features.inventory}
+        currentPath={location.pathname}
+        onOpenInventory={() => navigateDashboard('inventory')}
+      />
+    </>
   )
 
   if (route.kind === 'dashboard') {
@@ -172,7 +180,7 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
             workspaceEntry={workspaceEntry}
           />
         </NotificationCenterProvider>
-        {profileUpgradePrompt}
+        {profilePrompts}
         {route.section === 'profiles' && <WorkspaceEntryPrompt entry={workspaceEntry} />}
       </>
     )
@@ -209,7 +217,7 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
             />
           </NotificationCenterProvider>
         </PublicContentProvider>
-        {profileUpgradePrompt}
+        {profilePrompts}
       </>
     )
   }
@@ -251,7 +259,7 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
           />
         </Suspense>
       </NotificationCenterProvider>
-      {profileUpgradePrompt}
+      {profilePrompts}
     </>
   )
 }

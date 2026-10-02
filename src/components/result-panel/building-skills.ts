@@ -5,10 +5,16 @@ export const RECOVERY_SUPPORT_ICON_SRC = '/building-skills/bskill_dorm_all&one1.
 
 type Skill = { name: string; room: string; icon: string; description: string }
 type Unlock = { id: string; slot: number; elite: number; level: number }
-type CatalogOperator = { name: string; skills: Unlock[] }
+type CatalogOperator = { name: string; skills: Unlock[]; profession: string }
+type Profession = 'WARRIOR' | 'SNIPER' | 'TANK' | 'MEDIC' | 'SUPPORT' | 'CASTER' | 'SPECIAL' | 'PIONEER'
 const skills: Record<string, Skill> = catalog.skills
 const operators: Record<string, CatalogOperator> = catalog.operators
 const byName = new Map(Object.entries(operators).map(([id, operator]) => [operator.name, id]))
+
+export function operatorProfession(operator: RoomOperator): Profession | undefined {
+  const character = operators[operator.id ?? ''] ?? operators[byName.get(operator.name) ?? '']
+  return character?.profession as Profession | undefined
+}
 
 export function operatorBuildingSkills(operator: RoomOperator) {
   const character = operators[operator.id ?? ''] ?? operators[byName.get(operator.name) ?? '']

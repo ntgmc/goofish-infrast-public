@@ -57,6 +57,28 @@ afterEach(() => {
 })
 
 describe('ToolPage route guards', () => {
+  it.each([true, false])('opens the expiring profile export page only after saving the current draft: %s', async (saved) => {
+    const user = userEvent.setup()
+    const activeProfile = createProfile()
+    const expiringProfile = {
+      ...createProfile(),
+      id: 'expiring-profile',
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    }
+    const flushConfigSave = vi.fn().mockResolvedValue(saved)
+    const router = renderToolRoute('/tool/setup/config', {
+      activeProfile,
+      activeCdkProfile: activeProfile,
+      cdkProfiles: [activeProfile, expiringProfile],
+      license: { operators: [], config: {}, order_hash: 'order' },
+      flushConfigSave,
+    })
+    await user.click(await screen.findByRole('button', { name: '前往保存与导出' }))
+    expect(flushConfigSave).toHaveBeenCalledOnce()
+    await waitFor(() => expect(router.state.location.pathname).toBe(saved ? '/tool/optimize/plans' : '/tool/setup/config'))
+    expect(router.state.location.search).toBe(saved ? '?profile_id=expiring-profile' : '')
+  })
+
   it.each([true, false])('returns to profiles only when configuration saving succeeds: %s', async (saved) => {
     const user = userEvent.setup()
     const flushConfigSave = vi.fn().mockResolvedValue(saved)

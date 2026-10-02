@@ -426,6 +426,7 @@ export const publicCopy = {
     single_account_lifetime: "购买终身卡",
   },
   pricing_purchase_unavailable: "暂未开放购买",
+  pricing_archive_gift: (count: number) => `赠送 ${count} 个封存资格，绑定后自动生效${count === 1 ? '，续费不叠加' : ''}。`,
   pricing_recommendation_monthly: "尝鲜首选",
   pricing_recommendation_lifetime: "最多人选",
   pricing_upgrade_title: "补差价升级终身卡",

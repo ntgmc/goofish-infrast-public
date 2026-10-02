@@ -22,6 +22,7 @@ export type ManualDraft = {
   title: string;
   savedAt: string;
   plans: ManualPlan[];
+  schedule?: OptimizeResult;
 }
 
 function isFixedDormitory(source: OptimizeResult, type: string): boolean {
@@ -107,10 +108,10 @@ export function changeManualDrone(source: OptimizeResult, plans: ManualPlan[], o
   return next
 }
 
-export function validateManualPlans(source: OptimizeResult, value: unknown, operators: LicenseOperator[]): asserts value is ManualPlan[] {
+export function validateManualPlans(source: OptimizeResult, value: unknown, operators: LicenseOperator[], lockFiammetta = true): asserts value is ManualPlan[] {
   if (!Array.isArray(value) || value.length !== source.plans.length) throw new Error('Invalid shifts')
   const base = createManualPlans(source)
-  const locked = lockedManualOperators(source)
+  const locked = lockFiammetta ? lockedManualOperators(source) : new Set<string>()
   const allowed = new Set([
     ...operators.filter((operator) => operator.own).map((operator) => operator.name),
     ...base.flatMap((plan) => Object.values(plan.rooms).flat(2).filter(Boolean)),
@@ -143,7 +144,7 @@ export function validateManualPlans(source: OptimizeResult, value: unknown, oper
   })
 }
 
-export function manualResult(source: OptimizeResult, plans: ManualPlan[]): OptimizeResult {
+export function manualResult(source: OptimizeResult, plans: ManualPlan[], preserveSlots = false): OptimizeResult {
   return {
     schedule_source: 'manual',
     author: source.author, title: source.title, description: source.description, buildingType: source.buildingType,
@@ -161,7 +162,9 @@ export function manualResult(source: OptimizeResult, plans: ManualPlan[]): Optim
       },
       rooms: Object.fromEntries(Object.entries(plan.rooms).map(([type, rooms]) => [
         type, rooms.map((room, roomIndex) => ({
-          level: room.level, product: room.product, operators: plans[index].rooms[type][roomIndex].filter(Boolean), autofill: room.autofill,
+          level: room.level, product: room.product,
+          operators: preserveSlots ? plans[index].rooms[type][roomIndex].slice() : plans[index].rooms[type][roomIndex].filter(Boolean),
+          autofill: room.autofill,
         })),
       ])),
     })),
@@ -175,22 +178,24 @@ export function manualSourceKey(source: OptimizeResult): string {
   })
 }
 
-export function readManualDraft(profileId: string, source: OptimizeResult, operators: LicenseOperator[]): ManualDraft | null {
+export function readManualDraft(profileId: string, source: OptimizeResult, operators: LicenseOperator[], allowSchedule = false): ManualDraft | null {
   const raw = localStorage.getItem(`manual-schedule:${profileId}`)
   if (!raw) return null
-  return parseManualDraft(raw, source, operators)
+  return parseManualDraft(raw, source, operators, allowSchedule)
 }
 
-export function parseManualDraft(raw: string, source: OptimizeResult, operators: LicenseOperator[]): ManualDraft {
+export function parseManualDraft(raw: string, source: OptimizeResult, operators: LicenseOperator[], allowSchedule = false): ManualDraft {
   const draft = JSON.parse(raw) as ManualDraft
   if (!draft || draft.version !== 1 || draft.source !== manualSourceKey(source) || typeof draft.savedAt !== 'string') throw new Error('Draft does not match source')
-  validateManualPlans(source, draft.plans, operators)
+  if (draft.schedule && !allowSchedule) throw new Error('Schedule settings are locked')
+  validateManualPlans(draft.schedule ?? source, draft.plans, operators, !draft.schedule)
   return draft
 }
 
-export function saveManualDraft(profileId: string, source: OptimizeResult, plans: ManualPlan[], operators: LicenseOperator[]): ManualDraft {
-  validateManualPlans(source, plans, operators)
-  const draft: ManualDraft = { version: 1, source: manualSourceKey(source), title: source.title, savedAt: new Date().toISOString(), plans }
+export function saveManualDraft(profileId: string, source: OptimizeResult, plans: ManualPlan[], operators: LicenseOperator[], schedule?: OptimizeResult): ManualDraft {
+  validateManualPlans(schedule ?? source, plans, operators, !schedule)
+  const draft: ManualDraft = { version: 1, source: manualSourceKey(source), title: source.title, savedAt: new Date().toISOString(), plans,
+    ...(schedule && { schedule }) }
   localStorage.setItem(`manual-schedule:${profileId}`, JSON.stringify(draft))
   return draft
 }

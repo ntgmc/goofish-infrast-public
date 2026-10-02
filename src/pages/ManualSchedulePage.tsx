@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
+import FacilityLayoutEditor from '../components/FacilityLayoutEditor'
+import OperatorSkillPreview from '../components/result-panel/OperatorSkillPreview'
+import { OperatorAvatarTile } from '../components/result-panel/OperatorAvatarStrip'
 import ManualScheduleEditor from '../components/result-panel/ManualScheduleEditor'
 import { copy } from '../copy/index'
 import { CONFIG_PRESETS, normalizeConfig } from '../lib/config'
@@ -24,7 +27,10 @@ export default function ManualSchedulePage() {
     ? mergeOperators(session.workspace?.operators ?? [], session.eliteOverrides) : [],
   [ready, session.workspace?.operators, session.eliteOverrides])
   const [preset, setPreset] = useState('')
-  const [shiftHours, setShiftHours] = useState('8-8-8')
+  const [shiftHours, setShiftHours] = useState<string | null>(null)
+  const [configDraft, setConfigDraft] = useState<LicenseConfig | null>(null)
+  const baseConfig = configDraft ?? normalizeConfig(preset ? CONFIG_PRESETS[preset] : session.workspace?.config ?? CONFIG_PRESETS['243'])
+  const configuredHours = shiftHours ?? (Array.isArray(baseConfig.shift_hours) ? baseConfig.shift_hours.join('-') : baseConfig.shift_hours ?? '8-8-8')
   const [draft, setDraft] = useState<{ source: OptimizeResult; config: LicenseConfig; profileId: string; revision: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
@@ -45,14 +51,16 @@ export default function ManualSchedulePage() {
     setDraft(null)
     setError(null)
     setPreset('')
-    setShiftHours('8-8-8')
+    setConfigDraft(null)
+    setShiftHours(null)
     revision.current += 1
   }, [profile?.id])
 
   const configuration = (): LicenseConfig => ({
-    ...normalizeConfig(preset ? CONFIG_PRESETS[preset] : session.workspace?.config ?? CONFIG_PRESETS['243']),
-    schedule_mode: 'maa', dormitory_rule: 'fixed', shift_hours: shiftHours, Fiammetta: { enable: false },
+    ...baseConfig,
+    schedule_mode: 'maa', dormitory_rule: 'fixed', shift_hours: configuredHours, Fiammetta: { enable: false },
     drones: { enable: false, order: 'pre', targets: [] },
+    variable_shift_schedule: undefined,
   })
 
   function start() {
@@ -83,7 +91,9 @@ export default function ManualSchedulePage() {
         setDraft({ source, config, profileId: selectedProfileId, revision: run })
       }
     } catch (caught) {
-      if (revision.current === run) setError(caught instanceof Error && caught.message === label.tooLarge ? label.tooLarge : label.importFailed)
+      if (revision.current === run) setError(caught instanceof Error &&
+        [label.tooLarge, label.importLayoutMismatch, label.fiammettaInvalid, copy.common.facilityLayoutRequired].some((message) => message === caught.message)
+        ? caught.message : label.importFailed)
     } finally {
       setImporting(false)
       if (upload.current) upload.current.value = ''
@@ -129,20 +139,40 @@ export default function ManualSchedulePage() {
                 {label.operatorsRequired}{' '}
                 <Link className="text-brand-500 underline" to={profileScopedPath(workspaceSetupPath('operators'), profile.id)}>{label.setup}</Link>
               </p>}
+              {ready && operators.some((operator) => operator.own) && <details className="tool-inset p-4">
+                <summary className="cursor-pointer text-sm font-medium">{label.operators} · {operators.filter((operator) => operator.own).length}</summary>
+                <p className="my-3 text-xs leading-5 text-ink-muted">{label.operatorsHint}</p>
+                <OperatorSkillPreview>
+                  <div className="grid max-h-64 grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-4 lg:grid-cols-6">
+                    {operators.filter((operator) => operator.own).map((operator) => <div key={operator.id} className="flex items-center gap-2">
+                      <OperatorAvatarTile operator={operator} compact showFullNames />
+                      <span className="text-xs text-ink-secondary">{copy.domain.building_skills.unlock(operator.elite, Number(operator.level) || 1)}</span>
+                    </div>)}
+                  </div>
+                </OperatorSkillPreview>
+                <Link className="mt-3 inline-block text-sm text-brand-500 underline" to={profileScopedPath(workspaceSetupPath('operators'), profile.id)}>{label.editOperators}</Link>
+              </details>}
+              <p className="text-xs leading-5 text-ink-muted">{label.configHint}</p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block space-y-2 text-sm">
                   <span>{label.layout}</span>
-                  <select className="tool-field" value={preset} disabled={!enabled} onChange={(event) => setPreset(event.target.value)}>
+                  <select className="tool-field" value={preset} disabled={!enabled} onChange={(event) => { setPreset(event.target.value); setConfigDraft(null) }}>
                     <option value="">{label.currentLayout}</option>
                     {Object.entries(CONFIG_PRESETS).map(([key, config]) => <option key={key} value={key}>{config.desc}</option>)}
                   </select>
                 </label>
                 <label className="block space-y-2 text-sm">
                   <span>{label.shiftHours}</span>
-                  <input className="tool-field" value={shiftHours} disabled={!enabled} onChange={(event) => setShiftHours(event.target.value)} />
+                  <input className="tool-field" value={configuredHours} disabled={!enabled} onChange={(event) => setShiftHours(event.target.value)} />
                   <span className="block text-xs text-ink-muted">{label.shiftHint}</span>
                 </label>
               </div>
+              {ready && baseConfig.layout === '2-5-2' && <FacilityLayoutEditor
+                key={`${profile.id}:${preset}`} config={baseConfig} onUpdate={(mutate) => {
+                  const next = structuredClone(baseConfig)
+                  mutate(next)
+                  setConfigDraft(next)
+                }} />}
             </>
           )}
           {session.workspaceLoadError && <div role="alert" className="text-sm text-warning">

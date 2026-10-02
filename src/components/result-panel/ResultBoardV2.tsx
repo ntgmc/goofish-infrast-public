@@ -38,12 +38,13 @@ type BoardEditing = {
   onDroneTarget: (room: BoardRoom) => void;
 }
 
-export default function ResultBoardV2({ prepared, isRotationMode, shiftHours, activePlan, onPlanChange, editing }: {
+export default function ResultBoardV2({ prepared, isRotationMode, shiftHours, activePlan, onPlanChange, showProfession = false, editing }: {
   prepared: PreparedResult;
   isRotationMode: boolean;
   shiftHours?: number[];
   activePlan: number;
   onPlanChange: (index: number) => void;
+  showProfession?: boolean;
   editing?: BoardEditing;
 }) {
   const id = useId()
@@ -125,7 +126,7 @@ export default function ResultBoardV2({ prepared, isRotationMode, shiftHours, ac
                     const group = productionRooms.filter((room) => room.roomType === roomType)
                     return group.length > 0 && (
                       <div key={roomType} className={`grid gap-3 ${roomType === 'control' ? '' : roomType === 'power' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-                        {group.map((room) => <RoomCard key={room.key} room={room} drones={plan.drones} editing={editing} />)}
+                        {group.map((room) => <RoomCard key={room.key} room={room} drones={plan.drones} editing={editing} showProfession={showProfession} />)}
                       </div>
                     )
                   })}
@@ -135,7 +136,7 @@ export default function ResultBoardV2({ prepared, isRotationMode, shiftHours, ac
                 <section className="min-w-0 space-y-3" aria-label={label.support}>
                   <h3 className="tool-eyebrow">{label.support}</h3>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    {supportRooms.map((room) => <RoomCard key={room.key} room={room} drones={plan.drones} editing={editing} className={room.roomType === 'dormitory' ? 'sm:col-span-2' : ''} />)}
+                      {supportRooms.map((room) => <RoomCard key={room.key} room={room} drones={plan.drones} editing={editing} showProfession={showProfession} className={room.roomType === 'dormitory' ? 'sm:col-span-2' : ''} />)}
                   </div>
                 </section>
               )}
@@ -177,7 +178,7 @@ export function buildBoardV2Rooms(plan: PreparedPlan | undefined, isRotationMode
   })
 }
 
-function RoomCard({ room, drones, editing, className = '' }: { room: BoardRoom; drones?: DroneAssignment; editing?: BoardEditing; className?: string }) {
+function RoomCard({ room, drones, editing, showProfession, className = '' }: { room: BoardRoom; drones?: DroneAssignment; editing?: BoardEditing; showProfession?: boolean; className?: string }) {
   const { row } = room
   const { icon: Icon, tone } = ROOM_STYLES[room.roomType] ?? { icon: Building2, tone: 'text-ink-secondary' }
   const label = copy.domain.result_board_v2
@@ -227,14 +228,14 @@ function RoomCard({ room, drones, editing, className = '' }: { room: BoardRoom; 
                   title={locked ? copy.domain.manual_schedule.lock_operator : undefined}
                   className="relative rounded-md p-1 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 disabled:cursor-not-allowed disabled:opacity-70"
                   onClick={() => editing.onEditRoom(room, slot)}>
-                  <OperatorAvatarTile key={name || slot} operator={operator} placeholder={copy.domain.manual_schedule.empty_slot(slot + 1)} large showFullNames buttonChild />
+                  <OperatorAvatarTile key={name || slot} operator={operator} placeholder={copy.domain.manual_schedule.empty_slot(slot + 1)} large showFullNames buttonChild showProfession={showProfession} />
                   {locked && <LockKeyhole size={14} className="absolute right-0 top-0 rounded-sm bg-surface-1 text-warning" aria-label={copy.domain.manual_schedule.lock_operator} />}
                 </button>
               )
             })}
           </div>
         ) : row ? (
-          <OperatorAvatarStrip operators={row.operators} fallbackText={row.operatorText} large showFullNames />
+          <OperatorAvatarStrip operators={row.operators} fallbackText={row.operatorText} large showFullNames showProfession={showProfession} />
         ) : (
           <p className="rounded-md border border-dashed border-surface-3 p-3 text-sm leading-6 text-ink-muted">{label.empty_room}</p>
         )}

@@ -13,6 +13,8 @@ import { operatorBuildingSkills } from './building-skills'
 import ResultMetrics from './ResultMetrics'
 import ResultDetail from './ResultDetail'
 import ManualMoodSummary from './ManualMoodSummary'
+import ManualScheduleSettings from './ManualScheduleSettings'
+import { manualScheduleSourceSchema, resolveManualScheduleConfig } from '../../lib/manual-schedule-tool'
 import { getOptimizePollRetryDelayMs } from '../../lib/optimize-poll'
 import { submitOptimizationJob } from '../../pages/tool/optimize/optimization-api'
 import { fetchOptimizeJobSnapshotStatus, isOptimizeJobPollCancelled, isRetryableOptimizePollError, waitForOptimizePoll } from '../../pages/tool/optimize/job-progress'
@@ -21,7 +23,7 @@ import {
   manualSourceKey, parseManualDraft, readManualDraft, saveManualDraft, type ManualDraft, type ManualPlan,
 } from '../../lib/manual-schedule'
 
-export default function ManualScheduleEditor({ source, profileId, operators, simulationBaseline, draftStorageKey = profileId }: {
+export default function ManualScheduleEditor({ source: initialSource, profileId, operators, simulationBaseline, draftStorageKey = profileId }: {
   source: OptimizeResult;
   profileId: string;
   operators: LicenseOperator[];
@@ -29,8 +31,14 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
   draftStorageKey?: string;
 }) {
   const label = copy.domain.manual_schedule
+  const standalone = Boolean(simulationBaseline && !simulationBaseline.id)
+  const [source, setSource] = useState(initialSource)
+  const validationSource = useMemo(() => standalone ? {
+    ...source, plans: source.plans.map((plan) => ({ ...plan, Fiammetta: undefined })),
+  } : source, [source, standalone])
   const [plans, setPlans] = useState<ManualPlan[]>(() => createManualPlans(source))
-  const [baseline, setBaseline] = useState(() => canonicalJson(createManualPlans(source)))
+  const scheduleKey = (source: OptimizeResult, plans: ManualPlan[]) => canonicalJson(standalone ? { source, plans } : plans)
+  const [baseline, setBaseline] = useState(() => scheduleKey(source, createManualPlans(source)))
   const [stored, setStored] = useState<ManualDraft | null>(null)
   const [activePlan, setActivePlan] = useState(0)
   const [room, setRoom] = useState<BoardRoom | null>(null)
@@ -43,25 +51,39 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
   const simulationRun = useRef(0)
   const simulationLock = useRef(false)
   const operatorsKey = canonicalJson(operators)
-  const currentInputKey = useRef(canonicalJson({ plans, operators }))
-  currentInputKey.current = canonicalJson({ plans, operators })
+  const currentInputKey = useRef(canonicalJson({ source, plans, operators }))
+  currentInputKey.current = canonicalJson({ source, plans, operators })
   const [confirmation, setConfirmation] = useState<'reset' | 'restore' | 'import' | null>(null)
   const [imported, setImported] = useState<ManualDraft | null>(null)
   const upload = useRef<HTMLInputElement>(null)
-  const dirty = canonicalJson(plans) !== baseline
-  const changed = canonicalJson(plans) !== canonicalJson(createManualPlans(source))
-  const locked = useMemo(() => lockedManualOperators(source), [source])
+  const dirty = scheduleKey(source, plans) !== baseline
+  const changed = scheduleKey(source, plans) !== scheduleKey(initialSource, createManualPlans(initialSource))
+  const locked = useMemo(() => lockedManualOperators(validationSource), [validationSource])
   const result = useMemo(() => simulation ?? manualResult(source, plans), [source, plans, simulation])
   const prepared = useMemo(() => prepareResult(result, result.schedule_mode === 'rotation', result.dormitory_rule === 'maa_pure_autofill', operators), [result, operators])
   const selectedRoom = room ? plans[activePlan].rooms[room.roomType][room.roomIndex] : []
   const selectedName = selectedRoom[slot] ?? ''
+  const settingsError = useMemo(() => {
+    if (!standalone || !simulationBaseline) return null
+    try { resolveManualScheduleConfig(manualResult(source, plans), simulationBaseline.config, operators); return null }
+    catch (cause) {
+      return cause instanceof Error && [copy.tools.manualSchedule.fiammettaInvalid, copy.common.facilityLayoutRequired, copy.domain.lib_config_035]
+        .some((message) => message === cause.message) ? cause.message : copy.tools.manualSchedule.invalidSettings
+    }
+  }, [standalone, source, plans, simulationBaseline, operators])
   useEffect(() => () => { simulationRun.current += 1 }, [])
   useEffect(() => { setSimulation(null) }, [operatorsKey])
 
   useEffect(() => {
-    try { setStored(readManualDraft(draftStorageKey, source, operators)) }
+    try {
+      const draft = readManualDraft(draftStorageKey, initialSource, operators, standalone)
+      if (draft?.schedule) {
+        draft.schedule = manualScheduleSourceSchema.parse(draft.schedule)
+      }
+      setStored(draft)
+    }
     catch { setError(label.invalid_draft) }
-  }, [draftStorageKey, source, operators, label.invalid_draft])
+  }, [draftStorageKey, initialSource, operators, standalone, label.invalid_draft])
 
   useEffect(() => {
     if (!dirty) return
@@ -71,18 +93,39 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
   }, [dirty])
 
   const update = useCallback((next: ManualPlan[]) => {
-    currentInputKey.current = canonicalJson({ plans: next, operators })
+    currentInputKey.current = canonicalJson({ source, plans: next, operators })
     setPlans(next)
     setSimulation(null)
     setError(null)
     setNotice(null)
-  }, [operators])
+  }, [source, operators])
+
+  function updateSettings(next: OptimizeResult) {
+    try {
+      const checked = manualScheduleSourceSchema.parse(next)
+      const nextPlans = createManualPlans(checked)
+      nextPlans.forEach((plan, planIndex) => {
+        for (const [type, rooms] of Object.entries(plan.rooms)) rooms.forEach((room, roomIndex) => {
+          const previous = plans[planIndex].rooms[type][roomIndex]
+          if (previous.slice(room.length).some(Boolean)) throw new Error(copy.tools.manualSchedule.occupiedSlots)
+          plan.rooms[type][roomIndex] = Array.from({ length: room.length }, (_, index) => previous[index] ?? '')
+        })
+      })
+      setSource(checked)
+      currentInputKey.current = canonicalJson({ source: checked, plans: nextPlans, operators })
+      setPlans(nextPlans)
+      setSimulation(null)
+      setError(null)
+      setNotice(null)
+    } catch (cause) { setError(cause instanceof Error && cause.message === copy.tools.manualSchedule.occupiedSlots
+      ? cause.message : copy.tools.manualSchedule.invalidSettings) }
+  }
 
   async function simulate(submittedPlans = plans) {
-    if (!simulationBaseline || simulationLock.current) return
+    if (!simulationBaseline || simulationLock.current || settingsError) return
     simulationLock.current = true
     const run = ++simulationRun.current
-    const submittedKey = canonicalJson({ plans: submittedPlans, operators })
+    const submittedKey = canonicalJson({ source, plans: submittedPlans, operators })
     const isCancelled = () => simulationRun.current !== run
     setSimulating(true)
     setError(null)
@@ -93,7 +136,7 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
         operators, config: simulationBaseline.config, includeUpgradeSuggestions: false,
         manualSchedule: simulationBaseline.id
           ? { baselineHistoryId: simulationBaseline.id, plans: submittedPlans }
-          : { source, plans: submittedPlans },
+          : { source: manualResult(source, submittedPlans, true), plans: submittedPlans },
       }, label.simulation_failed)
       let failures = 0
       while (!isCancelled()) {
@@ -129,7 +172,7 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
     const additions = simulation?.mood_simulation?.dormitory_recovery?.additions
     if (!additions?.length || simulationLock.current) return
     try {
-      const next = fillManualDormitories(source, plans, operators, additions)
+      const next = fillManualDormitories(validationSource, plans, operators, additions)
       update(next)
       void simulate(next)
     } catch {
@@ -140,13 +183,16 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
   function chooseOperator(name: string) {
     if (!room) return
     try {
-      update(changeManualOperator(source, plans, operators, activePlan, room.roomType, room.roomIndex, slot, name))
+      update(changeManualOperator(validationSource, plans, operators, activePlan, room.roomType, room.roomIndex, slot, name))
     } catch { setError(label.invalid_edit) }
   }
 
   function restore(draft: ManualDraft) {
+    const restoredSource = draft.schedule ?? initialSource
+    setSource(restoredSource)
     update(structuredClone(draft.plans))
-    setBaseline(canonicalJson(draft.plans))
+    currentInputKey.current = canonicalJson({ source: restoredSource, plans: draft.plans, operators })
+    setBaseline(scheduleKey(restoredSource, draft.plans))
     setRoom(null)
   }
 
@@ -154,24 +200,25 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
     if (confirmation === 'reset') {
       try {
         localStorage.removeItem(`manual-schedule:${draftStorageKey}`)
-        const base = createManualPlans(source)
+        const base = createManualPlans(initialSource)
+        setSource(initialSource)
         update(base)
-        setBaseline(canonicalJson(base))
+        currentInputKey.current = canonicalJson({ source: initialSource, plans: base, operators })
+        setBaseline(scheduleKey(initialSource, base))
         setStored(null)
       } catch { setError(label.storage_failed) }
     } else if (confirmation === 'restore' && stored) restore(stored)
     else if (confirmation === 'import' && imported) {
-      update(imported.plans)
-      setRoom(null)
+      restore(imported)
     }
     setConfirmation(null)
   }
 
   function save() {
     try {
-      const draft = saveManualDraft(draftStorageKey, source, plans, operators)
+      const draft = saveManualDraft(draftStorageKey, initialSource, plans, operators, standalone ? manualResult(source, plans, true) : undefined)
       setStored(draft)
-      setBaseline(canonicalJson(plans))
+      setBaseline(scheduleKey(source, plans))
       setNotice(label.saved)
       setError(null)
     } catch { setError(label.storage_failed) }
@@ -183,7 +230,8 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
     setError(null)
     try {
       if (type === 'backup') {
-        const draft: ManualDraft = { version: 1, source: manualSourceKey(source), title: source.title, savedAt: new Date().toISOString(), plans }
+        const draft: ManualDraft = { version: 1, source: manualSourceKey(initialSource), title: source.title, savedAt: new Date().toISOString(), plans,
+          ...(standalone && { schedule: manualResult(source, plans, true) }) }
         const url = URL.createObjectURL(new Blob([JSON.stringify(draft, null, 2)], { type: 'application/json' }))
         const anchor = document.createElement('a')
         anchor.href = url
@@ -204,9 +252,12 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
     setBusy(true)
     try {
       if (file.size > 5_000_000) throw new Error('Backup too large')
-      const draft = parseManualDraft(await file.text(), source, operators)
+      const draft = parseManualDraft(await file.text(), initialSource, operators, standalone)
+      if (draft.schedule) {
+        draft.schedule = manualScheduleSourceSchema.parse(draft.schedule)
+      }
       if (dirty) { setImported(draft); setConfirmation('import') }
-      else update(draft.plans)
+      else restore(draft)
       setError(null)
     } catch { setError(label.importing_failed) }
     finally { setBusy(false); if (upload.current) upload.current.value = '' }
@@ -219,22 +270,22 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
         lockedOperators: locked,
         onEditRoom: (nextRoom, nextSlot) => { setRoom(nextRoom); setSlot(nextSlot) },
         onDroneTarget: (target) => {
-          try { update(changeManualDrone(source, plans, operators, activePlan, target.roomType, target.roomIndex)) }
+          try { update(changeManualDrone(validationSource, plans, operators, activePlan, target.roomType, target.roomIndex)) }
           catch { setError(label.invalid_edit) }
         },
       }} />
-  ), [prepared, source, activePlan, plans, locked, operators, update, label])
+  ), [prepared, source, validationSource, activePlan, plans, locked, operators, update, label])
 
   return (
     <section className="space-y-4" aria-label={label.title}>
       <div className="tool-alert tool-alert--warning space-y-2 p-4">
         <p className="font-semibold" role="status">{simulating ? label.simulating : simulation ? label.simulated : label.warning}</p>
-        <p className="text-sm"><LockKeyhole size={14} className="mr-1 inline" aria-hidden="true" />{label.locked}</p>
+        {!standalone && <p className="text-sm"><LockKeyhole size={14} className="mr-1 inline" aria-hidden="true" />{label.locked}</p>}
       </div>
       <div className="tool-panel space-y-3 p-4">
         {draftStorageKey === profileId && <p className="text-sm leading-6 text-ink-secondary">{label.result_scope}</p>}
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="tool-primary-action" disabled={!simulationBaseline || simulating} aria-busy={simulating} onClick={() => void simulate()}>{label.simulate}</button>
+          <button type="button" className="tool-primary-action" disabled={!simulationBaseline || simulating || Boolean(settingsError)} aria-busy={simulating} onClick={() => void simulate()}>{label.simulate}</button>
           <button type="button" className="tool-primary-action" disabled={!changed || busy} onClick={save}>{label.save}</button>
           <button type="button" className="tool-secondary-action" disabled={!stored || busy}
             onClick={() => dirty ? setConfirmation('restore') : stored && restore(stored)}>{label.restore}</button>
@@ -268,6 +319,9 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
         {notice && <p className="text-sm text-success" role="status">{notice}</p>}
       </div>
       {error && <p className="tool-alert tool-alert--warning p-3 text-sm" role="alert">{error}</p>}
+      {settingsError && <p className="tool-alert tool-alert--warning p-3 text-sm" role="alert">{settingsError}</p>}
+      {standalone && <ManualScheduleSettings result={manualResult(source, plans, true)} operators={operators}
+        activePlan={activePlan} onChange={updateSettings} onError={setError} />}
       {simulation && <ResultMetrics isRotationMode={source.schedule_mode === 'rotation'} prepared={prepared} />}
       {simulation?.mood_simulation && <ManualMoodSummary result={simulation} activePlan={activePlan}
         onPlanChange={setActivePlan} onFill={fillDormitories} filling={simulating || busy} />}
@@ -279,7 +333,7 @@ export default function ManualScheduleEditor({ source, profileId, operators, sim
         <button type="button" className="tool-secondary-action" disabled={busy} onClick={() => void download('current')}><Download size={14} aria-hidden="true" />{copy.domain.result_image.current}</button>
         <button type="button" className="tool-secondary-action" disabled={busy} onClick={() => void download('all')}><Download size={14} aria-hidden="true" />{copy.domain.result_image.all}</button>
         <button type="button" className="tool-secondary-action" disabled={!plans[activePlan]?.drones.enable || busy} onClick={() => {
-          try { update(changeManualDrone(source, plans, operators, activePlan)) } catch { setError(label.invalid_edit) }
+          try { update(changeManualDrone(validationSource, plans, operators, activePlan)) } catch { setError(label.invalid_edit) }
         }}>{label.no_drone}</button>
       </div>
       {board}

@@ -116,7 +116,7 @@ export default async (req: Request): Promise<Response> => {
           targetId: user.id,
           reason: '管理员导出用户工作区数据。',
         })
-        return exportAdminUserWorkspaces(user)
+        return exportAdminUserWorkspaces(user, url.searchParams.has('profile_id') ? url.searchParams.getAll('profile_id') : undefined)
       }
       if (include === 'operators') {
         const user = await findTargetUser({ user_id: userId })
@@ -503,8 +503,13 @@ async function saveProfilePatch(
   return updated
 }
 
-async function exportAdminUserWorkspaces(user: UserAccountRecord): Promise<Response> {
-  const profiles = await listProfilesForUser(user.id)
+async function exportAdminUserWorkspaces(user: UserAccountRecord, selectedProfileIds?: string[]): Promise<Response> {
+  const allProfiles = await listProfilesForUser(user.id)
+  const selectedIds = selectedProfileIds ? new Set(selectedProfileIds) : null
+  const profiles = selectedIds ? allProfiles.filter((profile) => selectedIds.has(profile.id)) : allProfiles
+  if (selectedIds && (selectedIds.size === 0 || profiles.length !== selectedIds.size)) {
+    return jsonResponse({ error: '所选账号档案不存在或不属于该用户。' }, 404)
+  }
   const profileIds = profiles.map((profile) => profile.id)
   const [workspaceMap, resultsByProfile] = await Promise.all([
     listProfileWorkspaces(profileIds),

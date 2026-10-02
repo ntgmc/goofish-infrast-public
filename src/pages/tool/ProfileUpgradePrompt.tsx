@@ -160,7 +160,7 @@ function isPromptSuppressed(userId: string | null): boolean {
   }
 }
 
-function waitForModalAvailability(onAvailable: () => void): () => void {
+export function waitForModalAvailability(onAvailable: () => void): () => void {
   if (typeof document === 'undefined') return () => undefined
   const isBlocked = () => Boolean(document.querySelector(
     'dialog[open], [role="dialog"][data-state="open"], [data-slot="dialog-content"][data-state="open"]',

@@ -33,9 +33,11 @@ beforeEach(() => {
     callback(new Blob(['png'], { type: 'image/png' }))
   })
   vi.stubGlobal('Image', class {
+    source = ''
     onload: (() => void) | null = null
     onerror: (() => void) | null = null
     set src(value: string) {
+      this.source = value
       imageRequests.push(value)
       queueMicrotask(() => value.includes('missing') || failedImages.includes(value) ? this.onerror?.() : this.onload?.())
     }
@@ -49,6 +51,41 @@ afterEach(() => {
 })
 
 describe('schedule image exports', () => {
+  it.each([
+    ['v2', false, undefined, []],
+    ['v2', true, 0, ['SNIPER', 'PIONEER']],
+    ['v2', true, undefined, ['SNIPER', 'PIONEER', 'CASTER']],
+    ['v1', true, undefined, []],
+  ] as const)('exports optional profession badges in %s (enabled %s, shift %s)', async (version, showProfession, planIndex, professions) => {
+    const { result } = schedule()
+    result.plans[0].rooms.trading[0].operators = ['能天使', '德克萨斯', '未知干员']
+    result.plans[1].rooms.trading[0].operators = ['阿米娅']
+    const prepared = prepareResult(result, false, false, [
+      { id: 'char_103_angel', name: '能天使', own: true, elite: 2, rarity: 6 },
+    ])
+    await renderScheduleImage({ prepared, version, showProfession, planIndex, title: result.title, isRotationMode: false })
+    expect(imageRequests.filter((url) => url.startsWith('/operator-professions/')))
+      .toEqual(professions.map((profession) => `/operator-professions/${profession}.png`))
+    const badges = drawnImage.mock.calls.filter(([image]) => image.source.startsWith('/operator-professions/'))
+    expect(badges).toHaveLength(professions.length)
+    for (const [, x, y, width, height] of badges) {
+      expect(width).toBe(20)
+      expect(height).toBe(20)
+      expect(drawnRoundRect.mock.calls.some(([avatarX, avatarY, avatarWidth]) =>
+        avatarWidth === 72 && x === avatarX + 50 && y === avatarY + 2)).toBe(true)
+    }
+  })
+
+  it('exports successfully when a profession icon cannot load', async () => {
+    const { result } = schedule()
+    result.plans[0].rooms.trading[0].operators = ['能天使']
+    failedImages = ['/operator-professions/SNIPER.png']
+    const prepared = prepareResult(result, false, false)
+    await expect(renderScheduleImage({ prepared, version: 'v2', showProfession: true, planIndex: 0, title: result.title, isRotationMode: false }))
+      .resolves.toHaveProperty('type', 'image/png')
+    expect(drawnImage.mock.calls.filter(([image]) => image.source.startsWith('/operator-professions/'))).toHaveLength(0)
+  })
+
   it.each(['v1', 'v2'] as const)('exports dormitory recovery support marks in %s', async (version) => {
     const { result, operators } = schedule()
     result.dormitory_rule = 'maa_pure_autofill'
