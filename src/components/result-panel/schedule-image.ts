@@ -5,6 +5,7 @@ import { formatCompactNumber, type PreparedResult } from './formatters'
 import { ROOM_LABELS } from './labels'
 import type { PreparedPlan, RoomRow } from './types'
 import { isDroneTarget } from './DroneMarker'
+import { getProductIconSrc } from '../ProductIcon'
 
 type ImageOptions = {
   prepared: PreparedResult;
@@ -61,7 +62,7 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
   if (document.fonts) await document.fonts.load(`500 ${FONT_SIZE}px ${fontFamily}`, `${title} ${allText}`)
   const images = new Map(await Promise.all([...new Set(plans.flatMap((plan) =>
     plan.rows.flatMap((row) => row.operators.flatMap((operator) => operator.id ? [operator.id] : [])),
-  ))].map(async (id) => [id, await loadAvatar(id)] as const)))
+  ))].map(async (id) => [id, await loadImage(`/webp96/${encodeURIComponent(id)}.webp`)] as const)))
 
   function lines(value: string, width: number, size = FONT_SIZE, weight = 500): string[] {
     context!.font = `${weight} ${size}px ${fontFamily}`
@@ -101,10 +102,13 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
 
   function cardHeight(card: ImageCard): number {
     return 40 + Math.max(lines(card.title, headerTextWidth, 16, 600).length,
-      card.product === '-' ? 0 : lines(card.product, headerTextWidth, 16, 600).length) * 22
+      card.product === '-' ? 0 : lines(card.product, productTextWidth(card), 16, 600).length) * 22
       + card.slots.reduce((height, slot) => height + slotHeight(slot), 0)
   }
 
+  function productTextWidth(card: ImageCard): number {
+    return headerTextWidth - (productImages.get(card.product) ? 24 : 0)
+  }
   function planLabel(plan: PreparedPlan, index: number): string {
     const hours = plan.shift_hours ?? shiftHours?.[index]
     return `${plan.name?.trim() || copy.domain.result_board_v2.shift(index + 1)}${typeof hours === 'number' && hours > 0 ? ` · ${formatCompactNumber(hours)}h` : ''}`
@@ -145,6 +149,14 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
         slots: [{ label: '', row: room.row }],
       })),
   }))
+  const productImages = new Map(await Promise.all(
+    (version === 'v2' ? [...new Set(sections.flatMap((section) => section.cards.map((card) => card.product)))] : [])
+      .flatMap((product) => {
+        const src = getProductIconSrc(product)
+        return src ? [[product, src] as const] : []
+      })
+      .map(async ([product, src]) => [product, await loadImage(src)] as const),
+  ))
   const placements: Array<{ card: ImageCard; x: number; y: number; height: number }> = []
   const headings: Array<{ value: string; y: number; note: string }> = []
   const heading = `${copy.domain.result_image.title} ${version}`
@@ -191,8 +203,14 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
     context.fillStyle = tone
     context.fillRect(x + 16, cardY + 16, 3, 20)
     const titleHeight = text(card.title, x + 28, cardY + 16, headerTextWidth, colors.text, 16, 600)
+    const productRight = x + CARD_WIDTH - 16 - (card.droneLabels.length > 0 ? 40 : 0)
+    const productImage = productImages.get(card.product)
+    if (productImage) {
+      const [firstLine] = lines(card.product, productTextWidth(card), 16, 600)
+      context.drawImage(productImage, productRight - context.measureText(firstLine).width - 24, cardY + 16, 20, 20)
+    }
     const productHeight = card.product === '-' ? 0
-      : text(card.product, x + CARD_WIDTH - 16 - (card.droneLabels.length > 0 ? 40 : 0), cardY + 16, headerTextWidth, tone, 16, 600, 'right')
+      : text(card.product, productRight, cardY + 16, productTextWidth(card), tone, 16, 600, 'right')
     let rowY = cardY + 16 + Math.max(titleHeight, productHeight) + 8
     if (card.droneLabels.length > 0) {
       context.strokeStyle = colors.brand
@@ -268,7 +286,7 @@ function readThemeColors() {
   }
 }
 
-function loadAvatar(id: string): Promise<HTMLImageElement | null> {
+function loadImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const image = new Image()
     const timer = window.setTimeout(() => finish(null), 8000)
@@ -279,6 +297,6 @@ function loadAvatar(id: string): Promise<HTMLImageElement | null> {
     }
     image.onload = () => finish(image)
     image.onerror = () => finish(null)
-    image.src = `/webp96/${encodeURIComponent(id)}.webp`
+    image.src = src
   })
 }

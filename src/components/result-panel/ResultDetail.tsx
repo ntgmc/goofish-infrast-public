@@ -4,6 +4,7 @@ import DroneSummary from './DroneSummary'
 import OperatorAvatarStrip from './OperatorAvatarStrip'
 import type { PreparedPlan, RoomRow } from './types'
 import { copy } from '../../copy/index'
+import ProductIcon from '../ProductIcon'
 
 
 type RotationRoomGroup = {
@@ -100,9 +101,13 @@ function MaaRoomRow({ row }: { row: RoomRow }) {
             <span className="ml-1 text-ink-muted">{row.indexLabel}</span>
           )}
         </span>
-        <span className="text-xs text-ink-muted md:hidden">{row.product}</span>
+        <span className="inline-flex shrink-0 items-center gap-1 text-xs text-ink-muted md:hidden">
+          <ProductIcon product={row.product} size={20} />
+          {row.product}
+        </span>
       </div>
-      <div className="hidden text-sm text-ink-muted md:block">
+      <div className="hidden min-w-0 items-center gap-1 text-sm text-ink-muted md:flex">
+        <ProductIcon product={row.product} size={20} />
         {row.product}
       </div>
       <div className="mt-3 min-w-0 md:mt-0">
@@ -147,7 +152,12 @@ function RotationRoomGrid({ groups }: { groups: RotationRoomGroup[] }) {
                 {group.label}
                 {group.indexLabel && <span className="ml-1 text-ink-muted">{group.indexLabel}</span>}
               </h3>
-              <p className="mt-1 truncate text-xs text-ink-muted">{group.product}</p>
+              <p className="mt-1 flex items-center gap-1 text-xs text-ink-muted">
+                {Array.from(new Set(group.rows.map((row) => row.product))).map((product) => (
+                  <ProductIcon key={product} product={product} size={20} />
+                ))}
+                <span className="truncate">{group.product}</span>
+              </p>
             </div>
             <span className="tool-status shrink-0">
               {group.rows.length} {copy.domain.components_result_panel_ResultDetail_014}</span>

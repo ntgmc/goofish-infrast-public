@@ -205,10 +205,15 @@ describe('ResultPanel overview v2', () => {
     expect(within(board).getByText('贸易1')).toBeInTheDocument()
     expect(within(board).queryByText('贸易2')).not.toBeInTheDocument()
     expect(within(board).queryByText('贸易3')).not.toBeInTheDocument()
-    const portrait = board.querySelector('img')
+    const productIcon = within(board).getByText('龙门币').parentElement?.querySelector('img')
+    expect(productIcon).toHaveAttribute('src', '/assets/products/GOLD.png')
+    expect(productIcon).toHaveAttribute('width', '20')
+    expect(productIcon).toHaveAttribute('aria-hidden', 'true')
+    const portrait = board.querySelector('img[src^="/webp96/"]')
     expect(portrait).toHaveAttribute('width', '72')
     fireEvent.error(portrait!)
-    expect(board.querySelector('img')).toBeNull()
+    expect(board.querySelector('img[src^="/webp96/"]')).toBeNull()
+    expect(within(board).getByText('龙门币')).toBeInTheDocument()
     expect(within(board).getByText('贸易1')).toBeInTheDocument()
 
     await user.click(within(board).getByRole('tab', { name: /第2班.*6h/ }))
@@ -320,6 +325,21 @@ function createThreeShiftResult(): OptimizeResult {
 }
 
 describe('ResultPanel tabs', () => {
+  it.each(['maa', 'rotation'] as const)('keeps product icons and labels together in %s details', async (mode) => {
+    const result = createThreeShiftResult()
+    result.schedule_mode = mode
+    result.plans = result.plans.slice(0, 2)
+    result.plans[1].rooms.trading[0].product = 'Orundum'
+    render(<ResultPanel result={result} />)
+    await userEvent.setup().click(screen.getByRole('tab', { name: mode === 'maa' ? '详情' : '预设队列' }))
+    const panel = screen.getByRole('tabpanel')
+    const icons = panel.querySelectorAll('img[src^="/assets/products/"]')
+    expect(icons).toHaveLength(mode === 'maa' ? 4 : 2)
+    expect(panel.querySelector('img[src="/assets/products/GOLD.png"]')).toBeInTheDocument()
+    expect(panel.querySelector('img[src="/assets/products/DIAMOND_SHD.png"]')).toBeInTheDocument()
+    expect(within(panel).getAllByText(mode === 'maa' ? '龙门币' : '龙门币 / 合成玉').length).toBeGreaterThan(0)
+  })
+
   it('shows dependency anchors for regular autofill and collapses dormitories only for pure autofill', () => {
     const regular = createPreviewOrderResult()
     regular.dormitory_rule = 'maa_autofill'
