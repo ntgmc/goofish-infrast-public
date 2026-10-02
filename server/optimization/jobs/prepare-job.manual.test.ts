@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { CONFIG_PRESETS } from '../../../src/lib/config'
+import { CONFIG_PRESETS, normalizeConfig } from '../../../src/lib/config'
 import { createManualPlans } from '../../../src/lib/manual-schedule'
+import { createBlankManualSchedule } from '../../../src/lib/manual-schedule-tool'
 import type { LicenseOperator, OptimizeResult } from '../../../src/lib/types'
 
 const mocks = vi.hoisted(() => ({
-  profile: vi.fn(), baseline: vi.fn(), session: vi.fn(),
+  profile: vi.fn(), baseline: vi.fn(), session: vi.fn(), authorization: vi.fn(),
 }))
 vi.mock('../../handlers/user-auth', () => ({ requireUserSession: mocks.session }))
 vi.mock('../../storage/user-store', async (original) => ({
@@ -12,7 +13,7 @@ vi.mock('../../storage/user-store', async (original) => ({
 }))
 vi.mock('../../storage/optimization-result-store', () => ({ getProfileOptimizationResult: mocks.baseline }))
 vi.mock('../../handlers/profile-authorization', () => ({
-  resolveProfileAuthorization: vi.fn(async () => ({ ok: true, permission: 'advanced', cdkRecord: null })),
+  resolveProfileAuthorization: mocks.authorization,
 }))
 vi.mock('../../feature-gate', () => ({ requireMeteredBillingFeature: vi.fn(async () => null) }))
 vi.mock('./job-status', () => ({
@@ -51,10 +52,55 @@ function request(overrides: Record<string, unknown> = {}): Request {
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.session.mockResolvedValue({ user: { id: 'user-1' }, tokenHash: 'session' })
+  mocks.authorization.mockResolvedValue({ ok: true, permission: 'advanced', cdkRecord: null })
   mocks.profile.mockResolvedValue({ id: 'profile-1', kind: 'cdk', permission: 'advanced' })
   mocks.baseline.mockResolvedValue({ id: 'history-1', result: source, config, archived_at: null })
 })
 describe('manual schedule admission', () => {
+  it('simulates a standalone source without requiring history or changing its facility configuration', async () => {
+    const standalone = createBlankManualSchedule({ ...normalizeConfig(CONFIG_PRESETS['333']), shift_hours: [12, 12, 12] })
+    const result = await prepareOptimizeJob(request({
+      manualSchedule: { source: standalone, plans: createManualPlans(standalone) },
+    }))
+    expect(result.ok).toBe(true)
+    if (!result.ok || 'kind' in result.prepared.payload) throw new Error('Expected standalone admission')
+    expect(mocks.baseline).not.toHaveBeenCalled()
+    expect(result.prepared.billing).toBeUndefined()
+    expect(result.prepared.payload.effectiveConfig).toMatchObject({
+      layout: '3-3-3', shift_hours: [12, 12, 12], trading_stations_count: 3, manufacturing_stations_count: 3,
+    })
+    expect(result.prepared.payload.request.manual_schedule?.plans).toHaveLength(3)
+  })
+
+  it('requires current advanced authorization for standalone sources and admits active advanced trials', async () => {
+    const standalone = createBlankManualSchedule(normalizeConfig(config))
+    const body = { manualSchedule: { source: standalone, plans: createManualPlans(standalone) } }
+    mocks.authorization.mockResolvedValueOnce({ ok: true, permission: 'recommended', cdkRecord: null })
+    const denied = await prepareOptimizeJob(request(body))
+    expect(denied.ok).toBe(false)
+    if (denied.ok) throw new Error('Expected permission rejection')
+    expect(denied.response.status).toBe(403)
+    mocks.authorization.mockResolvedValueOnce({ ok: false, status: 403, code: 'profile_expired', message: 'Expired' })
+    expect((await prepareOptimizeJob(request(body))).ok).toBe(false)
+    mocks.profile.mockResolvedValueOnce({
+      id: 'profile-1', kind: 'free_preview', permission: 'recommended', temporary_permission: {
+        source: 'limited_profile_voucher', activity_id: 'free-preview-limited-cdk-2026',
+        permission: 'advanced', starts_at: '2026-01-01', ends_at: '2099-01-01',
+      },
+    })
+    expect((await prepareOptimizeJob(request(body))).ok).toBe(true)
+  })
+
+  it('rejects standalone source tampering even when submitted slot arrays are valid', async () => {
+    const standalone = createBlankManualSchedule(normalizeConfig(config))
+    standalone.plans.forEach((plan) => {
+      plan.rooms.manufacture[0].product = 'LMD'
+    })
+    expect((await prepareOptimizeJob(request({
+      manualSchedule: { source: standalone, plans: createManualPlans(standalone) },
+    }))).ok).toBe(false)
+  })
+
   it('derives fixed-plan input and configuration from the owned baseline without billing or workspace effects', async () => {
     const result = await prepareOptimizeJob(request())
     expect(result.ok).toBe(true)

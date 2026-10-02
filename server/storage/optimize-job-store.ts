@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import type { OptimizeCalculationStage, OptimizeResult, WorkspaceResultHistoryItem } from '../../src/lib/types'
-import { formatOptimizeJobHardTimeout, getOptimizeGlobalWorkerConcurrency, getOptimizeJobHardTimeoutMs } from '../optimize-job-config'
+import { formatOptimizeJobHardTimeout, getOptimizeGlobalWorkerConcurrency, getOptimizeJobHardTimeoutMs, OPTIMIZE_JOB_HISTORY_RETENTION_MS } from '../optimize-job-config'
 import { query, withTransaction } from './postgres'
 import { recordAdminOperationAuditInTransaction } from './admin-operation-audit-store'
 import { ensureDatabaseSchema } from './schema'
@@ -46,6 +46,7 @@ interface OptimizeJobListRecord {
   job: OptimizeJobRecord
   queuePosition: number | null
   queueWaitMs?: number | null
+  historyResultId?: string | null
 }
 
 export interface OptimizeJobQueueEstimate {
@@ -518,21 +519,27 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
     },
     listJobsByProfile: async (profileId, limit = 50, before = null) => {
       await ensureSchema()
-      const result = await query<OptimizeJobRow & { queue_position: string | null }>(
+      const result = await query<OptimizeJobRow & { queue_position: string | null; history_result_id: string | null }>(
         `with queued_rank as (
            select id, row_number() over (
              order by (priority <= 0) asc, priority desc, created_at asc, id asc
            ) as queue_position
            from optimize_jobs where status = 'queued'
          )
-         select job.*, queued_rank.queue_position::text
+         select job.*, queued_rank.queue_position::text, history.id as history_result_id
          from optimize_jobs job
          left join queued_rank on queued_rank.id = job.id
+         left join optimization_result_history history on history.profile_id = job.profile_id and history.id = job.id
          where job.profile_id = $1
            and job.source <> 'reorder_check'
+           and (job.status in ('queued', 'running') or coalesce(job.finished_at, job.updated_at) >= $5::timestamptz)
            and ($2::timestamptz is null or (job.created_at, job.id) < ($2::timestamptz, $3::text))
          order by job.created_at desc, job.id desc limit $4`,
-        [profileId, before?.createdAt ?? null, before?.id ?? null, Math.max(1, Math.min(101, Math.floor(limit)))],
+        [
+          profileId, before?.createdAt ?? null, before?.id ?? null,
+          Math.max(1, Math.min(101, Math.floor(limit))),
+          new Date(Date.now() - OPTIMIZE_JOB_HISTORY_RETENTION_MS).toISOString(),
+        ],
       )
       const activeQueue = await query<OptimizeQueueCapacityRow>(
         `select id, status, priority, owner_key, payload_json, created_at, started_at
@@ -543,6 +550,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         job: fromRow(row),
         queuePosition: row.queue_position === null ? null : Number(row.queue_position),
         queueWaitMs: queueEstimates.get(row.id)?.estimatedWaitMs ?? null,
+        historyResultId: row.history_result_id,
       }))
     },
     findActiveByOwnerKey: async (ownerKey) => {
@@ -1132,17 +1140,17 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         await client.query(
           `delete from user_balance_reservations reservation using optimize_jobs job
             where reservation.job_id = job.id and reservation.status <> 'reserved'
-              and job.status = any($2) and job.updated_at < $1`,
-          [beforeIso, ['succeeded', 'failed', 'cancelled']],
+              and job.status = any($2) and coalesce(job.finished_at, job.updated_at) < $1`,
+          [beforeIso, ['succeeded', 'failed', 'cancelled', 'dead_lettered']],
         )
         await client.query(
-          `delete from optimize_jobs job where status = any($2) and updated_at < $1
+          `delete from optimize_jobs job where status = any($2) and coalesce(job.finished_at, job.updated_at) < $1
              and not exists (select 1 from user_balance_reservations reservation
                where reservation.job_id = job.id and reservation.status = 'reserved')
              and not exists (select 1 from optimization_job_effects effect
                where effect.job_id = job.id
                  and coalesce(effect.metadata_json->>'status', 'pending') = 'pending')`,
-          [beforeIso, ['succeeded', 'failed', 'cancelled']],
+          [beforeIso, ['succeeded', 'failed', 'cancelled', 'dead_lettered']],
         )
       })
     },
@@ -1423,7 +1431,9 @@ export function createMemoryOptimizeJobStore(
         Date.now(),
       )
       return [...records.values()]
-        .filter((job) => job.profile_id === profileId && job.source !== 'reorder_check' && (!before
+        .filter((job) => job.profile_id === profileId && job.source !== 'reorder_check'
+          && (activeStatuses.has(job.status) || Date.parse(job.finished_at ?? job.updated_at) >= Date.now() - OPTIMIZE_JOB_HISTORY_RETENTION_MS)
+          && (!before
           || Date.parse(job.created_at) < Date.parse(before.createdAt)
           || (job.created_at === before.createdAt && job.id < before.id)))
         .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id.localeCompare(a.id))
@@ -1808,7 +1818,7 @@ export function createMemoryOptimizeJobStore(
     cleanupOldJobs: async (beforeIso) => {
       const before = Date.parse(beforeIso)
       for (const [id, job] of records.entries()) {
-        if ((job.status === 'succeeded' || job.status === 'failed' || job.status === 'cancelled') && Date.parse(job.updated_at) < before) records.delete(id)
+        if (!activeStatuses.has(job.status) && Date.parse(job.finished_at ?? job.updated_at) < before) records.delete(id)
       }
     },
     reconcileBilling: async () => ({ settled: 0, released: 0, repaired: 0, quarantined: 0, anomalies: 0 }),
@@ -2594,12 +2604,12 @@ async function persistScheduleCompletionInTransaction(
     const historyItem: WorkspaceResultHistoryItem = {
       id: job.id,
       job_id: job.id,
-      name: `排班结果 ${formatShanghaiHistoryTime(nowIso)}`,
+      name: `${payload.request.manual_schedule ? '手动排班' : '排班结果'} ${formatShanghaiHistoryTime(nowIso)}`,
       created_at: nowIso,
       config: payload.effectiveConfig,
       result: persistedResult,
       operator_count: payload.operators.filter((operator) => operator.own !== false).length,
-      source: payload.request.history_source ?? 'generated',
+      source: payload.request.manual_schedule ? 'manual' : payload.request.history_source ?? 'generated',
     }
     await insertProfileOptimizationResultInTransaction(
       client,

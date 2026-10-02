@@ -96,7 +96,7 @@ export function prepareResult(
       if (isRotationMode && roomType === 'dormitory') return []
       return rooms.flatMap((room, index) => {
         const queueLabel = isRotationMode ? plan.name || `${copy.domain.components_result_panel_formatters_003}${planIndex + 1}` : plan.name || `${copy.domain.components_result_panel_formatters_004}${planIndex + 1}`
-        if (roomType === 'dormitory' && isPureMaaDormitoryAutofill) {
+        if (roomType === 'dormitory' && isPureMaaDormitoryAutofill && !rooms.some((entry) => entry.recovery_support_operators?.length)) {
           if (index > 0) return []
           return [{
             key: `${planIndex}-${roomType}-maa-autofill`,
@@ -138,7 +138,11 @@ export function prepareResult(
           roomIndex: index,
           queueLabel,
           product: formatProduct(room.product),
-          operators: resolveRoomOperators(ops, operatorLookup),
+          operators: resolveRoomOperators(ops, operatorLookup).map((operator) => ({
+            ...operator,
+            ...(room.cross_station_operators?.includes(operator.name) ? { crossStation: true } : {}),
+            ...(roomType === 'dormitory' && room.recovery_support_operators?.includes(operator.name) && { recoverySupport: true }),
+          })),
           operatorText: ops.join('、'),
           efficiency: formatPercent(efficiency),
           speedEfficiency: formatPercent(speedEfficiency),

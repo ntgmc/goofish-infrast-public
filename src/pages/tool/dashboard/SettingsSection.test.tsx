@@ -3,14 +3,37 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import SettingsSection from './SettingsSection'
+import { disableDebugMode } from '../../../lib/debug-diagnostics'
 
 afterEach(() => {
   cleanup()
+  disableDebugMode()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
 
 describe('SettingsSection privacy controls', () => {
+  it('collapses inactive diagnostics and keeps active diagnostics and feedback expanded', async () => {
+    disableDebugMode()
+    const user = userEvent.setup()
+    const props = { profiles: [], onLogout: vi.fn(), onPayload: vi.fn() }
+    const { unmount } = render(<SettingsSection {...props} />)
+    const toggle = screen.getByText('调试模式').closest('summary')!
+    expect(toggle.closest('details')).not.toHaveAttribute('open')
+    await user.click(toggle)
+    await user.click(screen.getByRole('button', { name: '开启调试模式' }))
+    expect(toggle.closest('details')).toHaveAttribute('open')
+    expect(screen.getByRole('status')).toHaveTextContent('调试模式已开启。')
+
+    unmount()
+    render(<SettingsSection {...props} />)
+    const diagnostics = screen.getByText('调试模式').closest('details')!
+    expect(diagnostics).toHaveAttribute('open')
+    await user.click(screen.getByRole('button', { name: '关闭并清空' }))
+    expect(diagnostics).toHaveAttribute('open')
+    expect(screen.getByRole('status')).toHaveTextContent('调试模式已关闭')
+  })
+
   it('limits all change-password fields and reports oversized passwords', async () => {
     const user = userEvent.setup()
     render(<SettingsSection profiles={[]} onLogout={vi.fn()} onPayload={vi.fn()} />)

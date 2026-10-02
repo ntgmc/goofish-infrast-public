@@ -8,6 +8,7 @@ import OperatorAvatarStrip, { OperatorAvatarTile } from './OperatorAvatarStrip'
 import type { PreparedPlan, RoomRow } from './types'
 import type { DroneAssignment } from '../../lib/types'
 import DroneMarker, { isDroneTarget } from './DroneMarker'
+import ProductIcon from '../ProductIcon'
 
 export const PRODUCTION_TYPES = ['control', 'trading', 'manufacture', 'power']
 const ROOM_STYLES: Record<string, { icon: LucideIcon; tone: string }> = {
@@ -183,12 +184,12 @@ function RoomCard({ room, drones, editing, className = '' }: { room: BoardRoom; 
   return (
     <article className={`tool-inset min-w-0 overflow-hidden p-3.5 sm:p-4 ${className}`}>
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-ink-primary">
+        <h4 className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm font-semibold text-ink-primary">
           <Icon size={16} className={`shrink-0 ${tone}`} aria-hidden="true" />
           {room.label}
           {room.indexLabel && <span className="text-xs font-medium text-ink-muted">{room.indexLabel}</span>}
         </h4>
-        <div className="ml-auto flex shrink-0 items-center justify-end gap-2">
+        <div className="ml-auto flex max-w-full shrink-0 items-center justify-end gap-2">
           {editing && ['trading', 'manufacture'].includes(room.roomType) ? (
             <button type="button" onClick={() => editing.onDroneTarget(room)}
               aria-label={copy.domain.manual_schedule.set_drone(`${room.label} ${room.indexLabel}`)}
@@ -199,7 +200,12 @@ function RoomCard({ room, drones, editing, className = '' }: { room: BoardRoom; 
               <Drone size={20} aria-hidden="true" />
             </button>
           ) : <DroneMarker labels={isDroneTarget(drones, room.roomType, room.roomIndex) ? [room.label] : []} />}
-          {room.product !== '-' && <span className={`text-right text-xs font-medium ${tone}`}>{room.product}</span>}
+          {room.product !== '-' && (
+            <span className={`inline-flex min-w-0 items-center gap-1 text-xs font-medium ${tone}`}>
+              <ProductIcon product={room.product} size={20} />
+              <span className="min-w-0 break-words text-right">{room.product}</span>
+            </span>
+          )}
         </div>
       </header>
       {!editing && row && row.efficiency !== '-' && PRODUCTION_TYPES.includes(room.roomType) && room.roomType !== 'control' && (

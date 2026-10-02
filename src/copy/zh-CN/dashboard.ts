@@ -1,4 +1,25 @@
 export const dashboardCopy = {
+  behavior_observation: {
+    title: "操作习惯记录",
+    description: "当前浏览器会保留最近 30 天、最多 500 条页面访问、操作结果和耗时记录，供后续分析重复操作。记录仅保存在本机，不会自动上传；不包含 UID、昵称、输入内容、配置内容或账号凭据。导出时会替换档案标识。",
+    export: "导出操作记录",
+    clear: "清空操作记录",
+    cleared: "已清空当前账号的操作记录，后续操作会重新记录。",
+    clear_failed: "无法清空记录，请允许网站存储后重试。",
+    export_failed: "无法导出记录，请稍后重试。",
+  },
+  workspace_entry: {
+    prompt_title: "下次直接进入这个游戏账号？",
+    prompt_body: "你最近多次从账号列表打开同一个游戏账号。启用后，可以省去每次选择账号，直接进入工作区设置；仍可返回账号列表管理账号，也可在账户设置中关闭。",
+    enable: "启用并进入工作区",
+    snooze: "7 天内不再提醒",
+    never: "不再提示",
+    settings_title: "默认进入方式",
+    setting_label: "只有一个游戏账号时，直接进入工作区设置",
+    setting_help: "仅在能确定唯一游戏账号时生效，同一 UID 优先使用可用的付费档案。返回账号列表仍可管理账号。此设置仅保存在当前浏览器。",
+    unavailable: "有唯一且可用的游戏账号时，可以启用此设置；多个档案需全部绑定同一 UID。",
+    storage_error: "无法在当前浏览器保存设置，请允许网站存储后重试。",
+  },
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
   pages_tool_dashboard_AnnouncementsSection_001: "暂时无法加载公告，请稍后重试。",
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
@@ -234,15 +255,13 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/ToolsSection.tsx
   pages_tool_dashboard_ToolsSection_001: "仓库价值分析",
   // src/pages/tool/dashboard/ToolsSection.tsx
-  pages_tool_dashboard_ToolsSection_002: "粘贴 MAA 仓库识别导出的 JSON，即可估算仓库价值并下载结果图片。此工具不会读取或修改当前账号中保存的数据。",
-  // src/pages/tool/dashboard/ToolsSection.tsx
-  pages_tool_dashboard_ToolsSection_003: "开始分析",
+  pages_tool_dashboard_ToolsSection_002: "导入 MAA 仓库 JSON 或森空岛库存，估算材料的等效理智价值并下载结果图片。",
   // src/pages/tool/AccountDashboard.tsx
   pages_tool_AccountDashboard_tour_001: "查看使用引导",
   pages_tool_AccountDashboard_tour_002: "管理游戏账号",
   pages_tool_AccountDashboard_tour_003: "查看正式档案和免费档案，选择账号后即可准备干员与基建数据。",
-  pages_tool_AccountDashboard_tour_004: "仓库分析工具",
-  pages_tool_AccountDashboard_tour_005: "仓库价值分析在独立页面运行，不会修改当前账号保存的数据。",
+  pages_tool_AccountDashboard_tour_004: "使用工具",
+  pages_tool_AccountDashboard_tour_005: "分析仓库价值并下载结果图片。手动排班模拟暂未开放，待功能完善后开放。",
   pages_tool_AccountDashboard_tour_006: "添加游戏账号",
   pages_tool_AccountDashboard_tour_007: "使用 CDK 创建正式档案；没有 CDK 时，也可以通过森空岛领取免费个人排班。",
   pages_tool_AccountDashboard_tour_008: "邀请奖励",

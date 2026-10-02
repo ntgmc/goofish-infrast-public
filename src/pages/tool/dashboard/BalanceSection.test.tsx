@@ -89,6 +89,11 @@ describe('BalanceSection', () => {
     render(<BalanceSection redemptionEnabled />)
 
     expect(await screen.findByText('12.30')).toBeInTheDocument()
+    const historyToggle = screen.getByText('积分明细').closest('summary')!
+    const history = historyToggle.closest('details')!
+    expect(history).not.toHaveAttribute('open')
+    await user.click(historyToggle)
+    expect(history).toHaveAttribute('open')
     expect(screen.getByText('+12.30')).toBeInTheDocument()
     expect(screen.getByText('12000')).toBeInTheDocument()
     expect(screen.getByText('1000 积分/每次成功生成')).toBeInTheDocument()
@@ -100,6 +105,9 @@ describe('BalanceSection', () => {
     await waitFor(() => expect(mocks.apiJson).toHaveBeenNthCalledWith(2, '/api/user/balance?cursor=next%20page'))
     expect(await screen.findByText('-2')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '查看更多记录' })).not.toBeInTheDocument()
+    expect(history).toHaveAttribute('open')
+    await user.click(historyToggle)
+    expect(history).not.toHaveAttribute('open')
   })
 
   it('shows pending recovery only when the account has debt', async () => {

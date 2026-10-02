@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CONFIG_PRESETS } from '../../../src/lib/config'
-import type { OptimizeResult } from '../../../src/lib/types'
+import type { OptimizeResult, UpgradeTrainingCost } from '../../../src/lib/types'
+import * as trainingCost from '../../handlers/training-cost'
 import { executeOptimizationJobWithPort } from './optimizer-dispatcher'
 import {
   OPTIMIZER_PORT_VERSION,
@@ -18,7 +19,39 @@ const context: OptimizeExecutionContext = {
   reportStage: vi.fn(),
 }
 
+afterEach(() => vi.restoreAllMocks())
+
 describe('optimization job dispatcher', () => {
+  it.each([1727, 0])('updates payback after attaching %s missing sanity', async (missing) => {
+    const payload = {
+      ...schedulePayload(),
+      activeProfileId: null,
+      request: { include_upgrade_suggestions: true, upgrade_suggestions_allowed: true },
+    }
+    const suggestion = {
+      type: 'single' as const, id: 'op-1', name: 'Operator', current: 0, target: 2, gain: 1,
+      roi: { efficiency_gain: 1, daily_sanity_gain: 18.9, payback_days: 0, payback_basis: 'missing_sanity' as const },
+    }
+    const bucket = (sanity: number) => ({ cash: 0, exp: 0, materials: [], equivalent_sanity: sanity })
+    const cost: UpgradeTrainingCost = {
+      status: 'available',
+      totals: bucket(8912), available: bucket(6591), missing: bucket(missing),
+      equivalent_sanity: 8912, unpriced_items: [], warnings: [], operators: [],
+      sources: {
+        skland: 'ok', yituliu: 'fresh', pricing_snapshot_id: null, pricing_fetched_at: null,
+        pricing_age_ms: null, valuation_version: null, lmd_exp: 'fixed_lmd_trade_gold_net_exp_36_per_10000',
+      },
+    }
+    vi.spyOn(trainingCost, 'attachTrainingCostsToUpgradeSuggestions')
+      .mockResolvedValueOnce([{ ...suggestion, training_cost: cost }])
+    const result = { ...scheduleResult(), upgrade_suggestions: [suggestion] }
+    const received = await executeOptimizationJobWithPort(job(payload), context, fakePort({
+      executeSchedule: vi.fn(async () => result),
+    })) as OptimizeResult
+    expect(received.upgrade_suggestions?.[0].roi?.payback_days).toBeCloseTo(missing / 18.9)
+    expect(received.upgrade_suggestions?.[0].training_cost).toEqual(cost)
+  })
+
   it('validates dormitory recovery suggestions and retains all degrading operators', async () => {
     const result = {
       ...scheduleResult(),
@@ -46,7 +79,8 @@ describe('optimization job dispatcher', () => {
     await expect(executeOptimizationJobWithPort(job(payload), context, port))
       .rejects.toThrow('does not support manual schedule simulation')
     expect(port.executeSchedule).not.toHaveBeenCalled()
-    await executeOptimizationJobWithPort(job(payload), context, { ...port, supportsManualScheduleSimulation: true })
+    const result = await executeOptimizationJobWithPort(job(payload), context, { ...port, supportsManualScheduleSimulation: true })
+    expect(result).toMatchObject({ schedule_source: 'manual' })
     expect(port.executeSchedule).toHaveBeenCalledWith(payload, context)
   })
   it.each(['252', '252-1'])('includes %s room levels in schedule result data', async (preset) => {
@@ -223,6 +257,7 @@ describe('optimization job dispatcher', () => {
         current: 1,
         target: 2,
         gain: 0.1,
+        roi: { efficiency_gain: 0.1, daily_sanity_gain: 18.9, payback_days: 0, payback_basis: 'missing_sanity' as const },
       }],
     }
     const reportStage = vi.fn()
@@ -233,6 +268,7 @@ describe('optimization job dispatcher', () => {
     expect('upgrade_suggestions' in received && received.upgrade_suggestions?.[0]).toMatchObject({
       suggestion_id: expect.stringMatching(/^upgrade-[a-f0-9]{20}$/),
       training_cost: { status: 'unavailable' },
+      roi: { payback_days: null },
     })
     expect(reportStage).toHaveBeenCalledWith('enriching_training_costs')
   })

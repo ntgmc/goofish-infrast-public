@@ -71,6 +71,21 @@ describe('optimization queue maintenance', () => {
     })
   })
 
+  it('retains two-day-old records and removes terminal records older than seven days', async () => {
+    process.env.APP_ROLE = 'api'
+    const store = createMemoryOptimizeJobStore()
+    globalThis.__maaOptimizeJobStoreForTesting = store
+    const recent = await store.createJob(input())
+    const old = await store.createJob(input())
+    const recentTime = new Date(Date.now() - 2 * 24 * 60 * 60_000).toISOString()
+    const oldTime = new Date(Date.now() - 8 * 24 * 60 * 60_000).toISOString()
+    Object.assign(store.records.get(recent.id)!, { status: 'succeeded', finished_at: recentTime, updated_at: recentTime })
+    Object.assign(store.records.get(old.id)!, { status: 'dead_lettered', finished_at: oldTime, updated_at: oldTime })
+    await initializeOptimizeQueueMaintenance()
+    expect(await store.getJob(recent.id)).not.toBeNull()
+    expect(await store.getJob(old.id)).toBeNull()
+  })
+
   it('initializes once, tolerates missing signal handlers, and resets on shutdown', async () => {
     process.env.APP_ROLE = 'api'
     const store = createMemoryOptimizeJobStore()

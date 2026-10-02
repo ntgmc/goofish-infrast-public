@@ -1378,7 +1378,7 @@ CREATE TABLE IF NOT EXISTS optimization_result_history (
   config_json JSONB,
   result_json JSONB NOT NULL,
   operator_count INTEGER NOT NULL DEFAULT 0 CHECK (operator_count >= 0),
-  source TEXT NOT NULL CHECK (source IN ('generated', 'applied_suggestions', 'legacy')),
+  source TEXT NOT NULL CHECK (source IN ('generated', 'applied_suggestions', 'legacy', 'manual')),
   archived_at TIMESTAMPTZ,
   position BIGINT NOT NULL DEFAULT nextval('optimization_result_history_position_seq'),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -1391,6 +1391,10 @@ CREATE INDEX IF NOT EXISTS idx_optimization_result_history_profile_archived_posi
   ON optimization_result_history(profile_id, position DESC) WHERE archived_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_optimization_result_history_job
   ON optimization_result_history(job_id) WHERE job_id IS NOT NULL;
+
+ALTER TABLE optimization_result_history DROP CONSTRAINT IF EXISTS optimization_result_history_source_check;
+ALTER TABLE optimization_result_history ADD CONSTRAINT optimization_result_history_source_check
+  CHECK (source IN ('generated', 'applied_suggestions', 'legacy', 'manual'));
 
 -- Backfill every structurally valid legacy result before removing the embedded
 -- copies.  Arrays are stored newest-first, so reverse ordinality preserves the
@@ -2504,6 +2508,27 @@ VALUES
   ('bind_skland', 'onboarding:bind_skland:v1', now()),
   ('first_main_schedule', 'onboarding:first_main_schedule:v1', now())
 ON CONFLICT (task_code) DO NOTHING;
+
+-- goofish:migration-phase
+-- Recover provenance from the submitted job, including previously archived results.
+UPDATE optimization_result_history AS history
+SET source = 'manual',
+    result_json = history.result_json || '{"schedule_source":"manual"}'::jsonb
+WHERE (history.source = 'manual'
+    OR history.result_json->>'schedule_source' = 'manual'
+    OR EXISTS (
+      SELECT 1 FROM optimize_jobs AS job
+      WHERE job.profile_id = history.profile_id
+        AND job.id = coalesce(history.job_id, history.id)
+        AND jsonb_typeof(job.payload_json #> '{request,manual_schedule}') = 'object'
+    ))
+  AND (history.source <> 'manual' OR history.result_json->>'schedule_source' IS DISTINCT FROM 'manual');
+
+UPDATE optimize_jobs
+SET result_json = result_json || '{"schedule_source":"manual"}'::jsonb
+WHERE jsonb_typeof(payload_json #> '{request,manual_schedule}') = 'object'
+  AND jsonb_typeof(result_json) = 'object'
+  AND result_json->>'schedule_source' IS DISTINCT FROM 'manual';
 `
 
 export const DATABASE_SCHEMA_CHECKSUM = createHash('sha256')

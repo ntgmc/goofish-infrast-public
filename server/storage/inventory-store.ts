@@ -7,6 +7,7 @@ import {
   type ExpiryPolicy,
   type GiftPackContentInput,
   type InventoryLedgerEvent,
+  type InventoryReward,
   type InventoryResponse,
   type InventoryStack,
   type ItemDefinition,
@@ -235,7 +236,7 @@ export async function listInventory(userId: string, now = new Date()): Promise<I
               case when version.id is not null then jsonb_build_object(
                 'opening_rule', version.opening_rule,
                 'contents', (select coalesce(jsonb_agg(jsonb_build_object(
-                  'item_code', content.item_code, 'name', reward.name, 'icon_key', reward.icon_key,
+                  'item_code', content.item_code, 'name', reward.name, 'description', reward.description, 'icon_key', reward.icon_key,
                   'quantity', content.quantity,
                   'expiry', case when content.validity_days = 0 then jsonb_build_object('mode', 'never')
                     else jsonb_build_object('mode', 'relative_days', 'days', content.validity_days) end
@@ -710,6 +711,8 @@ export async function refundReservedItemsInTransaction(
 }
 
 export async function useInventoryItem(userId: string, input: ItemUseRequest, operationNow = new Date()): Promise<Record<string, unknown>> {
+  normalizeQuantity(input.quantity)
+  if (input.quantity > 100) throw new InventoryError('quantity_invalid', '每次最多使用 100 个道具。', 400)
   await ensureSchema()
   const requestHash = createHash('sha256').update(JSON.stringify(input)).digest('hex')
   return withTransaction(async (client) => {
@@ -736,17 +739,35 @@ export async function useInventoryItem(userId: string, input: ItemUseRequest, op
     )
     const item = definition.rows[0]
     if (!item) throw new InventoryError('item_unknown', '道具不存在。', 404)
-    let response: Record<string, unknown>
-    if (item.kind === 'gift_pack') {
-      response = await openGiftPackInTransaction(client, userId, input, operationId, now)
-    } else if (item.kind === 'capacity_upgrade') {
-      if (!input.profile_id) throw new InventoryError('profile_required', '请选择要扩容的账号档案。', 400)
-      response = await applyCapacityUpgradeInTransaction(client, userId, input.item_code, item.effect_code, input.profile_id, operationId, now)
-    } else if (item.kind === 'license_voucher' && item.effect_code === 'activate_limited_profile') {
-      response = await activateLimitedProfileInTransaction(client, userId, input.item_code, operationId, now)
-    } else {
-      throw new InventoryError('context_only_item', '该道具只能在对应功能中使用。', 409)
+    if (input.quantity > 1 && item.kind !== 'gift_pack' && item.kind !== 'capacity_upgrade') {
+      throw new InventoryError('quantity_invalid', '该道具每次只能使用 1 个。', 400)
     }
+    let response: Record<string, unknown> = {}
+    const rewards = new Map<string, InventoryReward>()
+    // ponytail: reuse single-item operations for batches up to 100; group writes if larger batches are needed.
+    for (let index = 0; index < input.quantity; index++) {
+      const referenceId = input.quantity === 1 ? operationId : `${operationId}:${index}`
+      let next: Record<string, unknown>
+      if (item.kind === 'gift_pack') {
+        next = await openGiftPackInTransaction(client, userId, input, referenceId, now)
+        for (const reward of next.rewards as InventoryReward[]) {
+          const key = JSON.stringify([reward.item_code, reward.expires_at])
+          const previous = rewards.get(key)
+          rewards.set(key, { ...reward, quantity: (previous?.quantity ?? 0) + reward.quantity })
+        }
+      } else if (item.kind === 'capacity_upgrade') {
+        if (!input.profile_id) throw new InventoryError('profile_required', '请选择要扩容的账号档案。', 400)
+        next = await applyCapacityUpgradeInTransaction(client, userId, input.item_code, item.effect_code, input.profile_id, referenceId, now)
+      } else if (item.kind === 'license_voucher' && item.effect_code === 'activate_limited_profile') {
+        next = await activateLimitedProfileInTransaction(client, userId, input.item_code, referenceId, now)
+      } else {
+        throw new InventoryError('context_only_item', '该道具只能在对应功能中使用。', 409)
+      }
+      response = { ...next, ...(index > 0 && item.kind === 'capacity_upgrade' && { previous_limit: response.previous_limit }) }
+    }
+    response.operation_id = operationId
+    response.quantity = input.quantity
+    if (item.kind === 'gift_pack') response.rewards = [...rewards.values()]
     await client.query(
       'update inventory_operations set response_json = $3::jsonb, completed_at = $4 where id = $1 and user_id = $2',
       [operationId, userId, JSON.stringify(response), now],
@@ -1110,8 +1131,8 @@ async function openGiftPackInTransaction(
   const source = grant.rows[0]
   if (!source) throw new ItemUnavailableError(input.item_code)
   if (!source.gift_pack_version_id) throw new InventoryError('gift_pack_version_missing', '礼包没有绑定可开启的内容版本。', 409)
-  const contents = await client.query<{ item_code: string; quantity: number; validity_days: number; name: string; icon_key: string; opening_rule: GiftPackOpeningRule }>(
-    `select content.item_code, content.quantity, content.validity_days, definition.name, definition.icon_key, version.opening_rule
+  const contents = await client.query<{ item_code: string; quantity: number; validity_days: number; name: string; description: string; icon_key: string; opening_rule: GiftPackOpeningRule }>(
+    `select content.item_code, content.quantity, content.validity_days, definition.name, definition.description, definition.icon_key, version.opening_rule
        from gift_pack_version_contents content
        join gift_pack_versions version on version.id = content.gift_pack_version_id
        join item_definitions definition on definition.code = content.item_code
@@ -1144,7 +1165,7 @@ async function openGiftPackInTransaction(
     referenceType: 'gift_opening', referenceId: operationId,
     metadata: { gift_pack_version_id: source.gift_pack_version_id, opening_rule: rule, selected_item_codes: chosenContents.map((content) => content.item_code) }, now,
   })
-  const rewards: Array<{ item_code: string; name: string; icon_key: string; quantity: number; expires_at: string | null }> = []
+  const rewards: InventoryReward[] = []
   for (const content of chosenContents) {
     const expiry: ExpiryPolicy = content.validity_days > 0
       ? { mode: 'relative_days', days: content.validity_days }
@@ -1163,6 +1184,7 @@ async function openGiftPackInTransaction(
     if (grantId) rewards.push({
       item_code: content.item_code,
       name: content.name,
+      description: content.description,
       icon_key: content.icon_key,
       quantity: Number(content.quantity),
       expires_at: content.validity_days > 0 ? new Date(Date.parse(now) + content.validity_days * 86_400_000).toISOString() : null,

@@ -341,6 +341,7 @@ interface AssignmentDetail {
 }
 
 export interface OptimizeResult {
+  schedule_source?: 'manual';
   facility_layout?: string[];
   author: string;
   title: string;
@@ -565,6 +566,8 @@ interface RoomOverflow {
 }
 
 export interface ShiftRoom {
+  cross_station_operators?: string[];
+  recovery_support_operators?: string[];
   level?: number;
   operators?: string[];
   product?: string;
@@ -793,6 +796,8 @@ export interface AdminUserWorkspaceExportWorkspace {
   config: LicenseConfig | null;
   elite_overrides: Record<string, number>;
   last_result: OptimizeResult | null;
+  /** Source of the latest active optimizer result, excluding manual simulations. */
+  last_result_source: WorkspaceResultHistorySource | null;
   saved_configs: WorkspaceSavedConfig[];
   result_history: WorkspaceResultHistoryItem[];
   archived_results: WorkspaceResultHistoryItem[];
@@ -827,7 +832,7 @@ export interface WorkspaceSavedConfig {
   read_only?: boolean;
 }
 
-type WorkspaceResultHistorySource = 'generated' | 'applied_suggestions' | 'legacy';
+type WorkspaceResultHistorySource = 'generated' | 'applied_suggestions' | 'legacy' | 'manual';
 
 export interface WorkspaceResultHistorySummary {
   id: string;
@@ -1006,6 +1011,7 @@ export interface RegistrationSettings {
   version: 5;
   email_verification_required: boolean;
   invite_code_required: boolean;
+  bot_registration_enabled: boolean;
   email_provider_priority: EmailProviderPriority;
   brevo_quota_action: BrevoQuotaAction;
   admin_invite_email_reserve: number;

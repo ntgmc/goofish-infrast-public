@@ -23,6 +23,7 @@ import type { MeteredBillingKind, MeteredBillingOperation } from '../../../src/l
 import { normalizePointsAmount } from '../../../src/lib/balance-contracts';
 import { requireMeteredBillingFeature } from '../../feature-gate';
 import { manualResult, validateManualPlans } from '../../../src/lib/manual-schedule';
+import { resolveManualScheduleConfig } from '../../../src/lib/manual-schedule-tool';
 
 export async function prepareOptimizeJob(
   req: Request,
@@ -139,23 +140,34 @@ export async function prepareOptimizeJob(
       }
       checkedCdkRecord = authorization.cdkRecord;
       if (body.kind === 'schedule' && body.manualSchedule) {
-        if (profileKind === 'free_preview' || !hasCapability({ kind: profileKind, permission: authorization.permission }, 'edit_full_config')) {
+        if ((!('source' in body.manualSchedule) && profileKind === 'free_preview') ||
+          !hasCapability({ permission: authorization.permission }, 'edit_full_config')) {
           return fail({ error: '当前档案无法模拟手动排班。', code: 'capability_not_available' }, 403);
         }
         if (requestedItems.size > 0 || includeUpgradeSuggestions || body.billing_operation || body.billing_quote_id ||
           body.pricing_version || body.accepted_max_points || body.baseline_history_id || body.historySource) {
           return fail({ error: '手动排班测算选项无效。', code: 'validation_failed' }, 400);
         }
-        const baseline = await getProfileOptimizationResult(activeProfileId, body.manualSchedule.baselineHistoryId);
-        if (!baseline || baseline.archived_at || !baseline.config || baseline.result.preview_limit) {
-          return fail({ error: '原始排班不存在或已归档，请重新选择历史排班。', code: 'baseline_not_found' }, 409);
+        let source: OptimizeResult;
+        let simulationConfig: LicenseConfig;
+        if ('source' in body.manualSchedule) {
+          source = body.manualSchedule.source;
+          simulationConfig = config;
+        } else {
+          const baseline = await getProfileOptimizationResult(activeProfileId, body.manualSchedule.baselineHistoryId);
+          if (!baseline || baseline.archived_at || !baseline.config || baseline.result.preview_limit) {
+            return fail({ error: '原始排班不存在或已归档，请重新选择历史排班。', code: 'baseline_not_found' }, 409);
+          }
+          source = baseline.result;
+          simulationConfig = baseline.config;
         }
         try {
-          validateManualPlans(baseline.result, body.manualSchedule.plans, operators);
+          if ('source' in body.manualSchedule) simulationConfig = resolveManualScheduleConfig(source, config, operators);
+          validateManualPlans(source, body.manualSchedule.plans, operators);
         } catch {
           return fail({ error: '手动排班无效，请检查干员、设施和无人机安排。', code: 'validation_failed' }, 400);
         }
-        manualSimulation = { source: manualResult(baseline.result, body.manualSchedule.plans), config: baseline.config };
+        manualSimulation = { source: manualResult(source, body.manualSchedule.plans), config: simulationConfig };
       }
       if (profileKind === 'free_preview' && isScenarioComparison) {
         scheduleUsage = scheduleFailure('permission_denied', { profile_id: activeProfileId, permission: profile.permission, source: 'account_profile' });
@@ -218,7 +230,7 @@ export async function prepareOptimizeJob(
           return fail({ error: '当前档案需要先确认 700 积分的增量重算报价。', code: 'pricing_changed' }, 409);
         }
       }
-      if (isPreviewProfile && !profile.skland_binding) {
+      if (isPreviewProfile && !manualSimulation && !profile.skland_binding) {
         scheduleUsage = scheduleFailure('permission_denied', { profile_id: activeProfileId, permission: 'free_preview', source: 'free_preview' });
         return fail({ error: '免费个人排班档案必须先绑定森空岛后才能生成排班。' }, 403);
       }

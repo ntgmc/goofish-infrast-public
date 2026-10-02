@@ -339,7 +339,7 @@ function calculateOperatorCost(
     totals.cash += positiveArrayValue(LEVEL.evolveGoldCost[rarity], phase)
     const phaseCost = evolveCosts[phase]
     if (!isRecord(phaseCost) || !Array.isArray(phaseCost.items)) {
-      missingPromotionMaterials = true
+      if (rarity > 2) missingPromotionMaterials = true
       continue
     }
     mergeMaterials(totals.materials, phaseCost.items, context.itemMeta)

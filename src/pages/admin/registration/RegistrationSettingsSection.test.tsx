@@ -37,6 +37,7 @@ describe('RegistrationSettingsSection', () => {
             version: 5,
             email_verification_required: true,
             invite_code_required: false,
+            bot_registration_enabled: true,
             email_provider_priority: ['brevo', 'ses'],
             brevo_quota_action: 'pause_registration',
             admin_invite_email_reserve: 20,
@@ -57,6 +58,8 @@ describe('RegistrationSettingsSection', () => {
     render(<RegistrationSettingsSection />)
     const toggle = await screen.findByRole('checkbox', { name: '注册时要求验证邮箱' })
     const inviteToggle = screen.getByRole('checkbox', { name: '仅邀请可注册' })
+    const botToggle = screen.getByRole('checkbox', { name: '启用 Bot 注册' })
+    expect(botToggle).toBeChecked()
     expect(toggle).toBeChecked()
     expect(inviteToggle).not.toBeChecked()
     expect(screen.getByText('12 / 300')).toBeInTheDocument()
@@ -65,12 +68,14 @@ describe('RegistrationSettingsSection', () => {
     expect(screen.getByText('2026-07-21')).toBeInTheDocument()
     await user.click(toggle)
     await user.click(inviteToggle)
+    await user.click(botToggle)
     await user.click(screen.getByRole('button', { name: '保存注册设置' }))
     await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/registration-settings', expect.objectContaining({
       method: 'PUT',
       json: {
         email_verification_required: false,
         invite_code_required: true,
+        bot_registration_enabled: false,
         email_provider_priority: ['brevo', 'ses'],
         brevo_quota_action: 'pause_registration',
         admin_invite_email_reserve: 20,
@@ -92,6 +97,7 @@ describe('RegistrationSettingsSection', () => {
       json: {
         email_verification_required: true,
         invite_code_required: false,
+        bot_registration_enabled: true,
         email_provider_priority: ['brevo', 'ses'],
         brevo_quota_action: 'allow_unverified_registration',
         admin_invite_email_reserve: 20,
@@ -137,6 +143,7 @@ describe('RegistrationSettingsSection', () => {
           version: 5,
           email_verification_required: true,
           invite_code_required: false,
+          bot_registration_enabled: true,
           email_provider_priority: ['brevo', 'ses'],
           brevo_quota_action: 'pause_registration',
           admin_invite_email_reserve: 20,

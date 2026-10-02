@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Link2, Plus } from 'lucide-react'
+import { copy } from '../../copy'
 import type { RoomOperator } from './types'
+import { RECOVERY_SUPPORT_ICON_SRC } from './building-skills'
 
 export default function OperatorAvatarStrip({
   operators,
@@ -76,7 +78,7 @@ export function OperatorAvatarTile({
       data-operator-name={operator?.name} data-operator-id={operator?.id}
       data-operator-elite={operator?.elite} data-operator-level={operator?.level}
       tabIndex={operator && !buttonChild ? 0 : undefined}>
-      <div className={`mx-auto overflow-hidden rounded-md border border-surface-3 bg-surface-2 ${operator ? '' : 'border-dashed'} ${avatarSize}`}>
+      <div className={`relative mx-auto overflow-hidden rounded-md border border-surface-3 bg-surface-2 ${operator ? '' : 'border-dashed'} ${avatarSize}`}>
         {canLoadImage ? (
           <img
             src={`/webp96/${operator?.id}.webp`}
@@ -92,6 +94,23 @@ export function OperatorAvatarTile({
           <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-ink-muted" aria-hidden="true">
             {operator ? initial : <Plus size={24} />}
           </div>
+        )}
+        {operator?.crossStation && (
+          <span
+            role="img"
+            aria-label={copy.domain.result_board_v2.cross_station}
+            title={copy.domain.result_board_v2.cross_station_hint}
+            className={`absolute left-0 top-0 flex items-center justify-center rounded-br bg-surface-1 text-brand-400 ${large ? 'h-5 w-5' : micro ? 'h-3 w-3' : 'h-4 w-4'}`}>
+            <Link2 size={large ? 16 : micro ? 10 : 12} aria-hidden="true" />
+          </span>
+        )}
+        {operator?.recoverySupport && (
+          <img
+            src={RECOVERY_SUPPORT_ICON_SRC}
+            alt={copy.domain.result_board_v2.recovery_support}
+            title={copy.domain.result_board_v2.recovery_support_hint}
+            className={`absolute bottom-0 right-0 ${large ? 'h-5 w-5' : micro ? 'h-3 w-3' : 'h-4 w-4'}`}
+          />
         )}
       </div>
       <span className={labelClassName}>

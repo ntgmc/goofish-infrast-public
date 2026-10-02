@@ -171,7 +171,7 @@ export default function OverviewSection({
             </div>
             {latestResult && (
               <span className="tool-status tool-status--current">
-                {latestResult.source === 'applied_suggestions' ? copy.optimize.pages_tool_optimize_OverviewSection_015 : latestResult.source === 'legacy' ? copy.optimize.pages_tool_optimize_OverviewSection_016 : copy.optimize.pages_tool_optimize_OverviewSection_017}
+                {latestResult.source === 'manual' ? copy.domain.manual_schedule.tab : latestResult.source === 'applied_suggestions' ? copy.optimize.pages_tool_optimize_OverviewSection_015 : latestResult.source === 'legacy' ? copy.optimize.pages_tool_optimize_OverviewSection_016 : copy.optimize.pages_tool_optimize_OverviewSection_017}
               </span>
             )}
           </div>

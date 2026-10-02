@@ -6,6 +6,16 @@ import {
 } from './registration-settings-store'
 
 describe('registration settings', () => {
+  it('defaults Bot registration on and validates explicit changes', () => {
+    expect(normalizeRegistrationSettings({}).bot_registration_enabled).toBe(true)
+    expect(normalizeRegistrationSettings({ bot_registration_enabled: false }).bot_registration_enabled).toBe(false)
+    const { version: _version, updated_at: _updatedAt, ...patch } = DEFAULT_REGISTRATION_SETTINGS
+    expect(validateRegistrationSettingsPatch({ ...patch, bot_registration_enabled: false }).bot_registration_enabled).toBe(false)
+    expect(() => validateRegistrationSettingsPatch({ ...patch, bot_registration_enabled: 'false' })).toThrow(/Bot/)
+    const { bot_registration_enabled: _enabled, ...legacyPatch } = patch
+    expect(validateRegistrationSettingsPatch(legacyPatch)).not.toHaveProperty('bot_registration_enabled')
+  })
+
   it('requires email verification and keeps invite-only registration disabled by default', () => {
     expect(normalizeRegistrationSettings(null)).toEqual(DEFAULT_REGISTRATION_SETTINGS)
     expect(normalizeRegistrationSettings({ email_verification_required: 'false' })).toEqual(DEFAULT_REGISTRATION_SETTINGS)
@@ -19,6 +29,7 @@ describe('registration settings', () => {
       version: 5,
       email_verification_required: false,
       invite_code_required: false,
+      bot_registration_enabled: true,
       email_provider_priority: ['brevo', 'ses'],
       brevo_quota_action: 'pause_registration',
       admin_invite_email_reserve: 0,

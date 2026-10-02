@@ -5,9 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { NotificationBell, NotificationCenterProvider } from './NotificationCenter'
 import type { UserNotificationPage } from '../lib/types'
+import { markInventoryStale } from '../lib/inventory-refresh'
+
+vi.mock('../lib/inventory-refresh', () => ({ markInventoryStale: vi.fn() }))
 
 afterEach(() => {
   cleanup()
+  vi.mocked(markInventoryStale).mockClear()
   vi.useRealTimers()
   vi.unstubAllGlobals()
 })
@@ -17,6 +21,23 @@ beforeEach(() => {
 })
 
 describe('NotificationCenter', () => {
+  it('marks inventory stale when an existing grant notification gains new items', async () => {
+    const updated = page(1)
+    updated.notifications[0].updated_at = '2026-07-30T00:01:00.000Z'
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(page(1)))
+      .mockResolvedValueOnce(jsonResponse(updated))
+      .mockResolvedValue(jsonResponse(updated))
+    vi.stubGlobal('fetch', fetchMock)
+    renderCenter()
+    await screen.findByRole('button', { name: '通知，1 条未读' })
+    expect(markInventoryStale).not.toHaveBeenCalled()
+    window.dispatchEvent(new Event('focus'))
+    await waitFor(() => expect(markInventoryStale).toHaveBeenCalledOnce())
+    window.dispatchEvent(new Event('focus'))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
+    expect(markInventoryStale).toHaveBeenCalledOnce()
+  })
+
   it('opens without marking read, then marks a notification and navigates to inventory', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse(page(3)))

@@ -69,6 +69,7 @@ describe('app route contract', () => {
     expect(isAppRoutePath('/tool/inventory/')).toBe(true)
     expect(isAppRoutePath('/announcements')).toBe(true)
     expect(isAppRoutePath('/tools/depot-value')).toBe(true)
+    expect(isAppRoutePath('/tools/manual-schedule')).toBe(true)
     expect(isAppRoutePath('/tool/inventory/export')).toBe(false)
     expect(isAppRoutePath('/api/user/inventory')).toBe(false)
   })

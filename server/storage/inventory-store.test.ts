@@ -50,6 +50,32 @@ function mockChest(rule: GiftPackOpeningRule) {
 }
 
 describe('chest opening', () => {
+  it('aggregates batch rewards and replays the entire batch without consuming again', async () => {
+    const clientQuery = mockChest({ mode: 'all' })
+    const request = { item_code: 'chest', quantity: 3, gift_pack_version_id: 'chest-v1', idempotency_key: 'batch-request' }
+    const result = await useInventoryItem('user-1', request)
+    expect(result).toMatchObject({
+      quantity: 3,
+      rewards: [
+        { item_code: 'priority_compute_coupon', quantity: 9 },
+        { item_code: 'training_diagnosis_coupon', quantity: 6 },
+        { item_code: 'plan_capacity_certificate', quantity: 3 },
+      ],
+    })
+    expect(clientQuery.mock.calls.filter(([sql]) => sql.startsWith('update reward_grants'))).toHaveLength(3)
+    expect(await useInventoryItem('user-1', request)).toEqual(result)
+    expect(clientQuery.mock.calls.filter(([sql]) => sql.startsWith('update reward_grants'))).toHaveLength(3)
+  })
+
+  it('rejects invalid batch sizes before beginning a transaction', async () => {
+    const clientQuery = mockChest({ mode: 'all' })
+    for (const quantity of [0, -1, 1.5, 101, NaN]) {
+      await expect(useInventoryItem('user-1', { item_code: 'chest', quantity, idempotency_key: 'invalid' }))
+        .rejects.toMatchObject({ code: 'quantity_invalid' })
+    }
+    expect(clientQuery).not.toHaveBeenCalled()
+  })
+
   it('rejects invalid choices before consuming the chest and grants exactly the selected quantities', async () => {
     const clientQuery = mockChest({ mode: 'choice', count: 2 })
     const request = { item_code: 'chest', quantity: 1 as const, gift_pack_version_id: 'chest-v1', idempotency_key: 'choice-request' }

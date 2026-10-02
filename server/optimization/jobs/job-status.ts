@@ -207,8 +207,9 @@ export async function listOptimizationJobs(req: Request): Promise<Response> {
   const jobs = await store.listJobsByProfile(profileId, limit + 1, before)
   const page = jobs.slice(0, limit)
   const response: OptimizationJobListResponse = {
-    jobs: page.map(({ job, queuePosition, queueWaitMs }) => toOptimizationJobListItem(
+    jobs: page.map(({ job, queuePosition, queueWaitMs, historyResultId }) => toOptimizationJobListItem(
       formatOptimizeJobStatus(job, queuePosition, queueWaitMs),
+      historyResultId,
     )),
     nextCursor: jobs.length > limit && page.at(-1)
       ? encodeOptimizationJobCursor(page.at(-1)!.job)
@@ -217,13 +218,13 @@ export async function listOptimizationJobs(req: Request): Promise<Response> {
   return jsonResponse(response)
 }
 
-function toOptimizationJobListItem(snapshot: OptimizationJobSnapshot): OptimizationJobListItem {
+function toOptimizationJobListItem(snapshot: OptimizationJobSnapshot, historyResultId?: string | null): OptimizationJobListItem {
   if (snapshot.status === 'succeeded') {
-    const { result: _result, ...summary } = snapshot
+    const { result, historyResultId: _historyResultId, ...summary } = snapshot
     return {
       ...summary,
-      resultAvailable: true,
-      ...(snapshot.kind === 'schedule' && { historyResultId: snapshot.id }),
+      resultAvailable: snapshot.kind === 'schedule' ? Boolean(historyResultId) : result != null,
+      ...(snapshot.kind === 'schedule' && historyResultId && { historyResultId }),
     }
   }
   return { ...snapshot, resultAvailable: false }

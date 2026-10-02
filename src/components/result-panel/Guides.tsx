@@ -1,14 +1,22 @@
 import { copy } from '../../copy/index'
-export function RotationManualGuide({ compact = false }: { compact?: boolean }) {
+export function GameQueueGuide({ isRotationMode }: { isRotationMode: boolean }) {
+  const guide = copy.domain.game_queue
   return (
-    <div className={compact ? '' : 'mt-6 border-t border-surface-3/60 pt-5'}>
-      <div className={compact ? '' : 'tool-inset px-4 py-4'}>
-        <h3 className="text-base font-semibold text-ink-primary">
-          {copy.domain.components_result_panel_Guides_001}</h3>
-        <p className="mt-2 text-sm leading-6 text-ink-secondary">
-          {copy.domain.components_result_panel_Guides_002}</p>
+    <details className="tool-inset overflow-hidden" open={isRotationMode}>
+      <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-ink-primary">
+        {copy.domain.components_result_panel_Guides_001}
+      </summary>
+      <div className="space-y-3 border-t border-surface-3/60 p-4 text-sm leading-6 text-ink-secondary">
+        <p>{isRotationMode ? copy.domain.components_result_panel_Guides_002 : guide.maa_hint}</p>
+        <ol className="list-decimal space-y-2 pl-5">
+          <li>{guide.open_overview}</li>
+          <li>{guide.set_queues}</li>
+          <li>{isRotationMode ? guide.switch_rotation : guide.switch_maa}</li>
+          <li>{guide.support}</li>
+        </ol>
+        {!isRotationMode && <p>{guide.autofill}</p>}
       </div>
-    </div>
+    </details>
   )
 }
 

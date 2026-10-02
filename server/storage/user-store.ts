@@ -1705,7 +1705,7 @@ function normalizeResultHistory(value: unknown, maximum = WORKSPACE_RESULT_HISTO
     const name = typeof raw.name === 'string' ? raw.name : ''
     const createdAt = typeof raw.created_at === 'string' ? raw.created_at : ''
     if (!id || !name || !createdAt) return []
-    const source: WorkspaceResultHistoryItem['source'] = raw.source === 'applied_suggestions' || raw.source === 'legacy'
+    const source: WorkspaceResultHistoryItem['source'] = raw.source === 'manual' || raw.source === 'applied_suggestions' || raw.source === 'legacy'
       ? raw.source
       : 'generated'
     return [{

@@ -19,6 +19,8 @@ export interface ResultPanelProps {
 }
 
 export type RoomOperator = {
+  crossStation?: boolean;
+  recoverySupport?: boolean;
   name: string;
   id?: string;
   elite?: number;

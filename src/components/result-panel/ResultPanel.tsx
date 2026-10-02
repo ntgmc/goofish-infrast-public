@@ -3,7 +3,7 @@ import { Download } from 'lucide-react'
 import { LayoutGroup } from 'motion/react'
 import { AnimatedPresenceRegion, MotionNavIndicator } from '../MotionPrimitives'
 import { formatCompactNumber, prepareResult } from './formatters'
-import { MaaImportGuide, RotationManualGuide } from './Guides'
+import { GameQueueGuide, MaaImportGuide } from './Guides'
 import ResultBoard from './ResultBoard'
 import ResultBoardV2 from './ResultBoardV2'
 import OperatorSkillPreview from './OperatorSkillPreview'
@@ -138,6 +138,9 @@ export default function ResultPanel({
             <h2 className="text-lg font-semibold text-ink-primary">
               {selectedTab === 'manual' ? copy.domain.manual_schedule.title : isPreview ? copy.domain.components_result_panel_ResultPanel_025 : copy.domain.components_result_panel_ResultPanel_027}
             </h2>
+            {result.schedule_source === 'manual' && (
+              <p className="mt-2 text-sm text-warning" role="status">{copy.domain.manual_schedule.history_warning}</p>
+            )}
             <p className="mt-1 text-sm text-ink-secondary">
               {selectedTab === 'manual' ? copy.domain.manual_schedule.hint : isPreview
                 ? copy.domain.components_result_panel_ResultPanel_028
@@ -284,6 +287,7 @@ export default function ResultPanel({
         )}
         {selectedTab === 'data' && !isPreview && fullDataAvailable && (
           <div className="space-y-4">
+            {canEditManual && <p className="tool-inset p-4 text-sm leading-6 text-ink-secondary">{copy.domain.manual_schedule.data_scope}</p>}
             <ResultMetrics isRotationMode={isRotationMode} prepared={prepared} />
             {onDownloadFullResult && <FullResultExportDisclosure onDownload={onDownloadFullResult} busy={fullResultDownloadBusy} />}
           </div>
@@ -291,7 +295,10 @@ export default function ResultPanel({
         {selectedTab === 'detail' && <ResultDetail isRotationMode={isRotationMode} prepared={prepared} planTimes={result.planTimes} />}
         {selectedTab === 'import' && (
           <section className="tool-panel overflow-hidden p-5 sm:p-6">
-            {isRotationMode ? <RotationManualGuide compact /> : <MaaImportGuide compact />}
+            <div className="space-y-4">
+              {!isRotationMode && <MaaImportGuide compact />}
+              <GameQueueGuide isRotationMode={isRotationMode} />
+            </div>
           </section>
         )}
         {selectedTab === 'suggestions' && suggestionsSlot && <section className="tool-panel overflow-hidden p-5 sm:p-6">{suggestionsSlot}</section>}

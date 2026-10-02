@@ -132,8 +132,10 @@ export default function BalanceSection({ redemptionEnabled }: { redemptionEnable
         </div>
       </form>}
 
-      <section className="tool-panel p-5 sm:p-6" aria-labelledby="balance-history-title">
-        <h3 id="balance-history-title" className="text-base font-semibold text-ink-primary">{copy.balance.history}</h3>
+      <details className="tool-panel p-5 sm:p-6" aria-labelledby="balance-history-title">
+        <summary className="min-h-11 cursor-pointer content-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45">
+          <h3 id="balance-history-title" className="inline text-base font-semibold text-ink-primary">{copy.balance.history}</h3>
+        </summary>
         {(page?.transactions.length ?? 0) === 0 ? (
           <div className="tool-inset mt-4 p-6 text-center text-sm text-ink-muted">{copy.balance.empty}</div>
         ) : (
@@ -147,7 +149,7 @@ export default function BalanceSection({ redemptionEnabled }: { redemptionEnable
           </ul>
         )}
         {page?.next_cursor && <button type="button" disabled={loadingMore} onClick={() => void load(page.next_cursor)} className="tool-secondary-action mt-4 w-full">{loadingMore ? copy.balance.loading : copy.balance.load_more}</button>}
-      </section>
+      </details>
     </div>
   )
 }

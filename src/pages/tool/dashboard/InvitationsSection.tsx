@@ -187,15 +187,17 @@ export default function InvitationsSection() {
         {summary.daily_limit.remaining === 0 && <p className="mt-3 text-xs leading-5 text-warning-600">{copy.dashboard.pages_tool_dashboard_InvitationsSection_053}</p>}
       </section>}
 
-      <section className="tool-panel p-5 sm:p-6" aria-labelledby="invitation-records-title">
-        <h2 id="invitation-records-title" className="text-lg font-semibold text-ink-primary">{copy.dashboard.pages_tool_dashboard_InvitationsSection_054}</h2>
+      <details className="tool-panel p-5 sm:p-6" aria-labelledby="invitation-records-title">
+        <summary className="min-h-11 cursor-pointer content-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45">
+          <h2 id="invitation-records-title" className="inline text-lg font-semibold text-ink-primary">{copy.dashboard.pages_tool_dashboard_InvitationsSection_054}</h2>
+        </summary>
         {(summary?.records.length ?? 0) === 0 ? (
           <p className="tool-inset mt-4 p-8 text-center text-sm text-ink-muted">{copy.dashboard.pages_tool_dashboard_InvitationsSection_055}</p>
         ) : <>
           <InvitationRecords records={summary?.records ?? []} />
           {summary?.next_cursor && <div className="mt-4 flex justify-center"><button type="button" disabled={loadingMore} onClick={() => void loadMore()} className="tool-secondary-action">{loadingMore ? copy.dashboard.pages_tool_dashboard_InvitationsSection_073 : copy.dashboard.pages_tool_dashboard_InvitationsSection_072}</button></div>}
         </>}
-      </section>
+      </details>
     </div>
   )
 }

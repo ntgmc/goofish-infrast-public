@@ -8,6 +8,7 @@ export interface RegistrationSettingsV5 {
   version: 5
   email_verification_required: boolean
   invite_code_required: boolean
+  bot_registration_enabled: boolean
   email_provider_priority: EmailProviderPriority
   brevo_quota_action: BrevoQuotaAction
   admin_invite_email_reserve: number
@@ -18,12 +19,13 @@ export interface RegistrationSettingsV5 {
 export type RegistrationSettingsPatch = Pick<
   RegistrationSettingsV5,
   'email_verification_required' | 'invite_code_required' | 'email_provider_priority' | 'brevo_quota_action' | 'admin_invite_email_reserve' | 'password_reset_email_reserve'
->
+> & Partial<Pick<RegistrationSettingsV5, 'bot_registration_enabled'>>
 
 export const DEFAULT_REGISTRATION_SETTINGS: RegistrationSettingsV5 = {
   version: 5,
   email_verification_required: true,
   invite_code_required: false,
+  bot_registration_enabled: true,
   email_provider_priority: ['brevo', 'ses'],
   brevo_quota_action: 'pause_registration',
   admin_invite_email_reserve: 0,
@@ -60,6 +62,7 @@ export function normalizeRegistrationSettings(value: unknown): RegistrationSetti
       ? source.email_verification_required
       : true,
     invite_code_required: source.invite_code_required === true,
+    bot_registration_enabled: typeof source.bot_registration_enabled === 'boolean' ? source.bot_registration_enabled : true,
     email_provider_priority: isEmailProviderPriority(source.email_provider_priority)
       ? [...source.email_provider_priority]
       : ['brevo', 'ses'],
@@ -83,6 +86,9 @@ export function validateRegistrationSettingsPatch(value: unknown): RegistrationS
   }
   if (typeof source.invite_code_required !== 'boolean') {
     issues.push({ path: 'invite_code_required', message: '仅邀请注册设置必须是布尔值。' })
+  }
+  if (source.bot_registration_enabled !== undefined && typeof source.bot_registration_enabled !== 'boolean') {
+    issues.push({ path: 'bot_registration_enabled', message: 'Bot 注册设置必须是布尔值。' })
   }
   if (!isEmailProviderPriority(source.email_provider_priority)) {
     issues.push({ path: 'email_provider_priority', message: '邮件服务优先级必须包含 Brevo 和 Amazon SES，且不能重复。' })
@@ -110,6 +116,7 @@ export function validateRegistrationSettingsPatch(value: unknown): RegistrationS
   return {
     email_verification_required: source.email_verification_required as boolean,
     invite_code_required: source.invite_code_required as boolean,
+    ...(source.bot_registration_enabled !== undefined && { bot_registration_enabled: source.bot_registration_enabled as boolean }),
     email_provider_priority: [...source.email_provider_priority as EmailProviderPriority],
     brevo_quota_action: source.brevo_quota_action as BrevoQuotaAction,
     admin_invite_email_reserve: adminInviteReserve!,

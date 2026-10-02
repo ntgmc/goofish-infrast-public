@@ -12,6 +12,7 @@ import type { Announcement, AuthSuccessResponse, AuthUser, UserGameAccount } fro
 import { copy } from '../../copy/index'
 import { DEFAULT_SITE_FEATURES, type SiteFeatures } from '../../lib/site-features'
 import { NotificationBell } from '../../components/NotificationCenter'
+import type { WorkspaceEntryState } from './WorkspaceEntryPreference'
 
 
 const ProfilesSection = lazy(() => import('./dashboard/ProfilesSection'))
@@ -41,6 +42,7 @@ export default function AccountDashboard({
   onPayload,
   onOpenProfile,
   features = DEFAULT_SITE_FEATURES,
+  workspaceEntry,
 }: {
   user: AuthUser
   profiles: UserGameAccount[]
@@ -56,6 +58,7 @@ export default function AccountDashboard({
   onPayload: (payload: AuthSuccessResponse) => void
   onOpenProfile: (profile: UserGameAccount) => void
   features?: SiteFeatures
+  workspaceEntry?: WorkspaceEntryState
 }) {
   const displayedSection = useDeferredValue(section)
   const [redeemTourReplayToken, setRedeemTourReplayToken] = useState(0)
@@ -240,7 +243,7 @@ export default function AccountDashboard({
               {displayedSection === 'inventory' && <InventorySection onPayload={onPayload} onLifetimeProfileCreated={() => onSectionChange('profiles', { replace: true })} onViewProfiles={() => onSectionChange('profiles')} />}
               {displayedSection === 'balance' && <BalanceSection redemptionEnabled={features.cdk_redemption} />}
               {displayedSection === 'announcements' && <AnnouncementsSection onUnreadCountChange={onAnnouncementUnreadCountChange} />}
-              {displayedSection === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} onPayload={onPayload} />}
+              {displayedSection === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} onPayload={onPayload} workspaceEntry={workspaceEntry} />}
             </AnimatedPresenceRegion>
           </Suspense>
         </div>

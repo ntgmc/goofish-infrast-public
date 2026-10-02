@@ -16,10 +16,12 @@ import {
 import AccountDashboard from './tool/AccountDashboard'
 import AuthPage from './tool/AuthPage'
 import ProfileUpgradePrompt from './tool/ProfileUpgradePrompt'
+import { useWorkspaceEntryPreference, WorkspaceEntryPrompt } from './tool/WorkspaceEntryPreference'
 import WorkspaceSetupPage from './tool/WorkspaceSetupPage'
 import { isSchedulableProfile } from './tool/tool-utils'
 import { useToolSession } from './tool/useToolSession'
 import { useToolVisitReporter } from './tool/useToolVisitReporter'
+import { useToolBehaviorObservation } from './tool/useToolBehaviorObservation'
 import { copy } from '../copy/index'
 import { useSiteFeatures } from '../lib/site-feature-context'
 import type { SiteFeatures } from '../lib/site-features'
@@ -76,6 +78,11 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
     persistWorkspacePatch,
     handleLogout,
   } = useToolSession(requestedProfileId)
+  useToolBehaviorObservation(authStatus === 'authenticated' ? user?.id ?? null : null,
+    route?.kind === 'dashboard' ? requestedProfileId : activeProfile?.id ?? null)
+  const workspaceEntry = useWorkspaceEntryPreference(
+    user?.id ?? null, cdkProfiles, activeProfile, authStatus === 'authenticated', features.profiles,
+  )
 
   if (!route) return <Navigate to={profileScopedPath(fallbackToolPath(location.pathname), requestedProfileId)} replace />
 
@@ -153,14 +160,20 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
             onLogout={handleLogout}
             onPayload={applyAuthPayload}
             onOpenProfile={(profile) => {
+              const openedAt = Date.now()
               void refreshProfileWorkspace(profile)
-                .then(() => navigate(profileScopedPath(workspaceSetupPath('operators'), profile.id)))
+                .then(() => {
+                  workspaceEntry.recordOpen(profile, openedAt)
+                  return navigate(profileScopedPath(workspaceSetupPath('operators'), profile.id))
+                })
                 .catch(console.error)
             }}
             features={features}
+            workspaceEntry={workspaceEntry}
           />
         </NotificationCenterProvider>
         {profileUpgradePrompt}
+        {route.section === 'profiles' && <WorkspaceEntryPrompt entry={workspaceEntry} />}
       </>
     )
   }

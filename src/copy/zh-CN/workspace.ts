@@ -296,7 +296,7 @@ export const workspaceCopy = {
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_032: " 名",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_033: "搜索干员名称",
+  pages_tool_WorkspaceSetupPage_033: "搜索干员，支持拼音和首字母",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_034: "搜索干员名称",
   // src/pages/tool/WorkspaceSetupPage.tsx

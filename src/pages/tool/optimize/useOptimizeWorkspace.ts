@@ -6,6 +6,7 @@ import type { OptimizePhase, OptimizeSection } from './types'
 import { copy } from '../../../copy/index'
 import { apiJson } from '../../../lib/api-client'
 import { fetchResultHistoryDetail } from './optimization-api'
+import { recordToolBehavior } from '../../../lib/tool-behavior-observation'
 
 
 type Setter<T> = Dispatch<SetStateAction<T>>
@@ -16,6 +17,7 @@ type UseOptimizeWorkspaceOptions = {
   normalizeAllowedConfigOverride: (config: LicenseConfig) => LicenseConfig
   onWorkspacePatch: (patch: WorkspacePatch) => Promise<AuthSuccessResponse | void>
   onWorkspaceUpdated: (profileId: string, workspace: UserWorkspace) => void
+  refreshInventory: () => Promise<void>
   setConfigOverride: (config: LicenseConfig | null) => void
   setCurrentResult: Setter<OptimizeResult | null>
   setFinalResult: Setter<OptimizeResult | null>
@@ -37,6 +39,7 @@ export function useOptimizeWorkspace({
   normalizeAllowedConfigOverride,
   onWorkspacePatch,
   onWorkspaceUpdated,
+  refreshInventory,
   setConfigOverride,
   setCurrentResult,
   setFinalResult,
@@ -132,6 +135,7 @@ export function useOptimizeWorkspace({
   }, [profileId, setWorkspaceBusyAction, setWorkspaceError])
 
   const handleViewHistory = useCallback(async (summary: WorkspaceResultHistorySummary) => {
+    recordToolBehavior({ name: 'result_select', profile: profileId, subject: summary.id })
     const item = await loadHistoryDetail(summary)
     if (!item) return
     setCurrentResult(null)
@@ -142,9 +146,10 @@ export function useOptimizeWorkspace({
     setLastGeneratedSignature(null)
     setInlineError(null)
     setSection('result')
-  }, [loadHistoryDetail, setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions])
+  }, [profileId, loadHistoryDetail, setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions])
 
   const handleUseHistoryConfig = useCallback(async (summary: WorkspaceResultHistorySummary) => {
+    recordToolBehavior({ name: 'history_config_select', profile: profileId, subject: summary.id })
     const item = await loadHistoryDetail(summary)
     if (!item) return
     if (!item.config) {
@@ -161,7 +166,7 @@ export function useOptimizeWorkspace({
     setInlineError(null)
     setWorkspaceNotice(`${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_011}${item.name}${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_012}`)
     setSection('config')
-  }, [loadHistoryDetail, normalizeAllowedConfigOverride, setConfigOverride, setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions, setWorkspaceError, setWorkspaceNotice])
+  }, [profileId, loadHistoryDetail, normalizeAllowedConfigOverride, setConfigOverride, setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions, setWorkspaceError, setWorkspaceNotice])
 
   const handleDownloadHistory = useCallback((item: WorkspaceResultHistorySummary) => {
     if (!item.maa_exportable) {
@@ -173,25 +178,43 @@ export function useOptimizeWorkspace({
 
   const mutateHistoryResult = useCallback(async (
     item: WorkspaceResultHistorySummary,
-    action: 'archive' | 'unarchive' | 'delete',
+    action: 'archive' | 'unarchive' | 'delete' | 'rename',
+    name?: string,
   ) => {
     if (action === 'delete' && !window.confirm(copy.inventory.delete_result_confirm)) return
     setWorkspaceBusyAction(`${action}:${item.id}`)
     setWorkspaceError(null)
+    setWorkspaceNotice(null)
     try {
       const data = await apiJson<{ workspace: UserWorkspace }>('/api/user/result-archive', {
         method: 'POST',
-        json: { profile_id: profileId, result_id: item.id, action, idempotency_key: crypto.randomUUID() },
-        fallbackMessage: action === 'archive' ? copy.inventory.archive_full : action === 'unarchive' ? copy.inventory.history_full_for_unarchive : copy.inventory.delete_result,
+        json: { profile_id: profileId, result_id: item.id, action, ...(action === 'rename' ? { name } : {}), idempotency_key: crypto.randomUUID() },
+        fallbackMessage: action === 'rename' ? copy.inventory.archive_rename_failed : action === 'archive' ? copy.inventory.archive_full : action === 'unarchive' ? copy.inventory.history_full_for_unarchive : copy.inventory.delete_result,
       })
       onWorkspaceUpdated(profileId, data.workspace)
-      setWorkspaceNotice(action === 'archive' ? copy.inventory.archive_done : action === 'unarchive' ? copy.inventory.unarchive_done : copy.inventory.delete_result_done)
+      if (action !== 'rename') await refreshInventory()
+      if (action === 'rename') {
+        setHistoryItem((current) => current?.id === item.id ? { ...current, name: name! } : current)
+      }
+      setWorkspaceNotice(action === 'rename' ? copy.inventory.archive_rename_done : action === 'archive' ? copy.inventory.archive_done : action === 'unarchive' ? copy.inventory.unarchive_done : copy.inventory.delete_result_done)
     } catch (error) {
       setWorkspaceError((error as Error).message)
     } finally {
       setWorkspaceBusyAction(null)
     }
-  }, [onWorkspaceUpdated, profileId, setWorkspaceBusyAction, setWorkspaceError, setWorkspaceNotice])
+  }, [onWorkspaceUpdated, profileId, refreshInventory, setHistoryItem, setWorkspaceBusyAction, setWorkspaceError, setWorkspaceNotice])
+
+  const handleRenameArchivedHistory = useCallback(async (item: WorkspaceResultHistorySummary) => {
+    const nextName = window.prompt(copy.inventory.archive_rename_prompt, item.name)
+    if (nextName === null) return
+    const name = nextName.trim()
+    if (!name || name.length > 40) {
+      setWorkspaceNotice(null)
+      setWorkspaceError(copy.inventory.archive_name_invalid)
+      return
+    }
+    if (name !== item.name) await mutateHistoryResult(item, 'rename', name)
+  }, [mutateHistoryResult, setWorkspaceError, setWorkspaceNotice])
 
   return {
     handleSaveCurrentConfig,
@@ -201,6 +224,7 @@ export function useOptimizeWorkspace({
     handleViewHistory,
     handleUseHistoryConfig,
     handleDownloadHistory,
+    handleRenameArchivedHistory,
     handleArchiveHistory: (item: WorkspaceResultHistorySummary) => mutateHistoryResult(item, 'archive'),
     handleUnarchiveHistory: (item: WorkspaceResultHistorySummary) => mutateHistoryResult(item, 'unarchive'),
     handleDeleteHistory: (item: WorkspaceResultHistorySummary) => mutateHistoryResult(item, 'delete'),

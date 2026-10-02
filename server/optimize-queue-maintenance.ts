@@ -1,4 +1,4 @@
-import { getOptimizeJobMaxAttempts } from './optimize-job-config'
+import { getOptimizeJobMaxAttempts, OPTIMIZE_JOB_HISTORY_RETENTION_MS } from './optimize-job-config'
 import { requestOptimizeJobProcessing } from './optimize-job-signals'
 import { canMaintainOptimizeQueue } from './process-role'
 import { getOptimizeJobStore } from './storage/optimize-job-store'
@@ -13,7 +13,6 @@ import {
   waitForOptimizeWorkerAutoscalingIdle,
 } from './optimize-worker-autoscaler'
 
-const DEFAULT_CLEANUP_AGE_MS = 24 * 60 * 60 * 1000
 const MAINTENANCE_INTERVAL_MS = 60_000
 
 const controller = createBackgroundWorker({
@@ -74,7 +73,7 @@ async function runQueueMaintenanceAsLeader(): Promise<void> {
         console.warn('billing reconciliation metric skipped', describeServerError(trackingError))
       })
     }
-    const before = new Date(Date.now() - DEFAULT_CLEANUP_AGE_MS).toISOString()
+    const before = new Date(Date.now() - OPTIMIZE_JOB_HISTORY_RETENTION_MS).toISOString()
     await store.cleanupOldJobs(before)
     if (recovered > 0 || expired > 0) requestOptimizeJobProcessing()
   } catch (error) {

@@ -270,11 +270,10 @@ export async function mutateProfileOptimizationResultInTransaction(
   input: {
     profileId: string
     resultId: string
-    action: 'archive' | 'unarchive' | 'delete'
     historyLimit: number
     archiveLimit: number
     now: string
-  },
+  } & ({ action: 'archive' | 'unarchive' | 'delete' } | { action: 'rename'; name: string }),
 ): Promise<void> {
   await lockProfileResults(client, input.profileId)
   const selected = await client.query<{ archived_at: string | Date | null }>(
@@ -287,6 +286,16 @@ export async function mutateProfileOptimizationResultInTransaction(
   const row = selected.rows[0]
   if (!row) throw new OptimizationResultMutationError('排班结果不存在。', 404, 'result_not_found')
   const archived = row.archived_at !== null
+  if (input.action === 'rename') {
+    if (!archived) throw new OptimizationResultMutationError('封存区中不存在该结果。', 404, 'result_not_found')
+    await client.query(
+      `update optimization_result_history
+       set name = $3, updated_at = $4::timestamptz
+       where profile_id = $1 and id = $2`,
+      [input.profileId, input.resultId, input.name, input.now],
+    )
+    return
+  }
 
   if (input.action === 'archive') {
     if (archived) return
@@ -425,7 +434,9 @@ function toHistoryItem(row: OptimizationResultRow): WorkspaceResultHistoryExport
     name: row.name,
     created_at: row.created_at,
     config: isRecord(row.config_json) ? row.config_json as WorkspaceResultHistoryItem['config'] : null,
-    result: row.result_json as WorkspaceResultHistoryItem['result'],
+    result: row.source === 'manual'
+      ? { ...row.result_json as WorkspaceResultHistoryItem['result'], schedule_source: 'manual' }
+      : row.result_json as WorkspaceResultHistoryItem['result'],
     operator_count: Number(row.operator_count),
     source: normalizeSource(row.source),
     archived_at: normalizeTimestamp(row.archived_at),
@@ -433,7 +444,7 @@ function toHistoryItem(row: OptimizationResultRow): WorkspaceResultHistoryExport
 }
 
 function normalizeSource(value: string): WorkspaceResultHistoryItem['source'] {
-  return value === 'applied_suggestions' || value === 'legacy' ? value : 'generated'
+  return value === 'manual' || value === 'applied_suggestions' || value === 'legacy' ? value : 'generated'
 }
 
 function normalizeTimestamp(value: string | Date | null): string | null {

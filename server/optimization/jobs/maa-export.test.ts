@@ -4,6 +4,15 @@ import { FACILITY_IDS } from '../../../src/lib/facility-layout';
 import { buildMaaExportPayload, MaaExportValidationError } from './maa-export';
 
 describe('buildMaaExportPayload', () => {
+  it('preserves manual provenance in the downloaded execution JSON even when mood cannot cycle', () => {
+    const input = richResult()
+    input.schedule_source = 'manual'
+    input.mood_simulation = { valid: false, daily_loop_stable: false, iterations: 12, degrading_operators: [] }
+    const exported = JSON.parse(JSON.stringify(buildMaaExportPayload(input)))
+    expect(exported.schedule_source).toBe('manual')
+    expect(buildMaaExportPayload(richResult())).not.toHaveProperty('schedule_source')
+  })
+
   it('projects a rich optimizer result to the MAA execution allowlist', () => {
     const input = richResult();
     const original = structuredClone(input);

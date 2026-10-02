@@ -159,6 +159,11 @@ describe('manual schedule access and recovery', () => {
     await user.click(within(editor).getByRole('button', { name: '保存本地草稿' }))
     expect(JSON.parse(localStorage.getItem('manual-schedule:manual-profile')!).plans[0].rooms.trading[0]).toEqual(['贸易1', '', '新干员'])
     expect(result.plans[0].rooms.trading[0].operators).toEqual(['贸易1'])
+    await user.click(screen.getByRole('tab', { name: '详情' }))
+    const detail = within(screen.getByRole('tabpanel'))
+    expect(detail.getByText('贸易1')).toBeInTheDocument()
+    expect(detail.queryByText('新干员')).not.toBeInTheDocument()
+    expect(detail.getAllByText('200.0%').length).toBeGreaterThan(0)
     await user.click(screen.getByRole('tab', { name: '总览图 v2' }))
     await user.click(screen.getByRole('tab', { name: '手动排班' }))
     expect(within(editor).getByText('新干员')).toBeInTheDocument()
@@ -189,6 +194,21 @@ describe('manual schedule access and recovery', () => {
 })
 
 describe('ResultPanel overview v2', () => {
+  it('shows both product icons beside the v1 label when a facility changes product between shifts', () => {
+    const result = createThreeShiftResult()
+    result.plans[1].rooms.trading[0].product = 'Orundum'
+    render(<ResultPanel result={result} />)
+    const product = screen.getByText('龙门币 / 合成玉').parentElement!
+    const icons = product.querySelectorAll('img')
+    expect(icons).toHaveLength(2)
+    expect(icons[0]).toHaveAttribute('src', '/assets/products/GOLD.png')
+    expect(icons[1]).toHaveAttribute('src', '/assets/products/DIAMOND_SHD.png')
+    expect(icons[0]).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.getByText('贸易1')).toBeInTheDocument()
+    expect(screen.getByText('贸易2')).toBeInTheDocument()
+    expect(screen.getByText('贸易3')).toBeInTheDocument()
+  })
+
   it('keeps v1 as the default and shows one shift with larger portraits in v2', async () => {
     const user = userEvent.setup()
     const { container } = render(<ResultPanel result={createThreeShiftResult()} operators={[
@@ -197,7 +217,8 @@ describe('ResultPanel overview v2', () => {
     expect(screen.getByRole('tab', { name: '总览图' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByText('贸易2')).toBeInTheDocument()
     expect(screen.getByText('贸易3')).toBeInTheDocument()
-    expect(container.querySelector('img')).toHaveAttribute('width', '32')
+    expect(container.querySelector('img[src^="/webp96/"]')).toHaveAttribute('width', '32')
+    expect(container.querySelector('img[src="/assets/products/GOLD.png"]')).toHaveAttribute('width', '16')
 
     await user.click(screen.getByRole('tab', { name: '总览图 v2' }))
     const board = screen.getByRole('region', { name: '总览图 v2' })
@@ -205,10 +226,15 @@ describe('ResultPanel overview v2', () => {
     expect(within(board).getByText('贸易1')).toBeInTheDocument()
     expect(within(board).queryByText('贸易2')).not.toBeInTheDocument()
     expect(within(board).queryByText('贸易3')).not.toBeInTheDocument()
-    const portrait = board.querySelector('img')
+    const productIcon = within(board).getByText('龙门币').parentElement?.querySelector('img')
+    expect(productIcon).toHaveAttribute('src', '/assets/products/GOLD.png')
+    expect(productIcon).toHaveAttribute('width', '20')
+    expect(productIcon).toHaveAttribute('aria-hidden', 'true')
+    const portrait = board.querySelector('img[src^="/webp96/"]')
     expect(portrait).toHaveAttribute('width', '72')
     fireEvent.error(portrait!)
-    expect(board.querySelector('img')).toBeNull()
+    expect(board.querySelector('img[src^="/webp96/"]')).toBeNull()
+    expect(within(board).getByText('龙门币')).toBeInTheDocument()
     expect(within(board).getByText('贸易1')).toBeInTheDocument()
 
     await user.click(within(board).getByRole('tab', { name: /第2班.*6h/ }))
@@ -287,6 +313,51 @@ describe('ResultPanel overview v2', () => {
     },
   )
 
+  it.each(['maa_autofill', 'maa_pure_autofill'] as const)('marks explicitly placed dormitory recovery support in %s', async (mode) => {
+    const user = userEvent.setup()
+    const result = createPreviewOrderResult()
+    result.dormitory_rule = mode
+    result.plans[0].rooms.dormitory = [{
+      operators: ['杜林', '恢复目标'], recovery_support_operators: ['杜林'], autofill: false,
+    }]
+    render(<ResultPanel result={result} />)
+    await user.click(screen.getByRole('tab', { name: '总览图 v2' }))
+    const board = within(screen.getByRole('region', { name: '总览图 v2' }))
+    expect(board.getByText('杜林')).toBeInTheDocument()
+    expect(board.getByText('恢复目标')).toBeInTheDocument()
+    expect(board.getByRole('img', { name: '恢复支援' })).toHaveAttribute('src', '/building-skills/bskill_dorm_all&one1.png')
+    expect(board.getByRole('img', { name: '恢复支援' })).toHaveAttribute('title', '专门进驻宿舍，加速同宿舍干员恢复心情')
+    expect(board.queryByText('恢复支援')).not.toBeInTheDocument()
+    expect(board.queryByText('宿舍由 MAA 自动填满')).not.toBeInTheDocument()
+  })
+
+  it('shows cross-station markers from optimizer fields in both overview boards', async () => {
+    const user = userEvent.setup()
+    const result = createPreviewOrderResult()
+    result.plans[0].rooms.hire = [{ operators: ['凯尔希·思衡托'], cross_station_operators: ['凯尔希·思衡托'] }]
+    result.plans[0].rooms.processing = [{ operators: ['煌'], cross_station_operators: ['煌'] }]
+    result.plans[0].rooms.dormitory = [{
+      operators: ['逻各斯', '乌尔比安'],
+      cross_station_operators: ['逻各斯', '乌尔比安'],
+      recovery_support_operators: ['逻各斯'],
+    }]
+    result.plans[0].rooms.trading = [{ operators: ['深巡', '能天使'], cross_station_operators: ['深巡'] }]
+    result.plans[0].rooms.control = [{ operators: ['阿米娅'] }]
+    render(<ResultPanel result={result} />)
+    for (const tab of ['总览图', '总览图 v2']) {
+      await user.click(screen.getByRole('tab', { name: tab }))
+      const board = within(screen.getByRole('tabpanel', { name: tab }))
+      expect(board.getAllByRole('img', { name: '跨站联动' })).toHaveLength(5)
+      for (const name of ['凯尔希·思衡托', '煌', '逻各斯', '乌尔比安', '深巡']) {
+        const tile = board.getByText(name, { selector: 'span' }).closest('[data-operator-name]')!
+        expect(within(tile as HTMLElement).getByRole('img', { name: '跨站联动' }))
+          .toHaveAttribute('title', '与其他房间的干员配合生效，换班时请一并保留配套安排')
+      }
+      const support = board.getByText('逻各斯').closest('[data-operator-name]')!
+      expect(within(support as HTMLElement).getByRole('img', { name: '恢复支援' })).toBeInTheDocument()
+    }
+  })
+
   it('falls back to the first shift for shorter results and handles empty results', async () => {
     const user = userEvent.setup()
     const view = render(<ResultPanel result={createThreeShiftResult()} />)
@@ -320,6 +391,27 @@ function createThreeShiftResult(): OptimizeResult {
 }
 
 describe('ResultPanel tabs', () => {
+  it('identifies opened manual history and its potential mood cycle failure', () => {
+    render(<ResultPanel result={{ ...createThreeShiftResult(), schedule_source: 'manual' }} />)
+    expect(screen.getByRole('status')).toHaveTextContent('手动排班')
+    expect(screen.getByRole('status')).toHaveTextContent('心情可能无法持续循环')
+  })
+
+  it.each(['maa', 'rotation'] as const)('keeps product icons and labels together in %s details', async (mode) => {
+    const result = createThreeShiftResult()
+    result.schedule_mode = mode
+    result.plans = result.plans.slice(0, 2)
+    result.plans[1].rooms.trading[0].product = 'Orundum'
+    render(<ResultPanel result={result} />)
+    await userEvent.setup().click(screen.getByRole('tab', { name: mode === 'maa' ? '详情' : '预设队列' }))
+    const panel = screen.getByRole('tabpanel')
+    const icons = panel.querySelectorAll('img[src^="/assets/products/"]')
+    expect(icons).toHaveLength(mode === 'maa' ? 4 : 2)
+    expect(panel.querySelector('img[src="/assets/products/GOLD.png"]')).toBeInTheDocument()
+    expect(panel.querySelector('img[src="/assets/products/DIAMOND_SHD.png"]')).toBeInTheDocument()
+    expect(within(panel).getAllByText(mode === 'maa' ? '龙门币' : '龙门币 / 合成玉').length).toBeGreaterThan(0)
+  })
+
   it('shows dependency anchors for regular autofill and collapses dormitories only for pure autofill', () => {
     const regular = createPreviewOrderResult()
     regular.dormitory_rule = 'maa_autofill'

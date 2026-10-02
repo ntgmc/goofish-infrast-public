@@ -232,6 +232,26 @@ describe('optimization job attempt lifecycle', () => {
     })
   })
 
+  it('hides and cleans old terminal jobs while keeping active jobs and the seven-day boundary', async () => {
+    const store = createMemoryOptimizeJobStore()
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString()
+    const old = new Date(Date.parse(cutoff) - 1).toISOString()
+    const retainedIds: string[] = []
+    for (const status of ['queued', 'running', 'succeeded', 'failed', 'cancelled', 'dead_lettered'] as const) {
+      const record = await store.createJob({ ...input(), profile_id: 'profile-1' })
+      const job = store.records.get(record.id)!
+      Object.assign(job, { status, created_at: old, updated_at: old, finished_at: status === 'queued' || status === 'running' ? null : old })
+      if (status === 'queued' || status === 'running') retainedIds.push(job.id)
+    }
+    const boundary = await store.createJob({ ...input(), profile_id: 'profile-1' })
+    Object.assign(store.records.get(boundary.id)!, { status: 'succeeded', finished_at: cutoff, updated_at: old })
+    retainedIds.push(boundary.id)
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse(cutoff) + 7 * 24 * 60 * 60_000)
+    expect((await store.listJobsByProfile('profile-1')).map(({ job }) => job.id).sort()).toEqual([...retainedIds].sort())
+    await store.cleanupOldJobs(cutoff)
+    expect([...store.records.keys()].sort()).toEqual([...retainedIds].sort())
+  })
+
   it('uses the id tiebreaker consistently for queue rank, claiming, and composite pagination', async () => {
     const store = createMemoryOptimizeJobStore()
     const createdAt = '2026-07-31T00:00:00.000Z'

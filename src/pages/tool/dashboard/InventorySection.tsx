@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
+import { useCallback, useMemo, useRef, useState, type SyntheticEvent } from 'react'
+import { useAnimate, useReducedMotion } from 'motion/react'
 import { copy } from '../../../copy/index'
 import {
   Dialog,
@@ -7,6 +8,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '../../../components/ui/dialog'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../../components/ui/tooltip'
 import { apiJson, getApiErrorMessage } from '../../../lib/api-client'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import SklandBindingDialog, { type SklandPayload } from '../../../components/SklandBindingDialog'
@@ -15,14 +17,16 @@ import { formatShanghaiDateTime } from '../tool-utils'
 import {
   itemIconPath,
   type InventoryResponse,
+  type InventoryReward,
   type InventoryStack,
   type OnboardingTaskView,
   type ProfileCapacitySummary,
 } from '../../../lib/inventory-contracts'
+import { markInventoryStale, useInventoryRefresh } from '../../../lib/inventory-refresh'
 
 type Category = 'all' | 'consumable' | 'capacity_upgrade' | 'gift_pack' | 'license_voucher'
 type UseResponse = {
-  rewards?: Array<{ item_code: string; name: string; icon_key: string; quantity: number; expires_at: string | null }>
+  rewards?: InventoryReward[]
   operation_id?: string
   item_code?: string
   profile_id?: string
@@ -60,7 +64,9 @@ export default function InventorySection({
   const [category, setCategory] = useState<Category>('all')
   const [search, setSearch] = useState('')
   const [profileId, setProfileId] = useState('')
+  const [quantity, setQuantity] = useState(1)
   const [selectedRewardCodes, setSelectedRewardCodes] = useState<string[]>([])
+  const [highlightedReward, setHighlightedReward] = useState<number | null>(null)
   const [lifetimeDisplayName, setLifetimeDisplayName] = useState('')
   const [lifetimeNote, setLifetimeNote] = useState('')
   const [loading, setLoading] = useState(true)
@@ -72,9 +78,13 @@ export default function InventorySection({
   const selectedTriggerRef = useRef<HTMLButtonElement | null>(null)
   const itemIdempotencyKeyRef = useRef(crypto.randomUUID())
   const pendingItemKeysRef = useRef(new Map<string, string>())
+  const loadVersionRef = useRef(0)
+  const [chestScope, animate] = useAnimate<HTMLFieldSetElement>()
+  const reduceMotion = useReducedMotion()
   const { features } = useSiteFeatures()
 
   const load = useCallback(async () => {
+    const version = ++loadVersionRef.current
     setLoading(true)
     setError(null)
     try {
@@ -82,19 +92,20 @@ export default function InventorySection({
         ? apiJson<{ tasks: OnboardingTaskView[] }>('/api/user/onboarding-tasks').catch(() => ({ tasks: [] }))
         : Promise.resolve({ tasks: [] })
       const [nextInventory, nextTasks] = await Promise.all([
-        apiJson<InventoryResponse>('/api/user/inventory'),
+        apiJson<InventoryResponse>('/api/user/inventory', { cache: 'no-store' }),
         onboardingTasks,
       ])
+      if (version !== loadVersionRef.current) return
       setInventory(nextInventory)
       setTasks(nextTasks.tasks ?? [])
     } catch (caught) {
-      setError(getApiErrorMessage(caught, copy.inventory.load_failed))
+      if (version === loadVersionRef.current) setError(getApiErrorMessage(caught, copy.inventory.load_failed))
     } finally {
-      setLoading(false)
+      if (version === loadVersionRef.current) setLoading(false)
     }
   }, [features.onboarding_tasks])
 
-  useEffect(() => { void load() }, [load])
+  useInventoryRefresh(load)
 
   const filtered = useMemo(() => (inventory?.stacks ?? []).filter((stack) => {
     if (category !== 'all' && stack.item.kind !== category) return false
@@ -102,10 +113,10 @@ export default function InventorySection({
   }), [category, inventory?.stacks, search])
 
   const runItemAction = async () => {
-    if (!selected) return
+    if (!selected || busy || !canUseSelected) return
     const request = {
       item_code: selected.item.code,
-      quantity: 1,
+      quantity,
       ...(profileId && { profile_id: profileId }),
       ...(selected.gift_pack_version_id && { gift_pack_version_id: selected.gift_pack_version_id }),
       ...(selected.gift_pack?.opening_rule.mode === 'choice' && { selected_item_codes: [...selectedRewardCodes].sort() }),
@@ -124,8 +135,20 @@ export default function InventorySection({
           idempotency_key: idempotencyKey,
         },
       })
+      if (selected.gift_pack?.opening_rule.mode === 'random' && response.rewards?.length && !reduceMotion) {
+        const contents = selected.gift_pack.contents
+        const target = Math.max(0, contents.findIndex((reward) => reward.item_code === response.rewards![0].item_code))
+        const end = contents.length * 3 + target
+        await animate(0, [0, end, end], {
+          duration: 3,
+          times: [0, 0.85, 1],
+          ease: ['easeInOut', 'linear'],
+          onUpdate: (value) => setHighlightedReward(Math.floor(value) % contents.length),
+        })
+      }
       pendingItemKeysRef.current.delete(requestJson)
       setRewards(response.rewards)
+      markInventoryStale()
       if (isLimitedProfileUseResponse(response)) {
         const activatedProfile = response.auth.profiles.find((profile) => profile.id === response.profile_id)
           ?? response.auth.active_profile
@@ -143,10 +166,10 @@ export default function InventorySection({
         })
       }
       setSelected(null)
-      await load()
     } catch (caught) {
       setError(getApiErrorMessage(caught, copy.inventory.load_failed))
     } finally {
+      setHighlightedReward(null)
       setBusy(false)
     }
   }
@@ -160,7 +183,7 @@ export default function InventorySection({
         json: { idempotency_key: crypto.randomUUID() },
       })
       setNotice({ message: copy.inventory.claim_done })
-      await load()
+      markInventoryStale()
     } catch (caught) {
       setError(getApiErrorMessage(caught, copy.inventory.load_failed))
     } finally {
@@ -201,10 +224,13 @@ export default function InventorySection({
   if (loading && !inventory) return <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.inventory.loading}</div>
 
   const selectedCapacity = selected ? capacityForItem(selected.item.code, profileId, inventory?.capacities ?? []) : null
-  const canUseSelected = (selected?.item.kind === 'gift_pack' && (selected.gift_pack?.opening_rule.mode !== 'choice' || selectedRewardCodes.length === selected.gift_pack.opening_rule.count))
+  const maximumQuantity = Math.min(selected?.quantity ?? 0, 100,
+    selected?.item.kind === 'capacity_upgrade' ? Math.max(0, (selectedCapacity?.maximum ?? 0) - (selectedCapacity?.limit ?? 0))
+      : selected?.item.kind === 'gift_pack' ? 100 : 1)
+  const canUseSelected = Number.isInteger(quantity) && quantity >= 1 && quantity <= maximumQuantity && ((selected?.item.kind === 'gift_pack' && (selected.gift_pack?.opening_rule.mode !== 'choice' || selectedRewardCodes.length === selected.gift_pack.opening_rule.count))
     || selected?.actions.includes('bind')
     || (selected?.item.kind === 'license_voucher' && selected.actions.includes('use'))
-    || (selected?.item.kind === 'capacity_upgrade' && Boolean(selectedCapacity) && selectedCapacity!.limit < selectedCapacity!.maximum)
+    || (selected?.item.kind === 'capacity_upgrade' && Boolean(selectedCapacity) && selectedCapacity!.limit < selectedCapacity!.maximum))
 
   const handleLifetimePayload = (payload: SklandPayload) => {
     if (!payload.user) return
@@ -276,7 +302,7 @@ export default function InventorySection({
         ) : (
           <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {filtered.map((stack) => (
-            <button key={stack.stack_id} type="button" onClick={(event) => { selectedTriggerRef.current = event.currentTarget; setSelected(stack); setSelectedRewardCodes([]); setProfileId(''); setLifetimeDisplayName(''); setLifetimeNote('') }} className="tool-inset min-w-0 p-4 text-left transition hover:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
+              <button key={stack.stack_id} type="button" onClick={(event) => { selectedTriggerRef.current = event.currentTarget; setSelected(stack); setQuantity(1); setSelectedRewardCodes([]); setProfileId(''); setLifetimeDisplayName(''); setLifetimeNote('') }} className="tool-inset min-w-0 p-4 text-left transition hover:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
                 <img src={itemIconPath(stack.item.icon_key)} onError={fallbackItemIcon} alt="" width={64} height={64} className="mx-auto h-16 w-16 object-contain" />
                 <strong className="mt-3 block truncate text-sm text-ink-primary">{stack.item.name}</strong>
                 <span className="mt-1 block text-xs text-ink-secondary">{copy.inventory.quantity} × {stack.quantity}</span>
@@ -287,13 +313,14 @@ export default function InventorySection({
         )}
       </section>
 
-      <Dialog open={Boolean(selected)} onOpenChange={(open) => { if (!open) setSelected(null) }}>
+      <Dialog open={Boolean(selected)} onOpenChange={(open) => { if (!open && !busy) setSelected(null) }}>
         <DialogContent
-          className="block"
+          className="block sm:max-w-2xl"
           onCloseAutoFocus={(event) => {
             event.preventDefault()
-            if (!lifetimeDialogOpen && selectedTriggerRef.current?.isConnected) {
-              selectedTriggerRef.current.focus()
+            if (!lifetimeDialogOpen && !rewards?.length) {
+              const target = selectedTriggerRef.current?.isConnected ? selectedTriggerRef.current : document.getElementById('inventory-search')
+              target?.focus()
             }
           }}
         >
@@ -308,24 +335,38 @@ export default function InventorySection({
               </ul>
               {selected.item.kind === 'capacity_upgrade' && <>
                 <label htmlFor="inventory-profile" className="mt-5 block text-sm font-medium text-ink-primary">{copy.inventory.choose_profile}</label>
-                <select id="inventory-profile" className="tool-field mt-2 w-full" value={profileId} onChange={(event) => setProfileId(event.currentTarget.value)}>
+                <select id="inventory-profile" className="tool-field mt-2 w-full" disabled={busy} value={profileId} onChange={(event) => { setProfileId(event.currentTarget.value); setQuantity(1) }}>
                   <option value="">{copy.inventory.choose_profile}</option>
                   {(inventory?.capacities ?? []).map((profile) => <option key={profile.profile_id} value={profile.profile_id}>{profile.display_name}</option>)}
                 </select>
-                {selectedCapacity && <div className="tool-inset mt-3 grid grid-cols-3 gap-2 p-3 text-center text-xs"><span>{copy.inventory.current}<strong className="mt-1 block text-sm">{selectedCapacity.limit}</strong></span><span>{copy.inventory.after_use}<strong className="mt-1 block text-sm">{Math.min(selectedCapacity.maximum, selectedCapacity.limit + 1)}</strong></span><span>{copy.inventory.maximum}<strong className="mt-1 block text-sm">{selectedCapacity.maximum}</strong></span></div>}
+                {selectedCapacity && <div className="tool-inset mt-3 grid grid-cols-3 gap-2 p-3 text-center text-xs"><span>{copy.inventory.current}<strong className="mt-1 block text-sm">{selectedCapacity.limit}</strong></span><span>{copy.inventory.after_use}<strong className="mt-1 block text-sm">{Math.min(selectedCapacity.maximum, selectedCapacity.limit + quantity)}</strong></span><span>{copy.inventory.maximum}<strong className="mt-1 block text-sm">{selectedCapacity.maximum}</strong></span></div>}
               </>}
-            {selected.gift_pack && <fieldset className="tool-inset mt-5 space-y-3 p-4" disabled={busy}>
+            {(selected.item.kind === 'capacity_upgrade' || selected.item.kind === 'gift_pack') && selected.quantity > 1 && <div className="mt-5">
+              <label htmlFor="inventory-quantity" className="block text-sm font-medium text-ink-primary">{copy.inventory.use_quantity}</label>
+              <input id="inventory-quantity" type="number" min={1} max={maximumQuantity} step={1} disabled={busy || maximumQuantity === 0} className="tool-field mt-2 w-full" value={quantity} onChange={(event) => setQuantity(Number(event.currentTarget.value))} aria-describedby="inventory-quantity-limit" />
+              <p id="inventory-quantity-limit" className="mt-2 text-xs text-ink-muted">{copy.inventory.quantity_limit(maximumQuantity)}</p>
+            </div>}
+            {selected.gift_pack && <TooltipProvider delayDuration={200}><fieldset ref={chestScope} className="tool-inset mt-5 p-4" disabled={busy} aria-busy={highlightedReward !== null}>
               <legend className="px-1 text-sm font-semibold text-ink-primary">{selected.gift_pack.opening_rule.mode === 'choice' ? copy.inventory.chest_choice(selected.gift_pack.opening_rule.count) : selected.gift_pack.opening_rule.mode === 'random' ? copy.inventory.chest_random(selected.gift_pack.opening_rule.count) : copy.inventory.chest_all}</legend>
-              {selected.gift_pack.contents.map((reward) => <label key={reward.item_code} className="flex items-center gap-3 text-sm text-ink-secondary">
-                {selected.gift_pack!.opening_rule.mode === 'choice' && <input type="checkbox" checked={selectedRewardCodes.includes(reward.item_code)} disabled={!selectedRewardCodes.includes(reward.item_code) && selectedRewardCodes.length >= selected.gift_pack!.opening_rule.count} onChange={(event) => {
-                  const checked = event.currentTarget.checked
-                  setSelectedRewardCodes((current) => checked ? [...current, reward.item_code] : current.filter((code) => code !== reward.item_code))
-                }} />}
-                <img src={itemIconPath(reward.icon_key)} onError={fallbackItemIcon} alt="" width={36} height={36} className="h-9 w-9 object-contain" />
-                <span>{reward.name} × {reward.quantity} · {reward.expiry.mode === 'never' ? copy.inventory.permanent : copy.inventory.chest_reward_expiry(reward.expiry.days)}</span>
-              </label>)}
-              {selected.gift_pack.opening_rule.mode === 'choice' && <p role="status" className="text-xs text-ink-muted">{copy.inventory.chest_selected(selectedRewardCodes.length, selected.gift_pack.opening_rule.count)}</p>}
-            </fieldset>}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {selected.gift_pack.contents.map((reward, index) => <Tooltip key={reward.item_code}>
+                  <TooltipTrigger asChild>
+                    <label tabIndex={selected.gift_pack!.opening_rule.mode === 'choice' ? undefined : 0} className={`tool-inset relative flex min-w-0 flex-col items-center gap-2 p-3 text-center text-sm text-ink-secondary transition focus-within:ring-2 focus-within:ring-brand-400 ${selected.gift_pack!.opening_rule.mode === 'choice' ? 'cursor-pointer hover:border-brand-400' : ''} ${highlightedReward === index ? 'border-brand-400 bg-brand-400/10 shadow-lg shadow-brand-400/40 ring-2 ring-brand-400' : selectedRewardCodes.includes(reward.item_code) ? 'border-brand-400 bg-brand-400/10 ring-2 ring-brand-400' : ''}`}>
+                      {selected.gift_pack!.opening_rule.mode === 'choice' && <input type="checkbox" className="absolute right-2 top-2 accent-brand-500" checked={selectedRewardCodes.includes(reward.item_code)} disabled={!selectedRewardCodes.includes(reward.item_code) && selectedRewardCodes.length >= selected.gift_pack!.opening_rule.count} onChange={(event) => {
+                        const checked = event.currentTarget.checked
+                        setSelectedRewardCodes((current) => checked ? [...current, reward.item_code] : current.filter((code) => code !== reward.item_code))
+                      }} />}
+                      <img src={itemIconPath(reward.icon_key)} onError={fallbackItemIcon} alt="" width={56} height={56} className="h-14 w-14 object-contain" />
+                      <span className="font-medium text-ink-primary">{reward.name} × {reward.quantity}</span>
+                      <span className="text-xs text-ink-muted">{reward.expiry.mode === 'never' ? copy.inventory.permanent : copy.inventory.chest_reward_expiry(reward.expiry.days)}</span>
+                    </label>
+                  </TooltipTrigger>
+                  {reward.description && <TooltipContent>{reward.description}</TooltipContent>}
+                </Tooltip>)}
+              </div>
+              {highlightedReward !== null && <p role="status" className="mt-3 text-xs text-ink-muted">{copy.inventory.chest_revealing}</p>}
+              {selected.gift_pack.opening_rule.mode === 'choice' && <p role="status" className="mt-3 text-xs text-ink-muted">{copy.inventory.chest_selected(selectedRewardCodes.length, selected.gift_pack.opening_rule.count)}</p>}
+            </fieldset></TooltipProvider>}
             {selected.actions.includes('context_only') && <div className="tool-alert mt-5">{copy.inventory.context_only}</div>}
               {selected.item.code === 'lifetime_profile_voucher' && <>
                 <div className="tool-alert mt-5">{copy.inventory.lifetime_use_help}</div>
@@ -342,7 +383,7 @@ export default function InventorySection({
               </>}
               {selected.item.code === 'limited_profile_voucher' && <div className="tool-alert mt-5">{copy.inventory.limited_use_help}</div>}
             <div className="mt-6 flex flex-wrap justify-end gap-3">
-              <DialogClose className="tool-secondary-action">{copy.inventory.close}</DialogClose>
+              <DialogClose disabled={busy} className="tool-secondary-action">{copy.inventory.close}</DialogClose>
               {selected.item.code === 'lifetime_profile_voucher' ? <>
                 <button type="button" disabled={busy || !canUseSelected} onClick={() => void createLifetimeProfileWithJson()} className="tool-secondary-action">
                   {busy ? copy.inventory.processing : copy.inventory.create_with_json}
@@ -356,14 +397,33 @@ export default function InventorySection({
         </DialogContent>
       </Dialog>
 
-      {rewards && rewards.length > 0 && <section className="tool-panel p-5" aria-live="polite"><h3 className="text-base font-semibold text-ink-primary">{copy.inventory.rewards_received}</h3><ul className="mt-3 grid gap-2 sm:grid-cols-2">{rewards.map((reward) => <li key={reward.item_code} className="tool-inset flex items-center gap-3 p-3 text-sm text-ink-secondary"><img src={itemIconPath(reward.icon_key)} onError={fallbackItemIcon} alt="" width={36} height={36} className="h-9 w-9 object-contain" /><span>{reward.name} × {reward.quantity} · {reward.expires_at ? formatShanghaiDateTime(reward.expires_at) : copy.inventory.permanent}</span></li>)}</ul></section>}
-      {(inventory?.recent_events.length ?? 0) > 0 && <section className="tool-panel p-5 sm:p-6" aria-labelledby="inventory-events-title">
-        <h3 id="inventory-events-title" className="text-base font-semibold text-ink-primary">{copy.inventory.recent_events}</h3>
+      <Dialog open={Boolean(rewards?.length)} onOpenChange={(open) => { if (!open) setRewards(undefined) }}>
+        <DialogContent className="sm:max-w-2xl" onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          const target = selectedTriggerRef.current?.isConnected ? selectedTriggerRef.current : document.getElementById('inventory-search')
+          target?.focus()
+        }}>
+          <DialogTitle>{copy.inventory.rewards_received}</DialogTitle>
+          <DialogDescription>{copy.inventory.rewards_received_help}</DialogDescription>
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {rewards?.map((reward) => <li key={`${reward.item_code}:${reward.expires_at ?? 'never'}`} className="tool-inset flex min-w-0 flex-col items-center gap-2 p-4 text-center">
+              <img src={itemIconPath(reward.icon_key)} onError={fallbackItemIcon} alt="" width={64} height={64} className="h-16 w-16 object-contain" />
+              <strong className="text-sm text-ink-primary">{reward.name} × {reward.quantity}</strong>
+              <span className="text-xs text-ink-muted">{reward.expires_at ? formatShanghaiDateTime(reward.expires_at) : copy.inventory.permanent}</span>
+            </li>)}
+          </ul>
+          <div className="flex justify-end"><DialogClose className="tool-primary-action">{copy.inventory.close}</DialogClose></div>
+        </DialogContent>
+      </Dialog>
+      {(inventory?.recent_events.length ?? 0) > 0 && <details className="tool-panel p-5 sm:p-6" aria-labelledby="inventory-events-title">
+        <summary className="min-h-11 cursor-pointer content-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45">
+          <h3 id="inventory-events-title" className="inline text-base font-semibold text-ink-primary">{copy.inventory.recent_events}</h3>
+        </summary>
         <ul className="mt-3 space-y-2">{inventory!.recent_events.map((event) => <li key={event.id} className="tool-inset flex items-center gap-3 p-3 text-sm text-ink-secondary">
           <img src={itemIconPath(event.icon_key ?? 'placeholder')} onError={fallbackItemIcon} alt="" width={36} height={36} className="h-9 w-9 object-contain" />
           <span className="min-w-0 flex-1"><strong className="text-ink-primary">{event.item_name ?? event.item_code}</strong><span className="ml-2">{ledgerEventLabel(event.event_type)} × {event.quantity}</span><span className="mt-1 block text-xs text-ink-muted">{formatShanghaiDateTime(event.created_at)}</span></span>
         </li>)}</ul>
-      </section>}
+      </details>}
       <SklandBindingDialog
         open={lifetimeDialogOpen}
         profile={null}

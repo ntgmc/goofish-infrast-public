@@ -8,6 +8,7 @@ import {
   websiteIntegrationResponse,
 } from '../security/website-integration-auth'
 import { issueQqBotRegistrationInvitation } from '../storage/admin-registration-invitation-store'
+import { getRegistrationSettings } from '../storage/registration-settings-store'
 
 const ISSUANCE_RATE_LIMIT = 120
 const ISSUANCE_RATE_LIMIT_WINDOW_MS = 60_000
@@ -28,6 +29,10 @@ export default async function qqBotRegistrationInvitationsHandler(req: Request):
   }
 
   try {
+    const settings = await getRegistrationSettings()
+    if (!settings.bot_registration_enabled) {
+      return websiteIntegrationResponse({ error: 'Bot registration disabled', code: 'bot_registration_disabled' }, 403)
+    }
     const rateLimit = await reservePersistentRateLimit(
       'qqbot-registration-invitation',
       getRequestClientIp(req),

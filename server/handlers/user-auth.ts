@@ -178,6 +178,9 @@ export async function registerUser(
     throw error
   }
   const qqBotRegistration = adminInvitation?.source === 'qqbot'
+  if (qqBotRegistration && registrationSettings.bot_registration_enabled === false) {
+    return { ok: false, status: 403, message: authCopy.api_bot_registration_disabled, code: 'bot_registration_disabled' }
+  }
   let verificationRequired = registrationSettings.email_verification_required
   let emailReservation: EmailDeliveryReservation | null = null
 

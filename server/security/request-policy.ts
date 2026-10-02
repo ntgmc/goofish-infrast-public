@@ -23,6 +23,7 @@ import {
 } from '../../src/lib/workspace-validation'
 import { scenarioComparisonFactorsSchema } from '../optimization/jobs/runtime-contracts'
 import { manualPlansSchema } from '../../src/lib/manual-schedule'
+import { manualScheduleSourceSchema } from '../../src/lib/manual-schedule-tool'
 
 export const REQUEST_BODY_LIMITS = Object.freeze({
   none: 0,
@@ -233,6 +234,7 @@ export const requestSchemas = {
   adminRegistrationSettings: strict({
     email_verification_required: z.boolean(),
     invite_code_required: z.boolean(),
+    bot_registration_enabled: z.boolean().optional(),
     email_provider_priority: z.tuple([z.enum(['brevo', 'ses']), z.enum(['brevo', 'ses'])])
       .refine(([first, second]) => first !== second, 'Email providers must not be repeated'),
     brevo_quota_action: z.enum(['pause_registration', 'allow_unverified_registration']),
@@ -479,10 +481,10 @@ export const requestSchemas = {
       accepted_max_points: optionalString(32),
       billing_operation: z.enum(['main_schedule', 'incremental_recompute']).optional(),
       baseline_history_id: optionalString(128),
-      manualSchedule: strict({
-        baselineHistoryId: shortString(128),
-        plans: manualPlansSchema,
-      }).optional(),
+      manualSchedule: z.union([
+        strict({ baselineHistoryId: shortString(128), plans: manualPlansSchema }),
+        strict({ source: manualScheduleSourceSchema, plans: manualPlansSchema }),
+      ]).optional(),
     }),
     strict({
       kind: z.literal('scenario_comparison'),
@@ -503,7 +505,7 @@ export const requestSchemas = {
   ]),
   inventoryUse: strict({
     item_code: shortString(128),
-    quantity: z.literal(1),
+    quantity: z.number().int().min(1).max(100),
     profile_id: optionalString(128),
     gift_pack_version_id: optionalString(128),
     selected_item_codes: z.array(shortString(128)).min(1).max(100).optional(),
@@ -550,12 +552,21 @@ export const requestSchemas = {
     result_id: shortString(128),
     idempotency_key: shortString(200),
   }),
-  resultArchive: strict({
-    profile_id: shortString(128),
-    result_id: shortString(128),
-    action: z.enum(['archive', 'unarchive', 'delete']),
-    idempotency_key: shortString(200),
-  }),
+  resultArchive: z.discriminatedUnion('action', [
+    strict({
+      profile_id: shortString(128),
+      result_id: shortString(128),
+      action: z.enum(['archive', 'unarchive', 'delete']),
+      idempotency_key: shortString(200),
+    }),
+    strict({
+      profile_id: shortString(128),
+      result_id: shortString(128),
+      action: z.literal('rename'),
+      name: z.string().trim().min(1).max(40),
+      idempotency_key: shortString(200),
+    }),
+  ]),
   adminItems: z.discriminatedUnion('action', [
     strict({
       action: z.literal('create_gift_pack'),

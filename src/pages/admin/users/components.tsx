@@ -78,6 +78,7 @@ function UserDetailPanel({
         </div>
         <div className="flex flex-wrap gap-2">
           <SmallButton onClick={() => void onDownloadWorkspaces()} loading={busyAction === `user-workspaces-export:${user.id}`}>导出工作区</SmallButton>
+          <span className="text-xs text-ink-muted">导出的最近结果选用优化器排班；手动排班在完整历史中单独标注。</span>
           {user.status === 'active' && <SmallButton onClick={() => void onFreezeUser(user)} loading={busyAction === `app-user:freeze_account:${user.id}`}>冻结用户</SmallButton>}
           {user.status === 'frozen' && <SmallButton onClick={() => void onUnfreezeUser(user)} loading={busyAction === `app-user:unfreeze_account:${user.id}`} tone="success">解冻用户</SmallButton>}
           <SmallButton onClick={() => void onDeleteUser(user)} loading={busyAction === `app-user:delete_account:${user.id}`} tone="danger">删除用户</SmallButton>
@@ -554,6 +555,7 @@ function ProfileDetailCard({
         <DetailItem label="拥有干员" value={String(profile.operator_count)} />
         <DetailItem label="配置摘要" value={profile.workspace.config_desc || '-'} />
         <DetailItem label="最近结果" value={profile.workspace.has_last_result ? (profile.workspace.last_result_title || '有结果') : '无结果'} />
+        {profile.workspace.has_last_result && <DetailItem label="结果来源" value={profile.workspace.last_result_source === 'manual' ? '手动排班' : '优化器排班'} />}
         <DetailItem label="结果更新时间" value={formatDate(profile.workspace.updated_at)} />
       </dl>
 

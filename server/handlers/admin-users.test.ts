@@ -179,10 +179,16 @@ describe('admin user workspace export', () => {
       source: 'legacy' as const,
       archived_at: '2026-08-01T00:00:00.000Z',
     }
+    const manualResult = {
+      ...activeResult,
+      id: 'manual-1',
+      result: { title: '手动测算', schedule_source: 'manual' },
+      source: 'manual' as const,
+    }
     mocks.listProfilesForUser.mockResolvedValue([profile, secondProfile])
     mocks.listProfileWorkspaces.mockResolvedValue(new Map([[profile.id, workspace]]))
     mocks.listOptimizationResultsForProfiles.mockResolvedValue(new Map([
-      [profile.id, [activeResult, archivedResult]],
+      [profile.id, [manualResult, activeResult, archivedResult]],
     ]))
 
     const response = await adminUsersHandler(workspaceExportRequest())
@@ -205,8 +211,13 @@ describe('admin user workspace export', () => {
       config: workspace.config,
       elite_overrides: workspace.elite_overrides,
       last_result: activeResult.result,
+      last_result_source: 'generated',
       saved_configs: workspace.saved_configs,
-      result_history: [{
+      result_history: [expect.objectContaining({
+        id: manualResult.id,
+        source: 'manual',
+        result: expect.objectContaining({ schedule_source: 'manual' }),
+      }), {
         id: activeResult.id,
         name: activeResult.name,
         created_at: activeResult.created_at,
@@ -236,6 +247,21 @@ describe('admin user workspace export', () => {
     expect(JSON.stringify(body)).not.toContain('encrypted-secret')
     expect(JSON.stringify(body)).not.toContain('internal-activity-marker')
     expect(mocks.authenticateAdminRequest).toHaveBeenCalledWith(expect.any(Request), 'sensitive_data_view')
+  })
+
+  it.each(['manual', 'generated'] as const)('does not use a manual result as the analysis baseline when history source is %s', async (source) => {
+    mocks.listProfilesForUser.mockResolvedValue([profile])
+    mocks.listProfileWorkspaces.mockResolvedValue(new Map([[profile.id, {
+      profile_id: profile.id, operators: [], config: null, elite_overrides: {}, saved_configs: [],
+      free_schedule_entitlement: null, updated_at: profile.updated_at,
+    }]]))
+    mocks.listOptimizationResultsForProfiles.mockResolvedValue(new Map([[profile.id, [{
+      id: 'manual-only', source, result: { title: '手动排班', schedule_source: 'manual' }, archived_at: null,
+    }]]]))
+    const body = await (await adminUsersHandler(workspaceExportRequest())).json()
+    expect(body.profiles[0].workspace.last_result).toBeNull()
+    expect(body.profiles[0].workspace.last_result_source).toBeNull()
+    expect(body.profiles[0].workspace.result_history[0].result.schedule_source).toBe('manual')
   })
 
   it('exports an empty profile list without querying workspaces individually', async () => {
