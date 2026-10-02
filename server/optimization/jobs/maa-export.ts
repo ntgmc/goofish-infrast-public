@@ -47,6 +47,7 @@ interface MaaExportPlan {
 }
 
 export interface MaaExportPayload {
+  schedule_source?: 'manual';
   title: string;
   description: string;
   plans: MaaExportPlan[];
@@ -142,6 +143,7 @@ export function buildMaaExportPayload(result: OptimizeResult): MaaExportPayload 
     Math.max(...plans.map((plan) => plan.rooms[roomType]?.length ?? 0));
 
   return {
+    ...(validated.schedule_source === 'manual' ? { schedule_source: 'manual' as const } : {}),
     title: validated.title,
     description: validated.description,
     plans,

@@ -434,7 +434,9 @@ function toHistoryItem(row: OptimizationResultRow): WorkspaceResultHistoryExport
     name: row.name,
     created_at: row.created_at,
     config: isRecord(row.config_json) ? row.config_json as WorkspaceResultHistoryItem['config'] : null,
-    result: row.result_json as WorkspaceResultHistoryItem['result'],
+    result: row.source === 'manual'
+      ? { ...row.result_json as WorkspaceResultHistoryItem['result'], schedule_source: 'manual' }
+      : row.result_json as WorkspaceResultHistoryItem['result'],
     operator_count: Number(row.operator_count),
     source: normalizeSource(row.source),
     archived_at: normalizeTimestamp(row.archived_at),
@@ -442,7 +444,7 @@ function toHistoryItem(row: OptimizationResultRow): WorkspaceResultHistoryExport
 }
 
 function normalizeSource(value: string): WorkspaceResultHistoryItem['source'] {
-  return value === 'applied_suggestions' || value === 'legacy' ? value : 'generated'
+  return value === 'manual' || value === 'applied_suggestions' || value === 'legacy' ? value : 'generated'
 }
 
 function normalizeTimestamp(value: string | Date | null): string | null {

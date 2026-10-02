@@ -364,6 +364,12 @@ function createThreeShiftResult(): OptimizeResult {
 }
 
 describe('ResultPanel tabs', () => {
+  it('identifies opened manual history and its potential mood cycle failure', () => {
+    render(<ResultPanel result={{ ...createThreeShiftResult(), schedule_source: 'manual' }} />)
+    expect(screen.getByRole('status')).toHaveTextContent('手动排班')
+    expect(screen.getByRole('status')).toHaveTextContent('心情可能无法持续循环')
+  })
+
   it.each(['maa', 'rotation'] as const)('keeps product icons and labels together in %s details', async (mode) => {
     const result = createThreeShiftResult()
     result.schedule_mode = mode

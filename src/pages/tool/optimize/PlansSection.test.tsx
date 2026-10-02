@@ -12,6 +12,15 @@ afterEach(cleanup)
 
 const config = CONFIG_PRESETS['243']
 describe('PlansSection', () => {
+  it('labels both active and archived manual history separately from generated schedules', () => {
+    renderSection({
+      archiveLimit: 1,
+      resultHistory: [{ ...historyItem(1), source: 'manual' }],
+      archivedResults: [{ ...historyItem(2), source: 'manual', archived: true }],
+    })
+    expect(screen.getAllByText(/手动排班 ·/)).toHaveLength(2)
+  })
+
   it.each([
     { error: '封存区已满，请先取消封存或使用结果封存夹扩容。', notice: null, role: 'alert' },
     { error: null, notice: '结果已移入封存区。', role: 'status' },

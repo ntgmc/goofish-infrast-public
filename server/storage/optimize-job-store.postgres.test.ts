@@ -1184,6 +1184,34 @@ describe('PostgreSQL optimization job admission', () => {
     await expect(getWorkspace(profileId)).resolves.toMatchObject({ elite_overrides: { alpha: 1, beta: 2 } })
   })
 
+  it('persists a manual simulation with provenance in both the job snapshot and history', async () => {
+    const profileId = await seedProfile()
+    const payload = formalSchedulePayload(profileId)
+    const store = createPostgresOptimizeJobStore()
+    const admitted = await store.admitJob(input({
+      priority: 2_100_000_000,
+      owner_key: `profile:${profileId}`, profile_id: profileId, source: 'account_profile',
+      payload_json: { ...payload, request: { ...payload.request, manual_schedule: formalScheduleResult('baseline') } },
+    }))
+    const claimed = await store.claimNextJob('manual-worker', 'manual-lock', new Date(Date.now() + 60_000).toISOString(), 2, 100)
+    expect(claimed?.id).toBe(admitted.job.id)
+    const result = {
+      ...formalScheduleResult('manual-result'),
+      mood_simulation: { valid: false, daily_loop_stable: false, iterations: 12, degrading_operators: [] },
+    }
+    await expect(store.completeAttempt(claimed!.id, claimed!.attempt_count, 'manual-worker', 'manual-lock', result)).resolves.toBe(true)
+    await expect(getLatestProfileOptimizationResult(profileId)).resolves.toMatchObject({
+      id: admitted.job.id, source: 'manual', name: expect.stringContaining('手动排班'),
+      result: { schedule_source: 'manual', mood_simulation: { daily_loop_stable: false } },
+    })
+    await expect(listProfileOptimizationResults(profileId, 'active')).resolves.toMatchObject({
+      items: [{ source: 'manual' }],
+    })
+    await expect(store.getJob(admitted.job.id)).resolves.toMatchObject({
+      result_json: { schedule_source: 'manual' },
+    })
+  })
+
   it('persists a successful schedule into rolling workspace history and a durable effect outbox', async () => {
     const profileId = await seedProfile()
     const existingHistory = Array.from({ length: 6 }, (_, index) => ({

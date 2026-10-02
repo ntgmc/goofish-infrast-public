@@ -74,6 +74,7 @@ const freeScheduleDecisionSchema = z.strictObject({
 }).nullable()
 
 const optimizeResultSchema: z.ZodType<OptimizeResult> = z.object({
+  schedule_source: z.literal('manual').optional(),
   facility_layout: facilityLayoutSchema.optional(),
   author: z.string().max(1_000),
   title: z.string().max(1_000),
@@ -172,7 +173,8 @@ export function parseOptimizationJobResult(
   value: unknown,
 ): OptimizeResult | ScenarioComparisonResult {
   if ('kind' in payload && payload.kind === 'scenario_comparison') return scenarioComparisonResultSchema.parse(value)
-  return parseOptimizeResult(value)
+  const result = parseOptimizeResult(value)
+  return payload.request.manual_schedule ? { ...result, schedule_source: 'manual' } : result
 }
 
 function assertJsonSafe(value: unknown, context: z.RefinementCtx): void {

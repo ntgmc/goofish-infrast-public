@@ -138,6 +138,9 @@ export default function ResultPanel({
             <h2 className="text-lg font-semibold text-ink-primary">
               {selectedTab === 'manual' ? copy.domain.manual_schedule.title : isPreview ? copy.domain.components_result_panel_ResultPanel_025 : copy.domain.components_result_panel_ResultPanel_027}
             </h2>
+            {result.schedule_source === 'manual' && (
+              <p className="mt-2 text-sm text-warning" role="status">{copy.domain.manual_schedule.history_warning}</p>
+            )}
             <p className="mt-1 text-sm text-ink-secondary">
               {selectedTab === 'manual' ? copy.domain.manual_schedule.hint : isPreview
                 ? copy.domain.components_result_panel_ResultPanel_028

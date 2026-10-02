@@ -79,7 +79,8 @@ describe('optimization job dispatcher', () => {
     await expect(executeOptimizationJobWithPort(job(payload), context, port))
       .rejects.toThrow('does not support manual schedule simulation')
     expect(port.executeSchedule).not.toHaveBeenCalled()
-    await executeOptimizationJobWithPort(job(payload), context, { ...port, supportsManualScheduleSimulation: true })
+    const result = await executeOptimizationJobWithPort(job(payload), context, { ...port, supportsManualScheduleSimulation: true })
+    expect(result).toMatchObject({ schedule_source: 'manual' })
     expect(port.executeSchedule).toHaveBeenCalledWith(payload, context)
   })
   it.each(['252', '252-1'])('includes %s room levels in schedule result data', async (preset) => {

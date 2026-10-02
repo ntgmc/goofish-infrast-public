@@ -67,7 +67,7 @@ export function formatPlanName(config: LicenseConfig | null | undefined, fallbac
 }
 
 export function formatResultHistorySummary(summary: WorkspaceResultHistorySummary): string {
-  return formatScheduleMode(summary)
+  return summary.source === 'manual' ? `${copy.domain.manual_schedule.tab} · ${formatScheduleMode(summary)}` : formatScheduleMode(summary)
 }
 
 export function isMaaJsonDownloadable(result: OptimizeResult): boolean {

@@ -13,6 +13,7 @@ export const domainCopy = {
     unlock: (elite: number, level: number) => elite === 0 ? `初始 Lv.${level}` : `精英 ${elite} · Lv.${level}`,
   },
   manual_schedule: {
+    history_warning: "手动排班 · 按手动安排测算，心情可能无法持续循环，请核对心情测算结果后使用。",
     hint: "调整干员和无人机安排后，可模拟效率、产量和心情。",
     simulate: "模拟测算",
     simulating: "正在测算效率和心情，等待期间可以继续调整排班。",

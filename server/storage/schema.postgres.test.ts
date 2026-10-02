@@ -39,6 +39,49 @@ afterAll(async () => {
 })
 
 describe('PostgreSQL schema migration', () => {
+  it('backfills manual provenance from old jobs without changing optimizer history or custom names', async () => {
+    const profile = await seedProfile()
+    const jobId = randomUUID()
+    const result = { author: 'test', title: '手动测算', description: '', buildingType: 243, planTimes: '8×3', plans: [], raw_results: [] }
+    try {
+      await query(
+        `insert into optimize_jobs (id, profile_id, status, priority, owner_key, source, payload_json, result_json, created_at, updated_at)
+         values ($1, $2, 'succeeded', 0, $2, 'account_profile', $3::jsonb, $4::jsonb, now(), now())`,
+        [jobId, profile.profileId, JSON.stringify({ request: { manual_schedule: result } }), JSON.stringify(result)],
+      )
+      for (const [id, archivedAt, linkedJob] of [
+        ['manual-active', null, jobId],
+        ['manual-archive', '2026-10-01T00:00:00.000Z', jobId],
+        ['optimizer', null, null],
+      ]) {
+        await query(
+          `insert into optimization_result_history
+           (profile_id, id, job_id, name, created_at, result_json, source, archived_at)
+           values ($1, $2, $3, '自定义名称', '2026-10-01T00:00:00.000Z', $4::jsonb, 'generated', $5::timestamptz)`,
+          [profile.profileId, id, linkedJob, JSON.stringify(result), archivedAt],
+        )
+      }
+      await markCurrentMigrationPending()
+      await migrateDatabaseSchema()
+      for (const id of ['manual-active', 'manual-archive']) {
+        await expect(getProfileOptimizationResult(profile.profileId, id)).resolves.toMatchObject({
+          name: '自定义名称', source: 'manual', result: { schedule_source: 'manual' },
+        })
+      }
+      const optimizer = await getProfileOptimizationResult(profile.profileId, 'optimizer')
+      expect(optimizer?.source).toBe('generated')
+      expect(optimizer?.result).not.toHaveProperty('schedule_source')
+      expect((await query<{ result_json: unknown }>('select result_json from optimize_jobs where id = $1', [jobId])).rows[0].result_json)
+        .toMatchObject({ schedule_source: 'manual' })
+      await markCurrentMigrationPending()
+      await migrateDatabaseSchema()
+      expect((await query('select id from optimization_result_history where profile_id = $1', [profile.profileId])).rows).toHaveLength(3)
+    } finally {
+      await query('delete from optimize_jobs where id = $1', [jobId])
+      await query('delete from user_accounts where id = $1', [profile.userId])
+    }
+  })
+
   it('allows only one maintenance leader for the same advisory lock', async () => {
     const lockName = `maintenance-test:${randomUUID()}`
     let releaseLeader: () => void = () => undefined

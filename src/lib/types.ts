@@ -341,6 +341,7 @@ interface AssignmentDetail {
 }
 
 export interface OptimizeResult {
+  schedule_source?: 'manual';
   facility_layout?: string[];
   author: string;
   title: string;
@@ -794,6 +795,8 @@ export interface AdminUserWorkspaceExportWorkspace {
   config: LicenseConfig | null;
   elite_overrides: Record<string, number>;
   last_result: OptimizeResult | null;
+  /** Source of the latest active optimizer result, excluding manual simulations. */
+  last_result_source: WorkspaceResultHistorySource | null;
   saved_configs: WorkspaceSavedConfig[];
   result_history: WorkspaceResultHistoryItem[];
   archived_results: WorkspaceResultHistoryItem[];
@@ -828,7 +831,7 @@ export interface WorkspaceSavedConfig {
   read_only?: boolean;
 }
 
-type WorkspaceResultHistorySource = 'generated' | 'applied_suggestions' | 'legacy';
+type WorkspaceResultHistorySource = 'generated' | 'applied_suggestions' | 'legacy' | 'manual';
 
 export interface WorkspaceResultHistorySummary {
   id: string;

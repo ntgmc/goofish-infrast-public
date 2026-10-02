@@ -2604,12 +2604,12 @@ async function persistScheduleCompletionInTransaction(
     const historyItem: WorkspaceResultHistoryItem = {
       id: job.id,
       job_id: job.id,
-      name: `排班结果 ${formatShanghaiHistoryTime(nowIso)}`,
+      name: `${payload.request.manual_schedule ? '手动排班' : '排班结果'} ${formatShanghaiHistoryTime(nowIso)}`,
       created_at: nowIso,
       config: payload.effectiveConfig,
       result: persistedResult,
       operator_count: payload.operators.filter((operator) => operator.own !== false).length,
-      source: payload.request.history_source ?? 'generated',
+      source: payload.request.manual_schedule ? 'manual' : payload.request.history_source ?? 'generated',
     }
     await insertProfileOptimizationResultInTransaction(
       client,

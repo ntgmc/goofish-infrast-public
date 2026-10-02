@@ -145,6 +145,7 @@ export function validateManualPlans(source: OptimizeResult, value: unknown, oper
 
 export function manualResult(source: OptimizeResult, plans: ManualPlan[]): OptimizeResult {
   return {
+    schedule_source: 'manual',
     author: source.author, title: source.title, description: source.description, buildingType: source.buildingType,
     planTimes: source.planTimes, schedule_mode: source.schedule_mode, dormitory_rule: source.dormitory_rule,
     schedule_mode_name: source.schedule_mode_name, dormitory_rule_name: source.dormitory_rule_name,

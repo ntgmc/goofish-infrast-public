@@ -522,6 +522,7 @@ async function exportAdminUserWorkspaces(user: UserAccountRecord): Promise<Respo
       const results = resultsByProfile.get(profile.id) ?? []
       const resultHistory = results.filter((item) => item.archived_at === null).map(stripArchivedAt)
       const archivedResults = results.filter((item) => item.archived_at !== null).map(stripArchivedAt)
+      const lastOptimizerResult = resultHistory.find((item) => item.source !== 'manual' && item.result.schedule_source !== 'manual')
       return {
         id: profile.id,
         display_name: profile.display_name,
@@ -535,7 +536,8 @@ async function exportAdminUserWorkspaces(user: UserAccountRecord): Promise<Respo
               operators: workspace.operators,
               config: workspace.config,
               elite_overrides: workspace.elite_overrides,
-              last_result: resultHistory[0]?.result ?? null,
+              last_result: lastOptimizerResult?.result ?? null,
+              last_result_source: lastOptimizerResult?.source ?? null,
               saved_configs: workspace.saved_configs,
               result_history: resultHistory,
               archived_results: archivedResults,
@@ -726,6 +728,7 @@ function summarizeWorkspace(
     manufacturing_stations_count: config?.manufacturing_stations_count ?? null,
     has_last_result: Boolean(latestResult),
     last_result_title: latestResult?.name ?? null,
+    last_result_source: latestResult?.source ?? null,
     updated_at: workspace?.updated_at ?? null,
   }
 }

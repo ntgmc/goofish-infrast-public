@@ -427,6 +427,7 @@ interface AdminWorkspaceSummary {
   manufacturing_stations_count: number | null;
   has_last_result: boolean;
   last_result_title: string | null;
+  last_result_source?: import('../../lib/types').WorkspaceResultHistorySummary['source'] | null;
   updated_at: string | null;
 }
 
