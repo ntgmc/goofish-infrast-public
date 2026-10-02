@@ -565,6 +565,7 @@ interface RoomOverflow {
 }
 
 export interface ShiftRoom {
+  recovery_support_operators?: string[];
   level?: number;
   operators?: string[];
   product?: string;

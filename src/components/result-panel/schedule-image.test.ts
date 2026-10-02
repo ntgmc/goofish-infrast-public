@@ -49,6 +49,20 @@ afterEach(() => {
 })
 
 describe('schedule image exports', () => {
+  it.each(['v1', 'v2'] as const)('exports dormitory recovery support marks in %s', async (version) => {
+    const { result, operators } = schedule()
+    result.dormitory_rule = 'maa_pure_autofill'
+    result.plans[0].rooms.dormitory = [{
+      operators: ['杜林', '恢复目标'], recovery_support_operators: ['杜林'], autofill: false,
+    }]
+    const prepared = prepareResult(result, false, false, operators)
+    await renderScheduleImage({ prepared, version, planIndex: 0, title: result.title, isRotationMode: false })
+    expect(drawnText.mock.calls.map(([value]) => value).join('')).toContain('恢复支援')
+    expect(prepared.plans[0].rows.find((row) => row.roomType === 'dormitory')?.operators[0]).toMatchObject({
+      name: '杜林', recoverySupport: true,
+    })
+  })
+
   it.each([
     ['v1', undefined, ['trade1', 'trade2', 'trade3']],
     ['v2', 1, ['trade2']],

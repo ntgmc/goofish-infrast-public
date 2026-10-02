@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
+import { copy } from '../../copy'
 import type { RoomOperator } from './types'
 
 export default function OperatorAvatarStrip({
@@ -97,6 +98,12 @@ export function OperatorAvatarTile({
       <span className={labelClassName}>
         {name}
       </span>
+      {operator?.recoverySupport && (
+        <span className="mt-1 block rounded-sm bg-success/10 px-1 text-[10px] leading-4 text-success"
+          title={copy.domain.result_board_v2.recovery_support_hint}>
+          {copy.domain.result_board_v2.recovery_support}
+        </span>
+      )}
     </div>
   )
 }

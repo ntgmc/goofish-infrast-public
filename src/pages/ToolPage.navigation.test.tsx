@@ -6,6 +6,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import type { AuthUser, UserGameAccount } from '../lib/types'
 import type { InventoryResponse } from '../lib/inventory-contracts'
 import { cloneDefaultPublicContentSettings } from '../lib/public-content'
+import { readToolBehaviorEvents, recordToolBehavior } from '../lib/tool-behavior-observation'
 import { tourStorageKey } from '../components/GuidedTour'
 import ToolPage from './ToolPage'
 
@@ -349,7 +350,9 @@ describe('single game account workspace entry', () => {
     const router = renderToolRoute('/tool/profiles', session)
     expect(await screen.findByRole('heading', { name: '下次直接进入这个游戏账号？' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/tool/profiles')
+    expect(readToolBehaviorEvents('user-1').filter((event) => event.name === 'entry_prompt_shown')).toHaveLength(1)
     await user.click(screen.getByRole('button', { name: '启用并进入工作区' }))
+    expect(readToolBehaviorEvents('user-1').some((event) => event.name === 'entry_enable')).toBe(true)
     await waitFor(() => expect(router.state.location.pathname).toBe('/tool/setup/operators'))
     expect(router.state.location.search).toBe('?profile_id=profile-1')
     await user.click(await screen.findByRole('button', { name: '返回账号列表' }))
@@ -450,6 +453,19 @@ describe('single game account workspace entry', () => {
     expect(await screen.findByRole('heading', { name: '游戏账号' })).toBeInTheDocument()
     expect(disabled.state.location.pathname).toBe('/tool/profiles')
     expect(screen.queryByRole('button', { name: '启用并进入工作区' })).not.toBeInTheDocument()
+  })
+
+  it('keeps observation controls collapsed and can clear the current user operation log', async () => {
+    const user = userEvent.setup()
+    renderToolRoute('/tool/settings', accountSession([createProfile()]))
+    const summary = await screen.findByText('操作习惯记录')
+    expect(summary.closest('details')).not.toHaveAttribute('open')
+    recordToolBehavior({ name: 'config_save', profile: 'profile-1' })
+    expect(readToolBehaviorEvents('user-1')).toHaveLength(1)
+    await user.click(summary)
+    await user.click(screen.getByRole('button', { name: '清空操作记录' }))
+    expect(readToolBehaviorEvents('user-1')).toEqual([])
+    expect(screen.getByRole('status')).toHaveTextContent('已清空当前账号的操作记录')
   })
 
   it('keeps observations separate for different users and observes a different game account afresh', async () => {

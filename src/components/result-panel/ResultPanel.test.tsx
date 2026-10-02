@@ -308,6 +308,22 @@ describe('ResultPanel overview v2', () => {
     },
   )
 
+  it.each(['maa_autofill', 'maa_pure_autofill'] as const)('marks explicitly placed dormitory recovery support in %s', async (mode) => {
+    const user = userEvent.setup()
+    const result = createPreviewOrderResult()
+    result.dormitory_rule = mode
+    result.plans[0].rooms.dormitory = [{
+      operators: ['杜林', '恢复目标'], recovery_support_operators: ['杜林'], autofill: false,
+    }]
+    render(<ResultPanel result={result} />)
+    await user.click(screen.getByRole('tab', { name: '总览图 v2' }))
+    const board = within(screen.getByRole('region', { name: '总览图 v2' }))
+    expect(board.getByText('杜林')).toBeInTheDocument()
+    expect(board.getByText('恢复目标')).toBeInTheDocument()
+    expect(board.getByText('恢复支援')).toHaveAttribute('title', '专门进驻宿舍，加速同宿舍干员恢复心情')
+    expect(board.queryByText('宿舍由 MAA 自动填满')).not.toBeInTheDocument()
+  })
+
   it('falls back to the first shift for shorter results and handles empty results', async () => {
     const user = userEvent.setup()
     const view = render(<ResultPanel result={createThreeShiftResult()} />)

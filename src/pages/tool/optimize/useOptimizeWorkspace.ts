@@ -6,6 +6,7 @@ import type { OptimizePhase, OptimizeSection } from './types'
 import { copy } from '../../../copy/index'
 import { apiJson } from '../../../lib/api-client'
 import { fetchResultHistoryDetail } from './optimization-api'
+import { recordToolBehavior } from '../../../lib/tool-behavior-observation'
 
 
 type Setter<T> = Dispatch<SetStateAction<T>>
@@ -134,6 +135,7 @@ export function useOptimizeWorkspace({
   }, [profileId, setWorkspaceBusyAction, setWorkspaceError])
 
   const handleViewHistory = useCallback(async (summary: WorkspaceResultHistorySummary) => {
+    recordToolBehavior({ name: 'result_select', profile: profileId, subject: summary.id })
     const item = await loadHistoryDetail(summary)
     if (!item) return
     setCurrentResult(null)
@@ -144,9 +146,10 @@ export function useOptimizeWorkspace({
     setLastGeneratedSignature(null)
     setInlineError(null)
     setSection('result')
-  }, [loadHistoryDetail, setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions])
+  }, [profileId, loadHistoryDetail, setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions])
 
   const handleUseHistoryConfig = useCallback(async (summary: WorkspaceResultHistorySummary) => {
+    recordToolBehavior({ name: 'history_config_select', profile: profileId, subject: summary.id })
     const item = await loadHistoryDetail(summary)
     if (!item) return
     if (!item.config) {
@@ -163,7 +166,7 @@ export function useOptimizeWorkspace({
     setInlineError(null)
     setWorkspaceNotice(`${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_011}${item.name}${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_012}`)
     setSection('config')
-  }, [loadHistoryDetail, normalizeAllowedConfigOverride, setConfigOverride, setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions, setWorkspaceError, setWorkspaceNotice])
+  }, [profileId, loadHistoryDetail, normalizeAllowedConfigOverride, setConfigOverride, setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions, setWorkspaceError, setWorkspaceNotice])
 
   const handleDownloadHistory = useCallback((item: WorkspaceResultHistorySummary) => {
     if (!item.maa_exportable) {

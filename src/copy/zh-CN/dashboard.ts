@@ -1,4 +1,13 @@
 export const dashboardCopy = {
+  behavior_observation: {
+    title: "操作习惯记录",
+    description: "当前浏览器会保留最近 30 天、最多 500 条页面访问、操作结果和耗时记录，供后续分析重复操作。记录仅保存在本机，不会自动上传；不包含 UID、昵称、输入内容、配置内容或账号凭据。导出时会替换档案标识。",
+    export: "导出操作记录",
+    clear: "清空操作记录",
+    cleared: "已清空当前账号的操作记录，后续操作会重新记录。",
+    clear_failed: "无法清空记录，请允许网站存储后重试。",
+    export_failed: "无法导出记录，请稍后重试。",
+  },
   workspace_entry: {
     prompt_title: "下次直接进入这个游戏账号？",
     prompt_body: "你最近多次从账号列表打开同一个游戏账号。启用后，可以省去每次选择账号，直接进入工作区设置；仍可返回账号列表管理账号，也可在账户设置中关闭。",

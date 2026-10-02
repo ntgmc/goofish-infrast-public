@@ -3,7 +3,7 @@ import { buildBoardRoomGroups, buildBoardSlots } from './ResultBoard'
 import { buildBoardV2Rooms, PRODUCTION_TYPES } from './ResultBoardV2'
 import { formatCompactNumber, type PreparedResult } from './formatters'
 import { ROOM_LABELS } from './labels'
-import type { PreparedPlan, RoomRow } from './types'
+import type { PreparedPlan, RoomOperator, RoomRow } from './types'
 import { isDroneTarget } from './DroneMarker'
 import { getProductIconSrc } from '../ProductIcon'
 
@@ -30,6 +30,8 @@ const MARGIN = 32
 const GAP = 16
 const CARD_WIDTH = (WIDTH - MARGIN * 2 - GAP) / 2
 const FONT_SIZE = 14
+const operatorLabel = (operator: RoomOperator): string =>
+  operator.recoverySupport ? `${operator.name} · ${copy.domain.result_board_v2.recovery_support}` : operator.name
 
 export async function downloadScheduleImage(options: ImageOptions): Promise<void> {
   const blob = await renderScheduleImage(options)
@@ -111,7 +113,7 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
     }
     let height = slotMetaHeight(slot)
     for (let index = 0; index < row.operators.length; index += tilesPerRow(width)) {
-      const nameLines = Math.max(...row.operators.slice(index, index + tilesPerRow(width)).map((operator) => lines(operator.name, tileWidth - 8, 12).length))
+      const nameLines = Math.max(...row.operators.slice(index, index + tilesPerRow(width)).map((operator) => lines(operatorLabel(operator), tileWidth - 8, 12).length))
       height += avatarSize + nameGap + nameLines * 18 + rowGap
     }
     return height
@@ -307,7 +309,9 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
               text(operator.name.trim().slice(0, 1) || '?', centerX, rowY + avatarSize / 3, avatarSize, colors.muted, 20, 500, 'center')
             }
             context.restore()
-            nameHeight = Math.max(nameHeight, text(operator.name, centerX, rowY + avatarSize + nameGap, tileWidth - 8, colors.text, 12, 500, 'center'))
+            nameHeight = Math.max(nameHeight, text(
+              operatorLabel(operator),
+              centerX, rowY + avatarSize + nameGap, tileWidth - 8, colors.text, 12, 500, 'center'))
           })
           rowY += avatarSize + nameGap + nameHeight + rowGap
         }

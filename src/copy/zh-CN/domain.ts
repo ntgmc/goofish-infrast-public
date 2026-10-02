@@ -92,6 +92,8 @@ export const domainCopy = {
     footer: "MaaTool · 基建排班",
   },
   result_board_v2: {
+    recovery_support: "恢复支援",
+    recovery_support_hint: "专门进驻宿舍，加速同宿舍干员恢复心情",
     tab: "总览图 v2",
     shifts: "切换班次",
     hint: "切换班次查看干员安排，展开房间详情查看效率和心情。",

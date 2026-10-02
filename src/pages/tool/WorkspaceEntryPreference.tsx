@@ -5,6 +5,7 @@ import { copy } from '../../copy/index'
 import { dashboardPath, profileScopedPath, resolveToolRoute, workspaceSetupPath } from '../../lib/app-routes'
 import type { UserGameAccount } from '../../lib/types'
 import { isSchedulableProfile } from './tool-utils'
+import { clearToolBehaviorEvents, exportToolBehaviorData, recordToolBehavior } from '../../lib/tool-behavior-observation'
 
 const STORAGE_PREFIX = 'maatool:workspace-entry:v1:'
 const OBSERVATION_PREFIX = 'maatool:workspace-entry-observation:v1:'
@@ -84,6 +85,7 @@ export function useWorkspaceEntryPreference(
   const [storageError, setStorageError] = useState(false)
   const entryUserRef = useRef<string | null>(null)
   const visitRef = useRef<{ key: string; enteredAt: number; recorded: boolean } | null>(null)
+  const shownPromptRef = useRef<string | null>(null)
   const candidate = singleGameAccount(profiles, activeProfile)
   const preference = saved.userId === userId ? saved.preference : readPreference(userId)
   const observation = observed.userId === userId ? observed.observation : readObservation(userId)
@@ -96,6 +98,17 @@ export function useWorkspaceEntryPreference(
   const enabled = Boolean(candidate && (preference.target === candidate.target
     || preference.target === `profile:${candidate.profile.id}`))
   const path = candidate ? profileScopedPath(workspaceSetupPath('operators'), candidate.profile.id) : null
+  const showPrompt = Boolean(ready && userId && profilesEnabled && candidate && !enabled && repeatedEntry
+    && preference.remindAfter !== 'never' && preference.remindAfter <= Date.now())
+
+  useEffect(() => {
+    const key = `${userId}:${location.key}:${candidate?.profile.id}`
+    if (!showPrompt || location.pathname !== dashboardPath('profiles')) {
+      shownPromptRef.current = null
+    } else if (shownPromptRef.current !== key && recordToolBehavior({ name: 'entry_prompt_shown', profile: candidate?.profile.id })) {
+      shownPromptRef.current = key
+    }
+  }, [userId, showPrompt, location.key, location.pathname, candidate?.profile.id])
 
   useEffect(() => {
     const query = new URLSearchParams(location.search)
@@ -117,6 +130,7 @@ export function useWorkspaceEntryPreference(
     const query = new URLSearchParams(location.search)
     if (profilesEnabled && enabled && path && location.pathname === dashboardPath('profiles')
       && !query.has('profile_id') && !query.has('recovery')) {
+      recordToolBehavior({ name: 'entry_auto_open', profile: candidate?.profile.id })
       void navigate(path, { replace: true })
     }
   }, [userId, ready, profilesEnabled, enabled, path, location.pathname, location.search, navigate])
@@ -127,6 +141,7 @@ export function useWorkspaceEntryPreference(
       window.localStorage.setItem(`${STORAGE_PREFIX}${userId}`, JSON.stringify(next))
       setSaved({ userId, preference: next })
       setStorageError(false)
+      recordToolBehavior({ name: next.target ? 'entry_enable' : next.remindAfter === 'never' ? 'entry_disable' : 'entry_snooze' })
       return true
     } catch {
       setStorageError(true)
@@ -156,12 +171,12 @@ export function useWorkspaceEntryPreference(
   }
 
   return {
+    userId,
     candidate,
     enabled,
     profilesEnabled,
     storageError,
-    showPrompt: Boolean(ready && userId && profilesEnabled && candidate && !enabled && repeatedEntry
-      && preference.remindAfter !== 'never' && preference.remindAfter <= Date.now()),
+    showPrompt,
     recordOpen,
     enable: () => candidate && updatePreference({ target: candidate.target, remindAfter: 0 }),
     disable: () => updatePreference({ target: null, remindAfter: 'never' }),
@@ -200,6 +215,27 @@ export function WorkspaceEntryPrompt({ entry }: { entry: WorkspaceEntryState }) 
 
 export function WorkspaceEntrySettings({ entry }: { entry: WorkspaceEntryState }) {
   const text = copy.dashboard.workspace_entry
+  const observationText = copy.dashboard.behavior_observation
+  const [observationNotice, setObservationNotice] = useState<string | null>(null)
+  function exportObservations() {
+    if (!entry.userId) return
+    try {
+      const blob = new Blob([exportToolBehaviorData(entry.userId)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'maatool-behavior-observation.json'
+      try {
+        document.body.append(link)
+        link.click()
+      } finally {
+        link.remove()
+        window.setTimeout(() => URL.revokeObjectURL(url), 0)
+      }
+    } catch {
+      setObservationNotice(observationText.export_failed)
+    }
+  }
   return (
     <section className="tool-panel p-6">
       <h2 className="text-lg font-semibold text-ink-primary">{text.settings_title}</h2>
@@ -218,6 +254,17 @@ export function WorkspaceEntrySettings({ entry }: { entry: WorkspaceEntryState }
       </label>
       {(!entry.candidate || !entry.profilesEnabled) && <p className="mt-3 text-sm text-ink-muted">{text.unavailable}</p>}
       {entry.storageError && <p role="alert" className="tool-alert tool-alert--error mt-3">{text.storage_error}</p>}
+      <details className="mt-5 border-t border-surface-3 pt-4">
+        <summary className="cursor-pointer text-sm font-medium text-ink-secondary">{observationText.title}</summary>
+        <p className="mt-3 text-sm leading-6 text-ink-secondary">{observationText.description}</p>
+        {observationNotice && <p role="status" className="mt-3 text-sm text-ink-secondary">{observationNotice}</p>}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={exportObservations} className="tool-secondary-action">{observationText.export}</button>
+          <button type="button" onClick={() => {
+            if (entry.userId) setObservationNotice(clearToolBehaviorEvents(entry.userId) ? observationText.cleared : observationText.clear_failed)
+          }} className="tool-secondary-action">{observationText.clear}</button>
+        </div>
+      </details>
     </section>
   )
 }
