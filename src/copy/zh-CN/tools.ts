@@ -2,7 +2,6 @@ export const toolsCopy = {
   manualSchedule: {
     title: "手动排班模拟",
     description: "导入排班 JSON 或从空白方案开始，手动安排干员与无人机，模拟心情变化和生产效率。",
-    pending: "暂未开放，完善干员与练度信息、基建配置和产物设置后开放。",
     access: "账号至少有一个当前可用的高级版权限，即可使用手动排班模拟。",
     unavailable: "当前账号没有可用的高级版权限。获得可用的高级版权限后，可导入排班或创建空白方案。",
     loading: "正在加载手动排班工具",

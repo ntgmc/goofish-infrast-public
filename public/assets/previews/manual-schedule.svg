@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450" role="img" aria-labelledby="title description">
+  <title id="title">手动排班模拟</title>
+  <desc id="description">功能示意：安排贸易站、制造站和宿舍的干员，查看心情变化与生产效率。</desc>
+  <rect width="800" height="450" fill="#f1f5f9"/>
+  <rect x="52" y="36" width="696" height="378" rx="20" fill="#fff" stroke="#e2e8f0"/>
+  <g font-family="sans-serif">
+    <text x="84" y="86" font-size="24" font-weight="700" fill="#0f172a">手动排班模拟</text>
+    <text x="84" y="115" font-size="14" fill="#64748b">自由安排干员 · 心情变化 · 生产效率</text>
+    <rect x="630" y="64" width="86" height="28" rx="14" fill="#f1f5f9"/>
+    <text x="673" y="83" text-anchor="middle" font-size="12" fill="#64748b">功能示意</text>
+
+    <rect x="84" y="142" width="354" height="214" rx="12" fill="#eff6ff"/>
+    <g font-size="14" font-weight="700" fill="#1d4ed8" text-anchor="middle">
+      <rect x="170" y="158" width="74" height="28" rx="6" fill="#dbeafe"/>
+      <text x="207" y="177">第一班</text>
+      <text x="287" y="177">第二班</text>
+      <text x="367" y="177">第三班</text>
+    </g>
+    <g font-size="15" fill="#475569">
+      <text x="102" y="223">贸易站</text>
+      <text x="102" y="277">制造站</text>
+      <text x="102" y="331">宿舍</text>
+    </g>
+    <g fill="#fff">
+      <rect x="170" y="196" width="74" height="42" rx="8"/>
+      <rect x="250" y="196" width="74" height="42" rx="8"/>
+      <rect x="330" y="196" width="74" height="42" rx="8"/>
+      <rect x="170" y="250" width="74" height="42" rx="8"/>
+      <rect x="250" y="250" width="74" height="42" rx="8"/>
+      <rect x="330" y="250" width="74" height="42" rx="8"/>
+      <rect x="170" y="304" width="74" height="42" rx="8"/>
+      <rect x="250" y="304" width="74" height="42" rx="8"/>
+      <rect x="330" y="304" width="74" height="42" rx="8"/>
+    </g>
+    <g fill="#60a5fa">
+      <circle cx="188" cy="217" r="7"/><circle cx="207" cy="217" r="7"/><circle cx="226" cy="217" r="7"/>
+      <circle cx="268" cy="217" r="7"/><circle cx="287" cy="217" r="7"/>
+      <circle cx="348" cy="217" r="7"/><circle cx="367" cy="217" r="7"/><circle cx="386" cy="217" r="7"/>
+    </g>
+    <g fill="#a78bfa">
+      <circle cx="188" cy="271" r="7"/><circle cx="207" cy="271" r="7"/>
+      <circle cx="268" cy="271" r="7"/><circle cx="287" cy="271" r="7"/><circle cx="306" cy="271" r="7"/>
+      <circle cx="348" cy="271" r="7"/><circle cx="367" cy="271" r="7"/>
+    </g>
+    <g fill="#34d399">
+      <circle cx="188" cy="325" r="7"/><circle cx="207" cy="325" r="7"/><circle cx="226" cy="325" r="7"/>
+      <circle cx="268" cy="325" r="7"/><circle cx="287" cy="325" r="7"/>
+      <circle cx="348" cy="325" r="7"/><circle cx="367" cy="325" r="7"/><circle cx="386" cy="325" r="7"/>
+    </g>
+
+    <rect x="458" y="142" width="258" height="104" rx="12" fill="#ecfdf5"/>
+    <text x="478" y="170" font-size="15" font-weight="700" fill="#047857">心情变化</text>
+    <path d="M478 225H696" fill="none" stroke="#d1fae5" stroke-width="2"/>
+    <path d="M480 188L526 198L572 214L618 200L666 184L694 184" fill="none" stroke="#10b981" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="572" cy="214" r="5" fill="#fff" stroke="#10b981" stroke-width="3"/>
+
+    <rect x="458" y="258" width="258" height="98" rx="12" fill="#f8fafc" stroke="#e2e8f0"/>
+    <text x="478" y="286" font-size="15" font-weight="700" fill="#475569">生产效率</text>
+    <g fill="#e2e8f0">
+      <rect x="478" y="299" width="218" height="12" rx="6"/>
+      <rect x="478" y="323" width="218" height="12" rx="6"/>
+    </g>
+    <rect x="478" y="299" width="180" height="12" rx="6" fill="#60a5fa"/>
+    <rect x="478" y="323" width="140" height="12" rx="6" fill="#a78bfa"/>
+
+    <g font-size="13" fill="#64748b" text-anchor="middle">
+      <text x="178" y="385">JSON 导入</text>
+      <text x="400" y="385">设施与产物设置</text>
+      <text x="622" y="385">心情与效率测算</text>
+    </g>
+    <g fill="#cbd5e1">
+      <circle cx="284" cy="381" r="2"/><circle cx="512" cy="381" r="2"/>
+    </g>
+  </g>
+</svg>
