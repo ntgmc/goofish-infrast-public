@@ -857,18 +857,18 @@ function PresetActions({
     {
       label: copy.common.components_ConfigEditor_110,
       presets: [
-        ['243', autoInventoryOnly ? copy.common.components_ConfigEditor_035 : copy.common.components_ConfigEditor_030],
-        ['243-1', autoInventoryOnly ? copy.common.components_ConfigEditor_036 : copy.common.components_ConfigEditor_031],
-        ['333-lmd', copy.common.components_ConfigEditor_107],
-        ['333', autoInventoryOnly ? copy.common.components_ConfigEditor_037 : copy.common.components_ConfigEditor_032],
+        ['243', autoInventoryOnly ? copy.common.components_ConfigEditor_035 : copy.common.components_ConfigEditor_030, 'balanced', ['Pure Gold', 'Battle Record']],
+        ['243-1', autoInventoryOnly ? copy.common.components_ConfigEditor_036 : copy.common.components_ConfigEditor_031, 'orundum', ['Orundum']],
+        ['333-lmd', copy.common.components_ConfigEditor_107, 'gold', ['LMD']],
+        ['333', autoInventoryOnly ? copy.common.components_ConfigEditor_037 : copy.common.components_ConfigEditor_032, 'orundum', ['Orundum']],
       ],
     },
     {
       label: copy.common.components_ConfigEditor_111,
       presets: [
-        ['252', copy.common.components_ConfigEditor_103],
-        ['252-1', copy.common.components_ConfigEditor_105],
-        ['252-full', copy.common.components_ConfigEditor_108],
+        ['252', copy.common.components_ConfigEditor_103, 'experience', ['Battle Record']],
+        ['252-1', copy.common.components_ConfigEditor_105, 'gold', ['Pure Gold']],
+        ['252-full', copy.common.components_ConfigEditor_108, 'balanced', ['Pure Gold', 'Battle Record']],
       ],
     },
   ] as const
@@ -878,8 +878,8 @@ function PresetActions({
       {groups.map((group) => (
         <div key={group.label} role="group" aria-label={group.label} className="flex flex-wrap items-center gap-2">
           <span className="mr-1 text-xs font-medium text-ink-muted">{group.label}</span>
-          {group.presets.map(([id, label]) => (
-            <PresetButton key={id} label={label} onClick={() => onSelect(CONFIG_PRESETS[id])} />
+          {group.presets.map(([id, label, tone, products]) => (
+            <PresetButton key={id} label={label} tone={tone} products={products} onClick={() => onSelect(CONFIG_PRESETS[id])} />
           ))}
         </div>
       ))}
@@ -887,13 +887,21 @@ function PresetActions({
   )
 }
 
-function PresetButton({ label, onClick }: { label: string; onClick: () => void }) {
+function PresetButton({ label, tone, products, onClick }: {
+  label: string;
+  tone: 'balanced' | 'gold' | 'experience' | 'orundum';
+  products: readonly string[];
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="tool-secondary-action px-3 py-2 text-sm"
+      className={`tool-secondary-action config-preset config-preset--${tone} px-3 py-2 text-sm`}
     >
+      <span className="flex shrink-0 items-center gap-0.5 [&_img]:size-5">
+        {products.map((product) => <ProductIcon key={product} product={product} />)}
+      </span>
       {label}
     </button>
   )

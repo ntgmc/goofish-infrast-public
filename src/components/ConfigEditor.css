@@ -3,6 +3,33 @@
   --station-manufacturing: #ffcf00;
 }
 
+.config-preset {
+  border-color: color-mix(in srgb, var(--preset-color) 38%, var(--border));
+  background: color-mix(in srgb, var(--preset-color) 10%, var(--theme-surface-2));
+  color: var(--theme-ink-primary);
+}
+
+.config-preset:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--preset-color) 65%, var(--border));
+  background: color-mix(in srgb, var(--preset-color) 18%, var(--theme-surface-2));
+}
+
+.config-preset--balanced {
+  --preset-color: var(--theme-success);
+}
+
+.config-preset--gold {
+  --preset-color: var(--station-manufacturing);
+}
+
+.config-preset--experience {
+  --preset-color: var(--station-trading);
+}
+
+.config-preset--orundum {
+  --preset-color: var(--theme-error);
+}
+
 .config-station {
   min-width: 0;
   padding: 0.75rem;
