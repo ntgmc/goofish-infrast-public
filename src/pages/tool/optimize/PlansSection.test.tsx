@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -12,6 +12,19 @@ afterEach(cleanup)
 
 const config = CONFIG_PRESETS['243']
 describe('PlansSection', () => {
+  it.each([
+    { error: '封存区已满，请先取消封存或使用结果封存夹扩容。', notice: null, role: 'alert' },
+    { error: null, notice: '结果已移入封存区。', role: 'status' },
+  ])('shows result feedback in the viewport outside the configuration library: $role', ({ error, notice, role }) => {
+    const { container } = renderSection({ error, notice, resultHistory: [historyItem(1)] })
+    const message = error ?? notice!
+    const feedback = screen.getByRole(role)
+    expect(feedback).toHaveTextContent(message)
+    expect(feedback.parentElement).toBe(document.body)
+    expect(feedback).toHaveClass('fixed', 'bottom-6', 'pointer-events-none')
+    expect(within(container).queryByText(message)).not.toBeInTheDocument()
+  })
+
   it('separates configuration and history retention, disabling saves at the configuration limit', () => {
     renderSection({
       savedConfigs: [savedConfig(1), savedConfig(2), savedConfig(3)],

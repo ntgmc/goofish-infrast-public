@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { createPortal } from 'react-dom'
 import type { LicenseConfig, WorkspaceResultHistorySummary, WorkspaceSavedConfig } from '../../../lib/types'
 import { formatPlanName, formatResultHistorySummary, formatWorkspaceDate } from '../../../lib/workspace-history'
 import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../../lib/workspace-limits'
@@ -86,6 +87,19 @@ export default function PlansSection({
 
   return (
     <section className="space-y-4">
+      {(notice || error) && createPortal(
+        <div
+          className="pointer-events-none fixed inset-x-4 bottom-6 z-50 flex justify-center sm:inset-x-auto sm:right-6"
+          role={error ? 'alert' : 'status'}
+          aria-live={error ? 'assertive' : 'polite'}
+          aria-atomic="true"
+        >
+          <div className={`tool-alert w-full max-w-xl bg-surface-1 shadow-lg ${error ? 'tool-alert--error' : 'tool-alert--success'}`}>
+            {error ?? notice}
+          </div>
+        </div>,
+        document.body,
+      )}
       <section className="tool-panel overflow-hidden" aria-labelledby="saved-configs-title">
         <div className="tool-panel-header px-5 py-4 sm:px-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -124,11 +138,6 @@ export default function PlansSection({
           </p>
         )}
         </div>
-        {(notice || error) && (
-          <div className={`tool-alert mx-5 mb-5 ${error ? 'tool-alert--error' : 'tool-alert--success'}`} role={error ? 'alert' : 'status'} aria-live={error ? 'assertive' : 'polite'}>
-            {error ?? notice}
-          </div>
-        )}
         <div className="p-5 sm:p-6" data-tour-target="optimize-plans-saved">
           <div className="flex items-center justify-between gap-4">
             <h3 className="text-base font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_PlansSection_022}</h3>
