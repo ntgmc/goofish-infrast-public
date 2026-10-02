@@ -22,11 +22,11 @@ import {
 } from './user-store'
 import { hashCdk, isProfileCdkRecord, type CdkRecord, type LegacyProfileCdkRecord } from '../handlers/license-utils'
 import { resolveProfileAuthorization } from '../handlers/profile-authorization'
-import { redeemProfileCdk } from '../handlers/user-auth'
+import { redeemProfileCdk, upgradePreviewProfileWithCdk } from '../handlers/user-auth'
 import { adjustBalance, applyBalanceChangeInTransaction, BalanceError, createBalanceRequestHash, getBalanceSummary, releaseScheduleBalanceInTransaction, reserveScheduleBalanceInTransaction, reverseQualificationCredit, settleScheduleBalanceInTransaction } from './balance-store'
 import { getMeteredScheduleQuote } from '../../src/lib/metered-billing'
 import { batchArchiveCommercialProfiles, createCommercialProfile, createOrConvertMeteredPersonal, deleteCommercialProfile, listCommercialProfiles, patchCommercialProfile, updateCommercialAccount } from './metered-profile-store'
-import { createLifetimeProfileForJsonImport, getItemBalance, grantItemInTransaction } from './inventory-store'
+import { createLifetimeProfileForJsonImport, getItemBalance, getProfileCapacityLimits, grantItemInTransaction } from './inventory-store'
 
 let container: StartedPostgreSqlContainer
 
@@ -153,6 +153,83 @@ describe('CDK redemption PostgreSQL concurrency', () => {
 
       expect(first).toMatchObject({ ok: true, profile: { display_name: '账号 1' } })
       expect(replay).toMatchObject({ ok: true, profile: { id: first.ok ? first.profile.id : '' } })
+      expect(first.ok && await getProfileCapacityLimits(first.profile.id)).toMatchObject({ archive: 3 })
+      expect((await query('select 1 from entitlement_ledger where reference_type = $1 and reference_id = $2', ['cdk_redemption', key])).rowCount).toBe(1)
+      expect((await query('select 1 from reward_grants where user_id = $1', [userId])).rowCount).toBe(0)
+    } finally {
+      if (previousSecret === undefined) delete process.env.CDK_HASH_SECRET
+      else process.env.CDK_HASH_SECRET = previousSecret
+    }
+  })
+
+  it.each([
+    { duration: 'lifetime', kind: 'free_preview', expiresAt: null, units: 3 },
+    { duration: 'month', kind: 'free_preview', expiresAt: null, units: 1 },
+    { duration: 'half_year', kind: 'metered_personal', expiresAt: null, units: 1 },
+    { duration: 'year', kind: 'free_preview', expiresAt: null, units: 1 },
+    { duration: undefined, kind: 'free_preview', expiresAt: '2099-01-01T00:00:00.000Z', units: 1 },
+  ] as const)('grants $units archive slots for $duration CDKs without stacking renewals or concurrent retries', async ({ duration, kind, expiresAt, units }) => {
+    const previousSecret = process.env.CDK_HASH_SECRET
+    process.env.CDK_HASH_SECRET = 'archive-gift-test-secret'
+    try {
+      const userId = await seedUser()
+      const now = new Date().toISOString()
+      const user: UserAccountRecord = {
+        version: 1, id: userId, email: `${userId}@example.test`, password_hash: 'hash', salt: 'salt', iterations: 1,
+        permission: 'growth', status: 'active', cdk_key: null, cdk_code_hash: null, cdk_order_hash: null,
+        email_verified_at: now, created_at: now, updated_at: now,
+      }
+      const profileId = randomUUID()
+      await saveUserProfile({
+        version: 1, id: profileId, user_id: userId, kind, cdk_key: null, cdk_code_hash: null, cdk_order_hash: null,
+        permission: 'growth', status: 'active', display_name: 'Existing profile', note: '', created_at: now, updated_at: now,
+      })
+      await query(
+        `insert into profile_entitlement_balances (profile_id, entitlement_type, units, updated_at)
+         values ($1, 'archive_slots', 2, now())`, [profileId],
+      )
+      const code = `ARCHIVE-${randomUUID()}`
+      const codeHash = hashCdk(code, process.env.CDK_HASH_SECRET)
+      const key = `cdk/${codeHash}.json`
+      await createPostgresCdkRecordStore().create(key, {
+        version: 2, cdk_type: 'profile', code_hash: codeHash, permission: 'advanced', balance_amount: null,
+        profile_duration: duration, profile_expires_at: expiresAt, status: 'unused', created_at: now, used_at: null,
+        order_note: null, license_order_hash: null, operator_count: null, config_desc: null,
+      })
+      const redeem = () => upgradePreviewProfileWithCdk(user, profileId, code, undefined, undefined, 'archive-gift')
+      const results = await Promise.all([redeem(), redeem()])
+      expect(results.every((result) => result.ok)).toBe(true)
+      expect(results[0]).toEqual(results[1])
+      expect(await getProfileCapacityLimits(profileId)).toMatchObject({ archive: 2 + units })
+      expect((await query<{ units: number }>(
+        'select units from entitlement_ledger where profile_id = $1 and reference_type = $2 and reference_id = $3',
+        [profileId, 'cdk_redemption', key],
+      )).rows).toEqual([{ units }])
+      expect((await query('select 1 from reward_grants where user_id = $1', [userId])).rowCount).toBe(0)
+      const rebind = (key: string) => redeemCdkAtomically({
+        key,
+        idempotencyScope: `renewal:${profileId}`,
+        requestHash: key,
+        complete: async (_client, record) => ({
+          record: { ...record, status: 'used' as const, used_at: now, profile_id: profileId, account_id: userId },
+          response: { profile_id: profileId },
+        }),
+      })
+      const renewalKeys = await Promise.all([
+        seedCdk({ profile_duration: duration, profile_expires_at: expiresAt }),
+        seedCdk({ profile_duration: duration, profile_expires_at: expiresAt }),
+      ])
+      await Promise.all(renewalKeys.map(rebind))
+      expect(await getProfileCapacityLimits(profileId)).toMatchObject({ archive: 2 + units })
+      expect((await query(
+        "select 1 from entitlement_ledger where profile_id = $1 and reference_type = 'cdk_redemption'", [profileId],
+      )).rowCount).toBe(1)
+      await rebind(await seedCdk())
+      expect(await getProfileCapacityLimits(profileId)).toMatchObject({ archive: 5 })
+      expect((await query<{ units: number }>(
+        `select sum(units)::integer as units from entitlement_ledger
+         where profile_id = $1 and reference_type = 'cdk_redemption'`, [profileId],
+      )).rows).toEqual([{ units: 3 }])
     } finally {
       if (previousSecret === undefined) delete process.env.CDK_HASH_SECRET
       else process.env.CDK_HASH_SECRET = previousSecret
@@ -318,7 +395,7 @@ describe('CDK redemption PostgreSQL concurrency', () => {
     expect(saved).toMatchObject({ display_name: '新名称', note: '保留备注', skland_risk: { status: 'reviewed' } })
   })
 
-  it('rolls back profile and workspace when completion fails', async () => {
+  it('rolls back profile, workspace, and archive gift when response persistence fails', async () => {
     const key = await seedCdk()
     const profileId = randomUUID()
     const userId = randomUUID()
@@ -329,6 +406,7 @@ describe('CDK redemption PostgreSQL concurrency', () => {
     )
     await expect(redeemCdkAtomically({
       key,
+      idempotencyKey: 'rollback-gift',
       idempotencyScope: 'rollback',
       requestHash: createRequestHash({ profileId }),
       complete: async (client, record) => {
@@ -338,10 +416,16 @@ describe('CDK redemption PostgreSQL concurrency', () => {
         }
         await saveProfileInTransaction(client, profile)
         await saveWorkspaceInTransaction(client, emptyWorkspace(profile.id))
-        throw new Error('injected failure')
+        return {
+          record: { ...record, status: 'used' as const, profile_id: profileId, account_id: userId, used_at: profile.created_at },
+          response: { toJSON() { throw new Error('injected failure') } },
+        }
       },
     })).rejects.toThrow('injected failure')
     expect((await query('select 1 from user_game_accounts where id = $1', [profileId])).rowCount).toBe(0)
+    expect((await query('select 1 from user_profile_workspaces where profile_id = $1', [profileId])).rowCount).toBe(0)
+    expect((await query('select 1 from profile_entitlement_balances where profile_id = $1', [profileId])).rowCount).toBe(0)
+    expect((await query('select 1 from entitlement_ledger where profile_id = $1', [profileId])).rowCount).toBe(0)
     expect((await query<{ status: string }>('select status from cdk_records where key = $1', [key])).rows[0]?.status).toBe('unused')
   })
 
@@ -862,12 +946,13 @@ describe('CDK redemption PostgreSQL concurrency', () => {
   })
 })
 
-async function seedCdk(): Promise<string> {
+async function seedCdk(overrides: Partial<LegacyProfileCdkRecord> = {}): Promise<string> {
   const codeHash = randomUUID().replaceAll('-', '')
   const key = `cdk/${codeHash}.json`
   const record: LegacyProfileCdkRecord = {
     version: 1, code_hash: codeHash, permission: 'growth', status: 'unused', created_at: new Date().toISOString(), used_at: null,
     order_note: null, license_order_hash: null, operator_count: null, config_desc: null,
+    ...overrides,
   }
   await query(
     `insert into cdk_records (key, code_hash, status, permission, license_order_hash, record_json, created_at, updated_at)

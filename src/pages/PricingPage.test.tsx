@@ -47,13 +47,15 @@ describe('PricingPage', () => {
     expect(screen.getByRole('button', { name: '升级商品待上架' })).toBeDisabled()
   })
 
-  it('disables unconfigured purchases without using the global purchase URL', () => {
+  it('shows automatic archive gifts and disables unconfigured purchases without using the global purchase URL', () => {
     render(<MemoryRouter><PricingPage /></MemoryRouter>)
     const buttons = screen.getAllByRole('button', { name: '暂未开放购买' })
     expect(buttons).toHaveLength(4)
     buttons.forEach((button) => {
       expect(button).toBeDisabled()
     })
+    expect(screen.getAllByText('赠送 1 个封存资格，绑定后自动生效，续费不叠加。')).toHaveLength(3)
+    expect(screen.getByText('赠送 3 个封存资格，绑定后自动生效。')).toBeInTheDocument()
   })
 
   it('links each plan to its own purchase URL and disables only cleared plans', () => {

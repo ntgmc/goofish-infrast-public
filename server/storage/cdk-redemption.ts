@@ -1,11 +1,11 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import type { UserAccountRecord, UserGameAccountRecord, UserWorkspaceRecord } from './user-store'
 import { emptyWorkspace, insertUserAccountForRegistrationInTransaction } from './user-store'
 import { claimCdkRecord, completeCdkRedemption } from './cdk-store'
 import { withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
-import type { CdkRecord, ProfileCdkRecord } from '../handlers/license-utils'
+import { getCdkProfileDuration, getCdkProfileExpiresAt, isProfileCdkRecord, type CdkRecord, type ProfileCdkRecord } from '../handlers/license-utils'
 
 export class CdkAlreadyRedeemedError extends Error {}
 export class IdempotencyConflictError extends Error {
@@ -119,6 +119,32 @@ export async function redeemCdkAtomically<T>(options: {
     if (!claimed) throw new CdkAlreadyRedeemedError('CDK has already been used.')
     const completed = await options.complete(client, claimed)
     await completeCdkRedemption(client, options.key, completed.record)
+    if (isProfileCdkRecord(completed.record) && completed.record.profile_id) {
+      const giftLimit = getCdkProfileDuration(completed.record) === 'lifetime' && !getCdkProfileExpiresAt(completed.record) ? 3 : 1
+      await client.query('select id from user_game_accounts where id = $1 for update', [completed.record.profile_id])
+      const granted = await client.query<{ units: number }>(
+        `select coalesce(sum(units), 0)::integer as units from entitlement_ledger
+         where profile_id = $1 and entitlement_type = 'archive_slots'
+           and reference_type = 'cdk_redemption' and status = 'consumed'`,
+        [completed.record.profile_id],
+      )
+      const units = Math.max(0, giftLimit - granted.rows[0]!.units)
+      if (units > 0) {
+        await client.query(
+          `insert into entitlement_ledger
+            (id, profile_id, entitlement_type, status, units, reference_type, reference_id, created_at, settled_at)
+           values ($1, $2, 'archive_slots', 'consumed', $3, 'cdk_redemption', $4, now(), now())`,
+          [randomUUID(), completed.record.profile_id, units, options.key],
+        )
+        await client.query(
+          `insert into profile_entitlement_balances (profile_id, entitlement_type, units, updated_at)
+           values ($1, 'archive_slots', $2, now())
+           on conflict (profile_id, entitlement_type) do update
+             set units = profile_entitlement_balances.units + excluded.units, updated_at = excluded.updated_at`,
+          [completed.record.profile_id, units],
+        )
+      }
+    }
     if (options.idempotencyKey) {
       await client.query(
         `update cdk_redemption_idempotency set status = 'completed', response_json = $3::jsonb, updated_at = now()

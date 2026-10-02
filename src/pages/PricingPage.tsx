@@ -85,6 +85,7 @@ export default function PricingPage() {
                     <p className="mt-5 break-words text-xl font-semibold text-brand-400 tabular-nums">{plan.display_price}</p>
                     {plan.discount_fold < 10 && <p className="mt-1 text-xs text-ink-muted">{copy.public.pages_PricingPage_017(plan.original_price, plan.discount_fold)}</p>}
                     <p className="mt-4 whitespace-pre-line text-sm leading-7 text-ink-secondary">{plan.summary}</p>
+                    <p className="mt-3 text-sm leading-6 text-ink-secondary">{copy.public.pricing_archive_gift(plan.id === 'single_account_lifetime' ? 3 : 1)}</p>
                     <p className="mt-4 whitespace-pre-line border-t border-surface-3 pt-4 text-sm leading-6 text-ink-muted">{plan.account_scope}</p>
                     <div className="mt-auto pt-5">
                       {plan.purchase_url ? (
