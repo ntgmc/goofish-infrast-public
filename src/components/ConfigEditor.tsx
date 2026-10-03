@@ -18,6 +18,7 @@ import { copy } from '../copy/index'
 import InputNumber from './InputNumber'
 import FacilityLayoutEditor from './FacilityLayoutEditor'
 import ProductIcon from './ProductIcon'
+import { Switch } from './ui/switch'
 import './ConfigEditor.css'
 
 
@@ -586,12 +587,10 @@ export default function ConfigEditor({
                   </h4>
                   <label className="flex min-h-11 items-center justify-between gap-3 text-sm text-ink-secondary sm:min-w-36">
                     <span>{copy.common.components_ConfigEditor_056}</span>
-                    <input
-                      type="checkbox"
+                    <Switch
                       checked={orundumPlanning.monthly_card}
                       disabled={!canEdit}
                       onChange={(event) => setOrundumMonthlyCard(event.currentTarget.checked)}
-                      className="h-4 w-4 accent-brand-500"
                     />
                   </label>
                 </div>
@@ -726,18 +725,16 @@ export default function ConfigEditor({
               <div className="flex min-h-11 items-center justify-between gap-3">
                 <h4 id="config-fiammetta-heading" className="flex items-center gap-2 text-sm font-semibold text-ink-primary">
                   <Flame aria-hidden="true" className="h-4 w-4 shrink-0 text-primary" />
-                  <label htmlFor="config-fiammetta-enabled">{copy.common.components_ConfigEditor_068}</label>
+                  <label className="flex min-h-11 cursor-pointer items-center" htmlFor="config-fiammetta-enabled">{copy.common.components_ConfigEditor_068}</label>
                 </h4>
-                <input
+                <Switch
                   id="config-fiammetta-enabled"
-                  type="checkbox"
                   checked={!rotationMode && fiammettaShiftHoursSupported && (config.Fiammetta?.enable ?? false)}
                   disabled={!canEdit || rotationMode || !fiammettaShiftHoursSupported}
                   onChange={(event) => onUpdate((next) => {
                     next.Fiammetta = { enable: event.currentTarget.checked }
                     applyCounts(next)
                   })}
-                  className="h-4 w-4 accent-brand-500"
                 />
               </div>
               {rotationMode ? (
@@ -752,11 +749,10 @@ export default function ConfigEditor({
               <div className="flex min-h-11 items-center justify-between gap-3">
                 <h4 id="config-drones-heading" className="flex items-center gap-2 text-sm font-semibold text-ink-primary">
                   <Zap aria-hidden="true" className="h-4 w-4 shrink-0 text-primary" />
-                  <label htmlFor="config-drones-enabled">{copy.common.components_ConfigEditor_071}</label>
+                  <label className="flex min-h-11 cursor-pointer items-center" htmlFor="config-drones-enabled">{copy.common.components_ConfigEditor_071}</label>
                 </h4>
-                <input
+                <Switch
                   id="config-drones-enabled"
-                  type="checkbox"
                     checked={!rotationMode && (config.drones?.enable ?? false)}
                     disabled={!canEdit || rotationMode}
                   onChange={(event) => onUpdate((next) => {
@@ -767,13 +763,11 @@ export default function ConfigEditor({
                     }
                     applyCounts(next)
                   })}
-                  className="h-4 w-4 accent-brand-500"
                 />
               </div>
               <label className="flex min-h-11 items-center justify-between gap-3 border-t border-surface-3/60 pt-3 text-sm text-ink-secondary">
                 <span>{copy.common.components_ConfigEditor_072}</span>
-                <input
-                  type="checkbox"
+                <Switch
                     checked={!rotationMode && (config.drones?.auto ?? false)}
                     disabled={!canEdit || rotationMode || !config.drones?.enable}
                   onChange={(event) => onUpdate((next) => {
@@ -783,7 +777,6 @@ export default function ConfigEditor({
                     }
                     applyCounts(next)
                   })}
-                  className="h-4 w-4 accent-brand-500"
                 />
               </label>
               <div className="grid min-w-0 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">

@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import { LayoutGroup } from 'motion/react'
+import { Link } from 'react-router'
+import { ArrowUpRight } from 'lucide-react'
 import BrandLogo from '../../../components/BrandLogo'
 import CompactHeaderMenu from '../../../components/CompactHeaderMenu'
 import DeferredFeatureMenu from '../../../components/DeferredFeatureMenu'
@@ -46,7 +48,7 @@ export default function OptimizeShell({
 
   return (
     <div className="tool-shell">
-      <aside className="tool-sidebar fixed inset-y-0 left-0 hidden w-64 px-4 py-5 lg:block">
+      <aside className="tool-sidebar fixed inset-y-0 left-0 hidden w-64 flex-col overflow-y-auto px-4 py-5 lg:flex">
         <div className="border-b border-surface-3 px-2 pb-5">
           <div className="flex items-center gap-3">
             <BrandLogo size="sm" />
@@ -76,10 +78,16 @@ export default function OptimizeShell({
           </nav>
         </LayoutGroup>
 
-        <nav className="absolute inset-x-4 bottom-5 grid grid-cols-2 gap-2 border-t border-surface-3 pt-4" aria-label={copy.common.pages_tool_AccountDashboard_017}>
-          <button type="button" onClick={onReset} className="tool-secondary-action w-full">{copy.optimize.pages_tool_optimize_OptimizeShell_003}</button>
-          <button type="button" onClick={onLogout} className="tool-danger-action w-full">{copy.common.pages_tool_AccountDashboard_009}</button>
-        </nav>
+        <div className="mt-auto space-y-4 pt-8">
+          <Link to={profileScopedPath('/v2', profileId)} className="tool-inset block p-3 text-sm text-ink-secondary">
+            <span className="flex min-h-11 items-center justify-between gap-2 font-medium text-brand-500">{copy.v2.testEntry}<ArrowUpRight size={16} /></span>
+            <span className="block text-xs leading-5">{copy.v2.testEntryDescription}</span>
+          </Link>
+          <nav className="grid grid-cols-2 gap-2 border-t border-surface-3 pt-4" aria-label={copy.common.pages_tool_AccountDashboard_017}>
+            <button type="button" onClick={onReset} className="tool-secondary-action w-full">{copy.optimize.pages_tool_optimize_OptimizeShell_003}</button>
+            <button type="button" onClick={onLogout} className="tool-danger-action w-full">{copy.common.pages_tool_AccountDashboard_009}</button>
+          </nav>
+        </div>
       </aside>
 
       <main className="lg:pl-64" tabIndex={-1} data-route-focus>
@@ -105,6 +113,7 @@ export default function OptimizeShell({
                     onSelect: () => onSectionChange(item.id),
                   })),
                   { type: 'separator' as const, id: 'actions' },
+                  { type: 'link' as const, id: 'v2', label: copy.v2.testEntry, to: profileScopedPath('/v2', profileId) },
                   { type: 'button' as const, id: 'tour', label: copy.optimize.pages_tool_optimize_tour_001, onSelect: onOpenTour },
                   { type: 'button' as const, id: 'reset', label: copy.optimize.pages_tool_optimize_OptimizeShell_005, onSelect: onReset },
                   { type: 'button' as const, id: 'logout', label: copy.common.pages_tool_AccountDashboard_013, intent: 'danger' as const, onSelect: onLogout },

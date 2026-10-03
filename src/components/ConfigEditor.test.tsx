@@ -184,7 +184,7 @@ describe('ConfigEditor shift patterns', () => {
         onUpdate={onUpdate}
       />,
     )
-    expect(screen.getByRole('checkbox', { name: '菲亚梅塔' })).toBeEnabled()
+    expect(screen.getByRole('switch', { name: '菲亚梅塔' })).toBeEnabled()
     expect(screen.getByText(/过滤相关生产组合/)).toBeInTheDocument()
     expect(screen.getByText(/菲亚梅塔仍可执行换心情/)).toBeInTheDocument()
     expect(screen.getByText(/启用条件：换班间隔须锁定为8小时（误差需控制在5分钟以内）/)).toBeInTheDocument()
@@ -372,8 +372,8 @@ describe('ConfigEditor shift patterns', () => {
       />,
     )
 
-    expect(screen.getByRole('checkbox', { name: '菲亚梅塔' })).toBeDisabled()
-    expect(screen.getByRole('checkbox', { name: '菲亚梅塔' })).not.toBeChecked()
+    expect(screen.getByRole('switch', { name: '菲亚梅塔' })).toBeDisabled()
+    expect(screen.getByRole('switch', { name: '菲亚梅塔' })).not.toBeChecked()
     expect(screen.getByText('启用条件：换班间隔须锁定为8小时/12小时（误差需控制在5分钟以内），否则将引发干员“红脸”状态，导致实际效率低于未启用时的水平。')).toBeInTheDocument()
   })
 })
@@ -454,7 +454,7 @@ describe('ConfigEditor preset actions', () => {
     expect(within(screen.getByRole('region', { name: '房间结构' })).queryByRole('spinbutton')).not.toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: '产物数量' })).queryByRole('spinbutton')).not.toBeInTheDocument()
     onUpdate.mockImplementationOnce((mutate: (value: typeof config) => void) => mutate(rightFull252))
-    await user.click(screen.getByRole('checkbox', { name: '无人机' }))
+    await user.click(screen.getByRole('switch', { name: '无人机' }))
     expect(rightFull252.drones?.enable).toBe(false)
     expect(rightFull252.trading_station_levels).toEqual([3, 1])
 
@@ -478,7 +478,7 @@ describe('ConfigEditor preset actions', () => {
     )
     expect(screen.getByRole('region', { name: '房间结构' })).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: '房间结构' })).queryByRole('spinbutton')).not.toBeInTheDocument()
-    expect(screen.getByRole('checkbox', { name: '无人机' })).toBeEnabled()
+    expect(screen.getByRole('switch', { name: '无人机' })).toBeEnabled()
     await user.click(screen.getByRole('button', { name: '243 均衡' }))
     const apply243 = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
     apply243?.(rightFull252)

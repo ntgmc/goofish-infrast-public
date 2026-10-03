@@ -14,6 +14,7 @@ import IncomeAnalysis from './IncomeAnalysis'
 import OptionsDrawer, { type OptionPanel, type V2Session } from './OptionsDrawer'
 import { sortOperatorsForPreview } from '../tool/tool-utils'
 import V2Transition from './V2Transition'
+import TradingIcon from './TradingIcon'
 
 const text = copy.v2
 type View = 'summary' | 'details' | 'analysis'
@@ -165,7 +166,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
               <section className="v2-panel v2-config-panel">
                 <div className="v2-panel-heading"><h2>{text.currentConfig}</h2><button className="v2-text-button" type="button" onClick={() => openPanel('config')}>{text.edit}<ArrowUpRight size={13} /></button></div>
                 <div className="v2-layout-preview">
-                  {Array.from({ length: config.trading_stations_count }, (_, index) => <span className="v2-layout-trading" key={`t${index}`}><Building2 size={14} /></span>)}
+                  {Array.from({ length: config.trading_stations_count }, (_, index) => <span className="v2-layout-trading" key={`t${index}`}><TradingIcon size={14} /></span>)}
                   {Array.from({ length: config.manufacturing_stations_count }, (_, index) => <span className="v2-layout-manufacture" key={`m${index}`}><Factory size={14} /></span>)}
                   {Array.from({ length: Math.max(0, 9 - config.trading_stations_count - config.manufacturing_stations_count) }, (_, index) => <span className="v2-layout-power" key={`p${index}`}><Zap size={14} /></span>)}
                 </div>

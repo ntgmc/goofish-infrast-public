@@ -64,7 +64,7 @@
   width: var(--v2-rail-width);
   display: flex;
   flex-direction: column;
-  padding: var(--space-lg) var(--space-sm) 0;
+  padding: var(--space-lg) var(--space-sm) var(--space-md);
   border-right: 1px solid var(--color-v2-rail-line);
   background: var(--color-v2-rail);
   color: var(--color-v2-rail-ink);
@@ -318,7 +318,7 @@
 .v2-main {
   max-width: 1600px;
   margin: 0 auto;
-  padding: var(--space-lg) var(--space-lg) 0;
+  padding: var(--space-lg);
   outline: none;
 }
 
@@ -581,6 +581,9 @@
   background: var(--v2-paper);
 }
 
+.v2-schedule { padding-bottom: var(--space-md); }
+.v2-production-panel { padding-bottom: var(--space-sm); }
+
 .v2-panel-heading {
   display: flex;
   min-height: 59px;
@@ -731,8 +734,9 @@
 }
 
 .v2-room-card {
+  position: relative;
   min-width: 0;
-  padding: var(--space-sm) var(--space-sm) 0;
+  padding: var(--space-sm);
   border-radius: var(--radius-v2-control);
   background: var(--color-v2-inset);
   text-align: left;
@@ -747,6 +751,7 @@
   display: flex;
   align-items: center;
   gap: 7px;
+  padding-right: 32px;
 }
 
 .v2-room-icon {
@@ -789,8 +794,17 @@
 }
 
 .v2-drone-tag {
-  color: var(--v2-secondary);
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid color-mix(in oklab, var(--color-drone) 35%, transparent);
+  border-radius: var(--radius-v2-control);
+  background: var(--color-drone-soft);
+  color: var(--color-drone);
 }
+.v2-room-marker { position: absolute; top: var(--space-xs); right: var(--space-xs); }
+.v2-room-marker:empty { display: none; }
 
 .v2-room-operators {
   display: flex;
@@ -859,6 +873,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 6px;
+  flex-wrap: wrap;
   border-top: 1px solid var(--v2-line);
   font-size: var(--text-sm);
 }
@@ -908,15 +923,18 @@
 
 .v2-room-list .v2-room-card {
   display: grid;
-  grid-template-columns: 125px minmax(0, 1fr) 100px;
+  grid-template-columns: 155px 28px minmax(0, 1fr) 145px;
   align-items: center;
   gap: 14px;
   padding: 10px 12px;
 }
 
 .v2-room-list .v2-room-card-compact {
-  grid-template-columns: 125px minmax(0, 1fr) auto;
+  grid-template-columns: 155px 28px minmax(0, 1fr) 145px;
 }
+.v2-room-list .v2-room-header { padding-right: 0; }
+.v2-room-list .v2-room-title { white-space: nowrap; }
+.v2-room-list .v2-room-marker { position: static; display: block; }
 
 .v2-room-list .v2-room-operators {
   margin: 0;
@@ -927,6 +945,7 @@
   align-items: flex-end;
   border-top: 0;
 }
+.v2-room-list .v2-room-efficiency { flex-direction: column; align-items: flex-end; gap: 0; white-space: nowrap; }
 
 .v2-room-list .v2-room-arrow {
   display: none;
@@ -1266,6 +1285,7 @@
   border-radius: 7px;
   background: var(--v2-bg);
   color: var(--v2-muted);
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast), background-color var(--dur-fast);
 }
 
 .v2-search-label {
@@ -1274,8 +1294,14 @@
   color: var(--v2-secondary);
 }
 .v2-search:focus-within {
-  outline: 2px solid var(--color-v2-focus);
-  outline-offset: 2px;
+  border-color: var(--color-v2-focus);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-v2-focus) 14%, transparent);
+  background: var(--v2-paper);
+}
+.v2-drawer :is(.tool-field, input:not([type="checkbox"]), textarea, select):focus-visible {
+  outline: none;
+  border-color: var(--color-v2-focus);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-v2-focus) 14%, transparent);
 }
 .v2-search input {
   min-width: 0;
@@ -1285,12 +1311,15 @@
   color: var(--v2-ink);
 }
 
-.v2-search input:focus-visible {
+.v2-drawer .v2-search input:focus-visible {
   outline: none;
+  box-shadow: none;
 }
 
 .v2-import-row {
-  padding: 15px;
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
   border: 1px solid var(--v2-line);
   border-radius: 7px;
   background: var(--v2-bg);
@@ -1303,10 +1332,12 @@
 }
 
 .v2-import-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-xs);
 }
+.v2-import-actions .v2-button { min-width: 0; padding-inline: var(--space-2xs); border-color: var(--v2-line); white-space: normal; }
+.v2-import-profiles { min-height: 44px; justify-content: space-between; padding-top: var(--space-xs); border-top: 1px solid var(--v2-line); }
 
 .v2-operator-row {
   display: flex;
@@ -1512,7 +1543,7 @@
 }
 
 @media (max-width: 40rem) {
-  .v2-main { padding: var(--space-md) var(--space-sm) 0; }
+  .v2-main { padding: var(--space-md) var(--space-sm); }
   .v2-topbar { padding-inline: var(--space-xs); }
   .v2-breadcrumb { gap: var(--space-2xs); }
   .v2-breadcrumb > span,
@@ -1550,8 +1581,12 @@
   .v2-room-group-title { padding-inline: var(--space-xs); }
   .v2-room-title small { margin-left: var(--space-xs); }
   .v2-room-list .v2-room-card { display: block; }
+  .v2-room-list .v2-room-header { padding-right: 32px; }
+  .v2-room-list .v2-room-marker { position: absolute; }
+  .v2-room-list .v2-room-marker:empty { display: none; }
   .v2-room-list .v2-room-operators { margin-block: var(--space-sm); }
   .v2-room-list .v2-room-bottom { flex-direction: row; align-items: center; border-top: 1px solid var(--v2-line); }
+  .v2-room-list .v2-room-efficiency { flex-direction: row; align-items: center; gap: 4px; }
   .v2-result-aside { grid-template-columns: minmax(0, 1fr); }
   .v2-output-row { min-height: 52px; }
   .v2-output-row strong { flex: none; }
@@ -1567,7 +1602,7 @@
   .v2-footer a { display: inline-flex; min-height: 44px; align-items: center; }
   .v2-drawer { padding: var(--space-md) !important; border-radius: 0 !important; }
   .v2-drawer [aria-labelledby="config-shift-schedule-label"] { grid-template-columns: minmax(0, 1fr); }
-  .v2-import-actions { flex-direction: column; }
+  .v2-import-actions { grid-template-columns: minmax(0, 1fr); }
   .v2-operator-row { flex-wrap: wrap; }
 }
 

@@ -507,7 +507,7 @@ describe('V2 results-first workspace', () => {
     const dialog = await screen.findByRole('dialog')
     expect(await within(dialog).findByRole('button', { name: '243 均衡' })).not.toBeDisabled()
     expect(within(dialog).queryByRole('spinbutton', { name: /贸易站/ })).not.toBeInTheDocument()
-    expect(within(dialog).queryByRole('checkbox', { name: /菲亚梅塔/ })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('switch', { name: /菲亚梅塔/ })).not.toBeInTheDocument()
     await dismissDrawer(user)
     expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('54,720')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: copy.v2.analysisTab }))

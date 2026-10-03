@@ -135,6 +135,8 @@
   --color-v2-manufacturing-soft: oklch(0.945 0.025 65);
   --color-v2-power: oklch(0.455 0.065 155);
   --color-v2-power-soft: oklch(0.943 0.017 155);
+  --color-drone: #7550b7;
+  --color-drone-soft: #eae0f6;
   --color-v2-error: oklch(0.475 0.140 25);
   --color-v2-error-soft: oklch(0.953 0.016 25);
   --color-v2-scrim: oklch(0.200 0.020 255 / 0.55);
@@ -219,6 +221,8 @@
   --color-v2-manufacturing-soft: oklch(0.325 0.030 65);
   --color-v2-power: oklch(0.760 0.065 155);
   --color-v2-power-soft: oklch(0.315 0.026 155);
+  --color-drone: #c4a4f2;
+  --color-drone-soft: #392e4c;
   --color-v2-error: oklch(0.780 0.110 25);
   --color-v2-error-soft: oklch(0.300 0.030 25);
 }

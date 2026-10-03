@@ -1,6 +1,6 @@
-import { useId, useState, type KeyboardEvent } from 'react'
+import { useId, useState, type KeyboardEvent, type ComponentType } from 'react'
 import { LayoutGroup, motion, useReducedMotion } from 'motion/react'
-import { ArrowUpRight, BedDouble, Building2, Clock3, Drone, Factory, GraduationCap, HandCoins, LayoutGrid, List, UserRoundSearch, Users, Wrench, Zap, type LucideIcon } from 'lucide-react'
+import { ArrowUpRight, BedDouble, Building2, Clock3, Drone, Factory, GraduationCap, LayoutGrid, List, UserRoundSearch, Users, Wrench, Zap } from 'lucide-react'
 import { copy } from '../../copy'
 import { prepareResult } from '../../components/result-panel/formatters'
 import OperatorSkillPreview from '../../components/result-panel/OperatorSkillPreview'
@@ -11,16 +11,18 @@ import ProductIcon from '../../components/ProductIcon'
 import { MotionNavIndicator, motionTokens } from '../../components/MotionPrimitives'
 import type { LicenseOperator, OptimizeResult } from '../../lib/types'
 import V2Transition from './V2Transition'
+import TradingIcon from './TradingIcon'
 
 const text = copy.v2
 const ROOM_ORDER = ['trading', 'manufacture', 'control', 'power', 'meeting', 'processing', 'hire', 'training', 'dormitory']
-const ROOM_ICONS: Record<string, LucideIcon> = {
-  trading: HandCoins, manufacture: Factory, control: Building2, power: Zap,
+const MAXIMUM_LEVELS: Record<string, number> = { trading: 3, manufacture: 3, power: 3, control: 5, dormitory: 5, meeting: 3, processing: 3, hire: 3, training: 3 }
+const ROOM_ICONS: Record<string, ComponentType<{size?: number}>> = {
+  trading: TradingIcon, manufacture: Factory, control: Building2, power: Zap,
   meeting: Users, processing: Wrench, hire: UserRoundSearch, training: GraduationCap, dormitory: BedDouble,
 }
 
 export function roomLevelLabel(room: BoardRoom) {
-  const maximum = ({ trading: 3, manufacture: 3, power: 3, control: 5, dormitory: 5 } as Record<string, number>)[room.roomType]
+  const maximum = MAXIMUM_LEVELS[room.roomType]
   const level = room.level
   return level === undefined ? text.unknownLevel : level === maximum ? text.maxLevel : `Lv.${level}`
 }
@@ -52,8 +54,7 @@ export default function ScheduleBoard({ result, operators, expanded, shift, onSh
   const prepared = prepareResult(result, result.schedule_mode === 'rotation', result.dormitory_rule === 'maa_pure_autofill', operators)
   const plan = prepared.plans[selected]
   const allRooms = buildBoardV2Rooms(plan, result.schedule_mode === 'rotation')
-    .map((room) => ({ ...room, level: room.level ?? (String(result.buildingType).endsWith('3')
-      && ['trading', 'manufacture', 'power'].includes(room.roomType) ? 3 : undefined) }))
+    .map((room) => ({ ...room, level: room.level ?? (String(result.buildingType).endsWith('3') ? MAXIMUM_LEVELS[room.roomType] : undefined) }))
     .map((room) => ({ ...room, indexLabel: [plan?.rooms[room.roomType]?.length > 1 ? String(room.roomIndex + 1) : '', roomLevelLabel(room)].filter(Boolean).join(' · ') }))
     .map((room) => room.roomType === 'training' ? { ...room, label: copy.domain.building_skills.training } : room)
     .sort((a, b) => {
@@ -141,9 +142,9 @@ function RoomCard({ room, drone = false, compact = false, autofill = false, onCl
       <motion.div layout={reduceMotion ? false : 'position'} className="v2-room-header">
         <span className="v2-room-icon"><Icon size={16} /></span>
         <span className="v2-room-title">{room.label}<small>{room.indexLabel}</small></span>
-        {drone && <span className="v2-drone-tag" title={text.drones}><Drone size={14} /></span>}
         <ArrowUpRight size={14} className="v2-room-arrow" />
       </motion.div>
+      <span className="v2-room-marker">{drone && <span className="v2-drone-tag" title={text.drones}><Drone size={16} /></span>}</span>
       <motion.div layout={reduceMotion ? false : 'position'} className="v2-room-operators">
         {room.row?.operators.map((operator) => (
           <span className="v2-operator" key={operator.name}><Avatar operator={operator} small={compact} /><span>{operator.name}</span></span>
@@ -153,7 +154,7 @@ function RoomCard({ room, drone = false, compact = false, autofill = false, onCl
       </motion.div>
       {showBottom && <motion.div layout={reduceMotion ? false : 'position'} className="v2-room-bottom">
         {(!compact || room.product !== '-') && <span><ProductIcon product={room.product} size={18} />{room.product === '-' ? text.support : room.product}</span>}
-        {efficiency && <span>{room.roomType === 'trading' ? text.equivalentEfficiency : text.efficiency}<strong>{efficiency}</strong></span>}
+        {efficiency && <span className="v2-room-efficiency"><span>{room.roomType === 'trading' ? text.equivalentEfficiency : text.efficiency}</span><strong>{efficiency}</strong></span>}
       </motion.div>}
     </motion.button>
   )

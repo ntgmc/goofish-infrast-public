@@ -3,6 +3,7 @@ export const v2Copy = {
   brandDescription: '基建排班工具',
   testVersion: 'V2 测试版',
   testEntry: '体验 V2 测试版',
+  testEntryDescription: '新界面可以查看设施排班、干员技能和收益明细。',
   backToV1: '返回 V1',
   workspace: '工作台',
   infrastructure: '基建排班',

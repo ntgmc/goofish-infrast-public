@@ -114,7 +114,7 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
                 onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file) }} />
               {importError && <p role="alert" className="v2-error">{importError}</p>}
               {importDone && <p role="status" className="v2-muted">{session.user ? text.importSuccess : text.sampleImportSuccess}</p>}
-              {session.user && !session.activeProfile && <Link to="/tool/profiles" className="v2-text-button">{text.manageProfiles}<ArrowRight size={14} /></Link>}
+              {session.user && <Link to="/tool/profiles" className="v2-text-button v2-import-profiles">{text.manageProfiles}<ArrowRight size={14} /></Link>}
             </div>
             <div className="v2-operator-rows">
               {operators.filter((operator) => operator.name.toLowerCase().includes(search.trim().toLowerCase())).map((operator) => (
