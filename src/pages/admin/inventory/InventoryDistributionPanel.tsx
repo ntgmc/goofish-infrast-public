@@ -10,6 +10,11 @@ const CAMPAIGN_STATUS: Record<Campaign['status'], string> = {
   completed_with_failures: '部分发放失败', cancelled: '已取消', reversing: '正在撤回', reversed: '已撤回',
 }
 
+function publishedGiftVersions(versions: AdminInventoryGiftVersion[], itemCode: string) {
+  return versions.filter((version) => version.item_code === itemCode && version.status === 'published')
+    .sort((left, right) => right.version - left.version)
+}
+
 export function InventoryDistributionPanel({ data, busy, run }: InventoryPanelProps) {
   const [grant, setGrant] = useState(initialItem)
   const [campaignDraft, setCampaignDraft] = useState(initialItem)
@@ -36,10 +41,13 @@ export function InventoryDistributionPanel({ data, busy, run }: InventoryPanelPr
   const grantValid = userId.trim() && grantReason.trim().length >= 2 && validItem(grant)
   const campaignValid = recipientCount > 0 && campaignReason.trim().length >= 2 && validItem(campaignDraft)
     && (targetMode === 'all_users' ? rootPassword.length > 0 : userIds.length <= 10000 && userIds.every((id) => id.length <= 128))
-  const payload = (draft: ItemDraft) => ({
-    item_code: draft.itemCode, quantity: draft.quantity, validity_days: draft.validityDays,
-    ...(draft.giftVersionId && { gift_pack_version_id: draft.giftVersionId }),
-  })
+  const payload = (draft: ItemDraft) => {
+    const giftVersionId = draft.giftVersionId || publishedGiftVersions(data.gift_pack_versions, draft.itemCode)[0]?.id
+    return {
+      item_code: draft.itemCode, quantity: draft.quantity, validity_days: draft.validityDays,
+      ...(giftVersionId && { gift_pack_version_id: giftVersionId }),
+    }
+  }
 
   return <div className="min-w-0 space-y-6">
     <section className="grid min-w-0 items-start gap-5 xl:grid-cols-2">
@@ -146,8 +154,7 @@ function ItemFields({ definitions, versions, value, onChange }: {
 }) {
   const candidates = definitions.filter((item) => canIssueItem(item, versions))
   const selected = candidates.find((item) => item.code === value.itemCode)
-  const published = versions.filter((version) => version.item_code === value.itemCode && version.status === 'published')
-    .sort((left, right) => right.version - left.version)
+  const published = publishedGiftVersions(versions, value.itemCode)
   return <>
     <Field label="道具">
       <select className="tool-field mt-2 min-w-0" required value={selected ? value.itemCode : ''}
