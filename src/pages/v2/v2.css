@@ -1382,6 +1382,10 @@
   color: var(--v2-ink);
 }
 
+.v2-search input:focus-visible {
+  outline: none;
+}
+
 .v2-import-row {
   padding: 15px;
   border: 1px solid var(--v2-line);
@@ -1410,30 +1414,22 @@
 }
 
 .v2-operator-row strong {
+  min-width: 0;
   flex: 1;
   font-size: var(--text-sm);
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
-.v2-operator-row label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.v2-operator-training {
+  display: grid;
+  text-align: right;
+}
+
+.v2-operator-status {
   color: var(--v2-secondary);
   font-size: var(--text-sm);
-}
-
-.v2-operator-row input {
-  accent-color: var(--v2-accent);
-}
-
-.v2-operator-row select {
-  padding: 6px 9px;
-  border: 1px solid var(--v2-line);
-  border-radius: 4px;
-  background: var(--v2-paper);
-  color: var(--v2-ink);
-  font-size: var(--text-sm);
+  white-space: nowrap;
 }
 
 .v2-account-card {

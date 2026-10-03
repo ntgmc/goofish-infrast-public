@@ -20,7 +20,6 @@ export default function V2Page() {
   const [config, setConfig] = useState<LicenseConfig>(() => normalizeConfig(SAMPLE_CONFIG))
   const [operators, setOperators] = useState(SAMPLE_OPERATORS)
   const [changed, setChanged] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const activeConfig = session.configOverride ?? session.workspace?.config ?? config
   const updateConfig = (mutate: (config: LicenseConfig) => void) => {
     const next = normalizeConfig(activeConfig)
@@ -44,12 +43,7 @@ export default function V2Page() {
   }
 
   return <V2Dashboard session={session} result={SAMPLE_RESULT} operators={session.workspace?.operators ?? operators} config={activeConfig}
-    sample configChanged={changed} onUpdateConfig={updateConfig} onImportOperators={importOperators} error={error}
-    onOperatorsChange={(next) => {
-      if (session.user && session.activeProfile && session.workspace?.operators) {
-        void importOperators(next).catch((caught) => setError(caught instanceof Error ? caught.message : copy.v2.saveOperatorsFailed))
-      } else { setOperators(next); setChanged(true) }
-    }} />
+    sample configChanged={changed} onUpdateConfig={updateConfig} onImportOperators={importOperators} />
 }
 
 function ConnectedDashboard({ session }: { session: V2Session }) {
@@ -57,7 +51,6 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
   const license = session.license!
   const features = useSiteFeatures()
   const [reading, setReading] = useState(false)
-  const [saveBusy, setSaveBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [retained, setRetained] = useState<OptimizeResult | null>(null)
   const [operatorsChanged, setOperatorsChanged] = useState(false)
@@ -98,21 +91,6 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
     void workflow.handleViewHistory(latest).finally(() => setReading(false))
   }, [latest, workflow.handleViewHistory, workflow.loading])
 
-  async function saveOperators(operators: LicenseOperator[]) {
-    if (saveBusy || workflow.loading) return
-    setSaveBusy(true)
-    setError(null)
-    try {
-      if (!await session.flushConfigSave()) throw new Error(copy.v2.saveFailed)
-      await session.persistWorkspacePatch({ operators, elite_overrides: {} })
-      setOperatorsChanged(true)
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : copy.v2.saveOperatorsFailed)
-    } finally {
-      setSaveBusy(false)
-    }
-  }
-
   async function generate() {
     if (generationDisabledReason) { setError(generationDisabledReason); return }
     if (!await session.flushConfigSave()) { setError(copy.v2.saveFailed); return }
@@ -123,14 +101,14 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
   const result = current ?? retained
   return <V2Dashboard session={session} result={result ?? SAMPLE_RESULT} operators={workflow.mergedOperators} config={workflow.activeConfig}
     sample={!result} configChanged={Boolean(result && (operatorsChanged || workflow.configDiffRows.length > 0 || session.configOverride))}
-    onUpdateConfig={workflow.updateConfig} onOperatorsChange={(operators) => void saveOperators(operators)}
+    onUpdateConfig={workflow.updateConfig}
     onImportOperators={async (operators) => {
       if (!await session.flushConfigSave()) throw new Error(copy.v2.saveFailed)
       await session.persistWorkspacePatch({ operators, elite_overrides: {} })
       setOperatorsChanged(true)
     }}
     onGenerate={() => void generate()} onExport={workflow.handleDownloadMAA}
-    busy={workflow.loading || saveBusy || Boolean(workflow.workspaceBusyAction?.startsWith('download'))} loadingResult={reading} generationDisabledReason={generationDisabledReason}
+    busy={workflow.loading || Boolean(workflow.workspaceBusyAction?.startsWith('download'))} loadingResult={reading} generationDisabledReason={generationDisabledReason}
     onRetryResult={latest ? () => { setReading(true); void workflow.handleViewHistory(latest).finally(() => setReading(false)) } : undefined}
     error={error ?? workflow.inlineError?.message ?? workflow.configToast?.message ?? workflow.workspaceError ?? (session.configSyncStatus === 'failed' ? copy.v2.saveFailed : null)}
     notice={workflow.workspaceNotice ?? (!features.features.schedule_generation ? copy.features.schedule_read_only : !result && !reading ? copy.v2.dataPending : null)}

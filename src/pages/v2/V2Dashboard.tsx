@@ -14,7 +14,7 @@ const text = copy.v2
 type View = 'summary' | 'details' | 'analysis'
 
 export default function V2Dashboard({ session, result, operators, config, sample, configChanged, onUpdateConfig,
-  onOperatorsChange, onImportOperators, onGenerate, onExport, busy = false, loadingResult = false, generationDisabledReason, onRetryResult, error, notice,
+  onImportOperators, onGenerate, onExport, busy = false, loadingResult = false, generationDisabledReason, onRetryResult, error, notice,
   permission, canEditConfig = true, canUseIntermediateConfig = true, history = [], onHistory, children }: {
   session: V2Session
   result: OptimizeResult
@@ -23,8 +23,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
   sample: boolean
   configChanged: boolean
   onUpdateConfig: (mutate: (config: LicenseConfig) => void) => void
-  onOperatorsChange: (operators: LicenseOperator[]) => void
-  onImportOperators?: (operators: LicenseOperator[]) => Promise<void>
+  onImportOperators: (operators: LicenseOperator[]) => Promise<void>
   onGenerate?: () => void
   onExport?: () => void
   busy?: boolean
@@ -163,7 +162,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
       </div>
       <OptionsDrawer panel={panel} onClose={() => setPanel(null)} session={session} config={config} operators={operators}
         onUpdateConfig={onUpdateConfig} permission={permission} canEditConfig={canEditConfig} canUseIntermediateConfig={canUseIntermediateConfig}
-        sample={sample} busy={busy} onOperatorsChange={onOperatorsChange} onImportOperators={onImportOperators}
+        sample={sample} busy={busy} onImportOperators={onImportOperators}
         onAccount={() => openPanel('account')} history={history} onHistory={onHistory} room={room} />
     </div>
   )

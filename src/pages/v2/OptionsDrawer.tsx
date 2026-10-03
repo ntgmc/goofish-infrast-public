@@ -27,7 +27,7 @@ const titles: Record<OptionPanel, string> = {
 }
 
 export default function OptionsDrawer({ panel, onClose, session, config, operators, onUpdateConfig, permission,
-  canEditConfig = true, canUseIntermediateConfig = true, sample, busy, onOperatorsChange, onImportOperators, onAccount, history, onHistory, room }: {
+  canEditConfig = true, canUseIntermediateConfig = true, sample, busy, onImportOperators, onAccount, history, onHistory, room }: {
   panel: OptionPanel | null
   onClose: () => void
   session: V2Session
@@ -39,8 +39,7 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
   canUseIntermediateConfig?: boolean
   sample: boolean
   busy: boolean
-  onOperatorsChange: (operators: LicenseOperator[]) => void
-  onImportOperators?: (operators: LicenseOperator[]) => Promise<void>
+  onImportOperators: (operators: LicenseOperator[]) => Promise<void>
   onAccount: () => void
   history: WorkspaceResultHistorySummary[]
   onHistory?: (summary: WorkspaceResultHistorySummary) => Promise<void>
@@ -55,7 +54,7 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
   const featureState = useSiteFeatures()
   const isConfig = panel === 'config' || panel === 'preferences'
   const description = isConfig ? sample ? text.demoConfigDescription : text.configDescription
-    : panel === 'account' ? text.accountDescription : panel === 'room' ? text.roomDescription : text.drawerDescription
+    : panel === 'operators' ? text.operatorDescription : panel === 'account' ? text.accountDescription : panel === 'room' ? text.roomDescription : text.drawerDescription
 
   async function importFile(file: File) {
     setImportBusy(true)
@@ -64,8 +63,7 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
     try {
       const parsed = extensibleLicenseOperatorsSchema.safeParse(parseOperatorsText(await file.text()))
       if (!parsed.success) throw new Error(text.uploadFailed)
-      if (onImportOperators) await onImportOperators(parsed.data)
-      else onOperatorsChange(parsed.data)
+      await onImportOperators(parsed.data)
       setImportDone(true)
     } catch (caught) {
       setImportError(caught instanceof Error ? caught.message : text.uploadFailed)
@@ -112,12 +110,11 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
               {operators.filter((operator) => operator.name.toLowerCase().includes(search.trim().toLowerCase())).map((operator) => (
                 <div className="v2-operator-row" key={operator.id}>
                   <Avatar operator={operator} /><strong>{operator.name}</strong>
-                  <label><input type="checkbox" checked={operator.own} disabled={busy || importBusy}
-                    onChange={(event) => onOperatorsChange(operators.map((item) => item.id === operator.id ? { ...item, own: event.target.checked } : item))} />{text.ownedLabel}</label>
-                  <select aria-label={`${operator.name} ${text.elite}`} value={operator.elite} disabled={busy || importBusy}
-                    onChange={(event) => onOperatorsChange(operators.map((item) => item.id === operator.id ? { ...item, elite: Number(event.target.value) } : item))}>
-                    {[0, 1, 2].map((elite) => <option key={elite} value={elite}>E{elite}</option>)}
-                  </select>
+                  <span className="v2-operator-status">{operator.own ? text.ownedLabel : text.notOwnedLabel}</span>
+                  <div className="v2-operator-training">
+                    <span className="v2-operator-status">{text.elite(operator.elite)}</span>
+                    <span className="v2-operator-status">{text.operatorLevel(typeof operator.level === 'number' || typeof operator.level === 'string' ? operator.level : undefined)}</span>
+                  </div>
                 </div>
               ))}
               {!operators.some((operator) => operator.name.toLowerCase().includes(search.trim().toLowerCase())) && <p className="v2-muted">{text.noOperators}</p>}
