@@ -4,6 +4,8 @@ import type { AnnouncementStats as AnnouncementReachStats } from '../../../lib/t
 import { Permission, AdminCdkRecord, UsageDay, UsageFunnelStep, UsageFailureReason, UsageFailureSample, UsageLatencyStats, UsageSklandStats, UsageAnnouncementStats, UsageCdkDistributionItem, RiskReasonStats, RiskTrendDay, CdkOpsSummary, permissionLabels } from '../contracts'
 import { InfoRow, DetailItem, StatusPill, SmallButton, buildSummary, formatDate, formatDuration } from '../shared/helpers'
 import { Metric } from '../cdk/components'
+import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
+import SklandIcon from '../../../components/SklandIcon'
 
 export const EMPTY_LATENCY_STATS: UsageLatencyStats = {
   average_ms: 0,
@@ -143,7 +145,7 @@ export function OpsSummaryPanel({ summary }: { summary: ReturnType<typeof buildS
 export function SklandPanel({ stats }: { stats: UsageSklandStats }) {
   return (
     <section className="tool-panel p-5">
-      <h2 className="text-base font-semibold text-ink-primary">Skland 导入</h2>
+      <h2 className="flex items-center gap-2 text-base font-semibold text-ink-primary"><SklandIcon size={18} />Skland 导入</h2>
       <dl className="mt-4 space-y-3 text-sm">
         <InfoRow label="尝试" value={String(stats.attempts)} />
         <InfoRow label="成功" value={String(stats.success)} />
@@ -235,7 +237,7 @@ export function CdkRecordDistributionPanel({ summary }: { summary: CdkOpsSummary
         <span className="text-xs text-ink-muted">基于当前 CDK 记录</span>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        {summary.type_distribution.map((item) => (
+        {summary.type_distribution.filter((item) => item.cdk_type !== 'balance' || METERED_BILLING_AVAILABLE).map((item) => (
           <div key={item.cdk_type} className="tool-inset flex items-center justify-between gap-3 p-3">
             <span className="text-sm text-ink-secondary">{typeLabels[item.cdk_type]}</span>
             <span className="text-lg font-semibold text-ink-primary">{item.total}</span>

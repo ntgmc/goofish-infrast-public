@@ -4,6 +4,7 @@ import { apiJson, getApiErrorMessage } from '../../../lib/api-client'
 import { formatDate, formatShanghaiDateTime, getProfileAccessLabel, isFreePreviewProfile, isFreePreviewTrialActive } from '../tool-utils'
 import { copy } from '../../../copy/index'
 import { usePersonalUseDeclaration } from '../../../hooks/usePersonalUseDeclaration'
+import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
 
 
 
@@ -20,6 +21,8 @@ export default function ProfilesSection({
   onEdit: (payload: AuthSuccessResponse) => void
   meteredEnabled?: boolean
 }) {
+  profiles = profiles.filter((profile) => METERED_BILLING_AVAILABLE || !profile.kind.startsWith('metered_'))
+  meteredEnabled = METERED_BILLING_AVAILABLE && meteredEnabled
   const [meteredBusy, setMeteredBusy] = useState(false)
   const [meteredError, setMeteredError] = useState<string | null>(null)
   const { guard: guardPersonalUseDeclaration, declarationDialog } = usePersonalUseDeclaration({

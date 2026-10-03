@@ -86,7 +86,7 @@ export function InventoryPacksPanel({ data, busy, run }: InventoryPanelProps) {
           <p className="mt-1 break-all font-mono text-[11px] text-ink-muted">{version.item_code}</p>
           <RewardSummary contents={version.contents} definitions={data.definitions} />
           <p className="mt-2 text-xs text-ink-secondary">
-            {version.opening_rule.mode === 'all' ? '领取全部奖励' : `${version.opening_rule.mode === 'random' ? '随机获得' : '自行选择'} ${version.opening_rule.count} 项不同奖励`}
+            {version.opening_rule.mode === 'all' ? '领取全部奖励' : `${version.opening_rule.mode === 'random' ? '随机获得' : '自行选择'} ${version.opening_rule.count} 项奖励，${version.opening_rule.allow_duplicates ? '可重复领取同一种' : '每种只领取一次'}`}
           </p>
           {version.status === 'draft' && <button type="button" className="tool-secondary-action mt-3" disabled={busy}
             onClick={() => void run('/api/admin/items', { action: 'publish_gift_pack_version', version_id: version.id }, '礼包版本已发布。')}>发布</button>}

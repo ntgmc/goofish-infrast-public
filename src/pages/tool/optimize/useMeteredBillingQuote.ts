@@ -3,6 +3,7 @@ import { copy } from '../../../copy/index'
 import { apiJson, getApiErrorCode, getApiErrorMessage } from '../../../lib/api-client'
 import type { IssuedMeteredScheduleQuote, MeteredBillingOperation } from '../../../lib/metered-billing'
 import type { UserGameAccountKind } from '../../../lib/types'
+import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
 
 export type BillingQuote = IssuedMeteredScheduleQuote
 
@@ -16,7 +17,7 @@ export function useMeteredBillingQuote(
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const refresh = useCallback(async (): Promise<BillingQuote | null> => {
-    const shouldQuote = enabled && (operation !== 'main_schedule' || isMeteredProfileKind(profileKind))
+    const shouldQuote = METERED_BILLING_AVAILABLE && enabled && (operation !== 'main_schedule' || isMeteredProfileKind(profileKind))
     if (!shouldQuote) {
       setQuote(null)
       setError(null)

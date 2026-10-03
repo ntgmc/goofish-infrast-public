@@ -21,7 +21,7 @@ describe('feature gate', () => {
     await expect(enforceFeatureGate(new Request('http://localhost/api/optimization/jobs/job-1/cancel', { method: 'POST' }))).resolves.toBeNull()
   })
 
-  it('applies the metered billing switch only to metered profile admissions', async () => {
+  it('rejects retired metered admissions even with a stored enabled switch', async () => {
     getSiteFeatureSettings.mockResolvedValue(settingsWith({ metered_billing: false }))
 
     const personal = await requireMeteredBillingFeature('metered_personal')
@@ -33,7 +33,26 @@ describe('feature gate', () => {
     await expect(requireMeteredBillingFeature('cdk')).resolves.toBeNull()
 
     getSiteFeatureSettings.mockResolvedValue(settingsWith({ metered_billing: true }))
-    await expect(requireMeteredBillingFeature('metered_personal')).resolves.toBeNull()
+    expect((await requireMeteredBillingFeature('metered_personal'))?.status).toBe(503)
+    await expect(requireMeteredBillingFeature('cdk')).resolves.toBeNull()
+    await expect(requireMeteredBillingFeature('free_preview')).resolves.toBeNull()
+  })
+
+  it.each([
+    ['/api/user/balance', 'GET'],
+    ['/api/user/balance/redeem', 'POST'],
+    ['/api/user/profiles/metered-personal', 'POST'],
+    ['/api/user/commercial/profiles', 'GET'],
+    ['/api/user/billing/quote', 'POST'],
+    ['/api/admin/balance', 'GET'],
+    ['/api/admin/balance', 'POST'],
+    ['/api/admin/commercial', 'GET'],
+    ['/api/admin/commercial', 'PUT'],
+  ])('keeps the retired billing endpoint closed: %s %s', async (path, method) => {
+    getSiteFeatureSettings.mockResolvedValue(settingsWith({ metered_billing: true }))
+    const response = await enforceFeatureGate(new Request(`http://localhost${path}`, { method }))
+    expect(response?.status).toBe(503)
+    await expect(response?.json()).resolves.toMatchObject({ code: 'feature_disabled', feature: 'metered_billing' })
   })
 
   it('blocks ordinary sessions while keeping recovery, logout, privacy and admin routes open', async () => {

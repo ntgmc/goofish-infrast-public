@@ -53,7 +53,7 @@ export function OpeningRuleFields({ rule, contentCount, onChange }: {
     <Field label="奖励方式">
       <select className="tool-field mt-2 min-w-0" value={rule.mode} onChange={(event) => {
         const mode = event.currentTarget.value as GiftPackOpeningRule['mode']
-        onChange(mode === 'all' ? { mode } : { mode, count: rule.mode === 'all' ? 1 : rule.count })
+        onChange(mode === 'all' ? { mode } : rule.mode === 'all' ? { mode, count: 1 } : { ...rule, mode })
       }}>
         <option value="all">礼包：领取全部奖励</option>
         <option value="random">宝箱：随机多选奖励</option>
@@ -61,12 +61,17 @@ export function OpeningRuleFields({ rule, contentCount, onChange }: {
       </select>
     </Field>
     {rule.mode !== 'all' && <Field label="每次领取项数">
-      <input className="tool-field mt-2 min-w-0" type="number" required min={1} max={contentCount} step={1}
+      <input className="tool-field mt-2 min-w-0" type="number" required min={1} max={rule.allow_duplicates ? 100 : contentCount} step={1}
         value={Number.isNaN(rule.count) ? '' : rule.count} onChange={(event) => onChange({ ...rule, count: event.currentTarget.valueAsNumber })} />
-      <span className="mt-2 block text-xs leading-5">从 {contentCount} 种奖励中领取，每项数量按奖励列表设置，同一项只领取一次。</span>
+      <span className="mt-2 block text-xs leading-5">从 {contentCount} 种奖励中领取，每次选中的数量按奖励列表设置。{rule.allow_duplicates ? '同一项可重复领取，领取项数可超过奖励种类数。' : '同一项只领取一次。'}</span>
     </Field>}
+    {rule.mode !== 'all' && <label className="flex items-center gap-2 text-sm text-ink-secondary sm:col-span-2">
+      <input type="checkbox" className="accent-brand-500" checked={rule.allow_duplicates === true}
+        onChange={(event) => onChange({ mode: rule.mode, count: rule.count, ...(event.currentTarget.checked && { allow_duplicates: true }) })} />
+      允许重复领取同一种奖励
+    </label>}
     {!validOpeningRule(rule, contentCount) && <p className="text-xs text-warning-600 sm:col-span-2" role="status">
-      请添加奖励，并将领取项数设为 1 到奖励种类数之间的整数。
+      请添加奖励，并将领取项数设为 1 到 {rule.mode !== 'all' && rule.allow_duplicates ? 100 : contentCount} 之间的整数。
     </p>}
   </div>
 }

@@ -12,6 +12,7 @@ import { saveRiskControlSettings } from './risk/settings-actions'
 import { requestAdminOperationReason } from '../../lib/admin-operation-reason'
 import { createAdminProfileActions } from './users/profile-actions'
 import { useAdminUserList } from './users/useAdminUserList'
+import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
 
 function errorMessage(value: unknown): string {
   return value instanceof Error && value.message ? value.message : '未知错误'
@@ -669,7 +670,7 @@ export function useAdminController() {
           apiJson<{ detail?: AdminUserDetail }>(`/api/admin/users?user_id=${encodeURIComponent(user.id)}&profile_page=${profilePage}&profile_page_size=${profilePageSize}`, {
             fallbackMessage: '加载用户详情失败',
           }),
-          fetchAdminUserBalance(user.id),
+          METERED_BILLING_AVAILABLE ? fetchAdminUserBalance(user.id) : Promise.resolve(null),
         ])
         if (!data.detail) throw new Error('加载用户详情失败')
         setSelectedUserDetail(data.detail)

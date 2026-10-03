@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '../../../lib/api-client'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import type { AdminSiteFeatureSettingsV1, SiteFeatureKey, SiteFeatures } from '../../../lib/site-features'
-import { computeEffectiveSiteFeatures } from '../../../lib/site-features'
+import { computeEffectiveSiteFeatures, METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
 import { copy } from '../../../copy/index'
 import { AdminToast } from '../shared/AdminToast'
+import SklandIcon from '../../../components/SklandIcon'
 
 type FeatureSettingsResponse = {
   settings?: AdminSiteFeatureSettingsV1
@@ -120,7 +121,7 @@ export default function FeatureSettingsSection() {
         <section key={group.label} className="tool-panel p-5 sm:p-6" aria-labelledby={`feature-group-${group.features[0]}`}>
           <h3 id={`feature-group-${group.features[0]}`} className="text-base font-semibold text-ink-primary">{group.label}</h3>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {group.features.map((feature) => {
+            {group.features.filter((feature) => feature !== 'metered_billing' || METERED_BILLING_AVAILABLE).map((feature) => {
               const rawEnabled = settings.features[feature]
               const effectiveEnabled = effective[feature]
               return (
@@ -133,7 +134,7 @@ export default function FeatureSettingsSection() {
                     className="mt-1 h-4 w-4 accent-brand-600"
                   />
                   <span className="min-w-0">
-                    <strong className="block text-sm text-ink-primary">{copy.features.feature_labels[feature]}</strong>
+                    <strong className="flex items-center gap-2 text-sm text-ink-primary">{feature === 'skland' && <SklandIcon />}{copy.features.feature_labels[feature]}</strong>
                     <span className={`mt-1 block text-xs ${effectiveEnabled ? 'text-success' : 'text-ink-muted'}`}>
                       {effectiveEnabled ? copy.features.admin_effective_on : rawEnabled ? copy.features.admin_raw_on_effective_off : copy.features.admin_effective_off}
                     </span>

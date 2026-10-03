@@ -309,6 +309,26 @@ describe('administrator inventory request policy', () => {
       idempotency_key: 'gift-pack-request',
     }).success).toBe(false)
   })
+
+  it.each(['random', 'choice'])('accepts bounded repeatable %s chest rules and repeated reward selections', (mode) => {
+    const input = {
+      action: 'create_gift_pack',
+      name: '可重复宝箱',
+      description: '领取五次奖励',
+      contents: [reward],
+      opening_rule: { mode, count: 5, allow_duplicates: true },
+      idempotency_key: 'repeatable-pack-request',
+    }
+    expect(requestSchemas.adminItems.safeParse(input).success).toBe(true)
+    expect(requestSchemas.adminItems.safeParse({ ...input, opening_rule: { mode, count: 101, allow_duplicates: true } }).success).toBe(false)
+    expect(requestSchemas.adminItems.safeParse({ ...input, opening_rule: { mode, count: 5, allow_duplicates: 'true' } }).success).toBe(false)
+    expect(requestSchemas.inventoryUse.safeParse({
+      item_code: 'repeatable-chest',
+      quantity: 1,
+      selected_item_codes: Array<string>(5).fill(reward.item_code),
+      idempotency_key: 'repeatable-choice-request',
+    }).success).toBe(true)
+  })
 })
 
 describe('announcement request policy', () => {

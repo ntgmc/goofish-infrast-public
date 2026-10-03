@@ -263,7 +263,7 @@ function RewardGroup({ recipient, rewards, catalogByCode, giftPackVersionById, o
                     </div>
                     {!item?.selectable && <p className="mt-2 text-xs font-medium text-danger-500">{item?.unavailable_reason ?? '道具当前不可用。'}</p>}
                     {(configuredVersion ?? item?.latest_gift_pack_version) && <p className="mt-2 text-xs text-ink-secondary">礼包版本 v{(configuredVersion ?? item!.latest_gift_pack_version)!.version} · {packContents((configuredVersion ?? item!.latest_gift_pack_version)!.contents)}</p>}
-                    {packVersion?.opening_rule && packVersion.opening_rule.mode !== 'all' && <p className="mt-2 text-xs text-ink-secondary">每个宝箱{packVersion.opening_rule.mode === 'random' ? '随机获得' : '自行选择'} {packVersion.opening_rule.count} 项不同奖励</p>}
+                    {packVersion?.opening_rule && packVersion.opening_rule.mode !== 'all' && <p className="mt-2 text-xs text-ink-secondary">每个宝箱{packVersion.opening_rule.mode === 'random' ? '随机获得' : '自行选择'} {packVersion.opening_rule.count} 项奖励，{packVersion.opening_rule.allow_duplicates ? '可重复领取同一种' : '每种只领取一次'}</p>}
                   </div>
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(6rem,.75fr)]">

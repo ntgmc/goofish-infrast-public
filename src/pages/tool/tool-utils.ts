@@ -2,6 +2,7 @@ import type { LicenseConfig, LicenseFile, LicenseOperator, PermissionMode, UserG
 import { copy, CURRENT_LOCALE } from '../../copy/index'
 import { getPermissionProfile, normalizeRuntimePermission } from '../../lib/product-catalog'
 import { AUTH_PASSWORD_MAX_LENGTH, AUTH_PASSWORD_MIN_LENGTH } from '../../lib/auth-constraints'
+import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
 
 
 export function createAccountLicense(profile: UserGameAccount, operators: LicenseOperator[], config: LicenseConfig): LicenseFile {
@@ -34,7 +35,7 @@ export function getEffectiveProfilePermission(profile: UserGameAccount): Permiss
 
 export function isSchedulableProfile(profile: UserGameAccount): boolean {
   return !profile.archived_at && (profile.kind === 'cdk' || profile.kind === 'free_preview'
-    || profile.kind === 'metered_personal' || profile.kind === 'metered_commercial')
+    || (METERED_BILLING_AVAILABLE && (profile.kind === 'metered_personal' || profile.kind === 'metered_commercial')))
 }
 
 export function getProfileAccessLabel(profile: UserGameAccount): string {
@@ -47,6 +48,7 @@ export function sortOperatorsForPreview(operators: LicenseOperator[]): LicenseOp
   return [...operators].sort((left, right) => (
     numberValue(right.elite) - numberValue(left.elite)
     || numberValue(right.level) - numberValue(left.level)
+    || numberValue(right.rarity) - numberValue(left.rarity)
     || left.name.localeCompare(right.name, CURRENT_LOCALE)
     || left.id.localeCompare(right.id)
   ))

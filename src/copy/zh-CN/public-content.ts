@@ -4,6 +4,12 @@ export const publicContentCopy = {
   legacy_pricing_preset_supported: '支持右满252',
   legacy_pricing_eyebrow: '公开 SKU',
   legacy_pricing_intro: '先了解完整权益与限制，再选择适合自己的版本。现在提供月卡、半年卡、年卡、终身卡，以及个人和商用积分单次排班。',
+  retired_pricing_intro: '个人维护方案有 30 天、90 天、365 天和终身卡可选，每份方案绑定一个游戏 UID。偶尔使用或需要商用时，也可以选择积分单次排班。',
+  retired_personal_disclosure: '个人按次档案仅限本人非商业使用；商用档案仅可处理数据权利人已授权的数据。',
+  retired_commercial_disclosure: '商用主排班按成功任务计费；MaaTool 账号、CDK、档案和积分均不可转让或转售。',
+  pricing_transfer_disclosure: 'MaaTool 账号、CDK 和档案均不可转让或转售。',
+  retired_commercial_comparison: '批量报告导出 / 商用授权',
+  retired_comparison_unavailable: '不支持',
   legacy_pricing_plans: {
     single_account_monthly: {
       label: '单账号月卡 CDK',

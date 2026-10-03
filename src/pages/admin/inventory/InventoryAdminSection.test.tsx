@@ -88,6 +88,44 @@ describe('InventoryAdminSection', () => {
     })))
   })
 
+  it.each(['random', 'choice'])('publishes a repeatable %s chest and preserves its rule in a new version', async (mode) => {
+    adminApiJson.mockImplementation(async (_url: string, options?: { method?: string }) => options?.method === 'POST' ? {} : {
+      ...overview,
+      gift_pack_versions: [{
+        ...overview.gift_pack_versions[0],
+        opening_rule: { mode, count: 5, allow_duplicates: true },
+      }],
+    })
+    const user = userEvent.setup()
+    render(<InventoryAdminSection />)
+    await user.click(await screen.findByRole('tab', { name: /礼包管理/ }))
+    const fields = within(screen.getByText('创建礼包或宝箱').closest('form') as HTMLFormElement)
+    await user.type(fields.getByLabelText('礼包名称'), '可重复宝箱')
+    await user.type(fields.getByLabelText('说明'), '自由搭配五次奖励')
+    await user.selectOptions(fields.getByLabelText('奖励方式'), mode)
+    const count = fields.getByRole('spinbutton', { name: /每次领取项数/ })
+    await user.clear(count)
+    await user.type(count, '5')
+    expect(fields.getByRole('button', { name: '创建并发布' })).toBeDisabled()
+    await user.click(fields.getByRole('checkbox', { name: '允许重复领取同一种奖励' }))
+    expect(count).toHaveAttribute('max', '100')
+    await user.click(fields.getByRole('button', { name: '创建并发布' }))
+    await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/items', expect.objectContaining({
+      json: expect.objectContaining({ action: 'create_gift_pack', opening_rule: { mode, count: 5, allow_duplicates: true }, publish: true }),
+    })))
+    await user.click(fields.getByRole('checkbox', { name: '允许重复领取同一种奖励' }))
+    expect(fields.getByRole('button', { name: '创建并发布' })).toBeDisabled()
+
+    await user.selectOptions(screen.getByLabelText('基于礼包创建新版本'), 'newcomer_supply_pack')
+    const versionFields = within(screen.getByLabelText('基于礼包创建新版本').closest('form') as HTMLFormElement)
+    expect(versionFields.getByRole('checkbox', { name: '允许重复领取同一种奖励' })).toBeChecked()
+    expect(versionFields.getByRole('spinbutton', { name: /每次领取项数/ })).toHaveValue(5)
+    await user.click(versionFields.getByRole('button', { name: '发布新版本' }))
+    await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/items', expect.objectContaining({
+      json: expect.objectContaining({ action: 'create_gift_pack_version', opening_rule: { mode, count: 5, allow_duplicates: true }, publish: true }),
+    })))
+  })
+
   it('splits the management workflow into accessible tabs', async () => {
     const user = userEvent.setup()
     render(<InventoryAdminSection />)
@@ -423,6 +461,55 @@ describe('InventoryAdminSection', () => {
     expect(await screen.findByText(/最近发放批次 ID：grant-confirmed/)).toBeInTheDocument()
     expect(screen.getByLabelText('发放批次 ID')).toHaveValue('grant-confirmed')
     expect(adminApiJson.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(1)
+  })
+
+  it.each([
+    ['grant', 'latest'],
+    ['grant', 'pack-version-1'],
+    ['user_ids', 'latest'],
+    ['user_ids', 'pack-version-1'],
+    ['all_users', 'latest'],
+    ['all_users', 'pack-version-1'],
+  ])('submits %s issuance with the %s gift pack version', async (mode, selectedVersion) => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const baseVersion = overview.gift_pack_versions[0]
+    adminApiJson.mockImplementation(async (_url: string, options?: { method?: string }) => options?.method === 'POST' ? {} : {
+      ...overview,
+      gift_pack_versions: [
+        baseVersion,
+        { ...baseVersion, id: 'pack-version-2', version: 2 },
+        { ...baseVersion, id: 'pack-draft', version: 12, status: 'draft', published_at: null },
+        { ...baseVersion, id: 'other-pack-version', item_code: 'other_pack', version: 20 },
+        { ...baseVersion, id: 'pack-version-10', version: 10 },
+        { ...baseVersion, id: 'pack-retired', version: 11, status: 'retired' },
+      ],
+    })
+    const user = userEvent.setup()
+    render(<InventoryAdminSection />)
+    await user.click(await screen.findByRole('tab', { name: /发放中心/ }))
+    const form = within(screen.getByText(mode === 'grant' ? '单用户发放' : '批量与全站发放').closest('form') as HTMLFormElement)
+    await user.selectOptions(form.getByLabelText('道具'), 'newcomer_supply_pack')
+    const versionField = form.getByLabelText('礼包版本')
+    expect(versionField).toHaveValue('')
+    expect(within(versionField).getByRole('option', { name: '自动使用最新已发布版本（v10）' })).toBeInTheDocument()
+    if (selectedVersion !== 'latest') await user.selectOptions(versionField, selectedVersion)
+    if (mode === 'grant') {
+      await user.type(form.getByLabelText('用户 ID'), 'user-1')
+      await user.type(form.getByLabelText('发放原因'), '礼包发放测试')
+    } else {
+      await user.selectOptions(form.getByLabelText('目标模式'), mode)
+      await user.type(form.getByLabelText(mode === 'all_users' ? 'Root 口令' : '用户 ID（逗号、空格或换行分隔）'),
+        mode === 'all_users' ? 'test-root-password' : 'user-1 user-2')
+      await user.type(form.getByLabelText('管理员备注'), '礼包发放测试')
+    }
+    await user.click(form.getByRole('button', { name: mode === 'grant' ? '发放' : '创建发放活动' }))
+    await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/inventory', expect.objectContaining({
+      json: expect.objectContaining({
+        action: mode === 'grant' ? 'grant' : 'create_campaign',
+        item_code: 'newcomer_supply_pack',
+        gift_pack_version_id: selectedVersion === 'latest' ? 'pack-version-10' : selectedVersion,
+      }),
+    })))
   })
 
   it('excludes unavailable gift packs and clears a pinned version when switching items', async () => {

@@ -101,6 +101,50 @@ describe('chest opening', () => {
     expect(await useInventoryItem('user-1', request)).toEqual(result)
     expect(clientQuery.mock.calls.filter(([sql]) => sql.startsWith('update reward_grants'))).toHaveLength(1)
   })
+
+  it('grants repeated choices in batches with their original expiry and replays without granting again', async () => {
+    const clientQuery = mockChest({ mode: 'choice', count: 5, allow_duplicates: true })
+    const selected = ['priority_compute_coupon', 'priority_compute_coupon', 'priority_compute_coupon', 'training_diagnosis_coupon', 'training_diagnosis_coupon']
+    const request = {
+      item_code: 'chest', quantity: 2, gift_pack_version_id: 'chest-v1',
+      selected_item_codes: selected, idempotency_key: 'repeated-choice-request',
+    }
+    for (const invalid of [[], selected.slice(1), [...selected, 'plan_capacity_certificate'], [...selected.slice(1), 'unknown']]) {
+      await expect(useInventoryItem('user-1', { ...request, selected_item_codes: invalid }))
+        .rejects.toMatchObject({ code: 'gift_pack_selection_invalid' })
+    }
+    expect(clientQuery.mock.calls.some(([sql]) => sql.startsWith('update reward_grants'))).toBe(false)
+    const result = await useInventoryItem('user-1', request, new Date('2026-10-01T00:00:00.000Z'))
+    expect(result.rewards).toEqual([
+      expect.objectContaining({ item_code: 'priority_compute_coupon', quantity: 18, expires_at: '2026-10-08T00:00:00.000Z' }),
+      expect.objectContaining({ item_code: 'training_diagnosis_coupon', quantity: 8, expires_at: null }),
+    ])
+    const grants = clientQuery.mock.calls.filter(([sql]) => sql.includes('insert into reward_grants'))
+    expect(grants).toHaveLength(10)
+    expect(new Set(grants.map(([, values]) => JSON.stringify([values[4], values[5]]))).size).toBe(10)
+    expect(await useInventoryItem('user-1', request)).toEqual(result)
+    expect(clientQuery.mock.calls.filter(([sql]) => sql.includes('insert into reward_grants'))).toHaveLength(10)
+  })
+
+  it('draws the configured number of random rewards with replacement and preserves the first result on retry', async () => {
+    const clientQuery = mockChest({ mode: 'random', count: 5, allow_duplicates: true })
+    const request = { item_code: 'chest', quantity: 1, idempotency_key: 'repeated-random-request' }
+    await expect(useInventoryItem('user-1', { ...request, selected_item_codes: ['priority_compute_coupon'] }))
+      .rejects.toMatchObject({ code: 'gift_pack_selection_invalid' })
+    expect(clientQuery.mock.calls.some(([sql]) => sql.startsWith('update reward_grants'))).toBe(false)
+    const result = await useInventoryItem('user-1', request)
+    const rewards = result.rewards as Array<{ item_code: string; quantity: number }>
+    const quantities: Record<string, number> = { priority_compute_coupon: 3, training_diagnosis_coupon: 2, plan_capacity_certificate: 1 }
+    expect(rewards.length).toBeLessThanOrEqual(3)
+    expect(new Set(rewards.map((reward) => reward.item_code)).size).toBe(rewards.length)
+    expect(rewards.reduce((total, reward) => total + reward.quantity / quantities[reward.item_code], 0)).toBe(5)
+    const grants = clientQuery.mock.calls.filter(([sql]) => sql.includes('insert into reward_grants'))
+    expect(grants).toHaveLength(5)
+    expect(new Set(grants.map(([, values]) => values[5])).size).toBe(5)
+    expect(await useInventoryItem('user-1', request)).toEqual(result)
+    expect(clientQuery.mock.calls.filter(([sql]) => sql.startsWith('update reward_grants'))).toHaveLength(1)
+    expect(clientQuery.mock.calls.filter(([sql]) => sql.includes('insert into reward_grants'))).toHaveLength(5)
+  })
 })
 
 describe('inventory listing', () => {

@@ -1,5 +1,6 @@
 import { getValidatedJson } from '../security/request-validation'
 import { requestSchemas } from '../security/request-policy'
+import { METERED_BILLING_AVAILABLE } from '../../src/lib/site-features'
 import { CdkAlreadyRedeemedError, createRequestHash, IdempotencyConflictError, redeemCdkAtomically } from '../storage/cdk-redemption'
 import { grantItemInTransaction, InventoryError, listInventory } from '../storage/inventory-store'
 import {
@@ -31,6 +32,9 @@ export default async function userCdkHandler(req: Request): Promise<Response> {
       return jsonResponse({ error: '当前 CDK 不能用于升级档案。', code: 'cdk_type_mismatch' }, 409)
     }
     if (cdkType === 'balance') {
+      if (!METERED_BILLING_AVAILABLE) {
+        return jsonResponse({ error: '该功能当前未开放。', code: 'feature_disabled', feature: 'metered_billing' }, 503)
+      }
       return jsonResponse({ error: '该 CDK 是积分兑换码，请前往积分页兑换。', code: 'cdk_type_mismatch', target: '/tool/balance' }, 409)
     }
     if (cdkType === 'profile') {

@@ -18,6 +18,11 @@ const PUBLIC_METADATA: Record<string, Metadata> = {
     description: DEFAULT_DESCRIPTION,
     indexable: true,
   },
+  '/v2': {
+    title: `${copy.v2.brandDescription} | ${copy.v2.brand} · ${copy.v2.testVersion}`,
+    description: copy.v2.resultDescription,
+    indexable: false,
+  },
   '/announcements': {
     title: copy.metadata.components_RouteMetadata_003,
     description: copy.metadata.components_RouteMetadata_004,

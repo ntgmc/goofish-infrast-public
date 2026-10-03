@@ -1,8 +1,8 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { closePool, getPool, query, withPostgresAdvisoryLock, withTransaction } from './postgres'
-import { DATABASE_SCHEMA_VERSION, migrateDatabaseSchema } from './schema'
+import { DATABASE_SCHEMA_VERSION, migrateDatabaseSchema, validateRuntimeDatabaseSchema } from './schema'
 import {
   getDepotValueSampleStore,
   type DepotValueSampleRecord,
@@ -15,6 +15,7 @@ import {
   recordPersonalUseDeclarationUsage,
 } from './personal-use-declaration-store'
 import { CURRENT_PERSONAL_USE_DECLARATION } from '../personal-use-declaration'
+import { personalUseDeclarationContent } from '../../src/lib/personal-use-declaration'
 import { createPostgresAdminUserStore } from './admin-user-store'
 import type { AdminUserRecord } from '../handlers/admin-auth'
 import type { WorkspaceResultHistoryItem } from '../../src/lib/types'
@@ -195,6 +196,80 @@ describe('PostgreSQL schema migration', () => {
       .rejects.toThrow('admin_operation_audit is append-only')
   })
 
+  it('publishes a new declaration while preserving the previous document, acceptance, and failed migration', async () => {
+    const userId = randomUUID()
+    const legacyDeclaration = {
+      ...CURRENT_PERSONAL_USE_DECLARATION,
+      id: 'personal_use_v1_1',
+      version: 'V1.1',
+      effectiveDate: '2026-07-31',
+      sections: CURRENT_PERSONAL_USE_DECLARATION.sections.map((section) => (
+        section.id === 'personal-use-scope'
+          ? {
+              ...section,
+              paragraphs: [
+                '免费预览和个人按次档案仅限用户本人为其绑定游戏账号进行非商业性排班规划与参考使用。相关生成内容（包括但不限于排班方案、分析报告、MAA JSON 文件、预设配置等）不得用于商业目的；已解锁商用资格后，必须另行使用商用档案处理已获授权的数据。',
+              ],
+            }
+          : section
+      )),
+    }
+    const legacyContent = personalUseDeclarationContent(legacyDeclaration)
+    const legacyHash = createHash('sha256').update(legacyContent, 'utf8').digest('hex')
+    const previousMigrationVersion = '2026-10-03.2'
+
+    try {
+      await query(
+        `insert into personal_use_declaration_versions
+          (declaration_id, display_version, effective_date, content_text, content_hash, created_at)
+         values ($1, $2, $3, $4, $5, now())`,
+        [legacyDeclaration.id, legacyDeclaration.version, legacyDeclaration.effectiveDate, legacyContent, legacyHash],
+      )
+      await query(
+        `insert into personal_use_declaration_acceptances
+          (id, user_id, declaration_id, declaration_version, content_hash, action, client_ip, accepted_at)
+         values ($1, $2, $3, $4, $5, 'free_preview_claim', '203.0.113.12', '2026-08-01T00:00:00.000Z')`,
+        [randomUUID(), userId, legacyDeclaration.id, legacyDeclaration.version, legacyHash],
+      )
+      await query(
+        `insert into goofish_schema_migrations
+          (version, checksum, minimum_app_version, status, started_at, failed_at, failure_code)
+         values ($1, $2, '2.0.0', 'failed', now(), now(), 'migration_failed')`,
+        [previousMigrationVersion, 'a'.repeat(64)],
+      )
+      const previousDocument = await query('select * from personal_use_declaration_versions where declaration_id = $1', [legacyDeclaration.id])
+      const previousAcceptance = await query('select * from personal_use_declaration_acceptances where user_id = $1', [userId])
+      const previousMigration = await query('select * from goofish_schema_migrations where version = $1', [previousMigrationVersion])
+      await markCurrentMigrationPending()
+      await query('delete from personal_use_declaration_versions where declaration_id = $1', [CURRENT_PERSONAL_USE_DECLARATION.id])
+
+      await migrateDatabaseSchema()
+      await migrateDatabaseSchema()
+      await validateRuntimeDatabaseSchema()
+
+      expect((await query('select * from personal_use_declaration_versions where declaration_id = $1', [legacyDeclaration.id])).rows)
+        .toEqual(previousDocument.rows)
+      expect((await query('select * from personal_use_declaration_acceptances where user_id = $1', [userId])).rows)
+        .toEqual(previousAcceptance.rows)
+      expect((await query('select * from goofish_schema_migrations where version = $1', [previousMigrationVersion])).rows)
+        .toEqual(previousMigration.rows)
+      await expect(getPersonalUseDeclarationAcceptance(userId)).resolves.toBeNull()
+      const acceptance = await confirmPersonalUseDeclaration(userId, 'free_preview_claim', '203.0.113.12')
+      expect(acceptance).toMatchObject({
+        declaration_id: CURRENT_PERSONAL_USE_DECLARATION.id,
+        declaration_version: CURRENT_PERSONAL_USE_DECLARATION.version,
+        content_hash: CURRENT_PERSONAL_USE_DECLARATION.contentHash,
+      })
+      expect((await query('select * from personal_use_declaration_acceptances where id = $1', [previousAcceptance.rows[0].id])).rows)
+        .toEqual(previousAcceptance.rows)
+    } finally {
+      await query('delete from personal_use_declaration_acceptances where user_id = $1', [userId])
+      await query('delete from personal_use_declaration_versions where declaration_id = $1', [legacyDeclaration.id])
+      await query('delete from goofish_schema_migrations where version = $1', [previousMigrationVersion])
+      await migrateDatabaseSchema()
+    }
+  })
+
   it('accepts a first metered-personal confirmation and records protected operations', async () => {
     const userId = randomUUID()
     const acceptance = await confirmPersonalUseDeclaration(
@@ -202,14 +277,14 @@ describe('PostgreSQL schema migration', () => {
       'metered_personal_create',
       '203.0.113.10',
       null,
-      new Date('2026-08-01T01:00:00.000Z'),
+      new Date('2026-10-03T01:00:00.000Z'),
     )
     const usage = await recordPersonalUseDeclarationUsage({
       userId,
       profileId: 'profile-metered-1',
       action: 'optimization_generate',
       clientIp: '203.0.113.10',
-      occurredAt: new Date('2026-08-01T01:05:00.000Z'),
+      occurredAt: new Date('2026-10-03T01:05:00.000Z'),
     })
 
     expect(acceptance).toMatchObject({
@@ -222,8 +297,8 @@ describe('PostgreSQL schema migration', () => {
       acceptance_id: acceptance.id,
       action: 'optimization_generate',
       profile_id: 'profile-metered-1',
-      acceptance_accepted_at: '2026-08-01T01:00:00.000Z',
-      occurred_at: '2026-08-01T01:05:00.000Z',
+      acceptance_accepted_at: '2026-10-03T01:00:00.000Z',
+      occurred_at: '2026-10-03T01:05:00.000Z',
     })
     await query('delete from personal_use_declaration_acceptances where user_id = $1', [userId])
   })

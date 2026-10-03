@@ -38,7 +38,7 @@ export const metadataCopy = {
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_021: "价格与权益 | MaaTool",
   // src/components/RouteMetadata.tsx
-  components_RouteMetadata_022: "查看 MaaTool 各类维护方案、终身卡与积分单次排班的价格、功能、账号限制和售后说明。",
+  components_RouteMetadata_022: "查看 MaaTool 各类维护方案与终身卡的价格、功能、账号限制和售后说明。",
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_023: "致谢 | MaaTool",
   // src/components/RouteMetadata.tsx

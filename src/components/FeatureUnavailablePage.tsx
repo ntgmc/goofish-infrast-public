@@ -4,6 +4,7 @@ import { useSiteFeatures } from '../lib/site-feature-context'
 import SessionLoader from './SessionLoader'
 import ThemeSwitcher from './ThemeSwitcher'
 import BrandLogo from './BrandLogo'
+import SklandIcon from './SklandIcon'
 import { copy } from '../copy/index'
 
 export function FeatureRoute({ feature, children }: { feature: SiteFeatureKey; children: React.ReactNode }) {
@@ -38,7 +39,7 @@ export default function FeatureUnavailablePage({
           <ThemeSwitcher />
         </div>
         <section className="tool-panel mt-8 p-6 sm:p-8">
-          <p className="tool-eyebrow">{loadError ? copy.features.load_failed_title : copy.features.feature_labels[feature]}</p>
+          <p className="tool-eyebrow">{!loadError && feature === 'skland' && <SklandIcon className="mr-2" />}{loadError ? copy.features.load_failed_title : copy.features.feature_labels[feature]}</p>
           <h1 className="display-title mt-3 text-2xl text-ink-primary">{title}</h1>
           <p className="mt-4 text-sm leading-6 text-ink-secondary">{body}</p>
           <div className="mt-6 flex flex-wrap gap-3">

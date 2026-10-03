@@ -19,6 +19,9 @@ export const SITE_FEATURE_KEYS = [
 export type SiteFeatureKey = typeof SITE_FEATURE_KEYS[number]
 export type SiteFeatures = Record<SiteFeatureKey, boolean>
 
+// Keep the billing implementation and stored settings dormant until it is reimplemented.
+export const METERED_BILLING_AVAILABLE = false
+
 export interface SiteFeatureSettingsV1 {
   version: 1
   features: SiteFeatures
@@ -82,7 +85,7 @@ export function computeEffectiveSiteFeatures(settings: SiteFeatureSettingsV1): S
     cdk_redemption: profiles && raw.cdk_redemption,
     free_preview: profiles && raw.free_preview,
     schedule_generation: profiles && raw.schedule_generation,
-    metered_billing: profiles && raw.schedule_generation && raw.metered_billing,
+    metered_billing: METERED_BILLING_AVAILABLE && profiles && raw.schedule_generation && raw.metered_billing,
     depot_value: tools && raw.depot_value,
     skland: profiles && raw.skland,
     invitations: login && raw.invitations,

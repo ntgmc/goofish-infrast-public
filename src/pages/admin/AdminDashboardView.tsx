@@ -20,6 +20,8 @@ import { GeneratedPermission, AdminSection, UsageRangeKey, permissionLabels, sec
 import { useAdminController } from './useAdminController'
 import { AdminToast } from './shared/AdminToast'
 import type { AdminCapability } from './contracts'
+import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
+import { copy } from '../../copy'
 
 function canAccessAdminSection(section: AdminSection, capabilities: AdminCapability[]): boolean {
   if (section === 'overview') return capabilities.includes('usage_view') || capabilities.includes('risk_view')
@@ -295,7 +297,7 @@ export default function AdminDashboardView() {
                   <span className="mb-2 block text-sm font-medium text-ink-secondary">CDK 类型</span>
                   <select value={cdkType} onChange={(event) => setCdkType(event.currentTarget.value as 'profile' | 'balance' | 'item')} className="tool-field">
                     <option value="profile">档案兑换</option>
-                    <option value="balance">余额兑换</option>
+                    {METERED_BILLING_AVAILABLE && <option value="balance">余额兑换</option>}
                     <option value="item">道具兑换</option>
                   </select>
                 </label>
@@ -315,7 +317,7 @@ export default function AdminDashboardView() {
                       <option value="year">年卡（365 天）</option>
                     </select>
                   </label>
-                </> : cdkType === 'balance' ? <label>
+                </> : cdkType === 'balance' ? METERED_BILLING_AVAILABLE && <label>
                   <span className="mb-2 block text-sm font-medium text-ink-secondary">积分面额</span>
                   <input value={balanceAmount} onChange={(event) => setBalanceAmount(event.currentTarget.value)} inputMode="decimal" pattern="\d+(\.\d{1,2})?" className="tool-field" required />
                 </label> : <label>
@@ -358,7 +360,7 @@ export default function AdminDashboardView() {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="text-sm font-semibold text-ink-primary">已生成 {generatedCodes.length} 个 CDK</div>
-                      <div className="mt-1 text-xs text-ink-muted">{generatedCodes[0].cdk_type === 'balance' ? `余额 ${generatedCodes[0].amount} 积分` : generatedCodes[0].cdk_type === 'item' ? `${generatedCodes[0].item_name ?? generatedCodes[0].item_code}${generatedCodes[0].item_expires_at ? ` · ${formatDate(generatedCodes[0].item_expires_at)} 到期` : ''}` : `${permissionLabels[generatedCodes[0].permission!]}${generatedCodes[0].profile_duration && generatedCodes[0].profile_duration !== 'lifetime' ? ` · ${generatedCodes[0].profile_duration_days} 天` : ' · 终身'}`} · {formatDate(generatedCodes[0].created_at)}</div>
+                      <div className="mt-1 text-xs text-ink-muted">{generatedCodes[0].cdk_type === 'balance' ? METERED_BILLING_AVAILABLE ? `余额 ${generatedCodes[0].amount} 积分` : copy.admin.retired_cdk : generatedCodes[0].cdk_type === 'item' ? `${generatedCodes[0].item_name ?? generatedCodes[0].item_code}${generatedCodes[0].item_expires_at ? ` · ${formatDate(generatedCodes[0].item_expires_at)} 到期` : ''}` : `${permissionLabels[generatedCodes[0].permission!]}${generatedCodes[0].profile_duration && generatedCodes[0].profile_duration !== 'lifetime' ? ` · ${generatedCodes[0].profile_duration_days} 天` : ' · 终身'}`} · {formatDate(generatedCodes[0].created_at)}</div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <button type="button" onClick={handleCopyGeneratedCdks} className="tool-secondary-action">{generatedCodes.length === 1 ? '复制 CDK' : '复制全部'}</button>

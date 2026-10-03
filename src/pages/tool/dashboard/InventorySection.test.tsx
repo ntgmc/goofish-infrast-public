@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { InventoryResponse, ItemUseRequest } from '../../../lib/inventory-contracts'
@@ -96,7 +96,7 @@ afterEach(() => {
 })
 
 describe('InventorySection idempotent item use', () => {
-  it('shows item descriptions and animates one reveal for a batch before opening the rewards dialog', async () => {
+  it.each([false, true])('shows item descriptions and animates one reveal for a batch with allow_duplicates=%s', async (allowDuplicates) => {
     let finishReveal!: () => void
     mocks.animate.mockImplementationOnce(async (_from, values, options) => {
       options.onUpdate(values[1])
@@ -111,7 +111,7 @@ describe('InventorySection idempotent item use', () => {
         actions: ['open'],
         gift_pack_version_id: 'chest-v1',
         gift_pack: {
-          opening_rule: { mode: 'random', count: 1 },
+          opening_rule: { mode: 'random', count: allowDuplicates ? 5 : 1, ...(allowDuplicates && { allow_duplicates: true }) },
           contents: [
             { item_code: 'priority_compute_coupon', name: '优先计算券', description: '排班优先处理。', icon_key: 'placeholder', quantity: 1, expiry: { mode: 'never' } },
             { item_code: 'training_diagnosis_coupon', name: '培养诊断券', description: '获取养成建议。', icon_key: 'placeholder', quantity: 1, expiry: { mode: 'never' } },
@@ -124,7 +124,7 @@ describe('InventorySection idempotent item use', () => {
       if (path === '/api/user/onboarding-tasks') return { tasks: [] }
       if (options?.method === 'POST') {
         opened = true
-        return { rewards: [{ item_code: 'training_diagnosis_coupon', name: '培养诊断券', icon_key: 'placeholder', quantity: 2, expires_at: null }] }
+        return { rewards: [{ item_code: 'training_diagnosis_coupon', name: '培养诊断券', icon_key: 'placeholder', quantity: allowDuplicates ? 10 : 2, expires_at: null }] }
       }
       return opened ? { ...chest, stacks: [] } : chest
     })
@@ -144,7 +144,7 @@ describe('InventorySection idempotent item use', () => {
     expect(screen.getByRole('dialog', { name: '随机宝箱' })).toBeInTheDocument()
     await act(async () => finishReveal())
     const rewards = await screen.findByRole('dialog', { name: '获得的道具' })
-    expect(within(rewards).getByText('培养诊断券 × 2')).toBeInTheDocument()
+    expect(within(rewards).getByText(`培养诊断券 × ${allowDuplicates ? 10 : 2}`)).toBeInTheDocument()
     expect(mocks.animate).toHaveBeenCalledOnce()
     expect(mocks.animate).toHaveBeenCalledWith(0, [0, 7, 7], expect.objectContaining({ ease: ['easeInOut', 'linear'] }))
     expect(mocks.apiJson).toHaveBeenCalledWith('/api/user/inventory', expect.objectContaining({
@@ -231,6 +231,67 @@ describe('InventorySection idempotent item use', () => {
     await waitFor(() => expect(requests).toHaveLength(2))
     expect(requests[0]).toEqual(requests[1])
     expect(requests[0].selected_item_codes).toEqual(['priority_compute_coupon', 'training_diagnosis_coupon'])
+  })
+
+  it('allows a repeated reward mix per chest and retries the same batch after a lost response', async () => {
+    const chest: InventoryResponse = { ...inventory, stacks: [{
+      ...inventory.stacks[0],
+      item: { ...inventory.stacks[0].item, code: 'chest', name: '自选宝箱', kind: 'gift_pack', effect_code: 'open_gift_pack' },
+      quantity: 2,
+      gift_pack_version_id: 'chest-v1',
+      actions: ['open'],
+      gift_pack: {
+        opening_rule: { mode: 'choice', count: 5, allow_duplicates: true },
+        contents: [
+          { item_code: 'priority_compute_coupon', name: '优先计算券', icon_key: 'placeholder', quantity: 3, expiry: { mode: 'never' } },
+          { item_code: 'training_diagnosis_coupon', name: '培养诊断券', icon_key: 'placeholder', quantity: 2, expiry: { mode: 'relative_days', days: 7 } },
+          { item_code: 'plan_capacity_certificate', name: '方案扩容证', icon_key: 'placeholder', quantity: 1, expiry: { mode: 'never' } },
+        ],
+      },
+    }] }
+    const requests: ItemUseRequest[] = []
+    mocks.apiJson.mockImplementation(async (path: string, options?: { json?: ItemUseRequest }) => {
+      if (path === '/api/user/onboarding-tasks') return { tasks: [] }
+      if (!options?.json) return chest
+      requests.push(options.json)
+      if (requests.length === 1) throw new Error('response lost')
+      return { rewards: [{ item_code: 'priority_compute_coupon', name: '优先计算券', icon_key: 'placeholder', quantity: 30, expires_at: null }] }
+    })
+    const user = userEvent.setup()
+    render(<InventorySection onPayload={vi.fn()} />)
+    await user.click(await screen.findByRole('button', { name: /自选宝箱/ }))
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    const open = screen.getByRole('button', { name: '开启宝箱' })
+    const priority = screen.getByRole('spinbutton', { name: '优先计算券领取次数' })
+    const training = screen.getByRole('spinbutton', { name: '培养诊断券领取次数' })
+    expect(open).toBeDisabled()
+    await user.clear(priority)
+    await user.type(priority, '3')
+    expect(open).toBeDisabled()
+    await user.clear(training)
+    await user.type(training, '2')
+    expect(screen.getByText('已选择 5 / 5 项')).toBeInTheDocument()
+    expect(open).toBeEnabled()
+    expect(screen.getByRole('spinbutton', { name: '方案扩容证领取次数' })).toHaveAttribute('max', '0')
+    fireEvent.change(priority, { target: { value: '4' } })
+    expect(priority).toHaveValue(3)
+    await user.clear(training)
+    await user.clear(priority)
+    await user.type(priority, '5')
+    const quantity = screen.getByRole('spinbutton', { name: '使用数量' })
+    await user.clear(quantity)
+    await user.type(quantity, '2')
+    await user.click(open)
+    await screen.findByText('response lost')
+    await user.click(open)
+    const rewards = await screen.findByRole('dialog', { name: '获得的道具' })
+    expect(within(rewards).getByText('优先计算券 × 30')).toBeInTheDocument()
+    expect(requests).toHaveLength(2)
+    expect(requests[0]).toEqual(requests[1])
+    expect(requests[0]).toMatchObject({
+      quantity: 2,
+      selected_item_codes: Array<string>(5).fill('priority_compute_coupon'),
+    })
   })
 
   it('uses the local dialog contract and restores item focus on Escape', async () => {

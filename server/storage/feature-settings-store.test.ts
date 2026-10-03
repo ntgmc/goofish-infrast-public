@@ -44,6 +44,18 @@ describe('feature settings', () => {
     })
   })
 
+  it('retains the stored billing setting while keeping the effective feature retired', async () => {
+    const features = { ...DEFAULT_SITE_FEATURE_SETTINGS.features, metered_billing: true }
+    queryMock.mockResolvedValueOnce({ rows: [{ revision: 4 }] })
+    const saved = await saveSiteFeatureSettings(features, 3)
+    expect(saved.features.metered_billing).toBe(true)
+    expect(computeEffectiveSiteFeatures(saved).metered_billing).toBe(false)
+    expect(computeEffectiveSiteFeatures(saved).schedule_generation).toBe(true)
+    expect(queryMock).toHaveBeenCalledWith(expect.any(String), [
+      'global', expect.stringContaining('"metered_billing":true'), expect.any(String), 3,
+    ])
+  })
+
   it('requires a complete strict boolean map', () => {
     expect(validateSiteFeatures(DEFAULT_SITE_FEATURE_SETTINGS.features)).toEqual(DEFAULT_SITE_FEATURE_SETTINGS.features)
     expect(() => validateSiteFeatures({ ...DEFAULT_SITE_FEATURE_SETTINGS.features, login: 'yes' })).toThrow(/login/)

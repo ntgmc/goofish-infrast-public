@@ -41,8 +41,12 @@ describe('AccountDashboard route navigation', () => {
 
     render(<RouterProvider router={router} />)
     expect(screen.getByRole('heading', { name: '游戏账号' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '积分' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '商用账户' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '打开栏目菜单' }))
+    expect(screen.queryByRole('menuitem', { name: '积分' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: '商用账户' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('menuitem', { name: '工具' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/tool/tools'))
     await user.click(screen.getByRole('button', { name: '打开栏目菜单' }))

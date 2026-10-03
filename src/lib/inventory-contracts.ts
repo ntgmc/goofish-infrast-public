@@ -104,7 +104,7 @@ export interface GiftPackContentInput {
   gift_pack_version_id?: string
 }
 
-export type GiftPackOpeningRule = { mode: 'all' } | { mode: 'random' | 'choice'; count: number }
+export type GiftPackOpeningRule = { mode: 'all' } | { mode: 'random' | 'choice'; count: number; allow_duplicates?: boolean }
 
 export function normalizeGiftPackOpeningRule(value: unknown, contentCount: number): GiftPackOpeningRule | null {
   if (value === undefined) return { mode: 'all' }
@@ -112,8 +112,10 @@ export function normalizeGiftPackOpeningRule(value: unknown, contentCount: numbe
   const rule = value as Record<string, unknown>
   if (rule.mode === 'all') return { mode: 'all' }
   if ((rule.mode !== 'random' && rule.mode !== 'choice') || !Number.isInteger(rule.count)) return null
+  if (rule.allow_duplicates !== undefined && typeof rule.allow_duplicates !== 'boolean') return null
   const count = Number(rule.count)
-  return count >= 1 && count <= contentCount ? { mode: rule.mode, count } : null
+  if (contentCount < 1 || count < 1 || count > 100 || (!rule.allow_duplicates && count > contentCount)) return null
+  return { mode: rule.mode, count, ...(rule.allow_duplicates && { allow_duplicates: true }) }
 }
 
 export interface OnboardingTaskRewardView extends GiftPackContentInput {

@@ -10,6 +10,7 @@ import { AnimatedPresenceRegion, MotionNavIndicator, MotionSkeleton } from '../.
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import ToolBreadcrumbs from '../../components/ToolBreadcrumbs'
 import SklandBindingDialog, { type SklandPayload } from '../../components/SklandBindingDialog'
+import SklandIcon from '../../components/SklandIcon'
 import { ApiError, apiJson } from '../../lib/api-client'
 import { CONFIG_PRESETS, normalizeConfig, validateScheduleConfig } from '../../lib/config'
 import { resolveActivePurchaseChannel } from '../../lib/purchase'
@@ -569,7 +570,7 @@ function SklandStatusCard({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-semibold text-ink-primary">{copy.workspace.pages_tool_WorkspaceSetupPage_062}</p>
+            <p className="flex items-center gap-2 text-sm font-semibold text-ink-primary"><SklandIcon />{copy.workspace.pages_tool_WorkspaceSetupPage_062}</p>
             {binding ? (
               <span className={'tool-status ' + (invalid ? 'tool-status--error' : 'tool-status--success')}>
                 {invalid ? copy.workspace.pages_tool_WorkspaceSetupPage_063 : copy.workspace.pages_tool_WorkspaceSetupPage_064}
@@ -593,9 +594,11 @@ function SklandStatusCard({
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={onOpen} disabled={busy || dialogOpen} className="tool-primary-action">
+            <SklandIcon />
             {binding ? copy.workspace.pages_tool_WorkspaceSetupPage_073 : copy.workspace.pages_tool_WorkspaceSetupPage_074}
           </button>
           <button type="button" onClick={onRefresh} disabled={busy || dialogOpen || !canRefresh} className="tool-secondary-action">
+            <SklandIcon />
             {busy ? copy.workspace.pages_tool_WorkspaceSetupPage_075 : copy.workspace.pages_tool_WorkspaceSetupPage_076}
           </button>
         </div>
@@ -606,7 +609,7 @@ function SklandStatusCard({
           <div className="mt-2 flex flex-wrap gap-2">
             {(notice.recovery_action === 'rebind' || notice.recovery_action === 'bind_first') && (
               <button type="button" onClick={onOpen} disabled={busy || dialogOpen} className="tool-primary-action min-h-9 px-3 py-1.5 text-xs">
-                {copy.workspace.pages_tool_WorkspaceSetupPage_077}</button>
+                <SklandIcon />{copy.workspace.pages_tool_WorkspaceSetupPage_077}</button>
             )}
             {notice.recovery_action === 'retry' && (
               <button type="button" onClick={onRefresh} disabled={busy || dialogOpen || !binding} className="tool-secondary-action min-h-9 px-3 py-1.5 text-xs">

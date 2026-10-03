@@ -18,6 +18,23 @@ afterEach(() => {
 })
 
 describe('SiteFeatureProvider', () => {
+  it('keeps retired billing closed when an older server returns an enabled setting', async () => {
+    apiJson.mockResolvedValueOnce({
+      ...DEFAULT_SITE_FEATURE_SETTINGS,
+      features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, metered_billing: true },
+    })
+    render(
+      <MemoryRouter>
+        <SiteFeatureProvider>
+          <FeatureRoute feature="metered_billing"><p>Retired billing</p></FeatureRoute>
+          <FeatureRoute feature="schedule_generation"><p>Scheduling available</p></FeatureRoute>
+        </SiteFeatureProvider>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText('Scheduling available')).toBeInTheDocument()
+    expect(screen.queryByText('Retired billing')).not.toBeInTheDocument()
+  })
+
   it('fails closed and exposes a retry before rendering protected content', async () => {
     const user = userEvent.setup()
     apiJson

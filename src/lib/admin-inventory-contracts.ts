@@ -31,7 +31,11 @@ const itemDefinitionSchema = z.object({
 
 export const giftPackOpeningRuleSchema = z.discriminatedUnion('mode', [
   z.strictObject({ mode: z.literal('all') }),
-  z.strictObject({ mode: z.enum(['random', 'choice']), count: z.number().int().min(1).max(100) }),
+  z.strictObject({
+    mode: z.enum(['random', 'choice']),
+    count: z.number().int().min(1).max(100),
+    allow_duplicates: z.boolean().optional(),
+  }),
 ])
 
 const giftVersionSchema = z.object({

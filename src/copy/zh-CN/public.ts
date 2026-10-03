@@ -294,7 +294,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_031: "用户义务",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_032: "你应对自己的账号、CDK、游戏数据和操作行为负责，仅使用自己有权处理的数据，不得共享、转售、破解、干扰或以其他方式滥用本服务。免费预览与个人按次档案仅限本人非商业使用；商用账户可使用商用档案处理数据权利人已授权的多个 UID，仅在排班结果成功生成后计费。不得转售 MaaTool 账号或 CDK，账号、档案和积分均不可转让。",
+  pages_PublicInfoPage_032: "你应对自己的账号、CDK、游戏数据和操作行为负责，仅使用自己有权处理的数据，不得共享、转售、破解、干扰或以其他方式滥用本服务。免费预览仅限本人非商业使用。不得转售 MaaTool 账号或 CDK，账号和档案均不可转让。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_033: "请妥善保管密码、CDK 与森空岛授权信息。因用户主动泄露、设备失控或违反本协议造成的损失，应由用户自行承担。",
   // src/pages/PublicInfoPage.tsx
@@ -402,7 +402,7 @@ export const publicCopy = {
   // src/pages/PricingPage.tsx
   pages_PricingPage_002: "Pricing",
   // src/pages/PricingPage.tsx
-  pages_PricingPage_003: "个人维护方案有 30 天、90 天、365 天和终身卡可选，每份方案绑定一个游戏 UID。偶尔使用或需要商用时，也可以选择积分单次排班。",
+  pages_PricingPage_003: "个人维护方案有 30 天、90 天、365 天和终身卡可选，每份方案绑定一个游戏 UID。",
   // src/pages/PricingPage.tsx
   pages_PricingPage_005: "免费",
   // src/pages/PricingPage.tsx

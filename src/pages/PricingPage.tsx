@@ -8,6 +8,7 @@ import { PUBLIC_PRICING_PLAN_IDS } from '../lib/public-content'
 import { usePublicContent } from '../lib/public-content-context'
 import { getMeteredBillingPolicy, getMeteredScheduleQuote } from '../lib/metered-billing'
 import { useSiteFeatures } from '../lib/site-feature-context'
+import { METERED_BILLING_AVAILABLE } from '../lib/site-features'
 
 export default function PricingPage() {
   const { content } = usePublicContent()
@@ -130,7 +131,7 @@ export default function PricingPage() {
           </div>
         </section>
 
-        <section className="border-b border-surface-4 py-8" aria-labelledby="metered-pricing-title">
+        {METERED_BILLING_AVAILABLE && <section className="border-b border-surface-4 py-8" aria-labelledby="metered-pricing-title">
           <h2 id="metered-pricing-title" className="text-xl font-semibold text-ink-primary">{copy.metered.pricing.title}</h2>
           {featureState.status === 'loading' ? (
             <p className="mt-4 text-sm text-ink-secondary" role="status">{copy.metered.pricing.checking_availability}</p>
@@ -216,7 +217,7 @@ export default function PricingPage() {
               {featureState.status === 'error' && <span className="mt-1 block text-sm text-ink-secondary">{copy.metered.pricing.availability_unavailable}</span>}
             </div>
           )}
-        </section>
+        </section>}
 
         <section className="border-b border-surface-4 py-8" aria-labelledby="pricing-policy-title">
           <h2 id="pricing-policy-title" className="text-xl font-semibold text-ink-primary">{pricing.policy_heading}</h2>

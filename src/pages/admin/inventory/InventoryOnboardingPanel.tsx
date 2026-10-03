@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { GiftPackContentInput, OnboardingTaskCode } from '../../../lib/inventory-contracts'
 import { Field, RewardListEditor, validRewards, type InventoryPanelProps } from './InventoryEditors'
+import SklandIcon from '../../../components/SklandIcon'
 
 type TaskDraft = { enabled: boolean; rewards: GiftPackContentInput[] }
 const TASK_LABELS: Record<OnboardingTaskCode, string> = {
@@ -39,9 +40,12 @@ export function InventoryOnboardingPanel({ data, busy, run }: InventoryPanelProp
     <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
       <div className="min-w-0">
         <Field label="任务">
-          <select className="tool-field mt-2 min-w-0" value={taskCode} onChange={(event) => setTaskCode(event.currentTarget.value as OnboardingTaskCode)}>
-            {Object.entries(TASK_LABELS).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
-          </select>
+          <div className="mt-2 flex items-center gap-2">
+            {taskCode === 'bind_skland' && <SklandIcon />}
+            <select className="tool-field min-w-0" value={taskCode} onChange={(event) => setTaskCode(event.currentTarget.value as OnboardingTaskCode)}>
+              {Object.entries(TASK_LABELS).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+            </select>
+          </div>
         </Field>
         <label className="mt-4 flex items-center gap-2 text-sm">
           <input type="checkbox" checked={draft.enabled} onChange={(event) => update({ enabled: event.currentTarget.checked })} />新版本启用

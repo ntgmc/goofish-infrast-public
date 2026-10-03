@@ -187,7 +187,7 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/RedeemSection.tsx
   pages_tool_dashboard_RedeemSection_006: "免费个人排班",
   // src/pages/tool/dashboard/RedeemSection.tsx
-  pages_tool_dashboard_RedeemSection_007: "免费个人排班可查看完整游戏内轮换队列；MAA JSON 下载、原始数据、高级分析、批量导出和商用授权需要高级权限。",
+  pages_tool_dashboard_RedeemSection_007: "免费个人排班可查看完整游戏内轮换队列；MAA JSON 下载可通过高级体验期或导出体验券使用，完整原始数据与高级分析需要高级权限。",
   // src/pages/tool/dashboard/RedeemSection.tsx
   pages_tool_dashboard_RedeemSection_008: "档案名称",
   // src/pages/tool/dashboard/RedeemSection.tsx

@@ -24,6 +24,7 @@ import { upgradeProfileWithCdk } from '../profile-redemption'
 import { useResultDownloads } from './useResultDownloads'
 import { submitWithMeteredBillingQuote, useMeteredBillingQuote } from './useMeteredBillingQuote'
 import { useResultHistoryPagination } from './useResultHistoryPagination'
+import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
 export interface Props {
   profileId: string;
   profile: UserGameAccount;
@@ -89,8 +90,8 @@ export function useOptimizeWorkflow(props: Props) {
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
   const [workspaceBusyAction, setWorkspaceBusyAction] = useState<string | null>(null)
   const { quote: billingQuote, loading: billingQuoteLoading, error: billingQuoteError, refresh: loadBillingQuote } = useMeteredBillingQuote(profile.kind, profileId)
-  const addOnQuoteRequired = profile.kind === 'metered_personal' || profile.kind === 'metered_commercial'
-  const scenarioQuoteRequired = profile.kind === 'metered_personal' || profile.kind === 'metered_commercial'
+  const addOnQuoteRequired = METERED_BILLING_AVAILABLE && (profile.kind === 'metered_personal' || profile.kind === 'metered_commercial')
+  const scenarioQuoteRequired = METERED_BILLING_AVAILABLE && (profile.kind === 'metered_personal' || profile.kind === 'metered_commercial')
   const { quote: incrementalBillingQuote, loading: incrementalBillingQuoteLoading, error: incrementalBillingQuoteError, refresh: refreshIncrementalBillingQuote } = useMeteredBillingQuote(profile.kind, profileId, 'incremental_recompute', addOnQuoteRequired)
   const { quote: scenarioBillingQuote, loading: scenarioBillingQuoteLoading, error: scenarioBillingQuoteError, refresh: refreshScenarioBillingQuote } = useMeteredBillingQuote(profile.kind, profileId, 'scenario_comparison', scenarioQuoteRequired)
 

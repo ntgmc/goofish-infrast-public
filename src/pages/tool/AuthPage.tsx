@@ -3,6 +3,8 @@ import AuthForm from '../../components/AuthForm'
 import BrandLogo from '../../components/BrandLogo'
 import DeferredFeatureMenu from '../../components/DeferredFeatureMenu'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
+import SklandIcon from '../../components/SklandIcon'
+import type { ReactNode } from 'react'
 import type { Announcement, AuthSuccessResponse } from '../../lib/types'
 import { copy } from '../../copy/index'
 
@@ -35,7 +37,7 @@ export default function AuthPage({
               {copy.auth.pages_tool_AuthPage_004}</p>
             <dl className="landing-fact-strip mt-8">
               <AuthFact label={copy.auth.pages_tool_AuthPage_005} value={copy.auth.pages_tool_AuthPage_006} />
-              <AuthFact label={copy.auth.pages_tool_AuthPage_007} value={copy.auth.pages_tool_AuthPage_008} />
+              <AuthFact label={<><SklandIcon className="mr-2" />{copy.auth.pages_tool_AuthPage_007}</>} value={copy.auth.pages_tool_AuthPage_008} />
               <AuthFact label={copy.auth.pages_tool_AuthPage_009} value="MAA JSON" />
             </dl>
           </section>
@@ -54,7 +56,7 @@ export default function AuthPage({
   )
 }
 
-function AuthFact({ label, value }: { label: string; value: string }) {
+function AuthFact({ label, value }: { label: ReactNode; value: string }) {
   return (
     <div className="px-4 py-4">
       <dt className="text-xs font-medium text-ink-muted">{label}</dt>

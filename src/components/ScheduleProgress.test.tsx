@@ -86,7 +86,7 @@ describe('ScheduleProgress motion', () => {
     expect(screen.queryByText('正在取消任务')).not.toBeInTheDocument()
   })
 
-  it('shows reserved, settled, and released billing snapshots', () => {
+  it('keeps legacy billing snapshots out of visible task progress', () => {
     const billing = {
       billing_kind: 'metered_personal' as const,
       pricing_version: '2026-08-09-v4',
@@ -96,13 +96,14 @@ describe('ScheduleProgress motion', () => {
       charge: '1000.00',
     }
     const { rerender } = render(<ScheduleProgress progress={createProgress({ billing: { ...billing, status: 'reserved' } })} />)
-    expect(screen.getByText('计算中暂扣 1000.00 积分')).toBeInTheDocument()
+    expect(screen.queryByText(/积分/)).not.toBeInTheDocument()
 
     rerender(<ScheduleProgress progress={createProgress({ completedAt: NOW, estimatePhase: 'completed', billing: { ...billing, status: 'settled' } })} />)
-    expect(screen.getByText('已扣除 1000.00 积分')).toBeInTheDocument()
+    expect(screen.queryByText(/积分/)).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('排班方案已就绪')
 
     rerender(<ScheduleProgress progress={createProgress({ estimatePhase: 'failed', billing: { ...billing, status: 'released' } })} />)
-    expect(screen.getByText('已退回 1000.00 积分')).toBeInTheDocument()
+    expect(screen.queryByText(/积分/)).not.toBeInTheDocument()
     expect(screen.getByText('任务未完成')).toBeInTheDocument()
   })
 

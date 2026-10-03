@@ -6,6 +6,8 @@ import { AnimatedValue, RevealItem } from '../../../components/MotionPrimitives'
 import { PaginationControls } from '../shared/PaginationControls'
 import { requestAdminOperationReason } from '../../../lib/admin-operation-reason'
 import type { BulkCdkAction } from './bulk-actions'
+import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
+import { copy } from '../../../copy'
 
 export function CdkTable({ records, selected, filters, search, pagination, loading, busyAction, onSearchChange, onPageChange, onPageSizeChange, onFilterChange, onSelect, onBulk, onPatch, onOpenDetail, onDelete }: {
   records: AdminCdkRecord[];
@@ -78,7 +80,7 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
           <select value={filters.cdk_type} onChange={(event) => onFilterChange({ cdk_type: event.currentTarget.value as CdkTypeFilter })} className="tool-field">
             <option value="all">全部类型</option>
             <option value="profile">档案兑换</option>
-            <option value="balance">余额兑换</option>
+            {METERED_BILLING_AVAILABLE && <option value="balance">余额兑换</option>}
             <option value="item">道具</option>
           </select>
         </label>
@@ -115,7 +117,7 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
                 <tr key={record.code_hash} className="hover:bg-surface-2/50">
                     <td className="px-4 py-4 align-top"><input className="h-4 w-4 accent-brand-500" type="checkbox" disabled={busy} aria-label={`选择 CDK ${record.cdk_id}`} checked={selected.includes(record.code_hash)} onChange={(event) => onSelect(event.currentTarget.checked ? [...selected, record.code_hash] : selected.filter((hash) => hash !== record.code_hash))} /></td>
                     <td className="px-4 py-4 align-top font-mono text-ink-primary">{record.cdk_id}</td>
-                    <td className="px-4 py-4 align-top"><StatusPill status={record.status} /><div className="mt-1 text-xs text-ink-muted">{record.cdk_type === 'balance' ? `余额 ${record.amount} 积分` : record.cdk_type === 'item' ? itemCdkLabel(record) : profileCdkLabel(record)}</div></td>
+                    <td className="px-4 py-4 align-top"><StatusPill status={record.status} /><div className="mt-1 text-xs text-ink-muted">{record.cdk_type === 'balance' ? METERED_BILLING_AVAILABLE ? `余额 ${record.amount} 积分` : copy.admin.retired_cdk : record.cdk_type === 'item' ? itemCdkLabel(record) : profileCdkLabel(record)}</div></td>
                     <td className="px-4 py-4 align-top text-ink-secondary">
                       <div>{record.operator_count ?? '-'} 干员 / 生成 {record.schedule_generate_count ?? 0}</div>
                       <div className="mt-1 text-xs text-ink-muted">风险 {record.risk_event_count ?? 0}</div>
@@ -206,7 +208,7 @@ function CdkDetailPanel({
           <div className="flex flex-wrap items-center gap-2">
             <h2 id="admin-cdk-detail-title" className="font-mono text-base font-semibold text-ink-primary">{detail.cdk_id}</h2>
             <StatusPill status={detail.status} />
-            <span className="tool-status tool-status--current">{detail.cdk_type === 'balance' ? `余额 ${detail.amount} 积分` : detail.cdk_type === 'item' ? itemCdkLabel(detail) : profileCdkLabel(detail)}</span>
+            <span className="tool-status tool-status--current">{detail.cdk_type === 'balance' ? METERED_BILLING_AVAILABLE ? `余额 ${detail.amount} 积分` : copy.admin.retired_cdk : detail.cdk_type === 'item' ? itemCdkLabel(detail) : profileCdkLabel(detail)}</span>
           </div>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">订单备注：{detail.order_note || '-'}</p>
         </div>

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../../components/ui/dialog'
+import SklandIcon from '../../../components/SklandIcon'
 import type { AdminUserDetail } from '../contracts'
 
 export function WorkspaceExportDialog({
@@ -84,6 +85,7 @@ export function WorkspaceExportDialog({
                 <span className="block text-sm font-medium text-ink-primary">{profile.display_name || '账号档案'}</span>
                 {profile.skland_binding && (
                   <span className="mt-1 block text-xs text-ink-secondary">
+                    <SklandIcon className="mr-2" />
                     {profile.skland_binding.nickname} / {profile.skland_binding.uid} / {profile.skland_binding.channel_name}
                   </span>
                 )}

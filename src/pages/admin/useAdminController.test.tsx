@@ -112,6 +112,22 @@ describe('useAdminController announcement drafts', () => {
     expect(result.current.permission).toBe('advanced')
   })
 
+  it('opens user details without requesting the retired balance endpoint', async () => {
+    const originalImplementation = adminApi.json.getMockImplementation()!
+    const detail = { user: { id: 'user-1' }, profiles: [] } as unknown as AdminUserDetail
+    adminApi.json.mockImplementation(async (url: string, init?: { method?: string; json?: unknown }) => {
+      if (url.startsWith('/api/admin/users?user_id=')) return { detail }
+      return originalImplementation(url, init)
+    })
+    const { result } = renderHook(() => useAdminController())
+    await waitForHydration(result)
+    await act(async () => result.current.loadUserDetail(detail.user))
+    expect(result.current.selectedUserDetail).toEqual(detail)
+    expect(result.current.selectedUserBalance).toBeNull()
+    expect(result.current.error).toBeNull()
+    expect(adminApi.json.mock.calls.some(([url]) => url.startsWith('/api/admin/balance'))).toBe(false)
+  })
+
   it('flushes the latest edit before session reset and restores it after login', async () => {
     const { result } = renderHook(() => useAdminController())
     await waitForHydration(result)

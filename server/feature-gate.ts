@@ -41,7 +41,9 @@ function requiredFeatures(pathname: string, method: string): SiteFeatureKey[] {
   if (pathname === '/api/user/profiles/preview') return ['free_preview']
   if (pathname === '/api/user/profiles/redeem') return ['cdk_redemption']
   if (pathname === '/api/user/cdk/redeem') return ['cdk_redemption']
-  if (pathname === '/api/user/balance/redeem') return ['cdk_redemption']
+  if (pathname === '/api/user/balance') return ['metered_billing']
+  if (pathname === '/api/user/balance/redeem') return ['metered_billing', 'cdk_redemption']
+  if (pathname === '/api/admin/balance' || pathname === '/api/admin/commercial') return ['metered_billing']
   if (pathname === '/api/user/profiles/depot-value') return ['profiles', 'depot_value']
   if (pathname === '/api/user/profiles/metered-personal' || pathname === '/api/user/commercial/profiles'
     || pathname === '/api/user/billing/quote') return ['profiles', 'schedule_generation', 'metered_billing']

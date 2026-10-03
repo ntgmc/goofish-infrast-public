@@ -28,9 +28,9 @@ export type PublicPersonalUseDeclaration = {
 }
 
 export const PERSONAL_USE_DECLARATION = Object.freeze({
-  id: 'personal_use_v1_1',
-  version: 'V1.1',
-  effectiveDate: '2026-07-31',
+  id: 'personal_use_v1_2',
+  version: 'V1.2',
+  effectiveDate: '2026-10-03',
   title: personalUseCopy.declaration_title,
   sections: personalUseCopy.sections as readonly PersonalUseDeclarationSection[],
 })

@@ -5,6 +5,7 @@ import type { OptimizeCalculationStage, OptimizeJobPriority, OptimizeResult } fr
 import type { OptimizationBillingSnapshot } from '../lib/optimization-contracts'
 import { copy } from '../copy/index'
 import { getScheduleProgressPercent, isScheduleProgressPaused } from './schedule-progress-model'
+import { METERED_BILLING_AVAILABLE } from '../lib/site-features'
 
 export { SCHEDULE_PROGRESS_COMPLETION_DURATION_MS } from './schedule-progress-model'
 
@@ -109,7 +110,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
             <h3 role="status" aria-live="polite" aria-atomic="true" className={`${compact ? 'mt-2 text-base' : 'mt-3 text-lg'} font-semibold text-ink-primary`}>{task.title}</h3>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-secondary">{task.detail}</p>
             {task.adjustmentLabel && <p className="mt-3 tool-status tool-status--current max-w-full">{task.adjustmentLabel}</p>}
-            {progress.billing && <p className={`mt-3 tool-status max-w-full ${progress.billing.status === 'settled' ? 'tool-status--current' : progress.billing.status === 'released' ? 'tool-status--warning' : ''}`}>
+            {METERED_BILLING_AVAILABLE && progress.billing && <p className={`mt-3 tool-status max-w-full ${progress.billing.status === 'settled' ? 'tool-status--current' : progress.billing.status === 'released' ? 'tool-status--warning' : ''}`}>
               {formatBillingStatus(progress.billing)}
             </p>}
           </div>
@@ -323,7 +324,7 @@ function getStatusDetail(
   estimateContext: string,
 ): string {
   if (status === 'cancelled') return copy.common.components_ScheduleProgress_107
-  if (status === 'failed') return progress.billing?.status === 'released'
+  if (status === 'failed') return METERED_BILLING_AVAILABLE && progress.billing?.status === 'released'
     ? copy.metered.progress.failed_released
     : copy.metered.progress.failed
   if (status === 'cancelling') return copy.common.components_ScheduleProgress_103

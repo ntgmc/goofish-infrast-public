@@ -76,6 +76,7 @@ const standaloneAppPaths = new Set([
   '/tools/depot-value',
   '/tools/manual-schedule',
   '/verify-email',
+  '/v2',
 ])
 
 export function dashboardPath(section: DashboardSection): string {

@@ -10,7 +10,7 @@ import ThemeSwitcher from '../../components/ThemeSwitcher'
 import type { DashboardSection } from '../../lib/app-routes'
 import type { Announcement, AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
 import { copy } from '../../copy/index'
-import { DEFAULT_SITE_FEATURES, type SiteFeatures } from '../../lib/site-features'
+import { DEFAULT_SITE_FEATURES, METERED_BILLING_AVAILABLE, type SiteFeatures } from '../../lib/site-features'
 import { NotificationBell } from '../../components/NotificationCenter'
 import type { WorkspaceEntryState } from './WorkspaceEntryPreference'
 
@@ -92,7 +92,7 @@ export default function AccountDashboard({
     : undefined
   const sections = (Object.keys(labels) as DashboardSection[]).filter((key) => {
     if (key === 'profiles') return features.profiles
-    if (key === 'commercial') return features.metered_billing
+    if (key === 'commercial' || key === 'balance') return METERED_BILLING_AVAILABLE && features.metered_billing
     if (key === 'tools') return features.tools
     if (key === 'redeem') return features.cdk_redemption || features.free_preview
     if (key === 'invitations') return features.invitations
@@ -236,12 +236,12 @@ export default function AccountDashboard({
           <Suspense fallback={<SectionFallback />}>
             <AnimatedPresenceRegion motionKey={displayedSection}>
               {displayedSection === 'profiles' && <ProfilesSection profiles={profiles} openingProfileId={openingProfileId} onOpen={onOpenProfile} onEdit={onPayload} meteredEnabled={features.metered_billing} />}
-              {displayedSection === 'commercial' && <CommercialProfilesSection onOpen={onOpenProfile} />}
+              {displayedSection === 'commercial' && METERED_BILLING_AVAILABLE && features.metered_billing && <CommercialProfilesSection onOpen={onOpenProfile} />}
               {displayedSection === 'tools' && <ToolsSection />}
               {displayedSection === 'redeem' && <RedeemSection autoStartTour={!suppressInitialRedeemTour} tourReplayToken={redeemTourReplayToken} onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} onInventoryRedeemed={() => onSectionChange('inventory', { replace: true })} />}
               {displayedSection === 'invitations' && <InvitationsSection />}
               {displayedSection === 'inventory' && <InventorySection onPayload={onPayload} onLifetimeProfileCreated={() => onSectionChange('profiles', { replace: true })} onViewProfiles={() => onSectionChange('profiles')} />}
-              {displayedSection === 'balance' && <BalanceSection redemptionEnabled={features.cdk_redemption} />}
+              {displayedSection === 'balance' && METERED_BILLING_AVAILABLE && features.metered_billing && <BalanceSection redemptionEnabled={features.cdk_redemption} />}
               {displayedSection === 'announcements' && <AnnouncementsSection onUnreadCountChange={onAnnouncementUnreadCountChange} />}
               {displayedSection === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} onPayload={onPayload} workspaceEntry={workspaceEntry} />}
             </AnimatedPresenceRegion>

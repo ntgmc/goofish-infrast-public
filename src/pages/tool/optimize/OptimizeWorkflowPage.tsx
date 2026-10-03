@@ -17,6 +17,7 @@ import { useSiteFeatures } from '../../../lib/site-feature-context'
 import type { WorkspaceResultHistorySummary } from '../../../lib/types'
 import SessionLoader from '../../../components/SessionLoader'
 import { restoreScenarioComparisonJob } from './scenario-lab/useScenarioComparison'
+import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
 
 
 import PaidCapabilityPreview, { LockedScenarioPreview } from './PaidCapabilityPreview'
@@ -28,7 +29,7 @@ export default function OptimizeWorkflowPage(props: Props) {
   const taskCenterTriggerRef = useRef(taskCenterButtonRef)
   const taskCenter = useOptimizationTaskCenter(props.profileId, taskCenterOpen)
   const { license, progress, profile, onReset, announcement, redeemedNotice, permission, billingQuote, billingQuoteLoading, billingQuoteError, refreshBillingQuote, incrementalBillingQuote, incrementalBillingQuoteLoading, incrementalBillingQuoteError, scenarioQuoteRequired, scenarioBillingQuote, scenarioBillingQuoteLoading, scenarioBillingQuoteError, refreshScenarioBillingQuote, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, priorityCouponLoading, priorityCouponError, refreshRewardBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, inventoryLoaded, inventoryLoading, inventoryError, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, refreshInventory, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userCanDownloadFullResult, userCanViewFullData, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults, resultHistoryHasMore, archivedResultsHasMore, resultHistoryLoadingScope, resultHistoryError, loadMoreResultHistory, loadMoreArchivedResults, latestWorkspaceResult, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleRenameArchivedHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleGenerate, handleIncrementalRecompute, handleDownloadMAA, handleDownloadFullResult, handleUpgradePreviewProfile, declarationDialog } = useOptimizeWorkflow(props)
-  const isMetered = profile.kind === 'metered_personal' || profile.kind === 'metered_commercial'
+  const isMetered = METERED_BILLING_AVAILABLE && (profile.kind === 'metered_personal' || profile.kind === 'metered_commercial')
   const generationDisabledReason = !features.schedule_generation
     ? copy.features.schedule_read_only
     : isMetered && billingQuoteLoading
@@ -37,7 +38,7 @@ export default function OptimizeWorkflowPage(props: Props) {
         ? copy.metered.quote.load_failed
         : isMetered && !billingQuote
           ? copy.metered.quote.load_failed
-          : billingQuote?.sufficient === false
+          : isMetered && billingQuote?.sufficient === false
             ? copy.metered.quote.insufficient
             : null
   const [mainTourSeenAtMount] = useState(() => hasCompletedTour('optimize-overview', 2))
@@ -400,7 +401,7 @@ function MeteredBillingNotice({
   error: string | null
   onRetry: () => Promise<unknown>
 }) {
-  if (profile.kind !== 'metered_personal' && profile.kind !== 'metered_commercial') return null
+  if (!METERED_BILLING_AVAILABLE || (profile.kind !== 'metered_personal' && profile.kind !== 'metered_commercial')) return null
   return <div className={`tool-alert mb-4 ${error || quote?.sufficient === false ? 'tool-alert--error' : 'tool-alert--warning'}`} role={error ? 'alert' : 'status'}>
     <p>{error ?? (quote ? copy.metered.quote.summary(quote.charge, quote.available, quote.tier, quote.sufficient) : copy.metered.quote.loading)}</p>
     <div className="mt-3 flex flex-wrap gap-2">

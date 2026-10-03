@@ -1,5 +1,18 @@
 [
   {
+    "date": "2026-10-03",
+    "scope": "page",
+    "macrostructure": "Workbench",
+    "theme": "custom",
+    "theme_axes": "light / geometric-sans / warm-copper",
+    "vibe": "result-led, composed, legible, precise",
+    "enrichment": "none",
+    "nav": "existing side rail",
+    "footer": "Ft2 inline rule",
+    "brief": "V2 result workspace with slate navigation, mist surfaces, and copper actions",
+    "reference": "riic.autos result hierarchy; independent palette and implementation"
+  },
+  {
     "date": "2026-08-08",
     "scope": "page",
     "macrostructure": "Long Document",

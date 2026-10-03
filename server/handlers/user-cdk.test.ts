@@ -68,12 +68,15 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers())
 
 describe('user CDK redemption', () => {
-  it('routes balance CDKs to the points page without claiming them', async () => {
+  it('rejects retired balance CDKs without claiming them or suggesting a closed entry', async () => {
     mocks.findCdkRecordByCode.mockResolvedValue({ key: 'cdk/balance.json', codeHash: 'b'.repeat(64), record: { cdk_type: 'balance' } })
     const response = await userCdkHandler(request())
-    expect(response.status).toBe(409)
-    await expect(response.json()).resolves.toMatchObject({ code: 'cdk_type_mismatch', target: '/tool/balance' })
+    expect(response.status).toBe(503)
+    const body = await response.json()
+    expect(body).toMatchObject({ code: 'feature_disabled', feature: 'metered_billing' })
+    expect(body).not.toHaveProperty('target')
     expect(mocks.redeemCdkAtomically).not.toHaveBeenCalled()
+    expect(mocks.grantItemInTransaction).not.toHaveBeenCalled()
   })
 
   it('rejects legacy item records without claiming the CDK', async () => {
