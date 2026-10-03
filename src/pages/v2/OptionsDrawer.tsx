@@ -3,7 +3,8 @@ import { ArrowRight, Check, FileClock, LogOut, Search, Upload, UserRound } from 
 import { Link } from 'react-router'
 import AuthForm from '../../components/AuthForm'
 import SklandBindingDialog from '../../components/SklandBindingDialog'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/dialog'
+import { Dialog, DialogDescription, DialogTitle } from '../../components/ui/dialog'
+import { MotionDrawerContent } from '../../components/ui/motion-drawer'
 import { copy } from '../../copy'
 import { validateScheduleConfig } from '../../lib/config'
 import { useSiteFeatures } from '../../lib/site-feature-context'
@@ -15,6 +16,7 @@ import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
 import type { useToolSession } from '../tool/useToolSession'
 import { Avatar } from './ScheduleBoard'
 import { getProfileAccessLabel, parseOperatorsText } from '../tool/tool-utils'
+import V2Transition from './V2Transition'
 
 const ConfigEditor = lazy(() => import('../../components/ConfigEditor'))
 const text = copy.v2
@@ -75,11 +77,12 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
 
   return (
     <Dialog open={panel !== null} onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent className={`v2-drawer ${isConfig ? 'v2-drawer-wide' : ''}`} showCloseButton closeLabel={text.close}>
+      <MotionDrawerContent open={panel !== null} className={`v2-drawer ${isConfig ? 'v2-drawer-wide' : ''}`} closeLabel={text.close}>
         <div className="v2-drawer-heading">
           <DialogTitle>{panel === 'room' && room ? `${room.label} ${room.indexLabel}` : panel ? titles[panel] : ''}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </div>
+        <V2Transition motionKey={isConfig ? 'config' : panel === 'room' ? `room-${room?.key}` : panel ?? 'closed'} className="v2-drawer-body">
         {isConfig && (
           <>
             <Suspense fallback={<p className="v2-muted">{text.loadingConfig}</p>}>
@@ -165,7 +168,8 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
           <h3>{text.roomDetails}</h3><ul className="v2-room-detail-list">{room.row?.detailItems.map((item) => <li key={item}>{item}</li>)}</ul>
           <p className="v2-muted">{text.estimateNotice}</p>
         </div>}
-      </DialogContent>
+        </V2Transition>
+      </MotionDrawerContent>
       <SklandBindingDialog open={sklandOpen} profile={session.activeProfile} onOpenChange={setSklandOpen}
         onPayload={(payload) => {
           if (!payload.user) return

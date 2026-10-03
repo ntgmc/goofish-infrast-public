@@ -1,14 +1,17 @@
-import { useState, type ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
+import { AnimatePresence, LayoutGroup, motion, useIsPresent, useReducedMotion } from 'motion/react'
 import { Activity, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, CalendarClock, Check, ChevronDown, ChevronRight, Clock3, Download, Factory, FileClock, Gem, LayoutDashboard, Menu, RefreshCw, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Users, WalletCards, X, Zap } from 'lucide-react'
 import { Link } from 'react-router'
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
+import { AnimatedValue, MotionNavIndicator, RevealItem, StaggeredReveal, motionTokens } from '../../components/MotionPrimitives'
 import { formatAmount, prepareResult } from '../../components/result-panel/formatters'
 import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
 import { normalizeScheduleMode, parseShiftHours, SCHEDULE_MODE_LABELS } from '../../lib/config'
 import type { LicenseConfig, LicenseOperator, OptimizeResult, PermissionMode, WorkspaceResultHistorySummary } from '../../lib/types'
 import ScheduleBoard, { Avatar, OutputChart } from './ScheduleBoard'
 import OptionsDrawer, { type OptionPanel, type V2Session } from './OptionsDrawer'
+import V2Transition from './V2Transition'
 
 const text = copy.v2
 type View = 'summary' | 'details' | 'analysis'
@@ -42,8 +45,12 @@ export default function V2Dashboard({ session, result, operators, config, sample
   const [panel, setPanel] = useState<OptionPanel | null>(null)
   const [room, setRoom] = useState<BoardRoom | null>(null)
   const [view, setView] = useState<View>('summary')
+  const [shift, setShift] = useState(0)
+  const [boardView, setBoardView] = useState<'grid' | 'list'>('grid')
   const [mobileNavigation, setMobileNavigation] = useState(false)
   const [downloadNotice, setDownloadNotice] = useState(false)
+  const reduceMotion = useReducedMotion()
+  const motionId = useId()
   const prepared = prepareResult(result, result.schedule_mode === 'rotation', result.dormitory_rule === 'maa_pure_autofill', operators)
   const owned = operators.filter((operator) => operator.own)
   const resultMode = normalizeScheduleMode(result.schedule_mode)
@@ -65,8 +72,12 @@ export default function V2Dashboard({ session, result, operators, config, sample
   }
 
   return (
+    <LayoutGroup id={motionId}>
     <div className="v2-app">
-      {mobileNavigation && <button className="v2-nav-scrim" type="button" onClick={() => setMobileNavigation(false)} aria-label={text.close} />}
+      <AnimatePresence>
+        {mobileNavigation && <motion.button key="navigation-scrim" className="v2-nav-scrim" type="button" onClick={() => setMobileNavigation(false)} aria-label={text.close}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: motionTokens.duration.exit }} />}
+      </AnimatePresence>
       <aside className={`v2-sidebar ${mobileNavigation ? 'v2-sidebar-open' : ''}`}>
         <Link to="/v2" className="v2-brand"><span className="v2-brand-mark"><Building2 size={24} strokeWidth={1.8} /></span>
           <span><strong>{text.brand}<sup>V2</sup></strong><small>{text.brandDescription}</small></span></Link>
@@ -98,7 +109,9 @@ export default function V2Dashboard({ session, result, operators, config, sample
             <button className="v2-profile-button" type="button" onClick={() => openPanel('account')}><span className="v2-profile-avatar">{name.slice(0, 1)}</span><span>{name}</span><ChevronDown size={14} /></button>
           </div>
         </header>
-        <main className="v2-main" tabIndex={-1} data-route-focus>
+        <motion.main className="v2-main" tabIndex={-1} data-route-focus
+          initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: motionTokens.duration.page, ease: motionTokens.ease.enter }}>
           <div className="v2-page-title"><div><h1>{text.title}</h1><p>{text.subtitle}</p></div></div>
           <div className="v2-ready-banner">
             <span className="v2-ready-icon"><Check size={25} strokeWidth={2} /></span>
@@ -112,27 +125,34 @@ export default function V2Dashboard({ session, result, operators, config, sample
           <div className="v2-result-context"><span><span className="v2-status-dot" />{sample ? text.sampleProfile : name}</span>
             <span><Building2 size={13} />{config.layout}</span><span><Users size={13} />{text.owned(owned.length)}</span><span><Clock3 size={13} />{text.shiftHours(hours.join(' / '))}</span>
             <button type="button" onClick={() => openPanel('config')}>{text.configure}<ChevronRight size={12} /></button></div>
-          {(loadingResult || error || notice || downloadNotice || configChanged) && <div className={`v2-feedback ${error ? 'v2-feedback-error' : ''}`} role={error ? 'alert' : 'status'} aria-live="polite">
+          <AnimatePresence initial={false}>
+          {(loadingResult || error || notice || downloadNotice || configChanged) && <FeedbackRegion key="feedback">
+          <div className={`v2-feedback ${error ? 'v2-feedback-error' : ''}`} role={error ? 'alert' : 'status'} aria-live="polite">
             {loadingResult ? text.loadingResult : error ?? notice ?? (downloadNotice ? text.exported : sample ? text.demoConfigChanged : text.configChanged)}
             {error && onRetryResult && <button type="button" onClick={onRetryResult}>{text.retry}</button>}
-          </div>}
+          </div></FeedbackRegion>}
+          </AnimatePresence>
           {children}
-          <div className="v2-metrics">
+          <StaggeredReveal className="v2-metrics">
             <Metric label={text.lmd} value={formatAmount(prepared.productionStats.lmd)} unit={text.daily} hint={text.outputSubtitle} product="LMD" />
             <Metric label={text.exp} value={formatAmount((prepared.productionStats.manufacturing['Battle Record'] ?? 0) * 1000)} unit={text.expUnit} hint={text.outputSubtitle} product="Battle Record" />
             <Metric label={text.totalEfficiency} value={formatAmount(prepared.totalEff)} unit="%" hint={text.efficiencyHint} icon={<Activity size={20} />} />
             <Metric label={text.sanity} value={prepared.productionSanity.value.toFixed(1)} unit={text.daily} hint={text.sanityHint} icon={<Gem size={20} />} />
-          </div>
+          </StaggeredReveal>
           <div className="v2-content-tabs" role="group" aria-label={text.resultTabs}>
-            {([['summary', text.summaryTab], ['details', text.detailsTab], ['analysis', text.analysisTab]] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => setView(id)}>{label}</button>)}
+            {([['summary', text.summaryTab], ['details', text.detailsTab], ['analysis', text.analysisTab]] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => setView(id)}>
+              {label}{view === id && <MotionNavIndicator layoutId="result-tab" variant="underline" />}
+            </button>)}
             <span><ShieldCheck size={14} />{sample ? text.sampleSource : text.ownSource}</span>
           </div>
+          <V2Transition motionKey={view}>
           <div className={`v2-results-grid ${view === 'details' ? 'v2-results-expanded' : ''}`}>
             {view === 'analysis' ? (
               <section className="v2-panel v2-analysis"><div className="v2-panel-heading"><h2>{text.analysisTab}</h2><span className="v2-neutral-tag">24h</span></div><OutputChart result={result} large />
                 <div className="v2-analysis-note"><Gem size={21} /><div><h3>{text.sanity}: {prepared.productionSanity.value.toFixed(1)} {text.daily}</h3><p>{prepared.productionSanity.note}</p></div></div><p className="v2-muted">{text.estimateNotice}</p></section>
             ) : (
-              <ScheduleBoard result={result} operators={operators} expanded={view === 'details'} onRoom={(nextRoom) => { setRoom(nextRoom); openPanel('room') }} />
+              <ScheduleBoard result={result} operators={operators} expanded={view === 'details'} shift={shift} onShiftChange={setShift}
+                view={boardView} onViewChange={setBoardView} onRoom={(nextRoom) => { setRoom(nextRoom); openPanel('room') }} />
             )}
             {view !== 'details' && <aside className="v2-result-aside">
               <section className="v2-panel v2-production-panel">
@@ -156,15 +176,17 @@ export default function V2Dashboard({ session, result, operators, config, sample
               </section>
             </aside>}
           </div>
+          </V2Transition>
           <div className="v2-sample-notice"><span className="v2-notice-icon"><Sparkles size={16} /></span><p>{sample ? text.sampleHint : text.estimateNotice}</p>{sample && <button type="button" onClick={() => openPanel('account')}>{session.user ? text.account : text.login}<ArrowRight size={14} /></button>}</div>
           <footer className="v2-footer"><span>{text.footer}</span><nav><Link to="/faq">{text.helpAction}</Link><Link to="/terms">{text.terms}</Link><Link to="/privacy">{text.privacy}</Link></nav></footer>
-        </main>
+        </motion.main>
       </div>
       <OptionsDrawer panel={panel} onClose={() => setPanel(null)} session={session} config={config} operators={operators}
         onUpdateConfig={onUpdateConfig} permission={permission} canEditConfig={canEditConfig} canUseIntermediateConfig={canUseIntermediateConfig}
         sample={sample} busy={busy} onImportOperators={onImportOperators}
         onAccount={() => openPanel('account')} history={history} onHistory={onHistory} room={room} />
     </div>
+    </LayoutGroup>
   )
 }
 
@@ -172,12 +194,25 @@ function UserIcon() {
   return <span className="v2-user-nav-icon"><Users size={18} /></span>
 }
 
+function FeedbackRegion({ children }: { children: ReactNode }) {
+  const reduceMotion = useReducedMotion()
+  const isPresent = useIsPresent()
+  return (
+    <motion.div className="v2-feedback-region" aria-hidden={isPresent ? undefined : true} inert={isPresent ? undefined : true}
+      initial={{ opacity: 0, height: reduceMotion ? 'auto' : 0 }} animate={{ opacity: 1, height: 'auto' }}
+      exit={{ opacity: 0, height: reduceMotion ? 'auto' : 0 }}
+      transition={{ duration: reduceMotion ? motionTokens.duration.exit : motionTokens.duration.enter, ease: motionTokens.ease.enter }}>
+      {children}
+    </motion.div>
+  )
+}
+
 function Metric({ label, value, unit, hint, product, icon }: { label: string; value: string; unit: string; hint: string; product?: string; icon?: ReactNode }) {
-  return <section className="v2-metric" aria-label={label}><div className="v2-metric-top"><span>{label}</span><span className="v2-metric-icon">{product ? <ProductIcon product={product} size={24} /> : icon}</span></div>
-    <p className="v2-metric-value">{value}<small>{unit}</small></p><p className="v2-metric-hint">{hint}</p></section>
+  return <RevealItem className="v2-metric"><section aria-label={label}><div className="v2-metric-top"><span>{label}</span><span className="v2-metric-icon">{product ? <ProductIcon product={product} size={24} /> : icon}</span></div>
+    <p className="v2-metric-value"><AnimatedValue value={value} /><small>{unit}</small></p><p className="v2-metric-hint">{hint}</p></section></RevealItem>
 }
 
 function OutputRow({ product, value }: { product: string; value: number }) {
   const labels: Record<string, string> = { LMD: copy.common.components_ConfigEditor_001, 'Battle Record': copy.common.components_ConfigEditor_004, 'Pure Gold': copy.common.components_ConfigEditor_003 }
-  return <div className="v2-output-row"><span><ProductIcon product={product} size={29} /><span>{labels[product]}</span></span><strong>{formatAmount(value)}<small>{text.daily}</small></strong></div>
+  return <div className="v2-output-row"><span><ProductIcon product={product} size={29} /><span>{labels[product]}</span></span><strong><AnimatedValue value={formatAmount(value)} /><small>{text.daily}</small></strong></div>
 }

@@ -73,8 +73,10 @@ it deliberately when changing the shared design.
   and efficiency carry the visual weight.
 - Keep generation and export together beside result status. Copper marks
   the primary action and focus; station colors identify room types only.
-- No decorative reveal. Button press and mobile navigation transitions
-  disappear under reduced motion.
+- Keep motion quiet: short page and metric entrances, shared active indicators,
+  result and shift crossfades, card layout transitions, and drawer enter/exit.
+  Reduced motion removes translation, scaling, layout transitions, and chart
+  drawing; retained opacity transitions stay at or below 150ms.
 - The public result layout at `riic.autos` informed result hierarchy,
   adjacent shift controls, and portrait-led assignments. Use an independent
   palette and implementation.

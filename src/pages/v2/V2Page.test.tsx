@@ -31,6 +31,7 @@ const summary: WorkspaceResultHistorySummary = {
 }
 
 beforeEach(() => {
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
   mocks.features.mockReturnValue({ status: 'ready', features: DEFAULT_SITE_FEATURES, retry: vi.fn() })
   session = {
     user: null, activeProfile: null, license: null, workspace: null, configOverride: null,
@@ -51,6 +52,11 @@ afterEach(() => {
 
 function mount() {
   return render(<MemoryRouter initialEntries={['/v2']}><V2Page /></MemoryRouter>)
+}
+
+async function dismissDrawer(user: ReturnType<typeof userEvent.setup>) {
+  await user.keyboard('{Escape}')
+  await waitFor(() => expect(document.querySelector('[data-slot="dialog-content"]')).not.toBeInTheDocument())
 }
 
 function connect() {
@@ -105,8 +111,56 @@ describe('V2 results-first workspace', () => {
     expect(third).toHaveAttribute('aria-selected', 'true')
     await user.click(screen.getByRole('button', { name: /贸易站.*银灰/ }))
     expect(await screen.findByRole('dialog')).toHaveTextContent(copy.v2.roomDetails)
-    await user.keyboard('{Escape}')
+    await dismissDrawer(user)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('preserves the selected shift and display mode across result views without generating', async () => {
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('tab', { name: /第 2 班/ }))
+    await user.click(screen.getByRole('button', { name: copy.v2.list }))
+    await user.click(screen.getByRole('button', { name: copy.v2.detailsTab }))
+    expect(screen.getByRole('tab', { name: /第 2 班/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('button', { name: copy.v2.list })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(screen.getByRole('tabpanel')).getByText('能天使')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: copy.v2.analysisTab }))
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: copy.v2.summaryTab }))
+    expect(screen.getByRole('tab', { name: /第 2 班/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('button', { name: copy.v2.list })).toHaveAttribute('aria-pressed', 'true')
+    await waitFor(() => expect(screen.getByRole('tabpanel')).toBeVisible())
+    expect(mocks.workflow).not.toHaveBeenCalled()
+  })
+
+  it('exposes only the current team during rapid shift changes and keeps keyboard focus on the selected tab', async () => {
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('tab', { name: /第 2 班/ }))
+    await user.keyboard('{ArrowRight}{Home}{End}')
+    const third = screen.getByRole('tab', { name: /第 3 班/ })
+    expect(third).toHaveFocus()
+    expect(third).toHaveAttribute('aria-selected', 'true')
+    const board = within(screen.getByRole('tabpanel'))
+    expect(board.getByRole('button', { name: /贸易站.*银灰/ })).toBeInTheDocument()
+    expect(board.queryByRole('button', { name: /贸易站.*能天使/ })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
+  })
+
+  it('restores focus and releases the modal after its exit animation before reopening', async () => {
+    const user = userEvent.setup()
+    mount()
+    const opener = screen.getByRole('button', { name: copy.v2.operators })
+    await user.click(opener)
+    const dialog = await screen.findByRole('dialog', { name: copy.v2.operators })
+    expect(dialog).toContainElement(document.activeElement as HTMLElement)
+    await dismissDrawer(user)
+    await waitFor(() => expect(opener).toHaveFocus())
+    expect(document.body).not.toHaveAttribute('data-scroll-locked')
+    await user.click(opener)
+    expect(await screen.findByRole('dialog', { name: copy.v2.operators })).toBeInTheDocument()
+    await dismissDrawer(user)
+    await waitFor(() => expect(opener).toHaveFocus())
   })
 
   it('marks the correct drone target using one-based result indices in each shift', async () => {
@@ -148,7 +202,7 @@ describe('V2 results-first workspace', () => {
     expect(within(dialog).queryByText(copy.v2.sampleOperators.degenbrecher)).not.toBeInTheDocument()
     expect(session.persistWorkspacePatch).not.toHaveBeenCalled()
     expect(mocks.workflow).not.toHaveBeenCalled()
-    await user.keyboard('{Escape}')
+    await dismissDrawer(user)
     expect(screen.getByRole('status')).toHaveTextContent(copy.v2.demoConfigChanged)
   })
 
@@ -169,7 +223,7 @@ describe('V2 results-first workspace', () => {
     expect(within(dialog).queryByRole('combobox')).not.toBeInTheDocument()
     await user.tab()
     expect(within(dialog).getByRole('button', { name: copy.v2.uploadMaa })).toHaveFocus()
-    await user.keyboard('{Escape}')
+    await dismissDrawer(user)
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('54,720')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /第 1 班/ })).toBeInTheDocument()
@@ -278,7 +332,7 @@ describe('V2 results-first workspace', () => {
     expect(within(dialog).queryByText('锏')).not.toBeInTheDocument()
     expect(session.persistWorkspacePatch).not.toHaveBeenCalled()
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
-    await user.keyboard('{Escape}')
+    await dismissDrawer(user)
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
@@ -301,7 +355,7 @@ describe('V2 results-first workspace', () => {
     expect(session.flushConfigSave).toHaveBeenCalledOnce()
     expect(vi.mocked(session.flushConfigSave).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(session.persistWorkspacePatch).mock.invocationCallOrder[0])
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
-    await user.keyboard('{Escape}')
+    await dismissDrawer(user)
     expect(screen.getByRole('status')).toHaveTextContent(copy.v2.configChanged)
   })
 
@@ -322,7 +376,7 @@ describe('V2 results-first workspace', () => {
     expect(within(dialog).getByText(copy.v2.ownedLabel)).toBeInTheDocument()
     expect(within(dialog).getByText(copy.v2.elite(2))).toBeInTheDocument()
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
-    await user.keyboard('{Escape}')
+    await dismissDrawer(user)
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('54,720')).toBeInTheDocument()
   })

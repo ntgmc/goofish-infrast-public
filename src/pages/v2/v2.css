@@ -142,6 +142,7 @@
   border-radius: var(--radius-v2-control);
   color: var(--color-v2-rail-muted);
   text-align: left;
+  transition: background-color var(--dur-fast) ease-out, color var(--dur-fast) ease-out;
 }
 
 .v2-nav-item:hover {
@@ -386,7 +387,7 @@
   font-weight: 500;
   text-decoration: none;
   white-space: nowrap;
-  transition: transform var(--dur-fast) var(--ease-out);
+  transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-fast) ease-out, border-color var(--dur-fast) ease-out;
 }
 
 .v2-button:active:not(:disabled) {
@@ -595,12 +596,9 @@
   font-weight: 600;
 }
 
-.v2-content-tabs > button[aria-pressed="true"]::after {
-  position: absolute;
-  inset: auto 0 -1px;
-  height: 2px;
+.v2-content-tabs .motion-nav-indicator--underline {
+  bottom: -1px;
   background: var(--v2-accent);
-  content: "";
 }
 
 .v2-content-tabs > span {
@@ -622,6 +620,20 @@
 
 .v2-results-expanded {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.v2-transition {
+  position: relative;
+  min-width: 0;
+}
+
+.v2-transition-pane {
+  min-width: 0;
+}
+
+.v2-transition-pane[aria-hidden="true"] {
+  position: absolute;
+  inset: 0;
 }
 
 .v2-panel {
@@ -671,6 +683,8 @@
 }
 
 .v2-view-toggle button {
+  position: relative;
+  isolation: isolate;
   display: grid;
   width: 26px;
   height: 24px;
@@ -680,8 +694,13 @@
 }
 
 .v2-view-toggle button[aria-pressed="true"] {
-  background: var(--v2-paper);
   color: var(--v2-accent);
+}
+
+.v2-view-toggle .motion-nav-indicator {
+  border: 0;
+  border-radius: 3px;
+  background: var(--v2-paper);
 }
 
 .v2-shifts {
@@ -695,6 +714,8 @@
 }
 
 .v2-shifts > button {
+  position: relative;
+  isolation: isolate;
   min-width: 0;
   flex: 1;
   min-height: 60px;
@@ -707,12 +728,15 @@
 }
 
 .v2-shifts > button[aria-selected="true"] {
-  border-color: var(--v2-ink);
-  background: var(--v2-ink);
   color: var(--v2-paper);
 }
 
-.v2-shifts > button > span {
+.v2-shifts .motion-nav-indicator {
+  border-color: var(--v2-ink);
+  background: var(--v2-ink);
+}
+
+.v2-shifts > button > .v2-shift-label {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -764,6 +788,7 @@
   border-radius: var(--radius-v2-control);
   background: var(--color-v2-inset);
   text-align: left;
+  transition: background-color var(--dur-fast) ease-out;
 }
 
 .v2-room-card:hover {
@@ -1224,6 +1249,10 @@
   font-size: var(--text-sm);
 }
 
+.v2-feedback-region {
+  overflow: hidden;
+}
+
 .v2-feedback button {
   flex: none;
   text-decoration: underline;
@@ -1298,13 +1327,18 @@
   padding: 28px !important;
   border-radius: 12px 0 0 12px !important;
   background: var(--v2-paper) !important;
-  transform: none !important;
   translate: none !important;
   animation: none !important;
 }
 
 .v2-drawer-wide {
   width: min(800px, 100%) !important;
+}
+
+.v2-drawer-body > .v2-transition-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .v2-drawer .config-editor button {
