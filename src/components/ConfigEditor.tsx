@@ -578,10 +578,10 @@ export default function ConfigEditor({
           <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_051}</h3>
           <div className="mt-5 space-y-6">
             {showOrundumPlanning && (
-              <section aria-labelledby="config-orundum-heading" className="min-w-0 border-l-2 border-brand-300/60 bg-brand-500/5 px-4 py-4 sm:px-5">
+              <section aria-labelledby="config-orundum-heading" className="min-w-0 border-l-2 border-border bg-surface-2/50 px-4 py-4 sm:px-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h4 id="config-orundum-heading" className="flex items-center gap-2 text-sm font-semibold text-ink-primary">
-                    <Gem aria-hidden="true" className="h-4 w-4 shrink-0 text-brand-300" />
+                    <Gem aria-hidden="true" className="h-4 w-4 shrink-0 text-primary" />
                     {copy.common.components_ConfigEditor_052}
                   </h4>
                   <label className="flex min-h-11 items-center justify-between gap-3 text-sm text-ink-secondary sm:min-w-36">
@@ -618,7 +618,7 @@ export default function ConfigEditor({
                 </details>
               </section>
             )}
-            <section aria-labelledby="config-schedule-heading" className="min-w-0 space-y-5 border-l-2 border-brand-500/60 bg-brand-500/5 px-4 py-4 sm:px-5">
+            <section aria-labelledby="config-schedule-heading" className="min-w-0 space-y-5 border-l-2 border-border bg-surface-2/50 px-4 py-4 sm:px-5">
               <div>
                 <h4 id="config-schedule-heading" className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-primary">
                   <CalendarClock aria-hidden="true" className="h-4 w-4 shrink-0 text-brand-500" />
@@ -683,9 +683,9 @@ export default function ConfigEditor({
                 />
             )}
             </section>
-            <section aria-labelledby="config-dormitory-heading" className="min-w-0 border-l-2 border-success/60 bg-success/5 px-4 py-4 sm:px-5">
+            <section aria-labelledby="config-dormitory-heading" className="min-w-0 border-l-2 border-border bg-surface-2/50 px-4 py-4 sm:px-5">
               <h4 id="config-dormitory-heading" className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-primary">
-                <BedDouble aria-hidden="true" className="h-4 w-4 shrink-0 text-success" />
+                <BedDouble aria-hidden="true" className="h-4 w-4 shrink-0 text-primary" />
                 {copy.common.components_ConfigEditor_063}
               </h4>
               <div className="tool-inset grid gap-2 p-1 lg:grid-cols-3" role="group" aria-label={copy.common.components_ConfigEditor_064}>
@@ -722,10 +722,10 @@ export default function ConfigEditor({
                       : copy.common.components_ConfigEditor_067}
               </p>
             </section>
-            <section aria-labelledby="config-fiammetta-heading" className="min-w-0 space-y-3 border-l-2 border-error/60 bg-error/5 px-4 py-4 sm:px-5">
+            <section aria-labelledby="config-fiammetta-heading" className="min-w-0 space-y-3 border-l-2 border-border bg-surface-2/50 px-4 py-4 sm:px-5">
               <div className="flex min-h-11 items-center justify-between gap-3">
                 <h4 id="config-fiammetta-heading" className="flex items-center gap-2 text-sm font-semibold text-ink-primary">
-                  <Flame aria-hidden="true" className="h-4 w-4 shrink-0 text-error" />
+                  <Flame aria-hidden="true" className="h-4 w-4 shrink-0 text-primary" />
                   <label htmlFor="config-fiammetta-enabled">{copy.common.components_ConfigEditor_068}</label>
                 </h4>
                 <input
@@ -748,10 +748,10 @@ export default function ConfigEditor({
                   {copy.common.components_ConfigEditor_070(fiammettaShiftInterval)}</p>
               )}
             </section>
-            <section aria-labelledby="config-drones-heading" className="min-w-0 space-y-4 border-l-2 border-warning/60 bg-warning/5 px-4 py-4 sm:px-5">
+            <section aria-labelledby="config-drones-heading" className="min-w-0 space-y-4 border-l-2 border-border bg-surface-2/50 px-4 py-4 sm:px-5">
               <div className="flex min-h-11 items-center justify-between gap-3">
                 <h4 id="config-drones-heading" className="flex items-center gap-2 text-sm font-semibold text-ink-primary">
-                  <Zap aria-hidden="true" className="h-4 w-4 shrink-0 text-warning" />
+                  <Zap aria-hidden="true" className="h-4 w-4 shrink-0 text-primary" />
                   <label htmlFor="config-drones-enabled">{copy.common.components_ConfigEditor_071}</label>
                 </h4>
                 <input

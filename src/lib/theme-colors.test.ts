@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 const tokens = readFileSync(new URL('../../tokens.css', import.meta.url), 'utf8')
 const styles = readFileSync(new URL('../index.css', import.meta.url), 'utf8')
+const lightTokens = tokens.slice(0, tokens.indexOf('.dark {'))
 const darkTokens = tokens.slice(tokens.indexOf('.dark {'))
 const darkStyles = styles.slice(styles.indexOf('.dark {'), styles.indexOf('\nhtml {'))
 
@@ -26,18 +27,42 @@ function contrast(a: string, b: string) {
 }
 
 const surfaces = ['--color-paper', '--color-paper-2', '--color-paper-3', '--color-paper-4']
-const foregrounds = ['--color-ink', '--color-ink-2', '--color-muted', '--color-positive', '--color-negative', '--color-caution']
+const foregrounds = ['--color-ink', '--color-ink-2', '--color-ink-3', '--color-positive', '--color-negative', '--color-caution']
 
-describe('dark theme readability', () => {
+describe.each([['light', lightTokens], ['dark', darkTokens]])('%s theme readability', (_theme, source) => {
   it.each(surfaces)('keeps text and status colors readable on %s', surface => {
     for (const foreground of foregrounds) {
       expect(
-        contrast(hexToken(darkTokens, foreground), hexToken(darkTokens, surface)),
+        contrast(hexToken(source, foreground), hexToken(source, surface)),
         `${foreground} on ${surface}`,
       ).toBeGreaterThanOrEqual(4.5)
     }
   })
 
+  it.each([
+    ['--color-selected-ink', '--color-selected-bg'],
+    ['--color-selected-ink', '--color-selected-hover'],
+    ['--color-positive', '--color-positive-bg'],
+    ['--color-negative', '--color-negative-bg'],
+    ['--color-caution', '--color-caution-bg'],
+    ['--color-overload', '--color-overload-bg'],
+    ['--color-on-brand', '--color-brand-primary'],
+    ['--color-on-brand', '--color-brand-hover'],
+    ['--color-on-negative', '--color-negative'],
+    ['--color-on-negative', '--color-negative-hover'],
+  ])('keeps %s readable on %s', (foreground, background) => {
+    expect(contrast(hexToken(source, foreground), hexToken(source, background))).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('distinguishes selection and input boundaries from their backgrounds', () => {
+    expect(contrast(hexToken(source, '--color-selected-border'), hexToken(source, '--color-selected-bg'))).toBeGreaterThanOrEqual(3)
+    for (const surface of surfaces.slice(0, 3)) {
+      expect(contrast(hexToken(source, '--color-rule'), hexToken(source, surface))).toBeGreaterThanOrEqual(3)
+    }
+  })
+})
+
+describe('dark input styles', () => {
   it('distinguishes input boundaries from page and panel backgrounds', () => {
     for (const surface of surfaces.slice(0, 3)) {
       expect(

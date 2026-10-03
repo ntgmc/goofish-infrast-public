@@ -93,6 +93,7 @@ function UserDetailPanel({
           <DetailItem label="档案数量" value={String(detail.profile_pagination?.total ?? detail.profiles.length)} />
           <DetailItem label="CDK 订单标识" value={user.cdk_order_hash || '-'} />
           <DetailItem label="创建时间" value={formatDate(user.created_at)} />
+          <DetailItem label="最近上线" value={user.last_seen_at ? formatDate(user.last_seen_at) : '暂无记录'} />
           <DetailItem label="更新时间" value={formatDate(user.updated_at)} />
         </dl>
 

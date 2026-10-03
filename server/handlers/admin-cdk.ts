@@ -1,4 +1,5 @@
 import type { ProductPermissionMode } from '../../src/lib/types'
+import type { z } from 'zod'
 import { normalizePointsAmount } from '../../src/lib/balance-contracts'
 import { getPermissionRank, normalizeRuntimePermission } from '../../src/lib/product-catalog'
 import { authenticateAdminRequest } from './admin-auth'
@@ -36,7 +37,7 @@ import { FREE_PREVIEW_LIMITED_CDK_ACTIVITY, isFreePreviewLimitedCdkActivityActiv
 import { AdminPaginationError, buildAdminPagination, parseAdminPageRequest } from './admin-pagination'
 import { buildAdminCdkOpsSummary } from './admin-cdk-summary'
 import { requestSchemas } from '../security/request-policy'
-import { getValidatedJson } from '../security/request-validation'
+import { getValidatedJson, RequestInputError } from '../security/request-validation'
 import { getProfileById, getProfileWorkspace } from '../storage/user-store'
 
 type CdkStatusFilter = CdkStatus | 'all'
@@ -387,8 +388,8 @@ async function handleList(req: Request): Promise<Response> {
 
 async function handlePatch(req: Request): Promise<Response> {
   try {
-    const body = await getValidatedJson(req, requestSchemas.adminCdkPatch)
-    const { code_hash, code_hashes, action, permission, order_note, reason, baseline_source } = body
+    const body = await getValidatedJson(req, requestSchemas.adminCdkPatch, true)
+    const { code_hash, code_hashes, action } = body
 
     const authentication = await authenticateAdminRequest(req, {
       capability: 'admin_manage',
@@ -396,21 +397,24 @@ async function handlePatch(req: Request): Promise<Response> {
     })
     if (!authentication.ok) return authentication.response
     if (code_hashes !== undefined) {
-      if (action !== 'revoke' || code_hash !== undefined) {
-        return jsonResponse({ error: '批量请求仅支持撤销，且不能同时提交 code_hash。' }, 400)
+      if (!['revoke', 'upgrade', 'unfreeze', 'update_note'].includes(action) || code_hash !== undefined) {
+        return jsonResponse({ error: '批量请求支持撤销、升级、解冻和修改备注，且不能同时提交 code_hash。' }, 400)
       }
       if (new Set(code_hashes).size !== code_hashes.length || code_hashes.some((value) => !/^[a-f0-9]{64}$/i.test(value))) {
         return jsonResponse({ error: '批量 CDK 标识必须唯一且格式有效。' }, 400)
       }
       const store = await getCdkRecordStore()
-      const results = await Promise.all(code_hashes.map(async (codeHash) => {
+      const results = []
+      for (const codeHash of code_hashes) {
         try {
-          return await revokeCdkByHash(store, codeHash)
+          const response = await patchCdkByHash(store, { ...body, code_hash: codeHash })
+          const payload = await response.json() as { error?: string }
+          results.push({ code_hash: codeHash, ok: response.ok, status: response.status, ...payload })
         } catch (error) {
-          console.error('admin batch cdk revoke item error:', error)
-          return { code_hash: codeHash, ok: false as const, status: 500, error: 'Internal server error' }
+          console.error('admin batch cdk operation error:', error)
+          results.push({ code_hash: codeHash, ok: false, status: 500, error: '操作失败，请重试。' })
         }
-      }))
+      }
       const succeeded = results.filter((result) => result.ok).length
       return jsonResponse({ results, succeeded, failed: results.length - succeeded })
     }
@@ -419,6 +423,19 @@ async function handlePatch(req: Request): Promise<Response> {
     }
 
     const store = await getCdkRecordStore()
+    return await patchCdkByHash(store, { ...body, code_hash })
+  } catch (error) {
+    if (error instanceof RequestInputError) return jsonResponse({ error: error.message }, error.status)
+    console.error('admin cdk operation error:', error)
+    return jsonResponse({ error: 'Internal server error' }, 500)
+  }
+}
+
+async function patchCdkByHash(
+  store: Awaited<ReturnType<typeof getCdkRecordStore>>,
+  body: z.infer<typeof requestSchemas.adminCdkPatch> & { code_hash: string },
+): Promise<Response> {
+    const { code_hash, action, permission, order_note, reason, baseline_source } = body
     const key = `cdk/${code_hash}.json`
     const existing = await store.get(key) as CdkRecord | null
 
@@ -500,6 +517,7 @@ async function handlePatch(req: Request): Promise<Response> {
         })
       }
       const updated = await unfreezeCdkRecord(existing)
+      if (updated.status !== 'used') return jsonResponse({ error: '授权状态已改变，请刷新后重试。' }, 409)
       return jsonResponse({
         unfrozen: true,
         already_unfrozen: false,
@@ -525,8 +543,13 @@ async function handlePatch(req: Request): Promise<Response> {
         return jsonResponse({ error: '只能升级到更高等级的授权。' }, 409)
       }
 
-      const updated = await store.mutate(key, (current) => isProfileCdkRecord(current) ? { ...current, permission: nextPermission } : null) ?? existing
+      const updated = await store.mutate(key, (current) => {
+        if (!isProfileCdkRecord(current) || getPermissionRank(nextPermission) <= getPermissionRank(current.permission)) return null
+        return { ...current, permission: nextPermission }
+      }, { allowedStatuses: ['unused', 'used'] }) ?? existing
       if (updated.status === 'revoked') return jsonResponse({ error: '已撤销授权不能升级。' }, 409)
+      if (updated.status === 'frozen') return jsonResponse({ error: '请先解冻授权再升级。' }, 409)
+      if (updated.permission !== nextPermission) return jsonResponse({ error: '授权等级已改变，请刷新后重试。' }, 409)
       return jsonResponse({
         upgraded: true,
         cdk_id: existing.code_hash.slice(0, 12),
@@ -560,56 +583,42 @@ async function handlePatch(req: Request): Promise<Response> {
       cdk_id: existing.code_hash.slice(0, 12),
       revoked_at: revokedAt,
     })
-  } catch (error) {
-    console.error('admin cdk revoke error:', error)
-    return jsonResponse({ error: 'Internal server error' }, 500)
-  }
-}
-
-async function revokeCdkByHash(
-  store: Awaited<ReturnType<typeof getCdkRecordStore>>,
-  codeHash: string,
-): Promise<
-  | { code_hash: string; ok: true; already_revoked: boolean; revoked_at: string | null }
-  | { code_hash: string; ok: false; status: number; error: string }
-> {
-  const key = `cdk/${codeHash}.json`
-  const existing = await store.get(key)
-  if (!existing) return { code_hash: codeHash, ok: false, status: 404, error: 'CDK not found.' }
-  if (existing.status === 'revoked') {
-    return { code_hash: codeHash, ok: true, already_revoked: true, revoked_at: existing.revoked_at ?? null }
-  }
-  if (existing.status !== 'used' && existing.status !== 'frozen') {
-    return { code_hash: codeHash, ok: false, status: 409, error: 'Only used or frozen CDKs can be revoked.' }
-  }
-  const revokedAt = new Date().toISOString()
-  const updated = await store.mutate(key, (current) => ({
-    ...current,
-    status: 'revoked',
-    revoked_at: revokedAt,
-  }), { allowedStatuses: ['used', 'frozen'] }) ?? existing
-  if (updated.status !== 'revoked') {
-    return { code_hash: codeHash, ok: false, status: 409, error: 'Only used or frozen CDKs can be revoked.' }
-  }
-  return { code_hash: codeHash, ok: true, already_revoked: false, revoked_at: revokedAt }
 }
 
 async function handleDelete(req: Request): Promise<Response> {
   try {
-    const body = await getValidatedJson(req, requestSchemas.adminCdkDelete)
-    const { code_hash } = body
+    const body = await getValidatedJson(req, requestSchemas.adminCdkDelete, true)
 
     const authentication = await authenticateAdminRequest(req, {
       capability: 'admin_manage',
       requireRecentLogin: true,
     })
     if (!authentication.ok) return authentication.response
-    if (!code_hash || !/^[a-f0-9]{64}$/i.test(code_hash)) {
-      return jsonResponse({ error: 'CDK 标识无效，请刷新列表后重试。' }, 400)
-    }
-
     const store = await getCdkRecordStore()
-    const key = `cdk/${code_hash}.json`
+    if ('code_hashes' in body) {
+      const results = []
+      for (const codeHash of body.code_hashes) {
+        try {
+          const response = await deleteCdkByHash(store, codeHash)
+          results.push({ code_hash: codeHash, ok: response.ok, status: response.status, ...await response.json() })
+        } catch (error) {
+          console.error('admin batch cdk delete error:', error)
+          results.push({ code_hash: codeHash, ok: false, status: 500, error: '删除失败，请重试。' })
+        }
+      }
+      const succeeded = results.filter((result) => result.ok).length
+      return jsonResponse({ results, succeeded, failed: results.length - succeeded })
+    }
+    return await deleteCdkByHash(store, body.code_hash)
+  } catch (error) {
+    if (error instanceof RequestInputError) return jsonResponse({ error: error.message }, error.status)
+    console.error('admin cdk delete error:', error)
+    return jsonResponse({ error: 'Internal server error' }, 500)
+  }
+}
+
+async function deleteCdkByHash(store: Awaited<ReturnType<typeof getCdkRecordStore>>, codeHash: string): Promise<Response> {
+    const key = `cdk/${codeHash}.json`
     const existing = await store.get(key) as CdkRecord | null
 
     if (!existing) {
@@ -623,10 +632,6 @@ async function handleDelete(req: Request): Promise<Response> {
       return jsonResponse({ error: 'Only unused CDKs can be deleted.' }, 409)
     }
     return jsonResponse({ deleted: true, cdk_id: existing.code_hash.slice(0, 12) })
-  } catch (error) {
-    console.error('admin cdk delete error:', error)
-    return jsonResponse({ error: 'Internal server error' }, 500)
-  }
 }
 
 function normalizeStatusFilter(headerValue: string | null, requestUrl: string): CdkStatusFilter {

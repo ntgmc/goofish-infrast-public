@@ -181,7 +181,10 @@ export const requestSchemas = {
     reason: optionalString(500),
     baseline_source: z.enum(['latest', 'workspace', 'next_import']).optional(),
   }),
-  adminCdkDelete: strict({ code_hash: shortString(64) }),
+  adminCdkDelete: z.union([
+    strict({ code_hash: z.string().regex(/^[a-f0-9]{64}$/i) }),
+    strict({ code_hashes: z.array(z.string().regex(/^[a-f0-9]{64}$/i)).min(1).max(100).refine((values) => new Set(values).size === values.length) }),
+  ]),
   adminOptimization: z.discriminatedUnion('action', [
     strict({ action: z.literal('replay'), id: shortString(128), reason: adminOperationReasonSchema }),
     strict({ action: z.literal('discard'), id: shortString(128), reason: adminOperationReasonSchema }),
@@ -299,6 +302,11 @@ export const requestSchemas = {
     reason: z.string().trim().min(2).max(500),
   }),
   adminUserPatch: z.discriminatedUnion('action', [
+    strict({
+      action: z.enum(['batch_freeze_accounts', 'batch_unfreeze_accounts']),
+      user_ids: z.array(shortString(128)).min(1).max(100).refine((values) => new Set(values).size === values.length),
+      reason: adminOperationReasonSchema,
+    }),
     strict({
       ...adminTargetUserShape,
       action: z.literal('reset_password'),
@@ -692,7 +700,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
     PATCH: json('admin', requestSchemas.adminServiceStatusPatch),
   }, ['view'])],
   ['/api/admin/session', route({ GET: none(), POST: json('auth', requestSchemas.adminSession), DELETE: none() })],
-  ['/api/admin/users', route({ GET: none(), POST: json('admin', requestSchemas.adminUserCreate), PATCH: json('admin', requestSchemas.adminUserPatch), DELETE: json('admin', requestSchemas.adminUserDelete) }, ['user_id', 'profile_id', 'include', 'page', 'page_size', 'profile_page', 'profile_page_size', 'search'])],
+  ['/api/admin/users', route({ GET: none(), POST: json('admin', requestSchemas.adminUserCreate), PATCH: json('admin', requestSchemas.adminUserPatch), DELETE: json('admin', requestSchemas.adminUserDelete) }, ['user_id', 'profile_id', 'include', 'page', 'page_size', 'profile_page', 'profile_page_size', 'search', 'status', 'permission', 'profile_kind', 'email_verified', 'activity', 'registered_from', 'registered_to', 'last_seen_from', 'last_seen_to', 'sort'])],
   ['/api/admin/balance', route({ GET: none(), POST: json('admin', requestSchemas.adminBalanceAdjust) }, ['user_id', 'cursor', 'limit'])],
   ['/api/admin/commercial', route({ GET: none(), POST: json('admin', requestSchemas.adminCommercial) }, ['user_id', 'summary'])],
   ['/api/auth/register', route({ POST: json('auth', requestSchemas.authRegister) })],

@@ -326,13 +326,96 @@ describe('useAdminController announcement drafts', () => {
     await waitFor(() => expect(result.current.visibleRecords).toHaveLength(2))
     act(() => result.current.setSelectedCdkHashes([firstHash, secondHash]))
 
-    await act(async () => result.current.handleBulkRevoke())
+    await act(async () => result.current.handleBulkCdk('revoke'))
 
     const batchCalls = adminApi.json.mock.calls.filter(([url, init]) => url === '/api/admin/cdk' && init?.method === 'PATCH')
     expect(batchCalls).toHaveLength(1)
     expect(batchCalls[0]?.[1]).toMatchObject({
       json: { action: 'revoke', code_hashes: [firstHash, secondHash] },
     })
+  })
+
+  it('deletes unused selected CDKs and keeps only failed targets selected', async () => {
+    const hashes = ['a'.repeat(64), 'b'.repeat(64), 'c'.repeat(64)]
+    const records = hashes.map((hash, index) => ({ ...adminCdkRecord(hash), status: index === 2 ? 'used' : 'unused' }))
+    const originalImplementation = adminApi.json.getMockImplementation()!
+    adminApi.json.mockImplementation(async (url: string, init?: { method?: string; json?: unknown }) => {
+      if (url === '/api/admin/cdk' && init?.method === 'DELETE') return {
+        succeeded: 1, failed: 1, results: [
+          { code_hash: hashes[0], ok: true }, { code_hash: hashes[1], ok: false, error: '已被兑换' },
+        ],
+      }
+      if (url.startsWith('/api/admin/cdk?') && !url.includes('view=')) return { cdks: records }
+      return originalImplementation(url, init)
+    })
+    const { result } = renderHook(() => useAdminController())
+    await waitForHydration(result)
+    await waitFor(() => expect(result.current.visibleRecords).toHaveLength(3))
+    act(() => result.current.setSelectedCdkHashes(hashes))
+    await act(async () => result.current.handleBulkCdk('delete'))
+    expect(adminApi.json).toHaveBeenCalledWith('/api/admin/cdk', expect.objectContaining({
+      method: 'DELETE', json: { code_hashes: hashes.slice(0, 2) },
+    }))
+    expect(result.current.selectedCdkHashes).toEqual([hashes[1]])
+    expect(result.current.notice).toContain('成功 1 个，跳过 1 个')
+    expect(result.current.error).toContain('已被兑换')
+  })
+
+  it('clears CDK selections when filters change', async () => {
+    const { result } = renderHook(() => useAdminController())
+    await waitForHydration(result)
+    act(() => result.current.setSelectedCdkHashes(['a'.repeat(64)]))
+    act(() => result.current.setStatusFilter('used'))
+    expect(result.current.selectedCdkHashes).toEqual([])
+  })
+
+  it('sends combined user filters to the server and clears selections on filter or page changes', async () => {
+    const { result } = renderHook(() => useAdminController())
+    await waitForHydration(result)
+    act(() => result.current.setSelectedUserIds(['user-1']))
+    act(() => result.current.setUserFilters({
+      ...result.current.userFilters, permission: 'advanced', registered_from: '2026-10-01', sort: 'last_seen_desc',
+    }))
+    await waitFor(() => expect(adminApi.json.mock.calls.some(([url]) => (
+      url.startsWith('/api/admin/users?') && url.includes('permission=advanced') && url.includes('registered_from=2026-10-01') && url.includes('sort=last_seen_desc')
+    ))).toBe(true))
+    expect(result.current.selectedUserIds).toEqual([])
+    act(() => { result.current.setSelectedUserIds(['user-1']); result.current.setUserPage(2) })
+    expect(result.current.selectedUserIds).toEqual([])
+  })
+
+  it('copies selected user IDs for item grants and freezes eligible users in one audited batch', async () => {
+    const users = [
+      { id: 'user-1', email: 'first@example.test', status: 'active' },
+      { id: 'user-2', email: 'second@example.test', status: 'active' },
+      { id: 'user-3', email: 'third@example.test', status: 'frozen' },
+    ]
+    const writeText = vi.fn(async () => undefined)
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    const originalImplementation = adminApi.json.getMockImplementation()!
+    adminApi.json.mockImplementation(async (url: string, init?: { method?: string; json?: unknown }) => {
+      if (url === '/api/admin/users' && init?.method === 'PATCH') return {
+        succeeded: 1, failed: 1,
+        results: [{ user_id: 'user-1', ok: true }, { user_id: 'user-2', ok: false, error: '用户已注销' }],
+      }
+      if (url.startsWith('/api/admin/users?')) return { app_users: users }
+      return originalImplementation(url, init)
+    })
+    const { result } = renderHook(() => useAdminController())
+    await waitForHydration(result)
+    await waitFor(() => expect(result.current.appUsers).toHaveLength(3))
+    act(() => result.current.setSelectedUserIds(users.map((user) => user.id)))
+    await act(async () => result.current.handleCopyUsers('id'))
+    expect(writeText).toHaveBeenCalledWith('user-1\nuser-2\nuser-3')
+    await act(async () => result.current.handleBulkUsers('freeze'))
+    expect(adminApi.json).toHaveBeenCalledWith('/api/admin/users', expect.objectContaining({
+      method: 'PATCH', json: {
+        action: 'batch_freeze_accounts', user_ids: ['user-1', 'user-2'], reason: '工单 OPS-103 管理员操作',
+      },
+    }))
+    expect(result.current.selectedUserIds).toEqual(['user-2'])
+    expect(result.current.notice).toContain('跳过 1 个')
+    expect(result.current.error).toContain('用户已注销')
   })
 
   it('keeps successful overview blocks when another block fails', async () => {

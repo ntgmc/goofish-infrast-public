@@ -136,7 +136,7 @@ export default function OverviewSection({
                 <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.optimize.paid_preview.recompute_detail}</p>
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   <button type="button" disabled className="tool-secondary-action">{copy.optimize.paid_preview.recompute_action}</button>
-                  <Link to="/pricing" className="text-sm text-brand-200 underline">{copy.optimize.paid_preview.compare}</Link>
+                  <Link to="/pricing" className="text-sm text-primary underline">{copy.optimize.paid_preview.compare}</Link>
                 </div>
               </section>
             </>

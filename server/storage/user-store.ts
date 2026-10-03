@@ -1,5 +1,6 @@
 import { createHash, createHmac } from 'node:crypto'
 import type { PoolClient } from 'pg'
+import type { AdminUserFilters } from '../../src/lib/admin-user-filters'
 import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import {
@@ -52,6 +53,7 @@ export interface UserAccountRecord {
   cdk_code_hash: string | null
   cdk_order_hash: string | null
   email_verified_at: string | null
+  last_seen_at?: string | null
   created_at: string
   updated_at: string
 }
@@ -306,7 +308,7 @@ export async function insertUserAccountForRegistrationInTransaction(
 export async function getUserByEmail(email: string): Promise<UserAccountRecord | null> {
   await ensureSchema()
   const result = await query<{ record_json: UserAccountRecord }>(
-    'select record_json from user_accounts where email = $1',
+    "select record_json || jsonb_build_object('last_seen_at', last_seen_at) as record_json from user_accounts where email = $1",
     [email],
   )
   return result.rows[0]?.record_json ?? null
@@ -315,7 +317,7 @@ export async function getUserByEmail(email: string): Promise<UserAccountRecord |
 export async function getUserById(id: string): Promise<UserAccountRecord | null> {
   await ensureSchema()
   const result = await query<{ record_json: UserAccountRecord }>(
-    'select record_json from user_accounts where id = $1',
+    "select record_json || jsonb_build_object('last_seen_at', last_seen_at) as record_json from user_accounts where id = $1",
     [id],
   )
   return result.rows[0]?.record_json ?? null
@@ -337,16 +339,34 @@ export async function saveUserAccount(user: UserAccountRecord): Promise<void> {
 export async function saveUserAccountByAdmin(
   user: UserAccountRecord,
   options: { revokeSessions: boolean; audit: AdminOperationAuditInput },
-): Promise<void> {
+): Promise<UserAccountRecord> {
   await ensureSchema()
-  await withTransaction(async (client) => {
-    await saveUserAccountWithClient(client, user)
+  return withTransaction(async (client) => {
+    const selected = await client.query<{ record_json: UserAccountRecord }>(
+      "select record_json || jsonb_build_object('last_seen_at', last_seen_at) as record_json from user_accounts where id = $1 for update", [user.id],
+    )
+    const current = selected.rows[0]?.record_json
+    if (!current || (current.status !== 'active' && current.status !== 'frozen')) {
+      throw new AdminUserMutationConflictError('账号状态已改变，请刷新后重试。')
+    }
+    const updated = { ...current, status: user.status, updated_at: user.updated_at }
+    await client.query(
+      `update user_accounts set status = $2, updated_at = $3,
+       record_json = record_json || $4::jsonb where id = $1`,
+      [user.id, updated.status, updated.updated_at, JSON.stringify({ status: updated.status, updated_at: updated.updated_at })],
+    )
     if (options.revokeSessions) {
       await client.query('delete from user_sessions where user_id = $1', [user.id])
     }
-    await recordAdminOperationAuditInTransaction(client, options.audit)
+    const snapshot = (record: UserAccountRecord) => ({
+      id: record.id, email: record.email, status: record.status, permission: record.permission, updated_at: record.updated_at,
+    })
+    await recordAdminOperationAuditInTransaction(client, { ...options.audit, before: snapshot(current), after: snapshot(updated) })
+    return updated
   })
 }
+
+export class AdminUserMutationConflictError extends Error {}
 
 async function saveUserAccountWithClient(
   client: Pick<PoolClient, 'query'>,
@@ -491,8 +511,13 @@ export async function deleteUserAccountInTransaction(client: PoolClient, userId:
 
 export async function saveUserSession(session: UserSessionRecord): Promise<void> {
   await ensureSchema()
-  await query(
-    `insert into user_sessions
+  await withTransaction(async (client) => {
+    await client.query(
+      'update user_accounts set last_seen_at = greatest(last_seen_at, $2::timestamptz) where id = $1',
+      [session.user_id, session.last_seen_at],
+    )
+    await client.query(
+      `insert into user_sessions
       (id, user_id, token_hash, record_json, created_at, last_seen_at, expires_at)
      values ($1, $2, $3, $4::jsonb, $5, $6, $7)
      on conflict (id) do update set
@@ -500,16 +525,17 @@ export async function saveUserSession(session: UserSessionRecord): Promise<void>
       record_json = excluded.record_json,
       last_seen_at = excluded.last_seen_at,
       expires_at = excluded.expires_at`,
-    [
-      session.id,
-      session.user_id,
-      session.token_hash,
-      JSON.stringify(session),
-      session.created_at,
-      session.last_seen_at,
-      session.expires_at,
-    ],
-  )
+      [
+        session.id,
+        session.user_id,
+        session.token_hash,
+        JSON.stringify(session),
+        session.created_at,
+        session.last_seen_at,
+        session.expires_at,
+      ],
+    )
+  })
 }
 
 export async function getSessionByTokenHash(tokenHash: string): Promise<UserSessionRecord | null> {
@@ -526,12 +552,18 @@ export async function touchSession(session: UserSessionRecord, now: Date, cutoff
   const lastSeenAt = now.toISOString()
   const updated = { ...session, last_seen_at: lastSeenAt }
   const result = await query(
-    `update user_sessions
+    `with touched as (
+     update user_sessions
      set record_json = $4::jsonb,
          last_seen_at = $3
      where id = $1
        and token_hash = $2
-       and last_seen_at <= $5`,
+       and last_seen_at <= $5
+     returning user_id
+     )
+     update user_accounts account
+        set last_seen_at = greatest(account.last_seen_at, $3::timestamptz)
+       from touched where account.id = touched.user_id`,
     [session.id, session.token_hash, lastSeenAt, JSON.stringify(updated), cutoff.toISOString()],
   )
   return (result.rowCount ?? 0) > 0
@@ -1205,24 +1237,62 @@ export async function listAdminUserAccountsPage(options: {
   page: number
   pageSize: number
   search: string
+  filters?: AdminUserFilters
 }): Promise<AdminUserAccountPage> {
   await ensureSchema()
   const values: unknown[] = []
-  let where = ''
+  const conditions: string[] = []
+  const add = (value: unknown) => {
+    values.push(value)
+    return `$${values.length}`
+  }
   if (options.search) {
-    values.push(`%${escapeLikePattern(options.search.toLowerCase())}%`)
-    where = `where lower(user_accounts.email) like $1 escape '!'
-      or lower(user_accounts.id) like $1 escape '!'
+    const search = add(`%${escapeLikePattern(options.search.toLowerCase())}%`)
+    conditions.push(`(lower(user_accounts.email) like ${search} escape '!'
+      or lower(user_accounts.id) like ${search} escape '!'
       or exists (
         select 1 from user_game_accounts profile
         where profile.user_id = user_accounts.id
           and (
-            lower(profile.display_name) like $1 escape '!'
-            or lower(profile.id) like $1 escape '!'
-            or lower(coalesce(profile.cdk_order_hash, '')) like $1 escape '!'
+            lower(profile.display_name) like ${search} escape '!'
+            or lower(profile.id) like ${search} escape '!'
+            or lower(coalesce(profile.cdk_order_hash, '')) like ${search} escape '!'
           )
-      )`
+      ))`)
   }
+  const filters = options.filters
+  if (filters) {
+    if (filters.status !== 'all') conditions.push(`user_accounts.status = ${add(filters.status)}`)
+    if (filters.email_verified !== 'all') conditions.push(`user_accounts.email_verified_at is ${filters.email_verified === 'yes' ? 'not ' : ''}null`)
+    if (filters.activity !== 'all') conditions.push(`user_accounts.last_seen_at is ${filters.activity === 'seen' ? 'not ' : ''}null`)
+    for (const [column, from, to] of [
+      ['created_at', filters.registered_from, filters.registered_to],
+      ['last_seen_at', filters.last_seen_from, filters.last_seen_to],
+    ]) {
+      if (from) conditions.push(`user_accounts.${column} >= ${add(`${from}T00:00:00+08:00`)}::timestamptz`)
+      if (to) conditions.push(`user_accounts.${column} < ${add(`${to}T00:00:00+08:00`)}::timestamptz + interval '24 hours'`)
+    }
+    if (filters.profile_kind === 'none') {
+      conditions.push('not exists (select 1 from user_game_accounts profile where profile.user_id = user_accounts.id)')
+    } else if (filters.profile_kind !== 'all') {
+      conditions.push(`exists (select 1 from user_game_accounts profile
+        where profile.user_id = user_accounts.id and coalesce(profile.record_json->>'kind', 'cdk') = ${add(filters.profile_kind)})`)
+    }
+    if (filters.permission !== 'all') {
+      conditions.push(`exists (select 1 from user_game_accounts profile
+        where profile.user_id = user_accounts.id and profile.permission = ${add(filters.permission)}
+          and coalesce(profile.record_json->>'kind', 'cdk') = 'cdk' and profile.status = 'active'
+          and nullif(profile.record_json->>'archived_at', '') is null
+          and (nullif(profile.record_json->>'expires_at', '') is null or (profile.record_json->>'expires_at')::timestamptz > now())
+          and (profile.cdk_key is null or exists (select 1 from cdk_records cdk
+            where cdk.key = profile.cdk_key and cdk.status = 'used'
+              and (nullif(cdk.record_json->>'profile_expires_at', '') is null or (cdk.record_json->>'profile_expires_at')::timestamptz > now()))))`)
+    }
+  }
+  const where = conditions.length ? `where ${conditions.join(' and ')}` : ''
+  const sort = filters?.sort ?? 'registered_desc'
+  const order = sort.startsWith('last_seen') ? 'last_seen_at' : 'created_at'
+  const direction = sort.endsWith('asc') ? 'asc' : 'desc'
   const countResult = await query<{ total: string }>(
     `select count(*)::text as total from user_accounts ${where}`,
     values,
@@ -1235,8 +1305,8 @@ export async function listAdminUserAccountsPage(options: {
   const page = totalPages === 0 ? 1 : Math.min(options.page, totalPages)
   values.push(options.pageSize, (page - 1) * options.pageSize)
   const usersResult = await query<{ record_json: UserAccountRecord }>(
-    `select record_json from user_accounts ${where}
-     order by created_at desc, id asc limit $${values.length - 1} offset $${values.length}`,
+    `select record_json || jsonb_build_object('last_seen_at', last_seen_at) as record_json from user_accounts ${where}
+     order by ${order} ${direction} nulls last, id asc limit $${values.length - 1} offset $${values.length}`,
     values,
   )
   const users = usersResult.rows.map((row) => row.record_json)

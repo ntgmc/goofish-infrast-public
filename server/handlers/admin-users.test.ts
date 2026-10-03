@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   saveUserAccountByAdmin: vi.fn(),
   saveUserProfileByAdmin: vi.fn(),
   listCdkRecordsByKeys: vi.fn(),
+  listAdminUserAccountsPage: vi.fn(),
   recordAdminOperationAudit: vi.fn(),
 }))
 
@@ -43,6 +44,7 @@ vi.mock('./license-utils', () => ({
 
 vi.mock('../storage/user-store', () => ({
   AdminProfileMutationConflictError: class AdminProfileMutationConflictError extends Error {},
+  AdminUserMutationConflictError: class AdminUserMutationConflictError extends Error {},
   deleteUserAccount: vi.fn(),
   emptyWorkspace: vi.fn(),
   getUserByEmail: vi.fn(),
@@ -52,7 +54,7 @@ vi.mock('../storage/user-store', () => ({
   isFreePreviewProfile: vi.fn(() => false),
   listProfilesForUser: mocks.listProfilesForUser,
   listProfileWorkspaces: mocks.listProfileWorkspaces,
-  listAdminUserAccountsPage: vi.fn(),
+  listAdminUserAccountsPage: mocks.listAdminUserAccountsPage,
   normalizeProfileKind: vi.fn(() => 'cdk'),
   saveUserProfileByAdmin: mocks.saveUserProfileByAdmin,
   saveUserAccountByAdmin: mocks.saveUserAccountByAdmin,
@@ -124,7 +126,8 @@ beforeEach(() => {
   mocks.getProfileWorkspace.mockResolvedValue(null)
   mocks.getCdk.mockResolvedValue(cdk)
   mocks.saveUserProfileByAdmin.mockResolvedValue(undefined)
-  mocks.saveUserAccountByAdmin.mockResolvedValue(undefined)
+  mocks.saveUserAccountByAdmin.mockImplementation(async (updated) => updated)
+  mocks.listAdminUserAccountsPage.mockResolvedValue({ users: [], profiles: [], page: 1, total: 0 })
   mocks.listCdkRecordsByKeys.mockResolvedValue(new Map([[profile.cdk_key, cdk]]))
   mocks.recordAdminOperationAudit.mockResolvedValue(undefined)
   mocks.resetUserPasswordByAdmin.mockResolvedValue({ ok: true, user })
@@ -325,6 +328,70 @@ describe('admin user workspace export', () => {
     expect(mocks.listProfileWorkspaces).not.toHaveBeenCalled()
   })
 })
+
+describe('admin user filters and batch status operations', () => {
+  it('passes validated combined filters to the paginated query and returns last seen time', async () => {
+    mocks.listAdminUserAccountsPage.mockResolvedValue({
+      users: [{ ...user, last_seen_at: '2026-10-02T08:00:00.000Z' }],
+      profiles: [profile], page: 1, total: 1,
+    })
+    const response = await adminUsersHandler(new Request(
+      'http://localhost/api/admin/users?permission=advanced&status=active&registered_from=2026-10-01&last_seen_to=2026-10-03&sort=last_seen_desc',
+    ))
+    expect(response.status).toBe(200)
+    expect(mocks.listAdminUserAccountsPage).toHaveBeenCalledWith(expect.objectContaining({
+      filters: expect.objectContaining({
+        permission: 'advanced', status: 'active', registered_from: '2026-10-01', last_seen_to: '2026-10-03', sort: 'last_seen_desc',
+      }),
+    }))
+    await expect(response.json()).resolves.toMatchObject({ app_users: [{ id: user.id, last_seen_at: '2026-10-02T08:00:00.000Z' }] })
+  })
+
+  it.each([
+    'permission=invalid', 'registered_from=2026-02-30', 'registered_from=0000-01-01',
+    'registered_from=2026-10-03&registered_to=2026-10-01',
+    'activity=never&last_seen_from=2026-10-01', 'sort=email',
+  ])('rejects invalid filters before querying: %s', async (query) => {
+    const response = await adminUsersHandler(new Request(`http://localhost/api/admin/users?${query}`))
+    expect(response.status).toBe(400)
+    expect(mocks.listAdminUserAccountsPage).not.toHaveBeenCalled()
+  })
+
+  it('audits each successful freeze and keeps processing when a user is missing', async () => {
+    mocks.getUserById.mockImplementation(async (id) => id === user.id ? user : null)
+    const response = await adminUsersHandler(batchRequest(['user-1', 'missing']))
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      succeeded: 1, failed: 1, results: [{ user_id: 'user-1', ok: true }, { user_id: 'missing', ok: false }],
+    })
+    expect(mocks.authenticateAdminRequest).toHaveBeenCalledWith(expect.any(Request), { capability: 'user_manage', requireRecentLogin: false })
+    expect(mocks.saveUserAccountByAdmin).toHaveBeenCalledWith(expect.objectContaining({ status: 'frozen' }), {
+      revokeSessions: true,
+      audit: expect.objectContaining({ action: 'user.freeze_account', actorUsername: 'operator', reason: '工单 OPS-200' }),
+    })
+  })
+
+  it('does not mutate any user when authorization fails', async () => {
+    mocks.authenticateAdminRequest.mockResolvedValue({ ok: false, response: new Response(null, { status: 403 }) })
+    const response = await adminUsersHandler(batchRequest(['user-1']))
+    expect(response.status).toBe(403)
+    expect(mocks.getUserById).not.toHaveBeenCalled()
+    expect(mocks.saveUserAccountByAdmin).not.toHaveBeenCalled()
+  })
+
+  it('rejects repeated targets before performing writes', async () => {
+    const response = await adminUsersHandler(batchRequest(['user-1', 'user-1']))
+    expect(response.status).toBe(400)
+    expect(mocks.saveUserAccountByAdmin).not.toHaveBeenCalled()
+  })
+})
+
+function batchRequest(userIds: string[]) {
+  return new Request('http://localhost/api/admin/users', {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'batch_freeze_accounts', user_ids: userIds, reason: '工单 OPS-200' }),
+  })
+}
 
 describe('admin user profile pagination', () => {
   it('loads only the requested profile page with fixed batch query counts', async () => {

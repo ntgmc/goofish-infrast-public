@@ -468,7 +468,7 @@ function getStepClass(state: StepVisualState): string {
 }
 
 function getStepDotClass(state: StepVisualState): string {
-  if (state === 'done') return 'border-brand-500 bg-brand-500 text-white'
+  if (state === 'done') return 'border-brand-500 bg-primary text-primary-foreground'
   if (state === 'failed') return 'border-warning text-warning'
   if (state === 'active') return 'border-brand-400 text-brand-400'
   return 'border-surface-4 text-ink-muted'

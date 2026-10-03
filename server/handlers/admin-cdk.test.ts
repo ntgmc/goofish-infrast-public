@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   getProfileWorkspace: vi.fn(),
   setOperatorBaselineByAdmin: vi.fn(),
   validateOperators: vi.fn(),
+  unfreezeCdkRecord: vi.fn(),
 }))
 
 vi.mock('./admin-auth', () => ({ authenticateAdminRequest: mocks.authenticateAdminRequest }))
@@ -47,7 +48,7 @@ vi.mock('./license-utils', () => ({
   }),
   requireEnv: vi.fn(() => 'test-secret'),
   setOperatorBaselineByAdmin: mocks.setOperatorBaselineByAdmin,
-  unfreezeCdkRecord: vi.fn(),
+  unfreezeCdkRecord: mocks.unfreezeCdkRecord,
   validateOperators: mocks.validateOperators,
 }))
 
@@ -267,6 +268,76 @@ describe('admin CDK capability gates', () => {
 })
 
 describe('admin CDK atomic lifecycle operations', () => {
+  it('deletes only unused targets and reports every outcome in selection order', async () => {
+    const hashes = [codeHash, 'b'.repeat(64), 'c'.repeat(64), 'd'.repeat(64)]
+    mocks.getCdk.mockImplementation(async (key) => {
+      if (key.includes(hashes[3])) return null
+      return { ...record, code_hash: key.slice(4, -5), status: key.includes(hashes[1]) ? 'used' : 'unused' }
+    })
+    mocks.deleteUnusedCdk.mockImplementation(async (key) => !key.includes(hashes[2]))
+    const response = await adminCdkHandler(new Request('http://localhost/api/admin/cdk', {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code_hashes: hashes }),
+    }))
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      succeeded: 1, failed: 3,
+      results: [
+        { code_hash: hashes[0], ok: true }, { code_hash: hashes[1], ok: false, status: 409 },
+        { code_hash: hashes[2], ok: false, status: 409 }, { code_hash: hashes[3], ok: false, status: 404 },
+      ],
+    })
+    expect(mocks.deleteUnusedCdk).toHaveBeenCalledTimes(2)
+  })
+
+  it('upgrades eligible profile CDKs and rejects balance CDKs and downgrades', async () => {
+    const hashes = [codeHash, 'b'.repeat(64), 'c'.repeat(64)]
+    const records = hashes.map((hash, index) => ({
+      ...record, code_hash: hash, permission: index === 2 ? 'ultimate' : 'advanced',
+      cdk_type: index === 1 ? 'balance' : 'profile',
+    }))
+    mocks.getCdk.mockImplementation(async (key) => records.find((item) => key.includes(item.code_hash)))
+    mocks.mutateCdk.mockImplementation(async (key, mutate) => mutate(records.find((item) => key.includes(item.code_hash))))
+    const response = await adminCdkHandler(batchPatch({ action: 'upgrade', code_hashes: hashes, permission: 'ultimate' }))
+    await expect(response.json()).resolves.toMatchObject({
+      succeeded: 1, failed: 2,
+      results: [{ ok: true }, { ok: false, status: 409 }, { ok: false, status: 409 }],
+    })
+    expect(mocks.mutateCdk).toHaveBeenCalledTimes(1)
+  })
+
+  it('checks the locked record before upgrading to avoid overwriting a concurrent higher grade', async () => {
+    const newer = { ...record, permission: 'ultimate' }
+    mocks.getCdk.mockResolvedValue({ ...record, permission: 'recommended' })
+    mocks.mutateCdk.mockImplementation(async (_key, mutate) => mutate(newer) ?? newer)
+    const response = await adminCdkHandler(batchPatch({ action: 'upgrade', code_hash: codeHash, permission: 'advanced' }))
+    expect(response.status).toBe(409)
+    expect(newer.permission).toBe('ultimate')
+    expect(mocks.mutateCdk).toHaveBeenCalledWith(expect.any(String), expect.any(Function), { allowedStatuses: ['unused', 'used'] })
+  })
+
+  it('shares the note mutation path between single and batch requests', async () => {
+    const response = await adminCdkHandler(batchPatch({ action: 'update_note', code_hashes: [codeHash], order_note: '售后已核验' }))
+    await expect(response.json()).resolves.toMatchObject({ succeeded: 1, failed: 0 })
+    const mutate = mocks.mutateCdk.mock.calls[0][1]
+    expect(mutate(record)).toMatchObject({ order_note: '售后已核验' })
+  })
+
+  it('reports a failed unfreeze when the authorization was revoked concurrently', async () => {
+    mocks.getCdk.mockResolvedValue({ ...record, status: 'frozen' })
+    mocks.unfreezeCdkRecord.mockResolvedValue({ ...record, status: 'revoked' })
+    const response = await adminCdkHandler(batchPatch({ action: 'unfreeze', code_hashes: [codeHash] }))
+    await expect(response.json()).resolves.toMatchObject({ succeeded: 0, failed: 1, results: [{ ok: false, status: 409 }] })
+  })
+
+  it('rejects unsupported batch actions and duplicate hashes without writes', async () => {
+    const response = await adminCdkHandler(batchPatch({ action: 'set_permission', code_hashes: [codeHash], permission: 'growth' }))
+    expect(response.status).toBe(400)
+    const duplicate = await adminCdkHandler(batchPatch({ action: 'upgrade', code_hashes: [codeHash, codeHash], permission: 'ultimate' }))
+    expect(duplicate.status).toBe(400)
+    expect(mocks.mutateCdk).not.toHaveBeenCalled()
+  })
+
   it('returns stable per-item results for a batch revoke', async () => {
     const secondHash = 'b'.repeat(64)
     const response = await adminCdkHandler(new Request('http://localhost/api/admin/cdk', {
@@ -293,6 +364,12 @@ describe('admin CDK atomic lifecycle operations', () => {
     expect(mocks.deleteUnusedCdk).toHaveBeenCalledWith(`cdk/${codeHash}.json`)
   })
 })
+
+function batchPatch(body: Record<string, unknown>) {
+  return new Request('http://localhost/api/admin/cdk', {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  })
+}
 
 function baselineRequest(source: 'latest' | 'workspace' | 'next_import') {
   return new Request('http://localhost/api/admin/cdk', {

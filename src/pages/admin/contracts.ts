@@ -33,7 +33,7 @@ export type CdkType = 'profile' | 'balance' | 'item'
 type ItemCdkCode = 'lifetime_profile_voucher' | 'limited_profile_voucher'
 type ProfileCdkDuration = 'lifetime' | 'month' | 'half_year' | 'year'
 
-export type AppUserStatus = 'active' | 'frozen' | 'revoked'
+export type AppUserStatus = 'active' | 'frozen' | 'revoked' | 'pending_deletion'
 
 export type StatusFilter = CdkStatus | 'all'
 
@@ -400,6 +400,7 @@ export interface AppUserSummary {
   id: string;
   email: string;
   email_verified_at: string | null;
+  last_seen_at?: string | null;
   permission?: Permission;
   status: AppUserStatus;
   cdk_order_hash?: string | null;
@@ -562,6 +563,7 @@ export const appUserStatusLabels: Record<AppUserStatus, string> = {
   active: '正常',
   frozen: '已冻结',
   revoked: '已撤销',
+  pending_deletion: '等待注销',
 }
 
 export const sectionLabels: Record<AdminSection, string> = {

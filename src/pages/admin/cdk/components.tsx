@@ -5,8 +5,9 @@ import { DetailItem, StatusPill, SmallButton, formatDate, getNextProductPermissi
 import { AnimatedValue, RevealItem } from '../../../components/MotionPrimitives'
 import { PaginationControls } from '../shared/PaginationControls'
 import { requestAdminOperationReason } from '../../../lib/admin-operation-reason'
+import type { BulkCdkAction } from './bulk-actions'
 
-export function CdkTable({ records, selected, filters, search, pagination, loading, busyAction, onSearchChange, onPageChange, onPageSizeChange, onFilterChange, onSelect, onBulkRevoke, onPatch, onOpenDetail, onDelete }: {
+export function CdkTable({ records, selected, filters, search, pagination, loading, busyAction, onSearchChange, onPageChange, onPageSizeChange, onFilterChange, onSelect, onBulk, onPatch, onOpenDetail, onDelete }: {
   records: AdminCdkRecord[];
   selected: string[];
   filters: CdkTableFilters;
@@ -19,11 +20,15 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
   onSelect: (hashes: string[]) => void;
-  onBulkRevoke: () => void;
+  onBulk: (action: BulkCdkAction, permission?: GeneratedPermission, note?: string) => Promise<void>;
   onPatch: (record: AdminCdkRecord, action: string, nextPermission?: GeneratedPermission, extraBody?: Record<string, unknown>) => Promise<void>;
   onOpenDetail: (record: AdminCdkRecord) => Promise<void>;
   onDelete: (record: AdminCdkRecord) => Promise<void>;
 }) {
+  const [bulkPermission, setBulkPermission] = useState<GeneratedPermission>('ultimate')
+  const [bulkNote, setBulkNote] = useState('')
+  const busy = loading || Boolean(busyAction)
+  const selectedRecords = records.filter((record) => selected.includes(record.code_hash))
   const allSelected = records.length > 0 && records.every((record) => selected.includes(record.code_hash))
   return (
     <section className="tool-panel">
@@ -33,6 +38,7 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
             <button
               key={item}
               type="button"
+              disabled={Boolean(busyAction)}
               aria-pressed={filters.status === item}
               onClick={() => onFilterChange({ status: item })}
               className={`tool-secondary-action min-h-10 px-3 text-sm ${filters.status === item ? 'tool-option-selected' : ''}`}
@@ -41,17 +47,25 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={onBulkRevoke}
-          disabled={selected.length === 0}
-          aria-label={selected.length > 0 ? `批量撤销 ${selected.length} 个已选 CDK` : '请先选择要撤销的 CDK'}
-          className="tool-danger-action text-sm"
-        >
-          批量撤销{selected.length > 0 ? ` (${selected.length})` : ''}
-        </button>
+        <span className="text-sm text-ink-secondary">当前页已选 {selectedRecords.length} 个 CDK</span>
       </div>
-      <div className="grid gap-3 border-b border-surface-3 p-4 md:grid-cols-4">
+      <div className="flex flex-wrap items-end gap-2 border-b border-surface-3 p-4">
+        <label><span className="mb-1.5 block text-xs font-medium text-ink-muted">批量升级到</span>
+          <select className="tool-field" value={bulkPermission} disabled={busy} onChange={(event) => setBulkPermission(event.currentTarget.value as GeneratedPermission)}>
+            {cdkProductPermissions.map((permission) => <option key={permission} value={permission}>{permissionLabels[permission]}</option>)}
+          </select>
+        </label>
+        <button type="button" className="tool-secondary-action text-sm" disabled={busy || !selectedRecords.length} onClick={() => void onBulk('upgrade', bulkPermission)}>批量升级</button>
+        <button type="button" className="tool-secondary-action text-sm" disabled={busy || !selectedRecords.some((record) => record.status === 'frozen' && record.cdk_type === 'profile')} onClick={() => void onBulk('unfreeze')}>批量解冻</button>
+        <button type="button" className="tool-danger-action text-sm" disabled={busy || !selectedRecords.some((record) => record.status === 'used' || record.status === 'frozen')} onClick={() => void onBulk('revoke')}>批量撤销</button>
+        <button type="button" className="tool-danger-action text-sm" disabled={busy || !selectedRecords.some((record) => record.status === 'unused')} onClick={() => void onBulk('delete')}>批量删除未使用</button>
+        <label><span className="mb-1.5 block text-xs font-medium text-ink-muted">批量订单备注</span>
+          <input className="tool-field" value={bulkNote} maxLength={500} disabled={busy} placeholder="留空可清除备注" onChange={(event) => setBulkNote(event.currentTarget.value)} />
+        </label>
+        <button type="button" className="tool-secondary-action text-sm" disabled={busy || !selectedRecords.length} onClick={() => void onBulk('update_note', undefined, bulkNote)}>批量改备注</button>
+        <button type="button" className="tool-secondary-action text-sm" disabled={busy || !selected.length} onClick={() => onSelect([])}>取消选择</button>
+      </div>
+      <fieldset disabled={Boolean(busyAction)} className="grid gap-3 border-b border-surface-3 p-4 md:grid-cols-4">
         <label className="block md:col-span-4">
           <span className="mb-1.5 block text-xs font-medium text-ink-muted">搜索</span>
           <div className="flex gap-2">
@@ -77,13 +91,13 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
         </label>
         <BinaryFilterSelect label="风险事件" value={filters.risk} onChange={(value) => onFilterChange({ risk: value })} />
         <BinaryFilterSelect label="生成过排班" value={filters.generated} onChange={(value) => onFilterChange({ generated: value })} />
-      </div>
+      </fieldset>
         <div className="overflow-x-auto" aria-busy={loading}>
           {loading && <div className="border-b border-surface-3 px-4 py-2 text-sm text-ink-muted" role="status">正在加载…</div>}
           <table className="w-full min-w-[1120px] table-fixed text-left text-sm">
             <thead className="bg-surface-2 text-xs uppercase tracking-wide text-ink-muted">
               <tr>
-                <th className="w-12 px-4 py-3"><input className="h-4 w-4 accent-brand-500" type="checkbox" aria-label="选择当前筛选中的全部 CDK" checked={allSelected} onChange={(event) => onSelect(event.currentTarget.checked ? records.map((record) => record.code_hash) : [])} /></th>
+                <th className="w-12 px-4 py-3"><input className="h-4 w-4 accent-brand-500" type="checkbox" disabled={busy} aria-label="选择当前页全部 CDK" checked={allSelected} onChange={(event) => onSelect(event.currentTarget.checked ? records.map((record) => record.code_hash) : [])} /></th>
                 <th className="w-36 px-4 py-3">CDK</th>
                 <th className="w-32 px-4 py-3">状态</th>
                 <th className="w-56 px-4 py-3">数据</th>
@@ -99,7 +113,7 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
               const nextPermission = record.cdk_type === 'profile' ? getNextProductPermission(record.permission) : null
               return (
                 <tr key={record.code_hash} className="hover:bg-surface-2/50">
-                    <td className="px-4 py-4 align-top"><input className="h-4 w-4 accent-brand-500" type="checkbox" aria-label={`选择 CDK ${record.cdk_id}`} checked={selected.includes(record.code_hash)} onChange={(event) => onSelect(event.currentTarget.checked ? [...selected, record.code_hash] : selected.filter((hash) => hash !== record.code_hash))} /></td>
+                    <td className="px-4 py-4 align-top"><input className="h-4 w-4 accent-brand-500" type="checkbox" disabled={busy} aria-label={`选择 CDK ${record.cdk_id}`} checked={selected.includes(record.code_hash)} onChange={(event) => onSelect(event.currentTarget.checked ? [...selected, record.code_hash] : selected.filter((hash) => hash !== record.code_hash))} /></td>
                     <td className="px-4 py-4 align-top font-mono text-ink-primary">{record.cdk_id}</td>
                     <td className="px-4 py-4 align-top"><StatusPill status={record.status} /><div className="mt-1 text-xs text-ink-muted">{record.cdk_type === 'balance' ? `余额 ${record.amount} 积分` : record.cdk_type === 'item' ? itemCdkLabel(record) : profileCdkLabel(record)}</div></td>
                     <td className="px-4 py-4 align-top text-ink-secondary">
@@ -110,11 +124,11 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
                     <td className="px-4 py-4 align-top text-ink-secondary"><div className="truncate" title={record.order_note || undefined}>{record.order_note || '-'}</div></td>
                     <td className="px-4 py-4 align-top">
                       <div className="flex min-w-0 flex-wrap gap-2">
-                      <SmallButton onClick={() => void onOpenDetail(record)} loading={busyAction === `cdk-detail:${record.code_hash}`}>详情</SmallButton>
-                      {nextPermission && record.status !== 'frozen' && record.status !== 'revoked' && <SmallButton onClick={() => onPatch(record, 'upgrade', nextPermission)} loading={busyAction === `upgrade:${record.code_hash}`}>升级</SmallButton>}
-                      {record.status === 'frozen' && <SmallButton onClick={() => onPatch(record, 'unfreeze')} loading={busyAction === `unfreeze:${record.code_hash}`} tone="success">解冻</SmallButton>}
-                      {(record.status === 'used' || record.status === 'frozen') && <SmallButton onClick={() => onPatch(record, 'revoke')} loading={busyAction === `revoke:${record.code_hash}`} tone="danger">撤销</SmallButton>}
-                      {record.status === 'unused' && <SmallButton onClick={() => onDelete(record)} loading={busyAction === `delete:${record.code_hash}`} tone="danger">删除</SmallButton>}
+                      <SmallButton onClick={() => void onOpenDetail(record)} loading={busy}>详情</SmallButton>
+                      {nextPermission && record.status !== 'frozen' && record.status !== 'revoked' && <SmallButton onClick={() => onPatch(record, 'upgrade', nextPermission)} loading={busy}>升级</SmallButton>}
+                      {record.status === 'frozen' && <SmallButton onClick={() => onPatch(record, 'unfreeze')} loading={busy} tone="success">解冻</SmallButton>}
+                      {(record.status === 'used' || record.status === 'frozen') && <SmallButton onClick={() => onPatch(record, 'revoke')} loading={busy} tone="danger">撤销</SmallButton>}
+                      {record.status === 'unused' && <SmallButton onClick={() => onDelete(record)} loading={busy} tone="danger">删除</SmallButton>}
                     </div>
                   </td>
                 </tr>
@@ -123,7 +137,7 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
           </tbody>
         </table>
       </div>
-      <PaginationControls pagination={pagination} loading={loading} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
+      <PaginationControls pagination={pagination} loading={busy} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
     </section>
   )
 }

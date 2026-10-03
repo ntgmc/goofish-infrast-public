@@ -1,21 +1,17 @@
-.config-editor {
-  --station-trading: #00b0ff;
-  --station-manufacturing: #ffcf00;
-}
-
 .config-preset {
-  border-color: color-mix(in srgb, var(--preset-color) 38%, var(--border));
-  background: color-mix(in srgb, var(--preset-color) 10%, var(--theme-surface-2));
+  border-color: var(--border);
+  background: var(--theme-surface-1);
+  box-shadow: inset 3px 0 0 var(--preset-color);
   color: var(--theme-ink-primary);
 }
 
 .config-preset:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--preset-color) 65%, var(--border));
-  background: color-mix(in srgb, var(--preset-color) 18%, var(--theme-surface-2));
+  border-color: var(--input);
+  background: var(--theme-surface-3);
 }
 
 .config-preset--balanced {
-  --preset-color: var(--theme-success);
+  --preset-color: var(--primary);
 }
 
 .config-preset--gold {
@@ -27,14 +23,14 @@
 }
 
 .config-preset--orundum {
-  --preset-color: var(--theme-error);
+  --preset-color: var(--product-orundum);
 }
 
 .config-station {
   min-width: 0;
   padding: 0.75rem;
   border-left: 3px solid var(--station-color);
-  background: color-mix(in srgb, var(--station-color) 9%, var(--theme-surface-1));
+  background: var(--theme-surface-1);
 }
 
 .config-station--trading {
@@ -46,5 +42,5 @@
 }
 
 .config-station--power {
-  --station-color: var(--theme-success);
+  --station-color: var(--station-power);
 }

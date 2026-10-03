@@ -39,6 +39,29 @@ afterAll(async () => {
 })
 
 describe('PostgreSQL schema migration', () => {
+  it('backfills last seen from existing sessions once and preserves newer activity on rerun', async () => {
+    const profile = await seedProfile()
+    const sessionTime = '2026-10-02T08:00:00.000Z'
+    try {
+      await query(
+        `insert into user_sessions (id, user_id, token_hash, record_json, created_at, last_seen_at, expires_at)
+         values ($1, $2, $1, '{}'::jsonb, $3, $3, $3::timestamptz + interval '1 day')`,
+        [randomUUID(), profile.userId, sessionTime],
+      )
+      await query('update user_accounts set last_seen_at = null where id = $1', [profile.userId])
+      await markCurrentMigrationPending()
+      await migrateDatabaseSchema()
+      const readLastSeen = async () => (await query<{ last_seen_at: Date }>(
+        'select last_seen_at from user_accounts where id = $1', [profile.userId],
+      )).rows[0].last_seen_at.toISOString()
+      expect(await readLastSeen()).toBe(sessionTime)
+      await query('update user_accounts set last_seen_at = $2 where id = $1', [profile.userId, '2026-10-03T08:00:00.000Z'])
+      await markCurrentMigrationPending()
+      await migrateDatabaseSchema()
+      expect(await readLastSeen()).toBe('2026-10-03T08:00:00.000Z')
+    } finally { await query('delete from user_accounts where id = $1', [profile.userId]) }
+  })
+
   it('backfills manual provenance from old jobs without changing optimizer history or custom names', async () => {
     const profile = await seedProfile()
     const jobId = randomUUID()

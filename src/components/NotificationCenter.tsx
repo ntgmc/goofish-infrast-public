@@ -299,7 +299,7 @@ function NotificationBellContent({ center, iconOnly }: { center: NotificationCen
           {center.unreadCount > 0 && (
             <span
               aria-hidden="true"
-              className="absolute -right-1 -top-1 min-w-5 rounded-full bg-brand-500 px-1 text-center text-[10px] font-semibold leading-5 text-white shadow-sm"
+              className="absolute -right-1 -top-1 min-w-5 rounded-full bg-primary px-1 text-center text-[10px] font-semibold leading-5 text-primary-foreground shadow-sm"
             >
               {badge}
             </span>
