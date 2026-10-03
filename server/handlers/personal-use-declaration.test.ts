@@ -38,11 +38,11 @@ beforeEach(() => {
   mocks.isFreePreviewProfile.mockReturnValue(true)
   mocks.getProfileForUser.mockResolvedValue({ id: 'profile-1', user_id: 'user-1', kind: 'free_preview' })
   mocks.confirm.mockResolvedValue({
-    declaration_id: 'personal_use_v1_1',
-    declaration_version: 'V1.1',
+    declaration_id: CURRENT_PERSONAL_USE_DECLARATION.id,
+    declaration_version: CURRENT_PERSONAL_USE_DECLARATION.version,
     content_hash: CURRENT_PERSONAL_USE_DECLARATION.contentHash,
     action: 'generated_result_export',
-    accepted_at: '2026-07-31T10:00:00.000Z',
+    accepted_at: '2026-10-03T10:00:00.000Z',
   })
 })
 
@@ -55,7 +55,7 @@ describe('personal use declaration endpoint', () => {
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({
       accepted: false,
-      declaration: { id: 'personal_use_v1_1', version: 'V1.1' },
+      declaration: { id: CURRENT_PERSONAL_USE_DECLARATION.id, version: CURRENT_PERSONAL_USE_DECLARATION.version },
     })
     expect(mocks.getProfileForUser).toHaveBeenCalledWith('user-1', 'profile-1')
   })
@@ -69,7 +69,14 @@ describe('personal use declaration endpoint', () => {
 
     expect(response.status).toBe(200)
     expect(mocks.confirm).toHaveBeenCalledWith('user-1', 'generated_result_export', '203.0.113.8', 'profile-1')
-    await expect(response.json()).resolves.toMatchObject({ accepted: true })
+    await expect(response.json()).resolves.toMatchObject({
+      accepted: true,
+      acceptance: {
+        declaration_id: CURRENT_PERSONAL_USE_DECLARATION.id,
+        declaration_version: CURRENT_PERSONAL_USE_DECLARATION.version,
+        content_hash: CURRENT_PERSONAL_USE_DECLARATION.contentHash,
+      },
+    })
   })
 
   it('accepts a personal metered profile without treating it as commercial use', async () => {
@@ -100,13 +107,16 @@ describe('personal use declaration endpoint', () => {
     expect(mocks.confirm).not.toHaveBeenCalled()
   })
 
-  it('rejects confirmation for a declaration document the server no longer serves', async () => {
+  it.each([
+    { declaration_id: 'personal_use_v1_1' },
+    { content_hash: '0'.repeat(64) },
+  ])('rejects confirmation for a declaration document the server no longer serves: %j', async (outdatedDocument) => {
     const response = await personalUseDeclarationHandler(new Request('http://localhost/api/user/personal-use-declaration', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...confirmationBody('optimization_generate', 'profile-1'),
-        content_hash: '0'.repeat(64),
+        ...outdatedDocument,
       }),
     }))
 

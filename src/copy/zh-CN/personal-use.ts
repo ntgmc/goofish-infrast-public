@@ -1,6 +1,6 @@
 export const personalUseCopy = {
   declaration_title: '《个人使用声明》',
-  declaration_version: '版本 V1.1 / 生效日期：2026-07-31',
+  declaration_version: '版本 V1.2 / 生效日期：2026-10-03',
   confirmation_title: '个人使用确认',
   confirmation_effective_date: '生效日期：',
   confirmation_intro: '本人确认，本次及后续使用本服务所生成的全部内容（包括排班方案、分析报告、可执行文件等），仅服务于本人绑定的游戏账号，用于个人非商业参考。',
@@ -16,7 +16,7 @@ export const personalUseCopy = {
   confirmation_version_changed: '个人使用声明已更新，请阅读当前版本后重新确认。',
   privacy_acceptance_notice: '当你领取免费预览权益、生成或调整排班、导出个人档案结果时，平台会记录你确认的声明版本和时间、相关账号与档案、操作类型和当时的网络地址。记录仅用于证明你已确认声明、处理异常使用和争议；账号存续期间保留，注销后再保留一年，随后删除或移除可识别信息。',
   terms_personal_use_heading: '个人使用声明',
-  terms_personal_use_intro: '免费预览及其生成成果适用《个人使用声明》（V1.1 / 生效日期：2026-07-31）。本声明适用于生效日起发生的使用行为，不以新条款单独追溯此前行为。',
+  terms_personal_use_intro: '免费预览及其生成成果适用《个人使用声明》（V1.2 / 生效日期：2026-10-03）。本声明适用于生效日起发生的使用行为，不以新条款单独追溯此前行为。',
   sections: [
     {
       id: 'personal-use-scope',
