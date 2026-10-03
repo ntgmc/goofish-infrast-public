@@ -3,9 +3,10 @@ import { useSearchParams } from 'react-router'
 import { copy } from '../../copy'
 import ScheduleProgress from '../../components/ScheduleProgress'
 import { normalizeConfig } from '../../lib/config'
+import { hasCapability } from '../../lib/product-catalog'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import type { LicenseConfig, LicenseOperator, OptimizeResult } from '../../lib/types'
-import { isSchedulableProfile } from '../tool/tool-utils'
+import { getEffectiveProfilePermission, isFreePreviewProfile, isSchedulableProfile } from '../tool/tool-utils'
 import { useToolSession } from '../tool/useToolSession'
 import { useOptimizeWorkflow } from '../tool/optimize/useOptimizeWorkflow'
 import { useOptimizationTaskCenter } from '../tool/optimize/useOptimizationTaskCenter'
@@ -22,6 +23,8 @@ export default function V2Page() {
   const [operators, setOperators] = useState(SAMPLE_OPERATORS)
   const [changed, setChanged] = useState(false)
   const activeConfig = session.configOverride ?? session.workspace?.config ?? config
+  const profile = session.activeProfile
+  const permission = profile ? getEffectiveProfilePermission(profile) : undefined
   const updateConfig = (mutate: (config: LicenseConfig) => void) => {
     const next = normalizeConfig(activeConfig)
     mutate(next)
@@ -32,7 +35,7 @@ export default function V2Page() {
   async function importOperators(next: LicenseOperator[]) {
     if (session.user && session.activeProfile) {
       if (!await session.flushConfigSave()) throw new Error(copy.v2.saveFailed)
-      await session.persistWorkspacePatch({ operators: next, config: normalizeConfig(activeConfig), elite_overrides: {} })
+      await session.persistWorkspacePatch({ operators: next, elite_overrides: {} })
     } else {
       setOperators(next)
       setChanged(true)
@@ -44,7 +47,10 @@ export default function V2Page() {
   }
 
   return <V2Dashboard session={session} result={SAMPLE_RESULT} operators={session.workspace?.operators ?? operators} config={activeConfig}
-    sample configChanged={changed} onUpdateConfig={updateConfig} onImportOperators={importOperators} />
+    sample configChanged={changed} onUpdateConfig={updateConfig} onImportOperators={importOperators}
+    permission={permission} canEditConfig={!profile || hasCapability({ permission }, 'edit_full_config')}
+    canUseIntermediateConfig={!profile || isFreePreviewProfile(profile) || hasCapability({ permission }, 'use_intermediate_auto_config')}
+    canViewAnalysis={!profile || hasCapability({ kind: profile.kind, permission }, 'view_full_data')} />
 }
 
 function ConnectedDashboard({ session }: { session: V2Session }) {

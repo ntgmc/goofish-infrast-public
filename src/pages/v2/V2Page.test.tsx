@@ -514,4 +514,45 @@ describe('V2 results-first workspace', () => {
     expect(await screen.findByText(copy.v2.previewAnalysis)).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: copy.v2.sanityCalculation })).not.toBeInTheDocument()
   })
+
+  it.each([false, true])('uses effective trial access in the fallback workspace (trial: %s)', async (trial) => {
+    connect()
+    session.license = null
+    session.activeProfile!.kind = 'free_preview'
+    session.activeProfile!.permission = 'growth'
+    session.activeProfile!.trial = trial ? {
+      id: 'trial', starts_at: '2026-10-01T00:00:00Z', ends_at: '2026-10-10T00:00:00Z',
+      active: true, effective_permission: 'advanced',
+    } : null
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
+    const dialog = within(await screen.findByRole('dialog'))
+    expect(await dialog.findByRole('button', { name: '243 均衡' })).not.toBeDisabled()
+    if (trial) expect(dialog.getByRole('switch', { name: /^菲亚梅塔$/ })).not.toBeDisabled()
+    else expect(dialog.queryByRole('switch', { name: /^菲亚梅塔$/ })).not.toBeInTheDocument()
+    expect(session.setConfigOverride).not.toHaveBeenCalled()
+    expect(session.persistWorkspacePatch).not.toHaveBeenCalled()
+    await dismissDrawer(user)
+    await user.click(screen.getByRole('button', { name: copy.v2.analysisTab }))
+    if (trial) expect(screen.getByRole('region', { name: copy.v2.sanityCalculation })).toBeInTheDocument()
+    else expect(screen.queryByRole('region', { name: copy.v2.sanityCalculation })).not.toBeInTheDocument()
+    expect(mocks.workflow).not.toHaveBeenCalled()
+  })
+
+  it('shows orundum and shards in free aggregate output while keeping precise calculations gated', async () => {
+    const workflow = connect()
+    workflow.userCanViewFullData = false
+    workflow.historyItem = { result: { ...SAMPLE_RESULT, daily_production: {
+      manufacturing: { 'Originium Shard': 41.25 }, trading: { Orundum: 103.5 },
+    } } }
+    const user = userEvent.setup()
+    mount()
+    const panel = within(screen.getByRole('heading', { name: copy.v2.dailyOutput }).closest('section')!)
+    expect(panel.getByText('合成玉')).toBeInTheDocument()
+    expect(panel.getByText('103.5')).toBeInTheDocument()
+    expect(panel.getByText('源石碎片')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: copy.v2.analysisTab }))
+    expect(screen.queryByRole('region', { name: copy.v2.sanityCalculation })).not.toBeInTheDocument()
+  })
 })

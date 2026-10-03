@@ -1,6 +1,5 @@
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
-import { formatAmount } from '../../components/result-panel/formatters'
 import { PRODUCT_LABELS, ROOM_LABELS } from '../../components/result-panel/labels'
 import { calculateProductionSanity } from '../../lib/production-sanity'
 import { SANITY_PER_BATTLE_RECORD, SANITY_PER_LMD, SANITY_PER_ORIGINIUM_SHARD, SANITY_PER_ORUNDUM, SANITY_PER_PURE_GOLD } from '../../lib/orundum-economy'
@@ -67,8 +66,8 @@ export default function IncomeAnalysis({ result }: { result: OptimizeResult }) {
             const consumed = daily?.consumption?.[product] ?? 0
             return <tr key={product}><th scope="row">{PRODUCT_LABELS[product]}</th>
               <td>{unit.value.toFixed(6)}<small>{unit.formula}</small></td>
-              <td>{formatAmount(produced)} × {unit.value.toFixed(6)} = {amount(produced * unit.value)}</td>
-              <td>{consumed ? `${formatAmount(consumed)} × ${unit.value.toFixed(6)} = ${amount(consumed * unit.value)}` : '—'}</td></tr>
+              <td>{amount(produced)} × {unit.value.toFixed(6)} ≈ {amount(produced * unit.value)}</td>
+              <td>{consumed ? `${amount(consumed)} × ${unit.value.toFixed(6)} ≈ ${amount(consumed * unit.value)}` : '—'}</td></tr>
           })}</tbody></table>
       </div><p className="v2-muted">{text.sanityCalculationNote}</p>
     </section>

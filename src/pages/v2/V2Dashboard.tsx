@@ -6,7 +6,9 @@ import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
 import { AnimatedValue, MotionNavIndicator, RevealItem, StaggeredReveal, motionTokens } from '../../components/MotionPrimitives'
 import { formatAmount, prepareResult } from '../../components/result-panel/formatters'
+import { PRODUCT_LABELS } from '../../components/result-panel/labels'
 import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
+import { profileScopedPath } from '../../lib/app-routes'
 import { normalizeScheduleMode, parseShiftHours, SCHEDULE_MODE_LABELS } from '../../lib/config'
 import type { LicenseConfig, LicenseOperator, OptimizeResult, PermissionMode, WorkspaceResultHistorySummary } from '../../lib/types'
 import ScheduleBoard, { Avatar } from './ScheduleBoard'
@@ -84,7 +86,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: motionTokens.duration.exit }} />}
       </AnimatePresence>
       <aside className={`v2-sidebar ${mobileNavigation ? 'v2-sidebar-open' : ''}`}>
-        <Link to="/v2" className="v2-brand"><span className="v2-brand-mark"><Building2 size={24} strokeWidth={1.8} /></span>
+        <Link to={profileScopedPath('/v2', session.activeProfile?.id)} className="v2-brand"><span className="v2-brand-mark"><Building2 size={24} strokeWidth={1.8} /></span>
           <span><strong>{text.brand}<sup>V2</sup></strong><small>{text.brandDescription}</small></span></Link>
         <button className="v2-mobile-close v2-icon-button" type="button" onClick={() => setMobileNavigation(false)} aria-label={text.close}><X size={20} /></button>
         <nav aria-label={text.navigation}>
@@ -162,6 +164,10 @@ export default function V2Dashboard({ session, result, operators, config, sample
                 <OutputRow product="LMD" value={prepared.productionStats.lmd} />
                 <OutputRow product="Battle Record" value={prepared.productionStats.manufacturing['Battle Record'] ?? 0} />
                 <OutputRow product="Pure Gold" value={prepared.productionStats.manufacturing['Pure Gold'] ?? 0} />
+                {Object.keys(PRODUCT_LABELS).filter((product) => !['LMD', 'Battle Record', 'Pure Gold'].includes(product)).map((product) => {
+                  const value = (prepared.productionStats.manufacturing[product] ?? 0) + (result.daily_production?.trading?.[product] ?? 0)
+                  return value !== 0 ? <OutputRow key={product} product={product} value={value} /> : null
+                })}
               </section>
               <section className="v2-panel v2-config-panel">
                 <div className="v2-panel-heading"><h2>{text.currentConfig}</h2><button className="v2-text-button" type="button" onClick={() => openPanel('config')}>{text.edit}<ArrowUpRight size={13} /></button></div>
@@ -213,6 +219,5 @@ function Metric({ label, value, unit, hint, product, icon }: { label: string; va
 }
 
 function OutputRow({ product, value }: { product: string; value: number }) {
-  const labels: Record<string, string> = { LMD: copy.common.components_ConfigEditor_001, 'Battle Record': copy.common.components_ConfigEditor_004, 'Pure Gold': copy.common.components_ConfigEditor_003 }
-  return <div className="v2-output-row"><span><ProductIcon product={product} size={29} /><span>{labels[product]}</span></span><strong><AnimatedValue value={formatAmount(value)} /><small>{text.daily}</small></strong></div>
+  return <div className="v2-output-row"><span><ProductIcon product={product} size={29} /><span>{PRODUCT_LABELS[product] ?? product}</span></span><strong><AnimatedValue value={formatAmount(value)} /><small>{text.daily}</small></strong></div>
 }

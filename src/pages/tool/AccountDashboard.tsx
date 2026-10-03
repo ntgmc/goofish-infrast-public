@@ -1,13 +1,14 @@
 import { lazy, Suspense, useDeferredValue, useMemo, useState } from 'react'
 import { LayoutGroup } from 'motion/react'
 import { Link } from 'react-router'
+import { ArrowUpRight } from 'lucide-react'
 import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
 import CompactHeaderMenu from '../../components/CompactHeaderMenu'
 import GuidedTour, { hasCompletedTour, useFirstRunTour, type TourDefinition } from '../../components/GuidedTour'
 import { AnimatedPresenceRegion, MotionNavIndicator, MotionSkeleton } from '../../components/MotionPrimitives'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
-import type { DashboardSection } from '../../lib/app-routes'
+import { profileScopedPath, type DashboardSection } from '../../lib/app-routes'
 import type { Announcement, AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
 import { copy } from '../../copy/index'
 import { DEFAULT_SITE_FEATURES, METERED_BILLING_AVAILABLE, type SiteFeatures } from '../../lib/site-features'
@@ -107,7 +108,7 @@ export default function AccountDashboard({
 
   return (
     <div className="tool-shell">
-      <aside className="tool-sidebar fixed inset-y-0 left-0 hidden w-64 px-4 py-5 lg:block">
+      <aside className="tool-sidebar fixed inset-y-0 left-0 hidden w-64 flex-col overflow-y-auto px-4 py-5 lg:flex">
         <div className="border-b border-surface-3 px-2 pb-5">
           <div className="flex items-center gap-3">
             <BrandLogo size="sm" />
@@ -142,16 +143,22 @@ export default function AccountDashboard({
           </nav>
         </LayoutGroup>
 
-        <nav
-          className="absolute inset-x-4 bottom-5 grid grid-cols-2 gap-2 border-t border-surface-3 pt-4"
-          aria-label={copy.common.pages_tool_AccountDashboard_017}
-        >
-          <Link to="/" className="tool-secondary-action w-full">
-            {copy.common.pages_tool_AccountDashboard_016}
+        <div className="mt-auto space-y-4 pt-8">
+          <Link to={profileScopedPath('/v2', activeProfile?.id ?? null)} className="tool-inset block p-3 text-sm text-ink-secondary">
+            <span className="flex min-h-11 items-center justify-between gap-2 font-medium text-brand-500">{copy.v2.testEntry}<ArrowUpRight size={16} /></span>
+            <span className="block text-xs leading-5">{copy.v2.testEntryDescription}</span>
           </Link>
-          <button type="button" onClick={onLogout} className="tool-danger-action w-full">
-            {copy.common.pages_tool_AccountDashboard_009}</button>
-        </nav>
+          <nav
+            className="grid grid-cols-2 gap-2 border-t border-surface-3 pt-4"
+            aria-label={copy.common.pages_tool_AccountDashboard_017}
+          >
+            <Link to="/" className="tool-secondary-action w-full">
+              {copy.common.pages_tool_AccountDashboard_016}
+            </Link>
+            <button type="button" onClick={onLogout} className="tool-danger-action w-full">
+              {copy.common.pages_tool_AccountDashboard_009}</button>
+          </nav>
+        </div>
       </aside>
 
       <main className="lg:pl-64" tabIndex={-1} data-route-focus>
@@ -185,6 +192,7 @@ export default function AccountDashboard({
                     onSelect: () => onSectionChange(key),
                   })),
                   { type: 'separator' as const, id: 'actions' },
+                  { type: 'link' as const, id: 'v2', label: copy.v2.testEntry, to: profileScopedPath('/v2', activeProfile?.id ?? null) },
                   { type: 'button' as const, id: 'tour', label: copy.dashboard.pages_tool_AccountDashboard_tour_001, onSelect: replayTour },
                   { type: 'link' as const, id: 'home', label: copy.common.pages_tool_AccountDashboard_016, to: '/' },
                   { type: 'button' as const, id: 'logout', label: copy.common.pages_tool_AccountDashboard_013, intent: 'danger' as const, onSelect: onLogout },
