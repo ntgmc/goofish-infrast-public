@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { adminUserFiltersSchema } from '../../src/lib/admin-user-filters'
 import {
   authenticateAdminRequest,
   createAdminUser,
@@ -32,6 +33,7 @@ import {
   type UserGameAccountRecord,
   type UserWorkspaceRecord,
   AdminProfileMutationConflictError,
+  AdminUserMutationConflictError,
 } from '../storage/user-store'
 import {
   AdminPaginationError,
@@ -43,7 +45,7 @@ import {
 import { resetUserPasswordByAdmin } from './user-auth'
 import type { AdminUserWorkspaceExportV1, ProductPermissionMode } from '../../src/lib/types'
 import { requestSchemas } from '../security/request-policy'
-import { getValidatedJson } from '../security/request-validation'
+import { getValidatedJson, RequestInputError } from '../security/request-validation'
 import {
   listPersonalUseDeclarationAcceptancesForUser,
   listPersonalUseDeclarationUsageEventsForUser,
@@ -146,7 +148,9 @@ export default async (req: Request): Promise<Response> => {
         return jsonResponse({ detail: await buildAdminUserDetail(user, profilePage) })
       }
       const request = parseAdminPageRequest(url)
-      const result = await listAdminUserAccountsPage(request)
+      const filters = adminUserFiltersSchema.safeParse(Object.fromEntries(url.searchParams))
+      if (!filters.success) return jsonResponse({ error: filters.error.issues.map((issue) => issue.message).join('；') }, 400)
+      const result = await listAdminUserAccountsPage({ ...request, filters: filters.data })
       const profilesByUser = new Map<string, UserGameAccountRecord[]>()
       for (const profile of result.profiles) {
         const profiles = profilesByUser.get(profile.user_id) ?? []
@@ -165,9 +169,35 @@ export default async (req: Request): Promise<Response> => {
     }
 
     if (req.method === 'PATCH') {
-      const body = await getValidatedJson(req, requestSchemas.adminUserPatch)
+      const body = await getValidatedJson(req, requestSchemas.adminUserPatch, true)
       const authentication = await authenticateAdminRequest(req, adminUserActionRequirement(body.action))
       if (!authentication.ok) return authentication.response
+      if ('user_ids' in body) {
+        const results: Array<{ user_id: string; ok: boolean; error?: string }> = []
+        const status = body.action === 'batch_freeze_accounts' ? 'frozen' : 'active'
+        for (const userId of body.user_ids) {
+          try {
+            const user = await getUserById(userId)
+            if (!user) {
+              results.push({ user_id: userId, ok: false, error: '用户不存在。' })
+              continue
+            }
+            await setUserStatus(user, status, buildAuditOperationInput(req, {
+              actorUsername: authentication.username,
+              action: status === 'frozen' ? 'user.freeze_account' : 'user.unfreeze_account',
+              targetType: 'user',
+              targetId: user.id,
+              reason: body.reason,
+            }))
+            results.push({ user_id: userId, ok: true })
+          } catch (error) {
+            if (!(error instanceof AdminUserMutationConflictError)) console.error('admin batch user operation error:', error)
+            results.push({ user_id: userId, ok: false, error: error instanceof AdminUserMutationConflictError ? error.message : '操作失败，请重试。' })
+          }
+        }
+        const succeeded = results.filter((result) => result.ok).length
+        return jsonResponse({ results, succeeded, failed: results.length - succeeded })
+      }
       const target = await findTargetUser(body)
       if (!target) return jsonResponse({ error: '用户不存在。' }, 404)
 
@@ -332,8 +362,10 @@ export default async (req: Request): Promise<Response> => {
 
     return jsonResponse({ error: 'Method not allowed' }, 405)
   } catch (error) {
+    if (error instanceof RequestInputError) return jsonResponse({ error: error.message }, error.status)
     if (error instanceof AdminPaginationError) return jsonResponse({ error: error.message }, 400)
     if (error instanceof AdminProfileMutationConflictError) return jsonResponse({ error: error.message }, 409)
+    if (error instanceof AdminUserMutationConflictError) return jsonResponse({ error: error.message }, 409)
     if (error instanceof PasswordWorkCapacityError) {
       return jsonResponse(
         { error: '认证服务繁忙，请稍后重试。' },
@@ -436,11 +468,11 @@ async function setUserStatus(
     status,
     updated_at: new Date().toISOString(),
   }
-  await saveUserAccountByAdmin(updated, {
+  const saved = await saveUserAccountByAdmin(updated, {
     revokeSessions: status !== 'active',
     audit: { ...audit, after: userAuditSnapshot(updated) },
   })
-  return updated
+  return saved
 }
 
 async function updateProfileSummary(
@@ -764,6 +796,7 @@ function toAdminAppUser(user: UserAccountRecord, profiles: UserGameAccountRecord
     id: user.id,
     email: user.email,
     email_verified_at: user.email_verified_at,
+    last_seen_at: user.last_seen_at ?? null,
     permission: user.permission,
     status: user.status,
     cdk_order_hash: user.cdk_order_hash,

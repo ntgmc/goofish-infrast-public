@@ -24,13 +24,21 @@ import {
   saveEmailVerificationToken,
   savePasswordResetToken,
   saveUserSession,
+  saveUserProfile,
+  saveUserAccountByAdmin,
+  saveUserAccount,
+  listAdminUserAccountsPage,
+  touchSession,
+  deleteSessionByTokenHash,
   updateUserPasswordAtomically,
   verifyUserEmailWithToken,
   type EmailVerificationTokenRecord,
   type PasswordResetTokenRecord,
   type UserAccountRecord,
   type UserSessionRecord,
+  type UserGameAccountRecord,
 } from './user-store'
+import { DEFAULT_ADMIN_USER_FILTERS } from '../../src/lib/admin-user-filters'
 
 let container: StartedPostgreSqlContainer | undefined
 
@@ -52,6 +60,113 @@ afterAll(async () => {
 })
 
 describe('atomic password lifecycle', () => {
+  it('retains monotonic last seen time after session deletion without changing account revision', async () => {
+    const now = new Date('2026-10-02T08:00:00.000Z')
+    const user = await seedUser('last-seen@example.test', now)
+    const session = await seedSession(user.id, now, 'last-seen')
+    const later = new Date('2026-10-02T08:20:00.000Z')
+    expect(await touchSession(session, later, now)).toBe(true)
+    expect(await touchSession(session, new Date('2026-10-02T08:10:00.000Z'), now)).toBe(false)
+    await deleteSessionByTokenHash(session.token_hash)
+    const stored = await getUserById(user.id)
+    expect(Date.parse(stored?.last_seen_at ?? '')).toBe(later.getTime())
+    expect(stored?.updated_at).toBe(user.updated_at)
+    await saveUserAccount({ ...user, last_seen_at: now.toISOString() })
+    expect(Date.parse((await getUserById(user.id))?.last_seen_at ?? '')).toBe(later.getTime())
+    const page = await listAdminUserAccountsPage({
+      page: 1, pageSize: 25, search: 'last-seen',
+      filters: { ...DEFAULT_ADMIN_USER_FILTERS, last_seen_from: '2026-10-02', last_seen_to: '2026-10-02' },
+    })
+    expect(page.users.map((item) => item.id)).toEqual([user.id])
+    expect(Date.parse(page.users[0].last_seen_at ?? '')).toBe(later.getTime())
+  })
+
+  it('combines valid card, date, status and search filters before pagination in Beijing time', async () => {
+    const users = await Promise.all([
+      seedUser('match-card@example.test', new Date('2026-10-01T16:00:00Z')),
+      seedUser('match-preview@example.test', new Date('2026-10-02T01:00:00Z')),
+      seedUser('match-frozen@example.test', new Date('2026-10-02T02:00:00Z')),
+      seedUser('match-expired@example.test', new Date('2026-10-02T03:00:00Z')),
+      seedUser('match-before@example.test', new Date('2026-10-01T15:59:59Z')),
+      seedUser('match-archived@example.test', new Date('2026-10-02T03:00:00Z')),
+    ])
+    for (const [index, user] of users.entries()) {
+      const profile: UserGameAccountRecord = {
+        version: 1, id: randomUUID(), user_id: user.id, kind: index === 1 ? 'free_preview' : 'cdk',
+        authorization_source: 'admin_grant',
+        cdk_key: null, cdk_code_hash: null, cdk_order_hash: null, permission: 'advanced',
+        status: index === 2 ? 'frozen' : 'active', display_name: '筛选测试', note: '',
+        ...(index === 3 ? { expires_at: '2020-01-01T00:00:00Z' } : {}),
+        ...(index === 5 ? { archived_at: '2026-10-02T03:30:00Z' } : {}),
+        created_at: user.created_at, updated_at: user.updated_at,
+      }
+      await saveUserProfile(profile)
+    }
+    const page = await listAdminUserAccountsPage({
+      page: 99, pageSize: 25, search: 'match',
+      filters: { ...DEFAULT_ADMIN_USER_FILTERS, permission: 'advanced', status: 'active', registered_from: '2026-10-02', registered_to: '2026-10-02' },
+    })
+    expect(page.total).toBe(1)
+    expect(page.page).toBe(1)
+    expect(page.users.map((item) => item.id)).toEqual([users[0].id])
+  })
+
+  it('updates only account status and revokes sessions without overwriting newer credentials', async () => {
+    const now = new Date('2026-10-02T08:00:00.000Z')
+    const user = await seedUser('status-only@example.test', now)
+    await seedSession(user.id, now, 'status-only')
+    await query(`update user_accounts set password_hash = 'new-hash',
+      record_json = record_json || '{"password_hash":"new-hash"}'::jsonb where id = $1`, [user.id])
+    const audit = {
+      actorUsername: 'operator', action: 'user.freeze_account', targetType: 'user', targetId: user.id,
+      reason: '工单 OPS-201', requestId: randomUUID(),
+    }
+    const frozen = await saveUserAccountByAdmin({ ...user, status: 'frozen' }, { revokeSessions: true, audit })
+    expect(frozen.password_hash).toBe('new-hash')
+    expect((await getUserById(user.id))?.password_hash).toBe('new-hash')
+    expect(await countRows('user_sessions', 'user_id', user.id)).toBe(0)
+    const storedAudit = await query<{ before_json: { status: string }; after_json: { status: string } }>(
+      'select before_json, after_json from admin_operation_audit where target_id = $1', [user.id],
+    )
+    expect(storedAudit.rows[0].before_json.status).toBe('active')
+    expect(storedAudit.rows[0].after_json.status).toBe('frozen')
+    await query(`update user_accounts set status = 'pending_deletion',
+      record_json = record_json || '{"status":"pending_deletion"}'::jsonb where id = $1`, [user.id])
+    await expect(saveUserAccountByAdmin({ ...user, status: 'active' }, { revokeSessions: false, audit }))
+      .rejects.toThrow('账号状态已改变')
+    expect((await getUserById(user.id))?.status).toBe('pending_deletion')
+  })
+
+  it('filters cards against their current authorization status and expiry', async () => {
+    const { createPostgresCdkRecordStore } = await import('./cdk-store')
+    const store = createPostgresCdkRecordStore()
+    const statuses = ['used', 'frozen', 'revoked', 'used'] as const
+    const users = []
+    for (const [index, status] of statuses.entries()) {
+      const user = await seedUser(`linked-card-${index}@example.test`, new Date('2026-10-02T08:00:00Z'))
+      users.push(user)
+      const codeHash = randomUUID().replaceAll('-', '').padEnd(64, 'a')
+      const key = `cdk/${codeHash}.json`
+      await store.create(key, {
+        version: 1, code_hash: codeHash, cdk_type: 'profile', permission: 'advanced', status,
+        created_at: user.created_at, used_at: user.created_at, order_note: null,
+        license_order_hash: `linked-${user.id}`, operator_count: null, config_desc: null,
+        ...(index === 3 ? { profile_expires_at: '2020-01-01T00:00:00Z' } : {}),
+      })
+      await saveUserProfile({
+        version: 1, id: randomUUID(), user_id: user.id, kind: 'cdk',
+        cdk_key: key, cdk_code_hash: codeHash, cdk_order_hash: `linked-${user.id}`,
+        permission: 'advanced', status: 'active', display_name: '关联卡', note: '',
+        created_at: user.created_at, updated_at: user.updated_at,
+      })
+    }
+    const page = await listAdminUserAccountsPage({
+      page: 1, pageSize: 25, search: 'linked-card',
+      filters: { ...DEFAULT_ADMIN_USER_FILTERS, permission: 'advanced' },
+    })
+    expect(page.users.map((user) => user.id)).toEqual([users[0].id])
+  })
+
   it('invalidates every reset token and revokes every session after a token reset', async () => {
     const now = new Date('2026-07-31T04:00:00.000Z')
     const user = await seedUser('reset-all@example.test', now)

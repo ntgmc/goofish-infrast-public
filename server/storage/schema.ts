@@ -1121,6 +1121,15 @@ CREATE INDEX IF NOT EXISTS idx_user_sessions_token_hash ON user_sessions(token_h
 CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
 
+ALTER TABLE user_accounts ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;
+UPDATE user_accounts account
+   SET last_seen_at = activity.last_seen_at
+  FROM (SELECT user_id, max(last_seen_at) AS last_seen_at FROM user_sessions GROUP BY user_id) activity
+ WHERE account.id = activity.user_id
+   AND (account.last_seen_at IS NULL OR account.last_seen_at < activity.last_seen_at);
+CREATE INDEX IF NOT EXISTS idx_user_accounts_last_seen_at ON user_accounts(last_seen_at DESC NULLS LAST, id);
+CREATE INDEX IF NOT EXISTS idx_user_accounts_created_at ON user_accounts(created_at DESC, id);
+
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,

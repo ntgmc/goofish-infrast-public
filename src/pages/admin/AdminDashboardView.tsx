@@ -14,10 +14,10 @@ import PublicContentSettingsSection from './content/PublicContentSettingsSection
 import AnnouncementSettingsSection from './announcements/AnnouncementSettingsSection'
 import InventoryAdminSection from './inventory/InventoryAdminSection'
 import BehaviorRiskPanel from './risk/BehaviorRiskPanel'
+import { UserTable } from './users/UserTable'
 
-import { GeneratedPermission, AdminSection, UsageRangeKey, permissionLabels, sectionLabels, cdkProductPermissions, MAX_CDK_BATCH_COUNT, UserDetailDialog, CdkTable, CdkDetailDialog, RiskSettingsPanel, RiskTable, Metric, EMPTY_LATENCY_STATS, EMPTY_SKLAND_STATS, EMPTY_ANNOUNCEMENT_STATS, FunnelPanel, FailureReasonPanel, LatencyPanel, OpsSummaryPanel, SklandPanel, AnnouncementStatsPanel, CdkDistributionPanel, CdkRecordDistributionPanel, RiskConsoleSummary, RiskTrendPanel, RiskReasonPanel, UsageTrendChart, UserStatusPill, SmallButton, formatDate, formatDuration, omitFieldError, inputClassName, formatAdminProfileAccess } from './modules'
+import { GeneratedPermission, AdminSection, UsageRangeKey, permissionLabels, sectionLabels, cdkProductPermissions, MAX_CDK_BATCH_COUNT, UserDetailDialog, CdkTable, CdkDetailDialog, RiskSettingsPanel, RiskTable, Metric, EMPTY_LATENCY_STATS, EMPTY_SKLAND_STATS, EMPTY_ANNOUNCEMENT_STATS, FunnelPanel, FailureReasonPanel, LatencyPanel, OpsSummaryPanel, SklandPanel, AnnouncementStatsPanel, CdkDistributionPanel, CdkRecordDistributionPanel, RiskConsoleSummary, RiskTrendPanel, RiskReasonPanel, UsageTrendChart, formatDate, formatDuration, omitFieldError, inputClassName } from './modules'
 import { useAdminController } from './useAdminController'
-import { PaginationControls } from './shared/PaginationControls'
 import { AdminToast } from './shared/AdminToast'
 import type { AdminCapability } from './contracts'
 
@@ -34,7 +34,7 @@ export default function AdminDashboardView() {
   const navigate = useNavigate()
   const activeSection = resolveAdminSection(location.pathname)
   const setActiveSection = (section: AdminSection) => navigate(adminPath(section))
-  const { adminCapabilities, lastSuccessfulSyncAt, overviewPartialFailure, cdkSearchInput, setCdkSearchInput, setCdkPage, setCdkPageSize, cdkPagination, cdkLoading, userSearchInput, setUserSearchInput, setUserPage, setUserPageSize, userPagination, usersLoading, setRiskPage, setRiskPageSize, riskPagination, riskLoading, permission, cdkType, setCdkType, setCdkTypeFilter, balanceAmount, setBalanceAmount, adminUsername, loginUser, setLoginUser, loginPassword, setLoginPassword, authenticated, sessionChecking, setStatusFilter, setPermission, setPermissionFilter, setRiskFilter, setGeneratedFilter, appUsers, usageRange, setUsageRange, usageRangeFrom, setUsageRangeFrom, usageRangeTo, setUsageRangeTo, usageStats, banner, announcements, announcementStats, announcementDraftStatus, announcementDraftSavedAt, announcementDraftRestored, announcementDraftConflict, announcementDraftError, announcementDraftDirty, riskSettings, orderNote, setOrderNote, cdkCount, setCdkCount, generatedCodes, selectedCdkHashes, setSelectedCdkHashes, selectedCdkDetail, setSelectedCdkDetail, selectedUserDetail, setSelectedUserDetail, selectedUserBalance, setSelectedUserBalance, userBalanceLoading, operatorDataByProfileId, setOperatorDataByProfileId, expandedOperatorProfileId, setExpandedOperatorProfileId, resetUserEmail, setResetUserEmail, resetPassword, setResetPassword, loginFieldErrors, setLoginFieldErrors, resetFieldErrors, setResetFieldErrors, loading, busyAction, error, notice, clearNotice, summary, cdkOpsSummary, cdkFilters, visibleRecords, riskRecords, loadDashboard, handleLogin, handleLogout, handleExportUsageReport, handleGenerateCdk, handleCopyGeneratedCdks, handleDownloadGeneratedCdks, handleSaveAnnouncement, handleDiscardAnnouncementDraft, handleSaveRiskSettings, updateBanner, addAnnouncement, updateAnnouncement, deleteAnnouncement, reorderAnnouncements, patchCdk, deleteCdk, loadCdkDetail, handleUpdateCdkNote, handleSetCdkPermission, handleBulkRevoke, loadUserDetail, handleLoadMoreUserBalance, handleAdjustUserBalance, handleViewProfileOperators, handleDownloadProfileOperators, handleDownloadUserWorkspaces, handleUpdateProfile, handleSetProfileStatus, handleSetProfilePermission, handleUpgradePreviewProfile, handleClearProfileSklandBinding, handleClearProfileWorkspace, handleResetUserPassword, handleFreezeAppUser, handleUnfreezeAppUser, handleDeleteAppUser } = useAdminController()
+  const { userFilters, setUserFilters, selectedUserIds, setSelectedUserIds, handleCopyUsers, handleExportUsers, handleBulkUsers, adminCapabilities, lastSuccessfulSyncAt, overviewPartialFailure, cdkSearchInput, setCdkSearchInput, setCdkPage, setCdkPageSize, cdkPagination, cdkLoading, userSearchInput, setUserSearchInput, setUserPage, setUserPageSize, userPagination, usersLoading, setRiskPage, setRiskPageSize, riskPagination, riskLoading, permission, cdkType, setCdkType, setCdkTypeFilter, balanceAmount, setBalanceAmount, adminUsername, loginUser, setLoginUser, loginPassword, setLoginPassword, authenticated, sessionChecking, setStatusFilter, setPermission, setPermissionFilter, setRiskFilter, setGeneratedFilter, appUsers, usageRange, setUsageRange, usageRangeFrom, setUsageRangeFrom, usageRangeTo, setUsageRangeTo, usageStats, banner, announcements, announcementStats, announcementDraftStatus, announcementDraftSavedAt, announcementDraftRestored, announcementDraftConflict, announcementDraftError, announcementDraftDirty, riskSettings, orderNote, setOrderNote, cdkCount, setCdkCount, generatedCodes, selectedCdkHashes, setSelectedCdkHashes, selectedCdkDetail, setSelectedCdkDetail, selectedUserDetail, setSelectedUserDetail, selectedUserBalance, setSelectedUserBalance, userBalanceLoading, operatorDataByProfileId, setOperatorDataByProfileId, expandedOperatorProfileId, setExpandedOperatorProfileId, resetUserEmail, setResetUserEmail, resetPassword, setResetPassword, loginFieldErrors, setLoginFieldErrors, resetFieldErrors, setResetFieldErrors, loading, busyAction, error, notice, clearNotice, summary, cdkOpsSummary, cdkFilters, visibleRecords, riskRecords, loadDashboard, handleLogin, handleLogout, handleExportUsageReport, handleGenerateCdk, handleCopyGeneratedCdks, handleDownloadGeneratedCdks, handleSaveAnnouncement, handleDiscardAnnouncementDraft, handleSaveRiskSettings, updateBanner, addAnnouncement, updateAnnouncement, deleteAnnouncement, reorderAnnouncements, patchCdk, deleteCdk, loadCdkDetail, handleUpdateCdkNote, handleSetCdkPermission, handleBulkCdk, loadUserDetail, handleLoadMoreUserBalance, handleAdjustUserBalance, handleViewProfileOperators, handleDownloadProfileOperators, handleDownloadUserWorkspaces, handleUpdateProfile, handleSetProfileStatus, handleSetProfilePermission, handleUpgradePreviewProfile, handleClearProfileSklandBinding, handleClearProfileWorkspace, handleResetUserPassword, handleFreezeAppUser, handleUnfreezeAppUser, handleDeleteAppUser } = useAdminController()
   const visibleSections = (Object.keys(sectionLabels) as AdminSection[])
     .filter((section) => canAccessAdminSection(section, adminCapabilities))
   const canManageAdmins = adminCapabilities.includes('admin_manage')
@@ -397,7 +397,7 @@ export default function AdminDashboardView() {
                     setCdkPage(1)
                   }}
                   onSelect={setSelectedCdkHashes}
-                  onBulkRevoke={handleBulkRevoke}
+                  onBulk={handleBulkCdk}
                   onPatch={patchCdk}
                   onOpenDetail={loadCdkDetail}
                   onDelete={deleteCdk}
@@ -507,55 +507,15 @@ export default function AdminDashboardView() {
                   </div>
                 </form>
   
-                <section className="tool-panel overflow-hidden">
-                  <div className="border-b border-surface-3 p-4">
-                    <h2 className="text-lg font-semibold text-ink-primary">注册用户</h2>
-                    <label className="mt-3 block">
-                      <span className="mb-1.5 block text-xs font-medium text-ink-muted">搜索</span>
-                      <div className="flex gap-2">
-                        <input type="search" value={userSearchInput} onChange={(event) => setUserSearchInput(event.currentTarget.value)} placeholder="搜索邮箱、用户 ID、档案或订单标识" className="tool-field" />
-                        {userSearchInput && <button type="button" onClick={() => setUserSearchInput('')} className="tool-secondary-action px-3 text-sm">清空</button>}
-                      </div>
-                    </label>
-                  </div>
-                  <div className="overflow-x-auto" aria-busy={usersLoading}>
-                    {usersLoading && <div className="border-b border-surface-3 px-4 py-2 text-sm text-ink-muted" role="status">正在加载…</div>}
-                    <table className="min-w-full text-left text-sm">
-                      <thead className="bg-surface-2 text-xs uppercase tracking-wide text-ink-muted">
-                        <tr>
-                          <th className="px-4 py-3">邮箱</th>
-                          <th className="px-4 py-3">状态</th>
-                          <th className="px-4 py-3">权限</th>
-                          <th className="px-4 py-3">档案</th>
-                          <th className="px-4 py-3">时间</th>
-                          <th className="px-4 py-3">操作</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-surface-3">
-                        {appUsers.length === 0 ? (
-                          <tr><td colSpan={6} className="px-4 py-10 text-center text-ink-muted">{userSearchInput ? '没有匹配的用户，请调整搜索条件。' : '暂无注册用户。'}</td></tr>
-                        ) : appUsers.map((item) => (
-                          <tr key={item.id} className="hover:bg-surface-2/50">
-                            <td className="px-4 py-4 font-medium text-ink-primary">{item.email}</td>
-                            <td className="px-4 py-4"><UserStatusPill status={item.status} emailVerifiedAt={item.email_verified_at} /></td>
-                            <td className="px-4 py-4 text-ink-secondary">{formatAdminProfileAccess(item.profile_access)}</td>
-                            <td className="px-4 py-4 text-ink-secondary">{item.profile_count}</td>
-                            <td className="px-4 py-4 text-xs text-ink-muted">{formatDate(item.updated_at)}</td>
-                            <td className="px-4 py-4">
-                              <div className="flex flex-wrap gap-2">
-                                <SmallButton onClick={() => void loadUserDetail(item)} loading={busyAction === `user-detail:${item.id}`}>详情</SmallButton>
-                                {item.status === 'active' && <SmallButton onClick={() => void handleFreezeAppUser(item)} loading={busyAction === `app-user:freeze_account:${item.id}`}>冻结</SmallButton>}
-                                {item.status === 'frozen' && <SmallButton onClick={() => void handleUnfreezeAppUser(item)} loading={busyAction === `app-user:unfreeze_account:${item.id}`} tone="success">解冻</SmallButton>}
-                                <SmallButton onClick={() => void handleDeleteAppUser(item)} loading={busyAction === `app-user:delete_account:${item.id}`} tone="danger">删除</SmallButton>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <PaginationControls pagination={userPagination} loading={usersLoading} onPageChange={setUserPage} onPageSizeChange={(size) => { setUserPageSize(size); setUserPage(1) }} />
-                </section>
+                <UserTable
+                  users={appUsers} selected={selectedUserIds} filters={userFilters} search={userSearchInput}
+                  pagination={userPagination} loading={usersLoading} busyAction={busyAction} capabilities={adminCapabilities}
+                  onFilters={(filters) => { setUserFilters(filters); setUserPage(1) }}
+                  onSearch={setUserSearchInput} onSelect={setSelectedUserIds} onPage={setUserPage}
+                  onPageSize={(size) => { setUserPageSize(size); setUserPage(1) }}
+                  onCopy={handleCopyUsers} onExport={handleExportUsers} onBulk={handleBulkUsers}
+                  onDetail={loadUserDetail} onFreeze={handleFreezeAppUser} onUnfreeze={handleUnfreezeAppUser} onDelete={handleDeleteAppUser}
+                />
                 {selectedUserDetail && (
                   <UserDetailDialog
                     detail={selectedUserDetail}
