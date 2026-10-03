@@ -86,7 +86,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
         </nav>
         <div className="v2-sidebar-bottom">
           <div className="v2-help-card"><span className="v2-help-icon"><BookOpen size={19} /></span><h3>{text.help}</h3><p>{text.helpDescription}</p><Link to="/faq">{text.helpAction}<ArrowUpRight size={14} /></Link></div>
-          <div className="v2-sidebar-version"><span className="v2-green-dot" />{text.version}</div>
+          <div className="v2-sidebar-version"><span className="v2-nav-dot" />{text.version}</div>
         </div>
       </aside>
       <div className="v2-workspace">
@@ -94,23 +94,23 @@ export default function V2Dashboard({ session, result, operators, config, sample
           <div className="v2-breadcrumb"><button className="v2-menu-button v2-icon-button" type="button" onClick={() => setMobileNavigation(true)} aria-label={text.menu}><Menu size={21} /></button>
             <span>{text.workspace}</span><ChevronRight size={14} /><strong>{text.infrastructure}</strong></div>
           <div className="v2-topbar-actions"><Link className="v2-back-link" to="/">{text.backToV1}</Link><span className="v2-sample-pill"><span />{text.testVersion}</span>
-            <Link to="/changelog" className="v2-icon-button v2-notification" aria-label={text.updates}><Bell size={19} /><span /></Link>
+            <Link to="/changelog" className="v2-icon-button" aria-label={text.updates}><Bell size={19} /></Link>
             <span className="v2-topbar-divider" />
-            <button className="v2-profile-button" type="button" onClick={() => openPanel('account')}><span className="v2-profile-avatar">D</span><span>{name}</span><ChevronDown size={14} /></button>
+            <button className="v2-profile-button" type="button" onClick={() => openPanel('account')}><span className="v2-profile-avatar">{name.slice(0, 1)}</span><span>{name}</span><ChevronDown size={14} /></button>
           </div>
         </header>
         <main className="v2-main" tabIndex={-1} data-route-focus>
-          <div className="v2-page-title"><div><p className="v2-eyebrow">{text.eyebrow}</p><h1>{text.title}</h1><p>{text.subtitle}</p></div>
-            <button className="v2-button v2-button-secondary v2-export-button" type="button" disabled={busy || (!sample && resultMode === 'rotation')} title={resultMode === 'rotation' ? text.exportUnavailable : undefined}
-              onClick={sample ? downloadSample : onExport}><Download size={16} />{sample ? text.sampleExport : text.export}</button></div>
+          <div className="v2-page-title"><div><h1>{text.title}</h1><p>{text.subtitle}</p></div></div>
           <div className="v2-ready-banner">
             <span className="v2-ready-icon"><Check size={25} strokeWidth={2} /></span>
             <div><h2>{text.resultReady}<span className="v2-ready-tag">{sample ? text.sample : SCHEDULE_MODE_LABELS[resultMode]}</span></h2><p>{text.resultDescription}</p></div>
             <div className="v2-banner-actions"><button type="button" className="v2-button v2-button-white" onClick={() => openPanel('config')}><Settings2 size={16} />{text.configure}</button>
               <button type="button" className="v2-button v2-button-primary" disabled={busy || loadingResult || Boolean(generationDisabledReason)} title={generationDisabledReason ?? undefined}
-                onClick={() => onGenerate ? onGenerate() : openPanel('account')}><RefreshCw size={16} className={busy ? 'v2-spin' : ''} />{busy ? text.generating : text.regenerate}</button></div>
+                onClick={() => onGenerate ? onGenerate() : openPanel('account')}><RefreshCw size={16} className={busy ? 'v2-spin' : ''} />{busy ? text.generating : text.regenerate}</button>
+              <button className="v2-button v2-button-secondary v2-export-button" type="button" disabled={busy || (!sample && resultMode === 'rotation')} title={resultMode === 'rotation' ? text.exportUnavailable : undefined}
+                onClick={sample ? downloadSample : onExport}><Download size={16} />{sample ? text.sampleExport : text.export}</button></div>
           </div>
-          <div className="v2-result-context"><span><span className="v2-green-dot" />{sample ? text.sampleProfile : name}</span>
+          <div className="v2-result-context"><span><span className="v2-status-dot" />{sample ? text.sampleProfile : name}</span>
             <span><Building2 size={13} />{config.layout}</span><span><Users size={13} />{text.owned(owned.length)}</span><span><Clock3 size={13} />{text.shiftHours(hours.join(' / '))}</span>
             <button type="button" onClick={() => openPanel('config')}>{text.configure}<ChevronRight size={12} /></button></div>
           {(loadingResult || error || notice || downloadNotice || configChanged) && <div className={`v2-feedback ${error ? 'v2-feedback-error' : ''}`} role={error ? 'alert' : 'status'} aria-live="polite">
@@ -119,10 +119,10 @@ export default function V2Dashboard({ session, result, operators, config, sample
           </div>}
           {children}
           <div className="v2-metrics">
-            <Metric label={text.lmd} value={formatAmount(prepared.productionStats.lmd)} unit={text.daily} hint={text.outputSubtitle} product="LMD" tone="mint" />
-            <Metric label={text.exp} value={formatAmount((prepared.productionStats.manufacturing['Battle Record'] ?? 0) * 1000)} unit={text.expUnit} hint={text.outputSubtitle} product="Battle Record" tone="blue" />
-            <Metric label={text.totalEfficiency} value={formatAmount(prepared.totalEff)} unit="%" hint={text.efficiencyHint} icon={<Activity size={20} />} tone="amber" />
-            <Metric label={text.sanity} value={prepared.productionSanity.value.toFixed(1)} unit={text.daily} hint={text.sanityHint} icon={<Gem size={20} />} tone="purple" />
+            <Metric label={text.lmd} value={formatAmount(prepared.productionStats.lmd)} unit={text.daily} hint={text.outputSubtitle} product="LMD" />
+            <Metric label={text.exp} value={formatAmount((prepared.productionStats.manufacturing['Battle Record'] ?? 0) * 1000)} unit={text.expUnit} hint={text.outputSubtitle} product="Battle Record" />
+            <Metric label={text.totalEfficiency} value={formatAmount(prepared.totalEff)} unit="%" hint={text.efficiencyHint} icon={<Activity size={20} />} />
+            <Metric label={text.sanity} value={prepared.productionSanity.value.toFixed(1)} unit={text.daily} hint={text.sanityHint} icon={<Gem size={20} />} />
           </div>
           <div className="v2-content-tabs" role="group" aria-label={text.resultTabs}>
             {([['summary', text.summaryTab], ['details', text.detailsTab], ['analysis', text.analysisTab]] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => setView(id)}>{label}</button>)}
@@ -173,8 +173,8 @@ function UserIcon() {
   return <span className="v2-user-nav-icon"><Users size={18} /></span>
 }
 
-function Metric({ label, value, unit, hint, product, icon, tone }: { label: string; value: string; unit: string; hint: string; product?: string; icon?: ReactNode; tone: string }) {
-  return <section className={`v2-metric v2-metric-${tone}`} aria-label={label}><div className="v2-metric-top"><span>{label}</span><span className="v2-metric-icon">{product ? <ProductIcon product={product} size={24} /> : icon}</span></div>
+function Metric({ label, value, unit, hint, product, icon }: { label: string; value: string; unit: string; hint: string; product?: string; icon?: ReactNode }) {
+  return <section className="v2-metric" aria-label={label}><div className="v2-metric-top"><span>{label}</span><span className="v2-metric-icon">{product ? <ProductIcon product={product} size={24} /> : icon}</span></div>
     <p className="v2-metric-value">{value}<small>{unit}</small></p><p className="v2-metric-hint">{hint}</p></section>
 }
 

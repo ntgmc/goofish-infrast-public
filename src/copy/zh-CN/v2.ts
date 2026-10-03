@@ -29,7 +29,6 @@ export const v2Copy = {
   sampleProfile: '罗德岛 · 示例档案',
   sampleSource: '内置示例数据',
   ownSource: '当前游戏账号档案',
-  eyebrow: 'RHODES ISLAND / BASE OPERATIONS',
   title: '基建排班，一目了然。',
   subtitle: '你的干员各就各位，把时间留给下一场作战。',
   resultReady: '排班方案已就绪',

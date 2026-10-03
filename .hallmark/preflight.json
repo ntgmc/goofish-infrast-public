@@ -1,15 +1,15 @@
 {
-  "date": "2026-08-08",
+  "date": "2026-10-03",
   "design_system": "design.md",
   "font_stack": {
     "display": "Noto Sans SC Variable",
     "body": "Geist Variable",
     "mono": "SFMono-Regular / Consolas"
   },
-  "palette": "Custom OKLCH semantic properties in tokens.css; cool-violet anchor at 285 degrees",
+  "palette": "Canonical cool-violet tokens; scoped V2 mist, slate, and copper variant in tokens.css and design.md",
   "motion": "motion-on dependency; composed route and state transitions with reduced-motion fallback",
   "spacing": "Tailwind v4 plus a canonical 4px token scale",
-  "framework": "React 19.2, React Router 8.3, Vite 8.2, Tailwind CSS 4, shadcn/ui",
+  "framework": "React 19.2.8, React Router 8.3.0, Vite 8.2.0, Tailwind CSS 4, shadcn/ui",
   "assets": [
     "public/assets/logo.png",
     "public/assets/logo-horizontal.png",

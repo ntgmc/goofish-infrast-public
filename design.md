@@ -53,6 +53,32 @@ it deliberately when changing the shared design.
 - Display headings use `overflow-wrap: anywhere` and `min-width: 0`; document copy stays left aligned.
 - Accent is a signal only: primary action, active state, focus, and compact status marks.
 
+## Variants
+
+### V2 results workspace (`/v2`)
+
+- Keep the modern-minimal / Workbench application family, current routes,
+  side navigation, configuration drawers, and result workflow.
+- Audience: Arknights players reviewing and exporting base schedules. Lead with
+  the current result, daily production, shift selection, and operator assignments.
+- Palette: mist paper, slate ink and navigation, copper accent. `tokens.css`
+  defines `--color-v2-*`; `.v2-app` and `.v2-drawer` map those values to shared
+  semantic tokens. Other routes retain the canonical palette.
+- Light paper: `oklch(0.967 0.007 75)`; accent: `oklch(0.490 0.120 45)`.
+  Dark paper: `oklch(0.205 0.016 255)`; accent: `oklch(0.770 0.125 45)`.
+- Keep Noto Sans SC display and Geist body fonts, with tabular numbers for
+  production, efficiency, and shift times.
+- Preserve the side rail and Ft2 inline footer. Use one production summary
+  strip and one schedule panel with open room regions. Operator portraits
+  and efficiency carry the visual weight.
+- Keep generation and export together beside result status. Copper marks
+  the primary action and focus; station colors identify room types only.
+- No decorative reveal. Button press and mobile navigation transitions
+  disappear under reduced motion.
+- The public result layout at `riic.autos` informed result hierarchy,
+  adjacent shift controls, and portrait-led assignments. Use an independent
+  palette and implementation.
+
 ## CTA voice
 
 - Primary · accent fill · 7px radius · compact 12px/18px rhythm · concrete verb
@@ -75,6 +101,70 @@ it deliberately when changing the shared design.
 
 Runtime styles use `tokens.css`. The portable exports below mirror its light
 theme; dark theme values are defined under `.dark` in `tokens.css`.
+
+### V2 exports
+
+CSS source: the `--color-v2-*` token blocks and `.v2-app, .v2-drawer` mappings
+in `tokens.css`. Fonts, spacing, type scale, and easing use the canonical
+exports below. The variant's portable core follows.
+
+```css
+/* Tailwind v4 */
+@theme {
+  --color-v2-canvas: oklch(0.967 0.007 75);
+  --color-v2-surface: oklch(0.993 0.003 75);
+  --color-v2-inset: oklch(0.953 0.006 75);
+  --color-v2-ink: oklch(0.265 0.025 255);
+  --color-v2-secondary: oklch(0.440 0.018 255);
+  --color-v2-muted: oklch(0.495 0.012 255);
+  --color-v2-accent: oklch(0.490 0.120 45);
+  --color-v2-accent-ink: oklch(0.993 0.003 75);
+  --color-v2-line: oklch(0.865 0.008 75);
+  --color-v2-control: oklch(0.665 0.012 255);
+  --color-v2-focus: oklch(0.490 0.120 45);
+}
+```
+
+```json
+{
+  "v2": {
+    "canvas": { "$type": "color", "$value": "oklch(0.967 0.007 75)" },
+    "surface": { "$type": "color", "$value": "oklch(0.993 0.003 75)" },
+    "inset": { "$type": "color", "$value": "oklch(0.953 0.006 75)" },
+    "ink": { "$type": "color", "$value": "oklch(0.265 0.025 255)" },
+    "secondary": { "$type": "color", "$value": "oklch(0.440 0.018 255)" },
+    "muted": { "$type": "color", "$value": "oklch(0.495 0.012 255)" },
+    "accent": { "$type": "color", "$value": "oklch(0.490 0.120 45)" },
+    "accent-ink": { "$type": "color", "$value": "oklch(0.993 0.003 75)" },
+    "line": { "$type": "color", "$value": "oklch(0.865 0.008 75)" },
+    "control": { "$type": "color", "$value": "oklch(0.665 0.012 255)" },
+    "focus": { "$type": "color", "$value": "oklch(0.490 0.120 45)" }
+  }
+}
+```
+
+```css
+/* shadcn/ui */
+.v2-app, .v2-drawer {
+  --background: var(--color-v2-canvas);
+  --foreground: var(--color-v2-ink);
+  --card: var(--color-v2-surface);
+  --card-foreground: var(--color-v2-ink);
+  --popover: var(--color-v2-surface);
+  --popover-foreground: var(--color-v2-ink);
+  --primary: var(--color-v2-accent);
+  --primary-foreground: var(--color-v2-accent-ink);
+  --secondary: var(--color-v2-inset);
+  --secondary-foreground: var(--color-v2-ink);
+  --muted: var(--color-v2-inset);
+  --muted-foreground: var(--color-v2-muted);
+  --accent: var(--color-v2-hover);
+  --accent-foreground: var(--color-v2-ink);
+  --border: var(--color-v2-line);
+  --input: var(--color-v2-control);
+  --ring: var(--color-v2-focus);
+}
+```
 
 ### Tailwind v4
 

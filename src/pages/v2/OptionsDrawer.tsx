@@ -79,7 +79,6 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
     <Dialog open={panel !== null} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent className={`v2-drawer ${isConfig ? 'v2-drawer-wide' : ''}`} showCloseButton closeLabel={text.close}>
         <div className="v2-drawer-heading">
-          <span className="v2-eyebrow">{text.workspace} / {text.configuration}</span>
           <DialogTitle>{panel === 'room' && room ? `${room.label} ${room.indexLabel}` : panel ? titles[panel] : ''}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </div>
@@ -95,7 +94,7 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
         )}
         {panel === 'operators' && (
           <div className="v2-options-content">
-            <label className="v2-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={text.searchOperators} aria-label={text.searchOperators} /></label>
+            <label className="v2-search-label"><span>{text.searchOperators}</span><span className="v2-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label={text.searchOperators} /></span></label>
             <div className="v2-import-row"><p>{sample ? text.sampleNotice : text.importDescription}</p>
               <div className="v2-import-actions">
                 <button type="button" className="v2-button v2-button-secondary" disabled={busy || importBusy}

@@ -15,7 +15,7 @@ export function Avatar({ operator, small = false }: { operator: { id?: string; n
   return (
     <span className={`v2-avatar ${small ? 'v2-avatar-small' : ''}`} title={operator.name}>
       {operator.id && !failed
-        ? <img src={`/webp96/${operator.id}.webp`} alt={operator.name} onError={() => setFailed(true)} loading="lazy" />
+        ? <img src={`/webp96/${operator.id}.webp`} alt={operator.name} onError={() => setFailed(true)} loading="lazy" width={96} height={96} />
         : <span aria-label={operator.name}>{operator.name.slice(0, 1)}</span>}
     </span>
   )
@@ -47,7 +47,7 @@ export default function ScheduleBoard({ result, operators, expanded, onRoom }: {
     if (next === null) return
     event.preventDefault()
     setShift(next)
-    document.getElementById(`${id}-tab-${next}`)?.focus()
+    document.getElementById(`${id}-tab-${next}`)?.focus({ preventScroll: true })
   }
 
   return (
@@ -100,7 +100,7 @@ function RoomCard({ room, drone = false, onClick }: { room: BoardRoom; drone?: b
   const trading = room.roomType === 'trading'
   const Icon = trading ? Building2 : room.roomType === 'power' ? Zap : Factory
   return (
-    <button type="button" className={`v2-room-card ${trading ? 'v2-room-trade' : 'v2-room-manufacture'}`} onClick={onClick}>
+    <button type="button" className={`v2-room-card v2-room-${room.roomType}`} onClick={onClick}>
       <div className="v2-room-header">
         <span className="v2-room-icon"><Icon size={16} /></span>
         <span className="v2-room-title">{room.label}<small>{room.indexLabel}</small></span>
@@ -130,12 +130,12 @@ export function OutputChart({ result, large = false }: { result: OptimizeResult;
     <div className={`v2-output-chart ${large ? 'v2-output-chart-large' : ''}`}>
       <div className="v2-chart-caption"><span>{text.outputChart}</span><strong>{formatAmount(output * (hour ?? 24) / 24)}<small> / {hour ?? 24}h</small></strong></div>
       <svg viewBox="0 0 320 120" role="img" aria-label={text.chartDescription}>
-        <defs><linearGradient id={`fill-${id}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#53aa8e" stopOpacity=".22" /><stop offset="100%" stopColor="#53aa8e" stopOpacity="0" /></linearGradient></defs>
+        <defs><linearGradient id={`fill-${id}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--color-v2-accent)" stopOpacity=".16" /><stop offset="100%" stopColor="var(--color-v2-accent)" stopOpacity="0" /></linearGradient></defs>
         {[20, 55, 90].map((y) => <line key={y} x1="4" y1={y} x2="316" y2={y} stroke="currentColor" strokeOpacity=".08" strokeDasharray="3 4" />)}
         <path d="M4 105 L316 14 L316 110 L4 110 Z" fill={`url(#fill-${id})`} />
-        <path d="M4 105 L316 14" fill="none" stroke="#38977a" strokeWidth="2.5" />
+        <path d="M4 105 L316 14" fill="none" stroke="var(--color-v2-accent)" strokeWidth="2.5" />
         {[0, 4, 8, 12, 16, 20, 24].map((value) => <circle key={value} cx={4 + value * 13} cy={105 - value * 91 / 24} r={hour === value ? 5 : 3}
-          fill="#fff" stroke="#38977a" strokeWidth="2" />)}
+          fill="var(--color-v2-surface)" stroke="var(--color-v2-accent)" strokeWidth="2" />)}
       </svg>
       <div className="v2-chart-axis">{[0, 8, 16, 24].map((value) => <button key={value} type="button" onMouseEnter={() => setHour(value)} onMouseLeave={() => setHour(null)}
         onFocus={() => setHour(value)} onBlur={() => setHour(null)} aria-label={`${text.outputChart} ${value}h`}>{String(value).padStart(2, '0')}:00</button>)}</div>
