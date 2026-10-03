@@ -600,7 +600,7 @@ async function reverseCampaignBatch(campaignId: string, limit: number): Promise<
 
 function requireOpeningRule(value: unknown, contentCount: number): GiftPackOpeningRule {
   const rule = normalizeGiftPackOpeningRule(value, contentCount)
-  if (!rule || contentCount === 0) throw new InventoryError('gift_pack_opening_invalid', '请添加奖励，并将领取项数设为 1 到奖励种类数之间的整数。', 400)
+  if (!rule || contentCount === 0) throw new InventoryError('gift_pack_opening_invalid', '请添加奖励并设置 1 到 100 之间的整数领取项数；不允许重复时，领取项数不能超过奖励种类数。', 400)
   return rule
 }
 

@@ -23,10 +23,16 @@ export const inventoryCopy = {
   use: '使用道具',
   open: '开启礼包',
   open_chest: '开启宝箱',
-  chest_random: (count: number) => `开启后随机获得 ${count} 项不同奖励，每项数量按下方列表发放。`,
-  chest_choice: (count: number) => `选择 ${count} 项不同奖励后开启，每项数量按下方列表发放。`,
+  chest_random: (count: number, allowDuplicates = false) => allowDuplicates
+    ? `每个宝箱随机抽取 ${count} 次奖励，可重复抽到同一种，每次数量按下方列表发放。`
+    : `每个宝箱随机获得 ${count} 项不同奖励，每项数量按下方列表发放。`,
+  chest_choice: (count: number, allowDuplicates = false) => allowDuplicates
+    ? `为每个宝箱搭配 ${count} 次奖励，可重复选择同一种，每次数量按下方列表发放。`
+    : `为每个宝箱选择 ${count} 项不同奖励，每项数量按下方列表发放。`,
   chest_all: '开启后获得以下全部奖励。',
   chest_selected: (selected: number, count: number) => `已选择 ${selected} / ${count} 项`,
+  chest_selection_quantity: '领取次数',
+  chest_reward_selection: (name: string) => `${name}领取次数`,
   chest_reward_expiry: (days: number) => `获得后 ${days} 天内有效`,
   close: '关闭',
   processing: '处理中…',

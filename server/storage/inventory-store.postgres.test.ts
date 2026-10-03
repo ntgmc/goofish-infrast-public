@@ -129,6 +129,70 @@ describe('PostgreSQL unified inventory', () => {
     expect(await getItemBalance(userId, pack.item_code)).toBe(1)
   })
 
+  it.each(['random', 'choice'] as const)('grants every repeated %s reward atomically and replays the issued version', async (mode) => {
+    const { userId } = await seedUserProfile()
+    const contents = [
+      { item_code: 'priority_compute_coupon', quantity: 3, expiry: { mode: 'relative_days' as const, days: 7 } },
+      { item_code: 'training_diagnosis_coupon', quantity: 2, expiry: { mode: 'never' as const } },
+      { item_code: 'plan_capacity_certificate', quantity: 1, expiry: { mode: 'never' as const } },
+    ]
+    const pack = await createCustomGiftPack('root', {
+      name: '可重复宝箱', description: '从三种奖励中领取五次', contents,
+      opening_rule: { mode, count: 5, allow_duplicates: true }, publish: true,
+    }) as { item_code: string; version_id: string }
+    await adminGrantItem('root', {
+      userId, itemCode: pack.item_code, giftPackVersionId: pack.version_id,
+      quantity: 2, validityDays: 0, reason: '测试重复领取',
+    })
+    const stack = (await listInventory(userId)).stacks.find((entry) => entry.item.code === pack.item_code)!
+    expect(stack.gift_pack?.opening_rule).toEqual({ mode, count: 5, allow_duplicates: true })
+    expect((await getAdminInvitationSettingsOverview()).catalog.find((item) => item.item_code === pack.item_code))
+      .toMatchObject({ latest_gift_pack_version: { opening_rule: { mode, count: 5, allow_duplicates: true } } })
+    await createGiftPackDraft('root', pack.item_code, contents, randomUUID(), { opening_rule: { mode, count: 1 }, publish: true })
+    const request = {
+      item_code: pack.item_code, quantity: 2, gift_pack_version_id: pack.version_id, idempotency_key: randomUUID(),
+      ...(mode === 'choice' && { selected_item_codes: ['priority_compute_coupon', 'priority_compute_coupon', 'priority_compute_coupon', 'training_diagnosis_coupon', 'training_diagnosis_coupon'] }),
+    }
+    await expect(useInventoryItem(userId, { ...request, quantity: 3 })).rejects.toMatchObject({ code: 'item_unavailable' })
+    expect(await getItemBalance(userId, pack.item_code)).toBe(2)
+    for (const content of contents) expect(await getItemBalance(userId, content.item_code)).toBe(0)
+    const result = await useInventoryItem(userId, request)
+    const rewards = result.rewards as Array<{ item_code: string; quantity: number; expires_at: string | null }>
+    expect(new Set(rewards.map((reward) => reward.item_code)).size).toBe(rewards.length)
+    expect(rewards.reduce((total, reward) => total + reward.quantity / contents.find((content) => content.item_code === reward.item_code)!.quantity, 0)).toBe(10)
+    if (mode === 'choice') {
+      expect(rewards).toEqual([
+        expect.objectContaining({ item_code: 'priority_compute_coupon', quantity: 18, expires_at: expect.any(String) }),
+        expect.objectContaining({ item_code: 'training_diagnosis_coupon', quantity: 8, expires_at: null }),
+      ])
+    }
+    for (const reward of rewards) expect(await getItemBalance(userId, reward.item_code)).toBe(reward.quantity)
+    expect(await useInventoryItem(userId, request)).toEqual(result)
+    expect(await getItemBalance(userId, pack.item_code)).toBe(0)
+    for (const reward of rewards) expect(await getItemBalance(userId, reward.item_code)).toBe(reward.quantity)
+  })
+
+  it.each(['random', 'choice'] as const)('supports repeating a %s reward at the maximum per-draw quantity', async (mode) => {
+    const { userId } = await seedUserProfile()
+    const pack = await createCustomGiftPack('root', {
+      name: '重复大量奖励', description: '每次发放一万张券',
+      contents: [{ item_code: 'priority_compute_coupon', quantity: 10000, expiry: { mode: 'never' } }],
+      opening_rule: { mode, count: 5, allow_duplicates: true }, publish: true,
+    }) as { item_code: string; version_id: string }
+    await grantItem({
+      userId, itemCode: pack.item_code, giftPackVersionId: pack.version_id, quantity: 1,
+      expiry: { mode: 'never' }, sourceType: 'test', sourceId: randomUUID(), recipientRole: 'test',
+    })
+    const request = {
+      item_code: pack.item_code, quantity: 1, gift_pack_version_id: pack.version_id, idempotency_key: randomUUID(),
+      ...(mode === 'choice' && { selected_item_codes: Array<string>(5).fill('priority_compute_coupon') }),
+    }
+    const result = await useInventoryItem(userId, request)
+    expect(result.rewards).toEqual([expect.objectContaining({ item_code: 'priority_compute_coupon', quantity: 50000 })])
+    expect(await useInventoryItem(userId, request)).toEqual(result)
+    expect(await getItemBalance(userId, 'priority_compute_coupon')).toBe(50000)
+  })
+
   it('lists an empty inventory for a scheduling profile without a workspace', async () => {
     const { userId, profileId } = await seedUserProfile()
 

@@ -347,18 +347,34 @@ export default function InventorySection({
               <p id="inventory-quantity-limit" className="mt-2 text-xs text-ink-muted">{copy.inventory.quantity_limit(maximumQuantity)}</p>
             </div>}
             {selected.gift_pack && <TooltipProvider delayDuration={200}><fieldset ref={chestScope} className="tool-inset mt-5 p-4" disabled={busy} aria-busy={highlightedReward !== null}>
-              <legend className="px-1 text-sm font-semibold text-ink-primary">{selected.gift_pack.opening_rule.mode === 'choice' ? copy.inventory.chest_choice(selected.gift_pack.opening_rule.count) : selected.gift_pack.opening_rule.mode === 'random' ? copy.inventory.chest_random(selected.gift_pack.opening_rule.count) : copy.inventory.chest_all}</legend>
+              <legend className="px-1 text-sm font-semibold text-ink-primary">{selected.gift_pack.opening_rule.mode === 'choice' ? copy.inventory.chest_choice(selected.gift_pack.opening_rule.count, selected.gift_pack.opening_rule.allow_duplicates) : selected.gift_pack.opening_rule.mode === 'random' ? copy.inventory.chest_random(selected.gift_pack.opening_rule.count, selected.gift_pack.opening_rule.allow_duplicates) : copy.inventory.chest_all}</legend>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {selected.gift_pack.contents.map((reward, index) => <Tooltip key={reward.item_code}>
                   <TooltipTrigger asChild>
                     <label tabIndex={selected.gift_pack!.opening_rule.mode === 'choice' ? undefined : 0} className={`tool-inset relative flex min-w-0 flex-col items-center gap-2 p-3 text-center text-sm text-ink-secondary transition focus-within:ring-2 focus-within:ring-brand-400 ${selected.gift_pack!.opening_rule.mode === 'choice' ? 'cursor-pointer hover:border-brand-400' : ''} ${highlightedReward === index ? 'border-brand-400 bg-brand-400/10 shadow-lg shadow-brand-400/40 ring-2 ring-brand-400' : selectedRewardCodes.includes(reward.item_code) ? 'border-brand-400 bg-brand-400/10 ring-2 ring-brand-400' : ''}`}>
-                      {selected.gift_pack!.opening_rule.mode === 'choice' && <input type="checkbox" className="absolute right-2 top-2 accent-brand-500" checked={selectedRewardCodes.includes(reward.item_code)} disabled={!selectedRewardCodes.includes(reward.item_code) && selectedRewardCodes.length >= selected.gift_pack!.opening_rule.count} onChange={(event) => {
+                      {selected.gift_pack!.opening_rule.mode === 'choice' && !selected.gift_pack!.opening_rule.allow_duplicates && <input type="checkbox" className="absolute right-2 top-2 accent-brand-500" checked={selectedRewardCodes.includes(reward.item_code)} disabled={!selectedRewardCodes.includes(reward.item_code) && selectedRewardCodes.length >= selected.gift_pack!.opening_rule.count} onChange={(event) => {
                         const checked = event.currentTarget.checked
                         setSelectedRewardCodes((current) => checked ? [...current, reward.item_code] : current.filter((code) => code !== reward.item_code))
                       }} />}
                       <img src={itemIconPath(reward.icon_key)} onError={fallbackItemIcon} alt="" width={56} height={56} className="h-14 w-14 object-contain" />
                       <span className="font-medium text-ink-primary">{reward.name} × {reward.quantity}</span>
                       <span className="text-xs text-ink-muted">{reward.expiry.mode === 'never' ? copy.inventory.permanent : copy.inventory.chest_reward_expiry(reward.expiry.days)}</span>
+                      {selected.gift_pack!.opening_rule.mode === 'choice' && selected.gift_pack!.opening_rule.allow_duplicates && <>
+                        <span className="text-xs text-ink-secondary">{copy.inventory.chest_selection_quantity}</span>
+                        <input
+                          type="number" min={0} max={selected.gift_pack!.opening_rule.count - selectedRewardCodes.length + selectedRewardCodes.filter((code) => code === reward.item_code).length} step={1}
+                          className="tool-field w-full text-center" aria-label={copy.inventory.chest_reward_selection(reward.name)}
+                          value={selectedRewardCodes.filter((code) => code === reward.item_code).length}
+                          onChange={(event) => {
+                            const count = Number(event.currentTarget.value)
+                            const rule = selected.gift_pack!.opening_rule
+                            if (rule.mode !== 'choice' || !Number.isInteger(count) || count < 0 || count > rule.count) return
+                            setSelectedRewardCodes((current) => {
+                              const others = current.filter((code) => code !== reward.item_code)
+                              return others.length + count <= rule.count ? [...others, ...Array<string>(count).fill(reward.item_code)] : current
+                            })
+                          }} />
+                      </>}
                     </label>
                   </TooltipTrigger>
                   {reward.description && <TooltipContent>{reward.description}</TooltipContent>}

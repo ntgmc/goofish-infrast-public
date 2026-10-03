@@ -1146,17 +1146,23 @@ async function openGiftPackInTransaction(
   let chosenContents = contents.rows
   if (rule.mode === 'choice') {
     const selected = input.selected_item_codes ?? []
-    if (selected.length !== rule.count || new Set(selected).size !== rule.count
+    if (selected.length !== rule.count || (!rule.allow_duplicates && new Set(selected).size !== rule.count)
       || selected.some((code) => !contents.rows.some((content) => content.item_code === code))) {
-      throw new InventoryError('gift_pack_selection_invalid', `请选择 ${rule.count} 项不同的宝箱奖励。`, 400)
+      throw new InventoryError('gift_pack_selection_invalid', `请选择 ${rule.count} 项${rule.allow_duplicates ? '' : '不同的'}宝箱奖励。`, 400)
     }
-    chosenContents = contents.rows.filter((content) => selected.includes(content.item_code))
+    chosenContents = rule.allow_duplicates
+      ? selected.map((code) => contents.rows.find((content) => content.item_code === code)!)
+      : contents.rows.filter((content) => selected.includes(content.item_code))
   } else {
     if (input.selected_item_codes !== undefined) throw new InventoryError('gift_pack_selection_invalid', '此礼包或宝箱自动发放奖励，请直接开启。', 400)
     if (rule.mode === 'random') {
       const pool = [...contents.rows]
       chosenContents = []
-      for (let index = 0; index < rule.count; index++) chosenContents.push(...pool.splice(randomInt(pool.length), 1))
+      for (let index = 0; index < rule.count; index++) {
+        const selectedIndex = randomInt(pool.length)
+        chosenContents.push(pool[selectedIndex])
+        if (!rule.allow_duplicates) pool.splice(selectedIndex, 1)
+      }
     }
   }
   await client.query('update reward_grants set remaining_quantity = remaining_quantity - 1 where id = $1', [source.id])
@@ -1166,7 +1172,7 @@ async function openGiftPackInTransaction(
     metadata: { gift_pack_version_id: source.gift_pack_version_id, opening_rule: rule, selected_item_codes: chosenContents.map((content) => content.item_code) }, now,
   })
   const rewards: InventoryReward[] = []
-  for (const content of chosenContents) {
+  for (const [index, content] of chosenContents.entries()) {
     const expiry: ExpiryPolicy = content.validity_days > 0
       ? { mode: 'relative_days', days: content.validity_days }
       : { mode: 'never' }
@@ -1177,7 +1183,7 @@ async function openGiftPackInTransaction(
       expiry,
       sourceType: 'gift_opening',
       sourceId: operationId,
-      recipientRole: `content:${content.item_code}`,
+      recipientRole: `content:${content.item_code}${rule.mode !== 'all' && rule.allow_duplicates ? `:${index}` : ''}`,
       metadata: { gift_pack_version_id: source.gift_pack_version_id },
       now,
     })
