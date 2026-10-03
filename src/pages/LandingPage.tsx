@@ -99,8 +99,8 @@ export default function LandingPage({ onStart }: Props) {
             <img
               src={`/assets/previews/optimize-result-${resolvedTheme}.png`}
               alt={copy.public.pages_LandingPage_038}
-              width={resolvedTheme === 'dark' ? 1702 : 1703}
-              height={1050}
+              width={1440}
+              height={864}
               fetchPriority="high"
               loading="eager"
               className="block h-auto w-full"
@@ -186,9 +186,9 @@ function ProductPreview() {
               src={`/assets/previews/upload-entry-${resolvedTheme}.png`}
               alt={copy.public.pages_LandingPage_051}
               loading="lazy"
-              width={resolvedTheme === 'dark' ? 1686 : 1687}
-              height={resolvedTheme === 'dark' ? 1051 : 1050}
-              className="block aspect-[16/9] w-full object-cover object-top"
+              width={1440}
+              height={864}
+              className="block h-auto w-full"
             />
           </picture>
         </div>
