@@ -34,6 +34,7 @@ const PublicInfoPage = lazy(() => import('./pages/PublicInfoPage'))
 const PricingPage = lazy(() => import('./pages/PricingPage'))
 const ThanksPage = lazy(() => import('./pages/ThanksPage'))
 const StatusPage = lazy(() => import('./pages/StatusPage'))
+const V2Page = lazy(() => import('./pages/v2/V2Page'))
 
 export default function App() {
   return (
@@ -82,6 +83,7 @@ function AppContent() {
             <Route path="/terms" element={<LazyPage fallback={copy.common.App_006}><PublicInfoPage page="terms" /></LazyPage>} />
             <Route path="/disclaimer" element={<LazyPage fallback={copy.common.App_007}><PublicInfoPage page="disclaimer" /></LazyPage>} />
           </Route>
+          <Route path="/v2" element={<LazyPage fallback={copy.common.App_001}><V2Page /></LazyPage>} />
           <Route path="/tool/*" element={<LazyPage fallback={copy.common.App_001}><ToolPage /></LazyPage>} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
@@ -96,7 +98,7 @@ function AppContent() {
         </Routes>
       </AnimatedPresenceRegion>
       <DeploymentUpdatePrompt />
-      <BuildMetaStrip placement="corner" />
+      {location.pathname !== '/v2' && <BuildMetaStrip placement="corner" />}
     </div>
   )
 }

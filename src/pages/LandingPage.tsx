@@ -79,6 +79,9 @@ export default function LandingPage({ onStart }: Props) {
               <a href="#results" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-secondary underline underline-offset-4 transition-colors hover:text-ink-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-400">
                 {copy.public.landing_view_results}<span aria-hidden="true">↓</span>
               </a>
+              <Link to="/v2" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-surface-3 px-3 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-1 hover:text-ink-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-400">
+                {copy.v2.testEntry}
+              </Link>
             </div>
 
             <p className="mt-4 max-w-xl text-sm leading-6 text-ink-secondary">
