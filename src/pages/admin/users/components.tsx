@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { ChevronDown } from 'lucide-react'
+import SklandIcon from '../../../components/SklandIcon'
 import type { AdminBalanceTransaction, BalancePage } from '../../../lib/balance-contracts'
 import { normalizePointsAmount } from '../../../lib/balance-contracts'
 import { AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, permissionLabels, appUserStatusLabels } from '../contracts'
@@ -551,7 +552,7 @@ function ProfileDetailCard({
           {profile.kind === 'free_preview' && <SmallButton onClick={() => void onUpgradePreviewProfile(profile)} loading={busyAction === `profile:upgrade_preview_profile:${profile.id}`} tone="success">免 CDK 升级</SmallButton>}
           <SmallButton onClick={() => void onViewOperators(profile)} loading={busyAction === `profile-operators:${profile.id}`}>{operatorsExpanded ? '收起干员' : '查看干员'}</SmallButton>
           <SmallButton onClick={() => void onDownloadOperators(profile)} loading={busyAction === `profile-operators-download:${profile.id}`}>下载 JSON</SmallButton>
-          <SmallButton onClick={() => void onClearSklandBinding(profile)} loading={busyAction === `profile:clear_profile_skland_binding:${profile.id}`} tone="danger">清绑定</SmallButton>
+          <SmallButton onClick={() => void onClearSklandBinding(profile)} loading={busyAction === `profile:clear_profile_skland_binding:${profile.id}`} tone="danger"><SklandIcon />清绑定</SmallButton>
           <SmallButton onClick={() => void onClearWorkspace(profile)} loading={busyAction === `profile:clear_profile_workspace:${profile.id}`} tone="danger">清工作区</SmallButton>
         </div>
       </div>
@@ -559,7 +560,7 @@ function ProfileDetailCard({
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
         <DetailItem label="档案类型" value={profile.kind} />
         <DetailItem label="CDK 订单标识" value={profile.cdk_order_hash || profile.cdk?.license_order_hash || '-'} />
-        <DetailItem label="森空岛绑定" value={sklandSummary} />
+        <DetailItem label={<><SklandIcon className="mr-2" />森空岛绑定</>} value={sklandSummary} />
         <DetailItem label="绑定时间" value={formatDate(profile.skland_binding?.bound_at ?? null)} />
         <DetailItem label="最近导入" value={formatDate(profile.skland_binding?.last_imported_at ?? null)} />
         <DetailItem label="风险计数" value={String(riskCount)} />
@@ -610,7 +611,7 @@ function ProfileOperatorsPanel({ data }: { data: AdminProfileOperatorData }) {
     <div className="mt-4 border-t border-surface-3 pt-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h4 className="text-sm font-semibold text-ink-primary">森空岛干员数据</h4>
+          <h4 className="flex items-center gap-2 text-sm font-semibold text-ink-primary"><SklandIcon />森空岛干员数据</h4>
           <p className="mt-1 text-xs text-ink-muted">生成时间：{formatDate(data.generated_at)}</p>
         </div>
         <div className="grid gap-2 text-xs text-ink-secondary sm:grid-cols-3 lg:min-w-[420px]">
@@ -622,7 +623,7 @@ function ProfileOperatorsPanel({ data }: { data: AdminProfileOperatorData }) {
       <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
         <DetailItem label="档案" value={data.profile.display_name || data.profile.id} />
         <DetailItem label="档案状态" value={appUserStatusLabels[data.profile.status]} />
-        <DetailItem label="森空岛绑定" value={sklandSummary} />
+        <DetailItem label={<><SklandIcon className="mr-2" />森空岛绑定</>} value={sklandSummary} />
       </dl>
       <div className="tool-inset mt-3 overflow-x-auto">
         <table className="min-w-full text-left text-sm">

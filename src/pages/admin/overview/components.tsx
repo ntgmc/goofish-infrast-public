@@ -5,6 +5,7 @@ import { Permission, AdminCdkRecord, UsageDay, UsageFunnelStep, UsageFailureReas
 import { InfoRow, DetailItem, StatusPill, SmallButton, buildSummary, formatDate, formatDuration } from '../shared/helpers'
 import { Metric } from '../cdk/components'
 import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
+import SklandIcon from '../../../components/SklandIcon'
 
 export const EMPTY_LATENCY_STATS: UsageLatencyStats = {
   average_ms: 0,
@@ -144,7 +145,7 @@ export function OpsSummaryPanel({ summary }: { summary: ReturnType<typeof buildS
 export function SklandPanel({ stats }: { stats: UsageSklandStats }) {
   return (
     <section className="tool-panel p-5">
-      <h2 className="text-base font-semibold text-ink-primary">Skland 导入</h2>
+      <h2 className="flex items-center gap-2 text-base font-semibold text-ink-primary"><SklandIcon size={18} />Skland 导入</h2>
       <dl className="mt-4 space-y-3 text-sm">
         <InfoRow label="尝试" value={String(stats.attempts)} />
         <InfoRow label="成功" value={String(stats.success)} />

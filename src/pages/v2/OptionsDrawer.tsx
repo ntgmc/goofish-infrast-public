@@ -3,6 +3,7 @@ import { ArrowRight, Check, FileClock, LogOut, Search, Upload, UserRound } from 
 import { Link } from 'react-router'
 import AuthForm from '../../components/AuthForm'
 import SklandBindingDialog from '../../components/SklandBindingDialog'
+import SklandIcon from '../../components/SklandIcon'
 import { Dialog, DialogDescription, DialogTitle } from '../../components/ui/dialog'
 import { MotionDrawerContent } from '../../components/ui/motion-drawer'
 import { copy } from '../../copy'
@@ -103,7 +104,7 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
                 <button type="button" className="v2-button v2-button-secondary" disabled={busy || importBusy}
                   onClick={() => fileInput.current?.click()}><Upload size={15} />{text.uploadMaa}</button>
                 <button type="button" className="v2-button v2-button-secondary" disabled={busy || importBusy || !featureState.features.skland}
-                  onClick={() => { if (session.user && session.activeProfile) setSklandOpen(true); else onAccount() }}>{text.bindSkland}</button>
+                  onClick={() => { if (session.user && session.activeProfile) setSklandOpen(true); else onAccount() }}><SklandIcon />{text.bindSkland}</button>
               </div>
               <input className="sr-only" ref={fileInput} type="file" accept=".json,application/json" aria-label={text.uploadMaa}
                 onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file) }} />

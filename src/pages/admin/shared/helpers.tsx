@@ -1,4 +1,5 @@
 import type { Announcement, AnnouncementStats as AnnouncementReachStats } from '../../../lib/types'
+import type { ReactNode } from 'react'
 
 import { Permission, GeneratedPermission, CdkStatus, AppUserStatus, FieldErrors, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, UsageTotals, UsageDay, UsageRangeMode, UsageRange, UsageFunnelStep, UsageFailureReason, UsageFailureSample, UsageLatencyStats, UsageSklandStats, UsageAnnouncementStats, UsageCdkDistributionItem, UsageStatsResponse, CdkPermissionDistribution, CdkStatusDistribution, RiskReasonStats, RiskTrendDay, CdkOpsSummary, RiskControlSettings, AdminProfileAccessSummary, AdminProfileOperatorData, EMPTY_ANNOUNCEMENT_REACH_STATS, permissionLabels, statusLabels, appUserStatusLabels, cdkProductPermissions, cdkProductPermissionRank } from '../contracts'
 
@@ -6,7 +7,7 @@ export function InfoRow({ label, value }: { label: string; value: string }) {
 return <div className="flex items-center justify-between gap-4 border-b border-surface-3 pb-2 last:border-0"><dt className="text-ink-muted">{label}</dt><dd className="font-medium text-ink-primary">{value}</dd></div>
 }
 
-export function DetailItem({ label, value }: { label: string; value: string }) {
+export function DetailItem({ label, value }: { label: ReactNode; value: string }) {
   return (
     <div className="tool-inset min-w-0 px-3 py-2">
       <dt className="text-xs font-medium text-ink-muted">{label}</dt>
@@ -41,7 +42,7 @@ export function UserStatusPill({ status, emailVerifiedAt }: { status: AppUserSta
   return <span className={`tool-status ${className}`}>{getAppUserStatusLabel(status, emailVerifiedAt)}</span>
 }
 
-export function SmallButton({ children, onClick, loading, tone = 'default', autoFocus = false }: { children: string; onClick: () => void; loading?: boolean; tone?: 'default' | 'success' | 'danger'; autoFocus?: boolean }) {
+export function SmallButton({ children, onClick, loading, tone = 'default', autoFocus = false }: { children: ReactNode; onClick: () => void; loading?: boolean; tone?: 'default' | 'success' | 'danger'; autoFocus?: boolean }) {
   const className = tone === 'danger'
     ? 'border-error/40 bg-error/10 text-error hover:border-error/60 hover:bg-error/20 hover:text-error'
     : tone === 'success'

@@ -3,6 +3,7 @@ import type { AuthSuccessResponse } from '../../../lib/types'
 import { apiJson } from '../../../lib/api-client'
 import GuidedTour, { useFirstRunTour, type TourDefinition } from '../../../components/GuidedTour'
 import SklandBindingDialog, { type SklandPayload } from '../../../components/SklandBindingDialog'
+import SklandIcon from '../../../components/SklandIcon'
 import { copy } from '../../../copy/index'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import { usePersonalUseDeclaration } from '../../../hooks/usePersonalUseDeclaration'
@@ -142,6 +143,7 @@ export default function RedeemSection({ onRedeemed, onInventoryRedeemed, tourRep
           <span aria-hidden="true" className="mt-1 block text-xs text-ink-tertiary">{note.length}/500</span>
         </label>
         <button type="submit" disabled={loading} className="tool-primary-action mt-5">
+          {mode === 'preview' && <SklandIcon />}
           {loading ? copy.dashboard.pages_tool_dashboard_RedeemSection_013 : mode === 'preview' ? copy.dashboard.pages_tool_dashboard_RedeemSection_014 : copy.dashboard.pages_tool_dashboard_RedeemSection_015}
         </button>
       </form>

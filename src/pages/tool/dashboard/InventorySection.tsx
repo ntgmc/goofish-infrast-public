@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../
 import { apiJson, getApiErrorMessage } from '../../../lib/api-client'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import SklandBindingDialog, { type SklandPayload } from '../../../components/SklandBindingDialog'
+import SklandIcon from '../../../components/SklandIcon'
 import type { AuthSuccessResponse } from '../../../lib/types'
 import { formatShanghaiDateTime } from '../tool-utils'
 import {
@@ -268,7 +269,7 @@ export default function InventorySection({
           <div className="mt-4 grid gap-3 md:grid-cols-3">
             {tasks.filter((task) => task.enabled).map((task) => (
               <article key={task.code} className="tool-inset p-4">
-                <h4 className="text-sm font-semibold text-ink-primary">{task.title}</h4>
+                <h4 className="flex items-center gap-2 text-sm font-semibold text-ink-primary">{task.code === 'bind_skland' && <SklandIcon />}{task.title}</h4>
                 <p className="mt-1 text-xs leading-5 text-ink-secondary">{task.description}</p>
                 <ul className="mt-3 space-y-2" aria-label={copy.inventory.task_rewards_label(task.title)}>
                   {task.rewards.map((reward) => <li key={reward.item_code} className="flex items-center gap-2 text-xs text-ink-secondary">
@@ -405,7 +406,7 @@ export default function InventorySection({
                   {busy ? copy.inventory.processing : copy.inventory.create_with_json}
                 </button>
                 <button type="button" disabled={busy || !canUseSelected} onClick={() => { setSelected(null); setLifetimeDialogOpen(true) }} className="tool-primary-action">
-                  {copy.inventory.bind_and_use}
+                  <SklandIcon />{copy.inventory.bind_and_use}
                 </button>
               </> : !selected.actions.includes('context_only') && <button type="button" disabled={busy || !canUseSelected} onClick={() => void runItemAction()} className="tool-primary-action">{busy ? copy.inventory.processing : selected.item.kind === 'gift_pack' ? selected.gift_pack && selected.gift_pack.opening_rule.mode !== 'all' ? copy.inventory.open_chest : copy.inventory.open : copy.inventory.use}</button>}
             </div>

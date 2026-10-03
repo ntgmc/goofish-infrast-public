@@ -5,6 +5,7 @@ import { FACILITY_IDS, facilityLayoutSchema, facilityRoomsSchema } from '../lib/
 import { apiJson } from '../lib/api-client'
 import type { LicenseConfig } from '../lib/types'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
+import SklandIcon from './SklandIcon'
 import './FacilityLayoutEditor.css'
 
 const FACILITIES = {
@@ -130,6 +131,7 @@ export default function FacilityLayoutEditor({ config, onUpdate, profileId }: {
       </div>
       {profileId && (
         <button type="button" disabled={reading} onClick={() => { void readFacilities() }} className="tool-secondary-action mt-3 min-h-11 px-3">
+          <SklandIcon />
           {reading ? copy.common.facilityLayoutReading : copy.common.facilityLayoutRead}
         </button>
       )}

@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import BrandLogo from '../components/BrandLogo'
 import PublicFooter from '../components/PublicFooter'
 import ServiceStatusBadge from '../components/ServiceStatusBadge'
+import SklandIcon from '../components/SklandIcon'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import { copy } from '../copy/index'
 import {
@@ -161,7 +162,7 @@ export default function StatusPage() {
             <article className="border-b border-surface-3 py-5" aria-labelledby="skland-component-title">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <h3 id="skland-component-title" className="text-lg font-semibold text-ink-primary">{copy.status.pages_StatusPage_075}</h3>
+                  <h3 id="skland-component-title" className="flex items-center gap-2 text-lg font-semibold text-ink-primary"><SklandIcon size={20} />{copy.status.pages_StatusPage_075}</h3>
                   <p className="mt-2 max-w-2xl text-sm leading-7 text-ink-secondary">{copy.status.pages_StatusPage_076}</p>
                 </div>
                 {sklandStatus ? <ServiceStatusBadge level={sklandStatus} compact /> : <span className="tool-status">{error ? copy.status.pages_StatusPage_071 : copy.status.pages_StatusPage_024}</span>}

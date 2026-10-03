@@ -10,6 +10,7 @@ import {
   formatAccountDeletionDeadline,
 } from '../../../lib/account-lifecycle-client'
 import DebugModePanel from '../../../components/DebugModePanel'
+import SklandIcon from '../../../components/SklandIcon'
 import { WorkspaceEntrySettings, type WorkspaceEntryState } from '../WorkspaceEntryPreference'
 
 
@@ -206,7 +207,7 @@ export default function SettingsSection({
             && !clearedCredentialIds.has(profile.id)
           return (
             <div key={profile.id} className="tool-inset p-4">
-              <p className="font-medium text-ink-primary">{profile.display_name}</p>
+              <p className="flex items-center gap-2 font-medium text-ink-primary"><SklandIcon />{profile.display_name}</p>
               <p className="mt-2 text-xs leading-5 text-ink-muted">
                 {credentialAvailable
                   ? copy.dashboard.pages_tool_dashboard_SettingsSection_035
@@ -214,7 +215,7 @@ export default function SettingsSection({
               </p>
               {credentialAvailable && (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <button type="button" onClick={() => void clearCredential(profile)} disabled={privacyLoading !== null} className="tool-secondary-action px-3 text-sm">{copy.dashboard.pages_tool_dashboard_SettingsSection_026}</button>
+                  <button type="button" onClick={() => void clearCredential(profile)} disabled={privacyLoading !== null} className="tool-secondary-action px-3 text-sm"><SklandIcon />{copy.dashboard.pages_tool_dashboard_SettingsSection_026}</button>
                 </div>
               )}
             </div>

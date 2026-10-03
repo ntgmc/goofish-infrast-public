@@ -4,6 +4,7 @@ import AuthForm from '../components/AuthForm'
 import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import SklandBindingDialog, { type SklandPayload } from '../components/SklandBindingDialog'
+import SklandIcon from '../components/SklandIcon'
 import { getCurrentSiteUrl } from '../lib/site-url'
 import { apiJson, apiJsonOrNull } from '../lib/api-client'
 import { MAX_DEPOT_ITEM_COUNT, MAX_DEPOT_ITEM_TYPES } from '../lib/depot-value-constraints'
@@ -296,7 +297,7 @@ export default function DepotValuePage() {
             <div className="mt-6 border-t border-surface-3 pt-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold text-ink-primary">{copy.tools.pages_DepotValuePage_024}</h3>
+                  <h3 className="flex items-center gap-2 text-sm font-semibold text-ink-primary"><SklandIcon />{copy.tools.pages_DepotValuePage_024}</h3>
                   <p className="mt-1 text-sm leading-6 text-ink-secondary">
                     {copy.tools.pages_DepotValuePage_025}</p>
                 </div>
@@ -346,6 +347,7 @@ export default function DepotValuePage() {
                           disabled={loading !== null || profilePreparing}
                           className="tool-secondary-action"
                         >
+                          <SklandIcon />
                           {loading === 'skland'
                             ? copy.tools.pages_DepotValuePage_029
                             : selectedSklandProfile?.skland_binding?.credential_status === 'invalid'
@@ -366,6 +368,7 @@ export default function DepotValuePage() {
                       disabled={loading !== null || profilePreparing}
                       className="tool-primary-action w-full"
                     >
+                      <SklandIcon />
                       {profilePreparing ? copy.tools.pages_DepotValuePage_033 : copy.tools.pages_DepotValuePage_034}
                     </button>
                   )}

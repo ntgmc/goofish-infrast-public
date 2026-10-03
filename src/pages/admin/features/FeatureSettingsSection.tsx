@@ -5,6 +5,7 @@ import type { AdminSiteFeatureSettingsV1, SiteFeatureKey, SiteFeatures } from '.
 import { computeEffectiveSiteFeatures, METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
 import { copy } from '../../../copy/index'
 import { AdminToast } from '../shared/AdminToast'
+import SklandIcon from '../../../components/SklandIcon'
 
 type FeatureSettingsResponse = {
   settings?: AdminSiteFeatureSettingsV1
@@ -133,7 +134,7 @@ export default function FeatureSettingsSection() {
                     className="mt-1 h-4 w-4 accent-brand-600"
                   />
                   <span className="min-w-0">
-                    <strong className="block text-sm text-ink-primary">{copy.features.feature_labels[feature]}</strong>
+                    <strong className="flex items-center gap-2 text-sm text-ink-primary">{feature === 'skland' && <SklandIcon />}{copy.features.feature_labels[feature]}</strong>
                     <span className={`mt-1 block text-xs ${effectiveEnabled ? 'text-success' : 'text-ink-muted'}`}>
                       {effectiveEnabled ? copy.features.admin_effective_on : rawEnabled ? copy.features.admin_raw_on_effective_off : copy.features.admin_effective_off}
                     </span>
