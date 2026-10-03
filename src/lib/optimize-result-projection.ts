@@ -37,6 +37,20 @@ export function projectOptimizeResultForCapabilities(
       ...visibleResult
     } = projected
     projected = visibleResult as OptimizeResult
+    if (subject.kind === 'free_preview') {
+      const daily = result.daily_production
+      projected = {
+        ...projected,
+        ...(result.total_efficiency !== undefined && { total_efficiency: result.total_efficiency }),
+        ...(daily && { daily_production: {
+          hours: daily.hours,
+          manufacturing: daily.manufacturing,
+          trading: daily.trading,
+          consumption: daily.consumption,
+          net: daily.net,
+        } }),
+      }
+    }
   }
 
   if (!hasCapability(subject, 'view_raw_results')) {

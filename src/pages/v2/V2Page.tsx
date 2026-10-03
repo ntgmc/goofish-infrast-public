@@ -115,7 +115,7 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
     onRetryResult={latest ? () => { setReading(true); void workflow.handleViewHistory(latest).finally(() => setReading(false)) } : undefined}
     error={error ?? workflow.inlineError?.message ?? workflow.configToast?.message ?? workflow.workspaceError ?? (session.configSyncStatus === 'failed' ? copy.v2.saveFailed : null)}
     notice={workflow.workspaceNotice ?? (!features.features.schedule_generation ? copy.features.schedule_read_only : !result && !reading ? copy.v2.dataPending : null)}
-    permission={workflow.permission} canEditConfig={workflow.userCanEditConfig || workflow.isPreviewProfile}
+    permission={workflow.permission} canEditConfig={workflow.userCanEditConfig} canViewAnalysis={workflow.userCanViewFullData && !result?.preview_limit}
     canUseIntermediateConfig={workflow.userCanUseIntermediateAutoConfig} history={workflow.resultHistory} onHistory={workflow.handleViewHistory}>
     {workflow.progress && <div className="v2-progress"><ScheduleProgress progress={workflow.progress} />
       {workflow.loading && activeJob && <button type="button" className="v2-button v2-button-secondary" disabled={tasks.busyJobId === activeJob.id || activeJob.cancellationRequested}

@@ -294,6 +294,16 @@ describe('result history reads', () => {
     expect(response.status).toBe(404)
     expect(mocks.getProfileOptimizationResult).not.toHaveBeenCalled()
   })
+
+  it('returns free-preview production totals from saved history', async () => {
+    mocks.getProfileForUser.mockResolvedValue(profile('free_preview', 'growth'))
+    const response = await userResultsHandler(new Request('http://localhost/api/user/results/result-1?profile_id=profile-1'))
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body.item.result.daily_production.manufacturing).toEqual({ LMD: 1000 })
+    expect(body.item.result.daily_production).not.toHaveProperty('details')
+    expect(body.item.result.raw_results).toEqual([])
+  })
 })
 
 afterEach(() => {

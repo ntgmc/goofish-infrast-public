@@ -39,7 +39,7 @@ export default function ResultPanel({
     [result, isRotationMode, isPureMaaDormitoryAutofill, operators],
   )
   const { detailStats } = prepared
-  const isPreview = Boolean(previewLimit)
+  const isPreview = Boolean(previewLimit ?? result.preview_limit)
   const canEditManual = Boolean(manualEditProfile && manualEditProfile.kind !== 'free_preview'
     && !isPreview && !result.preview_limit && hasCapability(manualEditProfile, 'edit_full_config') && result.plans.length > 0)
   const manualKey = useMemo(() => manualSourceKey(result), [result])
@@ -281,7 +281,9 @@ export default function ResultPanel({
       >
         {selectedTab === 'board' && <ResultBoard isRotationMode={isRotationMode} prepared={prepared} planTimes={result.planTimes} />}
         {selectedTab === 'board-v2' && <ResultBoardV2 isRotationMode={isRotationMode} prepared={prepared} shiftHours={result.shift_hours} activePlan={selectedPlan} onPlanChange={setActivePlan} showProfession={showProfession} />}
-        {selectedTab === 'data' && (isPreview || !fullDataAvailable) && (
+        {selectedTab === 'data' && (isPreview || !fullDataAvailable) && <>
+          {prepared.hasDailyProduction && <ResultMetrics isRotationMode={isRotationMode} prepared={prepared} summaryOnly />}
+        {prepared.hasDailyProduction ? <section className="tool-panel space-y-4 p-5"><p className="text-sm leading-6 text-ink-secondary">{copy.v2.previewAnalysis}</p><a href="/pricing" className="block text-sm text-primary underline">{copy.v2.comparePlans}</a></section> : (
           <section className="tool-panel space-y-4 p-5" aria-label={copy.optimize.paid_preview.exports}>
             <h3 className="font-medium text-ink-primary">{copy.optimize.paid_preview.exports}</h3>
             <p className="text-sm leading-6 text-ink-secondary">{copy.optimize.paid_preview.exports_detail}</p>
@@ -293,7 +295,7 @@ export default function ResultPanel({
             <button type="button" disabled className="tool-secondary-action">{copy.optimize.paid_preview.export_action}</button>
             <a href="/pricing" className="block text-sm text-primary underline">{copy.optimize.paid_preview.compare}</a>
           </section>
-        )}
+        )}</>}
         {selectedTab === 'data' && !isPreview && fullDataAvailable && (
           <div className="space-y-4">
             {canEditManual && <p className="tool-inset p-4 text-sm leading-6 text-ink-secondary">{copy.domain.manual_schedule.data_scope}</p>}

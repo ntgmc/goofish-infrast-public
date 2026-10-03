@@ -83,6 +83,7 @@ function connect() {
     activeConfig: SAMPLE_CONFIG, mergedOperators: SAMPLE_OPERATORS, configDiffRows: [],
     updateConfig: vi.fn(), handleGenerate: vi.fn(async () => undefined), handleDownloadMAA: vi.fn(),
     permission: 'ultimate', userCanEditConfig: true, userCanUseIntermediateAutoConfig: true,
+    userCanViewFullData: true,
     resultHistory: [summary], loading: false, workspaceError: null, inlineError: null,
     workspaceNotice: null, declarationDialog: null, configToast: null as { message: string } | null,
     billingQuote: null as { charge: string; available: string; tier: number | null; sufficient: boolean } | null,
@@ -440,5 +441,25 @@ describe('V2 results-first workspace', () => {
     workflow.updateConfig.mock.calls[0][0](draft)
     expect(draft.schedule_mode).toBe('rotation')
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
+  })
+
+  it('keeps free preset controls while preventing custom configuration and calculation detail access', async () => {
+    const workflow = connect()
+    session.activeProfile!.kind = 'free_preview'
+    workflow.permission = 'growth'
+    workflow.userCanEditConfig = false
+    workflow.userCanViewFullData = false
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findByRole('button', { name: '243 均衡' })).not.toBeDisabled()
+    expect(within(dialog).queryByRole('spinbutton', { name: /贸易站/ })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('checkbox', { name: /菲亚梅塔/ })).not.toBeInTheDocument()
+    await dismissDrawer(user)
+    expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('54,720')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: copy.v2.analysisTab }))
+    expect(await screen.findByText(copy.v2.previewAnalysis)).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: copy.v2.chartDescription })).not.toBeInTheDocument()
   })
 })
