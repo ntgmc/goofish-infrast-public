@@ -11,6 +11,7 @@ import { normalizeScheduleMode, parseShiftHours, SCHEDULE_MODE_LABELS } from '..
 import type { LicenseConfig, LicenseOperator, OptimizeResult, PermissionMode, WorkspaceResultHistorySummary } from '../../lib/types'
 import ScheduleBoard, { Avatar, OutputChart } from './ScheduleBoard'
 import OptionsDrawer, { type OptionPanel, type V2Session } from './OptionsDrawer'
+import { sortOperatorsForPreview } from '../tool/tool-utils'
 import V2Transition from './V2Transition'
 
 const text = copy.v2
@@ -52,7 +53,8 @@ export default function V2Dashboard({ session, result, operators, config, sample
   const reduceMotion = useReducedMotion()
   const motionId = useId()
   const prepared = prepareResult(result, result.schedule_mode === 'rotation', result.dormitory_rule === 'maa_pure_autofill', operators)
-  const owned = operators.filter((operator) => operator.own)
+  const sortedOperators = sortOperatorsForPreview(operators)
+  const owned = sortedOperators.filter((operator) => operator.own)
   const resultMode = normalizeScheduleMode(result.schedule_mode)
   const configMode = normalizeScheduleMode(config.schedule_mode)
   const hours = parseShiftHours(config.shift_hours) ?? [8, 8, 8]
@@ -176,7 +178,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
           <footer className="v2-footer"><span>{text.brand}</span><nav><Link to="/terms">{text.terms}</Link><Link to="/privacy">{text.privacy}</Link></nav></footer>
         </motion.main>
       </div>
-      <OptionsDrawer panel={panel} onClose={() => setPanel(null)} session={session} config={config} operators={operators}
+      <OptionsDrawer panel={panel} onClose={() => setPanel(null)} session={session} config={config} operators={sortedOperators}
         onUpdateConfig={onUpdateConfig} permission={permission} canEditConfig={canEditConfig} canUseIntermediateConfig={canUseIntermediateConfig}
         sample={sample} busy={busy} onImportOperators={onImportOperators}
         onAccount={() => openPanel('account')} history={history} onHistory={onHistory} room={room} />

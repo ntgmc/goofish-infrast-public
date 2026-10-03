@@ -48,6 +48,7 @@ export function sortOperatorsForPreview(operators: LicenseOperator[]): LicenseOp
   return [...operators].sort((left, right) => (
     numberValue(right.elite) - numberValue(left.elite)
     || numberValue(right.level) - numberValue(left.level)
+    || numberValue(right.rarity) - numberValue(left.rarity)
     || left.name.localeCompare(right.name, CURRENT_LOCALE)
     || left.id.localeCompare(right.id)
   ))
