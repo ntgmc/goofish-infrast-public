@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '../../../lib/api-client'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import type { AdminSiteFeatureSettingsV1, SiteFeatureKey, SiteFeatures } from '../../../lib/site-features'
-import { computeEffectiveSiteFeatures } from '../../../lib/site-features'
+import { computeEffectiveSiteFeatures, METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
 import { copy } from '../../../copy/index'
 import { AdminToast } from '../shared/AdminToast'
 
@@ -120,7 +120,7 @@ export default function FeatureSettingsSection() {
         <section key={group.label} className="tool-panel p-5 sm:p-6" aria-labelledby={`feature-group-${group.features[0]}`}>
           <h3 id={`feature-group-${group.features[0]}`} className="text-base font-semibold text-ink-primary">{group.label}</h3>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {group.features.map((feature) => {
+            {group.features.filter((feature) => feature !== 'metered_billing' || METERED_BILLING_AVAILABLE).map((feature) => {
               const rawEnabled = settings.features[feature]
               const effectiveEnabled = effective[feature]
               return (

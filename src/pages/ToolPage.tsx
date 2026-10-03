@@ -148,6 +148,9 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
   )
 
   if (route.kind === 'dashboard') {
+    if ((route.section === 'balance' || route.section === 'commercial') && !features.metered_billing) {
+      return <Navigate to={dashboardPath('profiles')} replace />
+    }
     const requiredFeature = dashboardFeature(route.section, features)
     if (requiredFeature) return <FeatureUnavailablePage feature={requiredFeature} />
     return (

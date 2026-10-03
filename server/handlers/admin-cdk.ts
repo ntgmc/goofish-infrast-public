@@ -1,6 +1,7 @@
 import type { ProductPermissionMode } from '../../src/lib/types'
 import type { z } from 'zod'
 import { normalizePointsAmount } from '../../src/lib/balance-contracts'
+import { METERED_BILLING_AVAILABLE } from '../../src/lib/site-features'
 import { getPermissionRank, normalizeRuntimePermission } from '../../src/lib/product-catalog'
 import { authenticateAdminRequest } from './admin-auth'
 import {
@@ -83,6 +84,9 @@ export default async (req: Request): Promise<Response> => {
     })
     if (!authentication.ok) return authentication.response
     const cdkType = (cdk_type ?? 'profile') as CdkType
+    if (cdkType === 'balance' && !METERED_BILLING_AVAILABLE) {
+      return jsonResponse({ error: '该功能当前未开放。', code: 'feature_disabled', feature: 'metered_billing' }, 503)
+    }
     if (cdkType === 'profile' && (
       amount !== undefined
       || item_code !== undefined

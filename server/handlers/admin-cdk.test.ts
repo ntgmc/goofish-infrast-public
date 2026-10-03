@@ -164,6 +164,14 @@ describe('admin CDK operator baseline controls', () => {
 })
 
 describe('admin item CDK generation', () => {
+  it('rejects retired balance CDK generation before creating a code or changing storage', async () => {
+    const response = await adminCdkHandler(createRequest({ cdk_type: 'balance', amount: '1000.00', count: 1 }))
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({ code: 'feature_disabled', feature: 'metered_billing' })
+    expect(mocks.generateCdk).not.toHaveBeenCalled()
+    expect(mocks.createCdkBatch).not.toHaveBeenCalled()
+  })
+
   it('creates a version 3 lifetime voucher CDK', async () => {
     mocks.getCdk.mockResolvedValue(null)
     const response = await adminCdkHandler(createRequest({

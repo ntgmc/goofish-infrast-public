@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { apiJson } from './api-client'
 import type { SiteFeatureSettingsV1, SiteFeatures } from './site-features'
-import { DEFAULT_SITE_FEATURES, SITE_FEATURE_KEYS } from './site-features'
+import { computeEffectiveSiteFeatures, DEFAULT_SITE_FEATURES, SITE_FEATURE_KEYS } from './site-features'
 import { copy } from '../copy/index'
 
 type FeatureStatus = 'loading' | 'ready' | 'error'
@@ -38,7 +38,7 @@ export function SiteFeatureProvider({ children }: { children: ReactNode }) {
       signal: controller.signal,
       fallbackMessage: copy.features.load_failed_body,
     }).then((data) => {
-      setFeatures(data.features)
+      setFeatures(computeEffectiveSiteFeatures(data))
       setUpdatedAt(data.updated_at)
       setStatus('ready')
     }).catch((error) => {

@@ -57,6 +57,23 @@ afterEach(() => {
 })
 
 describe('ToolPage route guards', () => {
+  it.each(['/tool/balance', '/tool/commercial'])('returns a retired entry to profiles: %s', async (path) => {
+    const router = renderToolRoute(path)
+    await waitFor(() => expect(router.state.location.pathname).toBe('/tool/profiles'))
+    expect(screen.queryByText(/积分|商用账户/)).not.toBeInTheDocument()
+  })
+
+  it.each(['metered_personal', 'metered_commercial'] as const)('prevents a retired %s profile from entering the scheduler', async (kind) => {
+    const profile = createProfile(kind)
+    const router = renderToolRoute('/tool/optimize/overview', {
+      activeProfile: profile, activeCdkProfile: profile, cdkProfiles: [profile],
+      license: { operators: [], config: {}, order_hash: 'order' },
+    })
+    await waitFor(() => expect(router.state.location.pathname).toBe('/tool/profiles'))
+    expect(screen.queryByText('优化页')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '打开账号并准备数据' })).not.toBeInTheDocument()
+  })
+
   it.each([true, false])('opens the expiring profile export page only after saving the current draft: %s', async (saved) => {
     const user = userEvent.setup()
     const activeProfile = createProfile()

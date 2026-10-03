@@ -3,7 +3,7 @@ import { copy } from '../copy/index'
 import { getSku, productPolicies } from './product-catalog'
 
 export const PUBLIC_CONTENT_VERSION = 1 as const
-export const PUBLIC_CONTENT_DEFAULTS_REVISION = 8 as const
+export const PUBLIC_CONTENT_DEFAULTS_REVISION = 9 as const
 export const PUBLIC_PRICING_PLAN_IDS = [
   'free_preview',
   'single_account_monthly',
@@ -281,12 +281,14 @@ export const DEFAULT_PUBLIC_CONTENT_DRAFT: PublicContentDraftV1 = {
     },
     lifetime_upgrade: { purchase_url: '', service_fee: copy.publicContent.default_lifetime_upgrade_fee },
     policy_heading: copy.public.pages_PricingPage_006,
-    disclosures: [...productPolicies.public_disclosures],
+    disclosures: productPolicies.public_disclosures
+      .filter((line) => line !== copy.publicContent.retired_personal_disclosure)
+      .map((line) => line === copy.publicContent.retired_commercial_disclosure ? copy.publicContent.pricing_transfer_disclosure : line),
     comparison_heading: copy.public.pages_PricingPage_007,
     comparison_rows: productPolicies.public_feature_comparison.map((row, index) => ({
       id: `comparison-${index + 1}`,
       ...row,
-    })),
+    })).filter((row) => row.feature !== copy.publicContent.retired_commercial_comparison),
     support_heading: copy.public.pages_PricingPage_009,
     support_body: productPolicies.support.sla_statement,
   },
@@ -362,14 +364,14 @@ export function resolvePublicContentSettings(value: unknown): { content: PublicC
   }
   const storedDefaultsRevision = normalizeDefaultsRevision(source.defaults_revision)
   const normalizedDraft = normalizePricingComparisonDefaults(parsed.data)
-  const migratedDraft = storedDefaultsRevision < PUBLIC_CONTENT_DEFAULTS_REVISION
-    ? migrateDefaultPricingContent(migrateLegacyPricingCopy(migrateLegacyDefaultCredits(normalizedDraft)))
+  const migratedDraft = storedDefaultsRevision < 8
+    ? migrateDefaultPricingContent(migrateLegacyDefaultCredits(normalizedDraft))
     : normalizedDraft
   return {
     content: {
       version: PUBLIC_CONTENT_VERSION,
       defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION,
-      ...migratedDraft,
+      ...(storedDefaultsRevision < PUBLIC_CONTENT_DEFAULTS_REVISION ? migrateLegacyPricingCopy(migratedDraft) : migratedDraft),
       updated_at: typeof source.updated_at === 'string' ? source.updated_at : null,
     },
     isFallback: false,
@@ -438,7 +440,16 @@ function normalizePricingComparisonDefaults(draft: PublicContentDraftV1): Public
 
 function migrateLegacyPricingCopy(draft: PublicContentDraftV1): PublicContentDraftV1 {
   if (draft.pricing.eyebrow === LEGACY_PRICING_EYEBROW) draft.pricing.eyebrow = copy.public.pages_PricingPage_002
-  if (draft.pricing.intro === LEGACY_PRICING_INTRO) draft.pricing.intro = copy.public.pages_PricingPage_003
+  if (draft.pricing.intro === LEGACY_PRICING_INTRO || draft.pricing.intro === copy.publicContent.retired_pricing_intro) {
+    draft.pricing.intro = copy.public.pages_PricingPage_003
+  }
+  draft.pricing.disclosures = draft.pricing.disclosures
+    .filter((line) => line !== copy.publicContent.retired_personal_disclosure)
+    .map((line) => line === copy.publicContent.retired_commercial_disclosure ? copy.publicContent.pricing_transfer_disclosure : line)
+  draft.pricing.comparison_rows = draft.pricing.comparison_rows.filter((row) => (
+    row.feature !== copy.publicContent.retired_commercial_comparison
+    || PUBLIC_PRICING_PLAN_IDS.some((planId) => row[planId] !== copy.publicContent.retired_comparison_unavailable)
+  ))
   return draft
 }
 

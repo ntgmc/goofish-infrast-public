@@ -3,6 +3,7 @@ export const adminCopy = {
   user_filter_registered_range_invalid: '注册时间范围无效。',
   user_filter_last_seen_range_invalid: '最近上线时间范围无效。',
   user_filter_activity_range_conflict: '无上线记录不能同时筛选上线日期。',
+  retired_cdk: '已停用兑换码',
   registration_nav: '注册设置',
   registration_loading: '正在载入注册设置...',
   registration_load_failed: '加载注册设置失败',

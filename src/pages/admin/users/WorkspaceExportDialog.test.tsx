@@ -71,6 +71,8 @@ describe('workspace export dialog', () => {
       onDeleteUser: action,
     }
     const { rerender } = render(<UserDetailDialog {...props} />)
+    expect(screen.queryByText(/积分|商用账户控制/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '确认调整' })).not.toBeInTheDocument()
     const trigger = screen.getByRole('button', { name: '导出工作区' })
     expect(screen.queryByText(/导出的最近结果选用优化器排班/)).not.toBeInTheDocument()
     trigger.focus()

@@ -73,7 +73,8 @@ describe('FeatureSettingsSection', () => {
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '保存功能开关' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '重新加载' }))
-    expect(await screen.findAllByRole('checkbox')).toHaveLength(SITE_FEATURE_KEYS.length)
+    expect(await screen.findAllByRole('checkbox')).toHaveLength(SITE_FEATURE_KEYS.length - 1)
+    expect(screen.queryByRole('checkbox', { name: /按次排班与商用账户/ })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '保存功能开关' })).toBeInTheDocument()
   })
 

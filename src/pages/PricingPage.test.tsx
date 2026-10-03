@@ -80,23 +80,21 @@ describe('PricingPage', () => {
     expect(screen.getByRole('link', { name: '购买 30 天' })).toBeInTheDocument()
   })
 
-  it('hides metered prices and capabilities when metered billing is closed', () => {
+  it('removes the entire metered section when metered billing is closed', () => {
     featureState.meteredBilling = false
     render(<MemoryRouter><PricingPage /></MemoryRouter>)
-    expect(screen.getByText('暂未开放')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '按次排班' })).not.toBeInTheDocument()
     expect(screen.queryByText('1200–1800 积分/次')).not.toBeInTheDocument()
     expect(screen.queryByText(/按次档案包含高级版单次结果/)).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '积分如何扣除' })).not.toBeInTheDocument()
     expect(screen.queryByRole('table', { name: '商用等级与单次费用' })).not.toBeInTheDocument()
   })
 
-  it.each([
-    ['loading', '正在确认按次计费开放状态…'],
-    ['error', '暂时无法确认按次排班是否开放，请稍后重试。'],
-  ] as const)('fails closed while feature state is %s', (status, message) => {
+  it.each(['loading', 'error', 'ready'] as const)('does not restore retired pricing with a stale enabled setting while %s', (status) => {
     featureState.status = status
     render(<MemoryRouter><PricingPage /></MemoryRouter>)
-    expect(screen.getByText(new RegExp(message))).toBeInTheDocument()
+    expect(screen.queryByText(/积分|商用版|按次排班|按次计费/)).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '个人维护方案' })).toBeInTheDocument()
     expect(screen.queryByText('1200–1800 积分/次')).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '商用版规则' })).not.toBeInTheDocument()
   })

@@ -7,6 +7,7 @@ import { AdminDetailDialog } from '../shared/AdminDetailDialog'
 import { DetailItem, StatusPill, UserStatusPill, SmallButton, formatDate, getAdminProfileAccessLabel, formatAdminProfileAccess, formatOperatorValue, getAppUserStatusLabel } from '../shared/helpers'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import { WorkspaceExportDialog } from './WorkspaceExportDialog'
+import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
 
 export interface UserDetailPanelProps {
   detail: AdminUserDetail;
@@ -117,14 +118,14 @@ function UserDetailPanel({
           </div>
         )}
 
-        <UserBalanceCard
+        {METERED_BILLING_AVAILABLE && <UserBalanceCard
           userId={user.id}
           balance={balance}
           loading={balanceLoading}
           busy={busyAction === `user-balance:${user.id}`}
           onAdjust={onAdjustBalance}
           onLoadMore={onLoadMoreBalance}
-        />
+        />}
 
         <PersonalUseDeclarations declarations={detail.personal_use_declarations} />
 
