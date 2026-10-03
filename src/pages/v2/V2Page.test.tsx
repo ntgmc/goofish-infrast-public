@@ -9,6 +9,7 @@ import { DEFAULT_SITE_FEATURES } from '../../lib/site-features'
 import type { OptimizeResult, UserGameAccount, WorkspaceResultHistorySummary } from '../../lib/types'
 import type { V2Session } from './OptionsDrawer'
 import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './sample-result'
+import { SANITY_PER_LMD, SANITY_PER_PURE_GOLD } from '../../lib/orundum-economy'
 
 const mocks = vi.hoisted(() => ({
   session: vi.fn(),
@@ -95,6 +96,57 @@ function connect() {
 }
 
 describe('V2 results-first workspace', () => {
+  it('uses normalized backend station output and drone consumption without rescaling or averaging', async () => {
+    const workflow = connect()
+    workflow.historyItem = { result: { ...SAMPLE_RESULT, daily_production: {
+      hours: 24, source_hours: 16, normalization_factor: 1.5,
+      manufacturing: { 'Pure Gold': 20 }, trading: { LMD: 3000 }, consumption: { 'Pure Gold': 6 },
+      details: [
+        { shift: '早班', room_type: 'manufacture', room_index: 1, product: 'Pure Gold', amount: 20 },
+        { shift: '早班', room_type: 'trading', room_index: 2, product: 'LMD', amount: 2500, consume: { 'Pure Gold': 5 } },
+        { shift: '早班', room_type: 'trading', room_index: 2, product: 'LMD', source: 'drones', amount: 500, consume: { 'Pure Gold': 1 } },
+      ],
+    } } }
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('button', { name: copy.v2.analysisTab }))
+    const station = within(await screen.findByRole('region', { name: copy.v2.stationOutput }))
+    const rows = station.getAllByRole('row').slice(1)
+    expect(rows).toHaveLength(3)
+    expect(rows[0]).toHaveTextContent('赤金 20')
+    expect(rows[1]).toHaveTextContent('贸易站 2早班龙门币 2,500赤金 5')
+    expect(rows[2]).toHaveTextContent(`贸易站 2早班${copy.v2.drones}龙门币 500赤金 1`)
+    const sanity = 3000 * SANITY_PER_LMD + 14 * SANITY_PER_PURE_GOLD
+    expect(screen.getByRole('region', { name: copy.v2.sanityCalculation })).toHaveTextContent(sanity.toFixed(2))
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+  })
+
+  it('reads facility levels and operator moods from the chosen result and resolves skills using saved training', async () => {
+    const workflow = connect()
+    const result = structuredClone(SAMPLE_RESULT)
+    result.buildingType = 252
+    const room = result.plans[0].rooms.trading[0]
+    delete room.level
+    room.facility_level = 2
+    room.mood = { 银灰: { start: 21.5, end: 7.2 } }
+    room.overflow = { time: '7h', equivalent: { equivalent_efficiency: 304.2 } }
+    workflow.historyItem = { result }
+    const user = userEvent.setup()
+    mount()
+    const card = screen.getByRole('button', { name: /贸易站.*银灰/ })
+    expect(card).toHaveTextContent('Lv.2')
+    expect(card).toHaveTextContent(`${copy.v2.equivalentEfficiency}304.2%`)
+    await user.click(card)
+    const dialog = within(await screen.findByRole('dialog'))
+    expect(dialog.getByText('21.5')).toBeInTheDocument()
+    expect(dialog.getByText('7.2')).toBeInTheDocument()
+    expect(dialog.getAllByText(copy.v2.moodUnavailable)).toHaveLength(4)
+    expect(dialog.getByText(`${copy.v2.expectedFullOrders}7h`)).toBeInTheDocument()
+    await user.click(dialog.getAllByText(copy.domain.building_skills.title)[0])
+    expect(dialog.getAllByText(new RegExp(copy.domain.building_skills.active))[0]).toBeVisible()
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+  })
+
   it('shows an explicitly marked result immediately without requiring login or a CDK', () => {
     mount()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(copy.v2.title)
@@ -460,6 +512,6 @@ describe('V2 results-first workspace', () => {
     expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('54,720')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: copy.v2.analysisTab }))
     expect(await screen.findByText(copy.v2.previewAnalysis)).toBeInTheDocument()
-    expect(screen.queryByRole('img', { name: copy.v2.chartDescription })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: copy.v2.sanityCalculation })).not.toBeInTheDocument()
   })
 })

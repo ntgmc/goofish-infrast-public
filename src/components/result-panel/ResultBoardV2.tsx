@@ -6,7 +6,7 @@ import { formatCompactNumber, formatProduct, type PreparedResult } from './forma
 import { ROOM_LABELS } from './labels'
 import OperatorAvatarStrip, { OperatorAvatarTile } from './OperatorAvatarStrip'
 import type { PreparedPlan, RoomRow } from './types'
-import type { DroneAssignment } from '../../lib/types'
+import type { DroneAssignment, ShiftRoom } from '../../lib/types'
 import DroneMarker, { isDroneTarget } from './DroneMarker'
 import ProductIcon from '../ProductIcon'
 
@@ -28,6 +28,7 @@ export type BoardRoom = {
   label: string;
   indexLabel: string;
   level?: number;
+  data?: ShiftRoom;
   product: string;
   row?: RoomRow;
 }
@@ -167,7 +168,8 @@ export function buildBoardV2Rooms(plan: PreparedPlan | undefined, isRotationMode
         key: `${roomType}-${index}`,
         roomType,
         roomIndex: index,
-        level: room.level,
+        level: room.level ?? room.facility_level,
+        data: room,
         label: row?.label ?? ROOM_LABELS[roomType] ?? roomType,
         indexLabel: row?.indexLabel ?? [
           entries.length > 1 ? String(index + 1) : '',

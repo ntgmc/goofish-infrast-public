@@ -570,6 +570,7 @@ export interface ShiftRoom {
   recovery_support_operators?: string[];
   level?: number;
   operators?: string[];
+  facility_level?: number;
   product?: string;
   efficiency?: number | Record<string, number>;
   final_efficiency?: number;

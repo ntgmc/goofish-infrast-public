@@ -2,11 +2,13 @@ import { useId, useState, type KeyboardEvent } from 'react'
 import { LayoutGroup, motion, useReducedMotion } from 'motion/react'
 import { ArrowUpRight, BedDouble, Building2, Clock3, Drone, Factory, GraduationCap, HandCoins, LayoutGrid, List, UserRoundSearch, Users, Wrench, Zap, type LucideIcon } from 'lucide-react'
 import { copy } from '../../copy'
-import { prepareResult, formatAmount } from '../../components/result-panel/formatters'
+import { prepareResult } from '../../components/result-panel/formatters'
+import OperatorSkillPreview from '../../components/result-panel/OperatorSkillPreview'
+import type { RoomOperator } from '../../components/result-panel/types'
 import { buildBoardV2Rooms, type BoardRoom } from '../../components/result-panel/ResultBoardV2'
 import { isDroneTarget } from '../../components/result-panel/DroneMarker'
 import ProductIcon from '../../components/ProductIcon'
-import { AnimatedValue, MotionNavIndicator, motionTokens } from '../../components/MotionPrimitives'
+import { MotionNavIndicator, motionTokens } from '../../components/MotionPrimitives'
 import type { LicenseOperator, OptimizeResult } from '../../lib/types'
 import V2Transition from './V2Transition'
 
@@ -19,14 +21,15 @@ const ROOM_ICONS: Record<string, LucideIcon> = {
 
 export function roomLevelLabel(room: BoardRoom) {
   const maximum = ({ trading: 3, manufacture: 3, power: 3, control: 5, dormitory: 5 } as Record<string, number>)[room.roomType]
-  const level = room.level ?? maximum
+  const level = room.level
   return level === undefined ? text.unknownLevel : level === maximum ? text.maxLevel : `Lv.${level}`
 }
 
-export function Avatar({ operator, small = false }: { operator: { id?: string; name: string }; small?: boolean }) {
+export function Avatar({ operator, small = false }: { operator: RoomOperator; small?: boolean }) {
   const [failed, setFailed] = useState(false)
   return (
-    <span className={`v2-avatar ${small ? 'v2-avatar-small' : ''}`} title={operator.name}>
+    <span className={`v2-avatar ${small ? 'v2-avatar-small' : ''}`} data-operator-name={operator.name}
+      data-operator-id={operator.id} data-operator-elite={operator.elite} data-operator-level={operator.level}>
       {operator.id && !failed
         ? <img src={`/webp96/${operator.id}.webp`} alt={operator.name} onError={() => setFailed(true)} loading="lazy" width={96} height={96} />
         : <span aria-label={operator.name}>{operator.name.slice(0, 1)}</span>}
@@ -49,6 +52,8 @@ export default function ScheduleBoard({ result, operators, expanded, shift, onSh
   const prepared = prepareResult(result, result.schedule_mode === 'rotation', result.dormitory_rule === 'maa_pure_autofill', operators)
   const plan = prepared.plans[selected]
   const allRooms = buildBoardV2Rooms(plan, result.schedule_mode === 'rotation')
+    .map((room) => ({ ...room, level: room.level ?? (String(result.buildingType).endsWith('3')
+      && ['trading', 'manufacture', 'power'].includes(room.roomType) ? 3 : undefined) }))
     .map((room) => ({ ...room, indexLabel: [plan?.rooms[room.roomType]?.length > 1 ? String(room.roomIndex + 1) : '', roomLevelLabel(room)].filter(Boolean).join(' · ') }))
     .map((room) => room.roomType === 'training' ? { ...room, label: copy.domain.building_skills.training } : room)
     .sort((a, b) => {
@@ -76,7 +81,7 @@ export default function ScheduleBoard({ result, operators, expanded, shift, onSh
   }
 
   return (
-    <LayoutGroup id={id}>
+    <OperatorSkillPreview><LayoutGroup id={id}>
     <section className="v2-panel v2-schedule">
       <div className="v2-panel-heading">
         <div className="v2-heading-inline"><h2>{expanded ? text.allRooms : text.result}</h2><span className="v2-neutral-tag">{text.shifts(result.plans.length)}</span></div>
@@ -119,7 +124,7 @@ export default function ScheduleBoard({ result, operators, expanded, shift, onSh
         </V2Transition>
       </div>
     </section>
-    </LayoutGroup>
+    </LayoutGroup></OperatorSkillPreview>
   )
 }
 
@@ -148,34 +153,8 @@ function RoomCard({ room, drone = false, compact = false, autofill = false, onCl
       </motion.div>
       {showBottom && <motion.div layout={reduceMotion ? false : 'position'} className="v2-room-bottom">
         {(!compact || room.product !== '-') && <span><ProductIcon product={room.product} size={18} />{room.product === '-' ? text.support : room.product}</span>}
-        {efficiency && <span>{text.efficiency}<strong>{efficiency}</strong></span>}
+        {efficiency && <span>{room.roomType === 'trading' ? text.equivalentEfficiency : text.efficiency}<strong>{efficiency}</strong></span>}
       </motion.div>}
     </motion.button>
-  )
-}
-
-export function OutputChart({ result }: { result: OptimizeResult }) {
-  const reduceMotion = useReducedMotion()
-  const output = result.daily_production?.trading?.LMD ?? 0
-  const [hour, setHour] = useState<number | null>(null)
-  const id = useId().replace(/:/g, '')
-  return (
-    <div className="v2-output-chart v2-output-chart-large">
-      <div className="v2-chart-caption"><span>{text.outputChart}</span><strong><AnimatedValue value={formatAmount(output * (hour ?? 24) / 24)} /><small> / {hour ?? 24}h</small></strong></div>
-      <svg viewBox="0 0 320 120" role="img" aria-label={text.chartDescription}>
-        <defs><linearGradient id={`fill-${id}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--color-v2-accent)" stopOpacity=".16" /><stop offset="100%" stopColor="var(--color-v2-accent)" stopOpacity="0" /></linearGradient></defs>
-        {[20, 55, 90].map((y) => <line key={y} x1="4" y1={y} x2="316" y2={y} stroke="currentColor" strokeOpacity=".08" strokeDasharray="3 4" />)}
-        <path d="M4 105 L316 14 L316 110 L4 110 Z" fill={`url(#fill-${id})`} />
-        <motion.path d="M4 105 L316 14" fill="none" stroke="var(--color-v2-accent)" strokeWidth="2.5"
-          initial={reduceMotion ? false : { pathLength: 0 }} animate={{ pathLength: 1 }}
-          transition={{ duration: motionTokens.duration.page, ease: motionTokens.ease.enter }} />
-        {[0, 4, 8, 12, 16, 20, 24].map((value) => <motion.circle key={value} cx={4 + value * 13} cy={105 - value * 91 / 24}
-          initial={false} animate={{ r: hour === value ? 5 : 3 }} transition={{ duration: reduceMotion ? 0 : motionTokens.duration.instant }}
-          fill="var(--color-v2-surface)" stroke="var(--color-v2-accent)" strokeWidth="2" />)}
-      </svg>
-      <div className="v2-chart-axis">{[0, 8, 16, 24].map((value) => <button key={value} type="button" onMouseEnter={() => setHour(value)} onMouseLeave={() => setHour(null)}
-        onFocus={() => setHour(value)} onBlur={() => setHour(null)} aria-label={`${text.outputChart} ${value}h`}>{String(value).padStart(2, '0')}:00</button>)}</div>
-      <p className="v2-chart-note">{text.chartDescription}</p>
-    </div>
   )
 }

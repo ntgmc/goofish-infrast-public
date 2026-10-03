@@ -9,7 +9,8 @@ import { formatAmount, prepareResult } from '../../components/result-panel/forma
 import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
 import { normalizeScheduleMode, parseShiftHours, SCHEDULE_MODE_LABELS } from '../../lib/config'
 import type { LicenseConfig, LicenseOperator, OptimizeResult, PermissionMode, WorkspaceResultHistorySummary } from '../../lib/types'
-import ScheduleBoard, { Avatar, OutputChart } from './ScheduleBoard'
+import ScheduleBoard, { Avatar } from './ScheduleBoard'
+import IncomeAnalysis from './IncomeAnalysis'
 import OptionsDrawer, { type OptionPanel, type V2Session } from './OptionsDrawer'
 import { sortOperatorsForPreview } from '../tool/tool-utils'
 import V2Transition from './V2Transition'
@@ -147,8 +148,9 @@ export default function V2Dashboard({ session, result, operators, config, sample
           <V2Transition motionKey={view}>
           <div className={`v2-results-grid ${view !== 'summary' ? 'v2-results-expanded' : ''}`}>
             {view === 'analysis' ? (
-              <section className="v2-panel v2-analysis"><div className="v2-panel-heading"><h2>{text.analysisTab}</h2><span className="v2-neutral-tag">24h</span></div>{canViewAnalysis ? <><OutputChart result={result} />
-                <div className="v2-analysis-note"><Gem size={21} /><div><h3>{text.sanity}: {prepared.productionSanity.value.toFixed(1)} {text.daily}</h3><p>{prepared.productionSanity.note}</p></div></div></> : <div className="v2-analysis-note"><ShieldCheck size={21} /><div><p>{text.previewAnalysis}</p><Link className="v2-text-button" to="/pricing">{text.comparePlans}<ArrowRight size={14} /></Link></div></div>}</section>
+              <section className="v2-panel v2-analysis"><div className="v2-panel-heading"><h2>{text.analysisTab}</h2><span className="v2-neutral-tag">24h</span></div>{canViewAnalysis
+                ? <IncomeAnalysis result={result} />
+                : <div className="v2-analysis-note"><ShieldCheck size={21} /><div><p>{text.previewAnalysis}</p><Link className="v2-text-button" to="/pricing">{text.comparePlans}<ArrowRight size={14} /></Link></div></div>}</section>
             ) : (
               <ScheduleBoard result={result} operators={operators} expanded={view === 'details'} shift={shift} onShiftChange={setShift}
                 view={boardView} onViewChange={setBoardView} onRoom={(nextRoom) => { setRoom(nextRoom); openPanel('room') }} />

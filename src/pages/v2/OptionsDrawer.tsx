@@ -18,6 +18,7 @@ import type { useToolSession } from '../tool/useToolSession'
 import { Avatar, roomLevelLabel } from './ScheduleBoard'
 import { getProfileAccessLabel, parseOperatorsText } from '../tool/tool-utils'
 import V2Transition from './V2Transition'
+import BuildingSkills from './BuildingSkills'
 
 const ConfigEditor = lazy(() => import('../../components/ConfigEditor'))
 const text = copy.v2
@@ -117,14 +118,14 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
             </div>
             <div className="v2-operator-rows">
               {operators.filter((operator) => operator.name.toLowerCase().includes(search.trim().toLowerCase())).map((operator) => (
-                <div className="v2-operator-row" key={operator.id}>
+                <div className="v2-operator-entry" key={operator.id}><div className="v2-operator-row">
                   <Avatar operator={operator} /><strong>{operator.name}</strong>
                   <span className="v2-operator-status">{operator.own ? text.ownedLabel : text.notOwnedLabel}</span>
                   <div className="v2-operator-training">
                     <span className="v2-operator-status">{text.elite(operator.elite)}</span>
                     <span className="v2-operator-status">{text.operatorLevel(typeof operator.level === 'number' || typeof operator.level === 'string' ? operator.level : undefined)}</span>
                   </div>
-                </div>
+                </div><BuildingSkills operator={operator} /></div>
               ))}
               {!operators.some((operator) => operator.name.toLowerCase().includes(search.trim().toLowerCase())) && <p className="v2-muted">{text.noOperators}</p>}
             </div>
@@ -170,10 +171,22 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
                 <FileClock size={20} /><span><strong>{item.name}</strong><small>{formatWorkspaceDate(item.created_at)}</small></span><ArrowRight size={17} /></button>)}
         </div>}
         {panel === 'room' && room && <div className="v2-options-content">
-          <div className="v2-room-detail-avatars">{room.row?.operators.map((operator) => <span className="v2-operator" key={operator.name}><Avatar operator={operator} /><span>{operator.name}</span></span>)}</div>
+          <div className="v2-room-operator-details">{room.row?.operators.map((operator) => {
+            const mood = room.data?.mood?.[operator.name]
+            const moodValue = (value: number | undefined) => value !== undefined && Number.isFinite(value) ? value.toFixed(1) : text.moodUnavailable
+            return <section className="v2-room-operator" key={operator.name}>
+              <div className="v2-operator-row"><Avatar operator={operator} /><strong>{operator.name}</strong></div>
+              <dl className="v2-detail-data v2-mood-data"><div><dt>{text.startMood}</dt><dd>{moodValue(mood?.start)}</dd></div>
+                <div><dt>{text.endMood}</dt><dd>{moodValue(mood?.end)}</dd></div></dl>
+              <BuildingSkills operator={operator} />
+            </section>
+          })}</div>
           <dl className="v2-detail-data"><div><dt>{text.level}</dt><dd>{roomLevelLabel(room)}</dd></div>
-            <div><dt>{text.product}</dt><dd>{room.product}</dd></div><div><dt>{text.efficiency}</dt><dd>{room.row?.efficiency ?? '—'}</dd></div></dl>
-          <h3>{text.roomDetails}</h3><ul className="v2-room-detail-list">{room.row?.detailItems.map((item) => <li key={item}>{item}</li>)}</ul>
+            <div><dt>{text.product}</dt><dd>{room.product}</dd></div><div><dt>{room.roomType === 'trading' ? text.equivalentEfficiency : text.efficiency}</dt><dd>{room.row?.efficiency ?? '—'}</dd></div></dl>
+          <h3>{text.roomDetails}</h3><ul className="v2-room-detail-list">{room.row?.detailItems.map((item, index) => <li key={item}>{room.roomType === 'trading'
+            ? index === 0 ? `${text.equivalentEfficiency} ${room.row?.efficiency}`
+              : item.startsWith(copy.domain.components_result_panel_formatters_023) ? `${text.expectedFullOrders}${room.data?.overflow?.time}` : item
+            : item}</li>)}</ul>
         </div>}
         </V2Transition>
       </MotionDrawerContent>
