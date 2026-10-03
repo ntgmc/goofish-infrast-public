@@ -1,6 +1,6 @@
 import { useId, useState, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent, useReducedMotion } from 'motion/react'
-import { Activity, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, CalendarClock, Check, ChevronDown, ChevronRight, Download, Factory, FileClock, Gem, LayoutDashboard, Menu, RefreshCw, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Users, WalletCards, X, Zap } from 'lucide-react'
+import { Activity, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, CalendarClock, Check, ChevronDown, ChevronRight, Download, Factory, FileClock, Gem, LayoutDashboard, Menu, RefreshCw, Settings2, ShieldCheck, Sparkles, Users, WalletCards, X, Zap } from 'lucide-react'
 import { Link } from 'react-router'
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
@@ -91,7 +91,6 @@ export default function V2Dashboard({ session, result, operators, config, sample
           <p className="v2-nav-label">{text.configuration}</p>
           <button type="button" className="v2-nav-item" aria-label={text.operators} onClick={() => openPanel('operators')}><Users size={19} /><span>{text.operators}</span><small>{owned.length}</small></button>
           <button type="button" className="v2-nav-item" onClick={() => openPanel('config')}><Building2 size={19} /><span>{text.facilities}</span></button>
-          <button type="button" className="v2-nav-item" onClick={() => openPanel('preferences')}><SlidersHorizontal size={19} /><span>{text.preferences}</span></button>
           <p className="v2-nav-label">{text.personal}</p>
           <button type="button" className="v2-nav-item" onClick={() => openPanel('account')}><UserIcon /><span>{text.account}</span></button>
           <button type="button" className="v2-nav-item" onClick={() => openPanel('cdk')}><WalletCards size={19} /><span>{text.cdk}</span></button>
@@ -181,7 +180,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
       <OptionsDrawer panel={panel} onClose={() => setPanel(null)} session={session} config={config} operators={sortedOperators}
         onUpdateConfig={onUpdateConfig} permission={permission} canEditConfig={canEditConfig} canUseIntermediateConfig={canUseIntermediateConfig}
         sample={sample} busy={busy} onImportOperators={onImportOperators}
-        onAccount={() => openPanel('account')} history={history} onHistory={onHistory} room={room} />
+        onAccount={() => openPanel('account')} history={history} onHistory={onHistory} room={room} error={error} />
     </div>
     </LayoutGroup>
   )

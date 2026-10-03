@@ -8,6 +8,7 @@ import type { LicenseConfig, LicenseOperator, OptimizeResult } from '../../lib/t
 import { isSchedulableProfile } from '../tool/tool-utils'
 import { useToolSession } from '../tool/useToolSession'
 import { useOptimizeWorkflow } from '../tool/optimize/useOptimizeWorkflow'
+import { useOptimizationTaskCenter } from '../tool/optimize/useOptimizationTaskCenter'
 import V2Dashboard from './V2Dashboard'
 import type { V2Session } from './OptionsDrawer'
 import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './sample-result'
@@ -78,6 +79,8 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
     redeemedNotice: null,
     onProfileUpgraded: session.applyAuthPayload,
   })
+  const tasks = useOptimizationTaskCenter(profile.id, workflow.loading)
+  const activeJob = tasks.jobs.find((job) => job.id === workflow.progress?.jobId && job.canCancel)
   const latest = workflow.latestWorkspaceResult
   const current = workflow.finalResult ?? workflow.currentResult ?? workflow.historyItem?.result ?? null
   const generationDisabledReason = features.features.schedule_generation ? null : copy.features.schedule_read_only
@@ -114,7 +117,12 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
     notice={workflow.workspaceNotice ?? (!features.features.schedule_generation ? copy.features.schedule_read_only : !result && !reading ? copy.v2.dataPending : null)}
     permission={workflow.permission} canEditConfig={workflow.userCanEditConfig || workflow.isPreviewProfile}
     canUseIntermediateConfig={workflow.userCanUseIntermediateAutoConfig} history={workflow.resultHistory} onHistory={workflow.handleViewHistory}>
-    {workflow.loading && workflow.progress && <div className="v2-progress"><ScheduleProgress progress={workflow.progress} /></div>}
+    {workflow.progress && <div className="v2-progress"><ScheduleProgress progress={workflow.progress} />
+      {workflow.loading && activeJob && <button type="button" className="v2-button v2-button-secondary" disabled={tasks.busyJobId === activeJob.id || activeJob.cancellationRequested}
+        onClick={() => void tasks.cancel(activeJob)}>{tasks.busyJobId === activeJob.id || activeJob.cancellationRequested ? copy.v2.stopping : copy.v2.stopSchedule}</button>}
+      {tasks.error && <p role="alert" className="v2-error">{tasks.error}</p>}
+      {tasks.notice && <p role="status" className="v2-muted">{tasks.notice}</p>}
+    </div>}
     {workflow.declarationDialog}
   </V2Dashboard>
 }

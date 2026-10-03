@@ -1,6 +1,6 @@
 import { lazy, Suspense, useRef, useState } from 'react'
 import { ArrowRight, Check, FileClock, LogOut, Search, Upload, UserRound } from 'lucide-react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import AuthForm from '../../components/AuthForm'
 import SklandBindingDialog from '../../components/SklandBindingDialog'
 import SklandIcon from '../../components/SklandIcon'
@@ -15,22 +15,22 @@ import { extensibleLicenseOperatorsSchema } from '../../lib/workspace-validation
 import type { LicenseConfig, LicenseOperator, PermissionMode, WorkspaceResultHistorySummary } from '../../lib/types'
 import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
 import type { useToolSession } from '../tool/useToolSession'
-import { Avatar } from './ScheduleBoard'
+import { Avatar, roomLevelLabel } from './ScheduleBoard'
 import { getProfileAccessLabel, parseOperatorsText } from '../tool/tool-utils'
 import V2Transition from './V2Transition'
 
 const ConfigEditor = lazy(() => import('../../components/ConfigEditor'))
 const text = copy.v2
-export type OptionPanel = 'operators' | 'config' | 'preferences' | 'account' | 'cdk' | 'history' | 'room'
+export type OptionPanel = 'operators' | 'config' | 'account' | 'cdk' | 'history' | 'room'
 export type V2Session = ReturnType<typeof useToolSession>
 
 const titles: Record<OptionPanel, string> = {
-  operators: text.operators, config: text.facilities, preferences: text.preferences,
+  operators: text.operators, config: text.facilities,
   account: text.account, cdk: text.cdk, history: text.history, room: text.roomDetails,
 }
 
 export default function OptionsDrawer({ panel, onClose, session, config, operators, onUpdateConfig, permission,
-  canEditConfig = true, canUseIntermediateConfig = true, sample, busy, onImportOperators, onAccount, history, onHistory, room }: {
+  canEditConfig = true, canUseIntermediateConfig = true, sample, busy, onImportOperators, onAccount, history, onHistory, room, error }: {
   panel: OptionPanel | null
   onClose: () => void
   session: V2Session
@@ -47,7 +47,9 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
   history: WorkspaceResultHistorySummary[]
   onHistory?: (summary: WorkspaceResultHistorySummary) => Promise<void>
   room: BoardRoom | null
+  error?: string | null
 }) {
+  const [, setParams] = useSearchParams()
   const [search, setSearch] = useState('')
   const [sklandOpen, setSklandOpen] = useState(false)
   const [importBusy, setImportBusy] = useState(false)
@@ -55,7 +57,7 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
   const [importDone, setImportDone] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
   const featureState = useSiteFeatures()
-  const isConfig = panel === 'config' || panel === 'preferences'
+  const isConfig = panel === 'config'
   const description = isConfig ? sample ? text.demoConfigDescription : text.configDescription
     : panel === 'operators' ? sample ? text.sampleOperatorDescription : text.operatorDescription
       : panel === 'account' ? text.accountDescription : panel === 'room' ? text.roomDescription
@@ -88,6 +90,7 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
         <V2Transition motionKey={isConfig ? 'config' : panel === 'room' ? `room-${room?.key}` : panel ?? 'closed'} className="v2-drawer-body">
         {isConfig && (
           <>
+            {error && <p role="alert" className="v2-feedback v2-feedback-error">{error}</p>}
             <Suspense fallback={<p className="v2-muted">{text.loadingConfig}</p>}>
               <ConfigEditor config={config} canEdit={canEditConfig} canEditIntermediateInventory={canUseIntermediateConfig}
                 canSelectPreset={canUseIntermediateConfig} canEditFixedShiftHours={canEditConfig} permission={permission}
@@ -137,7 +140,10 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
                 {session.cdkProfiles.filter((profile) => (METERED_BILLING_AVAILABLE && featureState.features.metered_billing) || !profile.kind.startsWith('metered_')).map((profile) => <button type="button" className="v2-profile-option" key={profile.id}
                   disabled={busy || session.openingProfileId !== null} onClick={async () => {
                     if (await session.flushConfigSave()) {
-                      await session.refreshProfileWorkspace(profile).then(onClose).catch(() => undefined)
+                      await session.refreshProfileWorkspace(profile).then(() => {
+                        setParams((current) => { const next = new URLSearchParams(current); next.set('profile_id', profile.id); return next })
+                        onClose()
+                      }).catch(() => undefined)
                     }
                   }}>
                   <span><strong>{profile.display_name}</strong><small>{getProfileAccessLabel(profile)}</small></span>
@@ -165,7 +171,7 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
         </div>}
         {panel === 'room' && room && <div className="v2-options-content">
           <div className="v2-room-detail-avatars">{room.row?.operators.map((operator) => <span className="v2-operator" key={operator.name}><Avatar operator={operator} /><span>{operator.name}</span></span>)}</div>
-          <dl className="v2-detail-data"><div><dt>{text.level}</dt><dd>{room.indexLabel || '—'}</dd></div>
+          <dl className="v2-detail-data"><div><dt>{text.level}</dt><dd>{roomLevelLabel(room)}</dd></div>
             <div><dt>{text.product}</dt><dd>{room.product}</dd></div><div><dt>{text.efficiency}</dt><dd>{room.row?.efficiency ?? '—'}</dd></div></dl>
           <h3>{text.roomDetails}</h3><ul className="v2-room-detail-list">{room.row?.detailItems.map((item) => <li key={item}>{item}</li>)}</ul>
         </div>}

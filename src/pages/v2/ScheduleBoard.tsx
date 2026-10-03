@@ -17,6 +17,12 @@ const ROOM_ICONS: Record<string, LucideIcon> = {
   meeting: Users, processing: Wrench, hire: UserRoundSearch, training: GraduationCap, dormitory: BedDouble,
 }
 
+export function roomLevelLabel(room: BoardRoom) {
+  const maximum = ({ trading: 3, manufacture: 3, power: 3, control: 5, dormitory: 5 } as Record<string, number>)[room.roomType]
+  const level = room.level ?? maximum
+  return level === undefined ? text.unknownLevel : level === maximum ? text.maxLevel : `Lv.${level}`
+}
+
 export function Avatar({ operator, small = false }: { operator: { id?: string; name: string }; small?: boolean }) {
   const [failed, setFailed] = useState(false)
   return (
@@ -43,6 +49,7 @@ export default function ScheduleBoard({ result, operators, expanded, shift, onSh
   const prepared = prepareResult(result, result.schedule_mode === 'rotation', result.dormitory_rule === 'maa_pure_autofill', operators)
   const plan = prepared.plans[selected]
   const allRooms = buildBoardV2Rooms(plan, result.schedule_mode === 'rotation')
+    .map((room) => ({ ...room, indexLabel: [plan?.rooms[room.roomType]?.length > 1 ? String(room.roomIndex + 1) : '', roomLevelLabel(room)].filter(Boolean).join(' · ') }))
     .map((room) => room.roomType === 'training' ? { ...room, label: copy.domain.building_skills.training } : room)
     .sort((a, b) => {
       const aRank = ROOM_ORDER.indexOf(a.roomType)

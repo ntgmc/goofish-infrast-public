@@ -27,6 +27,7 @@ export type BoardRoom = {
   roomIndex: number;
   label: string;
   indexLabel: string;
+  level?: number;
   product: string;
   row?: RoomRow;
 }
@@ -166,6 +167,7 @@ export function buildBoardV2Rooms(plan: PreparedPlan | undefined, isRotationMode
         key: `${roomType}-${index}`,
         roomType,
         roomIndex: index,
+        level: room.level,
         label: row?.label ?? ROOM_LABELS[roomType] ?? roomType,
         indexLabel: row?.indexLabel ?? [
           entries.length > 1 ? String(index + 1) : '',

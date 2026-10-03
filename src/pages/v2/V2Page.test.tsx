@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { copy } from '../../copy'
 import { normalizeConfig } from '../../lib/config'
@@ -14,9 +14,11 @@ const mocks = vi.hoisted(() => ({
   session: vi.fn(),
   workflow: vi.fn(),
   features: vi.fn(),
+  tasks: vi.fn(),
 }))
 vi.mock('../tool/useToolSession', () => ({ useToolSession: mocks.session }))
 vi.mock('../tool/optimize/useOptimizeWorkflow', () => ({ useOptimizeWorkflow: mocks.workflow }))
+vi.mock('../tool/optimize/useOptimizationTaskCenter', () => ({ useOptimizationTaskCenter: mocks.tasks }))
 vi.mock('../../lib/site-feature-context', async (original) => ({
   ...await original<typeof import('../../lib/site-feature-context')>(),
   useSiteFeatures: mocks.features,
@@ -33,6 +35,7 @@ const summary: WorkspaceResultHistorySummary = {
 beforeEach(() => {
   vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
   mocks.features.mockReturnValue({ status: 'ready', features: DEFAULT_SITE_FEATURES, retry: vi.fn() })
+  mocks.tasks.mockReturnValue({ jobs: [], cancel: vi.fn(), busyJobId: null, error: null, notice: null })
   session = {
     user: null, activeProfile: null, license: null, workspace: null, configOverride: null,
     authStatus: 'anonymous', cdkProfiles: [], openingProfileId: null, workspaceLoadError: null,
@@ -50,8 +53,12 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+function RouteLocation() {
+  return <span data-testid="route-location">{useLocation().search}</span>
+}
+
 function mount() {
-  return render(<MemoryRouter initialEntries={['/v2']}><V2Page /></MemoryRouter>)
+  return render(<MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter>)
 }
 
 async function dismissDrawer(user: ReturnType<typeof userEvent.setup>) {
@@ -80,6 +87,7 @@ function connect() {
     workspaceNotice: null, declarationDialog: null, configToast: null as { message: string } | null,
     billingQuote: null as { charge: string; available: string; tier: number | null; sufficient: boolean } | null,
     billingQuoteLoading: false, billingQuoteError: null as string | null, refreshBillingQuote: vi.fn(async () => undefined),
+    progress: null as import('../../components/ScheduleProgress').ScheduleProgressState | null,
   }
   mocks.workflow.mockImplementation(() => workflow)
   return workflow
@@ -291,6 +299,45 @@ describe('V2 results-first workspace', () => {
     workflow.configToast = { message: 'Invalid schedule configuration' }
     mount()
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Invalid schedule configuration'))
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+  })
+
+  it('shows validation errors inside the configuration drawer', async () => {
+    const workflow = connect()
+    workflow.configToast = { message: 'Invalid schedule configuration' }
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
+    expect(within(await screen.findByRole('dialog')).getByRole('alert')).toHaveTextContent('Invalid schedule configuration')
+  })
+
+  it('writes the successfully selected profile into the route for refresh restoration', async () => {
+    connect()
+    const second = { ...session.activeProfile!, id: 'profile-2', display_name: 'Second Doctor' }
+    session.cdkProfiles.push(second)
+    vi.mocked(session.refreshProfileWorkspace).mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('button', { name: copy.v2.account }))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /Second Doctor/ }))
+    await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('profile_id=profile-2'))
+    expect(session.flushConfigSave).toHaveBeenCalledOnce()
+    expect(session.refreshProfileWorkspace).toHaveBeenCalledWith(second)
+    expect(mocks.session).toHaveBeenLastCalledWith('profile-2')
+  })
+
+  it('cancels the current job through the existing task controller while retaining the result', async () => {
+    const workflow = connect()
+    workflow.loading = true
+    workflow.progress = { mode: 'generate', startedAt: Date.now(), jobId: 'running-job', estimatePhase: 'running' }
+    const job = { id: 'running-job', canCancel: true, cancellationRequested: false }
+    const cancel = vi.fn(async () => undefined)
+    mocks.tasks.mockReturnValue({ jobs: [job], cancel, busyJobId: null, error: null, notice: null })
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('button', { name: copy.v2.stopSchedule }))
+    expect(cancel).toHaveBeenCalledWith(job)
+    expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('54,720')).toBeInTheDocument()
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
