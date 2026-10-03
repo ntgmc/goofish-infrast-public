@@ -1,6 +1,6 @@
 import { useId, useState, type KeyboardEvent } from 'react'
 import { LayoutGroup, motion, useReducedMotion } from 'motion/react'
-import { ArrowUpRight, Building2, Check, Clock3, Drone, Factory, LayoutGrid, List, Users, Zap } from 'lucide-react'
+import { ArrowUpRight, Building2, Clock3, Drone, Factory, LayoutGrid, List, Users, Zap } from 'lucide-react'
 import { copy } from '../../copy'
 import { prepareResult, formatAmount } from '../../components/result-panel/formatters'
 import { buildBoardV2Rooms, type BoardRoom } from '../../components/result-panel/ResultBoardV2'
@@ -102,7 +102,6 @@ export default function ScheduleBoard({ result, operators, expanded, shift, onSh
             <span className="v2-power-count"><Zap size={14} />{allRooms.filter((room) => room.roomType === 'power').length}</span>
           </div>
         )}
-        <div className="v2-board-footer"><Check size={14} /><span>{text.estimateNotice}</span></div>
         </V2Transition>
       </div>
     </section>
@@ -139,13 +138,13 @@ function RoomCard({ room, drone = false, onClick }: { room: BoardRoom; drone?: b
   )
 }
 
-export function OutputChart({ result, large = false }: { result: OptimizeResult; large?: boolean }) {
+export function OutputChart({ result }: { result: OptimizeResult }) {
   const reduceMotion = useReducedMotion()
   const output = result.daily_production?.trading?.LMD ?? 0
   const [hour, setHour] = useState<number | null>(null)
   const id = useId().replace(/:/g, '')
   return (
-    <div className={`v2-output-chart ${large ? 'v2-output-chart-large' : ''}`}>
+    <div className="v2-output-chart v2-output-chart-large">
       <div className="v2-chart-caption"><span>{text.outputChart}</span><strong><AnimatedValue value={formatAmount(output * (hour ?? 24) / 24)} /><small> / {hour ?? 24}h</small></strong></div>
       <svg viewBox="0 0 320 120" role="img" aria-label={text.chartDescription}>
         <defs><linearGradient id={`fill-${id}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--color-v2-accent)" stopOpacity=".16" /><stop offset="100%" stopColor="var(--color-v2-accent)" stopOpacity="0" /></linearGradient></defs>

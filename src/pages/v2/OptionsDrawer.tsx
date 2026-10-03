@@ -56,7 +56,9 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
   const featureState = useSiteFeatures()
   const isConfig = panel === 'config' || panel === 'preferences'
   const description = isConfig ? sample ? text.demoConfigDescription : text.configDescription
-    : panel === 'operators' ? text.operatorDescription : panel === 'account' ? text.accountDescription : panel === 'room' ? text.roomDescription : text.drawerDescription
+    : panel === 'operators' ? sample ? text.sampleOperatorDescription : text.operatorDescription
+      : panel === 'account' ? text.accountDescription : panel === 'room' ? text.roomDescription
+        : panel === 'cdk' ? text.cdkDescription : text.historyDescription
 
   async function importFile(file: File) {
     setImportBusy(true)
@@ -96,7 +98,7 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
         {panel === 'operators' && (
           <div className="v2-options-content">
             <label className="v2-search-label"><span>{text.searchOperators}</span><span className="v2-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label={text.searchOperators} /></span></label>
-            <div className="v2-import-row"><p>{sample ? text.sampleNotice : text.importDescription}</p>
+            <div className="v2-import-row">
               <div className="v2-import-actions">
                 <button type="button" className="v2-button v2-button-secondary" disabled={busy || importBusy}
                   onClick={() => fileInput.current?.click()}><Upload size={15} />{text.uploadMaa}</button>
@@ -106,7 +108,7 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
               <input className="sr-only" ref={fileInput} type="file" accept=".json,application/json" aria-label={text.uploadMaa}
                 onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file) }} />
               {importError && <p role="alert" className="v2-error">{importError}</p>}
-              {importDone && <p role="status" className="v2-muted">{session.user ? text.importSuccess : text.demoConfigDescription}</p>}
+              {importDone && <p role="status" className="v2-muted">{session.user ? text.importSuccess : text.sampleImportSuccess}</p>}
               {session.user && !session.activeProfile && <Link to="/tool/profiles" className="v2-text-button">{text.manageProfiles}<ArrowRight size={14} /></Link>}
             </div>
             <div className="v2-operator-rows">
@@ -152,10 +154,9 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
             )}
           </div>
         )}
-        {panel === 'cdk' && <div className="v2-options-content"><p className="v2-muted">{text.cdkDescription}</p>
+        {panel === 'cdk' && <div className="v2-options-content">
           <Link to="/tool/redeem" className="v2-button v2-button-primary">{text.manageCdk}<ArrowRight size={16} /></Link></div>}
         {panel === 'history' && <div className="v2-options-content">
-          <p className="v2-muted">{text.historyDescription}</p>
           {sample && history.length === 0 ? <button className="v2-history-option" type="button" onClick={onClose}><FileClock size={20} /><span><strong>{text.sampleHistory}</strong><small>{text.sampleSource}</small></span><ArrowRight size={17} /></button>
             : history.length === 0 ? <p className="v2-muted">{text.noHistory}</p>
               : history.map((item) => <button className="v2-history-option" type="button" key={item.id} disabled={busy} onClick={() => void onHistory?.(item).then(onClose)}>
@@ -166,7 +167,6 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
           <dl className="v2-detail-data"><div><dt>{text.level}</dt><dd>{room.indexLabel || '—'}</dd></div>
             <div><dt>{text.product}</dt><dd>{room.product}</dd></div><div><dt>{text.efficiency}</dt><dd>{room.row?.efficiency ?? '—'}</dd></div></dl>
           <h3>{text.roomDetails}</h3><ul className="v2-room-detail-list">{room.row?.detailItems.map((item) => <li key={item}>{item}</li>)}</ul>
-          <p className="v2-muted">{text.estimateNotice}</p>
         </div>}
         </V2Transition>
       </MotionDrawerContent>

@@ -1,6 +1,6 @@
 import { useId, useState, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent, useReducedMotion } from 'motion/react'
-import { Activity, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, CalendarClock, Check, ChevronDown, ChevronRight, Clock3, Download, Factory, FileClock, Gem, LayoutDashboard, Menu, RefreshCw, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Users, WalletCards, X, Zap } from 'lucide-react'
+import { Activity, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, CalendarClock, Check, ChevronDown, ChevronRight, Download, Factory, FileClock, Gem, LayoutDashboard, Menu, RefreshCw, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Users, WalletCards, X, Zap } from 'lucide-react'
 import { Link } from 'react-router'
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
@@ -95,8 +95,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
           <button type="button" className="v2-nav-item" onClick={() => openPanel('cdk')}><WalletCards size={19} /><span>{text.cdk}</span></button>
         </nav>
         <div className="v2-sidebar-bottom">
-          <div className="v2-help-card"><span className="v2-help-icon"><BookOpen size={19} /></span><h3>{text.help}</h3><p>{text.helpDescription}</p><Link to="/faq">{text.helpAction}<ArrowUpRight size={14} /></Link></div>
-          <div className="v2-sidebar-version"><span className="v2-nav-dot" />{text.version}</div>
+          <Link className="v2-help-link" to="/faq"><BookOpen size={19} /><span>{text.helpAction}</span><ArrowUpRight size={14} /></Link>
         </div>
       </aside>
       <div className="v2-workspace">
@@ -112,19 +111,16 @@ export default function V2Dashboard({ session, result, operators, config, sample
         <motion.main className="v2-main" tabIndex={-1} data-route-focus
           initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: motionTokens.duration.page, ease: motionTokens.ease.enter }}>
-          <div className="v2-page-title"><div><h1>{text.title}</h1><p>{text.subtitle}</p></div></div>
+          <div className="v2-page-title"><h1>{text.title}</h1></div>
           <div className="v2-ready-banner">
             <span className="v2-ready-icon"><Check size={25} strokeWidth={2} /></span>
-            <div><h2>{text.resultReady}<span className="v2-ready-tag">{sample ? text.sample : SCHEDULE_MODE_LABELS[resultMode]}</span></h2><p>{text.resultDescription}</p></div>
+            <div><h2>{text.resultReady}<span className="v2-ready-tag">{sample ? text.sample : SCHEDULE_MODE_LABELS[resultMode]}</span></h2></div>
             <div className="v2-banner-actions"><button type="button" className="v2-button v2-button-white" onClick={() => openPanel('config')}><Settings2 size={16} />{text.configure}</button>
               <button type="button" className="v2-button v2-button-primary" disabled={busy || loadingResult || Boolean(generationDisabledReason)} title={generationDisabledReason ?? undefined}
                 onClick={() => onGenerate ? onGenerate() : openPanel('account')}><RefreshCw size={16} className={busy ? 'v2-spin' : ''} />{busy ? text.generating : text.regenerate}</button>
               <button className="v2-button v2-button-secondary v2-export-button" type="button" disabled={busy || (!sample && resultMode === 'rotation')} title={resultMode === 'rotation' ? text.exportUnavailable : undefined}
                 onClick={sample ? downloadSample : onExport}><Download size={16} />{sample ? text.sampleExport : text.export}</button></div>
           </div>
-          <div className="v2-result-context"><span><span className="v2-status-dot" />{sample ? text.sampleProfile : name}</span>
-            <span><Building2 size={13} />{config.layout}</span><span><Users size={13} />{text.owned(owned.length)}</span><span><Clock3 size={13} />{text.shiftHours(hours.join(' / '))}</span>
-            <button type="button" onClick={() => openPanel('config')}>{text.configure}<ChevronRight size={12} /></button></div>
           <AnimatePresence initial={false}>
           {(loadingResult || error || notice || downloadNotice || configChanged) && <FeedbackRegion key="feedback">
           <div className={`v2-feedback ${error ? 'v2-feedback-error' : ''}`} role={error ? 'alert' : 'status'} aria-live="polite">
@@ -134,11 +130,12 @@ export default function V2Dashboard({ session, result, operators, config, sample
           </AnimatePresence>
           {children}
           <StaggeredReveal className="v2-metrics">
-            <Metric label={text.lmd} value={formatAmount(prepared.productionStats.lmd)} unit={text.daily} hint={text.outputSubtitle} product="LMD" />
-            <Metric label={text.exp} value={formatAmount((prepared.productionStats.manufacturing['Battle Record'] ?? 0) * 1000)} unit={text.expUnit} hint={text.outputSubtitle} product="Battle Record" />
+            <Metric label={text.lmd} value={formatAmount(prepared.productionStats.lmd)} unit={text.daily} product="LMD" />
+            <Metric label={text.exp} value={formatAmount((prepared.productionStats.manufacturing['Battle Record'] ?? 0) * 1000)} unit={text.expUnit} product="Battle Record" />
             <Metric label={text.totalEfficiency} value={formatAmount(prepared.totalEff)} unit="%" hint={text.efficiencyHint} icon={<Activity size={20} />} />
             <Metric label={text.sanity} value={prepared.productionSanity.value.toFixed(1)} unit={text.daily} hint={text.sanityHint} icon={<Gem size={20} />} />
           </StaggeredReveal>
+          <p className="v2-metrics-note">{text.outputSubtitle}</p>
           <div className="v2-content-tabs" role="group" aria-label={text.resultTabs}>
             {([['summary', text.summaryTab], ['details', text.detailsTab], ['analysis', text.analysisTab]] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => setView(id)}>
               {label}{view === id && <MotionNavIndicator layoutId="result-tab" variant="underline" />}
@@ -146,22 +143,20 @@ export default function V2Dashboard({ session, result, operators, config, sample
             <span><ShieldCheck size={14} />{sample ? text.sampleSource : text.ownSource}</span>
           </div>
           <V2Transition motionKey={view}>
-          <div className={`v2-results-grid ${view === 'details' ? 'v2-results-expanded' : ''}`}>
+          <div className={`v2-results-grid ${view !== 'summary' ? 'v2-results-expanded' : ''}`}>
             {view === 'analysis' ? (
-              <section className="v2-panel v2-analysis"><div className="v2-panel-heading"><h2>{text.analysisTab}</h2><span className="v2-neutral-tag">24h</span></div><OutputChart result={result} large />
-                <div className="v2-analysis-note"><Gem size={21} /><div><h3>{text.sanity}: {prepared.productionSanity.value.toFixed(1)} {text.daily}</h3><p>{prepared.productionSanity.note}</p></div></div><p className="v2-muted">{text.estimateNotice}</p></section>
+              <section className="v2-panel v2-analysis"><div className="v2-panel-heading"><h2>{text.analysisTab}</h2><span className="v2-neutral-tag">24h</span></div><OutputChart result={result} />
+                <div className="v2-analysis-note"><Gem size={21} /><div><h3>{text.sanity}: {prepared.productionSanity.value.toFixed(1)} {text.daily}</h3><p>{prepared.productionSanity.note}</p></div></div></section>
             ) : (
               <ScheduleBoard result={result} operators={operators} expanded={view === 'details'} shift={shift} onShiftChange={setShift}
                 view={boardView} onViewChange={setBoardView} onRoom={(nextRoom) => { setRoom(nextRoom); openPanel('room') }} />
             )}
-            {view !== 'details' && <aside className="v2-result-aside">
+            {view === 'summary' && <aside className="v2-result-aside">
               <section className="v2-panel v2-production-panel">
                 <div className="v2-panel-heading"><h2>{text.dailyOutput}</h2><span className="v2-output-clock"><CalendarClock size={16} /></span></div>
-                <p className="v2-panel-subtitle">{text.outputSubtitle}</p>
                 <OutputRow product="LMD" value={prepared.productionStats.lmd} />
                 <OutputRow product="Battle Record" value={prepared.productionStats.manufacturing['Battle Record'] ?? 0} />
                 <OutputRow product="Pure Gold" value={prepared.productionStats.manufacturing['Pure Gold'] ?? 0} />
-                <OutputChart result={result} />
               </section>
               <section className="v2-panel v2-config-panel">
                 <div className="v2-panel-heading"><h2>{text.currentConfig}</h2><button className="v2-text-button" type="button" onClick={() => openPanel('config')}>{text.edit}<ArrowUpRight size={13} /></button></div>
@@ -177,8 +172,8 @@ export default function V2Dashboard({ session, result, operators, config, sample
             </aside>}
           </div>
           </V2Transition>
-          <div className="v2-sample-notice"><span className="v2-notice-icon"><Sparkles size={16} /></span><p>{sample ? text.sampleHint : text.estimateNotice}</p>{sample && <button type="button" onClick={() => openPanel('account')}>{session.user ? text.account : text.login}<ArrowRight size={14} /></button>}</div>
-          <footer className="v2-footer"><span>{text.footer}</span><nav><Link to="/faq">{text.helpAction}</Link><Link to="/terms">{text.terms}</Link><Link to="/privacy">{text.privacy}</Link></nav></footer>
+          <div className="v2-sample-notice"><span className="v2-notice-icon"><Sparkles size={16} /></span><p>{sample && <>{text.sampleHint} </>}{text.estimateNotice}</p>{sample && <button type="button" onClick={() => openPanel('account')}>{session.user ? text.account : text.login}<ArrowRight size={14} /></button>}</div>
+          <footer className="v2-footer"><span>{text.brand}</span><nav><Link to="/terms">{text.terms}</Link><Link to="/privacy">{text.privacy}</Link></nav></footer>
         </motion.main>
       </div>
       <OptionsDrawer panel={panel} onClose={() => setPanel(null)} session={session} config={config} operators={operators}
@@ -207,9 +202,9 @@ function FeedbackRegion({ children }: { children: ReactNode }) {
   )
 }
 
-function Metric({ label, value, unit, hint, product, icon }: { label: string; value: string; unit: string; hint: string; product?: string; icon?: ReactNode }) {
+function Metric({ label, value, unit, hint, product, icon }: { label: string; value: string; unit: string; hint?: string; product?: string; icon?: ReactNode }) {
   return <RevealItem className="v2-metric"><section aria-label={label}><div className="v2-metric-top"><span>{label}</span><span className="v2-metric-icon">{product ? <ProductIcon product={product} size={24} /> : icon}</span></div>
-    <p className="v2-metric-value"><AnimatedValue value={value} /><small>{unit}</small></p><p className="v2-metric-hint">{hint}</p></section></RevealItem>
+    <p className="v2-metric-value"><AnimatedValue value={value} /><small>{unit}</small></p>{hint && <p className="v2-metric-hint">{hint}</p>}</section></RevealItem>
 }
 
 function OutputRow({ product, value }: { product: string; value: number }) {
