@@ -1,17 +1,21 @@
 import { useId, useState, type KeyboardEvent } from 'react'
 import { LayoutGroup, motion, useReducedMotion } from 'motion/react'
-import { ArrowUpRight, Building2, Clock3, Drone, Factory, LayoutGrid, List, Users, Zap } from 'lucide-react'
+import { ArrowUpRight, BedDouble, Building2, Clock3, Drone, Factory, GraduationCap, HandCoins, LayoutGrid, List, UserRoundSearch, Users, Wrench, Zap, type LucideIcon } from 'lucide-react'
 import { copy } from '../../copy'
 import { prepareResult, formatAmount } from '../../components/result-panel/formatters'
 import { buildBoardV2Rooms, type BoardRoom } from '../../components/result-panel/ResultBoardV2'
 import { isDroneTarget } from '../../components/result-panel/DroneMarker'
 import ProductIcon from '../../components/ProductIcon'
 import { AnimatedValue, MotionNavIndicator, motionTokens } from '../../components/MotionPrimitives'
-import { ROOM_LABELS } from '../../components/result-panel/labels'
 import type { LicenseOperator, OptimizeResult } from '../../lib/types'
 import V2Transition from './V2Transition'
 
 const text = copy.v2
+const ROOM_ORDER = ['trading', 'manufacture', 'control', 'power', 'meeting', 'processing', 'hire', 'training', 'dormitory']
+const ROOM_ICONS: Record<string, LucideIcon> = {
+  trading: HandCoins, manufacture: Factory, control: Building2, power: Zap,
+  meeting: Users, processing: Wrench, hire: UserRoundSearch, training: GraduationCap, dormitory: BedDouble,
+}
 
 export function Avatar({ operator, small = false }: { operator: { id?: string; name: string }; small?: boolean }) {
   const [failed, setFailed] = useState(false)
@@ -39,8 +43,17 @@ export default function ScheduleBoard({ result, operators, expanded, shift, onSh
   const prepared = prepareResult(result, result.schedule_mode === 'rotation', result.dormitory_rule === 'maa_pure_autofill', operators)
   const plan = prepared.plans[selected]
   const allRooms = buildBoardV2Rooms(plan, result.schedule_mode === 'rotation')
-  const productionRooms = allRooms.filter((room) => ['trading', 'manufacture'].includes(room.roomType))
-  const supportRooms = allRooms.filter((room) => !['trading', 'manufacture'].includes(room.roomType))
+    .map((room) => room.roomType === 'training' ? { ...room, label: copy.domain.building_skills.training } : room)
+    .sort((a, b) => {
+      const aRank = ROOM_ORDER.indexOf(a.roomType)
+      const bRank = ROOM_ORDER.indexOf(b.roomType)
+      return (aRank < 0 ? ROOM_ORDER.length : aRank) - (bRank < 0 ? ROOM_ORDER.length : bRank)
+    })
+  const roomGroups = [
+    { label: text.productionRooms, compact: false, rooms: allRooms.filter((room) => ['trading', 'manufacture'].includes(room.roomType)) },
+    { label: text.controlAndPower, compact: !expanded, rooms: allRooms.filter((room) => ['control', 'power'].includes(room.roomType)) },
+    { label: text.supportAndDormitories, compact: !expanded, rooms: allRooms.filter((room) => !['trading', 'manufacture', 'control', 'power'].includes(room.roomType)) },
+  ]
   const count = new Set(plan?.rows.flatMap((row) => row.operators.map((operator) => operator.name))).size
   const hours = result.shift_hours ?? result.plans.map((plan) => plan.shift_hours ?? 8)
 
@@ -86,22 +99,16 @@ export default function ScheduleBoard({ result, operators, expanded, shift, onSh
       <div id={`${id}-panel`} role="tabpanel" aria-labelledby={`${id}-tab-${selected}`} tabIndex={0}>
         <V2Transition motionKey={String(selected)}>
         <div className="v2-board-meta"><span><Users size={14} />{text.assigned(count)}</span><span><Clock3 size={14} />{text.shiftHours(String(hours[selected] ?? 8))}</span></div>
-        <div className={`v2-room-grid ${view === 'list' ? 'v2-room-list' : ''}`}>
-          {productionRooms.map((room) => <RoomCard key={room.key} room={room} onClick={() => onRoom(room)}
-            drone={isDroneTarget(plan?.drones, room.roomType, room.roomIndex)} />)}
-        </div>
-        {expanded ? (
-          <div className={`v2-room-grid v2-support-rooms ${view === 'list' ? 'v2-room-list' : ''}`}>
-            {supportRooms.map((room) => <RoomCard key={room.key} room={room} onClick={() => onRoom(room)} />)}
-          </div>
-        ) : (
-          <div className="v2-support-strip">
-            <Building2 size={17} />
-            <span>{ROOM_LABELS.control}</span>
-            <div className="v2-mini-avatars">{supportRooms.find((room) => room.roomType === 'control')?.row?.operators.map((operator) => <Avatar key={operator.name} operator={operator} small />)}</div>
-            <span className="v2-power-count"><Zap size={14} />{allRooms.filter((room) => room.roomType === 'power').length}</span>
-          </div>
-        )}
+        {roomGroups.filter((group) => group.rooms.length > 0).map((group) => (
+          <section key={group.label} className="v2-room-group" aria-label={group.label}>
+            <h3 className="v2-room-group-title">{group.label}</h3>
+            <div className={`v2-room-grid ${view === 'list' ? 'v2-room-list' : ''}`}>
+              {group.rooms.map((room) => <RoomCard key={room.key} room={room} compact={group.compact} onClick={() => onRoom(room)}
+                autofill={room.roomType === 'dormitory' && Boolean(plan?.rooms.dormitory?.[room.roomIndex]?.autofill)}
+                drone={isDroneTarget(plan?.drones, room.roomType, room.roomIndex)} />)}
+            </div>
+          </section>
+        ))}
         </V2Transition>
       </div>
     </section>
@@ -109,12 +116,14 @@ export default function ScheduleBoard({ result, operators, expanded, shift, onSh
   )
 }
 
-function RoomCard({ room, drone = false, onClick }: { room: BoardRoom; drone?: boolean; onClick: () => void }) {
+function RoomCard({ room, drone = false, compact = false, autofill = false, onClick }: { room: BoardRoom; drone?: boolean; compact?: boolean; autofill?: boolean; onClick: () => void }) {
   const reduceMotion = useReducedMotion()
-  const trading = room.roomType === 'trading'
-  const Icon = trading ? Building2 : room.roomType === 'power' ? Zap : Factory
+  const Icon = ROOM_ICONS[room.roomType] ?? Building2
+  const automaticDormitory = autofill || room.row?.isAutofill
+  const efficiency = room.row && room.row.efficiency !== '-' && ['trading', 'manufacture', 'power'].includes(room.roomType) ? room.row.efficiency : null
+  const showBottom = !compact || room.product !== '-' || Boolean(efficiency)
   return (
-    <motion.button type="button" className={`v2-room-card v2-room-${room.roomType}`} onClick={onClick}
+    <motion.button type="button" className={`v2-room-card v2-room-${room.roomType} ${compact ? 'v2-room-card-compact' : ''}`} onClick={onClick}
       layout={reduceMotion ? false : 'position'} whileHover={reduceMotion ? undefined : { y: -2 }}
       whileTap={reduceMotion ? undefined : { scale: 0.99 }} transition={motionTokens.spring}>
       <motion.div layout={reduceMotion ? false : 'position'} className="v2-room-header">
@@ -125,15 +134,15 @@ function RoomCard({ room, drone = false, onClick }: { room: BoardRoom; drone?: b
       </motion.div>
       <motion.div layout={reduceMotion ? false : 'position'} className="v2-room-operators">
         {room.row?.operators.map((operator) => (
-          <span className="v2-operator" key={operator.name}><Avatar operator={operator} /><span>{operator.name}</span></span>
+          <span className="v2-operator" key={operator.name}><Avatar operator={operator} small={compact} /><span>{operator.name}</span></span>
         ))}
-        {!room.row?.operators.length && <span className="v2-muted">{copy.domain.result_board_v2.empty_room}</span>}
+        {automaticDormitory && <span className="v2-muted">{room.row?.isAutofill ? room.row.operatorText : copy.domain.components_result_panel_formatters_005}</span>}
+        {!room.row?.operators.length && !automaticDormitory && <span className="v2-muted">{copy.domain.result_board_v2.empty_room}</span>}
       </motion.div>
-      <motion.div layout={reduceMotion ? false : 'position'} className="v2-room-bottom">
-        <span><ProductIcon product={room.product} size={18} />{room.product === '-' ? text.support : room.product}</span>
-        {room.row && room.row.efficiency !== '-' && ['trading', 'manufacture', 'power'].includes(room.roomType)
-          && <span>{text.efficiency}<strong>{room.row.efficiency}</strong></span>}
-      </motion.div>
+      {showBottom && <motion.div layout={reduceMotion ? false : 'position'} className="v2-room-bottom">
+        {(!compact || room.product !== '-') && <span><ProductIcon product={room.product} size={18} />{room.product === '-' ? text.support : room.product}</span>}
+        {efficiency && <span>{text.efficiency}<strong>{efficiency}</strong></span>}
+      </motion.div>}
     </motion.button>
   )
 }
