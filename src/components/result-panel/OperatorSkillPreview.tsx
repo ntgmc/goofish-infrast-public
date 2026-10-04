@@ -12,12 +12,16 @@ export default function OperatorSkillPreview({ children }: { children: ReactNode
   const label = copy.domain.building_skills
   const cancel = () => clearTimeout(timer.current)
   const close = () => { cancel(); setTarget(null) }
-  const preview = (element: EventTarget | null, keepFocus = false) => {
+  const findTile = (node: EventTarget | null, fromFocus = false) => {
+    if (!(node instanceof Element)) return null
+    const tile = node.closest<HTMLElement>('[data-operator-name]')
+    if (tile || !fromFocus) return tile
+    const tiles = node.closest('button')?.querySelectorAll<HTMLElement>('[data-operator-name]')
+    return tiles?.length === 1 ? tiles[0] : null
+  }
+  const preview = (element: EventTarget | null, { fromFocus = false, keepFocus = false } = {}) => {
     if (element instanceof Element && element.closest('[data-skill-preview]')) { cancel(); return }
-    const findTile = (node: EventTarget | null) => node instanceof Element
-      ? node.closest<HTMLElement>('[data-operator-name]') ?? node.closest('button')?.querySelector<HTMLElement>('[data-operator-name]')
-      : null
-    const tile = findTile(element) ?? (keepFocus ? findTile(document.activeElement) : null)
+    const tile = findTile(element, fromFocus) ?? (keepFocus ? findTile(document.activeElement, true) : null)
     cancel()
     if (!tile) { timer.current = setTimeout(() => setTarget(null), 100); return }
     if (tile === target) return
@@ -46,9 +50,9 @@ export default function OperatorSkillPreview({ children }: { children: ReactNode
 
   return (
     <div className="contents" onPointerOver={(event) => {
-      if (event.pointerType !== 'touch') preview(event.target, true)
-    }} onPointerOut={(event) => { if (event.pointerType !== 'touch') preview(event.relatedTarget, true) }} onPointerDownCapture={close} onFocusCapture={(event) => preview(event.target)}
-      onBlurCapture={(event) => preview(event.relatedTarget)}>
+      if (event.pointerType !== 'touch') preview(event.target)
+    }} onPointerOut={(event) => { if (event.pointerType !== 'touch') preview(event.relatedTarget, { keepFocus: true }) }} onPointerDownCapture={close} onFocusCapture={(event) => preview(event.target, { fromFocus: true })}
+      onBlurCapture={(event) => preview(event.relatedTarget, { fromFocus: true })}>
       {children}
       <Popover open={skills.length > 0} onOpenChange={(open) => { if (!open) close() }}>
         <PopoverAnchor virtualRef={anchor} />
