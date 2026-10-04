@@ -142,9 +142,11 @@ function RoomCard({ room, drone = false, compact = false, autofill = false, onCl
       <motion.div layout={reduceMotion ? false : 'position'} className="v2-room-header">
         <span className="v2-room-icon"><Icon size={16} /></span>
         <span className="v2-room-title">{room.label}<small>{room.indexLabel}</small></span>
-        <ArrowUpRight size={14} className="v2-room-arrow" />
       </motion.div>
-      <span className="v2-room-marker">{drone && <span className="v2-drone-tag" title={text.drones}><Drone size={16} /></span>}</span>
+      <span className="v2-room-marker">
+        {drone && <span className="v2-drone-tag" title={text.drones}><Drone size={16} /></span>}
+        <ArrowUpRight size={14} className="v2-room-arrow" />
+      </span>
       <motion.div layout={reduceMotion ? false : 'position'} className="v2-room-operators">
         {room.row?.operators.map((operator) => (
           <span className="v2-operator" key={operator.name}><Avatar operator={operator} small={compact} /><span>{operator.name}</span></span>

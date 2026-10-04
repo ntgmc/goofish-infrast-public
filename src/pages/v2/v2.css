@@ -751,7 +751,7 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  padding-right: 32px;
+  padding-right: calc(var(--space-xl) + var(--space-2xs));
 }
 
 .v2-room-icon {
@@ -803,8 +803,15 @@
   background: var(--color-drone-soft);
   color: var(--color-drone);
 }
-.v2-room-marker { position: absolute; top: var(--space-xs); right: var(--space-xs); }
-.v2-room-marker:empty { display: none; }
+.v2-room-marker {
+  position: absolute;
+  top: var(--space-xs);
+  right: var(--space-xs);
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  gap: var(--space-2xs);
+}
 
 .v2-room-operators {
   display: flex;
@@ -1581,9 +1588,8 @@
   .v2-room-group-title { padding-inline: var(--space-xs); }
   .v2-room-title small { margin-left: var(--space-xs); }
   .v2-room-list .v2-room-card { display: block; }
-  .v2-room-list .v2-room-header { padding-right: 32px; }
+  .v2-room-list .v2-room-header { padding-right: calc(var(--space-xl) + var(--space-2xs)); }
   .v2-room-list .v2-room-marker { position: absolute; }
-  .v2-room-list .v2-room-marker:empty { display: none; }
   .v2-room-list .v2-room-operators { margin-block: var(--space-sm); }
   .v2-room-list .v2-room-bottom { flex-direction: row; align-items: center; border-top: 1px solid var(--v2-line); }
   .v2-room-list .v2-room-efficiency { flex-direction: row; align-items: center; gap: 4px; }
