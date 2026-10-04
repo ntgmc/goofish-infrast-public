@@ -1,8 +1,7 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import {
   AnimatePresence,
   motion,
-  useIsPresent,
   useReducedMotion,
   type Transition,
   type Variants,
@@ -34,7 +33,6 @@ type AnimatedPresenceRegionProps = {
   id?: string
   labelledBy?: string
   role?: string
-  page?: boolean
 }
 
 export function AnimatedPresenceRegion({
@@ -44,66 +42,17 @@ export function AnimatedPresenceRegion({
   id,
   labelledBy,
   role,
-  page = false,
 }: AnimatedPresenceRegionProps) {
-  const reduceMotion = useReducedMotion()
-
   return (
-    <AnimatePresence initial={false} mode="sync">
-      <PresencePane
-        key={motionKey}
-        className={className}
-        id={id}
-        labelledBy={labelledBy}
-        role={role}
-        reduceMotion={Boolean(reduceMotion)}
-        page={page}
-      >
-        {children}
-      </PresencePane>
-    </AnimatePresence>
-  )
-}
-
-function PresencePane({
-  children,
-  className,
-  id,
-  labelledBy,
-  role,
-  reduceMotion,
-  page,
-}: Omit<AnimatedPresenceRegionProps, 'motionKey'> & { reduceMotion: boolean }) {
-  const isPresent = useIsPresent()
-  const paneRef = useRef<HTMLDivElement>(null)
-  const distance = page ? 8 : 6
-  const enterDuration = page ? motionTokens.duration.page : motionTokens.duration.enter
-
-  useEffect(() => {
-    const pane = paneRef.current
-    if (!pane) return
-    if (isPresent) pane.removeAttribute('inert')
-    else pane.setAttribute('inert', '')
-  }, [isPresent])
-
-  return (
-    <motion.div
-      ref={paneRef}
-      className={`${className ?? ''} ${isPresent ? '' : 'pointer-events-none'}`}
+    <div
+      key={motionKey}
+      className={`motion-region-enter ${className ?? ''}`}
       id={id}
       role={role}
       aria-labelledby={labelledBy}
-      aria-hidden={isPresent ? undefined : true}
-      initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: distance }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -4 }}
-      transition={{
-        duration: isPresent ? enterDuration : motionTokens.duration.exit,
-        ease: isPresent ? motionTokens.ease.enter : motionTokens.ease.exit,
-      }}
     >
       {children}
-    </motion.div>
+    </div>
   )
 }
 

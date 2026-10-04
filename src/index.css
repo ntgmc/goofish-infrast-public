@@ -970,6 +970,15 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--color-focus); ou
   animation: motion-skeleton-shimmer 1.6s var(--motion-ease-enter) infinite;
 }
 
+.motion-region-enter {
+  animation: motion-region-enter 100ms var(--motion-ease-enter);
+}
+
+@keyframes motion-region-enter {
+  from { transform: translateY(3px); }
+  to { transform: translateY(0); }
+}
+
 .tool-alert {
   animation: motion-feedback-enter var(--motion-enter) var(--motion-ease-enter) both;
 }

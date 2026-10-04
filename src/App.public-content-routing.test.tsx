@@ -1,18 +1,31 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cloneDefaultPublicContentSettings } from './lib/public-content'
 import { DEFAULT_SITE_FEATURE_SETTINGS } from './lib/site-features'
 
 const apiJson = vi.hoisted(() => vi.fn())
 const apiVoid = vi.hoisted(() => vi.fn())
+const toolMount = vi.hoisted(() => vi.fn())
+const toolUnmount = vi.hoisted(() => vi.fn())
 vi.mock('./lib/api-client', async (importOriginal) => ({
   ...await importOriginal<typeof import('./lib/api-client')>(),
   apiJson,
   apiVoid,
 }))
-vi.mock('./pages/ToolPage', () => ({ default: () => null }))
+vi.mock('./pages/ToolPage', async () => {
+  const { useEffect } = await import('react')
+  return {
+    default: () => {
+      useEffect(() => {
+        toolMount()
+        return () => { toolUnmount() }
+      }, [])
+      return <main data-route-focus>Tool workspace</main>
+    },
+  }
+})
 vi.mock('./pages/DepotValuePage', () => ({ default: () => null }))
 vi.mock('./pages/AdminSetupPage', () => ({ default: () => null }))
 vi.mock('./pages/AdminPage', () => ({ default: () => null }))
@@ -23,6 +36,9 @@ import App from './App'
 describe('App public content routing', () => {
   beforeEach(() => {
     apiVoid.mockReset().mockResolvedValue(undefined)
+    toolMount.mockReset()
+    toolUnmount.mockReset()
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
     apiJson.mockReset().mockImplementation(async (url: string) => {
       if (url === '/api/site/features') return DEFAULT_SITE_FEATURE_SETTINGS
       if (url === '/api/site/public-content') return cloneDefaultPublicContentSettings()
@@ -66,6 +82,35 @@ describe('App public content routing', () => {
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
     expect(await screen.findByRole('link', { name: '体验 V2 测试版' })).toHaveAttribute('href', '/v2')
     expect(screen.queryByText('V2 test workspace')).not.toBeInTheDocument()
+  })
+
+  it('reuses loaded public content across public navigation and history', async () => {
+    const router = createMemoryRouter([{ path: '*', element: <App /> }], { initialEntries: ['/faq'] })
+    render(<RouterProvider router={router} />)
+    await waitFor(() => expect(apiJson.mock.calls.filter(([url]) => url === '/api/site/public-content')).toHaveLength(1))
+
+    await act(async () => router.navigate('/privacy'))
+    await waitFor(() => expect(document.title).toContain('隐私'))
+    await act(async () => router.navigate(-1))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/faq'))
+
+    expect(apiJson.mock.calls.filter(([url]) => url === '/api/site/public-content')).toHaveLength(1)
+  })
+
+  it('keeps one tool session across tool routes and releases it when leaving', async () => {
+    const router = createMemoryRouter([{ path: '*', element: <App /> }], { initialEntries: ['/faq'] })
+    render(<RouterProvider router={router} />)
+    await screen.findByRole('heading', { level: 1 })
+
+    await act(async () => router.navigate('/tool/profiles'))
+    expect(await screen.findByText('Tool workspace')).toBeInTheDocument()
+    await act(async () => router.navigate('/tool/settings'))
+
+    expect(toolMount).toHaveBeenCalledTimes(1)
+    expect(screen.getAllByText('Tool workspace')).toHaveLength(1)
+    await act(async () => router.navigate('/faq'))
+    expect(toolUnmount).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText('Tool workspace')).not.toBeInTheDocument()
   })
 
   it('opens the separate V2 test route without indexing it', async () => {

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useDeferredValue, useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { LayoutGroup } from 'motion/react'
 import { Link } from 'react-router'
 import { ArrowUpRight } from 'lucide-react'
@@ -61,7 +61,6 @@ export default function AccountDashboard({
   features?: SiteFeatures
   workspaceEntry?: WorkspaceEntryState
 }) {
-  const displayedSection = useDeferredValue(section)
   const [redeemTourReplayToken, setRedeemTourReplayToken] = useState(0)
   const [suppressInitialRedeemTour] = useState(() => section === 'redeem' && !hasCompletedTour('dashboard-overview', 1))
   const dashboardTour = useFirstRunTour({ id: 'dashboard-overview', version: 1 })
@@ -102,7 +101,7 @@ export default function AccountDashboard({
     return true
   })
   const replayTour = () => {
-    if (displayedSection === 'redeem') setRedeemTourReplayToken((token) => token + 1)
+    if (section === 'redeem') setRedeemTourReplayToken((token) => token + 1)
     else dashboardTour.start()
   }
 
@@ -130,10 +129,10 @@ export default function AccountDashboard({
                 aria-label={key === 'announcements' && announcementBadgeLabel
                   ? `${labels[key]} ${announcementBadgeLabel}`
                   : undefined}
-                aria-current={displayedSection === key ? 'page' : undefined}
+                aria-current={section === key ? 'page' : undefined}
                 className="tool-nav-link flex w-full items-center gap-2 px-3 text-left text-sm font-medium"
               >
-                {displayedSection === key && <MotionNavIndicator layoutId="dashboard-active" />}
+                {section === key && <MotionNavIndicator layoutId="dashboard-active" />}
                 <span className="relative z-10 min-w-0 flex-1 truncate">{labels[key]}</span>
                 {key === 'announcements' && announcementBadge && (
                   <AnnouncementUnreadBadge value={announcementBadge} label={announcementBadgeLabel!} />
@@ -167,12 +166,12 @@ export default function AccountDashboard({
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <BrandLogo size="sm" />
               <CompactHeaderMenu
-                ariaLabel={displayedSection === 'announcements' && announcementBadgeLabel
+                ariaLabel={section === 'announcements' && announcementBadgeLabel
                   ? `${copy.common.components_CompactHeaderMenu_001}，${announcementBadgeLabel}`
                   : copy.common.components_CompactHeaderMenu_001}
-                triggerLabel={labels[displayedSection]}
-                triggerBadge={displayedSection === 'announcements' ? announcementBadge : undefined}
-                triggerBadgeLabel={displayedSection === 'announcements' ? announcementBadgeLabel : undefined}
+                triggerLabel={labels[section]}
+                triggerBadge={section === 'announcements' ? announcementBadge : undefined}
+                triggerBadgeLabel={section === 'announcements' ? announcementBadgeLabel : undefined}
                 align="start"
                 tourTargets={sections.map((key) => `dashboard-nav-${key}`)}
                 className="min-w-0 flex-1 justify-between"
@@ -187,7 +186,7 @@ export default function AccountDashboard({
                     label: labels[key],
                     badge: key === 'announcements' ? announcementBadge : undefined,
                     badgeLabel: key === 'announcements' ? announcementBadgeLabel : undefined,
-                    current: displayedSection === key,
+                    current: section === key,
                     tourTarget: `dashboard-nav-${key}`,
                     onSelect: () => onSectionChange(key),
                   })),
@@ -210,8 +209,8 @@ export default function AccountDashboard({
               <div className="min-w-0">
                 <p className="section-index">{copy.common.pages_tool_AccountDashboard_010}</p>
                 <div className="mt-1 flex items-center gap-2">
-                  <h1 className="display-title text-xl text-ink-primary">{labels[displayedSection]}</h1>
-                  {displayedSection === 'announcements' && announcementBadge && (
+                  <h1 className="display-title text-xl text-ink-primary">{labels[section]}</h1>
+                  {section === 'announcements' && announcementBadge && (
                     <AnnouncementUnreadBadge value={announcementBadge} label={announcementBadgeLabel!} />
                   )}
                 </div>
@@ -242,16 +241,16 @@ export default function AccountDashboard({
             </div>
           )}
           <Suspense fallback={<SectionFallback />}>
-            <AnimatedPresenceRegion motionKey={displayedSection}>
-              {displayedSection === 'profiles' && <ProfilesSection profiles={profiles} openingProfileId={openingProfileId} onOpen={onOpenProfile} onEdit={onPayload} meteredEnabled={features.metered_billing} />}
-              {displayedSection === 'commercial' && METERED_BILLING_AVAILABLE && features.metered_billing && <CommercialProfilesSection onOpen={onOpenProfile} />}
-              {displayedSection === 'tools' && <ToolsSection />}
-              {displayedSection === 'redeem' && <RedeemSection autoStartTour={!suppressInitialRedeemTour} tourReplayToken={redeemTourReplayToken} onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} onInventoryRedeemed={() => onSectionChange('inventory', { replace: true })} />}
-              {displayedSection === 'invitations' && <InvitationsSection />}
-              {displayedSection === 'inventory' && <InventorySection onPayload={onPayload} onLifetimeProfileCreated={() => onSectionChange('profiles', { replace: true })} onViewProfiles={() => onSectionChange('profiles')} />}
-              {displayedSection === 'balance' && METERED_BILLING_AVAILABLE && features.metered_billing && <BalanceSection redemptionEnabled={features.cdk_redemption} />}
-              {displayedSection === 'announcements' && <AnnouncementsSection onUnreadCountChange={onAnnouncementUnreadCountChange} />}
-              {displayedSection === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} onPayload={onPayload} workspaceEntry={workspaceEntry} />}
+            <AnimatedPresenceRegion motionKey={section}>
+              {section === 'profiles' && <ProfilesSection profiles={profiles} openingProfileId={openingProfileId} onOpen={onOpenProfile} onEdit={onPayload} meteredEnabled={features.metered_billing} />}
+              {section === 'commercial' && METERED_BILLING_AVAILABLE && features.metered_billing && <CommercialProfilesSection onOpen={onOpenProfile} />}
+              {section === 'tools' && <ToolsSection />}
+              {section === 'redeem' && <RedeemSection autoStartTour={!suppressInitialRedeemTour} tourReplayToken={redeemTourReplayToken} onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} onInventoryRedeemed={() => onSectionChange('inventory', { replace: true })} />}
+              {section === 'invitations' && <InvitationsSection />}
+              {section === 'inventory' && <InventorySection onPayload={onPayload} onLifetimeProfileCreated={() => onSectionChange('profiles', { replace: true })} onViewProfiles={() => onSectionChange('profiles')} />}
+              {section === 'balance' && METERED_BILLING_AVAILABLE && features.metered_billing && <BalanceSection redemptionEnabled={features.cdk_redemption} />}
+              {section === 'announcements' && <AnnouncementsSection onUnreadCountChange={onAnnouncementUnreadCountChange} />}
+              {section === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} onPayload={onPayload} workspaceEntry={workspaceEntry} />}
             </AnimatedPresenceRegion>
           </Suspense>
         </div>
