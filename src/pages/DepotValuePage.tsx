@@ -347,7 +347,6 @@ export default function DepotValuePage() {
                           disabled={loading !== null || profilePreparing}
                           className="tool-secondary-action"
                         >
-                          <SklandIcon />
                           {loading === 'skland'
                             ? copy.tools.pages_DepotValuePage_029
                             : selectedSklandProfile?.skland_binding?.credential_status === 'invalid'
@@ -368,7 +367,6 @@ export default function DepotValuePage() {
                       disabled={loading !== null || profilePreparing}
                       className="tool-primary-action w-full"
                     >
-                      <SklandIcon />
                       {profilePreparing ? copy.tools.pages_DepotValuePage_033 : copy.tools.pages_DepotValuePage_034}
                     </button>
                   )}

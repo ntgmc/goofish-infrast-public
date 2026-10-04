@@ -267,7 +267,7 @@ export default function SettingsSection({
                     </div>
                     {credentialAvailable && (
                       <div className="shrink-0">
-                        <button type="button" onClick={() => void clearCredential(profile)} disabled={privacyLoading !== null} className="tool-secondary-action px-3 text-sm"><SklandIcon />{copy.dashboard.pages_tool_dashboard_SettingsSection_026}</button>
+                        <button type="button" onClick={() => void clearCredential(profile)} disabled={privacyLoading !== null} className="tool-secondary-action px-3 text-sm">{copy.dashboard.pages_tool_dashboard_SettingsSection_026}</button>
                       </div>
                     )}
                   </div>

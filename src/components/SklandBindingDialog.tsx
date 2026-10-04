@@ -194,7 +194,6 @@ export default function SklandBindingDialog({
         <div className="mt-5 flex flex-wrap justify-end gap-2">
           {hasError && sklandLogin.mode === 'scan' && (
             <button type="button" onClick={startSklandLogin} disabled={busy || (!profile && !canStartWithoutProfile)} className="tool-primary-action">
-              <SklandIcon />
               {copy.workspace.components_SklandBindingDialog_018}</button>
           )}
           {hasError && (
@@ -207,13 +206,11 @@ export default function SklandBindingDialog({
           )}
           {sklandLogin.status === 'account_selection_required' && (
             <button type="button" onClick={previewSelectedAccount} disabled={busy || !sklandLogin.selectedUid} className="tool-primary-action">
-              <SklandIcon />
               {busy ? copy.workspace.components_SklandBindingDialog_021 : copy.workspace.components_SklandBindingDialog_022}
             </button>
           )}
           {sklandLogin.status === 'confirm_required' && (
             <button type="button" onClick={confirmSklandLogin} disabled={confirmDisabled} className="tool-primary-action">
-              <SklandIcon />
               {isDepot ? copy.workspace.components_SklandBindingDialog_023 : copy.workspace.components_SklandBindingDialog_024}
             </button>
           )}
@@ -247,7 +244,6 @@ function ScanModePanel({
           <p className="mt-1 text-sm leading-6 text-ink-secondary">{copy.workspace.components_SklandBindingDialog_026}</p>
         </div>
         <button type="button" onClick={onStart} disabled={busy || (!profile && !canStartWithoutProfile)} className="tool-primary-action">
-          <SklandIcon />
           {waiting ? copy.workspace.components_SklandBindingDialog_027 : copy.workspace.components_SklandBindingDialog_028}
         </button>
       </div>
@@ -279,7 +275,7 @@ function ManualModePanel({
       </div>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => window.open('https://www.skland.com/index', '_blank', 'noopener,noreferrer')} className="tool-secondary-action">
-          <SklandIcon />{copy.workspace.components_SklandBindingDialog_033}</button>
+          {copy.workspace.components_SklandBindingDialog_033}</button>
         <button type="button" onClick={() => void navigator.clipboard?.writeText(SKLAND_CONSOLE_CODE)} className="tool-secondary-action">
           {copy.workspace.components_SklandBindingDialog_034}</button>
       </div>
@@ -304,7 +300,7 @@ function ManualModePanel({
       <label htmlFor="skland-manual-credential" className="block text-xs font-semibold text-ink-muted">{copy.workspace.components_SklandBindingDialog_036}</label>
       <textarea id="skland-manual-credential" ref={inputRef} rows={4} className="tool-field resize-y font-mono text-sm" placeholder={copy.workspace.components_SklandBindingDialog_037} />
       <button type="button" onClick={onPreview} disabled={busy} className="tool-primary-action">
-        <SklandIcon />{copy.workspace.components_SklandBindingDialog_038}</button>
+        {copy.workspace.components_SklandBindingDialog_038}</button>
     </section>
   )
 }
@@ -343,21 +339,21 @@ function BookmarkletModePanel({
           onDragStart={() => onMessage(copy.workspace.components_SklandBindingDialog_046)}
           className="tool-secondary-action px-6 text-base"
         >
-          <SklandIcon />{copy.workspace.components_SklandBindingDialog_047}</a>
+          {copy.workspace.components_SklandBindingDialog_047}</a>
         <p className="mt-3 text-xs text-ink-muted">{copy.workspace.components_SklandBindingDialog_048}</p>
       </div>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => void navigator.clipboard?.writeText(SKLAND_BOOKMARKLET)} className="tool-secondary-action">
           {copy.workspace.components_SklandBindingDialog_049}</button>
         <button type="button" onClick={() => window.open('https://www.skland.com/index', '_blank', 'noopener,noreferrer')} className="tool-secondary-action">
-          <SklandIcon />{copy.workspace.components_SklandBindingDialog_050}</button>
+          {copy.workspace.components_SklandBindingDialog_050}</button>
       </div>
       <label htmlFor="skland-bookmarklet-script" className="block text-xs font-semibold text-ink-muted">{copy.workspace.components_SklandBindingDialog_051}</label>
       <textarea id="skland-bookmarklet-script" readOnly value={SKLAND_BOOKMARKLET} rows={4} className="tool-field resize-y font-mono text-xs text-ink-secondary" />
       <label htmlFor="skland-bookmarklet-credential" className="block text-xs font-semibold text-ink-muted">{copy.workspace.components_SklandBindingDialog_052}</label>
       <textarea id="skland-bookmarklet-credential" ref={inputRef} rows={4} className="tool-field resize-y font-mono text-sm" placeholder={copy.workspace.components_SklandBindingDialog_053} />
       <button type="button" onClick={onPreview} disabled={busy} className="tool-primary-action">
-        <SklandIcon />{copy.workspace.components_SklandBindingDialog_054}</button>
+        {copy.workspace.components_SklandBindingDialog_054}</button>
     </section>
   )
 }

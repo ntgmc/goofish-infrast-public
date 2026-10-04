@@ -594,11 +594,9 @@ function SklandStatusCard({
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={onOpen} disabled={busy || dialogOpen} className="tool-primary-action">
-            <SklandIcon />
             {binding ? copy.workspace.pages_tool_WorkspaceSetupPage_073 : copy.workspace.pages_tool_WorkspaceSetupPage_074}
           </button>
           <button type="button" onClick={onRefresh} disabled={busy || dialogOpen || !canRefresh} className="tool-secondary-action">
-            <SklandIcon />
             {busy ? copy.workspace.pages_tool_WorkspaceSetupPage_075 : copy.workspace.pages_tool_WorkspaceSetupPage_076}
           </button>
         </div>
@@ -609,7 +607,7 @@ function SklandStatusCard({
           <div className="mt-2 flex flex-wrap gap-2">
             {(notice.recovery_action === 'rebind' || notice.recovery_action === 'bind_first') && (
               <button type="button" onClick={onOpen} disabled={busy || dialogOpen} className="tool-primary-action min-h-9 px-3 py-1.5 text-xs">
-                <SklandIcon />{copy.workspace.pages_tool_WorkspaceSetupPage_077}</button>
+                {copy.workspace.pages_tool_WorkspaceSetupPage_077}</button>
             )}
             {notice.recovery_action === 'retry' && (
               <button type="button" onClick={onRefresh} disabled={busy || dialogOpen || !binding} className="tool-secondary-action min-h-9 px-3 py-1.5 text-xs">
