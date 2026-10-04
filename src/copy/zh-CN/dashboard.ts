@@ -1,4 +1,13 @@
 export const dashboardCopy = {
+  animation: {
+    title: "动画效果",
+    settings: "界面设置",
+    description: "设置保存在当前浏览器，V1 与 V2 同步生效。",
+    reduce: "减少动画",
+    help: "开启后，页面和面板立即切换，减少动画开销。此设置仅保存在当前浏览器。",
+    system: "已跟随系统的减少动态效果设置。关闭系统设置后，可在这里调整。",
+    storageError: "本次使用已生效，浏览器未能保存此设置。刷新后可能需要重新调整。",
+  },
   profile_expiry: {
     title: "限时 CDK 档案即将到期",
     description: (name: string, expiresAt: string) => `请尽快保存「${name}」需要保留的数据，并在排班方案中将排班 JSON 导出到本地。档案将于 ${expiresAt}（北京时间）到期，到期后需续期才能继续使用。`,

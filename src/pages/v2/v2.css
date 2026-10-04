@@ -1218,7 +1218,24 @@
   border-radius: 12px 0 0 12px !important;
   background: var(--v2-paper) !important;
   translate: none !important;
-  animation: none !important;
+}
+
+.v2-drawer[data-state="open"] {
+  animation: v2-drawer-enter 260ms var(--motion-ease-enter) both !important;
+}
+
+.v2-drawer[data-state="closed"] {
+  animation: v2-drawer-exit 140ms var(--motion-ease-exit) both !important;
+}
+
+@keyframes v2-drawer-enter {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes v2-drawer-exit {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(16px); }
 }
 
 .v2-drawer-wide {

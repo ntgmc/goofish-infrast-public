@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState, type SyntheticEvent } from 'react'
-import { useAnimate, useReducedMotion } from 'motion/react'
+import { useAnimate } from 'motion/react'
+import { useAppReducedMotion } from '../../../lib/motion-preference'
 import { copy } from '../../../copy/index'
 import {
   Dialog,
@@ -81,7 +82,7 @@ export default function InventorySection({
   const pendingItemKeysRef = useRef(new Map<string, string>())
   const loadVersionRef = useRef(0)
   const [chestScope, animate] = useAnimate<HTMLFieldSetElement>()
-  const reduceMotion = useReducedMotion()
+  const reduceMotion = useAppReducedMotion()
   const { features } = useSiteFeatures()
 
   const load = useCallback(async () => {

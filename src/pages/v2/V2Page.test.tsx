@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { copy } from '../../copy'
+import { MotionPreferenceProvider } from '../../lib/motion-preference'
 import { normalizeConfig } from '../../lib/config'
 import { DEFAULT_SITE_FEATURES } from '../../lib/site-features'
 import type { OptimizeResult, UserGameAccount, WorkspaceResultHistorySummary } from '../../lib/types'
@@ -51,6 +52,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  window.localStorage.removeItem('maatool-reduce-motion')
   vi.restoreAllMocks()
 })
 
@@ -190,14 +192,19 @@ describe('V2 results-first workspace', () => {
   it('switches teams by mouse and keyboard and exposes room details on demand', async () => {
     const user = userEvent.setup()
     mount()
+    const originalRoom = within(screen.getByRole('tabpanel')).getByRole('button', { name: /贸易站.*银灰/ })
+    const originalPane = originalRoom.closest('.v2-transition-pane')
     const second = screen.getByRole('tab', { name: /第 2 班/ })
     await user.click(second)
     expect(second).toHaveAttribute('aria-selected', 'true')
     expect(within(screen.getByRole('tabpanel')).getByText('能天使')).toBeInTheDocument()
+    expect(within(screen.getByRole('tabpanel')).getByRole('button', { name: /贸易站.*能天使/ })).toBe(originalRoom)
+    expect(originalRoom.closest('.v2-transition-pane')).toBe(originalPane)
     await user.keyboard('{ArrowRight}')
     const third = screen.getByRole('tab', { name: /第 3 班/ })
     expect(third).toHaveFocus()
     expect(third).toHaveAttribute('aria-selected', 'true')
+    expect(within(screen.getByRole('tabpanel')).getByRole('button', { name: /贸易站.*银灰/ })).toBe(originalRoom)
     await user.click(screen.getByRole('button', { name: /贸易站.*银灰/ }))
     expect(await screen.findByRole('dialog')).toHaveTextContent(copy.v2.roomDetails)
     await dismissDrawer(user)
@@ -208,7 +215,9 @@ describe('V2 results-first workspace', () => {
     const user = userEvent.setup()
     mount()
     await user.click(screen.getByRole('tab', { name: /第 2 班/ }))
+    const room = within(screen.getByRole('tabpanel')).getByRole('button', { name: /贸易站.*能天使/ })
     await user.click(screen.getByRole('button', { name: copy.v2.list }))
+    expect(within(screen.getByRole('tabpanel')).getByRole('button', { name: /贸易站.*能天使/ })).toBe(room)
     await user.click(screen.getByRole('button', { name: copy.v2.detailsTab }))
     expect(screen.getByRole('tab', { name: /第 2 班/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('button', { name: copy.v2.list })).toHaveAttribute('aria-pressed', 'true')
@@ -234,6 +243,25 @@ describe('V2 results-first workspace', () => {
     expect(board.getByRole('button', { name: /贸易站.*银灰/ })).toBeInTheDocument()
     expect(board.queryByRole('button', { name: /贸易站.*能天使/ })).not.toBeInTheDocument()
     expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
+  })
+
+  it('applies the shared reduced-animation setting from V2 without generating or losing the selected team', async () => {
+    const user = userEvent.setup()
+    render(<MotionPreferenceProvider><MemoryRouter initialEntries={['/v2']}><V2Page /></MemoryRouter></MotionPreferenceProvider>)
+    await user.click(screen.getByRole('tab', { name: /第 2 班/ }))
+    await user.click(screen.getByRole('button', { name: copy.dashboard.animation.settings }))
+    const dialog = within(await screen.findByRole('dialog', { name: copy.dashboard.animation.settings }))
+    await user.click(dialog.getByRole('switch', { name: copy.dashboard.animation.reduce }))
+    expect(document.documentElement).toHaveAttribute('data-reduced-motion')
+    expect(window.localStorage.getItem('maatool-reduce-motion')).toBe('true')
+    await dismissDrawer(user)
+    expect(screen.getByRole('tab', { name: /第 2 班/ })).toHaveAttribute('aria-selected', 'true')
+    await user.click(screen.getByRole('button', { name: copy.v2.list }))
+    expect(screen.getByRole('button', { name: copy.v2.list })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('tab', { name: /第 2 班/ })).toHaveAttribute('aria-selected', 'true')
+    await user.click(screen.getByRole('button', { name: copy.dashboard.animation.settings }))
+    expect(within(await screen.findByRole('dialog')).getByRole('switch', { name: copy.dashboard.animation.reduce })).toBeChecked()
+    expect(mocks.workflow).not.toHaveBeenCalled()
   })
 
   it('restores focus and releases the modal before reopening', async () => {

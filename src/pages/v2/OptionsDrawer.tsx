@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { ArrowRight, Check, FileClock, LogOut, Search, Upload, UserRound } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
 import AuthForm from '../../components/AuthForm'
+import AnimationSettings from '../../components/AnimationSettings'
 import ConfigEditor from '../../components/ConfigEditor'
 import SklandBindingDialog from '../../components/SklandBindingDialog'
 import SklandIcon from '../../components/SklandIcon'
@@ -21,11 +22,11 @@ import V2Transition from './V2Transition'
 import BuildingSkills from './BuildingSkills'
 
 const text = copy.v2
-export type OptionPanel = 'operators' | 'config' | 'account' | 'cdk' | 'history' | 'room'
+export type OptionPanel = 'operators' | 'config' | 'account' | 'cdk' | 'history' | 'room' | 'settings'
 export type V2Session = ReturnType<typeof useToolSession>
 
 const titles: Record<OptionPanel, string> = {
-  operators: text.operators, config: text.facilities,
+  operators: text.operators, config: text.facilities, settings: copy.dashboard.animation.settings,
   account: text.account, cdk: text.cdk, history: text.history, room: text.roomDetails,
 }
 
@@ -58,11 +59,14 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
   const fileInput = useRef<HTMLInputElement>(null)
   const opener = useRef<HTMLElement | null>(null)
   const featureState = useSiteFeatures()
-  const isConfig = panel === 'config'
-  const description = isConfig ? sample ? text.demoConfigDescription : text.configDescription
-    : panel === 'operators' ? sample ? text.sampleOperatorDescription : text.operatorDescription
-      : panel === 'account' ? text.accountDescription : panel === 'room' ? text.roomDescription
-        : panel === 'cdk' ? text.cdkDescription : text.historyDescription
+  const [lastPanel, setLastPanel] = useState(panel)
+  if (panel !== null && panel !== lastPanel) setLastPanel(panel)
+  const shownPanel = panel ?? lastPanel
+  const isConfig = shownPanel === 'config'
+  const description = shownPanel === 'settings' ? copy.dashboard.animation.description : isConfig ? sample ? text.demoConfigDescription : text.configDescription
+    : shownPanel === 'operators' ? sample ? text.sampleOperatorDescription : text.operatorDescription
+      : shownPanel === 'account' ? text.accountDescription : shownPanel === 'room' ? text.roomDescription
+        : shownPanel === 'cdk' ? text.cdkDescription : text.historyDescription
 
   async function importFile(file: File) {
     setImportBusy(true)
@@ -85,12 +89,12 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
     <Dialog open={panel !== null} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent className={`v2-drawer ${isConfig ? 'v2-drawer-wide' : ''}`} showCloseButton closeLabel={text.close}
         onOpenAutoFocus={() => { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null }}
-        onCloseAutoFocus={(event) => { event.preventDefault(); if (opener.current?.isConnected) opener.current.focus({ preventScroll: true }) }}>
+        onCloseAutoFocus={(event) => { event.preventDefault(); setLastPanel(null); if (opener.current?.isConnected) opener.current.focus({ preventScroll: true }) }}>
         <div className="v2-drawer-heading">
-          <DialogTitle>{panel === 'room' && room ? `${room.label} ${room.indexLabel}` : panel ? titles[panel] : ''}</DialogTitle>
+          <DialogTitle>{shownPanel === 'room' && room ? `${room.label} ${room.indexLabel}` : shownPanel ? titles[shownPanel] : ''}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </div>
-        <V2Transition motionKey={isConfig ? 'config' : panel === 'room' ? `room-${room?.key}` : panel ?? 'closed'} className="v2-drawer-body">
+        <V2Transition motionKey={isConfig ? 'config' : shownPanel === 'room' ? `room-${room?.key}` : shownPanel ?? 'closed'} className="v2-drawer-body">
         {isConfig && (
           <>
             {error && <p role="alert" className="v2-feedback v2-feedback-error">{error}</p>}
@@ -100,7 +104,7 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
             <button type="button" className="v2-button v2-button-primary v2-drawer-done" onClick={onClose}><Check size={16} />{text.done}</button>
           </>
         )}
-        {panel === 'operators' && (
+        {shownPanel === 'operators' && (
           <div className="v2-options-content">
             <label className="v2-search-label"><span>{text.searchOperators}</span><span className="v2-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label={text.searchOperators} /></span></label>
             <div className="v2-import-row">
@@ -131,7 +135,7 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
             </div>
           </div>
         )}
-        {panel === 'account' && (
+        {shownPanel === 'account' && (
           <div className="v2-options-content">
             {session.user ? (
               <>
@@ -162,15 +166,16 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
             )}
           </div>
         )}
-        {panel === 'cdk' && <div className="v2-options-content">
+        {shownPanel === 'settings' && <AnimationSettings className="v2-options-content" />}
+        {shownPanel === 'cdk' && <div className="v2-options-content">
           <Link to="/tool/redeem" className="v2-button v2-button-primary">{text.manageCdk}<ArrowRight size={16} /></Link></div>}
-        {panel === 'history' && <div className="v2-options-content">
+        {shownPanel === 'history' && <div className="v2-options-content">
           {sample && history.length === 0 ? <button className="v2-history-option" type="button" onClick={onClose}><FileClock size={20} /><span><strong>{text.sampleHistory}</strong><small>{text.sampleSource}</small></span><ArrowRight size={17} /></button>
             : history.length === 0 ? <p className="v2-muted">{text.noHistory}</p>
               : history.map((item) => <button className="v2-history-option" type="button" key={item.id} disabled={busy} onClick={() => void onHistory?.(item).then(onClose)}>
                 <FileClock size={20} /><span><strong>{item.name}</strong><small>{formatWorkspaceDate(item.created_at)}</small></span><ArrowRight size={17} /></button>)}
         </div>}
-        {panel === 'room' && room && <div className="v2-options-content">
+        {shownPanel === 'room' && room && <div className="v2-options-content">
           <div className="v2-room-operator-details">{room.row?.operators.map((operator) => {
             const mood = room.data?.mood?.[operator.name]
             const moodValue = (value: number | undefined) => value !== undefined && Number.isFinite(value) ? value.toFixed(1) : text.moodUnavailable

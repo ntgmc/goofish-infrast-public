@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
+import { useAppReducedMotion } from '../lib/motion-preference'
 import {
   AnimatePresence,
   motion,
-  useReducedMotion,
   type Transition,
   type Variants,
 } from 'motion/react'
@@ -77,13 +77,14 @@ const revealVariants: Variants = {
 }
 
 export function StaggeredReveal({ children, className }: { children: ReactNode; className?: string }) {
-  const reduceMotion = useReducedMotion()
+  const reduceMotion = useAppReducedMotion()
+  if (reduceMotion) return <div className={className}>{children}</div>
   return (
     <motion.div
       className={className}
-      variants={reduceMotion ? undefined : staggerVariants}
-      initial={reduceMotion ? false : 'hidden'}
-      animate={reduceMotion ? undefined : 'visible'}
+      variants={staggerVariants}
+      initial="hidden"
+      animate="visible"
     >
       {children}
     </motion.div>
@@ -91,30 +92,31 @@ export function StaggeredReveal({ children, className }: { children: ReactNode; 
 }
 
 export function RevealItem({ children, className }: { children: ReactNode; className?: string }) {
-  const reduceMotion = useReducedMotion()
+  const reduceMotion = useAppReducedMotion()
+  if (reduceMotion) return <div className={className}>{children}</div>
   return (
-    <motion.div className={className} variants={reduceMotion ? undefined : revealVariants}>
+    <motion.div className={className} variants={revealVariants}>
       {children}
     </motion.div>
   )
 }
 
 export function AnimatedValue({ value, className, accessibleLabel }: { value: string; className?: string; accessibleLabel?: string }) {
-  const reduceMotion = useReducedMotion()
+  const reduceMotion = useAppReducedMotion()
   return (
     <span className={`motion-value ${className ?? ''}`} aria-label={accessibleLabel ?? value}>
-      <AnimatePresence initial={false} mode="popLayout">
+      {reduceMotion ? <span aria-hidden="true">{value}</span> : <AnimatePresence initial={false} mode="popLayout">
         <motion.span
           key={value}
           aria-hidden="true"
-          initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 4 }}
+          initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -3 }}
+          exit={{ opacity: 0, y: -3 }}
           transition={{ duration: motionTokens.duration.instant, ease: motionTokens.ease.enter }}
         >
           {value}
         </motion.span>
-      </AnimatePresence>
+      </AnimatePresence>}
     </span>
   )
 }
@@ -134,11 +136,14 @@ export function MotionSkeleton({ label, rows = 3, className }: { label: string; 
 }
 
 export function MotionNavIndicator({ layoutId, variant = 'pill' }: { layoutId: string; variant?: 'pill' | 'underline' }) {
+  const reduceMotion = useAppReducedMotion()
+  const className = variant === 'underline' ? 'motion-nav-indicator motion-nav-indicator--underline' : 'motion-nav-indicator'
+  if (reduceMotion) return <span aria-hidden="true" className={className} />
   return (
     <motion.span
       layoutId={layoutId}
       aria-hidden="true"
-      className={variant === 'underline' ? 'motion-nav-indicator motion-nav-indicator--underline' : 'motion-nav-indicator'}
+      className={className}
       transition={motionTokens.spring}
     />
   )

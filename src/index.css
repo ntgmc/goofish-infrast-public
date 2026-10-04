@@ -971,12 +971,12 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--color-focus); ou
 }
 
 .motion-region-enter {
-  animation: motion-region-enter 100ms var(--motion-ease-enter);
+  animation: motion-region-enter 220ms var(--motion-ease-enter) both;
 }
 
 @keyframes motion-region-enter {
-  from { transform: translateY(3px); }
-  to { transform: translateY(0); }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .tool-alert {
@@ -1060,6 +1060,19 @@ dialog[open] > * {
   .motion-skeleton-block::after {
     display: none;
   }
+}
+
+html:root[data-reduced-motion] *,
+html:root[data-reduced-motion] *::before,
+html:root[data-reduced-motion] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+html[data-reduced-motion] .motion-skeleton-line::after,
+html[data-reduced-motion] .motion-skeleton-block::after {
+  display: none;
 }
 
 @theme inline {
