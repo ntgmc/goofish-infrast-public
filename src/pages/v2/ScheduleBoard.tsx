@@ -30,8 +30,7 @@ export function roomLevelLabel(room: BoardRoom) {
 export function Avatar({ operator, small = false }: { operator: RoomOperator; small?: boolean }) {
   const [failed, setFailed] = useState(false)
   return (
-    <span className={`v2-avatar ${small ? 'v2-avatar-small' : ''}`} data-operator-name={operator.name}
-      data-operator-id={operator.id} data-operator-elite={operator.elite} data-operator-level={operator.level}>
+    <span className={`v2-avatar ${small ? 'v2-avatar-small' : ''}`}>
       {operator.id && !failed
         ? <img src={`/webp96/${operator.id}.webp`} alt={operator.name} onError={() => setFailed(true)} loading="lazy" decoding="async" width={96} height={96} />
         : <span aria-label={operator.name}>{operator.name.slice(0, 1)}</span>}
@@ -145,7 +144,10 @@ function RoomCard({ room, drone = false, compact = false, autofill = false, onCl
       </span>
       <div className="v2-room-operators">
         {room.row?.operators.map((operator) => (
-          <span className="v2-operator" key={operator.name}><Avatar operator={operator} small={compact} /><span>{operator.name}</span></span>
+          <span className="v2-operator" key={operator.name} data-operator-name={operator.name}
+            data-operator-id={operator.id} data-operator-elite={operator.elite} data-operator-level={operator.level}>
+            <Avatar operator={operator} small={compact} /><span>{operator.name}</span>
+          </span>
         ))}
         {automaticDormitory && <span className="v2-muted">{room.row?.isAutofill ? room.row.operatorText : copy.domain.components_result_panel_formatters_005}</span>}
         {!room.row?.operators.length && !automaticDormitory && <span className="v2-muted">{copy.domain.result_board_v2.empty_room}</span>}
