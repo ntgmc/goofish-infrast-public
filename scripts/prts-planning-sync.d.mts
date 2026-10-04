@@ -1,0 +1,1 @@
+export function syncPrtsPlanning(options?: { output?: string; reconcile?: string; signal?: AbortSignal; costs?: string; 'refresh-assets'?: string }, request?: (url: string) => Promise<unknown>, pause?: () => Promise<void>): Promise<{ changed: number; cursor: number; reconciled: number }>

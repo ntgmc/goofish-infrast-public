@@ -33,6 +33,7 @@ function requiredFeatures(pathname: string, method: string): SiteFeatureKey[] {
   if (pathname === '/api/auth/login' || pathname === '/api/auth/me') return ['login']
   if (pathname === '/api/announcement') return ['announcements']
   if (pathname === '/api/depot-value') return ['depot_value']
+  if (pathname === '/api/cultivation-plan') return ['tools', 'skland']
   if (pathname === '/api/usage-stats') return ['login']
 
   if (pathname === '/api/user/data/credential/clear') return ['profiles']

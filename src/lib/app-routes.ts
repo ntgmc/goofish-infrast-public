@@ -75,6 +75,7 @@ const standaloneAppPaths = new Set([
   '/tool',
   '/tools/depot-value',
   '/tools/manual-schedule',
+  '/tools/cultivation-plan',
   '/verify-email',
   '/v2',
 ])

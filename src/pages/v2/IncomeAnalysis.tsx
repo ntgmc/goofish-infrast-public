@@ -3,9 +3,10 @@ import ProductIcon from '../../components/ProductIcon'
 import { PRODUCT_LABELS, ROOM_LABELS } from '../../components/result-panel/labels'
 import { calculateProductionSanity } from '../../lib/production-sanity'
 import { SANITY_PER_BATTLE_RECORD, SANITY_PER_LMD, SANITY_PER_ORIGINIUM_SHARD, SANITY_PER_ORUNDUM, SANITY_PER_PURE_GOLD } from '../../lib/orundum-economy'
-import type { DailyProduction, OptimizeResult } from '../../lib/types'
+import type { DailyProduction, OptimizeResult, OrundumEconomy } from '../../lib/types'
 
 const text = copy.v2
+const amount = (value: number) => value.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
 const values: Record<string, { value: number; formula: string }> = {
   LMD: { value: SANITY_PER_LMD, formula: '36 ÷ 10,000' },
   'Battle Record': { value: SANITY_PER_BATTLE_RECORD, formula: '36 ÷ 10,000 × 1,000' },
@@ -42,7 +43,6 @@ export default function IncomeAnalysis({ result }: { result: OptimizeResult }) {
   const rows = stationProductionRows(daily)
   const sanity = calculateProductionSanity(daily)
   const products = Object.keys(values).filter((key) => (daily?.manufacturing?.[key] ?? daily?.trading?.[key] ?? 0) !== 0 || (daily?.consumption?.[key] ?? 0) !== 0)
-  const amount = (value: number) => value.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
   return <div className="v2-income-content">
     <h3>{text.stationOutput}</h3><p className="v2-muted">{text.stationOutputNote}</p>
     {rows.length ? <div className="v2-table-scroll" tabIndex={0} role="region" aria-label={text.stationOutput}>
@@ -55,6 +55,7 @@ export default function IncomeAnalysis({ result }: { result: OptimizeResult }) {
           <td>{row.sanity === null ? '—' : amount(row.sanity)}</td>
         </tr>)}</tbody></table>
     </div> : <p className="v2-analysis-note">{text.noStationOutput}</p>}
+    {result.orundum_economy && <OpportunityCostAnalysis economy={result.orundum_economy} />}
     <section className="v2-sanity-calculation" aria-label={text.sanityCalculation}>
       <h3>{text.sanityCalculation} · {sanity.value.toFixed(2)} {text.daily}</h3>
       <p>{text.sanityFormula}</p><p className="v2-muted">{sanity.note}</p>
@@ -72,4 +73,58 @@ export default function IncomeAnalysis({ result }: { result: OptimizeResult }) {
       </div><p className="v2-muted">{text.sanityCalculationNote}</p>
     </section>
   </div>
+}
+
+function OpportunityCostAnalysis({ economy }: { economy: OrundumEconomy }) {
+  const shards = economy.sustainable_orundum / 10
+  const orirockCost = shards * 2 * 4.8
+  const lmdCost = economy.hard_lmd_cost * SANITY_PER_LMD
+  const factoryCost = shards * (60 / 72) * SANITY_PER_PURE_GOLD
+  const shardCost = shards * SANITY_PER_ORIGINIUM_SHARD
+  const orundumValue = economy.sustainable_orundum * SANITY_PER_ORUNDUM
+  const capacityRows = [
+    [text.dailySanityBudget, economy.daily_sanity_budget, text.opportunityCostUnit],
+    [text.monthlyCardSanity, economy.total_daily_sanity_budget - economy.daily_sanity_budget, text.opportunityCostUnit],
+    [text.totalSanityBudget, economy.total_daily_sanity_budget, text.opportunityCostUnit],
+    [text.dailyOrirockSupply, economy.daily_orirock_supply, text.orirockUnit],
+    [text.rockLimitedOrundum, economy.rock_limited_orundum, text.orundumUnit],
+    [text.factoryOrundumCapacity, economy.factory_orundum_capacity, text.orundumUnit],
+    [text.tradeOrundumCapacity, economy.trade_orundum_capacity, text.orundumUnit],
+    [text.sustainableOrundum, economy.sustainable_orundum, text.orundumUnit],
+    [text.shortTermOrundum, economy.short_term_orundum, text.orundumUnit],
+    ...(economy.inventory_depletion_days !== null ? [[text.inventoryDepletion, economy.inventory_depletion_days, text.daysUnit] as const] : []),
+  ] as const
+  const costRows = [
+    [text.orirockCost, `${amount(shards)} × 2 × 4.8`, orirockCost],
+    [text.shardLmdCost, `(${amount(shards)} × 1,600 ≈ ${amount(economy.hard_lmd_cost)}) × ${SANITY_PER_LMD}`, lmdCost],
+    [text.factoryOpportunityCost, `${amount(shards)} × 60 ÷ 72 × ${SANITY_PER_PURE_GOLD.toFixed(6)}`, factoryCost],
+    [text.shardTotalCost, `${amount(shards)} × ${SANITY_PER_ORIGINIUM_SHARD.toFixed(6)}`, shardCost],
+    [text.orundumSanityValue, `${amount(economy.sustainable_orundum)} × ${SANITY_PER_ORUNDUM}`, orundumValue],
+    [text.opportunityCost, `max(0, ${amount(shardCost)} − ${amount(orundumValue)})`, economy.opportunity_cost_sanity],
+  ] as const
+
+  return <section className="v2-sanity-calculation" aria-label={text.opportunityCostCalculation}>
+    <h3>{text.opportunityCostCalculation} · {economy.opportunity_cost_sanity.toFixed(2)} {text.opportunityCostUnit}</h3>
+    <p>{text.opportunityCostFormula}</p><p className="v2-muted">{text.opportunityCostNote}</p>
+    <h4>{text.orundumCapacity}</h4><p className="v2-muted">{text.orundumCapacityNote}</p>
+    <div className="v2-table-scroll" tabIndex={0} role="region" aria-label={text.orundumCapacity}>
+      <table className="v2-income-table"><thead><tr><th>{text.calculationItem}</th><th>{text.calculationBasis}</th></tr></thead>
+        <tbody>{capacityRows.map(([label, value, unit]) => <tr key={label}>
+          <th scope="row">{label}</th><td>{amount(value)} {unit}</td>
+        </tr>)}</tbody></table>
+    </div>
+    <p>{amount(economy.total_daily_sanity_budget)} ÷ 4.8 ≈ {amount(economy.daily_orirock_supply)} {text.orirockUnit}</p>
+    <p>{text.sustainableOrundum} = min({amount(economy.rock_limited_orundum)}, {amount(economy.factory_orundum_capacity)}, {amount(economy.trade_orundum_capacity)}) ≈ {amount(economy.sustainable_orundum)} {text.orundumUnit}</p>
+    <h4>{text.opportunityCostDetails}</h4>
+    <p>{text.dailyShardConsumption} = {amount(economy.sustainable_orundum)} ÷ 10 ≈ {amount(shards)} {PRODUCT_LABELS['Originium Shard']} {text.daily}</p>
+    <div className="v2-table-scroll" tabIndex={0} role="region" aria-label={text.opportunityCostDetails}>
+      <table className="v2-income-table"><thead><tr><th>{text.calculationItem}</th><th>{text.calculationBasis}</th><th>{text.sanityValue}</th></tr></thead>
+        <tbody>{costRows.map(([label, formula, value]) => <tr key={label}>
+          <th scope="row">{label}</th><td>{formula}</td><td>≈ {amount(value)}</td>
+        </tr>)}</tbody></table>
+    </div>
+    <p className="v2-muted">{text.factoryOpportunityCostNote}</p>
+    <p>{text.opportunityLmdEquivalent}：{amount(economy.opportunity_cost_sanity)} ÷ {SANITY_PER_LMD} ≈ {amount(economy.opportunity_lmd_equivalent)} {PRODUCT_LABELS.LMD} {text.daily}</p>
+    <p className="v2-muted">{text.opportunityLmdNote}</p>
+  </section>
 }

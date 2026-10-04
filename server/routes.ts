@@ -20,6 +20,7 @@ import releaseConfirmationHandler from './handlers/release-confirmation'
 import authHandler from './handlers/auth'
 import { EFFICIENCY_DATA, EFFICIENCY_DATA_METADATA } from './handlers/data'
 import depotValueHandler from './handlers/depot-value'
+import cultivationPlanHandler from './handlers/cultivation-plan'
 import optimizationHandler from './handlers/optimization'
 import userAnnouncementsHandler from './handlers/user-announcements'
 import userNotificationsHandler from './handlers/user-notifications'
@@ -54,6 +55,7 @@ import { APP_BUILD_META } from '../src/lib/build-meta'
 type ApiHandler = (req: Request) => Promise<Response>
 
 const ROUTES = new Map<string, ApiHandler>([
+  ['/api/cultivation-plan', cultivationPlanHandler],
   ['/api/admin/cdk', adminCdkHandler as unknown as ApiHandler],
   ['/api/admin/risk-settings', adminRiskSettingsHandler as unknown as ApiHandler],
   ['/api/admin/behavior-risk', adminBehaviorRiskHandler as unknown as ApiHandler],

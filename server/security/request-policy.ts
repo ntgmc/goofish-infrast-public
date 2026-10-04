@@ -124,6 +124,7 @@ const adminTargetProfileShape = {
 }
 
 export const requestSchemas = {
+  cultivationPlan: strict({ profile_id: shortString(128), mode: z.enum(['all', 'normal', 'challenge']).default('all') }),
   depotValue: depotValueRequestSchema,
   adminSession: strict({ username: shortString(64), password: shortString(128) }),
   authRegister: strict({
@@ -730,6 +731,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/usage-stats', route({ POST: json('standard', requestSchemas.usageStats) }, ['admin'])],
   ['/api/admin/usage-stats', route({ GET: none() }, ['admin', 'format', 'from', 'to', 'range'])],
   ['/api/depot-value', route({ POST: json('depot', requestSchemas.depotValue) })],
+  ['/api/cultivation-plan', route({ POST: json('standard', requestSchemas.cultivationPlan) })],
   ['/api/user/announcements', route({ GET: none(), PATCH: json('standard', requestSchemas.userAnnouncement) })],
   ['/api/user/notifications', route({ GET: none(), PATCH: json('standard', requestSchemas.userNotification) }, ['cursor', 'limit'])],
   ['/api/user/profiles', route({ GET: none(), PATCH: json('standard', requestSchemas.profilePatch) })],
