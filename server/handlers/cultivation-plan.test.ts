@@ -6,6 +6,8 @@ import { prtsSnapshotSchema } from '../cultivation/catalog'
 const mocks = vi.hoisted(() => ({ session: vi.fn(), snapshot: vi.fn(), player: vi.fn(), inventory: vi.fn(), pricing: vi.fn(), gate: vi.fn() }))
 vi.mock('./user-auth', () => ({ requireUserSession: mocks.session, jsonResponse: (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }) }))
 vi.mock('../feature-gate', () => ({ requireSiteFeatures: mocks.gate }))
+vi.mock('../cultivation/references', () => ({ getCultivationStatistics: async () => ({ status: 'unavailable', updatedAt: null, operators: {} }) }))
+vi.mock('../cultivation/special-items', async (original) => ({ ...await original<typeof import('../cultivation/special-items')>(), getSpecialItemCatalog: async () => ({ parserVersion: 4, status: 'fresh', updatedAt: '', items: [], itemNames: {}, itemIcons: {}, excludedOperators: [], skillIcons: {} }) }))
 vi.mock('../cultivation/catalog', async (original) => ({ ...await original<typeof import('../cultivation/catalog')>(), readPrtsSnapshot: mocks.snapshot }))
 vi.mock('./material-value', async (original) => ({ ...await original<typeof import('./material-value')>(), getYituliuPricing: mocks.pricing }))
 vi.mock('./skland-client', () => ({
@@ -14,7 +16,7 @@ vi.mock('./skland-client', () => ({
   SklandClient: class { getGamePlayerInfo = mocks.player; getCultivatePlayer = mocks.inventory },
 }))
 
-const request = (body: unknown = { profile_id: 'mine', mode: 'all' }) => new Request('http://local/api/cultivation-plan', { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } })
+const request = (body: unknown = { profile_id: 'mine' }) => new Request('http://local/api/cultivation-plan', { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } })
 
 beforeEach(() => {
   vi.clearAllMocks()

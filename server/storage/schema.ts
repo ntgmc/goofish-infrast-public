@@ -1675,6 +1675,31 @@ CREATE INDEX IF NOT EXISTS idx_user_notifications_user_updated
 CREATE INDEX IF NOT EXISTS idx_user_notifications_user_unread
   ON user_notifications(user_id, updated_at DESC, id DESC) WHERE read_at IS NULL;
 
+CREATE TABLE IF NOT EXISTS qqbot_binding_codes (
+  user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
+  code_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE TABLE IF NOT EXISTS qqbot_account_bindings (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL UNIQUE REFERENCES user_accounts(id) ON DELETE CASCADE,
+  qq_number TEXT NOT NULL UNIQUE CHECK (qq_number ~ '^[1-9][0-9]{4,11}$'),
+  notifications_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL
+);
+CREATE TABLE IF NOT EXISTS qqbot_schedule_notifications (
+  id TEXT PRIMARY KEY,
+  binding_id TEXT NOT NULL REFERENCES qqbot_account_bindings(id) ON DELETE CASCADE,
+  profile_id TEXT NOT NULL REFERENCES user_game_accounts(id) ON DELETE CASCADE,
+  result_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  delivered_at TIMESTAMPTZ,
+  UNIQUE (binding_id, result_id)
+);
+CREATE INDEX IF NOT EXISTS idx_qqbot_schedule_notifications_pending
+  ON qqbot_schedule_notifications(created_at, id) WHERE delivered_at IS NULL;
+
 CREATE TABLE IF NOT EXISTS depot_value_samples (
   uid_hash TEXT PRIMARY KEY,
   uid_hash_key_version TEXT NOT NULL DEFAULT 'legacy',

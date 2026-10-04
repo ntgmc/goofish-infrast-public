@@ -1,13 +1,7 @@
 import type { CultivationCurrent, CultivationTarget } from '../../src/lib/cultivation-contract'
 import { asRecord, asRows, type PrtsSnapshot } from './catalog'
 
-export function cultivationSatisfied(current: CultivationCurrent, target: CultivationTarget, skillId: string) {
-  return (current.elite > target.elite || (current.elite === target.elite && current.level >= target.level))
-    && current.skillLevel !== null && current.skillLevel >= Math.min(7, target.skillLevel)
-    && (target.skillLevel <= 7 || (current.masteries[skillId] ?? -1) >= target.skillLevel - 7)
-    && (!target.moduleId || (current.modulesKnown !== false && (current.modules[target.moduleId] ?? -1) >= target.moduleLevel))
-    && current.potential >= target.potential
-}
+export { cultivationSatisfied } from '../../src/lib/cultivation-target'
 
 export function cultivationCosts(snapshot: PrtsSnapshot, id: string, current: CultivationCurrent, target: CultivationTarget, skillId: string) {
   const warnings: string[] = []
@@ -46,7 +40,7 @@ export function cultivationCosts(snapshot: PrtsSnapshot, id: string, current: Cu
       add(promotions[phase] ?? (info.rarity <= 3 ? {} : null))
     }
   }
-  if (current.skillLevel === null) warnings.push('森空岛未返回当前技能等级')
+  if (current.skillLevel === null && target.skillLevel > 1) warnings.push('森空岛未返回当前技能等级')
   const skills = asRecord(row.skills)
   const normal = Array.isArray(skills.normal) ? skills.normal : []
   for (let index = (current.skillLevel ?? 1) - 1; index < Math.min(7, target.skillLevel) - 1; index++) add(normal[index])

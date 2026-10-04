@@ -49,6 +49,7 @@ USAGE_VISITOR_SECRET=<stable random value of at least 32 characters>
 # USAGE_VISITOR_SECRET_PREVIOUS=<previous value during a controlled rotation>
 WEBSITE_EVENTS_TOKEN=<independent random value of at least 32 bytes>
 WEBSITE_RELEASE_CONFIRMATION_TOKEN=<different random value of at least 32 bytes>
+# WEBSITE_QQBOT_TOKEN=<third independent random value of at least 32 bytes, after bot adaptation>
 ```
 
 `SKLAND_CREDENTIAL_SECRET`（或其 keyring 配置）用于加密可刷新的森空岛凭证；`FREE_PREVIEW_UID_HASH_SECRET` 用于生成稳定的 UID HMAC、防止重复领取。两者都必须由密码学安全随机源生成、纳入受控密钥备份，并在所有 API 实例间保持一致。不要直接替换 UID HMAC 密钥；轮换前必须迁移现有 claim hash。凭证 keyring 轮换应保留旧解密密钥，完成 `scripts/rekey-skland-credentials.mjs` 重加密后再移除旧密钥。生产环境会在监听端口前校验这两类配置，缺失或长度不足时启动失败。
@@ -79,6 +80,8 @@ Content-Type: application/json
 首次签发返回 `created`，有效期内重复请求返回 `active` 和原邀请码，过期后返回 `renewed` 和新邀请码，已经绑定则只返回 `bound`。注册链接形如 `https://maatool.com/tool/profiles#invite=...`；页面自动填入邀请码后立即清除片段，不会把邀请码作为普通查询参数发送给服务端。邀请码有效期为 24 小时，数据库只保存哈希和由 `WEBSITE_EVENTS_TOKEN` 派生密钥加密的密文。轮换 `WEBSITE_EVENTS_TOKEN` 后，同一 QQ 再次请求会换发邀请码，Bot 应始终把最新响应发送给用户。
 
 该接口只接受 QQ 号，不接受邮箱、密码、道具代码或数量。内测道具继续通过网站新人任务配置和领取，Bot 不参与奖励参数或发放状态管理。由于 `WEBSITE_EVENTS_TOKEN` 同时具备事件读取和邀请码签发权限，必须仅注入受控 Bot 运行环境，不得写入日志或仓库。
+
+个人排班通知、账号绑定和 MAA JSON 私聊下载使用独立的 `WEBSITE_QQBOT_TOKEN`。用户在账号安全页生成绑定码，私聊 bot 完成绑定后主动开启通知。网站会在排班成功时保存待发送通知，bot 负责轮询、私聊发送文件和确认送达；自动推送不会消耗体验券。接口、命令和重试契约见 [QQ Bot 接入交接文档](docs/qqbot-handoff.md)。bot 完成适配前保持该凭据未配置，部署时先迁移数据库 `2026-10-04.1`。
 
 公告从未启用状态首次保存为启用状态时，公告文档和 `announcement.published` 事件在同一 PostgreSQL 事务中提交；再次编辑已发布公告不会产生新事件。部署此功能前必须先运行 `npm run migrate:database`，创建 append-only 的 `website_notification_events` 表。
 

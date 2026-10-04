@@ -1214,6 +1214,11 @@ describe('PostgreSQL optimization job admission', () => {
 
   it('persists a successful schedule into rolling workspace history and a durable effect outbox', async () => {
     const profileId = await seedProfile()
+    await query(
+      `insert into qqbot_account_bindings (id, user_id, qq_number, notifications_enabled, created_at)
+       select 'completion-binding', user_id, '123459999', true, now() from user_game_accounts where id = $1`,
+      [profileId],
+    )
     const existingHistory = Array.from({ length: 6 }, (_, index) => ({
       id: `history-${index}`,
       name: `History ${index}`,
@@ -1291,6 +1296,10 @@ describe('PostgreSQL optimization job admission', () => {
       formalScheduleResult('duplicate'),
     )).resolves.toBe(false)
     expect((await listProfileOptimizationResults(profileId, 'active', { limit: 50 })).items).toHaveLength(6)
+    expect((await query<{ count: string }>(
+      'select count(*)::text as count from qqbot_schedule_notifications where result_id = $1 and binding_id = $2',
+      [admitted.job.id, 'completion-binding'],
+    )).rows[0].count).toBe('1')
     expect((await store.listJobsByProfile(profileId))[0].historyResultId).toBe(admitted.job.id)
     await query('update optimization_result_history set archived_at = now() where profile_id = $1 and id = $2', [profileId, admitted.job.id])
     expect((await store.listJobsByProfile(profileId))[0].historyResultId).toBe(admitted.job.id)

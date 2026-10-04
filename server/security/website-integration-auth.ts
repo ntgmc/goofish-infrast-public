@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 import { jsonResponse } from '../handlers/license-utils'
 
 export type WebsiteIntegrationTokenName =
+  | 'WEBSITE_QQBOT_TOKEN'
   | 'WEBSITE_EVENTS_TOKEN'
   | 'WEBSITE_RELEASE_CONFIRMATION_TOKEN'
 
@@ -32,16 +33,13 @@ export function authenticateWebsiteIntegrationRequest(
   const authorization = req.headers.get('Authorization')
   const match = /^Bearer ([^\s]+)$/.exec(authorization ?? '')
   const presentedToken = match?.[1] ?? ''
-  const otherTokenName = tokenName === 'WEBSITE_EVENTS_TOKEN'
-    ? 'WEBSITE_RELEASE_CONFIRMATION_TOKEN'
-    : 'WEBSITE_EVENTS_TOKEN'
-  const otherConfiguredToken = process.env[otherTokenName]?.trim()
   const matchesExpectedToken = tokensMatch(configuredToken, presentedToken)
-  const matchesOtherSecurityDomain = Boolean(
-    otherConfiguredToken
-    && Buffer.byteLength(otherConfiguredToken, 'utf8') >= 32
-    && tokensMatch(otherConfiguredToken, presentedToken),
-  )
+  const matchesOtherSecurityDomain = (['WEBSITE_EVENTS_TOKEN', 'WEBSITE_RELEASE_CONFIRMATION_TOKEN', 'WEBSITE_QQBOT_TOKEN'] as const)
+    .filter((name) => name !== tokenName)
+    .some((name) => {
+      const otherToken = process.env[name]?.trim()
+      return Boolean(otherToken && Buffer.byteLength(otherToken, 'utf8') >= 32 && tokensMatch(otherToken, presentedToken))
+    })
   if (!matchesExpectedToken) {
     if (matchesOtherSecurityDomain) {
       return {

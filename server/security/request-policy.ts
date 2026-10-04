@@ -124,7 +124,7 @@ const adminTargetProfileShape = {
 }
 
 export const requestSchemas = {
-  cultivationPlan: strict({ profile_id: shortString(128), mode: z.enum(['all', 'normal', 'challenge']).default('all') }),
+  cultivationPlan: strict({ profile_id: shortString(128) }),
   depotValue: depotValueRequestSchema,
   adminSession: strict({ username: shortString(64), password: shortString(128) }),
   authRegister: strict({
@@ -362,6 +362,28 @@ export const requestSchemas = {
   qqBotRegistrationInvitation: strict({
     qq_number: z.string().trim().regex(/^[1-9][0-9]{4,11}$/),
   }),
+  qqBotPreferences: strict({ notifications_enabled: z.boolean() }),
+  qqBotBinding: strict({
+    qq_number: z.string().trim().regex(/^[1-9][0-9]{4,11}$/),
+    binding_code: z.string().regex(/^[A-Za-z0-9_-]{24}$/),
+  }),
+  qqBotAccountPreferences: strict({
+    qq_number: z.string().trim().regex(/^[1-9][0-9]{4,11}$/),
+    notifications_enabled: z.boolean(),
+  }),
+  qqBotNotificationAck: strict({
+    qq_number: z.string().trim().regex(/^[1-9][0-9]{4,11}$/),
+    notification_id: shortString(128),
+  }),
+  qqBotMaaExport: strict({
+    qq_number: z.string().trim().regex(/^[1-9][0-9]{4,11}$/),
+    binding_id: shortString(128),
+    profile_id: shortString(128),
+    result_id: shortString(128),
+    idempotency_key: shortString(120),
+    automatic: z.boolean().optional(),
+    use_coupon: z.literal(true).optional(),
+  }).refine((body) => !body.automatic || !body.use_coupon, { message: '自动发送不能消耗体验券。' }),
   usageStats: strict({
     event: shortString(64),
     announcement_id: optionalString(120),
@@ -727,6 +749,13 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/integrations/qqbot/registration-invitations', route({
     POST: json('standard', requestSchemas.qqBotRegistrationInvitation),
   })],
+  ['/api/integrations/qqbot/binding', route({ POST: json('standard', requestSchemas.qqBotBinding), DELETE: json('standard', requestSchemas.qqBotRegistrationInvitation) })],
+  ['/api/integrations/qqbot/account', route({ GET: none(), PATCH: json('standard', requestSchemas.qqBotAccountPreferences) }, ['qq_number'])],
+  ['/api/integrations/qqbot/notifications', route({ GET: none() }, ['limit', 'cursor'])],
+  ['/api/integrations/qqbot/notifications/ack', route({ POST: json('standard', requestSchemas.qqBotNotificationAck) })],
+  ['/api/integrations/qqbot/results', route({ GET: none() }, ['qq_number', 'profile_id', 'scope', 'cursor', 'limit'])],
+  ['/api/integrations/qqbot/maa-export', route({ POST: json('standard', requestSchemas.qqBotMaaExport) })],
+  ['/api/user/qqbot', route({ GET: none(), POST: none(), PATCH: json('standard', requestSchemas.qqBotPreferences), DELETE: none() })],
   ['/api/internal/releases/confirm', route({ POST: json('standard', requestSchemas.releaseConfirmation) })],
   ['/api/usage-stats', route({ POST: json('standard', requestSchemas.usageStats) }, ['admin'])],
   ['/api/admin/usage-stats', route({ GET: none() }, ['admin', 'format', 'from', 'to', 'range'])],

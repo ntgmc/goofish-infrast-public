@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router'
 import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import DebugModePanel from '../components/DebugModePanel'
+import QqBotSettingsPanel from '../components/QqBotSettingsPanel'
 import {
   apiJson,
   apiVoid,
@@ -72,6 +73,7 @@ export default function AccountSafetyPage() {
             <Link to="/tool/profiles?recovery=1" className="tool-secondary-action">{copy.features.recovery}</Link>
           </div>
         </section>
+        <QqBotSettingsPanel />
         <DebugModePanel />
         <section className="tool-panel p-6 sm:p-8">
           {deletion ? (

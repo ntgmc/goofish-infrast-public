@@ -23,6 +23,7 @@ import { parseOptimizationJobResult } from '../optimization/jobs/runtime-contrac
 import { confirmMeteredQuoteInTransaction, MeteredBillingQuoteError } from './metered-billing-store'
 import { insertProfileOptimizationResultInTransaction } from './optimization-result-store'
 import { CdkScenarioQuotaExceededError, releaseCdkScenarioQuotaInTransaction, releaseCdkScheduleQuotaInTransaction, reserveCdkScenarioQuotaInTransaction, settleCdkScenarioQuotaInTransaction } from './cdk-store'
+import { enqueueQqBotScheduleNotificationInTransaction } from './qqbot-store'
 import { productPolicies } from '../../src/lib/product-catalog'
 
 export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered'
@@ -2633,6 +2634,9 @@ async function persistScheduleCompletionInTransaction(
      on conflict (job_id, effect_type) do nothing`,
     [job.id, JSON.stringify({ status: 'pending', attempts: 0 }), nowIso],
   )
+  await enqueueQqBotScheduleNotificationInTransaction(client, {
+    profileId, resultId: job.id, title: persistedResult.title, now: nowIso,
+  })
   return persistedResult
 }
 
