@@ -11,6 +11,7 @@ import { useToolSession } from '../tool/useToolSession'
 import { useOptimizeWorkflow } from '../tool/optimize/useOptimizeWorkflow'
 import { useOptimizationTaskCenter } from '../tool/optimize/useOptimizationTaskCenter'
 import V2Dashboard from './V2Dashboard'
+import V2LoadingScreen from './V2LoadingScreen'
 import type { V2Session } from './OptionsDrawer'
 import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './sample-result'
 import './v2.css'
@@ -42,7 +43,12 @@ export default function V2Page() {
     }
   }
 
-  if (features.status === 'ready' && features.features.site && features.features.profiles && session.user && session.activeProfile && session.license && isSchedulableProfile(session.activeProfile)) {
+  if (features.status === 'loading') return <V2LoadingScreen />
+  if (features.status === 'error') return <V2LoadingScreen error={copy.features.load_failed_body} onRetry={features.retry} retryLabel={copy.features.retry} />
+  if (session.authStatus === 'loading') return <V2LoadingScreen />
+  if (session.authStatus === 'error') return <V2LoadingScreen error={copy.common.pages_ToolPage_003} onRetry={session.retryAuth} retryLabel={copy.common.pages_ToolPage_005} />
+
+  if (features.features.site && features.features.profiles && session.user && session.activeProfile && session.license && isSchedulableProfile(session.activeProfile)) {
     return <ConnectedDashboard key={session.activeProfile.id} session={session} />
   }
 
@@ -90,16 +96,27 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
   const latest = workflow.latestWorkspaceResult
   const current = workflow.finalResult ?? workflow.currentResult ?? workflow.historyItem?.result ?? null
   const generationDisabledReason = features.features.schedule_generation ? null : copy.features.schedule_read_only
+  const readLatestResult = useCallback(async () => {
+    if (!latest) return
+    loadedId.current = latest.id
+    setReading(true)
+    setError(null)
+    try {
+      await workflow.handleViewHistory(latest)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : copy.v2.resultLoadFailed)
+    } finally {
+      setReading(false)
+    }
+  }, [latest, workflow.handleViewHistory])
 
   useEffect(() => { if (current) setRetained(current) }, [current])
   useEffect(() => { if (workflow.currentResult || workflow.finalResult) setOperatorsChanged(false) }, [workflow.currentResult, workflow.finalResult])
   useEffect(() => {
     if (!latest || loadedId.current === latest.id || workflow.loading) return
-    loadedId.current = latest.id
-    if (workflow.currentResult || workflow.finalResult) return
-    setReading(true)
-    void workflow.handleViewHistory(latest).finally(() => setReading(false))
-  }, [latest, workflow.handleViewHistory, workflow.loading, workflow.currentResult, workflow.finalResult])
+    if (workflow.currentResult || workflow.finalResult) { loadedId.current = latest.id; return }
+    void readLatestResult()
+  }, [latest, readLatestResult, workflow.loading, workflow.currentResult, workflow.finalResult])
 
   async function generate() {
     if (generationDisabledReason) { setError(generationDisabledReason); return }
@@ -109,6 +126,18 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
   }
 
   const result = current ?? retained
+  const progress = workflow.progress && (workflow.progress.estimatePhase !== 'completed' || !current) && <div className="v2-progress"><ScheduleProgress progress={workflow.progress} />
+    {workflow.loading && activeJob && <button type="button" className="v2-button v2-button-secondary" disabled={tasks.busyJobId === activeJob.id || activeJob.cancellationRequested}
+      onClick={() => void tasks.cancel(activeJob)}>{tasks.busyJobId === activeJob.id || activeJob.cancellationRequested ? copy.v2.stopping : copy.v2.stopSchedule}</button>}
+    {tasks.error && <p role="alert" className="v2-error">{tasks.error}</p>}
+    {tasks.notice && <p role="status" className="v2-muted">{tasks.notice}</p>}
+  </div>
+  if (!result && latest) {
+    const pending = reading || loadedId.current !== latest.id
+    return <V2LoadingScreen error={pending ? null : error ?? workflow.workspaceError ?? copy.v2.resultLoadFailed} onRetry={() => void readLatestResult()}>
+      {progress}
+    </V2LoadingScreen>
+  }
   return <V2Dashboard session={session} result={result ?? SAMPLE_RESULT} operators={workflow.mergedOperators} config={workflow.activeConfig}
     sample={!result} configChanged={Boolean(result && (operatorsChanged || workflow.configDiffRows.length > 0 || session.configOverride))}
     onUpdateConfig={workflow.updateConfig}
@@ -119,17 +148,12 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
     }}
     onGenerate={() => void generate()} onExport={features.features.maa_export ? workflow.handleDownloadMAA : undefined}
     busy={workflow.loading || Boolean(workflow.workspaceBusyAction?.startsWith('download'))} loadingResult={reading} generationDisabledReason={generationDisabledReason}
-    onRetryResult={latest ? () => { setReading(true); void workflow.handleViewHistory(latest).finally(() => setReading(false)) } : undefined}
+    onRetryResult={latest ? () => void readLatestResult() : undefined}
     error={error ?? workflow.inlineError?.message ?? workflow.configToast?.message ?? workflow.workspaceError ?? (session.configSyncStatus === 'failed' ? copy.v2.saveFailed : null)}
     notice={workflow.workspaceNotice ?? (!features.features.schedule_generation ? copy.features.schedule_read_only : !result && !reading ? copy.v2.dataPending : null)}
     permission={workflow.permission} canEditConfig={workflow.userCanEditConfig} canViewAnalysis={workflow.userCanViewFullData && !result?.preview_limit}
     canUseIntermediateConfig={workflow.userCanUseIntermediateAutoConfig} history={workflow.resultHistory} onHistory={workflow.handleViewHistory}>
-    {workflow.progress && (workflow.progress.estimatePhase !== 'completed' || !current) && <div className="v2-progress"><ScheduleProgress progress={workflow.progress} />
-      {workflow.loading && activeJob && <button type="button" className="v2-button v2-button-secondary" disabled={tasks.busyJobId === activeJob.id || activeJob.cancellationRequested}
-        onClick={() => void tasks.cancel(activeJob)}>{tasks.busyJobId === activeJob.id || activeJob.cancellationRequested ? copy.v2.stopping : copy.v2.stopSchedule}</button>}
-      {tasks.error && <p role="alert" className="v2-error">{tasks.error}</p>}
-      {tasks.notice && <p role="status" className="v2-muted">{tasks.notice}</p>}
-    </div>}
+    {progress}
     {workflow.declarationDialog}
   </V2Dashboard>
 }

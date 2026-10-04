@@ -38,11 +38,12 @@ export function SiteFeatureProvider({ children }: { children: ReactNode }) {
       signal: controller.signal,
       fallbackMessage: copy.features.load_failed_body,
     }).then((data) => {
+      if (controller.signal.aborted) return
       setFeatures(computeEffectiveSiteFeatures(data))
       setUpdatedAt(data.updated_at)
       setStatus('ready')
     }).catch((error) => {
-      if ((error as Error).name === 'AbortError') return
+      if (controller.signal.aborted || (error as Error).name === 'AbortError') return
       setFeatures(CLOSED_FEATURES)
       setUpdatedAt(null)
       setStatus('error')

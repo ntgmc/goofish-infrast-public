@@ -119,6 +119,21 @@ describe('App public content routing', () => {
     await waitFor(() => expect(document.head.querySelector('meta[name="robots"]')).toHaveAttribute('content', 'noindex, nofollow'))
   })
 
+  it('keeps V2 service-state failures and retries in the V2 loading screen', async () => {
+    let requests = 0
+    const original = apiJson.getMockImplementation()!
+    apiJson.mockImplementation((url: string) => {
+      if (url === '/api/site/features' && ++requests === 1) return Promise.reject(new Error('offline'))
+      return original(url)
+    })
+    render(<MemoryRouter initialEntries={['/v2']}><App /></MemoryRouter>)
+    expect(await screen.findByRole('alert')).toHaveTextContent('相关功能当前不可用，请稍后重新获取服务状态。')
+    expect(document.querySelector('.v2-loading-screen')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '暂时无法获取服务状态' })).not.toBeInTheDocument()
+    await act(async () => screen.getByRole('button', { name: '重新获取' }).click())
+    expect(await screen.findByText('V2 test workspace')).toBeInTheDocument()
+  })
+
   it.each([
     ['/v2', 'v2'], ['/tools/manual-schedule', 'manual_schedule'], ['/tools/cultivation-plan', 'cultivation_plan'],
     ['/faq', 'faq'], ['/support', 'support'], ['/pricing', 'pricing'], ['/changelog', 'changelog'],

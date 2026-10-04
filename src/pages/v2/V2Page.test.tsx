@@ -76,6 +76,7 @@ function connect() {
   } as UserGameAccount
   session = {
     ...session,
+    authStatus: 'authenticated',
     user: { id: 'user-1', email: 'doctor@example.test' } as V2Session['user'],
     activeProfile: profile, cdkProfiles: [profile],
     license: { version: 2, order_hash: 'order', operators: SAMPLE_OPERATORS, config: SAMPLE_CONFIG, issued_at: '', sig: '' },
@@ -98,6 +99,63 @@ function connect() {
 }
 
 describe('V2 results-first workspace', () => {
+  it('waits for service and login restoration before showing a confirmed guest example', () => {
+    session.authStatus = 'loading'
+    mocks.features.mockReturnValue({ status: 'loading', features: DEFAULT_SITE_FEATURES, retry: vi.fn() })
+    const page = mount()
+    expect(screen.getByRole('status')).toHaveTextContent(copy.v2.loading)
+    expect(screen.queryByText(copy.v2.sampleSource)).not.toBeInTheDocument()
+
+    mocks.features.mockReturnValue({ status: 'ready', features: DEFAULT_SITE_FEATURES, retry: vi.fn() })
+    page.rerender(<MemoryRouter><V2Page /></MemoryRouter>)
+    expect(screen.getByRole('status')).toHaveTextContent(copy.v2.loading)
+    expect(screen.queryByText(copy.v2.sampleSource)).not.toBeInTheDocument()
+
+    session.authStatus = 'anonymous'
+    page.rerender(<MemoryRouter><V2Page /></MemoryRouter>)
+    expect(screen.getByText(copy.v2.sampleSource)).toBeInTheDocument()
+    expect(screen.queryByText(copy.v2.loading)).not.toBeInTheDocument()
+    expect(mocks.workflow).not.toHaveBeenCalled()
+  })
+
+  it('offers login recovery instead of switching to example data after a session error', async () => {
+    session.authStatus = 'error'
+    mount()
+    expect(screen.getByRole('alert')).toHaveTextContent(copy.common.pages_ToolPage_003)
+    expect(screen.queryByText(copy.v2.sampleSource)).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: copy.common.pages_ToolPage_005 }))
+    expect(session.retryAuth).toHaveBeenCalledOnce()
+    expect(mocks.workflow).not.toHaveBeenCalled()
+  })
+
+  it('shows an example once the personal workspace confirms there is no previous result', () => {
+    const workflow = connect()
+    workflow.latestWorkspaceResult = null as unknown as typeof summary
+    workflow.historyItem = null as unknown as typeof workflow.historyItem
+    workflow.resultHistory = []
+    mount()
+    expect(screen.getByText(copy.v2.sampleSource)).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(copy.v2.dataPending)
+    expect(workflow.handleViewHistory).not.toHaveBeenCalled()
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+  })
+
+  it('keeps restored task progress and cancellation available while the first result is pending', async () => {
+    const workflow = connect()
+    workflow.historyItem = null as unknown as typeof workflow.historyItem
+    workflow.loading = true
+    workflow.progress = { mode: 'generate', startedAt: Date.now(), jobId: 'running-job', estimatePhase: 'running' }
+    const job = { id: 'running-job', canCancel: true, cancellationRequested: false }
+    const cancel = vi.fn(async () => undefined)
+    mocks.tasks.mockReturnValue({ jobs: [job], cancel, busyJobId: null, error: null, notice: null })
+    mount()
+    expect(screen.getByText(copy.v2.loading)).toBeInTheDocument()
+    expect(screen.queryByText(copy.v2.sampleSource)).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: copy.v2.stopSchedule }))
+    expect(cancel).toHaveBeenCalledWith(job)
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+  })
+
   it('uses normalized backend station output and drone consumption without rescaling or averaging', async () => {
     const workflow = connect()
     workflow.historyItem = { result: { ...SAMPLE_RESULT, daily_production: {

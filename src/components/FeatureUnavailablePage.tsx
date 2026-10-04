@@ -8,10 +8,14 @@ import SklandIcon from './SklandIcon'
 import { copy } from '../copy/index'
 import { dashboardPath } from '../lib/app-routes'
 
-export function FeatureRoute({ feature, children }: { feature: SiteFeatureKey; children: React.ReactNode }) {
+export function FeatureRoute({ feature, children, renderPending }: {
+  feature: SiteFeatureKey
+  children: React.ReactNode
+  renderPending?: (status: 'loading' | 'error', retry: () => void) => React.ReactNode
+}) {
   const state = useSiteFeatures()
-  if (state.status === 'loading') return <SessionLoader label={copy.features.loading} />
-  if (state.status === 'error') return <FeatureUnavailablePage loadError onRetry={state.retry} />
+  if (state.status === 'loading') return renderPending?.('loading', state.retry) ?? <SessionLoader label={copy.features.loading} />
+  if (state.status === 'error') return renderPending?.('error', state.retry) ?? <FeatureUnavailablePage loadError onRetry={state.retry} />
   if (!state.features[feature]) return <FeatureUnavailablePage feature={feature} />
   return children
 }

@@ -137,6 +137,7 @@ export const v2Copy = {
   configChanged: '配置已修改，当前仍是上次结果。点击「重新排班」应用修改。',
   demoConfigChanged: '示例配置已修改，排班保持原样。登录后可生成个人方案。',
   dataPending: '先导入干员并调整基建配置，再点击「重新排班」生成个人方案。',
+  loading: '正在加载排班…',
   loadingResult: '正在读取最近一次排班…',
   resultLoadFailed: '最近一次排班读取失败，请重试。',
   retry: '重新读取',

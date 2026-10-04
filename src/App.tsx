@@ -7,6 +7,7 @@ import { motionTokens } from './components/MotionPrimitives'
 import RouteLifecycle from './components/RouteLifecycle'
 import RouteMetadata from './components/RouteMetadata'
 import SessionLoader from './components/SessionLoader'
+import V2LoadingScreen from './pages/v2/V2LoadingScreen'
 import LandingPage from './pages/LandingPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import VerifyEmailPage from './pages/VerifyEmailPage'
@@ -90,7 +91,9 @@ function AppContent() {
           <Route path="/terms" element={<LazyPage fallback={copy.common.App_006}><PublicInfoPage page="terms" /></LazyPage>} />
           <Route path="/disclaimer" element={<LazyPage fallback={copy.common.App_007}><PublicInfoPage page="disclaimer" /></LazyPage>} />
         </Route>
-        <Route path="/v2" element={<FeatureRoute feature="v2"><LazyPage fallback={copy.common.App_001}><V2Page /></LazyPage></FeatureRoute>} />
+        <Route path="/v2" element={<FeatureRoute feature="v2" renderPending={(status, retry) => <V2LoadingScreen
+          error={status === 'error' ? copy.features.load_failed_body : null} onRetry={retry} retryLabel={copy.features.retry} />}>
+          <Suspense fallback={<V2LoadingScreen />}><V2Page /></Suspense></FeatureRoute>} />
         <Route path="/tool/*" element={<LazyPage fallback={copy.common.App_001}><ToolPage /></LazyPage>} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
