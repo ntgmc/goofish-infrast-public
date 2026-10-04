@@ -13,6 +13,11 @@ type Metadata = {
 }
 
 const PUBLIC_METADATA: Record<string, Metadata> = {
+  '/tools/cultivation-plan': {
+    title: copy.tools.cultivation.title,
+    description: copy.tools.cultivation.description,
+    indexable: false,
+  },
   '/': {
     title: copy.metadata.components_RouteMetadata_002,
     description: DEFAULT_DESCRIPTION,

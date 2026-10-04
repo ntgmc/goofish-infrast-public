@@ -34,7 +34,7 @@ try {
   runNpm(['test'], temporaryRoot)
 
   const serverOutputs = (await readdir(join(temporaryRoot, 'server/dist'))).sort()
-  const expectedOutputs = ['index.js', 'index.js.map', 'migrate.js', 'migrate.js.map', 'routes.js', 'routes.js.map']
+  const expectedOutputs = ['import-prts-planning.js', 'import-prts-planning.js.map', 'index.js', 'index.js.map', 'migrate.js', 'migrate.js.map', 'routes.js', 'routes.js.map', 'sync-prts-planning.js', 'sync-prts-planning.js.map']
   if (JSON.stringify(serverOutputs) !== JSON.stringify(expectedOutputs)) {
     throw new Error(`public server output mismatch: ${serverOutputs.join(', ')}`)
   }

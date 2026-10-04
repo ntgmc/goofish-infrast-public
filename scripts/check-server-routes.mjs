@@ -25,6 +25,7 @@ const expectedRoutes = [
   '/api/auth/registration-settings',
   '/api/data',
   '/api/depot-value',
+  '/api/cultivation-plan',
   '/api/health',
   '/api/health/live',
   '/api/health/ready',

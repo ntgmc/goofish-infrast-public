@@ -23,6 +23,8 @@ const {
   initializeStatusHistory,
   shutdownStatusHistory,
   waitStatusHistory,
+  initializeCultivation,
+  shutdownCultivation,
 } = vi.hoisted(() => ({
   initializeJobProcessing: vi.fn(async () => undefined),
   initializeQueueMaintenance: vi.fn(async () => undefined),
@@ -46,6 +48,8 @@ const {
   initializeStatusHistory: vi.fn(async () => undefined),
   shutdownStatusHistory: vi.fn(),
   waitStatusHistory: vi.fn(async () => undefined),
+  initializeCultivation: vi.fn(),
+  shutdownCultivation: vi.fn(async () => undefined),
 }))
 
 vi.mock('./optimize-job-runner', () => ({
@@ -86,6 +90,7 @@ vi.mock('./service-status-history', () => ({
   shutdownServiceStatusHistory: shutdownStatusHistory,
   waitForServiceStatusHistoryIdle: waitStatusHistory,
 }))
+vi.mock('./cultivation/maintenance', () => ({ initializeCultivationMaintenance: initializeCultivation, shutdownCultivationMaintenance: shutdownCultivation }))
 
 import { apiOnlyProcessHooks } from './api-process-hooks'
 import { createCombinedProcessHooks } from './combined-process-hooks'
@@ -116,6 +121,8 @@ describe('API process hook compositions', () => {
     expect(shutdownAuthMaintenance).toHaveBeenCalledTimes(2)
     expect(shutdownStatusHistory).toHaveBeenCalledTimes(2)
     expect(waitStatusHistory).toHaveBeenCalledOnce()
+    expect(initializeCultivation).toHaveBeenCalledOnce()
+    expect(shutdownCultivation).toHaveBeenCalledTimes(2)
     expect(initializeJobProcessing).not.toHaveBeenCalled()
     expect(shutdownJobProcessing).not.toHaveBeenCalled()
   })
