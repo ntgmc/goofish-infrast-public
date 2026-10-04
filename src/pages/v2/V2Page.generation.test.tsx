@@ -75,6 +75,49 @@ afterEach(() => {
   vi.resetAllMocks()
 })
 
+it('waits for login and saved-result detail, then retries a failed read without showing example data', async () => {
+  let restoreAuth!: (payload: AuthSuccessResponse) => void
+  const authResponse = new Promise<AuthSuccessResponse>((resolve) => { restoreAuth = resolve })
+  let failHistory!: (error: Error) => void
+  const firstHistory = new Promise<never>((_resolve, reject) => { failHistory = reject })
+  let restoreHistory!: (payload: { item: typeof previous & { config: typeof SAMPLE_CONFIG; result: typeof newResult } }) => void
+  const secondHistory = new Promise<Parameters<typeof restoreHistory>[0]>((resolve) => { restoreHistory = resolve })
+  let historyReads = 0
+  vi.mocked(apiJson).mockImplementation(async (url) => {
+    if (url === '/api/auth/me') return authResponse
+    if (url.startsWith('/api/user/results/previous-result?')) return ++historyReads === 1 ? firstHistory : secondHistory
+    if (url.startsWith('/api/optimization/jobs?')) return { jobs: [], nextCursor: null }
+    if (url.startsWith('/api/user/status?')) return {}
+    if (url === '/api/user/inventory') return { stacks: [], capacities: [], recent_events: [] }
+    if (url === '/api/user/priority-coupon-balance') return { balances: [] }
+    throw new Error(`Unexpected API request: ${url}`)
+  })
+  render(<MemoryRouter initialEntries={['/v2']}><MotionPreferenceProvider><V2Page /></MotionPreferenceProvider></MemoryRouter>)
+  expect(screen.getByRole('status')).toHaveTextContent(copy.v2.loading)
+  expect(screen.queryByText(copy.v2.sampleSource)).not.toBeInTheDocument()
+
+  await act(async () => restoreAuth(auth))
+  await waitFor(() => expect(historyReads).toBe(1))
+  expect(screen.getByText(copy.v2.loading)).toBeInTheDocument()
+  expect(screen.queryByText(copy.v2.sampleSource)).not.toBeInTheDocument()
+  expect(screen.queryByRole('region', { name: copy.v2.lmd })).not.toBeInTheDocument()
+
+  await act(async () => failHistory(new Error('Cannot read saved schedule')))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Cannot read saved schedule')
+  expect(screen.queryByText(copy.v2.sampleSource)).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: copy.v2.retry }))
+  expect(screen.getByText(copy.v2.loading)).toBeInTheDocument()
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+
+  await act(async () => restoreHistory({ item: { ...previous, config: SAMPLE_CONFIG, result: newResult } }))
+  expect(await screen.findByText(copy.v2.ownSource)).toBeInTheDocument()
+  expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('12,345')).toBeInTheDocument()
+  expect(screen.queryByText(copy.v2.loading)).not.toBeInTheDocument()
+  expect(screen.queryByText(copy.v2.sampleSource)).not.toBeInTheDocument()
+  expect(historyReads).toBe(2)
+  expect(vi.mocked(apiJson).mock.calls.some(([_url, options]) => options?.method === 'POST')).toBe(false)
+})
+
 it.each(['submitted', 'restored'])('automatically displays a %s job result and dismisses completed progress', async (mode) => {
   let completeJob!: (job: OptimizationJobSnapshot) => void
   const completion = new Promise<OptimizationJobSnapshot>((resolve) => { completeJob = resolve })
