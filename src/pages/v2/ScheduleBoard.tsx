@@ -11,7 +11,6 @@ import ProductIcon from '../../components/ProductIcon'
 import { MotionNavIndicator, motionTokens } from '../../components/MotionPrimitives'
 import { useAppReducedMotion } from '../../lib/motion-preference'
 import type { OptimizeResult } from '../../lib/types'
-import V2Transition from './V2Transition'
 import TradingIcon from './TradingIcon'
 
 const text = copy.v2
@@ -51,6 +50,7 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, shift, 
 }) {
   const id = useId()
   const selected = Math.min(shift, Math.max(result.plans.length - 1, 0))
+  const layoutKey = `${view}-${selected}`
   const plan = prepared.plans[selected]
   const allRooms = buildBoardV2Rooms(plan, result.schedule_mode === 'rotation')
     .map((room) => ({ ...room, level: room.level ?? (String(result.buildingType).endsWith('3') ? MAXIMUM_LEVELS[room.roomType] : undefined) }))
@@ -109,26 +109,26 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, shift, 
         })}
       </div>
       <div id={`${id}-panel`} role="tabpanel" aria-labelledby={`${id}-tab-${selected}`} tabIndex={0}>
-        <V2Transition motionKey={String(selected)}>
+        <div className="v2-transition-pane">
         <div className="v2-board-meta"><span><Users size={14} />{text.assigned(count)}</span><span><Clock3 size={14} />{text.shiftHours(String(hours[selected] ?? 8))}</span></div>
         {roomGroups.filter((group) => group.rooms.length > 0).map((group) => (
           <section key={group.label} className="v2-room-group" aria-label={group.label}>
             <h3 className="v2-room-group-title">{group.label}</h3>
             <div className={`v2-room-grid ${view === 'list' ? 'v2-room-list' : ''}`}>
-              {group.rooms.map((room) => <RoomCard key={room.key} room={room} view={view} compact={group.compact} onClick={() => onRoom(room)}
+              {group.rooms.map((room) => <RoomCard key={room.key} room={room} layoutKey={layoutKey} compact={group.compact} onClick={() => onRoom(room)}
                 autofill={room.roomType === 'dormitory' && Boolean(plan?.rooms.dormitory?.[room.roomIndex]?.autofill)}
                 drone={isDroneTarget(plan?.drones, room.roomType, room.roomIndex)} />)}
             </div>
           </section>
         ))}
-        </V2Transition>
+        </div>
       </div>
     </section>
     </LayoutGroup></OperatorSkillPreview>
   )
 })
 
-function RoomCard({ room, view, drone = false, compact = false, autofill = false, onClick }: { room: BoardRoom; view: 'grid' | 'list'; drone?: boolean; compact?: boolean; autofill?: boolean; onClick: () => void }) {
+function RoomCard({ room, layoutKey, drone = false, compact = false, autofill = false, onClick }: { room: BoardRoom; layoutKey: string; drone?: boolean; compact?: boolean; autofill?: boolean; onClick: () => void }) {
   const reduceMotion = useAppReducedMotion()
   const layout = reduceMotion ? false : 'position'
   const Icon = ROOM_ICONS[room.roomType] ?? Building2
@@ -137,9 +137,9 @@ function RoomCard({ room, view, drone = false, compact = false, autofill = false
   const showBottom = !compact || room.product !== '-' || Boolean(efficiency)
   return (
     <motion.button type="button" className={`v2-room-card v2-room-${room.roomType} ${compact ? 'v2-room-card-compact' : ''}`} onClick={onClick}
-      layout={!reduceMotion} layoutDependency={view} transition={motionTokens.spring}
+      layout={!reduceMotion} layoutDependency={layoutKey} transition={motionTokens.spring}
       whileHover={reduceMotion ? undefined : { y: -2 }} whileTap={reduceMotion ? undefined : { scale: 0.99 }}>
-      <motion.div layout={layout} layoutDependency={view} transition={motionTokens.spring} className="v2-room-header">
+      <motion.div layout={layout} layoutDependency={layoutKey} transition={motionTokens.spring} className="v2-room-header">
         <span className="v2-room-icon"><Icon size={16} /></span>
         <span className="v2-room-title">{room.label}<small>{room.indexLabel}</small></span>
       </motion.div>
@@ -147,17 +147,20 @@ function RoomCard({ room, view, drone = false, compact = false, autofill = false
         {drone && <span className="v2-drone-tag" title={text.drones}><Drone size={16} /></span>}
         <ArrowUpRight size={14} className="v2-room-arrow" />
       </span>
-      <motion.div layout={layout} layoutDependency={view} transition={motionTokens.spring} className="v2-room-operators">
+      <motion.div layout={layout} layoutDependency={layoutKey} transition={motionTokens.spring} className="v2-room-operators">
         {room.row?.operators.map((operator) => (
-          <span className="v2-operator" key={operator.name} data-operator-name={operator.name}
+          <motion.span className="v2-operator" key={operator.name} data-operator-name={operator.name}
+            layout={layout} layoutDependency={layoutKey}
+            initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }}
+            transition={{ ...motionTokens.spring, opacity: { duration: reduceMotion ? 0 : motionTokens.duration.instant } }}
             data-operator-id={operator.id} data-operator-elite={operator.elite} data-operator-level={operator.level}>
             <Avatar operator={operator} small={compact} /><span>{operator.name}</span>
-          </span>
+          </motion.span>
         ))}
         {automaticDormitory && <span className="v2-muted">{room.row?.isAutofill ? room.row.operatorText : copy.domain.components_result_panel_formatters_005}</span>}
         {!room.row?.operators.length && !automaticDormitory && <span className="v2-muted">{copy.domain.result_board_v2.empty_room}</span>}
       </motion.div>
-      {showBottom && <motion.div layout={layout} layoutDependency={view} transition={motionTokens.spring} className="v2-room-bottom">
+      {showBottom && <motion.div layout={layout} layoutDependency={layoutKey} transition={motionTokens.spring} className="v2-room-bottom">
         {(!compact || room.product !== '-') && <span><ProductIcon product={room.product} size={18} />{room.product === '-' ? text.support : room.product}</span>}
         {efficiency && <span className="v2-room-efficiency"><span>{room.roomType === 'trading' ? text.equivalentEfficiency : text.efficiency}</span><strong>{efficiency}</strong></span>}
       </motion.div>}
