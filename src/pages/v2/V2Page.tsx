@@ -94,11 +94,11 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
   useEffect(() => { if (current) setRetained(current) }, [current])
   useEffect(() => { if (workflow.currentResult || workflow.finalResult) setOperatorsChanged(false) }, [workflow.currentResult, workflow.finalResult])
   useEffect(() => {
-    if (!latest || loadedId.current === latest.id || workflow.loading) return
+    if (!latest || loadedId.current === latest.id || workflow.loading || workflow.currentResult || workflow.finalResult) return
     loadedId.current = latest.id
     setReading(true)
     void workflow.handleViewHistory(latest).finally(() => setReading(false))
-  }, [latest, workflow.handleViewHistory, workflow.loading])
+  }, [latest, workflow.handleViewHistory, workflow.loading, workflow.currentResult, workflow.finalResult])
 
   async function generate() {
     if (generationDisabledReason) { setError(generationDisabledReason); return }
@@ -123,7 +123,7 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
     notice={workflow.workspaceNotice ?? (!features.features.schedule_generation ? copy.features.schedule_read_only : !result && !reading ? copy.v2.dataPending : null)}
     permission={workflow.permission} canEditConfig={workflow.userCanEditConfig} canViewAnalysis={workflow.userCanViewFullData && !result?.preview_limit}
     canUseIntermediateConfig={workflow.userCanUseIntermediateAutoConfig} history={workflow.resultHistory} onHistory={workflow.handleViewHistory}>
-    {workflow.progress && <div className="v2-progress"><ScheduleProgress progress={workflow.progress} />
+    {workflow.progress && (workflow.progress.estimatePhase !== 'completed' || !current) && <div className="v2-progress"><ScheduleProgress progress={workflow.progress} />
       {workflow.loading && activeJob && <button type="button" className="v2-button v2-button-secondary" disabled={tasks.busyJobId === activeJob.id || activeJob.cancellationRequested}
         onClick={() => void tasks.cancel(activeJob)}>{tasks.busyJobId === activeJob.id || activeJob.cancellationRequested ? copy.v2.stopping : copy.v2.stopSchedule}</button>}
       {tasks.error && <p role="alert" className="v2-error">{tasks.error}</p>}

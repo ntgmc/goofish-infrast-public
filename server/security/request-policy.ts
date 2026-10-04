@@ -124,7 +124,7 @@ const adminTargetProfileShape = {
 }
 
 export const requestSchemas = {
-  cultivationPlan: strict({ profile_id: shortString(128), mode: z.enum(['all', 'normal', 'challenge']).default('all') }),
+  cultivationPlan: strict({ profile_id: shortString(128) }),
   depotValue: depotValueRequestSchema,
   adminSession: strict({ username: shortString(64), password: shortString(128) }),
   authRegister: strict({
