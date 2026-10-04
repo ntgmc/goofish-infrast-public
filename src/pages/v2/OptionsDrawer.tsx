@@ -98,7 +98,7 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
         {isConfig && (
           <>
             {error && <p role="alert" className="v2-feedback v2-feedback-error">{error}</p>}
-            <ConfigEditor config={config} canEdit={canEditConfig} canEditIntermediateInventory={canUseIntermediateConfig}
+            <ConfigEditor profileId={session.activeProfile?.id} config={config} canEdit={canEditConfig} canEditIntermediateInventory={canUseIntermediateConfig}
               canSelectPreset={canUseIntermediateConfig} canEditFixedShiftHours={canEditConfig} permission={permission}
               validation={validateScheduleConfig(config)} onUpdate={onUpdateConfig} embedded />
             <button type="button" className="v2-button v2-button-primary v2-drawer-done" onClick={onClose}><Check size={16} />{text.done}</button>
