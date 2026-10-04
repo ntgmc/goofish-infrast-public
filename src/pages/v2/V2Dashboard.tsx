@@ -140,7 +140,13 @@ export default function V2Dashboard({ session, result, operators, config, sample
             <Metric label={text.lmd} value={formatAmount(prepared.productionStats.lmd)} unit={text.daily} product="LMD" />
             <Metric label={text.exp} value={formatAmount((prepared.productionStats.manufacturing['Battle Record'] ?? 0) * 1000)} unit={text.expUnit} product="Battle Record" />
             <Metric label={text.totalEfficiency} value={formatAmount(prepared.totalEff)} unit="%" hint={text.efficiencyHint} icon={<Activity size={20} />} />
-            <Metric label={text.sanity} value={prepared.productionSanity.value.toFixed(1)} unit={text.daily} hint={text.sanityHint} icon={<Gem size={20} />} />
+            <Metric
+              label={prepared.orundumEconomy ? text.opportunityCost : text.sanity}
+              value={(prepared.orundumEconomy?.opportunity_cost_sanity ?? prepared.productionSanity.value).toFixed(1)}
+              unit={prepared.orundumEconomy ? text.opportunityCostUnit : text.daily}
+              hint={prepared.orundumEconomy ? text.opportunityCostHint : text.sanityHint}
+              icon={<Gem size={20} />}
+            />
           </StaggeredReveal>
           <p className="v2-metrics-note">{text.outputSubtitle}</p>
           <div className="v2-content-tabs" role="group" aria-label={text.resultTabs}>
