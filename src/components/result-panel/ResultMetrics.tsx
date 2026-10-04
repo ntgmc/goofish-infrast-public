@@ -13,9 +13,11 @@ import { copy } from '../../copy/index'
 export default function ResultMetrics({
   isRotationMode,
   prepared,
+  summaryOnly = false,
 }: {
   isRotationMode: boolean;
   prepared: PreparedResult;
+  summaryOnly?: boolean;
 }) {
   const {
     totalEff,
@@ -24,11 +26,12 @@ export default function ResultMetrics({
     rotationStatsNote,
     productionStats,
     productionSanity,
-    orundumEconomy,
+    orundumEconomy: fullOrundumEconomy,
     intermediateDepletion,
     maaDefaultComparison,
     detailStats,
   } = prepared
+  const orundumEconomy = summaryOnly ? undefined : fullOrundumEconomy
   const showProductionMetrics = !isRotationMode || hasDailyProduction
   const showMaaDefaultComparison = Boolean(maaDefaultComparison) && !isRotationMode
   const orundumEconomyNote = orundumEconomy
@@ -57,7 +60,7 @@ export default function ResultMetrics({
             label={copy.domain.components_result_panel_ResultMetrics_017}
             value={totalEff.toFixed(2)}
             suffix="%"
-            note={rotationStatsNote ?? (Math.abs(totalEff - rawTotalEff) >= 0.05 ? `${copy.domain.components_result_panel_ResultMetrics_018}${rawTotalEff.toFixed(2)}%` : undefined)}
+            note={summaryOnly ? undefined : rotationStatsNote ?? (Math.abs(totalEff - rawTotalEff) >= 0.05 ? `${copy.domain.components_result_panel_ResultMetrics_018}${rawTotalEff.toFixed(2)}%` : undefined)}
             highlight
           />
         )}
@@ -79,12 +82,12 @@ export default function ResultMetrics({
               label={orundumEconomy ? copy.domain.components_result_panel_ResultMetrics_030 : copy.domain.components_result_panel_ResultMetrics_031}
               value={formatAmount(orundumEconomy?.short_term_orundum ?? productionSanity.value)}
               suffix={orundumEconomy ? copy.domain.components_result_panel_ResultMetrics_032 : copy.domain.components_result_panel_ResultMetrics_033}
-              note={orundumEconomy ? orundumEconomyNote : productionSanityNote}
+              note={summaryOnly ? undefined : orundumEconomy ? orundumEconomyNote : productionSanityNote}
             />
           </>
         )}
       </StaggeredReveal>
-      {intermediateDepletionSummary && (
+      {!summaryOnly && intermediateDepletionSummary && (
         <div className="border-t border-surface-3/60 px-5 py-3 text-xs leading-5 text-ink-secondary sm:px-6">
           <span className="font-medium text-ink-primary">{copy.domain.components_result_panel_ResultMetrics_034}</span>{intermediateDepletionSummary}
         </div>

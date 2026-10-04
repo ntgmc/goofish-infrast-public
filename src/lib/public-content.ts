@@ -3,7 +3,7 @@ import { copy } from '../copy/index'
 import { getSku, productPolicies } from './product-catalog'
 
 export const PUBLIC_CONTENT_VERSION = 1 as const
-export const PUBLIC_CONTENT_DEFAULTS_REVISION = 9 as const
+export const PUBLIC_CONTENT_DEFAULTS_REVISION = 10 as const
 export const PUBLIC_PRICING_PLAN_IDS = [
   'free_preview',
   'single_account_monthly',
@@ -265,6 +265,7 @@ export const DEFAULT_PUBLIC_CONTENT_DRAFT: PublicContentDraftV1 = {
       faq('data-security', copy.public.pages_PublicInfoPage_097, copy.public.pages_PublicInfoPage_098),
       faq('delete-account', copy.public.pages_PublicInfoPage_016, copy.public.pages_PublicInfoPage_017),
       faq('support-info', copy.public.pages_PublicInfoPage_099, copy.public.pages_PublicInfoPage_100),
+      ...copy.public.faq_additional_items.map((item) => faq(item.id, item.question, item.answer)),
       faq('qq-group', copy.publicContent.faq_join_question, copy.publicContent.faq_join_answer, 'qq_group'),
     ],
   },
@@ -364,14 +365,16 @@ export function resolvePublicContentSettings(value: unknown): { content: PublicC
   }
   const storedDefaultsRevision = normalizeDefaultsRevision(source.defaults_revision)
   const normalizedDraft = normalizePricingComparisonDefaults(parsed.data)
-  const migratedDraft = storedDefaultsRevision < 8
+  let migratedDraft = storedDefaultsRevision < 8
     ? migrateDefaultPricingContent(migrateLegacyDefaultCredits(normalizedDraft))
     : normalizedDraft
+  if (storedDefaultsRevision < 9) migratedDraft = migrateLegacyPricingCopy(migratedDraft)
+  if (storedDefaultsRevision < 10) migratedDraft = migrateDefaultFaqContent(migratedDraft)
   return {
     content: {
       version: PUBLIC_CONTENT_VERSION,
       defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION,
-      ...(storedDefaultsRevision < PUBLIC_CONTENT_DEFAULTS_REVISION ? migrateLegacyPricingCopy(migratedDraft) : migratedDraft),
+      ...migratedDraft,
       updated_at: typeof source.updated_at === 'string' ? source.updated_at : null,
     },
     isFallback: false,
@@ -436,6 +439,21 @@ function normalizePricingComparisonDefaults(draft: PublicContentDraftV1): Public
       }),
     },
   }
+}
+
+function migrateDefaultFaqContent(draft: PublicContentDraftV1): PublicContentDraftV1 {
+  const previous = copy.publicContent.legacy_faq
+  const current = DEFAULT_PUBLIC_CONTENT_DRAFT.faq
+  for (const field of ['intro', 'cta_heading', 'cta_body'] as const) {
+    if (draft.faq[field] === previous[field]) draft.faq[field] = current[field]
+  }
+  const unchangedItems = draft.faq.items.length === previous.items.length
+    && draft.faq.items.every((item, index) => {
+      const old = previous.items[index]
+      return item.id === old.id && item.question === old.question && item.answer === old.answer && item.action === old.action
+    })
+  if (unchangedItems) draft.faq.items = structuredClone(current.items)
+  return draft
 }
 
 function migrateLegacyPricingCopy(draft: PublicContentDraftV1): PublicContentDraftV1 {

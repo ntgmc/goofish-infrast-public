@@ -10,7 +10,7 @@ describe('preview search statistics', () => {
     }
     const projected = limitPreviewOptimizeResult(result)
     expect(projected.searched_state_count).toBe(count)
-    expect(projected).not.toHaveProperty('total_efficiency')
+    expect(projected.total_efficiency).toBe(100)
     expect(projected.preview_limit).toBeDefined()
   })
 })

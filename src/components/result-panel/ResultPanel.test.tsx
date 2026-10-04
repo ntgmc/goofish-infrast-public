@@ -549,6 +549,18 @@ describe('ResultPanel tabs', () => {
     expect(screen.getByRole('tab', { name: '导入' })).toBeInTheDocument()
   })
 
+  it('shows free-preview totals without detailed sanity calculations or exports', async () => {
+    const result = createResult()
+    result.preview_limit = { hidden_room_count: 0, notice: 'preview' }
+    result.daily_production = { manufacturing: { 'Pure Gold': 100 }, trading: { LMD: 50000 }, consumption: { 'Pure Gold': 100 } }
+    render(<ResultPanel result={result} fullDataAvailable={false} />)
+    await userEvent.setup().click(screen.getByRole('tab', { name: '数据' }))
+    expect(await screen.findByText('50,000')).toBeInTheDocument()
+    expect(screen.getByText(/赤金 100/)).toBeInTheDocument()
+    expect(screen.queryByText(/制造折算/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '下载完整计算数据' })).not.toBeInTheDocument()
+  })
+
   it('disables the MAA download while the request is in flight', async () => {
     const user = userEvent.setup()
     const onDownload = vi.fn()

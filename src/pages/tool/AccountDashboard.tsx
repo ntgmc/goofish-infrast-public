@@ -1,13 +1,14 @@
-import { lazy, Suspense, useDeferredValue, useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { LayoutGroup } from 'motion/react'
 import { Link } from 'react-router'
+import { ArrowUpRight } from 'lucide-react'
 import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
 import CompactHeaderMenu from '../../components/CompactHeaderMenu'
 import GuidedTour, { hasCompletedTour, useFirstRunTour, type TourDefinition } from '../../components/GuidedTour'
 import { AnimatedPresenceRegion, MotionNavIndicator, MotionSkeleton } from '../../components/MotionPrimitives'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
-import type { DashboardSection } from '../../lib/app-routes'
+import { profileScopedPath, type DashboardSection } from '../../lib/app-routes'
 import type { Announcement, AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
 import { copy } from '../../copy/index'
 import { DEFAULT_SITE_FEATURES, METERED_BILLING_AVAILABLE, type SiteFeatures } from '../../lib/site-features'
@@ -60,7 +61,6 @@ export default function AccountDashboard({
   features?: SiteFeatures
   workspaceEntry?: WorkspaceEntryState
 }) {
-  const displayedSection = useDeferredValue(section)
   const [redeemTourReplayToken, setRedeemTourReplayToken] = useState(0)
   const [suppressInitialRedeemTour] = useState(() => section === 'redeem' && !hasCompletedTour('dashboard-overview', 1))
   const dashboardTour = useFirstRunTour({ id: 'dashboard-overview', version: 1 })
@@ -101,13 +101,13 @@ export default function AccountDashboard({
     return true
   })
   const replayTour = () => {
-    if (displayedSection === 'redeem') setRedeemTourReplayToken((token) => token + 1)
+    if (section === 'redeem') setRedeemTourReplayToken((token) => token + 1)
     else dashboardTour.start()
   }
 
   return (
     <div className="tool-shell">
-      <aside className="tool-sidebar fixed inset-y-0 left-0 hidden w-64 px-4 py-5 lg:block">
+      <aside className="tool-sidebar fixed inset-y-0 left-0 hidden w-64 flex-col overflow-y-auto px-4 py-5 lg:flex">
         <div className="border-b border-surface-3 px-2 pb-5">
           <div className="flex items-center gap-3">
             <BrandLogo size="sm" />
@@ -129,10 +129,10 @@ export default function AccountDashboard({
                 aria-label={key === 'announcements' && announcementBadgeLabel
                   ? `${labels[key]} ${announcementBadgeLabel}`
                   : undefined}
-                aria-current={displayedSection === key ? 'page' : undefined}
+                aria-current={section === key ? 'page' : undefined}
                 className="tool-nav-link flex w-full items-center gap-2 px-3 text-left text-sm font-medium"
               >
-                {displayedSection === key && <MotionNavIndicator layoutId="dashboard-active" />}
+                {section === key && <MotionNavIndicator layoutId="dashboard-active" />}
                 <span className="relative z-10 min-w-0 flex-1 truncate">{labels[key]}</span>
                 {key === 'announcements' && announcementBadge && (
                   <AnnouncementUnreadBadge value={announcementBadge} label={announcementBadgeLabel!} />
@@ -142,16 +142,22 @@ export default function AccountDashboard({
           </nav>
         </LayoutGroup>
 
-        <nav
-          className="absolute inset-x-4 bottom-5 grid grid-cols-2 gap-2 border-t border-surface-3 pt-4"
-          aria-label={copy.common.pages_tool_AccountDashboard_017}
-        >
-          <Link to="/" className="tool-secondary-action w-full">
-            {copy.common.pages_tool_AccountDashboard_016}
+        <div className="mt-auto space-y-4 pt-8">
+          <Link to={profileScopedPath('/v2', activeProfile?.id ?? null)} className="tool-inset block p-3 text-sm text-ink-secondary">
+            <span className="flex min-h-11 items-center justify-between gap-2 font-medium text-brand-500">{copy.v2.testEntry}<ArrowUpRight size={16} /></span>
+            <span className="block text-xs leading-5">{copy.v2.testEntryDescription}</span>
           </Link>
-          <button type="button" onClick={onLogout} className="tool-danger-action w-full">
-            {copy.common.pages_tool_AccountDashboard_009}</button>
-        </nav>
+          <nav
+            className="grid grid-cols-2 gap-2 border-t border-surface-3 pt-4"
+            aria-label={copy.common.pages_tool_AccountDashboard_017}
+          >
+            <Link to="/" className="tool-secondary-action w-full">
+              {copy.common.pages_tool_AccountDashboard_016}
+            </Link>
+            <button type="button" onClick={onLogout} className="tool-danger-action w-full">
+              {copy.common.pages_tool_AccountDashboard_009}</button>
+          </nav>
+        </div>
       </aside>
 
       <main className="lg:pl-64" tabIndex={-1} data-route-focus>
@@ -160,12 +166,12 @@ export default function AccountDashboard({
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <BrandLogo size="sm" />
               <CompactHeaderMenu
-                ariaLabel={displayedSection === 'announcements' && announcementBadgeLabel
+                ariaLabel={section === 'announcements' && announcementBadgeLabel
                   ? `${copy.common.components_CompactHeaderMenu_001}，${announcementBadgeLabel}`
                   : copy.common.components_CompactHeaderMenu_001}
-                triggerLabel={labels[displayedSection]}
-                triggerBadge={displayedSection === 'announcements' ? announcementBadge : undefined}
-                triggerBadgeLabel={displayedSection === 'announcements' ? announcementBadgeLabel : undefined}
+                triggerLabel={labels[section]}
+                triggerBadge={section === 'announcements' ? announcementBadge : undefined}
+                triggerBadgeLabel={section === 'announcements' ? announcementBadgeLabel : undefined}
                 align="start"
                 tourTargets={sections.map((key) => `dashboard-nav-${key}`)}
                 className="min-w-0 flex-1 justify-between"
@@ -180,11 +186,12 @@ export default function AccountDashboard({
                     label: labels[key],
                     badge: key === 'announcements' ? announcementBadge : undefined,
                     badgeLabel: key === 'announcements' ? announcementBadgeLabel : undefined,
-                    current: displayedSection === key,
+                    current: section === key,
                     tourTarget: `dashboard-nav-${key}`,
                     onSelect: () => onSectionChange(key),
                   })),
                   { type: 'separator' as const, id: 'actions' },
+                  { type: 'link' as const, id: 'v2', label: copy.v2.testEntry, to: profileScopedPath('/v2', activeProfile?.id ?? null) },
                   { type: 'button' as const, id: 'tour', label: copy.dashboard.pages_tool_AccountDashboard_tour_001, onSelect: replayTour },
                   { type: 'link' as const, id: 'home', label: copy.common.pages_tool_AccountDashboard_016, to: '/' },
                   { type: 'button' as const, id: 'logout', label: copy.common.pages_tool_AccountDashboard_013, intent: 'danger' as const, onSelect: onLogout },
@@ -202,8 +209,8 @@ export default function AccountDashboard({
               <div className="min-w-0">
                 <p className="section-index">{copy.common.pages_tool_AccountDashboard_010}</p>
                 <div className="mt-1 flex items-center gap-2">
-                  <h1 className="display-title text-xl text-ink-primary">{labels[displayedSection]}</h1>
-                  {displayedSection === 'announcements' && announcementBadge && (
+                  <h1 className="display-title text-xl text-ink-primary">{labels[section]}</h1>
+                  {section === 'announcements' && announcementBadge && (
                     <AnnouncementUnreadBadge value={announcementBadge} label={announcementBadgeLabel!} />
                   )}
                 </div>
@@ -234,16 +241,16 @@ export default function AccountDashboard({
             </div>
           )}
           <Suspense fallback={<SectionFallback />}>
-            <AnimatedPresenceRegion motionKey={displayedSection}>
-              {displayedSection === 'profiles' && <ProfilesSection profiles={profiles} openingProfileId={openingProfileId} onOpen={onOpenProfile} onEdit={onPayload} meteredEnabled={features.metered_billing} />}
-              {displayedSection === 'commercial' && METERED_BILLING_AVAILABLE && features.metered_billing && <CommercialProfilesSection onOpen={onOpenProfile} />}
-              {displayedSection === 'tools' && <ToolsSection />}
-              {displayedSection === 'redeem' && <RedeemSection autoStartTour={!suppressInitialRedeemTour} tourReplayToken={redeemTourReplayToken} onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} onInventoryRedeemed={() => onSectionChange('inventory', { replace: true })} />}
-              {displayedSection === 'invitations' && <InvitationsSection />}
-              {displayedSection === 'inventory' && <InventorySection onPayload={onPayload} onLifetimeProfileCreated={() => onSectionChange('profiles', { replace: true })} onViewProfiles={() => onSectionChange('profiles')} />}
-              {displayedSection === 'balance' && METERED_BILLING_AVAILABLE && features.metered_billing && <BalanceSection redemptionEnabled={features.cdk_redemption} />}
-              {displayedSection === 'announcements' && <AnnouncementsSection onUnreadCountChange={onAnnouncementUnreadCountChange} />}
-              {displayedSection === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} onPayload={onPayload} workspaceEntry={workspaceEntry} />}
+            <AnimatedPresenceRegion motionKey={section}>
+              {section === 'profiles' && <ProfilesSection profiles={profiles} openingProfileId={openingProfileId} onOpen={onOpenProfile} onEdit={onPayload} meteredEnabled={features.metered_billing} />}
+              {section === 'commercial' && METERED_BILLING_AVAILABLE && features.metered_billing && <CommercialProfilesSection onOpen={onOpenProfile} />}
+              {section === 'tools' && <ToolsSection />}
+              {section === 'redeem' && <RedeemSection autoStartTour={!suppressInitialRedeemTour} tourReplayToken={redeemTourReplayToken} onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} onInventoryRedeemed={() => onSectionChange('inventory', { replace: true })} />}
+              {section === 'invitations' && <InvitationsSection />}
+              {section === 'inventory' && <InventorySection onPayload={onPayload} onLifetimeProfileCreated={() => onSectionChange('profiles', { replace: true })} onViewProfiles={() => onSectionChange('profiles')} />}
+              {section === 'balance' && METERED_BILLING_AVAILABLE && features.metered_billing && <BalanceSection redemptionEnabled={features.cdk_redemption} />}
+              {section === 'announcements' && <AnnouncementsSection onUnreadCountChange={onAnnouncementUnreadCountChange} />}
+              {section === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} onPayload={onPayload} workspaceEntry={workspaceEntry} />}
             </AnimatedPresenceRegion>
           </Suspense>
         </div>

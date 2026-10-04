@@ -447,6 +447,7 @@ export function useOptimizeWorkflow(props: Props) {
       return () => {
         cancelled = true
         optimizeInFlightRef.current = false
+        if (optimizeRestoreKeyRef.current === active.storageKey) optimizeRestoreKeyRef.current = null
       }
     }, [flushPendingLicenseSync, license.order_hash, optimizeSignature, pollOptimizeJob, profileId, refreshInventory, refreshRewardBalance, refreshWorkspaceResults])
 

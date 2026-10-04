@@ -81,6 +81,16 @@ describe('optimization job result projection', () => {
     expect(snapshot.result.daily_production).toBeDefined()
     expect(snapshot.result.total_efficiency).toBe(100)
   })
+
+  it('exposes aggregate production to a free-preview owner without exposing raw results', async () => {
+    mocks.getProfileForUser.mockResolvedValue({ id: 'profile-1', kind: 'free_preview', permission: 'growth' })
+    const response = await getOptimizationJob(request(), 'job-1')
+    expect(response.status).toBe(200)
+    const snapshot = await response.json()
+    expect(snapshot.result.daily_production.manufacturing).toEqual({ LMD: 1000 })
+    expect(snapshot.result.daily_production).not.toHaveProperty('details')
+    expect(snapshot.result.raw_results).toEqual([])
+  })
 })
 
 function request(): Request {

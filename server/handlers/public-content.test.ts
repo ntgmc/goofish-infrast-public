@@ -53,7 +53,7 @@ describe('public content handlers', () => {
     const body = await response.json()
     expect(body).toMatchObject({
       version: 1,
-      defaults_revision: 9,
+      defaults_revision: 10,
       cdk_purchase: { xianyu_url: DEFAULT_PUBLIC_CONTENT_DRAFT.cdk_purchase.xianyu_url },
       qq_group: { number: '891655477' },
     })

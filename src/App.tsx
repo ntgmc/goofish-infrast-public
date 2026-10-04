@@ -3,7 +3,7 @@ import { MotionConfig } from 'motion/react'
 import { Route, Routes, useLocation, useNavigate } from 'react-router'
 import BuildMetaStrip from './components/BuildMetaStrip'
 import DeploymentUpdatePrompt from './components/DeploymentUpdatePrompt'
-import { AnimatedPresenceRegion, motionTokens } from './components/MotionPrimitives'
+import { motionTokens } from './components/MotionPrimitives'
 import RouteLifecycle from './components/RouteLifecycle'
 import RouteMetadata from './components/RouteMetadata'
 import SessionLoader from './components/SessionLoader'
@@ -51,7 +51,6 @@ export default function App() {
 function AppContent() {
   const navigate = useNavigate()
   const location = useLocation()
-  const routeGroup = getRouteGroup(location.pathname)
 
   useEffect(() => {
     recordDebugNavigation(location.pathname)
@@ -69,34 +68,32 @@ function AppContent() {
     <div className="min-h-screen bg-surface-0 text-ink-primary">
       <RouteMetadata />
       <RouteLifecycle />
-      <AnimatedPresenceRegion motionKey={routeGroup} page>
-        <Routes location={location}>
-          <Route element={<PublicContentRoute />}>
-            <Route path="/" element={<LandingPage onStart={() => navigate('/tool/profiles')} />} />
-            <Route path="/changelog" element={<LazyPage fallback={copy.common.App_014}><ChangelogPage /></LazyPage>} />
-            <Route path="/faq" element={<LazyPage fallback={copy.common.App_003}><PublicInfoPage page="faq" /></LazyPage>} />
-            <Route path="/support" element={<LazyPage fallback={copy.common.App_004}><PublicInfoPage page="support" /></LazyPage>} />
-            <Route path="/pricing" element={<LazyPage fallback={copy.common.App_012}><PricingPage /></LazyPage>} />
-            <Route path="/thanks" element={<LazyPage fallback={copy.common.App_013}><ThanksPage /></LazyPage>} />
-            <Route path="/status" element={<LazyPage fallback={copy.status.pages_StatusPage_024}><StatusPage /></LazyPage>} />
-            <Route path="/privacy" element={<LazyPage fallback={copy.common.App_005}><PublicInfoPage page="privacy" /></LazyPage>} />
-            <Route path="/terms" element={<LazyPage fallback={copy.common.App_006}><PublicInfoPage page="terms" /></LazyPage>} />
-            <Route path="/disclaimer" element={<LazyPage fallback={copy.common.App_007}><PublicInfoPage page="disclaimer" /></LazyPage>} />
-          </Route>
-          <Route path="/v2" element={<LazyPage fallback={copy.common.App_001}><V2Page /></LazyPage>} />
-          <Route path="/tool/*" element={<LazyPage fallback={copy.common.App_001}><ToolPage /></LazyPage>} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/verify-email" element={<VerifyEmailPage />} />
-          <Route path="/cancel-account-deletion" element={<CancelAccountDeletionPage />} />
-          <Route path="/account-safety" element={<AccountSafetyPage />} />
-          <Route path="/announcements" element={<FeatureRoute feature="announcements"><LazyPage fallback={copy.common.App_002}><AnnouncementsPage /></LazyPage></FeatureRoute>} />
-          <Route path="/tools/depot-value" element={<FeatureRoute feature="depot_value"><LazyPage fallback={copy.common.App_009}><DepotValuePage /></LazyPage></FeatureRoute>} />
-          <Route path="/tools/manual-schedule" element={<FeatureRoute feature="tools"><FeatureRoute feature="schedule_generation"><LazyPage fallback={copy.tools.manualSchedule.loading}><ManualSchedulePage /></LazyPage></FeatureRoute></FeatureRoute>} />
-          <Route path="/admin/setup" element={<LazyPage fallback={copy.common.App_010}><AdminSetupPage /></LazyPage>} />
-          <Route path="/admin/*" element={<LazyPage fallback={copy.common.App_011}><AdminPage /></LazyPage>} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </AnimatedPresenceRegion>
+      <Routes>
+        <Route element={<PublicContentRoute />}>
+          <Route path="/" element={<LandingPage onStart={() => navigate('/tool/profiles')} />} />
+          <Route path="/changelog" element={<LazyPage fallback={copy.common.App_014}><ChangelogPage /></LazyPage>} />
+          <Route path="/faq" element={<LazyPage fallback={copy.common.App_003}><PublicInfoPage page="faq" /></LazyPage>} />
+          <Route path="/support" element={<LazyPage fallback={copy.common.App_004}><PublicInfoPage page="support" /></LazyPage>} />
+          <Route path="/pricing" element={<LazyPage fallback={copy.common.App_012}><PricingPage /></LazyPage>} />
+          <Route path="/thanks" element={<LazyPage fallback={copy.common.App_013}><ThanksPage /></LazyPage>} />
+          <Route path="/status" element={<LazyPage fallback={copy.status.pages_StatusPage_024}><StatusPage /></LazyPage>} />
+          <Route path="/privacy" element={<LazyPage fallback={copy.common.App_005}><PublicInfoPage page="privacy" /></LazyPage>} />
+          <Route path="/terms" element={<LazyPage fallback={copy.common.App_006}><PublicInfoPage page="terms" /></LazyPage>} />
+          <Route path="/disclaimer" element={<LazyPage fallback={copy.common.App_007}><PublicInfoPage page="disclaimer" /></LazyPage>} />
+        </Route>
+        <Route path="/v2" element={<LazyPage fallback={copy.common.App_001}><V2Page /></LazyPage>} />
+        <Route path="/tool/*" element={<LazyPage fallback={copy.common.App_001}><ToolPage /></LazyPage>} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/cancel-account-deletion" element={<CancelAccountDeletionPage />} />
+        <Route path="/account-safety" element={<AccountSafetyPage />} />
+        <Route path="/announcements" element={<FeatureRoute feature="announcements"><LazyPage fallback={copy.common.App_002}><AnnouncementsPage /></LazyPage></FeatureRoute>} />
+        <Route path="/tools/depot-value" element={<FeatureRoute feature="depot_value"><LazyPage fallback={copy.common.App_009}><DepotValuePage /></LazyPage></FeatureRoute>} />
+        <Route path="/tools/manual-schedule" element={<FeatureRoute feature="tools"><FeatureRoute feature="schedule_generation"><LazyPage fallback={copy.tools.manualSchedule.loading}><ManualSchedulePage /></LazyPage></FeatureRoute></FeatureRoute>} />
+        <Route path="/admin/setup" element={<LazyPage fallback={copy.common.App_010}><AdminSetupPage /></LazyPage>} />
+        <Route path="/admin/*" element={<LazyPage fallback={copy.common.App_011}><AdminPage /></LazyPage>} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
       <DeploymentUpdatePrompt />
       {location.pathname !== '/v2' && <BuildMetaStrip placement="corner" />}
     </div>
@@ -109,10 +106,4 @@ function LazyPage({ fallback, children }: { fallback: string; children: React.Re
       {children}
     </Suspense>
   )
-}
-
-function getRouteGroup(pathname: string): string {
-  if (pathname.startsWith('/tool/')) return 'tool'
-  if (pathname.startsWith('/admin/')) return 'admin'
-  return pathname
 }

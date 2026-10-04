@@ -5,36 +5,21 @@ import type { UsageReasonCode } from "../../storage/usage-store";
 import { settleCdkScheduleQuota } from '../../storage/cdk-store';
 import type { ScheduleUsageContext } from './shared';
 import { FREE_PREVIEW_MODE } from './shared';
+import { projectOptimizeResultForCapabilities } from '../../../src/lib/optimize-result-projection';
 
 export function getDownloadableHistoryResult(result: OptimizeResult): OptimizeResult {
   return result;
 }
 
 export function limitPreviewOptimizeResult(result: OptimizeResult): OptimizeResult {
-  const {
-    daily_production,
-    maa_default_comparison,
-    raw_results,
-    raw_total_efficiency,
-    total_efficiency,
-    upgrade_suggestions,
-    ...safeResult
-  } = result;
-  void daily_production;
-  void maa_default_comparison;
-  void raw_results;
-  void raw_total_efficiency;
-  void total_efficiency;
-  void upgrade_suggestions;
-
   return {
-    ...safeResult,
+    ...projectOptimizeResultForCapabilities(result, { kind: 'free_preview', permission: 'recommended' }),
     plans: result.plans ?? [],
     raw_results: [],
     preview_limit: {
       mode: FREE_PREVIEW_MODE,
       hidden_room_count: 0,
-      notice: "免费个人排班可查看完整游戏内轮换队列，但不包含导出、原始数据和高级分析。",
+      notice: "可查看完整游戏内轮换队列和总体产出。具体收益计算与完整数据导出需要高级版权益。",
     },
   };
 }

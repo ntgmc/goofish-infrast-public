@@ -38,7 +38,7 @@ export const SAMPLE_CONFIG = normalizeConfig({
 })
 
 function room(keys: Array<keyof typeof names>, efficiency: number, product?: string): ShiftRoom {
-  return { operators: keys.map((key) => names[key]), level: 3, efficiency, product }
+  return { operators: keys.map((key) => names[key]), level: keys.includes('amiya') ? 5 : 3, efficiency, product }
 }
 
 // These fixed example plans illustrate the interface; they are never presented as a computed personal result.

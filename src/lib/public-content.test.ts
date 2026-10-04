@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { copy } from '../copy/index'
 import {
   cloneDefaultPublicContentSettings,
   DEFAULT_PUBLIC_CONTENT_DRAFT,
@@ -50,7 +51,7 @@ describe('public content settings', () => {
     delete roi.single_account_monthly
 
     const migrated = normalizePublicContentSettings(legacy)
-    expect(migrated.defaults_revision).toBe(9)
+    expect(migrated.defaults_revision).toBe(10)
     expect(migrated.pricing.comparison_rows.find((row) => row.feature === '基建预设')).toMatchObject({
       id: preset.id,
       free_preview: '支持右满252（经验多 / 赤金多）与满血252',
@@ -97,11 +98,11 @@ describe('public content settings', () => {
     expect(() => parsePublicContentDraft(draft)).toThrow()
   })
 
-  it('provides a valid editable default with the CDK purchase link, QQ group, and nineteen FAQ items', () => {
+  it('provides a valid editable default with the CDK purchase link, QQ group, and forty-eight FAQ items', () => {
     const parsed = parsePublicContentDraft(DEFAULT_PUBLIC_CONTENT_DRAFT)
     expect(parsed.cdk_purchase.xianyu_url).toMatch(/^https:\/\//)
     expect(parsed.qq_group).toMatchObject({ number: '891655477', join_url: expect.stringMatching(/^https:\/\//) })
-    expect(parsed.faq.items).toHaveLength(19)
+    expect(parsed.faq.items).toHaveLength(48)
     expect(parsed.faq.items[parsed.faq.items.length - 1]).toMatchObject({ id: 'qq-group', action: 'qq_group' })
     expect(parsed.thanks.sections.map((section) => section.id)).toEqual(['data-community', 'developers', 'helpers'])
     expect(parsed.thanks.sections[1].entries[0]).toMatchObject({
@@ -226,7 +227,7 @@ describe('public content settings', () => {
     delete (intermediate as unknown as { defaults_revision?: number }).defaults_revision
     intermediate.thanks.sections[1].entries[0].avatar_url = 'https://avatars.githubusercontent.com/u/74061867?v=4'
     expect(normalizePublicContentSettings(intermediate)).toMatchObject({
-      defaults_revision: 9,
+      defaults_revision: 10,
       thanks: {
         sections: expect.arrayContaining([
           expect.objectContaining({
@@ -246,7 +247,7 @@ describe('public content settings', () => {
     legacy.pricing.intro = '先了解完整权益与限制，再选择适合自己的版本。现在提供月卡、半年卡、年卡、终身卡，以及个人和商用积分单次排班。'
 
     expect(normalizePublicContentSettings(legacy)).toMatchObject({
-      defaults_revision: 9,
+      defaults_revision: 10,
       pricing: {
         eyebrow: 'Pricing',
         intro: '个人维护方案有 30 天、90 天、365 天和终身卡可选，每份方案绑定一个游戏 UID。',
@@ -315,7 +316,7 @@ describe('public content settings', () => {
     delete (legacy as unknown as { cdk_purchase?: unknown }).cdk_purchase
 
     const migrated = normalizePublicContentSettings(legacy)
-    expect(migrated.defaults_revision).toBe(9)
+    expect(migrated.defaults_revision).toBe(10)
     expect(migrated.qq_group.name).toBe('管理员自定义群名')
     expect(migrated.cdk_purchase.xianyu_url).toBe(DEFAULT_PUBLIC_CONTENT_DRAFT.cdk_purchase.xianyu_url)
 
@@ -331,6 +332,50 @@ describe('public content settings', () => {
   it('falls back to a fresh default for invalid stored records', () => {
     const fallback = normalizePublicContentSettings({ version: 0 })
     fallback.faq.items.splice(0, 1)
-    expect(cloneDefaultPublicContentSettings().faq.items).toHaveLength(19)
+    expect(cloneDefaultPublicContentSettings().faq.items).toHaveLength(48)
+  })
+
+  it('upgrades the untouched stored FAQ without changing other content or its timestamp', () => {
+    const stored = {
+      ...cloneDefaultPublicContentSettings(),
+      defaults_revision: 9,
+      updated_at: '2026-10-01T00:00:00.000Z',
+    }
+    Object.assign(stored.faq, structuredClone(copy.publicContent.legacy_faq))
+    stored.qq_group.name = '管理员自定义群名'
+    stored.pricing.intro = copy.publicContent.retired_pricing_intro
+
+    const migrated = normalizePublicContentSettings(stored)
+    expect(migrated.faq).toEqual(DEFAULT_PUBLIC_CONTENT_DRAFT.faq)
+    expect(migrated.defaults_revision).toBe(10)
+    expect(migrated.updated_at).toBe(stored.updated_at)
+    expect(migrated.qq_group).toEqual(stored.qq_group)
+    expect(migrated.pricing).toEqual(stored.pricing)
+    expect(normalizePublicContentSettings(migrated)).toEqual(migrated)
+    expect(stored.faq.items).toHaveLength(19)
+  })
+
+  it.each(['edited', 'reordered', 'removed', 'added', 'empty', 'full'] as const)('preserves a %s FAQ list during the default upgrade', (change) => {
+    const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 9 }
+    Object.assign(stored.faq, structuredClone(copy.publicContent.legacy_faq))
+    stored.faq.intro = '管理员自定义介绍'
+    stored.faq.cta_heading = '管理员自定义标题'
+    stored.faq.cta_body = '管理员自定义说明'
+    if (change === 'edited') stored.faq.items[0].answer = '管理员自定义答案'
+    if (change === 'reordered') stored.faq.items.reverse()
+    if (change === 'removed') stored.faq.items.splice(0, 1)
+    if (change === 'added') stored.faq.items.push({ id: 'custom', question: '自定义问题', answer: '自定义答案', action: 'none' })
+    if (change === 'empty') stored.faq.items = []
+    if (change === 'full') stored.faq.items = Array.from({ length: 50 }, (_, index) => ({ id: `custom-${index}`, question: '自定义问题', answer: '自定义答案', action: 'none' }))
+
+    const migrated = normalizePublicContentSettings(stored)
+    expect(migrated.faq).toEqual(stored.faq)
+    expect(normalizePublicContentSettings(migrated)).toEqual(migrated)
+  })
+
+  it('does not reapply the FAQ upgrade after an administrator restores earlier copy', () => {
+    const stored = cloneDefaultPublicContentSettings()
+    Object.assign(stored.faq, structuredClone(copy.publicContent.legacy_faq))
+    expect(normalizePublicContentSettings(stored).faq).toEqual(stored.faq)
   })
 })

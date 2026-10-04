@@ -3,11 +3,13 @@ import { useSearchParams } from 'react-router'
 import { copy } from '../../copy'
 import ScheduleProgress from '../../components/ScheduleProgress'
 import { normalizeConfig } from '../../lib/config'
+import { hasCapability } from '../../lib/product-catalog'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import type { LicenseConfig, LicenseOperator, OptimizeResult } from '../../lib/types'
-import { isSchedulableProfile } from '../tool/tool-utils'
+import { getEffectiveProfilePermission, isFreePreviewProfile, isSchedulableProfile } from '../tool/tool-utils'
 import { useToolSession } from '../tool/useToolSession'
 import { useOptimizeWorkflow } from '../tool/optimize/useOptimizeWorkflow'
+import { useOptimizationTaskCenter } from '../tool/optimize/useOptimizationTaskCenter'
 import V2Dashboard from './V2Dashboard'
 import type { V2Session } from './OptionsDrawer'
 import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './sample-result'
@@ -21,6 +23,8 @@ export default function V2Page() {
   const [operators, setOperators] = useState(SAMPLE_OPERATORS)
   const [changed, setChanged] = useState(false)
   const activeConfig = session.configOverride ?? session.workspace?.config ?? config
+  const profile = session.activeProfile
+  const permission = profile ? getEffectiveProfilePermission(profile) : undefined
   const updateConfig = (mutate: (config: LicenseConfig) => void) => {
     const next = normalizeConfig(activeConfig)
     mutate(next)
@@ -31,7 +35,7 @@ export default function V2Page() {
   async function importOperators(next: LicenseOperator[]) {
     if (session.user && session.activeProfile) {
       if (!await session.flushConfigSave()) throw new Error(copy.v2.saveFailed)
-      await session.persistWorkspacePatch({ operators: next, config: normalizeConfig(activeConfig), elite_overrides: {} })
+      await session.persistWorkspacePatch({ operators: next, elite_overrides: {} })
     } else {
       setOperators(next)
       setChanged(true)
@@ -43,7 +47,10 @@ export default function V2Page() {
   }
 
   return <V2Dashboard session={session} result={SAMPLE_RESULT} operators={session.workspace?.operators ?? operators} config={activeConfig}
-    sample configChanged={changed} onUpdateConfig={updateConfig} onImportOperators={importOperators} />
+    sample configChanged={changed} onUpdateConfig={updateConfig} onImportOperators={importOperators}
+    permission={permission} canEditConfig={!profile || hasCapability({ permission }, 'edit_full_config')}
+    canUseIntermediateConfig={!profile || isFreePreviewProfile(profile) || hasCapability({ permission }, 'use_intermediate_auto_config')}
+    canViewAnalysis={!profile || hasCapability({ kind: profile.kind, permission }, 'view_full_data')} />
 }
 
 function ConnectedDashboard({ session }: { session: V2Session }) {
@@ -78,6 +85,8 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
     redeemedNotice: null,
     onProfileUpgraded: session.applyAuthPayload,
   })
+  const tasks = useOptimizationTaskCenter(profile.id, workflow.loading)
+  const activeJob = tasks.jobs.find((job) => job.id === workflow.progress?.jobId && job.canCancel)
   const latest = workflow.latestWorkspaceResult
   const current = workflow.finalResult ?? workflow.currentResult ?? workflow.historyItem?.result ?? null
   const generationDisabledReason = features.features.schedule_generation ? null : copy.features.schedule_read_only
@@ -112,9 +121,14 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
     onRetryResult={latest ? () => { setReading(true); void workflow.handleViewHistory(latest).finally(() => setReading(false)) } : undefined}
     error={error ?? workflow.inlineError?.message ?? workflow.configToast?.message ?? workflow.workspaceError ?? (session.configSyncStatus === 'failed' ? copy.v2.saveFailed : null)}
     notice={workflow.workspaceNotice ?? (!features.features.schedule_generation ? copy.features.schedule_read_only : !result && !reading ? copy.v2.dataPending : null)}
-    permission={workflow.permission} canEditConfig={workflow.userCanEditConfig || workflow.isPreviewProfile}
+    permission={workflow.permission} canEditConfig={workflow.userCanEditConfig} canViewAnalysis={workflow.userCanViewFullData && !result?.preview_limit}
     canUseIntermediateConfig={workflow.userCanUseIntermediateAutoConfig} history={workflow.resultHistory} onHistory={workflow.handleViewHistory}>
-    {workflow.loading && workflow.progress && <div className="v2-progress"><ScheduleProgress progress={workflow.progress} /></div>}
+    {workflow.progress && <div className="v2-progress"><ScheduleProgress progress={workflow.progress} />
+      {workflow.loading && activeJob && <button type="button" className="v2-button v2-button-secondary" disabled={tasks.busyJobId === activeJob.id || activeJob.cancellationRequested}
+        onClick={() => void tasks.cancel(activeJob)}>{tasks.busyJobId === activeJob.id || activeJob.cancellationRequested ? copy.v2.stopping : copy.v2.stopSchedule}</button>}
+      {tasks.error && <p role="alert" className="v2-error">{tasks.error}</p>}
+      {tasks.notice && <p role="status" className="v2-muted">{tasks.notice}</p>}
+    </div>}
     {workflow.declarationDialog}
   </V2Dashboard>
 }
