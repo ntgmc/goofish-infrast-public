@@ -145,7 +145,6 @@ export const v2Copy = {
   allRooms: '全部设施与干员安排',
   exportUnavailable: '游戏内轮换模式不生成 MAA JSON。',
   chooseProfile: '切换档案前请等待当前排班完成。',
-  loadingConfig: '正在加载配置选项…',
   saveFailed: '配置保存失败，请重试后再生成排班。',
   elite: (elite: number) => `精英${elite}`,
   operatorLevel: (level?: number | string) => level === undefined ? '等级未知' : `Lv.${level}`,

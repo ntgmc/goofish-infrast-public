@@ -159,6 +159,34 @@ describe('V2 results-first workspace', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
+  it('refreshes cached teams and expanded skills when saved training and the result change', async () => {
+    const workflow = connect()
+    const user = userEvent.setup()
+    const page = mount()
+    await user.click(screen.getByRole('button', { name: copy.v2.operators }))
+    const dialog = within(await screen.findByRole('dialog'))
+    await user.type(dialog.getByRole('textbox', { name: copy.v2.searchOperators }), '银灰')
+    expect(dialog.queryByText('喀兰之主')).not.toBeInTheDocument()
+    await user.click(dialog.getByText(copy.domain.building_skills.title))
+    expect((await dialog.findByText('喀兰之主')).closest('.v2-skill')).toHaveClass('v2-skill-active')
+
+    workflow.mergedOperators = SAMPLE_OPERATORS.map((operator) => operator.name === '银灰' ? { ...operator, elite: 0, level: 1 } : operator)
+    const nextResult = structuredClone(SAMPLE_RESULT)
+    nextResult.plans[0].rooms.trading[0].level = 2
+    workflow.historyItem = { result: nextResult }
+    page.rerender(<MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter>)
+    expect(dialog.getByText('喀兰之主').closest('.v2-skill')).toHaveClass('v2-skill-locked')
+    expect(dialog.getByText('喀兰贸易·α').closest('.v2-skill')).toHaveClass('v2-skill-active')
+    await user.click(dialog.getByText(copy.domain.building_skills.title))
+    await waitFor(() => expect(dialog.queryByText('喀兰之主')).not.toBeInTheDocument())
+    await dismissDrawer(user)
+    const card = screen.getByRole('button', { name: /贸易站.*银灰/ })
+    expect(card).toHaveTextContent('Lv.2')
+    expect(card.querySelector('[data-operator-name="银灰"]')).toHaveAttribute('data-operator-elite', '0')
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+    expect(session.persistWorkspacePatch).not.toHaveBeenCalled()
+  })
+
   it('switches teams by mouse and keyboard and exposes room details on demand', async () => {
     const user = userEvent.setup()
     mount()
@@ -208,7 +236,7 @@ describe('V2 results-first workspace', () => {
     expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
   })
 
-  it('restores focus and releases the modal after its exit animation before reopening', async () => {
+  it('restores focus and releases the modal before reopening', async () => {
     const user = userEvent.setup()
     mount()
     const opener = screen.getByRole('button', { name: copy.v2.operators })

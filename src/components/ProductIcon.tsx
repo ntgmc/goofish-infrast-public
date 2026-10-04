@@ -25,6 +25,7 @@ export default function ProductIcon({ product, size = 32 }: { product: string; s
       aria-hidden="true"
       width={size}
       height={size}
+      decoding="async"
       style={{ width: size, height: size }}
       className="shrink-0 object-contain"
     />

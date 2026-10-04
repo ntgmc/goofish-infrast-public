@@ -1,11 +1,11 @@
-import { lazy, Suspense, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { ArrowRight, Check, FileClock, LogOut, Search, Upload, UserRound } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
 import AuthForm from '../../components/AuthForm'
+import ConfigEditor from '../../components/ConfigEditor'
 import SklandBindingDialog from '../../components/SklandBindingDialog'
 import SklandIcon from '../../components/SklandIcon'
-import { Dialog, DialogDescription, DialogTitle } from '../../components/ui/dialog'
-import { MotionDrawerContent } from '../../components/ui/motion-drawer'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/dialog'
 import { copy } from '../../copy'
 import { validateScheduleConfig } from '../../lib/config'
 import { useSiteFeatures } from '../../lib/site-feature-context'
@@ -20,7 +20,6 @@ import { getProfileAccessLabel, parseOperatorsText } from '../tool/tool-utils'
 import V2Transition from './V2Transition'
 import BuildingSkills from './BuildingSkills'
 
-const ConfigEditor = lazy(() => import('../../components/ConfigEditor'))
 const text = copy.v2
 export type OptionPanel = 'operators' | 'config' | 'account' | 'cdk' | 'history' | 'room'
 export type V2Session = ReturnType<typeof useToolSession>
@@ -57,6 +56,7 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
   const [importError, setImportError] = useState<string | null>(null)
   const [importDone, setImportDone] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
+  const opener = useRef<HTMLElement | null>(null)
   const featureState = useSiteFeatures()
   const isConfig = panel === 'config'
   const description = isConfig ? sample ? text.demoConfigDescription : text.configDescription
@@ -83,7 +83,9 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
 
   return (
     <Dialog open={panel !== null} onOpenChange={(open) => { if (!open) onClose() }}>
-      <MotionDrawerContent open={panel !== null} className={`v2-drawer ${isConfig ? 'v2-drawer-wide' : ''}`} closeLabel={text.close}>
+      <DialogContent className={`v2-drawer ${isConfig ? 'v2-drawer-wide' : ''}`} showCloseButton closeLabel={text.close}
+        onOpenAutoFocus={() => { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null }}
+        onCloseAutoFocus={(event) => { event.preventDefault(); if (opener.current?.isConnected) opener.current.focus({ preventScroll: true }) }}>
         <div className="v2-drawer-heading">
           <DialogTitle>{panel === 'room' && room ? `${room.label} ${room.indexLabel}` : panel ? titles[panel] : ''}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -92,11 +94,9 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
         {isConfig && (
           <>
             {error && <p role="alert" className="v2-feedback v2-feedback-error">{error}</p>}
-            <Suspense fallback={<p className="v2-muted">{text.loadingConfig}</p>}>
-              <ConfigEditor config={config} canEdit={canEditConfig} canEditIntermediateInventory={canUseIntermediateConfig}
-                canSelectPreset={canUseIntermediateConfig} canEditFixedShiftHours={canEditConfig} permission={permission}
-                validation={validateScheduleConfig(config)} onUpdate={onUpdateConfig} embedded />
-            </Suspense>
+            <ConfigEditor config={config} canEdit={canEditConfig} canEditIntermediateInventory={canUseIntermediateConfig}
+              canSelectPreset={canUseIntermediateConfig} canEditFixedShiftHours={canEditConfig} permission={permission}
+              validation={validateScheduleConfig(config)} onUpdate={onUpdateConfig} embedded />
             <button type="button" className="v2-button v2-button-primary v2-drawer-done" onClick={onClose}><Check size={16} />{text.done}</button>
           </>
         )}
@@ -189,7 +189,7 @@ export default function OptionsDrawer({ panel, onClose, session, config, operato
             : item}</li>)}</ul>
         </div>}
         </V2Transition>
-      </MotionDrawerContent>
+      </DialogContent>
       <SklandBindingDialog open={sklandOpen} profile={session.activeProfile} onOpenChange={setSklandOpen}
         onPayload={(payload) => {
           if (!payload.user) return

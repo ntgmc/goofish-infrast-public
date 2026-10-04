@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from 'react'
+import { useCallback, useId, useMemo, useState, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent, useReducedMotion } from 'motion/react'
 import { Activity, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, CalendarClock, Check, ChevronDown, ChevronRight, Download, Factory, FileClock, Gem, LayoutDashboard, Menu, RefreshCw, Settings2, ShieldCheck, Sparkles, Users, WalletCards, X, Zap } from 'lucide-react'
 import { Link } from 'react-router'
@@ -55,16 +55,16 @@ export default function V2Dashboard({ session, result, operators, config, sample
   const [boardView, setBoardView] = useState<'grid' | 'list'>('grid')
   const [mobileNavigation, setMobileNavigation] = useState(false)
   const [downloadNotice, setDownloadNotice] = useState(false)
-  const reduceMotion = useReducedMotion()
   const motionId = useId()
-  const prepared = prepareResult(result, result.schedule_mode === 'rotation', result.dormitory_rule === 'maa_pure_autofill', operators)
-  const sortedOperators = sortOperatorsForPreview(operators)
-  const owned = sortedOperators.filter((operator) => operator.own)
+  const prepared = useMemo(() => prepareResult(result, result.schedule_mode === 'rotation', result.dormitory_rule === 'maa_pure_autofill', operators), [result, operators])
+  const sortedOperators = useMemo(() => sortOperatorsForPreview(operators), [operators])
+  const owned = useMemo(() => sortedOperators.filter((operator) => operator.own), [sortedOperators])
   const resultMode = normalizeScheduleMode(result.schedule_mode)
   const configMode = normalizeScheduleMode(config.schedule_mode)
   const hours = parseShiftHours(config.shift_hours) ?? [8, 8, 8]
   const name = session.activeProfile?.display_name ?? text.guest
-  const openPanel = (next: OptionPanel) => { setPanel(next); setMobileNavigation(false) }
+  const openPanel = useCallback((next: OptionPanel) => { setPanel(next); setMobileNavigation(false) }, [])
+  const openRoom = useCallback((next: BoardRoom) => { setRoom(next); openPanel('room') }, [openPanel])
 
   function downloadSample() {
     const url = URL.createObjectURL(new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' }))
@@ -114,9 +114,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
             <button className="v2-profile-button" type="button" onClick={() => openPanel('account')}><span className="v2-profile-avatar">{name.slice(0, 1)}</span><span>{name}</span><ChevronDown size={14} /></button>
           </div>
         </header>
-        <motion.main className="v2-main" tabIndex={-1} data-route-focus
-          initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: motionTokens.duration.page, ease: motionTokens.ease.enter }}>
+        <main className="v2-main" tabIndex={-1} data-route-focus>
           <div className="v2-page-title"><h1>{text.title}</h1></div>
           <div className="v2-ready-banner">
             <span className="v2-ready-icon"><Check size={25} strokeWidth={2} /></span>
@@ -155,8 +153,8 @@ export default function V2Dashboard({ session, result, operators, config, sample
                 ? <IncomeAnalysis result={result} />
                 : <div className="v2-analysis-note"><ShieldCheck size={21} /><div><p>{text.previewAnalysis}</p><Link className="v2-text-button" to="/pricing">{text.comparePlans}<ArrowRight size={14} /></Link></div></div>}</section>
             ) : (
-              <ScheduleBoard result={result} operators={operators} expanded={view === 'details'} shift={shift} onShiftChange={setShift}
-                view={boardView} onViewChange={setBoardView} onRoom={(nextRoom) => { setRoom(nextRoom); openPanel('room') }} />
+              <ScheduleBoard result={result} prepared={prepared} expanded={view === 'details'} shift={shift} onShiftChange={setShift}
+                view={boardView} onViewChange={setBoardView} onRoom={openRoom} />
             )}
             {view === 'summary' && <aside className="v2-result-aside">
               <section className="v2-panel v2-production-panel">
@@ -185,7 +183,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
           </V2Transition>
           <div className="v2-sample-notice"><span className="v2-notice-icon"><Sparkles size={16} /></span><p>{sample && <>{text.sampleHint} </>}{text.estimateNotice}</p>{sample && <button type="button" onClick={() => openPanel('account')}>{session.user ? text.account : text.login}<ArrowRight size={14} /></button>}</div>
           <footer className="v2-footer"><span>{text.brand}</span><nav><Link to="/terms">{text.terms}</Link><Link to="/privacy">{text.privacy}</Link></nav></footer>
-        </motion.main>
+        </main>
       </div>
       <OptionsDrawer panel={panel} onClose={() => setPanel(null)} session={session} config={config} operators={sortedOperators}
         onUpdateConfig={onUpdateConfig} permission={permission} canEditConfig={canEditConfig} canUseIntermediateConfig={canUseIntermediateConfig}

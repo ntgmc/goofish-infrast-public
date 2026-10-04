@@ -1,15 +1,15 @@
-import { useId, useState, type KeyboardEvent, type ComponentType } from 'react'
-import { LayoutGroup, motion, useReducedMotion } from 'motion/react'
+import { memo, useId, useState, type KeyboardEvent, type ComponentType } from 'react'
+import { LayoutGroup } from 'motion/react'
 import { ArrowUpRight, BedDouble, Building2, Clock3, Drone, Factory, GraduationCap, LayoutGrid, List, UserRoundSearch, Users, Wrench, Zap } from 'lucide-react'
 import { copy } from '../../copy'
-import { prepareResult } from '../../components/result-panel/formatters'
+import type { PreparedResult } from '../../components/result-panel/formatters'
 import OperatorSkillPreview from '../../components/result-panel/OperatorSkillPreview'
 import type { RoomOperator } from '../../components/result-panel/types'
 import { buildBoardV2Rooms, type BoardRoom } from '../../components/result-panel/ResultBoardV2'
 import { isDroneTarget } from '../../components/result-panel/DroneMarker'
 import ProductIcon from '../../components/ProductIcon'
-import { MotionNavIndicator, motionTokens } from '../../components/MotionPrimitives'
-import type { LicenseOperator, OptimizeResult } from '../../lib/types'
+import { MotionNavIndicator } from '../../components/MotionPrimitives'
+import type { OptimizeResult } from '../../lib/types'
 import V2Transition from './V2Transition'
 import TradingIcon from './TradingIcon'
 
@@ -33,15 +33,15 @@ export function Avatar({ operator, small = false }: { operator: RoomOperator; sm
     <span className={`v2-avatar ${small ? 'v2-avatar-small' : ''}`} data-operator-name={operator.name}
       data-operator-id={operator.id} data-operator-elite={operator.elite} data-operator-level={operator.level}>
       {operator.id && !failed
-        ? <img src={`/webp96/${operator.id}.webp`} alt={operator.name} onError={() => setFailed(true)} loading="lazy" width={96} height={96} />
+        ? <img src={`/webp96/${operator.id}.webp`} alt={operator.name} onError={() => setFailed(true)} loading="lazy" decoding="async" width={96} height={96} />
         : <span aria-label={operator.name}>{operator.name.slice(0, 1)}</span>}
     </span>
   )
 }
 
-export default function ScheduleBoard({ result, operators, expanded, shift, onShiftChange, view, onViewChange, onRoom }: {
+export default memo(function ScheduleBoard({ result, prepared, expanded, shift, onShiftChange, view, onViewChange, onRoom }: {
   result: OptimizeResult
-  operators: LicenseOperator[]
+  prepared: PreparedResult
   expanded: boolean
   shift: number
   onShiftChange: (shift: number) => void
@@ -51,7 +51,6 @@ export default function ScheduleBoard({ result, operators, expanded, shift, onSh
 }) {
   const id = useId()
   const selected = Math.min(shift, Math.max(result.plans.length - 1, 0))
-  const prepared = prepareResult(result, result.schedule_mode === 'rotation', result.dormitory_rule === 'maa_pure_autofill', operators)
   const plan = prepared.plans[selected]
   const allRooms = buildBoardV2Rooms(plan, result.schedule_mode === 'rotation')
     .map((room) => ({ ...room, level: room.level ?? (String(result.buildingType).endsWith('3') ? MAXIMUM_LEVELS[room.roomType] : undefined) }))
@@ -127,37 +126,34 @@ export default function ScheduleBoard({ result, operators, expanded, shift, onSh
     </section>
     </LayoutGroup></OperatorSkillPreview>
   )
-}
+})
 
 function RoomCard({ room, drone = false, compact = false, autofill = false, onClick }: { room: BoardRoom; drone?: boolean; compact?: boolean; autofill?: boolean; onClick: () => void }) {
-  const reduceMotion = useReducedMotion()
   const Icon = ROOM_ICONS[room.roomType] ?? Building2
   const automaticDormitory = autofill || room.row?.isAutofill
   const efficiency = room.row && room.row.efficiency !== '-' && ['trading', 'manufacture', 'power'].includes(room.roomType) ? room.row.efficiency : null
   const showBottom = !compact || room.product !== '-' || Boolean(efficiency)
   return (
-    <motion.button type="button" className={`v2-room-card v2-room-${room.roomType} ${compact ? 'v2-room-card-compact' : ''}`} onClick={onClick}
-      layout={reduceMotion ? false : 'position'} whileHover={reduceMotion ? undefined : { y: -2 }}
-      whileTap={reduceMotion ? undefined : { scale: 0.99 }} transition={motionTokens.spring}>
-      <motion.div layout={reduceMotion ? false : 'position'} className="v2-room-header">
+    <button type="button" className={`v2-room-card v2-room-${room.roomType} ${compact ? 'v2-room-card-compact' : ''}`} onClick={onClick}>
+      <div className="v2-room-header">
         <span className="v2-room-icon"><Icon size={16} /></span>
         <span className="v2-room-title">{room.label}<small>{room.indexLabel}</small></span>
-      </motion.div>
+      </div>
       <span className="v2-room-marker">
         {drone && <span className="v2-drone-tag" title={text.drones}><Drone size={16} /></span>}
         <ArrowUpRight size={14} className="v2-room-arrow" />
       </span>
-      <motion.div layout={reduceMotion ? false : 'position'} className="v2-room-operators">
+      <div className="v2-room-operators">
         {room.row?.operators.map((operator) => (
           <span className="v2-operator" key={operator.name}><Avatar operator={operator} small={compact} /><span>{operator.name}</span></span>
         ))}
         {automaticDormitory && <span className="v2-muted">{room.row?.isAutofill ? room.row.operatorText : copy.domain.components_result_panel_formatters_005}</span>}
         {!room.row?.operators.length && !automaticDormitory && <span className="v2-muted">{copy.domain.result_board_v2.empty_room}</span>}
-      </motion.div>
-      {showBottom && <motion.div layout={reduceMotion ? false : 'position'} className="v2-room-bottom">
+      </div>
+      {showBottom && <div className="v2-room-bottom">
         {(!compact || room.product !== '-') && <span><ProductIcon product={room.product} size={18} />{room.product === '-' ? text.support : room.product}</span>}
         {efficiency && <span className="v2-room-efficiency"><span>{room.roomType === 'trading' ? text.equivalentEfficiency : text.efficiency}</span><strong>{efficiency}</strong></span>}
-      </motion.div>}
-    </motion.button>
+      </div>}
+    </button>
   )
 }

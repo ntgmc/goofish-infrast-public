@@ -568,11 +568,6 @@
   min-width: 0;
 }
 
-.v2-transition-pane[aria-hidden="true"] {
-  position: absolute;
-  inset: 0;
-}
-
 .v2-panel {
   min-width: 0;
   overflow: clip;
@@ -1354,7 +1349,12 @@
   border-bottom: 1px solid var(--v2-line);
 }
 
-.v2-operator-entry { padding-bottom: var(--space-sm); border-bottom: 1px solid var(--v2-line); }
+.v2-operator-entry {
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--v2-line);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 140px;
+}
 .v2-operator-entry .v2-operator-row, .v2-room-operator .v2-operator-row { border: 0; }
 .v2-building-skills summary { display: flex; min-height: 44px; align-items: center; gap: var(--space-xs); cursor: pointer; color: var(--v2-secondary); }
 .v2-building-skills summary::after { content: '+'; margin-left: auto; font-size: var(--text-md); }
