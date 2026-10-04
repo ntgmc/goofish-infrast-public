@@ -1,5 +1,6 @@
 import { useCallback, useId, useMemo, useState, type ReactNode } from 'react'
-import { AnimatePresence, LayoutGroup, motion, useIsPresent, useReducedMotion } from 'motion/react'
+import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
+import { useAppReducedMotion } from '../../lib/motion-preference'
 import { Activity, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, CalendarClock, Check, ChevronDown, ChevronRight, Download, Factory, FileClock, Gem, LayoutDashboard, Menu, RefreshCw, Settings2, ShieldCheck, Sparkles, Users, WalletCards, X, Zap } from 'lucide-react'
 import { Link } from 'react-router'
 import { copy } from '../../copy'
@@ -55,6 +56,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
   const [boardView, setBoardView] = useState<'grid' | 'list'>('grid')
   const [mobileNavigation, setMobileNavigation] = useState(false)
   const [downloadNotice, setDownloadNotice] = useState(false)
+  const reduceMotion = useAppReducedMotion()
   const motionId = useId()
   const prepared = useMemo(() => prepareResult(result, result.schedule_mode === 'rotation', result.dormitory_rule === 'maa_pure_autofill', operators), [result, operators])
   const sortedOperators = useMemo(() => sortOperatorsForPreview(operators), [operators])
@@ -83,7 +85,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
     <div className="v2-app">
       <AnimatePresence>
         {mobileNavigation && <motion.button key="navigation-scrim" className="v2-nav-scrim" type="button" onClick={() => setMobileNavigation(false)} aria-label={text.close}
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: motionTokens.duration.exit }} />}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduceMotion ? 0 : motionTokens.duration.exit }} />}
       </AnimatePresence>
       <aside className={`v2-sidebar ${mobileNavigation ? 'v2-sidebar-open' : ''}`}>
         <Link to={profileScopedPath('/v2', session.activeProfile?.id)} className="v2-brand"><span className="v2-brand-mark"><Building2 size={24} strokeWidth={1.8} /></span>
@@ -97,6 +99,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
           <button type="button" className="v2-nav-item" aria-label={text.operators} onClick={() => openPanel('operators')}><Users size={19} /><span>{text.operators}</span><small>{owned.length}</small></button>
           <button type="button" className="v2-nav-item" onClick={() => openPanel('config')}><Building2 size={19} /><span>{text.facilities}</span></button>
           <p className="v2-nav-label">{text.personal}</p>
+          <button type="button" className="v2-nav-item" onClick={() => openPanel('settings')}><Settings2 size={19} /><span>{copy.dashboard.animation.settings}</span></button>
           <button type="button" className="v2-nav-item" onClick={() => openPanel('account')}><UserIcon /><span>{text.account}</span></button>
           <button type="button" className="v2-nav-item" onClick={() => openPanel('cdk')}><WalletCards size={19} /><span>{text.cdk}</span></button>
         </nav>
@@ -114,7 +117,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
             <button className="v2-profile-button" type="button" onClick={() => openPanel('account')}><span className="v2-profile-avatar">{name.slice(0, 1)}</span><span>{name}</span><ChevronDown size={14} /></button>
           </div>
         </header>
-        <main className="v2-main" tabIndex={-1} data-route-focus>
+        <main className="v2-main motion-region-enter" tabIndex={-1} data-route-focus>
           <div className="v2-page-title"><h1>{text.title}</h1></div>
           <div className="v2-ready-banner">
             <span className="v2-ready-icon"><Check size={25} strokeWidth={2} /></span>
@@ -199,13 +202,13 @@ function UserIcon() {
 }
 
 function FeedbackRegion({ children }: { children: ReactNode }) {
-  const reduceMotion = useReducedMotion()
+  const reduceMotion = useAppReducedMotion()
   const isPresent = useIsPresent()
   return (
     <motion.div className="v2-feedback-region" aria-hidden={isPresent ? undefined : true} inert={isPresent ? undefined : true}
       initial={{ opacity: 0, height: reduceMotion ? 'auto' : 0 }} animate={{ opacity: 1, height: 'auto' }}
       exit={{ opacity: 0, height: reduceMotion ? 'auto' : 0 }}
-      transition={{ duration: reduceMotion ? motionTokens.duration.exit : motionTokens.duration.enter, ease: motionTokens.ease.enter }}>
+      transition={{ duration: reduceMotion ? 0 : motionTokens.duration.enter, ease: motionTokens.ease.enter }}>
       {children}
     </motion.div>
   )

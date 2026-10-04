@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { motion, useReducedMotion } from 'motion/react'
+import { motion } from 'motion/react'
+import { useAppReducedMotion } from '../lib/motion-preference'
 import { AnimatedValue } from './MotionPrimitives'
 import type { OptimizeCalculationStage, OptimizeJobPriority, OptimizeResult } from '../lib/types'
 import type { OptimizationBillingSnapshot } from '../lib/optimization-contracts'
@@ -68,7 +69,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
   const percent = Math.max(0, Math.min(100, Math.round(rawPercent)))
   const task = useMemo(() => getTaskView(progress, rawPercent, now), [progress, rawPercent, now])
   const compact = variant === 'embedded'
-  const reduceMotion = useReducedMotion()
+  const reduceMotion = useAppReducedMotion()
 
   useEffect(() => {
     let timer = 0

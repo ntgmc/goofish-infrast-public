@@ -10,6 +10,7 @@ import {
   formatAccountDeletionDeadline,
 } from '../../../lib/account-lifecycle-client'
 import DebugModePanel from '../../../components/DebugModePanel'
+import AnimationSettings from '../../../components/AnimationSettings'
 import SklandIcon from '../../../components/SklandIcon'
 import { WorkspaceEntrySettings, type WorkspaceEntryState } from '../WorkspaceEntryPreference'
 
@@ -194,6 +195,7 @@ export default function SettingsSection({
       </label>
       <button type="submit" disabled={loading} className="tool-primary-action mt-5">{loading ? copy.dashboard.pages_tool_dashboard_SettingsSection_020 : copy.dashboard.pages_tool_dashboard_SettingsSection_021}</button>
     </form>
+    <AnimationSettings className="tool-panel p-6" />
     <DebugModePanel />
     {workspaceEntry && <WorkspaceEntrySettings entry={workspaceEntry} />}
     <section className="tool-panel p-6">

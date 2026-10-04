@@ -13,6 +13,7 @@ import VerifyEmailPage from './pages/VerifyEmailPage'
 import CancelAccountDeletionPage from './pages/CancelAccountDeletionPage'
 import { copy } from './copy/index'
 import { ThemeProvider } from './lib/theme'
+import { MotionPreferenceProvider, useAppReducedMotion } from './lib/motion-preference'
 import { SiteFeatureProvider } from './lib/site-feature-context'
 import { FeatureRoute } from './components/FeatureUnavailablePage'
 import AccountSafetyPage from './pages/AccountSafetyPage'
@@ -39,13 +40,20 @@ const V2Page = lazy(() => import('./pages/v2/V2Page'))
 export default function App() {
   return (
     <ThemeProvider>
-      <SiteFeatureProvider>
-        <MotionConfig reducedMotion="user" transition={{ duration: motionTokens.duration.enter, ease: motionTokens.ease.enter }}>
-          <AppContent />
-        </MotionConfig>
-      </SiteFeatureProvider>
+      <MotionPreferenceProvider>
+        <SiteFeatureProvider>
+          <AnimatedApp />
+        </SiteFeatureProvider>
+      </MotionPreferenceProvider>
     </ThemeProvider>
   )
+}
+
+function AnimatedApp() {
+  const reduceMotion = useAppReducedMotion()
+  return <MotionConfig reducedMotion={reduceMotion ? 'always' : 'user'} transition={{ duration: reduceMotion ? 0 : motionTokens.duration.enter, ease: motionTokens.ease.enter }}>
+    <AppContent />
+  </MotionConfig>
 }
 
 function AppContent() {
