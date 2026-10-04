@@ -12,6 +12,8 @@ const expectedRoutes = [
   '/api/announcement',
   '/api/integrations/qqbot/events',
   '/api/integrations/qqbot/registration-invitations',
+  ...['binding', 'account', 'notifications', 'notifications/ack', 'results', 'maa-export'].map((path) => `/api/integrations/qqbot/${path}`),
+  '/api/user/qqbot',
   '/api/internal/releases/confirm',
   '/api/auth/login',
   '/api/auth/logout',

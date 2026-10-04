@@ -93,7 +93,7 @@ function buildRequestBehaviorRiskEvent(
 
 export async function recordAuthenticatedRequestBehaviorEvent(input: {
   req: Request
-  auth: AuthContext
+  auth: Pick<AuthContext, 'user'> & { tokenHash: string | null }
   eventType: BehaviorRiskEventType
   profileId?: string | null
   jobId?: string | null
@@ -180,7 +180,7 @@ export async function recordOperatorDataAnomalyBehaviorEvent(input: {
 
 export async function recordTrackedExportBehaviorEvent(input: {
   req: Request
-  auth: AuthContext
+  auth: Pick<AuthContext, 'user'> & { tokenHash: string | null }
   profileId: string
   jobId: string
   uid?: string | null

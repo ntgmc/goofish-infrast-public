@@ -80,6 +80,8 @@ async function exportData(userId: string): Promise<Response> {
     invitationCode,
     invitations,
     qqBotRegistration,
+    qqBotBinding,
+    qqBotNotifications,
     profileEntitlements,
     entitlementLedger,
     meteredPersonalClaim,
@@ -175,6 +177,15 @@ async function exportData(userId: string): Promise<Response> {
       `select qq_number, created_at, updated_at
          from qqbot_registration_qualifications
         where bound_user_id = $1`,
+      [userId],
+    ),
+    query('select id, qq_number, notifications_enabled, created_at from qqbot_account_bindings where user_id = $1', [userId]),
+    query(
+      `select notification.id, notification.profile_id, notification.result_id, notification.title,
+              notification.created_at, notification.delivered_at
+       from qqbot_schedule_notifications notification
+       join qqbot_account_bindings binding on binding.id = notification.binding_id
+       where binding.user_id = $1 order by notification.created_at, notification.id`,
       [userId],
     ),
     query(
@@ -279,6 +290,8 @@ async function exportData(userId: string): Promise<Response> {
     invitation_code: invitationCode.rows[0] ?? null,
     invitations: invitations.rows,
     qqbot_registration: qqBotRegistration.rows[0] ?? null,
+    qqbot_binding: qqBotBinding.rows[0] ?? null,
+    qqbot_notifications: qqBotNotifications.rows,
     profile_entitlements: profileEntitlements.rows,
     entitlement_ledger: entitlementLedger.rows,
     metered_personal_claim: meteredPersonalClaim.rows[0] ?? null,

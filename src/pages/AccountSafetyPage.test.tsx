@@ -15,11 +15,11 @@ describe('AccountSafetyPage lifecycle controls', () => {
   it('shows the scheduled deletion and queued cancellation email before leaving', async () => {
     const user = userEvent.setup()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url) => Promise.resolve(new Response(JSON.stringify(url === '/api/user/qqbot' ? { available: false, binding: null } : {
       ok: true,
       scheduled_for: '2026-08-07T00:00:00.000Z',
       cancellation_email: 'queued',
-    }), { status: 202, headers: { 'Content-Type': 'application/json' } })))
+    }), { status: 202, headers: { 'Content-Type': 'application/json' } }))))
     renderPage()
 
     const email = screen.getByLabelText('账号邮箱')

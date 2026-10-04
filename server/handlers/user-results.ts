@@ -27,7 +27,7 @@ import {
   OptimizationResultMutationError,
 } from '../storage/optimization-result-store'
 import { withTransaction } from '../storage/postgres'
-import { jsonResponse, requireUserSession } from './user-auth'
+import { jsonResponse, requireUserSession, type AuthContext } from './user-auth'
 import { recordTrackedExportBehaviorEvent } from '../behavior-risk/service'
 import {
   PersonalUseDeclarationRequiredError,
@@ -39,6 +39,13 @@ import { resolveProfileAuthorization } from './profile-authorization'
 import { getRequestClientIp } from '../security/client-ip'
 
 export default async function userResultsHandler(req: Request): Promise<Response> {
+  return handleUserResultsRequest(req, () => requireUserSession(req))
+}
+
+export async function handleUserResultsRequest(
+  req: Request,
+  authenticate: () => Promise<(Pick<AuthContext, 'user'> & { tokenHash: string | null }) | null>,
+): Promise<Response> {
   const url = new URL(req.url)
   const pathname = url.pathname
   const detailResultId = matchResultDetailId(pathname)
@@ -48,7 +55,7 @@ export default async function userResultsHandler(req: Request): Promise<Response
   const isFullResultExportRequest = pathname.endsWith('/full-result-export')
 
   try {
-    const auth = await requireUserSession(req)
+    const auth = await authenticate()
     if (!auth) return jsonResponse({ error: '请先登录。' }, 401)
 
     if (req.method === 'GET' && (isResultListRequest || isResultDetailRequest)) {

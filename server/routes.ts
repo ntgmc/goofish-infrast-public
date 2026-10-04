@@ -15,6 +15,8 @@ import adminBalanceHandler from './handlers/admin-balance'
 import adminCommercialHandler from './handlers/admin-commercial'
 import announcementHandler from './handlers/announcement'
 import websiteEventsHandler from './handlers/website-events'
+import qqBotAccountHandler from './handlers/qqbot-account'
+import userQqBotHandler from './handlers/user-qqbot'
 import qqBotRegistrationInvitationsHandler from './handlers/qqbot-registration-invitations'
 import releaseConfirmationHandler from './handlers/release-confirmation'
 import authHandler from './handlers/auth'
@@ -94,6 +96,9 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/announcement', announcementHandler as unknown as ApiHandler],
   ['/api/integrations/qqbot/events', websiteEventsHandler as unknown as ApiHandler],
   ['/api/integrations/qqbot/registration-invitations', qqBotRegistrationInvitationsHandler as unknown as ApiHandler],
+  ...['binding', 'account', 'notifications', 'notifications/ack', 'results', 'maa-export'].map((path) =>
+    [`/api/integrations/qqbot/${path}`, qqBotAccountHandler as unknown as ApiHandler] as [string, ApiHandler]),
+  ['/api/user/qqbot', userQqBotHandler as unknown as ApiHandler],
   ['/api/internal/releases/confirm', releaseConfirmationHandler as unknown as ApiHandler],
   ['/api/usage-stats', usageStatsHandler as unknown as ApiHandler],
   ['/api/admin/usage-stats', usageStatsHandler as unknown as ApiHandler],

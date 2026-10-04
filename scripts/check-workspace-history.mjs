@@ -979,6 +979,9 @@ function memoryUserStoreModule() {
 export function emptyWorkspace(profileId) {
 return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, saved_configs: [], free_schedule_entitlement: null, free_preview_normalized_activity_id: null, updated_at: new Date().toISOString() }
 }
+    export async function getUserById(userId) {
+      return store.user?.id === userId ? store.user : null
+    }
     export async function insertUserAccountForRegistrationInTransaction() {}
     export async function listProfilesForUser(userId) {
       return [...store.profiles.values()].filter((profile) => profile.user_id === userId)
