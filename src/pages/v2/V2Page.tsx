@@ -94,8 +94,9 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
   useEffect(() => { if (current) setRetained(current) }, [current])
   useEffect(() => { if (workflow.currentResult || workflow.finalResult) setOperatorsChanged(false) }, [workflow.currentResult, workflow.finalResult])
   useEffect(() => {
-    if (!latest || loadedId.current === latest.id || workflow.loading || workflow.currentResult || workflow.finalResult) return
+    if (!latest || loadedId.current === latest.id || workflow.loading) return
     loadedId.current = latest.id
+    if (workflow.currentResult || workflow.finalResult) return
     setReading(true)
     void workflow.handleViewHistory(latest).finally(() => setReading(false))
   }, [latest, workflow.handleViewHistory, workflow.loading, workflow.currentResult, workflow.finalResult])
