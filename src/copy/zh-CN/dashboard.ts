@@ -1,4 +1,17 @@
 export const dashboardCopy = {
+  settings: {
+    description: "管理登录密码、使用偏好、消息通知和个人数据。",
+    navigation: "设置分区",
+    security: "账号安全",
+    password_help: "修改用于登录 MaaTool 的密码。",
+    preferences: "使用偏好",
+    preferences_help: "调整动画效果和进入工作区的方式。",
+    data: "数据与隐私",
+    credentials: "森空岛授权",
+    no_credentials: "暂无森空岛绑定账号。导入游戏数据后，可在这里管理授权信息。",
+    privacy_details: "个人数据的保存与删除",
+    deletion_help: "提交后立即退出登录，7 天内可通过邮件撤销。",
+  },
   animation: {
     title: "动画效果",
     settings: "界面设置",
@@ -236,8 +249,6 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_015: "暂时无法提交注销申请，请确认邮箱和当前密码后重试。",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_016: "修改登录密码",
-  // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_017: "当前密码",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_018: "新密码",
@@ -247,8 +258,6 @@ export const dashboardCopy = {
   pages_tool_dashboard_SettingsSection_020: "保存中...",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_021: "修改密码",
-  // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_022: "数据与隐私",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_023: "网站会保存登录资料、游戏档案、工作区和使用记录。仓库分析中的汇总样本会与网站档案关联，以便随账号一起删除。注销后有 7 天撤销期；到期后删除账号、工作区和关联样本。用于安全风控的去标识记录最长保留 90 天，个人使用声明记录在注销后最长保留一年。详情见隐私政策。",
   // src/pages/tool/dashboard/SettingsSection.tsx

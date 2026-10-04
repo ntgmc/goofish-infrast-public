@@ -177,7 +177,7 @@ export default function AccountDashboard({
                 className="min-w-0 flex-1 justify-between"
                 metadata={{
                   title: copy.common.pages_tool_AccountDashboard_010,
-                  description: activeProfile ? `${copy.common.pages_tool_AccountDashboard_011}${activeProfile.display_name}` : copy.common.pages_tool_AccountDashboard_012,
+                  description: section === 'settings' ? user.email : activeProfile ? `${copy.common.pages_tool_AccountDashboard_011}${activeProfile.display_name}` : copy.common.pages_tool_AccountDashboard_012,
                 }}
                 items={[
                   ...sections.map((key) => ({
@@ -215,7 +215,7 @@ export default function AccountDashboard({
                   )}
                 </div>
                 <p className="mt-1 text-sm text-ink-muted">
-                  {activeProfile ? `${copy.common.pages_tool_AccountDashboard_011}${activeProfile.display_name}` : copy.common.pages_tool_AccountDashboard_012}
+                  {section === 'settings' ? user.email : activeProfile ? `${copy.common.pages_tool_AccountDashboard_011}${activeProfile.display_name}` : copy.common.pages_tool_AccountDashboard_012}
                 </p>
               </div>
             </div>

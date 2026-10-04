@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Bell } from 'lucide-react'
 import { apiJson } from '../lib/api-client'
 import { copy } from '../copy/index'
 
@@ -33,16 +34,20 @@ export default function QqBotSettingsPanel() {
   useEffect(() => { void run(refresh) }, [refresh, run])
 
   return (
-    <section className="tool-panel p-6 sm:p-8">
-      <h2 className="text-lg font-semibold text-ink-primary">{text.title}</h2>
+    <section className="tool-panel p-5 sm:p-6">
+      <div className="flex items-center gap-3">
+        <Bell size={20} className="shrink-0 text-brand-500" aria-hidden="true" />
+        <h2 className="text-lg font-semibold text-ink-primary">{text.title}</h2>
+      </div>
       <p className="mt-2 text-sm leading-6 text-ink-secondary">{text.body}</p>
       {error && <p className="tool-alert tool-alert--error mt-4" role="alert">{error}</p>}
       {settings && !settings.available && <p className="mt-4 text-sm text-ink-secondary">{text.unavailable}</p>}
       {settings?.binding ? (
         <div className="mt-4 space-y-4">
           <p className="text-sm text-ink-secondary">{text.bound(settings.binding.qq_number)}</p>
-          <label className="flex items-center gap-3 text-sm text-ink-primary">
+          <label className="flex min-h-11 items-center gap-3 text-sm text-ink-primary">
             <input type="checkbox" checked={settings.binding.notifications_enabled}
+              className="size-4 shrink-0 accent-brand-500"
               disabled={busy || (!settings.available && !settings.binding.notifications_enabled)}
               onChange={(event) => {
                 const enabled = event.currentTarget.checked

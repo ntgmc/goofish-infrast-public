@@ -29,12 +29,19 @@ import type { SiteFeatures } from '../lib/site-features'
 import FeatureUnavailablePage from '../components/FeatureUnavailablePage'
 import { NotificationCenterProvider } from '../components/NotificationCenter'
 import { PublicContentProvider } from '../lib/public-content-context'
+import AccountSafetyPage from './AccountSafetyPage'
 
 
 const OptimizePage = lazy(() => import('./OptimizePage'))
 
 export default function ToolPage() {
   const featureState = useSiteFeatures()
+  const location = useLocation()
+  if (location.pathname.replace(/\/+$/, '') === dashboardPath('settings')
+    && (featureState.status === 'error' || (featureState.status === 'ready'
+      && (!featureState.features.site || !featureState.features.login)))) {
+    return <AccountSafetyPage />
+  }
   if (featureState.status === 'loading') return <SessionLoader label={copy.features.loading} />
   if (featureState.status === 'error') return <FeatureUnavailablePage loadError onRetry={featureState.retry} />
   if (!featureState.features.site) return <FeatureUnavailablePage feature="site" />

@@ -213,7 +213,7 @@ export function WorkspaceEntryPrompt({ entry }: { entry: WorkspaceEntryState }) 
   )
 }
 
-export function WorkspaceEntrySettings({ entry }: { entry: WorkspaceEntryState }) {
+export function WorkspaceEntrySettings({ entry, className = 'tool-panel p-6' }: { entry: WorkspaceEntryState; className?: string }) {
   const text = copy.dashboard.workspace_entry
   const observationText = copy.dashboard.behavior_observation
   const [observationNotice, setObservationNotice] = useState<string | null>(null)
@@ -237,7 +237,7 @@ export function WorkspaceEntrySettings({ entry }: { entry: WorkspaceEntryState }
     }
   }
   return (
-    <section className="tool-panel p-6">
+    <section className={className}>
       <h2 className="text-lg font-semibold text-ink-primary">{text.settings_title}</h2>
       <label className="mt-4 flex items-start gap-3">
         <input

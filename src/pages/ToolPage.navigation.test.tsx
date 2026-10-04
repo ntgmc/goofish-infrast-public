@@ -8,7 +8,11 @@ import type { InventoryResponse } from '../lib/inventory-contracts'
 import { cloneDefaultPublicContentSettings } from '../lib/public-content'
 import { readToolBehaviorEvents, recordToolBehavior } from '../lib/tool-behavior-observation'
 import { tourStorageKey } from '../components/GuidedTour'
+import { useSiteFeatures } from '../lib/site-feature-context'
+import { DEFAULT_SITE_FEATURES } from '../lib/site-features'
 import ToolPage from './ToolPage'
+
+vi.mock('../lib/site-feature-context', () => ({ useSiteFeatures: vi.fn() }))
 
 const { apiJson, sessionState, toolsSectionImport } = vi.hoisted(() => {
   let resolveToolsSection!: () => void
@@ -41,11 +45,15 @@ vi.mock('./tool/dashboard/ToolsSection', async () => {
 })
 
 beforeEach(() => {
+  vi.mocked(useSiteFeatures).mockReturnValue({
+    status: 'ready', features: DEFAULT_SITE_FEATURES, updatedAt: null, retry: vi.fn(),
+  })
   window.localStorage.clear()
   window.localStorage.setItem(tourStorageKey('dashboard-overview', 1), 'done')
   window.localStorage.setItem(tourStorageKey('workspace-setup', 1), 'done')
   apiJson.mockReset().mockImplementation(async (url: string) => {
     if (url === '/api/site/public-content') return cloneDefaultPublicContentSettings()
+    if (url === '/api/user/qqbot') return { available: false, binding: null }
     throw new Error(`Unexpected request: ${url}`)
   })
   sessionState.current = createSession()
@@ -57,6 +65,35 @@ afterEach(() => {
 })
 
 describe('ToolPage route guards', () => {
+  it.each(['site', 'login', 'error'] as const)('keeps settings safety operations available when %s is unavailable', async (unavailable) => {
+    vi.mocked(useSiteFeatures).mockReturnValue({
+      status: unavailable === 'error' ? 'error' : 'ready',
+      features: { ...DEFAULT_SITE_FEATURES, ...(unavailable === 'error' ? {} : { [unavailable]: false }) },
+      updatedAt: null, retry: vi.fn(),
+    })
+    const router = renderToolRoute('/tool/settings')
+    expect(screen.getByRole('button', { name: '安全退出' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '修改密码' })).not.toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/tool/settings')
+    await screen.findByText('QQ 通知服务尚未开放，开放后即可绑定并接收提醒。')
+  })
+
+  it('updates QQ notifications from the account settings entry', async () => {
+    const user = userEvent.setup()
+    let enabled = false
+    apiJson.mockImplementation(async (url: string, options?: { method?: string; json?: { notifications_enabled: boolean } }) => {
+      if (url !== '/api/user/qqbot') throw new Error(`Unexpected request: ${url}`)
+      if (options?.method === 'PATCH') enabled = options.json!.notifications_enabled
+      return { available: true, binding: { binding_id: 'binding-1', qq_number: '123456', notifications_enabled: enabled, bound_at: '2026-10-04T00:00:00Z' } }
+    })
+    renderToolRoute('/tool/settings')
+    const notificationSetting = await screen.findByRole('checkbox', { name: '接收排班完成通知' })
+    expect(notificationSetting).not.toBeChecked()
+    await user.click(notificationSetting)
+    await waitFor(() => expect(notificationSetting).toBeChecked())
+    expect(apiJson).toHaveBeenCalledWith('/api/user/qqbot', { method: 'PATCH', json: { notifications_enabled: true } })
+  })
+
   it.each(['/tool/balance', '/tool/commercial'])('returns a retired entry to profiles: %s', async (path) => {
     const router = renderToolRoute(path)
     await waitFor(() => expect(router.state.location.pathname).toBe('/tool/profiles'))
