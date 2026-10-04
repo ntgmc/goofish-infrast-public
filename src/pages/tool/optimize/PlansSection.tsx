@@ -5,6 +5,7 @@ import { formatPlanName, formatResultHistorySummary, formatWorkspaceDate } from 
 import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../../lib/workspace-limits'
 import { SmallActionButton } from './feedback'
 import { copy } from '../../../copy/index'
+import { useSiteFeatures } from '../../../lib/site-feature-context'
 
 
 export default function PlansSection({
@@ -70,6 +71,7 @@ export default function PlansSection({
   onLoadMoreResultHistory?: () => Promise<void>;
   onLoadMoreArchivedResults?: () => Promise<void>;
 }) {
+  const { features } = useSiteFeatures()
   const [draftName, setDraftName] = useState(formatPlanName(activeConfig))
 
   useEffect(() => {
@@ -190,7 +192,7 @@ export default function PlansSection({
                     </div>
                     <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
                       <SmallActionButton onClick={() => void onViewHistory(item)} disabled={busyAction === `detail:${item.id}`} tone="primary">{copy.optimize.pages_tool_optimize_PlansSection_030}</SmallActionButton>
-                      <SmallActionButton onClick={() => onDownloadHistory(item)} disabled={busyAction === `download:${item.id}` || !item.maa_exportable}>{busyAction === `download:${item.id}` ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_PlansSection_031}</SmallActionButton>
+                      {features.maa_export && <SmallActionButton onClick={() => onDownloadHistory(item)} disabled={busyAction === `download:${item.id}` || !item.maa_exportable}>{busyAction === `download:${item.id}` ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_PlansSection_031}</SmallActionButton>}
                       <SmallActionButton onClick={() => void onUseHistoryConfig(item)} disabled={busyAction === `detail:${item.id}` || !item.has_config}>{copy.optimize.pages_tool_optimize_PlansSection_032}</SmallActionButton>
                       <SmallActionButton onClick={() => void onUnarchiveHistory(item)} disabled={historyLimitReached || busyAction === `unarchive:${item.id}`}>{copy.inventory.unarchive_action}</SmallActionButton>
                       <SmallActionButton onClick={() => void onRenameArchivedHistory(item)} disabled={busyAction === `rename:${item.id}`}>{copy.inventory.archive_rename_action}</SmallActionButton>
@@ -235,7 +237,7 @@ export default function PlansSection({
                   </div>
                   <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
                     <SmallActionButton onClick={() => void onViewHistory(item)} disabled={busyAction === `detail:${item.id}`} tone="primary">{copy.optimize.pages_tool_optimize_PlansSection_030}</SmallActionButton>
-                    <SmallActionButton onClick={() => onDownloadHistory(item)} disabled={busyAction === `download:${item.id}` || !item.maa_exportable}>{busyAction === `download:${item.id}` ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_PlansSection_031}</SmallActionButton>
+                    {features.maa_export && <SmallActionButton onClick={() => onDownloadHistory(item)} disabled={busyAction === `download:${item.id}` || !item.maa_exportable}>{busyAction === `download:${item.id}` ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_PlansSection_031}</SmallActionButton>}
                     <SmallActionButton onClick={() => void onUseHistoryConfig(item)} disabled={busyAction === `detail:${item.id}` || !item.has_config}>{copy.optimize.pages_tool_optimize_PlansSection_032}</SmallActionButton>
                     <SmallActionButton onClick={() => void onArchiveHistory(item)} disabled={archiveLimit < 1 || busyAction === `archive:${item.id}`}>{copy.inventory.archive_action}</SmallActionButton>
                     <SmallActionButton onClick={() => void onDeleteHistory(item)} disabled={busyAction === `delete:${item.id}`} tone="danger">{copy.inventory.delete_result}</SmallActionButton>

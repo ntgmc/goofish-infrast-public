@@ -50,7 +50,7 @@ export default function OptimizeWorkflowPage(props: Props) {
   const plansTour = useFirstRunTour({ id: 'optimize-tab-plans', version: 2, autoStart: childAutoStartEnabled && section === 'plans' })
   const configTour = useFirstRunTour({ id: 'optimize-tab-config', version: 1, autoStart: childAutoStartEnabled && section === 'config' })
   const resultTour = useFirstRunTour({ id: 'optimize-tab-result', version: 1, autoStart: childAutoStartEnabled && section === 'result' && hasResult })
-  const labTour = useFirstRunTour({ id: 'optimize-tab-lab', version: 1, autoStart: childAutoStartEnabled && section === 'lab' && userCanUseScenarioLab && features.schedule_generation })
+  const labTour = useFirstRunTour({ id: 'optimize-tab-lab', version: 1, autoStart: childAutoStartEnabled && section === 'lab' && userCanUseScenarioLab && features.scenario_comparison })
 
   useEffect(() => {
     if (mainTour.completed && section !== initialSectionRef.current) setSectionChangedAfterMainTour(true)
@@ -64,9 +64,9 @@ export default function OptimizeWorkflowPage(props: Props) {
       { target: 'optimize-nav-plans', title: copy.optimize.pages_tool_optimize_tour_004, body: copy.optimize.pages_tool_optimize_tour_005 },
       { target: 'optimize-nav-config', title: copy.optimize.pages_tool_optimize_tour_006, body: copy.optimize.pages_tool_optimize_tour_007 },
       { target: 'optimize-nav-result', title: copy.optimize.pages_tool_optimize_tour_008, body: copy.optimize.pages_tool_optimize_tour_009 },
-      ...(userCanUseScenarioLab && features.schedule_generation ? [{ target: 'optimize-nav-lab', title: copy.optimize.pages_tool_optimize_tour_010, body: copy.optimize.pages_tool_optimize_tour_011 }] : []),
+      ...(userCanUseScenarioLab && features.scenario_comparison ? [{ target: 'optimize-nav-lab', title: copy.optimize.pages_tool_optimize_tour_010, body: copy.optimize.pages_tool_optimize_tour_011 }] : []),
     ],
-  }), [features.schedule_generation, userCanUseScenarioLab])
+  }), [features.scenario_comparison, userCanUseScenarioLab])
   const overviewTourDefinition = useMemo<TourDefinition>(() => ({ id: 'optimize-tab-overview', version: 2, steps: [
     { target: 'optimize-overview-status', title: copy.optimize.pages_tool_optimize_tour_012, body: copy.optimize.pages_tool_optimize_tour_013 },
     { target: 'optimize-overview-generate', title: copy.optimize.pages_tool_optimize_tour_014, body: copy.optimize.pages_tool_optimize_tour_015 },
@@ -114,7 +114,7 @@ export default function OptimizeWorkflowPage(props: Props) {
         profileId={profile.id}
         profileLabel={profile.display_name}
         permissionLabel={getProfileAccessLabel(profile)}
-        showScenarioLab={(userCanUseScenarioLab || isRestrictedPreview) && features.schedule_generation}
+        showScenarioLab={(userCanUseScenarioLab || isRestrictedPreview) && features.scenario_comparison}
         badges={{ result: hasResult ? copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_001 : undefined }}
         headerActions={(
           <OptimizationTaskCenterButton
@@ -223,7 +223,7 @@ export default function OptimizeWorkflowPage(props: Props) {
                 {priorityCouponError && <button type="button" className="tool-secondary-action" disabled={priorityCouponLoading} onClick={() => void refreshRewardBalance()}>{priorityCouponLoading ? copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_005 : copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_007}</button>}
               </div>
             </div>}
-            {isRestrictedPreview && <PaidCapabilityPreview onOpen={(target) => setSection(target)} showScenarioLab={features.schedule_generation} />}
+            {isRestrictedPreview && <PaidCapabilityPreview onOpen={(target) => setSection(target)} showScenarioLab={features.scenario_comparison} />}
             <OverviewSection
               activeConfig={activeConfig}
               configChanged={configChanged}
@@ -349,8 +349,8 @@ export default function OptimizeWorkflowPage(props: Props) {
               upgradeError={upgradeError}
               onUpgradeCdkChange={setUpgradeCdk}
               onUpgradePreviewProfile={handleUpgradePreviewProfile}
-              onDownloadMAA={handleDownloadMAA}
-              onDownloadFullResult={userCanDownloadFullResult ? handleDownloadFullResult : undefined}
+              onDownloadMAA={features.maa_export ? handleDownloadMAA : undefined}
+              onDownloadFullResult={features.full_result_export && userCanDownloadFullResult ? handleDownloadFullResult : undefined}
               maaDownloadBusy={workspaceBusyAction?.startsWith('download:') === true}
               fullResultDownloadBusy={workspaceBusyAction?.startsWith('download-full:') === true}
               fullDataAvailable={userCanViewFullData}
@@ -359,8 +359,8 @@ export default function OptimizeWorkflowPage(props: Props) {
             />
           )}
 
-          {section === 'lab' && isRestrictedPreview && !userCanUseScenarioLab && features.schedule_generation && <LockedScenarioPreview />}
-          {section === 'lab' && userCanUseScenarioLab && features.schedule_generation && (
+          {section === 'lab' && isRestrictedPreview && !userCanUseScenarioLab && features.scenario_comparison && <LockedScenarioPreview />}
+          {section === 'lab' && userCanUseScenarioLab && features.scenario_comparison && (
             <ScenarioLabSection
               profileId={props.profileId}
               operators={mergedOperators}
@@ -382,7 +382,7 @@ export default function OptimizeWorkflowPage(props: Props) {
         <GuidedTour definition={plansTourDefinition} open={plansTour.open} onFinish={plansTour.finish} onSkip={plansTour.skip} />
         <GuidedTour definition={configTourDefinition} open={configTour.open} onFinish={configTour.finish} onSkip={configTour.skip} />
         <GuidedTour definition={resultTourDefinition} open={resultTour.open} onFinish={resultTour.finish} onSkip={resultTour.skip} />
-        {userCanUseScenarioLab && features.schedule_generation && <GuidedTour definition={labTourDefinition} open={labTour.open} onFinish={labTour.finish} onSkip={labTour.skip} />}
+        {userCanUseScenarioLab && features.scenario_comparison && <GuidedTour definition={labTourDefinition} open={labTour.open} onFinish={labTour.finish} onSkip={labTour.skip} />}
         {declarationDialog}
       </OptimizeShell>
     )

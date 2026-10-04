@@ -3,7 +3,7 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cloneDefaultPublicContentSettings } from './lib/public-content'
-import { DEFAULT_SITE_FEATURE_SETTINGS } from './lib/site-features'
+import { DEFAULT_SITE_FEATURE_SETTINGS, type SiteFeatureKey } from './lib/site-features'
 
 const apiJson = vi.hoisted(() => vi.fn())
 const apiVoid = vi.hoisted(() => vi.fn())
@@ -117,5 +117,35 @@ describe('App public content routing', () => {
     render(<MemoryRouter initialEntries={['/v2']}><App /></MemoryRouter>)
     expect(await screen.findByText('V2 test workspace')).toBeInTheDocument()
     await waitFor(() => expect(document.head.querySelector('meta[name="robots"]')).toHaveAttribute('content', 'noindex, nofollow'))
+  })
+
+  it.each([
+    ['/v2', 'v2'], ['/tools/manual-schedule', 'manual_schedule'], ['/tools/cultivation-plan', 'cultivation_plan'],
+    ['/faq', 'faq'], ['/support', 'support'], ['/pricing', 'pricing'], ['/changelog', 'changelog'],
+    ['/thanks', 'thanks'], ['/status', 'service_status'],
+  ] satisfies Array<[string, SiteFeatureKey]>)('blocks direct visits to the disabled page %s', async (route, feature) => {
+    const original = apiJson.getMockImplementation()!
+    apiJson.mockImplementation((url: string) => url === '/api/site/features'
+      ? Promise.resolve({ ...DEFAULT_SITE_FEATURE_SETTINGS,
+        features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, [feature]: false } })
+      : original(url))
+    render(<MemoryRouter initialEntries={[route]}><App /></MemoryRouter>)
+    expect(await screen.findByRole('heading', { name: '该功能暂未开放' })).toBeInTheDocument()
+    expect(screen.queryByText('V2 test workspace')).not.toBeInTheDocument()
+  })
+
+  it('hides disabled V2 and public page links while preserving legal pages', async () => {
+    const original = apiJson.getMockImplementation()!
+    apiJson.mockImplementation((url: string) => url === '/api/site/features'
+      ? Promise.resolve({ ...DEFAULT_SITE_FEATURE_SETTINGS, features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features,
+        v2: false, pricing: false, changelog: false, thanks: false, service_status: false, faq: false } })
+      : original(url))
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
+    await screen.findByRole('button', { name: '开始排班' })
+    await waitFor(() => expect(screen.queryByRole('link', { name: '体验 V2 测试版' })).not.toBeInTheDocument())
+    for (const href of ['/v2', '/pricing', '/changelog', '/thanks', '/status', '/faq']) {
+      expect(document.querySelector(`a[href="${href}"]`)).toBeNull()
+    }
+    expect(document.querySelector('a[href="/privacy"]')).toBeInTheDocument()
   })
 })

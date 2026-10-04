@@ -12,6 +12,7 @@ import { OPTIMIZE_SECTIONS, type OptimizeSection } from './types'
 import { copy } from '../../../copy/index'
 import { NotificationBell } from '../../../components/NotificationCenter'
 import { dashboardPath, optimizePath, profileScopedPath } from '../../../lib/app-routes'
+import { useSiteFeatures } from '../../../lib/site-feature-context'
 
 
 export default function OptimizeShell({
@@ -43,6 +44,7 @@ export default function OptimizeShell({
   onLogout: () => void
   children: ReactNode
 }) {
+  const { features } = useSiteFeatures()
   const sections = OPTIMIZE_SECTIONS.filter((item) => item.id !== 'lab' || showScenarioLab)
   const current = sections.find((item) => item.id === section) ?? sections[0]
 
@@ -79,10 +81,10 @@ export default function OptimizeShell({
         </LayoutGroup>
 
         <div className="mt-auto space-y-4 pt-8">
-          <Link to={profileScopedPath('/v2', profileId)} className="tool-inset block p-3 text-sm text-ink-secondary">
+          {features.v2 && <Link to={profileScopedPath('/v2', profileId)} className="tool-inset block p-3 text-sm text-ink-secondary">
             <span className="flex min-h-11 items-center justify-between gap-2 font-medium text-brand-500">{copy.v2.testEntry}<ArrowUpRight size={16} /></span>
             <span className="block text-xs leading-5">{copy.v2.testEntryDescription}</span>
-          </Link>
+          </Link>}
           <nav className="grid grid-cols-2 gap-2 border-t border-surface-3 pt-4" aria-label={copy.common.pages_tool_AccountDashboard_017}>
             <button type="button" onClick={onReset} className="tool-secondary-action w-full">{copy.optimize.pages_tool_optimize_OptimizeShell_003}</button>
             <button type="button" onClick={onLogout} className="tool-danger-action w-full">{copy.common.pages_tool_AccountDashboard_009}</button>
@@ -113,7 +115,7 @@ export default function OptimizeShell({
                     onSelect: () => onSectionChange(item.id),
                   })),
                   { type: 'separator' as const, id: 'actions' },
-                  { type: 'link' as const, id: 'v2', label: copy.v2.testEntry, to: profileScopedPath('/v2', profileId) },
+                  ...(features.v2 ? [{ type: 'link' as const, id: 'v2', label: copy.v2.testEntry, to: profileScopedPath('/v2', profileId) }] : []),
                   { type: 'button' as const, id: 'tour', label: copy.optimize.pages_tool_optimize_tour_001, onSelect: onOpenTour },
                   { type: 'button' as const, id: 'reset', label: copy.optimize.pages_tool_optimize_OptimizeShell_005, onSelect: onReset },
                   { type: 'button' as const, id: 'logout', label: copy.common.pages_tool_AccountDashboard_013, intent: 'danger' as const, onSelect: onLogout },

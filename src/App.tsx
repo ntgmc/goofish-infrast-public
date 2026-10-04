@@ -80,17 +80,17 @@ function AppContent() {
       <Routes>
         <Route element={<PublicContentRoute />}>
           <Route path="/" element={<LandingPage onStart={() => navigate('/tool/profiles')} />} />
-          <Route path="/changelog" element={<LazyPage fallback={copy.common.App_014}><ChangelogPage /></LazyPage>} />
-          <Route path="/faq" element={<LazyPage fallback={copy.common.App_003}><PublicInfoPage page="faq" /></LazyPage>} />
-          <Route path="/support" element={<LazyPage fallback={copy.common.App_004}><PublicInfoPage page="support" /></LazyPage>} />
-          <Route path="/pricing" element={<LazyPage fallback={copy.common.App_012}><PricingPage /></LazyPage>} />
-          <Route path="/thanks" element={<LazyPage fallback={copy.common.App_013}><ThanksPage /></LazyPage>} />
-          <Route path="/status" element={<LazyPage fallback={copy.status.pages_StatusPage_024}><StatusPage /></LazyPage>} />
+          <Route path="/changelog" element={<FeatureRoute feature="changelog"><LazyPage fallback={copy.common.App_014}><ChangelogPage /></LazyPage></FeatureRoute>} />
+          <Route path="/faq" element={<FeatureRoute feature="faq"><LazyPage fallback={copy.common.App_003}><PublicInfoPage page="faq" /></LazyPage></FeatureRoute>} />
+          <Route path="/support" element={<FeatureRoute feature="support"><LazyPage fallback={copy.common.App_004}><PublicInfoPage page="support" /></LazyPage></FeatureRoute>} />
+          <Route path="/pricing" element={<FeatureRoute feature="pricing"><LazyPage fallback={copy.common.App_012}><PricingPage /></LazyPage></FeatureRoute>} />
+          <Route path="/thanks" element={<FeatureRoute feature="thanks"><LazyPage fallback={copy.common.App_013}><ThanksPage /></LazyPage></FeatureRoute>} />
+          <Route path="/status" element={<FeatureRoute feature="service_status"><LazyPage fallback={copy.status.pages_StatusPage_024}><StatusPage /></LazyPage></FeatureRoute>} />
           <Route path="/privacy" element={<LazyPage fallback={copy.common.App_005}><PublicInfoPage page="privacy" /></LazyPage>} />
           <Route path="/terms" element={<LazyPage fallback={copy.common.App_006}><PublicInfoPage page="terms" /></LazyPage>} />
           <Route path="/disclaimer" element={<LazyPage fallback={copy.common.App_007}><PublicInfoPage page="disclaimer" /></LazyPage>} />
         </Route>
-        <Route path="/v2" element={<LazyPage fallback={copy.common.App_001}><V2Page /></LazyPage>} />
+        <Route path="/v2" element={<FeatureRoute feature="v2"><LazyPage fallback={copy.common.App_001}><V2Page /></LazyPage></FeatureRoute>} />
         <Route path="/tool/*" element={<LazyPage fallback={copy.common.App_001}><ToolPage /></LazyPage>} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
@@ -98,8 +98,8 @@ function AppContent() {
         <Route path="/account-safety" element={<AccountSafetyPage />} />
         <Route path="/announcements" element={<FeatureRoute feature="announcements"><LazyPage fallback={copy.common.App_002}><AnnouncementsPage /></LazyPage></FeatureRoute>} />
         <Route path="/tools/depot-value" element={<FeatureRoute feature="depot_value"><LazyPage fallback={copy.common.App_009}><DepotValuePage /></LazyPage></FeatureRoute>} />
-        <Route path="/tools/manual-schedule" element={<FeatureRoute feature="tools"><FeatureRoute feature="schedule_generation"><LazyPage fallback={copy.tools.manualSchedule.loading}><ManualSchedulePage /></LazyPage></FeatureRoute></FeatureRoute>} />
-        <Route path="/tools/cultivation-plan" element={<FeatureRoute feature="tools"><LazyPage fallback={copy.tools.cultivation.loading}><CultivationPlanPage /></LazyPage></FeatureRoute>} />
+        <Route path="/tools/manual-schedule" element={<FeatureRoute feature="manual_schedule"><LazyPage fallback={copy.tools.manualSchedule.loading}><ManualSchedulePage /></LazyPage></FeatureRoute>} />
+        <Route path="/tools/cultivation-plan" element={<FeatureRoute feature="cultivation_plan"><LazyPage fallback={copy.tools.cultivation.loading}><CultivationPlanPage /></LazyPage></FeatureRoute>} />
         <Route path="/admin/setup" element={<LazyPage fallback={copy.common.App_010}><AdminSetupPage /></LazyPage>} />
         <Route path="/admin/*" element={<LazyPage fallback={copy.common.App_011}><AdminPage /></LazyPage>} />
         <Route path="*" element={<NotFoundPage />} />

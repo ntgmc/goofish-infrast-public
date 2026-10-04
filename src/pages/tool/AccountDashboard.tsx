@@ -143,10 +143,10 @@ export default function AccountDashboard({
         </LayoutGroup>
 
         <div className="mt-auto space-y-4 pt-8">
-          <Link to={profileScopedPath('/v2', activeProfile?.id ?? null)} className="tool-inset block p-3 text-sm text-ink-secondary">
+          {features.v2 && <Link to={profileScopedPath('/v2', activeProfile?.id ?? null)} className="tool-inset block p-3 text-sm text-ink-secondary">
             <span className="flex min-h-11 items-center justify-between gap-2 font-medium text-brand-500">{copy.v2.testEntry}<ArrowUpRight size={16} /></span>
             <span className="block text-xs leading-5">{copy.v2.testEntryDescription}</span>
-          </Link>
+          </Link>}
           <nav
             className="grid grid-cols-2 gap-2 border-t border-surface-3 pt-4"
             aria-label={copy.common.pages_tool_AccountDashboard_017}
@@ -191,7 +191,7 @@ export default function AccountDashboard({
                     onSelect: () => onSectionChange(key),
                   })),
                   { type: 'separator' as const, id: 'actions' },
-                  { type: 'link' as const, id: 'v2', label: copy.v2.testEntry, to: profileScopedPath('/v2', activeProfile?.id ?? null) },
+                  ...(features.v2 ? [{ type: 'link' as const, id: 'v2', label: copy.v2.testEntry, to: profileScopedPath('/v2', activeProfile?.id ?? null) }] : []),
                   { type: 'button' as const, id: 'tour', label: copy.dashboard.pages_tool_AccountDashboard_tour_001, onSelect: replayTour },
                   { type: 'link' as const, id: 'home', label: copy.common.pages_tool_AccountDashboard_016, to: '/' },
                   { type: 'button' as const, id: 'logout', label: copy.common.pages_tool_AccountDashboard_013, intent: 'danger' as const, onSelect: onLogout },

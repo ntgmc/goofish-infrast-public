@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { copy } from '../../../copy/index'
 import { getOrCreateExportIdempotencyKey, requestFullResultExport, requestMaaExport } from './optimization-api'
+import { useSiteFeatures } from '../../../lib/site-feature-context'
 
 interface UseResultDownloadsOptions {
   profileId: string
@@ -23,6 +24,7 @@ export function useResultDownloads({
   setWorkspaceError,
   setWorkspaceBusyAction,
 }: UseResultDownloadsOptions) {
+  const { features } = useSiteFeatures()
   const requestKeysRef = useRef(new Map<string, string>())
   const exportInFlightRef = useRef(false)
 
@@ -32,6 +34,10 @@ export function useResultDownloads({
   }, [profileId])
 
   const downloadMaaResult = useCallback(async (resultId: string) => {
+    if (!features.maa_export) {
+      setWorkspaceError(copy.features.closed_body)
+      return
+    }
     await guardExport(async () => {
       if (exportInFlightRef.current) return
       const useCoupon = !canExportMaaWithoutCoupon
@@ -60,9 +66,13 @@ export function useResultDownloads({
         setWorkspaceBusyAction(null)
       }
     })
-  }, [canExportMaaWithoutCoupon, guardExport, maaExportCouponBalance, profileId, refreshInventory, setWorkspaceBusyAction, setWorkspaceError, setWorkspaceNotice])
+  }, [features.maa_export, canExportMaaWithoutCoupon, guardExport, maaExportCouponBalance, profileId, refreshInventory, setWorkspaceBusyAction, setWorkspaceError, setWorkspaceNotice])
 
   const downloadFullResult = useCallback(async (resultId: string) => {
+    if (!features.full_result_export) {
+      setWorkspaceError(copy.features.closed_body)
+      return
+    }
     await guardExport(async () => {
       if (exportInFlightRef.current) return
       const requestKey = `full:${profileId}:${resultId}`
@@ -80,7 +90,7 @@ export function useResultDownloads({
         setWorkspaceBusyAction(null)
       }
     })
-  }, [guardExport, profileId, setWorkspaceBusyAction, setWorkspaceError])
+  }, [features.full_result_export, guardExport, profileId, setWorkspaceBusyAction, setWorkspaceError])
 
   return { downloadMaaResult, downloadFullResult }
 }

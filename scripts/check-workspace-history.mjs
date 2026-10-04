@@ -896,6 +896,10 @@ function memoryStorePlugin() {
         path: 'memory-personal-use-declaration-store',
         namespace: 'workspace-history-smoke',
       }))
+      build.onResolve({ filter: /(^|[\\/])feature-settings-store(\.ts)?$/ }, () => ({
+        path: 'memory-feature-settings-store',
+        namespace: 'workspace-history-smoke',
+      }))
       build.onResolve({ filter: /workspace-history-optimizer-port(\.ts)?$/ }, () => ({
         path: 'memory-optimizer-port',
         namespace: 'workspace-history-smoke',
@@ -920,6 +924,7 @@ function memoryModule(path) {
   if (path === 'memory-usage-stats') return memoryUsageStatsModule()
   if (path === 'memory-training-cost') return 'export async function attachTrainingCostsToUpgradeSuggestions({ suggestions }) { return suggestions }'
   if (path === 'memory-personal-use-declaration-store') return memoryPersonalUseDeclarationStoreModule()
+  if (path === 'memory-feature-settings-store') return 'export async function getSiteFeatureSettings() { return { version: 1, features: {}, updated_at: null } }'
   if (path === 'memory-optimizer-port') return memoryOptimizerPortModule()
   return 'export const APP_BUILD_META = { frontend_version: "test", backend_version: "test", data_version: "test", generated_at: "test", source_summary: "test" }'
 }

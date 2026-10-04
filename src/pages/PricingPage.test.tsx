@@ -3,13 +3,14 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { DEFAULT_SITE_FEATURES } from '../lib/site-features'
 
 const featureState = vi.hoisted(() => ({
   status: 'ready' as 'loading' | 'ready' | 'error',
   meteredBilling: true,
 }))
 vi.mock('../lib/site-feature-context', () => ({
-  useSiteFeatures: () => ({ status: featureState.status, features: { metered_billing: featureState.meteredBilling }, updatedAt: null, retry: vi.fn() }),
+  useSiteFeatures: () => ({ status: featureState.status, features: { ...DEFAULT_SITE_FEATURES, metered_billing: featureState.meteredBilling }, updatedAt: null, retry: vi.fn() }),
 }))
 import PricingPage from './PricingPage'
 import { cloneDefaultPublicContentSettings, PUBLIC_PRICING_PLAN_IDS } from '../lib/public-content'

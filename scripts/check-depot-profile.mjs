@@ -133,6 +133,10 @@ function memoryStorePlugin() {
         path: 'memory-optimize-job-store',
         namespace: 'depot-profile-smoke',
       }))
+      build.onResolve({ filter: /(^|[\\/])feature-settings-store(\.ts)?$/ }, () => ({
+        path: 'memory-feature-settings-store',
+        namespace: 'depot-profile-smoke',
+      }))
       build.onLoad({ filter: /.*/, namespace: 'depot-profile-smoke' }, (args) => ({
         contents: args.path === 'memory-user-store'
           ? memoryUserStoreModule()
@@ -142,6 +146,8 @@ function memoryStorePlugin() {
               ? memoryUsageStatsModule()
               : args.path === 'memory-optimize-job-store'
                 ? memoryOptimizeJobStoreModule()
+              : args.path === 'memory-feature-settings-store'
+                ? 'export async function getSiteFeatureSettings() { return { version: 1, features: {}, updated_at: null } }'
             : memoryUserAuthModule(),
         loader: 'js',
       }))

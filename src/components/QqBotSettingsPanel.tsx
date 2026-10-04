@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Bell } from 'lucide-react'
 import { apiJson } from '../lib/api-client'
 import { copy } from '../copy/index'
+import { useSiteFeatures } from '../lib/site-feature-context'
 
 type Settings = {
   available: boolean
@@ -11,6 +12,11 @@ type BindingCode = { binding_code: string; expires_at: string }
 const ENDPOINT = '/api/user/qqbot'
 
 export default function QqBotSettingsPanel() {
+  const { features } = useSiteFeatures()
+  return features.qqbot ? <QqBotSettingsContent /> : null
+}
+
+function QqBotSettingsContent() {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [code, setCode] = useState<BindingCode | null>(null)
   const [busy, setBusy] = useState(false)

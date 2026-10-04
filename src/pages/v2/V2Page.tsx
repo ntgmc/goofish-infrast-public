@@ -117,7 +117,7 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
       await session.persistWorkspacePatch({ operators, elite_overrides: {} })
       setOperatorsChanged(true)
     }}
-    onGenerate={() => void generate()} onExport={workflow.handleDownloadMAA}
+    onGenerate={() => void generate()} onExport={features.features.maa_export ? workflow.handleDownloadMAA : undefined}
     busy={workflow.loading || Boolean(workflow.workspaceBusyAction?.startsWith('download'))} loadingResult={reading} generationDisabledReason={generationDisabledReason}
     onRetryResult={latest ? () => { setReading(true); void workflow.handleViewHistory(latest).finally(() => setReading(false)) } : undefined}
     error={error ?? workflow.inlineError?.message ?? workflow.configToast?.message ?? workflow.workspaceError ?? (session.configSyncStatus === 'failed' ? copy.v2.saveFailed : null)}

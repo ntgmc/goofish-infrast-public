@@ -57,7 +57,7 @@ export default async function qqBotAccountHandler(req: Request): Promise<Respons
       const { user, binding } = await getQqBotAccount(body.qq_number)
       if (body.binding_id !== binding.id) throw new QqBotError('binding_changed', 'QQ 绑定已变化，请重新查询。', 409)
       if (body.automatic && !binding.notifications_enabled) throw new QqBotError('notifications_disabled', 'QQ 通知已关闭。', 403)
-      const gate = await requireSiteFeatures(['profiles', 'inventory'])
+      const gate = await requireSiteFeatures(['profiles', 'inventory', 'maa_export'])
       if (gate) return gate
       return await forwardResultRequest(req, '/api/user/maa-export', {
         profile_id: body.profile_id, result_id: body.result_id,

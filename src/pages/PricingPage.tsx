@@ -55,13 +55,13 @@ export default function PricingPage() {
                 ariaLabel={copy.common.components_CompactHeaderMenu_002}
                 triggerVariant="icon"
                 items={[
-                  { type: 'link', id: 'support', label: copy.public.pages_PricingPage_010, to: '/support' },
+                  ...(featureState.features.support ? [{ type: 'link' as const, id: 'support', label: copy.public.pages_PricingPage_010, to: '/support' }] : []),
                   { type: 'link', id: 'home', label: copy.public.pages_PricingPage_011, to: '/' },
                 ]}
               />
             </div>
             <div className="hidden sm:block"><ThemeSwitcher /></div>
-            <Link to="/support" className="tool-nav-link hidden items-center px-3 sm:inline-flex">{copy.public.pages_PricingPage_010}</Link>
+            {featureState.features.support && <Link to="/support" className="tool-nav-link hidden items-center px-3 sm:inline-flex">{copy.public.pages_PricingPage_010}</Link>}
             <Link to="/" className="tool-secondary-action hidden sm:inline-flex">{copy.public.pages_PricingPage_011}</Link>
           </nav>
         </header>
@@ -106,7 +106,7 @@ export default function PricingPage() {
                 <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.public.pricing_upgrade_description(pricing.lifetime_upgrade.service_fee)}</p>
                 <p className="mt-2 text-sm leading-6 text-ink-muted">{copy.public.pricing_upgrade_process}</p>
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                  <Link to="/support" className="tool-secondary-action justify-center">{copy.public.pricing_upgrade_contact}</Link>
+                  {featureState.features.support && <Link to="/support" className="tool-secondary-action justify-center">{copy.public.pricing_upgrade_contact}</Link>}
                   {pricing.lifetime_upgrade.purchase_url ? (
                     <a href={pricing.lifetime_upgrade.purchase_url} target="_blank" rel="noopener noreferrer" className="tool-primary-action justify-center">{copy.public.pricing_upgrade_purchase}</a>
                   ) : (

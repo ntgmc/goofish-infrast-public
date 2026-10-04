@@ -14,6 +14,20 @@ export const SITE_FEATURE_KEYS = [
   'inventory',
   'onboarding_tasks',
   'announcements',
+  'v2',
+  'faq',
+  'support',
+  'pricing',
+  'changelog',
+  'thanks',
+  'service_status',
+  'cultivation_plan',
+  'manual_schedule',
+  'scenario_comparison',
+  'notifications',
+  'qqbot',
+  'maa_export',
+  'full_result_export',
 ] as const
 
 export type SiteFeatureKey = typeof SITE_FEATURE_KEYS[number]
@@ -48,6 +62,20 @@ export const DEFAULT_SITE_FEATURES: SiteFeatures = Object.freeze({
   inventory: true,
   onboarding_tasks: true,
   announcements: true,
+  v2: true,
+  faq: true,
+  support: true,
+  pricing: true,
+  changelog: true,
+  thanks: true,
+  service_status: true,
+  cultivation_plan: true,
+  manual_schedule: true,
+  scenario_comparison: true,
+  notifications: true,
+  qqbot: true,
+  maa_export: true,
+  full_result_export: true,
 })
 
 export const DEFAULT_SITE_FEATURE_SETTINGS: SiteFeatureSettingsV1 = Object.freeze({
@@ -61,7 +89,7 @@ export function normalizeSiteFeatureSettings(value: unknown): SiteFeatureSetting
   const storedFeatures = isRecord(source.features) ? source.features : {}
   const features = Object.fromEntries(SITE_FEATURE_KEYS.map((key) => [
     key,
-    typeof storedFeatures[key] === 'boolean' ? storedFeatures[key] : key !== 'metered_billing',
+    typeof storedFeatures[key] === 'boolean' ? storedFeatures[key] : DEFAULT_SITE_FEATURES[key],
   ])) as unknown as SiteFeatures
   return {
     version: 1,
@@ -71,7 +99,7 @@ export function normalizeSiteFeatureSettings(value: unknown): SiteFeatureSetting
 }
 
 export function computeEffectiveSiteFeatures(settings: SiteFeatureSettingsV1): SiteFeatures {
-  const raw = settings.features
+  const raw = normalizeSiteFeatureSettings(settings).features
   const site = raw.site
   const login = site && raw.login
   const profiles = login && raw.profiles
@@ -92,6 +120,20 @@ export function computeEffectiveSiteFeatures(settings: SiteFeatureSettingsV1): S
     inventory: login && raw.inventory,
     onboarding_tasks: login && raw.inventory && raw.onboarding_tasks,
     announcements: site && raw.announcements,
+    v2: site && raw.v2,
+    faq: raw.faq,
+    support: raw.support,
+    pricing: raw.pricing,
+    changelog: raw.changelog,
+    thanks: raw.thanks,
+    service_status: raw.service_status,
+    cultivation_plan: tools && raw.cultivation_plan,
+    manual_schedule: tools && profiles && raw.schedule_generation && raw.manual_schedule,
+    scenario_comparison: profiles && raw.schedule_generation && raw.scenario_comparison,
+    notifications: login && raw.notifications,
+    qqbot: login && raw.qqbot,
+    maa_export: profiles && raw.inventory && raw.maa_export,
+    full_result_export: profiles && raw.full_result_export,
   }
 }
 

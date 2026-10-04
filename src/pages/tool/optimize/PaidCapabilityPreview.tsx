@@ -3,8 +3,10 @@ import { useId, useState } from 'react'
 import { ArrowRight, ChevronDown, Sparkles } from 'lucide-react'
 import { copy } from '../../../copy'
 import { productPolicies } from '../../../lib/product-catalog'
+import { useSiteFeatures } from '../../../lib/site-feature-context'
 
 export default function PaidCapabilityPreview({ onOpen, showScenarioLab }: { onOpen: (target: 'config' | 'result' | 'lab') => void; showScenarioLab: boolean }) {
+  const { features } = useSiteFeatures()
   const text = copy.optimize.paid_preview
   const [expanded, setExpanded] = useState<string | null>(null)
   const id = useId()
@@ -41,13 +43,14 @@ export default function PaidCapabilityPreview({ onOpen, showScenarioLab }: { onO
       <p className="mt-4 text-xs leading-5 text-ink-muted"><span className="font-medium">{text.trial_export}</span> · {text.trial_export_detail}</p>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-surface-3/60 pt-4">
         <p className="text-sm leading-6 text-ink-secondary">{text.conclusion}</p>
-        <Link to="/pricing" className="tool-primary-action">{text.compare}</Link>
+        {features.pricing && <Link to="/pricing" className="tool-primary-action">{text.compare}</Link>}
       </div>
     </details>
   )
 }
 
 export function LockedScenarioPreview() {
+  const { features } = useSiteFeatures()
   const text = copy.optimize.paid_preview
   return (
     <section className="tool-panel space-y-4 p-5 sm:p-6" aria-label={text.lab}>
@@ -62,12 +65,13 @@ export function LockedScenarioPreview() {
       <p className="tool-inset p-4 text-sm text-ink-muted">{text.pending}</p>
       <p className="text-sm text-ink-secondary">{text.lab_detail}</p>
       <p className="text-sm text-ink-secondary">{text.quotas(productPolicies.metered_billing.scenario_quotas.month, productPolicies.metered_billing.scenario_quotas.half_year, productPolicies.metered_billing.scenario_quotas.year)}</p>
-      <Link to="/pricing" className="inline-block text-sm text-primary underline">{text.compare}</Link>
+      {features.pricing && <Link to="/pricing" className="inline-block text-sm text-primary underline">{text.compare}</Link>}
     </section>
   )
 }
 
 export function LockedResultPreview() {
+  const { features } = useSiteFeatures()
   const text = copy.optimize.paid_preview
   return (
     <section className="tool-panel mt-4 space-y-4 p-5" aria-label={text.exports}>
@@ -77,7 +81,7 @@ export function LockedResultPreview() {
       <h3 className="font-medium text-ink-primary">{text.analysis}</h3>
       <p className="text-sm leading-6 text-ink-secondary">{text.analysis_detail}</p>
       <div className="tool-inset p-4 text-sm text-ink-muted"><p>{text.roi}</p><p className="mt-2">{text.result_pending}</p></div>
-      <Link to="/pricing" className="inline-block text-sm text-primary underline">{text.compare}</Link>
+      {features.pricing && <Link to="/pricing" className="inline-block text-sm text-primary underline">{text.compare}</Link>}
     </section>
   )
 }

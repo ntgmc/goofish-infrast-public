@@ -32,14 +32,16 @@ function requiredFeatures(pathname: string, method: string): SiteFeatureKey[] {
   if (pathname === '/api/auth/register') return ['registration']
   if (pathname === '/api/auth/login' || pathname === '/api/auth/me') return ['login']
   if (pathname === '/api/announcement') return ['announcements']
+  if (pathname === '/api/status') return ['service_status']
   if (pathname === '/api/depot-value') return ['depot_value']
-  if (pathname === '/api/cultivation-plan') return ['tools', 'skland']
+  if (pathname === '/api/cultivation-plan') return ['tools', 'cultivation_plan', 'skland']
   if (pathname === '/api/usage-stats') return ['login']
 
   if (pathname === '/api/user/data/credential/clear') return ['profiles']
   if (pathname === '/api/user/announcements') return ['login', 'announcements']
-  if (pathname === '/api/user/qqbot') return ['login']
-  if (pathname === '/api/user/notifications') return ['login']
+  if (pathname === '/api/user/qqbot') return ['login', 'qqbot']
+  if (pathname === '/api/user/notifications') return ['login', 'notifications']
+  if (pathname.startsWith('/api/integrations/qqbot/')) return ['qqbot']
   if (pathname === '/api/user/profiles/preview') return ['free_preview']
   if (pathname === '/api/user/profiles/redeem') return ['cdk_redemption']
   if (pathname === '/api/user/cdk/redeem') return ['cdk_redemption']
@@ -51,8 +53,12 @@ function requiredFeatures(pathname: string, method: string): SiteFeatureKey[] {
     || pathname === '/api/user/billing/quote') return ['profiles', 'schedule_generation', 'metered_billing']
   if (pathname === '/api/user/profiles' || pathname === '/api/user/status') return ['profiles']
   if (pathname === '/api/user/workspace') return ['profiles']
+  if (pathname === '/api/user/maa-export'
+    || (pathname.startsWith('/api/user/results/') && pathname.endsWith('/maa-export'))) return ['inventory', 'maa_export']
+  if (pathname === '/api/user/full-result-export'
+    || (pathname.startsWith('/api/user/results/') && pathname.endsWith('/full-result-export'))) return ['full_result_export']
   if (pathname === '/api/user/results' || pathname.startsWith('/api/user/results/')) return ['profiles']
-  if (pathname === '/api/user/inventory' || pathname === '/api/user/maa-export' || pathname === '/api/user/result-archive') {
+  if (pathname === '/api/user/inventory' || pathname === '/api/user/inventory/lifetime-profile' || pathname === '/api/user/result-archive') {
     return ['inventory']
   }
   if (pathname === '/api/user/onboarding-tasks' || pathname === '/api/user/onboarding-tasks/claim'

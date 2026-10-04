@@ -236,8 +236,8 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
     return <Navigate to={profileScopedPath(workspace?.operators ? workspaceSetupPath('config') : workspaceSetupPath('operators'), activeProfile.id)} replace />
   }
 
-  if (route.section === 'lab' && !features.schedule_generation) {
-    return <FeatureUnavailablePage feature="schedule_generation" />
+  if (route.section === 'lab' && !features.scenario_comparison) {
+    return <FeatureUnavailablePage feature="scenario_comparison" />
   }
 
   return (

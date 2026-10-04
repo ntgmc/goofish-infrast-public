@@ -1,15 +1,16 @@
 import { Link } from 'react-router'
 import { copy } from '../copy/index'
 import { usePublicContent } from '../lib/public-content-context'
+import { useSiteFeatures } from '../lib/site-feature-context'
+import type { SiteFeatureKey } from '../lib/site-features'
 
 const GITHUB_REPOSITORY_URL = 'https://github.com/ntgmc/goofish-infrast-public'
 
-const footerLinks = [
-  { to: '/status', label: copy.status.pages_StatusPage_002 },
-  { to: '/pricing', label: copy.public.components_PublicFooter_012 },
-  { to: '/faq', label: copy.public.components_PublicFooter_001 },
-  { to: '/changelog', label: copy.public.components_PublicFooter_014 },
-  { to: '/thanks', label: copy.public.components_PublicFooter_013 },
+const footerLinks: Array<{ to: string; label: string; feature?: SiteFeatureKey }> = [
+  { to: '/status', label: copy.status.pages_StatusPage_002, feature: 'service_status' },
+  { to: '/pricing', label: copy.public.components_PublicFooter_012, feature: 'pricing' },
+  { to: '/changelog', label: copy.public.components_PublicFooter_014, feature: 'changelog' },
+  { to: '/thanks', label: copy.public.components_PublicFooter_013, feature: 'thanks' },
   { to: '/terms', label: copy.public.components_PublicFooter_002 },
   { to: '/privacy', label: copy.public.components_PublicFooter_003 },
   { to: '/disclaimer', label: copy.public.components_PublicFooter_004 },
@@ -22,6 +23,7 @@ interface PublicFooterProps {
 
 export default function PublicFooter({ className = '', variant = 'landing' }: PublicFooterProps) {
   const { content } = usePublicContent()
+  const { features } = useSiteFeatures()
   const linkClassName = 'inline-flex min-h-11 items-center text-sm text-ink-secondary underline-offset-4 transition-colors hover:text-ink-primary hover:underline'
   const iconLinkClassName = 'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-ink-secondary transition-colors hover:bg-surface-2 hover:text-ink-primary'
   return (
@@ -32,7 +34,7 @@ export default function PublicFooter({ className = '', variant = 'landing' }: Pu
           <p className="mt-1 text-xs leading-5 text-ink-muted">{copy.public.components_PublicFooter_007}</p>
         </div>
         <nav className="flex flex-wrap items-center gap-x-5 gap-y-3" aria-label={copy.public.components_PublicFooter_008}>
-          <Link className={linkClassName} to="/faq">{copy.public.components_PublicFooter_009}</Link>
+          {features.faq && <Link className={linkClassName} to="/faq">{copy.public.components_PublicFooter_009}</Link>}
           <a
             className={linkClassName}
             href={content.qq_group.join_url}
@@ -40,7 +42,7 @@ export default function PublicFooter({ className = '', variant = 'landing' }: Pu
             rel="noopener noreferrer"
           >
             {content.qq_group.link_label} · {content.qq_group.number}</a>
-          {footerLinks.filter((link) => link.to !== '/faq').map((link) => (
+          {footerLinks.filter((link) => !link.feature || features[link.feature]).map((link) => (
             <Link key={link.to} className={linkClassName} to={link.to}>
               {link.label}
             </Link>

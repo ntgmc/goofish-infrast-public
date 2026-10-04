@@ -14,6 +14,7 @@ import { apiJson, getApiErrorMessage } from '../lib/api-client'
 import { itemIconPath } from '../lib/inventory-contracts'
 import { markInventoryStale } from '../lib/inventory-refresh'
 import type { UserNotification, UserNotificationPage } from '../lib/types'
+import { useSiteFeatures } from '../lib/site-feature-context'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 
 const POLL_INTERVAL_MS = 60_000
@@ -36,6 +37,12 @@ type NotificationCenterValue = {
 const NotificationCenterContext = createContext<NotificationCenterValue | null>(null)
 
 export function NotificationCenterProvider({ userId, children }: { userId: string; children: ReactNode }) {
+  const { features } = useSiteFeatures()
+  if (!features.notifications) return children
+  return <EnabledNotificationCenterProvider userId={userId}>{children}</EnabledNotificationCenterProvider>
+}
+
+function EnabledNotificationCenterProvider({ userId, children }: { userId: string; children: ReactNode }) {
   const [notifications, setNotifications] = useState<UserNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [nextCursor, setNextCursor] = useState<string | null>(null)

@@ -4,7 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
-import { DEFAULT_SITE_FEATURE_SETTINGS } from './site-features'
+import { DEFAULT_SITE_FEATURE_SETTINGS, normalizeSiteFeatureSettings, computeEffectiveSiteFeatures } from './site-features'
 
 const { apiJson } = vi.hoisted(() => ({ apiJson: vi.fn() }))
 vi.mock('./api-client', () => ({ apiJson }))
@@ -18,6 +18,22 @@ afterEach(() => {
 })
 
 describe('SiteFeatureProvider', () => {
+  it('fills new switches from legacy settings while preserving disabled parents', async () => {
+    apiJson.mockResolvedValueOnce({ version: 1, features: { tools: false, login: false }, updated_at: null })
+    render(<MemoryRouter><SiteFeatureProvider>
+      <FeatureRoute feature="v2"><p>V2 available</p></FeatureRoute>
+      <FeatureRoute feature="cultivation_plan"><p>Cultivation available</p></FeatureRoute>
+      <FeatureRoute feature="notifications"><p>Notifications available</p></FeatureRoute>
+    </SiteFeatureProvider></MemoryRouter>)
+    expect(await screen.findByText('V2 available')).toBeInTheDocument()
+    expect(screen.queryByText('Cultivation available')).not.toBeInTheDocument()
+    expect(screen.queryByText('Notifications available')).not.toBeInTheDocument()
+    const settings = normalizeSiteFeatureSettings({ features: { schedule_generation: false, inventory: false } })
+    expect(settings.features.manual_schedule).toBe(true)
+    expect(computeEffectiveSiteFeatures(settings)).toMatchObject({
+      manual_schedule: false, scenario_comparison: false, maa_export: false, full_result_export: true,
+    })
+  })
   it('keeps retired billing closed when an older server returns an enabled setting', async () => {
     apiJson.mockResolvedValueOnce({
       ...DEFAULT_SITE_FEATURE_SETTINGS,

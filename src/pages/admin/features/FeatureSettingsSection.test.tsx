@@ -65,6 +65,24 @@ describe('FeatureSettingsSection', () => {
     })))
   })
 
+  it('fills legacy settings before saving new switches with the current revision', async () => {
+    const user = userEvent.setup()
+    adminApiJson.mockResolvedValueOnce({ settings: {
+      version: 1, features: { site: true, tools: false, depot_value: false }, updated_at: null, revision: 5,
+    } })
+    render(<FeatureSettingsSection />)
+    const manual = await screen.findByRole('checkbox', { name: /手动排班与模拟/ })
+    expect(manual).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: /公开工具中心/ })).not.toBeChecked()
+    await user.click(screen.getByRole('checkbox', { name: /V2 工作台/ }))
+    await user.click(screen.getByRole('button', { name: '保存功能开关' }))
+    await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/feature-settings', expect.objectContaining({
+      json: { expected_revision: 5, features: {
+        ...DEFAULT_SITE_FEATURE_SETTINGS.features, tools: false, depot_value: false, v2: false,
+      } },
+    })))
+  })
+
   it('does not expose settings or save when the initial load fails', async () => {
     const user = userEvent.setup()
     adminApiJson.mockRejectedValueOnce(new Error('数据库不可用'))

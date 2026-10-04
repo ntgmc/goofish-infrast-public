@@ -14,6 +14,7 @@ import DebugModePanel from '../../../components/DebugModePanel'
 import AnimationSettings from '../../../components/AnimationSettings'
 import QqBotSettingsPanel from '../../../components/QqBotSettingsPanel'
 import SklandIcon from '../../../components/SklandIcon'
+import { useSiteFeatures } from '../../../lib/site-feature-context'
 import { WorkspaceEntrySettings, type WorkspaceEntryState } from '../WorkspaceEntryPreference'
 
 
@@ -35,6 +36,7 @@ export default function SettingsSection({
   safetyOnly?: boolean
   onDeletionStateChange?: (state: 'idle' | 'submitting' | 'accepted') => void
 }) {
+  const { features } = useSiteFeatures()
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -156,7 +158,7 @@ export default function SettingsSection({
         <nav aria-label={text.navigation} className="flex flex-wrap gap-2">
           <button type="button" onClick={() => openSection('settings-security')} className="tool-secondary-action text-sm"><ShieldCheck size={16} aria-hidden="true" />{text.security}</button>
           <button type="button" onClick={() => openSection('settings-preferences')} className="tool-secondary-action text-sm"><SlidersHorizontal size={16} aria-hidden="true" />{text.preferences}</button>
-          <button type="button" onClick={() => openSection('settings-notifications')} className="tool-secondary-action text-sm"><Bell size={16} aria-hidden="true" />{copy.notifications.title}</button>
+          {features.qqbot && <button type="button" onClick={() => openSection('settings-notifications')} className="tool-secondary-action text-sm"><Bell size={16} aria-hidden="true" />{copy.notifications.title}</button>}
           <button type="button" onClick={() => openSection('settings-data')} className="tool-secondary-action text-sm">{text.data}</button>
         </nav>
       </div>}
@@ -238,7 +240,7 @@ export default function SettingsSection({
           <AnimationSettings className="mt-5 border-t border-surface-3 pt-5" />
           {workspaceEntry && <WorkspaceEntrySettings entry={workspaceEntry} className="mt-5 border-t border-surface-3 pt-5" />}
         </section>}
-        <div id="settings-notifications" tabIndex={-1} className="min-w-0 scroll-mt-32"><QqBotSettingsPanel /></div>
+        {features.qqbot && <div id="settings-notifications" tabIndex={-1} className="min-w-0 scroll-mt-32"><QqBotSettingsPanel /></div>}
         <section id="settings-data" tabIndex={-1} className="tool-panel min-w-0 scroll-mt-32 p-5 sm:p-6">
           <div className="flex items-center gap-3">
             <ShieldCheck size={20} className="shrink-0 text-brand-500" aria-hidden="true" />

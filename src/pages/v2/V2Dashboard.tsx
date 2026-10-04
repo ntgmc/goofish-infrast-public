@@ -18,6 +18,7 @@ import OptionsDrawer, { type OptionPanel, type V2Session } from './OptionsDrawer
 import { sortOperatorsForPreview } from '../tool/tool-utils'
 import V2Transition from './V2Transition'
 import TradingIcon from './TradingIcon'
+import { useSiteFeatures } from '../../lib/site-feature-context'
 
 const text = copy.v2
 type View = 'summary' | 'details' | 'analysis'
@@ -49,6 +50,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
   onHistory?: (summary: WorkspaceResultHistorySummary) => Promise<void>
   children?: ReactNode
 }) {
+  const { features } = useSiteFeatures()
   const [panel, setPanel] = useState<OptionPanel | null>(null)
   const [room, setRoom] = useState<BoardRoom | null>(null)
   const [view, setView] = useState<View>('summary')
@@ -104,7 +106,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
           <button type="button" className="v2-nav-item" onClick={() => openPanel('cdk')}><WalletCards size={19} /><span>{text.cdk}</span></button>
         </nav>
         <div className="v2-sidebar-bottom">
-          <Link className="v2-help-link" to="/faq"><BookOpen size={19} /><span>{text.helpAction}</span><ArrowUpRight size={14} /></Link>
+          {features.faq && <Link className="v2-help-link" to="/faq"><BookOpen size={19} /><span>{text.helpAction}</span><ArrowUpRight size={14} /></Link>}
         </div>
       </aside>
       <div className="v2-workspace">
@@ -112,7 +114,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
           <div className="v2-breadcrumb"><button className="v2-menu-button v2-icon-button" type="button" onClick={() => setMobileNavigation(true)} aria-label={text.menu}><Menu size={21} /></button>
             <span>{text.workspace}</span><ChevronRight size={14} /><strong>{text.infrastructure}</strong></div>
           <div className="v2-topbar-actions"><Link className="v2-back-link" to="/">{text.backToV1}</Link><span className="v2-sample-pill"><span />{text.testVersion}</span>
-            <Link to="/changelog" className="v2-icon-button" aria-label={text.updates}><Bell size={19} /></Link>
+            {features.changelog && <Link to="/changelog" className="v2-icon-button" aria-label={text.updates}><Bell size={19} /></Link>}
             <span className="v2-topbar-divider" />
             <button className="v2-profile-button" type="button" onClick={() => openPanel('account')}><span className="v2-profile-avatar">{name.slice(0, 1)}</span><span>{name}</span><ChevronDown size={14} /></button>
           </div>
@@ -125,8 +127,8 @@ export default function V2Dashboard({ session, result, operators, config, sample
             <div className="v2-banner-actions"><button type="button" className="v2-button v2-button-white" onClick={() => openPanel('config')}><Settings2 size={16} />{text.configure}</button>
               <button type="button" className="v2-button v2-button-primary" disabled={busy || loadingResult || Boolean(generationDisabledReason)} title={generationDisabledReason ?? undefined}
                 onClick={() => onGenerate ? onGenerate() : openPanel('account')}><RefreshCw size={16} className={busy ? 'v2-spin' : ''} />{busy ? text.generating : text.regenerate}</button>
-              <button className="v2-button v2-button-secondary v2-export-button" type="button" disabled={busy || (!sample && resultMode === 'rotation')} title={resultMode === 'rotation' ? text.exportUnavailable : undefined}
-                onClick={sample ? downloadSample : onExport}><Download size={16} />{sample ? text.sampleExport : text.export}</button></div>
+              {(sample || features.maa_export) && <button className="v2-button v2-button-secondary v2-export-button" type="button" disabled={busy || (!sample && (resultMode === 'rotation' || !onExport))} title={resultMode === 'rotation' ? text.exportUnavailable : undefined}
+                onClick={sample ? downloadSample : onExport}><Download size={16} />{sample ? text.sampleExport : text.export}</button>}</div>
           </div>
           <AnimatePresence initial={false}>
           {(loadingResult || error || notice || downloadNotice || configChanged) && <FeedbackRegion key="feedback">
@@ -160,7 +162,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
             {view === 'analysis' ? (
               <section className="v2-panel v2-analysis"><div className="v2-panel-heading"><h2>{text.analysisTab}</h2><span className="v2-neutral-tag">24h</span></div>{canViewAnalysis
                 ? <IncomeAnalysis result={result} />
-                : <div className="v2-analysis-note"><ShieldCheck size={21} /><div><p>{text.previewAnalysis}</p><Link className="v2-text-button" to="/pricing">{text.comparePlans}<ArrowRight size={14} /></Link></div></div>}</section>
+                : <div className="v2-analysis-note"><ShieldCheck size={21} /><div><p>{text.previewAnalysis}</p>{features.pricing && <Link className="v2-text-button" to="/pricing">{text.comparePlans}<ArrowRight size={14} /></Link>}</div></div>}</section>
             ) : (
               <ScheduleBoard result={result} prepared={prepared} expanded={view === 'details'} shift={shift} onShiftChange={setShift}
                 view={boardView} onViewChange={setBoardView} onRoom={openRoom} />
