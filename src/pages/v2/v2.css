@@ -735,18 +735,12 @@
   border-radius: var(--radius-v2-control);
   background: var(--color-v2-inset);
   text-align: left;
-  transition: background-color var(--dur-fast) ease-out, transform 180ms var(--motion-ease-enter);
+  transition: background-color var(--dur-fast) ease-out;
 }
 
 .v2-room-card:hover {
   background: var(--color-v2-hover);
 }
-
-@media (hover: hover) {
-  :root:not([data-reduced-motion]) .v2-room-card:hover { transform: translateY(-2px); }
-}
-
-:root:not([data-reduced-motion]) .v2-room-card:active { transform: scale(0.99); }
 
 .v2-room-header {
   display: flex;
