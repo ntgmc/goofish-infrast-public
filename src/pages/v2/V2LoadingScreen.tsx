@@ -11,14 +11,8 @@ function V2LoadingSpinner() {
 }
 
 export function V2SectionLoading({ label = copy.common.pages_tool_AccountDashboard_015 }: { label?: string }) {
-  return <div className="v2-panel v2-section-skeleton" role="status" aria-label={label} aria-busy="true">
-    <div className="v2-section-loading-status"><V2LoadingSpinner /><p>{label}</p></div>
-    <div className="v2-section-skeleton-content" aria-hidden="true">
-      <div className="motion-skeleton-line h-4 w-32" />
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        {Array.from({ length: 4 }, (_, index) => <div key={index} className="motion-skeleton-block h-24" />)}
-      </div>
-    </div>
+  return <div className="v2-section-loading-region" role="status" aria-label={label} aria-busy="true">
+    <V2LoadingSpinner /><p>{label}</p>
   </div>
 }
 

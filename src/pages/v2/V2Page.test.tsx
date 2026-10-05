@@ -682,7 +682,7 @@ function ManualDraftStub({ onDirtyChange }: { onDirtyChange: (dirty: boolean) =>
 }
 
 describe('V2 feature continuity', () => {
-  it('keeps the V2 spinner and skeleton visible until inventory data arrives', async () => {
+  it('keeps the navigation and main loading animation until inventory data arrives', async () => {
     connect()
     let finishInventory!: (response: Response) => void
     const inventory = new Promise<Response>((resolve) => { finishInventory = resolve })
@@ -690,11 +690,19 @@ describe('V2 feature continuity', () => {
       : new Response(JSON.stringify({ tasks: [], notifications: [], unread_count: 0, next_cursor: null }), { status: 200 }))
     const user = userEvent.setup()
     mount()
+    const navigation = screen.getByRole('navigation', { name: copy.v2.navigation })
+    const topbar = document.querySelector('.v2-topbar')
+    const main = screen.getByRole('main')
     await user.click(screen.getByRole('button', { name: copy.inventory.nav }))
     const loading = await screen.findByRole('status', { name: copy.inventory.loading })
     expect(loading).toHaveAttribute('aria-busy', 'true')
+    expect(loading).toHaveClass('v2-section-loading-region')
+    expect(loading).not.toHaveClass('v2-panel')
+    expect(loading.closest('main')).toBe(main)
     expect(loading.querySelector('.v2-loading-spinner')).toBeInTheDocument()
-    expect(loading.querySelectorAll('.motion-skeleton-block')).toHaveLength(4)
+    expect(document.querySelector('.motion-skeleton-block')).not.toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: copy.v2.navigation })).toBe(navigation)
+    expect(document.querySelector('.v2-topbar')).toBe(topbar)
     expect(screen.queryByRole('heading', { name: copy.inventory.title, level: 2 })).not.toBeInTheDocument()
 
     await act(async () => { finishInventory(new Response(JSON.stringify({ stacks: [], capacities: [], recent_events: [] }), { status: 200 })) })
