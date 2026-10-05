@@ -156,7 +156,7 @@ function Generation({ workflow: w, disabledReason, onNavigate, onConfig }: { wor
       savedConfigCount={w.savedConfigs.length} savedConfigLimit={w.profileCapacity?.plan_slots.limit} resultHistoryCount={w.profileCapacity?.history_slots.used ?? w.resultHistory.length}
       resultHistoryLimit={w.profileCapacity?.history_slots.limit} latestResult={w.latestWorkspaceResult} generationDisabledReason={disabledReason}
       freeSchedule={{ visible: w.isRestrictedPreview }} onGenerate={w.handleGenerate}
-      incrementalRecompute={{ visible: !w.isRestrictedPreview && Boolean(w.latestWorkspaceResult), loading: w.loading, quote: w.incrementalBillingQuote, quoteLoading: w.incrementalBillingQuoteLoading, quoteError: w.incrementalBillingQuoteError, onRun: w.handleIncrementalRecompute }}
+      incrementalRecompute={{ visible: false, loading: w.loading, quote: w.incrementalBillingQuote, quoteLoading: w.incrementalBillingQuoteLoading, quoteError: w.incrementalBillingQuoteError, onRun: w.handleIncrementalRecompute }}
       onReset={w.onReset} onOpenPlans={() => onNavigate('plans')} onOpenConfig={onConfig}
       onViewHistory={w.handleViewHistory} onUseHistoryConfig={w.handleUseHistoryConfig} onDownloadHistory={w.handleDownloadHistory}
       downloadBusy={w.workspaceBusyAction === `download:${w.latestWorkspaceResult?.id ?? ''}`} />
