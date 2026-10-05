@@ -27,7 +27,7 @@ export function MaaImportGuide({ compact = false }: { compact?: boolean }) {
         <span>{copy.domain.components_result_panel_Guides_003}</span>
         <span className="text-xs font-medium text-ink-muted">{copy.domain.components_result_panel_Guides_004}</span>
       </summary>
-      <div className="grid gap-5 border-t border-surface-3/60 p-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(320px,1.25fr)] lg:items-start">
+      <div className="grid gap-5 border-t border-surface-3/60 p-4">
         <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-ink-secondary">
           <li>{copy.domain.components_result_panel_Guides_005}<span className="font-medium text-ink-primary">{copy.domain.components_result_panel_Guides_006}</span></li>
           <li>{copy.domain.components_result_panel_Guides_007}<span className="font-medium text-ink-primary">{copy.domain.components_result_panel_Guides_008}</span> {copy.domain.components_result_panel_Guides_009}<span className="font-medium text-ink-primary">{copy.domain.components_result_panel_Guides_010}</span></li>
@@ -35,7 +35,10 @@ export function MaaImportGuide({ compact = false }: { compact?: boolean }) {
           <li><span className="font-medium text-ink-primary">{copy.domain.components_result_panel_Guides_014}</span> {copy.domain.components_result_panel_Guides_015}<span className="font-medium text-ink-primary">{copy.domain.components_result_panel_Guides_016}</span></li>
           <li>{copy.domain.components_result_panel_Guides_017}</li>
         </ol>
-        <div className="tool-inset overflow-hidden">
+        <details className="tool-inset overflow-hidden">
+          <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-medium text-ink-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500/45">
+            {copy.domain.maa_import_screenshot}
+          </summary>
           <picture>
             <source srcSet="/assets/maa-import-schedule-json-dark.png" media="(prefers-color-scheme: dark)" />
             <img
@@ -45,7 +48,7 @@ export function MaaImportGuide({ compact = false }: { compact?: boolean }) {
               loading="lazy"
             />
           </picture>
-        </div>
+        </details>
       </div>
     </details>
   )

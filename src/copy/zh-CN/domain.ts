@@ -185,6 +185,7 @@ export const domainCopy = {
   components_result_panel_Guides_017: "点击选择，选择本站下载的排班 JSON",
   // src/components/result-panel/Guides.tsx
   components_result_panel_Guides_018: "MAA 自定义基建配置中选择排班 JSON 的位置示意图",
+  maa_import_screenshot: "查看 MAA 设置截图",
   // src/components/result-panel/ResultBoard.tsx
   components_result_panel_ResultBoard_001: "游戏内轮换参考图",
   // src/components/result-panel/ResultBoard.tsx
