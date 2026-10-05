@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import type { UserAnnouncementRead } from '../../../lib/types'
 import { apiJson } from '../../../lib/api-client'
 import { formatDate } from '../tool-utils'
@@ -7,7 +7,7 @@ import { copy } from '../../../copy/index'
 
 
 
-export default function AnnouncementsSection({ onUnreadCountChange }: { onUnreadCountChange: (count: number) => void }) {
+export default function AnnouncementsSection({ onUnreadCountChange, loadingFallback }: { onUnreadCountChange: (count: number) => void; loadingFallback?: ReactNode }) {
   const [items, setItems] = useState<UserAnnouncementRead[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -54,6 +54,7 @@ export default function AnnouncementsSection({ onUnreadCountChange }: { onUnread
   }
 
   const unreadCount = items.filter((item) => !item.read_at).length
+  if (loading && !items.length && loadingFallback) return loadingFallback
 
   return (
     <section className="max-w-4xl space-y-4">

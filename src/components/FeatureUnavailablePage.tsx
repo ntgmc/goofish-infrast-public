@@ -6,11 +6,16 @@ import ThemeSwitcher from './ThemeSwitcher'
 import BrandLogo from './BrandLogo'
 import SklandIcon from './SklandIcon'
 import { copy } from '../copy/index'
+import { dashboardPath } from '../lib/app-routes'
 
-export function FeatureRoute({ feature, children }: { feature: SiteFeatureKey; children: React.ReactNode }) {
+export function FeatureRoute({ feature, children, renderPending }: {
+  feature: SiteFeatureKey
+  children: React.ReactNode
+  renderPending?: (status: 'loading' | 'error', retry: () => void) => React.ReactNode
+}) {
   const state = useSiteFeatures()
-  if (state.status === 'loading') return <SessionLoader label={copy.features.loading} />
-  if (state.status === 'error') return <FeatureUnavailablePage loadError onRetry={state.retry} />
+  if (state.status === 'loading') return renderPending?.('loading', state.retry) ?? <SessionLoader label={copy.features.loading} />
+  if (state.status === 'error') return renderPending?.('error', state.retry) ?? <FeatureUnavailablePage loadError onRetry={state.retry} />
   if (!state.features[feature]) return <FeatureUnavailablePage feature={feature} />
   return children
 }
@@ -45,7 +50,7 @@ export default function FeatureUnavailablePage({
           <div className="mt-6 flex flex-wrap gap-3">
             {loadError && onRetry && <button type="button" onClick={onRetry} className="tool-primary-action">{copy.features.retry}</button>}
             <Link to="/" className="tool-secondary-action">{copy.features.back_home}</Link>
-            <Link to="/account-safety" className="tool-secondary-action">{copy.features.account_safety}</Link>
+            <Link to={dashboardPath('settings')} className="tool-secondary-action">{copy.features.account_safety}</Link>
           </div>
         </section>
       </div>

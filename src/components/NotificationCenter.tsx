@@ -14,6 +14,7 @@ import { apiJson, getApiErrorMessage } from '../lib/api-client'
 import { itemIconPath } from '../lib/inventory-contracts'
 import { markInventoryStale } from '../lib/inventory-refresh'
 import type { UserNotification, UserNotificationPage } from '../lib/types'
+import { useSiteFeatures } from '../lib/site-feature-context'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 
 const POLL_INTERVAL_MS = 60_000
@@ -36,6 +37,12 @@ type NotificationCenterValue = {
 const NotificationCenterContext = createContext<NotificationCenterValue | null>(null)
 
 export function NotificationCenterProvider({ userId, children }: { userId: string; children: ReactNode }) {
+  const { features } = useSiteFeatures()
+  if (!features.notifications) return children
+  return <EnabledNotificationCenterProvider userId={userId}>{children}</EnabledNotificationCenterProvider>
+}
+
+function EnabledNotificationCenterProvider({ userId, children }: { userId: string; children: ReactNode }) {
   const [notifications, setNotifications] = useState<UserNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
@@ -259,13 +266,13 @@ export function NotificationCenterProvider({ userId, children }: { userId: strin
   )
 }
 
-export function NotificationBell({ iconOnly = false }: { iconOnly?: boolean }) {
+export function NotificationBell({ iconOnly = false, onInventory }: { iconOnly?: boolean; onInventory?: () => void }) {
   const center = useContext(NotificationCenterContext)
   if (!center) return null
-  return <NotificationBellContent center={center} iconOnly={iconOnly} />
+  return <NotificationBellContent center={center} iconOnly={iconOnly} onInventory={onInventory} />
 }
 
-function NotificationBellContent({ center, iconOnly }: { center: NotificationCenterValue; iconOnly: boolean }) {
+function NotificationBellContent({ center, iconOnly, onInventory }: { center: NotificationCenterValue; iconOnly: boolean; onInventory?: () => void }) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const badge = center.unreadCount > 99 ? '99+' : String(center.unreadCount)
@@ -280,7 +287,10 @@ function NotificationBellContent({ center, iconOnly }: { center: NotificationCen
       }
     }
     setOpen(false)
-    if (notification.action?.kind === 'inventory') navigate('/tool/inventory')
+    if (notification.action?.kind === 'inventory') {
+      if (onInventory) onInventory()
+      else navigate('/tool/inventory')
+    }
   }
 
   return (

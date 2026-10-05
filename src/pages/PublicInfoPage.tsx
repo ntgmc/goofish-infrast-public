@@ -9,6 +9,7 @@ import { copy } from '../copy/index'
 import { productPolicies } from '../lib/product-catalog'
 import { usePublicContent } from '../lib/public-content-context'
 import { PERSONAL_USE_DECLARATION } from '../lib/personal-use-declaration'
+import { useSiteFeatures } from '../lib/site-feature-context'
 
 
 export type PublicInfoPageKind = 'faq' | 'support' | 'privacy' | 'terms' | 'disclaimer'
@@ -125,16 +126,18 @@ const pageMeta: Record<PublicInfoPageKind, { title: string; eyebrow: string; int
   disclaimer: { title: copy.public.pages_PublicInfoPage_055, eyebrow: copy.public.pages_PublicInfoPage_056, intro: copy.public.pages_PublicInfoPage_057 },
 }
 
-export default function PublicInfoPage({ page }: { page: PublicInfoPageKind }) {
+export default function PublicInfoPage({ page, embedded = false }: { page: PublicInfoPageKind; embedded?: boolean }) {
+  const PageRoot = embedded ? 'section' : 'main'
+  const { features } = useSiteFeatures()
   const { content } = usePublicContent()
   const meta = page === 'faq'
     ? { title: content.faq.title, eyebrow: content.faq.eyebrow, intro: content.faq.intro }
     : pageMeta[page]
 
   return (
-    <main className="tool-page" tabIndex={-1} data-route-focus>
-      <div className="public-shell">
-        <header className="public-nav">
+    <PageRoot className={embedded ? 'v2-embedded-tool' : 'tool-page'} tabIndex={-1} data-route-focus>
+      <div className={embedded ? undefined : 'public-shell'}>
+        {!embedded && <header className="public-nav">
           <Link to="/" className="flex min-w-0 flex-1 items-center gap-2 text-left sm:gap-3">
             <BrandLogo size="sm" className="sm:h-10 sm:w-10 sm:rounded-lg sm:p-1" />
             <span className="min-w-0">
@@ -149,20 +152,20 @@ export default function PublicInfoPage({ page }: { page: PublicInfoPageKind }) {
                 ariaLabel={copy.common.components_CompactHeaderMenu_002}
                 triggerVariant="icon"
                 items={[
-                  { type: 'link', id: 'faq', label: 'FAQ', to: '/faq', current: page === 'faq' },
-                  { type: 'link', id: 'support', label: copy.public.pages_PublicInfoPage_061, to: '/support', current: page === 'support' },
+                  ...(features.faq ? [{ type: 'link' as const, id: 'faq', label: 'FAQ', to: '/faq', current: page === 'faq' }] : []),
+                  ...(features.support ? [{ type: 'link' as const, id: 'support', label: copy.public.pages_PublicInfoPage_061, to: '/support', current: page === 'support' }] : []),
                   { type: 'link', id: 'home', label: copy.public.pages_PublicInfoPage_062, to: '/' },
                 ]}
               />
             </div>
             <div className="hidden sm:block"><ThemeSwitcher /></div>
-            <Link to="/faq" className="tool-nav-link hidden items-center px-3 sm:inline-flex">FAQ</Link>
-            <Link to="/support" className="tool-nav-link hidden items-center px-3 sm:inline-flex">{copy.public.pages_PublicInfoPage_061}</Link>
+            {features.faq && <Link to="/faq" className="tool-nav-link hidden items-center px-3 sm:inline-flex">FAQ</Link>}
+            {features.support && <Link to="/support" className="tool-nav-link hidden items-center px-3 sm:inline-flex">{copy.public.pages_PublicInfoPage_061}</Link>}
             <Link to="/" className="tool-secondary-action hidden sm:inline-flex">{copy.public.pages_PublicInfoPage_062}</Link>
           </nav>
-        </header>
+        </header>}
 
-        <article className="public-document">
+        <article className={embedded ? undefined : 'public-document'}>
         <header className="public-document-header">
           <p className="public-kicker">{meta.eyebrow}</p>
           <h1 className="display-title mt-3 text-3xl leading-tight text-ink-primary sm:text-4xl">{meta.title}</h1>
@@ -179,8 +182,8 @@ export default function PublicInfoPage({ page }: { page: PublicInfoPageKind }) {
         </div>
         </article>
       </div>
-      <PublicFooter variant="tool" className="mt-10" />
-    </main>
+      {!embedded && <PublicFooter variant="tool" className="mt-10" />}
+    </PageRoot>
   )
 }
 

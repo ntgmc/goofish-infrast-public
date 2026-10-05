@@ -1,5 +1,16 @@
 [
   {
+    "date": "2026-10-04",
+    "scope": "page",
+    "macrostructure": "Workbench",
+    "theme": "custom",
+    "theme_axes": "light / geometric-sans / cool-violet",
+    "enrichment": "none",
+    "nav": "existing side rail",
+    "footer": "existing application shell",
+    "brief": "Unified account settings with grouped preferences, QQ notifications, and shared safety controls"
+  },
+  {
     "date": "2026-10-03",
     "scope": "page",
     "macrostructure": "Workbench",

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type SyntheticEvent } from 'react'
+import { useCallback, useMemo, useRef, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { useAnimate } from 'motion/react'
 import { useAppReducedMotion } from '../../../lib/motion-preference'
 import { copy } from '../../../copy/index'
@@ -55,10 +55,12 @@ export default function InventorySection({
   onPayload,
   onLifetimeProfileCreated,
   onViewProfiles,
+  loadingFallback,
 }: {
   onPayload: (payload: AuthSuccessResponse) => void
   onLifetimeProfileCreated?: () => void
   onViewProfiles?: () => void
+  loadingFallback?: ReactNode
 }) {
   const [inventory, setInventory] = useState<InventoryResponse | null>(null)
   const [tasks, setTasks] = useState<OnboardingTaskView[]>([])
@@ -223,7 +225,7 @@ export default function InventorySection({
     }
   }
 
-  if (loading && !inventory) return <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.inventory.loading}</div>
+  if (loading && !inventory) return loadingFallback ?? <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.inventory.loading}</div>
 
   const selectedCapacity = selected ? capacityForItem(selected.item.code, profileId, inventory?.capacities ?? []) : null
   const maximumQuantity = Math.min(selected?.quantity ?? 0, 100,

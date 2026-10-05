@@ -5,8 +5,10 @@ import PublicFooter from '../components/PublicFooter'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import { copy } from '../copy/index'
 import { usePublicContent } from '../lib/public-content-context'
+import { useSiteFeatures } from '../lib/site-feature-context'
 
 export default function ThanksPage() {
+  const { features } = useSiteFeatures()
   const { content } = usePublicContent()
   const thanks = content.thanks
 
@@ -25,13 +27,13 @@ export default function ThanksPage() {
                 ariaLabel={copy.common.components_CompactHeaderMenu_002}
                 triggerVariant="icon"
                 items={[
-                  { type: 'link', id: 'faq', label: 'FAQ', to: '/faq' },
+                  ...(features.faq ? [{ type: 'link' as const, id: 'faq', label: 'FAQ', to: '/faq' }] : []),
                   { type: 'link', id: 'home', label: copy.public.pages_PublicInfoPage_062, to: '/' },
                 ]}
               />
             </div>
             <div className="hidden sm:block"><ThemeSwitcher /></div>
-            <Link to="/faq" className="tool-nav-link hidden items-center px-3 sm:inline-flex">FAQ</Link>
+            {features.faq && <Link to="/faq" className="tool-nav-link hidden items-center px-3 sm:inline-flex">FAQ</Link>}
             <Link to="/" className="tool-secondary-action hidden sm:inline-flex">{copy.public.pages_PublicInfoPage_062}</Link>
           </nav>
         </header>

@@ -13,11 +13,12 @@ const GENERATED_SECTION_TITLES = {
   security: copy.public.pages_ChangelogPage_024,
 } as const
 
-export default function ChangelogPage() {
+export default function ChangelogPage({ embedded = false }: { embedded?: boolean } = {}) {
+  const PageRoot = embedded ? 'section' : 'main'
   return (
-    <main className="tool-page" tabIndex={-1} data-route-focus>
-      <div className="public-shell">
-        <header className="public-nav">
+    <PageRoot className={embedded ? 'v2-embedded-tool' : 'tool-page'} tabIndex={-1} data-route-focus>
+      <div className={embedded ? undefined : 'public-shell'}>
+        {!embedded && <header className="public-nav">
           <Link to="/" className="flex min-w-0 flex-1 items-center gap-2 text-left sm:gap-3">
             <BrandLogo size="sm" className="sm:h-10 sm:w-10 sm:rounded-lg sm:p-1" />
             <span className="min-w-0">
@@ -30,9 +31,9 @@ export default function ChangelogPage() {
             <div className="hidden sm:block"><ThemeSwitcher /></div>
             <Link to="/" className="tool-secondary-action hidden sm:inline-flex">{copy.public.pages_PublicInfoPage_062}</Link>
           </nav>
-        </header>
+        </header>}
 
-        <article className="public-document">
+        <article className={embedded ? undefined : 'public-document'}>
           <header className="public-document-header">
             <p className="public-kicker">{copy.public.pages_ChangelogPage_001}</p>
             <h1 className="display-title mt-3 text-3xl leading-tight text-ink-primary sm:text-4xl">{copy.public.pages_ChangelogPage_002}</h1>
@@ -73,8 +74,8 @@ export default function ChangelogPage() {
           </div>
         </article>
       </div>
-      <PublicFooter variant="tool" className="mt-10" />
-    </main>
+      {!embedded && <PublicFooter variant="tool" className="mt-10" />}
+    </PageRoot>
   )
 }
 

@@ -46,6 +46,7 @@ export function useToolSession(requestedProfileId?: string | null) {
   const [configSyncStatus, setConfigSyncStatus] = useState<ConfigSyncStatus>('idle')
   const workspacePatchQueueRef = useRef<Promise<void>>(Promise.resolve())
   const activeProfileRef = useRef<UserGameAccount | null>(null)
+  const loadedAuthVersionRef = useRef(-1)
   const licenseRef = useRef<LicenseFile | null>(null)
   const configGenerationRef = useRef(0)
   const configSaveTimerRef = useRef<number | null>(null)
@@ -103,6 +104,8 @@ export function useToolSession(requestedProfileId?: string | null) {
   }, [])
 
   useEffect(() => {
+    if (requestedProfileId && activeProfileRef.current?.id === requestedProfileId && loadedAuthVersionRef.current === authRequestVersion) return
+    loadedAuthVersionRef.current = authRequestVersion
     let cancelled = false
     setAuthError(null)
     setAuthStatus('loading')

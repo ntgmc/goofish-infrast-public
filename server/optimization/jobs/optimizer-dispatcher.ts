@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { ScenarioComparisonResult } from '../../../src/lib/scenario-comparison'
 import type { OptimizeResult } from '../../../src/lib/types'
+import { inventoryDepletionWarnings } from '../../../src/lib/inventory-warnings'
 import { getUpgradePaybackDays } from '../../../src/lib/upgrade-suggestion-roi'
 import { attachTrainingCostsToUpgradeSuggestions } from '../../handlers/training-cost'
 import type { OptimizeJobRecord } from '../../storage/optimize-job-store'
@@ -132,6 +133,9 @@ async function dispatchOptimizationJobPayload(
       })
     }
     const result = await port.executeSchedule(payload, context)
+    const inventoryWarnings = inventoryDepletionWarnings(result.intermediate_depletion)
+    if (inventoryWarnings.length > 0) result.inventory_warnings = inventoryWarnings
+    else delete result.inventory_warnings
     if (payload.effectiveConfig.layout === '2-5-2' && payload.effectiveConfig.facility_layout) {
       result.facility_layout = [...payload.effectiveConfig.facility_layout]
     } else {

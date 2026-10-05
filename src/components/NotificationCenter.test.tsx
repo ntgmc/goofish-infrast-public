@@ -7,6 +7,9 @@ import { NotificationBell, NotificationCenterProvider } from './NotificationCent
 import type { UserNotificationPage } from '../lib/types'
 import { markInventoryStale } from '../lib/inventory-refresh'
 
+const featureSwitches = vi.hoisted(() => ({ notifications: true }))
+vi.mock('../lib/site-feature-context', () => ({ useSiteFeatures: () => ({ features: featureSwitches }) }))
+
 vi.mock('../lib/inventory-refresh', () => ({ markInventoryStale: vi.fn() }))
 
 afterEach(() => {
@@ -17,10 +20,21 @@ afterEach(() => {
 })
 
 beforeEach(() => {
+  featureSwitches.notifications = true
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
 })
 
 describe('NotificationCenter', () => {
+  it('keeps page content available without polling or showing a bell when notifications are closed', () => {
+    featureSwitches.notifications = false
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    renderCenter()
+    expect(screen.getByTestId('location')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /通知/ })).not.toBeInTheDocument()
+    window.dispatchEvent(new Event('focus'))
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
   it('marks inventory stale when an existing grant notification gains new items', async () => {
     const updated = page(1)
     updated.notifications[0].updated_at = '2026-07-30T00:01:00.000Z'

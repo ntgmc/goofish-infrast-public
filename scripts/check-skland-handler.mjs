@@ -670,6 +670,7 @@ async function assertFacilityRead() {
 }
 
 async function assertRefreshImport() {
+  store.workspaces.get('profile-1').config.allow_product_rebalance = false
   setFetchMode('refresh')
   const result = await callSkland('/api/user/skland/import/refresh', { profile_id: 'profile-1' })
   assertNoSecretLeak(result.body, 'refresh response')
@@ -692,7 +693,8 @@ async function assertRefreshImport() {
   if (
     workspace?.config?.intermediate_inventory?.['Pure Gold'] !== 9 ||
     workspace?.config?.intermediate_inventory?.['Originium Shard'] !== 8 ||
-    workspace?.config?.intermediate_inventory?.['Orirock Cube'] !== 76
+    workspace?.config?.intermediate_inventory?.['Orirock Cube'] !== 76 ||
+    workspace?.config?.allow_product_rebalance !== false
   ) {
     throw new Error(`refresh import: intermediate inventory was not refreshed ${JSON.stringify(workspace?.config?.intermediate_inventory)}`)
   }

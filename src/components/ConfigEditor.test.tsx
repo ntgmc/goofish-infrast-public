@@ -138,7 +138,7 @@ describe('ConfigEditor shift patterns', () => {
     const config = normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: hours === 8 ? [12, 12, 12] : [8, 8, 8] })
     const onUpdate = vi.fn()
     render(
-      <ConfigEditor config={config} canEdit={false} canEditFixedShiftHours validation={{ ok: true }} onUpdate={onUpdate} />,
+      <ConfigEditor config={config} canEdit={false} canEditIntermediateInventory canEditFixedShiftHours validation={{ ok: true }} onUpdate={onUpdate} />,
     )
 
     expect(screen.getByRole('button', { name: '一天3换（8小时一换）' })).toBeEnabled()
@@ -375,6 +375,42 @@ describe('ConfigEditor shift patterns', () => {
     expect(screen.getByRole('switch', { name: '菲亚梅塔' })).toBeDisabled()
     expect(screen.getByRole('switch', { name: '菲亚梅塔' })).not.toBeChecked()
     expect(screen.getByText('启用条件：换班间隔须锁定为8小时/12小时（误差需控制在5分钟以内），否则将引发干员“红脸”状态，导致实际效率低于未启用时的水平。')).toBeInTheDocument()
+  })
+})
+
+describe('ConfigEditor inventory product balance', () => {
+  it.each([true, false])('preserves an explicit balance choice through stock updates and preset changes with canEdit=%s', async (canEdit) => {
+    const user = userEvent.setup()
+    let latest = normalizeConfig({
+      ...CONFIG_PRESETS['243'],
+      intermediate_inventory: { 'Pure Gold': 50 },
+      auto_balance_source: 'intermediate_inventory',
+    })
+    function Editor() {
+      const [config, setConfig] = useState(latest)
+      return <ConfigEditor config={config} canEdit={canEdit} canEditIntermediateInventory canSelectPreset
+        validation={{ ok: true }} onUpdate={(mutate) => setConfig((current) => {
+          const next = cloneConfig(current)
+          mutate(next)
+          latest = next
+          return next
+        })} />
+    }
+    render(<Editor />)
+    const balanceSwitch = screen.getByRole('switch', { name: '允许库存自动平衡调整产物数量' })
+    expect(balanceSwitch).toHaveProperty('checked', !canEdit)
+    await user.click(balanceSwitch)
+    expect(latest.allow_product_rebalance).toBe(canEdit)
+
+    const inventory = within(screen.getByText('中间产物库存').parentElement!)
+    const goldStock = inventory.getByRole('spinbutton', { name: '赤金' })
+    await user.clear(goldStock)
+    await user.type(goldStock, '0')
+    await user.click(screen.getByRole('button', { name: '243 搓玉' }))
+
+    expect(latest.allow_product_rebalance).toBe(canEdit)
+    expect(latest.intermediate_inventory?.['Pure Gold']).toBe(0)
+    expect(balanceSwitch).toHaveProperty('checked', canEdit)
   })
 })
 

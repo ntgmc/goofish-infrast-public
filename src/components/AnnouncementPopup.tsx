@@ -24,9 +24,10 @@ interface Props {
   announcements: Announcement[];
   userId?: string;
   onUnreadCountChange?: (count: number) => void;
+  announcementsPath?: string;
 }
 
-export default function AnnouncementPopup({ announcements, userId, onUnreadCountChange }: Props) {
+export default function AnnouncementPopup({ announcements, userId, onUnreadCountChange, announcementsPath = '/announcements' }: Props) {
   const candidates = useMemo(
     () => announcements.filter((item) => item.active && item.kind === 'popup'),
     [announcements],
@@ -160,7 +161,7 @@ export default function AnnouncementPopup({ announcements, userId, onUnreadCount
             </h2>
           </div>
           <Link
-            to="/announcements"
+            to={announcementsPath}
             onClick={dismissPopupSession}
             className="tool-secondary-action shrink-0 px-3 text-sm"
           >

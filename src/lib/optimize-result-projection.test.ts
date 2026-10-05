@@ -55,6 +55,20 @@ describe('projectOptimizeResultForCapabilities', () => {
     expect(projected.upgrade_suggestions_status).toBe('completed')
   })
 
+  it.each(['recommended', 'growth'] as const)('keeps actionable inventory warnings for %s profiles through repeated projection', (permission) => {
+    const input = {
+      ...result(),
+      inventory_warnings: [{ product: 'Pure Gold' as const, days_remaining: 0 }],
+      intermediate_depletion: [{ product: 'Pure Gold' as const, stock: 0, net_per_day: -40, days_remaining: 0 }],
+    }
+    for (const kind of ['cdk', 'free_preview'] as const) {
+      const projected = projectOptimizeResultForCapabilities(input, { kind, permission })
+      expect(projected.inventory_warnings).toEqual(input.inventory_warnings)
+      expect(projected.intermediate_depletion).toBeUndefined()
+      expect(projectOptimizeResultForCapabilities(projected, { kind, permission })).toEqual(projected)
+    }
+  })
+
   it('keeps the complete result for advanced profiles', () => {
     const input = result()
     const projected = projectOptimizeResultForCapabilities(input, {

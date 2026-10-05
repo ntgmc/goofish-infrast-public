@@ -1,52 +1,24 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, Navigate, useNavigate } from 'react-router'
 import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
-import DebugModePanel from '../components/DebugModePanel'
-import QqBotSettingsPanel from '../components/QqBotSettingsPanel'
-import {
-  apiJson,
-  apiVoid,
-} from '../lib/api-client'
-import type { AccountDeletionAccepted } from '../lib/types'
-import { AUTH_EMAIL_MAX_LENGTH, AUTH_PASSWORD_MAX_LENGTH } from '../lib/auth-constraints'
-import {
-  accountLifecycleErrorMessage,
-  deletionEmailMessage,
-  formatAccountDeletionDeadline,
-} from '../lib/account-lifecycle-client'
+import SessionLoader from '../components/SessionLoader'
+import SettingsSection from './tool/dashboard/SettingsSection'
+import { apiVoid } from '../lib/api-client'
+import { dashboardPath } from '../lib/app-routes'
+import { useSiteFeatures } from '../lib/site-feature-context'
 import { copy } from '../copy/index'
 
 export default function AccountSafetyPage() {
   const navigate = useNavigate()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [busy, setBusy] = useState<'delete' | 'logout' | null>(null)
+  const featureState = useSiteFeatures()
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [deletion, setDeletion] = useState<AccountDeletionAccepted | null>(null)
-
-  const requestDeletion = async () => {
-    if (!window.confirm(copy.features.delete_confirm)) return
-    setBusy('delete')
-    setError(null)
-    try {
-      const accepted = await apiJson<AccountDeletionAccepted>('/api/user/data/delete-request', {
-        method: 'POST',
-        json: { email, password },
-        fallbackMessage: copy.features.delete_failed,
-      })
-      setDeletion(accepted)
-      setPassword('')
-    } catch (caught) {
-      setError(accountLifecycleErrorMessage(caught, copy.features.delete_failed))
-    } finally {
-      setBusy(null)
-    }
-  }
+  const [deletionState, setDeletionState] = useState<'idle' | 'submitting' | 'accepted'>('idle')
 
   const logout = async () => {
-    setBusy('logout')
+    setBusy(true)
     setError(null)
     try {
       await apiVoid('/api/auth/logout', { method: 'POST' })
@@ -54,8 +26,13 @@ export default function AccountSafetyPage() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : copy.features.logout)
     } finally {
-      setBusy(null)
+      setBusy(false)
     }
+  }
+
+  if (featureState.status === 'loading') return <SessionLoader label={copy.features.loading} />
+  if (featureState.status === 'ready' && featureState.features.site && featureState.features.login) {
+    return <Navigate to={dashboardPath('settings')} replace />
   }
 
   return (
@@ -69,48 +46,15 @@ export default function AccountSafetyPage() {
           {error && <div className="tool-alert tool-alert--error mt-5" role="alert">{error}</div>}
           {notice && <div className="tool-alert tool-alert--success mt-5" role="status">{notice}</div>}
           <div className="mt-6 flex flex-wrap gap-3">
-            <button type="button" onClick={() => void logout()} disabled={busy !== null || Boolean(deletion)} className="tool-secondary-action">{copy.features.logout}</button>
+            <button type="button" onClick={() => void logout()} disabled={busy || deletionState !== 'idle'} className="tool-secondary-action">{copy.features.logout}</button>
             <Link to="/tool/profiles?recovery=1" className="tool-secondary-action">{copy.features.recovery}</Link>
           </div>
         </section>
-        <QqBotSettingsPanel />
-        <DebugModePanel />
-        <section className="tool-panel p-6 sm:p-8">
-          {deletion ? (
-            <DeletionAcceptedPanel deletion={deletion} onLeave={() => navigate('/', { replace: true })} />
-          ) : (
-            <>
-              <h2 className="text-lg font-semibold text-ink-primary">{copy.features.delete_title}</h2>
-              <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.features.delete_body}</p>
-              <label className="mt-5 block">
-                <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.features.email}</span>
-                <input value={email} onChange={(event) => setEmail(event.currentTarget.value)} type="email" maxLength={AUTH_EMAIL_MAX_LENGTH} autoComplete="email" className="tool-field" />
-              </label>
-              <label className="mt-4 block">
-                <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.features.password}</span>
-                <input value={password} onChange={(event) => setPassword(event.currentTarget.value)} type="password" maxLength={AUTH_PASSWORD_MAX_LENGTH} autoComplete="current-password" className="tool-field" />
-              </label>
-              <button type="button" onClick={() => void requestDeletion()} disabled={busy !== null || !email || !password} className="tool-danger-action mt-5">
-                {busy === 'delete' ? copy.features.deleting : copy.features.delete_account}
-              </button>
-            </>
-          )}
-        </section>
+        <fieldset disabled={busy} className="min-w-0">
+          <SettingsSection safetyOnly profiles={[]} onPayload={() => undefined} onDeletionStateChange={setDeletionState} onLogout={() => { void navigate('/', { replace: true }) }} />
+        </fieldset>
         <Link to="/" className="tool-secondary-action">{copy.features.back_home}</Link>
       </div>
     </main>
-  )
-}
-
-function DeletionAcceptedPanel({ deletion, onLeave }: { deletion: AccountDeletionAccepted; onLeave: () => void }) {
-  return (
-    <div role="status" aria-live="polite">
-      <h2 className="text-lg font-semibold text-ink-primary">{copy.features.delete_accepted_title}</h2>
-      <p className="mt-2 text-sm leading-6 text-ink-secondary">
-        {copy.features.delete_accepted_before}<strong>{formatAccountDeletionDeadline(deletion.scheduled_for)}</strong>{copy.features.delete_accepted_after}
-      </p>
-      <p className="mt-3 text-sm leading-6 text-ink-secondary">{deletionEmailMessage(deletion.cancellation_email)}</p>
-      <button type="button" onClick={onLeave} className="tool-primary-action mt-5">{copy.features.delete_accepted_leave}</button>
-    </div>
   )
 }

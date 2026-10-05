@@ -14,6 +14,7 @@ type Setter<T> = Dispatch<SetStateAction<T>>
 type UseOptimizeWorkspaceOptions = {
   profileId: string
   activeConfig: LicenseConfig
+  isConfigReadOnly?: () => boolean
   normalizeAllowedConfigOverride: (config: LicenseConfig) => LicenseConfig
   onWorkspacePatch: (patch: WorkspacePatch) => Promise<AuthSuccessResponse | void>
   onWorkspaceUpdated: (profileId: string, workspace: UserWorkspace) => void
@@ -36,6 +37,7 @@ type UseOptimizeWorkspaceOptions = {
 export function useOptimizeWorkspace({
   profileId,
   activeConfig,
+  isConfigReadOnly,
   normalizeAllowedConfigOverride,
   onWorkspacePatch,
   onWorkspaceUpdated,
@@ -105,6 +107,7 @@ export function useOptimizeWorkspace({
   }, [runSavedConfigAction])
 
   const handleUseSavedConfig = useCallback((config: WorkspaceSavedConfig) => {
+    if (isConfigReadOnly?.()) return
     setConfigOverride(normalizeAllowedConfigOverride(config.config))
     setCurrentResult(null)
     setFinalResult(null)
@@ -119,7 +122,7 @@ export function useOptimizeWorkspace({
       type: 'touch',
       id: config.id,
     }, `${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_009}${config.name}”。`)
-  }, [normalizeAllowedConfigOverride, runSavedConfigAction, setConfigOverride, setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions, setWorkspaceNotice])
+  }, [isConfigReadOnly, normalizeAllowedConfigOverride, runSavedConfigAction, setConfigOverride, setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions, setWorkspaceNotice])
 
   const loadHistoryDetail = useCallback(async (item: WorkspaceResultHistorySummary) => {
     setWorkspaceBusyAction(`detail:${item.id}`)
@@ -149,9 +152,10 @@ export function useOptimizeWorkspace({
   }, [profileId, loadHistoryDetail, setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions])
 
   const handleUseHistoryConfig = useCallback(async (summary: WorkspaceResultHistorySummary) => {
+    if (isConfigReadOnly?.()) return
     recordToolBehavior({ name: 'history_config_select', profile: profileId, subject: summary.id })
     const item = await loadHistoryDetail(summary)
-    if (!item) return
+    if (!item || isConfigReadOnly?.()) return
     if (!item.config) {
       setWorkspaceError(copy.workspace.pages_tool_optimize_useOptimizeWorkspace_010)
       return
@@ -166,7 +170,7 @@ export function useOptimizeWorkspace({
     setInlineError(null)
     setWorkspaceNotice(`${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_011}${item.name}${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_012}`)
     setSection('config')
-  }, [profileId, loadHistoryDetail, normalizeAllowedConfigOverride, setConfigOverride, setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions, setWorkspaceError, setWorkspaceNotice])
+  }, [profileId, isConfigReadOnly, loadHistoryDetail, normalizeAllowedConfigOverride, setConfigOverride, setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions, setWorkspaceError, setWorkspaceNotice])
 
   const handleDownloadHistory = useCallback((item: WorkspaceResultHistorySummary) => {
     if (!item.maa_exportable) {

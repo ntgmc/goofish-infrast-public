@@ -8,7 +8,8 @@ import GenerateControlBar, { DashboardMiniStat } from './GenerateControlBar'
 import { SmallActionButton } from './feedback'
 import type { ValidationState } from './types'
 import { copy } from '../../../copy/index'
-import { Link } from 'react-router'
+import Link from '../../../components/InternalLink'
+import { useSiteFeatures } from '../../../lib/site-feature-context'
 
 
 type FreeScheduleViewState = {
@@ -85,6 +86,7 @@ export default function OverviewSection({
   onDownloadHistory: (item: WorkspaceResultHistorySummary) => void;
   downloadBusy?: boolean;
 }) {
+  const { features } = useSiteFeatures()
   return (
     <div className="space-y-4">
       <div data-tour-target="optimize-overview-status">
@@ -136,7 +138,7 @@ export default function OverviewSection({
                 <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.optimize.paid_preview.recompute_detail}</p>
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   <button type="button" disabled className="tool-secondary-action">{copy.optimize.paid_preview.recompute_action}</button>
-                  <Link to="/pricing" className="text-sm text-primary underline">{copy.optimize.paid_preview.compare}</Link>
+                  {features.pricing && <Link to="/pricing" className="text-sm text-primary underline">{copy.optimize.paid_preview.compare}</Link>}
                 </div>
               </section>
             </>
@@ -178,8 +180,8 @@ export default function OverviewSection({
           {latestResult ? (
             <div className="mt-4 flex flex-wrap gap-2">
               <SmallActionButton onClick={() => void onViewHistory(latestResult)}>{copy.optimize.pages_tool_optimize_OverviewSection_018}</SmallActionButton>
-              <SmallActionButton onClick={() => onDownloadHistory(latestResult)} disabled={downloadBusy || !latestResult.maa_exportable}>{downloadBusy ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_OverviewSection_019}</SmallActionButton>
-              <SmallActionButton onClick={() => void onUseHistoryConfig(latestResult)} disabled={!latestResult.has_config}>{copy.optimize.pages_tool_optimize_OverviewSection_020}</SmallActionButton>
+              {features.maa_export && <SmallActionButton onClick={() => onDownloadHistory(latestResult)} disabled={downloadBusy || !latestResult.maa_exportable}>{downloadBusy ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_OverviewSection_019}</SmallActionButton>}
+              <SmallActionButton onClick={() => void onUseHistoryConfig(latestResult)} disabled={loading || !latestResult.has_config}>{copy.optimize.pages_tool_optimize_OverviewSection_020}</SmallActionButton>
             </div>
           ) : null}
         </section>

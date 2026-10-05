@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useInternalHref } from '../../../components/InternalLink'
 import { copy } from '../../../copy/index'
 import { ApiError, apiJson, getApiErrorMessage } from '../../../lib/api-client'
 import type { BalancePage, PublicBalanceTransaction } from '../../../lib/balance-contracts'
@@ -14,6 +15,7 @@ type RedeemResponse = {
 }
 
 export default function BalanceSection({ redemptionEnabled }: { redemptionEnabled: boolean }) {
+  const resolveHref = useInternalHref()
   const [page, setPage] = useState<BalancePage | null>(null)
   const [cdk, setCdk] = useState('')
   const [pending, setPending] = useState<{ cdk: string; key: string } | null>(null)
@@ -115,7 +117,7 @@ export default function BalanceSection({ redemptionEnabled }: { redemptionEnable
         </div>
         {error && <div className="tool-alert tool-alert--error mt-4" role="alert">
           <span>{error}</span>
-          {errorTarget && <a className="ml-2 underline" href={errorTarget}>{copy.balance.go_to_redeem}</a>}
+          {errorTarget && <a className="ml-2 underline" href={resolveHref(errorTarget)}>{copy.balance.go_to_redeem}</a>}
         </div>}
         {notice && <div className="tool-alert tool-alert--success mt-4" role="status" aria-live="polite">{notice}</div>}
       </section>

@@ -1,4 +1,10 @@
 export const commonCopy = {
+  configGenerationReadOnly: "排班生成期间，基建配置为只读。生成结束后可继续修改。",
+  inventoryProductRebalanceLabel: "允许库存自动平衡调整产物数量",
+  inventoryProductRebalanceHelp: "开启后，库存不足时可调整赤金或源石碎片制造站数量。关闭后保持所选数量，结果会提示库存耗尽风险。",
+  inventoryProductRebalanceRotation: "游戏内轮换保持固定产物数量，不自动调整。",
+  inventoryProductRebalanceEnabled: "允许调整",
+  inventoryProductRebalanceDisabled: "保持所选数量",
   facilityLayoutTitle: "设施位置与等级",
   facilityLayoutRead: "从森空岛读取设施",
   facilityLayoutReading: "正在读取设施…",
@@ -193,7 +199,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_033: "按库存微调产物",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_034: "先选择 243 或 333 预设；库存充足时保留原产物消耗，库存较少时只调整一个制造站产物。",
+  components_ConfigEditor_034: "选择预设并填写当前库存，可开启库存自动平衡调整产物数量，或保持预设数量并查看库存耗尽风险。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_035: "243 均衡",
   // src/components/ConfigEditor.tsx

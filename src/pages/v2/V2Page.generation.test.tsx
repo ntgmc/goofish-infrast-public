@@ -75,6 +75,49 @@ afterEach(() => {
   vi.resetAllMocks()
 })
 
+it('waits for login and saved-result detail, then retries a failed read without showing example data', async () => {
+  let restoreAuth!: (payload: AuthSuccessResponse) => void
+  const authResponse = new Promise<AuthSuccessResponse>((resolve) => { restoreAuth = resolve })
+  let failHistory!: (error: Error) => void
+  const firstHistory = new Promise<never>((_resolve, reject) => { failHistory = reject })
+  let restoreHistory!: (payload: { item: typeof previous & { config: typeof SAMPLE_CONFIG; result: typeof newResult } }) => void
+  const secondHistory = new Promise<Parameters<typeof restoreHistory>[0]>((resolve) => { restoreHistory = resolve })
+  let historyReads = 0
+  vi.mocked(apiJson).mockImplementation(async (url) => {
+    if (url === '/api/auth/me') return authResponse
+    if (url.startsWith('/api/user/results/previous-result?')) return ++historyReads === 1 ? firstHistory : secondHistory
+    if (url.startsWith('/api/optimization/jobs?')) return { jobs: [], nextCursor: null }
+    if (url.startsWith('/api/user/status?')) return {}
+    if (url === '/api/user/inventory') return { stacks: [], capacities: [], recent_events: [] }
+    if (url === '/api/user/priority-coupon-balance') return { balances: [] }
+    throw new Error(`Unexpected API request: ${url}`)
+  })
+  render(<MemoryRouter initialEntries={['/v2']}><MotionPreferenceProvider><V2Page /></MotionPreferenceProvider></MemoryRouter>)
+  expect(screen.getByRole('status')).toHaveTextContent(copy.v2.loading)
+  expect(screen.queryByText(copy.v2.sampleSource)).not.toBeInTheDocument()
+
+  await act(async () => restoreAuth(auth))
+  await waitFor(() => expect(historyReads).toBe(1))
+  expect(screen.getByText(copy.v2.loading)).toBeInTheDocument()
+  expect(screen.queryByText(copy.v2.sampleSource)).not.toBeInTheDocument()
+  expect(screen.queryByRole('region', { name: copy.v2.lmd })).not.toBeInTheDocument()
+
+  await act(async () => failHistory(new Error('Cannot read saved schedule')))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Cannot read saved schedule')
+  expect(screen.queryByText(copy.v2.sampleSource)).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: copy.v2.retry }))
+  expect(screen.getByText(copy.v2.loading)).toBeInTheDocument()
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+
+  await act(async () => restoreHistory({ item: { ...previous, config: SAMPLE_CONFIG, result: newResult } }))
+  expect(await screen.findByText(copy.v2.ownSource)).toBeInTheDocument()
+  expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('12,345')).toBeInTheDocument()
+  expect(screen.queryByText(copy.v2.loading)).not.toBeInTheDocument()
+  expect(screen.queryByText(copy.v2.sampleSource)).not.toBeInTheDocument()
+  expect(historyReads).toBe(2)
+  expect(vi.mocked(apiJson).mock.calls.some(([_url, options]) => options?.method === 'POST')).toBe(false)
+})
+
 it.each(['submitted', 'restored'])('automatically displays a %s job result and dismisses completed progress', async (mode) => {
   let completeJob!: (job: OptimizationJobSnapshot) => void
   const completion = new Promise<OptimizationJobSnapshot>((resolve) => { completeJob = resolve })
@@ -106,6 +149,13 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and d
   }
   await waitFor(() => expect(apiJson).toHaveBeenCalledWith('/api/optimization/jobs/new-job', expect.anything()))
   expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('54,720')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: copy.v2.facilities }))
+  const configDialog = await screen.findByRole('dialog')
+  expect(within(configDialog).getByText(copy.common.configGenerationReadOnly)).toBeInTheDocument()
+  const editor = within(configDialog).getByRole('group', { name: copy.common.components_ConfigEditor_021 })
+  for (const control of editor.querySelectorAll('button, input, select, textarea')) expect(control).toBeDisabled()
+  await userEvent.click(within(configDialog).getByRole('button', { name: copy.v2.done }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   await act(async () => completeJob({
     ...queued, status: 'succeeded', result: newResult, historyResultId: latest.id,
     executionPhase: 'terminal', calculationStage: 'completed', canCancel: false,
@@ -115,12 +165,19 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and d
   expect(screen.queryByText(copy.common.components_ScheduleProgress_060)).not.toBeInTheDocument()
   await act(async () => refreshWorkspace({ ...auth, workspace: { ...workspace, latest_result: latest, result_history: [latest, previous] } }))
   await waitFor(() => expect(screen.getByRole('button', { name: copy.v2.regenerate })).not.toBeDisabled())
+  await userEvent.click(screen.getByRole('button', { name: copy.v2.facilities }))
+  const unlockedDialog = await screen.findByRole('dialog')
+  expect(within(unlockedDialog).queryByText(copy.common.configGenerationReadOnly)).not.toBeInTheDocument()
+  expect(within(unlockedDialog).getByRole('button', { name: copy.common.components_ConfigEditor_007 })).toBeEnabled()
+  await userEvent.click(within(unlockedDialog).getByRole('button', { name: copy.v2.done }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   expect(vi.mocked(apiJson).mock.calls.filter(([url, options]) => url === '/api/optimization/jobs' && options?.method === 'POST'))
     .toHaveLength(mode === 'submitted' ? 1 : 0)
   expect(vi.mocked(apiJson).mock.calls.some(([url]) => url.startsWith('/api/user/results/new-result?'))).toBe(false)
   await userEvent.click(screen.getByRole('button', { name: copy.v2.history }))
-  await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /Previous schedule/ }))
+  const previousCard = (await screen.findByText('Previous schedule')).closest('.tool-inset')!
+  await userEvent.click(within(previousCard as HTMLElement).getByRole('button', { name: copy.optimize.pages_tool_optimize_PlansSection_030 }))
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-  expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('54,720')).toBeInTheDocument()
+  await waitFor(() => expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('54,720')).toBeInTheDocument())
   expect(vi.mocked(apiJson).mock.calls.some(([url]) => url.startsWith('/api/user/results/new-result?'))).toBe(false)
 })

@@ -1,7 +1,8 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router'
 import AnnouncementPopup from '../components/AnnouncementPopup'
-import SessionLoader from '../components/SessionLoader'
+import SessionLoader, { SectionLoader } from '../components/SessionLoader'
+import OptimizeShell from './tool/optimize/OptimizeShell'
 import {
   dashboardPath,
   fallbackToolPath,
@@ -19,7 +20,7 @@ import ProfileUpgradePrompt from './tool/ProfileUpgradePrompt'
 import ProfileExpiryPrompt from './tool/ProfileExpiryPrompt'
 import { useWorkspaceEntryPreference, WorkspaceEntryPrompt } from './tool/WorkspaceEntryPreference'
 import WorkspaceSetupPage from './tool/WorkspaceSetupPage'
-import { isSchedulableProfile } from './tool/tool-utils'
+import { getProfileAccessLabel, isSchedulableProfile } from './tool/tool-utils'
 import { useToolSession } from './tool/useToolSession'
 import { useToolVisitReporter } from './tool/useToolVisitReporter'
 import { useToolBehaviorObservation } from './tool/useToolBehaviorObservation'
@@ -29,12 +30,19 @@ import type { SiteFeatures } from '../lib/site-features'
 import FeatureUnavailablePage from '../components/FeatureUnavailablePage'
 import { NotificationCenterProvider } from '../components/NotificationCenter'
 import { PublicContentProvider } from '../lib/public-content-context'
+import AccountSafetyPage from './AccountSafetyPage'
 
 
 const OptimizePage = lazy(() => import('./OptimizePage'))
 
 export default function ToolPage() {
   const featureState = useSiteFeatures()
+  const location = useLocation()
+  if (location.pathname.replace(/\/+$/, '') === dashboardPath('settings')
+    && (featureState.status === 'error' || (featureState.status === 'ready'
+      && (!featureState.features.site || !featureState.features.login)))) {
+    return <AccountSafetyPage />
+  }
   if (featureState.status === 'loading') return <SessionLoader label={copy.features.loading} />
   if (featureState.status === 'error') return <FeatureUnavailablePage loadError onRetry={featureState.retry} />
   if (!featureState.features.site) return <FeatureUnavailablePage feature="site" />
@@ -229,15 +237,18 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
     return <Navigate to={profileScopedPath(workspace?.operators ? workspaceSetupPath('config') : workspaceSetupPath('operators'), activeProfile.id)} replace />
   }
 
-  if (route.section === 'lab' && !features.schedule_generation) {
-    return <FeatureUnavailablePage feature="schedule_generation" />
+  if (route.section === 'lab' && !features.scenario_comparison) {
+    return <FeatureUnavailablePage feature="scenario_comparison" />
   }
 
   return (
     <>
       <NotificationCenterProvider userId={user.id}>
         {features.announcements && <AnnouncementPopup announcements={popups} userId={user.id} onUnreadCountChange={setAnnouncementUnreadCount} />}
-        <Suspense fallback={<SessionLoader label={copy.common.pages_ToolPage_002} />}>
+        <Suspense fallback={<OptimizeShell section={route.section} profileId={activeProfile.id} profileLabel={activeProfile.display_name}
+          permissionLabel={getProfileAccessLabel(activeProfile)} showScenarioLab={route.section === 'lab' && features.scenario_comparison}
+          onSectionChange={navigateOptimize} onOpenTour={() => undefined} onReset={() => { void navigateAfterConfigSave(profileScopedPath(workspaceSetupPath('operators'), activeProfile.id)) }}
+          onLogout={handleLogout}><SectionLoader label={copy.common.pages_ToolPage_002} /></OptimizeShell>}>
           <OptimizePage
             profileId={activeProfile.id}
             profile={activeProfile}

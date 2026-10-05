@@ -1,4 +1,11 @@
 export const domainCopy = {
+  inventory_warning: {
+    title: "中间产物库存不足",
+    depleted: (product: string) => `${product}库存已耗尽，当前产量无法满足消耗。`,
+    depletes_today: (product: string) => `${product}库存不足一天用量，按当前排班将很快耗尽。`,
+    depletes_in_days: (product: string, days: string) => `${product}库存预计约 ${days} 天后耗尽。`,
+    action: "请补充库存或调整生产配置，避免生产中断。",
+  },
   building_skills: {
     title: "基建技能",
     facility: "技能适用设施",

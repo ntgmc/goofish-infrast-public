@@ -6,7 +6,8 @@ import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
 import CompactHeaderMenu from '../../components/CompactHeaderMenu'
 import GuidedTour, { useFirstRunTour, type TourDefinition } from '../../components/GuidedTour'
-import { AnimatedPresenceRegion, MotionNavIndicator, MotionSkeleton } from '../../components/MotionPrimitives'
+import { MotionNavIndicator, PageTransition } from '../../components/MotionPrimitives'
+import { SectionLoader } from '../../components/SessionLoader'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import ToolBreadcrumbs from '../../components/ToolBreadcrumbs'
 import SklandBindingDialog, { type SklandPayload } from '../../components/SklandBindingDialog'
@@ -253,7 +254,7 @@ export default function WorkspaceSetupPage({
         </nav>
       </aside>
 
-      <main className="lg:pl-64" tabIndex={-1} data-route-focus>
+      <main className="tool-workspace lg:pl-64" tabIndex={-1} data-route-focus>
         <header className="tool-header sticky top-0 z-20 px-4 py-1.5 lg:px-8 lg:py-4">
           <div className="mx-auto flex h-11 max-w-7xl items-center justify-between gap-2 lg:hidden">
             <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -315,10 +316,11 @@ export default function WorkspaceSetupPage({
           </div>
         </header>
 
-<div className="workspace-setup-page mx-auto max-w-7xl space-y-4 px-5 py-6 sm:px-8">
+<div className="tool-page-content workspace-setup-page mx-auto max-w-7xl space-y-4 px-5 py-6 sm:px-8">
           <AnnouncementBanner announcement={announcement} />
-          <AnimatedPresenceRegion motionKey={activeSection}>
-            {activeSection === 'cdk' ? (
+          <PageTransition motionKey={activeSection} className="tool-page-transition">{(displayedSection) => <div key={displayedSection} className="tool-section-content">
+          <Suspense fallback={<SectionLoader label={copy.workspace.pages_tool_WorkspaceSetupPage_081} />}>
+            {displayedSection === 'cdk' ? (
               <ProfileCdkPaths
                 profile={profile}
                 purchaseChannel={activePurchaseChannel}
@@ -332,7 +334,7 @@ export default function WorkspaceSetupPage({
                     {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
                     {status && <div className="tool-alert tool-alert--success" role="status" aria-live="polite">{status}</div>}
 
-                    {activeSection === 'operators' && (
+                    {displayedSection === 'operators' && (
                       <section className="tool-panel p-5 sm:p-6">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div>
@@ -371,9 +373,8 @@ export default function WorkspaceSetupPage({
                       </section>
                     )}
 
-                    {activeSection === 'config' && (
+                    {displayedSection === 'config' && (
                       <div data-tour-target="workspace-config-editor">
-                        <Suspense fallback={<SectionFallback />}>
                           <WorkspaceConfigSection
                             profileId={profile.id}
                             config={normalizedConfig}
@@ -385,7 +386,6 @@ export default function WorkspaceSetupPage({
                             validation={configValidation}
                             onUpdate={updateConfig}
                           />
-                        </Suspense>
                       </div>
                     )}
                   </div>
@@ -415,7 +415,8 @@ export default function WorkspaceSetupPage({
                 </div>
               </form>
             )}
-          </AnimatedPresenceRegion>
+          </Suspense>
+          </div>}</PageTransition>
         </div>
       </main>
 
@@ -594,11 +595,9 @@ function SklandStatusCard({
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={onOpen} disabled={busy || dialogOpen} className="tool-primary-action">
-            <SklandIcon />
             {binding ? copy.workspace.pages_tool_WorkspaceSetupPage_073 : copy.workspace.pages_tool_WorkspaceSetupPage_074}
           </button>
           <button type="button" onClick={onRefresh} disabled={busy || dialogOpen || !canRefresh} className="tool-secondary-action">
-            <SklandIcon />
             {busy ? copy.workspace.pages_tool_WorkspaceSetupPage_075 : copy.workspace.pages_tool_WorkspaceSetupPage_076}
           </button>
         </div>
@@ -609,7 +608,7 @@ function SklandStatusCard({
           <div className="mt-2 flex flex-wrap gap-2">
             {(notice.recovery_action === 'rebind' || notice.recovery_action === 'bind_first') && (
               <button type="button" onClick={onOpen} disabled={busy || dialogOpen} className="tool-primary-action min-h-9 px-3 py-1.5 text-xs">
-                <SklandIcon />{copy.workspace.pages_tool_WorkspaceSetupPage_077}</button>
+                {copy.workspace.pages_tool_WorkspaceSetupPage_077}</button>
             )}
             {notice.recovery_action === 'retry' && (
               <button type="button" onClick={onRefresh} disabled={busy || dialogOpen || !binding} className="tool-secondary-action min-h-9 px-3 py-1.5 text-xs">
@@ -696,9 +695,6 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function SectionFallback() {
-  return <MotionSkeleton label={copy.workspace.pages_tool_WorkspaceSetupPage_081} rows={4} />
-}
 
 function sklandPayloadFromError(caught: unknown): Partial<SklandPayload> | null {
   if (!(caught instanceof ApiError) || !caught.data || typeof caught.data !== 'object') return null

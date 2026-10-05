@@ -472,7 +472,7 @@ function canEditConfigForPermission(permission: PermissionMode): boolean {
 }
 
 function isIntermediateAutoConfig(config: LicenseConfig | null | undefined): boolean {
-  return config?.auto_balance_source === 'intermediate_inventory' || config?.auto_balance_source === 'limited_config'
+  return config?.allow_product_rebalance !== undefined || config?.auto_balance_source === 'intermediate_inventory' || config?.auto_balance_source === 'limited_config'
 }
 
 export function resolveConfigForPermission(
@@ -518,6 +518,7 @@ function cloneConfig(config: LicenseConfig): LicenseConfig {
 
 function resolvePresetMode(config: LicenseConfig, preset: LicenseConfig): LicenseConfig {
   const resolved = cloneConfig(preset)
+  resolved.allow_product_rebalance = config.allow_product_rebalance
   if (resolved.layout === '2-5-2') resolved.facility_layout = config.facility_layout?.slice()
   resolved.dormitory_rule = normalizeDormitoryRule(config.dormitory_rule)
   if (normalizeScheduleMode(config.schedule_mode) === 'rotation') {
@@ -532,6 +533,7 @@ function resolvePresetMode(config: LicenseConfig, preset: LicenseConfig): Licens
 
 function resolveFreePreviewPresetMode(config: LicenseConfig, preset: LicenseConfig): LicenseConfig {
   const resolved = cloneConfig(preset)
+  resolved.allow_product_rebalance = config.allow_product_rebalance
   if (resolved.layout === '2-5-2') resolved.facility_layout = config.facility_layout?.slice()
   resolved.dormitory_rule = normalizeDormitoryRule(config.dormitory_rule)
   delete resolved.optimizer_search

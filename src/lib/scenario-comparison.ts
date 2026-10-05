@@ -366,6 +366,7 @@ function buildScenario(
   config.schedule_mode = scheduleStrategy === 'variable' ? 'variable' : scheduleMode
   config.shift_hours = shifts
   delete config.auto_balance_source
+  delete config.allow_product_rebalance
   if (scheduleStrategy === 'variable') {
     config.variable_shift_schedule = {
       enable: true,

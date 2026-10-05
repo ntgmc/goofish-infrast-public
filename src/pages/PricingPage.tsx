@@ -1,4 +1,4 @@
-import { Link } from 'react-router'
+import Link from '../components/InternalLink'
 import BrandLogo from '../components/BrandLogo'
 import CompactHeaderMenu from '../components/CompactHeaderMenu'
 import PublicFooter, { SupportGroupLink } from '../components/PublicFooter'
@@ -10,7 +10,8 @@ import { getMeteredBillingPolicy, getMeteredScheduleQuote } from '../lib/metered
 import { useSiteFeatures } from '../lib/site-feature-context'
 import { METERED_BILLING_AVAILABLE } from '../lib/site-features'
 
-export default function PricingPage() {
+export default function PricingPage({ embedded = false }: { embedded?: boolean } = {}) {
+  const PageRoot = embedded ? 'section' : 'main'
   const { content } = usePublicContent()
   const pricing = content.pricing
   const freePlan = pricing.plans.free_preview
@@ -41,9 +42,9 @@ export default function PricingPage() {
     )
   }
   return (
-    <main className="tool-page" tabIndex={-1} data-route-focus>
-      <div className="public-shell">
-        <header className="public-nav">
+    <PageRoot className={embedded ? 'v2-embedded-tool' : 'tool-page'} tabIndex={-1} data-route-focus>
+      <div className={embedded ? undefined : 'public-shell'}>
+        {!embedded && <header className="public-nav">
           <Link to="/" className="flex min-w-0 flex-1 items-center gap-2 text-left sm:gap-3">
             <BrandLogo size="sm" className="sm:h-10 sm:w-10 sm:rounded-lg sm:p-1" />
             <span className="truncate text-sm font-semibold text-ink-primary">{copy.public.pages_PricingPage_001}</span>
@@ -55,16 +56,16 @@ export default function PricingPage() {
                 ariaLabel={copy.common.components_CompactHeaderMenu_002}
                 triggerVariant="icon"
                 items={[
-                  { type: 'link', id: 'support', label: copy.public.pages_PricingPage_010, to: '/support' },
+                  ...(featureState.features.support ? [{ type: 'link' as const, id: 'support', label: copy.public.pages_PricingPage_010, to: '/support' }] : []),
                   { type: 'link', id: 'home', label: copy.public.pages_PricingPage_011, to: '/' },
                 ]}
               />
             </div>
             <div className="hidden sm:block"><ThemeSwitcher /></div>
-            <Link to="/support" className="tool-nav-link hidden items-center px-3 sm:inline-flex">{copy.public.pages_PricingPage_010}</Link>
+            {featureState.features.support && <Link to="/support" className="tool-nav-link hidden items-center px-3 sm:inline-flex">{copy.public.pages_PricingPage_010}</Link>}
             <Link to="/" className="tool-secondary-action hidden sm:inline-flex">{copy.public.pages_PricingPage_011}</Link>
           </nav>
-        </header>
+        </header>}
 
         <section className="border-b border-surface-4 py-12 sm:py-16" aria-labelledby="pricing-title">
           <p className="public-kicker">{pricing.eyebrow}</p>
@@ -106,7 +107,7 @@ export default function PricingPage() {
                 <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.public.pricing_upgrade_description(pricing.lifetime_upgrade.service_fee)}</p>
                 <p className="mt-2 text-sm leading-6 text-ink-muted">{copy.public.pricing_upgrade_process}</p>
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                  <Link to="/support" className="tool-secondary-action justify-center">{copy.public.pricing_upgrade_contact}</Link>
+                  {featureState.features.support && <Link to="/support" className="tool-secondary-action justify-center">{copy.public.pricing_upgrade_contact}</Link>}
                   {pricing.lifetime_upgrade.purchase_url ? (
                     <a href={pricing.lifetime_upgrade.purchase_url} target="_blank" rel="noopener noreferrer" className="tool-primary-action justify-center">{copy.public.pricing_upgrade_purchase}</a>
                   ) : (
@@ -247,8 +248,8 @@ export default function PricingPage() {
           <SupportGroupLink className="tool-primary-action mt-5 inline-flex items-center justify-center sm:mt-0">{copy.public.pages_PricingPage_010}</SupportGroupLink>
         </section>
       </div>
-      <PublicFooter variant="tool" className="mt-10" />
-    </main>
+      {!embedded && <PublicFooter variant="tool" className="mt-10" />}
+    </PageRoot>
   )
 }
 

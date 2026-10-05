@@ -9,6 +9,8 @@ const { requestFullResultExport, requestMaaExport } = vi.hoisted(() => ({
   requestFullResultExport: vi.fn(),
   requestMaaExport: vi.fn(),
 }))
+const featureSwitches = vi.hoisted(() => ({ maa_export: true, full_result_export: true }))
+vi.mock('../../../lib/site-feature-context', () => ({ useSiteFeatures: () => ({ features: featureSwitches }) }))
 
 vi.mock('./optimization-api', async (importOriginal) => ({
   ...await importOriginal<typeof import('./optimization-api')>(),
@@ -34,10 +36,27 @@ function renderDownloads(overrides: Partial<Parameters<typeof useResultDownloads
 describe('useResultDownloads', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    featureSwitches.maa_export = true
+    featureSwitches.full_result_export = true
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('blocks closed exports before declarations, confirmation or coupon consumption', async () => {
+    featureSwitches.maa_export = false
+    featureSwitches.full_result_export = false
+    const guardExport = vi.fn(async (run: () => void | Promise<void>) => { await run() })
+    const { options, result } = renderDownloads({ guardExport, maaExportCouponBalance: 2 })
+    await act(async () => {
+      await result.current.downloadMaaResult('result-1')
+      await result.current.downloadFullResult('result-1')
+    })
+    expect(guardExport).not.toHaveBeenCalled()
+    expect(requestMaaExport).not.toHaveBeenCalled()
+    expect(requestFullResultExport).not.toHaveBeenCalled()
+    expect(options.setWorkspaceError).toHaveBeenCalledWith(copy.features.closed_body)
   })
 
   it('fails closed before requesting a MAA export when no coupon is available', async () => {

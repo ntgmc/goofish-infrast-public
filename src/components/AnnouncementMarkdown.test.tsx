@@ -4,6 +4,8 @@ import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import AnnouncementBodyEditor, { MAX_ANNOUNCEMENT_BODY_LENGTH } from './AnnouncementBodyEditor'
 import AnnouncementMarkdown from './AnnouncementMarkdown'
+import { InternalLinkProvider } from './InternalLink'
+import { v2Href } from '../pages/v2/navigation'
 
 afterEach(cleanup)
 
@@ -72,4 +74,21 @@ describe('AnnouncementBodyEditor', () => {
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '公告' })).toBeInTheDocument()
   })
+})
+
+it('keeps legacy announcement destinations inside V2 with account, query and anchor context', async () => {
+  const router = createMemoryRouter([{
+    path: '*',
+    element: <InternalLinkProvider value={(href) => v2Href(href, 'doctor-1')}><AnnouncementMarkdown>{'[干员管理](/tool/setup/operators?source=announcement#upload)\n\n[背包](/tool/inventory)\n\n[游戏网站](https://example.com/tool/inventory)'}</AnnouncementMarkdown></InternalLinkProvider>,
+  }], { initialEntries: ['/v2?section=announcements&profile_id=doctor-1'] })
+  render(<RouterProvider router={router} />)
+  expect(screen.getByRole('link', { name: '背包' })).toHaveAttribute('href', '/v2?section=inventory&profile_id=doctor-1')
+  expect(screen.getByRole('link', { name: '游戏网站' })).toHaveAttribute('href', 'https://example.com/tool/inventory')
+  expect(screen.getByRole('link', { name: '游戏网站' })).toHaveAttribute('target', '_blank')
+  const operators = screen.getByRole('link', { name: '干员管理' })
+  expect(operators).toHaveAttribute('href', '/v2?profile_id=doctor-1&source=announcement&panel=operators#upload')
+  fireEvent.click(operators)
+  await waitFor(() => expect(router.state.location.pathname).toBe('/v2'))
+  expect(router.state.location.search).toContain('panel=operators')
+  expect(router.state.location.hash).toBe('#upload')
 })

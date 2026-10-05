@@ -9,29 +9,37 @@ import ResultBoardV2 from './ResultBoardV2'
 import OperatorSkillPreview from './OperatorSkillPreview'
 import ResultDetail from './ResultDetail'
 import ResultMetrics from './ResultMetrics'
+import InventoryDepletionWarning from './InventoryDepletionWarning'
 import type { ResultPanelProps, ResultTabId } from './types'
 import { copy, CURRENT_LOCALE } from '../../copy/index'
 import { hasCapability } from '../../lib/product-catalog'
 import { manualSourceKey } from '../../lib/manual-schedule'
+import { useSiteFeatures } from '../../lib/site-feature-context'
+import { useInternalHref } from '../InternalLink'
 
 const ManualScheduleEditor = lazy(() => import('./ManualScheduleEditor'))
 
 export default function ResultPanel({
   result,
   operators = [],
-  onDownload,
-  onDownloadFullResult,
+  onDownload: downloadMaa,
+  onDownloadFullResult: downloadFullResult,
   downloadBusy = false,
   fullResultDownloadBusy = false,
   fullDataAvailable = true,
   onSaveWorkfile,
   detailDefaultOpen = false,
   suggestionsSlot,
-  manualPreviewSlot,
+  manualPreviewSlot: manualPreview,
   previewLimit,
   manualEditProfile,
   manualSimulationBaseline,
 }: ResultPanelProps) {
+  const { features } = useSiteFeatures()
+  const resolveHref = useInternalHref()
+  const onDownload = features.maa_export ? downloadMaa : undefined
+  const onDownloadFullResult = features.full_result_export ? downloadFullResult : undefined
+  const manualPreviewSlot = features.manual_schedule ? manualPreview : undefined
   const isRotationMode = result.schedule_mode === 'rotation'
   const isPureMaaDormitoryAutofill = !isRotationMode && result.dormitory_rule === 'maa_pure_autofill'
   const prepared = useMemo(
@@ -40,7 +48,7 @@ export default function ResultPanel({
   )
   const { detailStats } = prepared
   const isPreview = Boolean(previewLimit ?? result.preview_limit)
-  const canEditManual = Boolean(manualEditProfile && manualEditProfile.kind !== 'free_preview'
+  const canEditManual = Boolean(features.manual_schedule && manualEditProfile && manualEditProfile.kind !== 'free_preview'
     && !isPreview && !result.preview_limit && hasCapability(manualEditProfile, 'edit_full_config') && result.plans.length > 0)
   const manualKey = useMemo(() => manualSourceKey(result), [result])
   const searchedStateCount = result.searched_state_count
@@ -133,6 +141,7 @@ export default function ResultPanel({
   return (
     <OperatorSkillPreview>
     <div className="space-y-4">
+      <InventoryDepletionWarning result={result} />
       <div className="tool-panel overflow-hidden">
         <div className="tool-panel-header flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
@@ -283,7 +292,7 @@ export default function ResultPanel({
         {selectedTab === 'board-v2' && <ResultBoardV2 isRotationMode={isRotationMode} prepared={prepared} shiftHours={result.shift_hours} activePlan={selectedPlan} onPlanChange={setActivePlan} showProfession={showProfession} />}
         {selectedTab === 'data' && (isPreview || !fullDataAvailable) && <>
           {prepared.hasDailyProduction && <ResultMetrics isRotationMode={isRotationMode} prepared={prepared} summaryOnly />}
-        {prepared.hasDailyProduction ? <section className="tool-panel space-y-4 p-5"><p className="text-sm leading-6 text-ink-secondary">{copy.v2.previewAnalysis}</p><a href="/pricing" className="block text-sm text-primary underline">{copy.v2.comparePlans}</a></section> : (
+        {prepared.hasDailyProduction ? <section className="tool-panel space-y-4 p-5"><p className="text-sm leading-6 text-ink-secondary">{copy.v2.previewAnalysis}</p>{features.pricing && <a href={resolveHref('/pricing')} className="block text-sm text-primary underline">{copy.v2.comparePlans}</a>}</section> : (
           <section className="tool-panel space-y-4 p-5" aria-label={copy.optimize.paid_preview.exports}>
             <h3 className="font-medium text-ink-primary">{copy.optimize.paid_preview.exports}</h3>
             <p className="text-sm leading-6 text-ink-secondary">{copy.optimize.paid_preview.exports_detail}</p>
@@ -293,7 +302,7 @@ export default function ResultPanel({
               ))}
             </dl>
             <button type="button" disabled className="tool-secondary-action">{copy.optimize.paid_preview.export_action}</button>
-            <a href="/pricing" className="block text-sm text-primary underline">{copy.optimize.paid_preview.compare}</a>
+            {features.pricing && <a href={resolveHref('/pricing')} className="block text-sm text-primary underline">{copy.optimize.paid_preview.compare}</a>}
           </section>
         )}</>}
         {selectedTab === 'data' && !isPreview && fullDataAvailable && (

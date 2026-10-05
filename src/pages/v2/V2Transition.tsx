@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { AnimatedPresenceRegion } from '../../components/MotionPrimitives'
 
+export { PageTransition as V2PageTransition } from '../../components/MotionPrimitives'
+
 export default function V2Transition({ motionKey, children, className }: {
   motionKey: string
   children: ReactNode

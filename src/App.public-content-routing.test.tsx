@@ -2,8 +2,9 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { copy } from './copy'
 import { cloneDefaultPublicContentSettings } from './lib/public-content'
-import { DEFAULT_SITE_FEATURE_SETTINGS } from './lib/site-features'
+import { DEFAULT_SITE_FEATURE_SETTINGS, type SiteFeatureKey } from './lib/site-features'
 
 const apiJson = vi.hoisted(() => vi.fn())
 const apiVoid = vi.hoisted(() => vi.fn())
@@ -78,9 +79,9 @@ describe('App public content routing', () => {
     await waitFor(() => expect(apiJson.mock.calls.some(([url]) => url === '/api/site/public-content')).toBe(true))
   })
 
-  it('keeps V1 as the default and exposes V2 only through its test entry', async () => {
+  it('keeps V1 as the default and exposes the V2 workspace entry', async () => {
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
-    expect(await screen.findByRole('link', { name: '体验 V2 测试版' })).toHaveAttribute('href', '/v2')
+    expect(await screen.findByRole('link', { name: copy.v2.testEntry })).toHaveAttribute('href', '/v2')
     expect(screen.queryByText('V2 test workspace')).not.toBeInTheDocument()
   })
 
@@ -117,5 +118,50 @@ describe('App public content routing', () => {
     render(<MemoryRouter initialEntries={['/v2']}><App /></MemoryRouter>)
     expect(await screen.findByText('V2 test workspace')).toBeInTheDocument()
     await waitFor(() => expect(document.head.querySelector('meta[name="robots"]')).toHaveAttribute('content', 'noindex, nofollow'))
+  })
+
+  it('keeps V2 service-state failures and retries in the V2 loading screen', async () => {
+    let requests = 0
+    const original = apiJson.getMockImplementation()!
+    apiJson.mockImplementation((url: string) => {
+      if (url === '/api/site/features' && ++requests === 1) return Promise.reject(new Error('offline'))
+      return original(url)
+    })
+    render(<MemoryRouter initialEntries={['/v2']}><App /></MemoryRouter>)
+    expect(await screen.findByRole('alert')).toHaveTextContent('相关功能当前不可用，请稍后重新获取服务状态。')
+    expect(document.querySelector('.v2-loading-screen')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '暂时无法获取服务状态' })).not.toBeInTheDocument()
+    await act(async () => screen.getByRole('button', { name: '重新获取' }).click())
+    expect(await screen.findByText('V2 test workspace')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['/v2', 'v2'], ['/tools/manual-schedule', 'manual_schedule'], ['/tools/cultivation-plan', 'cultivation_plan'],
+    ['/faq', 'faq'], ['/support', 'support'], ['/pricing', 'pricing'], ['/changelog', 'changelog'],
+    ['/thanks', 'thanks'], ['/status', 'service_status'],
+  ] satisfies Array<[string, SiteFeatureKey]>)('blocks direct visits to the disabled page %s', async (route, feature) => {
+    const original = apiJson.getMockImplementation()!
+    apiJson.mockImplementation((url: string) => url === '/api/site/features'
+      ? Promise.resolve({ ...DEFAULT_SITE_FEATURE_SETTINGS,
+        features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, [feature]: false } })
+      : original(url))
+    render(<MemoryRouter initialEntries={[route]}><App /></MemoryRouter>)
+    expect(await screen.findByRole('heading', { name: '该功能暂未开放' })).toBeInTheDocument()
+    expect(screen.queryByText('V2 test workspace')).not.toBeInTheDocument()
+  })
+
+  it('hides disabled V2 and public page links while preserving legal pages', async () => {
+    const original = apiJson.getMockImplementation()!
+    apiJson.mockImplementation((url: string) => url === '/api/site/features'
+      ? Promise.resolve({ ...DEFAULT_SITE_FEATURE_SETTINGS, features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features,
+        v2: false, pricing: false, changelog: false, thanks: false, service_status: false, faq: false } })
+      : original(url))
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
+    await screen.findByRole('button', { name: '开始排班' })
+    await waitFor(() => expect(screen.queryByRole('link', { name: copy.v2.testEntry })).not.toBeInTheDocument())
+    for (const href of ['/v2', '/pricing', '/changelog', '/thanks', '/status', '/faq']) {
+      expect(document.querySelector(`a[href="${href}"]`)).toBeNull()
+    }
+    expect(document.querySelector('a[href="/privacy"]')).toBeInTheDocument()
   })
 })

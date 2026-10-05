@@ -1,11 +1,13 @@
 import { useState, type ReactNode } from 'react'
-import { Link } from 'react-router'
+import Link from './InternalLink'
 import { Sparkles } from 'lucide-react'
 import type { LicenseConfig } from '../lib/types'
 import ConfigEditor from './ConfigEditor'
 import { copy } from '../copy'
+import { useSiteFeatures } from '../lib/site-feature-context'
 
 export default function ConfigCapabilityPreview({ config, enabled, children }: { config: LicenseConfig; enabled: boolean; children: ReactNode }) {
+  const { features } = useSiteFeatures()
   const [preview, setPreview] = useState(false)
   const text = copy.optimize.paid_preview
   if (!enabled) return children
@@ -24,7 +26,7 @@ export default function ConfigCapabilityPreview({ config, enabled, children }: {
           <div className="tool-inset mb-4 p-4">
             <p className="font-medium text-ink-primary">{text.config_title}</p>
             <p className="mt-1 text-sm leading-6 text-ink-secondary">{text.config_description}</p>
-            <Link to="/pricing" className="mt-2 inline-block text-sm text-primary underline">{text.compare}</Link>
+            {features.pricing && <Link to="/pricing" className="mt-2 inline-block text-sm text-primary underline">{text.compare}</Link>}
           </div>
           <fieldset disabled className="min-w-0" aria-label={text.readonly}>
             <ConfigEditor config={config} canEdit validation={{ ok: true }} onUpdate={() => {}} embedded note={text.readonly} />

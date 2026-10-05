@@ -1,31 +1,49 @@
-import { useCallback, useId, useMemo, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
 import { useAppReducedMotion } from '../../lib/motion-preference'
-import { Activity, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, CalendarClock, Check, ChevronDown, ChevronRight, Download, Factory, FileClock, Gem, LayoutDashboard, Menu, RefreshCw, Settings2, ShieldCheck, Sparkles, Users, WalletCards, X, Zap } from 'lucide-react'
-import { Link } from 'react-router'
+import { Activity, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, CalendarClock, Check, ChevronDown, ChevronRight, Download, Factory, FileClock, Gem, LayoutDashboard, Menu, RefreshCw, ScrollText, Settings2, ShieldCheck, Sparkles, Users, WalletCards, X, Zap } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router'
+import Link from '../../components/InternalLink'
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
 import { AnimatedValue, MotionNavIndicator, RevealItem, StaggeredReveal, motionTokens } from '../../components/MotionPrimitives'
 import { formatAmount, prepareResult } from '../../components/result-panel/formatters'
 import { PRODUCT_LABELS } from '../../components/result-panel/labels'
+import InventoryDepletionWarning from '../../components/result-panel/InventoryDepletionWarning'
 import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
-import { profileScopedPath } from '../../lib/app-routes'
+import { manualSourceKey } from '../../lib/manual-schedule'
+import { hasCapability } from '../../lib/product-catalog'
+import { NotificationBell } from '../../components/NotificationCenter'
+import AnnouncementBanner from '../../components/AnnouncementBanner'
+import AnnouncementPopup from '../../components/AnnouncementPopup'
+import { UpgradeSuggestionStatusNotice } from '../tool/optimize/ResultSection'
+import WorkspaceSections, { sectionLabels, type V2Workflow } from './WorkspaceSections'
+import { v2Path, v2Section, v2SectionAvailable, type V2Section } from './navigation'
 import { normalizeScheduleMode, parseShiftHours, SCHEDULE_MODE_LABELS } from '../../lib/config'
-import type { LicenseConfig, LicenseOperator, OptimizeResult, PermissionMode, WorkspaceResultHistorySummary } from '../../lib/types'
+import type { AuthSuccessResponse, LicenseConfig, LicenseOperator, OptimizeResult, PermissionMode } from '../../lib/types'
 import ScheduleBoard, { Avatar } from './ScheduleBoard'
 import IncomeAnalysis from './IncomeAnalysis'
 import OptionsDrawer, { type OptionPanel, type V2Session } from './OptionsDrawer'
 import { sortOperatorsForPreview } from '../tool/tool-utils'
-import V2Transition from './V2Transition'
+import V2Transition, { V2PageTransition } from './V2Transition'
 import TradingIcon from './TradingIcon'
+import { useSiteFeatures } from '../../lib/site-feature-context'
+import ThemeSwitcher from '../../components/ThemeSwitcher'
+import ProfileExpiryPrompt from '../tool/ProfileExpiryPrompt'
+import { useWorkspaceEntryPreference, WorkspaceEntryPrompt } from '../tool/WorkspaceEntryPreference'
 
 const text = copy.v2
-type View = 'summary' | 'details' | 'analysis'
+type View = 'summary' | 'details' | 'analysis' | 'manual' | 'advanced' | 'training'
+const ManualScheduleEditor = lazy(() => import('../../components/result-panel/ManualScheduleEditor'))
+const ResultPanel = lazy(() => import('../../components/ResultPanel'))
+const UpgradeSuggestions = lazy(() => import('../../components/UpgradeSuggestions'))
 
-export default function V2Dashboard({ session, result, operators, config, sample, configChanged, onUpdateConfig,
+export default function V2Dashboard({ session, workflow, taskCenterAction, result, operators, config, sample, configChanged, onUpdateConfig,
   onImportOperators, onGenerate, onExport, busy = false, loadingResult = false, generationDisabledReason, onRetryResult, error, notice,
-  permission, canEditConfig = true, canViewAnalysis = true, canUseIntermediateConfig = true, history = [], onHistory, children }: {
+  permission, onManualDirtyChange, canEditConfig = true, canViewAnalysis = true, canUseIntermediateConfig = true, children }: {
   session: V2Session
+  workflow?: V2Workflow
+  taskCenterAction?: ReactNode
   result: OptimizeResult
   operators: LicenseOperator[]
   config: LicenseConfig
@@ -34,6 +52,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
   onUpdateConfig: (mutate: (config: LicenseConfig) => void) => void
   onImportOperators: (operators: LicenseOperator[]) => Promise<void>
   onGenerate?: () => void
+  onManualDirtyChange?: (dirty: boolean) => void
   onExport?: () => void
   busy?: boolean
   loadingResult?: boolean
@@ -45,10 +64,19 @@ export default function V2Dashboard({ session, result, operators, config, sample
   canEditConfig?: boolean
   canViewAnalysis?: boolean
   canUseIntermediateConfig?: boolean
-  history?: WorkspaceResultHistorySummary[]
-  onHistory?: (summary: WorkspaceResultHistorySummary) => Promise<void>
   children?: ReactNode
 }) {
+  const { features } = useSiteFeatures()
+  const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
+  const section = v2Section(params)
+  const workspacePath = useCallback((profileId: string) => v2Path('overview', profileId), [])
+  const workspaceEntry = useWorkspaceEntryPreference(session.user?.id ?? null, session.cdkProfiles, session.activeProfile, session.authStatus === 'authenticated', features.profiles, workspacePath, section === 'profiles')
+  const [navigationError, setNavigationError] = useState<string | null>(null)
+  const [manualOpened, setManualOpened] = useState(false)
+  const [manualDirty, setManualDirty] = useState(false)
+  const [toolDirty, setToolDirty] = useState(false)
+  useEffect(() => { onManualDirtyChange?.(manualDirty) }, [manualDirty, onManualDirtyChange])
   const [panel, setPanel] = useState<OptionPanel | null>(null)
   const [room, setRoom] = useState<BoardRoom | null>(null)
   const [view, setView] = useState<View>('summary')
@@ -67,7 +95,58 @@ export default function V2Dashboard({ session, result, operators, config, sample
   const name = session.activeProfile?.display_name ?? text.guest
   const openPanel = useCallback((next: OptionPanel) => { setPanel(next); setMobileNavigation(false) }, [])
   const openRoom = useCallback((next: BoardRoom) => { setRoom(next); openPanel('room') }, [openPanel])
+  const canManual = Boolean(features.manual_schedule && !sample && session.activeProfile && session.activeProfile.kind !== 'free_preview' && !result.preview_limit
+    && hasCapability({ kind: session.activeProfile.kind, permission }, 'edit_full_config') && result.plans.length)
+  const manualKey = useMemo(() => manualSourceKey(result), [result])
+  const simulationBaseline = workflow?.historyItem?.config ? { id: workflow.historyItem.id, config: workflow.historyItem.config }
+    : workflow?.progress?.historyResultId || workflow?.progress?.jobId || workflow?.latestWorkspaceResult?.id
+      ? { id: workflow.progress?.historyResultId ?? workflow.progress?.jobId ?? workflow.latestWorkspaceResult!.id, config } : undefined
+  useEffect(() => { setShift(0); setManualOpened(false); setManualDirty(false) }, [manualKey])
+  useEffect(() => { if (!canManual && view === 'manual') setView('summary') }, [canManual, view])
+  useEffect(() => {
+    const requested = params.get('panel')
+    if (requested === 'operators' || requested === 'config') setPanel(requested)
+  }, [params])
 
+  function navigateSection(next: V2Section) {
+    setMobileNavigation(false)
+    setPanel(null)
+    void navigate(v2Path(next, session.activeProfile?.id))
+  }
+  async function openProfile(profile: V2Session['profiles'][number], next: V2Section = 'overview') {
+    if (busy || session.openingProfileId || ((manualDirty || toolDirty) && !window.confirm(text.discardManual))) return
+    if (!await session.flushConfigSave()) { setNavigationError(text.saveFailed); return }
+    try {
+      const openedAt = Date.now()
+      await session.refreshProfileWorkspace(profile)
+      workspaceEntry.recordOpen(profile, openedAt)
+      setManualDirty(false)
+      setToolDirty(false)
+      setPanel(null)
+      void navigate(v2Path(next, profile.id))
+    } catch (caught) { setNavigationError(caught instanceof Error ? caught.message : text.resultLoadFailed) }
+  }
+  async function accountAdded(payload: AuthSuccessResponse) {
+    let keepCurrent = false
+    if (session.activeProfile && payload.active_profile?.id !== session.activeProfile.id) {
+      keepCurrent = (manualDirty || toolDirty) && !window.confirm(text.discardManual)
+      if (!keepCurrent && !await session.flushConfigSave()) { keepCurrent = true; setNavigationError(text.saveFailed) }
+    }
+    const next = keepCurrent ? { ...payload, active_profile: session.activeProfile, workspace: session.workspace } : payload
+    session.applyAuthPayload(next)
+    setPanel(null)
+    void navigate(v2Path('profiles', next.active_profile?.id))
+  }
+  async function logout() {
+    if ((manualDirty || toolDirty) && !window.confirm(text.discardManual)) return
+    if (!await session.flushConfigSave()) { setNavigationError(text.saveFailed); return }
+    await session.handleLogout()
+  }
+  const guardedSession = { ...session, handleLogout: logout }
+  function closePanel() {
+    setPanel(null)
+    if (params.has('panel')) setParams((current) => { const next = new URLSearchParams(current); next.delete('panel'); return next }, { replace: true })
+  }
   function downloadSample() {
     const url = URL.createObjectURL(new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' }))
     const link = document.createElement('a')
@@ -88,45 +167,53 @@ export default function V2Dashboard({ session, result, operators, config, sample
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduceMotion ? 0 : motionTokens.duration.exit }} />}
       </AnimatePresence>
       <aside className={`v2-sidebar ${mobileNavigation ? 'v2-sidebar-open' : ''}`}>
-        <Link to={profileScopedPath('/v2', session.activeProfile?.id)} className="v2-brand"><span className="v2-brand-mark"><Building2 size={24} strokeWidth={1.8} /></span>
+        <Link to={v2Path('overview', session.activeProfile?.id)} className="v2-brand"><span className="v2-brand-mark"><Building2 size={24} strokeWidth={1.8} /></span>
           <span><strong>{text.brand}<sup>V2</sup></strong><small>{text.brandDescription}</small></span></Link>
         <button className="v2-mobile-close v2-icon-button" type="button" onClick={() => setMobileNavigation(false)} aria-label={text.close}><X size={20} /></button>
         <nav aria-label={text.navigation}>
           <p className="v2-nav-label">{text.workspace}</p>
-          <button type="button" className="v2-nav-item v2-nav-active" aria-current="page" onClick={() => { setView('summary'); setMobileNavigation(false) }}><LayoutDashboard size={19} /><span>{text.overview}</span><span className="v2-nav-dot" /></button>
-          <button type="button" className="v2-nav-item" onClick={() => openPanel('history')}><FileClock size={19} /><span>{text.history}</span></button>
+          {(['overview', 'generation', 'plans', 'lab', 'tools'] as const).filter((entry) => v2SectionAvailable(entry, features)).map((entry) => <button type="button" key={entry} className={`v2-nav-item ${section === entry ? 'v2-nav-active' : ''}`} aria-current={section === entry ? 'page' : undefined} onClick={() => navigateSection(entry)}>
+            {entry === 'overview' ? <LayoutDashboard size={19} /> : entry === 'plans' ? <FileClock size={19} /> : entry === 'generation' ? <RefreshCw size={19} /> : entry === 'lab' ? <Activity size={19} /> : <CalendarClock size={19} />}<span>{sectionLabels[entry]}</span>{section === entry && <span className="v2-nav-dot" />}</button>)}
           <p className="v2-nav-label">{text.configuration}</p>
           <button type="button" className="v2-nav-item" aria-label={text.operators} onClick={() => openPanel('operators')}><Users size={19} /><span>{text.operators}</span><small>{owned.length}</small></button>
           <button type="button" className="v2-nav-item" onClick={() => openPanel('config')}><Building2 size={19} /><span>{text.facilities}</span></button>
           <p className="v2-nav-label">{text.personal}</p>
           <button type="button" className="v2-nav-item" onClick={() => openPanel('settings')}><Settings2 size={19} /><span>{copy.dashboard.animation.settings}</span></button>
-          <button type="button" className="v2-nav-item" onClick={() => openPanel('account')}><UserIcon /><span>{text.account}</span></button>
-          <button type="button" className="v2-nav-item" onClick={() => openPanel('cdk')}><WalletCards size={19} /><span>{text.cdk}</span></button>
+          {(['profiles', 'inventory', 'commercial', 'balance', 'announcements', 'settings'] as const).filter((entry) => v2SectionAvailable(entry, features)).map((entry) => <button type="button" key={entry} className={`v2-nav-item ${section === entry ? 'v2-nav-active' : ''}`} aria-current={section === entry ? 'page' : undefined} onClick={() => navigateSection(entry)}>
+            {entry === 'profiles' ? <UserIcon /> : entry === 'announcements' ? <Bell size={19} /> : entry === 'settings' ? <Settings2 size={19} /> : <WalletCards size={19} />}<span>{sectionLabels[entry]}</span>{entry === 'announcements' && session.announcementUnreadCount > 0 && <small>{session.announcementUnreadCount}</small>}</button>)}
         </nav>
         <div className="v2-sidebar-bottom">
-          <Link className="v2-help-link" to="/faq"><BookOpen size={19} /><span>{text.helpAction}</span><ArrowUpRight size={14} /></Link>
+          {features.faq && <Link className="v2-help-link" to={v2Path('help', session.activeProfile?.id)}><BookOpen size={19} /><span>{text.helpAction}</span><ArrowUpRight size={14} /></Link>}
         </div>
       </aside>
       <div className="v2-workspace">
         <header className="v2-topbar">
           <div className="v2-breadcrumb"><button className="v2-menu-button v2-icon-button" type="button" onClick={() => setMobileNavigation(true)} aria-label={text.menu}><Menu size={21} /></button>
-            <span>{text.workspace}</span><ChevronRight size={14} /><strong>{text.infrastructure}</strong></div>
-          <div className="v2-topbar-actions"><Link className="v2-back-link" to="/">{text.backToV1}</Link><span className="v2-sample-pill"><span />{text.testVersion}</span>
-            <Link to="/changelog" className="v2-icon-button" aria-label={text.updates}><Bell size={19} /></Link>
+            <span>{text.workspace}</span><ChevronRight size={14} /><strong>{sectionLabels[section]}</strong></div>
+          <div className="v2-topbar-actions"><span className="v2-sample-pill"><span />{text.testVersion}</span>
+            {features.changelog && <Link to={v2Path('updates', session.activeProfile?.id)} className="v2-icon-button" aria-label={text.updates}><ScrollText size={19} /></Link>}
+            <div className="v2-feature-content">{taskCenterAction}</div>
+            <div className="v2-feature-content"><ThemeSwitcher iconOnly /></div>
+            <NotificationBell iconOnly onInventory={() => navigateSection('inventory')} />
             <span className="v2-topbar-divider" />
             <button className="v2-profile-button" type="button" onClick={() => openPanel('account')}><span className="v2-profile-avatar">{name.slice(0, 1)}</span><span>{name}</span><ChevronDown size={14} /></button>
           </div>
         </header>
         <main className="v2-main motion-region-enter" tabIndex={-1} data-route-focus>
+          {navigationError && <p className="v2-feedback v2-feedback-error" role="alert">{navigationError}<button type="button" onClick={() => { session.retryConfigSave(); setNavigationError(null) }}>{text.loginRetry}</button></p>}
+          <AnnouncementBanner announcement={session.banner} />
+          <V2PageTransition motionKey={section} className="v2-page-transition">{(displayedSection) => <>
+          <WorkspaceSections section={displayedSection} session={guardedSession} workflow={workflow} workspaceEntry={workspaceEntry} onAccountAdded={accountAdded} onToolDirtyChange={setToolDirty} onOpenProfile={(profile) => openProfile(profile, section === 'manual-tool' ? 'manual-tool' : 'overview')} onNavigate={navigateSection} onConfig={() => openPanel('config')} generationDisabledReason={generationDisabledReason} />
+          <div hidden={displayedSection !== 'overview'}>
           <div className="v2-page-title"><h1>{text.title}</h1></div>
           <div className="v2-ready-banner">
             <span className="v2-ready-icon"><Check size={25} strokeWidth={2} /></span>
             <div><h2>{text.resultReady}<span className="v2-ready-tag">{sample ? text.sample : SCHEDULE_MODE_LABELS[resultMode]}</span></h2></div>
             <div className="v2-banner-actions"><button type="button" className="v2-button v2-button-white" onClick={() => openPanel('config')}><Settings2 size={16} />{text.configure}</button>
               <button type="button" className="v2-button v2-button-primary" disabled={busy || loadingResult || Boolean(generationDisabledReason)} title={generationDisabledReason ?? undefined}
-                onClick={() => onGenerate ? onGenerate() : openPanel('account')}><RefreshCw size={16} className={busy ? 'v2-spin' : ''} />{busy ? text.generating : text.regenerate}</button>
-              <button className="v2-button v2-button-secondary v2-export-button" type="button" disabled={busy || (!sample && resultMode === 'rotation')} title={resultMode === 'rotation' ? text.exportUnavailable : undefined}
-                onClick={sample ? downloadSample : onExport}><Download size={16} />{sample ? text.sampleExport : text.export}</button></div>
+                onClick={() => { if (onGenerate) onGenerate(); else openPanel('account') }}><RefreshCw size={16} className={busy ? 'v2-spin' : ''} />{busy ? text.generating : text.regenerate}</button>
+              {(sample || features.maa_export) && <button className="v2-button v2-button-secondary v2-export-button" type="button" disabled={busy || (!sample && (resultMode === 'rotation' || !onExport))} title={resultMode === 'rotation' ? text.exportUnavailable : undefined}
+                onClick={sample ? downloadSample : onExport}><Download size={16} />{sample ? text.sampleExport : text.export}</button>}</div>
           </div>
           <AnimatePresence initial={false}>
           {(loadingResult || error || notice || downloadNotice || configChanged) && <FeedbackRegion key="feedback">
@@ -136,6 +223,7 @@ export default function V2Dashboard({ session, result, operators, config, sample
           </div></FeedbackRegion>}
           </AnimatePresence>
           {children}
+          {view !== 'advanced' && <InventoryDepletionWarning result={result} />}
           <StaggeredReveal className="v2-metrics">
             <Metric label={text.lmd} value={formatAmount(prepared.productionStats.lmd)} unit={text.daily} product="LMD" />
             <Metric label={text.exp} value={formatAmount((prepared.productionStats.manufacturing['Battle Record'] ?? 0) * 1000)} unit={text.expUnit} product="Battle Record" />
@@ -150,17 +238,22 @@ export default function V2Dashboard({ session, result, operators, config, sample
           </StaggeredReveal>
           <p className="v2-metrics-note">{text.outputSubtitle}</p>
           <div className="v2-content-tabs" role="group" aria-label={text.resultTabs}>
-            {([['summary', text.summaryTab], ['details', text.detailsTab], ['analysis', text.analysisTab]] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => setView(id)}>
+            {([['summary', text.summaryTab], ['details', text.detailsTab], ['analysis', text.analysisTab], ['advanced', text.advancedTab], ...(canManual ? [['manual', text.manualTab] as const] : []), ...(!sample && (workflow?.suggestions?.length || result.upgrade_suggestions_status) ? [['training', text.trainingTab] as const] : [])] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => { setView(id); if (id === 'manual') setManualOpened(true) }}>
               {label}{view === id && <MotionNavIndicator layoutId="result-tab" variant="underline" />}
             </button>)}
             <span><ShieldCheck size={14} />{sample ? text.sampleSource : text.ownSource}</span>
           </div>
+          <div className="v2-feature-content" hidden={view !== 'manual'}>
+            {canManual && manualOpened && session.activeProfile && <Suspense fallback={<p role="status">{text.loading}</p>}><ManualScheduleEditor key={manualKey} source={result} profileId={session.activeProfile.id} operators={operators} simulationBaseline={simulationBaseline} onDirtyChange={setManualDirty} /></Suspense>}
+          </div>
           <V2Transition motionKey={view}>
-          <div className={`v2-results-grid ${view !== 'summary' ? 'v2-results-expanded' : ''}`}>
-            {view === 'analysis' ? (
+          <div hidden={view === 'manual'} className={`v2-results-grid ${view !== 'summary' ? 'v2-results-expanded' : ''}`}>
+            {view === 'advanced' ? <section className="v2-feature-content"><Suspense fallback={<p role="status">{text.loading}</p>}><ResultPanel result={result} operators={operators} fullDataAvailable={canViewAnalysis}
+              onDownload={sample ? undefined : onExport} onDownloadFullResult={features.full_result_export && workflow?.userCanDownloadFullResult ? workflow.handleDownloadFullResult : undefined}
+              downloadBusy={busy} fullResultDownloadBusy={busy} /></Suspense></section> : view === 'training' ? <section className="v2-panel v2-feature-content v2-section-loading"><Suspense fallback={<p role="status">{text.loading}</p>}><UpgradeSuggestionStatusNotice result={result} /><UpgradeSuggestions suggestions={workflow?.suggestions ?? []} embedded /></Suspense></section> : view === 'analysis' ? (
               <section className="v2-panel v2-analysis"><div className="v2-panel-heading"><h2>{text.analysisTab}</h2><span className="v2-neutral-tag">24h</span></div>{canViewAnalysis
                 ? <IncomeAnalysis result={result} />
-                : <div className="v2-analysis-note"><ShieldCheck size={21} /><div><p>{text.previewAnalysis}</p><Link className="v2-text-button" to="/pricing">{text.comparePlans}<ArrowRight size={14} /></Link></div></div>}</section>
+                : <div className="v2-analysis-note"><ShieldCheck size={21} /><div><p>{text.previewAnalysis}</p>{features.pricing && <Link className="v2-text-button" to="/pricing">{text.comparePlans}<ArrowRight size={14} /></Link>}</div></div>}</section>
             ) : (
               <ScheduleBoard result={result} prepared={prepared} expanded={view === 'details'} shift={shift} onShiftChange={setShift}
                 view={boardView} onViewChange={setBoardView} onRoom={openRoom} />
@@ -191,13 +284,23 @@ export default function V2Dashboard({ session, result, operators, config, sample
           </div>
           </V2Transition>
           <div className="v2-sample-notice"><span className="v2-notice-icon"><Sparkles size={16} /></span><p>{sample && <>{text.sampleHint} </>}{text.estimateNotice}</p>{sample && <button type="button" onClick={() => openPanel('account')}>{session.user ? text.account : text.login}<ArrowRight size={14} /></button>}</div>
-          <footer className="v2-footer"><span>{text.brand}</span><nav><Link to="/terms">{text.terms}</Link><Link to="/privacy">{text.privacy}</Link></nav></footer>
+          </div>
+          </>}</V2PageTransition>
+          <footer className="v2-footer"><span>{text.brand}</span><nav>{(['status', 'support', 'terms', 'privacy', 'disclaimer'] as const).filter((entry) => v2SectionAvailable(entry, features)).map((entry) => <Link key={entry} to={v2Path(entry, session.activeProfile?.id)}>{sectionLabels[entry]}</Link>)}</nav></footer>
         </main>
       </div>
-      <OptionsDrawer panel={panel} onClose={() => setPanel(null)} session={session} config={config} operators={sortedOperators}
+      <OptionsDrawer panel={panel} onClose={closePanel} onOpenProfile={openProfile} onNavigate={navigateSection} session={guardedSession} config={config} operators={sortedOperators}
         onUpdateConfig={onUpdateConfig} permission={permission} canEditConfig={canEditConfig} canUseIntermediateConfig={canUseIntermediateConfig}
-        sample={sample} busy={busy} onImportOperators={onImportOperators}
-        onAccount={() => openPanel('account')} history={history} onHistory={onHistory} room={room} error={error} />
+        sample={sample} busy={busy} configReadOnly={workflow?.loading} onImportOperators={onImportOperators} configDiffRows={workflow?.configDiffRows} hasPreviousResult={Boolean(workflow?.latestWorkspaceResult)}
+        onAccount={() => openPanel('account')} room={room} error={error} />
+      {session.user && features.profiles && <ProfileExpiryPrompt userId={session.user.id} profiles={session.cdkProfiles} onOpenExport={(profile) => { void (async () => {
+        if ((manualDirty || toolDirty) && !window.confirm(text.discardManual)) return
+        if (!await session.flushConfigSave()) { setNavigationError(text.saveFailed); return }
+        if (profile.id !== session.activeProfile?.id) { try { await session.refreshProfileWorkspace(profile) } catch { return } }
+        void navigate(v2Path('plans', profile.id))
+      })() }} />}
+      {section === 'profiles' && <div className="v2-feature-content"><WorkspaceEntryPrompt entry={workspaceEntry} /></div>}
+      {features.announcements && <AnnouncementPopup announcements={session.popups ?? []} userId={session.user?.id} onUnreadCountChange={session.setAnnouncementUnreadCount} announcementsPath={v2Path('announcements', session.activeProfile?.id)} />}
     </div>
     </LayoutGroup>
   )

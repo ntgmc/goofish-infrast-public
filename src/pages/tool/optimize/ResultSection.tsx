@@ -12,6 +12,7 @@ import { copy } from '../../../copy/index'
 import { LockedResultPreview } from './PaidCapabilityPreview'
 import { recordDebugError } from '../../../lib/debug-diagnostics'
 import type { ResultPanelProps } from '../../../components/result-panel/types'
+import { useSiteFeatures } from '../../../lib/site-feature-context'
 
 
 const ResultPanel = lazy(() => import('../../../components/ResultPanel'))
@@ -174,6 +175,7 @@ export default function ResultSection({
 }
 
 function LockedCapabilityPreview({ purchaseHref, title, description }: { purchaseHref?: string; title: string; description: string }) {
+  const { features } = useSiteFeatures()
   return (
     <div className="relative min-h-80 overflow-hidden rounded-xl">
       <div className="space-y-4 select-none opacity-50 blur-[3px]" aria-hidden="true" data-locked-capability-preview>
@@ -208,7 +210,7 @@ function LockedCapabilityPreview({ purchaseHref, title, description }: { purchas
               <a href={purchaseHref} target="_blank" rel="noopener noreferrer" className="tool-primary-action">
                 {copy.optimize.pages_tool_optimize_ResultSection_018}
               </a>
-            ) : (
+            ) : features.pricing && (
               <Link to="/pricing" className="tool-primary-action">
                 {copy.optimize.pages_tool_optimize_ResultSection_018}
               </Link>
@@ -223,7 +225,7 @@ function LockedCapabilityPreview({ purchaseHref, title, description }: { purchas
   )
 }
 
-class ResultErrorBoundary extends Component<{
+export class ResultErrorBoundary extends Component<{
   resetKey: string
   onDownloadDiagnostic?: () => void
   diagnosticDownloadBusy: boolean
@@ -304,7 +306,7 @@ export function UpgradeSuggestionStatusNotice({ result }: { result: OptimizeResu
   )
 }
 
-function PreviewUpgradePanel({
+export function PreviewUpgradePanel({
   cdk,
   loading,
   error,

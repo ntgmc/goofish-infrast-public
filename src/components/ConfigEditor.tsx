@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { BedDouble, CalendarClock, Flame, Gem, Zap } from 'lucide-react'
 import {
+  allowsInventoryProductRebalance,
   getRightFull252Variant,
   isFullBlood252Config,
   isFiammettaShiftHoursSupported,
@@ -240,6 +241,7 @@ interface ConfigEditorProps {
   profileId?: string;
   config: LicenseConfig;
   canEdit: boolean;
+  readOnly?: boolean;
   canEditIntermediateInventory?: boolean;
   canSelectPreset?: boolean;
   canEditFixedShiftHours?: boolean;
@@ -257,6 +259,7 @@ export default function ConfigEditor({
   profileId,
   config,
   canEdit,
+  readOnly = false,
   canEditIntermediateInventory,
   canSelectPreset = false,
   canEditFixedShiftHours = false,
@@ -286,6 +289,7 @@ export default function ConfigEditor({
     : copy.common.components_ConfigEditor_100
   const validationMessage = validation.ok === false ? validation.message : null
   const intermediateInventory = normalizeIntermediateInventory(config.intermediate_inventory)
+  const allowProductRebalance = allowsInventoryProductRebalance(config, canEdit)
   const orundumPlanning = normalizeOrundumPlanning(config)
   const showOrundumPlanning =
     (config.product_requirements.trading_stations.Orundum ?? 0) > 0 ||
@@ -295,6 +299,7 @@ export default function ConfigEditor({
     onUpdate((next) => {
       const intermediateInventory = normalizeIntermediateInventory(next.intermediate_inventory)
       const autoBalanceEnabled =
+        next.allow_product_rebalance !== undefined ||
         next.auto_balance_source === 'intermediate_inventory' ||
         next.auto_balance_source === 'limited_config'
       const copy = normalizeConfig(preset)
@@ -347,7 +352,17 @@ export default function ConfigEditor({
         ...normalizeIntermediateInventory(next.intermediate_inventory),
         [product]: stock,
       }
+      next.allow_product_rebalance = allowsInventoryProductRebalance(next, canEdit)
       markIntermediateInventoryForOptimizer(next)
+      applyCounts(next)
+    })
+  }
+
+  const setProductRebalance = (enabled: boolean) => {
+    onUpdate((next) => {
+      next.allow_product_rebalance = enabled
+      next.auto_balance_source = enabled ? 'intermediate_inventory' : 'limited_config'
+      next.intermediate_inventory = normalizeIntermediateInventory(next.intermediate_inventory)
       applyCounts(next)
     })
   }
@@ -374,7 +389,8 @@ export default function ConfigEditor({
   }
 
   return (
-<section className={`config-editor ${embedded ? '' : 'tool-panel p-5 sm:p-6'}`}>
+<fieldset disabled={readOnly} className={`config-editor min-w-0 ${embedded ? '' : 'tool-panel p-5 sm:p-6'}`} aria-label={copy.common.components_ConfigEditor_021}>
+      {readOnly && <p className="tool-alert tool-alert--info mb-4" role="status">{copy.common.configGenerationReadOnly}</p>}
       {!hideHeader && (
 <div className="config-editor-header flex flex-col gap-4 border-b border-surface-3/60 pb-5">
         <div>
@@ -400,7 +416,7 @@ export default function ConfigEditor({
       )}
 
       {supported252PresetSelected && (
-        <FacilityLayoutEditor key={JSON.stringify([profileId, config.trading_station_levels, config.manufacturing_station_levels])} profileId={profileId} config={config} onUpdate={onUpdate} />
+        <FacilityLayoutEditor key={JSON.stringify([profileId, config.trading_station_levels, config.manufacturing_station_levels])} profileId={profileId} config={config} readOnly={readOnly} onUpdate={onUpdate} />
       )}
       {supported252PresetSelected && (
         <p className="tool-alert tool-alert--warning mt-3 px-3 py-2 text-xs leading-5" role="note">
@@ -450,6 +466,15 @@ export default function ConfigEditor({
                     ? copy.common.components_ConfigEditor_062
                     : copy.common.components_ConfigEditor_095}
                 </p>
+                {!rotationMode && canEditFixedShiftHours && <div className="mt-4">
+                  <ShiftHoursEditor value={config.shift_hours} variableMode={variableShiftMode} canEdit={false} canEditFixedShiftHours
+                    onSelectVariable={() => undefined} onChange={(hours) => onUpdate((next) => {
+                      next.schedule_mode = 'maa'
+                      next.shift_hours = hours
+                      next.variable_shift_schedule = { ...(next.variable_shift_schedule ?? {}), enable: false, enabled: false }
+                      applyCounts(next)
+                    })} />
+                </div>}
               </div>
               <div>
                 <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_040}</p>
@@ -493,6 +518,9 @@ export default function ConfigEditor({
                 canEdit={canUseIntermediateInventory}
                 inventory={intermediateInventory}
                 showOrirock={showOrundumPlanning}
+                allowProductRebalance={allowProductRebalance}
+                rotationMode={rotationMode}
+                onProductRebalanceChange={setProductRebalance}
                 onChange={setIntermediateInventory}
               />
             </div>
@@ -570,6 +598,9 @@ export default function ConfigEditor({
               canEdit={canEdit}
               inventory={intermediateInventory}
               showOrirock={showOrundumPlanning}
+              allowProductRebalance={allowProductRebalance}
+              rotationMode={rotationMode}
+              onProductRebalanceChange={setProductRebalance}
               onChange={setIntermediateInventory}
             />
           </div>
@@ -825,7 +856,7 @@ export default function ConfigEditor({
       {validationMessage && (
         <p className="tool-alert tool-alert--warning mt-4" role="alert">{validationMessage}</p>
       )}
-    </section>
+    </fieldset>
   )
 }
 
@@ -946,13 +977,20 @@ function IntermediateInventoryEditor({
   canEdit,
   inventory,
   showOrirock,
+  allowProductRebalance,
+  rotationMode,
+  onProductRebalanceChange,
   onChange,
 }: {
   canEdit: boolean;
   inventory: Record<IntermediateProduct, number>;
   showOrirock: boolean;
+  allowProductRebalance: boolean;
+  rotationMode: boolean;
+  onProductRebalanceChange: (enabled: boolean) => void;
   onChange: (product: IntermediateProduct, value: number) => void;
 }) {
+  const helpId = useId()
   return (
     <div>
       <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_077}</p>
@@ -981,6 +1019,14 @@ function IntermediateInventoryEditor({
           />
         )}
       </div>
+      <label className="mt-3 flex min-h-11 items-center justify-between gap-3 text-sm text-ink-secondary">
+        <span>{copy.common.inventoryProductRebalanceLabel}</span>
+        <Switch checked={allowProductRebalance} disabled={!canEdit || rotationMode} aria-describedby={helpId}
+          onChange={(event) => onProductRebalanceChange(event.currentTarget.checked)} />
+      </label>
+      <p id={helpId} className="mt-1 text-xs leading-5 text-ink-muted">
+        {rotationMode ? copy.common.inventoryProductRebalanceRotation : copy.common.inventoryProductRebalanceHelp}
+      </p>
     </div>
   )
 }

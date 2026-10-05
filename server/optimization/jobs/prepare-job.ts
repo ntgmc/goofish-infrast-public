@@ -21,7 +21,7 @@ import { formatOptimizeJobHardTimeout, getOptimizeJobHardTimeoutMs } from '../..
 import { recordOperatorDataAnomalyBehaviorEvent } from '../../behavior-risk/service';
 import type { MeteredBillingKind, MeteredBillingOperation } from '../../../src/lib/metered-billing';
 import { normalizePointsAmount } from '../../../src/lib/balance-contracts';
-import { requireMeteredBillingFeature } from '../../feature-gate';
+import { requireMeteredBillingFeature, requireSiteFeatures } from '../../feature-gate';
 import { manualResult, validateManualPlans } from '../../../src/lib/manual-schedule';
 import { resolveManualScheduleConfig } from '../../../src/lib/manual-schedule-tool';
 
@@ -41,6 +41,10 @@ export async function prepareOptimizeJob(
   try {
     const body = await getValidatedJson(req, requestSchemas.optimizationJob) as unknown as CreateOptimizationJobRequest;
     isScenarioComparison = body.kind === 'scenario_comparison';
+    const featureGate = await requireSiteFeatures(body.kind === 'scenario_comparison'
+      ? ['scenario_comparison']
+      : body.manualSchedule ? ['manual_schedule'] : ['schedule_generation']);
+    if (featureGate) return { ok: false, response: featureGate };
     const rawBody = body as unknown as Record<string, unknown>;
     if ('use_priority_coupon' in rawBody && typeof rawBody.use_priority_coupon !== 'boolean') {
       return fail({ error: '优先计算券选项无效，请重新选择。', code: 'priority_coupon_not_applicable' }, 400);

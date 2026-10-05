@@ -228,7 +228,8 @@
 }
 
 .v2-app,
-.v2-drawer {
+.v2-drawer,
+.v2-dialog {
   --color-brand-50: var(--color-v2-accent-soft);
   --color-brand-100: var(--color-v2-accent-soft);
   --color-brand-200: var(--color-v2-line);

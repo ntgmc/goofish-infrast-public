@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '../../../lib/api-client'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import type { AdminSiteFeatureSettingsV1, SiteFeatureKey, SiteFeatures } from '../../../lib/site-features'
-import { computeEffectiveSiteFeatures, METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
+import { computeEffectiveSiteFeatures, METERED_BILLING_AVAILABLE, normalizeSiteFeatureSettings } from '../../../lib/site-features'
 import { copy } from '../../../copy/index'
 import { AdminToast } from '../shared/AdminToast'
 import SklandIcon from '../../../components/SklandIcon'
@@ -15,9 +15,11 @@ type FeatureSettingsResponse = {
 const GROUPS: Array<{ label: string; features: SiteFeatureKey[] }> = [
   { label: copy.features.admin_groups.site, features: ['site'] },
   { label: copy.features.admin_groups.account, features: ['registration', 'login', 'profiles', 'cdk_redemption', 'free_preview', 'skland'] },
-  { label: copy.features.admin_groups.scheduling, features: ['schedule_generation', 'metered_billing'] },
-  { label: copy.features.admin_groups.tools, features: ['tools', 'depot_value'] },
-  { label: copy.features.admin_groups.community, features: ['invitations', 'inventory', 'onboarding_tasks', 'announcements'] },
+  { label: copy.features.admin_groups.pages, features: ['v2', 'faq', 'support', 'pricing', 'changelog', 'thanks', 'service_status'] },
+  { label: copy.features.admin_groups.scheduling, features: ['schedule_generation', 'scenario_comparison', 'metered_billing'] },
+  { label: copy.features.admin_groups.tools, features: ['tools', 'depot_value', 'cultivation_plan', 'manual_schedule'] },
+  { label: copy.features.admin_groups.exports, features: ['maa_export', 'full_result_export'] },
+  { label: copy.features.admin_groups.community, features: ['invitations', 'inventory', 'onboarding_tasks', 'announcements', 'notifications', 'qqbot'] },
 ]
 
 export default function FeatureSettingsSection() {
@@ -32,9 +34,9 @@ export default function FeatureSettingsSection() {
 
   const applyResponse = useCallback((data: FeatureSettingsResponse) => {
     if (!data.settings) throw new Error(copy.features.admin_load_failed)
-    const nextSettings = data.settings
+    const nextSettings = { ...normalizeSiteFeatureSettings(data.settings), revision: data.settings.revision }
     setSettings(nextSettings)
-    setEffective(data.effective_features ?? computeEffectiveSiteFeatures(nextSettings))
+    setEffective(computeEffectiveSiteFeatures(nextSettings))
     setDirty(false)
     setConflict(false)
   }, [])

@@ -104,6 +104,24 @@ describe('feature gate', () => {
     await expect(response?.json()).resolves.toMatchObject({ code: 'feature_settings_unavailable' })
     await expect(enforceFeatureGate(new Request('http://localhost/api/auth/login', { method: 'OPTIONS' }))).resolves.toBeNull()
   })
+
+  it.each([
+    ['cultivation_plan', '/api/cultivation-plan', 'POST'],
+    ['service_status', '/api/status', 'GET'],
+    ['notifications', '/api/user/notifications', 'GET'],
+    ['qqbot', '/api/user/qqbot', 'POST'],
+    ['qqbot', '/api/integrations/qqbot/binding', 'POST'],
+    ['maa_export', '/api/user/maa-export', 'POST'],
+    ['full_result_export', '/api/user/full-result-export', 'POST'],
+    ['inventory', '/api/user/inventory/lifetime-profile', 'POST'],
+  ] as const)('blocks %s at its API boundary without closing unrelated features', async (feature, path, method) => {
+    getSiteFeatureSettings.mockResolvedValue(settingsWith({ [feature]: false }))
+    const response = await enforceFeatureGate(new Request(`http://localhost${path}`, { method }))
+    expect(response?.status).toBe(503)
+    await expect(response?.json()).resolves.toMatchObject({ code: 'feature_disabled', feature })
+    await expect(enforceFeatureGate(new Request('http://localhost/api/user/results'))).resolves.toBeNull()
+    await expect(enforceFeatureGate(new Request('http://localhost/api/admin/feature-settings'))).resolves.toBeNull()
+  })
 })
 
 function settingsWith(patch: Partial<typeof DEFAULT_SITE_FEATURE_SETTINGS.features>) {

@@ -23,12 +23,13 @@ import {
   manualSourceKey, parseManualDraft, readManualDraft, saveManualDraft, type ManualDraft, type ManualPlan,
 } from '../../lib/manual-schedule'
 
-export default function ManualScheduleEditor({ source: initialSource, profileId, operators, simulationBaseline, draftStorageKey = profileId }: {
+export default function ManualScheduleEditor({ source: initialSource, profileId, operators, simulationBaseline, draftStorageKey = profileId, onDirtyChange }: {
   source: OptimizeResult;
   profileId: string;
   operators: LicenseOperator[];
   simulationBaseline?: { id?: string; config: LicenseConfig };
   draftStorageKey?: string;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const label = copy.domain.manual_schedule
   const standalone = Boolean(simulationBaseline && !simulationBaseline.id)
@@ -57,6 +58,7 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
   const [imported, setImported] = useState<ManualDraft | null>(null)
   const upload = useRef<HTMLInputElement>(null)
   const dirty = scheduleKey(source, plans) !== baseline
+  useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
   const changed = scheduleKey(source, plans) !== scheduleKey(initialSource, createManualPlans(initialSource))
   const locked = useMemo(() => lockedManualOperators(validationSource), [validationSource])
   const result = useMemo(() => simulation ?? manualResult(source, plans), [source, plans, simulation])

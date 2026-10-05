@@ -111,6 +111,7 @@ export function useOptimizeWorkflow(props: Props) {
   const [lastGeneratedSignature, setLastGeneratedSignature] = useState<string | null>(null)
   const progressRef = useRef<ScheduleProgressState | null>(null)
   const optimizeInFlightRef = useRef(false)
+  const isConfigReadOnly = useCallback(() => optimizeInFlightRef.current, [])
   const optimizeRestoreKeyRef = useRef<string | null>(null)
   const configToastTimerRef = useRef<number | null>(null)
   const configToastIdRef = useRef(0)
@@ -191,10 +192,11 @@ export function useOptimizeWorkflow(props: Props) {
       if (userCanEditConfig || isPreviewProfile) return next
   
       const limited = normalizeConfig(baseConfig)
+      limited.allow_product_rebalance = next.allow_product_rebalance
     if (limited.layout === '2-5-2') limited.facility_layout = next.facility_layout?.slice()
       limited.schedule_mode = normalizeScheduleMode(next.schedule_mode)
       limited.dormitory_rule = normalizeDormitoryRule(next.dormitory_rule)
-      if (limited.schedule_mode !== 'rotation' && userCanUseIntermediateAutoConfig && (next.auto_balance_source === 'intermediate_inventory' || next.auto_balance_source === 'limited_config')) {
+      if (limited.schedule_mode !== 'rotation' && userCanUseIntermediateAutoConfig && (next.allow_product_rebalance !== undefined || next.auto_balance_source === 'intermediate_inventory' || next.auto_balance_source === 'limited_config')) {
         limited.intermediate_inventory = next.intermediate_inventory
         limited.auto_balance_source = next.auto_balance_source
         limited.drones = next.drones
@@ -265,7 +267,7 @@ export function useOptimizeWorkflow(props: Props) {
   const resultIsCurrent = hasResult && lastGeneratedSignature === optimizeSignature
 
   const updateConfig = useCallback((mutate: (config: LicenseConfig) => void) => {
-      if (!userCanApplyConfigOverride) return
+      if (!userCanApplyConfigOverride || isConfigReadOnly()) return
       const draft = normalizeConfig(activeConfig)
       mutate(draft)
       draft.layout = resolveConfigLayout(draft)
@@ -278,9 +280,10 @@ export function useOptimizeWorkflow(props: Props) {
         showConfigValidationToast(nextValidation.message)
       }
       setInlineError(null)
-    }, [activeConfig, clearConfigValidationToast, normalizeAllowedConfigOverride, setConfigOverride, showConfigValidationToast, userCanApplyConfigOverride])
+    }, [activeConfig, clearConfigValidationToast, isConfigReadOnly, normalizeAllowedConfigOverride, setConfigOverride, showConfigValidationToast, userCanApplyConfigOverride])
 
   const handleApplyScenarioConfig = useCallback((scenarioConfig: LicenseConfig) => {
+    if (isConfigReadOnly()) return
     updateConfig((draft) => {
       for (const key of Object.keys(draft)) delete (draft as Record<string, unknown>)[key]
       Object.assign(draft, JSON.parse(JSON.stringify(scenarioConfig)) as LicenseConfig)
@@ -288,7 +291,7 @@ export function useOptimizeWorkflow(props: Props) {
     configToastIdRef.current += 1
     setConfigToast({ id: configToastIdRef.current, message: copy.optimize.pages_tool_optimize_useOptimizeWorkflow_010 })
     setSection('config')
-  }, [updateConfig])
+  }, [isConfigReadOnly, updateConfig])
 
   const refreshWorkspaceResults = useCallback(async () => {
     const data = await apiJson<AuthSuccessResponse>(
@@ -324,6 +327,7 @@ export function useOptimizeWorkflow(props: Props) {
   } = useOptimizeWorkspace({
     profileId,
     activeConfig,
+    isConfigReadOnly,
     normalizeAllowedConfigOverride,
     onWorkspacePatch,
     onWorkspaceUpdated,

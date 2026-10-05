@@ -77,9 +77,12 @@ export function useWorkspaceEntryPreference(
   activeProfile: UserGameAccount | null,
   ready: boolean,
   profilesEnabled: boolean,
+  workspacePath?: (profileId: string) => string,
+  entryPage?: boolean,
 ) {
   const location = useLocation()
   const navigate = useNavigate()
+  const onEntryPage = entryPage ?? location.pathname === dashboardPath('profiles')
   const [saved, setSaved] = useState(() => ({ userId, preference: readPreference(userId) }))
   const [observed, setObserved] = useState(() => ({ userId, observation: readObservation(userId) }))
   const [storageError, setStorageError] = useState(false)
@@ -97,43 +100,43 @@ export function useWorkspaceEntryPreference(
     && new Set(recentOpens.map((openedAt) => new Date(openedAt).toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' }))).size >= 3
   const enabled = Boolean(candidate && (preference.target === candidate.target
     || preference.target === `profile:${candidate.profile.id}`))
-  const path = candidate ? profileScopedPath(workspaceSetupPath('operators'), candidate.profile.id) : null
+  const path = candidate ? workspacePath?.(candidate.profile.id) ?? profileScopedPath(workspaceSetupPath('operators'), candidate.profile.id) : null
   const showPrompt = Boolean(ready && userId && profilesEnabled && candidate && !enabled && repeatedEntry
     && preference.remindAfter !== 'never' && preference.remindAfter <= Date.now())
 
   useEffect(() => {
     const key = `${userId}:${location.key}:${candidate?.profile.id}`
-    if (!showPrompt || location.pathname !== dashboardPath('profiles')) {
+    if (!showPrompt || !onEntryPage) {
       shownPromptRef.current = null
     } else if (shownPromptRef.current !== key && recordToolBehavior({ name: 'entry_prompt_shown', profile: candidate?.profile.id })) {
       shownPromptRef.current = key
     }
-  }, [userId, showPrompt, location.key, location.pathname, candidate?.profile.id])
+  }, [userId, showPrompt, location.key, onEntryPage, candidate?.profile.id])
 
   useEffect(() => {
     const query = new URLSearchParams(location.search)
-    if (!ready || !userId || location.pathname !== dashboardPath('profiles')
+    if (!ready || !userId || !onEntryPage
       || query.has('profile_id') || query.has('recovery')) {
       visitRef.current = null
     } else if (visitRef.current?.key !== location.key) {
       visitRef.current = { key: location.key, enteredAt: Date.now(), recorded: false }
     }
-  }, [userId, ready, location.key, location.pathname, location.search])
+  }, [userId, ready, location.key, onEntryPage, location.search])
 
   useEffect(() => {
     if (!userId) {
       entryUserRef.current = null
       return
     }
-    if (!ready || !resolveToolRoute(location.pathname) || entryUserRef.current === userId) return
+    if (!ready || (!resolveToolRoute(location.pathname) && !workspacePath) || entryUserRef.current === userId) return
     entryUserRef.current = userId
     const query = new URLSearchParams(location.search)
-    if (profilesEnabled && enabled && path && location.pathname === dashboardPath('profiles')
+    if (profilesEnabled && enabled && path && onEntryPage
       && !query.has('profile_id') && !query.has('recovery')) {
       recordToolBehavior({ name: 'entry_auto_open', profile: candidate?.profile.id })
       void navigate(path, { replace: true })
     }
-  }, [userId, ready, profilesEnabled, enabled, path, location.pathname, location.search, navigate])
+  }, [userId, ready, profilesEnabled, enabled, path, onEntryPage, workspacePath, location.pathname, location.search, navigate])
 
   function updatePreference(next: EntryPreference) {
     if (!userId) return false
@@ -213,7 +216,7 @@ export function WorkspaceEntryPrompt({ entry }: { entry: WorkspaceEntryState }) 
   )
 }
 
-export function WorkspaceEntrySettings({ entry }: { entry: WorkspaceEntryState }) {
+export function WorkspaceEntrySettings({ entry, className = 'tool-panel p-6' }: { entry: WorkspaceEntryState; className?: string }) {
   const text = copy.dashboard.workspace_entry
   const observationText = copy.dashboard.behavior_observation
   const [observationNotice, setObservationNotice] = useState<string | null>(null)
@@ -237,7 +240,7 @@ export function WorkspaceEntrySettings({ entry }: { entry: WorkspaceEntryState }
     }
   }
   return (
-    <section className="tool-panel p-6">
+    <section className={className}>
       <h2 className="text-lg font-semibold text-ink-primary">{text.settings_title}</h2>
       <label className="mt-4 flex items-start gap-3">
         <input

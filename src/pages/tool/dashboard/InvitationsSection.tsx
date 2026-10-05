@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { copy, CURRENT_LOCALE } from '../../../copy/index'
 import { apiJson } from '../../../lib/api-client'
 import { itemIconPath } from '../../../lib/inventory-contracts'
@@ -9,7 +9,7 @@ import type {
   InviterRewardStatus,
 } from '../../../lib/types'
 
-export default function InvitationsSection() {
+export default function InvitationsSection({ loadingFallback }: { loadingFallback?: ReactNode }) {
   const [summary, setSummary] = useState<InvitationSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -118,7 +118,7 @@ export default function InvitationsSection() {
     }
   }
 
-  if (loading && !summary) return <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.dashboard.pages_tool_dashboard_InvitationsSection_005}</div>
+  if (loading && !summary) return loadingFallback ?? <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.dashboard.pages_tool_dashboard_InvitationsSection_005}</div>
 
   return (
     <div className="space-y-5">

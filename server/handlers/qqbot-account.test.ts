@@ -90,6 +90,7 @@ describe('QQ bot private account boundary', () => {
     mocks.requireSiteFeatures.mockResolvedValue(Response.json({ code: 'feature_disabled' }, { status: 503 }))
     expect((await handler(request('maa-export', exportBody))).status).toBe(503)
     expect(mocks.handleUserResultsRequest).toHaveBeenCalledOnce()
+    expect(mocks.requireSiteFeatures).toHaveBeenLastCalledWith(['profiles', 'inventory', 'maa_export'])
   })
 
   it('requires valid paging and propagates persistent rate limits', async () => {

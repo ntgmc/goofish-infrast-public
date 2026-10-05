@@ -3,9 +3,11 @@ import { CONFIG_PRESETS, normalizeConfig } from '../../../src/lib/config'
 import { createManualPlans } from '../../../src/lib/manual-schedule'
 import { createBlankManualSchedule } from '../../../src/lib/manual-schedule-tool'
 import type { LicenseOperator, OptimizeResult } from '../../../src/lib/types'
+import { DEFAULT_SITE_FEATURE_SETTINGS } from '../../../src/lib/site-features'
 
 const mocks = vi.hoisted(() => ({
   profile: vi.fn(), baseline: vi.fn(), session: vi.fn(), authorization: vi.fn(),
+  features: vi.fn(),
 }))
 vi.mock('../../handlers/user-auth', () => ({ requireUserSession: mocks.session }))
 vi.mock('../../storage/user-store', async (original) => ({
@@ -15,7 +17,10 @@ vi.mock('../../storage/optimization-result-store', () => ({ getProfileOptimizati
 vi.mock('../../handlers/profile-authorization', () => ({
   resolveProfileAuthorization: mocks.authorization,
 }))
-vi.mock('../../feature-gate', () => ({ requireMeteredBillingFeature: vi.fn(async () => null) }))
+vi.mock('../../feature-gate', async (original) => ({
+  ...await original<typeof import('../../feature-gate')>(), requireMeteredBillingFeature: vi.fn(async () => null),
+}))
+vi.mock('../../storage/feature-settings-store', () => ({ getSiteFeatureSettings: mocks.features }))
 vi.mock('./job-status', () => ({
   resolveOptimizeDurationEstimate: vi.fn(async (bucket) => ({
     estimated_duration_ms: 1000, estimate_bucket: bucket, estimate_source: 'fallback_p95', estimate_sample_count: 0,
@@ -51,12 +56,31 @@ function request(overrides: Record<string, unknown> = {}): Request {
 }
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.features.mockResolvedValue(DEFAULT_SITE_FEATURE_SETTINGS)
   mocks.session.mockResolvedValue({ user: { id: 'user-1' }, tokenHash: 'session' })
   mocks.authorization.mockResolvedValue({ ok: true, permission: 'advanced', cdkRecord: null })
   mocks.profile.mockResolvedValue({ id: 'profile-1', kind: 'cdk', permission: 'advanced' })
   mocks.baseline.mockResolvedValue({ id: 'history-1', result: source, config, archived_at: null })
 })
 describe('manual schedule admission', () => {
+  it.each([
+    ['manual_schedule', { manualSchedule: { baselineHistoryId: 'history-1', plans: createManualPlans(source) } }],
+    ['scenario_comparison', { kind: 'scenario_comparison', manualSchedule: undefined, includeUpgradeSuggestions: undefined,
+      factors: { layouts: [{ layout: '243', plans: [{ trading: { lmd: 2, orundum: 0 },
+        manufacturing: { pureGold: 2, battleRecord: 2, originiumShard: 0 } }] }],
+        maaSchedules: ['8x3'], includeRotation: false, droneStrategies: ['off'] } }],
+  ])('rejects disabled %s before authorization, history reads or admission effects', async (feature, override) => {
+    mocks.features.mockResolvedValue({ ...DEFAULT_SITE_FEATURE_SETTINGS,
+      features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, [feature]: false } })
+    const result = await prepareOptimizeJob(request(override))
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('Expected feature rejection')
+    expect(result.response.status).toBe(503)
+    await expect(result.response.json()).resolves.toMatchObject({ code: 'feature_disabled', feature })
+    expect(mocks.session).not.toHaveBeenCalled()
+    expect(mocks.baseline).not.toHaveBeenCalled()
+  })
+
   it('simulates a standalone source without requiring history or changing its facility configuration', async () => {
     const standalone = createBlankManualSchedule({ ...normalizeConfig(CONFIG_PRESETS['333']), shift_hours: [12, 12, 12] })
     const result = await prepareOptimizeJob(request({

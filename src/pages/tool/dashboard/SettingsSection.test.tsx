@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import SettingsSection from './SettingsSection'
 import { disableDebugMode } from '../../../lib/debug-diagnostics'
 
+vi.mock('../../../components/QqBotSettingsPanel', () => ({ default: () => null }))
+
 afterEach(() => {
   cleanup()
   disableDebugMode()
@@ -93,6 +95,7 @@ describe('SettingsSection privacy controls', () => {
     }), { status: 202, headers: { 'Content-Type': 'application/json' } })))
     render(<SettingsSection profiles={[]} onLogout={onLogout} onPayload={vi.fn()} />)
 
+    await user.click(screen.getByText('注销账号'))
     const email = screen.getByLabelText('确认邮箱')
     expect(email).toHaveAttribute('type', 'email')
     expect(email).toHaveAttribute('maxlength', '254')
@@ -105,5 +108,26 @@ describe('SettingsSection privacy controls', () => {
     expect(onLogout).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: '返回首页' }))
     expect(onLogout).toHaveBeenCalledOnce()
+  })
+
+  it('keeps deletion feedback and entered credentials available when a request fails', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: '暂时无法提交注销申请' }), {
+      status: 503, headers: { 'Content-Type': 'application/json' },
+    })))
+    const onDeletionStateChange = vi.fn()
+    render(<SettingsSection profiles={[]} onLogout={vi.fn()} onPayload={vi.fn()} onDeletionStateChange={onDeletionStateChange} />)
+    await user.click(screen.getByText('注销账号'))
+    await user.type(screen.getByLabelText('确认邮箱'), 'user@example.test')
+    const password = screen.getByLabelText('当前密码', { selector: '#settings-delete-password' })
+    await user.type(password, 'password')
+    await user.click(screen.getByRole('button', { name: '申请注销账号' }))
+
+    const error = await screen.findByRole('alert')
+    expect(error.closest('details')).toHaveAttribute('open')
+    expect(password).toHaveValue('password')
+    expect(screen.getByRole('button', { name: '申请注销账号' })).toBeEnabled()
+    expect(onDeletionStateChange.mock.calls).toEqual([['submitting'], ['idle']])
   })
 })
