@@ -26,12 +26,20 @@ export default function ResultMetrics({
     rotationStatsNote,
     productionStats,
     productionSanity,
-    orundumEconomy: fullOrundumEconomy,
+    orundumEconomy,
     intermediateDepletion,
     maaDefaultComparison,
     detailStats,
   } = prepared
-  const orundumEconomy = summaryOnly ? undefined : fullOrundumEconomy
+  const isOrundum = Boolean(orundumEconomy) || productionStats.orundum > 0
+  const shortTermOrundum = orundumEconomy?.short_term_orundum ?? productionStats.orundum
+  const sustainablePulls = orundumEconomy ? (orundumEconomy.sustainable_orundum * 30 / 600).toFixed(1) : '—'
+  const sustainablePullsNote = orundumEconomy
+    ? copy.v2.sustainablePullsHint(formatAmount(orundumEconomy.sustainable_orundum))
+    : copy.v2.sustainableOrundumUnavailable
+  const inventoryBurstNote = orundumEconomy?.case === 'inventory_burst' && orundumEconomy.inventory_depletion_days !== null
+    ? copy.v2.inventoryBurstHint(formatAmount(orundumEconomy.inventory_depletion_days))
+    : ''
   const showProductionMetrics = !isRotationMode || hasDailyProduction
   const showMaaDefaultComparison = Boolean(maaDefaultComparison) && !isRotationMode
   const orundumEconomyNote = orundumEconomy
@@ -76,17 +84,23 @@ export default function ResultMetrics({
               label={copy.domain.components_result_panel_ResultMetrics_024}
               value={formatAmount(productionStats.lmd)}
               suffix={copy.domain.components_result_panel_ResultMetrics_025}
-              note={`${copy.domain.components_result_panel_ResultMetrics_026}${formatSigned(productionStats.goldNet)}${productionStats.orundum > 0 ? `${copy.domain.components_result_panel_ResultMetrics_027}${formatAmount(productionStats.orundum)}` : ''}`}
+              note={`${copy.domain.components_result_panel_ResultMetrics_026}${formatSigned(productionStats.goldNet)}${isOrundum ? `${copy.domain.components_result_panel_ResultMetrics_027}${formatAmount(shortTermOrundum)}` : ''}${inventoryBurstNote ? ` · ${inventoryBurstNote}` : ''}`}
             />
             <MetricCard
-              label={orundumEconomy ? copy.domain.components_result_panel_ResultMetrics_030 : copy.domain.components_result_panel_ResultMetrics_031}
-              value={formatAmount(orundumEconomy?.short_term_orundum ?? productionSanity.value)}
-              suffix={orundumEconomy ? copy.domain.components_result_panel_ResultMetrics_032 : copy.domain.components_result_panel_ResultMetrics_033}
-              note={summaryOnly ? undefined : orundumEconomy ? orundumEconomyNote : productionSanityNote}
+              label={isOrundum ? copy.domain.components_result_panel_ResultMetrics_030 : copy.domain.components_result_panel_ResultMetrics_031}
+              value={isOrundum ? sustainablePulls : formatAmount(productionSanity.value)}
+              suffix={isOrundum ? copy.domain.components_result_panel_ResultMetrics_032 : copy.domain.components_result_panel_ResultMetrics_033}
+              note={isOrundum ? sustainablePullsNote : summaryOnly ? undefined : productionSanityNote}
             />
           </>
         )}
       </StaggeredReveal>
+      {!summaryOnly && orundumEconomy && (
+        <details className="border-t border-surface-3/60 px-5 py-3 text-xs leading-5 text-ink-secondary sm:px-6">
+          <summary className="cursor-pointer font-medium text-ink-primary">{copy.v2.orundumInputs}</summary>
+          <p className="mt-2">{orundumEconomyNote}</p>
+        </details>
+      )}
       {!summaryOnly && intermediateDepletionSummary && (
         <div className="border-t border-surface-3/60 px-5 py-3 text-xs leading-5 text-ink-secondary sm:px-6">
           <span className="font-medium text-ink-primary">{copy.domain.components_result_panel_ResultMetrics_034}</span>{intermediateDepletionSummary}

@@ -257,15 +257,15 @@ export const domainCopy = {
   // src/components/result-panel/ResultDetail.tsx
   components_result_panel_ResultDetail_018: "多产物",
   // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_001: "长期 ",
+  components_result_panel_ResultMetrics_001: "可持续产量 ",
   // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_002: "/日 · 固源岩预算 ",
+  components_result_panel_ResultMetrics_002: " 合成玉/天 · 固源岩供应 ",
   // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_003: "/日 · 龙门币硬成本 ",
+  components_result_panel_ResultMetrics_003: " 个/天 · 龙门币消耗 ",
   // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_004: "/日",
+  components_result_panel_ResultMetrics_004: "/天",
   // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_005: " · 库存约 ",
+  components_result_panel_ResultMetrics_005: " · 库存预计耗尽 ",
   // src/components/result-panel/ResultMetrics.tsx
   components_result_panel_ResultMetrics_006: " 天",
   // src/components/result-panel/ResultMetrics.tsx
@@ -297,13 +297,13 @@ export const domainCopy = {
   // src/components/result-panel/ResultMetrics.tsx
   components_result_panel_ResultMetrics_026: "赤金净变动 ",
   // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_027: "，合成玉 ",
+  components_result_panel_ResultMetrics_027: "，预计合成玉 ",
   // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_030: "搓玉经济",
+  components_result_panel_ResultMetrics_030: "可持续抽数",
   // src/components/result-panel/ResultMetrics.tsx
   components_result_panel_ResultMetrics_031: "等效理智",
   // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_032: "合成玉/日",
+  components_result_panel_ResultMetrics_032: "抽 / 30 天",
   // src/components/result-panel/ResultMetrics.tsx
   components_result_panel_ResultMetrics_033: "理智",
   // src/components/result-panel/ResultMetrics.tsx

@@ -94,7 +94,17 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
   const resultMode = normalizeScheduleMode(result.schedule_mode)
   const configMode = normalizeScheduleMode(config.schedule_mode)
   const battleRecords = prepared.productionStats.manufacturing['Battle Record'] ?? 0
-  const showOrundum = (config.product_requirements.trading_stations.Orundum ?? 0) > 0 && battleRecords === 0
+  const orundumEconomy = prepared.orundumEconomy
+  const isOrundum = Boolean(orundumEconomy) || prepared.productionStats.orundum > 0
+  const showOrundum = isOrundum && battleRecords === 0
+  const shortTermOrundum = orundumEconomy?.short_term_orundum ?? prepared.productionStats.orundum
+  const sustainablePulls = orundumEconomy ? (orundumEconomy.sustainable_orundum * 30 / 600).toFixed(1) : '—'
+  const sustainablePullsNote = orundumEconomy
+    ? text.sustainablePullsHint(formatAmount(orundumEconomy.sustainable_orundum))
+    : text.sustainableOrundumUnavailable
+  const inventoryBurstNote = orundumEconomy?.case === 'inventory_burst' && orundumEconomy.inventory_depletion_days !== null
+    ? text.inventoryBurstHint(formatAmount(orundumEconomy.inventory_depletion_days))
+    : ''
   const hours = parseShiftHours(config.shift_hours) ?? [8, 8, 8]
   const name = session.activeProfile?.display_name ?? text.guest
   const openPanel = useCallback((next: OptionPanel) => { setPanel(next); setMobileNavigation(false) }, [])
@@ -230,14 +240,15 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
           <InventoryDepletionWarning result={result} />
           <StaggeredReveal className="v2-metrics">
             <Metric label={text.lmd} value={formatAmount(prepared.productionStats.lmd)} unit={text.daily} product="LMD" />
-            <Metric label={showOrundum ? text.orundum : text.exp} value={formatAmount(showOrundum ? prepared.productionStats.orundum : battleRecords * 1000)}
-              unit={showOrundum ? text.daily : text.expUnit} product={showOrundum ? 'Orundum' : 'Battle Record'} />
+            <Metric label={showOrundum ? text.orundum : text.exp} value={formatAmount(showOrundum ? shortTermOrundum : battleRecords * 1000)}
+              unit={showOrundum ? text.daily : text.expUnit} product={showOrundum ? 'Orundum' : 'Battle Record'}
+              hint={showOrundum && orundumEconomy ? [text.shortTermOrundumHint, inventoryBurstNote].filter(Boolean).join(' · ') : undefined} />
             <Metric label={text.totalEfficiency} value={formatAmount(prepared.totalEff)} unit="%" hint={text.efficiencyHint} icon={<Activity size={20} />} />
             <Metric
-              label={prepared.orundumEconomy ? text.opportunityCost : text.sanity}
-              value={(prepared.orundumEconomy?.opportunity_cost_sanity ?? prepared.productionSanity.value).toFixed(1)}
-              unit={prepared.orundumEconomy ? text.opportunityCostUnit : text.daily}
-              hint={prepared.orundumEconomy ? text.opportunityCostHint : text.sanityHint}
+              label={isOrundum ? text.sustainablePulls : text.sanity}
+              value={isOrundum ? sustainablePulls : prepared.productionSanity.value.toFixed(1)}
+              unit={isOrundum ? text.pullsPer30Days : text.daily}
+              hint={isOrundum ? sustainablePullsNote : text.sanityHint}
               icon={<Gem size={20} />}
             />
           </StaggeredReveal>
@@ -268,7 +279,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
                 <OutputRow product="Battle Record" value={prepared.productionStats.manufacturing['Battle Record'] ?? 0} />
                 <OutputRow product="Pure Gold" value={prepared.productionStats.manufacturing['Pure Gold'] ?? 0} />
                 {Object.keys(PRODUCT_LABELS).filter((product) => !['LMD', 'Battle Record', 'Pure Gold'].includes(product)).map((product) => {
-                  const value = (prepared.productionStats.manufacturing[product] ?? 0) + (result.daily_production?.trading?.[product] ?? 0)
+                  const value = (prepared.productionStats.manufacturing[product] ?? 0) + (product === 'Orundum' ? shortTermOrundum : result.daily_production?.trading?.[product] ?? 0)
                   return value !== 0 ? <OutputRow key={product} product={product} value={value} /> : null
                 })}
               </section>
