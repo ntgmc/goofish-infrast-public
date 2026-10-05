@@ -6,7 +6,8 @@ import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
 import CompactHeaderMenu from '../../components/CompactHeaderMenu'
 import GuidedTour, { hasCompletedTour, useFirstRunTour, type TourDefinition } from '../../components/GuidedTour'
-import { AnimatedPresenceRegion, MotionNavIndicator, MotionSkeleton } from '../../components/MotionPrimitives'
+import { MotionNavIndicator, PageTransition } from '../../components/MotionPrimitives'
+import { SectionLoader } from '../../components/SessionLoader'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import { profileScopedPath, type DashboardSection } from '../../lib/app-routes'
 import type { Announcement, AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
@@ -160,7 +161,7 @@ export default function AccountDashboard({
         </div>
       </aside>
 
-      <main className="lg:pl-64" tabIndex={-1} data-route-focus>
+      <main className="tool-workspace lg:pl-64" tabIndex={-1} data-route-focus>
         <header className="tool-header sticky top-0 z-20 px-4 py-1.5 lg:px-8 lg:py-4">
           <div className="mx-auto flex h-11 max-w-7xl items-center justify-between gap-2 lg:hidden">
             <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -233,26 +234,26 @@ export default function AccountDashboard({
           </div>
         </header>
 
-        <div className="mx-auto max-w-7xl space-y-4 px-5 py-6 sm:px-8">
+        <div className="tool-page-content mx-auto max-w-7xl space-y-4 px-5 py-6 sm:px-8">
           <AnnouncementBanner announcement={announcement} />
           {workspaceLoadError && (
             <div className="tool-alert tool-alert--error" role="alert">
               {workspaceLoadError}
             </div>
           )}
-          <Suspense fallback={<SectionFallback />}>
-            <AnimatedPresenceRegion motionKey={section}>
-              {section === 'profiles' && <ProfilesSection profiles={profiles} openingProfileId={openingProfileId} onOpen={onOpenProfile} onEdit={onPayload} meteredEnabled={features.metered_billing} />}
-              {section === 'commercial' && METERED_BILLING_AVAILABLE && features.metered_billing && <CommercialProfilesSection onOpen={onOpenProfile} />}
-              {section === 'tools' && <ToolsSection />}
-              {section === 'redeem' && <RedeemSection autoStartTour={!suppressInitialRedeemTour} tourReplayToken={redeemTourReplayToken} onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} onInventoryRedeemed={() => onSectionChange('inventory', { replace: true })} />}
-              {section === 'invitations' && <InvitationsSection />}
-              {section === 'inventory' && <InventorySection onPayload={onPayload} onLifetimeProfileCreated={() => onSectionChange('profiles', { replace: true })} onViewProfiles={() => onSectionChange('profiles')} />}
-              {section === 'balance' && METERED_BILLING_AVAILABLE && features.metered_billing && <BalanceSection redemptionEnabled={features.cdk_redemption} />}
-              {section === 'announcements' && <AnnouncementsSection onUnreadCountChange={onAnnouncementUnreadCountChange} />}
-              {section === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} onPayload={onPayload} workspaceEntry={workspaceEntry} />}
-            </AnimatedPresenceRegion>
-          </Suspense>
+          <PageTransition motionKey={section} className="tool-page-transition">{(displayedSection) => <div key={displayedSection} className="tool-section-content">
+            <Suspense fallback={<SectionLoader label={copy.common.pages_tool_AccountDashboard_015} />}>
+              {displayedSection === 'profiles' && <ProfilesSection profiles={profiles} openingProfileId={openingProfileId} onOpen={onOpenProfile} onEdit={onPayload} meteredEnabled={features.metered_billing} />}
+              {displayedSection === 'commercial' && METERED_BILLING_AVAILABLE && features.metered_billing && <CommercialProfilesSection onOpen={onOpenProfile} />}
+              {displayedSection === 'tools' && <ToolsSection />}
+              {displayedSection === 'redeem' && <RedeemSection autoStartTour={!suppressInitialRedeemTour} tourReplayToken={redeemTourReplayToken} onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} onInventoryRedeemed={() => onSectionChange('inventory', { replace: true })} />}
+              {displayedSection === 'invitations' && <InvitationsSection loadingFallback={<SectionLoader label={copy.dashboard.pages_tool_dashboard_InvitationsSection_005} />} />}
+              {displayedSection === 'inventory' && <InventorySection loadingFallback={<SectionLoader label={copy.inventory.loading} />} onPayload={onPayload} onLifetimeProfileCreated={() => onSectionChange('profiles', { replace: true })} onViewProfiles={() => onSectionChange('profiles')} />}
+              {displayedSection === 'balance' && METERED_BILLING_AVAILABLE && features.metered_billing && <BalanceSection redemptionEnabled={features.cdk_redemption} />}
+              {displayedSection === 'announcements' && <AnnouncementsSection loadingFallback={<SectionLoader label={copy.dashboard.pages_tool_dashboard_AnnouncementsSection_006} />} onUnreadCountChange={onAnnouncementUnreadCountChange} />}
+              {displayedSection === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} onPayload={onPayload} workspaceEntry={workspaceEntry} />}
+            </Suspense>
+          </div>}</PageTransition>
         </div>
       </main>
       <GuidedTour
@@ -271,8 +272,4 @@ function AnnouncementUnreadBadge({ value, label }: { value: string; label: strin
       {value}
     </span>
   )
-}
-
-function SectionFallback() {
-  return <MotionSkeleton label={copy.common.pages_tool_AccountDashboard_015} rows={4} />
 }

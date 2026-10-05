@@ -5,7 +5,7 @@ import { ArrowUpRight } from 'lucide-react'
 import BrandLogo from '../../../components/BrandLogo'
 import CompactHeaderMenu from '../../../components/CompactHeaderMenu'
 import DeferredFeatureMenu from '../../../components/DeferredFeatureMenu'
-import { AnimatedPresenceRegion, MotionNavIndicator } from '../../../components/MotionPrimitives'
+import { MotionNavIndicator, PageTransition } from '../../../components/MotionPrimitives'
 import ThemeSwitcher from '../../../components/ThemeSwitcher'
 import ToolBreadcrumbs from '../../../components/ToolBreadcrumbs'
 import { OPTIMIZE_SECTIONS, type OptimizeSection } from './types'
@@ -42,7 +42,7 @@ export default function OptimizeShell({
   onOpenTour: () => void
   onReset: () => void
   onLogout: () => void
-  children: ReactNode
+  children: ReactNode | ((section: OptimizeSection) => ReactNode)
 }) {
   const { features } = useSiteFeatures()
   const sections = OPTIMIZE_SECTIONS.filter((item) => item.id !== 'lab' || showScenarioLab)
@@ -92,7 +92,7 @@ export default function OptimizeShell({
         </div>
       </aside>
 
-      <main className="lg:pl-64" tabIndex={-1} data-route-focus>
+      <main className="tool-workspace lg:pl-64" tabIndex={-1} data-route-focus>
         <header className="tool-header sticky top-0 z-20 px-4 py-1.5 lg:px-8 lg:py-4">
           <div className="mx-auto flex h-11 max-w-7xl items-center justify-between gap-2 lg:hidden">
             <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -160,8 +160,10 @@ export default function OptimizeShell({
             </div>
           </div>
         </header>
-        <div className="mx-auto max-w-7xl px-5 py-6 sm:px-8">
-          <AnimatedPresenceRegion motionKey={section}>{children}</AnimatedPresenceRegion>
+        <div className="tool-page-content mx-auto max-w-7xl px-5 py-6 sm:px-8">
+          <PageTransition motionKey={section} className="tool-page-transition">{(displayedSection) => <div className="tool-section-content">
+            {typeof children === 'function' ? children(displayedSection) : children}
+          </div>}</PageTransition>
         </div>
       </main>
     </div>

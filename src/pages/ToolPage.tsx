@@ -1,7 +1,8 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router'
 import AnnouncementPopup from '../components/AnnouncementPopup'
-import SessionLoader from '../components/SessionLoader'
+import SessionLoader, { SectionLoader } from '../components/SessionLoader'
+import OptimizeShell from './tool/optimize/OptimizeShell'
 import {
   dashboardPath,
   fallbackToolPath,
@@ -19,7 +20,7 @@ import ProfileUpgradePrompt from './tool/ProfileUpgradePrompt'
 import ProfileExpiryPrompt from './tool/ProfileExpiryPrompt'
 import { useWorkspaceEntryPreference, WorkspaceEntryPrompt } from './tool/WorkspaceEntryPreference'
 import WorkspaceSetupPage from './tool/WorkspaceSetupPage'
-import { isSchedulableProfile } from './tool/tool-utils'
+import { getProfileAccessLabel, isSchedulableProfile } from './tool/tool-utils'
 import { useToolSession } from './tool/useToolSession'
 import { useToolVisitReporter } from './tool/useToolVisitReporter'
 import { useToolBehaviorObservation } from './tool/useToolBehaviorObservation'
@@ -244,7 +245,10 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
     <>
       <NotificationCenterProvider userId={user.id}>
         {features.announcements && <AnnouncementPopup announcements={popups} userId={user.id} onUnreadCountChange={setAnnouncementUnreadCount} />}
-        <Suspense fallback={<SessionLoader label={copy.common.pages_ToolPage_002} />}>
+        <Suspense fallback={<OptimizeShell section={route.section} profileId={activeProfile.id} profileLabel={activeProfile.display_name}
+          permissionLabel={getProfileAccessLabel(activeProfile)} showScenarioLab={route.section === 'lab' && features.scenario_comparison}
+          onSectionChange={navigateOptimize} onOpenTour={() => undefined} onReset={() => { void navigateAfterConfigSave(profileScopedPath(workspaceSetupPath('operators'), activeProfile.id)) }}
+          onLogout={handleLogout}><SectionLoader label={copy.common.pages_ToolPage_002} /></OptimizeShell>}>
           <OptimizePage
             profileId={activeProfile.id}
             profile={activeProfile}

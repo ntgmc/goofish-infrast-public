@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRouter, RouterProvider } from 'react-router'
@@ -11,6 +11,7 @@ import { tourStorageKey } from '../components/GuidedTour'
 import { useSiteFeatures } from '../lib/site-feature-context'
 import { DEFAULT_SITE_FEATURES } from '../lib/site-features'
 import ToolPage from './ToolPage'
+import { copy } from '../copy'
 
 vi.mock('../lib/site-feature-context', () => ({ useSiteFeatures: vi.fn() }))
 
@@ -179,22 +180,55 @@ describe('ToolPage route guards', () => {
     expect(refreshProfileWorkspace).toHaveBeenCalledWith(secondProfile)
   })
 
-  it('keeps the current dashboard section visible until the next section code is ready', async () => {
+  it('preserves the navigation and background while the next section code loads', async () => {
     const user = userEvent.setup()
     const router = renderToolRoute('/tool/profiles')
+    await screen.findByRole('heading', { name: '还没有添加游戏账号' })
+    const shell = document.querySelector('.tool-shell')
+    const navigation = screen.getByRole('navigation', { name: copy.common.pages_tool_AccountDashboard_008 })
 
     await user.click(screen.getAllByRole('button', { name: '工具' })[0])
 
     expect(router.state.location.pathname).toBe('/tool/tools')
-    expect(screen.getByRole('heading', { name: '还没有添加游戏账号' })).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: '游戏账号' })[0]).toHaveAttribute('aria-current', 'page')
-    expect(screen.getAllByRole('button', { name: '工具' })[0]).not.toHaveAttribute('aria-current')
-    expect(screen.queryByText('正在载入...')).not.toBeInTheDocument()
+    const loading = await screen.findByRole('status', { name: copy.common.pages_tool_AccountDashboard_015 })
+    expect(loading).toHaveClass('tool-section-loader')
+    expect(loading.querySelector('.page-loading-spinner')).toBeInTheDocument()
+    expect(document.querySelector('.tool-shell')).toBe(shell)
+    expect(screen.getByRole('navigation', { name: copy.common.pages_tool_AccountDashboard_008 })).toBe(navigation)
+    expect(screen.getAllByRole('button', { name: '工具' })[0]).toHaveAttribute('aria-current', 'page')
 
     toolsSectionImport.resolve()
     expect(await screen.findByText('工具内容')).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: '工具' })[0]).toHaveAttribute('aria-current', 'page')
+    expect(screen.queryByRole('status', { name: copy.common.pages_tool_AccountDashboard_015 })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '还没有添加游戏账号' })).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['inventory', '/api/user/inventory', copy.inventory.nav, copy.inventory.loading],
+    ['invitations', '/api/user/invitations', copy.common.pages_tool_AccountDashboard_004, copy.dashboard.pages_tool_dashboard_InvitationsSection_005],
+    ['announcements', '/api/user/announcements', copy.common.pages_tool_AccountDashboard_005, copy.dashboard.pages_tool_dashboard_AnnouncementsSection_006],
+  ])('keeps the main loading region until %s data succeeds or fails', async (section, endpoint, navLabel, loadingLabel) => {
+    let rejectLoad!: (error: Error) => void
+    const pending = new Promise<never>((_, reject) => { rejectLoad = reject })
+    apiJson.mockImplementation(async (url: string) => url === endpoint ? pending : { tasks: [], notifications: [], unread_count: 0 })
+    const user = userEvent.setup()
+    const router = renderToolRoute('/tool/profiles')
+    await screen.findByRole('heading', { name: '还没有添加游戏账号' })
+    const main = screen.getByRole('main')
+    const header = document.querySelector('.tool-header')
+
+    await user.click(screen.getAllByRole('button', { name: navLabel })[0])
+    const loading = await screen.findByRole('status', { name: loadingLabel })
+    expect(loading).toHaveAttribute('aria-busy', 'true')
+    expect(loading).toHaveClass('tool-section-loader')
+    expect(loading.closest('main')).toBe(main)
+    expect(document.querySelector('.tool-header')).toBe(header)
+    expect(router.state.location.pathname).toBe(`/tool/${section}`)
+
+    await act(async () => { rejectLoad(new Error('Load failed')) })
+    expect(await screen.findByRole('alert')).toHaveTextContent('Load failed')
+    expect(screen.queryByRole('status', { name: loadingLabel })).not.toBeInTheDocument()
+    expect(document.querySelector('.tool-header')).toBe(header)
   })
 
   it('keeps a requested deep link while the user is signed out', async () => {

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useAppReducedMotion } from '../lib/motion-preference'
 import {
   AnimatePresence,
@@ -24,6 +24,29 @@ export const motionTokens = {
     damping: 34,
     mass: 0.75,
   } satisfies Transition,
+}
+
+export function PageTransition<T extends string>({ motionKey, children, className }: {
+  motionKey: T
+  children: (displayedKey: T) => ReactNode
+  className?: string
+}) {
+  const reduceMotion = useAppReducedMotion()
+  const [displayedKey, setDisplayedKey] = useState(motionKey)
+  const exiting = !reduceMotion && displayedKey !== motionKey
+
+  useEffect(() => {
+    if (reduceMotion) setDisplayedKey(motionKey)
+  }, [motionKey, reduceMotion])
+
+  return <motion.div className={className} initial={false}
+    animate={{ opacity: exiting ? 0 : 1, y: exiting ? 6 : 0 }}
+    transition={{ duration: reduceMotion ? 0 : exiting ? motionTokens.duration.exit : motionTokens.duration.enter,
+      ease: exiting ? motionTokens.ease.exit : motionTokens.ease.enter }}
+    inert={exiting || undefined} aria-hidden={exiting || undefined}
+    onAnimationComplete={() => { if (exiting) setDisplayedKey(motionKey) }}>
+    {children(reduceMotion ? motionKey : displayedKey)}
+  </motion.div>
 }
 
 type AnimatedPresenceRegionProps = {
@@ -118,20 +141,6 @@ export function AnimatedValue({ value, className, accessibleLabel }: { value: st
         </motion.span>
       </AnimatePresence>}
     </span>
-  )
-}
-
-export function MotionSkeleton({ label, rows = 3, className }: { label: string; rows?: number; className?: string }) {
-  return (
-    <div className={`motion-skeleton tool-panel p-5 sm:p-6 ${className ?? ''}`} role="status" aria-label={label}>
-      <span className="sr-only">{label}</span>
-      <div className="motion-skeleton-line h-4 w-32" aria-hidden="true" />
-      <div className="mt-5 grid gap-3 sm:grid-cols-2" aria-hidden="true">
-        {Array.from({ length: Math.max(1, Math.min(rows, 8)) }, (_, index) => (
-          <div key={index} className="motion-skeleton-block h-24" />
-        ))}
-      </div>
-    </div>
   )
 }
 

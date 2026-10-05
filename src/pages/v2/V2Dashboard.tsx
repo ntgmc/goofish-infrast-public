@@ -201,7 +201,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
         <main className="v2-main motion-region-enter" tabIndex={-1} data-route-focus>
           {navigationError && <p className="v2-feedback v2-feedback-error" role="alert">{navigationError}<button type="button" onClick={() => { session.retryConfigSave(); setNavigationError(null) }}>{text.loginRetry}</button></p>}
           <AnnouncementBanner announcement={session.banner} />
-          <V2PageTransition motionKey={section}>{(displayedSection) => <>
+          <V2PageTransition motionKey={section} className="v2-page-transition">{(displayedSection) => <>
           <WorkspaceSections section={displayedSection} session={guardedSession} workflow={workflow} workspaceEntry={workspaceEntry} onAccountAdded={accountAdded} onToolDirtyChange={setToolDirty} onOpenProfile={(profile) => openProfile(profile, section === 'manual-tool' ? 'manual-tool' : 'overview')} onNavigate={navigateSection} onConfig={() => openPanel('config')} generationDisabledReason={generationDisabledReason} />
           <div hidden={displayedSection !== 'overview'}>
           <div className="v2-page-title"><h1>{text.title}</h1></div>

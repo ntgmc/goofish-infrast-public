@@ -15,7 +15,7 @@ import { useOptimizeWorkflow, type Props } from './useOptimizeWorkflow'
 import { copy } from '../../../copy/index'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import type { WorkspaceResultHistorySummary } from '../../../lib/types'
-import SessionLoader from '../../../components/SessionLoader'
+import { SectionLoader } from '../../../components/SessionLoader'
 import { restoreScenarioComparisonJob } from './scenario-lab/useScenarioComparison'
 import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
 
@@ -104,9 +104,7 @@ export default function OptimizeWorkflowPage(props: Props) {
     if (section === 'lab' && inventoryLoaded && !userCanUseScenarioLab && !isRestrictedPreview) setSection('overview')
   }, [inventoryLoaded, section, setSection, userCanUseScenarioLab, isRestrictedPreview])
 
-  if (section === 'lab' && !isRestrictedPreview && !userHasScenarioLabCapability && !inventoryLoaded) {
-    return <SessionLoader label={copy.inventory.loading} />
-  }
+  const awaitingLabInventory = !isRestrictedPreview && !userHasScenarioLabCapability && !inventoryLoaded
 
   return (
       <OptimizeShell
@@ -114,7 +112,7 @@ export default function OptimizeWorkflowPage(props: Props) {
         profileId={profile.id}
         profileLabel={profile.display_name}
         permissionLabel={getProfileAccessLabel(profile)}
-        showScenarioLab={(userCanUseScenarioLab || isRestrictedPreview) && features.scenario_comparison}
+        showScenarioLab={(userCanUseScenarioLab || isRestrictedPreview || (section === 'lab' && !inventoryLoaded)) && features.scenario_comparison}
         badges={{ result: hasResult ? copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_001 : undefined }}
         headerActions={(
           <OptimizationTaskCenterButton
@@ -143,7 +141,7 @@ export default function OptimizeWorkflowPage(props: Props) {
         onOpenTour={openCurrentTour}
         onReset={onReset}
         onLogout={props.onLogout}
-      >
+      >{(displayedSection) => displayedSection === 'lab' && awaitingLabInventory ? <SectionLoader label={copy.inventory.loading} /> : <>
         {configToast && <ConfigValidationToast key={configToast.id} message={configToast.message} />}
         <div className="space-y-4">
           {(licenseSyncing || licenseSyncStatus || announcement || redeemedNotice) && (
@@ -208,7 +206,7 @@ export default function OptimizeWorkflowPage(props: Props) {
             retryEnabled={features.schedule_generation}
           />
   
-          {section === 'overview' && (
+          {displayedSection === 'overview' && (
             <><MeteredBillingNotice
               profile={profile}
               quote={billingQuote}
@@ -276,7 +274,7 @@ export default function OptimizeWorkflowPage(props: Props) {
             /></>
           )}
   
-          {section === 'plans' && (
+          {displayedSection === 'plans' && (
             <PlansSection
               activeConfig={activeConfig}
               savedConfigs={savedConfigs}
@@ -312,7 +310,7 @@ export default function OptimizeWorkflowPage(props: Props) {
             />
           )}
   
-          {section === 'config' && (
+          {displayedSection === 'config' && (
             <div className="space-y-4">
               <ConfigSection
                 profileId={profile.id}
@@ -334,7 +332,7 @@ export default function OptimizeWorkflowPage(props: Props) {
             </div>
           )}
   
-          {section === 'result' && (
+          {displayedSection === 'result' && (
             <ResultSection
               phase={phase}
               historyItem={historyItem}
@@ -361,8 +359,8 @@ export default function OptimizeWorkflowPage(props: Props) {
             />
           )}
 
-          {section === 'lab' && isRestrictedPreview && !userCanUseScenarioLab && features.scenario_comparison && <LockedScenarioPreview />}
-          {section === 'lab' && userCanUseScenarioLab && features.scenario_comparison && (
+          {displayedSection === 'lab' && isRestrictedPreview && !userCanUseScenarioLab && features.scenario_comparison && <LockedScenarioPreview />}
+          {displayedSection === 'lab' && userCanUseScenarioLab && features.scenario_comparison && (
             <ScenarioLabSection
               profileId={props.profileId}
               operators={mergedOperators}
@@ -387,7 +385,7 @@ export default function OptimizeWorkflowPage(props: Props) {
         <GuidedTour definition={resultTourDefinition} open={resultTour.open} onFinish={resultTour.finish} onSkip={resultTour.skip} />
         {userCanUseScenarioLab && features.scenario_comparison && <GuidedTour definition={labTourDefinition} open={labTour.open} onFinish={labTour.finish} onSkip={labTour.skip} />}
         {declarationDialog}
-      </OptimizeShell>
+      </>}</OptimizeShell>
     )
 }
 

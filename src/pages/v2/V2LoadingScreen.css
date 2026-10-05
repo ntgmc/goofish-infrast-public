@@ -32,43 +32,14 @@
   text-align: center;
 }
 
-.v2-section-loading-region .v2-loading-spinner {
-  width: 64px;
-  height: 64px;
-}
-
-/* Adapted from https://uiverse.io/barisdogansutcu/light-rat-32 (MIT). */
-.v2-loading-spinner {
+.v2-loading-screen .page-loading-spinner {
   width: 48px;
   height: 48px;
-  flex: none;
-  transform-origin: center;
 }
 
-.v2-loading-spinner circle {
-  fill: none;
+.v2-loading-screen .page-loading-spinner circle,
+.v2-section-loading-region .page-loading-spinner circle {
   stroke: var(--color-v2-accent);
-  stroke-width: 2;
-  stroke-dasharray: 90, 200;
-  stroke-linecap: round;
-}
-
-.v2-loading-spinner:not([data-reduced-motion]) {
-  animation: v2-loader-rotate 2s linear infinite;
-}
-
-.v2-loading-spinner:not([data-reduced-motion]) circle {
-  animation: v2-loader-dash 1.5s ease-in-out infinite;
-}
-
-@keyframes v2-loader-rotate {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes v2-loader-dash {
-  0% { stroke-dasharray: 1, 200; stroke-dashoffset: 0; }
-  50% { stroke-dasharray: 90, 200; stroke-dashoffset: -35px; }
-  100% { stroke-dasharray: 90, 200; stroke-dashoffset: -125px; }
 }
 
 .v2-loading-retry {
@@ -88,9 +59,4 @@
 
 .v2-loading-screen > .v2-progress {
   width: min(100%, 40rem);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .v2-loading-spinner,
-  .v2-loading-spinner circle { animation: none !important; }
 }

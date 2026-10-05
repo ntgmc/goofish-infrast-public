@@ -952,22 +952,76 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--color-focus); ou
   grid-area: 1 / 1;
 }
 
-.motion-skeleton-line,
-.motion-skeleton-block {
-  position: relative;
-  overflow: hidden;
-  border-radius: 0.5rem;
-  background: var(--theme-surface-2);
+.tool-workspace {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 100dvh;
 }
 
-.motion-skeleton-line::after,
-.motion-skeleton-block::after {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(100deg, transparent 20%, color-mix(in oklab, var(--theme-surface-4) 55%, transparent) 50%, transparent 80%);
-  content: "";
-  transform: translateX(-100%);
-  animation: motion-skeleton-shimmer 1.6s var(--motion-ease-enter) infinite;
+.tool-page-content,
+.tool-page-transition,
+.tool-section-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+
+.tool-section-loader {
+  display: flex;
+  flex: 1;
+  min-height: 20rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.tool-section-content > :not(.tool-section-loader) {
+  animation: motion-content-enter var(--dur-base) var(--ease-out) both;
+}
+
+@keyframes motion-content-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Adapted from https://uiverse.io/barisdogansutcu/light-rat-32 (MIT). */
+.page-loading-spinner {
+  width: 64px;
+  height: 64px;
+  flex: none;
+  transform-origin: center;
+}
+
+.page-loading-spinner circle {
+  fill: none;
+  stroke: var(--color-brand-primary);
+  stroke-width: 2;
+  stroke-dasharray: 90, 200;
+  stroke-linecap: round;
+}
+
+.page-loading-spinner:not([data-reduced-motion]) {
+  animation: page-loader-rotate 2s linear infinite;
+}
+
+.page-loading-spinner:not([data-reduced-motion]) circle {
+  animation: page-loader-dash 1.5s ease-in-out infinite;
+}
+
+@keyframes page-loader-rotate {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes page-loader-dash {
+  0% { stroke-dasharray: 1, 200; stroke-dashoffset: 0; }
+  50% { stroke-dasharray: 90, 200; stroke-dashoffset: -35px; }
+  100% { stroke-dasharray: 90, 200; stroke-dashoffset: -125px; }
 }
 
 .motion-region-enter {
@@ -990,10 +1044,6 @@ dialog[open]::backdrop {
 dialog[open] > * {
   animation: motion-dialog-enter var(--motion-enter) var(--motion-ease-enter) both;
   transform-origin: center top;
-}
-
-@keyframes motion-skeleton-shimmer {
-  to { transform: translateX(100%); }
 }
 
 @keyframes motion-feedback-enter {
@@ -1056,9 +1106,9 @@ dialog[open] > * {
     animation-iteration-count: 1 !important;
   }
 
-  .motion-skeleton-line::after,
-  .motion-skeleton-block::after {
-    display: none;
+  .page-loading-spinner,
+  .page-loading-spinner circle {
+    animation: none !important;
   }
 }
 
@@ -1068,11 +1118,6 @@ html:root[data-reduced-motion] *::after {
   animation: none !important;
   transition: none !important;
   scroll-behavior: auto !important;
-}
-
-html[data-reduced-motion] .motion-skeleton-line::after,
-html[data-reduced-motion] .motion-skeleton-block::after {
-  display: none;
 }
 
 @theme inline {

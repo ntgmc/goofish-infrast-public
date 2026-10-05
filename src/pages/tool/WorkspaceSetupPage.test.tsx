@@ -420,7 +420,7 @@ async function openCdkTab(user: ReturnType<typeof userEvent.setup>) {
   const cdkTab = within(workspaceNavigation).getByRole('button', { name: '档案与 CDK' })
   await user.click(cdkTab)
   expect(cdkTab).toHaveAttribute('aria-current', 'page')
-  expect(screen.getByRole('heading', { name: '档案与 CDK' })).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: '档案与 CDK' })).toBeInTheDocument()
 }
 
 function publicContentValue(xianyuUrl: string, isFallback = false): ReturnType<typeof publicContentContext.usePublicContent> {
