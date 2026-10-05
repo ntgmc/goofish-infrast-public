@@ -1336,7 +1336,7 @@
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-v2-focus) 14%, transparent);
   background: var(--v2-paper);
 }
-.v2-drawer :is(.tool-field, input:not([type="checkbox"]), textarea, select):focus-visible {
+:is(.v2-app, .v2-drawer, .v2-dialog) :is(.tool-field, input:not([type="checkbox"]), textarea, select):focus-visible {
   outline: none;
   border-color: var(--color-v2-focus);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-v2-focus) 14%, transparent);
