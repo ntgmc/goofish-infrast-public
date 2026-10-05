@@ -9,6 +9,7 @@ import type { AuthSuccessResponse } from '../../lib/types'
 import type { V2Session } from './OptionsDrawer'
 import type { WorkspaceEntryState } from '../tool/WorkspaceEntryPreference'
 import { v2Path, v2SectionAvailable, type V2Section } from './navigation'
+import { V2SectionLoading } from './V2LoadingScreen'
 
 const Profiles = lazy(() => import('../tool/dashboard/ProfilesSection'))
 const AddAccount = lazy(() => import('../tool/dashboard/RedeemSection'))
@@ -77,7 +78,8 @@ export default function WorkspaceSections({ section, session, workflow, workspac
       {['manual-tool', 'cultivation', 'depot'].includes(section) && <Link className="v2-button v2-button-secondary" to={v2Path('tools', session.activeProfile?.id)}><ArrowLeft size={16} />{copy.v2.backToTools}</Link>}
       {section === 'profiles' && v2SectionAvailable('add-account', features) && <button type="button" className="v2-button v2-button-primary" onClick={() => onNavigate('add-account')}>{copy.v2.addAccount}<ArrowRight size={16} /></button>}
     </div>
-    <Suspense fallback={<p className="v2-panel v2-section-loading" role="status">{copy.common.pages_tool_AccountDashboard_015}</p>}>
+    <div className="v2-section-body">
+    <Suspense fallback={<V2SectionLoading label={section === 'inventory' ? copy.inventory.loading : undefined} />}>
       {section === 'overview' ? null : !available ? <p className="v2-panel v2-section-loading" role="status">{copy.v2.featureUnavailable}</p>
         : needsLogin ? <div className="v2-panel v2-login-panel"><p>{copy.v2.signInRequired}</p><AuthForm compact allowCdk={false} onAuthenticated={session.applyAuthPayload} submitClassName="v2-button v2-button-primary w-full" /></div>
           : needsWorkspace ? <div className="v2-panel v2-section-loading"><p>{copy.v2.profileRequired}</p><button className="v2-button v2-button-primary" type="button" onClick={() => onNavigate('profiles')}>{copy.v2.account}</button></div>
@@ -89,7 +91,7 @@ export default function WorkspaceSections({ section, session, workflow, workspac
               </>}
               {section === 'settings' && (signedIn ? <Settings profiles={session.profiles} onLogout={session.handleLogout} onPayload={session.applyAuthPayload} workspaceEntry={workspaceEntry} /> : <GuestSettings />)}
               {section === 'announcements' && (signedIn ? <Announcements onUnreadCountChange={session.setAnnouncementUnreadCount} /> : <PublicAnnouncements embedded />)}
-              {section === 'inventory' && <Inventory onPayload={session.applyAuthPayload} onLifetimeProfileCreated={() => onNavigate('profiles')} onViewProfiles={() => onNavigate('profiles')} />}
+              {section === 'inventory' && <Inventory loadingFallback={<V2SectionLoading label={copy.inventory.loading} />} onPayload={session.applyAuthPayload} onLifetimeProfileCreated={() => onNavigate('profiles')} onViewProfiles={() => onNavigate('profiles')} />}
               {section === 'balance' && <Balance redemptionEnabled={features.cdk_redemption} />}
               {section === 'commercial' && <Commercial onOpen={(profile) => void onOpenProfile(profile)} />}
               {section === 'tools' && <Tools profileId={session.activeProfile?.id} />}
@@ -114,8 +116,9 @@ export default function WorkspaceSections({ section, session, workflow, workspac
                 : <LockedScenario />)}
             </>}
     </Suspense>
-    {openedTools.map((tool) => <div key={tool} hidden={section !== tool} inert={section !== tool}>
-      <Suspense fallback={<p role="status">{copy.v2.loading}</p>}>
+    </div>
+    {openedTools.map((tool) => <div key={tool} className="v2-section-body" hidden={section !== tool} inert={section !== tool}>
+      <Suspense fallback={<V2SectionLoading />}>
         {tool === 'manual-tool' && v2SectionAvailable(tool, features) && <ManualTool embedded session={session} onDirtyChange={onToolDirtyChange} onOpenProfile={onOpenProfile} />}
         {tool === 'cultivation' && v2SectionAvailable(tool, features) && <Cultivation embedded session={session} />}
         {tool === 'depot' && v2SectionAvailable(tool, features) && <Depot embedded session={session} />}

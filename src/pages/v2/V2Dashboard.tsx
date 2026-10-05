@@ -24,7 +24,7 @@ import ScheduleBoard, { Avatar } from './ScheduleBoard'
 import IncomeAnalysis from './IncomeAnalysis'
 import OptionsDrawer, { type OptionPanel, type V2Session } from './OptionsDrawer'
 import { sortOperatorsForPreview } from '../tool/tool-utils'
-import V2Transition from './V2Transition'
+import V2Transition, { V2PageTransition } from './V2Transition'
 import TradingIcon from './TradingIcon'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
@@ -201,8 +201,9 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
         <main className="v2-main motion-region-enter" tabIndex={-1} data-route-focus>
           {navigationError && <p className="v2-feedback v2-feedback-error" role="alert">{navigationError}<button type="button" onClick={() => { session.retryConfigSave(); setNavigationError(null) }}>{text.loginRetry}</button></p>}
           <AnnouncementBanner announcement={session.banner} />
-          <WorkspaceSections section={section} session={guardedSession} workflow={workflow} workspaceEntry={workspaceEntry} onAccountAdded={accountAdded} onToolDirtyChange={setToolDirty} onOpenProfile={(profile) => openProfile(profile, section === 'manual-tool' ? 'manual-tool' : 'overview')} onNavigate={navigateSection} onConfig={() => openPanel('config')} generationDisabledReason={generationDisabledReason} />
-          <div hidden={section !== 'overview'}>
+          <V2PageTransition motionKey={section}>{(displayedSection) => <>
+          <WorkspaceSections section={displayedSection} session={guardedSession} workflow={workflow} workspaceEntry={workspaceEntry} onAccountAdded={accountAdded} onToolDirtyChange={setToolDirty} onOpenProfile={(profile) => openProfile(profile, section === 'manual-tool' ? 'manual-tool' : 'overview')} onNavigate={navigateSection} onConfig={() => openPanel('config')} generationDisabledReason={generationDisabledReason} />
+          <div hidden={displayedSection !== 'overview'}>
           <div className="v2-page-title"><h1>{text.title}</h1></div>
           <div className="v2-ready-banner">
             <span className="v2-ready-icon"><Check size={25} strokeWidth={2} /></span>
@@ -282,6 +283,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
           </V2Transition>
           <div className="v2-sample-notice"><span className="v2-notice-icon"><Sparkles size={16} /></span><p>{sample && <>{text.sampleHint} </>}{text.estimateNotice}</p>{sample && <button type="button" onClick={() => openPanel('account')}>{session.user ? text.account : text.login}<ArrowRight size={14} /></button>}</div>
           </div>
+          </>}</V2PageTransition>
           <footer className="v2-footer"><span>{text.brand}</span><nav>{(['status', 'support', 'terms', 'privacy', 'disclaimer'] as const).filter((entry) => v2SectionAvailable(entry, features)).map((entry) => <Link key={entry} to={v2Path(entry, session.activeProfile?.id)}>{sectionLabels[entry]}</Link>)}</nav></footer>
         </main>
       </div>

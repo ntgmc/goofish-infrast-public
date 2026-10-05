@@ -20,6 +20,35 @@
   gap: var(--space-md);
 }
 
+.v2-section-skeleton {
+  padding: var(--space-lg);
+}
+
+.v2-section-loading-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--color-v2-muted);
+  font-size: var(--text-sm);
+}
+
+.v2-section-loading-status .v2-loading-spinner {
+  width: 28px;
+  height: 28px;
+}
+
+.v2-section-skeleton-content {
+  margin-top: var(--space-lg);
+}
+
+.v2-section-skeleton :is(.motion-skeleton-line, .motion-skeleton-block) {
+  background: var(--color-v2-inset);
+}
+
+.v2-section-skeleton :is(.motion-skeleton-line, .motion-skeleton-block)::after {
+  background: linear-gradient(100deg, transparent 20%, var(--color-v2-surface) 50%, transparent 80%);
+}
+
 /* Adapted from https://uiverse.io/barisdogansutcu/light-rat-32 (MIT). */
 .v2-loading-spinner {
   width: 48px;

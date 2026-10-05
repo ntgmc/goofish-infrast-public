@@ -682,6 +682,26 @@ function ManualDraftStub({ onDirtyChange }: { onDirtyChange: (dirty: boolean) =>
 }
 
 describe('V2 feature continuity', () => {
+  it('keeps the V2 spinner and skeleton visible until inventory data arrives', async () => {
+    connect()
+    let finishInventory!: (response: Response) => void
+    const inventory = new Promise<Response>((resolve) => { finishInventory = resolve })
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => String(url) === '/api/user/inventory' ? inventory
+      : new Response(JSON.stringify({ tasks: [], notifications: [], unread_count: 0, next_cursor: null }), { status: 200 }))
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('button', { name: copy.inventory.nav }))
+    const loading = await screen.findByRole('status', { name: copy.inventory.loading })
+    expect(loading).toHaveAttribute('aria-busy', 'true')
+    expect(loading.querySelector('.v2-loading-spinner')).toBeInTheDocument()
+    expect(loading.querySelectorAll('.motion-skeleton-block')).toHaveLength(4)
+    expect(screen.queryByRole('heading', { name: copy.inventory.title, level: 2 })).not.toBeInTheDocument()
+
+    await act(async () => { finishInventory(new Response(JSON.stringify({ stacks: [], capacities: [], recent_events: [] }), { status: 200 })) })
+    expect(await screen.findByRole('heading', { name: copy.inventory.title, level: 2 })).toBeInTheDocument()
+    expect(screen.queryByRole('status', { name: copy.inventory.loading })).not.toBeInTheDocument()
+  })
+
   it('retains manual changes across tabs and pages and uses the selected history baseline', async () => {
     const workflow = connect()
     const baseline = normalizeConfig({ ...SAMPLE_CONFIG, desc: 'saved baseline' })
@@ -696,7 +716,7 @@ describe('V2 feature continuity', () => {
     await user.click(screen.getByRole('button', { name: copy.v2.tools }))
     expect(await screen.findByRole('link', { name: new RegExp(copy.tools.manualSchedule.title) })).toHaveAttribute('href', '/v2?section=manual-tool&profile_id=profile-1')
     await user.click(screen.getByRole('button', { name: copy.v2.overview }))
-    expect(screen.getByRole('button', { name: 'Edit draft: edited' })).toBe(edit)
+    expect(await screen.findByRole('button', { name: 'Edit draft: edited' })).toBe(edit)
     await user.click(screen.getByRole('button', { name: copy.v2.summaryTab }))
     await user.click(screen.getByRole('button', { name: copy.v2.manualTab }))
     expect(screen.getByRole('button', { name: 'Edit draft: edited' })).toBe(edit)
@@ -746,7 +766,7 @@ describe('V2 feature continuity', () => {
     expect(confirm).toHaveBeenCalledWith(copy.v2.discardManual)
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: copy.v2.overview }))
-    expect(screen.getByRole('button', { name: 'Edit draft: edited' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Edit draft: edited' })).toBeInTheDocument()
   })
 
   it('keeps free-preview upload and manual-edit restrictions while allowing the standalone tool', async () => {
@@ -833,7 +853,7 @@ describe('V2 feature continuity', () => {
     expect(screen.getByTestId('route-location')).toHaveTextContent(`profile_id=${expectedProfile!.id}`)
     if (mode !== 'switch') {
       await user.click(screen.getByRole('button', { name: copy.v2.overview }))
-      expect(screen.getByRole('button', { name: 'Edit draft: edited' })).toBeInTheDocument()
+      expect(await screen.findByRole('button', { name: 'Edit draft: edited' })).toBeInTheDocument()
     }
   })
 
@@ -888,7 +908,7 @@ describe('V2 feature continuity', () => {
     expect(screen.getByRole('button', { name: 'Edit draft: edited' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: copy.v2.tools }))
     await user.click(await screen.findByRole('link', { name: new RegExp(copy.tools.manualSchedule.title) }))
-    expect(screen.getByRole('button', { name: 'Edit draft: edited' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Edit draft: edited' })).toBeInTheDocument()
     expect(screen.getByTestId('route-location')).toHaveTextContent('profile_id=profile-1')
   })
 
