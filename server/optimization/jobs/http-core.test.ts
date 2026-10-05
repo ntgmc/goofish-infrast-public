@@ -3,6 +3,54 @@ import { CONFIG_PRESETS } from '../../../src/lib/config'
 import type { OptimizeConfigPermission } from './shared'
 import { sanitizeConfigForPublicOptimize } from './http-core'
 
+describe('sanitizeConfigForPublicOptimize inventory balance policy', () => {
+  it.each<OptimizeConfigPermission>(['advanced', 'metered_advanced', 'ultimate', 'admin'])(
+    'preserves selected 333 product counts with depleted inventory for %s',
+    (permission) => {
+      for (const goldCount of [1, 2]) {
+        const config = {
+          ...structuredClone(CONFIG_PRESETS['333-lmd']),
+          product_requirements: {
+            trading_stations: { LMD: 3 },
+            manufacturing_stations: { 'Pure Gold': goldCount, 'Battle Record': 3 - goldCount },
+          },
+          intermediate_inventory: { 'Pure Gold': 0, 'Originium Shard': 1, 'Orirock Cube': 866 },
+          auto_balance_source: 'intermediate_inventory',
+        }
+
+        const sanitized = sanitizeConfigForPublicOptimize(config, permission)
+
+        expect(sanitized.auto_balance_source).toBe('limited_config')
+        expect(sanitized.product_requirements).toEqual(config.product_requirements)
+        expect(sanitized.intermediate_inventory).toEqual(config.intermediate_inventory)
+        expect(sanitized.drones).toEqual(config.drones)
+        expect(config.auto_balance_source).toBe('intermediate_inventory')
+        expect(sanitizeConfigForPublicOptimize(sanitized, permission)).toEqual(sanitized)
+      }
+    },
+  )
+
+  it.each<OptimizeConfigPermission>(['free_preview', 'recommended', 'growth'])(
+    'retains inventory-based product adjustment for %s presets',
+    (permission) => {
+      const config = {
+        ...CONFIG_PRESETS['243'],
+        intermediate_inventory: { 'Pure Gold': 0 },
+        auto_balance_source: 'intermediate_inventory',
+      }
+
+      const sanitized = sanitizeConfigForPublicOptimize(config, permission)
+
+      expect(sanitized.auto_balance_source).toBe('intermediate_inventory')
+      expect(sanitized.intermediate_inventory).toEqual(config.intermediate_inventory)
+    },
+  )
+
+  it('does not enable inventory reporting when no inventory balance was requested', () => {
+    expect(sanitizeConfigForPublicOptimize(CONFIG_PRESETS['243'], 'advanced').auto_balance_source).toBeUndefined()
+  })
+})
+
 describe('sanitizeConfigForPublicOptimize layout cost policy', () => {
   it.each<OptimizeConfigPermission>(['free_preview', 'recommended', 'growth', 'advanced', 'ultimate', 'admin'])(
     'forces non-243/333 layouts to fast mode for %s',

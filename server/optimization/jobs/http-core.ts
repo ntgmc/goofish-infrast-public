@@ -15,6 +15,10 @@ export function sanitizeConfigForPublicOptimize(
   permission: OptimizeConfigPermission,
 ): LicenseConfig {
   const next = structuredClone(config);
+  if (hasCapability({ permission }, 'edit_full_config') && next.auto_balance_source === 'intermediate_inventory') {
+    // Keep inventory depletion reporting without overriding explicit product counts.
+    next.auto_balance_source = 'limited_config';
+  }
   if (next.Fiammetta?.enable && (isVariableShiftScheduleEnabled(next)
     || (next.shift_hours !== undefined && !isFiammettaShiftHoursSupported(next.shift_hours)))) {
     next.Fiammetta = { ...next.Fiammetta, enable: false };
