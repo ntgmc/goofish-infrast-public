@@ -257,7 +257,7 @@ export default function OptimizeWorkflowPage(props: Props) {
               }}
               onGenerate={handleGenerate}
               incrementalRecompute={{
-                visible: !isRestrictedPreview && Boolean(latestWorkspaceResult),
+                visible: false,
                 loading,
                 quote: incrementalBillingQuote,
                 quoteLoading: incrementalBillingQuoteLoading,
