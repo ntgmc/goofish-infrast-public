@@ -6,6 +6,7 @@ import type {
   AdminOptimizationQueueSnapshot,
   AdminOptimizationQueueStatus,
 } from '../contracts'
+import { SectionLoader } from '../../../components/SessionLoader'
 import DeadLetterPanel from './DeadLetterPanel'
 import ServiceStatusHistoryPanel from './ServiceStatusHistoryPanel'
 
@@ -20,7 +21,7 @@ type Filters = {
 
 const DEFAULT_FILTERS: Filters = { query: '', status: 'all', source: 'all', priority: 'all' }
 
-export default function QueueMonitorPanel() {
+export default function QueueMonitorPanel({ active = true }: { active?: boolean }) {
   const [snapshot, setSnapshot] = useState<AdminOptimizationQueueSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -53,6 +54,7 @@ export default function QueueMonitorPanel() {
   }, [])
 
   useEffect(() => {
+    if (!active) return
     void loadSnapshot()
     const poll = window.setInterval(() => {
       if (document.visibilityState === 'visible') void loadSnapshot()
@@ -66,7 +68,7 @@ export default function QueueMonitorPanel() {
       document.removeEventListener('visibilitychange', onVisibilityChange)
       requestRef.current?.abort()
     }
-  }, [loadSnapshot])
+  }, [active, loadSnapshot])
 
   const allJobs = useMemo(() => snapshot
     ? [...snapshot.queued_jobs, ...snapshot.running_jobs, ...snapshot.recent_jobs]
@@ -86,6 +88,8 @@ export default function QueueMonitorPanel() {
       return next
     })
   }
+
+  if (!snapshot && !error) return <SectionLoader label="正在加载异步队列…" />
 
   return (
     <section className="space-y-5" aria-labelledby="optimization-queue-title">
@@ -115,11 +119,7 @@ export default function QueueMonitorPanel() {
           </div>
         )}
 
-        {!snapshot ? (
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="正在加载队列摘要">
-            {Array.from({ length: 4 }, (_, index) => <div key={index} className="tool-inset h-24 animate-pulse motion-reduce:animate-none" />)}
-          </div>
-        ) : (
+        {snapshot && (
           <>
             <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <QueueMetric label="等待任务" value={`${snapshot.counts.queued} / ${snapshot.capacity.queue_limit}`} hint="当前排队 / 全局容量" tone={snapshot.counts.queued >= snapshot.capacity.queue_limit ? 'warning' : 'default'} />
@@ -183,7 +183,7 @@ export default function QueueMonitorPanel() {
         </>
       )}
 
-      <DeadLetterPanel />
+      <DeadLetterPanel active={active} />
     </section>
   )
 }

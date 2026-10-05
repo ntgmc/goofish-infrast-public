@@ -1,10 +1,11 @@
+import { useEffect, useState } from 'react'
 import { LayoutGroup } from 'motion/react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import { adminPath, fallbackAdminPath, resolveAdminSection } from '../../lib/app-routes'
-import { AnimatedPresenceRegion, MotionNavIndicator } from '../../components/MotionPrimitives'
+import { MotionNavIndicator, PageTransition } from '../../components/MotionPrimitives'
 import BrandLogo from '../../components/BrandLogo'
 import CompactHeaderMenu from '../../components/CompactHeaderMenu'
-import SessionLoader from '../../components/SessionLoader'
+import SessionLoader, { SectionLoader } from '../../components/SessionLoader'
 import InvitationSettingsSection from './invitations/InvitationSettingsSection'
 import RegistrationSettingsSection from './registration/RegistrationSettingsSection'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
@@ -40,6 +41,18 @@ export default function AdminDashboardView() {
   const visibleSections = (Object.keys(sectionLabels) as AdminSection[])
     .filter((section) => canAccessAdminSection(section, adminCapabilities))
   const canManageAdmins = adminCapabilities.includes('admin_manage')
+  const [visitedSections, setVisitedSections] = useState<AdminSection[]>([])
+
+  useEffect(() => {
+    if (!authenticated) setVisitedSections([])
+    else if (activeSection) setVisitedSections((current) => current.includes(activeSection) ? current : [...current, activeSection])
+  }, [activeSection, authenticated])
+
+  const sectionLoading = (section: AdminSection) =>
+    (loading && ['overview', 'announcement', 'cdk', 'users', 'risk'].includes(section))
+    || (section === 'cdk' && cdkLoading)
+    || (section === 'users' && usersLoading)
+    || (section === 'risk' && riskLoading)
 
   if (!activeSection) return <Navigate to={fallbackAdminPath()} replace />
 
@@ -137,7 +150,7 @@ export default function AdminDashboardView() {
           <button type="button" onClick={handleLogout} className="tool-secondary-action absolute bottom-5 left-4 right-4">退出登录</button>
         </aside>
   
-        <main className="lg:pl-64" tabIndex={-1} data-route-focus>
+        <main className="tool-workspace lg:pl-64" tabIndex={-1} data-route-focus>
           <header className="tool-header sticky top-0 z-20 bg-surface-0/95 px-4 py-1.5 backdrop-blur lg:px-8 lg:py-4">
             <div className="flex h-11 items-center justify-between gap-2 lg:hidden">
               <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -179,12 +192,16 @@ export default function AdminDashboardView() {
             </div>
           </header>
   
-          <div className="px-5 py-6 sm:px-8">
+          <div className="tool-page-content px-5 py-6 sm:px-8">
             {error && <div className="tool-alert tool-alert--error mb-5" role="alert">{error}</div>}
             {notice && <AdminToast message={notice} onDismiss={clearNotice} />}
 
-            <AnimatedPresenceRegion motionKey={activeSection}>
-            {activeSection === 'overview' && (
+            <PageTransition motionKey={activeSection} className="tool-page-transition">{(displayedSection) => <>
+            {visibleSections.filter((section) => section === displayedSection || visitedSections.includes(section)).map((section) => (
+            <div key={section} hidden={section !== displayedSection} className="admin-section tool-section-content" data-loading={sectionLoading(section) || undefined}>
+            <SectionLoader label={`正在加载${sectionLabels[section]}…`} />
+            <div className="admin-section-body tool-page-content">
+            {section === 'overview' && (
               <section className="space-y-6">
                 <div className="tool-panel flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
@@ -287,9 +304,9 @@ export default function AdminDashboardView() {
               </section>
             )}
 
-            {activeSection === 'queue' && <QueueMonitorPanel />}
+            {section === 'queue' && <QueueMonitorPanel active={displayedSection === 'queue'} />}
   
-        {activeSection === 'cdk' && (
+        {section === 'cdk' && (
           <section className="space-y-5">
             <form onSubmit={handleGenerateCdk} className="tool-panel p-5">
               <div className="grid gap-4 lg:grid-cols-3 xl:grid-cols-6 xl:items-end">
@@ -404,7 +421,7 @@ export default function AdminDashboardView() {
                   onOpenDetail={loadCdkDetail}
                   onDelete={deleteCdk}
                 />
-                {selectedCdkDetail && (
+                {selectedCdkDetail && displayedSection === 'cdk' && (
                   <CdkDetailDialog
                     detail={selectedCdkDetail}
                     busyAction={busyAction}
@@ -417,14 +434,14 @@ export default function AdminDashboardView() {
               </section>
             )}
   
-            {activeSection === 'risk' && (
+            {section === 'risk' && (
               <section className="space-y-5">
                 <RiskSettingsPanel
                   settings={riskSettings}
                   saving={busyAction === 'risk-settings'}
                   onChange={handleSaveRiskSettings}
                 />
-                <BehaviorRiskPanel />
+                <BehaviorRiskPanel active={displayedSection === 'risk'} />
                 <RiskConsoleSummary summary={cdkOpsSummary} />
                 <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
                   <RiskTrendPanel days={cdkOpsSummary.risk_trend} />
@@ -434,7 +451,7 @@ export default function AdminDashboardView() {
               </section>
             )}
   
-            {activeSection === 'announcement' && (
+            {section === 'announcement' && (
               <AnnouncementSettingsSection
                 banner={banner}
                 announcements={announcements}
@@ -457,13 +474,13 @@ export default function AdminDashboardView() {
               />
             )}
 
-            {activeSection === 'features' && <FeatureSettingsSection />}
-            {activeSection === 'content' && <PublicContentSettingsSection />}
-            {activeSection === 'items' && <InventoryAdminSection />}
-            {activeSection === 'registration' && <RegistrationSettingsSection />}
-            {activeSection === 'invitation' && <InvitationSettingsSection />}
+            {section === 'features' && <FeatureSettingsSection />}
+            {section === 'content' && <PublicContentSettingsSection />}
+            {section === 'items' && <InventoryAdminSection />}
+            {section === 'registration' && <RegistrationSettingsSection />}
+            {section === 'invitation' && <InvitationSettingsSection active={displayedSection === 'invitation'} />}
   
-            {activeSection === 'users' && (
+            {section === 'users' && (
               <section className="space-y-5">
               <form onSubmit={handleResetUserPassword} noValidate className="tool-panel p-5">
                   <h2 className="text-lg font-semibold text-ink-primary">重置用户密码</h2>
@@ -518,7 +535,7 @@ export default function AdminDashboardView() {
                   onCopy={handleCopyUsers} onExport={handleExportUsers} onBulk={handleBulkUsers}
                   onDetail={loadUserDetail} onFreeze={handleFreezeAppUser} onUnfreeze={handleUnfreezeAppUser} onDelete={handleDeleteAppUser}
                 />
-                {selectedUserDetail && (
+                {selectedUserDetail && displayedSection === 'users' && (
                   <UserDetailDialog
                     detail={selectedUserDetail}
                     balance={selectedUserBalance}
@@ -551,7 +568,10 @@ export default function AdminDashboardView() {
                 )}
               </section>
             )}
-            </AnimatedPresenceRegion>
+            </div>
+            </div>
+            ))}
+            </>}</PageTransition>
           </div>
         </main>
       </div>

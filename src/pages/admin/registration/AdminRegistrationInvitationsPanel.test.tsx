@@ -52,7 +52,7 @@ describe('AdminRegistrationInvitationsPanel', () => {
   it('creates, shows once, copies, and revokes an administrator invitation', async () => {
     const user = userEvent.setup()
     render(<AdminRegistrationInvitationsPanel />)
-    expect(await screen.findByText('可使用')).toBeInTheDocument()
+    expect(await screen.findByRole('cell', { name: '可使用' })).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('操作原因'), 'test issuance')
     await user.type(screen.getByLabelText('Root 口令'), 'root-secret')

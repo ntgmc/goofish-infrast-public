@@ -18,6 +18,7 @@ import type {
   InvitationSettings,
 } from '../../../lib/types'
 import { AdminToast } from '../shared/AdminToast'
+import { SectionLoader } from '../../../components/SessionLoader'
 
 const DEFAULT_SETTINGS: InvitationSettings = {
   version: 2,
@@ -35,7 +36,7 @@ const DEFAULT_SETTINGS: InvitationSettings = {
   updated_at: null,
 }
 
-export default function InvitationSettingsSection() {
+export default function InvitationSettingsSection({ active = true }: { active?: boolean }) {
   const [settings, setSettings] = useState<InvitationSettings>(DEFAULT_SETTINGS)
   const [savedSettings, setSavedSettings] = useState<InvitationSettings>(DEFAULT_SETTINGS)
   const [catalog, setCatalog] = useState<InvitationRewardCatalogItem[]>([])
@@ -67,6 +68,7 @@ export default function InvitationSettingsSection() {
   }, [])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => { if (!active) setAddingFor(null) }, [active])
 
   const dirty = useMemo(() => JSON.stringify(settings) !== JSON.stringify(savedSettings), [savedSettings, settings])
   const catalogByCode = useMemo(() => new Map(catalog.map((item) => [item.item_code, item])), [catalog])
@@ -129,7 +131,7 @@ export default function InvitationSettingsSection() {
     }
   }
 
-  if (loading) return <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">正在载入邀请设置...</div>
+  if (loading) return <SectionLoader label="正在载入邀请设置…" />
 
   const invalidRewards = settings.rewards.filter((reward) => catalogByCode.get(reward.item_code)?.selectable !== true)
   const cannotSave = saving || !dirty || invalidRewards.length > 0 || (settings.enabled && settings.rewards.length === 0)
@@ -174,14 +176,14 @@ export default function InvitationSettingsSection() {
             <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">分别配置邀请人和新用户的道具组合；同一次成功邀请只占邀请人的一个每日名额。</p>
           </div>
           <label className="tool-inset flex min-h-11 items-center gap-3 px-4 text-sm font-semibold text-ink-secondary">
-            <input type="checkbox" checked={settings.enabled} onChange={(event) => setSettings((current) => ({ ...current, enabled: event.currentTarget.checked }))} className="h-4 w-4 accent-brand-600" />
+            <input type="checkbox" checked={settings.enabled} onChange={(event) => { const enabled = event.currentTarget.checked; setSettings((current) => ({ ...current, enabled })) }} className="h-4 w-4 accent-brand-600" />
             启用邀请活动
           </label>
         </div>
 
         <label className="mt-6 block max-w-sm" htmlFor="daily-inviter-limit">
           <span className="mb-2 block text-sm font-medium text-ink-secondary">每日获奖邀请人数上限</span>
-          <input id="daily-inviter-limit" type="number" min={1} max={1000} value={settings.daily_inviter_reward_limit} onChange={(event) => setSettings((current) => ({ ...current, daily_inviter_reward_limit: Number(event.currentTarget.value) }))} className="tool-field" />
+          <input id="daily-inviter-limit" type="number" min={1} max={1000} value={settings.daily_inviter_reward_limit} onChange={(event) => { const limit = Number(event.currentTarget.value); setSettings((current) => ({ ...current, daily_inviter_reward_limit: limit })) }} className="tool-field" />
           <span className="mt-1.5 block text-xs text-ink-muted">按 Asia/Shanghai 自然日统计；每位成功激活的新用户只占一个名额，与奖励道具数量无关。</span>
         </label>
 

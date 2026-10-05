@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AdminOptimizationQueueSnapshot } from '../contracts'
 
@@ -17,6 +17,7 @@ describe('QueueMonitorPanel', () => {
   })
 
   afterEach(() => {
+    cleanup()
     vi.useRealTimers()
     vi.restoreAllMocks()
   })
@@ -41,6 +42,31 @@ describe('QueueMonitorPanel', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: /running-job/ })[0])
     expect(screen.getAllByText('worker-a').length).toBeGreaterThan(0)
+  })
+
+  it('pauses both queue polls while another admin section is active and preserves local edits', async () => {
+    const view = render(<QueueMonitorPanel />)
+    await act(async () => { await Promise.resolve() })
+    const search = screen.getByPlaceholderText('任务 ID、邮箱或档案')
+    const title = screen.getByPlaceholderText('事件标题')
+    fireEvent.change(search, { target: { value: 'running-job' } })
+    fireEvent.change(title, { target: { value: '尚未发布的事件' } })
+    const initialCalls = adminApiJson.mock.calls.length
+
+    view.rerender(<QueueMonitorPanel active={false} />)
+    await act(async () => {
+      vi.advanceTimersByTime(15_000)
+      document.dispatchEvent(new Event('visibilitychange'))
+      await Promise.resolve()
+    })
+    expect(adminApiJson.mock.calls).toHaveLength(initialCalls)
+    expect(title).toHaveValue('尚未发布的事件')
+
+    view.rerender(<QueueMonitorPanel active />)
+    await act(async () => { await Promise.resolve() })
+    expect(adminApiJson.mock.calls.length).toBeGreaterThan(initialCalls)
+    expect(search).toHaveValue('running-job')
+    expect(title).toHaveValue('尚未发布的事件')
   })
 
   it('polls while visible, pauses while hidden, and refreshes immediately when visible again', async () => {

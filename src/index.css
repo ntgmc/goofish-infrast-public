@@ -985,6 +985,19 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--color-focus); ou
   animation: motion-content-enter var(--dur-base) var(--ease-out) both;
 }
 
+.admin-section[hidden],
+.admin-section > .tool-section-loader {
+  display: none;
+}
+
+.admin-section:is([data-loading], :has(.admin-section-body .tool-section-loader)) > .admin-section-body {
+  display: none;
+}
+
+.admin-section:is([data-loading], :has(.admin-section-body .tool-section-loader)) > .tool-section-loader {
+  display: flex;
+}
+
 @keyframes motion-content-enter {
   from { opacity: 0; }
   to { opacity: 1; }

@@ -4,6 +4,7 @@ import { adminApiJson } from '../../../lib/admin-api-client'
 import type { AdminSiteFeatureSettingsV1, SiteFeatureKey, SiteFeatures } from '../../../lib/site-features'
 import { computeEffectiveSiteFeatures, METERED_BILLING_AVAILABLE, normalizeSiteFeatureSettings } from '../../../lib/site-features'
 import { copy } from '../../../copy/index'
+import { SectionLoader } from '../../../components/SessionLoader'
 import { AdminToast } from '../shared/AdminToast'
 import SklandIcon from '../../../components/SklandIcon'
 
@@ -93,7 +94,7 @@ export default function FeatureSettingsSection() {
     }
   }
 
-  if (loading) return <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.features.admin_loading}</div>
+  if (loading) return <SectionLoader label={copy.features.admin_loading} />
 
   const reload = () => {
     if (dirty && !window.confirm(copy.features.admin_discard_confirm)) return
