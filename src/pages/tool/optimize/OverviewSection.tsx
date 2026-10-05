@@ -181,7 +181,7 @@ export default function OverviewSection({
             <div className="mt-4 flex flex-wrap gap-2">
               <SmallActionButton onClick={() => void onViewHistory(latestResult)}>{copy.optimize.pages_tool_optimize_OverviewSection_018}</SmallActionButton>
               {features.maa_export && <SmallActionButton onClick={() => onDownloadHistory(latestResult)} disabled={downloadBusy || !latestResult.maa_exportable}>{downloadBusy ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_OverviewSection_019}</SmallActionButton>}
-              <SmallActionButton onClick={() => void onUseHistoryConfig(latestResult)} disabled={!latestResult.has_config}>{copy.optimize.pages_tool_optimize_OverviewSection_020}</SmallActionButton>
+              <SmallActionButton onClick={() => void onUseHistoryConfig(latestResult)} disabled={loading || !latestResult.has_config}>{copy.optimize.pages_tool_optimize_OverviewSection_020}</SmallActionButton>
             </div>
           ) : null}
         </section>

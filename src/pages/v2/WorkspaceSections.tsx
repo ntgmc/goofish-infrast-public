@@ -104,13 +104,13 @@ export default function WorkspaceSections({ section, session, workflow, workspac
                 savedConfigLimit={workflow.profileCapacity?.plan_slots.limit} resultHistoryLimit={workflow.profileCapacity?.history_slots.limit} archiveLimit={workflow.profileCapacity?.archive_slots.limit}
                 resultHistoryUsed={workflow.profileCapacity?.history_slots.used} archivedResultsUsed={workflow.profileCapacity?.archive_slots.used}
                 resultHistoryHasMore={workflow.resultHistoryHasMore} archivedResultsHasMore={workflow.archivedResultsHasMore} historyLoadingScope={workflow.resultHistoryLoadingScope} historyLoadError={workflow.resultHistoryError}
-                selectedHistoryId={workflow.historyItem?.id ?? null} busyAction={workflow.workspaceBusyAction} notice={workflow.workspaceNotice} error={workflow.workspaceError}
+                selectedHistoryId={workflow.historyItem?.id ?? null} configReadOnly={workflow.loading} busyAction={workflow.workspaceBusyAction} notice={workflow.workspaceNotice} error={workflow.workspaceError}
                 onSaveCurrent={workflow.handleSaveCurrentConfig} onUseSavedConfig={workflow.handleUseSavedConfig} onRenameSavedConfig={workflow.handleRenameSavedConfig} onDeleteSavedConfig={workflow.handleDeleteSavedConfig}
                 onViewHistory={workflow.handleViewHistory} onUseHistoryConfig={workflow.handleUseHistoryConfig} onDownloadHistory={workflow.handleDownloadHistory}
                 onRenameArchivedHistory={workflow.handleRenameArchivedHistory} onArchiveHistory={workflow.handleArchiveHistory} onUnarchiveHistory={workflow.handleUnarchiveHistory} onDeleteHistory={workflow.handleDeleteHistory}
                 onLoadMoreResultHistory={workflow.loadMoreResultHistory} onLoadMoreArchivedResults={workflow.loadMoreArchivedResults} />}
               {section === 'generation' && workflow && <Generation workflow={workflow} disabledReason={generationDisabledReason} onNavigate={onNavigate} onConfig={onConfig} />}
-              {section === 'lab' && workflow && (workflow.userCanUseScenarioLab ? <Lab profileId={workflow.profile.id} operators={workflow.mergedOperators} activeConfig={workflow.activeConfig}
+              {section === 'lab' && workflow && (workflow.userCanUseScenarioLab ? <Lab profileId={workflow.profile.id} operators={workflow.mergedOperators} activeConfig={workflow.activeConfig} configReadOnly={workflow.loading}
                 requiresQuote={workflow.scenarioQuoteRequired} billingQuote={workflow.scenarioBillingQuote} billingQuoteLoading={workflow.scenarioBillingQuoteLoading} billingQuoteError={workflow.scenarioBillingQuoteError}
                 onRefreshBillingQuote={workflow.refreshScenarioBillingQuote} onInventoryChange={workflow.refreshInventory} onApplyConfig={(config) => { workflow.handleApplyScenarioConfig(config); onConfig() }} />
                 : <LockedScenario />)}

@@ -149,6 +149,13 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and d
   }
   await waitFor(() => expect(apiJson).toHaveBeenCalledWith('/api/optimization/jobs/new-job', expect.anything()))
   expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('54,720')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: copy.v2.facilities }))
+  const configDialog = await screen.findByRole('dialog')
+  expect(within(configDialog).getByText(copy.common.configGenerationReadOnly)).toBeInTheDocument()
+  const editor = within(configDialog).getByRole('group', { name: copy.common.components_ConfigEditor_021 })
+  for (const control of editor.querySelectorAll('button, input, select, textarea')) expect(control).toBeDisabled()
+  await userEvent.click(within(configDialog).getByRole('button', { name: copy.v2.done }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   await act(async () => completeJob({
     ...queued, status: 'succeeded', result: newResult, historyResultId: latest.id,
     executionPhase: 'terminal', calculationStage: 'completed', canCancel: false,
@@ -158,6 +165,12 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and d
   expect(screen.queryByText(copy.common.components_ScheduleProgress_060)).not.toBeInTheDocument()
   await act(async () => refreshWorkspace({ ...auth, workspace: { ...workspace, latest_result: latest, result_history: [latest, previous] } }))
   await waitFor(() => expect(screen.getByRole('button', { name: copy.v2.regenerate })).not.toBeDisabled())
+  await userEvent.click(screen.getByRole('button', { name: copy.v2.facilities }))
+  const unlockedDialog = await screen.findByRole('dialog')
+  expect(within(unlockedDialog).queryByText(copy.common.configGenerationReadOnly)).not.toBeInTheDocument()
+  expect(within(unlockedDialog).getByRole('button', { name: copy.common.components_ConfigEditor_007 })).toBeEnabled()
+  await userEvent.click(within(unlockedDialog).getByRole('button', { name: copy.v2.done }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   expect(vi.mocked(apiJson).mock.calls.filter(([url, options]) => url === '/api/optimization/jobs' && options?.method === 'POST'))
     .toHaveLength(mode === 'submitted' ? 1 : 0)
   expect(vi.mocked(apiJson).mock.calls.some(([url]) => url.startsWith('/api/user/results/new-result?'))).toBe(false)

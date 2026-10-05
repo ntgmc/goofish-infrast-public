@@ -111,6 +111,7 @@ export function useOptimizeWorkflow(props: Props) {
   const [lastGeneratedSignature, setLastGeneratedSignature] = useState<string | null>(null)
   const progressRef = useRef<ScheduleProgressState | null>(null)
   const optimizeInFlightRef = useRef(false)
+  const isConfigReadOnly = useCallback(() => optimizeInFlightRef.current, [])
   const optimizeRestoreKeyRef = useRef<string | null>(null)
   const configToastTimerRef = useRef<number | null>(null)
   const configToastIdRef = useRef(0)
@@ -265,7 +266,7 @@ export function useOptimizeWorkflow(props: Props) {
   const resultIsCurrent = hasResult && lastGeneratedSignature === optimizeSignature
 
   const updateConfig = useCallback((mutate: (config: LicenseConfig) => void) => {
-      if (!userCanApplyConfigOverride) return
+      if (!userCanApplyConfigOverride || isConfigReadOnly()) return
       const draft = normalizeConfig(activeConfig)
       mutate(draft)
       draft.layout = resolveConfigLayout(draft)
@@ -278,9 +279,10 @@ export function useOptimizeWorkflow(props: Props) {
         showConfigValidationToast(nextValidation.message)
       }
       setInlineError(null)
-    }, [activeConfig, clearConfigValidationToast, normalizeAllowedConfigOverride, setConfigOverride, showConfigValidationToast, userCanApplyConfigOverride])
+    }, [activeConfig, clearConfigValidationToast, isConfigReadOnly, normalizeAllowedConfigOverride, setConfigOverride, showConfigValidationToast, userCanApplyConfigOverride])
 
   const handleApplyScenarioConfig = useCallback((scenarioConfig: LicenseConfig) => {
+    if (isConfigReadOnly()) return
     updateConfig((draft) => {
       for (const key of Object.keys(draft)) delete (draft as Record<string, unknown>)[key]
       Object.assign(draft, JSON.parse(JSON.stringify(scenarioConfig)) as LicenseConfig)
@@ -288,7 +290,7 @@ export function useOptimizeWorkflow(props: Props) {
     configToastIdRef.current += 1
     setConfigToast({ id: configToastIdRef.current, message: copy.optimize.pages_tool_optimize_useOptimizeWorkflow_010 })
     setSection('config')
-  }, [updateConfig])
+  }, [isConfigReadOnly, updateConfig])
 
   const refreshWorkspaceResults = useCallback(async () => {
     const data = await apiJson<AuthSuccessResponse>(
@@ -324,6 +326,7 @@ export function useOptimizeWorkflow(props: Props) {
   } = useOptimizeWorkspace({
     profileId,
     activeConfig,
+    isConfigReadOnly,
     normalizeAllowedConfigOverride,
     onWorkspacePatch,
     onWorkspaceUpdated,

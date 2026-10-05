@@ -23,6 +23,7 @@ export default function PlansSection({
   resultHistoryUsed = resultHistory.length,
   archivedResultsUsed = archivedResults.length,
   selectedHistoryId,
+  configReadOnly = false,
   busyAction,
   notice,
   error,
@@ -54,6 +55,7 @@ export default function PlansSection({
   resultHistoryUsed?: number;
   archivedResultsUsed?: number;
   selectedHistoryId: string | null;
+  configReadOnly?: boolean;
   busyAction: string | null;
   notice: string | null;
   error: string | null;
@@ -157,7 +159,7 @@ export default function PlansSection({
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
-                    <SmallActionButton onClick={() => onUseSavedConfig(item)} disabled={item.read_only || busyAction === `touch:${item.id}`} tone="primary">{copy.optimize.pages_tool_optimize_PlansSection_025}</SmallActionButton>
+                    <SmallActionButton onClick={() => onUseSavedConfig(item)} disabled={configReadOnly || item.read_only || busyAction === `touch:${item.id}`} tone="primary">{copy.optimize.pages_tool_optimize_PlansSection_025}</SmallActionButton>
                     <SmallActionButton onClick={() => void onRenameSavedConfig(item)} disabled={item.read_only || busyAction === `rename:${item.id}`}>{copy.optimize.pages_tool_optimize_PlansSection_026}</SmallActionButton>
                     <SmallActionButton onClick={() => void onDeleteSavedConfig(item)} disabled={busyAction === `delete:${item.id}`} tone="danger">{copy.optimize.pages_tool_optimize_PlansSection_027}</SmallActionButton>
                   </div>
@@ -193,7 +195,7 @@ export default function PlansSection({
                     <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
                       <SmallActionButton onClick={() => void onViewHistory(item)} disabled={busyAction === `detail:${item.id}`} tone="primary">{copy.optimize.pages_tool_optimize_PlansSection_030}</SmallActionButton>
                       {features.maa_export && <SmallActionButton onClick={() => onDownloadHistory(item)} disabled={busyAction === `download:${item.id}` || !item.maa_exportable}>{busyAction === `download:${item.id}` ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_PlansSection_031}</SmallActionButton>}
-                      <SmallActionButton onClick={() => void onUseHistoryConfig(item)} disabled={busyAction === `detail:${item.id}` || !item.has_config}>{copy.optimize.pages_tool_optimize_PlansSection_032}</SmallActionButton>
+                      <SmallActionButton onClick={() => void onUseHistoryConfig(item)} disabled={configReadOnly || busyAction === `detail:${item.id}` || !item.has_config}>{copy.optimize.pages_tool_optimize_PlansSection_032}</SmallActionButton>
                       <SmallActionButton onClick={() => void onUnarchiveHistory(item)} disabled={historyLimitReached || busyAction === `unarchive:${item.id}`}>{copy.inventory.unarchive_action}</SmallActionButton>
                       <SmallActionButton onClick={() => void onRenameArchivedHistory(item)} disabled={busyAction === `rename:${item.id}`}>{copy.inventory.archive_rename_action}</SmallActionButton>
                     </div>
@@ -238,7 +240,7 @@ export default function PlansSection({
                   <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
                     <SmallActionButton onClick={() => void onViewHistory(item)} disabled={busyAction === `detail:${item.id}`} tone="primary">{copy.optimize.pages_tool_optimize_PlansSection_030}</SmallActionButton>
                     {features.maa_export && <SmallActionButton onClick={() => onDownloadHistory(item)} disabled={busyAction === `download:${item.id}` || !item.maa_exportable}>{busyAction === `download:${item.id}` ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_PlansSection_031}</SmallActionButton>}
-                    <SmallActionButton onClick={() => void onUseHistoryConfig(item)} disabled={busyAction === `detail:${item.id}` || !item.has_config}>{copy.optimize.pages_tool_optimize_PlansSection_032}</SmallActionButton>
+                    <SmallActionButton onClick={() => void onUseHistoryConfig(item)} disabled={configReadOnly || busyAction === `detail:${item.id}` || !item.has_config}>{copy.optimize.pages_tool_optimize_PlansSection_032}</SmallActionButton>
                     <SmallActionButton onClick={() => void onArchiveHistory(item)} disabled={archiveLimit < 1 || busyAction === `archive:${item.id}`}>{copy.inventory.archive_action}</SmallActionButton>
                     <SmallActionButton onClick={() => void onDeleteHistory(item)} disabled={busyAction === `delete:${item.id}`} tone="danger">{copy.inventory.delete_result}</SmallActionButton>
                   </div>

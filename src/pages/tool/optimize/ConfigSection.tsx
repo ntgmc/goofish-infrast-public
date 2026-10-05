@@ -18,6 +18,7 @@ export default function ConfigSection({
   permission,
   isPreviewProfile = false,
   userCanEditConfig,
+  readOnly = false,
   canEditFixedShiftHours,
   userCanUseIntermediateAutoConfig,
   configPresetLabel,
@@ -33,6 +34,7 @@ export default function ConfigSection({
   permission: PermissionMode
   isPreviewProfile?: boolean
   userCanEditConfig: boolean
+  readOnly?: boolean
   canEditFixedShiftHours?: boolean
   userCanUseIntermediateAutoConfig: boolean
   configPresetLabel: string
@@ -72,6 +74,7 @@ export default function ConfigSection({
                 ? `${copy.common.components_ConfigEditor_024}${copy.workspace.pages_tool_tool_utils_002}${copy.common.components_ConfigEditor_025}`
                 : undefined}
               canEdit={userCanEditConfig}
+              readOnly={readOnly}
               canEditFixedShiftHours={canEditFixedShiftHours}
               canEditIntermediateInventory={userCanUseIntermediateAutoConfig}
               canSelectPreset={userCanUseIntermediateAutoConfig}

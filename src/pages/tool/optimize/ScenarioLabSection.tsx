@@ -14,6 +14,7 @@ export default function ScenarioLabSection({
   profileId,
   operators,
   activeConfig,
+  configReadOnly = false,
   requiresCoupon = false,
   couponBalance = 0,
   requiresQuote = false,
@@ -27,6 +28,7 @@ export default function ScenarioLabSection({
   profileId: string;
   operators: LicenseOperator[];
   activeConfig: LicenseConfig;
+  configReadOnly?: boolean;
   requiresCoupon?: boolean;
   couponBalance?: number;
   requiresQuote?: boolean;
@@ -159,7 +161,7 @@ export default function ScenarioLabSection({
               </div>
               <ScenarioParetoChart points={result.points} selectedId={selectedId} onSelect={setSelectedId} />
             </div>
-            {selected && <SelectedScenario point={selected} onApply={() => onApplyConfig(selected.config)} />}
+            {selected && <SelectedScenario point={selected} disabled={configReadOnly} onApply={() => onApplyConfig(selected.config)} />}
             {result.warnings.map((warning) => <div key={warning} className="tool-alert tool-alert--warning" role="status">{warning}</div>)}
             <div className="tool-panel p-4 sm:p-5">
               <div className="mb-3">
@@ -179,7 +181,7 @@ function SummaryStat({ label, value, note }: { label: string; value: string; not
   return <div className="tool-inset p-4"><p className="text-xs text-ink-muted">{label}</p><p className="mt-1 text-2xl font-semibold tabular-nums text-ink-primary">{value}</p><p className="mt-1 text-xs text-ink-secondary">{note}</p></div>
 }
 
-function SelectedScenario({ point, onApply }: { point: ScenarioComparisonPoint; onApply: () => void }) {
+function SelectedScenario({ point, disabled, onApply }: { point: ScenarioComparisonPoint; disabled: boolean; onApply: () => void }) {
   const value = point.verified ?? point.screening
   const economy = value?.orundumEconomy
   return (
@@ -202,7 +204,7 @@ function SelectedScenario({ point, onApply }: { point: ScenarioComparisonPoint; 
           </dl>
         )}
       </div>
-      <button type="button" onClick={onApply} disabled={!value} className="tool-primary-action shrink-0">
+      <button type="button" onClick={onApply} disabled={disabled || !value} className="tool-primary-action shrink-0">
         {copy.optimize.pages_tool_optimize_ScenarioLabSection_043}</button>
     </div>
   )

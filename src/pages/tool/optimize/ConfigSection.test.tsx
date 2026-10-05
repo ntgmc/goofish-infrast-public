@@ -6,11 +6,39 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import { CONFIG_PRESETS } from '../../../lib/config'
+import { copy } from '../../../copy'
 import ConfigSection from './ConfigSection'
 
 afterEach(cleanup)
 
 describe('ConfigSection', () => {
+  it.each([
+    { preset: '243', canEdit: true },
+    { preset: '252', canEdit: false },
+  ])('locks all configuration controls for $preset during generation and unlocks afterwards', async ({ preset, canEdit }) => {
+    const updateConfig = vi.fn()
+    const props = {
+      activeConfig: CONFIG_PRESETS[preset], permission: 'growth' as const,
+      userCanEditConfig: canEdit, userCanUseIntermediateAutoConfig: true,
+      canEditFixedShiftHours: true, configPresetLabel: preset,
+      configValidation: { ok: true } as const, configSyncStatus: 'idle' as const,
+      latestResult: null, diffRows: [], updateConfig, retryConfigSave: vi.fn(),
+    }
+    const view = render(<MemoryRouter><ConfigSection {...props} readOnly /></MemoryRouter>)
+    await screen.findByText(copy.common.configGenerationReadOnly)
+    const editor = screen.getByRole('group', { name: copy.common.components_ConfigEditor_021 })
+    const controls = editor.querySelectorAll('button, input, select, textarea')
+    expect(controls.length).toBeGreaterThan(0)
+    for (const control of controls) expect(control).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: copy.common.components_ConfigEditor_007 }))
+    expect(updateConfig).not.toHaveBeenCalled()
+
+    view.rerender(<MemoryRouter><ConfigSection {...props} readOnly={false} /></MemoryRouter>)
+    expect(screen.queryByText(copy.common.configGenerationReadOnly)).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: copy.common.components_ConfigEditor_007 }))
+    expect(updateConfig).toHaveBeenCalledOnce()
+  })
+
   it('shows saved configuration separately from changes requiring a new result', () => {
     render(
       <ConfigSection

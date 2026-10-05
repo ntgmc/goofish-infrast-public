@@ -292,6 +292,7 @@ export default function OptimizeWorkflowPage(props: Props) {
               historyLoadingScope={resultHistoryLoadingScope}
               historyLoadError={resultHistoryError}
               selectedHistoryId={historyItem?.id ?? null}
+              configReadOnly={loading}
               busyAction={workspaceBusyAction}
               notice={workspaceNotice}
               error={workspaceError}
@@ -319,6 +320,7 @@ export default function OptimizeWorkflowPage(props: Props) {
                 permission={permission}
                 isPreviewProfile={profile.kind === 'free_preview'}
                 userCanEditConfig={userCanEditConfig}
+                readOnly={loading}
                 canEditFixedShiftHours={isRestrictedPreview}
                 userCanUseIntermediateAutoConfig={userCanUseIntermediateAutoConfig}
                 configPresetLabel={configPresetLabel}
@@ -365,6 +367,7 @@ export default function OptimizeWorkflowPage(props: Props) {
               profileId={props.profileId}
               operators={mergedOperators}
               activeConfig={activeConfig}
+              configReadOnly={loading}
               requiresCoupon={false}
               couponBalance={itemBalances.scenario_simulation_coupon ?? 0}
               requiresQuote={scenarioQuoteRequired}

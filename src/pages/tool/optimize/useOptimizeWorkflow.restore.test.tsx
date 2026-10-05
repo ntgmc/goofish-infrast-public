@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { createElement, StrictMode, type PropsWithChildren } from 'react'
-import { cleanup, renderHook, waitFor } from '@testing-library/react'
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { apiJson } from '../../../lib/api-client'
 import { CONFIG_PRESETS, normalizeConfig } from '../../../lib/config'
@@ -21,7 +21,7 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-it('restores polling after StrictMode effect cleanup and handles cancellation without resubmitting', async () => {
+it.each(['cancelled', 'failed'] as const)('locks configuration while restoring polling in StrictMode and unlocks after a %s job', async (status) => {
   const profile: UserGameAccount = {
     id: 'restored-profile', user_id: 'user', kind: 'cdk', permission: 'ultimate',
     status: 'active', cdk_order_hash: 'order', display_name: 'Doctor', note: '',
@@ -40,16 +40,22 @@ it('restores polling after StrictMode effect cleanup and handles cancellation wi
   }
   const storageKey = buildOptimizeJobStorageKey(profile.id, license.order_hash, buildOptimizeSignature([], config), 'generate')
   writeActiveOptimizeJob(storageKey, job)
-  vi.mocked(apiJson).mockImplementation(async (path) => path === '/api/optimization/jobs/restored-job' ? {
-    id: job.job_id, status: 'cancelled', kind: 'schedule', source: 'generated',
-    priority: { kind: 'standard', label: '' }, queuePosition: null, pollAfterMs: 500,
-    timestamps: { submittedAt: job.submitted_at },
-    estimate: { durationMs: 1000, bucket: 'maa_plain', source: 'fallback_p95', sampleCount: 0,
-      remainingMs: 0, totalMs: 1000, phase: 'cancelled', updatedAt: job.estimate_updated_at },
-    executionPhase: 'terminal', calculationStage: null, upgradeSuggestions: { requested: false, allowed: false },
-    attemptCount: 0, failureCount: 0, cancellationRequested: true, canCancel: false, canRetry: false,
-    error: { code: 'JOB_CANCELLED', message: 'Cancelled', retryable: false, recoveryAction: 'none', supportReference: 'restored-job' },
-  } : { stacks: [], capacities: [], balances: [] })
+  let finishJob!: () => void
+  const completion = new Promise<void>((resolve) => { finishJob = resolve })
+  vi.mocked(apiJson).mockImplementation(async (path) => {
+    if (path !== '/api/optimization/jobs/restored-job') return { stacks: [], capacities: [], balances: [] }
+    await completion
+    return {
+      id: job.job_id, status, kind: 'schedule', source: 'generated',
+      priority: { kind: 'standard', label: '' }, queuePosition: null, pollAfterMs: 500,
+      timestamps: { submittedAt: job.submitted_at },
+      estimate: { durationMs: 1000, bucket: 'maa_plain', source: 'fallback_p95', sampleCount: 0,
+        remainingMs: 0, totalMs: 1000, phase: status, updatedAt: job.estimate_updated_at },
+      executionPhase: 'terminal', calculationStage: null, upgradeSuggestions: { requested: false, allowed: false },
+      attemptCount: 0, failureCount: 0, cancellationRequested: status === 'cancelled', canCancel: false, canRetry: false,
+      error: { code: status === 'cancelled' ? 'JOB_CANCELLED' : 'OPTIMIZATION_FAILED', message: status, retryable: false, recoveryAction: 'none', supportReference: 'restored-job' },
+    }
+  })
   const props: Props = {
     profileId: profile.id, profile, license, workspace: null, setLicense: vi.fn(), eliteOverrides: {},
     configOverride: null, setConfigOverride: vi.fn(), configSyncStatus: 'idle',
@@ -60,9 +66,26 @@ it('restores polling after StrictMode effect cleanup and handles cancellation wi
   const wrapper = ({ children }: PropsWithChildren) => createElement(StrictMode, null, children)
   const { result } = renderHook(() => useOptimizeWorkflow(props), { wrapper })
   await waitFor(() => expect(apiJson).toHaveBeenCalledWith('/api/optimization/jobs/restored-job', expect.anything()))
+  expect(result.current.loading).toBe(true)
+  act(() => {
+    result.current.updateConfig((draft) => { draft.schedule_mode = 'rotation' })
+    result.current.handleApplyScenarioConfig(CONFIG_PRESETS['333'])
+    result.current.handleUseSavedConfig({ id: 'saved', name: 'Saved', config: CONFIG_PRESETS['333'],
+      created_at: '', updated_at: '', last_used_at: null })
+  })
+  expect(props.setConfigOverride).not.toHaveBeenCalled()
+  expect(props.onWorkspacePatch).not.toHaveBeenCalled()
+  expect(result.current.configToast).toBeNull()
+  await act(async () => finishJob())
   await waitFor(() => expect(result.current.loading).toBe(false))
-  expect(result.current.progress).toMatchObject({ jobId: job.job_id, estimatePhase: 'cancelled' })
-  expect(result.current.inlineError).toBeNull()
+  if (status === 'cancelled') {
+    expect(result.current.progress).toMatchObject({ jobId: job.job_id, estimatePhase: status })
+    expect(result.current.inlineError).toBeNull()
+  } else {
+    expect(result.current.inlineError).toMatchObject({ scope: 'generate' })
+  }
+  act(() => result.current.updateConfig((draft) => { draft.schedule_mode = 'rotation' }))
+  expect(props.setConfigOverride).toHaveBeenCalledOnce()
   expect(window.sessionStorage.getItem(storageKey)).toBeNull()
   expect(vi.mocked(apiJson).mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false)
 })

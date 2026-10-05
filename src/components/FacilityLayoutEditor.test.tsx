@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CONFIG_PRESETS } from '../lib/config'
@@ -41,6 +41,28 @@ describe('Skland facility import', () => {
     expect(screen.getByText('布局已确认')).toBeInTheDocument()
     expect(onUpdate).not.toHaveBeenCalled()
   })
+  it('cancels a pending facility read when configuration becomes read-only and preserves the confirmed layout', async () => {
+    let finishRead!: (response: { rooms: unknown[] }) => void
+    apiJson.mockReturnValue(new Promise((resolve) => { finishRead = resolve }))
+    const config = { ...structuredClone(CONFIG_PRESETS['252']), facility_layout: [...FACILITY_IDS] }
+    const onUpdate = vi.fn()
+    const view = render(<FacilityLayoutEditor profileId="profile-1" config={config} onUpdate={onUpdate} />)
+    await userEvent.click(screen.getByRole('button', { name: '从森空岛读取设施' }))
+    const signal = apiJson.mock.calls[0][1].signal as AbortSignal
+    view.rerender(<FacilityLayoutEditor profileId="profile-1" config={config} readOnly onUpdate={onUpdate} />)
+    expect(signal.aborted).toBe(true)
+    expect(screen.getByRole('button', { name: '从森空岛读取设施' })).toBeDisabled()
+    await act(async () => finishRead({ rooms: [
+      ...config.trading_station_levels!.map((level) => ({ type: 'trading', level })),
+      ...config.manufacturing_station_levels!.map((level) => ({ type: 'manufacture', level })),
+      { type: 'power', level: 3 }, { type: 'power', level: 3 },
+    ] }))
+    expect(onUpdate).not.toHaveBeenCalled()
+    expect(screen.getByText('布局已确认')).toBeInTheDocument()
+    view.rerender(<FacilityLayoutEditor profileId="profile-1" config={config} onUpdate={onUpdate} />)
+    expect(screen.getByRole('button', { name: '修改布局' })).toBeEnabled()
+  })
+
   it('cancels a pending read when the editor unmounts', async () => {
     apiJson.mockReturnValue(new Promise(() => {}))
     const onUpdate = vi.fn()

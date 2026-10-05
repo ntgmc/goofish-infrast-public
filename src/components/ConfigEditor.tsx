@@ -240,6 +240,7 @@ interface ConfigEditorProps {
   profileId?: string;
   config: LicenseConfig;
   canEdit: boolean;
+  readOnly?: boolean;
   canEditIntermediateInventory?: boolean;
   canSelectPreset?: boolean;
   canEditFixedShiftHours?: boolean;
@@ -257,6 +258,7 @@ export default function ConfigEditor({
   profileId,
   config,
   canEdit,
+  readOnly = false,
   canEditIntermediateInventory,
   canSelectPreset = false,
   canEditFixedShiftHours = false,
@@ -374,7 +376,8 @@ export default function ConfigEditor({
   }
 
   return (
-<section className={`config-editor ${embedded ? '' : 'tool-panel p-5 sm:p-6'}`}>
+<fieldset disabled={readOnly} className={`config-editor min-w-0 ${embedded ? '' : 'tool-panel p-5 sm:p-6'}`} aria-label={copy.common.components_ConfigEditor_021}>
+      {readOnly && <p className="tool-alert tool-alert--info mb-4" role="status">{copy.common.configGenerationReadOnly}</p>}
       {!hideHeader && (
 <div className="config-editor-header flex flex-col gap-4 border-b border-surface-3/60 pb-5">
         <div>
@@ -400,7 +403,7 @@ export default function ConfigEditor({
       )}
 
       {supported252PresetSelected && (
-        <FacilityLayoutEditor key={JSON.stringify([profileId, config.trading_station_levels, config.manufacturing_station_levels])} profileId={profileId} config={config} onUpdate={onUpdate} />
+        <FacilityLayoutEditor key={JSON.stringify([profileId, config.trading_station_levels, config.manufacturing_station_levels])} profileId={profileId} config={config} readOnly={readOnly} onUpdate={onUpdate} />
       )}
       {supported252PresetSelected && (
         <p className="tool-alert tool-alert--warning mt-3 px-3 py-2 text-xs leading-5" role="note">
@@ -834,7 +837,7 @@ export default function ConfigEditor({
       {validationMessage && (
         <p className="tool-alert tool-alert--warning mt-4" role="alert">{validationMessage}</p>
       )}
-    </section>
+    </fieldset>
   )
 }
 

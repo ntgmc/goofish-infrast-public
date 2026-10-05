@@ -1,4 +1,5 @@
 export const commonCopy = {
+  configGenerationReadOnly: "排班生成期间，基建配置为只读。生成结束后可继续修改。",
   facilityLayoutTitle: "设施位置与等级",
   facilityLayoutRead: "从森空岛读取设施",
   facilityLayoutReading: "正在读取设施…",

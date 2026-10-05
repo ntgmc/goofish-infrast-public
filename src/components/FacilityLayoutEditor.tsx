@@ -18,8 +18,9 @@ type Room = { type: FacilityType; level: number }
 const TYPES = Object.keys(FACILITIES) as FacilityType[]
 const positionLabel = (position: number) => `B${Math.floor(position / 3) + 1} · ${copy.common.facilityLayoutColumns[position % 3]}`
 
-export default function FacilityLayoutEditor({ config, onUpdate, profileId }: {
+export default function FacilityLayoutEditor({ config, onUpdate, profileId, readOnly = false }: {
   profileId?: string
+  readOnly?: boolean
   config: LicenseConfig
   onUpdate: (mutate: (config: LicenseConfig) => void) => void
 }) {
@@ -45,9 +46,15 @@ export default function FacilityLayoutEditor({ config, onUpdate, profileId }: {
   const expected = FACILITY_IDS.map(roomFor)
   const expectedSignature = JSON.stringify(expected)
   useEffect(() => () => requestRef.current?.abort(), [])
+  useEffect(() => {
+    if (!readOnly) return
+    requestRef.current?.abort()
+    setReading(false)
+    setSelectedPosition(null)
+  }, [readOnly])
 
   const readFacilities = async () => {
-    if (!profileId || reading) return
+    if (!profileId || reading || readOnly) return
     const controller = new AbortController()
     requestRef.current = controller
     setReading(true)
@@ -130,13 +137,13 @@ export default function FacilityLayoutEditor({ config, onUpdate, profileId }: {
         </span>
       </div>
       {profileId && (
-        <button type="button" disabled={reading} onClick={() => { void readFacilities() }} className="tool-secondary-action mt-3 min-h-11 px-3">
+        <button type="button" disabled={reading || readOnly} onClick={() => { void readFacilities() }} className="tool-secondary-action mt-3 min-h-11 px-3">
           <SklandIcon />
           {reading ? copy.common.facilityLayoutReading : copy.common.facilityLayoutRead}
         </button>
       )}
       {readNotice && <p role="status" className="tool-alert mt-3">{readNotice}</p>}
-      <fieldset disabled={reading} className="min-w-0 border-0 p-0" aria-busy={reading}>
+      <fieldset disabled={reading || readOnly} className="min-w-0 border-0 p-0" aria-busy={reading}>
       {collapsed ? (
         <div className="tool-inset mt-3 flex flex-wrap items-center justify-between gap-3 p-4">
           <div role="status">
@@ -202,7 +209,7 @@ export default function FacilityLayoutEditor({ config, onUpdate, profileId }: {
       </div>
       )}
       </fieldset>
-      <Dialog open={selectedPosition !== null} onOpenChange={(open) => { if (!open) setSelectedPosition(null) }}>
+      <Dialog open={selectedPosition !== null && !readOnly} onOpenChange={(open) => { if (!open) setSelectedPosition(null) }}>
         <DialogContent showCloseButton closeLabel={copy.common.facilityLayoutClose}
           onCloseAutoFocus={(event) => { event.preventDefault(); triggerRef.current?.focus() }}>
           <DialogTitle>{copy.common.facilityLayoutChoose}{selectedPosition !== null ? ` · ${positionLabel(selectedPosition)}` : ''}</DialogTitle>

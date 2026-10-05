@@ -37,7 +37,7 @@ const titles: Record<OptionPanel, string> = {
 }
 
 export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigate, session, config, operators, onUpdateConfig, permission,
-  canEditConfig = true, canUseIntermediateConfig = true, sample, busy, onImportOperators, onAccount, room, error, configDiffRows, hasPreviousResult }: {
+  canEditConfig = true, canUseIntermediateConfig = true, configReadOnly = false, sample, busy, onImportOperators, onAccount, room, error, configDiffRows, hasPreviousResult }: {
   panel: OptionPanel | null
   onClose: () => void
   onOpenProfile: (profile: V2Session['profiles'][number]) => Promise<void>
@@ -49,6 +49,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
   permission?: PermissionMode
   canEditConfig?: boolean
   canUseIntermediateConfig?: boolean
+  configReadOnly?: boolean
   sample: boolean
   busy: boolean
   onImportOperators: (operators: LicenseOperator[]) => Promise<void>
@@ -125,7 +126,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
           <>
             {error && <p role="alert" className="v2-feedback v2-feedback-error">{error}</p>}
             <ConfigCapabilityPreview config={config} enabled={!canEditConfig}>
-            <ConfigEditor profileId={session.activeProfile?.id} config={config} canEdit={canEditConfig && !busy} canEditIntermediateInventory={canUseIntermediateConfig}
+            <ConfigEditor profileId={session.activeProfile?.id} config={config} canEdit={canEditConfig} readOnly={configReadOnly} canEditIntermediateInventory={canUseIntermediateConfig}
               canSelectPreset={canUseIntermediateConfig} canEditFixedShiftHours={canEditConfig || Boolean(session.activeProfile && isFreePreviewProfile(session.activeProfile))} permission={permission}
               validation={validateScheduleConfig(config)} onUpdate={onUpdateConfig} embedded />
             </ConfigCapabilityPreview>
