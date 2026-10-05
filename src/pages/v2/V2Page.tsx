@@ -156,7 +156,7 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
   async function generate() {
     if (!confirmResultChange()) return
     if (generationDisabledReason) { setError(generationDisabledReason); return }
-    if (!await session.flushConfigSave()) { setError(copy.v2.saveFailed); return }
+    if (!await session.flushConfigSave()) { setError(workflow.configValidation.ok ? copy.v2.saveFailed : workflow.configValidation.message); return }
     setError(null)
     await workflow.handleGenerate()
   }
@@ -205,7 +205,7 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
     }, handleIncrementalRecompute: async () => {
       if (!confirmResultChange()) return
       if (generationDisabledReason) { setError(generationDisabledReason); return }
-      if (!await session.flushConfigSave()) { setError(copy.v2.saveFailed); return }
+      if (!await session.flushConfigSave()) { setError(workflow.configValidation.ok ? copy.v2.saveFailed : workflow.configValidation.message); return }
       await workflow.handleIncrementalRecompute()
     } }} taskCenterAction={taskCenterAction} result={result ?? SAMPLE_RESULT} operators={workflow.mergedOperators} config={workflow.activeConfig}
     sample={!result} configChanged={Boolean(result && (operatorsChanged || workflow.configDiffRows.length > 0 || session.configOverride))}
@@ -218,7 +218,7 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
     onManualDirtyChange={onManualDirtyChange} onGenerate={() => void generate()} onExport={features.features.maa_export ? workflow.handleDownloadMAA : undefined}
     busy={workflow.loading || Boolean(workflow.workspaceBusyAction?.startsWith('download'))} loadingResult={reading} generationDisabledReason={generationDisabledReason}
     onRetryResult={latest ? () => void readLatestResult() : undefined}
-    error={error ?? workflow.inlineError?.message ?? workflow.configToast?.message ?? workflow.workspaceError ?? (session.configSyncStatus === 'failed' ? copy.v2.saveFailed : null)}
+    error={error ?? workflow.inlineError?.message ?? (workflow.configValidation.ok ? workflow.configToast?.message : null) ?? workflow.workspaceError ?? (session.configSyncStatus === 'failed' ? copy.v2.saveFailed : null)}
     notice={workflow.workspaceNotice ?? (!features.features.schedule_generation ? copy.features.schedule_read_only : !result && !reading ? copy.v2.dataPending : null)}
     permission={workflow.permission} canEditConfig={workflow.userCanEditConfig} canViewAnalysis={workflow.userCanViewFullData && !result?.preview_limit}
     canUseIntermediateConfig={workflow.userCanUseIntermediateAutoConfig}>

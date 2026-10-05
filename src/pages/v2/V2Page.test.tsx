@@ -6,7 +6,7 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { copy } from '../../copy'
 import { MotionPreferenceProvider } from '../../lib/motion-preference'
-import { normalizeConfig } from '../../lib/config'
+import { normalizeConfig, validateScheduleConfig } from '../../lib/config'
 import { DEFAULT_SITE_FEATURES } from '../../lib/site-features'
 import type { OptimizeResult, UserGameAccount, WorkspaceResultHistorySummary } from '../../lib/types'
 import type { V2Session } from './OptionsDrawer'
@@ -92,7 +92,7 @@ function connect() {
     updateConfig: vi.fn(), handleGenerate: vi.fn(async () => undefined), handleDownloadMAA: vi.fn(),
     permission: 'ultimate', userCanEditConfig: true, userCanUseIntermediateAutoConfig: true,
     userCanViewFullData: true,
-    configValidation: { ok: true }, configPresetLabel: '2-4-3', hasResult: true, resultIsCurrent: false,
+    configValidation: { ok: true } as ReturnType<typeof validateScheduleConfig>, configPresetLabel: '2-4-3', hasResult: true, resultIsCurrent: false,
     resultHistory: [summary], loading: false, workspaceError: null, inlineError: null,
     workspaceNotice: null, declarationDialog: null, configToast: null as { message: string } | null,
     billingQuote: null as { charge: string; available: string; tier: number | null; sufficient: boolean } | null,
@@ -492,6 +492,37 @@ describe('V2 results-first workspace', () => {
     mount()
     await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
     expect(within(await screen.findByRole('dialog')).getByRole('alert')).toHaveTextContent('Invalid schedule configuration')
+  })
+
+  it('keeps incomplete configuration feedback in the drawer without a validation toast', async () => {
+    const workflow = connect()
+    workflow.activeConfig = normalizeConfig(SAMPLE_CONFIG)
+    workflow.activeConfig.product_requirements.manufacturing_stations['Pure Gold'] += 1
+    workflow.configValidation = validateScheduleConfig(workflow.activeConfig)
+    if (workflow.configValidation.ok) throw new Error('Expected an incomplete configuration')
+    const message = workflow.configValidation.message
+    workflow.configToast = { message }
+    session.configSyncStatus = 'pending'
+    const user = userEvent.setup()
+    mount()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(message)).toHaveAttribute('role', 'status')
+    expect(within(dialog).getAllByText(message)).toHaveLength(1)
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+    expect(within(dialog).queryByText(copy.v2.saveFailed)).not.toBeInTheDocument()
+    expect(within(dialog).queryByText(copy.workspace.config_save_pending)).not.toBeInTheDocument()
+  })
+
+  it('retains the save retry action in the configuration drawer after a request failure', async () => {
+    connect()
+    session.configSyncStatus = 'failed'
+    const user = userEvent.setup()
+    mount('/v2?panel=config')
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: copy.workspace.config_save_failed }))
+    expect(session.retryConfigSave).toHaveBeenCalledOnce()
   })
 
   it('writes the successfully selected profile into the route for refresh restoration', async () => {

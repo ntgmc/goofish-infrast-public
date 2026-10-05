@@ -1296,6 +1296,19 @@
   font-size: var(--text-sm);
 }
 
+.v2-config-feedback {
+  display: flex;
+  height: 64px;
+  align-items: center;
+  margin-top: 12px;
+  overflow-y: auto;
+}
+
+.v2-drawer-heading .v2-config-feedback p {
+  width: 100%;
+  margin: 0;
+}
+
 .v2-drawer-done {
   position: sticky;
   bottom: 0;
