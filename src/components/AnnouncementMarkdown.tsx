@@ -1,5 +1,5 @@
 import ReactMarkdown from 'react-markdown'
-import { Link } from 'react-router'
+import Link from './InternalLink'
 import remarkGfm from 'remark-gfm'
 import { isAppRoutePath } from '../lib/app-routes'
 import type { MouseEvent } from 'react'

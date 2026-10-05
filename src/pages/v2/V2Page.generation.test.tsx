@@ -162,8 +162,9 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and d
     .toHaveLength(mode === 'submitted' ? 1 : 0)
   expect(vi.mocked(apiJson).mock.calls.some(([url]) => url.startsWith('/api/user/results/new-result?'))).toBe(false)
   await userEvent.click(screen.getByRole('button', { name: copy.v2.history }))
-  await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /Previous schedule/ }))
+  const previousCard = (await screen.findByText('Previous schedule')).closest('.tool-inset')!
+  await userEvent.click(within(previousCard as HTMLElement).getByRole('button', { name: copy.optimize.pages_tool_optimize_PlansSection_030 }))
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-  expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('54,720')).toBeInTheDocument()
+  await waitFor(() => expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('54,720')).toBeInTheDocument())
   expect(vi.mocked(apiJson).mock.calls.some(([url]) => url.startsWith('/api/user/results/new-result?'))).toBe(false)
 })

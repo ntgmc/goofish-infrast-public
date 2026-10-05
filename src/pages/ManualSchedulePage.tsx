@@ -10,14 +10,27 @@ import { copy } from '../copy/index'
 import { CONFIG_PRESETS, normalizeConfig } from '../lib/config'
 import { createBlankManualSchedule, isManualScheduleProfileAvailable, parseManualScheduleJson } from '../lib/manual-schedule-tool'
 import { profileScopedPath, workspaceSetupPath } from '../lib/app-routes'
+import { v2Path } from './v2/navigation'
 import { useSiteFeatures } from '../lib/site-feature-context'
 import { mergeOperators } from '../lib/license'
 import type { LicenseConfig, OptimizeResult } from '../lib/types'
 import { useToolSession } from './tool/useToolSession'
 
-export default function ManualSchedulePage() {
-  const label = copy.tools.manualSchedule
+type PageProps = { embedded?: boolean; session?: ReturnType<typeof useToolSession>; onDirtyChange?: (dirty: boolean) => void; onOpenProfile?: (profile: ReturnType<typeof useToolSession>['profiles'][number]) => Promise<void> }
+
+export default function ManualSchedulePage({ embedded = false, session, onDirtyChange, onOpenProfile }: PageProps = {}) {
+  return session ? <ManualScheduleContent session={session} embedded={embedded} onDirtyChange={onDirtyChange} onOpenProfile={onOpenProfile} /> : <StandaloneManualSchedule />
+}
+
+function StandaloneManualSchedule() {
   const session = useToolSession()
+  return <ManualScheduleContent session={session} />
+}
+
+function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpenProfile }: PageProps & { session: ReturnType<typeof useToolSession> }) {
+  const label = copy.tools.manualSchedule
+  const ContentRoot = embedded ? 'div' : 'main'
+  const operatorsPath = (profileId: string) => embedded ? `${v2Path('overview', profileId)}&panel=operators` : profileScopedPath(workspaceSetupPath('operators'), profileId)
   const { features } = useSiteFeatures()
   const available = session.profiles.filter((profile) => isManualScheduleProfileAvailable(profile) &&
     (features.metered_billing || !profile.kind.startsWith('metered_')))
@@ -42,12 +55,13 @@ export default function ManualSchedulePage() {
   const enabled = canUse && !importing
 
   useEffect(() => {
-    if (profile && profile.id !== session.activeProfile?.id) {
+    if (!embedded && profile && profile.id !== session.activeProfile?.id) {
       void session.refreshProfileWorkspace(profile).catch(() => undefined)
     }
-  }, [profile, session.activeProfile?.id, session.refreshProfileWorkspace])
+  }, [embedded, profile, session.activeProfile?.id, session.refreshProfileWorkspace])
 
   useEffect(() => {
+    onDirtyChange?.(false)
     setDraft(null)
     setError(null)
     setPreset('')
@@ -101,18 +115,18 @@ export default function ManualSchedulePage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-      <header className="mb-8 flex items-center justify-between gap-4">
+    <div className={embedded ? 'v2-embedded-tool' : 'mx-auto max-w-7xl px-4 py-6 sm:px-6'}>
+      {!embedded && <header className="mb-8 flex items-center justify-between gap-4">
         <Link to="/tool/tools" aria-label={label.back}><BrandLogo /></Link>
         <div className="flex items-center gap-4">
           <Link to="/tool/tools" className="text-sm text-ink-secondary hover:text-ink-primary">{label.back}</Link>
           <ThemeSwitcher />
         </div>
-      </header>
-      <main className="space-y-6">
+      </header>}
+      <ContentRoot className="space-y-6">
         <section className="tool-panel space-y-4 p-5 sm:p-6">
           <div>
-            <h1 className="text-2xl font-semibold text-ink-primary">{label.title}</h1>
+            {!embedded && <h1 className="text-2xl font-semibold text-ink-primary">{label.title}</h1>}
             <p className="mt-2 text-sm leading-6 text-ink-secondary">{label.description}</p>
             <p className="mt-2 text-sm leading-6 text-ink-muted">{label.access}</p>
           </div>
@@ -125,19 +139,21 @@ export default function ManualSchedulePage() {
             <>
               <label className="block space-y-2 text-sm">
                 <span>{label.profile}</span>
-                <select className="tool-field" value={profile.id} disabled={Boolean(session.openingProfileId) || importing}
+                <select className="tool-field" value={embedded && !ready ? "" : profile.id} disabled={Boolean(session.openingProfileId) || importing}
                   onChange={(event) => {
                     const selected = available.find((entry) => entry.id === event.target.value)
+                    if (!selected) return
+                    if (onOpenProfile) { void onOpenProfile(selected); return }
                     if (draft && !window.confirm(label.replace)) return
-                    setDraft(null)
-                    if (selected) void session.refreshProfileWorkspace(selected).catch(() => undefined)
+                    void session.flushConfigSave().then((saved) => saved ? session.refreshProfileWorkspace(selected) : undefined).catch(() => undefined)
                   }}>
+                  {embedded && !ready && <option value="" disabled>{copy.common.pages_tool_useToolSession_004}</option>}
                   {available.map((entry) => <option key={entry.id} value={entry.id}>{entry.display_name}</option>)}
                 </select>
               </label>
               {ready && !operators.some((operator) => operator.own) && <p className="text-sm text-ink-secondary">
                 {label.operatorsRequired}{' '}
-                <Link className="text-brand-500 underline" to={profileScopedPath(workspaceSetupPath('operators'), profile.id)}>{label.setup}</Link>
+                <Link className="text-brand-500 underline" to={operatorsPath(profile.id)}>{label.setup}</Link>
               </p>}
               {ready && operators.some((operator) => operator.own) && <details className="tool-inset p-4">
                 <summary className="cursor-pointer text-sm font-medium">{label.operators} · {operators.filter((operator) => operator.own).length}</summary>
@@ -150,7 +166,7 @@ export default function ManualSchedulePage() {
                     </div>)}
                   </div>
                 </OperatorSkillPreview>
-                <Link className="mt-3 inline-block text-sm text-brand-500 underline" to={profileScopedPath(workspaceSetupPath('operators'), profile.id)}>{label.editOperators}</Link>
+                <Link className="mt-3 inline-block text-sm text-brand-500 underline" to={operatorsPath(profile.id)}>{label.editOperators}</Link>
               </details>}
               <p className="text-xs leading-5 text-ink-muted">{label.configHint}</p>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -193,9 +209,9 @@ export default function ManualSchedulePage() {
         {canUse && draft?.profileId === profile?.id && draft && (
           <ManualScheduleEditor key={`${draft.profileId}:${draft.revision}`} source={draft.source}
             profileId={draft.profileId} draftStorageKey={`tool:${draft.profileId}`}
-            operators={operators} simulationBaseline={{ config: draft.config }} />
+            operators={operators} simulationBaseline={{ config: draft.config }} onDirtyChange={onDirtyChange} />
         )}
-      </main>
+      </ContentRoot>
     </div>
   )
 }

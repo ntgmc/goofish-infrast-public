@@ -8,7 +8,7 @@ import GenerateControlBar, { DashboardMiniStat } from './GenerateControlBar'
 import { SmallActionButton } from './feedback'
 import type { ValidationState } from './types'
 import { copy } from '../../../copy/index'
-import { Link } from 'react-router'
+import Link from '../../../components/InternalLink'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 
 

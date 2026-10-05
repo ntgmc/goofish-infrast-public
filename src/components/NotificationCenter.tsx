@@ -266,13 +266,13 @@ function EnabledNotificationCenterProvider({ userId, children }: { userId: strin
   )
 }
 
-export function NotificationBell({ iconOnly = false }: { iconOnly?: boolean }) {
+export function NotificationBell({ iconOnly = false, onInventory }: { iconOnly?: boolean; onInventory?: () => void }) {
   const center = useContext(NotificationCenterContext)
   if (!center) return null
-  return <NotificationBellContent center={center} iconOnly={iconOnly} />
+  return <NotificationBellContent center={center} iconOnly={iconOnly} onInventory={onInventory} />
 }
 
-function NotificationBellContent({ center, iconOnly }: { center: NotificationCenterValue; iconOnly: boolean }) {
+function NotificationBellContent({ center, iconOnly, onInventory }: { center: NotificationCenterValue; iconOnly: boolean; onInventory?: () => void }) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const badge = center.unreadCount > 99 ? '99+' : String(center.unreadCount)
@@ -287,7 +287,10 @@ function NotificationBellContent({ center, iconOnly }: { center: NotificationCen
       }
     }
     setOpen(false)
-    if (notification.action?.kind === 'inventory') navigate('/tool/inventory')
+    if (notification.action?.kind === 'inventory') {
+      if (onInventory) onInventory()
+      else navigate('/tool/inventory')
+    }
   }
 
   return (

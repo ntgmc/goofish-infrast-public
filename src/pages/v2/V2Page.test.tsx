@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { useState } from 'react'
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
@@ -17,7 +18,9 @@ const mocks = vi.hoisted(() => ({
   workflow: vi.fn(),
   features: vi.fn(),
   tasks: vi.fn(),
+  manual: vi.fn(),
 }))
+vi.mock('../../components/result-panel/ManualScheduleEditor', () => ({ default: mocks.manual }))
 vi.mock('../tool/useToolSession', () => ({ useToolSession: mocks.session }))
 vi.mock('../tool/optimize/useOptimizeWorkflow', () => ({ useOptimizeWorkflow: mocks.workflow }))
 vi.mock('../tool/optimize/useOptimizationTaskCenter', () => ({ useOptimizationTaskCenter: mocks.tasks }))
@@ -39,7 +42,7 @@ beforeEach(() => {
   mocks.features.mockReturnValue({ status: 'ready', features: DEFAULT_SITE_FEATURES, retry: vi.fn() })
   mocks.tasks.mockReturnValue({ jobs: [], cancel: vi.fn(), busyJobId: null, error: null, notice: null })
   session = {
-    user: null, activeProfile: null, license: null, workspace: null, configOverride: null,
+    user: null, profiles: [], announcementUnreadCount: 0, popups: [], setAnnouncementUnreadCount: vi.fn(), activeProfile: null, license: null, workspace: null, configOverride: null,
     authStatus: 'anonymous', cdkProfiles: [], openingProfileId: null, workspaceLoadError: null,
     configSyncStatus: 'idle', eliteOverrides: {}, banner: null,
     retryAuth: vi.fn(), setLicense: vi.fn(), applyAuthPayload: vi.fn(),
@@ -60,8 +63,8 @@ function RouteLocation() {
   return <span data-testid="route-location">{useLocation().search}</span>
 }
 
-function mount() {
-  return render(<MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter>)
+function mount(path = '/v2') {
+  return render(<MemoryRouter initialEntries={[path]}><V2Page /><RouteLocation /></MemoryRouter>)
 }
 
 async function dismissDrawer(user: ReturnType<typeof userEvent.setup>) {
@@ -78,16 +81,18 @@ function connect() {
     ...session,
     authStatus: 'authenticated',
     user: { id: 'user-1', email: 'doctor@example.test' } as V2Session['user'],
-    activeProfile: profile, cdkProfiles: [profile],
+    activeProfile: profile, cdkProfiles: [profile], profiles: [profile], announcementUnreadCount: 0, popups: [], setAnnouncementUnreadCount: vi.fn(),
     license: { version: 2, order_hash: 'order', operators: SAMPLE_OPERATORS, config: SAMPLE_CONFIG, issued_at: '', sig: '' },
   }
   const workflow = {
+    profile, savedConfigs: [], archivedResults: [], suggestions: [], itemBalances: {},
     latestWorkspaceResult: summary, handleViewHistory: vi.fn(async () => undefined),
     currentResult: null as OptimizeResult | null, finalResult: null, historyItem: { result: SAMPLE_RESULT },
     activeConfig: SAMPLE_CONFIG, mergedOperators: SAMPLE_OPERATORS, configDiffRows: [],
     updateConfig: vi.fn(), handleGenerate: vi.fn(async () => undefined), handleDownloadMAA: vi.fn(),
     permission: 'ultimate', userCanEditConfig: true, userCanUseIntermediateAutoConfig: true,
     userCanViewFullData: true,
+    configValidation: { ok: true }, configPresetLabel: '2-4-3', hasResult: true, resultIsCurrent: false,
     resultHistory: [summary], loading: false, workspaceError: null, inlineError: null,
     workspaceNotice: null, declarationDialog: null, configToast: null as { message: string } | null,
     billingQuote: null as { charge: string; available: string; tier: number | null; sufficient: boolean } | null,
@@ -213,7 +218,7 @@ describe('V2 results-first workspace', () => {
     expect(screen.getByText(copy.v2.sampleSource)).toBeInTheDocument()
     expect(screen.getByText(copy.v2.brandDescription)).toBeInTheDocument()
     expect(screen.queryByText('可露希尔基建终端')).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: copy.v2.backToV1 })).toHaveAttribute('href', '/')
+    expect(screen.queryByRole('link', { name: '返回 V1' })).not.toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /第 1 班/ })).toHaveAttribute('aria-selected', 'true')
     expect(mocks.workflow).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -485,7 +490,7 @@ describe('V2 results-first workspace', () => {
     vi.mocked(session.refreshProfileWorkspace).mockResolvedValue(undefined)
     const user = userEvent.setup()
     mount()
-    await user.click(screen.getByRole('button', { name: copy.v2.account }))
+    await user.click(screen.getByRole('button', { name: /My Doctor/ }))
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /Second Doctor/ }))
     await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('profile_id=profile-2'))
     expect(session.flushConfigSave).toHaveBeenCalledOnce()
@@ -541,7 +546,7 @@ describe('V2 results-first workspace', () => {
     expect(within(dialog).getByText(copy.v2.operatorLevel(0))).toBeInTheDocument()
     expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('combobox')).not.toBeInTheDocument()
-    await user.type(within(dialog).getByRole('textbox', { name: copy.v2.searchOperators }), '银灰')
+    await user.type(within(dialog).getByRole('textbox', { name: copy.v2.searchOperators }), 'yinhui')
     expect(within(dialog).getByText('银灰')).toBeInTheDocument()
     expect(within(dialog).queryByText('锏')).not.toBeInTheDocument()
     expect(session.persistWorkspacePatch).not.toHaveBeenCalled()
@@ -586,7 +591,7 @@ describe('V2 results-first workspace', () => {
     await user.upload(within(dialog).getByLabelText(copy.v2.uploadMaa), file)
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('干员数据异常，请核对当前游戏账号后重新导入。')
     expect(within(dialog).queryByRole('status')).not.toBeInTheDocument()
-    await user.type(within(dialog).getByRole('textbox', { name: copy.v2.searchOperators }), '银灰')
+    await user.type(within(dialog).getByRole('textbox', { name: copy.v2.searchOperators }), 'yinhui')
     expect(within(dialog).getByText(copy.v2.ownedLabel)).toBeInTheDocument()
     expect(within(dialog).getByText(copy.v2.elite(2))).toBeInTheDocument()
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
@@ -668,5 +673,230 @@ describe('V2 results-first workspace', () => {
     expect(panel.getByText('源石碎片')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: copy.v2.analysisTab }))
     expect(screen.queryByRole('region', { name: copy.v2.sanityCalculation })).not.toBeInTheDocument()
+  })
+})
+
+function ManualDraftStub({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void }) {
+  const [draft, setDraft] = useState('original')
+  return <button type="button" onClick={() => { setDraft('edited'); onDirtyChange(true) }}>Edit draft: {draft}</button>
+}
+
+describe('V2 feature continuity', () => {
+  it('retains manual changes across tabs and pages and uses the selected history baseline', async () => {
+    const workflow = connect()
+    const baseline = normalizeConfig({ ...SAMPLE_CONFIG, desc: 'saved baseline' })
+    Object.assign(workflow.historyItem, { id: summary.id, config: baseline })
+    mocks.manual.mockImplementation(ManualDraftStub)
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('button', { name: copy.v2.manualTab }))
+    const edit = await screen.findByRole('button', { name: 'Edit draft: original' })
+    await user.click(edit)
+    expect(mocks.manual.mock.calls[mocks.manual.mock.calls.length - 1]?.[0]).toMatchObject({ profileId: 'profile-1', simulationBaseline: { id: summary.id, config: baseline } })
+    await user.click(screen.getByRole('button', { name: copy.v2.tools }))
+    expect(await screen.findByRole('link', { name: new RegExp(copy.tools.manualSchedule.title) })).toHaveAttribute('href', '/v2?section=manual-tool&profile_id=profile-1')
+    await user.click(screen.getByRole('button', { name: copy.v2.overview }))
+    expect(screen.getByRole('button', { name: 'Edit draft: edited' })).toBe(edit)
+    await user.click(screen.getByRole('button', { name: copy.v2.summaryTab }))
+    await user.click(screen.getByRole('button', { name: copy.v2.manualTab }))
+    expect(screen.getByRole('button', { name: 'Edit draft: edited' })).toBe(edit)
+    expect(session.persistWorkspacePatch).not.toHaveBeenCalled()
+  })
+
+  it('blocks profile switching when configuration cannot be saved', async () => {
+    connect()
+    const next = { ...session.activeProfile!, id: 'profile-2', display_name: 'Second Doctor' }
+    session.cdkProfiles.push(next)
+    vi.mocked(session.flushConfigSave).mockResolvedValue(false)
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('button', { name: /My Doctor/ }))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /Second Doctor/ }))
+    expect(session.refreshProfileWorkspace).not.toHaveBeenCalled()
+    expect(screen.getByTestId('route-location')).not.toHaveTextContent('profile_id=profile-2')
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('requires confirmation before replacing unsaved manual changes', async () => {
+    const workflow = connect()
+    mocks.manual.mockImplementation(ManualDraftStub)
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('button', { name: copy.v2.manualTab }))
+    await user.click(await screen.findByRole('button', { name: 'Edit draft: original' }))
+    await user.click(screen.getByRole('button', { name: copy.v2.regenerate }))
+    expect(confirm).toHaveBeenCalledWith(copy.v2.discardManual)
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+    confirm.mockReturnValue(true)
+    await user.click(screen.getByRole('button', { name: copy.v2.regenerate }))
+    expect(workflow.handleGenerate).toHaveBeenCalledOnce()
+  })
+
+  it('protects a manual result draft when generation is started from the full generation page', async () => {
+    const workflow = connect()
+    mocks.manual.mockImplementation(ManualDraftStub)
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('button', { name: copy.v2.manualTab }))
+    await user.click(await screen.findByRole('button', { name: 'Edit draft: original' }))
+    await user.click(screen.getByRole('button', { name: copy.v2.generation }))
+    await user.click(await screen.findByRole('button', { name: copy.optimize.pages_tool_optimize_GenerateControlBar_029 }))
+    expect(confirm).toHaveBeenCalledWith(copy.v2.discardManual)
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: copy.v2.overview }))
+    expect(screen.getByRole('button', { name: 'Edit draft: edited' })).toBeInTheDocument()
+  })
+
+  it('keeps free-preview upload and manual-edit restrictions while allowing the standalone tool', async () => {
+    const workflow = connect()
+    session.activeProfile = { ...session.activeProfile!, kind: 'free_preview' }
+    workflow.userCanEditConfig = false
+    workflow.activeConfig = normalizeConfig({ ...SAMPLE_CONFIG, schedule_mode: 'maa' })
+    const user = userEvent.setup()
+    mount()
+    expect(screen.queryByRole('button', { name: copy.v2.manualTab })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: copy.v2.operators }))
+    const dialog = within(await screen.findByRole('dialog'))
+    expect(dialog.getByRole('button', { name: copy.v2.uploadMaa })).toBeDisabled()
+    expect(dialog.getByText(copy.workspace.pages_tool_WorkspaceSetupPage_004)).toBeInTheDocument()
+    await dismissDrawer(user)
+    await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
+    const configDialog = within(await screen.findByRole('dialog'))
+    const fixedHours = configDialog.getByRole('button', { name: copy.common.components_ConfigEditor_088 })
+    expect(fixedHours).toBeEnabled()
+    expect(configDialog.getByRole('button', { name: copy.common.components_ConfigEditor_091 })).toBeDisabled()
+    await user.click(fixedHours)
+    expect(workflow.updateConfig).toHaveBeenCalledOnce()
+    await dismissDrawer(user)
+    await user.click(screen.getByRole('button', { name: copy.v2.tools }))
+    expect(await screen.findByRole('link', { name: new RegExp(copy.tools.manualSchedule.title) })).toHaveAttribute('href', expect.stringContaining('section=manual-tool'))
+  })
+
+  it('opens full account settings inside V2 and shares the existing animation preferences', async () => {
+    connect()
+    const user = userEvent.setup()
+    render(<MotionPreferenceProvider><MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter></MotionPreferenceProvider>)
+    await user.click(screen.getByRole('button', { name: copy.v2.settings }))
+    expect(await screen.findByLabelText(copy.dashboard.pages_tool_dashboard_SettingsSection_018)).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: copy.dashboard.animation.reduce })).toBeInTheDocument()
+    expect(screen.getByText(copy.dashboard.workspace_entry.settings_title)).toBeInTheDocument()
+    expect(screen.getByTestId('route-location')).toHaveTextContent('section=settings')
+    expect(screen.queryByRole('link', { name: '返回 V1' })).not.toBeInTheDocument()
+  })
+
+  it('honors the existing automatic workspace preference without leaving V2 or redirecting settings', async () => {
+    connect()
+    window.localStorage.setItem('maatool:workspace-entry:v1:user-1', JSON.stringify({ target: 'profile:profile-1', remindAfter: 0 }))
+    try {
+      const view = mount('/v2?section=profiles')
+      await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('?profile_id=profile-1'))
+      view.unmount()
+      mount('/v2?section=settings')
+      expect(screen.getByTestId('route-location')).toHaveTextContent('section=settings')
+    } finally { window.localStorage.removeItem('maatool:workspace-entry:v1:user-1') }
+  })
+
+  it('prefers free account binding while retaining CDK redemption inside V2', async () => {
+    connect()
+    const user = userEvent.setup()
+    mount('/v2?section=add-account')
+    const preview = await screen.findByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_006 })
+    expect(preview).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_005 }))
+    expect(screen.getByRole('textbox', { name: 'CDK' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /邀请有礼/ })).not.toBeInTheDocument()
+    expect(session.applyAuthPayload).not.toHaveBeenCalled()
+  })
+
+  it.each(['switch', 'keep-draft', 'save-failed'])('uses the resulting account ID and protects the current workspace after adding an account: %s', async (mode) => {
+    connect()
+    mocks.manual.mockImplementation(ManualDraftStub)
+    vi.spyOn(window, 'confirm').mockReturnValue(mode !== 'keep-draft')
+    vi.mocked(session.flushConfigSave).mockResolvedValue(mode !== 'save-failed')
+    const next = { ...session.activeProfile!, id: 'added-profile', display_name: 'New Doctor' }
+    const payload = { user: session.user!, profiles: [...session.profiles, next], active_profile: next, workspace: { ...session.workspace, profile_id: next.id } }
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => new Response(JSON.stringify(String(url) === '/api/user/cdk/redeem' ? { redemption_type: 'profile', auth: payload } : { notifications: [], unread_count: 0, next_cursor: null }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('button', { name: copy.v2.manualTab }))
+    await user.click(await screen.findByRole('button', { name: 'Edit draft: original' }))
+    await user.click(screen.getByRole('button', { name: copy.v2.account }))
+    await user.click(await screen.findByRole('button', { name: copy.v2.addAccount }))
+    await user.click(await screen.findByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_005 }))
+    await user.type(screen.getByRole('textbox', { name: 'CDK' }), 'MAA-NEW-ACCOUNT')
+    await user.click(screen.getByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_015 }))
+    await waitFor(() => expect(session.applyAuthPayload).toHaveBeenCalledOnce())
+    const expectedProfile = mode === 'switch' ? next : session.activeProfile
+    expect(session.applyAuthPayload).toHaveBeenCalledWith(expect.objectContaining({ active_profile: expectedProfile, profiles: payload.profiles }))
+    expect(screen.getByTestId('route-location')).toHaveTextContent(`profile_id=${expectedProfile!.id}`)
+    if (mode !== 'switch') {
+      await user.click(screen.getByRole('button', { name: copy.v2.overview }))
+      expect(screen.getByRole('button', { name: 'Edit draft: edited' })).toBeInTheDocument()
+    }
+  })
+
+  it('redeems an existing CDK for the current free profile through the original upgrade workflow', async () => {
+    const workflow = connect()
+    session.activeProfile = { ...session.activeProfile!, kind: 'free_preview' }
+    const upgrade = vi.fn((event: { preventDefault: () => void }) => event.preventDefault())
+    const changeCdk = vi.fn()
+    Object.assign(workflow, { upgradeCdk: 'MAA-EXISTING', upgradeLoading: false, upgradeError: null, setUpgradeCdk: changeCdk, handleUpgradePreviewProfile: upgrade })
+    const user = userEvent.setup()
+    mount('/v2?section=add-account&profile_id=profile-1')
+    await user.click(await screen.findByText(copy.workspace.pages_tool_WorkspaceSetupPage_052))
+    await user.click(await screen.findByRole('button', { name: copy.optimize.pages_tool_optimize_ResultSection_007 }))
+    expect(upgrade).toHaveBeenCalledOnce()
+    expect(screen.getByTestId('route-location')).toHaveTextContent('profile_id=profile-1')
+    expect(session.applyAuthPayload).not.toHaveBeenCalled()
+  })
+
+  it('uses the current session in the manual tool and routes operator editing back into V2', async () => {
+    connect()
+    session.workspace = { operators: SAMPLE_OPERATORS, config: SAMPLE_CONFIG } as V2Session['workspace']
+    const user = userEvent.setup()
+    mount('/v2?section=manual-tool&profile_id=profile-1')
+    const edit = await screen.findByRole('link', { name: copy.tools.manualSchedule.editOperators })
+    expect(edit).toHaveAttribute('href', '/v2?profile_id=profile-1&panel=operators')
+    expect(mocks.session.mock.calls.every((args) => args[0] === 'profile-1')).toBe(true)
+    await user.click(edit)
+    expect(await screen.findByRole('dialog', { name: copy.v2.operators })).toBeInTheDocument()
+    expect(screen.getByTestId('route-location')).toHaveTextContent('panel=operators')
+  })
+
+  it('keeps the manual tool draft while navigation or a failed profile save leaves the current account in place', async () => {
+    connect()
+    session.workspace = { operators: SAMPLE_OPERATORS, config: SAMPLE_CONFIG } as V2Session['workspace']
+    const next = { ...session.activeProfile!, id: 'profile-2', display_name: 'Second Doctor' }
+    session.profiles.push(next)
+    session.cdkProfiles.push(next)
+    mocks.manual.mockImplementation(ManualDraftStub)
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const user = userEvent.setup()
+    mount('/v2?section=manual-tool&profile_id=profile-1')
+    await user.click(await screen.findByRole('button', { name: copy.tools.manualSchedule.start }))
+    await user.click(await screen.findByRole('button', { name: 'Edit draft: original' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: copy.tools.manualSchedule.profile }), next.id)
+    expect(session.refreshProfileWorkspace).not.toHaveBeenCalled()
+    expect(confirm).toHaveBeenCalledWith(copy.v2.discardManual)
+    confirm.mockReturnValue(true)
+    vi.mocked(session.flushConfigSave).mockResolvedValue(false)
+    await user.selectOptions(screen.getByRole('combobox', { name: copy.tools.manualSchedule.profile }), next.id)
+    await waitFor(() => expect(session.flushConfigSave).toHaveBeenCalledOnce())
+    expect(session.refreshProfileWorkspace).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Edit draft: edited' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: copy.v2.tools }))
+    await user.click(await screen.findByRole('link', { name: new RegExp(copy.tools.manualSchedule.title) }))
+    expect(screen.getByRole('button', { name: 'Edit draft: edited' })).toBeInTheDocument()
+    expect(screen.getByTestId('route-location')).toHaveTextContent('profile_id=profile-1')
+  })
+
+  it('honors service switches even when a disabled tool is opened directly', async () => {
+    mocks.features.mockReturnValue({ status: 'ready', features: { ...DEFAULT_SITE_FEATURES, manual_schedule: false }, retry: vi.fn() })
+    mount('/v2?section=manual-tool')
+    expect(await screen.findByText(copy.v2.featureUnavailable)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: copy.tools.manualSchedule.start })).not.toBeInTheDocument()
+    expect(mocks.manual).not.toHaveBeenCalled()
   })
 })

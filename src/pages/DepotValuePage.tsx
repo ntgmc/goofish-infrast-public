@@ -10,12 +10,24 @@ import { apiJson, apiJsonOrNull } from '../lib/api-client'
 import { MAX_DEPOT_ITEM_COUNT, MAX_DEPOT_ITEM_TYPES } from '../lib/depot-value-constraints'
 import type { AuthMeResponse, DepotValueItem, DepotValueProfileResponse, DepotValueRequest, DepotValueResponse, UserGameAccount } from '../lib/types'
 import { copy, CURRENT_LOCALE } from '../copy/index'
+import type { useToolSession } from './tool/useToolSession'
+import { v2Path } from './v2/navigation'
 
 
 const LMD_ITEM_ID = '4001'
 const DEPOT_REQUEST_MAX_BYTES = 1024 * 1024
 
-export default function DepotValuePage() {
+export default function DepotValuePage({ embedded = false, session }: { embedded?: boolean; session?: ReturnType<typeof useToolSession> } = {}) {
+  const PageRoot = embedded ? 'section' : 'main'
+  const updateSession = useCallback((payload: AuthMeResponse) => {
+    if (!payload.user || !session) return
+    session.applyAuthPayload({
+      user: payload.user, profiles: payload.profiles ?? session.profiles,
+      active_profile: session.user ? session.activeProfile : payload.active_profile ?? null,
+      workspace: session.user ? session.workspace : payload.workspace,
+      announcement_unread_count: payload.announcement_unread_count ?? session.announcementUnreadCount,
+    })
+  }, [session?.user, session?.profiles, session?.activeProfile, session?.workspace, session?.announcementUnreadCount, session?.applyAuthPayload])
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [depotText, setDepotText] = useState('')
   const [auth, setAuth] = useState<AuthMeResponse | null>(null)
@@ -43,6 +55,12 @@ export default function DepotValuePage() {
   }, [])
 
   useEffect(() => {
+    if (session) {
+      applyAuthData({ user: session.user, profiles: session.profiles, active_profile: session.activeProfile, workspace: session.workspace })
+      setAuthLoading(session.authLoading)
+      setAuthError(session.authError?.message ?? null)
+      return
+    }
     const controller = new AbortController()
     setAuthLoading(true)
     setAuthError(null)
@@ -60,7 +78,7 @@ export default function DepotValuePage() {
         if (!controller.signal.aborted) setAuthLoading(false)
       })
     return () => controller.abort()
-  }, [applyAuthData, authLoadRevision])
+  }, [applyAuthData, authLoadRevision, session?.user, session?.profiles, session?.activeProfile, session?.workspace, session?.authLoading, session?.authError])
 
   useEffect(() => {
     if (result) drawShareCard(canvasRef.current, result)
@@ -106,13 +124,14 @@ export default function DepotValuePage() {
         throw new Error(copy.tools.pages_DepotValuePage_003)
       }
       applyAuthData(data)
+      updateSession(data)
       setDepotProfile(data.depot_profile)
       setSelectedProfileId(data.depot_profile.id)
       return data.depot_profile
     } finally {
       setProfilePreparing(false)
     }
-  }, [applyAuthData])
+  }, [applyAuthData, updateSession])
 
   const openSklandBinding = useCallback(async () => {
     setResult(null)
@@ -174,11 +193,13 @@ export default function DepotValuePage() {
 
   const handleAuthenticated = (payload: AuthMeResponse) => {
     applyAuthData(payload)
+    updateSession(payload)
     void openSklandBinding()
   }
 
   const handleSklandPayload = (payload: SklandPayload) => {
     applyAuthData(payload)
+    updateSession(payload)
     const profile = payload.active_profile ?? payload.profiles?.find((item) => item.kind === 'depot_value') ?? null
     if (profile?.kind === 'depot_value') setDepotProfile(profile)
   }
@@ -207,19 +228,20 @@ export default function DepotValuePage() {
   }
 
   return (
-    <main className="tool-page" tabIndex={-1} data-route-focus>
-      <div className="tool-page-frame max-w-6xl">
+    <PageRoot className={embedded ? 'v2-embedded-tool' : 'tool-page'} tabIndex={-1} data-route-focus>
+      <div className={embedded ? undefined : 'tool-page-frame max-w-6xl'}>
         <header className="tool-page-header flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 items-start gap-3">
-            <BrandLogo size="md" />
+            {!embedded && <BrandLogo size="md" />}
             <div className="min-w-0">
               <p className="section-index">{copy.tools.pages_DepotValuePage_009}</p>
-              <h1 className="display-title mt-2 text-2xl text-ink-primary">{copy.tools.pages_DepotValuePage_010}</h1>
+              {!embedded && <h1 className="display-title mt-2 text-2xl text-ink-primary">{copy.tools.pages_DepotValuePage_010}</h1>}
               <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">
                 {copy.tools.pages_DepotValuePage_011}</p>
             </div>
           </div>
           <nav className="flex flex-wrap gap-2">
+            {embedded ? <Link to={v2Path('profiles', session?.activeProfile?.id)} className="tool-secondary-action">{copy.v2.account}</Link> : <>
             <ThemeSwitcher />
             <Link
               to="/"
@@ -231,6 +253,7 @@ export default function DepotValuePage() {
               className="tool-primary-action"
             >
               {copy.tools.pages_DepotValuePage_013}</Link>
+            </>}
           </nav>
         </header>
 
@@ -413,7 +436,7 @@ export default function DepotValuePage() {
           onCompleted={handleSklandCompleted}
         />
       </div>
-    </main>
+    </PageRoot>
   )
 }
 

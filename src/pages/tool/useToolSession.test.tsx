@@ -333,3 +333,29 @@ describe('useToolSession config synchronization', () => {
   })
 
 })
+
+describe('useToolSession profile navigation', () => {
+  afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers() })
+
+  it('retains pending configuration when navigation adds the already loaded profile to the URL', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === '/api/announcement') return new Response(null, { status: 204 })
+      if (url.startsWith('/api/auth/me')) return jsonResponse(authPayload(baseConfig))
+      throw new Error(`Unexpected request: ${url}`)
+    }))
+    const { result, rerender } = renderHook(({ profileId }) => useToolSession(profileId), { initialProps: { profileId: null as string | null } })
+    await waitFor(() => expect(result.current.authStatus).toBe('authenticated'))
+    vi.useFakeTimers()
+    const edited = { ...baseConfig, desc: 'pending changes' }
+    act(() => result.current.setConfigOverride(edited))
+    rerender({ profileId: 'profile-1' })
+    expect(result.current.authStatus).toBe('authenticated')
+    expect(result.current.configOverride).toEqual(edited)
+    expect(result.current.configSyncStatus).toBe('pending')
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).startsWith('/api/auth/me'))).toHaveLength(1)
+    act(() => result.current.retryAuth())
+    await act(async () => { await Promise.resolve() })
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).startsWith('/api/auth/me'))).toHaveLength(2)
+  })
+})

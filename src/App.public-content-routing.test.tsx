@@ -2,6 +2,7 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { copy } from './copy'
 import { cloneDefaultPublicContentSettings } from './lib/public-content'
 import { DEFAULT_SITE_FEATURE_SETTINGS, type SiteFeatureKey } from './lib/site-features'
 
@@ -78,9 +79,9 @@ describe('App public content routing', () => {
     await waitFor(() => expect(apiJson.mock.calls.some(([url]) => url === '/api/site/public-content')).toBe(true))
   })
 
-  it('keeps V1 as the default and exposes V2 only through its test entry', async () => {
+  it('keeps V1 as the default and exposes the V2 workspace entry', async () => {
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
-    expect(await screen.findByRole('link', { name: '体验 V2 测试版' })).toHaveAttribute('href', '/v2')
+    expect(await screen.findByRole('link', { name: copy.v2.testEntry })).toHaveAttribute('href', '/v2')
     expect(screen.queryByText('V2 test workspace')).not.toBeInTheDocument()
   })
 
@@ -157,7 +158,7 @@ describe('App public content routing', () => {
       : original(url))
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
     await screen.findByRole('button', { name: '开始排班' })
-    await waitFor(() => expect(screen.queryByRole('link', { name: '体验 V2 测试版' })).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('link', { name: copy.v2.testEntry })).not.toBeInTheDocument())
     for (const href of ['/v2', '/pricing', '/changelog', '/thanks', '/status', '/faq']) {
       expect(document.querySelector(`a[href="${href}"]`)).toBeNull()
     }

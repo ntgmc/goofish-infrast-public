@@ -39,7 +39,8 @@ const UNAVAILABLE_STATUS: ServiceStatusResponse = {
   incidents: [],
 }
 
-export default function StatusPage() {
+export default function StatusPage({ embedded = false }: { embedded?: boolean } = {}) {
+  const PageRoot = embedded ? 'section' : 'main'
   const [status, setStatus] = useState<ServiceStatusResponse | null>(null)
   const [error, setError] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -96,9 +97,9 @@ export default function StatusPage() {
   const updatedAt = status ? formatUpdatedAt(status.generated_at) : error ? copy.status.pages_StatusPage_072 : copy.status.pages_StatusPage_024
 
   return (
-    <main className="tool-page" tabIndex={-1} data-route-focus>
-      <div className="public-shell">
-        <header className="public-nav">
+    <PageRoot className={embedded ? 'v2-embedded-tool' : 'tool-page'} tabIndex={-1} data-route-focus>
+      <div className={embedded ? undefined : 'public-shell'}>
+        {!embedded && <header className="public-nav">
           <Link to="/" className="flex min-w-0 flex-1 items-center gap-2 text-left sm:gap-3">
             <BrandLogo size="sm" className="sm:h-10 sm:w-10 sm:rounded-lg sm:p-1" />
             <span className="truncate text-sm font-semibold text-ink-primary">{copy.status.pages_StatusPage_001}</span>
@@ -108,7 +109,7 @@ export default function StatusPage() {
             <div className="hidden sm:block"><ThemeSwitcher /></div>
             <Link to="/tool/profiles" className="tool-primary-action">{copy.status.pages_StatusPage_005}</Link>
           </nav>
-        </header>
+        </header>}
 
         <div className="mx-auto max-w-4xl py-12 sm:py-16 lg:py-20">
           <header className="status-reading-measure">
@@ -187,8 +188,8 @@ export default function StatusPage() {
           </section>
         </div>
       </div>
-      <PublicFooter variant="tool" />
-    </main>
+      {!embedded && <PublicFooter variant="tool" />}
+    </PageRoot>
   )
 }
 

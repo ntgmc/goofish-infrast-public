@@ -7,7 +7,8 @@ import ThemeSwitcher from '../components/ThemeSwitcher'
 import { copy, CURRENT_LOCALE } from '../copy/index'
 
 
-export default function AnnouncementsPage() {
+export default function AnnouncementsPage({ embedded = false }: { embedded?: boolean } = {}) {
+  const PageRoot = embedded ? 'section' : 'main'
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -34,19 +35,19 @@ export default function AnnouncementsPage() {
   }, [])
 
   return (
-    <main className="tool-page" tabIndex={-1} data-route-focus>
-      <div className="public-document">
+    <PageRoot className={embedded ? 'v2-embedded-tool' : 'tool-page'} tabIndex={-1} data-route-focus>
+      <div className={embedded ? undefined : 'public-document'}>
         <div className="tool-page-header flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="section-index">{copy.public.pages_AnnouncementsPage_002}</p>
             <h1 className="display-title text-2xl">{copy.public.pages_AnnouncementsPage_003}</h1>
             <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.public.pages_AnnouncementsPage_004}</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          {!embedded && <div className="flex flex-wrap gap-2">
             <ThemeSwitcher />
             <Link to="/tool/profiles" className="tool-secondary-action shrink-0">
               {copy.public.pages_AnnouncementsPage_005}</Link>
-          </div>
+          </div>}
         </div>
 
         {loading && <p className="tool-inset mt-6 px-4 py-3 text-sm text-ink-secondary" role="status">{copy.public.pages_AnnouncementsPage_006}</p>}
@@ -71,7 +72,7 @@ export default function AnnouncementsPage() {
           ))}
         </div>
       </div>
-    </main>
+    </PageRoot>
   )
 }
 

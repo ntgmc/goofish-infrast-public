@@ -15,9 +15,9 @@ type CdkRedeemResponse =
   | { redemption_type: 'profile'; auth: AuthSuccessResponse }
   | { redemption_type: 'inventory'; item: { code: string; name: string; quantity: 1; expires_at: string | null } }
 
-export default function RedeemSection({ onRedeemed, onInventoryRedeemed, tourReplayToken = 0, autoStartTour = true }: { onRedeemed: (payload: AuthSuccessResponse) => void; onInventoryRedeemed?: (itemName: string) => void; tourReplayToken?: number; autoStartTour?: boolean }) {
+export default function RedeemSection({ onRedeemed, onInventoryRedeemed, tourReplayToken = 0, autoStartTour = true, preferPreview = false }: { onRedeemed: (payload: AuthSuccessResponse) => void; onInventoryRedeemed?: (itemName: string) => void; tourReplayToken?: number; autoStartTour?: boolean; preferPreview?: boolean }) {
   const { features } = useSiteFeatures()
-  const [mode, setMode] = useState<AddAccountMode>(() => features.cdk_redemption ? 'cdk' : 'preview')
+  const [mode, setMode] = useState<AddAccountMode>(() => preferPreview && features.free_preview ? 'preview' : features.cdk_redemption ? 'cdk' : 'preview')
   const [cdk, setCdk] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [note, setNote] = useState('')

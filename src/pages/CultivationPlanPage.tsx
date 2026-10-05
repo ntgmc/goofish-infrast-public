@@ -7,14 +7,26 @@ import { apiJson } from '../lib/api-client'
 import type { CultivationData, CultivationOptions } from '../lib/cultivation-contract'
 import { buildCultivationPlan } from '../lib/cultivation-planner'
 import { useToolSession } from './tool/useToolSession'
+import { v2Path } from './v2/navigation'
 import CultivationResults, { number } from './cultivation/CultivationResults'
 import CultivationSpecialItems from './cultivation/CultivationSpecialItems'
 
 const label = copy.tools.cultivation
 const today = () => new Date(Date.now() + 4 * 3600000).toISOString().slice(0, 10)
 
-export default function CultivationPlanPage() {
+type PageProps = { embedded?: boolean; session?: ReturnType<typeof useToolSession> }
+
+export default function CultivationPlanPage({ embedded = false, session }: PageProps = {}) {
+  return session ? <CultivationContent session={session} embedded={embedded} /> : <StandaloneCultivation />
+}
+
+function StandaloneCultivation() {
   const session = useToolSession()
+  return <CultivationContent session={session} />
+}
+
+function CultivationContent({ session, embedded = false }: { session: ReturnType<typeof useToolSession>; embedded?: boolean }) {
+  const ContentRoot = embedded ? 'div' : 'main'
   const profiles = session.profiles.filter((row) => row.status === 'active' && !row.archived_at && row.skland_binding)
   const [chosenProfile, setChosenProfile] = useState('')
   const profileId = profiles.some((row) => row.id === chosenProfile) ? chosenProfile : profiles.find((row) => row.id === session.activeProfile?.id)?.id ?? profiles[0]?.id ?? ''
@@ -89,16 +101,16 @@ export default function CultivationPlanPage() {
     <span>{title}</span><input type="number" min={min} max={max} className="tool-field" value={numbers[key]} onChange={(event) => setNumbers((prior) => ({ ...prior, [key]: event.target.value }))} />
   </label>
 
-  return <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-    <header className="mb-8 flex items-center justify-between gap-3">
+  return <div className={embedded ? 'v2-embedded-tool' : 'mx-auto max-w-7xl px-4 py-6 sm:px-6'}>
+    {!embedded && <header className="mb-8 flex items-center justify-between gap-3">
       <Link to="/tool/tools" aria-label={label.back}><BrandLogo /></Link>
       <div className="flex items-center gap-3"><Link to="/tool/tools" className="whitespace-nowrap text-sm text-ink-secondary hover:text-ink-primary">{label.back}</Link><ThemeSwitcher /></div>
-    </header>
-    <main className="space-y-6">
+    </header>}
+    <ContentRoot className="space-y-6">
       <section className="tool-panel space-y-5 p-5 sm:p-6">
-        <div><h1 className="text-2xl font-semibold text-ink-primary">{label.title}</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">{label.description}</p></div>
+        <div>{!embedded && <h1 className="text-2xl font-semibold text-ink-primary">{label.title}</h1>}<p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">{label.description}</p></div>
         {session.authLoading ? <p role="status">{label.loading}</p> : session.authStatus === 'error' ? <div role="alert"><p>{session.authError?.message}</p><button className="tool-secondary-action mt-3" onClick={session.retryAuth}>{copy.tools.pages_DepotValuePage_086}</button></div>
-          : session.authStatus !== 'authenticated' || !profiles.length ? <div className="tool-inset space-y-3 p-4"><p className="text-sm">{session.authStatus !== 'authenticated' ? label.login : label.noProfile}</p><Link to="/tool/profiles" className="tool-secondary-action inline-flex">{label.loginAction}</Link></div>
+          : session.authStatus !== 'authenticated' || !profiles.length ? <div className="tool-inset space-y-3 p-4"><p className="text-sm">{session.authStatus !== 'authenticated' ? label.login : label.noProfile}</p><Link to={embedded ? v2Path('profiles', session.activeProfile?.id) : '/tool/profiles'} className="tool-secondary-action inline-flex">{label.loginAction}</Link></div>
             : <div className="flex flex-wrap items-end gap-4">
               <label className="min-w-0 flex-1 space-y-2 text-sm"><span className="block">{label.profile}</span><select className="tool-field" value={profileId} onChange={(event) => setChosenProfile(event.target.value)}>{profiles.map((row) => <option key={row.id} value={row.id}>{row.display_name}</option>)}</select></label>
               <button className="tool-primary-action max-w-full whitespace-nowrap" disabled={busy} onClick={() => void load()}>{busy ? label.loadingData : label.load}</button>
@@ -121,6 +133,6 @@ export default function CultivationPlanPage() {
         <CultivationSpecialItems key={profileId} data={data} plan={plan} preference={appliedOptions.preference} />
         <p className="text-xs leading-5 text-ink-muted">{label.dataDate} · {new Date(data.updatedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}<br />{label.importDate} · {new Date(data.importedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</p>
       </>}
-    </main>
+    </ContentRoot>
   </div>
 }

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Link } from 'react-router'
+import Link from './InternalLink'
 import { Sparkles } from 'lucide-react'
 import type { LicenseConfig } from '../lib/types'
 import ConfigEditor from './ConfigEditor'

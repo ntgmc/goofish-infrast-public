@@ -225,7 +225,7 @@ function LockedCapabilityPreview({ purchaseHref, title, description }: { purchas
   )
 }
 
-class ResultErrorBoundary extends Component<{
+export class ResultErrorBoundary extends Component<{
   resetKey: string
   onDownloadDiagnostic?: () => void
   diagnosticDownloadBusy: boolean
@@ -306,7 +306,7 @@ export function UpgradeSuggestionStatusNotice({ result }: { result: OptimizeResu
   )
 }
 
-function PreviewUpgradePanel({
+export function PreviewUpgradePanel({
   cdk,
   loading,
   error,

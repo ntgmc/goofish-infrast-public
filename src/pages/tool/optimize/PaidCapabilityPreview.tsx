@@ -1,4 +1,4 @@
-import { Link } from 'react-router'
+import Link from '../../../components/InternalLink'
 import { useId, useState } from 'react'
 import { ArrowRight, ChevronDown, Sparkles } from 'lucide-react'
 import { copy } from '../../../copy'

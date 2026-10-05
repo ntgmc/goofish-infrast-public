@@ -450,6 +450,15 @@ export default function ConfigEditor({
                     ? copy.common.components_ConfigEditor_062
                     : copy.common.components_ConfigEditor_095}
                 </p>
+                {!rotationMode && canEditFixedShiftHours && <div className="mt-4">
+                  <ShiftHoursEditor value={config.shift_hours} variableMode={variableShiftMode} canEdit={false} canEditFixedShiftHours
+                    onSelectVariable={() => undefined} onChange={(hours) => onUpdate((next) => {
+                      next.schedule_mode = 'maa'
+                      next.shift_hours = hours
+                      next.variable_shift_schedule = { ...(next.variable_shift_schedule ?? {}), enable: false, enabled: false }
+                      applyCounts(next)
+                    })} />
+                </div>}
               </div>
               <div>
                 <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_040}</p>

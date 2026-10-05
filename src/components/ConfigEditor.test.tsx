@@ -138,7 +138,7 @@ describe('ConfigEditor shift patterns', () => {
     const config = normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: hours === 8 ? [12, 12, 12] : [8, 8, 8] })
     const onUpdate = vi.fn()
     render(
-      <ConfigEditor config={config} canEdit={false} canEditFixedShiftHours validation={{ ok: true }} onUpdate={onUpdate} />,
+      <ConfigEditor config={config} canEdit={false} canEditIntermediateInventory canEditFixedShiftHours validation={{ ok: true }} onUpdate={onUpdate} />,
     )
 
     expect(screen.getByRole('button', { name: '一天3换（8小时一换）' })).toBeEnabled()

@@ -126,7 +126,8 @@ const pageMeta: Record<PublicInfoPageKind, { title: string; eyebrow: string; int
   disclaimer: { title: copy.public.pages_PublicInfoPage_055, eyebrow: copy.public.pages_PublicInfoPage_056, intro: copy.public.pages_PublicInfoPage_057 },
 }
 
-export default function PublicInfoPage({ page }: { page: PublicInfoPageKind }) {
+export default function PublicInfoPage({ page, embedded = false }: { page: PublicInfoPageKind; embedded?: boolean }) {
+  const PageRoot = embedded ? 'section' : 'main'
   const { features } = useSiteFeatures()
   const { content } = usePublicContent()
   const meta = page === 'faq'
@@ -134,9 +135,9 @@ export default function PublicInfoPage({ page }: { page: PublicInfoPageKind }) {
     : pageMeta[page]
 
   return (
-    <main className="tool-page" tabIndex={-1} data-route-focus>
-      <div className="public-shell">
-        <header className="public-nav">
+    <PageRoot className={embedded ? 'v2-embedded-tool' : 'tool-page'} tabIndex={-1} data-route-focus>
+      <div className={embedded ? undefined : 'public-shell'}>
+        {!embedded && <header className="public-nav">
           <Link to="/" className="flex min-w-0 flex-1 items-center gap-2 text-left sm:gap-3">
             <BrandLogo size="sm" className="sm:h-10 sm:w-10 sm:rounded-lg sm:p-1" />
             <span className="min-w-0">
@@ -162,9 +163,9 @@ export default function PublicInfoPage({ page }: { page: PublicInfoPageKind }) {
             {features.support && <Link to="/support" className="tool-nav-link hidden items-center px-3 sm:inline-flex">{copy.public.pages_PublicInfoPage_061}</Link>}
             <Link to="/" className="tool-secondary-action hidden sm:inline-flex">{copy.public.pages_PublicInfoPage_062}</Link>
           </nav>
-        </header>
+        </header>}
 
-        <article className="public-document">
+        <article className={embedded ? undefined : 'public-document'}>
         <header className="public-document-header">
           <p className="public-kicker">{meta.eyebrow}</p>
           <h1 className="display-title mt-3 text-3xl leading-tight text-ink-primary sm:text-4xl">{meta.title}</h1>
@@ -181,8 +182,8 @@ export default function PublicInfoPage({ page }: { page: PublicInfoPageKind }) {
         </div>
         </article>
       </div>
-      <PublicFooter variant="tool" className="mt-10" />
-    </main>
+      {!embedded && <PublicFooter variant="tool" className="mt-10" />}
+    </PageRoot>
   )
 }
 
