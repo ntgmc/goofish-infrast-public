@@ -253,6 +253,7 @@ interface ConfigEditorProps {
   embedded?: boolean;
   hideHeader?: boolean;
   hidePresetActions?: boolean;
+  hideValidation?: boolean;
 }
 
 export default function ConfigEditor({
@@ -271,6 +272,7 @@ export default function ConfigEditor({
   embedded = false,
   hideHeader = false,
   hidePresetActions = false,
+  hideValidation = false,
 }: ConfigEditorProps) {
   const canUseIntermediateInventory = canEdit || Boolean(canEditIntermediateInventory)
   const autoInventoryOnly = !canEdit && canUseIntermediateInventory
@@ -287,7 +289,7 @@ export default function ConfigEditor({
   const fiammettaShiftInterval = fiammettaShiftHoursSupported
     ? `${Math.max(...(parseShiftHours(config.shift_hours) ?? [8]))}${copy.common.components_ConfigEditor_099}`
     : copy.common.components_ConfigEditor_100
-  const validationMessage = validation.ok === false ? validation.message : null
+  const validationMessage = !hideValidation && validation.ok === false ? validation.message : null
   const intermediateInventory = normalizeIntermediateInventory(config.intermediate_inventory)
   const allowProductRebalance = allowsInventoryProductRebalance(config, canEdit)
   const orundumPlanning = normalizeOrundumPlanning(config)

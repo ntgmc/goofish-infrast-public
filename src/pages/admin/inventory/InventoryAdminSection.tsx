@@ -3,6 +3,7 @@ import { adminApiJson } from '../../../lib/admin-api-client'
 import { adminInventoryOverviewSchema, type AdminInventoryOverview as Overview } from '../../../lib/admin-inventory-contracts'
 import { itemIconPath, type ItemDefinition } from '../../../lib/inventory-contracts'
 import { AdminToast } from '../shared/AdminToast'
+import { SectionLoader } from '../../../components/SessionLoader'
 import { Field, itemKindLabel, type InventoryPanelProps } from './InventoryEditors'
 import { InventoryPacksPanel } from './InventoryPacksPanel'
 import { InventoryOnboardingPanel } from './InventoryOnboardingPanel'
@@ -81,8 +82,9 @@ export default function InventoryAdminSection() {
     finally { inFlight.current = false; setBusy(false) }
   }
 
-  if (!data) return <div className="tool-panel p-6 text-sm text-ink-secondary" role={error ? 'alert' : 'status'}>
-    <p>{error ?? '正在加载道具管理…'}</p>
+  if (!data && !error) return <SectionLoader label="正在加载道具管理…" />
+  if (!data) return <div className="tool-panel p-6 text-sm text-ink-secondary" role="alert">
+    <p>{error}</p>
     {error && <button type="button" className="tool-secondary-action mt-4" disabled={busy} onClick={() => void refresh()}>重试加载</button>}
   </div>
 

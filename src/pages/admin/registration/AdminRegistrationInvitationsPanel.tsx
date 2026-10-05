@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { SectionLoader } from '../../../components/SessionLoader'
 import type { AdminRegistrationInvitation, AdminRegistrationInvitationStatus } from '../../../lib/types'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import { copy } from '../../../copy/index'
@@ -138,6 +139,8 @@ export default function AdminRegistrationInvitationsPanel() {
       setError('复制失败，请手动选择并复制注册链接。')
     }
   }
+
+  if (loading && !invitations.length) return <SectionLoader label="正在加载注册邀请…" />
 
   return (
     <section className="tool-panel p-5 sm:p-6" aria-labelledby="admin-registration-invitations-title">

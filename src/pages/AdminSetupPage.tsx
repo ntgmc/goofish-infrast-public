@@ -4,6 +4,7 @@ import { getApiErrorMessage } from '../lib/api-client'
 import { adminApiJson, adminApiVoid } from '../lib/admin-api-client'
 import { copy } from '../copy/index'
 import ThemeSwitcher from '../components/ThemeSwitcher'
+import { SectionLoader } from '../components/SessionLoader'
 
 
 interface AdminUserSummary {
@@ -97,7 +98,7 @@ export default function AdminSetupPage() {
 
   return (
     <main className="tool-page" tabIndex={-1} data-route-focus>
-      <div className="tool-page-frame max-w-5xl">
+      <div className="tool-page-frame tool-page-content min-h-[calc(100dvh-3rem)] max-w-5xl">
         <div className="tool-page-header flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="section-index">{copy.common.pages_AdminSetupPage_008}</p>
@@ -111,7 +112,9 @@ export default function AdminSetupPage() {
           </div>
         </div>
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-[380px_1fr]">
+        <div className="admin-section tool-section-content mt-8" data-loading={usersLoading || undefined}>
+        {usersLoading && <SectionLoader label={copy.common.pages_AdminSetupPage_033} />}
+        <div className="admin-section-body grid gap-6 lg:grid-cols-[380px_1fr]" hidden={usersLoading}>
           <form onSubmit={handleCreate} className="tool-panel p-5">
             <h2 className="text-base font-semibold text-ink-primary">{copy.common.pages_AdminSetupPage_012}</h2>
             <label className="mt-5 block">
@@ -151,9 +154,7 @@ export default function AdminSetupPage() {
               <p className="mt-1 text-sm text-ink-muted">{copy.common.pages_AdminSetupPage_020}</p>
             </div>
             <div className="divide-y divide-surface-3">
-              {usersLoading ? (
-                <div className="p-8 text-center text-sm text-ink-muted">{copy.common.pages_AdminSetupPage_033}</div>
-              ) : usersError ? (
+              {usersError ? (
                 <div className="p-6 text-center">
                   <p className="text-sm text-error" role="alert">{usersError}</p>
                   <button type="button" onClick={() => void loadUsers()} className="tool-secondary-action mt-3">{copy.common.pages_AdminSetupPage_034}</button>
@@ -172,6 +173,7 @@ export default function AdminSetupPage() {
               ))}
             </div>
           </section>
+        </div>
         </div>
       </div>
     </main>

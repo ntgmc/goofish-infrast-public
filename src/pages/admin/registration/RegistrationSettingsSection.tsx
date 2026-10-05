@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import type { BrevoEmailStats, RegistrationSettings } from '../../../lib/types'
 import { copy } from '../../../copy/index'
+import { SectionLoader } from '../../../components/SessionLoader'
 import AdminRegistrationInvitationsPanel from './AdminRegistrationInvitationsPanel'
 import { AdminToast } from '../shared/AdminToast'
 
@@ -77,7 +78,7 @@ export default function RegistrationSettingsSection() {
   }
 
   if (loading && (!settings || !emailStats)) {
-    return <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.admin.registration_loading}</div>
+    return <SectionLoader label={copy.admin.registration_loading} />
   }
 
   if (!settings || !emailStats) {

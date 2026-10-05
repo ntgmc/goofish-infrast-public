@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type FormEvent } from 'react'
 import { copy } from '../../../copy/index'
+import { SectionLoader } from '../../../components/SessionLoader'
 import { ApiError } from '../../../lib/api-client'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import {
@@ -123,7 +124,7 @@ export default function PublicContentSettingsSection() {
     }
   }
 
-  if (loading) return <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.publicContent.admin_loading}</div>
+  if (loading) return <SectionLoader label={copy.publicContent.admin_loading} />
 
   if (!settings) {
     return (

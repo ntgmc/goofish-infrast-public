@@ -3,8 +3,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { adminApiBlob as apiBlob, adminApiJson as apiJson } from '../../../lib/admin-api-client'
 import type { AdminOptimizationDeadLetter, AdminOptimizationDeadLetterDetail } from '../contracts'
 import { requestAdminOperationReason } from '../../../lib/admin-operation-reason'
+import { SectionLoader } from '../../../components/SessionLoader'
 
-export default function DeadLetterPanel() {
+export default function DeadLetterPanel({ active = true }: { active?: boolean }) {
   const [records, setRecords] = useState<AdminOptimizationDeadLetter[]>([])
   const [details, setDetails] = useState<Record<string, AdminOptimizationDeadLetterDetail>>({})
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null)
@@ -13,6 +14,7 @@ export default function DeadLetterPanel() {
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const load = useCallback(async () => {
@@ -25,9 +27,11 @@ export default function DeadLetterPanel() {
       setError((caught as Error).message)
     } finally {
       setLoading(false)
+      setLoaded(true)
     }
   }, [])
   useEffect(() => {
+    if (!active) return
     void load()
     const poll = window.setInterval(() => {
       if (document.visibilityState === 'visible') void load()
@@ -40,7 +44,7 @@ export default function DeadLetterPanel() {
       window.clearInterval(poll)
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
-  }, [load])
+  }, [active, load])
   const loadDetail = async (id: string) => {
     if (loadingDetailIds.has(id)) return
     setLoadingDetailIds((current) => new Set(current).add(id))
@@ -136,6 +140,8 @@ export default function DeadLetterPanel() {
     }
   }
   const pendingCount = records.filter((record) => record.status === 'pending_review').length
+  if (!loaded) return <SectionLoader label="正在加载优化死信…" />
+
   return (
     <section className="tool-panel p-5" aria-labelledby="optimization-dlq-title">
       <div className="flex flex-wrap items-start justify-between gap-3">

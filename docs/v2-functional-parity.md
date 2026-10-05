@@ -8,8 +8,9 @@ CDK、档案权益、道具和导出能力继续按原规则使用。添加账�
 | --- | --- | --- |
 | 生成、增量重算、生成选项、进度和恢复 | 排班总览、生成与计算 | `useOptimizeWorkflow`、`OverviewSection` |
 | 任务查询、取消、重试、结果恢复和完成通知 | 顶栏任务中心 | `useOptimizationTaskCenter`、`OptimizationTaskCenterDialog` |
-| 排班详情、技能、心情、收益明细 | 排班总览的结果视图 | 既有结果格式化、技能与收益计算 |
-| 完整结果、MAA 下载与执行说明 | 排班总览、完整结果与导出 | `ResultPanel`、`useResultDownloads` |
+| 排班安排、技能与心情 | 排班总览的排班安排；展开设施或点击设施查看详情 | `ScheduleBoard`、`OptionsDrawer`、既有结果格式化与技能计算 |
+| 收益明细、产出汇总与库存 | 排班总览的收益分析；汇总与库存按需展开 | `IncomeAnalysis`、`ResultMetrics` |
+| MAA 文件、排班图片、完整计算数据与执行说明 | 排班总览顶部的导出面板 | `ResultExportDrawer`、`useResultDownloads`、`downloadScheduleImage` |
 | 结果后的手动调整、草稿、导入导出与模拟 | 排班总览的手动调整 | `ManualScheduleEditor` |
 | 干员培养收益与成本建议 | 结果中的培养建议 | `UpgradeSuggestions` |
 | 常用配置、历史分页、归档、恢复与删除 | 历史方案 | `PlansSection`、`useOptimizeWorkspace` |

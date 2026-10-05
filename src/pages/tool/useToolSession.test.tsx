@@ -173,6 +173,58 @@ describe('useToolSession config synchronization', () => {
     expect(result.current.configSyncStatus).toBe('idle')
   })
 
+  it.each([false, true])('keeps invalid edits pending and saves after correction (in flight: %s)', async (inFlight) => {
+    let resolveFirst!: (response: Response) => void
+    const firstResponse = new Promise<Response>((resolve) => { resolveFirst = resolve })
+    const workspaceRequests: LicenseConfig[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url === '/api/announcement') return new Response(null, { status: 204 })
+      if (url === '/api/auth/me') return jsonResponse(authPayload(baseConfig))
+      const body = JSON.parse(String(init?.body)) as { config: LicenseConfig }
+      workspaceRequests.push(body.config)
+      return inFlight && workspaceRequests.length === 1 ? firstResponse : jsonResponse(authPayload(body.config))
+    }))
+
+    const { result } = renderHook(() => useToolSession())
+    await waitFor(() => expect(result.current.authLoading).toBe(false))
+    vi.useFakeTimers()
+    const first = { ...baseConfig, desc: 'first' }
+    if (inFlight) {
+      await act(async () => {
+        result.current.setConfigOverride(first)
+        vi.advanceTimersByTime(600)
+      })
+      expect(workspaceRequests).toEqual([first])
+    }
+    const invalid = {
+      ...baseConfig,
+      product_requirements: { ...baseConfig.product_requirements, manufacturing_stations: { gold: 3, exp: 2 } },
+    }
+    act(() => result.current.setConfigOverride(invalid))
+    await act(async () => {
+      vi.advanceTimersByTime(600)
+      if (inFlight) resolveFirst(jsonResponse(authPayload(first)))
+    })
+    let saved: boolean | undefined
+    await act(async () => { saved = await result.current.flushConfigSave() })
+    expect(saved).toBe(false)
+    expect(workspaceRequests).toEqual(inFlight ? [first] : [])
+    expect(result.current.configOverride).toEqual(invalid)
+    expect(result.current.configSyncStatus).toBe('pending')
+    expect(result.current.workspace?.config).toEqual(baseConfig)
+
+    const corrected = { ...baseConfig, desc: 'corrected' }
+    await act(async () => {
+      result.current.setConfigOverride(corrected)
+      vi.advanceTimersByTime(600)
+    })
+    expect(workspaceRequests).toEqual(inFlight ? [first, corrected] : [corrected])
+    expect(result.current.configOverride).toBeNull()
+    expect(result.current.configSyncStatus).toBe('idle')
+    expect(result.current.workspace?.config).toEqual(corrected)
+  })
+
   it('keeps a newer draft while an older request completes', async () => {
     let resolveFirst!: (response: Response) => void
     const firstResponse = new Promise<Response>((resolve) => { resolveFirst = resolve })

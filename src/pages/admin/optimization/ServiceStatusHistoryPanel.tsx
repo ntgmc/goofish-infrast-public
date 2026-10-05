@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import ServiceStatusBadge from '../../../components/ServiceStatusBadge'
+import { SectionLoader } from '../../../components/SessionLoader'
 import { copy } from '../../../copy'
 import EcsCostControlPanel from './EcsCostControlPanel'
 import { calculateServiceStatusCostEstimate } from '../../../lib/service-status-cost'
@@ -18,7 +19,7 @@ const EMPTY: AdminServiceStatusResponse = {
 export default function ServiceStatusHistoryPanel() {
   const [data, setData] = useState<AdminServiceStatusResponse>(EMPTY)
   const [error, setError] = useState<string | null>(null)
-  const [refreshing, setRefreshing] = useState(false)
+  const [refreshing, setRefreshing] = useState(true)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [impact, setImpact] = useState<StatusIncidentImpact>('minor')
@@ -90,6 +91,8 @@ export default function ServiceStatusHistoryPanel() {
     } catch (caught) { setError(caught instanceof Error ? caught.message : '事件更新失败') }
     finally { setBusy(false) }
   }
+
+  if (refreshing && data === EMPTY && !error) return <SectionLoader label="正在加载服务历史…" />
 
   return <section className="tool-panel p-5" aria-labelledby="service-status-history-admin-title">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="tool-eyebrow">状态与成本</p><h3 id="service-status-history-admin-title" className="mt-2 text-lg font-semibold text-ink-primary">30 天服务历史</h3><p className="mt-1 text-sm leading-6 text-ink-secondary">{copy.status.pages_AdminServiceStatusHistory_001}</p></div><button type="button" className="tool-secondary-action gap-2" onClick={() => void load()} disabled={refreshing}><RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin motion-reduce:animate-none' : ''}`} aria-hidden="true" />刷新</button></div>

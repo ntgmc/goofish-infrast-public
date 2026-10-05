@@ -6,7 +6,7 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { copy } from '../../copy'
 import { MotionPreferenceProvider } from '../../lib/motion-preference'
-import { normalizeConfig } from '../../lib/config'
+import { CONFIG_PRESETS, normalizeConfig, validateScheduleConfig } from '../../lib/config'
 import { DEFAULT_SITE_FEATURES } from '../../lib/site-features'
 import type { OptimizeResult, UserGameAccount, WorkspaceResultHistorySummary } from '../../lib/types'
 import type { V2Session } from './OptionsDrawer'
@@ -19,8 +19,10 @@ const mocks = vi.hoisted(() => ({
   features: vi.fn(),
   tasks: vi.fn(),
   manual: vi.fn(),
+  image: vi.fn(),
 }))
 vi.mock('../../components/result-panel/ManualScheduleEditor', () => ({ default: mocks.manual }))
+vi.mock('../../components/result-panel/schedule-image', () => ({ downloadScheduleImage: mocks.image }))
 vi.mock('../tool/useToolSession', () => ({ useToolSession: mocks.session }))
 vi.mock('../tool/optimize/useOptimizeWorkflow', () => ({ useOptimizeWorkflow: mocks.workflow }))
 vi.mock('../tool/optimize/useOptimizationTaskCenter', () => ({ useOptimizationTaskCenter: mocks.tasks }))
@@ -41,6 +43,7 @@ beforeEach(() => {
   vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
   mocks.features.mockReturnValue({ status: 'ready', features: DEFAULT_SITE_FEATURES, retry: vi.fn() })
   mocks.tasks.mockReturnValue({ jobs: [], cancel: vi.fn(), busyJobId: null, error: null, notice: null })
+  mocks.image.mockReset().mockResolvedValue(undefined)
   session = {
     user: null, profiles: [], announcementUnreadCount: 0, popups: [], setAnnouncementUnreadCount: vi.fn(), activeProfile: null, license: null, workspace: null, configOverride: null,
     authStatus: 'anonymous', cdkProfiles: [], openingProfileId: null, workspaceLoadError: null,
@@ -91,8 +94,8 @@ function connect() {
     activeConfig: SAMPLE_CONFIG, mergedOperators: SAMPLE_OPERATORS, configDiffRows: [],
     updateConfig: vi.fn(), handleGenerate: vi.fn(async () => undefined), handleDownloadMAA: vi.fn(),
     permission: 'ultimate', userCanEditConfig: true, userCanUseIntermediateAutoConfig: true,
-    userCanViewFullData: true,
-    configValidation: { ok: true }, configPresetLabel: '2-4-3', hasResult: true, resultIsCurrent: false,
+    userCanViewFullData: true, userCanDownloadFullResult: true, handleDownloadFullResult: vi.fn(),
+    configValidation: { ok: true } as ReturnType<typeof validateScheduleConfig>, configPresetLabel: '2-4-3', hasResult: true, resultIsCurrent: false,
     resultHistory: [summary], loading: false, workspaceError: null, inlineError: null,
     workspaceNotice: null, declarationDialog: null, configToast: null as { message: string } | null,
     billingQuote: null as { charge: string; available: string; tier: number | null; sufficient: boolean } | null,
@@ -233,6 +236,9 @@ describe('V2 results-first workspace', () => {
     expect(screen.getByRole('tab', { name: /第 1 班/ })).toHaveAttribute('aria-selected', 'true')
     expect(mocks.workflow).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: copy.v2.resultTabs })).getAllByRole('button').map((button) => button.textContent)).toEqual([
+      copy.v2.scheduleTab, copy.v2.analysisTab,
+    ])
   })
 
   it('refreshes cached teams and expanded skills when saved training and the result change', async () => {
@@ -285,24 +291,45 @@ describe('V2 results-first workspace', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('preserves the selected shift and display mode across result views without generating', async () => {
+  it('preserves the selected shift, Fiammetta target and display mode across result views without generating', async () => {
+    const workflow = connect()
+    const result = structuredClone(SAMPLE_RESULT)
+    result.plans[0].Fiammetta = { enable: true, target: ' 银灰 ', order: 'pre' }
+    result.plans[1].Fiammetta = { enable: true, target: '德克萨斯', order: 'post' }
+    result.plans[2].Fiammetta = { enable: false, target: '但书', order: 'pre' }
+    workflow.historyItem = { result }
     const user = userEvent.setup()
-    mount()
+    const page = mount()
+    expect(within(screen.getByRole('tabpanel')).getByText('菲亚梅塔 → 银灰')).toBeInTheDocument()
     await user.click(screen.getByRole('tab', { name: /第 2 班/ }))
+    expect(within(screen.getByRole('tabpanel')).getByText('菲亚梅塔 → 德克萨斯')).toBeInTheDocument()
+    expect(within(screen.getByRole('tabpanel')).queryByText('菲亚梅塔 → 银灰')).not.toBeInTheDocument()
     const room = within(screen.getByRole('tabpanel')).getByRole('button', { name: /贸易站.*能天使/ })
     await user.click(screen.getByRole('button', { name: copy.v2.list }))
     expect(within(screen.getByRole('tabpanel')).getByRole('button', { name: /贸易站.*能天使/ })).toBe(room)
-    await user.click(screen.getByRole('button', { name: copy.v2.detailsTab }))
+    await user.click(screen.getByRole('button', { name: copy.v2.expandRooms }))
+    expect(screen.getByRole('button', { name: copy.v2.compactRooms })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('heading', { name: copy.v2.dailyOutput })).not.toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /第 2 班/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('button', { name: copy.v2.list })).toHaveAttribute('aria-pressed', 'true')
     expect(within(screen.getByRole('tabpanel')).getByText('能天使')).toBeInTheDocument()
+    expect(within(screen.getByRole('tabpanel')).getByText('菲亚梅塔 → 德克萨斯')).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: /第 3 班/ }))
+    expect(within(screen.getByRole('tabpanel')).queryByText(/菲亚梅塔 →/)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: /第 2 班/ }))
     await user.click(screen.getByRole('button', { name: copy.v2.analysisTab }))
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: copy.v2.summaryTab }))
+    await user.click(screen.getByRole('button', { name: copy.v2.scheduleTab }))
+    expect(screen.getByRole('button', { name: copy.v2.compactRooms })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('tab', { name: /第 2 班/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('button', { name: copy.v2.list })).toHaveAttribute('aria-pressed', 'true')
     await waitFor(() => expect(screen.getByRole('tabpanel')).toBeVisible())
-    expect(mocks.workflow).not.toHaveBeenCalled()
+    expect(within(screen.getByRole('tabpanel')).getByText('菲亚梅塔 → 德克萨斯')).toBeInTheDocument()
+    result.schedule_mode = 'rotation'
+    workflow.historyItem = { result: { ...result } }
+    page.rerender(<MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter>)
+    expect(within(screen.getByRole('tabpanel')).queryByText(/菲亚梅塔 →/)).not.toBeInTheDocument()
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
   it('exposes only the current team during rapid shift changes and keeps keyboard focus on the selected tab', async () => {
@@ -362,6 +389,86 @@ describe('V2 results-first workspace', () => {
     await user.click(screen.getByRole('tab', { name: /第 2 班/ }))
     expect(within(screen.getByRole('button', { name: /贸易站.*能天使/ })).getByTitle(copy.v2.drones)).toBeInTheDocument()
     expect(within(screen.getByRole('button', { name: /贸易站.*芳汀/ })).queryByTitle(copy.v2.drones)).not.toBeInTheDocument()
+  })
+
+  it('exports the selected result from one drawer and preserves the selected shift on close', async () => {
+    const workflow = connect()
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('tab', { name: /第 2 班/ }))
+    const opener = screen.getByRole('button', { name: copy.v2.export })
+    await user.click(opener)
+    const dialog = within(await screen.findByRole('dialog', { name: copy.v2.exportTitle }))
+    expect(dialog.getByText(copy.v2.imageShift(copy.v2.shift(2)))).toBeInTheDocument()
+    await user.click(dialog.getByRole('button', { name: copy.v2.exportMaa }))
+    expect(workflow.handleDownloadMAA).toHaveBeenCalledOnce()
+    await user.click(dialog.getByRole('button', { name: copy.domain.components_result_panel_ResultPanel_039 }))
+    expect(workflow.handleDownloadFullResult).toHaveBeenCalledOnce()
+    expect(dialog.queryByRole('tablist')).not.toBeInTheDocument()
+    await dismissDrawer(user)
+    await waitFor(() => expect(opener).toHaveFocus())
+    expect(screen.getByRole('tab', { name: /第 2 班/ })).toHaveAttribute('aria-selected', 'true')
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+  })
+
+  it.each(['service', 'permission', 'analysis', 'preview'] as const)('keeps complete calculation exports gated by %s', async (restriction) => {
+    const workflow = connect()
+    if (restriction === 'service') mocks.features.mockReturnValue({ status: 'ready', features: { ...DEFAULT_SITE_FEATURES, full_result_export: false }, retry: vi.fn() })
+    if (restriction === 'permission') workflow.userCanDownloadFullResult = false
+    if (restriction === 'analysis') workflow.userCanViewFullData = false
+    if (restriction === 'preview') workflow.historyItem = { result: { ...SAMPLE_RESULT, preview_limit: { room_limit: 1, hidden_room_count: 1, notice: 'Preview' } } }
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('button', { name: copy.v2.export }))
+    const dialog = within(await screen.findByRole('dialog', { name: copy.v2.exportTitle }))
+    expect(dialog.queryByRole('button', { name: copy.domain.components_result_panel_ResultPanel_039 })).not.toBeInTheDocument()
+    expect(dialog.getByRole('button', { name: copy.domain.result_image.current })).toBeEnabled()
+    expect(workflow.handleDownloadFullResult).not.toHaveBeenCalled()
+  })
+
+  it('keeps image exports and execution guidance available when MAA export is unavailable', async () => {
+    const workflow = connect()
+    workflow.historyItem = { result: { ...SAMPLE_RESULT, schedule_mode: 'rotation' } }
+    const user = userEvent.setup()
+    const page = mount()
+    await user.click(screen.getByRole('button', { name: copy.v2.export }))
+    const dialog = within(await screen.findByRole('dialog', { name: copy.v2.exportTitle }))
+    expect(dialog.getByRole('button', { name: copy.v2.exportMaa })).toBeDisabled()
+    expect(dialog.getByText(copy.v2.exportUnavailable)).toBeInTheDocument()
+    expect(dialog.getByRole('button', { name: copy.domain.result_image.all })).toBeEnabled()
+    expect(dialog.getByText(copy.domain.components_result_panel_Guides_001)).toBeInTheDocument()
+    mocks.features.mockReturnValue({ status: 'ready', features: { ...DEFAULT_SITE_FEATURES, maa_export: false }, retry: vi.fn() })
+    page.rerender(<MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter>)
+    expect(dialog.queryByRole('button', { name: copy.v2.exportMaa })).not.toBeInTheDocument()
+    expect(workflow.handleDownloadMAA).not.toHaveBeenCalled()
+  })
+
+  it('retries failed image exports and locks concurrent downloads without losing the selected shift', async () => {
+    connect()
+    mocks.image.mockRejectedValueOnce(new Error('Canvas unavailable'))
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('tab', { name: /第 2 班/ }))
+    await user.click(screen.getByRole('button', { name: copy.v2.export }))
+    const dialog = within(await screen.findByRole('dialog', { name: copy.v2.exportTitle }))
+    const current = dialog.getByRole('button', { name: copy.domain.result_image.current })
+    const all = dialog.getByRole('button', { name: copy.domain.result_image.all })
+    await user.click(current)
+    expect(await dialog.findByRole('alert')).toHaveTextContent(copy.domain.result_image.failed)
+    expect(mocks.image).toHaveBeenCalledWith(expect.objectContaining({ version: 'v2', planIndex: 1, isRotationMode: false }))
+    let finish!: () => void
+    mocks.image.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve }))
+    await user.click(current)
+    expect(current).toBeDisabled()
+    expect(all).toBeDisabled()
+    expect(dialog.getByRole('status')).toHaveTextContent(copy.domain.result_image.busy)
+    await user.click(all)
+    expect(mocks.image).toHaveBeenCalledTimes(2)
+    await act(async () => { finish() })
+    await waitFor(() => expect(all).toBeEnabled())
+    expect(dialog.queryByRole('alert')).not.toBeInTheDocument()
+    await user.click(all)
+    expect(mocks.image).toHaveBeenLastCalledWith(expect.objectContaining({ planIndex: undefined }))
   })
 
   it('rejects malformed operator fields without replacing the currently displayed data', async () => {
@@ -492,6 +599,37 @@ describe('V2 results-first workspace', () => {
     mount()
     await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
     expect(within(await screen.findByRole('dialog')).getByRole('alert')).toHaveTextContent('Invalid schedule configuration')
+  })
+
+  it('keeps incomplete configuration feedback in the drawer without a validation toast', async () => {
+    const workflow = connect()
+    workflow.activeConfig = normalizeConfig(SAMPLE_CONFIG)
+    workflow.activeConfig.product_requirements.manufacturing_stations['Pure Gold'] += 1
+    workflow.configValidation = validateScheduleConfig(workflow.activeConfig)
+    if (workflow.configValidation.ok) throw new Error('Expected an incomplete configuration')
+    const message = workflow.configValidation.message
+    workflow.configToast = { message }
+    session.configSyncStatus = 'pending'
+    const user = userEvent.setup()
+    mount()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(message)).toHaveAttribute('role', 'status')
+    expect(within(dialog).getAllByText(message)).toHaveLength(1)
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+    expect(within(dialog).queryByText(copy.v2.saveFailed)).not.toBeInTheDocument()
+    expect(within(dialog).queryByText(copy.workspace.config_save_pending)).not.toBeInTheDocument()
+  })
+
+  it('retains the save retry action in the configuration drawer after a request failure', async () => {
+    connect()
+    session.configSyncStatus = 'failed'
+    const user = userEvent.setup()
+    mount('/v2?panel=config')
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: copy.workspace.config_save_failed }))
+    expect(session.retryConfigSave).toHaveBeenCalledOnce()
   })
 
   it('writes the successfully selected profile into the route for refresh restoration', async () => {
@@ -673,15 +811,25 @@ describe('V2 results-first workspace', () => {
   it('shows orundum and shards in free aggregate output while keeping precise calculations gated', async () => {
     const workflow = connect()
     workflow.userCanViewFullData = false
+    workflow.activeConfig = normalizeConfig(CONFIG_PRESETS['243-1'])
     workflow.historyItem = { result: { ...SAMPLE_RESULT, daily_production: {
       manufacturing: { 'Originium Shard': 41.25 }, trading: { Orundum: 103.5 },
     } } }
     const user = userEvent.setup()
-    mount()
+    const page = mount()
+    expect(screen.getByRole('region', { name: copy.v2.orundum })).toHaveTextContent(`103.5${copy.v2.daily}`)
+    expect(screen.getByRole('region', { name: copy.v2.orundum }).querySelector('img')).toHaveAttribute('src', '/assets/products/DIAMOND_SHD.png')
+    expect(screen.queryByRole('region', { name: copy.v2.exp })).not.toBeInTheDocument()
     const panel = within(screen.getByRole('heading', { name: copy.v2.dailyOutput }).closest('section')!)
     expect(panel.getByText('合成玉')).toBeInTheDocument()
     expect(panel.getByText('103.5')).toBeInTheDocument()
     expect(panel.getByText('源石碎片')).toBeInTheDocument()
+    workflow.historyItem = { result: { ...SAMPLE_RESULT, daily_production: {
+      manufacturing: { 'Originium Shard': 41.25, 'Battle Record': 1 }, trading: { Orundum: 103.5 },
+    } } }
+    page.rerender(<MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter>)
+    expect(screen.getByRole('region', { name: copy.v2.exp })).toHaveTextContent(`1,000${copy.v2.expUnit}`)
+    expect(screen.queryByRole('region', { name: copy.v2.orundum })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: copy.v2.analysisTab }))
     expect(screen.queryByRole('region', { name: copy.v2.sanityCalculation })).not.toBeInTheDocument()
   })
@@ -736,7 +884,7 @@ describe('V2 feature continuity', () => {
     expect(await screen.findByRole('link', { name: new RegExp(copy.tools.manualSchedule.title) })).toHaveAttribute('href', '/v2?section=manual-tool&profile_id=profile-1')
     await user.click(screen.getByRole('button', { name: copy.v2.overview }))
     expect(await screen.findByRole('button', { name: 'Edit draft: edited' })).toBe(edit)
-    await user.click(screen.getByRole('button', { name: copy.v2.summaryTab }))
+    await user.click(screen.getByRole('button', { name: copy.v2.scheduleTab }))
     await user.click(screen.getByRole('button', { name: copy.v2.manualTab }))
     expect(screen.getByRole('button', { name: 'Edit draft: edited' })).toBe(edit)
     expect(session.persistWorkspacePatch).not.toHaveBeenCalled()

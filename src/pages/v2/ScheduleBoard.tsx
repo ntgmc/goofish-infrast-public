@@ -38,10 +38,11 @@ export function Avatar({ operator, small = false }: { operator: RoomOperator; sm
   )
 }
 
-export default memo(function ScheduleBoard({ result, prepared, expanded, shift, onShiftChange, view, onViewChange, onRoom }: {
+export default memo(function ScheduleBoard({ result, prepared, expanded, onExpandedChange, shift, onShiftChange, view, onViewChange, onRoom }: {
   result: OptimizeResult
   prepared: PreparedResult
   expanded: boolean
+  onExpandedChange: (expanded: boolean) => void
   shift: number
   onShiftChange: (shift: number) => void
   view: 'grid' | 'list'
@@ -52,6 +53,7 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, shift, 
   const selected = Math.min(shift, Math.max(result.plans.length - 1, 0))
   const layoutKey = `${view}-${selected}`
   const plan = prepared.plans[selected]
+  const fiammettaTarget = result.schedule_mode !== 'rotation' && plan?.Fiammetta?.enable ? plan.Fiammetta.target?.trim() : ''
   const allRooms = buildBoardV2Rooms(plan, result.schedule_mode === 'rotation')
     .map((room) => ({ ...room, level: room.level ?? (String(result.buildingType).endsWith('3') ? MAXIMUM_LEVELS[room.roomType] : undefined) }))
     .map((room) => ({ ...room, indexLabel: [plan?.rooms[room.roomType]?.length > 1 ? String(room.roomIndex + 1) : '', roomLevelLabel(room)].filter(Boolean).join(' · ') }))
@@ -84,7 +86,11 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, shift, 
     <OperatorSkillPreview><LayoutGroup id={id}>
     <section className="v2-panel v2-schedule">
       <div className="v2-panel-heading">
-        <div className="v2-heading-inline"><h2>{expanded ? text.allRooms : text.result}</h2><span className="v2-neutral-tag">{text.shifts(result.plans.length)}</span></div>
+        <div className="v2-heading-inline"><h2>{text.result}</h2><span className="v2-neutral-tag">{text.shifts(result.plans.length)}</span></div>
+        <div className="v2-board-controls">
+        <button type="button" className="v2-text-button" aria-pressed={expanded} onClick={() => onExpandedChange(!expanded)}>
+          {expanded ? text.compactRooms : text.expandRooms}
+        </button>
         <div className="v2-view-toggle" role="group" aria-label={text.result}>
           <button type="button" aria-label={text.grid} aria-pressed={view === 'grid'} onClick={() => onViewChange('grid')}>
             {view === 'grid' && <MotionNavIndicator layoutId="board-view" />}<LayoutGrid size={16} />
@@ -92,6 +98,7 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, shift, 
           <button type="button" aria-label={text.list} aria-pressed={view === 'list'} onClick={() => onViewChange('list')}>
             {view === 'list' && <MotionNavIndicator layoutId="board-view" />}<List size={17} />
           </button>
+        </div>
         </div>
       </div>
       <div className="v2-shifts" role="tablist" aria-label={text.shiftTabs}>
@@ -110,7 +117,9 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, shift, 
       </div>
       <div id={`${id}-panel`} role="tabpanel" aria-labelledby={`${id}-tab-${selected}`} tabIndex={0}>
         <div className="v2-transition-pane">
-        <div className="v2-board-meta"><span><Users size={14} />{text.assigned(count)}</span><span><Clock3 size={14} />{text.shiftHours(String(hours[selected] ?? 8))}</span></div>
+        <div className="v2-board-meta"><span><Users size={14} />{text.assigned(count)}</span><span><Clock3 size={14} />{text.shiftHours(String(hours[selected] ?? 8))}</span>
+          {fiammettaTarget && <span>{copy.domain.components_result_panel_ResultBoard_017}{fiammettaTarget}</span>}
+        </div>
         {roomGroups.filter((group) => group.rooms.length > 0).map((group) => (
           <section key={group.label} className="v2-room-group" aria-label={group.label}>
             <h3 className="v2-room-group-title">{group.label}</h3>

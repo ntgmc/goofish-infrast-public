@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { SectionLoader } from '../../../components/SessionLoader'
 import {
   behaviorRiskCasePageSchema,
   type BehaviorRiskCaseDto,
@@ -35,11 +36,11 @@ function emptyPage(): BehaviorRiskCasePageDto {
   }
 }
 
-export default function BehaviorRiskPanel() {
+export default function BehaviorRiskPanel({ active = true }: { active?: boolean }) {
   const [status, setStatus] = useState<RiskStatus>('pending')
   const [page, setPage] = useState(1)
   const [data, setData] = useState<BehaviorRiskCasePageDto>(emptyPage)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [busyCase, setBusyCase] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -76,12 +77,13 @@ export default function BehaviorRiskPanel() {
   }, [page, status])
 
   useEffect(() => {
+    if (!active) return
     void load()
     return () => {
       requestId.current += 1
       abortController.current?.abort()
     }
-  }, [load])
+  }, [active, load])
 
   const review = async (riskCase: BehaviorRiskCaseDto, outcome: 'dismiss' | 'restrict') => {
     const note = notes[riskCase.id]?.trim() ?? ''
@@ -143,7 +145,8 @@ export default function BehaviorRiskPanel() {
   const canReview = data.capabilities?.includes('risk_review') === true
   const controlsDisabled = loading || Boolean(error) || busyCase !== null
 
-  return (
+  return (<>
+    {loading && <SectionLoader label="正在加载行为复核单…" />}
     <section className="tool-panel">
       <div className="tool-panel-header flex flex-wrap items-center justify-between gap-3 p-4">
         <div>
@@ -321,7 +324,7 @@ export default function BehaviorRiskPanel() {
         </div>
       </div>
     </section>
-  )
+  </>)
 }
 
 function behaviorRiskEventLabel(eventType: string): string {

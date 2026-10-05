@@ -23,6 +23,7 @@ import { normalizeScheduleMode, parseShiftHours, SCHEDULE_MODE_LABELS } from '..
 import type { AuthSuccessResponse, LicenseConfig, LicenseOperator, OptimizeResult, PermissionMode } from '../../lib/types'
 import ScheduleBoard, { Avatar } from './ScheduleBoard'
 import IncomeAnalysis from './IncomeAnalysis'
+import ResultExportDrawer from './ResultExportDrawer'
 import OptionsDrawer, { type OptionPanel, type V2Session } from './OptionsDrawer'
 import { sortOperatorsForPreview } from '../tool/tool-utils'
 import V2Transition, { V2PageTransition } from './V2Transition'
@@ -33,9 +34,8 @@ import ProfileExpiryPrompt from '../tool/ProfileExpiryPrompt'
 import { useWorkspaceEntryPreference, WorkspaceEntryPrompt } from '../tool/WorkspaceEntryPreference'
 
 const text = copy.v2
-type View = 'summary' | 'details' | 'analysis' | 'manual' | 'advanced' | 'training'
+type View = 'schedule' | 'analysis' | 'manual' | 'training'
 const ManualScheduleEditor = lazy(() => import('../../components/result-panel/ManualScheduleEditor'))
-const ResultPanel = lazy(() => import('../../components/ResultPanel'))
 const UpgradeSuggestions = lazy(() => import('../../components/UpgradeSuggestions'))
 
 export default function V2Dashboard({ session, workflow, taskCenterAction, result, operators, config, sample, configChanged, onUpdateConfig,
@@ -79,7 +79,9 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
   useEffect(() => { onManualDirtyChange?.(manualDirty) }, [manualDirty, onManualDirtyChange])
   const [panel, setPanel] = useState<OptionPanel | null>(null)
   const [room, setRoom] = useState<BoardRoom | null>(null)
-  const [view, setView] = useState<View>('summary')
+  const [view, setView] = useState<View>('schedule')
+  const [expanded, setExpanded] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
   const [shift, setShift] = useState(0)
   const [boardView, setBoardView] = useState<'grid' | 'list'>('grid')
   const [mobileNavigation, setMobileNavigation] = useState(false)
@@ -91,6 +93,18 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
   const owned = useMemo(() => sortedOperators.filter((operator) => operator.own), [sortedOperators])
   const resultMode = normalizeScheduleMode(result.schedule_mode)
   const configMode = normalizeScheduleMode(config.schedule_mode)
+  const battleRecords = prepared.productionStats.manufacturing['Battle Record'] ?? 0
+  const orundumEconomy = prepared.orundumEconomy
+  const isOrundum = Boolean(orundumEconomy) || prepared.productionStats.orundum > 0
+  const showOrundum = isOrundum && battleRecords === 0
+  const shortTermOrundum = orundumEconomy?.short_term_orundum ?? prepared.productionStats.orundum
+  const sustainablePulls = orundumEconomy ? (orundumEconomy.sustainable_orundum * 30 / 600).toFixed(1) : '—'
+  const sustainablePullsNote = orundumEconomy
+    ? text.sustainablePullsHint(formatAmount(orundumEconomy.sustainable_orundum))
+    : text.sustainableOrundumUnavailable
+  const inventoryBurstNote = orundumEconomy?.case === 'inventory_burst' && orundumEconomy.inventory_depletion_days !== null
+    ? text.inventoryBurstHint(formatAmount(orundumEconomy.inventory_depletion_days))
+    : ''
   const hours = parseShiftHours(config.shift_hours) ?? [8, 8, 8]
   const name = session.activeProfile?.display_name ?? text.guest
   const openPanel = useCallback((next: OptionPanel) => { setPanel(next); setMobileNavigation(false) }, [])
@@ -102,7 +116,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
     : workflow?.progress?.historyResultId || workflow?.progress?.jobId || workflow?.latestWorkspaceResult?.id
       ? { id: workflow.progress?.historyResultId ?? workflow.progress?.jobId ?? workflow.latestWorkspaceResult!.id, config } : undefined
   useEffect(() => { setShift(0); setManualOpened(false); setManualDirty(false) }, [manualKey])
-  useEffect(() => { if (!canManual && view === 'manual') setView('summary') }, [canManual, view])
+  useEffect(() => { if (!canManual && view === 'manual') setView('schedule') }, [canManual, view])
   useEffect(() => {
     const requested = params.get('panel')
     if (requested === 'operators' || requested === 'config') setPanel(requested)
@@ -212,8 +226,8 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
             <div className="v2-banner-actions"><button type="button" className="v2-button v2-button-white" onClick={() => openPanel('config')}><Settings2 size={16} />{text.configure}</button>
               <button type="button" className="v2-button v2-button-primary" disabled={busy || loadingResult || Boolean(generationDisabledReason)} title={generationDisabledReason ?? undefined}
                 onClick={() => { if (onGenerate) onGenerate(); else openPanel('account') }}><RefreshCw size={16} className={busy ? 'v2-spin' : ''} />{busy ? text.generating : text.regenerate}</button>
-              {(sample || features.maa_export) && <button className="v2-button v2-button-secondary v2-export-button" type="button" disabled={busy || (!sample && (resultMode === 'rotation' || !onExport))} title={resultMode === 'rotation' ? text.exportUnavailable : undefined}
-                onClick={sample ? downloadSample : onExport}><Download size={16} />{sample ? text.sampleExport : text.export}</button>}</div>
+              <button className="v2-button v2-button-secondary v2-export-button" type="button" disabled={busy || loadingResult}
+                onClick={() => setExportOpen(true)}><Download size={16} />{text.export}</button></div>
           </div>
           <AnimatePresence initial={false}>
           {(loadingResult || error || notice || downloadNotice || configChanged) && <FeedbackRegion key="feedback">
@@ -223,22 +237,24 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
           </div></FeedbackRegion>}
           </AnimatePresence>
           {children}
-          {view !== 'advanced' && <InventoryDepletionWarning result={result} />}
+          <InventoryDepletionWarning result={result} />
           <StaggeredReveal className="v2-metrics">
             <Metric label={text.lmd} value={formatAmount(prepared.productionStats.lmd)} unit={text.daily} product="LMD" />
-            <Metric label={text.exp} value={formatAmount((prepared.productionStats.manufacturing['Battle Record'] ?? 0) * 1000)} unit={text.expUnit} product="Battle Record" />
+            <Metric label={showOrundum ? text.orundum : text.exp} value={formatAmount(showOrundum ? shortTermOrundum : battleRecords * 1000)}
+              unit={showOrundum ? text.daily : text.expUnit} product={showOrundum ? 'Orundum' : 'Battle Record'}
+              hint={showOrundum && orundumEconomy ? [text.shortTermOrundumHint, inventoryBurstNote].filter(Boolean).join(' · ') : undefined} />
             <Metric label={text.totalEfficiency} value={formatAmount(prepared.totalEff)} unit="%" hint={text.efficiencyHint} icon={<Activity size={20} />} />
             <Metric
-              label={prepared.orundumEconomy ? text.opportunityCost : text.sanity}
-              value={(prepared.orundumEconomy?.opportunity_cost_sanity ?? prepared.productionSanity.value).toFixed(1)}
-              unit={prepared.orundumEconomy ? text.opportunityCostUnit : text.daily}
-              hint={prepared.orundumEconomy ? text.opportunityCostHint : text.sanityHint}
+              label={isOrundum ? text.sustainablePulls : text.sanity}
+              value={isOrundum ? sustainablePulls : prepared.productionSanity.value.toFixed(1)}
+              unit={isOrundum ? text.pullsPer30Days : text.daily}
+              hint={isOrundum ? sustainablePullsNote : text.sanityHint}
               icon={<Gem size={20} />}
             />
           </StaggeredReveal>
           <p className="v2-metrics-note">{text.outputSubtitle}</p>
           <div className="v2-content-tabs" role="group" aria-label={text.resultTabs}>
-            {([['summary', text.summaryTab], ['details', text.detailsTab], ['analysis', text.analysisTab], ['advanced', text.advancedTab], ...(canManual ? [['manual', text.manualTab] as const] : []), ...(!sample && (workflow?.suggestions?.length || result.upgrade_suggestions_status) ? [['training', text.trainingTab] as const] : [])] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => { setView(id); if (id === 'manual') setManualOpened(true) }}>
+            {([['schedule', text.scheduleTab], ['analysis', text.analysisTab], ...(canManual ? [['manual', text.manualTab] as const] : []), ...(!sample && (workflow?.suggestions?.length || result.upgrade_suggestions_status) ? [['training', text.trainingTab] as const] : [])] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => { setView(id); if (id === 'manual') setManualOpened(true) }}>
               {label}{view === id && <MotionNavIndicator layoutId="result-tab" variant="underline" />}
             </button>)}
             <span><ShieldCheck size={14} />{sample ? text.sampleSource : text.ownSource}</span>
@@ -247,25 +263,23 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
             {canManual && manualOpened && session.activeProfile && <Suspense fallback={<p role="status">{text.loading}</p>}><ManualScheduleEditor key={manualKey} source={result} profileId={session.activeProfile.id} operators={operators} simulationBaseline={simulationBaseline} onDirtyChange={setManualDirty} /></Suspense>}
           </div>
           <V2Transition motionKey={view}>
-          <div hidden={view === 'manual'} className={`v2-results-grid ${view !== 'summary' ? 'v2-results-expanded' : ''}`}>
-            {view === 'advanced' ? <section className="v2-feature-content"><Suspense fallback={<p role="status">{text.loading}</p>}><ResultPanel result={result} operators={operators} fullDataAvailable={canViewAnalysis}
-              onDownload={sample ? undefined : onExport} onDownloadFullResult={features.full_result_export && workflow?.userCanDownloadFullResult ? workflow.handleDownloadFullResult : undefined}
-              downloadBusy={busy} fullResultDownloadBusy={busy} /></Suspense></section> : view === 'training' ? <section className="v2-panel v2-feature-content v2-section-loading"><Suspense fallback={<p role="status">{text.loading}</p>}><UpgradeSuggestionStatusNotice result={result} /><UpgradeSuggestions suggestions={workflow?.suggestions ?? []} embedded /></Suspense></section> : view === 'analysis' ? (
+          <div hidden={view === 'manual'} className={`v2-results-grid ${view !== 'schedule' || expanded ? 'v2-results-expanded' : ''}`}>
+            {view === 'training' ? <section className="v2-panel v2-feature-content v2-section-loading"><Suspense fallback={<p role="status">{text.loading}</p>}><UpgradeSuggestionStatusNotice result={result} /><UpgradeSuggestions suggestions={workflow?.suggestions ?? []} embedded /></Suspense></section> : view === 'analysis' ? (
               <section className="v2-panel v2-analysis"><div className="v2-panel-heading"><h2>{text.analysisTab}</h2><span className="v2-neutral-tag">24h</span></div>{canViewAnalysis
-                ? <IncomeAnalysis result={result} />
+                ? <IncomeAnalysis result={result} prepared={prepared} />
                 : <div className="v2-analysis-note"><ShieldCheck size={21} /><div><p>{text.previewAnalysis}</p>{features.pricing && <Link className="v2-text-button" to="/pricing">{text.comparePlans}<ArrowRight size={14} /></Link>}</div></div>}</section>
             ) : (
-              <ScheduleBoard result={result} prepared={prepared} expanded={view === 'details'} shift={shift} onShiftChange={setShift}
+              <ScheduleBoard result={result} prepared={prepared} expanded={expanded} onExpandedChange={setExpanded} shift={shift} onShiftChange={setShift}
                 view={boardView} onViewChange={setBoardView} onRoom={openRoom} />
             )}
-            {view === 'summary' && <aside className="v2-result-aside">
+            {view === 'schedule' && !expanded && <aside className="v2-result-aside">
               <section className="v2-panel v2-production-panel">
                 <div className="v2-panel-heading"><h2>{text.dailyOutput}</h2><span className="v2-output-clock"><CalendarClock size={16} /></span></div>
                 <OutputRow product="LMD" value={prepared.productionStats.lmd} />
                 <OutputRow product="Battle Record" value={prepared.productionStats.manufacturing['Battle Record'] ?? 0} />
                 <OutputRow product="Pure Gold" value={prepared.productionStats.manufacturing['Pure Gold'] ?? 0} />
                 {Object.keys(PRODUCT_LABELS).filter((product) => !['LMD', 'Battle Record', 'Pure Gold'].includes(product)).map((product) => {
-                  const value = (prepared.productionStats.manufacturing[product] ?? 0) + (result.daily_production?.trading?.[product] ?? 0)
+                  const value = (prepared.productionStats.manufacturing[product] ?? 0) + (product === 'Orundum' ? shortTermOrundum : result.daily_production?.trading?.[product] ?? 0)
                   return value !== 0 ? <OutputRow key={product} product={product} value={value} /> : null
                 })}
               </section>
@@ -289,6 +303,9 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
           <footer className="v2-footer"><span>{text.brand}</span><nav>{(['status', 'support', 'terms', 'privacy', 'disclaimer'] as const).filter((entry) => v2SectionAvailable(entry, features)).map((entry) => <Link key={entry} to={v2Path(entry, session.activeProfile?.id)}>{sectionLabels[entry]}</Link>)}</nav></footer>
         </main>
       </div>
+      <ResultExportDrawer key={`${session.activeProfile?.id ?? 'sample'}:${manualKey}`} open={exportOpen} onOpenChange={setExportOpen} result={result} prepared={prepared} shift={shift} busy={busy}
+        onDownloadMaa={!sample && features.maa_export ? onExport : undefined} onDownloadSample={sample ? downloadSample : undefined}
+        onDownloadFullResult={!sample && canViewAnalysis && !result.preview_limit && features.full_result_export && workflow?.userCanDownloadFullResult ? workflow.handleDownloadFullResult : undefined} />
       <OptionsDrawer panel={panel} onClose={closePanel} onOpenProfile={openProfile} onNavigate={navigateSection} session={guardedSession} config={config} operators={sortedOperators}
         onUpdateConfig={onUpdateConfig} permission={permission} canEditConfig={canEditConfig} canUseIntermediateConfig={canUseIntermediateConfig}
         sample={sample} busy={busy} configReadOnly={workflow?.loading} onImportOperators={onImportOperators} configDiffRows={workflow?.configDiffRows} hasPreviousResult={Boolean(workflow?.latestWorkspaceResult)}

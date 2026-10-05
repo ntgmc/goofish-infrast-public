@@ -71,6 +71,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
   if (panel !== null && panel !== lastPanel) setLastPanel(panel)
   const shownPanel = panel ?? lastPanel
   const isConfig = shownPanel === 'config'
+  const validation = validateScheduleConfig(config)
   const description = shownPanel === 'settings' ? copy.dashboard.animation.description : isConfig ? sample ? text.demoConfigDescription : text.configDescription
     : shownPanel === 'operators' ? sample ? text.sampleOperatorDescription : text.operatorDescription
       : shownPanel === 'account' ? text.accountDescription : text.roomDescription
@@ -120,22 +121,25 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
         <div className="v2-drawer-heading">
           <DialogTitle>{shownPanel === 'room' && room ? `${room.label} ${room.indexLabel}` : shownPanel ? titles[shownPanel] : ''}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
+          {isConfig && <div className="v2-config-feedback">
+            {!validation.ok ? <p role="status" className="tool-alert tool-alert--warning">{validation.message}</p>
+              : error && session.configSyncStatus !== 'failed' ? <p role="alert" className="v2-feedback v2-feedback-error">{error}</p>
+                : session.user && <ConfigSaveStatus status={session.configSyncStatus} onRetry={session.retryConfigSave} />}
+          </div>}
         </div>
         <V2Transition motionKey={isConfig ? 'config' : shownPanel === 'room' ? `room-${room?.key}` : shownPanel ?? 'closed'} className="v2-drawer-body">
         {isConfig && (
           <>
-            {error && <p role="alert" className="v2-feedback v2-feedback-error">{error}</p>}
             <ConfigCapabilityPreview config={config} enabled={!canEditConfig}>
             <ConfigEditor profileId={session.activeProfile?.id} config={config} canEdit={canEditConfig} readOnly={configReadOnly} canEditIntermediateInventory={canUseIntermediateConfig}
               canSelectPreset={canUseIntermediateConfig} canEditFixedShiftHours={canEditConfig || Boolean(session.activeProfile && isFreePreviewProfile(session.activeProfile))} permission={permission}
-              validation={validateScheduleConfig(config)} onUpdate={onUpdateConfig} embedded />
+              validation={validation} onUpdate={onUpdateConfig} embedded hideValidation />
             </ConfigCapabilityPreview>
             {hasPreviousResult && <aside className="v2-options-content">
               <h3>{copy.optimize.pages_tool_optimize_ConfigSection_010}</h3>
               {configDiffRows?.length ? <dl>{configDiffRows.map((row) => <div key={row.label}><dt>{row.label}</dt><dd>{copy.optimize.pages_tool_optimize_ConfigSection_012}{row.before}<br />{copy.optimize.pages_tool_optimize_ConfigSection_013}{row.after}</dd></div>)}</dl>
                 : <p role="status">{copy.optimize.pages_tool_optimize_ConfigSection_014}</p>}
             </aside>}
-            {session.user && <ConfigSaveStatus status={session.configSyncStatus} onRetry={session.retryConfigSave} />}
             <button type="button" className="v2-button v2-button-primary v2-drawer-done" onClick={onClose}><Check size={16} />{text.done}</button>
           </>
         )}

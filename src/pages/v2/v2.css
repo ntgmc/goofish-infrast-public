@@ -596,6 +596,9 @@
 }
 
 .v2-schedule { padding-bottom: var(--space-md); }
+.v2-schedule .v2-panel-heading { flex-wrap: wrap; }
+.v2-board-controls { display: flex; align-items: center; gap: var(--space-xs); margin-left: auto; }
+.v2-board-controls > button { min-height: 44px; white-space: nowrap; }
 .v2-production-panel { padding-bottom: var(--space-sm); }
 
 .v2-panel-heading {
@@ -640,8 +643,8 @@
   position: relative;
   isolation: isolate;
   display: grid;
-  width: 26px;
-  height: 24px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   border-radius: 3px;
   color: var(--v2-secondary);
@@ -1203,6 +1206,8 @@
 .v2-income-table .v2-neutral-tag { display: inline-block; margin-left: var(--space-2xs); }
 .v2-product-amount { display: inline-flex; align-items: center; gap: var(--space-2xs); white-space: nowrap; }
 .v2-sanity-calculation { display: grid; gap: var(--space-xs); padding-top: var(--space-sm); border-top: 1px solid var(--v2-line); }
+.v2-analysis-details { border-top: 1px solid var(--v2-line); }
+.v2-analysis-details > summary { min-height: 44px; padding-block: var(--space-xs); cursor: pointer; color: var(--v2-secondary); }
 
 .v2-analysis-note {
   display: flex;
@@ -1296,6 +1301,19 @@
   font-size: var(--text-sm);
 }
 
+.v2-config-feedback {
+  display: flex;
+  height: 64px;
+  align-items: center;
+  margin-top: 12px;
+  overflow-y: auto;
+}
+
+.v2-drawer-heading .v2-config-feedback p {
+  width: 100%;
+  margin: 0;
+}
+
 .v2-drawer-done {
   position: sticky;
   bottom: 0;
@@ -1313,6 +1331,14 @@
   font-size: 14px;
   font-weight: 600;
 }
+
+.v2-export-content > section { display: grid; min-width: 0; gap: var(--space-xs); }
+.v2-export-content > section + section { padding-top: var(--space-md); border-top: 1px solid var(--v2-line); }
+.v2-export-content p { color: var(--v2-secondary); line-height: 1.7; }
+.v2-export-content .v2-error { color: var(--color-v2-error); }
+.v2-export-content .v2-button { justify-self: start; }
+.v2-export-actions { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+.v2-export-guides summary { min-height: 44px; }
 
 .v2-search {
   display: flex;
