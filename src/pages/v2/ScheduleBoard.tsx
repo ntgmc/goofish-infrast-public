@@ -38,10 +38,11 @@ export function Avatar({ operator, small = false }: { operator: RoomOperator; sm
   )
 }
 
-export default memo(function ScheduleBoard({ result, prepared, expanded, shift, onShiftChange, view, onViewChange, onRoom }: {
+export default memo(function ScheduleBoard({ result, prepared, expanded, onExpandedChange, shift, onShiftChange, view, onViewChange, onRoom }: {
   result: OptimizeResult
   prepared: PreparedResult
   expanded: boolean
+  onExpandedChange: (expanded: boolean) => void
   shift: number
   onShiftChange: (shift: number) => void
   view: 'grid' | 'list'
@@ -85,7 +86,11 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, shift, 
     <OperatorSkillPreview><LayoutGroup id={id}>
     <section className="v2-panel v2-schedule">
       <div className="v2-panel-heading">
-        <div className="v2-heading-inline"><h2>{expanded ? text.allRooms : text.result}</h2><span className="v2-neutral-tag">{text.shifts(result.plans.length)}</span></div>
+        <div className="v2-heading-inline"><h2>{text.result}</h2><span className="v2-neutral-tag">{text.shifts(result.plans.length)}</span></div>
+        <div className="v2-board-controls">
+        <button type="button" className="v2-text-button" aria-pressed={expanded} onClick={() => onExpandedChange(!expanded)}>
+          {expanded ? text.compactRooms : text.expandRooms}
+        </button>
         <div className="v2-view-toggle" role="group" aria-label={text.result}>
           <button type="button" aria-label={text.grid} aria-pressed={view === 'grid'} onClick={() => onViewChange('grid')}>
             {view === 'grid' && <MotionNavIndicator layoutId="board-view" />}<LayoutGrid size={16} />
@@ -93,6 +98,7 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, shift, 
           <button type="button" aria-label={text.list} aria-pressed={view === 'list'} onClick={() => onViewChange('list')}>
             {view === 'list' && <MotionNavIndicator layoutId="board-view" />}<List size={17} />
           </button>
+        </div>
         </div>
       </div>
       <div className="v2-shifts" role="tablist" aria-label={text.shiftTabs}>

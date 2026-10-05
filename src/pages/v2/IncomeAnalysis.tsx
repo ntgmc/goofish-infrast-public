@@ -1,5 +1,7 @@
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
+import ResultMetrics from '../../components/result-panel/ResultMetrics'
+import type { PreparedResult } from '../../components/result-panel/formatters'
 import { PRODUCT_LABELS, ROOM_LABELS } from '../../components/result-panel/labels'
 import { calculateProductionSanity } from '../../lib/production-sanity'
 import { SANITY_PER_BATTLE_RECORD, SANITY_PER_LMD, SANITY_PER_ORIGINIUM_SHARD, SANITY_PER_ORUNDUM, SANITY_PER_PURE_GOLD } from '../../lib/orundum-economy'
@@ -38,7 +40,7 @@ function stationProductionRows(daily: DailyProduction | undefined) {
   })
 }
 
-export default function IncomeAnalysis({ result }: { result: OptimizeResult }) {
+export default function IncomeAnalysis({ result, prepared }: { result: OptimizeResult; prepared: PreparedResult }) {
   const daily = result.daily_production
   const rows = stationProductionRows(daily)
   const sanity = calculateProductionSanity(daily)
@@ -72,6 +74,10 @@ export default function IncomeAnalysis({ result }: { result: OptimizeResult }) {
           })}</tbody></table>
       </div><p className="v2-muted">{text.sanityCalculationNote}</p>
     </section>
+    <details className="v2-analysis-details v2-feature-content">
+      <summary>{text.productionDetails}</summary>
+      <ResultMetrics prepared={prepared} isRotationMode={result.schedule_mode === 'rotation'} />
+    </details>
   </div>
 }
 
