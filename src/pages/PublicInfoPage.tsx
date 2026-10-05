@@ -165,7 +165,7 @@ export default function PublicInfoPage({ page, embedded = false }: { page: Publi
           </nav>
         </header>}
 
-        <article className={embedded ? undefined : 'public-document'}>
+        <article className={embedded ? 'v2-document' : 'public-document'}>
         <header className="public-document-header">
           <p className="public-kicker">{meta.eyebrow}</p>
           <h1 className="display-title mt-3 text-3xl leading-tight text-ink-primary sm:text-4xl">{meta.title}</h1>
@@ -178,7 +178,7 @@ export default function PublicInfoPage({ page, embedded = false }: { page: Publi
         <div>
           {page === 'faq' && <FaqContent />}
           {page === 'support' && <SupportContent />}
-          {(page === 'privacy' || page === 'terms' || page === 'disclaimer') && <LegalContent sections={legalContent[page]} />}
+          {(page === 'privacy' || page === 'terms' || page === 'disclaimer') && <LegalContent sections={legalContent[page]} withContents={embedded} />}
         </div>
         </article>
       </div>
@@ -197,8 +197,8 @@ function FaqContent() {
     return terms.every((term) => text.includes(term))
   })
   return (
-    <section aria-label={copy.public.pages_PublicInfoPage_064}>
-      <div className="mb-4 pt-6">
+    <section className="document-faq" aria-label={copy.public.pages_PublicInfoPage_064}>
+      <div className="document-faq-search mb-4 pt-6">
         <label htmlFor="faq-search" className="mb-2 block text-sm font-medium text-ink-primary">{copy.public.faq_search_label}</label>
         <div className="flex items-center gap-2">
           <div className="relative min-w-0 flex-1">
@@ -216,7 +216,7 @@ function FaqContent() {
         <p className="font-medium text-ink-primary">{copy.public.faq_search_empty}</p>
         <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.public.faq_search_empty_hint}</p>
       </div>}
-      <div>
+      <div className="document-faq-results">
         {items.map((item) => (
           <details key={item.id} open={terms.length > 0 || undefined} className="group border-b border-surface-3 py-3 transition-colors has-[summary:focus-visible]:border-brand-500/55 has-[summary:focus-visible]:bg-surface-1">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-5 rounded-lg text-base font-semibold text-ink-primary focus-visible:outline-none">
@@ -241,15 +241,15 @@ function FaqContent() {
 
 function SupportContent() {
   return (
-    <section>
-      <div className="public-prose-section sm:flex sm:items-center sm:justify-between sm:gap-8">
+    <section className="document-support">
+      <div className="document-support-contact public-prose-section sm:flex sm:items-center sm:justify-between sm:gap-8">
         <div className="max-w-2xl">
           <h2 className="text-xl font-semibold text-ink-primary">{copy.public.pages_PublicInfoPage_067}</h2>
           <p className="mt-3 text-sm leading-7 text-ink-secondary">{copy.public.pages_PublicInfoPage_068}</p>
         </div>
         <SupportGroupLink className="tool-primary-action mt-6 sm:mt-0" />
       </div>
-      <div className="grid border-b border-surface-3 sm:grid-cols-2">
+      <div className="document-support-guidance grid border-b border-surface-3 sm:grid-cols-2">
         <div className="py-6 sm:pr-6">
           <h2 className="text-base font-semibold text-ink-primary">{copy.public.pages_PublicInfoPage_069}</h2>
           <ul className="mt-3 space-y-2 text-sm leading-6 text-ink-secondary">
@@ -267,7 +267,7 @@ function SupportContent() {
           </ul>
         </div>
       </div>
-      <div className="public-prose-section">
+      <div className="document-support-requests public-prose-section">
         <h2 className="text-xl font-semibold text-ink-primary">{copy.public.pages_PublicInfoPage_079}</h2>
         <p className="mt-3 text-sm leading-7 text-ink-secondary">{copy.public.pages_PublicInfoPage_080}</p>
         <div className="mt-4 grid border-y border-surface-3 sm:grid-cols-2">
@@ -280,12 +280,16 @@ function SupportContent() {
   )
 }
 
-function LegalContent({ sections }: { sections: readonly LegalSection[] }) {
+function LegalContent({ sections, withContents = false }: { sections: readonly LegalSection[]; withContents?: boolean }) {
   return (
-    <div>
-      <div>
+    <div className={withContents ? 'v2-document-layout' : undefined}>
+      {withContents && <nav className="v2-document-contents" aria-label={copy.v2.contents}>
+        <strong>{copy.v2.contents}</strong>
+        {sections.map((section) => <a key={section.id} href={`#${section.id}`} title={section.heading}>{section.heading}</a>)}
+      </nav>}
+      <div className={withContents ? 'v2-document-reading' : undefined}>
         {sections.map((section) => (
-          <section key={section.id} id={section.id} className="public-prose-section">
+          <section key={section.id} id={section.id} tabIndex={withContents ? -1 : undefined} className="public-prose-section">
             <h2 className="text-xl font-semibold text-ink-primary">{section.heading}</h2>
             <div className="mt-4 space-y-4 text-sm leading-7 text-ink-secondary">
               {section.paragraphs.map((paragraph, index) => <p key={`${section.id}-${index}`}>{paragraph}</p>)}
@@ -297,12 +301,12 @@ function LegalContent({ sections }: { sections: readonly LegalSection[] }) {
             </div>
           </section>
         ))}
-      </div>
       <section className="public-prose-section">
         <h2 className="text-base font-semibold text-ink-primary">{copy.public.pages_PublicInfoPage_077}</h2>
         <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.public.pages_PublicInfoPage_078}</p>
         <SupportGroupLink className="tool-secondary-action mt-4" />
       </section>
+      </div>
     </div>
   )
 }

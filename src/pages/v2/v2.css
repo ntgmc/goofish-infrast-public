@@ -1710,17 +1710,9 @@
 .v2-feature-content :is(.text-brand-500, .text-brand-400) { color: var(--v2-accent); }
 .v2-feature-content :is(button, a, input, select, textarea) { font-family: inherit; }
 .v2-feature-content :is(.tool-primary-action, .tool-secondary-action):disabled { opacity: .55; }
-.v2-tools-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-md); }
-.v2-tool-card { position: relative; display: flex; flex-direction: column; padding: var(--space-lg); color: var(--v2-ink); white-space: normal !important; text-decoration: none; transition: border-color var(--motion-enter) ease; }
-.v2-tool-card:hover { border-color: var(--v2-accent); }
-.v2-tool-icon { width: 64px; height: 64px; display: grid; place-items: center; background: var(--v2-accent-soft); color: var(--v2-accent); border-radius: var(--radius-v2-control); margin-bottom: var(--space-lg); }
-.v2-tool-card h2 { font-size: var(--text-lg); font-weight: 600; }
-.v2-tool-card p { margin-top: var(--space-sm); color: var(--v2-muted); line-height: 1.8; }
-.v2-tool-arrow { display: flex; justify-content: flex-end; margin-top: auto; padding-top: var(--space-lg); color: var(--v2-accent); }
 .v2-embedded-tool { min-width: 0; }
 .v2-embedded-tool .public-document-header { padding-top: 0; }
-@media (max-width: 64rem) { .v2-tools-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 40rem) { .v2-tools-grid { grid-template-columns: minmax(0, 1fr); } .v2-section-heading h1 { font-size: var(--text-xl); } }
+@media (max-width: 40rem) { .v2-section-heading h1 { font-size: var(--text-xl); } }
 .v2-dialog { background: var(--v2-paper); border-color: var(--v2-line); border-radius: var(--radius-v2-control); }
 .v2-dialog :is(button, input, select, textarea) { font-family: inherit; }
 .v2-dialog :focus-visible { outline: 2px solid var(--color-v2-focus); outline-offset: 3px; }

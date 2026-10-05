@@ -166,8 +166,8 @@ export default function CommercialProfilesSection({ onOpen }: { onOpen: (profile
         </button>
       </div>}
     </section>
-    {loading && !page ? <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.metered.commercial_profiles.loading}</div> : <section className="grid gap-3 xl:grid-cols-2">
-      {(page?.profiles ?? []).map((profile) => <article key={profile.id} className="tool-panel p-5">
+    {loading && !page ? <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.metered.commercial_profiles.loading}</div> : <section className="workspace-commercial-list grid gap-3 xl:grid-cols-2">
+      {(page?.profiles ?? []).map((profile) => <article key={profile.id} className="workspace-commercial-row tool-panel p-5">
         {editDraft?.profileId === profile.id ? <div className="space-y-3">
           <label><span className="mb-1 block text-xs text-ink-muted">{copy.metered.commercial_profiles.name_label}</span><input className="tool-field" maxLength={40} value={editDraft.displayName} onChange={(event) => setEditDraft({ ...editDraft, displayName: event.currentTarget.value })} /></label>
           <label><span className="mb-1 block text-xs text-ink-muted">{copy.metered.commercial_profiles.note_label}</span><textarea className="tool-field min-h-24" maxLength={500} value={editDraft.note} onChange={(event) => setEditDraft({ ...editDraft, note: event.currentTarget.value })} /></label>

@@ -55,7 +55,7 @@ it deliberately when changing the shared design.
 
 ## Variants
 
-### V2 results workspace (`/v2`)
+### V2 workspace (`/v2`)
 
 - Keep the modern-minimal / Workbench application family, current routes,
   side navigation, configuration drawers, and result workflow.
@@ -80,6 +80,26 @@ it deliberately when changing the shared design.
 - The public result layout at `riic.autos` informed result hierarchy,
   adjacent shift controls, and portrait-led assignments. Use an independent
   palette and implementation.
+- Supporting application pages use the same palette and hierarchy. Account
+  profiles and tools use lists; saved configurations sit beside
+  archived results and history; generation, scenario comparison, cultivation,
+  and depot valuation pair controls with results or supporting information.
+- Settings use horizontal section navigation and stacked sections of equal
+  width. Account actions sit directly below each profile's summary. These
+  pages use centered, bounded content widths. Inventory uses searchable item
+  rows and a task sidebar, with separators only between rows. Pricing uses
+  term, description, and purchase columns instead of a four-card grid.
+- Embedded content owns its page heading. Reading pages use a centered content
+  region; legal pages place their contents column to the right of a reading
+  area of up to 65ch, balancing the application's left navigation. FAQ pairs
+  search with answers; support pairs a contact column with feedback and service
+  information. Releases and public announcements pair metadata with prose.
+- `src/pages/v2/workspace-pages.css` applies these layouts through semantic
+  hooks under `.v2-page-section`; shared components keep their standalone
+  layouts. Collapse secondary columns below 80rem, document navigation below
+  60rem, and dense rows below 40rem. Keep containing surfaces padded and leave
+  space between separators and the following text.
+- Page coverage and verification: [V2 workspace redesign](docs/v2-workspace-redesign.md).
 
 ## CTA voice
 

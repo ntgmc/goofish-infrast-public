@@ -58,9 +58,9 @@ export default function ProfilesSection({
     )
   }
   return (
-    <div className="space-y-4">
+    <div className="workspace-profiles space-y-4">
       {meteredEnabled && <section className="tool-panel p-5 sm:p-6"><h2 className="font-semibold text-ink-primary">{copy.metered.personal_profiles.title}</h2><p className="mt-2 text-sm text-ink-secondary">{copy.metered.personal_profiles.description}</p>{!profiles.some((profile) => profile.kind === 'metered_personal') && <button type="button" disabled={meteredBusy} onClick={() => createMetered()} className="tool-secondary-action mt-4">{copy.metered.personal_profiles.create}</button>}{meteredError && <div className="tool-alert tool-alert--error mt-3">{meteredError}</div>}</section>}
-    <section className="grid gap-4 xl:grid-cols-2">
+    <section className="workspace-profile-list grid gap-4 xl:grid-cols-2">
       {profiles.map((profile, index) => (
         <ProfileCard
           key={profile.id}
@@ -126,8 +126,8 @@ function ProfileCard({
   }
 
   return (
-    <article className="tool-panel p-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <article className="workspace-profile-row tool-panel p-5">
+      <div className="workspace-profile-main flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="truncate text-lg font-semibold text-ink-primary">{profile.display_name || fallbackName}</h2>
@@ -155,10 +155,12 @@ function ProfileCard({
           {opening ? copy.dashboard.pages_tool_dashboard_ProfilesSection_009 : copy.dashboard.pages_tool_dashboard_ProfilesSection_010}
         </button>
       </div>
+      <div className="workspace-profile-actions">
       <button type="button" onClick={() => setEditing((value) => !value)} className="tool-secondary-action mt-4 px-3 text-sm" aria-expanded={editing}>{copy.dashboard.pages_tool_dashboard_ProfilesSection_011}</button>
       {meteredEnabled && isFreePreviewProfile(profile) && <button type="button" onClick={onConvert} disabled={converting} className="tool-secondary-action ml-2 mt-4 px-3 text-sm">{copy.metered.personal_profiles.convert}</button>}
+      </div>
       {editing && (
-        <div className="tool-inset mt-4 space-y-3 p-4">
+        <div className="workspace-profile-edit tool-inset mt-4 space-y-3 p-4">
           {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
           <input aria-label={copy.dashboard.pages_tool_dashboard_ProfilesSection_012} value={displayName} maxLength={40} onChange={(event) => setDisplayName(event.currentTarget.value)} className="tool-field" />
           <textarea aria-label={copy.dashboard.pages_tool_dashboard_ProfilesSection_013} value={note} maxLength={500} rows={3} onChange={(event) => setNote(event.currentTarget.value)} className="tool-field resize-y" placeholder={copy.dashboard.pages_tool_dashboard_ProfilesSection_014} />

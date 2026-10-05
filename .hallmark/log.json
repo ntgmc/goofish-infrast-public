@@ -1,5 +1,19 @@
 [
   {
+    "date": "2026-10-05",
+    "scope": "app",
+    "macrostructure": "Application: Workbench; Content: Long Document",
+    "theme": "custom",
+    "theme_axes": "light and dark / geometric-sans / warm-copper",
+    "vibe": "result-led, composed, legible, precise",
+    "enrichment": "none",
+    "nav": "existing side rail",
+    "footer": "Ft2 inline rule",
+    "brief": "Review all 23 V2 sections and restructure supporting workspace pages with horizontal rows, controls/results regions, and document navigation",
+    "design_system": "design.md",
+    "report": "docs/v2-workspace-redesign.md"
+  },
+  {
     "date": "2026-10-04",
     "scope": "page",
     "macrostructure": "Workbench",

@@ -152,8 +152,8 @@ export default function SettingsSection({
   }
 
   return (
-    <div className="space-y-6">
-      {!safetyOnly && <div className="flex flex-col gap-4 border-b border-surface-3 pb-5">
+    <div className="workspace-settings space-y-6">
+      {!safetyOnly && <div className="workspace-settings-navigation flex flex-col gap-4 border-b border-surface-3 pb-5">
         <p className="text-sm leading-6 text-ink-secondary">{text.description}</p>
         <nav aria-label={text.navigation} className="flex flex-wrap gap-2">
           <button type="button" onClick={() => openSection('settings-security')} className="tool-secondary-action text-sm"><ShieldCheck size={16} aria-hidden="true" />{text.security}</button>
@@ -162,7 +162,7 @@ export default function SettingsSection({
           <button type="button" onClick={() => openSection('settings-data')} className="tool-secondary-action text-sm">{text.data}</button>
         </nav>
       </div>}
-      <div className={`grid min-w-0 items-start gap-6 ${safetyOnly ? '' : 'xl:grid-cols-2'}`}>
+      <div className={`workspace-settings-panels grid min-w-0 items-start gap-6 ${safetyOnly ? '' : 'xl:grid-cols-2'}`}>
         {!safetyOnly && <form id="settings-security" tabIndex={-1} onSubmit={submit} noValidate className="tool-panel min-w-0 scroll-mt-32 p-5 sm:p-6">
           <div className="flex items-center gap-3">
             <LockKeyhole size={20} className="shrink-0 text-brand-500" aria-hidden="true" />

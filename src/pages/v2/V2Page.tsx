@@ -24,6 +24,7 @@ import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './sample-result'
 import { v2Href, v2Path, v2Section } from './navigation'
 import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
 import './v2.css'
+import './workspace-pages.css'
 
 export default function V2Page() {
   const [params] = useSearchParams()

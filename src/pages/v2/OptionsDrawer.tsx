@@ -3,7 +3,6 @@ import PinyinMatch from 'pinyin-match'
 import ConfigCapabilityPreview from '../../components/ConfigCapabilityPreview'
 import type { ConfigDiffItem } from '../../lib/workspace-history'
 import { ArrowRight, Check, LogOut, RefreshCw, Search, Upload, UserRound } from 'lucide-react'
-import Link from '../../components/InternalLink'
 import AuthForm from '../../components/AuthForm'
 import AnimationSettings from '../../components/AnimationSettings'
 import ConfigEditor from '../../components/ConfigEditor'
@@ -25,7 +24,7 @@ import type { SklandPayload } from '../../components/SklandBindingDialog'
 import ConfigSaveStatus from '../tool/workspace/ConfigSaveStatus'
 import V2Transition from './V2Transition'
 import BuildingSkills from './BuildingSkills'
-import { v2Path, type V2Section } from './navigation'
+import type { V2Section } from './navigation'
 
 const text = copy.v2
 export type OptionPanel = 'operators' | 'config' | 'account' | 'room' | 'settings'
@@ -159,7 +158,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
                 onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file) }} />
               {importError && <p role="alert" className="v2-error">{importError}</p>}
               {importDone && <p role="status" className="v2-muted">{session.user ? text.importSuccess : text.sampleImportSuccess}</p>}
-              {session.user && <Link to={v2Path('profiles', session.activeProfile?.id)} className="v2-text-button v2-import-profiles">{text.manageProfiles}<ArrowRight size={14} /></Link>}
+              {session.user && <button type="button" onClick={() => onNavigate('profiles')} className="v2-text-button v2-import-profiles">{text.manageProfiles}<ArrowRight size={14} /></button>}
             </div>
             <div className="v2-operator-rows">
               {filteredOperators.map((operator) => (

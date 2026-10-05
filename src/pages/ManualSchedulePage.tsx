@@ -124,12 +124,13 @@ function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpe
         </div>
       </header>}
       <ContentRoot className="space-y-6">
-        <section className="tool-panel space-y-4 p-5 sm:p-6">
-          <div>
+        <section className="workspace-manual-setup tool-panel space-y-4 p-5 sm:p-6">
+          <div className="workspace-manual-intro">
             {!embedded && <h1 className="text-2xl font-semibold text-ink-primary">{label.title}</h1>}
             <p className="mt-2 text-sm leading-6 text-ink-secondary">{label.description}</p>
             <p className="mt-2 text-sm leading-6 text-ink-muted">{label.access}</p>
           </div>
+          <div className="workspace-manual-inputs space-y-4">
           {session.authLoading ? <p role="status">{label.loading}</p> : session.authStatus === 'error' ? (
             <div className="tool-alert tool-alert--warning" role="alert">
               <p>{session.authError?.message}</p>
@@ -205,6 +206,7 @@ function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpe
           </div>
           {profile && <p className="text-xs leading-5 text-ink-muted">{label.importHint}</p>}
           {draft && <p className="text-sm text-warning">{label.replace}</p>}
+          </div>
         </section>
         {canUse && draft?.profileId === profile?.id && draft && (
           <ManualScheduleEditor key={`${draft.profileId}:${draft.revision}`} source={draft.source}

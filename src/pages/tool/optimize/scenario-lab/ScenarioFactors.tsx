@@ -76,7 +76,7 @@ export default function ScenarioFactors({
         <p className="mt-1 text-xs leading-5 text-ink-secondary">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_033(additionalConfigCount, SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS)}</p>
         <div
           data-testid="scenario-layout-grid"
-          className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3"
+          className="workspace-scenario-layouts mt-3 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3"
         >
           {LAYOUTS.map((layout) => (
             <LayoutPlanEditor
@@ -90,7 +90,7 @@ export default function ScenarioFactors({
         </div>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-2">
+      <div className="workspace-scenario-options grid gap-5 xl:grid-cols-2">
         <div>
           <h3 className="text-sm font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_014}</h3>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -155,12 +155,12 @@ function LayoutPlanEditor({
   const duplicate = plans.some((plan) => samePlan(plan, draft))
 
   return (
-    <section className="tool-inset min-w-0 p-3" aria-labelledby={`layout-${layout.id}-title`}>
+    <section className="workspace-scenario-layout tool-inset min-w-0 p-3" aria-labelledby={`layout-${layout.id}-title`}>
       <div className="flex items-center justify-between gap-2">
         <h4 id={`layout-${layout.id}-title`} className="text-sm font-semibold text-ink-primary">{layout.id}</h4>
         <span className="tool-status tabular-nums">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_019}{plans.length}</span>
       </div>
-      <div className="mt-3 grid gap-3">
+      <div className="workspace-scenario-fields mt-3 grid gap-3">
         <SelectField
           id={`layout-${layout.id}-orundum`}
           label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_020}

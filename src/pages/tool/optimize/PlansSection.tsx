@@ -90,7 +90,7 @@ export default function PlansSection({
   }
 
   return (
-    <section className="space-y-4">
+    <section className="workspace-plans space-y-4">
       {(notice || error) && createPortal(
         <div
           className="pointer-events-none fixed inset-x-4 bottom-6 z-50 flex justify-center sm:inset-x-auto sm:right-6"
@@ -104,7 +104,7 @@ export default function PlansSection({
         </div>,
         document.body,
       )}
-      <section className="tool-panel overflow-hidden" aria-labelledby="saved-configs-title">
+      <section className="workspace-saved-configs tool-panel overflow-hidden" aria-labelledby="saved-configs-title">
         <div className="tool-panel-header px-5 py-4 sm:px-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
@@ -171,7 +171,7 @@ export default function PlansSection({
       </section>
 
       {archiveLimit > 0 && (
-        <section className="tool-panel overflow-hidden" aria-labelledby="archived-results-title">
+        <section className="workspace-archived-results tool-panel overflow-hidden" aria-labelledby="archived-results-title">
           <div className="tool-panel-header px-5 py-4 sm:px-6">
             <div className="flex items-center justify-between gap-4">
               <div>
@@ -186,7 +186,7 @@ export default function PlansSection({
             <div className="space-y-3">
               {archivedResults.length === 0 && <p className="tool-inset px-3 py-3 text-sm text-ink-muted">{copy.inventory.archive_empty}</p>}
               {archivedResults.map((item) => (
-                <div key={item.id} className={`tool-inset px-3 py-3 ${selectedHistoryId === item.id ? 'border-brand-500/60 bg-brand-600/10' : ''}`}>
+                <div key={item.id} aria-current={selectedHistoryId === item.id ? 'true' : undefined} className={`tool-inset px-3 py-3 ${selectedHistoryId === item.id ? 'border-brand-500/60 bg-brand-600/10' : ''}`}>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-ink-primary">{item.name}</p>
@@ -214,7 +214,7 @@ export default function PlansSection({
         </section>
       )}
 
-      <section className="tool-panel overflow-hidden" aria-labelledby="result-history-title" data-tour-target="optimize-plans-history">
+      <section className="workspace-result-history tool-panel overflow-hidden" aria-labelledby="result-history-title" data-tour-target="optimize-plans-history">
         <div className="tool-panel-header px-5 py-4 sm:px-6">
           <div className="flex items-center justify-between gap-4">
             <div>
@@ -229,7 +229,7 @@ export default function PlansSection({
           <div className="mt-4 space-y-3">
             {resultHistory.length === 0 && <p className="tool-inset px-3 py-3 text-sm text-ink-muted">{copy.optimize.pages_tool_optimize_PlansSection_029}</p>}
             {resultHistory.map((item) => (
-              <div key={item.id} className={`tool-inset px-3 py-3 ${selectedHistoryId === item.id ? 'border-brand-500/60 bg-brand-600/10' : ''}`}>
+              <div key={item.id} aria-current={selectedHistoryId === item.id ? 'true' : undefined} className={`tool-inset px-3 py-3 ${selectedHistoryId === item.id ? 'border-brand-500/60 bg-brand-600/10' : ''}`}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink-primary">{item.name}</p>

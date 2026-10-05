@@ -257,7 +257,7 @@ export default function DepotValuePage({ embedded = false, session }: { embedded
           </nav>
         </header>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.9fr] lg:items-start">
+        <div className="workspace-depot-input mt-6 grid gap-6 lg:grid-cols-[1fr_0.9fr] lg:items-start">
           <section className="tool-panel p-5 sm:p-6">
             <div>
               <div>
@@ -421,7 +421,7 @@ export default function DepotValuePage({ embedded = false, session }: { embedded
         </div>
 
         {result && (
-          <section id="depot-result" className="mt-6 grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+          <section id="depot-result" className="workspace-depot-result mt-6 grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
             <ResultSummary result={result} />
             <SharePanel result={result} canvasRef={canvasRef} onDownload={downloadShareImage} />
           </section>

@@ -93,12 +93,12 @@ export default function BalanceSection({ redemptionEnabled }: { redemptionEnable
   ] as const
 
   return (
-    <div className="space-y-5">
+    <div className="workspace-balance space-y-5">
       <section className="tool-panel p-5 sm:p-6">
         <p className="tool-eyebrow">{copy.balance.eyebrow}</p>
         <h2 className="mt-2 text-xl font-semibold text-ink-primary">{copy.balance.title}</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">{copy.balance.description}</p>
-        <div className={`mt-5 grid gap-3 ${hasDebt ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+        <div className={`workspace-balance-metrics mt-5 grid gap-3 ${hasDebt ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
           {balanceCards.map(([label, value]) => <div key={label} className="tool-inset p-5">
             <span className="text-sm text-ink-secondary">{label}</span>
             <strong className="mt-2 block text-2xl font-semibold tabular-nums text-ink-primary">{value}</strong>
@@ -122,7 +122,7 @@ export default function BalanceSection({ redemptionEnabled }: { redemptionEnable
         {notice && <div className="tool-alert tool-alert--success mt-4" role="status" aria-live="polite">{notice}</div>}
       </section>
 
-      {redemptionEnabled && <form onSubmit={redeem} className="tool-panel p-5 sm:p-6">
+      {redemptionEnabled && <form onSubmit={redeem} className="workspace-balance-redemption tool-panel p-5 sm:p-6">
         <h3 className="text-base font-semibold text-ink-primary">{copy.balance.redeem_title}</h3>
         <p className="mt-1 text-sm leading-6 text-ink-secondary">{copy.balance.redeem_description}</p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">

@@ -36,6 +36,7 @@ export const v2Copy = {
   personal: '个人中心',
   account: '账号与档案',
   helpAction: '使用指南',
+  contents: '本页内容',
   menu: '展开导航',
   close: '关闭',
   updates: '更新日志',

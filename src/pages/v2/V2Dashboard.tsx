@@ -31,7 +31,6 @@ import TradingIcon from './TradingIcon'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import ProfileExpiryPrompt from '../tool/ProfileExpiryPrompt'
-import { useWorkspaceEntryPreference, WorkspaceEntryPrompt } from '../tool/WorkspaceEntryPreference'
 
 const text = copy.v2
 type View = 'schedule' | 'analysis' | 'manual' | 'training'
@@ -70,8 +69,6 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const section = v2Section(params)
-  const workspacePath = useCallback((profileId: string) => v2Path('overview', profileId), [])
-  const workspaceEntry = useWorkspaceEntryPreference(session.user?.id ?? null, session.cdkProfiles, session.activeProfile, session.authStatus === 'authenticated', features.profiles, workspacePath, section === 'profiles')
   const [navigationError, setNavigationError] = useState<string | null>(null)
   const [manualOpened, setManualOpened] = useState(false)
   const [manualDirty, setManualDirty] = useState(false)
@@ -131,9 +128,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
     if (busy || session.openingProfileId || ((manualDirty || toolDirty) && !window.confirm(text.discardManual))) return
     if (!await session.flushConfigSave()) { setNavigationError(text.saveFailed); return }
     try {
-      const openedAt = Date.now()
       await session.refreshProfileWorkspace(profile)
-      workspaceEntry.recordOpen(profile, openedAt)
       setManualDirty(false)
       setToolDirty(false)
       setPanel(null)
@@ -217,7 +212,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
           {navigationError && <p className="v2-feedback v2-feedback-error" role="alert">{navigationError}<button type="button" onClick={() => { session.retryConfigSave(); setNavigationError(null) }}>{text.loginRetry}</button></p>}
           <AnnouncementBanner announcement={session.banner} />
           <V2PageTransition motionKey={section} className="v2-page-transition">{(displayedSection) => <>
-          <WorkspaceSections section={displayedSection} session={guardedSession} workflow={workflow} workspaceEntry={workspaceEntry} onAccountAdded={accountAdded} onToolDirtyChange={setToolDirty} onOpenProfile={(profile) => openProfile(profile, section === 'manual-tool' ? 'manual-tool' : 'overview')} onNavigate={navigateSection} onConfig={() => openPanel('config')} generationDisabledReason={generationDisabledReason} />
+          <WorkspaceSections section={displayedSection} session={guardedSession} workflow={workflow} onAccountAdded={accountAdded} onToolDirtyChange={setToolDirty} onOpenProfile={(profile) => openProfile(profile, section === 'manual-tool' ? 'manual-tool' : 'overview')} onNavigate={navigateSection} onConfig={() => openPanel('config')} generationDisabledReason={generationDisabledReason} />
           <div hidden={displayedSection !== 'overview'}>
           <div className="v2-page-title"><h1>{text.title}</h1></div>
           <div className="v2-ready-banner">
@@ -264,7 +259,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
           </div>
           <V2Transition motionKey={view}>
           <div hidden={view === 'manual'} className={`v2-results-grid ${view !== 'schedule' || expanded ? 'v2-results-expanded' : ''}`}>
-            {view === 'training' ? <section className="v2-panel v2-feature-content v2-section-loading"><Suspense fallback={<p role="status">{text.loading}</p>}><UpgradeSuggestionStatusNotice result={result} /><UpgradeSuggestions suggestions={workflow?.suggestions ?? []} embedded /></Suspense></section> : view === 'analysis' ? (
+            {view === 'training' ? <section className="v2-panel v2-feature-content v2-training-workspace v2-section-loading"><Suspense fallback={<p role="status">{text.loading}</p>}><UpgradeSuggestionStatusNotice result={result} /><UpgradeSuggestions suggestions={workflow?.suggestions ?? []} embedded /></Suspense></section> : view === 'analysis' ? (
               <section className="v2-panel v2-analysis"><div className="v2-panel-heading"><h2>{text.analysisTab}</h2><span className="v2-neutral-tag">24h</span></div>{canViewAnalysis
                 ? <IncomeAnalysis result={result} prepared={prepared} />
                 : <div className="v2-analysis-note"><ShieldCheck size={21} /><div><p>{text.previewAnalysis}</p>{features.pricing && <Link className="v2-text-button" to="/pricing">{text.comparePlans}<ArrowRight size={14} /></Link>}</div></div>}</section>
@@ -316,7 +311,6 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
         if (profile.id !== session.activeProfile?.id) { try { await session.refreshProfileWorkspace(profile) } catch { return } }
         void navigate(v2Path('plans', profile.id))
       })() }} />}
-      {section === 'profiles' && <div className="v2-feature-content"><WorkspaceEntryPrompt entry={workspaceEntry} /></div>}
       {features.announcements && <AnnouncementPopup announcements={session.popups ?? []} userId={session.user?.id} onUnreadCountChange={session.setAnnouncementUnreadCount} announcementsPath={v2Path('announcements', session.activeProfile?.id)} />}
     </div>
     </LayoutGroup>

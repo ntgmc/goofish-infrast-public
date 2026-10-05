@@ -7,7 +7,6 @@ import { useSiteFeatures } from '../../lib/site-feature-context'
 import type { useOptimizeWorkflow } from '../tool/optimize/useOptimizeWorkflow'
 import type { AuthSuccessResponse } from '../../lib/types'
 import type { V2Session } from './OptionsDrawer'
-import type { WorkspaceEntryState } from '../tool/WorkspaceEntryPreference'
 import { v2Path, v2SectionAvailable, type V2Section } from './navigation'
 import { V2SectionLoading } from './V2LoadingScreen'
 
@@ -52,11 +51,10 @@ const descriptions: Partial<Record<V2Section, string>> = {
 const publicSections: V2Section[] = ['tools', 'depot', 'manual-tool', 'cultivation', 'announcements', 'help', 'updates', 'settings', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing']
 const workflowSections: V2Section[] = ['generation', 'plans', 'lab']
 
-export default function WorkspaceSections({ section, session, workflow, workspaceEntry, onAccountAdded, onToolDirtyChange, onOpenProfile, onNavigate, onConfig, generationDisabledReason }: {
+export default function WorkspaceSections({ section, session, workflow, onAccountAdded, onToolDirtyChange, onOpenProfile, onNavigate, onConfig, generationDisabledReason }: {
   section: V2Section
   session: V2Session
   workflow?: V2Workflow
-  workspaceEntry: WorkspaceEntryState
   onAccountAdded: (payload: AuthSuccessResponse) => Promise<void>
   onToolDirtyChange: (dirty: boolean) => void
   onOpenProfile: (profile: V2Session['profiles'][number]) => Promise<void>
@@ -73,11 +71,12 @@ export default function WorkspaceSections({ section, session, workflow, workspac
   const signedIn = Boolean(session.user)
   const needsLogin = !signedIn && !publicSections.includes(section)
   const needsWorkspace = workflowSections.includes(section) && !workflow
-  return <section hidden={section === 'overview'} className="v2-feature-content" aria-label={sectionLabels[section]}>
-    <div className="v2-section-heading"><div><h1>{sectionLabels[section]}</h1>{descriptions[section] && <p>{descriptions[section]}</p>}</div>
+  const ownsHeading = available && (['help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing'].includes(section) || (section === 'announcements' && !signedIn))
+  return <section hidden={section === 'overview'} className="v2-feature-content v2-page-section" data-v2-section={section} aria-label={sectionLabels[section]}>
+    {!ownsHeading && <div className="v2-section-heading"><div><h1>{sectionLabels[section]}</h1>{descriptions[section] && <p>{descriptions[section]}</p>}</div>
       {['manual-tool', 'cultivation', 'depot'].includes(section) && <Link className="v2-button v2-button-secondary" to={v2Path('tools', session.activeProfile?.id)}><ArrowLeft size={16} />{copy.v2.backToTools}</Link>}
       {section === 'profiles' && v2SectionAvailable('add-account', features) && <button type="button" className="v2-button v2-button-primary" onClick={() => onNavigate('add-account')}>{copy.v2.addAccount}<ArrowRight size={16} /></button>}
-    </div>
+    </div>}
     <div className="v2-section-body">
     <Suspense fallback={<V2SectionLoading label={section === 'inventory' ? copy.inventory.loading : undefined} />}>
       {section === 'overview' ? null : !available ? <p className="v2-panel v2-section-loading" role="status">{copy.v2.featureUnavailable}</p>
@@ -89,7 +88,7 @@ export default function WorkspaceSections({ section, session, workflow, workspac
                 <AddAccount preferPreview autoStartTour={false} onRedeemed={onAccountAdded} onInventoryRedeemed={() => onNavigate('inventory')} />
                 {session.activeProfile?.kind === 'free_preview' && features.cdk_redemption && workflow && <details className="v2-panel mt-5 p-5"><summary className="cursor-pointer font-medium">{copy.workspace.pages_tool_WorkspaceSetupPage_052}</summary><PreviewUpgrade cdk={workflow.upgradeCdk} loading={workflow.upgradeLoading} error={workflow.upgradeError} onCdkChange={workflow.setUpgradeCdk} onSubmit={workflow.handleUpgradePreviewProfile} /></details>}
               </>}
-              {section === 'settings' && (signedIn ? <Settings profiles={session.profiles} onLogout={session.handleLogout} onPayload={session.applyAuthPayload} workspaceEntry={workspaceEntry} /> : <GuestSettings />)}
+              {section === 'settings' && (signedIn ? <Settings profiles={session.profiles} onLogout={session.handleLogout} onPayload={session.applyAuthPayload} /> : <GuestSettings />)}
               {section === 'announcements' && (signedIn ? <Announcements onUnreadCountChange={session.setAnnouncementUnreadCount} /> : <PublicAnnouncements embedded />)}
               {section === 'inventory' && <Inventory loadingFallback={<V2SectionLoading label={copy.inventory.loading} />} onPayload={session.applyAuthPayload} onLifetimeProfileCreated={() => onNavigate('profiles')} onViewProfiles={() => onNavigate('profiles')} />}
               {section === 'balance' && <Balance redemptionEnabled={features.cdk_redemption} />}
@@ -98,7 +97,7 @@ export default function WorkspaceSections({ section, session, workflow, workspac
 
               {(['help', 'terms', 'privacy', 'disclaimer', 'support'] as V2Section[]).includes(section) && <PublicInfo page={section === 'help' ? 'faq' : section as 'terms' | 'privacy' | 'disclaimer' | 'support'} embedded />}
               {section === 'pricing' && <Pricing embedded />}
-              {section === 'status' && <Status embedded />}
+              {section === 'status' && <div className="v2-status-workspace"><Status embedded /></div>}
               {section === 'updates' && <Updates embedded />}
               {section === 'plans' && workflow && <Plans activeConfig={workflow.activeConfig} savedConfigs={workflow.savedConfigs} resultHistory={workflow.resultHistory} archivedResults={workflow.archivedResults}
                 savedConfigLimit={workflow.profileCapacity?.plan_slots.limit} resultHistoryLimit={workflow.profileCapacity?.history_slots.limit} archiveLimit={workflow.profileCapacity?.archive_slots.limit}
@@ -137,7 +136,7 @@ function Tools({ profileId }: { profileId?: string }) {
     { section: 'cultivation' as const, enabled: features.cultivation_plan, icon: Sprout, title: copy.tools.cultivation.title, description: copy.tools.cultivation.description },
     { section: 'depot' as const, enabled: features.depot_value, icon: Coins, title: copy.dashboard.pages_tool_dashboard_ToolsSection_001, description: copy.dashboard.pages_tool_dashboard_ToolsSection_002 },
   ].filter((tool) => tool.enabled)
-  return <div className="v2-tools-grid">{tools.map(({ section, icon: Icon, title, description }) => <Link key={section} to={v2Path(section, profileId)} className="v2-panel v2-tool-card"><span className="v2-tool-icon"><Icon size={28} /></span><h2>{title}</h2><p>{description}</p><span className="v2-tool-arrow"><ArrowRight size={18} /></span></Link>)}
+  return <div className="v2-tools-list">{tools.map(({ section, icon: Icon, title, description }) => <Link key={section} to={v2Path(section, profileId)} className="v2-tool-card"><span className="v2-tool-icon"><Icon size={24} aria-hidden="true" /></span><div className="v2-tool-description"><h2>{title}</h2><p>{description}</p></div><span className="v2-tool-arrow"><ArrowRight size={20} aria-hidden="true" /></span></Link>)}
     {!tools.length && <p className="v2-panel v2-section-loading">{copy.v2.featureUnavailable}</p>}
   </div>
 }

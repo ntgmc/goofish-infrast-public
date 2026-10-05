@@ -88,7 +88,7 @@ export default function OverviewSection({
 }) {
   const { features } = useSiteFeatures()
   return (
-    <div className="space-y-4">
+    <div className="workspace-generation space-y-4">
       <div data-tour-target="optimize-overview-status">
         <GenerateControlBar
           config={activeConfig}
@@ -144,7 +144,7 @@ export default function OverviewSection({
             </>
           )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <div className="workspace-generation-support grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <section className="tool-panel p-5 sm:p-6" data-tour-target="optimize-overview-workspace">
           <p className="tool-eyebrow">{copy.optimize.pages_tool_optimize_OverviewSection_001}</p>
           <h2 className="mt-1 text-lg font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_OverviewSection_002}</h2>

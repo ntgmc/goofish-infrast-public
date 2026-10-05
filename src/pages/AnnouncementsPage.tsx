@@ -59,7 +59,7 @@ export default function AnnouncementsPage({ embedded = false }: { embedded?: boo
 
         <div className="mt-6 border-t border-surface-4">
           {announcements.map((announcement) => (
-            <article key={announcement.id} className="border-b border-surface-3 py-6">
+            <article key={announcement.id} className="workspace-announcement-public border-b border-surface-3 py-6">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="tool-status">
                   {copy.public.pages_AnnouncementsPage_009}

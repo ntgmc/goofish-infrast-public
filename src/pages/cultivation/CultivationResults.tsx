@@ -49,7 +49,7 @@ export default memo(function CultivationResults({ data, plan, excluded, exclude 
   const [visible, setVisible] = useState(50)
   const rows = useMemo(() => data.candidates.filter((row) => row.name.includes(search)).sort((a, b) => b.frequency - a.frequency), [data, search])
   return <>
-    <section className="tool-panel p-5 sm:p-6">
+    <section className="workspace-cultivation-suggestions tool-panel p-5 sm:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-3"><h2 className="text-lg font-semibold">{label.suggestions}</h2><p className="text-sm text-ink-secondary">{label.total} · {plan.totalSanity === null ? label.unpriced : number(plan.totalSanity)}</p></div>
       <p className="my-3 text-xs leading-5 text-ink-muted">{label.adviceHint}</p>
       {!plan.selected.length ? <p className="py-4 text-sm text-ink-secondary">{label.empty}</p> : <ol className="divide-y divide-surface-3">
@@ -71,13 +71,13 @@ export default memo(function CultivationResults({ data, plan, excluded, exclude 
         </li>)}
       </ol>}
     </section>
-    <section className="tool-panel space-y-4 p-5 sm:p-6"><h2 className="text-lg font-semibold">{label.summary}</h2>
+    <section className="workspace-cultivation-summary tool-panel space-y-4 p-5 sm:p-6"><h2 className="text-lg font-semibold">{label.summary}</h2>
       <div className="grid gap-4 sm:grid-cols-2"><div className="tool-inset p-4"><p className="text-sm text-ink-secondary">{label.totalTraining}</p><strong className="mt-2 block text-2xl tabular-nums">{plan.totalTrainingSanity === null ? label.unpriced : number(plan.totalTrainingSanity)}</strong></div><div className="tool-inset p-4"><p className="text-sm text-ink-secondary">{label.total}</p><strong className="mt-2 block text-2xl tabular-nums">{plan.totalSanity === null ? label.unpriced : number(plan.totalSanity)}</strong></div></div>
       <h3 className="text-sm font-medium">{label.totalMaterials}</h3><Materials items={plan.totalMaterials} data={data} />
       <h3 className="text-sm font-medium">{label.missingMaterials}</h3><Materials items={plan.missingMaterials} data={data} />
     </section>
     {plan.blocked.length > 0 && <section className="tool-alert tool-alert--warning space-y-3 p-5"><h2 className="font-semibold">{label.blocked}</h2><p className="text-xs leading-5">{label.blockedHint}</p><Materials items={Object.fromEntries(plan.blocked.map((task) => [task.item, plan.missingMaterials[task.item]]))} data={data} /></section>}
-    <section className="tool-panel p-5 sm:p-6"><h2 className="text-lg font-semibold">{label.calendar}</h2><p className="my-3 text-xs leading-5 text-ink-muted">{label.calendarHint}</p>
+    <section className="workspace-cultivation-calendar tool-panel p-5 sm:p-6"><h2 className="text-lg font-semibold">{label.calendar}</h2><p className="my-3 text-xs leading-5 text-ink-muted">{label.calendarHint}</p>
       <div className="divide-y divide-surface-3">{plan.days.map((day) => <div key={day.date} className="grid gap-2 py-4 sm:grid-cols-[10rem_minmax(0,1fr)]"><div><h3 className="text-sm font-semibold tabular-nums">{day.date}</h3><p className="mt-1 text-xs text-ink-muted">{label.budget(day.spent, day.budget)}</p></div><div className="space-y-2">{!day.farms.length && <p className="text-xs text-ink-muted">{label.noFarms}</p>}{day.farms.map((farm) => <p key={`${farm.item}:${farm.stage}`} className="text-sm">{farm.stage} · {data.itemNames[farm.item] ?? farm.item}<span className="ml-2 text-xs text-ink-secondary">{label.runs(farm.runs, number(farm.expectedQuantity))}</span></p>)}{day.potions.map((potion) => <p key={potion.name} className="text-xs text-ink-secondary">{potion.name} × {potion.count}</p>)}</div></div>)}</div>
       {plan.remaining.length > 0 && <div className="tool-inset mt-3 p-4"><h3 className="text-sm font-medium">{label.remaining}</h3><p className="mt-2 text-xs leading-5 text-ink-muted">{plan.remaining.map((task) => `${data.itemNames[task.item] ?? task.item} × ${number(task.remaining)}`).join(' · ')}</p></div>}
     </section>

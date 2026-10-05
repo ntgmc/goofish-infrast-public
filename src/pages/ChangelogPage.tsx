@@ -42,8 +42,8 @@ export default function ChangelogPage({ embedded = false }: { embedded?: boolean
 
           <div className="mt-10">
             {CHANGELOG_RELEASES.map((release) => (
-              <article key={release.id} className="border-t border-surface-3 py-8 first:border-t-0 first:pt-0" aria-labelledby={`release-${release.id}`}>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
+              <article key={release.id} className="workspace-release border-t border-surface-3 py-8 first:border-t-0 first:pt-0" aria-labelledby={`release-${release.id}`}>
+                <div className="workspace-release-meta flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
                   <h2 id={`release-${release.id}`} className="text-xl font-semibold text-ink-primary">
                     {release.displayVersion}
                   </h2>

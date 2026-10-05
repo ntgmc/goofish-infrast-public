@@ -66,8 +66,8 @@ export default function GenerateControlBar({
       : ''
 
   return (
-    <section className="tool-panel overflow-hidden" aria-labelledby="generate-control-title">
-      <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_16rem] lg:items-end">
+    <section className="workspace-generation-control tool-panel overflow-hidden" aria-labelledby="generate-control-title">
+      <div className="workspace-generation-control-body grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_16rem] lg:items-end">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="tool-eyebrow">{copy.optimize.pages_tool_optimize_GenerateControlBar_008}</p>
@@ -96,7 +96,7 @@ export default function GenerateControlBar({
           </div>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-2">
+        <div className="workspace-generation-actions flex min-w-0 flex-col gap-2">
           <div className="tool-inset flex items-start gap-3 px-3 py-3 text-sm text-ink-secondary">
             <input
               id="use-priority-coupon"

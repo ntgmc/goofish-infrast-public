@@ -279,12 +279,12 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
   ), [prepared, source, validationSource, activePlan, plans, locked, operators, update, label])
 
   return (
-    <section className="space-y-4" aria-label={label.title}>
+    <section className="workspace-manual-editor space-y-4" aria-label={label.title}>
       <div className="tool-alert tool-alert--warning space-y-2 p-4">
         <p className="font-semibold" role="status">{simulating ? label.simulating : simulation ? label.simulated : label.warning}</p>
         {!standalone && <p className="text-sm"><LockKeyhole size={14} className="mr-1 inline" aria-hidden="true" />{label.locked}</p>}
       </div>
-      <div className="tool-panel space-y-3 p-4">
+      <div className="workspace-manual-toolbar tool-panel space-y-3 p-4">
         {draftStorageKey === profileId && <p className="text-sm leading-6 text-ink-secondary">{label.result_scope}</p>}
         <div className="flex flex-wrap gap-2">
           <button type="button" className="tool-primary-action" disabled={!simulationBaseline || simulating || Boolean(settingsError)} aria-busy={simulating} onClick={() => void simulate()}>{label.simulate}</button>
