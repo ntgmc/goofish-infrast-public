@@ -285,10 +285,19 @@ describe('V2 results-first workspace', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('preserves the selected shift and display mode across result views without generating', async () => {
+  it('preserves the selected shift, Fiammetta target and display mode across result views without generating', async () => {
+    const workflow = connect()
+    const result = structuredClone(SAMPLE_RESULT)
+    result.plans[0].Fiammetta = { enable: true, target: ' 银灰 ', order: 'pre' }
+    result.plans[1].Fiammetta = { enable: true, target: '德克萨斯', order: 'post' }
+    result.plans[2].Fiammetta = { enable: false, target: '但书', order: 'pre' }
+    workflow.historyItem = { result }
     const user = userEvent.setup()
-    mount()
+    const page = mount()
+    expect(within(screen.getByRole('tabpanel')).getByText('菲亚梅塔 → 银灰')).toBeInTheDocument()
     await user.click(screen.getByRole('tab', { name: /第 2 班/ }))
+    expect(within(screen.getByRole('tabpanel')).getByText('菲亚梅塔 → 德克萨斯')).toBeInTheDocument()
+    expect(within(screen.getByRole('tabpanel')).queryByText('菲亚梅塔 → 银灰')).not.toBeInTheDocument()
     const room = within(screen.getByRole('tabpanel')).getByRole('button', { name: /贸易站.*能天使/ })
     await user.click(screen.getByRole('button', { name: copy.v2.list }))
     expect(within(screen.getByRole('tabpanel')).getByRole('button', { name: /贸易站.*能天使/ })).toBe(room)
@@ -296,13 +305,22 @@ describe('V2 results-first workspace', () => {
     expect(screen.getByRole('tab', { name: /第 2 班/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('button', { name: copy.v2.list })).toHaveAttribute('aria-pressed', 'true')
     expect(within(screen.getByRole('tabpanel')).getByText('能天使')).toBeInTheDocument()
+    expect(within(screen.getByRole('tabpanel')).getByText('菲亚梅塔 → 德克萨斯')).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: /第 3 班/ }))
+    expect(within(screen.getByRole('tabpanel')).queryByText(/菲亚梅塔 →/)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: /第 2 班/ }))
     await user.click(screen.getByRole('button', { name: copy.v2.analysisTab }))
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: copy.v2.summaryTab }))
     expect(screen.getByRole('tab', { name: /第 2 班/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('button', { name: copy.v2.list })).toHaveAttribute('aria-pressed', 'true')
     await waitFor(() => expect(screen.getByRole('tabpanel')).toBeVisible())
-    expect(mocks.workflow).not.toHaveBeenCalled()
+    expect(within(screen.getByRole('tabpanel')).getByText('菲亚梅塔 → 德克萨斯')).toBeInTheDocument()
+    result.schedule_mode = 'rotation'
+    workflow.historyItem = { result: { ...result } }
+    page.rerender(<MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter>)
+    expect(within(screen.getByRole('tabpanel')).queryByText(/菲亚梅塔 →/)).not.toBeInTheDocument()
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
   it('exposes only the current team during rapid shift changes and keeps keyboard focus on the selected tab', async () => {

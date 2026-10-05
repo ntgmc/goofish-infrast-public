@@ -52,6 +52,7 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, shift, 
   const selected = Math.min(shift, Math.max(result.plans.length - 1, 0))
   const layoutKey = `${view}-${selected}`
   const plan = prepared.plans[selected]
+  const fiammettaTarget = result.schedule_mode !== 'rotation' && plan?.Fiammetta?.enable ? plan.Fiammetta.target?.trim() : ''
   const allRooms = buildBoardV2Rooms(plan, result.schedule_mode === 'rotation')
     .map((room) => ({ ...room, level: room.level ?? (String(result.buildingType).endsWith('3') ? MAXIMUM_LEVELS[room.roomType] : undefined) }))
     .map((room) => ({ ...room, indexLabel: [plan?.rooms[room.roomType]?.length > 1 ? String(room.roomIndex + 1) : '', roomLevelLabel(room)].filter(Boolean).join(' · ') }))
@@ -110,7 +111,9 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, shift, 
       </div>
       <div id={`${id}-panel`} role="tabpanel" aria-labelledby={`${id}-tab-${selected}`} tabIndex={0}>
         <div className="v2-transition-pane">
-        <div className="v2-board-meta"><span><Users size={14} />{text.assigned(count)}</span><span><Clock3 size={14} />{text.shiftHours(String(hours[selected] ?? 8))}</span></div>
+        <div className="v2-board-meta"><span><Users size={14} />{text.assigned(count)}</span><span><Clock3 size={14} />{text.shiftHours(String(hours[selected] ?? 8))}</span>
+          {fiammettaTarget && <span>{copy.domain.components_result_panel_ResultBoard_017}{fiammettaTarget}</span>}
+        </div>
         {roomGroups.filter((group) => group.rooms.length > 0).map((group) => (
           <section key={group.label} className="v2-room-group" aria-label={group.label}>
             <h3 className="v2-room-group-title">{group.label}</h3>
