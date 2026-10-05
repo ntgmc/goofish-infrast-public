@@ -125,6 +125,7 @@ const licenseConfigShape = {
   }).optional(),
   variable_shift_schedule: variableShiftScheduleSchema.optional(),
   intermediate_inventory: intermediateInventorySchema.optional(),
+  allow_product_rebalance: z.boolean().optional(),
   auto_balance_source: boundedString(40).optional(),
 }
 

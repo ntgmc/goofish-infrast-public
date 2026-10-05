@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { CONFIG_PRESETS } from '../../../src/lib/config'
+import { licenseConfigSchema } from '../../../src/lib/workspace-validation'
+import { resolveConfigForPermission, resolveFreePreviewConfig } from '../../handlers/license-utils'
 import type { OptimizeConfigPermission } from './shared'
 import { sanitizeConfigForPublicOptimize } from './http-core'
 
@@ -30,6 +32,32 @@ describe('sanitizeConfigForPublicOptimize inventory balance policy', () => {
     },
   )
 
+  it.each<OptimizeConfigPermission>(['advanced', 'metered_advanced', 'ultimate', 'admin', 'free_preview', 'recommended', 'growth'])(
+    'retains an explicit inventory balance choice through validation, preset resolution and JSON round trips for %s',
+    (permission) => {
+      for (const enabled of [true, false]) {
+        const submitted = licenseConfigSchema.parse({
+          ...structuredClone(CONFIG_PRESETS['243']),
+          intermediate_inventory: { 'Pure Gold': 0 },
+          allow_product_rebalance: enabled,
+        })
+        const resolved = permission === 'free_preview'
+          ? resolveFreePreviewConfig(submitted)
+          : resolveConfigForPermission(permission, submitted)
+        expect(resolved.ok).toBe(true)
+        if (!resolved.ok) throw new Error(resolved.message)
+
+        const sanitized = sanitizeConfigForPublicOptimize(resolved.config, permission)
+        const stored = licenseConfigSchema.parse(JSON.parse(JSON.stringify(sanitized)))
+
+        expect(stored.allow_product_rebalance).toBe(enabled)
+        expect(stored.auto_balance_source).toBe(enabled ? 'intermediate_inventory' : 'limited_config')
+        expect(stored.intermediate_inventory).toEqual({ 'Pure Gold': 0 })
+        expect(sanitizeConfigForPublicOptimize(stored, permission)).toEqual(sanitized)
+      }
+    },
+  )
+
   it.each<OptimizeConfigPermission>(['free_preview', 'recommended', 'growth'])(
     'retains inventory-based product adjustment for %s presets',
     (permission) => {
@@ -45,6 +73,14 @@ describe('sanitizeConfigForPublicOptimize inventory balance policy', () => {
       expect(sanitized.intermediate_inventory).toEqual(config.intermediate_inventory)
     },
   )
+
+  it('reports provided stock even when product rebalancing is disabled by default', () => {
+    const sanitized = sanitizeConfigForPublicOptimize({
+      ...CONFIG_PRESETS['243'], intermediate_inventory: { 'Pure Gold': 0 },
+    }, 'advanced')
+    expect(sanitized.allow_product_rebalance).toBe(false)
+    expect(sanitized.auto_balance_source).toBe('limited_config')
+  })
 
   it('does not enable inventory reporting when no inventory balance was requested', () => {
     expect(sanitizeConfigForPublicOptimize(CONFIG_PRESETS['243'], 'advanced').auto_balance_source).toBeUndefined()

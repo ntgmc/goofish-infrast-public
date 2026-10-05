@@ -378,6 +378,42 @@ describe('ConfigEditor shift patterns', () => {
   })
 })
 
+describe('ConfigEditor inventory product balance', () => {
+  it.each([true, false])('preserves an explicit balance choice through stock updates and preset changes with canEdit=%s', async (canEdit) => {
+    const user = userEvent.setup()
+    let latest = normalizeConfig({
+      ...CONFIG_PRESETS['243'],
+      intermediate_inventory: { 'Pure Gold': 50 },
+      auto_balance_source: 'intermediate_inventory',
+    })
+    function Editor() {
+      const [config, setConfig] = useState(latest)
+      return <ConfigEditor config={config} canEdit={canEdit} canEditIntermediateInventory canSelectPreset
+        validation={{ ok: true }} onUpdate={(mutate) => setConfig((current) => {
+          const next = cloneConfig(current)
+          mutate(next)
+          latest = next
+          return next
+        })} />
+    }
+    render(<Editor />)
+    const balanceSwitch = screen.getByRole('switch', { name: '允许库存自动平衡调整产物数量' })
+    expect(balanceSwitch).toHaveProperty('checked', !canEdit)
+    await user.click(balanceSwitch)
+    expect(latest.allow_product_rebalance).toBe(canEdit)
+
+    const inventory = within(screen.getByText('中间产物库存').parentElement!)
+    const goldStock = inventory.getByRole('spinbutton', { name: '赤金' })
+    await user.clear(goldStock)
+    await user.type(goldStock, '0')
+    await user.click(screen.getByRole('button', { name: '243 搓玉' }))
+
+    expect(latest.allow_product_rebalance).toBe(canEdit)
+    expect(latest.intermediate_inventory?.['Pure Gold']).toBe(0)
+    expect(balanceSwitch).toHaveProperty('checked', canEdit)
+  })
+})
+
 describe('ConfigEditor number inputs', () => {
   it('uses InputNumber controls for room and product counts', async () => {
     const user = userEvent.setup()

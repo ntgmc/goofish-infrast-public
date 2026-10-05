@@ -33,10 +33,16 @@ describe('expandScenarioComparison', () => {
     const base = {
       ...CONFIG_PRESETS['243'],
       orundum_planning: { daily_sanity_budget: 300, monthly_card: true },
+      allow_product_rebalance: true,
+      auto_balance_source: 'intermediate_inventory',
     }
     const result = expandScenarioComparison(base, baseFactors)
     expect(result.scenarios).toHaveLength(11)
     expect(result.variableScenarioCount).toBe(5)
+    for (const scenario of result.scenarios) {
+      expect(scenario.config.allow_product_rebalance).toBeUndefined()
+      expect(scenario.config.auto_balance_source).toBeUndefined()
+    }
     expect(result.scenarios.filter((item) => item.scheduleStrategy === 'rotation')).toHaveLength(1)
     const variable = result.scenarios.find((item) => item.scheduleStrategy === 'variable')
     expect(variable?.config.variable_shift_schedule).toEqual(expect.objectContaining({

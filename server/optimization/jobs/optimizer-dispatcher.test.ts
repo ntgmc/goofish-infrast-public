@@ -101,6 +101,36 @@ describe('optimization job dispatcher', () => {
     expect(actual.plans[0].rooms.trading.map((room) => room.level)).toEqual(payload.effectiveConfig.trading_station_levels)
     expect(actual.plans[0].rooms.manufacture.map((room) => room.level)).toEqual(payload.effectiveConfig.manufacturing_station_levels)
   })
+  it('attaches short-term inventory warnings before capability projection and history serialization', async () => {
+    const result: OptimizeResult = {
+      ...scheduleResult(),
+      intermediate_depletion: [
+        { product: 'Pure Gold', stock: 0, net_per_day: -40, days_remaining: 0 },
+        { product: 'Originium Shard', stock: 14, net_per_day: -2, days_remaining: 7 },
+        { product: 'Orirock Cube', stock: 80, net_per_day: -10, days_remaining: 8 },
+      ],
+    }
+    const actual = await executeOptimizationJobWithPort(job(schedulePayload()), context,
+      fakePort({ executeSchedule: vi.fn(async () => result) })) as OptimizeResult
+
+    expect(JSON.parse(JSON.stringify(actual)).inventory_warnings).toEqual([
+      { product: 'Pure Gold', days_remaining: 0 },
+      { product: 'Originium Shard', days_remaining: 7 },
+    ])
+  })
+
+  it('clears stale inventory warnings when the current result has sufficient production', async () => {
+    const result: OptimizeResult = {
+      ...scheduleResult(),
+      intermediate_depletion: [{ product: 'Pure Gold', stock: 0, net_per_day: 10, days_remaining: null }],
+      inventory_warnings: [{ product: 'Pure Gold', days_remaining: 0 }],
+    }
+    const actual = await executeOptimizationJobWithPort(job(schedulePayload()), context,
+      fakePort({ executeSchedule: vi.fn(async () => result) })) as OptimizeResult
+
+    expect(actual.inventory_warnings).toBeUndefined()
+  })
+
   it('dispatches schedule payloads without a kind', async () => {
     const port = fakePort()
     const payload = schedulePayload()

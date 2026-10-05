@@ -161,6 +161,17 @@ describe('V2 results-first workspace', () => {
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
+  it('shows inventory depletion warnings on the result overview without analysis access', () => {
+    const workflow = connect()
+    workflow.userCanViewFullData = false
+    workflow.historyItem = { result: { ...SAMPLE_RESULT,
+      inventory_warnings: [{ product: 'Pure Gold', days_remaining: 0 }],
+    } }
+    mount()
+    expect(screen.getByRole('alert')).toHaveTextContent('赤金库存已耗尽')
+    expect(screen.getByRole('alert')).toHaveTextContent('请补充库存或调整生产配置')
+  })
+
   it('uses normalized backend station output and drone consumption without rescaling or averaging', async () => {
     const workflow = connect()
     workflow.historyItem = { result: { ...SAMPLE_RESULT, daily_production: {

@@ -61,6 +61,7 @@ export interface LicenseConfig {
     trace_mood_cycle?: boolean;
   };
   intermediate_inventory?: IntermediateInventory;
+  allow_product_rebalance?: boolean;
   auto_balance_source?: string;
   [key: string]: unknown;
 }
@@ -399,6 +400,7 @@ export interface OptimizeResult {
   maa_default_comparison?: MaaDefaultComparison;
   orundum_economy?: OrundumEconomy;
   intermediate_depletion?: IntermediateDepletion[];
+  inventory_warnings?: { product: IntermediateProduct; days_remaining: number }[];
   upgrade_suggestions?: RawUpgradeSuggestion[];
   upgrade_suggestions_status?: 'completed' | 'partial' | 'not_requested' | 'not_allowed' | 'failed';
   upgrade_suggestions_candidate_count?: number;

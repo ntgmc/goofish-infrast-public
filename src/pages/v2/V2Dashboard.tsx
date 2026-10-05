@@ -9,6 +9,7 @@ import ProductIcon from '../../components/ProductIcon'
 import { AnimatedValue, MotionNavIndicator, RevealItem, StaggeredReveal, motionTokens } from '../../components/MotionPrimitives'
 import { formatAmount, prepareResult } from '../../components/result-panel/formatters'
 import { PRODUCT_LABELS } from '../../components/result-panel/labels'
+import InventoryDepletionWarning from '../../components/result-panel/InventoryDepletionWarning'
 import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
 import { manualSourceKey } from '../../lib/manual-schedule'
 import { hasCapability } from '../../lib/product-catalog'
@@ -222,6 +223,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
           </div></FeedbackRegion>}
           </AnimatePresence>
           {children}
+          {view !== 'advanced' && <InventoryDepletionWarning result={result} />}
           <StaggeredReveal className="v2-metrics">
             <Metric label={text.lmd} value={formatAmount(prepared.productionStats.lmd)} unit={text.daily} product="LMD" />
             <Metric label={text.exp} value={formatAmount((prepared.productionStats.manufacturing['Battle Record'] ?? 0) * 1000)} unit={text.expUnit} product="Battle Record" />

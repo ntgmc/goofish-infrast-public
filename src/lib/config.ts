@@ -228,6 +228,10 @@ export function resolveConfigLayout(config: Pick<LicenseConfig, 'trading_station
     : `${config.trading_stations_count}-${config.manufacturing_stations_count}-3`
 }
 
+export function allowsInventoryProductRebalance(config: LicenseConfig, canEditConfig: boolean): boolean {
+  return config.allow_product_rebalance ?? (!canEditConfig && config.auto_balance_source !== 'limited_config')
+}
+
 export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   const next = cloneConfig(config)
   if (next.layout !== '2-5-2') delete next.facility_layout

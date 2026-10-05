@@ -9,6 +9,7 @@ import ResultBoardV2 from './ResultBoardV2'
 import OperatorSkillPreview from './OperatorSkillPreview'
 import ResultDetail from './ResultDetail'
 import ResultMetrics from './ResultMetrics'
+import InventoryDepletionWarning from './InventoryDepletionWarning'
 import type { ResultPanelProps, ResultTabId } from './types'
 import { copy, CURRENT_LOCALE } from '../../copy/index'
 import { hasCapability } from '../../lib/product-catalog'
@@ -140,6 +141,7 @@ export default function ResultPanel({
   return (
     <OperatorSkillPreview>
     <div className="space-y-4">
+      <InventoryDepletionWarning result={result} />
       <div className="tool-panel overflow-hidden">
         <div className="tool-panel-header flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">

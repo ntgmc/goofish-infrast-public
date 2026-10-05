@@ -46,6 +46,7 @@ export function describeConfigDiff(current: LicenseConfig, previous: LicenseConf
   pushDiff(rows, copy.common.lib_workspace_history_019, previous.Fiammetta?.enable ? copy.common.lib_workspace_history_020 : copy.common.lib_workspace_history_021, current.Fiammetta?.enable ? copy.common.lib_workspace_history_022 : copy.common.lib_workspace_history_023)
   pushDiff(rows, copy.common.lib_workspace_history_024, formatDrones(previous), formatDrones(current))
   pushDiff(rows, copy.common.lib_workspace_history_025, formatIntermediateInventory(previous), formatIntermediateInventory(current))
+  pushDiff(rows, copy.common.inventoryProductRebalanceLabel, formatProductRebalance(previous), formatProductRebalance(current))
   return rows
 }
 
@@ -129,6 +130,11 @@ function formatDrones(config: LicenseConfig): string {
   if (config.drones.auto) return `${copy.common.lib_workspace_history_038}${formatDroneAutoStrategy(config)}`
   const targets = config.drones.targets?.length ? config.drones.targets.map(formatProduct).join(' / ') : copy.common.lib_workspace_history_039
   return `${formatDroneOrder(config.drones.order)} · ${targets}`
+}
+
+function formatProductRebalance(config: LicenseConfig): string {
+  const enabled = config.allow_product_rebalance ?? config.auto_balance_source === 'intermediate_inventory'
+  return enabled ? copy.common.inventoryProductRebalanceEnabled : copy.common.inventoryProductRebalanceDisabled
 }
 
 function formatIntermediateInventory(config: LicenseConfig): string {

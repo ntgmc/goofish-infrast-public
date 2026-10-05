@@ -428,6 +428,32 @@ function createThreeShiftResult(): OptimizeResult {
   }
 }
 
+describe('ResultPanel inventory warnings', () => {
+  it('warns immediately for exhausted stock even without full calculation data', () => {
+    render(<ResultPanel result={{ ...createResult(), inventory_warnings: [{ product: 'Pure Gold', days_remaining: 0 }] }} fullDataAvailable={false} />)
+    expect(screen.getByRole('alert')).toHaveTextContent('赤金库存已耗尽')
+    expect(screen.getByRole('alert')).toHaveTextContent('请补充库存或调整生产配置')
+  })
+
+  it.each([0.5, 7])('warns for saved results with stock running out in %s days', (days) => {
+    render(<ResultPanel result={{ ...createResult(), intermediate_depletion: [
+      { product: 'Pure Gold', stock: days * 40, net_per_day: -40, days_remaining: days },
+    ] }} />)
+    expect(screen.getByRole('alert')).toHaveTextContent(days < 1 ? '赤金库存不足一天用量' : '赤金库存预计约 7 天后耗尽')
+  })
+
+  it.each([
+    { net_per_day: -40, days_remaining: 8 },
+    { net_per_day: 0, days_remaining: 0 },
+    { net_per_day: 40, days_remaining: null },
+  ])('omits depletion warnings when consumption is sustainable or stock is sufficient: %j', (balance) => {
+    render(<ResultPanel result={{ ...createResult(), intermediate_depletion: [
+      { product: 'Pure Gold', stock: 320, ...balance },
+    ] }} />)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
 describe('ResultPanel tabs', () => {
   it('identifies opened manual history and its potential mood cycle failure', () => {
     render(<ResultPanel result={{ ...createThreeShiftResult(), schedule_source: 'manual' }} />)
