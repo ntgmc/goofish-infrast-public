@@ -13,6 +13,43 @@ const game = (elite = 1) => ({ data: { chars: [{ charId: 'char_test', evolvePhas
 const pricing = { status: 'fresh' as const, prices: new Map([['rock', 5]]), fetched_at: '', age_ms: 0, snapshot_id: '', valuation_version: '' }
 
 describe('PRTS and Skland cultivation data', () => {
+  it('weights recent demand by approval evidence and bounded popularity, excluding expired and undated jobs', () => {
+    const input = snapshot()
+    const now = Date.now()
+    const base = { ...input.homeworks[0], views: 0, hotScore: 0 }
+    const daysAgo = (days: number) => new Date(now - days * 86400000).toISOString()
+    input.homeworks = [
+      { ...base, id: 1, uploadedAt: daysAgo(0) },
+      { ...base, id: 2, uploadedAt: daysAgo(90) },
+      { ...base, id: 3, uploadedAt: daysAgo(0), likes: 1, dislikes: 0 },
+      { ...base, id: 4, uploadedAt: daysAgo(0), likes: 10, dislikes: 90 },
+      { ...base, id: 5, uploadedAt: daysAgo(0), views: 1_000_000_000 },
+      { ...base, id: 6, uploadedAt: daysAgo(0), hotScore: 1_000_000_000 },
+      { ...base, id: 7, uploadedAt: daysAgo(0), likes: 0, dislikes: 0 },
+      { ...base, id: 8, uploadedAt: daysAgo(366) },
+      { ...base, id: 9, uploadedAt: undefined },
+    ]
+    const result = buildCultivationData(input, game(0), { items: [{ id: 'selector', count: 1 }] }, pricing, undefined, {
+      parserVersion: 4, status: 'fresh', updatedAt: '', itemNames: {}, itemIcons: {}, excludedOperators: [], skillIcons: {},
+      items: [{ id: 'selector', name: '调用凭证', iconId: 'selector', kind: 'selector', scope: '', sourceUrl: '', rarity: 4, operators: ['char_test'], options: [] }],
+    })
+    const row = result.candidates[0]
+    const weights = Object.fromEntries(Object.entries(row.demandWeights!).map(([key, weight]) => [key.split(':')[0], weight]))
+    expect(weights[2]).toBeCloseTo(weights[1] / 2)
+    expect(weights[1]).toBeGreaterThan(weights[3])
+    expect(weights[1]).toBeGreaterThan(weights[4])
+    expect(weights[5]).toBeCloseTo(weights[1] * 2)
+    expect(weights[6]).toBeCloseTo(weights[1] * 2)
+    expect(weights[7]).toBeGreaterThan(0)
+    expect(weights[8]).toBeUndefined()
+    expect(weights[9]).toBeUndefined()
+    expect(row.frequency).toBe(7)
+    expect(row.weightedFrequency).toBeCloseTo(Object.values(weights).reduce((sum, weight) => sum + weight, 0))
+    expect(result.specialItems![0].recommendations[0].demand).toBeCloseTo(row.weightedFrequency!)
+    expect(result.stats.homeworks).toBe(7)
+    expect(result.warnings).toContain('部分作业缺少发布时间，暂不参与推荐；请重新导入作业数据或等待同步补齐。')
+  })
+
   it('charges only missing levels, mastery of the selected skill, and ranks of the specified module', () => {
     const cost = cultivationCosts(snapshot(), 'char_test', current, target, 's1')
     expect(cost.warnings).toEqual(['养成材料表缺失'])

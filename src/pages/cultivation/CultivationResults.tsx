@@ -47,7 +47,7 @@ type Props = { data: CultivationData; plan: ReturnType<typeof buildCultivationPl
 export default memo(function CultivationResults({ data, plan, excluded, exclude }: Props) {
   const [search, setSearch] = useState('')
   const [visible, setVisible] = useState(50)
-  const rows = useMemo(() => data.candidates.filter((row) => row.name.includes(search)).sort((a, b) => b.frequency - a.frequency), [data, search])
+  const rows = useMemo(() => data.candidates.filter((row) => row.name.includes(search)).sort((a, b) => (b.weightedFrequency ?? b.frequency) - (a.weightedFrequency ?? a.frequency)), [data, search])
   return <>
     <section className="workspace-cultivation-suggestions tool-panel p-5 sm:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-3"><h2 className="text-lg font-semibold">{label.suggestions}</h2><p className="text-sm text-ink-secondary">{label.total} · {plan.totalSanity === null ? label.unpriced : number(plan.totalSanity)}</p></div>

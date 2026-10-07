@@ -44,16 +44,20 @@ export function buildCultivationPlan(data: CultivationData, options: Cultivation
   const selected: Array<{ candidate: CultivationCandidate; allocation: Allocation; estimatedDate: string | null }> = []
   const score = (candidate: CultivationCandidate, allocation: Allocation) => {
     const cost = allocation.sanity ?? Infinity
+    const demand = candidate.weightedFrequency ?? candidate.frequency
     if (options.preference === 'community') return [-(candidate.communityRate ?? 0), cost]
-    if (options.preference === 'cost') return [cost, -candidate.frequency]
-    if (options.preference === 'materials') return [Object.keys(allocation.missing).length === 0 ? 0 : 1, cost, -candidate.frequency]
-    return [-candidate.frequency, cost]
+    if (options.preference === 'cost') return [cost, -demand]
+    if (options.preference === 'materials') return [Object.keys(allocation.missing).length === 0 ? 0 : 1, cost, -demand]
+    return [-demand, cost]
   }
   const fulfilledGroups = new Set<string>()
-  const frequency = (candidate: CultivationCandidate) => candidate.demandKeys
-    ? candidate.demandKeys.filter((key) => !fulfilledGroups.has(key)).length : candidate.frequency
+  const remainingDemand = (candidate: CultivationCandidate) => {
+    if (!candidate.demandKeys) return candidate
+    const keys = candidate.demandKeys.filter((key) => !fulfilledGroups.has(key))
+    return { ...candidate, frequency: keys.length, weightedFrequency: keys.reduce((sum, key) => sum + (candidate.demandWeights?.[key] ?? 1), 0) }
+  }
   while (candidates.length && selected.length < Math.max(1, Math.min(30, options.limit))) {
-    const ranked = candidates.filter((candidate) => candidate.source === 'community' || frequency(candidate) > 0).map((candidate) => ({ candidate: { ...candidate, frequency: frequency(candidate) }, allocation: allocateCultivationMaterials(candidate.items, stock, data) }))
+    const ranked = candidates.map(remainingDemand).filter((candidate) => candidate.source === 'community' || candidate.frequency > 0).map((candidate) => ({ candidate, allocation: allocateCultivationMaterials(candidate.items, stock, data) }))
     if (!ranked.length) break
     ranked.sort((a, b) => {
       const left = score(a.candidate, a.allocation), right = score(b.candidate, b.allocation)

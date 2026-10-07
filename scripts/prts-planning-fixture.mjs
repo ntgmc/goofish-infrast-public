@@ -1,7 +1,7 @@
 export function planningFixture() {
   return {
     version: 1, updatedAt: '2026-10-04T00:00:00.000Z', cursor: 20, reconcilePage: 1,
-    homeworks: [{ id: 20, hash: 'hash', stageId: 'main_01', mode: 1, content: { stage_name: 'main_01', opers: [{ name: '测试干员', skill: 1, requirements: { elite: 1, level: 2, skill_level: 7, module: 0, potentiality: 1 } }] } }],
+    homeworks: [{ id: 20, hash: 'hash', stageId: 'main_01', mode: 1, uploadedAt: new Date().toISOString(), likes: 90, dislikes: 10, views: 10000, hotScore: 20, content: { stage_name: 'main_01', opers: [{ name: '测试干员', skill: 1, requirements: { elite: 1, level: 2, skill_level: 7, module: 0, potentiality: 1 } }] } }],
     operators: { char_test: { name: '测试干员', rarity: 4, skills: ['s1', 's2'] } },
     costs: {
       game_sha: 'a'.repeat(40),
