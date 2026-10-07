@@ -10,6 +10,8 @@ describe('buildMaaExportPayload', () => {
     input.mood_simulation = { valid: false, daily_loop_stable: false, iterations: 12, degrading_operators: [] }
     const exported = JSON.parse(JSON.stringify(buildMaaExportPayload(input)))
     expect(exported.schedule_source).toBe('manual')
+    expect(exported.title).toBe('MaaTool · 253基建 · 1班 · 手动排班')
+    expect(exported.description).toContain('心情可能无法持续循环')
     expect(buildMaaExportPayload(richResult())).not.toHaveProperty('schedule_source')
   })
 
@@ -20,8 +22,8 @@ describe('buildMaaExportPayload', () => {
     const exported = buildMaaExportPayload(input);
 
     expect(exported).toEqual({
-      title: '测试排班',
-      description: '仅供测试',
+      title: 'MaaTool · 253基建 · 1班',
+      description: '按班次顺序换班。换班时间请按生成排班时的设置安排。',
       plans: [{
         name: '第1班',
         description: '12H',
@@ -107,6 +109,7 @@ describe('buildMaaExportPayload', () => {
     input.buildingType = 252;
     input.facility_layout = [...FACILITY_IDS];
     input.planTimes = '3班';
+    input.shift_hours = [8, 8, 8];
     input.plans = Array.from({ length: 3 }, (_, index) => ({
       name: `第${index + 1}班`,
       rooms: {
@@ -125,9 +128,27 @@ describe('buildMaaExportPayload', () => {
       power: 2,
       dormitory: 4,
     });
+    expect(exported.title).toBe('MaaTool · 252基建 · 3班');
+    expect(exported.description).toContain('班次时长：8h / 8h / 8h');
     expect(Object.keys(exported).at(-1)).toBe('scheduleType');
     delete input.facility_layout;
     expect(() => buildMaaExportPayload(input)).toThrow(/缺少设施位置/);
+  });
+
+  it('describes the exported shifts using plan durations rather than stale summary fields', () => {
+    const input = richResult();
+    input.planTimes = '旧班次数';
+    input.shift_pattern = '旧班次时长';
+    input.shift_hours = [12, 12];
+    input.plans = [8, 16].map((shift_hours, index) => ({
+      ...structuredClone(input.plans[0]), name: `第${index + 1}班`, shift_hours,
+    }));
+    const original = structuredClone(input);
+
+    const exported = buildMaaExportPayload(input);
+    expect(exported.title).toBe('MaaTool · 253基建 · 2班');
+    expect(exported.description).toContain('班次时长：8h / 16h');
+    expect(input).toEqual(original);
   });
 
   it('counts rooms available across shifts when room lists differ', () => {
