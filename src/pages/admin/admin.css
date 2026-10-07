@@ -69,6 +69,8 @@
 .admin-login-heading { margin-bottom: 24px; }
 .admin-login-heading h1 { margin-top: 12px; font-size: var(--text-v2-title); }
 .admin-user-filters > details[open] { grid-column: 1 / -1; }
+.admin-catalog-layout > .admin-selection-index { max-height: min(65dvh, 28rem); }
+.admin-catalog-editor > label { margin-top: 0; }
 .admin-app table { font-variant-numeric: tabular-nums; }
 .admin-app td { vertical-align: top; }
 @media (max-width: 80rem) { .admin-selection { grid-template-columns: minmax(160px, 220px) minmax(0, 1fr); } }
@@ -81,6 +83,7 @@
   .admin-main { padding: 20px 16px 48px; }
   .admin-selection { grid-template-columns: minmax(0, 1fr); }
   .admin-selection-index { max-height: 220px; border-right: 0; border-bottom: 1px solid var(--color-v2-line); padding: 0 0 12px; }
+  .admin-catalog-layout > .admin-selection-index { max-height: 220px; }
 }
 @media (max-width: 40rem) {
   .admin-header-user { display: none; }

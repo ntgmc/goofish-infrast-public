@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { AnnouncementStats as AnnouncementReachStats } from '../../../lib/types'
 
-import { Permission, AdminCdkRecord, UsageDay, UsageFunnelStep, UsageFailureReason, UsageFailureSample, UsageLatencyStats, UsageSklandStats, UsageAnnouncementStats, UsageCdkDistributionItem, RiskReasonStats, RiskTrendDay, CdkOpsSummary, permissionLabels } from '../contracts'
+import { AdminCdkRecord, UsageDay, UsageFunnelStep, UsageFailureReason, UsageFailureSample, UsageLatencyStats, UsageSklandStats, UsageAnnouncementStats, RiskReasonStats, RiskTrendDay, CdkOpsSummary, permissionLabels } from '../contracts'
 import { InfoRow, DetailItem, StatusPill, SmallButton, buildSummary, formatDate, formatDuration } from '../shared/helpers'
 import { Metric } from '../cdk/components'
 import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
@@ -192,39 +192,6 @@ export function AnnouncementReachMetrics({ stats }: { stats: AnnouncementReachSt
         <dd className="mt-1 font-semibold text-ink-primary">{stats.read_rate}%</dd>
       </div>
     </dl>
-  )
-}
-
-export function CdkDistributionPanel({ items }: { items: UsageCdkDistributionItem[] }) {
-  return (
-    <section className="tool-panel p-5">
-      <h2 className="text-base font-semibold text-ink-primary">CDK 兑换事件分布</h2>
-      <div className="mt-4 overflow-x-auto">
-        <table className="min-w-full text-left text-sm">
-          <thead className="text-xs text-ink-muted">
-            <tr>
-              <th className="pb-2 pr-4 font-medium">权限</th>
-              <th className="pb-2 pr-4 font-medium">总量</th>
-              <th className="pb-2 pr-4 font-medium">成功</th>
-              <th className="pb-2 font-medium">失败</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-surface-3">
-            {items.length === 0 && (
-              <tr><td colSpan={4} className="py-5 text-center text-sm text-ink-muted">暂无 CDK 兑换事件</td></tr>
-            )}
-            {items.map((item) => (
-              <tr key={item.permission}>
-                <td className="py-3 pr-4 font-medium text-ink-primary">{permissionLabels[item.permission as Permission] ?? item.permission}</td>
-                <td className="py-3 pr-4 text-ink-secondary">{item.total}</td>
-                <td className="py-3 pr-4 text-success">{item.success}</td>
-                <td className="py-3 text-error">{item.failure}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
   )
 }
 

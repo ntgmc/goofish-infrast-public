@@ -3,7 +3,7 @@ import { AdminTabs } from '../shared/AdminTabs'
 import type { AdminController } from '../useAdminController'
 import { Metric } from '../cdk/components'
 import { formatDuration } from '../shared/helpers'
-import { AnnouncementStatsPanel, CdkDistributionPanel, EMPTY_ANNOUNCEMENT_STATS, EMPTY_LATENCY_STATS, EMPTY_SKLAND_STATS,
+import { AnnouncementStatsPanel, EMPTY_ANNOUNCEMENT_STATS, EMPTY_LATENCY_STATS, EMPTY_SKLAND_STATS,
   FailureReasonPanel, FunnelPanel, LatencyPanel, OpsSummaryPanel, SklandPanel, UsageTrendChart } from './components'
 
 const tabs = [{ id: 'summary', label: '运营摘要' }, { id: 'analysis', label: '详细分析' }] as const
@@ -37,7 +37,6 @@ export default function OverviewSection({ model: c }: { model: AdminController }
     <div hidden={view !== 'analysis'} role="tabpanel" aria-label="详细分析" className="space-y-5">
       <div className="grid gap-5 xl:grid-cols-2"><FunnelPanel steps={stats?.funnel ?? []} /><LatencyPanel stats={stats?.latency.schedule_generate ?? EMPTY_LATENCY_STATS} /></div>
       <div className="grid gap-5 xl:grid-cols-3"><OpsSummaryPanel summary={c.summary} /><SklandPanel stats={stats?.skland ?? EMPTY_SKLAND_STATS} /><AnnouncementStatsPanel stats={stats?.announcement ?? EMPTY_ANNOUNCEMENT_STATS} /></div>
-      <CdkDistributionPanel items={stats?.cdk_distribution ?? []} />
       {stats && <details className="tool-panel p-4"><summary className="min-h-11 cursor-pointer text-sm">统计范围与数据状态</summary><p className="mt-3 text-xs leading-6 text-ink-muted">
         {stats.range.from} 至 {stats.range.to}，按 UTC 自然日统计。原始事件保留 {stats.completeness.retention_days || '-'} 天，指标版本 {stats.metrics_version}。
         数据生成时间：{stats.generated_at || '-'}。缺少状态的事件：{stats.completeness.unknown_status_events}。
