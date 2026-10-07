@@ -16,6 +16,7 @@ import {
 } from '../lib/config'
 import { BASE_DAILY_SANITY_BUDGET, MONTHLY_CARD_DAILY_SANITY_BONUS, normalizeOrundumPlanning } from '../lib/orundum-economy'
 import type { IntermediateProduct, LicenseConfig, PermissionMode } from '../lib/types'
+import { useSiteFeatures } from '../lib/site-feature-context'
 import { copy } from '../copy/index'
 import InputNumber from './InputNumber'
 import FacilityLayoutEditor from './FacilityLayoutEditor'
@@ -64,7 +65,7 @@ const VARIABLE_SHIFT_SCHEDULE_DEFAULTS = {
 const SHIFT_SCHEDULE_OPTIONS = [
   { id: '8x3', label: copy.common.components_ConfigEditor_087, hours: [8, 8, 8] },
   { id: '12x3', label: copy.common.components_ConfigEditor_088, hours: [12, 12, 12] },
-  { id: '24x3', label: copy.common.components_ConfigEditor_089, hours: [24, 24, 24], disabled: true },
+  { id: '24x3', label: copy.common.components_ConfigEditor_089, hours: [24, 24, 24] },
   { id: 'variable', label: copy.common.components_ConfigEditor_090 },
   { id: 'custom', label: copy.common.components_ConfigEditor_091 },
 ] as const
@@ -1129,6 +1130,7 @@ function ShiftHoursEditor({
   onSelectVariable: () => void;
   onChange: (hours: number[]) => void;
 }) {
+  const { features } = useSiteFeatures()
   const normalized = parseShiftHours(value) ?? [8, 8, 8]
   const formatted = normalized.join('-')
   const [draftValue, setDraftValue] = useState(formatted)
@@ -1145,7 +1147,7 @@ function ShiftHoursEditor({
   const commitDraft = () => {
     if (!canEdit) return
     const parsed = parseShiftHours(draftValue)
-    if (parsed?.every((hours) => Math.abs(hours - 24) <= 0.0001)) {
+    if (!features.one_shift_per_day && parsed?.every((hours) => Math.abs(hours - 24) <= 0.0001)) {
       setError(copy.common.components_ConfigEditor_101)
       return
     }
@@ -1162,8 +1164,12 @@ function ShiftHoursEditor({
     }
   }
 
+  const isChoiceDisabled = (choice: typeof SHIFT_SCHEDULE_OPTIONS[number]) => choice.id === '24x3'
+    ? !canEdit || !features.one_shift_per_day
+    : !canEdit && !(canEditFixedShiftHours && 'hours' in choice)
+
   const selectChoice = (choice: typeof SHIFT_SCHEDULE_OPTIONS[number]) => {
-    if ((!canEdit && !(canEditFixedShiftHours && 'hours' in choice)) || ('disabled' in choice && choice.disabled)) return
+    if (isChoiceDisabled(choice)) return
     if (choice.id === 'custom') {
       setCustomSelected(true)
       return
@@ -1185,7 +1191,7 @@ function ShiftHoursEditor({
             key={choice.id}
             type="button"
             aria-pressed={selectedChoice === choice.id}
-            disabled={(!canEdit && !(canEditFixedShiftHours && 'hours' in choice)) || ('disabled' in choice && choice.disabled)}
+            disabled={isChoiceDisabled(choice)}
             onClick={() => selectChoice(choice)}
             className={`tool-secondary-action min-h-11 whitespace-normal px-2 py-2 text-xs leading-5 disabled:cursor-not-allowed disabled:text-ink-muted sm:text-sm ${
               selectedChoice === choice.id
@@ -1236,9 +1242,11 @@ function ShiftHoursEditor({
             : copy.common.components_ConfigEditor_093}
         </p>
       )}
-      <p className="mt-2 text-xs leading-5 text-ink-muted">
-        {copy.common.components_ConfigEditor_101}
-      </p>
+      {!features.one_shift_per_day && (
+        <p className="mt-2 text-xs leading-5 text-ink-muted">
+          {copy.common.components_ConfigEditor_101}
+        </p>
+      )}
     </div>
   )
 }

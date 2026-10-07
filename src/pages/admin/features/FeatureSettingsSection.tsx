@@ -17,7 +17,7 @@ const GROUPS: Array<{ label: string; features: SiteFeatureKey[] }> = [
   { label: copy.features.admin_groups.site, features: ['site'] },
   { label: copy.features.admin_groups.account, features: ['registration', 'login', 'profiles', 'cdk_redemption', 'free_preview', 'skland'] },
   { label: copy.features.admin_groups.pages, features: ['v2', 'faq', 'support', 'pricing', 'changelog', 'thanks', 'service_status'] },
-  { label: copy.features.admin_groups.scheduling, features: ['schedule_generation', 'scenario_comparison', 'metered_billing'] },
+  { label: copy.features.admin_groups.scheduling, features: ['schedule_generation', 'one_shift_per_day', 'scenario_comparison', 'metered_billing'] },
   { label: copy.features.admin_groups.tools, features: ['tools', 'depot_value', 'cultivation_plan', 'manual_schedule'] },
   { label: copy.features.admin_groups.exports, features: ['maa_export', 'full_result_export'] },
   { label: copy.features.admin_groups.community, features: ['invitations', 'inventory', 'onboarding_tasks', 'announcements', 'notifications', 'qqbot'] },

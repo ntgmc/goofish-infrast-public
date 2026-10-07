@@ -6,7 +6,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CONFIG_PRESETS, cloneConfig, normalizeConfig } from '../lib/config'
 import ConfigEditor from './ConfigEditor'
 
-afterEach(cleanup)
+const { featureSwitches } = vi.hoisted(() => ({ featureSwitches: { one_shift_per_day: false } }))
+vi.mock('../lib/site-feature-context', () => ({ useSiteFeatures: () => ({ features: featureSwitches }) }))
+
+afterEach(() => {
+  cleanup()
+  featureSwitches.one_shift_per_day = false
+})
 
 describe('ConfigEditor facility configuration', () => {
   it('loads confirmed layouts collapsed and requires review again after editing', async () => {
@@ -133,7 +139,8 @@ describe('ConfigEditor facility configuration', () => {
 })
 
 describe('ConfigEditor shift patterns', () => {
-  it.each([8, 12])('allows restricted profiles to select the %s-hour preset only', async (hours) => {
+  it.each([8, 12])('allows restricted profiles to select the %s-hour preset only even when one shift per day is enabled', async (hours) => {
+    featureSwitches.one_shift_per_day = true
     const user = userEvent.setup()
     const config = normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: hours === 8 ? [12, 12, 12] : [8, 8, 8] })
     const onUpdate = vi.fn()
@@ -239,7 +246,7 @@ describe('ConfigEditor shift patterns', () => {
     await user.type(input, '12-12')
     await user.click(screen.getByRole('button', { name: '应用间隔' }))
 
-    expect(screen.getByRole('alert')).toHaveTextContent('请输入 3 到 6 班。间隔不同时须合计 24 小时，等长间隔支持 8 或 12 小时。')
+    expect(screen.getByRole('alert')).toHaveTextContent('请输入 3 到 6 班。间隔不同时须合计 24 小时，等长间隔须使用已开放的换班频率。')
     expect(onUpdate).not.toHaveBeenCalled()
   })
 
@@ -326,6 +333,34 @@ describe('ConfigEditor shift patterns', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('一天一换已停用，建议直接使用游戏内队列轮换。')
     expect(onUpdate).not.toHaveBeenCalled()
+  })
+
+  it.each(['preset', 'custom'])('allows one shift per day through %s when the feature switch is enabled', async (selection) => {
+    featureSwitches.one_shift_per_day = true
+    const user = userEvent.setup()
+    const config = normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: [8, 8, 8] })
+    const onUpdate = vi.fn()
+    render(<ConfigEditor config={config} canEdit validation={{ ok: true }} onUpdate={onUpdate} />)
+
+    expect(screen.getByRole('button', { name: '一天1换（24小时一换）' })).toBeEnabled()
+    expect(screen.queryByText('一天一换已停用，建议直接使用游戏内队列轮换。')).not.toBeInTheDocument()
+    if (selection === 'custom') {
+      await user.click(screen.getByRole('button', { name: '自定义' }))
+      const input = screen.getByLabelText('MAA 换班间隔')
+      await user.clear(input)
+      await user.type(input, '24-24-24')
+      await user.click(screen.getByRole('button', { name: '应用间隔' }))
+    } else {
+      await user.click(screen.getByRole('button', { name: '一天1换（24小时一换）' }))
+    }
+
+    expect(onUpdate).toHaveBeenCalledOnce()
+    const next = cloneConfig(config)
+    onUpdate.mock.calls[0][0](next)
+    expect(next.shift_hours).toEqual([24, 24, 24])
+    expect(next.schedule_mode).toBe('maa')
+    expect(next.Fiammetta?.enable).toBe(false)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('leaves automatic variable mode when applying a custom pattern', async () => {

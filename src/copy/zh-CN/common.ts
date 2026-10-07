@@ -304,7 +304,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_080: "固源岩",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_081: "请输入 3 到 6 班。间隔不同时须合计 24 小时，等长间隔支持 8 或 12 小时。",
+  components_ConfigEditor_081: "请输入 3 到 6 班。间隔不同时须合计 24 小时，等长间隔须使用已开放的换班频率。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_082: "MAA 换班间隔",
   // src/components/ConfigEditor.tsx
