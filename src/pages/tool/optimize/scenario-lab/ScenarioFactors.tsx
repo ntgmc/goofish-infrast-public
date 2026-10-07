@@ -10,18 +10,18 @@ import { SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS } from '../../../../lib/scen
 import { copy } from '../../../../copy/index'
 
 
-const LAYOUTS: Array<{ id: ScenarioLayout; trading: number; manufacturing: number }> = [
+export const LAYOUTS: Array<{ id: ScenarioLayout; trading: number; manufacturing: number }> = [
   { id: '153', trading: 1, manufacturing: 5 },
   { id: '243', trading: 2, manufacturing: 4 },
   { id: '333', trading: 3, manufacturing: 3 },
 ]
 
-const SCHEDULES: Array<{ id: ScenarioMaaSchedule; label: string }> = [
+export const SCHEDULES: Array<{ id: ScenarioMaaSchedule; label: string }> = [
   { id: 'variable', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_001 },
   { id: '8x3', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_002 },
 ]
 
-const DRONES: Array<{ id: ScenarioDroneStrategy; label: string }> = [
+export const DRONES: Array<{ id: ScenarioDroneStrategy; label: string }> = [
   { id: 'off', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_004 },
   { id: 'auto', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_005 },
   { id: 'lmd', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_006 },
@@ -252,7 +252,7 @@ function CheckOption({ id, checked, onChange, children }: { id: string; checked:
   )
 }
 
-function buildPlan(
+export function buildPlan(
   layout: { trading: number; manufacturing: number },
   orundum: number,
   originiumShard: number,
@@ -268,11 +268,11 @@ function buildPlan(
   }
 }
 
-function planLabel(plan: ScenarioProductionPlan): string {
+export function planLabel(plan: ScenarioProductionPlan): string {
   return `${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_028}${plan.trading.lmd}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_029}${plan.trading.orundum}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_030}${plan.manufacturing.pureGold}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_031}${plan.manufacturing.battleRecord}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_032}${plan.manufacturing.originiumShard}`
 }
 
-function planKey(plan: ScenarioProductionPlan): string {
+export function planKey(plan: ScenarioProductionPlan): string {
   return `${plan.trading.lmd}-${plan.trading.orundum}-${plan.manufacturing.pureGold}-${plan.manufacturing.battleRecord}-${plan.manufacturing.originiumShard}`
 }
 

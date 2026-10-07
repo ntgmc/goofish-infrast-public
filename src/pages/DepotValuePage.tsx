@@ -17,8 +17,7 @@ import { v2Path } from './v2/navigation'
 const LMD_ITEM_ID = '4001'
 const DEPOT_REQUEST_MAX_BYTES = 1024 * 1024
 
-export default function DepotValuePage({ embedded = false, session }: { embedded?: boolean; session?: ReturnType<typeof useToolSession> } = {}) {
-  const PageRoot = embedded ? 'section' : 'main'
+export function useDepotValue(session?: ReturnType<typeof useToolSession>) {
   const updateSession = useCallback((payload: AuthMeResponse) => {
     if (!payload.user || !session) return
     session.applyAuthPayload({
@@ -227,6 +226,18 @@ export default function DepotValuePage({ embedded = false, session }: { embedded
     link.click()
   }
 
+  return { canvasRef, depotText, setDepotText, auth, authLoading, authError, setAuthLoadRevision, depotProfile,
+    selectedProfileId, setSelectedProfileId, result, setResult, loading, profilePreparing, sklandDialogOpen, setSklandDialogOpen,
+    sampleConsent, setSampleConsent, error, setError, sklandProfiles, selectedSklandProfile, openSklandBinding,
+    readClipboard, analyzeUpload, analyzeSkland, handleAuthenticated, handleSklandPayload, handleSklandCompleted, downloadShareImage }
+}
+
+export default function DepotValuePage({ embedded = false, session }: { embedded?: boolean; session?: ReturnType<typeof useToolSession> } = {}) {
+  const PageRoot = embedded ? 'section' : 'main'
+  const { canvasRef, depotText, setDepotText, auth, authLoading, authError, setAuthLoadRevision, depotProfile,
+    selectedProfileId, setSelectedProfileId, result, setResult, loading, profilePreparing, sklandDialogOpen, setSklandDialogOpen,
+    sampleConsent, setSampleConsent, error, setError, sklandProfiles, selectedSklandProfile, openSklandBinding,
+    readClipboard, analyzeUpload, analyzeSkland, handleAuthenticated, handleSklandPayload, handleSklandCompleted, downloadShareImage } = useDepotValue(session)
   return (
     <PageRoot className={embedded ? 'v2-embedded-tool' : 'tool-page'} tabIndex={-1} data-route-focus>
       <div className={embedded ? undefined : 'tool-page-frame max-w-6xl'}>
@@ -699,7 +710,7 @@ function getShareCardColors() {
   }
 }
 
-function formatProfileLabel(profile: UserGameAccount): string {
+export function formatProfileLabel(profile: UserGameAccount): string {
   const binding = profile.skland_binding
   return binding
     ? `${profile.display_name} · ${binding.nickname} (${binding.uid})${binding.credential_status === 'invalid' ? copy.tools.pages_DepotValuePage_069 : ''}`
@@ -743,11 +754,11 @@ function validateDepotInventoryForClient(value: unknown): void {
   }
 }
 
-function getUtf8ByteLength(value: string): number {
+export function getUtf8ByteLength(value: string): number {
   return new TextEncoder().encode(value).byteLength
 }
 
-function formatPricingStatus(status: DepotValueResponse['sources']['yituliu']): string {
+export function formatPricingStatus(status: DepotValueResponse['sources']['yituliu']): string {
   return {
     fresh: copy.tools.pages_DepotValuePage_101,
     stale: copy.tools.pages_DepotValuePage_102,
@@ -756,7 +767,7 @@ function formatPricingStatus(status: DepotValueResponse['sources']['yituliu']): 
   }[status]
 }
 
-function formatContributionStatus(status: DepotValueResponse['ranking']['contribution_status']): string {
+export function formatContributionStatus(status: DepotValueResponse['ranking']['contribution_status']): string {
   return {
     saved: copy.tools.pages_DepotValuePage_105,
     declined: copy.tools.pages_DepotValuePage_106,
@@ -766,13 +777,13 @@ function formatContributionStatus(status: DepotValueResponse['ranking']['contrib
   }[status]
 }
 
-function formatOptionalDate(value: string | null): string {
+export function formatOptionalDate(value: string | null): string {
   if (!value) return copy.tools.pages_DepotValuePage_093
   const date = new Date(value)
   return Number.isFinite(date.getTime()) ? date.toLocaleString(CURRENT_LOCALE) : value
 }
 
-function formatRankingNote(result: DepotValueResponse): string {
+export function formatRankingNote(result: DepotValueResponse): string {
   if (result.ranking.mode === 'sample_adjusted') {
     const weightText = `${Math.round(result.ranking.sample_weight * 100)}%`
     return `${copy.tools.pages_DepotValuePage_072}${formatNumber(result.ranking.sample_count)}${copy.tools.pages_DepotValuePage_073}${weightText}。`
@@ -783,12 +794,12 @@ function formatRankingNote(result: DepotValueResponse): string {
   return copy.tools.pages_DepotValuePage_075
 }
 
-function formatUnitSanityLabel(item: DepotValueItem): string {
+export function formatUnitSanityLabel(item: DepotValueItem): string {
   if (item.id === LMD_ITEM_ID) return `${copy.tools.pages_DepotValuePage_076}${formatNumber(item.unit_sanity * 10000)}${copy.tools.pages_DepotValuePage_077}`
   return `${copy.tools.pages_DepotValuePage_078}${formatNumber(item.unit_sanity)}${copy.tools.pages_DepotValuePage_079}`
 }
 
-function formatNumber(value: number): string {
+export function formatNumber(value: number): string {
   if (!Number.isFinite(value)) return '-'
   return new Intl.NumberFormat(CURRENT_LOCALE, {
     maximumFractionDigits: value >= 100 ? 0 : 2,

@@ -27,10 +27,8 @@ function StandaloneManualSchedule() {
   return <ManualScheduleContent session={session} />
 }
 
-function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpenProfile }: PageProps & { session: ReturnType<typeof useToolSession> }) {
+export function useManualTool({ session, embedded = false, onDirtyChange }: PageProps & { session: ReturnType<typeof useToolSession> }) {
   const label = copy.tools.manualSchedule
-  const ContentRoot = embedded ? 'div' : 'main'
-  const operatorsPath = (profileId: string) => embedded ? `${v2Path('overview', profileId)}&panel=operators` : profileScopedPath(workspaceSetupPath('operators'), profileId)
   const { features } = useSiteFeatures()
   const available = session.profiles.filter((profile) => isManualScheduleProfileAvailable(profile) &&
     (features.metered_billing || !profile.kind.startsWith('metered_')))
@@ -114,6 +112,16 @@ function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpe
     }
   }
 
+  return { available, profile, ready, operators, preset, setPreset, setConfigDraft, baseConfig, configuredHours,
+    setShiftHours, draft, error, importing, upload, canUse, enabled, start, importSchedule }
+}
+
+function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpenProfile }: PageProps & { session: ReturnType<typeof useToolSession> }) {
+  const label = copy.tools.manualSchedule
+  const ContentRoot = embedded ? 'div' : 'main'
+  const operatorsPath = (profileId: string) => embedded ? `${v2Path('overview', profileId)}&panel=operators` : profileScopedPath(workspaceSetupPath('operators'), profileId)
+  const { available, profile, ready, operators, preset, setPreset, setConfigDraft, baseConfig, configuredHours,
+    setShiftHours, draft, error, importing, upload, canUse, enabled, start, importSchedule } = useManualTool({ session, embedded, onDirtyChange })
   return (
     <div className={embedded ? 'v2-embedded-tool' : 'mx-auto max-w-7xl px-4 py-6 sm:px-6'}>
       {!embedded && <header className="mb-8 flex items-center justify-between gap-4">

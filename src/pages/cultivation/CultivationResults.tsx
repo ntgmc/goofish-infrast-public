@@ -7,7 +7,7 @@ import type { buildCultivationPlan } from '../../lib/cultivation-planner'
 const label = copy.tools.cultivation
 export const number = (value: number) => new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 }).format(value)
 
-function progress(row: CultivationCandidate, target = false) {
+export function progress(row: CultivationCandidate, target = false) {
   return target ? label.targetProgress(row.target.elite, row.target.level, row.target.skill, row.target.skillLevel, row.target.moduleLevel)
     : label.progress(row.current.elite, row.current.level, row.target.skill, row.current.skillLevel, row.current.masteries[row.skillId], row.target.moduleId ? row.current.modules[row.target.moduleId] ?? 0 : undefined)
 }

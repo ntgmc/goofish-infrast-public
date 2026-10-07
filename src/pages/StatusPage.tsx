@@ -39,8 +39,7 @@ const UNAVAILABLE_STATUS: ServiceStatusResponse = {
   incidents: [],
 }
 
-export default function StatusPage({ embedded = false }: { embedded?: boolean } = {}) {
-  const PageRoot = embedded ? 'section' : 'main'
+export function useServiceStatus() {
   const [status, setStatus] = useState<ServiceStatusResponse | null>(null)
   const [error, setError] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -96,6 +95,12 @@ export default function StatusPage({ embedded = false }: { embedded?: boolean } 
   const statusMessage = status ? statusMessageFor(status.status) : error ? copy.status.pages_StatusPage_021 : copy.status.pages_StatusPage_024
   const updatedAt = status ? formatUpdatedAt(status.generated_at) : error ? copy.status.pages_StatusPage_072 : copy.status.pages_StatusPage_024
 
+  return { status, error, refreshing, loadStatus, currentStatus, optimizationStatus, sklandStatus, statusMessage, updatedAt }
+}
+
+export default function StatusPage({ embedded = false }: { embedded?: boolean } = {}) {
+  const PageRoot = embedded ? 'section' : 'main'
+  const { status, error, refreshing, loadStatus, currentStatus, optimizationStatus, sklandStatus, statusMessage, updatedAt } = useServiceStatus()
   return (
     <PageRoot className={embedded ? 'v2-embedded-tool' : 'tool-page'} tabIndex={-1} data-route-focus>
       <div className={embedded ? undefined : 'public-shell'}>
@@ -278,7 +283,7 @@ function IncidentCard({ incident }: { incident: PublicStatusIncident }) {
   )
 }
 
-function createHistoryCells(history: ServiceStatusResponse['history']): ServiceStatusHistoryBucket[] {
+export function createHistoryCells(history: ServiceStatusResponse['history']): ServiceStatusHistoryBucket[] {
   const end = Date.parse(history.to); const start = Date.parse(history.from)
   const lookup = new Map(history.buckets.map((bucket) => [bucket.bucket_start, bucket]))
   const cells: ServiceStatusHistoryBucket[] = []
@@ -294,7 +299,7 @@ function createHistoryCells(history: ServiceStatusResponse['history']): ServiceS
   return cells.slice(-PUBLIC_STATUS_HISTORY_HOURS)
 }
 
-function historyCellLabel(cell: ServiceStatusHistoryBucket): string {
+export function historyCellLabel(cell: ServiceStatusHistoryBucket): string {
   const start = Date.parse(cell.bucket_start); const end = new Date(start + 3600000)
   const range = `${new Date(start).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })}–${end.toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })}`
   return `${range}，${statusLabel(cell.status)}，${copy.status.pages_StatusPage_048} ${cell.sample_count}，${copy.status.pages_StatusPage_049} ${cell.availability_percent === null ? copy.status.pages_StatusPage_050 : `${cell.availability_percent}%`}`
@@ -304,11 +309,11 @@ function formatHistoryRange(from: string, to: string): string { return `${format
 function formatDateInProjectTimezone(value: string): string { const timestamp = Date.parse(value); return Number.isFinite(timestamp) ? new Date(timestamp).toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' }) : copy.status.pages_StatusPage_051 }
 function formatDay(value: string | undefined): string { if (!value) return ''; const timestamp = Date.parse(value); return Number.isFinite(timestamp) ? new Date(timestamp).toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', month: 'numeric', day: 'numeric' }) : '' }
 function formatHour(value: string): string { const timestamp = Date.parse(value); return Number.isFinite(timestamp) ? new Date(timestamp).toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', hour: '2-digit', hour12: false }) : '' }
-function statusLabel(level: ServiceStatusHistoryLevel): string { return ({ available: copy.status.pages_StatusPage_052, scaling: copy.status.pages_StatusPage_066, busy: copy.status.pages_StatusPage_053, congested: copy.status.pages_StatusPage_054, overloaded: copy.status.pages_StatusPage_065, unavailable: copy.status.pages_StatusPage_055, unknown: copy.status.pages_StatusPage_050 } as const)[level] }
-function incidentStatusLabel(status: PublicStatusIncident['status']): string { return ({ investigating: copy.status.pages_StatusPage_056, identified: copy.status.pages_StatusPage_057, monitoring: copy.status.pages_StatusPage_058, resolved: copy.status.pages_StatusPage_059 } as const)[status] }
-function incidentImpactLabel(impact: PublicStatusIncident['impact']): string { return ({ minor: copy.status.pages_StatusPage_060, major: copy.status.pages_StatusPage_061, critical: copy.status.pages_StatusPage_062 } as const)[impact] }
+export function statusLabel(level: ServiceStatusHistoryLevel): string { return ({ available: copy.status.pages_StatusPage_052, scaling: copy.status.pages_StatusPage_066, busy: copy.status.pages_StatusPage_053, congested: copy.status.pages_StatusPage_054, overloaded: copy.status.pages_StatusPage_065, unavailable: copy.status.pages_StatusPage_055, unknown: copy.status.pages_StatusPage_050 } as const)[level] }
+export function incidentStatusLabel(status: PublicStatusIncident['status']): string { return ({ investigating: copy.status.pages_StatusPage_056, identified: copy.status.pages_StatusPage_057, monitoring: copy.status.pages_StatusPage_058, resolved: copy.status.pages_StatusPage_059 } as const)[status] }
+export function incidentImpactLabel(impact: PublicStatusIncident['impact']): string { return ({ minor: copy.status.pages_StatusPage_060, major: copy.status.pages_StatusPage_061, critical: copy.status.pages_StatusPage_062 } as const)[impact] }
 
-function formatUpdatedAt(value: string): string {
+export function formatUpdatedAt(value: string): string {
   const timestamp = Date.parse(value)
   if (!Number.isFinite(timestamp) || timestamp === 0) return copy.status.pages_StatusPage_024
   return new Date(timestamp).toLocaleString('zh-CN', { hour12: false, timeZone: 'Asia/Shanghai' })

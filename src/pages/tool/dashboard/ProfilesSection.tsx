@@ -8,16 +8,8 @@ import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
 
 
 
-export default function ProfilesSection({
-  profiles,
-  openingProfileId,
-  onOpen,
-  onEdit,
-  meteredEnabled = false,
-}: {
+export function useProfiles({ profiles, onEdit, meteredEnabled = false }: {
   profiles: UserGameAccount[]
-  openingProfileId: string | null
-  onOpen: (profile: UserGameAccount) => void
   onEdit: (payload: AuthSuccessResponse) => void
   meteredEnabled?: boolean
 }) {
@@ -47,6 +39,17 @@ export default function ProfilesSection({
       profileId ?? null,
     )
   }
+  return { profiles, meteredEnabled, meteredBusy, meteredError, createMetered, declarationDialog }
+}
+
+export default function ProfilesSection({ profiles: source, openingProfileId, onOpen, onEdit, meteredEnabled: enabled = false }: {
+  profiles: UserGameAccount[]
+  openingProfileId: string | null
+  onOpen: (profile: UserGameAccount) => void
+  onEdit: (payload: AuthSuccessResponse) => void
+  meteredEnabled?: boolean
+}) {
+  const { profiles, meteredEnabled, meteredBusy, meteredError, createMetered, declarationDialog } = useProfiles({ profiles: source, onEdit, meteredEnabled: enabled })
   if (profiles.length === 0) {
     return (
 <><section className="tool-panel p-6">
@@ -78,25 +81,7 @@ export default function ProfilesSection({
   )
 }
 
-function ProfileCard({
-  profile,
-  fallbackName,
-  opening,
-  onOpen,
-  onSaved,
-  onConvert,
-  converting,
-  meteredEnabled,
-}: {
-  profile: UserGameAccount
-  fallbackName: string
-  opening: boolean
-  onOpen: () => void
-  onSaved: (payload: AuthSuccessResponse) => void
-  onConvert: () => void
-  converting: boolean
-  meteredEnabled: boolean
-}) {
+export function useProfileDetails(profile: UserGameAccount, fallbackName: string, onSaved: (payload: AuthSuccessResponse) => void) {
   const [editing, setEditing] = useState(false)
   const [displayName, setDisplayName] = useState(profile.display_name || fallbackName)
   const [note, setNote] = useState(profile.note)
@@ -125,6 +110,20 @@ function ProfileCard({
     setEditing(false)
   }
 
+  return { editing, setEditing, displayName, setDisplayName, note, setNote, error, activeTrial, description, save }
+}
+
+function ProfileCard({ profile, fallbackName, opening, onOpen, onSaved, onConvert, converting, meteredEnabled }: {
+  profile: UserGameAccount
+  fallbackName: string
+  opening: boolean
+  onOpen: () => void
+  onSaved: (payload: AuthSuccessResponse) => void
+  onConvert: () => void
+  converting: boolean
+  meteredEnabled: boolean
+}) {
+  const { editing, setEditing, displayName, setDisplayName, note, setNote, error, activeTrial, description, save } = useProfileDetails(profile, fallbackName, onSaved)
   return (
     <article className="workspace-profile-row tool-panel p-5">
       <div className="workspace-profile-main flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

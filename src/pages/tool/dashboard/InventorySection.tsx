@@ -51,16 +51,9 @@ type LimitedProfileUseResponse = UseResponse & {
 }
 type InventoryNotice = { message: string; action?: 'profiles' }
 
-export default function InventorySection({
-  onPayload,
-  onLifetimeProfileCreated,
-  onViewProfiles,
-  loadingFallback,
-}: {
+export function useInventory({ onPayload, onLifetimeProfileCreated }: {
   onPayload: (payload: AuthSuccessResponse) => void
   onLifetimeProfileCreated?: () => void
-  onViewProfiles?: () => void
-  loadingFallback?: ReactNode
 }) {
   const [inventory, setInventory] = useState<InventoryResponse | null>(null)
   const [tasks, setTasks] = useState<OnboardingTaskView[]>([])
@@ -225,8 +218,6 @@ export default function InventorySection({
     }
   }
 
-  if (loading && !inventory) return loadingFallback ?? <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.inventory.loading}</div>
-
   const selectedCapacity = selected ? capacityForItem(selected.item.code, profileId, inventory?.capacities ?? []) : null
   const maximumQuantity = Math.min(selected?.quantity ?? 0, 100,
     selected?.item.kind === 'capacity_upgrade' ? Math.max(0, (selectedCapacity?.maximum ?? 0) - (selectedCapacity?.limit ?? 0))
@@ -245,6 +236,25 @@ export default function InventorySection({
     else void load()
   }
 
+  return { inventory, tasks, selected, setSelected, category, setCategory, search, setSearch, profileId, setProfileId,
+    quantity, setQuantity, selectedRewardCodes, setSelectedRewardCodes, highlightedReward, lifetimeDisplayName, setLifetimeDisplayName,
+    lifetimeNote, setLifetimeNote, loading, busy, error, notice, rewards, setRewards, lifetimeDialogOpen, setLifetimeDialogOpen,
+    selectedTriggerRef, chestScope, filtered, runItemAction, claimTask, createLifetimeProfileWithJson, selectedCapacity,
+    maximumQuantity, canUseSelected, handleLifetimePayload, load }
+}
+
+export default function InventorySection({ onPayload, onLifetimeProfileCreated, onViewProfiles, loadingFallback }: {
+  onPayload: (payload: AuthSuccessResponse) => void
+  onLifetimeProfileCreated?: () => void
+  onViewProfiles?: () => void
+  loadingFallback?: ReactNode
+}) {
+  const { inventory, tasks, selected, setSelected, category, setCategory, search, setSearch, profileId, setProfileId,
+    quantity, setQuantity, selectedRewardCodes, setSelectedRewardCodes, highlightedReward, lifetimeDisplayName, setLifetimeDisplayName,
+    lifetimeNote, setLifetimeNote, loading, busy, error, notice, rewards, setRewards, lifetimeDialogOpen, setLifetimeDialogOpen,
+    selectedTriggerRef, chestScope, filtered, runItemAction, claimTask, createLifetimeProfileWithJson, selectedCapacity,
+    maximumQuantity, canUseSelected, handleLifetimePayload } = useInventory({ onPayload, onLifetimeProfileCreated })
+  if (loading && !inventory) return loadingFallback ?? <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.inventory.loading}</div>
   return (
     <div className="workspace-inventory space-y-5">
       <section className="workspace-inventory-summary tool-panel p-5 sm:p-6">
@@ -457,7 +467,7 @@ export default function InventorySection({
   )
 }
 
-function categoryLabel(category: Category): string {
+export function categoryLabel(category: Category): string {
   if (category === 'consumable') return copy.inventory.consumable
   if (category === 'capacity_upgrade') return copy.inventory.capacity
   if (category === 'gift_pack') return copy.inventory.packs
@@ -474,7 +484,7 @@ function capacityForItem(code: string, profileId: string, profiles: ProfileCapac
   return null
 }
 
-function ledgerEventLabel(eventType: InventoryResponse['recent_events'][number]['event_type']): string {
+export function ledgerEventLabel(eventType: InventoryResponse['recent_events'][number]['event_type']): string {
   if (eventType === 'grant') return copy.inventory.ledger_grant
   if (eventType === 'reserve') return copy.inventory.ledger_reserve
   if (eventType === 'consume') return copy.inventory.ledger_consume
@@ -499,7 +509,7 @@ function isLimitedProfileUseResponse(response: UseResponse): response is Limited
     && Object.prototype.hasOwnProperty.call(response.auth, 'workspace')
 }
 
-function fallbackItemIcon(event: SyntheticEvent<HTMLImageElement>): void {
+export function fallbackItemIcon(event: SyntheticEvent<HTMLImageElement>): void {
   event.currentTarget.onerror = null
   event.currentTarget.src = itemIconPath('placeholder')
 }

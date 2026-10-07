@@ -10,7 +10,7 @@ const itemIcon = (id: string) => `https://torappu.prts.wiki/assets/item_icon/${e
 
 type Props = { data: CultivationData; plan: ReturnType<typeof buildCultivationPlan>; preference: CultivationOptions['preference'] }
 
-export default memo(function CultivationSpecialItems({ data, plan, preference }: Props) {
+export function useSpecialItems({ data, plan, preference }: Props) {
   const [chosen, setChosen] = useState('')
   const [visible, setVisible] = useState(8)
   const selected = data.specialItems?.find((item) => item.id === chosen)
@@ -37,6 +37,11 @@ export default memo(function CultivationSpecialItems({ data, plan, preference }:
       return b.demand - a.demand || (b.communityRate ?? -1) - (a.communityRate ?? -1) || (b.sanity ?? -1) - (a.sanity ?? -1) || a.key.localeCompare(b.key)
     })
   }, [data, plan, preference, selected])
+  return { chosen, setChosen, visible, setVisible, selected, recommendations }
+}
+
+export default memo(function CultivationSpecialItems({ data, plan, preference }: Props) {
+  const { chosen, setChosen, visible, setVisible, selected, recommendations } = useSpecialItems({ data, plan, preference })
   return <section className="tool-panel space-y-4 p-5 sm:p-6">
     <div><h2 className="text-lg font-semibold">{label.specialItems}</h2><p className="mt-2 text-sm leading-6 text-ink-secondary">{label.specialHint}</p></div>
     {!data.specialItems?.length ? <p className="text-sm text-ink-secondary">{label.noSpecialItems}</p> : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{data.specialItems.map((item) => <button key={item.id} type="button" aria-pressed={item.id === chosen} className={`tool-secondary-action flex min-w-0 items-center justify-start gap-3 text-left ${item.id === chosen ? 'tool-option-selected' : ''}`} onClick={() => { setChosen(item.id); setVisible(8) }}>

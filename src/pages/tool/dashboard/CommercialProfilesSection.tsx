@@ -18,7 +18,7 @@ type Limits = {
 type Page = { profiles: UserGameAccount[]; next_cursor: string | null; limits: Limits }
 type EditDraft = { profileId: string; displayName: string; note: string }
 
-export default function CommercialProfilesSection({ onOpen }: { onOpen: (profile: UserGameAccount) => void }) {
+export function useCommercialProfiles() {
   const [page, setPage] = useState<Page | null>(null)
   const [state, setState] = useState<'active' | 'archived'>('active')
   const [draftQuery, setDraftQuery] = useState('')
@@ -140,6 +140,13 @@ export default function CommercialProfilesSection({ onOpen }: { onOpen: (profile
 
   const activeProfiles = state === 'active' ? page?.profiles ?? [] : []
   const allVisibleSelected = activeProfiles.length > 0 && activeProfiles.every((profile) => selectedIds.has(profile.id))
+  return { page, state, setState, draftQuery, setDraftQuery, loading, busy, error, notice, selectedIds, setSelectedIds,
+    editDraft, setEditDraft, setPage, load, create, mutate, saveEdit, search, batchArchive, activeProfiles, allVisibleSelected }
+}
+
+export default function CommercialProfilesSection({ onOpen }: { onOpen: (profile: UserGameAccount) => void }) {
+  const { page, state, setState, draftQuery, setDraftQuery, loading, busy, error, notice, selectedIds, setSelectedIds,
+    editDraft, setEditDraft, setPage, load, create, mutate, saveEdit, search, batchArchive, activeProfiles, allVisibleSelected } = useCommercialProfiles()
   return <div className="space-y-4">
     <section className="tool-panel p-5 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

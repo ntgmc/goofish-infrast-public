@@ -80,25 +80,29 @@ it deliberately when changing the shared design.
 - The public result layout at `riic.autos` informed result hierarchy,
   adjacent shift controls, and portrait-led assignments. Use an independent
   palette and implementation.
-- Supporting application pages use the same palette and hierarchy. Account
-  profiles and tools use lists; saved configurations sit beside
-  archived results and history; generation, scenario comparison, cultivation,
-  and depot valuation pair controls with results or supporting information.
-- Settings use horizontal section navigation and stacked sections of equal
-  width. Account actions sit directly below each profile's summary. These
-  pages use centered, bounded content widths. Inventory uses searchable item
-  rows and a task sidebar, with separators only between rows. Pricing uses
-  term, description, and purchase columns instead of a four-card grid.
-- Embedded content owns its page heading. Reading pages use a centered content
-  region; legal pages place their contents column to the right of a reading
-  area of up to 65ch, balancing the application's left navigation. FAQ pairs
-  search with answers; support pairs a contact column with feedback and service
-  information. Releases and public announcements pair metadata with prose.
-- `src/pages/v2/workspace-pages.css` applies these layouts through semantic
-  hooks under `.v2-page-section`; shared components keep their standalone
-  layouts. Collapse secondary columns below 80rem, document navigation below
-  60rem, and dense rows below 40rem. Keep containing surfaces padded and leave
-  space between separators and the following text.
+- Supporting pages own their V2 components in `src/pages/v2/pages/`. Share
+  business hooks with V1; compose each workspace around its user's next task.
+  Keep the specialized configuration editor, schedule editor, binding dialog,
+  progress renderer and comparison chart as shared controls.
+- Accounts use a searchable selection index and one account detail region.
+  History separates result records from saved configurations, then exposes
+  actions for the selected record. Inventory uses an item shelf, inspect/use
+  dialogs, and separate task and activity views.
+- Generation separates preparation from execution. Comparison composes the
+  experiment before inspecting candidate results. Cultivation separates
+  conditions from priority, material, calendar and inventory results. Manual
+  scheduling makes account, layout and starting schedule explicit steps.
+- Settings use task navigation and a single visible content region. Pricing
+  selects a term before presenting the chosen entitlement and purchase action.
+  All pages use bounded content widths and the existing V2 tokens.
+- The workspace shell owns page headings. Legal documents place their index
+  to the right of a reading area of up to 65ch. FAQ pairs search with expandable
+  answers; support pairs a contact region with preparation steps. Releases and
+  signed-in announcements use a selection index and reading region.
+- `src/pages/v2/workspace-pages.css` styles V2-owned structure under
+  `.v2-page-section`. Collapse secondary columns below 80rem, selection and
+  document columns below 60rem, and dense controls below 40rem. Retain padded
+  surfaces, keyboard focus, 44px controls, and shared reduced-motion support.
 - Page coverage and verification: [V2 workspace redesign](docs/v2-workspace-redesign.md).
 
 ## CTA voice

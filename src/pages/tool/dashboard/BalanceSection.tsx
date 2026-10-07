@@ -14,8 +14,7 @@ type RedeemResponse = {
   replayed: boolean
 }
 
-export default function BalanceSection({ redemptionEnabled }: { redemptionEnabled: boolean }) {
-  const resolveHref = useInternalHref()
+export function useBalance() {
   const [page, setPage] = useState<BalancePage | null>(null)
   const [cdk, setCdk] = useState('')
   const [pending, setPending] = useState<{ cdk: string; key: string } | null>(null)
@@ -76,6 +75,12 @@ export default function BalanceSection({ redemptionEnabled }: { redemptionEnable
     }
   }
 
+  return { page, cdk, setCdk, setPending, loading, loadingMore, redeeming, error, notice, errorTarget, load, redeem }
+}
+
+export default function BalanceSection({ redemptionEnabled }: { redemptionEnabled: boolean }) {
+  const resolveHref = useInternalHref()
+  const { page, cdk, setCdk, setPending, loading, loadingMore, redeeming, error, notice, errorTarget, load, redeem } = useBalance()
   if (!page) {
     if (loading) return <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.balance.loading}</div>
     return <div className="tool-panel p-6" role="alert">
@@ -160,7 +165,7 @@ function transactionLabel(kind: PublicBalanceTransaction['kind']): string {
   return copy.balance[kind]
 }
 
-function formatPoints(value: string): string {
+export function formatPoints(value: string): string {
   return value.endsWith('.00') ? value.slice(0, -3) : value
 }
 

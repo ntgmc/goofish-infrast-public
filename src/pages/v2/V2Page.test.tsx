@@ -806,12 +806,12 @@ describe('V2 results-first workspace', () => {
     session.activeProfile!.kind = 'free_preview'
     session.activeProfile!.permission = 'growth'
     session.activeProfile!.trial = trial ? {
-      id: 'trial', starts_at: '2026-10-01T00:00:00Z', ends_at: '2026-10-10T00:00:00Z',
+      id: 'trial', starts_at: new Date(Date.now() - 86400000).toISOString(), ends_at: new Date(Date.now() + 30 * 86400000).toISOString(),
       active: true, effective_permission: 'advanced',
     } : null
     const user = userEvent.setup()
     mount()
-    await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
+    await user.click(await screen.findByRole('button', { name: copy.v2.facilities }))
     const dialog = within(await screen.findByRole('dialog'))
     expect(await dialog.findByRole('button', { name: '243 均衡' })).not.toBeDisabled()
     if (trial) expect(dialog.getByRole('switch', { name: /^菲亚梅塔$/ })).not.toBeDisabled()
@@ -984,6 +984,7 @@ describe('V2 feature continuity', () => {
     render(<MotionPreferenceProvider><MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter></MotionPreferenceProvider>)
     await user.click(screen.getByRole('button', { name: copy.v2.settings }))
     expect(await screen.findByLabelText(copy.dashboard.pages_tool_dashboard_SettingsSection_018)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: copy.dashboard.settings.preferences }))
     expect(screen.getByRole('switch', { name: copy.dashboard.animation.reduce })).toBeInTheDocument()
     expect(screen.queryByText(copy.dashboard.workspace_entry.settings_title)).not.toBeInTheDocument()
     expect(screen.getByTestId('route-location')).toHaveTextContent('section=settings')

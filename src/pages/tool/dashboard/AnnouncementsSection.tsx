@@ -7,7 +7,7 @@ import { copy } from '../../../copy/index'
 
 
 
-export default function AnnouncementsSection({ onUnreadCountChange, loadingFallback }: { onUnreadCountChange: (count: number) => void; loadingFallback?: ReactNode }) {
+export function useUserAnnouncements(onUnreadCountChange: (count: number) => void) {
   const [items, setItems] = useState<UserAnnouncementRead[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -54,6 +54,11 @@ export default function AnnouncementsSection({ onUnreadCountChange, loadingFallb
   }
 
   const unreadCount = items.filter((item) => !item.read_at).length
+  return { items, loading, error, markingId, markingAll, load, markRead, unreadCount }
+}
+
+export default function AnnouncementsSection({ onUnreadCountChange, loadingFallback }: { onUnreadCountChange: (count: number) => void; loadingFallback?: ReactNode }) {
+  const { items, loading, error, markingId, markingAll, markRead, unreadCount } = useUserAnnouncements(onUnreadCountChange)
   if (loading && !items.length && loadingFallback) return loadingFallback
 
   return (

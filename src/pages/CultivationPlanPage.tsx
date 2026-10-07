@@ -25,8 +25,7 @@ function StandaloneCultivation() {
   return <CultivationContent session={session} />
 }
 
-function CultivationContent({ session, embedded = false }: { session: ReturnType<typeof useToolSession>; embedded?: boolean }) {
-  const ContentRoot = embedded ? 'div' : 'main'
+export function useCultivation(session: ReturnType<typeof useToolSession>) {
   const profiles = session.profiles.filter((row) => row.status === 'active' && !row.archived_at && row.skland_binding)
   const [chosenProfile, setChosenProfile] = useState('')
   const profileId = profiles.some((row) => row.id === chosenProfile) ? chosenProfile : profiles.find((row) => row.id === session.activeProfile?.id)?.id ?? profiles[0]?.id ?? ''
@@ -97,6 +96,14 @@ function CultivationContent({ session, embedded = false }: { session: ReturnType
     setPotionNumbers(Object.fromEntries(Object.entries(next.potions).map(([key, value]) => [key, String(value)])))
   }
 
+  return { profiles, profileId, setChosenProfile, data, busy, error, options, setOptions, appliedOptions,
+    numbers, setNumbers, potionNumbers, setPotionNumbers, plan, load, exclude, changed, apply }
+}
+
+function CultivationContent({ session, embedded = false }: { session: ReturnType<typeof useToolSession>; embedded?: boolean }) {
+  const ContentRoot = embedded ? 'div' : 'main'
+  const { profiles, profileId, setChosenProfile, data, busy, error, options, setOptions, appliedOptions,
+    numbers, setNumbers, potionNumbers, setPotionNumbers, plan, load, exclude, changed, apply } = useCultivation(session)
   const field = (key: 'dailySanity' | 'days' | 'limit', title: string, min: number, max: number) => <label className="block space-y-2 text-sm">
     <span>{title}</span><input type="number" min={min} max={max} className="tool-field" value={numbers[key]} onChange={(event) => setNumbers((prior) => ({ ...prior, [key]: event.target.value }))} />
   </label>

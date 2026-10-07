@@ -7,8 +7,7 @@ import ThemeSwitcher from '../components/ThemeSwitcher'
 import { copy, CURRENT_LOCALE } from '../copy/index'
 
 
-export default function AnnouncementsPage({ embedded = false }: { embedded?: boolean } = {}) {
-  const PageRoot = embedded ? 'section' : 'main'
+export function usePublicAnnouncements() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +33,12 @@ export default function AnnouncementsPage({ embedded = false }: { embedded?: boo
     }
   }, [])
 
+  return { announcements, loading, error }
+}
+
+export default function AnnouncementsPage({ embedded = false }: { embedded?: boolean } = {}) {
+  const PageRoot = embedded ? 'section' : 'main'
+  const { announcements, loading, error } = usePublicAnnouncements()
   return (
     <PageRoot className={embedded ? 'v2-embedded-tool' : 'tool-page'} tabIndex={-1} data-route-focus>
       <div className={embedded ? undefined : 'public-document'}>

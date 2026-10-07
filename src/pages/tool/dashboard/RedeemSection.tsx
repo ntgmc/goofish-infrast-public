@@ -15,7 +15,9 @@ type CdkRedeemResponse =
   | { redemption_type: 'profile'; auth: AuthSuccessResponse }
   | { redemption_type: 'inventory'; item: { code: string; name: string; quantity: 1; expires_at: string | null } }
 
-export default function RedeemSection({ onRedeemed, onInventoryRedeemed, tourReplayToken = 0, autoStartTour = true, preferPreview = false }: { onRedeemed: (payload: AuthSuccessResponse) => void; onInventoryRedeemed?: (itemName: string) => void; tourReplayToken?: number; autoStartTour?: boolean; preferPreview?: boolean }) {
+type RedeemProps = { onRedeemed: (payload: AuthSuccessResponse) => void; onInventoryRedeemed?: (itemName: string) => void; tourReplayToken?: number; autoStartTour?: boolean; preferPreview?: boolean }
+
+export function useAccountRedemption({ onRedeemed, onInventoryRedeemed, tourReplayToken = 0, autoStartTour = true, preferPreview = false }: RedeemProps) {
   const { features } = useSiteFeatures()
   const [mode, setMode] = useState<AddAccountMode>(() => preferPreview && features.free_preview ? 'preview' : features.cdk_redemption ? 'cdk' : 'preview')
   const [cdk, setCdk] = useState('')
@@ -89,6 +91,13 @@ export default function RedeemSection({ onRedeemed, onInventoryRedeemed, tourRep
     onRedeemed(payload)
   }
 
+  return { features, mode, setMode, cdk, setCdk, displayName, setDisplayName, note, setNote, loading, error, setError,
+    claimDialogOpen, setClaimDialogOpen, submit, handleClaimPayload, declarationDialog, redeemTour, redeemTourDefinition }
+}
+
+export default function RedeemSection(props: RedeemProps) {
+  const { features, mode, setMode, cdk, setCdk, displayName, setDisplayName, note, setNote, loading, error, setError,
+    claimDialogOpen, setClaimDialogOpen, submit, handleClaimPayload, declarationDialog, redeemTour, redeemTourDefinition } = useAccountRedemption(props)
   return (
     <>
       <form onSubmit={submit} className="workspace-redemption tool-panel max-w-2xl p-6" data-tour-target={mode === 'preview' ? 'dashboard-redeem-preview' : undefined}>

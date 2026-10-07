@@ -14,7 +14,7 @@ import { useSiteFeatures } from '../lib/site-feature-context'
 
 export type PublicInfoPageKind = 'faq' | 'support' | 'privacy' | 'terms' | 'disclaimer'
 
-const EFFECTIVE_DATE = copy.public.pages_PublicInfoPage_001
+export const EFFECTIVE_DATE = copy.public.pages_PublicInfoPage_001
 
 type LegalSection = {
   id: string
@@ -23,7 +23,7 @@ type LegalSection = {
   items?: readonly string[]
 }
 
-const legalContent: Record<Exclude<PublicInfoPageKind, 'faq' | 'support'>, readonly LegalSection[]> = {
+export const legalContent: Record<Exclude<PublicInfoPageKind, 'faq' | 'support'>, readonly LegalSection[]> = {
   privacy: [
     {
       id: 'processed-information',
@@ -118,7 +118,7 @@ const legalContent: Record<Exclude<PublicInfoPageKind, 'faq' | 'support'>, reado
   ],
 }
 
-const pageMeta: Record<PublicInfoPageKind, { title: string; eyebrow: string; intro: string }> = {
+export const pageMeta: Record<PublicInfoPageKind, { title: string; eyebrow: string; intro: string }> = {
   faq: { title: copy.public.pages_PublicInfoPage_043, eyebrow: copy.public.pages_PublicInfoPage_044, intro: copy.public.pages_PublicInfoPage_045 },
   support: { title: copy.public.pages_PublicInfoPage_046, eyebrow: copy.public.pages_PublicInfoPage_047, intro: copy.public.pages_PublicInfoPage_048 },
   privacy: { title: copy.public.pages_PublicInfoPage_049, eyebrow: copy.public.pages_PublicInfoPage_050, intro: copy.public.pages_PublicInfoPage_051 },
