@@ -379,6 +379,24 @@ describe('ConfigEditor shift patterns', () => {
 })
 
 describe('ConfigEditor inventory product balance', () => {
+  it.each(['efficiency', 'inventory_balance'])('preserves %s after editing stock and applying a preset', async (strategy) => {
+    const config = normalizeConfig(CONFIG_PRESETS['243'])
+    const onUpdate = (mutate: (next: typeof config) => void) => mutate(config)
+    const view = render(<ConfigEditor config={config} canEdit validation={{ ok: true }} onUpdate={onUpdate} />)
+    const selector = screen.getByRole('combobox', { name: '无人机自动模式' })
+    expect(within(selector).getAllByRole('option').map((option) => option.textContent)).toEqual(['效率优先', '库存平衡优先'])
+    await userEvent.selectOptions(selector, strategy)
+    const inventory = within(screen.getByText('中间产物库存').parentElement!)
+    await userEvent.clear(inventory.getByRole('spinbutton', { name: '赤金' }))
+    await userEvent.type(inventory.getByRole('spinbutton', { name: '赤金' }), '100')
+    expect(config.drones?.auto_strategy).toBe(strategy)
+    await userEvent.click(screen.getByRole('button', { name: '243 搓玉' }))
+    expect(config.drones?.auto_strategy).toBe(strategy)
+    expect(config.drones?.auto_target_product).toBeUndefined()
+    view.rerender(<ConfigEditor config={config} canEdit validation={{ ok: true }} onUpdate={onUpdate} />)
+    expect(screen.getByRole('combobox', { name: '无人机自动模式' })).toHaveValue(strategy)
+  })
+
   it.each([true, false])('preserves an explicit balance choice through stock updates and preset changes with canEdit=%s', async (canEdit) => {
     const user = userEvent.setup()
     let latest = normalizeConfig({

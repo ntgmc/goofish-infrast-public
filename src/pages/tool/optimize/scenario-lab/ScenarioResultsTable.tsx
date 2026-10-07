@@ -183,7 +183,8 @@ function scheduleLabel(point: ScenarioComparisonPoint): string {
 function droneLabel(value: ScenarioComparisonPoint['droneStrategy']): string {
   return ({
     off: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_040,
-    auto: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_041,
+    auto: copy.common.droneAutoEfficiency,
+    inventory_balance: copy.common.droneAutoInventoryBalance,
     lmd: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_042,
     orundum: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_043,
     pure_gold: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_044,

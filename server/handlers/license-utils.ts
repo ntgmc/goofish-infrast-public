@@ -17,7 +17,7 @@ import {
 } from '../../src/lib/product-catalog'
 import { createPostgresCdkRecordStore } from '../storage/cdk-store'
 import { licenseConfigSchema, licenseOperatorsSchema } from '../../src/lib/workspace-validation'
-import { isFullBlood252Config, isRightFull252Config, parseShiftHours } from '../../src/lib/config'
+import { isFullBlood252Config, isRightFull252Config, normalizeDroneAutoStrategy, parseShiftHours } from '../../src/lib/config'
 import {
   createPostgresRiskControlSettingsStore,
   DEFAULT_RISK_CONTROL_SETTINGS,
@@ -521,12 +521,17 @@ function resolvePresetMode(config: LicenseConfig, preset: LicenseConfig): Licens
   resolved.allow_product_rebalance = config.allow_product_rebalance
   if (resolved.layout === '2-5-2') resolved.facility_layout = config.facility_layout?.slice()
   resolved.dormitory_rule = normalizeDormitoryRule(config.dormitory_rule)
+  resolved.drones!.auto_strategy = normalizeDroneAutoStrategy(config.drones?.auto_strategy)
   if (normalizeScheduleMode(config.schedule_mode) === 'rotation') {
     resolved.schedule_mode = 'rotation'
   } else if (isIntermediateAutoConfig(config)) {
     resolved.intermediate_inventory = config.intermediate_inventory
     resolved.auto_balance_source = config.auto_balance_source
     resolved.drones = cloneConfig(config).drones
+    if (resolved.drones) {
+      resolved.drones.auto_strategy = normalizeDroneAutoStrategy(resolved.drones.auto_strategy)
+      delete resolved.drones.auto_target_product
+    }
   }
   return resolved
 }
@@ -537,6 +542,7 @@ function resolveFreePreviewPresetMode(config: LicenseConfig, preset: LicenseConf
   if (resolved.layout === '2-5-2') resolved.facility_layout = config.facility_layout?.slice()
   resolved.dormitory_rule = normalizeDormitoryRule(config.dormitory_rule)
   delete resolved.optimizer_search
+  resolved.drones!.auto_strategy = normalizeDroneAutoStrategy(config.drones?.auto_strategy)
   if (normalizeScheduleMode(config.schedule_mode) === 'rotation') {
     resolved.schedule_mode = 'rotation'
   } else if (isIntermediateAutoConfig(config)) {
@@ -546,7 +552,7 @@ function resolveFreePreviewPresetMode(config: LicenseConfig, preset: LicenseConf
       ...(resolved.drones ?? { order: 'pre', targets: [] }),
       enable: true,
       auto: true,
-      auto_strategy: 'trading_priority',
+      auto_strategy: normalizeDroneAutoStrategy(config.drones?.auto_strategy),
       order: resolved.drones?.order ?? 'pre',
       targets: Array.isArray(resolved.drones?.targets) ? resolved.drones.targets : [],
     }
@@ -563,6 +569,7 @@ function hasForbiddenFreePreviewDroneConfig(config: LicenseConfig): boolean {
   const target = typeof drones.auto_target_product === 'string' ? drones.auto_target_product : ''
   if (target) return true
   if (!strategy) return false
+  if (drones.auto && ['efficiency', 'inventory_balance'].includes(strategy)) return false
   return !(isIntermediateAutoConfig(config) && strategy === 'trading_priority')
 }
 

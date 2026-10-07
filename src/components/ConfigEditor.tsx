@@ -8,6 +8,7 @@ import {
   isValidShiftHours,
   isVariableShiftScheduleEnabled,
   normalizeConfig,
+  normalizeDroneAutoStrategy,
   normalizeDormitoryRule,
   normalizeScheduleMode,
   parseShiftHours,
@@ -216,25 +217,16 @@ function bindAutoDrones(config: LicenseConfig): void {
     ...(config.drones ?? { order: 'pre', targets: [] }),
     enable: true,
     auto: true,
-    auto_strategy: config.drones?.auto_strategy ?? 'trading_priority',
-    auto_target_product: config.drones?.auto_target_product,
+    auto_strategy: normalizeDroneAutoStrategy(config.drones?.auto_strategy),
     order: config.drones?.order ?? 'pre',
     targets: Array.isArray(config.drones?.targets) ? config.drones.targets : [],
   }
-}
-
-function setAutoDroneTradingPriority(config: LicenseConfig): void {
-  bindAutoDrones(config)
-  config.drones = {
-    ...config.drones!,
-    auto_strategy: 'trading_priority',
-    auto_target_product: undefined,
-  }
+  delete config.drones.auto_target_product
 }
 
 function markIntermediateInventoryForOptimizer(config: LicenseConfig): void {
   config.auto_balance_source = 'intermediate_inventory'
-  setAutoDroneTradingPriority(config)
+  bindAutoDrones(config)
 }
 
 interface ConfigEditorProps {
@@ -304,7 +296,9 @@ export default function ConfigEditor({
         next.allow_product_rebalance !== undefined ||
         next.auto_balance_source === 'intermediate_inventory' ||
         next.auto_balance_source === 'limited_config'
+      const droneStrategy = normalizeDroneAutoStrategy(next.drones?.auto_strategy)
       const copy = normalizeConfig(preset)
+      copy.drones!.auto_strategy = droneStrategy
       delete next.trading_station_levels
       delete next.manufacturing_station_levels
       delete next.facility_layout
@@ -812,6 +806,31 @@ export default function ConfigEditor({
                   })}
                 />
               </label>
+              {config.drones?.auto && (
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-ink-muted" htmlFor="drone-auto-strategy">
+                    {copy.common.droneAutoStrategyLabel}</label>
+                  <select
+                    id="drone-auto-strategy"
+                    value={normalizeDroneAutoStrategy(config.drones.auto_strategy)}
+                    disabled={!canEdit || rotationMode || !config.drones.enable}
+                    onChange={(event) => onUpdate((next) => {
+                      bindAutoDrones(next)
+                      next.drones!.auto_strategy = event.currentTarget.value
+                      applyCounts(next)
+                    })}
+                    className="tool-field disabled:text-ink-muted"
+                  >
+                    <option value="efficiency">{copy.common.droneAutoEfficiency}</option>
+                    <option value="inventory_balance">{copy.common.droneAutoInventoryBalance}</option>
+                  </select>
+                  <p className="mt-2 text-xs leading-5 text-ink-muted">
+                    {normalizeDroneAutoStrategy(config.drones.auto_strategy) === 'inventory_balance'
+                      ? copy.common.droneAutoInventoryBalanceHelp
+                      : copy.common.droneAutoEfficiencyHelp}
+                  </p>
+                </div>
+              )}
               <div className="grid min-w-0 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
                 <div>
                   <label className="mb-2 block text-xs font-medium text-ink-muted" htmlFor="drone-order">

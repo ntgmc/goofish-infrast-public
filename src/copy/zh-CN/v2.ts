@@ -132,6 +132,8 @@ export const v2Copy = {
   sustainableOrundum: '可持续合成玉产量',
   shortTermOrundum: '短期合成玉产量',
   inventoryDepletion: '库存预计耗尽时间',
+  goldNetChange: '赤金净变动',
+  intermediateInventory: '中间产物库存',
   daysUnit: '天',
   orirockUnit: '个 / 天',
   orundumUnit: '合成玉 / 天',

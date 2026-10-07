@@ -1,16 +1,17 @@
+import type { ReactNode } from 'react'
 import { copy } from '../../copy'
 import { inventoryDepletionWarnings } from '../../lib/inventory-warnings'
 import type { OptimizeResult } from '../../lib/types'
 import { formatAmount } from './formatters'
 import { PRODUCT_LABELS } from './labels'
 
-export default function InventoryDepletionWarning({ result }: { result: OptimizeResult }) {
+export default function InventoryDepletionWarning({ result, className = '', action }: { result: OptimizeResult; className?: string; action?: ReactNode }) {
   const warnings = result.inventory_warnings ?? inventoryDepletionWarnings(result.intermediate_depletion)
   if (warnings.length === 0) return null
   const text = copy.domain.inventory_warning
 
   return (
-    <div className="tool-alert tool-alert--warning p-4 text-sm leading-6" role="alert">
+    <div className={`tool-alert tool-alert--warning p-4 text-sm leading-6 ${className}`} role="alert">
       <p className="font-semibold">{text.title}</p>
       <ul className="mt-1 space-y-1">
         {warnings.map(({ product, days_remaining: days }) => (
@@ -22,6 +23,7 @@ export default function InventoryDepletionWarning({ result }: { result: Optimize
         ))}
       </ul>
       <p className="mt-2">{text.action}</p>
+      {action}
     </div>
   )
 }

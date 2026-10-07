@@ -97,7 +97,7 @@ const free243OrundumInventoryConfig = {
   },
   intermediate_inventory: { 'Pure Gold': 123, 'Originium Shard': 45 },
   auto_balance_source: 'intermediate_inventory',
-  drones: { enable: true, auto: true, auto_strategy: 'trading_priority' },
+  drones: { enable: true, auto: true, auto_strategy: 'inventory_balance' },
 }
 
 const sampleOperators = [
@@ -240,7 +240,7 @@ async function assertOrirockInventoryPersistence() {
     ...sampleConfig,
     intermediate_inventory: { 'Pure Gold': 123, 'Originium Shard': 45, 'Orirock Cube': 7658 },
     auto_balance_source: 'intermediate_inventory',
-    drones: { ...sampleConfig.drones, auto_strategy: 'trading_priority' },
+    drones: { ...sampleConfig.drones, auto_strategy: 'inventory_balance' },
   }
   const savedWorkspace = await call(workspaceHandler, '/api/user/workspace', {
     profile_id: 'profile-1',
@@ -1427,13 +1427,13 @@ function memoryLicenseUtilsModule() {
         && drone.auto === true
         && (drone.order ?? 'pre') === 'pre'
         && JSON.stringify(drone.targets ?? []) === JSON.stringify(['LMD', 'Pure Gold', 'LMD'])
-        && !drone.auto_strategy
+        && (!drone.auto_strategy || ['efficiency', 'inventory_balance'].includes(drone.auto_strategy))
         && !drone.auto_target_product
       const inventoryAssist = config.auto_balance_source === 'intermediate_inventory'
         && config.intermediate_inventory
         && drone.enable === true
         && drone.auto === true
-        && drone.auto_strategy === 'trading_priority'
+        && ['efficiency', 'inventory_balance', 'trading_priority'].includes(drone.auto_strategy)
         && !drone.auto_target_product
       return !(presetDrone || inventoryAssist)
     }

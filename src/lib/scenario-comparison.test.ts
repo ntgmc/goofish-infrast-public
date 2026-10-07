@@ -10,6 +10,7 @@ import {
   type ScenarioProductionPlan,
 } from './scenario-comparison'
 import { CONFIG_PRESETS } from './config'
+import { scenarioComparisonFactorsSchema } from './scenario-comparison-validation'
 
 const balancedPlan: ScenarioProductionPlan = {
   trading: { lmd: 2, orundum: 0 },
@@ -25,7 +26,7 @@ const baseFactors: ScenarioComparisonFactors = {
   layouts: [{ layout: '243', plans: [balancedPlan] }],
   maaSchedules: ['variable', '8x3'],
   includeRotation: true,
-  droneStrategies: ['off', 'auto', 'lmd', 'orundum', 'pure_gold', 'battle_record', 'originium_shard'],
+  droneStrategies: ['off', 'auto', 'inventory_balance', 'lmd', 'orundum', 'pure_gold', 'battle_record', 'originium_shard'],
 }
 
 describe('expandScenarioComparison', () => {
@@ -36,9 +37,12 @@ describe('expandScenarioComparison', () => {
       allow_product_rebalance: true,
       auto_balance_source: 'intermediate_inventory',
     }
-    const result = expandScenarioComparison(base, baseFactors)
-    expect(result.scenarios).toHaveLength(11)
-    expect(result.variableScenarioCount).toBe(5)
+    const result = expandScenarioComparison(base, scenarioComparisonFactorsSchema.parse(baseFactors))
+    expect(result.scenarios).toHaveLength(13)
+    expect(result.variableScenarioCount).toBe(6)
+    for (const scenario of result.scenarios.filter((item) => item.config.drones?.auto)) {
+      expect(scenario.config.drones?.auto_strategy).toBe(scenario.droneStrategy === 'auto' ? 'efficiency' : 'inventory_balance')
+    }
     for (const scenario of result.scenarios) {
       expect(scenario.config.allow_product_rebalance).toBeUndefined()
       expect(scenario.config.auto_balance_source).toBeUndefined()
@@ -81,8 +85,8 @@ describe('expandScenarioComparison', () => {
       maaSchedules: ['8x3'],
       includeRotation: false,
     })
-    expect(result.rawCombinationCount).toBe(7)
-    expect(result.scenarios.map((item) => item.droneStrategy)).toEqual(['off', 'auto', 'lmd', 'pure_gold', 'battle_record'])
+    expect(result.rawCombinationCount).toBe(8)
+    expect(result.scenarios.map((item) => item.droneStrategy)).toEqual(['off', 'auto', 'inventory_balance', 'lmd', 'pure_gold', 'battle_record'])
     expect(result.skipped).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'missing_product', droneStrategy: 'orundum', count: 1 }),
       expect.objectContaining({ code: 'missing_product', droneStrategy: 'originium_shard', count: 1 }),

@@ -1,5 +1,10 @@
 export const commonCopy = {
   configGenerationReadOnly: "排班生成期间，基建配置为只读。生成结束后可继续修改。",
+  droneAutoStrategyLabel: "无人机自动模式",
+  droneAutoEfficiency: "效率优先",
+  droneAutoInventoryBalance: "库存平衡优先",
+  droneAutoEfficiencyHelp: "选择增产收益最高的设施加速。",
+  droneAutoInventoryBalanceHelp: "结合赤金、源石碎片和固源岩库存，优先缓解生产与消耗的缺口。",
   inventoryProductRebalanceLabel: "允许库存自动平衡调整产物数量",
   inventoryProductRebalanceHelp: "开启后，库存不足时可调整赤金或源石碎片制造站数量。关闭后保持所选数量，结果会提示库存耗尽风险。",
   inventoryProductRebalanceRotation: "游戏内轮换保持固定产物数量，不自动调整。",
@@ -640,16 +645,6 @@ export const commonCopy = {
   lib_workspace_history_030: "未设置",
   // src/lib/workspace-history.ts
   lib_workspace_history_031: "自定义顺序",
-  // src/lib/workspace-history.ts
-  lib_workspace_history_032: "默认策略",
-  // src/lib/workspace-history.ts
-  lib_workspace_history_033: "贸易站优先",
-  // src/lib/workspace-history.ts
-  lib_workspace_history_034: "制造站优先：",
-  // src/lib/workspace-history.ts
-  lib_workspace_history_035: "制造站优先",
-  // src/lib/workspace-history.ts
-  lib_workspace_history_036: "自定义策略",
   // src/lib/workspace-history.ts
   lib_workspace_history_037: "未启用",
   // src/lib/workspace-history.ts
