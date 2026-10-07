@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
 import { useAppReducedMotion } from '../../lib/motion-preference'
 import { Activity, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, CalendarClock, Check, ChevronDown, ChevronRight, Download, Factory, FileClock, Gem, LayoutDashboard, Menu, RefreshCw, ScrollText, Settings2, ShieldCheck, Sparkles, Users, WalletCards, X, Zap } from 'lucide-react'
@@ -7,7 +7,7 @@ import Link from '../../components/InternalLink'
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
 import { AnimatedValue, MotionNavIndicator, RevealItem, StaggeredReveal, motionTokens } from '../../components/MotionPrimitives'
-import { formatAmount, prepareResult } from '../../components/result-panel/formatters'
+import { formatAmount, formatIntermediateDepletionSummary, formatSigned, prepareResult } from '../../components/result-panel/formatters'
 import { PRODUCT_LABELS } from '../../components/result-panel/labels'
 import InventoryDepletionWarning from '../../components/result-panel/InventoryDepletionWarning'
 import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
@@ -31,19 +31,19 @@ import TradingIcon from './TradingIcon'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import ProfileExpiryPrompt from '../tool/ProfileExpiryPrompt'
-import { useWorkspaceEntryPreference, WorkspaceEntryPrompt } from '../tool/WorkspaceEntryPreference'
 
 const text = copy.v2
 type View = 'schedule' | 'analysis' | 'manual' | 'training'
 const ManualScheduleEditor = lazy(() => import('../../components/result-panel/ManualScheduleEditor'))
 const UpgradeSuggestions = lazy(() => import('../../components/UpgradeSuggestions'))
 
-export default function V2Dashboard({ session, workflow, taskCenterAction, result, operators, config, sample, configChanged, onUpdateConfig,
+export default function V2Dashboard({ session, workflow, taskCenterAction, generationProgress, result, operators, config, sample, configChanged, onUpdateConfig,
   onImportOperators, onGenerate, onExport, busy = false, loadingResult = false, generationDisabledReason, onRetryResult, error, notice,
   permission, onManualDirtyChange, canEditConfig = true, canViewAnalysis = true, canUseIntermediateConfig = true, children }: {
   session: V2Session
   workflow?: V2Workflow
   taskCenterAction?: ReactNode
+  generationProgress?: ReactNode
   result: OptimizeResult
   operators: LicenseOperator[]
   config: LicenseConfig
@@ -70,8 +70,6 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const section = v2Section(params)
-  const workspacePath = useCallback((profileId: string) => v2Path('overview', profileId), [])
-  const workspaceEntry = useWorkspaceEntryPreference(session.user?.id ?? null, session.cdkProfiles, session.activeProfile, session.authStatus === 'authenticated', features.profiles, workspacePath, section === 'profiles')
   const [navigationError, setNavigationError] = useState<string | null>(null)
   const [manualOpened, setManualOpened] = useState(false)
   const [manualDirty, setManualDirty] = useState(false)
@@ -102,6 +100,8 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
   const sustainablePullsNote = orundumEconomy
     ? text.sustainablePullsHint(formatAmount(orundumEconomy.sustainable_orundum))
     : text.sustainableOrundumUnavailable
+  const hasGoldNet = Number.isFinite(result.daily_production?.net?.['Pure Gold'])
+  const inventorySummary = resultMode !== 'rotation' ? formatIntermediateDepletionSummary(prepared.intermediateDepletion) : ''
   const inventoryBurstNote = orundumEconomy?.case === 'inventory_burst' && orundumEconomy.inventory_depletion_days !== null
     ? text.inventoryBurstHint(formatAmount(orundumEconomy.inventory_depletion_days))
     : ''
@@ -131,9 +131,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
     if (busy || session.openingProfileId || ((manualDirty || toolDirty) && !window.confirm(text.discardManual))) return
     if (!await session.flushConfigSave()) { setNavigationError(text.saveFailed); return }
     try {
-      const openedAt = Date.now()
       await session.refreshProfileWorkspace(profile)
-      workspaceEntry.recordOpen(profile, openedAt)
       setManualDirty(false)
       setToolDirty(false)
       setPanel(null)
@@ -155,6 +153,13 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
     if ((manualDirty || toolDirty) && !window.confirm(text.discardManual)) return
     if (!await session.flushConfigSave()) { setNavigationError(text.saveFailed); return }
     await session.handleLogout()
+  }
+  async function openLegacy(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    event.preventDefault()
+    if ((manualDirty || toolDirty) && !window.confirm(text.discardManual)) return
+    if (!await session.flushConfigSave()) { setNavigationError(text.saveFailed); return }
+    void navigate('/v1')
   }
   const guardedSession = { ...session, handleLogout: logout }
   function closePanel() {
@@ -204,7 +209,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
         <header className="v2-topbar">
           <div className="v2-breadcrumb"><button className="v2-menu-button v2-icon-button" type="button" onClick={() => setMobileNavigation(true)} aria-label={text.menu}><Menu size={21} /></button>
             <span>{text.workspace}</span><ChevronRight size={14} /><strong>{sectionLabels[section]}</strong></div>
-          <div className="v2-topbar-actions"><span className="v2-sample-pill"><span />{text.testVersion}</span>
+          <div className="v2-topbar-actions"><Link to="/v1" className="v2-sample-pill" onClick={openLegacy} aria-label={`${text.testVersion} · ${text.legacyEntry}`} title={text.legacyEntry}><span />{text.testVersion}</Link>
             {features.changelog && <Link to={v2Path('updates', session.activeProfile?.id)} className="v2-icon-button" aria-label={text.updates}><ScrollText size={19} /></Link>}
             <div className="v2-feature-content">{taskCenterAction}</div>
             <div className="v2-feature-content"><ThemeSwitcher iconOnly /></div>
@@ -217,9 +222,10 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
           {navigationError && <p className="v2-feedback v2-feedback-error" role="alert">{navigationError}<button type="button" onClick={() => { session.retryConfigSave(); setNavigationError(null) }}>{text.loginRetry}</button></p>}
           <AnnouncementBanner announcement={session.banner} />
           <V2PageTransition motionKey={section} className="v2-page-transition">{(displayedSection) => <>
-          <WorkspaceSections section={displayedSection} session={guardedSession} workflow={workflow} workspaceEntry={workspaceEntry} onAccountAdded={accountAdded} onToolDirtyChange={setToolDirty} onOpenProfile={(profile) => openProfile(profile, section === 'manual-tool' ? 'manual-tool' : 'overview')} onNavigate={navigateSection} onConfig={() => openPanel('config')} generationDisabledReason={generationDisabledReason} />
+          <WorkspaceSections section={displayedSection} session={guardedSession} workflow={workflow} generationProgress={generationProgress} onAccountAdded={accountAdded} onToolDirtyChange={setToolDirty} onOpenProfile={(profile) => openProfile(profile, section === 'manual-tool' ? 'manual-tool' : 'overview')} onNavigate={navigateSection} onConfig={() => openPanel('config')} generationDisabledReason={generationDisabledReason} />
           <div hidden={displayedSection !== 'overview'}>
           <div className="v2-page-title"><h1>{text.title}</h1></div>
+          <InventoryDepletionWarning result={result} className="v2-inventory-warning" action={<button type="button" className="v2-button v2-button-secondary" onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" />{text.configure}</button>} />
           <div className="v2-ready-banner">
             <span className="v2-ready-icon"><Check size={25} strokeWidth={2} /></span>
             <div><h2>{text.resultReady}<span className="v2-ready-tag">{sample ? text.sample : SCHEDULE_MODE_LABELS[resultMode]}</span></h2></div>
@@ -236,8 +242,8 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
             {error && onRetryResult && <button type="button" onClick={onRetryResult}>{text.retry}</button>}
           </div></FeedbackRegion>}
           </AnimatePresence>
+          {generationProgress}
           {children}
-          <InventoryDepletionWarning result={result} />
           <StaggeredReveal className="v2-metrics">
             <Metric label={text.lmd} value={formatAmount(prepared.productionStats.lmd)} unit={text.daily} product="LMD" />
             <Metric label={showOrundum ? text.orundum : text.exp} value={formatAmount(showOrundum ? shortTermOrundum : battleRecords * 1000)}
@@ -264,7 +270,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
           </div>
           <V2Transition motionKey={view}>
           <div hidden={view === 'manual'} className={`v2-results-grid ${view !== 'schedule' || expanded ? 'v2-results-expanded' : ''}`}>
-            {view === 'training' ? <section className="v2-panel v2-feature-content v2-section-loading"><Suspense fallback={<p role="status">{text.loading}</p>}><UpgradeSuggestionStatusNotice result={result} /><UpgradeSuggestions suggestions={workflow?.suggestions ?? []} embedded /></Suspense></section> : view === 'analysis' ? (
+            {view === 'training' ? <section className="v2-panel v2-feature-content v2-training-workspace v2-section-loading"><Suspense fallback={<p role="status">{text.loading}</p>}><UpgradeSuggestionStatusNotice result={result} /><UpgradeSuggestions suggestions={workflow?.suggestions ?? []} embedded /></Suspense></section> : view === 'analysis' ? (
               <section className="v2-panel v2-analysis"><div className="v2-panel-heading"><h2>{text.analysisTab}</h2><span className="v2-neutral-tag">24h</span></div>{canViewAnalysis
                 ? <IncomeAnalysis result={result} prepared={prepared} />
                 : <div className="v2-analysis-note"><ShieldCheck size={21} /><div><p>{text.previewAnalysis}</p>{features.pricing && <Link className="v2-text-button" to="/pricing">{text.comparePlans}<ArrowRight size={14} /></Link>}</div></div>}</section>
@@ -283,6 +289,10 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
                   return value !== 0 ? <OutputRow key={product} product={product} value={value} /> : null
                 })}
               </section>
+              {(hasGoldNet || inventorySummary) && <dl className="v2-inventory-summary" aria-label={text.intermediateInventory}>
+                {hasGoldNet && <div className="v2-inventory-net"><dt>{text.goldNetChange}</dt><dd data-decreasing={prepared.productionStats.goldNet < 0}><strong>{formatSigned(prepared.productionStats.goldNet)}</strong><span>{text.daily}</span></dd></div>}
+                {inventorySummary && <div><dt>{text.intermediateInventory}</dt><dd>{inventorySummary}</dd></div>}
+              </dl>}
               <section className="v2-panel v2-config-panel">
                 <div className="v2-panel-heading"><h2>{text.currentConfig}</h2><button className="v2-text-button" type="button" onClick={() => openPanel('config')}>{text.edit}<ArrowUpRight size={13} /></button></div>
                 <div className="v2-layout-preview">
@@ -316,7 +326,6 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
         if (profile.id !== session.activeProfile?.id) { try { await session.refreshProfileWorkspace(profile) } catch { return } }
         void navigate(v2Path('plans', profile.id))
       })() }} />}
-      {section === 'profiles' && <div className="v2-feature-content"><WorkspaceEntryPrompt entry={workspaceEntry} /></div>}
       {features.announcements && <AnnouncementPopup announcements={session.popups ?? []} userId={session.user?.id} onUnreadCountChange={session.setAnnouncementUnreadCount} announcementsPath={v2Path('announcements', session.activeProfile?.id)} />}
     </div>
     </LayoutGroup>

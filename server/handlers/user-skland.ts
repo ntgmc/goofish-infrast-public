@@ -2,6 +2,7 @@ import { createHash, createHmac, randomUUID } from 'node:crypto'
 import QRCode from 'qrcode'
 import type { PoolClient } from 'pg'
 import type { AuthSuccessResponse, LicenseConfig, SklandCredentialInvalidReason } from '../../src/lib/types'
+import { normalizeDroneAutoStrategy } from '../../src/lib/config'
 import {
   emptyWorkspace,
   deleteFreePreviewPendingClaim,
@@ -1320,6 +1321,7 @@ async function confirmFreePreviewClaim(
     const existing = await client.query<{ record_json: UserGameAccountRecord }>(
       `select record_json from user_game_accounts
         where user_id = $1 and kind = 'free_preview'
+          and nullif(record_json->>'merged_into_profile_id', '') is null
         order by created_at asc
         for update`,
       [user.id],
@@ -1680,7 +1682,7 @@ function applyIntermediateInventoryToConfig(config: LicenseConfig, inventory: In
     ...(config.drones ?? { order: 'pre', targets: [] }),
     enable: true,
     auto: true,
-    auto_strategy: 'trading_priority',
+    auto_strategy: normalizeDroneAutoStrategy(config.drones?.auto_strategy ?? 'inventory_balance'),
     auto_target_product: undefined,
     order: config.drones?.order ?? 'pre',
     targets: Array.isArray(config.drones?.targets) ? config.drones.targets : [],

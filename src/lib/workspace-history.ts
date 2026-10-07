@@ -1,5 +1,6 @@
 import type { LicenseConfig, OptimizeResult, WorkspaceResultHistorySummary } from './types'
 import { copy, CURRENT_LOCALE } from '../copy/index'
+import { normalizeDroneAutoStrategy } from './config'
 
 
 export interface ConfigDiffItem {
@@ -115,14 +116,9 @@ function formatDroneOrder(order: string | undefined): string {
 }
 
 function formatDroneAutoStrategy(config: LicenseConfig): string {
-  const strategy = config.drones?.auto_strategy
-  if (!strategy) return copy.common.lib_workspace_history_032
-  if (strategy === 'trading_priority') return copy.common.lib_workspace_history_033
-  if (strategy === 'manufacture_product') {
-    const target = config.drones?.auto_target_product
-    return target ? `${copy.common.lib_workspace_history_034}${formatProduct(target)}` : copy.common.lib_workspace_history_035
-  }
-  return copy.common.lib_workspace_history_036
+  return normalizeDroneAutoStrategy(config.drones?.auto_strategy) === 'inventory_balance'
+    ? copy.common.droneAutoInventoryBalance
+    : copy.common.droneAutoEfficiency
 }
 
 function formatDrones(config: LicenseConfig): string {

@@ -63,11 +63,13 @@ afterEach(() => {
 })
 
 function RouteLocation() {
-  return <span data-testid="route-location">{useLocation().search}</span>
+  const location = useLocation()
+  return <span data-testid="route-location" data-pathname={location.pathname}>{location.search}</span>
 }
 
 function mount(path = '/v2') {
-  return render(<MemoryRouter initialEntries={[path]}><V2Page /><RouteLocation /></MemoryRouter>)
+  window.localStorage.setItem('maatool-reduce-motion', 'true')
+  return render(<MemoryRouter initialEntries={[path]}><V2Page /><RouteLocation /></MemoryRouter>, { wrapper: MotionPreferenceProvider })
 }
 
 async function dismissDrawer(user: ReturnType<typeof userEvent.setup>) {
@@ -164,15 +166,19 @@ describe('V2 results-first workspace', () => {
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
-  it('shows inventory depletion warnings on the result overview without analysis access', () => {
+  it('shows inventory depletion warnings without analysis access and opens configuration from the warning', async () => {
     const workflow = connect()
     workflow.userCanViewFullData = false
     workflow.historyItem = { result: { ...SAMPLE_RESULT,
       inventory_warnings: [{ product: 'Pure Gold', days_remaining: 0 }],
     } }
     mount()
-    expect(screen.getByRole('alert')).toHaveTextContent('赤金库存已耗尽')
-    expect(screen.getByRole('alert')).toHaveTextContent('请补充库存或调整生产配置')
+    const warning = screen.getByRole('alert')
+    expect(warning).toHaveTextContent('赤金库存已耗尽')
+    expect(warning).toHaveTextContent('请补充库存或调整生产配置')
+    await userEvent.click(within(warning).getByRole('button', { name: copy.v2.configure }))
+    expect(await screen.findByRole('dialog', { name: copy.v2.facilities })).toBeInTheDocument()
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
   it('uses normalized backend station output and drone consumption without rescaling or averaging', async () => {
@@ -232,13 +238,52 @@ describe('V2 results-first workspace', () => {
     expect(screen.getByText(copy.v2.sampleSource)).toBeInTheDocument()
     expect(screen.getByText(copy.v2.brandDescription)).toBeInTheDocument()
     expect(screen.queryByText('可露希尔基建终端')).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: '返回 V1' })).not.toBeInTheDocument()
+    const legacyEntry = within(screen.getByRole('banner')).getByRole('link', { name: `${copy.v2.testVersion} · ${copy.v2.legacyEntry}` })
+    expect(legacyEntry).toHaveAttribute('href', '/v1')
+    expect(legacyEntry).toHaveAttribute('title', copy.v2.legacyEntry)
+    expect(legacyEntry).toHaveTextContent(copy.v2.testVersion)
     expect(screen.getByRole('tab', { name: /第 1 班/ })).toHaveAttribute('aria-selected', 'true')
     expect(mocks.workflow).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(within(screen.getByRole('group', { name: copy.v2.resultTabs })).getAllByRole('button').map((button) => button.textContent)).toEqual([
       copy.v2.scheduleTab, copy.v2.analysisTab,
     ])
+  })
+
+  it('waits for configuration saving before switching versions and stays in V2 when saving fails', async () => {
+    connect()
+    let finishSave!: (saved: boolean) => void
+    vi.mocked(session.flushConfigSave).mockReturnValueOnce(new Promise((resolve) => { finishSave = resolve }))
+    const user = userEvent.setup()
+    mount('/')
+    const badge = screen.getByRole('link', { name: `${copy.v2.testVersion} · ${copy.v2.legacyEntry}` })
+    await user.click(badge)
+    expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/')
+    await act(async () => finishSave(false))
+    expect(screen.getByRole('alert')).toHaveTextContent(copy.v2.saveFailed)
+    expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/')
+    await user.click(badge)
+    await waitFor(() => expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v1'))
+    expect(session.flushConfigSave).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([
+    '/?profile_id=profile-1',
+    '/?profile_id=profile-1&panel=operators',
+    '/v2?profile_id=profile-1',
+    '/v2?profile_id=profile-1&panel=operators',
+    '/v2?section=profiles&profile_id=profile-1',
+  ])('opens profile management and closes the operator drawer from %s', async (path) => {
+    connect()
+    const user = userEvent.setup()
+    mount(path)
+    if (!path.includes('panel=operators')) await user.click(screen.getByRole('button', { name: copy.v2.operators }))
+    const dialog = within(await screen.findByRole('dialog'))
+    await user.click(dialog.getByText(copy.v2.manageProfiles))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: copy.v2.account })).toBeVisible())
+    expect(screen.getByTestId('route-location')).toHaveTextContent('?section=profiles&profile_id=profile-1')
+    expect(screen.getByTestId('route-location')).not.toHaveTextContent('panel=')
   })
 
   it('refreshes cached teams and expanded skills when saved training and the result change', async () => {
@@ -644,10 +689,11 @@ describe('V2 results-first workspace', () => {
     await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('profile_id=profile-2'))
     expect(session.flushConfigSave).toHaveBeenCalledOnce()
     expect(session.refreshProfileWorkspace).toHaveBeenCalledWith(second)
-    expect(mocks.session).toHaveBeenLastCalledWith('profile-2')
+    expect(mocks.session).toHaveBeenLastCalledWith('profile-2', true)
   })
 
-  it('cancels the current job through the existing task controller while retaining the result', async () => {
+  it.each(['overview', 'generation'])('cancels the current job from %s through the existing task controller while retaining the result', async (section) => {
+    if (section === 'generation') await import('./pages/Generation')
     const workflow = connect()
     workflow.loading = true
     workflow.progress = { mode: 'generate', startedAt: Date.now(), jobId: 'running-job', estimatePhase: 'running' }
@@ -655,10 +701,19 @@ describe('V2 results-first workspace', () => {
     const cancel = vi.fn(async () => undefined)
     mocks.tasks.mockReturnValue({ jobs: [job], cancel, busyJobId: null, error: null, notice: null })
     const user = userEvent.setup()
-    mount()
-    await user.click(screen.getByRole('button', { name: copy.v2.stopSchedule }))
+    const view = mount(`/v2?section=${section}`)
+    const progress = within(await screen.findByRole('region', { name: copy.common.components_ScheduleProgress_001 }))
+    await user.click(progress.getByRole('button', { name: copy.v2.stopSchedule }))
     expect(cancel).toHaveBeenCalledWith(job)
-    expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('54,720')).toBeInTheDocument()
+    mocks.tasks.mockReturnValue({ jobs: [job], cancel, busyJobId: job.id, error: null, notice: null })
+    view.rerender(<MemoryRouter initialEntries={[`/v2?section=${section}`]}><V2Page /><RouteLocation /></MemoryRouter>)
+    const stopping = screen.getByRole('button', { name: copy.v2.stopping })
+    expect(stopping).toBeDisabled()
+    expect(stopping).toHaveAttribute('aria-busy', 'true')
+    await user.click(stopping)
+    expect(cancel).toHaveBeenCalledOnce()
+    if (section === 'generation') await user.click(screen.getByRole('button', { name: copy.v2.overview }))
+    await waitFor(() => expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('54,720')).toBeInTheDocument())
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
@@ -789,12 +844,12 @@ describe('V2 results-first workspace', () => {
     session.activeProfile!.kind = 'free_preview'
     session.activeProfile!.permission = 'growth'
     session.activeProfile!.trial = trial ? {
-      id: 'trial', starts_at: '2026-10-01T00:00:00Z', ends_at: '2026-10-10T00:00:00Z',
+      id: 'trial', starts_at: new Date(Date.now() - 86400000).toISOString(), ends_at: new Date(Date.now() + 30 * 86400000).toISOString(),
       active: true, effective_permission: 'advanced',
     } : null
     const user = userEvent.setup()
     mount()
-    await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
+    await user.click(await screen.findByRole('button', { name: copy.v2.facilities }))
     const dialog = within(await screen.findByRole('dialog'))
     expect(await dialog.findByRole('button', { name: '243 均衡' })).not.toBeDisabled()
     if (trial) expect(dialog.getByRole('switch', { name: /^菲亚梅塔$/ })).not.toBeDisabled()
@@ -915,6 +970,10 @@ describe('V2 feature continuity', () => {
     await user.click(screen.getByRole('button', { name: copy.v2.regenerate }))
     expect(confirm).toHaveBeenCalledWith(copy.v2.discardManual)
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('link', { name: `${copy.v2.testVersion} · ${copy.v2.legacyEntry}` }))
+    expect(confirm).toHaveBeenCalledTimes(2)
+    expect(session.flushConfigSave).not.toHaveBeenCalled()
+    expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2')
     confirm.mockReturnValue(true)
     await user.click(screen.getByRole('button', { name: copy.v2.regenerate }))
     expect(workflow.handleGenerate).toHaveBeenCalledOnce()
@@ -967,22 +1026,42 @@ describe('V2 feature continuity', () => {
     render(<MotionPreferenceProvider><MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter></MotionPreferenceProvider>)
     await user.click(screen.getByRole('button', { name: copy.v2.settings }))
     expect(await screen.findByLabelText(copy.dashboard.pages_tool_dashboard_SettingsSection_018)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: copy.dashboard.settings.preferences }))
     expect(screen.getByRole('switch', { name: copy.dashboard.animation.reduce })).toBeInTheDocument()
-    expect(screen.getByText(copy.dashboard.workspace_entry.settings_title)).toBeInTheDocument()
+    expect(screen.queryByText(copy.dashboard.workspace_entry.settings_title)).not.toBeInTheDocument()
     expect(screen.getByTestId('route-location')).toHaveTextContent('section=settings')
     expect(screen.queryByRole('link', { name: '返回 V1' })).not.toBeInTheDocument()
   })
 
-  it('honors the existing automatic workspace preference without leaving V2 or redirecting settings', async () => {
+  it.each([true, false])('ignores V1 workspace entry preferences and observations in V2: enabled=%s', async (enabled) => {
     connect()
-    window.localStorage.setItem('maatool:workspace-entry:v1:user-1', JSON.stringify({ target: 'profile:profile-1', remindAfter: 0 }))
+    const user = userEvent.setup()
+    const storageKey = 'maatool:workspace-entry:v1:user-1'
+    const observationKey = 'maatool:workspace-entry-observation:v1:user-1'
+    const preference = JSON.stringify({ target: enabled ? 'profile:profile-1' : null, remindAfter: 0 })
+    const now = Date.now()
+    const observation = JSON.stringify({ target: 'profile:profile-1', opens: [4, 3, 2, 1, 0.5].map((days) => now - days * 24 * 60 * 60 * 1000) })
+    window.localStorage.setItem(storageKey, preference)
+    window.localStorage.setItem(observationKey, observation)
     try {
       const view = mount('/v2?section=profiles')
+      expect(await screen.findByRole('heading', { level: 1, name: copy.v2.account })).toBeInTheDocument()
+      expect(screen.getByTestId('route-location')).toHaveTextContent('?section=profiles')
+      expect(screen.queryByRole('heading', { name: copy.dashboard.workspace_entry.prompt_title })).not.toBeInTheDocument()
+      await user.click(await screen.findByRole('button', { name: copy.dashboard.pages_tool_dashboard_ProfilesSection_010 }))
       await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('?profile_id=profile-1'))
+      expect(session.refreshProfileWorkspace).toHaveBeenCalledWith(session.activeProfile)
       view.unmount()
       mount('/v2?section=settings')
-      expect(screen.getByTestId('route-location')).toHaveTextContent('section=settings')
-    } finally { window.localStorage.removeItem('maatool:workspace-entry:v1:user-1') }
+      expect(await screen.findByLabelText(copy.dashboard.pages_tool_dashboard_SettingsSection_018)).toBeInTheDocument()
+      expect(screen.getByTestId('route-location')).toHaveTextContent('?section=settings')
+      expect(screen.queryByText(copy.dashboard.workspace_entry.settings_title)).not.toBeInTheDocument()
+      expect(window.localStorage.getItem(storageKey)).toBe(preference)
+      expect(window.localStorage.getItem(observationKey)).toBe(observation)
+    } finally {
+      window.localStorage.removeItem(storageKey)
+      window.localStorage.removeItem(observationKey)
+    }
   })
 
   it('prefers free account binding while retaining CDK redemption inside V2', async () => {

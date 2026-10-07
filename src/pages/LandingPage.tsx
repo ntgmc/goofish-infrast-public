@@ -51,7 +51,7 @@ export default function LandingPage({ onStart }: Props) {
     <main className="landing-shell min-h-screen" tabIndex={-1} data-route-focus>
       <section className="public-shell">
         <nav className="public-nav" aria-label={copy.public.pages_LandingPage_018}>
-          <Link to="/" className="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left focus-visible:outline-none sm:gap-3">
+          <Link to="/v1" className="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left focus-visible:outline-none sm:gap-3">
             <BrandLogo size="sm" className="sm:h-10 sm:w-10 sm:rounded-lg sm:p-1" />
             <span className="min-w-0">
               <span className="block truncate text-sm font-semibold text-ink-primary">{copy.public.pages_LandingPage_018}</span>

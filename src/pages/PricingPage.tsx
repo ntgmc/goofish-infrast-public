@@ -67,16 +67,17 @@ export default function PricingPage({ embedded = false }: { embedded?: boolean }
           </nav>
         </header>}
 
-        <section className="border-b border-surface-4 py-12 sm:py-16" aria-labelledby="pricing-title">
+        <section className="workspace-pricing-intro border-b border-surface-4 py-12 sm:py-16" aria-labelledby="pricing-title">
           <p className="public-kicker">{pricing.eyebrow}</p>
           <h1 id="pricing-title" className="display-title mt-3 text-3xl text-ink-primary sm:text-4xl">{pricing.title}</h1>
           <p className="mt-4 max-w-3xl whitespace-pre-line text-base leading-7 text-ink-secondary">{pricing.intro}</p>
           <div className="mt-10 flex flex-col gap-8">
             <section aria-labelledby="single-account-pricing-title">
               <h2 id="single-account-pricing-title" className="text-xl font-semibold text-ink-primary">{copy.public.pages_PricingPage_012}</h2>
-              <div className="mt-7 grid grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="workspace-pricing-plans mt-7 grid grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2 xl:grid-cols-4">
                 {cdkPlans.map((plan) => (
-                  <article key={plan.id} className="tool-panel relative flex min-w-0 flex-col p-5 pt-7" aria-labelledby={`${plan.id}-title`}>
+                  <article key={plan.id} className="workspace-pricing-plan tool-panel relative flex min-w-0 flex-col p-5 pt-7" aria-labelledby={`${plan.id}-title`}>
+                    <div className="workspace-pricing-term">
                     {(plan.id === 'single_account_monthly' || plan.id === 'single_account_lifetime') && (
                       <span className={`absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-brand-500/50 px-3 py-1 text-xs font-semibold shadow-sm ${plan.id === 'single_account_lifetime' ? 'bg-primary text-primary-foreground' : 'bg-surface-1 text-brand-400'}`}>
                         {plan.id === 'single_account_monthly' ? copy.public.pricing_recommendation_monthly : copy.public.pricing_recommendation_lifetime}
@@ -86,10 +87,13 @@ export default function PricingPage({ embedded = false }: { embedded?: boolean }
                     <h3 id={`${plan.id}-title`} className="mt-2 break-words text-lg font-semibold text-ink-primary">{formatPlanTerm(plan.label)}</h3>
                     <p className="mt-5 break-words text-xl font-semibold text-brand-400 tabular-nums">{plan.display_price}</p>
                     {plan.discount_fold < 10 && <p className="mt-1 text-xs text-ink-muted">{copy.public.pages_PricingPage_017(plan.original_price, plan.discount_fold)}</p>}
+                    </div>
+                    <div className="workspace-pricing-description">
                     <p className="mt-4 whitespace-pre-line text-sm leading-7 text-ink-secondary">{plan.summary}</p>
                     <p className="mt-3 text-sm leading-6 text-ink-secondary">{copy.public.pricing_archive_gift(plan.id === 'single_account_lifetime' ? 3 : 1)}</p>
                     <p className="mt-4 whitespace-pre-line border-t border-surface-3 pt-4 text-sm leading-6 text-ink-muted">{plan.account_scope}</p>
-                    <div className="mt-auto pt-5">
+                    </div>
+                    <div className="workspace-pricing-purchase mt-auto pt-5">
                       {plan.purchase_url ? (
                         <a href={plan.purchase_url} target="_blank" rel="noopener noreferrer" className="tool-primary-action flex w-full items-center justify-center whitespace-nowrap">
                           {copy.public.pricing_purchase_labels[plan.id]}

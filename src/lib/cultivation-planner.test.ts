@@ -26,6 +26,20 @@ describe('cultivation planning with shared resources', () => {
     expect(input.inventory).toEqual({ rock: 2 })
   })
 
+  it('uses weighted demand across preferences and subtracts only fulfilled group weights', () => {
+    const old = { ...candidate('old', 100, { rock: 1 }), demandKeys: ['old'], demandWeights: { old: 0.1 }, weightedFrequency: 0.1 }
+    const recent = { ...candidate('recent', 1, { rock: 1 }), demandKeys: ['recent'], demandWeights: { recent: 1 }, weightedFrequency: 1 }
+    for (const preference of ['coverage', 'cost', 'materials'] as const) {
+      expect(buildCultivationPlan(data({ candidates: [old, recent] }), options({ preference, limit: 1 })).selected[0].candidate.key).toBe('recent')
+    }
+    const a = { ...candidate('a', 2, { rock: 1 }), demandKeys: ['group', 'a-fixed'], demandWeights: { group: 5, 'a-fixed': 1 }, weightedFrequency: 6 }
+    const b = { ...candidate('b', 2, { rock: 1 }), demandKeys: ['group', 'b-fixed'], demandWeights: { group: 5, 'b-fixed': 0.1 }, weightedFrequency: 5.1 }
+    const c = { ...candidate('c', 1, { rock: 1 }), demandKeys: ['c-fixed'], demandWeights: { 'c-fixed': 0.5 }, weightedFrequency: 0.5 }
+    const input = data({ candidates: [b, a, c], groups: [{ key: 'group', options: [a, b].map((row) => ({ operatorId: row.operatorId, target: row.target, skillId: row.skillId })) }] })
+    const result = buildCultivationPlan(input, options())
+    expect(result.selected.map((row) => [row.candidate.key, row.candidate.frequency, row.candidate.weightedFrequency])).toEqual([['a', 2, 6], ['c', 1, 0.5], ['b', 1, 0.1]])
+  })
+
   it('reserves shared direct requirements and includes crafting currency', () => {
     const input = data({ recipes: { high: { count: 1, items: { rock: 3, '4001': 100 } } }, prices: { rock: 5, '4001': 0.0036 } })
     const result = allocateCultivationMaterials({ high: 2, rock: 2 }, { rock: 6, '4001': 100 }, input)

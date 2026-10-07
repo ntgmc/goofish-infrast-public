@@ -14,6 +14,11 @@ export const prtsSnapshotSchema = z.object({
     stageId: z.string(),
     mode: z.number().int().min(1).max(3),
     content: record,
+    uploadedAt: z.string().datetime().optional(),
+    likes: z.number().int().nonnegative().optional(),
+    dislikes: z.number().int().nonnegative().optional(),
+    views: z.number().int().nonnegative().optional(),
+    hotScore: z.number().nonnegative().optional(),
   })),
   operators: z.record(z.string(), z.object({ name: z.string(), rarity: z.number().int().min(1).max(6), skills: z.array(z.string()) })),
   costs: z.object({

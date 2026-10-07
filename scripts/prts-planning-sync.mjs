@@ -35,7 +35,7 @@ export async function syncPrtsPlanning(options = {}, request = (url) => fetchJso
         const detail = unwrap(await request(`${API}/copilot/get/${row.id}`))
         if (detail.available === false || (detail.status && detail.status !== 'PUBLIC')) continue
         const content = JSON.parse(detail.content)
-        const homework = homeworkRow(row.id, content, hashContent(row.content))
+        const homework = homeworkRow(row.id, content, hashContent(detail.content), { ...row, ...detail })
         if (homework) { byId.set(row.id, homework); changed++ }
       }
       if (boundary || !data.has_next) break
@@ -56,9 +56,12 @@ export async function syncPrtsPlanning(options = {}, request = (url) => fetchJso
       const detail = unwrap(payload)
       if (detail.available === false || (detail.status && detail.status !== 'PUBLIC')) { byId.delete(id); changed++; continue }
       const content = JSON.parse(detail.content)
-      const homework = homeworkRow(id, content, hashContent(detail.content))
-      if (!homework) byId.delete(id)
-      else if (JSON.stringify(homework.content) !== JSON.stringify(byId.get(id)?.content)) { byId.set(id, homework); changed++ }
+      const homework = homeworkRow(id, content, hashContent(detail.content), detail)
+      if (!homework) { byId.delete(id); changed++ }
+      else {
+        const updated = { ...byId.get(id), ...homework }
+        if (JSON.stringify(updated) !== JSON.stringify(byId.get(id))) { byId.set(id, updated); changed++ }
+      }
     }
     let assets = {}
     if (options['refresh-assets'] === 'true') {

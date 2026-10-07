@@ -14,8 +14,7 @@ type RedeemResponse = {
   replayed: boolean
 }
 
-export default function BalanceSection({ redemptionEnabled }: { redemptionEnabled: boolean }) {
-  const resolveHref = useInternalHref()
+export function useBalance() {
   const [page, setPage] = useState<BalancePage | null>(null)
   const [cdk, setCdk] = useState('')
   const [pending, setPending] = useState<{ cdk: string; key: string } | null>(null)
@@ -76,6 +75,12 @@ export default function BalanceSection({ redemptionEnabled }: { redemptionEnable
     }
   }
 
+  return { page, cdk, setCdk, setPending, loading, loadingMore, redeeming, error, notice, errorTarget, load, redeem }
+}
+
+export default function BalanceSection({ redemptionEnabled }: { redemptionEnabled: boolean }) {
+  const resolveHref = useInternalHref()
+  const { page, cdk, setCdk, setPending, loading, loadingMore, redeeming, error, notice, errorTarget, load, redeem } = useBalance()
   if (!page) {
     if (loading) return <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.balance.loading}</div>
     return <div className="tool-panel p-6" role="alert">
@@ -93,12 +98,12 @@ export default function BalanceSection({ redemptionEnabled }: { redemptionEnable
   ] as const
 
   return (
-    <div className="space-y-5">
+    <div className="workspace-balance space-y-5">
       <section className="tool-panel p-5 sm:p-6">
         <p className="tool-eyebrow">{copy.balance.eyebrow}</p>
         <h2 className="mt-2 text-xl font-semibold text-ink-primary">{copy.balance.title}</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">{copy.balance.description}</p>
-        <div className={`mt-5 grid gap-3 ${hasDebt ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+        <div className={`workspace-balance-metrics mt-5 grid gap-3 ${hasDebt ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
           {balanceCards.map(([label, value]) => <div key={label} className="tool-inset p-5">
             <span className="text-sm text-ink-secondary">{label}</span>
             <strong className="mt-2 block text-2xl font-semibold tabular-nums text-ink-primary">{value}</strong>
@@ -122,7 +127,7 @@ export default function BalanceSection({ redemptionEnabled }: { redemptionEnable
         {notice && <div className="tool-alert tool-alert--success mt-4" role="status" aria-live="polite">{notice}</div>}
       </section>
 
-      {redemptionEnabled && <form onSubmit={redeem} className="tool-panel p-5 sm:p-6">
+      {redemptionEnabled && <form onSubmit={redeem} className="workspace-balance-redemption tool-panel p-5 sm:p-6">
         <h3 className="text-base font-semibold text-ink-primary">{copy.balance.redeem_title}</h3>
         <p className="mt-1 text-sm leading-6 text-ink-secondary">{copy.balance.redeem_description}</p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
@@ -160,7 +165,7 @@ function transactionLabel(kind: PublicBalanceTransaction['kind']): string {
   return copy.balance[kind]
 }
 
-function formatPoints(value: string): string {
+export function formatPoints(value: string): string {
   return value.endsWith('.00') ? value.slice(0, -3) : value
 }
 

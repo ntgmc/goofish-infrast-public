@@ -13,6 +13,7 @@ export type ScenarioMaaSchedule = 'variable' | '8x3'
 export type ScenarioDroneStrategy =
   | 'off'
   | 'auto'
+  | 'inventory_balance'
   | 'lmd'
   | 'orundum'
   | 'pure_gold'
@@ -137,7 +138,8 @@ const SCHEDULES: Record<Exclude<ScenarioMaaSchedule, 'variable'>, number[]> = {
 
 const DRONE_LABELS: Record<ScenarioDroneStrategy, string> = {
   off: copy.domain.lib_scenario_comparison_001,
-  auto: copy.domain.lib_scenario_comparison_002,
+  auto: copy.common.droneAutoEfficiency,
+  inventory_balance: copy.common.droneAutoInventoryBalance,
   lmd: copy.domain.lib_scenario_comparison_003,
   orundum: copy.domain.lib_scenario_comparison_004,
   pure_gold: copy.domain.lib_scenario_comparison_005,
@@ -405,7 +407,7 @@ function buildScenario(
 }
 
 function hasDroneTarget(plan: ScenarioProductionPlan, strategy: ScenarioDroneStrategy): boolean {
-  if (strategy === 'off' || strategy === 'auto') return true
+  if (strategy === 'off' || strategy === 'auto' || strategy === 'inventory_balance') return true
   return ({
     lmd: plan.trading.lmd,
     orundum: plan.trading.orundum,
@@ -417,7 +419,9 @@ function hasDroneTarget(plan: ScenarioProductionPlan, strategy: ScenarioDroneStr
 
 function buildDroneConfig(strategy: ScenarioDroneStrategy): NonNullable<LicenseConfig['drones']> {
   if (strategy === 'off') return { enable: false, auto: false, order: 'pre', targets: [] }
-  if (strategy === 'auto') return { enable: true, auto: true, order: 'pre', targets: [] }
+  if (strategy === 'auto' || strategy === 'inventory_balance') {
+    return { enable: true, auto: true, auto_strategy: strategy === 'auto' ? 'efficiency' : 'inventory_balance', order: 'pre', targets: [] }
+  }
   const product = ({
     lmd: 'LMD',
     orundum: 'Orundum',

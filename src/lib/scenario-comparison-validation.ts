@@ -16,6 +16,7 @@ const MAX_RAW_SCENARIO_COMBINATIONS = 256
 const scenarioDroneStrategySchema = z.enum([
   'off',
   'auto',
+  'inventory_balance',
   'lmd',
   'orundum',
   'pure_gold',
@@ -44,7 +45,7 @@ export const scenarioComparisonFactorsSchema: z.ZodType<ScenarioComparisonFactor
   layouts: z.array(scenarioLayoutFactorSchema).min(1).max(3),
   maaSchedules: z.array(z.enum(['variable', '8x3'])).min(1).max(2),
   includeRotation: z.boolean(),
-  droneStrategies: z.array(scenarioDroneStrategySchema).min(1).max(7),
+  droneStrategies: z.array(scenarioDroneStrategySchema).min(1).max(8),
 }).superRefine((factors, context) => {
   assertUnique(factors.layouts.map((entry) => entry.layout), ['layouts'], copy.domain.lib_scenario_comparison_validation_001, context)
   assertUnique(factors.maaSchedules, ['maaSchedules'], copy.domain.lib_scenario_comparison_validation_002, context)

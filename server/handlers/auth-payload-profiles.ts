@@ -11,7 +11,7 @@ export function selectAuthPayloadProfiles(
   const records = allRecords.filter((profile) => profile.kind !== 'metered_commercial')
   const defaultActiveProfile = records.find((profile) => profile.kind !== 'depot_value') ?? records[0] ?? null
   const requestedActiveProfile = activeProfileId
-    ? allRecords.find((profile) => profile.id === activeProfileId) ?? null
+    ? allRecords.find((profile) => profile.id === activeProfileId || profile.merged_profile_ids?.includes(activeProfileId)) ?? null
     : null
   const activeProfileRecord = requestedActiveProfile ?? defaultActiveProfile
   const workspaceProfileIds = activeProfileRecord?.kind === 'metered_commercial'

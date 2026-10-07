@@ -18,7 +18,7 @@ type Limits = {
 type Page = { profiles: UserGameAccount[]; next_cursor: string | null; limits: Limits }
 type EditDraft = { profileId: string; displayName: string; note: string }
 
-export default function CommercialProfilesSection({ onOpen }: { onOpen: (profile: UserGameAccount) => void }) {
+export function useCommercialProfiles() {
   const [page, setPage] = useState<Page | null>(null)
   const [state, setState] = useState<'active' | 'archived'>('active')
   const [draftQuery, setDraftQuery] = useState('')
@@ -140,6 +140,13 @@ export default function CommercialProfilesSection({ onOpen }: { onOpen: (profile
 
   const activeProfiles = state === 'active' ? page?.profiles ?? [] : []
   const allVisibleSelected = activeProfiles.length > 0 && activeProfiles.every((profile) => selectedIds.has(profile.id))
+  return { page, state, setState, draftQuery, setDraftQuery, loading, busy, error, notice, selectedIds, setSelectedIds,
+    editDraft, setEditDraft, setPage, load, create, mutate, saveEdit, search, batchArchive, activeProfiles, allVisibleSelected }
+}
+
+export default function CommercialProfilesSection({ onOpen }: { onOpen: (profile: UserGameAccount) => void }) {
+  const { page, state, setState, draftQuery, setDraftQuery, loading, busy, error, notice, selectedIds, setSelectedIds,
+    editDraft, setEditDraft, setPage, load, create, mutate, saveEdit, search, batchArchive, activeProfiles, allVisibleSelected } = useCommercialProfiles()
   return <div className="space-y-4">
     <section className="tool-panel p-5 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -166,8 +173,8 @@ export default function CommercialProfilesSection({ onOpen }: { onOpen: (profile
         </button>
       </div>}
     </section>
-    {loading && !page ? <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.metered.commercial_profiles.loading}</div> : <section className="grid gap-3 xl:grid-cols-2">
-      {(page?.profiles ?? []).map((profile) => <article key={profile.id} className="tool-panel p-5">
+    {loading && !page ? <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.metered.commercial_profiles.loading}</div> : <section className="workspace-commercial-list grid gap-3 xl:grid-cols-2">
+      {(page?.profiles ?? []).map((profile) => <article key={profile.id} className="workspace-commercial-row tool-panel p-5">
         {editDraft?.profileId === profile.id ? <div className="space-y-3">
           <label><span className="mb-1 block text-xs text-ink-muted">{copy.metered.commercial_profiles.name_label}</span><input className="tool-field" maxLength={40} value={editDraft.displayName} onChange={(event) => setEditDraft({ ...editDraft, displayName: event.currentTarget.value })} /></label>
           <label><span className="mb-1 block text-xs text-ink-muted">{copy.metered.commercial_profiles.note_label}</span><textarea className="tool-field min-h-24" maxLength={500} value={editDraft.note} onChange={(event) => setEditDraft({ ...editDraft, note: event.currentTarget.value })} /></label>

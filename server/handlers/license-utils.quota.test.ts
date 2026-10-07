@@ -10,6 +10,16 @@ import {
 } from './license-utils'
 
 describe('restricted profile presets', () => {
+  it.each(['efficiency', 'inventory_balance'])('preserves the %s automatic drone mode across permission resolution', (strategy) => {
+    const config = structuredClone(CONFIG_PRESETS['243'])
+    config.drones!.auto_strategy = strategy
+    for (const result of [resolveConfigForPermission('recommended', config), resolveFreePreviewConfig(config)]) {
+      expect(result).toMatchObject({ ok: true, config: { drones: { auto_strategy: strategy } } })
+    }
+    config.drones!.auto_target_product = 'Pure Gold'
+    expect(resolveFreePreviewConfig(config)).toMatchObject({ ok: false })
+  })
+
   it('preserves facility positions for restricted profiles and free preview', () => {
     const config = {
       ...CONFIG_PRESETS['252-full'],

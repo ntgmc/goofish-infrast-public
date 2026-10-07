@@ -23,7 +23,7 @@ export async function importPrtsPlanning(options) {
         cursor = Math.max(cursor, row.homework_id)
         const score = JSON.parse(row.payload_json)
         if (!row.content_json || row.summary_hash !== score.summary_hash) { missing++; continue }
-        const homework = homeworkRow(row.homework_id, JSON.parse(row.content_json), row.summary_hash)
+        const homework = homeworkRow(row.homework_id, JSON.parse(row.content_json), row.summary_hash, score)
         if (homework) homeworks.push(homework)
       }
       if (missing > 0) throw new Error(`${missing} active homework details are missing or outdated; finish qqbot full refresh before export`)

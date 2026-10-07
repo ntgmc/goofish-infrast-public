@@ -43,9 +43,12 @@ describe('FeatureSettingsSection', () => {
     render(<FeatureSettingsSection />)
     await screen.findByRole('checkbox', { name: /全站业务/ })
     await user.click(screen.getByRole('checkbox', { name: /用户注册/ }))
+    const dailyShift = screen.getByRole('checkbox', { name: /一天一换/ })
+    expect(dailyShift).not.toBeChecked()
+    await user.click(dailyShift)
     const savedSettings = {
       ...DEFAULT_SITE_FEATURE_SETTINGS,
-      features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, registration: false },
+      features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, registration: false, one_shift_per_day: true },
       revision: 3,
     }
     adminApiJson.mockResolvedValueOnce({
@@ -55,7 +58,7 @@ describe('FeatureSettingsSection', () => {
     await user.click(screen.getByRole('button', { name: '保存功能开关' }))
     await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/feature-settings', expect.objectContaining({
       method: 'PUT',
-      json: { features: expect.objectContaining({ registration: false, login: true, site: true }), expected_revision: 2 },
+      json: { features: expect.objectContaining({ registration: false, login: true, site: true, one_shift_per_day: true }), expected_revision: 2 },
     })))
     await user.click(screen.getByRole('checkbox', { name: /登录与普通会话/ }))
     await user.click(screen.getByRole('button', { name: '保存功能开关' }))
@@ -73,6 +76,7 @@ describe('FeatureSettingsSection', () => {
     render(<FeatureSettingsSection />)
     const manual = await screen.findByRole('checkbox', { name: /手动排班与模拟/ })
     expect(manual).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: /一天一换/ })).not.toBeChecked()
     expect(screen.getByRole('checkbox', { name: /公开工具中心/ })).not.toBeChecked()
     await user.click(screen.getByRole('checkbox', { name: /V2 工作台/ }))
     await user.click(screen.getByRole('button', { name: '保存功能开关' }))

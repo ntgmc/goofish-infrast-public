@@ -50,6 +50,7 @@ describe('App public content routing', () => {
   afterEach(() => cleanup())
 
   it.each([
+    '/',
     '/reset-password',
     '/account-safety',
     '/tool/profiles',
@@ -64,7 +65,7 @@ describe('App public content routing', () => {
   })
 
   it.each([
-    '/',
+    '/v1',
     '/changelog',
     '/faq',
     '/support',
@@ -79,10 +80,26 @@ describe('App public content routing', () => {
     await waitFor(() => expect(apiJson.mock.calls.some(([url]) => url === '/api/site/public-content')).toBe(true))
   })
 
-  it('keeps V1 as the default and exposes the V2 workspace entry', async () => {
+  it('uses the V2 loading screen and workspace from the first homepage render', async () => {
+    let resolveFeatures!: (value: typeof DEFAULT_SITE_FEATURE_SETTINGS) => void
+    apiJson.mockImplementation(() => new Promise((resolve) => { resolveFeatures = resolve }))
     render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
-    expect(await screen.findByRole('link', { name: copy.v2.testEntry })).toHaveAttribute('href', '/v2')
-    expect(screen.queryByText('V2 test workspace')).not.toBeInTheDocument()
+    expect(document.querySelector('.v2-loading-screen')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: copy.public.pages_LandingPage_023 })).not.toBeInTheDocument()
+    await act(async () => resolveFeatures(DEFAULT_SITE_FEATURE_SETTINGS))
+    expect(await screen.findByText('V2 test workspace')).toBeInTheDocument()
+    expect(apiJson.mock.calls.some(([url]) => url === '/api/site/public-content')).toBe(false)
+    expect(toolMount).not.toHaveBeenCalled()
+  })
+
+  it('preserves the V1 homepage and its original workspace entry', async () => {
+    const router = createMemoryRouter([{ path: '*', element: <App /> }], { initialEntries: ['/v1'] })
+    render(<RouterProvider router={router} />)
+    expect(await screen.findByRole('heading', { name: copy.public.pages_LandingPage_023 })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: copy.v2.testEntry })).toHaveAttribute('href', '/v2')
+    await act(async () => screen.getByRole('button', { name: copy.public.pages_LandingPage_026 }).click())
+    expect(await screen.findByText('Tool workspace')).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/tool/profiles')
   })
 
   it('reuses loaded public content across public navigation and history', async () => {
@@ -114,20 +131,20 @@ describe('App public content routing', () => {
     expect(screen.queryByText('Tool workspace')).not.toBeInTheDocument()
   })
 
-  it('opens the separate V2 test route without indexing it', async () => {
+  it('keeps the existing V2 route accessible without indexing it', async () => {
     render(<MemoryRouter initialEntries={['/v2']}><App /></MemoryRouter>)
     expect(await screen.findByText('V2 test workspace')).toBeInTheDocument()
     await waitFor(() => expect(document.head.querySelector('meta[name="robots"]')).toHaveAttribute('content', 'noindex, nofollow'))
   })
 
-  it('keeps V2 service-state failures and retries in the V2 loading screen', async () => {
+  it.each(['/', '/v2'])('keeps V2 service-state failures and retries in the V2 loading screen at %s', async (route) => {
     let requests = 0
     const original = apiJson.getMockImplementation()!
     apiJson.mockImplementation((url: string) => {
       if (url === '/api/site/features' && ++requests === 1) return Promise.reject(new Error('offline'))
       return original(url)
     })
-    render(<MemoryRouter initialEntries={['/v2']}><App /></MemoryRouter>)
+    render(<MemoryRouter initialEntries={[route]}><App /></MemoryRouter>)
     expect(await screen.findByRole('alert')).toHaveTextContent('相关功能当前不可用，请稍后重新获取服务状态。')
     expect(document.querySelector('.v2-loading-screen')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '暂时无法获取服务状态' })).not.toBeInTheDocument()
@@ -136,7 +153,7 @@ describe('App public content routing', () => {
   })
 
   it.each([
-    ['/v2', 'v2'], ['/tools/manual-schedule', 'manual_schedule'], ['/tools/cultivation-plan', 'cultivation_plan'],
+    ['/', 'v2'], ['/v2', 'v2'], ['/tools/manual-schedule', 'manual_schedule'], ['/tools/cultivation-plan', 'cultivation_plan'],
     ['/faq', 'faq'], ['/support', 'support'], ['/pricing', 'pricing'], ['/changelog', 'changelog'],
     ['/thanks', 'thanks'], ['/status', 'service_status'],
   ] satisfies Array<[string, SiteFeatureKey]>)('blocks direct visits to the disabled page %s', async (route, feature) => {
@@ -156,7 +173,7 @@ describe('App public content routing', () => {
       ? Promise.resolve({ ...DEFAULT_SITE_FEATURE_SETTINGS, features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features,
         v2: false, pricing: false, changelog: false, thanks: false, service_status: false, faq: false } })
       : original(url))
-    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
+    render(<MemoryRouter initialEntries={['/v1']}><App /></MemoryRouter>)
     await screen.findByRole('button', { name: '开始排班' })
     await waitFor(() => expect(screen.queryByRole('link', { name: copy.v2.testEntry })).not.toBeInTheDocument())
     for (const href of ['/v2', '/pricing', '/changelog', '/thanks', '/status', '/faq']) {

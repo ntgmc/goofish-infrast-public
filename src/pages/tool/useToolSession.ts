@@ -28,7 +28,7 @@ export type AuthStatus = 'loading' | 'authenticated' | 'anonymous' | 'error'
 
 const CONFIG_SAVE_DEBOUNCE_MS = 600
 
-export function useToolSession(requestedProfileId?: string | null) {
+export function useToolSession(requestedProfileId?: string | null, rememberLastProfile = false) {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading')
   const [authError, setAuthError] = useState<Error | null>(null)
   const [authRequestVersion, setAuthRequestVersion] = useState(0)
@@ -75,6 +75,9 @@ export function useToolSession(requestedProfileId?: string | null) {
     const nextProfiles = payload?.profiles ?? []
     const nextProfile = payload?.active_profile ?? null
     const nextWorkspace = payload?.workspace ?? null
+    if (rememberLastProfile && nextUser && nextProfile && isSchedulableProfile(nextProfile)) {
+      try { window.localStorage.setItem(`maatool:v2:last-profile:${nextUser.id}`, nextProfile.id) } catch { /* Storage may be disabled. */ }
+    }
     setUser(nextUser)
     setProfiles(nextProfiles)
     setActiveProfile(nextProfile)
@@ -88,7 +91,7 @@ export function useToolSession(requestedProfileId?: string | null) {
     setLicense(nextProfile && nextWorkspace?.operators && nextWorkspace.config
       ? createAccountLicense(nextProfile, nextWorkspace.operators, nextWorkspace.config)
       : null)
-  }, [cancelPendingConfigSave])
+  }, [cancelPendingConfigSave, rememberLastProfile])
 
   const applyAuthPayload = useCallback((payload: AuthSuccessResponse | null) => {
     applyAuthPayloadInternal(payload, {
@@ -123,14 +126,30 @@ export function useToolSession(requestedProfileId?: string | null) {
       ? `/api/auth/me?profile_id=${encodeURIComponent(requestedProfileId)}`
       : '/api/auth/me'
     void apiJson<Partial<AuthSuccessResponse> & { user: AuthUser | null }>(authUrl, { fallbackMessage: copy.common.pages_tool_useToolSession_001 })
-      .then((data) => {
+      .then(async (data) => {
         if (cancelled) return
         if (data.user === null) {
           applyAuthPayload(null)
           return
         }
         if (!data.user) throw new Error(copy.common.pages_tool_useToolSession_001)
-        applyAuthPayload(data as AuthSuccessResponse)
+        if (rememberLastProfile && !requestedProfileId) {
+          let remembered: string | null = null
+          try { remembered = window.localStorage.getItem(`maatool:v2:last-profile:${data.user.id}`) } catch { /* Storage may be disabled. */ }
+          if (remembered && remembered !== data.active_profile?.id) {
+            data = await apiJson<AuthSuccessResponse>(`/api/auth/me?profile_id=${encodeURIComponent(remembered)}`, {
+              fallbackMessage: copy.common.pages_tool_useToolSession_001,
+            })
+          }
+          if (data.user && (!data.active_profile || !isSchedulableProfile(data.active_profile))) {
+            const fallback = data.profiles?.find(isSchedulableProfile)
+            if (fallback) data = await apiJson<AuthSuccessResponse>(`/api/auth/me?profile_id=${encodeURIComponent(fallback.id)}`, {
+              fallbackMessage: copy.common.pages_tool_useToolSession_001,
+            })
+          }
+        }
+        if (!data.user && data.user !== null) throw new Error(copy.common.pages_tool_useToolSession_001)
+        if (!cancelled) applyAuthPayload(data.user ? data as AuthSuccessResponse : null)
       })
       .catch((caught: unknown) => {
         if (cancelled) return
@@ -141,7 +160,7 @@ export function useToolSession(requestedProfileId?: string | null) {
     return () => {
       cancelled = true
     }
-  }, [applyAuthPayload, authRequestVersion, requestedProfileId])
+  }, [applyAuthPayload, authRequestVersion, requestedProfileId, rememberLastProfile])
 
   useEffect(() => () => {
     pendingConfigRef.current = null

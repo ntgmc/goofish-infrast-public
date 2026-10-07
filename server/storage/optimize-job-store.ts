@@ -126,7 +126,7 @@ interface OptimizeJobPreemption {
 
 export class OptimizeJobAdmissionError extends Error {
   constructor(
-    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'commercial_queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'commercial_submission_rate_exceeded' | 'priority_coupon_unavailable' | 'item_unavailable' | 'insufficient_balance' | 'pricing_changed' | 'quote_already_used' | 'profile_not_found' | 'not_metered_profile' | 'profile_archived' | 'commercial_not_eligible' | 'commercial_suspended' | 'debt_outstanding' | 'subscription_scenario_quota_exceeded',
+    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'commercial_queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'commercial_submission_rate_exceeded' | 'priority_coupon_unavailable' | 'item_unavailable' | 'insufficient_balance' | 'pricing_changed' | 'quote_already_used' | 'profile_not_found' | 'not_metered_profile' | 'profile_archived' | 'profile_merged' | 'commercial_not_eligible' | 'commercial_suspended' | 'debt_outstanding' | 'subscription_scenario_quota_exceeded',
     readonly status: 404 | 409 | 429,
     message: string,
   ) {
@@ -332,6 +332,16 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           const job = await client.query<OptimizeJobRow>('select * from optimize_jobs where id = $1', [existing.job_id])
           if (!job.rows[0]) throw new OptimizeJobAdmissionError('idempotency_in_progress', 409, '优化请求正在处理中。')
           return { job: fromRow(job.rows[0]), replayed: true }
+        }
+
+        if (input.profile_id) {
+          const profile = await client.query<{ merged_into_profile_id: string | null }>(
+            "select record_json->>'merged_into_profile_id' as merged_into_profile_id from user_game_accounts where id = $1 for update",
+            [input.profile_id],
+          )
+          if (profile.rows[0]?.merged_into_profile_id) {
+            throw new OptimizeJobAdmissionError('profile_merged', 409, '该档案已合并，请刷新页面后使用合并后的档案。')
+          }
         }
 
         let confirmedBillingQuote: MeteredScheduleQuote | null = null

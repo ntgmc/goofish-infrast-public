@@ -471,7 +471,7 @@ async function assertConfirmImport() {
     workspace.config?.intermediate_inventory?.['Originium Shard'] !== 45 ||
     workspace.config?.intermediate_inventory?.['Orirock Cube'] !== 7658 ||
     workspace.config?.auto_balance_source !== 'intermediate_inventory' ||
-    workspace.config?.drones?.auto_strategy !== 'trading_priority'
+    workspace.config?.drones?.auto_strategy !== 'inventory_balance'
   ) {
     throw new Error(`confirm import: intermediate inventory was not saved to config ${JSON.stringify(workspace.config)}`)
   }

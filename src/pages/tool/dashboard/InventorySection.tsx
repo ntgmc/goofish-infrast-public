@@ -51,16 +51,9 @@ type LimitedProfileUseResponse = UseResponse & {
 }
 type InventoryNotice = { message: string; action?: 'profiles' }
 
-export default function InventorySection({
-  onPayload,
-  onLifetimeProfileCreated,
-  onViewProfiles,
-  loadingFallback,
-}: {
+export function useInventory({ onPayload, onLifetimeProfileCreated }: {
   onPayload: (payload: AuthSuccessResponse) => void
   onLifetimeProfileCreated?: () => void
-  onViewProfiles?: () => void
-  loadingFallback?: ReactNode
 }) {
   const [inventory, setInventory] = useState<InventoryResponse | null>(null)
   const [tasks, setTasks] = useState<OnboardingTaskView[]>([])
@@ -225,8 +218,6 @@ export default function InventorySection({
     }
   }
 
-  if (loading && !inventory) return loadingFallback ?? <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.inventory.loading}</div>
-
   const selectedCapacity = selected ? capacityForItem(selected.item.code, profileId, inventory?.capacities ?? []) : null
   const maximumQuantity = Math.min(selected?.quantity ?? 0, 100,
     selected?.item.kind === 'capacity_upgrade' ? Math.max(0, (selectedCapacity?.maximum ?? 0) - (selectedCapacity?.limit ?? 0))
@@ -245,9 +236,28 @@ export default function InventorySection({
     else void load()
   }
 
+  return { inventory, tasks, selected, setSelected, category, setCategory, search, setSearch, profileId, setProfileId,
+    quantity, setQuantity, selectedRewardCodes, setSelectedRewardCodes, highlightedReward, lifetimeDisplayName, setLifetimeDisplayName,
+    lifetimeNote, setLifetimeNote, loading, busy, error, notice, rewards, setRewards, lifetimeDialogOpen, setLifetimeDialogOpen,
+    selectedTriggerRef, chestScope, filtered, runItemAction, claimTask, createLifetimeProfileWithJson, selectedCapacity,
+    maximumQuantity, canUseSelected, handleLifetimePayload, load }
+}
+
+export default function InventorySection({ onPayload, onLifetimeProfileCreated, onViewProfiles, loadingFallback }: {
+  onPayload: (payload: AuthSuccessResponse) => void
+  onLifetimeProfileCreated?: () => void
+  onViewProfiles?: () => void
+  loadingFallback?: ReactNode
+}) {
+  const { inventory, tasks, selected, setSelected, category, setCategory, search, setSearch, profileId, setProfileId,
+    quantity, setQuantity, selectedRewardCodes, setSelectedRewardCodes, highlightedReward, lifetimeDisplayName, setLifetimeDisplayName,
+    lifetimeNote, setLifetimeNote, loading, busy, error, notice, rewards, setRewards, lifetimeDialogOpen, setLifetimeDialogOpen,
+    selectedTriggerRef, chestScope, filtered, runItemAction, claimTask, createLifetimeProfileWithJson, selectedCapacity,
+    maximumQuantity, canUseSelected, handleLifetimePayload } = useInventory({ onPayload, onLifetimeProfileCreated })
+  if (loading && !inventory) return loadingFallback ?? <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.inventory.loading}</div>
   return (
-    <div className="space-y-5">
-      <section className="tool-panel p-5 sm:p-6">
+    <div className="workspace-inventory space-y-5">
+      <section className="workspace-inventory-summary tool-panel p-5 sm:p-6">
         <p className="tool-eyebrow">{copy.inventory.eyebrow}</p>
         <h2 className="mt-2 text-xl font-semibold text-ink-primary">{copy.inventory.title}</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">{copy.inventory.description}</p>
@@ -267,7 +277,7 @@ export default function InventorySection({
       </section>
 
       {tasks.some((task) => task.enabled) && (
-        <section className="tool-panel p-5 sm:p-6" aria-labelledby="inventory-tasks-title">
+        <section className="workspace-inventory-tasks tool-panel p-5 sm:p-6" aria-labelledby="inventory-tasks-title">
           <h3 id="inventory-tasks-title" className="text-base font-semibold text-ink-primary">{copy.inventory.tasks}</h3>
           <div className="mt-4 grid gap-3 md:grid-cols-3">
             {tasks.filter((task) => task.enabled).map((task) => (
@@ -289,11 +299,11 @@ export default function InventorySection({
         </section>
       )}
 
-      <section className="tool-panel p-5 sm:p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <section className="workspace-inventory-catalog tool-panel p-5 sm:p-6">
+        <div className="workspace-inventory-toolbar flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap gap-2" role="group" aria-label={copy.inventory.title}>
             {(['all', 'license_voucher', 'consumable', 'capacity_upgrade', 'gift_pack'] as Category[]).map((value) => (
-              <button key={value} type="button" onClick={() => setCategory(value)} className={category === value ? 'tool-primary-action' : 'tool-secondary-action'}>
+              <button key={value} type="button" aria-pressed={category === value} onClick={() => setCategory(value)} className={category === value ? 'tool-primary-action' : 'tool-secondary-action'}>
                 {categoryLabel(value)}
               </button>
             ))}
@@ -304,13 +314,15 @@ export default function InventorySection({
         {filtered.length === 0 ? (
           <div className="tool-inset mt-5 p-8 text-center text-sm text-ink-muted">{copy.inventory.empty}</div>
         ) : (
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="workspace-inventory-items mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {filtered.map((stack) => (
-              <button key={stack.stack_id} type="button" onClick={(event) => { selectedTriggerRef.current = event.currentTarget; setSelected(stack); setQuantity(1); setSelectedRewardCodes([]); setProfileId(''); setLifetimeDisplayName(''); setLifetimeNote('') }} className="tool-inset min-w-0 p-4 text-left transition hover:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
+              <button key={stack.stack_id} type="button" onClick={(event) => { selectedTriggerRef.current = event.currentTarget; setSelected(stack); setQuantity(1); setSelectedRewardCodes([]); setProfileId(''); setLifetimeDisplayName(''); setLifetimeNote('') }} className="workspace-inventory-item tool-inset min-w-0 p-4 text-left transition hover:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
                 <img src={itemIconPath(stack.item.icon_key)} onError={fallbackItemIcon} alt="" width={64} height={64} className="mx-auto h-16 w-16 object-contain" />
-                <strong className="mt-3 block truncate text-sm text-ink-primary">{stack.item.name}</strong>
-                <span className="mt-1 block text-xs text-ink-secondary">{copy.inventory.quantity} × {stack.quantity}</span>
-                <span className="mt-1 block truncate text-[11px] text-ink-muted">{stack.next_expiry_at ? `${copy.inventory.expires}${formatShanghaiDateTime(stack.next_expiry_at)}` : copy.inventory.permanent}</span>
+                <span className="workspace-inventory-item-content">
+                  <strong className="mt-3 block truncate text-sm text-ink-primary">{stack.item.name}</strong>
+                  <span className="mt-1 block text-xs text-ink-secondary">{copy.inventory.quantity} × {stack.quantity}</span>
+                  <span className="mt-1 block truncate text-[11px] text-ink-muted">{stack.next_expiry_at ? `${copy.inventory.expires}${formatShanghaiDateTime(stack.next_expiry_at)}` : copy.inventory.permanent}</span>
+                </span>
               </button>
             ))}
           </div>
@@ -435,7 +447,7 @@ export default function InventorySection({
           <div className="flex justify-end"><DialogClose className="tool-primary-action">{copy.inventory.close}</DialogClose></div>
         </DialogContent>
       </Dialog>
-      {(inventory?.recent_events.length ?? 0) > 0 && <details className="tool-panel p-5 sm:p-6" aria-labelledby="inventory-events-title">
+      {(inventory?.recent_events.length ?? 0) > 0 && <details className="workspace-inventory-events tool-panel p-5 sm:p-6" aria-labelledby="inventory-events-title">
         <summary className="min-h-11 cursor-pointer content-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45">
           <h3 id="inventory-events-title" className="inline text-base font-semibold text-ink-primary">{copy.inventory.recent_events}</h3>
         </summary>
@@ -455,7 +467,7 @@ export default function InventorySection({
   )
 }
 
-function categoryLabel(category: Category): string {
+export function categoryLabel(category: Category): string {
   if (category === 'consumable') return copy.inventory.consumable
   if (category === 'capacity_upgrade') return copy.inventory.capacity
   if (category === 'gift_pack') return copy.inventory.packs
@@ -472,7 +484,7 @@ function capacityForItem(code: string, profileId: string, profiles: ProfileCapac
   return null
 }
 
-function ledgerEventLabel(eventType: InventoryResponse['recent_events'][number]['event_type']): string {
+export function ledgerEventLabel(eventType: InventoryResponse['recent_events'][number]['event_type']): string {
   if (eventType === 'grant') return copy.inventory.ledger_grant
   if (eventType === 'reserve') return copy.inventory.ledger_reserve
   if (eventType === 'consume') return copy.inventory.ledger_consume
@@ -497,7 +509,7 @@ function isLimitedProfileUseResponse(response: UseResponse): response is Limited
     && Object.prototype.hasOwnProperty.call(response.auth, 'workspace')
 }
 
-function fallbackItemIcon(event: SyntheticEvent<HTMLImageElement>): void {
+export function fallbackItemIcon(event: SyntheticEvent<HTMLImageElement>): void {
   event.currentTarget.onerror = null
   event.currentTarget.src = itemIconPath('placeholder')
 }

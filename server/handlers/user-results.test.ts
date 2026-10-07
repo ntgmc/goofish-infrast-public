@@ -320,8 +320,8 @@ describe('MAA JSON export entitlement', () => {
       consumed_coupon: false,
       result_id: 'result-1',
       result: {
-        title: '测试排班',
-        description: '测试说明',
+        title: 'MaaTool · 253基建 · 1班',
+        description: '按班次顺序换班。换班时间请按生成排班时的设置安排。',
         plans: [{
           name: '第1班',
           rooms: {

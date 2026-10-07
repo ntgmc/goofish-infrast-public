@@ -5,11 +5,21 @@ import { prtsSnapshotSchema } from '../server/cultivation/catalog.ts'
 
 export const hashContent = (content) => createHash('sha256').update(typeof content === 'string' ? content : JSON.stringify(content)).digest('hex')
 
-export function homeworkRow(id, content, hash = hashContent(content)) {
+export function homeworkRow(id, content, hash = hashContent(content), metadata = {}) {
   if (!Number.isSafeInteger(id) || id < 1 || !content || typeof content !== 'object' || Array.isArray(content)) throw new Error('Invalid PRTS homework')
   if (content.type === 'SSS' || typeof content.stage_name !== 'string' || !content.stage_name) return null
   const mode = [1, 2, 3].includes(content.difficulty) ? content.difficulty : content.stage_name.includes('#f#') ? 2 : 1
-  return { id, content, hash, mode, stageId: content.stage_name.split('#f#')[0] }
+  const statistics = {}
+  for (const [key, value] of Object.entries({ likes: metadata.likes ?? metadata.like, dislikes: metadata.dislikes ?? metadata.dislike, views: metadata.views, hotScore: metadata.hotScore ?? metadata.hot_score })) {
+    if (typeof value === 'number' && Number.isFinite(value) && value >= 0 && (key === 'hotScore' || Number.isSafeInteger(value))) statistics[key] = value
+  }
+  const uploadedAt = metadata.uploadedAt ?? metadata.upload_time
+  if (typeof uploadedAt === 'string' && /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/.test(uploadedAt)) {
+    // PRTS returns China local time when the timestamp has no offset.
+    const timestamp = Date.parse(uploadedAt.replace(' ', 'T') + (/(?:Z|[+-]\d{2}:\d{2})$/.test(uploadedAt) ? '' : '+08:00'))
+    if (Number.isFinite(timestamp)) statistics.uploadedAt = new Date(timestamp).toISOString()
+  }
+  return { id, content, hash, mode, stageId: content.stage_name.split('#f#')[0], ...statistics }
 }
 
 export async function readJson(path) { return JSON.parse(await readFile(path, 'utf8')) }

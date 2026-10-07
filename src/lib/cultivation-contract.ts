@@ -27,6 +27,8 @@ export type CultivationCandidate = {
   skillId: string
   moduleName?: string
   demandKeys?: string[]
+  demandWeights?: Record<string, number>
+  weightedFrequency?: number
   source?: 'homework' | 'community'
   communityRate?: number
   frequency: number

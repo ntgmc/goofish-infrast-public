@@ -68,8 +68,8 @@ export default function ScenarioLabSection({
   const selected = result?.points.find((point) => point.id === selectedId) ?? null
   const quoteUnavailable = requiresQuote && (!billingQuote || billingQuoteLoading || billingQuote.sufficient === false)
   return (
-    <section aria-labelledby="scenario-lab-title" className="grid min-w-0 gap-4">
-      <div className="tool-panel min-w-0 p-5 sm:p-6">
+    <section aria-labelledby="scenario-lab-title" className="workspace-scenarios grid min-w-0 gap-4">
+      <div className="workspace-scenario-controls tool-panel min-w-0 p-5 sm:p-6">
         <div>
           <p className="tool-eyebrow">{copy.optimize.pages_tool_optimize_ScenarioLabSection_001}</p>
           <h2 id="scenario-lab-title" className="mt-1 text-lg font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_ScenarioLabSection_002}</h2>
@@ -127,7 +127,7 @@ export default function ScenarioLabSection({
         </button>
       </div>
 
-      <div className="min-w-0 space-y-4" data-tour-target="optimize-lab-results">
+      <div className="workspace-scenario-results min-w-0 space-y-4" data-tour-target="optimize-lab-results">
         {progress && <div className="space-y-2">
           <ScheduleProgress progress={progress} variant="focus" />
           {canCancel && <button

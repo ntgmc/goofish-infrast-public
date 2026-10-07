@@ -7,7 +7,7 @@ import { copy } from '../../../copy/index'
 
 
 
-export default function AnnouncementsSection({ onUnreadCountChange, loadingFallback }: { onUnreadCountChange: (count: number) => void; loadingFallback?: ReactNode }) {
+export function useUserAnnouncements(onUnreadCountChange: (count: number) => void) {
   const [items, setItems] = useState<UserAnnouncementRead[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -54,10 +54,15 @@ export default function AnnouncementsSection({ onUnreadCountChange, loadingFallb
   }
 
   const unreadCount = items.filter((item) => !item.read_at).length
+  return { items, loading, error, markingId, markingAll, load, markRead, unreadCount }
+}
+
+export default function AnnouncementsSection({ onUnreadCountChange, loadingFallback }: { onUnreadCountChange: (count: number) => void; loadingFallback?: ReactNode }) {
+  const { items, loading, error, markingId, markingAll, markRead, unreadCount } = useUserAnnouncements(onUnreadCountChange)
   if (loading && !items.length && loadingFallback) return loadingFallback
 
   return (
-    <section className="max-w-4xl space-y-4">
+    <section className="workspace-announcements max-w-4xl space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-ink-secondary">{copy.dashboard.pages_tool_dashboard_AnnouncementsSection_003}</p>
         <button
@@ -73,7 +78,7 @@ export default function AnnouncementsSection({ onUnreadCountChange, loadingFallb
       {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
       {!loading && items.length === 0 && <div className="tool-panel p-6 text-sm text-ink-secondary">{copy.dashboard.pages_tool_dashboard_AnnouncementsSection_007}</div>}
       {items.map(({ announcement, read_at }) => (
-        <article key={announcement.id} className={`tool-panel p-5 ${read_at ? '' : 'border-brand-500/50 bg-brand-500/10'}`}>
+        <article key={announcement.id} data-unread={!read_at} className={`workspace-announcement tool-panel p-5 ${read_at ? '' : 'border-brand-500/50 bg-brand-500/10'}`}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">

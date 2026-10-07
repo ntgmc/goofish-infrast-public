@@ -15,7 +15,9 @@ type CdkRedeemResponse =
   | { redemption_type: 'profile'; auth: AuthSuccessResponse }
   | { redemption_type: 'inventory'; item: { code: string; name: string; quantity: 1; expires_at: string | null } }
 
-export default function RedeemSection({ onRedeemed, onInventoryRedeemed, tourReplayToken = 0, autoStartTour = true, preferPreview = false }: { onRedeemed: (payload: AuthSuccessResponse) => void; onInventoryRedeemed?: (itemName: string) => void; tourReplayToken?: number; autoStartTour?: boolean; preferPreview?: boolean }) {
+type RedeemProps = { onRedeemed: (payload: AuthSuccessResponse) => void; onInventoryRedeemed?: (itemName: string) => void; tourReplayToken?: number; autoStartTour?: boolean; preferPreview?: boolean }
+
+export function useAccountRedemption({ onRedeemed, onInventoryRedeemed, tourReplayToken = 0, autoStartTour = true, preferPreview = false }: RedeemProps) {
   const { features } = useSiteFeatures()
   const [mode, setMode] = useState<AddAccountMode>(() => preferPreview && features.free_preview ? 'preview' : features.cdk_redemption ? 'cdk' : 'preview')
   const [cdk, setCdk] = useState('')
@@ -89,13 +91,22 @@ export default function RedeemSection({ onRedeemed, onInventoryRedeemed, tourRep
     onRedeemed(payload)
   }
 
+  return { features, mode, setMode, cdk, setCdk, displayName, setDisplayName, note, setNote, loading, error, setError,
+    claimDialogOpen, setClaimDialogOpen, submit, handleClaimPayload, declarationDialog, redeemTour, redeemTourDefinition }
+}
+
+export default function RedeemSection(props: RedeemProps) {
+  const { features, mode, setMode, cdk, setCdk, displayName, setDisplayName, note, setNote, loading, error, setError,
+    claimDialogOpen, setClaimDialogOpen, submit, handleClaimPayload, declarationDialog, redeemTour, redeemTourDefinition } = useAccountRedemption(props)
   return (
     <>
-      <form onSubmit={submit} className="tool-panel max-w-2xl p-6" data-tour-target={mode === 'preview' ? 'dashboard-redeem-preview' : undefined}>
+      <form onSubmit={submit} className="workspace-redemption tool-panel max-w-2xl p-6" data-tour-target={mode === 'preview' ? 'dashboard-redeem-preview' : undefined}>
+        <div className="workspace-redemption-intro">
         <h2 className="text-lg font-semibold text-ink-primary">{copy.dashboard.pages_tool_dashboard_RedeemSection_002}</h2>
         <p className="mt-2 text-sm leading-6 text-ink-secondary">
           {copy.dashboard.pages_tool_dashboard_RedeemSection_003}</p>
-
+        </div>
+        <div className="workspace-redemption-fields">
         <div className="tool-inset mt-5 inline-flex p-1" role="group" aria-label={copy.dashboard.pages_tool_dashboard_RedeemSection_004} data-tour-target="dashboard-redeem-mode">
           {features.cdk_redemption && <button
             type="button"
@@ -146,6 +157,7 @@ export default function RedeemSection({ onRedeemed, onInventoryRedeemed, tourRep
           {mode === 'preview' && <SklandIcon />}
           {loading ? copy.dashboard.pages_tool_dashboard_RedeemSection_013 : mode === 'preview' ? copy.dashboard.pages_tool_dashboard_RedeemSection_014 : copy.dashboard.pages_tool_dashboard_RedeemSection_015}
         </button>
+        </div>
       </form>
       {features.free_preview && <SklandBindingDialog
         open={claimDialogOpen}

@@ -232,6 +232,12 @@ export function allowsInventoryProductRebalance(config: LicenseConfig, canEditCo
   return config.allow_product_rebalance ?? (!canEditConfig && config.auto_balance_source !== 'limited_config')
 }
 
+export function normalizeDroneAutoStrategy(strategy: string | undefined): 'efficiency' | 'inventory_balance' {
+  return ['inventory_balance', 'trading_priority', 'manufacture_product'].includes(strategy ?? '')
+    ? 'inventory_balance'
+    : 'efficiency'
+}
+
 export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   const next = cloneConfig(config)
   if (next.layout !== '2-5-2') delete next.facility_layout
@@ -262,8 +268,7 @@ export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   next.drones = {
     enable: next.drones?.enable ?? false,
     auto: next.drones?.auto ?? false,
-    auto_strategy: next.drones?.auto_strategy,
-    auto_target_product: next.drones?.auto_target_product,
+    auto_strategy: normalizeDroneAutoStrategy(next.drones?.auto_strategy),
     order: next.drones?.order ?? 'pre',
     targets: Array.isArray(next.drones?.targets) ? next.drones.targets : [],
   }

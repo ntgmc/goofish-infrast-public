@@ -25,8 +25,7 @@ function StandaloneCultivation() {
   return <CultivationContent session={session} />
 }
 
-function CultivationContent({ session, embedded = false }: { session: ReturnType<typeof useToolSession>; embedded?: boolean }) {
-  const ContentRoot = embedded ? 'div' : 'main'
+export function useCultivation(session: ReturnType<typeof useToolSession>) {
   const profiles = session.profiles.filter((row) => row.status === 'active' && !row.archived_at && row.skland_binding)
   const [chosenProfile, setChosenProfile] = useState('')
   const profileId = profiles.some((row) => row.id === chosenProfile) ? chosenProfile : profiles.find((row) => row.id === session.activeProfile?.id)?.id ?? profiles[0]?.id ?? ''
@@ -97,6 +96,14 @@ function CultivationContent({ session, embedded = false }: { session: ReturnType
     setPotionNumbers(Object.fromEntries(Object.entries(next.potions).map(([key, value]) => [key, String(value)])))
   }
 
+  return { profiles, profileId, setChosenProfile, data, busy, error, options, setOptions, appliedOptions,
+    numbers, setNumbers, potionNumbers, setPotionNumbers, plan, load, exclude, changed, apply }
+}
+
+function CultivationContent({ session, embedded = false }: { session: ReturnType<typeof useToolSession>; embedded?: boolean }) {
+  const ContentRoot = embedded ? 'div' : 'main'
+  const { profiles, profileId, setChosenProfile, data, busy, error, options, setOptions, appliedOptions,
+    numbers, setNumbers, potionNumbers, setPotionNumbers, plan, load, exclude, changed, apply } = useCultivation(session)
   const field = (key: 'dailySanity' | 'days' | 'limit', title: string, min: number, max: number) => <label className="block space-y-2 text-sm">
     <span>{title}</span><input type="number" min={min} max={max} className="tool-field" value={numbers[key]} onChange={(event) => setNumbers((prior) => ({ ...prior, [key]: event.target.value }))} />
   </label>
@@ -106,8 +113,8 @@ function CultivationContent({ session, embedded = false }: { session: ReturnType
       <Link to="/tool/tools" aria-label={label.back}><BrandLogo /></Link>
       <div className="flex items-center gap-3"><Link to="/tool/tools" className="whitespace-nowrap text-sm text-ink-secondary hover:text-ink-primary">{label.back}</Link><ThemeSwitcher /></div>
     </header>}
-    <ContentRoot className="space-y-6">
-      <section className="tool-panel space-y-5 p-5 sm:p-6">
+    <ContentRoot className="workspace-cultivation space-y-6">
+      <section className="workspace-cultivation-source tool-panel space-y-5 p-5 sm:p-6">
         <div>{!embedded && <h1 className="text-2xl font-semibold text-ink-primary">{label.title}</h1>}<p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">{label.description}</p></div>
         {session.authLoading ? <p role="status">{label.loading}</p> : session.authStatus === 'error' ? <div role="alert"><p>{session.authError?.message}</p><button className="tool-secondary-action mt-3" onClick={session.retryAuth}>{copy.tools.pages_DepotValuePage_086}</button></div>
           : session.authStatus !== 'authenticated' || !profiles.length ? <div className="tool-inset space-y-3 p-4"><p className="text-sm">{session.authStatus !== 'authenticated' ? label.login : label.noProfile}</p><Link to={embedded ? v2Path('profiles', session.activeProfile?.id) : '/tool/profiles'} className="tool-secondary-action inline-flex">{label.loginAction}</Link></div>
@@ -118,9 +125,9 @@ function CultivationContent({ session, embedded = false }: { session: ReturnType
         {error && <p role="alert" className="tool-alert tool-alert--warning p-3 text-sm">{error}</p>}
       </section>
       {data && plan && <>
-        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">{Object.entries({ homeworks: data.stats.homeworks, owned: data.stats.owned, satisfied: data.candidates.filter((row) => row.satisfied).length, incomplete: data.stats.incomplete }).map(([key, value]) => <div key={key} className="tool-inset p-4"><dt className="text-xs text-ink-secondary">{label.stats[key as keyof typeof label.stats]}</dt><dd className="mt-2 text-2xl font-semibold tabular-nums">{number(value)}</dd></div>)}</dl>
+        <dl className="workspace-cultivation-metrics grid grid-cols-2 gap-3 sm:grid-cols-4">{Object.entries({ homeworks: data.stats.homeworks, owned: data.stats.owned, satisfied: data.candidates.filter((row) => row.satisfied).length, incomplete: data.stats.incomplete }).map(([key, value]) => <div key={key} className="tool-inset p-4"><dt className="text-xs text-ink-secondary">{label.stats[key as keyof typeof label.stats]}</dt><dd className="mt-2 text-2xl font-semibold tabular-nums">{number(value)}</dd></div>)}</dl>
         {data.warnings.length > 0 && <ul className="tool-alert tool-alert--warning space-y-1 p-4 text-sm">{data.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
-        <section className="tool-panel space-y-5 p-5 sm:p-6">
+        <section className="workspace-cultivation-options tool-panel space-y-5 p-5 sm:p-6">
           <fieldset><legend className="mb-3 text-base font-semibold">{label.preference}</legend><div className="flex flex-wrap gap-2">{Object.entries(label.preferences).map(([key, text]) => <label key={key} className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${options.preference === key ? 'border-brand-500 bg-brand-500/10 text-ink-primary' : 'border-surface-3 text-ink-secondary'}`}><input type="radio" name="preference" value={key} checked={options.preference === key} onChange={() => setOptions((value) => ({ ...value, preference: key as CultivationOptions['preference'] }))} />{text}</label>)}</div><p className="mt-3 text-sm leading-6 text-ink-muted">{label.preferenceHints[options.preference]}</p></fieldset>
           {options.preference === 'community' && data.community?.status !== 'fresh' && <p role="status" className="text-sm text-warning">{data.community?.status === 'stale' ? label.communityStale : label.communityUnavailable}</p>}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{field('dailySanity', label.daily, 0, 2000)}<label className="block space-y-2 text-sm"><span>{label.start}</span><input type="date" className="tool-field" value={options.startDate} onChange={(event) => setOptions((value) => ({ ...value, startDate: event.target.value }))} /></label>{field('days', label.days, 1, 180)}{field('limit', label.limit, 1, 30)}</div>

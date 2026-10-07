@@ -10,20 +10,21 @@ import { SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS } from '../../../../lib/scen
 import { copy } from '../../../../copy/index'
 
 
-const LAYOUTS: Array<{ id: ScenarioLayout; trading: number; manufacturing: number }> = [
+export const LAYOUTS: Array<{ id: ScenarioLayout; trading: number; manufacturing: number }> = [
   { id: '153', trading: 1, manufacturing: 5 },
   { id: '243', trading: 2, manufacturing: 4 },
   { id: '333', trading: 3, manufacturing: 3 },
 ]
 
-const SCHEDULES: Array<{ id: ScenarioMaaSchedule; label: string }> = [
+export const SCHEDULES: Array<{ id: ScenarioMaaSchedule; label: string }> = [
   { id: 'variable', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_001 },
   { id: '8x3', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_002 },
 ]
 
-const DRONES: Array<{ id: ScenarioDroneStrategy; label: string }> = [
+export const DRONES: Array<{ id: ScenarioDroneStrategy; label: string }> = [
   { id: 'off', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_004 },
-  { id: 'auto', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_005 },
+  { id: 'auto', label: copy.common.droneAutoEfficiency },
+  { id: 'inventory_balance', label: copy.common.droneAutoInventoryBalance },
   { id: 'lmd', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_006 },
   { id: 'orundum', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_007 },
   { id: 'pure_gold', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_008 },
@@ -76,7 +77,7 @@ export default function ScenarioFactors({
         <p className="mt-1 text-xs leading-5 text-ink-secondary">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_033(additionalConfigCount, SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS)}</p>
         <div
           data-testid="scenario-layout-grid"
-          className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3"
+          className="workspace-scenario-layouts mt-3 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3"
         >
           {LAYOUTS.map((layout) => (
             <LayoutPlanEditor
@@ -90,7 +91,7 @@ export default function ScenarioFactors({
         </div>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-2">
+      <div className="workspace-scenario-options grid gap-5 xl:grid-cols-2">
         <div>
           <h3 className="text-sm font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_014}</h3>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -155,12 +156,12 @@ function LayoutPlanEditor({
   const duplicate = plans.some((plan) => samePlan(plan, draft))
 
   return (
-    <section className="tool-inset min-w-0 p-3" aria-labelledby={`layout-${layout.id}-title`}>
+    <section className="workspace-scenario-layout tool-inset min-w-0 p-3" aria-labelledby={`layout-${layout.id}-title`}>
       <div className="flex items-center justify-between gap-2">
         <h4 id={`layout-${layout.id}-title`} className="text-sm font-semibold text-ink-primary">{layout.id}</h4>
         <span className="tool-status tabular-nums">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_019}{plans.length}</span>
       </div>
-      <div className="mt-3 grid gap-3">
+      <div className="workspace-scenario-fields mt-3 grid gap-3">
         <SelectField
           id={`layout-${layout.id}-orundum`}
           label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_020}
@@ -252,7 +253,7 @@ function CheckOption({ id, checked, onChange, children }: { id: string; checked:
   )
 }
 
-function buildPlan(
+export function buildPlan(
   layout: { trading: number; manufacturing: number },
   orundum: number,
   originiumShard: number,
@@ -268,11 +269,11 @@ function buildPlan(
   }
 }
 
-function planLabel(plan: ScenarioProductionPlan): string {
+export function planLabel(plan: ScenarioProductionPlan): string {
   return `${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_028}${plan.trading.lmd}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_029}${plan.trading.orundum}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_030}${plan.manufacturing.pureGold}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_031}${plan.manufacturing.battleRecord}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_032}${plan.manufacturing.originiumShard}`
 }
 
-function planKey(plan: ScenarioProductionPlan): string {
+export function planKey(plan: ScenarioProductionPlan): string {
   return `${plan.trading.lmd}-${plan.trading.orundum}-${plan.manufacturing.pureGold}-${plan.manufacturing.battleRecord}-${plan.manufacturing.originiumShard}`
 }
 

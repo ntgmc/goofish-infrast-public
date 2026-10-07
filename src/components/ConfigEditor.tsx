@@ -8,6 +8,7 @@ import {
   isValidShiftHours,
   isVariableShiftScheduleEnabled,
   normalizeConfig,
+  normalizeDroneAutoStrategy,
   normalizeDormitoryRule,
   normalizeScheduleMode,
   parseShiftHours,
@@ -15,6 +16,7 @@ import {
 } from '../lib/config'
 import { BASE_DAILY_SANITY_BUDGET, MONTHLY_CARD_DAILY_SANITY_BONUS, normalizeOrundumPlanning } from '../lib/orundum-economy'
 import type { IntermediateProduct, LicenseConfig, PermissionMode } from '../lib/types'
+import { useSiteFeatures } from '../lib/site-feature-context'
 import { copy } from '../copy/index'
 import InputNumber from './InputNumber'
 import FacilityLayoutEditor from './FacilityLayoutEditor'
@@ -63,7 +65,7 @@ const VARIABLE_SHIFT_SCHEDULE_DEFAULTS = {
 const SHIFT_SCHEDULE_OPTIONS = [
   { id: '8x3', label: copy.common.components_ConfigEditor_087, hours: [8, 8, 8] },
   { id: '12x3', label: copy.common.components_ConfigEditor_088, hours: [12, 12, 12] },
-  { id: '24x3', label: copy.common.components_ConfigEditor_089, hours: [24, 24, 24], disabled: true },
+  { id: '24x3', label: copy.common.components_ConfigEditor_089, hours: [24, 24, 24] },
   { id: 'variable', label: copy.common.components_ConfigEditor_090 },
   { id: 'custom', label: copy.common.components_ConfigEditor_091 },
 ] as const
@@ -216,25 +218,16 @@ function bindAutoDrones(config: LicenseConfig): void {
     ...(config.drones ?? { order: 'pre', targets: [] }),
     enable: true,
     auto: true,
-    auto_strategy: config.drones?.auto_strategy ?? 'trading_priority',
-    auto_target_product: config.drones?.auto_target_product,
+    auto_strategy: normalizeDroneAutoStrategy(config.drones?.auto_strategy),
     order: config.drones?.order ?? 'pre',
     targets: Array.isArray(config.drones?.targets) ? config.drones.targets : [],
   }
-}
-
-function setAutoDroneTradingPriority(config: LicenseConfig): void {
-  bindAutoDrones(config)
-  config.drones = {
-    ...config.drones!,
-    auto_strategy: 'trading_priority',
-    auto_target_product: undefined,
-  }
+  delete config.drones.auto_target_product
 }
 
 function markIntermediateInventoryForOptimizer(config: LicenseConfig): void {
   config.auto_balance_source = 'intermediate_inventory'
-  setAutoDroneTradingPriority(config)
+  bindAutoDrones(config)
 }
 
 interface ConfigEditorProps {
@@ -304,7 +297,9 @@ export default function ConfigEditor({
         next.allow_product_rebalance !== undefined ||
         next.auto_balance_source === 'intermediate_inventory' ||
         next.auto_balance_source === 'limited_config'
+      const droneStrategy = normalizeDroneAutoStrategy(next.drones?.auto_strategy)
       const copy = normalizeConfig(preset)
+      copy.drones!.auto_strategy = droneStrategy
       delete next.trading_station_levels
       delete next.manufacturing_station_levels
       delete next.facility_layout
@@ -812,7 +807,32 @@ export default function ConfigEditor({
                   })}
                 />
               </label>
-              <div className="grid min-w-0 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+              {config.drones?.auto && (
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-ink-muted" htmlFor="drone-auto-strategy">
+                    {copy.common.droneAutoStrategyLabel}</label>
+                  <select
+                    id="drone-auto-strategy"
+                    value={normalizeDroneAutoStrategy(config.drones.auto_strategy)}
+                    disabled={!canEdit || rotationMode || !config.drones.enable}
+                    onChange={(event) => onUpdate((next) => {
+                      bindAutoDrones(next)
+                      next.drones!.auto_strategy = event.currentTarget.value
+                      applyCounts(next)
+                    })}
+                    className="tool-field disabled:text-ink-muted"
+                  >
+                    <option value="efficiency">{copy.common.droneAutoEfficiency}</option>
+                    <option value="inventory_balance">{copy.common.droneAutoInventoryBalance}</option>
+                  </select>
+                  <p className="mt-2 text-xs leading-5 text-ink-muted">
+                    {normalizeDroneAutoStrategy(config.drones.auto_strategy) === 'inventory_balance'
+                      ? copy.common.droneAutoInventoryBalanceHelp
+                      : copy.common.droneAutoEfficiencyHelp}
+                  </p>
+                </div>
+              )}
+              <div className={`grid min-w-0 gap-4 ${config.drones?.auto ? '' : 'md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]'}`}>
                 <div>
                   <label className="mb-2 block text-xs font-medium text-ink-muted" htmlFor="drone-order">
                     {copy.common.components_ConfigEditor_073}</label>
@@ -833,13 +853,13 @@ export default function ConfigEditor({
                     <option value="post">{copy.common.components_ConfigEditor_075}</option>
                   </select>
                 </div>
-                <div>
+                {!config.drones?.auto && <div>
                   <label className="mb-2 block text-xs font-medium text-ink-muted" htmlFor="drone-targets">
                     {copy.common.components_ConfigEditor_076}</label>
                     <DroneTargetsInput
                       id="drone-targets"
                       value={droneTargets}
-                    disabled={!canEdit || rotationMode || !config.drones?.enable || Boolean(config.drones?.auto)}
+                    disabled={!canEdit || rotationMode || !config.drones?.enable}
                       onChange={(value) => onUpdate((next) => {
                         next.drones = {
                           ...(next.drones ?? { enable: true, order: 'pre' }),
@@ -848,7 +868,7 @@ export default function ConfigEditor({
                         applyCounts(next)
                       })}
                     />
-                </div>
+                </div>}
               </div>
             </section>
           </div>
@@ -1110,6 +1130,7 @@ function ShiftHoursEditor({
   onSelectVariable: () => void;
   onChange: (hours: number[]) => void;
 }) {
+  const { features } = useSiteFeatures()
   const normalized = parseShiftHours(value) ?? [8, 8, 8]
   const formatted = normalized.join('-')
   const [draftValue, setDraftValue] = useState(formatted)
@@ -1126,7 +1147,7 @@ function ShiftHoursEditor({
   const commitDraft = () => {
     if (!canEdit) return
     const parsed = parseShiftHours(draftValue)
-    if (parsed?.every((hours) => Math.abs(hours - 24) <= 0.0001)) {
+    if (!features.one_shift_per_day && parsed?.every((hours) => Math.abs(hours - 24) <= 0.0001)) {
       setError(copy.common.components_ConfigEditor_101)
       return
     }
@@ -1143,8 +1164,12 @@ function ShiftHoursEditor({
     }
   }
 
+  const isChoiceDisabled = (choice: typeof SHIFT_SCHEDULE_OPTIONS[number]) => choice.id === '24x3'
+    ? !canEdit || !features.one_shift_per_day
+    : !canEdit && !(canEditFixedShiftHours && 'hours' in choice)
+
   const selectChoice = (choice: typeof SHIFT_SCHEDULE_OPTIONS[number]) => {
-    if ((!canEdit && !(canEditFixedShiftHours && 'hours' in choice)) || ('disabled' in choice && choice.disabled)) return
+    if (isChoiceDisabled(choice)) return
     if (choice.id === 'custom') {
       setCustomSelected(true)
       return
@@ -1166,7 +1191,7 @@ function ShiftHoursEditor({
             key={choice.id}
             type="button"
             aria-pressed={selectedChoice === choice.id}
-            disabled={(!canEdit && !(canEditFixedShiftHours && 'hours' in choice)) || ('disabled' in choice && choice.disabled)}
+            disabled={isChoiceDisabled(choice)}
             onClick={() => selectChoice(choice)}
             className={`tool-secondary-action min-h-11 whitespace-normal px-2 py-2 text-xs leading-5 disabled:cursor-not-allowed disabled:text-ink-muted sm:text-sm ${
               selectedChoice === choice.id
@@ -1217,9 +1242,11 @@ function ShiftHoursEditor({
             : copy.common.components_ConfigEditor_093}
         </p>
       )}
-      <p className="mt-2 text-xs leading-5 text-ink-muted">
-        {copy.common.components_ConfigEditor_101}
-      </p>
+      {!features.one_shift_per_day && (
+        <p className="mt-2 text-xs leading-5 text-ink-muted">
+          {copy.common.components_ConfigEditor_101}
+        </p>
+      )}
     </div>
   )
 }

@@ -27,10 +27,8 @@ function StandaloneManualSchedule() {
   return <ManualScheduleContent session={session} />
 }
 
-function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpenProfile }: PageProps & { session: ReturnType<typeof useToolSession> }) {
+export function useManualTool({ session, embedded = false, onDirtyChange }: PageProps & { session: ReturnType<typeof useToolSession> }) {
   const label = copy.tools.manualSchedule
-  const ContentRoot = embedded ? 'div' : 'main'
-  const operatorsPath = (profileId: string) => embedded ? `${v2Path('overview', profileId)}&panel=operators` : profileScopedPath(workspaceSetupPath('operators'), profileId)
   const { features } = useSiteFeatures()
   const available = session.profiles.filter((profile) => isManualScheduleProfileAvailable(profile) &&
     (features.metered_billing || !profile.kind.startsWith('metered_')))
@@ -114,6 +112,16 @@ function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpe
     }
   }
 
+  return { available, profile, ready, operators, preset, setPreset, setConfigDraft, baseConfig, configuredHours,
+    setShiftHours, draft, error, importing, upload, canUse, enabled, start, importSchedule }
+}
+
+function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpenProfile }: PageProps & { session: ReturnType<typeof useToolSession> }) {
+  const label = copy.tools.manualSchedule
+  const ContentRoot = embedded ? 'div' : 'main'
+  const operatorsPath = (profileId: string) => embedded ? `${v2Path('overview', profileId)}&panel=operators` : profileScopedPath(workspaceSetupPath('operators'), profileId)
+  const { available, profile, ready, operators, preset, setPreset, setConfigDraft, baseConfig, configuredHours,
+    setShiftHours, draft, error, importing, upload, canUse, enabled, start, importSchedule } = useManualTool({ session, embedded, onDirtyChange })
   return (
     <div className={embedded ? 'v2-embedded-tool' : 'mx-auto max-w-7xl px-4 py-6 sm:px-6'}>
       {!embedded && <header className="mb-8 flex items-center justify-between gap-4">
@@ -124,12 +132,13 @@ function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpe
         </div>
       </header>}
       <ContentRoot className="space-y-6">
-        <section className="tool-panel space-y-4 p-5 sm:p-6">
-          <div>
+        <section className="workspace-manual-setup tool-panel space-y-4 p-5 sm:p-6">
+          <div className="workspace-manual-intro">
             {!embedded && <h1 className="text-2xl font-semibold text-ink-primary">{label.title}</h1>}
             <p className="mt-2 text-sm leading-6 text-ink-secondary">{label.description}</p>
             <p className="mt-2 text-sm leading-6 text-ink-muted">{label.access}</p>
           </div>
+          <div className="workspace-manual-inputs space-y-4">
           {session.authLoading ? <p role="status">{label.loading}</p> : session.authStatus === 'error' ? (
             <div className="tool-alert tool-alert--warning" role="alert">
               <p>{session.authError?.message}</p>
@@ -205,6 +214,7 @@ function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpe
           </div>
           {profile && <p className="text-xs leading-5 text-ink-muted">{label.importHint}</p>}
           {draft && <p className="text-sm text-warning">{label.replace}</p>}
+          </div>
         </section>
         {canUse && draft?.profileId === profile?.id && draft && (
           <ManualScheduleEditor key={`${draft.profileId}:${draft.revision}`} source={draft.source}

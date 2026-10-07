@@ -21,22 +21,11 @@ import { WorkspaceEntrySettings, type WorkspaceEntryState } from '../WorkspaceEn
 type FieldErrors = Record<string, string>
 
 
-export default function SettingsSection({
-  profiles,
-  onLogout,
-  onPayload,
-  workspaceEntry,
-  safetyOnly = false,
-  onDeletionStateChange,
-}: {
+export function useAccountSettings({ profiles, onPayload, onDeletionStateChange }: {
   profiles: UserGameAccount[]
-  onLogout: () => void
   onPayload: (payload: AuthSuccessResponse) => void
-  workspaceEntry?: WorkspaceEntryState
-  safetyOnly?: boolean
   onDeletionStateChange?: (state: 'idle' | 'submitting' | 'accepted') => void
 }) {
-  const { features } = useSiteFeatures()
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -52,14 +41,7 @@ export default function SettingsSection({
   const [deletePassword, setDeletePassword] = useState('')
   const [deletion, setDeletion] = useState<AccountDeletionAccepted | null>(null)
   const [deletionError, setDeletionError] = useState<string | null>(null)
-  const text = copy.dashboard.settings
   const boundProfiles = profiles.filter((profile) => profile.skland_binding)
-
-  const openSection = (id: string) => {
-    const section = document.getElementById(id)
-    section?.scrollIntoView({ block: 'start' })
-    section?.focus({ preventScroll: true })
-  }
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -151,9 +133,34 @@ export default function SettingsSection({
     } finally { setPrivacyLoading(null) }
   }
 
+  return { oldPassword, setOldPassword, newPassword, setNewPassword, confirmPassword, setConfirmPassword,
+    status, error, fieldErrors, loading, submit, clearFieldError, boundProfiles, clearedCredentialIds,
+    privacyLoading, privacyError, privacyStatus, clearCredential, deleteEmail, setDeleteEmail,
+    deletePassword, setDeletePassword, deletion, deletionError, requestDeletion }
+}
+
+export default function SettingsSection({ profiles, onLogout, onPayload, workspaceEntry, safetyOnly = false, onDeletionStateChange }: {
+  profiles: UserGameAccount[]
+  onLogout: () => void
+  onPayload: (payload: AuthSuccessResponse) => void
+  workspaceEntry?: WorkspaceEntryState
+  safetyOnly?: boolean
+  onDeletionStateChange?: (state: 'idle' | 'submitting' | 'accepted') => void
+}) {
+  const { features } = useSiteFeatures()
+  const text = copy.dashboard.settings
+  const { oldPassword, setOldPassword, newPassword, setNewPassword, confirmPassword, setConfirmPassword,
+    status, error, fieldErrors, loading, submit, clearFieldError, boundProfiles, clearedCredentialIds,
+    privacyLoading, privacyError, privacyStatus, clearCredential, deleteEmail, setDeleteEmail,
+    deletePassword, setDeletePassword, deletion, deletionError, requestDeletion } = useAccountSettings({ profiles, onPayload, onDeletionStateChange })
+  const openSection = (id: string) => {
+    const section = document.getElementById(id)
+    section?.scrollIntoView({ block: 'start' })
+    section?.focus({ preventScroll: true })
+  }
   return (
-    <div className="space-y-6">
-      {!safetyOnly && <div className="flex flex-col gap-4 border-b border-surface-3 pb-5">
+    <div className="workspace-settings space-y-6">
+      {!safetyOnly && <div className="workspace-settings-navigation flex flex-col gap-4 border-b border-surface-3 pb-5">
         <p className="text-sm leading-6 text-ink-secondary">{text.description}</p>
         <nav aria-label={text.navigation} className="flex flex-wrap gap-2">
           <button type="button" onClick={() => openSection('settings-security')} className="tool-secondary-action text-sm"><ShieldCheck size={16} aria-hidden="true" />{text.security}</button>
@@ -162,7 +169,7 @@ export default function SettingsSection({
           <button type="button" onClick={() => openSection('settings-data')} className="tool-secondary-action text-sm">{text.data}</button>
         </nav>
       </div>}
-      <div className={`grid min-w-0 items-start gap-6 ${safetyOnly ? '' : 'xl:grid-cols-2'}`}>
+      <div className={`workspace-settings-panels grid min-w-0 items-start gap-6 ${safetyOnly ? '' : 'xl:grid-cols-2'}`}>
         {!safetyOnly && <form id="settings-security" tabIndex={-1} onSubmit={submit} noValidate className="tool-panel min-w-0 scroll-mt-32 p-5 sm:p-6">
           <div className="flex items-center gap-3">
             <LockKeyhole size={20} className="shrink-0 text-brand-500" aria-hidden="true" />
