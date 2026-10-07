@@ -1,5 +1,4 @@
 import type { OptimizeResult } from '../../../src/lib/types';
-import { domainCopy } from '../../../src/copy/zh-CN/domain';
 import { ZodError } from 'zod';
 import { parseOptimizeResult } from './runtime-contracts';
 
@@ -143,18 +142,10 @@ export function buildMaaExportPayload(result: OptimizeResult): MaaExportPayload 
   const roomCount = (roomType: 'trading' | 'manufacture' | 'power' | 'dormitory') =>
     Math.max(...plans.map((plan) => plan.rooms[roomType]?.length ?? 0));
 
-  const manual = validated.schedule_source === 'manual';
-  const shiftHours = validated.plans.map((plan, index) =>
-    plan.shift_hours ?? (Array.isArray(validated.shift_hours) ? validated.shift_hours[index] : undefined));
-  const shiftPattern = shiftHours.every((hours) => typeof hours === 'number' && Number.isFinite(hours) && hours > 0 && hours <= 24)
-    ? shiftHours.map((hours) => `${hours}h`).join(' / ')
-    : '';
-
   return {
-    ...(manual ? { schedule_source: 'manual' as const } : {}),
-    title: domainCopy.maa_export.title(validated.buildingType, plans.length, manual),
-    description: domainCopy.maa_export.description(shiftPattern)
-      + (manual ? `\n${domainCopy.manual_schedule.history_warning}` : ''),
+    ...(validated.schedule_source === 'manual' ? { schedule_source: 'manual' as const } : {}),
+    title: validated.title,
+    description: validated.description,
     plans,
     scheduleType: {
       planTimes: plans.length,

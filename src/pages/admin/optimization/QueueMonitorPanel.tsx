@@ -9,6 +9,7 @@ import type {
 import { SectionLoader } from '../../../components/SessionLoader'
 import DeadLetterPanel from './DeadLetterPanel'
 import ServiceStatusHistoryPanel from './ServiceStatusHistoryPanel'
+import { AdminTabs } from '../shared/AdminTabs'
 
 const POLL_INTERVAL_MS = 5_000
 
@@ -22,6 +23,9 @@ type Filters = {
 const DEFAULT_FILTERS: Filters = { query: '', status: 'all', source: 'all', priority: 'all' }
 
 export default function QueueMonitorPanel({ active = true }: { active?: boolean }) {
+  const [view, setView] = useState<'tasks' | 'history' | 'dead'>('tasks')
+  const [jobView, setJobView] = useState<'queued' | 'running' | 'recent'>('queued')
+  const [visited, setVisited] = useState<string[]>(['tasks'])
   const [snapshot, setSnapshot] = useState<AdminOptimizationQueueSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -54,7 +58,7 @@ export default function QueueMonitorPanel({ active = true }: { active?: boolean 
   }, [])
 
   useEffect(() => {
-    if (!active) return
+    if (!active || view !== 'tasks') return
     void loadSnapshot()
     const poll = window.setInterval(() => {
       if (document.visibilityState === 'visible') void loadSnapshot()
@@ -68,7 +72,7 @@ export default function QueueMonitorPanel({ active = true }: { active?: boolean 
       document.removeEventListener('visibilitychange', onVisibilityChange)
       requestRef.current?.abort()
     }
-  }, [active, loadSnapshot])
+  }, [active, loadSnapshot, view])
 
   const allJobs = useMemo(() => snapshot
     ? [...snapshot.queued_jobs, ...snapshot.running_jobs, ...snapshot.recent_jobs]
@@ -81,25 +85,23 @@ export default function QueueMonitorPanel({ active = true }: { active?: boolean 
   }), [filters, snapshot])
 
   const toggleJob = (id: string) => {
-    setExpandedJobs((current) => {
-      const next = new Set(current)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+    setExpandedJobs((current) => current.has(id) ? new Set() : new Set([id]))
   }
 
   if (!snapshot && !error) return <SectionLoader label="正在加载异步队列…" />
 
   return (
-    <section className="space-y-5" aria-labelledby="optimization-queue-title">
+    <section className="space-y-5" aria-label="服务与任务监控">
+      <AdminTabs label="服务监控任务" items={[{ id: 'tasks', label: '任务监控' }, { id: 'history', label: '服务历史与事件' }, { id: 'dead', label: '死信处理' }]} value={view}
+        onChange={(next) => { setView(next); setVisited((current) => current.includes(next) ? current : [...current, next]) }} />
+      <div hidden={view !== 'tasks'} role="tabpanel" aria-label="任务监控" className="space-y-5">
       <section className="tool-panel p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="tool-eyebrow">实时运维</p>
             <h2 id="optimization-queue-title" className="mt-2 text-lg font-semibold text-ink-primary">异步优化队列</h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-secondary">
-              展示当前全部等待和执行任务。队列位置按基础优先级与入队时间计算，实际调度仍受账号串行、重试和公平性规则影响。
+              查看等待、计算和已结束的任务，定位失败、运行异常及取消请求。
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -121,7 +123,7 @@ export default function QueueMonitorPanel({ active = true }: { active?: boolean 
 
         {snapshot && (
           <>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="admin-metrics mt-5">
               <QueueMetric label="等待任务" value={`${snapshot.counts.queued} / ${snapshot.capacity.queue_limit}`} hint="当前排队 / 全局容量" tone={snapshot.counts.queued >= snapshot.capacity.queue_limit ? 'warning' : 'default'} />
               <QueueMetric
                 label="正在执行"
@@ -140,13 +142,12 @@ export default function QueueMonitorPanel({ active = true }: { active?: boolean 
         )}
       </section>
 
-      <ServiceStatusHistoryPanel />
-
       <QueueFilters filters={filters} sources={sources} onChange={setFilters} />
 
+      <AdminTabs label="任务状态" items={[{ id: 'queued', label: '等待执行' }, { id: 'running', label: '正在执行' }, { id: 'recent', label: '最近结束' }]} value={jobView} onChange={setJobView} />
       {snapshot && (
         <>
-          <QueueJobsSection
+          {jobView === 'queued' && <QueueJobsSection
             id="queue-waiting"
             title="等待执行"
             description="按基础队列位置展示所有等待任务。"
@@ -154,8 +155,8 @@ export default function QueueMonitorPanel({ active = true }: { active?: boolean 
             total={snapshot.queued_jobs.length}
             expandedJobs={expandedJobs}
             onToggle={toggleJob}
-          />
-          <QueueJobsSection
+          />}
+          {jobView === 'running' && <QueueJobsSection
             id="queue-running"
             title="正在执行"
             description="关注 Worker、运行时长、最后心跳和取消请求状态。"
@@ -164,26 +165,22 @@ export default function QueueMonitorPanel({ active = true }: { active?: boolean 
             heartbeatStaleMs={snapshot.capacity.stale_after_ms}
             expandedJobs={expandedJobs}
             onToggle={toggleJob}
-          />
-          <details className="tool-panel group" open={false}>
-            <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
-              <div>
-                <h3 className="font-semibold text-ink-primary">最近结束</h3>
-                <p className="mt-1 text-sm text-ink-muted">最近 20 条成功、失败、取消或死信任务。</p>
-              </div>
-              <span className="flex items-center gap-2 text-sm text-ink-secondary">
-                {filtered.recent.length} / {snapshot.recent_jobs.length}
-                <ChevronDown aria-hidden="true" className="h-4 w-4 transition-transform duration-150 group-open:rotate-180 motion-reduce:transition-none" />
-              </span>
-            </summary>
-            <div className="border-t border-surface-3 p-5">
-              <QueueJobsContent jobs={filtered.recent} expandedJobs={expandedJobs} onToggle={toggleJob} />
-            </div>
-          </details>
+          />}
+          {jobView === 'recent' && <QueueJobsSection
+            id="queue-recent"
+            title="最近结束"
+            description="最近 20 条成功、失败、取消或死信任务。"
+            jobs={filtered.recent}
+            total={snapshot.recent_jobs.length}
+            expandedJobs={expandedJobs}
+            onToggle={toggleJob}
+          />}
         </>
       )}
 
-      <DeadLetterPanel active={active} />
+      </div>
+      <div hidden={view !== 'history'} role="tabpanel" aria-label="服务历史与事件">{visited.includes('history') && <ServiceStatusHistoryPanel />}</div>
+      <div hidden={view !== 'dead'} role="tabpanel" aria-label="死信处理">{visited.includes('dead') && <DeadLetterPanel active={active && view === 'dead'} />}</div>
     </section>
   )
 }

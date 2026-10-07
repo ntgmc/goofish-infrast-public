@@ -26,9 +26,8 @@ describe('QueueMonitorPanel', () => {
     render(<QueueMonitorPanel />)
     await act(async () => { await Promise.resolve() })
 
-    const statusHeading = screen.getByRole('heading', { name: '30 天服务历史' })
-    const deadLetterHeading = screen.getByRole('heading', { name: '异步优化死信队列' })
-    expect(statusHeading.compareDocumentPosition(deadLetterHeading) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+    expect(screen.queryByRole('heading', { name: '30 天服务历史' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '异步优化死信队列' })).not.toBeInTheDocument()
     expect(screen.getByText('2 / 200')).toBeInTheDocument()
     expect(screen.getByText('1 / 3')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '实时资源状态' })).not.toBeInTheDocument()
@@ -38,19 +37,32 @@ describe('QueueMonitorPanel', () => {
 
     fireEvent.change(screen.getByPlaceholderText('任务 ID、邮箱或档案'), { target: { value: 'running-job' } })
     expect(screen.queryByText('queued-job')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: '正在执行' }))
     expect(screen.getAllByText('running-job').length).toBeGreaterThan(0)
 
     fireEvent.click(screen.getAllByRole('button', { name: /running-job/ })[0])
     expect(screen.getAllByText('worker-a').length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('tab', { name: '服务历史与事件' }))
+    await act(async () => { await Promise.resolve() })
+    expect(screen.getByRole('heading', { name: '30 天服务历史' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: '死信处理' }))
+    await act(async () => { await Promise.resolve() })
+    expect(screen.getByRole('heading', { name: '异步优化死信队列' })).toBeInTheDocument()
   })
 
   it('pauses both queue polls while another admin section is active and preserves local edits', async () => {
     const view = render(<QueueMonitorPanel />)
     await act(async () => { await Promise.resolve() })
     const search = screen.getByPlaceholderText('任务 ID、邮箱或档案')
-    const title = screen.getByPlaceholderText('事件标题')
     fireEvent.change(search, { target: { value: 'running-job' } })
+    fireEvent.click(screen.getByRole('tab', { name: '服务历史与事件' }))
+    await act(async () => { await Promise.resolve() })
+    const title = screen.getByPlaceholderText('事件标题')
     fireEvent.change(title, { target: { value: '尚未发布的事件' } })
+    fireEvent.click(screen.getByRole('tab', { name: '死信处理' }))
+    await act(async () => { await Promise.resolve() })
+    fireEvent.click(screen.getByRole('tab', { name: '任务监控' }))
+    await act(async () => { await Promise.resolve() })
     const initialCalls = adminApiJson.mock.calls.length
 
     view.rerender(<QueueMonitorPanel active={false} />)

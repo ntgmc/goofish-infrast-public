@@ -1,6 +1,18 @@
 [
   {
     "date": "2026-10-07",
+    "scope": "admin",
+    "macrostructure": "Workbench",
+    "theme": "V2 variant",
+    "theme_axes": "light and dark / geometric-sans / warm-copper",
+    "enrichment": "none",
+    "nav": "grouped side rail with compact mobile menu",
+    "brief": "Rebuild the admin workspace around record search, selected details, task views and domain data loading",
+    "design_system": "design.md",
+    "report": "docs/admin-workspace-redesign.md"
+  },
+  {
+    "date": "2026-10-07",
     "scope": "app",
     "macrostructure": "Application: Workbench; Content: Long Document",
     "theme": "custom",

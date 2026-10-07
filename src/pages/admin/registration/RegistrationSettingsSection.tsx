@@ -5,6 +5,7 @@ import { copy } from '../../../copy/index'
 import { SectionLoader } from '../../../components/SessionLoader'
 import AdminRegistrationInvitationsPanel from './AdminRegistrationInvitationsPanel'
 import { AdminToast } from '../shared/AdminToast'
+import { AdminTabs } from '../shared/AdminTabs'
 
 type RegistrationSettingsResponse = {
   settings: RegistrationSettings
@@ -12,6 +13,8 @@ type RegistrationSettingsResponse = {
 }
 
 export default function RegistrationSettingsSection() {
+  const [view, setView] = useState<'policy' | 'mail' | 'invites'>('policy')
+  const [invitesVisited, setInvitesVisited] = useState(false)
   const [settings, setSettings] = useState<RegistrationSettings | null>(null)
   const [emailStats, setEmailStats] = useState<BrevoEmailStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -99,10 +102,12 @@ export default function RegistrationSettingsSection() {
   const reserveTotalValid = settings.admin_invite_email_reserve + settings.password_reset_email_reserve <= emailStats.daily_limit
 
   return (
+    <div className="space-y-5"><AdminTabs label="注册管理任务" items={[{ id: 'policy', label: '注册策略' }, { id: 'mail', label: '邮件容量' }, { id: 'invites', label: '注册邀请' }]} value={view}
+      onChange={(next) => { setView(next); if (next === 'invites') setInvitesVisited(true) }} />
     <form onSubmit={submit} className="space-y-5" noValidate>
       {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
       {notice && <AdminToast message={notice} onDismiss={() => setNotice(null)} />}
-      <section className="tool-panel p-5 sm:p-6" aria-labelledby="admin-brevo-stats-title">
+      <section hidden={view !== 'mail'} role="tabpanel" className="tool-panel p-5 sm:p-6" aria-labelledby="admin-brevo-stats-title">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="tool-eyebrow">{copy.admin.registration_brevo_eyebrow}</p>
@@ -195,7 +200,7 @@ export default function RegistrationSettingsSection() {
             : ''}
         </p>
       </section>
-      <section className="tool-panel p-5 sm:p-6" aria-labelledby="admin-registration-title">
+      <section hidden={view !== 'policy'} role="tabpanel" className="tool-panel p-5 sm:p-6" aria-labelledby="admin-registration-title">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="tool-eyebrow">{copy.admin.registration_eyebrow}</p>
@@ -345,7 +350,7 @@ export default function RegistrationSettingsSection() {
         {settings.brevo_quota_action === 'allow_unverified_registration' && (
           <div className="tool-alert tool-alert--error mt-4" role="note">{copy.admin.registration_quota_warning}</div>
         )}
-        <div className="mt-5 flex flex-wrap items-center gap-3">
+        <div className="admin-savebar mt-5">
           <button type="submit" disabled={saving || loading} className="tool-primary-action">{saving ? copy.admin.registration_saving : copy.admin.registration_save}</button>
           <button type="button" disabled={saving || loading} onClick={() => void load()} className="tool-secondary-action">{copy.admin.registration_reload}</button>
           <span className="text-xs text-ink-muted">
@@ -353,8 +358,9 @@ export default function RegistrationSettingsSection() {
           </span>
         </div>
       </section>
-      <AdminRegistrationInvitationsPanel />
     </form>
+    <div hidden={view !== 'invites'} role="tabpanel" aria-label="注册邀请">{invitesVisited && <AdminRegistrationInvitationsPanel />}</div>
+    </div>
   )
 }
 

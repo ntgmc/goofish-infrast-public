@@ -837,6 +837,8 @@ export const commonCopy = {
   lib_admin_operation_reason_004: "确认并继续",
   // src/lib/admin-operation-reason.ts
   lib_admin_operation_reason_005: "操作原因须为 2 到 500 个字符。",
+  lib_admin_operation_refresh: "刷新目标数据",
+  lib_admin_operation_refresh_failed: "刷新失败，请重试。",
   // src/lib/api-client.ts
   lib_api_client_method_not_allowed: "当前操作不受支持。",
   lib_api_client_internal_error: "服务暂时不可用，请稍后重试。",

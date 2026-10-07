@@ -154,9 +154,7 @@ export interface UsageDay extends UsageTotals {
   date: string;
 }
 
-export type UsageRangeKey = '7d' | '14d' | '30d'
-
-export type UsageRangeMode = UsageRangeKey | 'custom'
+export type UsageRangeMode = '7d' | '14d' | '30d' | 'custom'
 
 export interface UsageRange {
   from: string;

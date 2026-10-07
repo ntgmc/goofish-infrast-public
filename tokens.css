@@ -229,7 +229,11 @@
 
 .v2-app,
 .v2-drawer,
-.v2-dialog {
+.v2-dialog,
+.admin-app,
+.admin-dialog,
+body:has(.admin-app) [data-slot="dropdown-menu-content"],
+body:has(.admin-app) [data-slot="popover-content"] {
   --color-brand-50: var(--color-v2-accent-soft);
   --color-brand-100: var(--color-v2-accent-soft);
   --color-brand-200: var(--color-v2-line);

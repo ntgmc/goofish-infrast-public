@@ -3,7 +3,8 @@ import { ChevronDown } from 'lucide-react'
 import SklandIcon from '../../../components/SklandIcon'
 import type { AdminBalanceTransaction, BalancePage } from '../../../lib/balance-contracts'
 import { normalizePointsAmount } from '../../../lib/balance-contracts'
-import { AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, permissionLabels, appUserStatusLabels } from '../contracts'
+import { AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, permissionLabels, appUserStatusLabels, type AdminCapability } from '../contracts'
+import { AdminTabs } from '../shared/AdminTabs'
 import { AdminDetailDialog } from '../shared/AdminDetailDialog'
 import { DetailItem, StatusPill, UserStatusPill, SmallButton, formatDate, getAdminProfileAccessLabel, formatAdminProfileAccess, formatOperatorValue, getAppUserStatusLabel } from '../shared/helpers'
 import { adminApiJson } from '../../../lib/admin-api-client'
@@ -11,6 +12,9 @@ import { WorkspaceExportDialog } from './WorkspaceExportDialog'
 import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
 
 export interface UserDetailPanelProps {
+  inline?: boolean;
+  active?: boolean;
+  capabilities?: AdminCapability[];
   detail: AdminUserDetail;
   busyAction: string | null;
   operatorDataByProfileId: Record<string, AdminProfileOperatorData>;
@@ -36,6 +40,7 @@ export interface UserDetailPanelProps {
 }
 
 export function UserDetailDialog(props: UserDetailPanelProps) {
+  if (props.inline) return <UserDetailPanel key={props.detail.user.id} {...props} />
   return (
     <AdminDetailDialog labelledBy="admin-user-detail-title" onClose={props.onClose}>
       <UserDetailPanel {...props} />
@@ -44,6 +49,8 @@ export function UserDetailDialog(props: UserDetailPanelProps) {
 }
 
 function UserDetailPanel({
+  active = true,
+  capabilities = [],
   detail,
   busyAction,
   operatorDataByProfileId,
@@ -68,6 +75,11 @@ function UserDetailPanel({
   onDeleteUser,
 }: UserDetailPanelProps) {
   const [workspaceExportOpen, setWorkspaceExportOpen] = useState(false)
+  const [view, setView] = useState('profiles')
+  const [profileId, setProfileId] = useState(detail.profiles[0]?.id ?? '')
+  const selectedProfile = detail.profiles.find((profile) => profile.id === profileId) ?? detail.profiles[0]
+  const canManage = capabilities.includes('user_manage')
+  useEffect(() => { if (!active) setWorkspaceExportOpen(false) }, [active])
   const user = detail.user
   return (
     <section className="tool-panel overflow-hidden">
@@ -82,9 +94,9 @@ function UserDetailPanel({
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <SmallButton onClick={() => setWorkspaceExportOpen(true)}>导出工作区</SmallButton>
-          {user.status === 'active' && <SmallButton onClick={() => void onFreezeUser(user)} loading={busyAction === `app-user:freeze_account:${user.id}`}>冻结用户</SmallButton>}
-          {user.status === 'frozen' && <SmallButton onClick={() => void onUnfreezeUser(user)} loading={busyAction === `app-user:unfreeze_account:${user.id}`} tone="success">解冻用户</SmallButton>}
-          <SmallButton onClick={() => void onDeleteUser(user)} loading={busyAction === `app-user:delete_account:${user.id}`} tone="danger">删除用户</SmallButton>
+          {canManage && user.status === 'active' && <SmallButton onClick={() => void onFreezeUser(user)} loading={busyAction === `app-user:freeze_account:${user.id}`}>冻结用户</SmallButton>}
+          {canManage && user.status === 'frozen' && <SmallButton onClick={() => void onUnfreezeUser(user)} loading={busyAction === `app-user:unfreeze_account:${user.id}`} tone="success">解冻用户</SmallButton>}
+          {capabilities.includes('user_delete') && <SmallButton onClick={() => void onDeleteUser(user)} loading={busyAction === `app-user:delete_account:${user.id}`} tone="danger">删除用户</SmallButton>}
           <SmallButton onClick={onClose} autoFocus>关闭</SmallButton>
         </div>
       </div>
@@ -119,24 +131,32 @@ function UserDetailPanel({
           </div>
         )}
 
-        {METERED_BILLING_AVAILABLE && <UserBalanceCard
+        <div className="mt-5"><AdminTabs label="用户详情任务" value={view} onChange={setView} items={[
+          { id: 'profiles', label: '账号档案' }, { id: 'declarations', label: '使用声明' },
+          ...(METERED_BILLING_AVAILABLE ? [{ id: 'balance', label: '积分记录' }] : []),
+        ]} /></div>
+        {METERED_BILLING_AVAILABLE && <div hidden={view !== 'balance'}><UserBalanceCard
           userId={user.id}
           balance={balance}
           loading={balanceLoading}
           busy={busyAction === `user-balance:${user.id}`}
           onAdjust={onAdjustBalance}
           onLoadMore={onLoadMoreBalance}
-        />}
+        /></div>}
 
-        <PersonalUseDeclarations declarations={detail.personal_use_declarations} />
+        <div hidden={view !== 'declarations'}><PersonalUseDeclarations declarations={detail.personal_use_declarations} /></div>
 
-        <div className="mt-5 space-y-4">
+        <div hidden={view !== 'profiles'} className="mt-5 admin-selection">
+          <aside className="admin-selection-index" aria-label="选择账号档案">{detail.profiles.map((profile) => <button key={profile.id} type="button" aria-pressed={selectedProfile?.id === profile.id} onClick={() => setProfileId(profile.id)}>
+            <strong>{profile.display_name || '账号档案'}</strong><small>{getAdminProfileAccessLabel(profile)}</small>
+          </button>)}</aside><div className="min-w-0">
           {detail.profiles.length === 0 ? (
             <div className="tool-inset border-dashed px-4 py-8 text-center text-sm text-ink-muted">该用户暂无档案。</div>
-          ) : detail.profiles.map((profile) => (
+          ) : selectedProfile && [selectedProfile].map((profile) => (
             <ProfileDetailCard
               key={profile.id}
               profile={profile}
+              canManage={canManage}
               busyAction={busyAction}
               operatorData={operatorDataByProfileId[profile.id] ?? null}
               operatorsExpanded={expandedOperatorProfileId === profile.id}
@@ -150,9 +170,9 @@ function UserDetailPanel({
               onDownloadOperators={onDownloadOperators}
             />
           ))}
-        </div>
+        </div></div>
       </div>
-      {workspaceExportOpen && (
+      {workspaceExportOpen && active && (
         <WorkspaceExportDialog
           key={user.id}
           detail={detail}
@@ -501,6 +521,7 @@ function personalUseActionLabel(action: string): string {
 
 function ProfileDetailCard({
   profile,
+  canManage,
   busyAction,
   operatorData,
   operatorsExpanded,
@@ -514,6 +535,7 @@ function ProfileDetailCard({
   onDownloadOperators,
 }: {
   profile: AdminProfileSummary;
+  canManage: boolean;
   busyAction: string | null;
   operatorData: AdminProfileOperatorData | null;
   operatorsExpanded: boolean;
@@ -546,14 +568,14 @@ function ProfileDetailCard({
           {profile.note && <p className="mt-2 text-sm text-ink-secondary">{profile.note}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
-          <SmallButton onClick={() => void onUpdateProfile(profile)} loading={busyAction === `profile:update_profile:${profile.id}`}>改名称</SmallButton>
+          {canManage && <><SmallButton onClick={() => void onUpdateProfile(profile)} loading={busyAction === `profile:update_profile:${profile.id}`}>改名称</SmallButton>
           <SmallButton onClick={() => void onSetProfileStatus(profile)} loading={busyAction === `profile:set_profile_status:${profile.id}`}>改状态</SmallButton>
           <SmallButton onClick={() => void onSetProfilePermission(profile)} loading={busyAction === `profile:set_profile_permission:${profile.id}`}>改权限</SmallButton>
-          {profile.kind === 'free_preview' && <SmallButton onClick={() => void onUpgradePreviewProfile(profile)} loading={busyAction === `profile:upgrade_preview_profile:${profile.id}`} tone="success">免 CDK 升级</SmallButton>}
+          {profile.kind === 'free_preview' && <SmallButton onClick={() => void onUpgradePreviewProfile(profile)} loading={busyAction === `profile:upgrade_preview_profile:${profile.id}`} tone="success">免 CDK 升级</SmallButton>}</>}
           <SmallButton onClick={() => void onViewOperators(profile)} loading={busyAction === `profile-operators:${profile.id}`}>{operatorsExpanded ? '收起干员' : '查看干员'}</SmallButton>
           <SmallButton onClick={() => void onDownloadOperators(profile)} loading={busyAction === `profile-operators-download:${profile.id}`}>下载 JSON</SmallButton>
-          <SmallButton onClick={() => void onClearSklandBinding(profile)} loading={busyAction === `profile:clear_profile_skland_binding:${profile.id}`} tone="danger"><SklandIcon />清绑定</SmallButton>
-          <SmallButton onClick={() => void onClearWorkspace(profile)} loading={busyAction === `profile:clear_profile_workspace:${profile.id}`} tone="danger">清工作区</SmallButton>
+          {canManage && <><SmallButton onClick={() => void onClearSklandBinding(profile)} loading={busyAction === `profile:clear_profile_skland_binding:${profile.id}`} tone="danger"><SklandIcon />清绑定</SmallButton>
+          <SmallButton onClick={() => void onClearWorkspace(profile)} loading={busyAction === `profile:clear_profile_workspace:${profile.id}`} tone="danger">清工作区</SmallButton></>}
         </div>
       </div>
 

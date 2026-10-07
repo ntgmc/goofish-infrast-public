@@ -25,7 +25,6 @@ interface Props {
   onDetail: (user: AppUserSummary) => Promise<void>
   onFreeze: (user: AppUserSummary) => Promise<void>
   onUnfreeze: (user: AppUserSummary) => Promise<void>
-  onDelete: (user: AppUserSummary) => Promise<void>
 }
 
 export function UserTable(props: Props) {
@@ -38,8 +37,8 @@ export function UserTable(props: Props) {
   return <section className="tool-panel overflow-hidden">
     <div className="border-b border-surface-3 p-4">
       <h2 className="text-lg font-semibold text-ink-primary">注册用户</h2>
-      <fieldset disabled={Boolean(busyAction)} className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <label className="sm:col-span-2 xl:col-span-4">
+      <fieldset disabled={Boolean(busyAction)} className="admin-user-filters mt-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <label className="col-span-2 xl:col-span-4">
           <span className="mb-1.5 block text-xs font-medium text-ink-muted">搜索</span>
           <input type="search" value={props.search} onChange={(event) => props.onSearch(event.currentTarget.value)} placeholder="搜索邮箱、用户 ID、档案或订单标识" className="tool-field" />
         </label>
@@ -55,6 +54,7 @@ export function UserTable(props: Props) {
             {cdkProductPermissions.map((permission) => <option key={permission} value={permission}>{permissionLabels[permission]}</option>)}
           </select>
         </label>
+        <details className="self-end"><summary className="min-h-11 cursor-pointer py-2 text-sm text-ink-secondary">高级筛选</summary><div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <label><span className="mb-1.5 block text-xs font-medium text-ink-muted">档案类型</span>
           <select className="tool-field" value={filters.profile_kind} onChange={(event) => filter('profile_kind', event.currentTarget.value)}>
             <option value="all">全部类型</option><option value="cdk">卡授权档案</option><option value="free_preview">免费预览</option>
@@ -86,11 +86,11 @@ export function UserTable(props: Props) {
             <option value="last_seen_desc">最近上线：新到旧</option><option value="last_seen_asc">最近上线：旧到新</option>
           </select>
         </label>
+        </div><p className="mt-3 text-xs text-ink-muted">卡等级筛选匹配仍有效且未冻结、未归档的卡授权档案。最近上线约每 10 分钟更新；历史会话已清理的用户可能没有记录。</p></details>
+        <button type="button" className="tool-secondary-action self-end text-sm" onClick={() => { props.onSearch(''); props.onFilters(DEFAULT_ADMIN_USER_FILTERS) }}>重置筛选</button>
       </fieldset>
-      <p className="mt-3 text-xs text-ink-muted">卡等级筛选匹配仍有效且未冻结、未归档的卡授权档案。最近上线约每 10 分钟更新；历史会话已清理的用户可能没有记录。</p>
-      <button type="button" className="tool-secondary-action mt-3 text-sm" disabled={Boolean(busyAction)} onClick={() => { props.onSearch(''); props.onFilters(DEFAULT_ADMIN_USER_FILTERS) }}>重置筛选</button>
     </div>
-    <div className="flex flex-wrap items-center gap-2 border-b border-surface-3 p-4">
+    <div hidden={!selectedUsers.length} className="flex flex-wrap items-center gap-2 border-b border-surface-3 p-4">
       <span className="text-sm text-ink-secondary">当前页已选 {selectedUsers.length} 个用户</span>
       <button type="button" className="tool-secondary-action text-sm" disabled={busy || !selectedUsers.length} onClick={() => void props.onCopy('id')}>复制用户 ID</button>
       <button type="button" className="tool-secondary-action text-sm" disabled={busy || !selectedUsers.length} onClick={() => void props.onCopy('email')}>复制邮箱</button>
@@ -103,7 +103,7 @@ export function UserTable(props: Props) {
     </div>
     <div className="overflow-x-auto" aria-busy={loading}>
       {loading && <div className="border-b border-surface-3 px-4 py-2 text-sm text-ink-muted" role="status">正在加载…</div>}
-      <table className="min-w-full text-left text-sm">
+      <table className="w-full min-w-[56rem] text-left text-sm">
         <thead className="bg-surface-2 text-xs uppercase tracking-wide text-ink-muted"><tr>
           <th className="px-4 py-3"><input className="h-4 w-4 accent-brand-500" type="checkbox" aria-label="选择当前页全部用户" disabled={busy} checked={allSelected} onChange={(event) => props.onSelect(event.currentTarget.checked ? users.map((user) => user.id) : [])} /></th>
           <th className="px-4 py-3">邮箱／用户 ID</th><th className="px-4 py-3">状态</th><th className="px-4 py-3">权限</th><th className="px-4 py-3">档案</th><th className="px-4 py-3">时间</th><th className="px-4 py-3">操作</th>
@@ -120,7 +120,6 @@ export function UserTable(props: Props) {
               {capabilities.includes('sensitive_data_view') && <SmallButton onClick={() => void props.onDetail(user)} loading={busy}>详情</SmallButton>}
               {canManage && user.status === 'active' && <SmallButton onClick={() => void props.onFreeze(user)} loading={busy}>冻结</SmallButton>}
               {canManage && user.status === 'frozen' && <SmallButton onClick={() => void props.onUnfreeze(user)} loading={busy} tone="success">解冻</SmallButton>}
-              {capabilities.includes('user_delete') && <SmallButton onClick={() => void props.onDelete(user)} loading={busy} tone="danger">删除</SmallButton>}
             </div></td>
           </tr>)}
         </tbody>

@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
-import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, renderHook, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { ApiError } from '../../lib/api-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FormEvent } from 'react'
 import type { Announcement, AnnouncementAdminResponse } from '../../lib/types'
@@ -24,13 +26,13 @@ vi.mock('../../lib/admin-api-client', () => ({
   adminApiJson: adminApi.json,
   adminApiVoid: adminApi.void,
 }))
-vi.mock('../../lib/admin-operation-reason', () => ({ requestAdminOperationReason }))
+vi.mock('../../lib/admin-operation-reason', async (importOriginal) => ({ ...await importOriginal<typeof import('../../lib/admin-operation-reason')>(), requestAdminOperationReason }))
 
 let serverAnnouncements: AnnouncementAdminResponse
 let sessionUsername: string
 let failAnnouncementGet: boolean
 let failAnnouncementPut: boolean
-let failCdkPageGet: boolean
+let failUserPageGet: boolean
 let usageVisits: number
 let deferredUsageResponses: Array<ReturnType<typeof deferred<unknown>>>
 
@@ -44,7 +46,7 @@ describe('useAdminController announcement drafts', () => {
     sessionUsername = 'alice'
     failAnnouncementGet = false
     failAnnouncementPut = false
-    failCdkPageGet = false
+    failUserPageGet = false
     usageVisits = 0
     deferredUsageResponses = []
     adminApi.blob.mockReset().mockResolvedValue(new Blob(['workspace export'], { type: 'application/json' }))
@@ -91,11 +93,11 @@ describe('useAdminController announcement drafts', () => {
         return { totals: { visits: usageVisits } }
       }
       if (url === '/api/admin/risk-settings') return {}
-      if (url.startsWith('/api/admin/cdk')) {
-        if (failCdkPageGet && url.includes('page=')) throw new Error('CDK 列表刷新失败')
+      if (url.startsWith('/api/admin/cdk')) return {}
+      if (url.startsWith('/api/admin/users')) {
+        if (failUserPageGet && url.includes('page=')) throw new Error('用户列表刷新失败')
         return {}
       }
-      if (url.startsWith('/api/admin/users')) return {}
       throw new Error(`Unexpected admin API request: ${url}`)
     })
   })
@@ -103,6 +105,41 @@ describe('useAdminController announcement drafts', () => {
   afterEach(() => {
     cleanup()
     vi.unstubAllGlobals()
+  })
+
+  it('refreshes a conflicted profile version without replacing the edit or using the workspace timestamp', async () => {
+    const oldVersion = '2026-10-01T00:00:00.000Z'
+    const newVersion = '2026-10-02T00:00:00.000Z'
+    const workspaceVersion = '2026-10-03T00:00:00.000Z'
+    const profile = { id: 'profile-1', display_name: '原名称', note: '', updated_at: oldVersion, workspace: { updated_at: workspaceVersion } } as AdminProfileSummary
+    const detail = { user: { id: 'user-1', email: 'user@example.test' }, profiles: [profile] } as unknown as AdminUserDetail
+    const implementation = adminApi.json.getMockImplementation()!
+    let submitted = false
+    adminApi.json.mockImplementation(async (url: string, init?: { method?: string; json?: unknown }) => {
+      if (url.startsWith('/api/admin/users?user_id=')) return { detail: { ...detail, profiles: [{ ...profile, updated_at: newVersion }] } }
+      if (url === '/api/admin/users' && init?.method === 'PATCH') {
+        if (!submitted) { submitted = true; throw new ApiError('档案已被其他请求修改，请刷新后重试。', 409, {}, url) }
+        return { detail }
+      }
+      return implementation(url, init)
+    })
+    const { result } = renderHook(() => useAdminController('users'))
+    await waitFor(() => expect(result.current.authenticated).toBe(true))
+    act(() => result.current.setSelectedUserDetail(detail))
+    let pending!: Promise<void>
+    act(() => { pending = result.current.handleUpdateProfile(profile) })
+    const user = userEvent.setup()
+    await user.clear(screen.getByLabelText('档案名称'))
+    await user.type(screen.getByLabelText('档案名称'), '输入的新名称')
+    await user.type(screen.getByRole('textbox', { name: '操作原因或工单号' }), '工单 OPS-104')
+    await act(async () => { fireEvent.submit(screen.getByRole('button', { name: '保存资料' }).closest('form')!) })
+    expect(screen.getByRole('alert')).toHaveTextContent('请刷新后重试')
+    await act(async () => { await user.click(screen.getByRole('button', { name: '刷新目标数据' })) })
+    expect(screen.getByLabelText('档案名称')).toHaveValue('输入的新名称')
+    await act(async () => { fireEvent.submit(screen.getByRole('button', { name: '保存资料' }).closest('form')!); await pending })
+    const patches = adminApi.json.mock.calls.filter(([url, init]) => url === '/api/admin/users' && init?.method === 'PATCH')
+    expect(patches.map(([, init]) => init.json.expected_updated_at)).toEqual([oldVersion, newVersion])
+    expect(patches[1][1].json).toMatchObject({ display_name: '输入的新名称', reason: '工单 OPS-104' })
   })
 
   it('defaults profile CDK generation to advanced permission', () => {
@@ -337,7 +374,7 @@ describe('useAdminController announcement drafts', () => {
       }
       return originalImplementation(url, init)
     })
-    const { result } = renderHook(() => useAdminController())
+    const { result } = renderHook(() => useAdminController('cdk'))
     await waitForHydration(result)
     await waitFor(() => expect(result.current.visibleRecords).toHaveLength(2))
     act(() => result.current.setSelectedCdkHashes([firstHash, secondHash]))
@@ -364,7 +401,7 @@ describe('useAdminController announcement drafts', () => {
       if (url.startsWith('/api/admin/cdk?') && !url.includes('view=')) return { cdks: records }
       return originalImplementation(url, init)
     })
-    const { result } = renderHook(() => useAdminController())
+    const { result } = renderHook(() => useAdminController('cdk'))
     await waitForHydration(result)
     await waitFor(() => expect(result.current.visibleRecords).toHaveLength(3))
     act(() => result.current.setSelectedCdkHashes(hashes))
@@ -386,7 +423,7 @@ describe('useAdminController announcement drafts', () => {
   })
 
   it('sends combined user filters to the server and clears selections on filter or page changes', async () => {
-    const { result } = renderHook(() => useAdminController())
+    const { result } = renderHook(() => useAdminController('users'))
     await waitForHydration(result)
     act(() => result.current.setSelectedUserIds(['user-1']))
     act(() => result.current.setUserFilters({
@@ -417,7 +454,7 @@ describe('useAdminController announcement drafts', () => {
       if (url.startsWith('/api/admin/users?')) return { app_users: users }
       return originalImplementation(url, init)
     })
-    const { result } = renderHook(() => useAdminController())
+    const { result } = renderHook(() => useAdminController('users'))
     await waitForHydration(result)
     await waitFor(() => expect(result.current.appUsers).toHaveLength(3))
     act(() => result.current.setSelectedUserIds(users.map((user) => user.id)))
@@ -476,9 +513,9 @@ describe('useAdminController announcement drafts', () => {
   })
 
   it('reports a successful user mutation separately from a failed background refresh', async () => {
-    const { result } = renderHook(() => useAdminController())
+    const { result } = renderHook(() => useAdminController('users'))
     await waitForHydration(result)
-    failCdkPageGet = true
+    failUserPageGet = true
     const target = {
       id: 'user-1',
       email: 'user@example.test',
@@ -496,13 +533,17 @@ describe('useAdminController announcement drafts', () => {
     }))
     expect(result.current.notice).toContain('已冻结账号：user@example.test')
     expect(result.current.notice).toContain('操作已成功，但部分数据刷新失败')
-    expect(result.current.error).toContain('CDK 列表刷新失败')
+    expect(result.current.error).toContain('用户列表刷新失败')
   })
 })
 
 async function waitForHydration(result: { current: ReturnType<typeof useAdminController> }) {
   await waitFor(() => expect(result.current.authenticated).toBe(true))
-  await waitFor(() => expect(result.current.banner.title).toBe('线上横幅'))
+  await waitFor(() => {
+    expect(result.current.loading).toBe(false)
+    expect(result.current.cdkLoading).toBe(false)
+    expect(result.current.usersLoading).toBe(false)
+  })
 }
 
 function deferred<T>() {

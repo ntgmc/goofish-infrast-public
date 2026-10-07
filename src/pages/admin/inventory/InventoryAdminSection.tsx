@@ -8,6 +8,7 @@ import { Field, itemKindLabel, type InventoryPanelProps } from './InventoryEdito
 import { InventoryPacksPanel } from './InventoryPacksPanel'
 import { InventoryOnboardingPanel } from './InventoryOnboardingPanel'
 import { InventoryDistributionPanel } from './InventoryDistributionPanel'
+import { AdminTabs } from '../shared/AdminTabs'
 
 const ADMIN_TABS = [
   { id: 'catalog', label: '道具目录', description: '维护系统道具的展示信息和发放状态' },
@@ -103,30 +104,11 @@ export default function InventoryAdminSection() {
       {notice && <AdminToast message={notice} onDismiss={() => setNotice(null)} />}
     </section>
 
-    <nav className="tool-panel min-w-0 overflow-x-auto p-2" aria-label="道具与礼包管理分区">
-      <div className="flex min-w-max gap-2" role="tablist" aria-label="道具管理">
-        {ADMIN_TABS.map((tab, index) => <button key={tab.id} id={`inventory-admin-tab-${tab.id}`}
-          type="button" role="tab" disabled={busy} tabIndex={activeTab === tab.id ? 0 : -1}
-          aria-selected={activeTab === tab.id} aria-controls={`inventory-admin-panel-${tab.id}`}
-          className={`min-w-32 rounded-xl px-4 py-3 text-left transition ${activeTab === tab.id ? 'bg-brand-500 text-primary-foreground shadow-sm' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}
-          onClick={() => selectTab(tab.id)} onKeyDown={(event) => {
-            const next = event.key === 'ArrowRight' ? (index + 1) % ADMIN_TABS.length
-              : event.key === 'ArrowLeft' ? (index + ADMIN_TABS.length - 1) % ADMIN_TABS.length
-                : event.key === 'Home' ? 0 : event.key === 'End' ? ADMIN_TABS.length - 1 : null
-            if (next === null) return
-            event.preventDefault()
-            const target = ADMIN_TABS[next].id
-            selectTab(target)
-            document.getElementById(`inventory-admin-tab-${target}`)?.focus()
-          }}>
-          <span className="block text-sm font-semibold">{tab.label}</span>
-          <span aria-hidden="true" className={`mt-1 hidden text-xs sm:block ${activeTab === tab.id ? 'text-primary-foreground/80' : 'text-ink-muted'}`}>{tab.description}</span>
-        </button>)}
-      </div>
-    </nav>
+    <nav aria-label="道具与礼包管理分区"><AdminTabs label="道具管理" items={ADMIN_TABS} value={activeTab} onChange={selectTab} disabled={busy} /></nav>
+    <p className="text-sm text-ink-muted">{ADMIN_TABS.find((tab) => tab.id === activeTab)?.description}</p>
 
     {ADMIN_TABS.map((tab) => <fieldset key={tab.id} id={`inventory-admin-panel-${tab.id}`} role="tabpanel"
-      aria-labelledby={`inventory-admin-tab-${tab.id}`} hidden={activeTab !== tab.id} disabled={busy}
+      aria-label={tab.label} hidden={activeTab !== tab.id} disabled={busy}
       tabIndex={0} className="m-0 min-w-0 border-0 p-0">
       {visited.includes(tab.id) && <>
         {tab.id === 'catalog' && <CatalogPanel {...props} />}
@@ -148,20 +130,10 @@ function CatalogPanel({ data, busy, run }: InventoryPanelProps) {
   }
   return <section className="tool-panel min-w-0 p-5 sm:p-6">
     <h3 className="text-base font-semibold text-ink-primary">道具目录</h3>
-    <div className="mt-4 overflow-x-auto">
-      <table className="min-w-full text-left text-sm">
-        <thead className="text-ink-muted"><tr>
-          {['道具', '类型', '用途', '发放状态', '操作'].map((heading) => <th key={heading} scope="col" className="p-2">{heading}</th>)}
-        </tr></thead>
-        <tbody>{data.definitions.map((definition) => <tr key={definition.code} className="border-t border-surface-3">
-          <td className="p-2">{definition.name}</td><td className="p-2">{itemKindLabel(definition.kind)}</td>
-          <td className="min-w-48 p-2">{definition.description}</td>
-          <td className="whitespace-nowrap p-2">{definition.issuance_enabled ? '允许' : '停用'}</td>
-          <td className="p-2"><button type="button" className="tool-secondary-action" onClick={() => setItemCode(definition.code)}>编辑</button></td>
-        </tr>)}</tbody>
-      </table>
-    </div>
-    {item && <form className="mt-5 grid min-w-0 gap-3 border-t border-surface-3 pt-5 lg:grid-cols-2" onSubmit={(event) => {
+    <div className="admin-selection mt-4"><aside className="admin-selection-index" aria-label="选择道具">{data.definitions.map((definition) => <button key={definition.code} type="button" aria-pressed={definition.code === itemCode} onClick={() => setItemCode(definition.code)}>
+      <strong>{definition.name}</strong><small>{itemKindLabel(definition.kind)} · {definition.issuance_enabled ? '允许发放' : '停用'}</small>
+    </button>)}</aside>
+    {item && <form className="grid min-w-0 gap-3 lg:grid-cols-2" onSubmit={(event) => {
       event.preventDefault()
       const submittedItem = item
       void run('/api/admin/items', {
@@ -191,7 +163,7 @@ function CatalogPanel({ data, busy, run }: InventoryPanelProps) {
         </label>
         <button className="tool-secondary-action" disabled={busy || !item.name.trim() || !item.description.trim()}>保存目录展示信息</button>
       </div>
-    </form>}
+    </form>}</div>
     {data.definitions.length === 0 && <p className="mt-4 text-sm text-ink-muted">暂无道具。</p>}
   </section>
 }

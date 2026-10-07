@@ -107,10 +107,6 @@ export const domainCopy = {
     support: "工作区之外的控制中枢、会客室和办公室按对应班次手动更换；下班干员按宿舍安排休息，使用“干员休整”后检查床位和恢复支援干员。无人机按各班目标及换班前后的使用顺序手动处理；启用菲亚梅塔时，按排班安排手动恢复目标干员心情。",
     autofill: "采用 MAA 自动填满宿舍的方案时，在游戏内为下班干员安排休息，并保留排班中的宿舍技能干员；纯自动填满方案也需自行安排宿舍。",
   },
-  maa_export: {
-    title: (layout: number, shifts: number, manual: boolean) => `MaaTool · ${layout}基建 · ${shifts}班${manual ? " · 手动排班" : ""}`,
-    description: (shiftPattern: string) => `按班次顺序换班。${shiftPattern ? `班次时长：${shiftPattern}，请按对应时长设置换班时间。` : "换班时间请按生成排班时的设置安排。"}`,
-  },
   result_image: {
     long: "导出总览长图",
     current: "导出当前班次",

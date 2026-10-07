@@ -5,6 +5,8 @@ import { adminApiJson, adminApiVoid } from '../lib/admin-api-client'
 import { copy } from '../copy/index'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import { SectionLoader } from '../components/SessionLoader'
+import { DialogSurfaceProvider } from '../components/ui/dialog'
+import './admin/admin.css'
 
 
 interface AdminUserSummary {
@@ -97,7 +99,7 @@ export default function AdminSetupPage() {
   }
 
   return (
-    <main className="tool-page" tabIndex={-1} data-route-focus>
+    <DialogSurfaceProvider value="admin-dialog"><main className="admin-app admin-setup tool-page" tabIndex={-1} data-route-focus>
       <div className="tool-page-frame tool-page-content min-h-[calc(100dvh-3rem)] max-w-5xl">
         <div className="tool-page-header flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -176,7 +178,7 @@ export default function AdminSetupPage() {
         </div>
         </div>
       </div>
-    </main>
+    </main></DialogSurfaceProvider>
   )
 }
 
