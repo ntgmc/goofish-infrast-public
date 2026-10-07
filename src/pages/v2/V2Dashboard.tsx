@@ -7,7 +7,7 @@ import Link from '../../components/InternalLink'
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
 import { AnimatedValue, MotionNavIndicator, RevealItem, StaggeredReveal, motionTokens } from '../../components/MotionPrimitives'
-import { formatAmount, prepareResult } from '../../components/result-panel/formatters'
+import { formatAmount, formatIntermediateDepletionSummary, formatSigned, prepareResult } from '../../components/result-panel/formatters'
 import { PRODUCT_LABELS } from '../../components/result-panel/labels'
 import InventoryDepletionWarning from '../../components/result-panel/InventoryDepletionWarning'
 import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
@@ -100,6 +100,8 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const sustainablePullsNote = orundumEconomy
     ? text.sustainablePullsHint(formatAmount(orundumEconomy.sustainable_orundum))
     : text.sustainableOrundumUnavailable
+  const hasGoldNet = Number.isFinite(result.daily_production?.net?.['Pure Gold'])
+  const inventorySummary = resultMode !== 'rotation' ? formatIntermediateDepletionSummary(prepared.intermediateDepletion) : ''
   const inventoryBurstNote = orundumEconomy?.case === 'inventory_burst' && orundumEconomy.inventory_depletion_days !== null
     ? text.inventoryBurstHint(formatAmount(orundumEconomy.inventory_depletion_days))
     : ''
@@ -216,6 +218,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           <WorkspaceSections section={displayedSection} session={guardedSession} workflow={workflow} generationProgress={generationProgress} onAccountAdded={accountAdded} onToolDirtyChange={setToolDirty} onOpenProfile={(profile) => openProfile(profile, section === 'manual-tool' ? 'manual-tool' : 'overview')} onNavigate={navigateSection} onConfig={() => openPanel('config')} generationDisabledReason={generationDisabledReason} />
           <div hidden={displayedSection !== 'overview'}>
           <div className="v2-page-title"><h1>{text.title}</h1></div>
+          <InventoryDepletionWarning result={result} className="v2-inventory-warning" action={<button type="button" className="v2-button v2-button-secondary" onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" />{text.configure}</button>} />
           <div className="v2-ready-banner">
             <span className="v2-ready-icon"><Check size={25} strokeWidth={2} /></span>
             <div><h2>{text.resultReady}<span className="v2-ready-tag">{sample ? text.sample : SCHEDULE_MODE_LABELS[resultMode]}</span></h2></div>
@@ -234,7 +237,6 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           </AnimatePresence>
           {generationProgress}
           {children}
-          <InventoryDepletionWarning result={result} />
           <StaggeredReveal className="v2-metrics">
             <Metric label={text.lmd} value={formatAmount(prepared.productionStats.lmd)} unit={text.daily} product="LMD" />
             <Metric label={showOrundum ? text.orundum : text.exp} value={formatAmount(showOrundum ? shortTermOrundum : battleRecords * 1000)}
@@ -280,6 +282,10 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
                   return value !== 0 ? <OutputRow key={product} product={product} value={value} /> : null
                 })}
               </section>
+              {(hasGoldNet || inventorySummary) && <dl className="v2-inventory-summary" aria-label={text.intermediateInventory}>
+                {hasGoldNet && <div className="v2-inventory-net"><dt>{text.goldNetChange}</dt><dd data-decreasing={prepared.productionStats.goldNet < 0}><strong>{formatSigned(prepared.productionStats.goldNet)}</strong><span>{text.daily}</span></dd></div>}
+                {inventorySummary && <div><dt>{text.intermediateInventory}</dt><dd>{inventorySummary}</dd></div>}
+              </dl>}
               <section className="v2-panel v2-config-panel">
                 <div className="v2-panel-heading"><h2>{text.currentConfig}</h2><button className="v2-text-button" type="button" onClick={() => openPanel('config')}>{text.edit}<ArrowUpRight size={13} /></button></div>
                 <div className="v2-layout-preview">

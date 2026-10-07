@@ -1195,6 +1195,104 @@
   line-height: 1.9;
 }
 
+.v2-inventory-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--radius-v2-panel);
+  background: var(--v2-paper);
+}
+
+.v2-inventory-summary > div {
+  min-width: 0;
+}
+
+.v2-inventory-summary dt {
+  color: var(--v2-secondary);
+  font-size: var(--text-sm);
+}
+
+.v2-inventory-summary dd {
+  margin-top: var(--space-2xs);
+  font-size: var(--text-base);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.v2-inventory-net dd {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+}
+
+.v2-inventory-net strong {
+  font-size: var(--text-lg);
+}
+
+.v2-inventory-net span {
+  color: var(--v2-muted);
+  font-size: var(--text-xs);
+  font-weight: 400;
+}
+
+.v2-inventory-net dd[data-decreasing="true"] strong {
+  color: var(--color-v2-error);
+}
+
+.v2-inventory-warning {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2xs) var(--space-lg);
+  margin-bottom: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--color-caution-border);
+  border-left: 4px solid var(--color-caution);
+  background: var(--color-caution-bg);
+  color: var(--v2-ink);
+}
+
+.v2-inventory-warning > :is(p, ul) {
+  grid-column: 1;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.v2-inventory-warning > p:first-child {
+  color: var(--color-caution);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
+
+.v2-inventory-warning > ul {
+  font-weight: 600;
+}
+
+.v2-inventory-warning > .v2-button {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: center;
+  border-color: var(--color-caution);
+  color: var(--color-caution);
+  background: transparent;
+}
+
+@media (max-width: 40rem) {
+  .v2-inventory-warning {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-sm);
+  }
+  .v2-inventory-warning > .v2-button {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: start;
+    margin-top: var(--space-2xs);
+  }
+}
+
 .v2-progress {
   margin-bottom: 18px;
 }
