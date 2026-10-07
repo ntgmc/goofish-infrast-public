@@ -210,6 +210,9 @@
 }
 
 .v2-workspace {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
   min-width: 0;
   margin-left: var(--v2-rail-width);
 }
@@ -318,6 +321,10 @@
 
 .v2-main {
   --v2-main-padding: var(--space-lg);
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: 100%;
   max-width: 1600px;
   margin: 0 auto;
   padding: var(--v2-main-padding);
@@ -1134,6 +1141,8 @@
 
 .v2-footer {
   display: flex;
+  margin-top: auto;
+  padding-top: var(--space-lg);
   min-height: 66px;
   align-items: center;
   justify-content: space-between;

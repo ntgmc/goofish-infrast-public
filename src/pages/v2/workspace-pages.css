@@ -48,6 +48,33 @@ textarea.v2-input { resize: vertical; }
 .v2-step-number, .v2-section-number { color: var(--v2-accent); font-family: var(--font-mono); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
 .v2-selection-workspace { display: grid; grid-template-columns: minmax(14rem, .75fr) minmax(0, 1.6fr); align-items: start; gap: var(--space-xl); }
 
+/* Keep mounted forms; replay the shared entrance when a view becomes visible. */
+.v2-page-section :is(
+  .v2-settings-content > section,
+  .v2-inventory-workspace > section,
+  .v2-history-workspace > section,
+  .v2-planning-outcome > section,
+  .v2-depot-skland,
+  .v2-depot-upload
+):not([hidden]),
+.v2-page-section :is(
+  .v2-account-detail,
+  .v2-account-registration,
+  .v2-record-details,
+  .v2-announcement-reading,
+  .v2-release-detail,
+  .v2-pricing-selected,
+  .v2-comparison-selected,
+  .v2-special-detail,
+  .v2-item-shelf
+) {
+  animation: motion-region-enter var(--dur-base) var(--motion-ease-enter) both;
+}
+.v2-page-section button[aria-pressed] {
+  transition: color var(--dur-fast) ease-out, background-color var(--dur-fast) ease-out,
+    border-color var(--dur-fast) ease-out, box-shadow var(--dur-fast) ease-out;
+}
+
 /* Select an account, then act on that account. */
 .v2-account-index { min-width: 0; }
 .v2-selection-list { margin-top: var(--space-sm); }

@@ -16,7 +16,7 @@ export default function AddAccount({ onAdded, onInventory }: { onAdded: (payload
   ]
   return <div className="v2-add-account">
     <div className="v2-account-methods" role="group" aria-label={text.pages_tool_dashboard_RedeemSection_004}>{choices.map((choice) => <button key={choice.id} aria-label={choice.label} aria-pressed={model.mode === choice.id} onClick={() => { model.setMode(choice.id); model.setError(null) }}><choice.icon size={24} /><strong>{choice.label}</strong><span>{choice.description}</span></button>)}</div>
-    <form onSubmit={model.submit} className="v2-account-registration">
+    <form key={model.mode} onSubmit={model.submit} className="v2-account-registration">
       <SectionTitle title={choices.find((choice) => choice.id === model.mode)?.label ?? text.pages_tool_dashboard_RedeemSection_002} description={model.mode === 'preview' ? text.pages_tool_dashboard_RedeemSection_007 : text.pages_tool_dashboard_RedeemSection_003} />
       <Notice error>{model.error}</Notice>
       {model.mode === 'cdk' && <Field label="CDK" value={model.cdk} maxLength={256} required autoComplete="off" onChange={(event) => model.setCdk(event.target.value)} />}
