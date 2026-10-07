@@ -25,6 +25,13 @@ describe('auth payload profile selection', () => {
     expect(selected.workspaceProfileIds).not.toContain('commercial-a')
   })
 
+  it('restores a merged preview link to its CDK profile', () => {
+    const cdk = { ...profile('cdk', 'cdk'), merged_profile_ids: ['old-preview'] }
+    const selected = selectAuthPayloadProfiles([personal, cdk], 'old-preview')
+    expect(selected.activeProfileRecord?.id).toBe('cdk')
+    expect(selected.records.map((item) => item.id)).toEqual(['personal', 'cdk'])
+  })
+
   it('falls back to the default profile when the requested id is not owned', () => {
     const selected = selectAuthPayloadProfiles(records, 'missing')
 

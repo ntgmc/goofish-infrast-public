@@ -173,6 +173,9 @@ export default async (req: Request): Promise<Response> => {
     await recordAuthenticatedRequestBehaviorEvent({ req, auth, eventType: 'workspace_save', profileId: profile.id })
     return jsonResponse(await buildAuthPayload(auth.user, profile.id))
   } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'profile_merged') {
+      return jsonResponse({ error: error.message, code: error.code }, 409)
+    }
     if (error instanceof WorkspaceMutationError) {
       return jsonResponse({ error: error.message }, error.status)
     }

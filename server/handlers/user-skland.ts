@@ -1321,6 +1321,7 @@ async function confirmFreePreviewClaim(
     const existing = await client.query<{ record_json: UserGameAccountRecord }>(
       `select record_json from user_game_accounts
         where user_id = $1 and kind = 'free_preview'
+          and nullif(record_json->>'merged_into_profile_id', '') is null
         order by created_at asc
         for update`,
       [user.id],

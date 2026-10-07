@@ -36,11 +36,123 @@ function errorResponse(status: number): Response {
 }
 
 describe('useToolSession config synchronization', () => {
-  beforeEach(() => vi.useRealTimers())
+  beforeEach(() => { vi.useRealTimers(); window.localStorage.clear() })
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
     vi.useRealTimers()
+  })
+
+  it('restores the last v2 profile before exposing the authenticated workspace and remembers switches', async () => {
+    window.localStorage.setItem('maatool:v2:last-profile:user-1', 'profile-2')
+    const requestedUrls: string[] = []
+    let restore!: (response: Response) => void
+    const pending = new Promise<Response>((resolve) => { restore = resolve })
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      requestedUrls.push(url)
+      if (url === '/api/announcement') return new Response(null, { status: 204 })
+      if (url === '/api/auth/me?profile_id=profile-2') return pending
+      if (url === '/api/auth/me') return jsonResponse(authPayload(baseConfig))
+      if (url === '/api/user/workspace?profile_id=profile-3') return jsonResponse(authPayload(baseConfig, 'profile-3'))
+      throw new Error(`Unexpected request: ${url}`)
+    }))
+    const { result, unmount } = renderHook(() => useToolSession(null, true))
+    await waitFor(() => expect(requestedUrls).toContain('/api/auth/me?profile_id=profile-2'))
+    expect(result.current.authStatus).toBe('loading')
+    expect(result.current.activeProfile).toBeNull()
+    await act(async () => restore(jsonResponse(authPayload(baseConfig, 'profile-2'))))
+    await waitFor(() => expect(result.current.activeProfile?.id).toBe('profile-2'))
+    expect(window.localStorage.getItem('maatool:v2:last-profile:user-1')).toBe('profile-2')
+    await act(async () => result.current.refreshProfileWorkspace(authPayload(baseConfig, 'profile-3').active_profile!))
+    expect(window.localStorage.getItem('maatool:v2:last-profile:user-1')).toBe('profile-3')
+    unmount()
+  })
+
+  it('ignores an outstanding remembered-profile load after navigating to an explicit profile', async () => {
+    window.localStorage.setItem('maatool:v2:last-profile:user-1', 'profile-2')
+    let restore!: (response: Response) => void
+    const pending = new Promise<Response>((resolve) => { restore = resolve })
+    const requestedUrls: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      requestedUrls.push(url)
+      if (url === '/api/announcement') return new Response(null, { status: 204 })
+      if (url.endsWith('profile_id=profile-2')) return pending
+      return jsonResponse(authPayload(baseConfig, url.includes('profile_id=') ? 'profile-3' : 'profile-1'))
+    }))
+    const { result, rerender } = renderHook(({ id }: { id: string | null }) => useToolSession(id, true), { initialProps: { id: null as string | null } })
+    await waitFor(() => expect(requestedUrls).toContain('/api/auth/me?profile_id=profile-2'))
+    rerender({ id: 'profile-3' })
+    await waitFor(() => expect(result.current.activeProfile?.id).toBe('profile-3'))
+    await act(async () => restore(jsonResponse(authPayload(baseConfig, 'profile-2'))))
+    expect(result.current.activeProfile?.id).toBe('profile-3')
+    expect(window.localStorage.getItem('maatool:v2:last-profile:user-1')).toBe('profile-3')
+  })
+
+  it('falls back to an available profile when the remembered profile is archived', async () => {
+    window.localStorage.setItem('maatool:v2:last-profile:user-1', 'archived')
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === '/api/announcement') return new Response(null, { status: 204 })
+      const payload = authPayload(baseConfig, url.endsWith('profile_id=profile-2') ? 'profile-2' : 'profile-1')
+      if (url.endsWith('profile_id=archived')) {
+        payload.active_profile = { ...payload.active_profile!, id: 'archived', archived_at: '2026-01-01' }
+        payload.profiles = [payload.active_profile, authPayload(baseConfig, 'profile-2').active_profile!]
+      }
+      return jsonResponse(payload)
+    }))
+    const { result } = renderHook(() => useToolSession(null, true))
+    await waitFor(() => expect(result.current.authStatus).toBe('authenticated'))
+    expect(result.current.activeProfile?.id).toBe('profile-2')
+    expect(window.localStorage.getItem('maatool:v2:last-profile:user-1')).toBe('profile-2')
+  })
+
+  it.each(['missing-profile', 'merged-preview'])('replaces a stale v2 preference with the server-selected profile (%s)', async (remembered) => {
+    window.localStorage.setItem('maatool:v2:last-profile:user-1', remembered)
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === '/api/announcement') return new Response(null, { status: 204 })
+      return jsonResponse(authPayload(baseConfig, String(input).includes('profile_id=') ? 'profile-2' : 'profile-1'))
+    }))
+    const { result } = renderHook(() => useToolSession(null, true))
+    await waitFor(() => expect(result.current.authStatus).toBe('authenticated'))
+    expect(result.current.activeProfile?.id).toBe('profile-2')
+    expect(window.localStorage.getItem('maatool:v2:last-profile:user-1')).toBe('profile-2')
+  })
+
+  it.each([true, false])('gives a URL profile priority and keeps memory opt-in (%s)', async (remember) => {
+    window.localStorage.setItem('maatool:v2:last-profile:user-1', 'profile-2')
+    const requestedUrls: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      requestedUrls.push(String(input))
+      if (String(input) === '/api/announcement') return new Response(null, { status: 204 })
+      return jsonResponse(authPayload(baseConfig, 'profile-3'))
+    }))
+    const { result } = renderHook(() => useToolSession('profile-3', remember))
+    await waitFor(() => expect(result.current.authStatus).toBe('authenticated'))
+    expect(requestedUrls).toEqual(expect.arrayContaining(['/api/auth/me?profile_id=profile-3']))
+    expect(requestedUrls).not.toContain('/api/auth/me?profile_id=profile-2')
+    expect(window.localStorage.getItem('maatool:v2:last-profile:user-1')).toBe(remember ? 'profile-3' : 'profile-2')
+  })
+
+  it('isolates v2 preferences by login account and tolerates unavailable storage', async () => {
+    window.localStorage.setItem('maatool:v2:last-profile:other-user', 'foreign-profile')
+    const requestedUrls: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      requestedUrls.push(String(input))
+      if (String(input) === '/api/announcement') return new Response(null, { status: 204 })
+      return jsonResponse(authPayload(baseConfig))
+    }))
+    const first = renderHook(() => useToolSession(null, true))
+    await waitFor(() => expect(first.result.current.authStatus).toBe('authenticated'))
+    expect(requestedUrls).not.toContain('/api/auth/me?profile_id=foreign-profile')
+    expect(window.localStorage.getItem('maatool:v2:last-profile:other-user')).toBe('foreign-profile')
+    first.unmount()
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked') })
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked') })
+    const second = renderHook(() => useToolSession(null, true))
+    await waitFor(() => expect(second.result.current.authStatus).toBe('authenticated'))
+    expect(second.result.current.activeProfile?.id).toBe('profile-1')
   })
 
   it('requests the profile selected by the URL when restoring the session', async () => {
@@ -80,13 +192,15 @@ describe('useToolSession config synchronization', () => {
     expect(result.current.user).toBeNull()
   })
 
-  it('rejects a successful response that omits the user field', async () => {
+  it.each([false, true])('rejects a successful response that omits the user field (restoring: %s)', async (remember) => {
+    window.localStorage.setItem('maatool:v2:last-profile:user-1', 'profile-2')
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       if (String(input) === '/api/announcement') return new Response(null, { status: 204 })
+      if (remember && String(input) === '/api/auth/me') return jsonResponse(authPayload(baseConfig))
       return jsonResponse({ profiles: [], active_profile: null, workspace: null })
     }))
 
-    const { result } = renderHook(() => useToolSession())
+    const { result } = renderHook(() => useToolSession(null, remember))
     await waitFor(() => expect(result.current.authStatus).toBe('error'))
     expect(result.current.authError).toBeInstanceOf(Error)
     expect(result.current.user).toBeNull()

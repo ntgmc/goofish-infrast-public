@@ -3,6 +3,7 @@ import type { PoolClient } from 'pg'
 import type { AdminUserFilters } from '../../src/lib/admin-user-filters'
 import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
+import { mergeDuplicateSklandProfiles } from './profile-merge-store'
 import {
   recordAdminOperationAuditInTransaction,
   type AdminOperationAuditInput,
@@ -70,6 +71,8 @@ export interface UserGameAccountRecord {
   permission: PermissionMode
   status: 'active' | 'frozen' | 'revoked'
   archived_at?: string | null
+  merged_into_profile_id?: string | null
+  merged_profile_ids?: string[]
   display_name: string
   note: string
   skland_binding?: SklandBindingRecord | null
@@ -765,7 +768,7 @@ export async function listProfilesForUser(userId: string): Promise<UserGameAccou
     'select record_json from user_game_accounts where user_id = $1 order by created_at asc',
     [userId],
   )
-  return result.rows.map((row) => row.record_json)
+  return mergeDuplicateSklandProfiles(userId, result.rows.map((row) => row.record_json))
 }
 
 export async function getProfileById(profileId: string): Promise<UserGameAccountRecord | null> {
@@ -780,7 +783,11 @@ export async function getProfileById(profileId: string): Promise<UserGameAccount
 export async function getProfileForUser(userId: string, profileId: string): Promise<UserGameAccountRecord | null> {
   await ensureSchema()
   const result = await query<{ record_json: UserGameAccountRecord }>(
-    'select record_json from user_game_accounts where id = $1 and user_id = $2',
+    `select coalesce(target.record_json, profile.record_json) as record_json
+       from user_game_accounts profile
+       left join user_game_accounts target
+         on target.id = profile.record_json->>'merged_into_profile_id' and target.user_id = profile.user_id
+      where profile.id = $1 and profile.user_id = $2`,
     [profileId, userId],
   )
   return result.rows[0]?.record_json ?? null
@@ -1360,8 +1367,22 @@ export async function getProfileWorkspaceForUpdateInTransaction(
   return normalizeWorkspaceRecord(current.rows[0]?.record_json ?? null)
 }
 
+class ProfileMergedError extends Error {
+  readonly status = 409
+  readonly code = 'profile_merged'
+  constructor() {
+    super('该档案已合并，请刷新页面后使用合并后的档案。')
+    this.name = 'ProfileMergedError'
+  }
+}
+
 async function lockWorkspaceForUpdate(client: PoolClient, profileId: string): Promise<void> {
   await client.query("select pg_advisory_xact_lock(hashtextextended('workspace:' || $1, 0))", [profileId])
+  const profile = await client.query(
+    "select 1 from user_game_accounts where id = $1 and nullif(record_json->>'merged_into_profile_id', '') is not null",
+    [profileId],
+  )
+  if (profile.rowCount) throw new ProfileMergedError()
 }
 
 async function saveProfileWorkspaceWithClient(client: PoolClient, normalized: UserWorkspaceRecord): Promise<void> {

@@ -665,7 +665,7 @@ describe('V2 results-first workspace', () => {
     await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('profile_id=profile-2'))
     expect(session.flushConfigSave).toHaveBeenCalledOnce()
     expect(session.refreshProfileWorkspace).toHaveBeenCalledWith(second)
-    expect(mocks.session).toHaveBeenLastCalledWith('profile-2')
+    expect(mocks.session).toHaveBeenLastCalledWith('profile-2', true)
   })
 
   it.each(['overview', 'generation'])('cancels the current job from %s through the existing task controller while retaining the result', async (section) => {
