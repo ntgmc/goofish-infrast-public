@@ -831,7 +831,7 @@ export default function ConfigEditor({
                   </p>
                 </div>
               )}
-              <div className="grid min-w-0 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+              <div className={`grid min-w-0 gap-4 ${config.drones?.auto ? '' : 'md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]'}`}>
                 <div>
                   <label className="mb-2 block text-xs font-medium text-ink-muted" htmlFor="drone-order">
                     {copy.common.components_ConfigEditor_073}</label>
@@ -852,13 +852,13 @@ export default function ConfigEditor({
                     <option value="post">{copy.common.components_ConfigEditor_075}</option>
                   </select>
                 </div>
-                <div>
+                {!config.drones?.auto && <div>
                   <label className="mb-2 block text-xs font-medium text-ink-muted" htmlFor="drone-targets">
                     {copy.common.components_ConfigEditor_076}</label>
                     <DroneTargetsInput
                       id="drone-targets"
                       value={droneTargets}
-                    disabled={!canEdit || rotationMode || !config.drones?.enable || Boolean(config.drones?.auto)}
+                    disabled={!canEdit || rotationMode || !config.drones?.enable}
                       onChange={(value) => onUpdate((next) => {
                         next.drones = {
                           ...(next.drones ?? { enable: true, order: 'pre' }),
@@ -867,7 +867,7 @@ export default function ConfigEditor({
                         applyCounts(next)
                       })}
                     />
-                </div>
+                </div>}
               </div>
             </section>
           </div>
