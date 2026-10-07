@@ -74,13 +74,17 @@ function AppContent() {
     }).catch(() => undefined)
   }, [location.pathname])
 
+  const v2Page = <FeatureRoute feature="v2" renderPending={(status, retry) => <V2LoadingScreen
+    error={status === 'error' ? copy.features.load_failed_body : null} onRetry={retry} retryLabel={copy.features.retry} />}>
+    <Suspense fallback={<V2LoadingScreen />}><V2Page /></Suspense></FeatureRoute>
+
   return (
     <div className="min-h-screen bg-surface-0 text-ink-primary">
       <RouteMetadata />
       <RouteLifecycle />
       <Routes>
         <Route element={<PublicContentRoute />}>
-          <Route path="/" element={<LandingPage onStart={() => navigate('/tool/profiles')} />} />
+          <Route path="/v1" element={<LandingPage onStart={() => navigate('/tool/profiles')} />} />
           <Route path="/changelog" element={<FeatureRoute feature="changelog"><LazyPage fallback={copy.common.App_014}><ChangelogPage /></LazyPage></FeatureRoute>} />
           <Route path="/faq" element={<FeatureRoute feature="faq"><LazyPage fallback={copy.common.App_003}><PublicInfoPage page="faq" /></LazyPage></FeatureRoute>} />
           <Route path="/support" element={<FeatureRoute feature="support"><LazyPage fallback={copy.common.App_004}><PublicInfoPage page="support" /></LazyPage></FeatureRoute>} />
@@ -91,9 +95,8 @@ function AppContent() {
           <Route path="/terms" element={<LazyPage fallback={copy.common.App_006}><PublicInfoPage page="terms" /></LazyPage>} />
           <Route path="/disclaimer" element={<LazyPage fallback={copy.common.App_007}><PublicInfoPage page="disclaimer" /></LazyPage>} />
         </Route>
-        <Route path="/v2" element={<FeatureRoute feature="v2" renderPending={(status, retry) => <V2LoadingScreen
-          error={status === 'error' ? copy.features.load_failed_body : null} onRetry={retry} retryLabel={copy.features.retry} />}>
-          <Suspense fallback={<V2LoadingScreen />}><V2Page /></Suspense></FeatureRoute>} />
+        <Route path="/" element={v2Page} />
+        <Route path="/v2" element={v2Page} />
         <Route path="/tool/*" element={<LazyPage fallback={copy.common.App_001}><ToolPage /></LazyPage>} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
@@ -108,7 +111,7 @@ function AppContent() {
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
       <DeploymentUpdatePrompt />
-      {location.pathname !== '/v2' && <BuildMetaStrip placement="corner" />}
+      {location.pathname !== '/' && location.pathname !== '/v2' && <BuildMetaStrip placement="corner" />}
     </div>
   )
 }

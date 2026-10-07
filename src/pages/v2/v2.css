@@ -259,6 +259,7 @@
 
 .v2-sample-pill {
   display: flex;
+  min-height: 44px;
   flex: none;
   white-space: nowrap;
   align-items: center;
@@ -269,6 +270,10 @@
   background: var(--color-v2-inset);
   color: var(--v2-secondary);
   font-size: var(--text-sm);
+}
+
+.v2-sample-pill:hover {
+  border-color: var(--v2-accent);
 }
 
 .v2-sample-pill > span {
@@ -1741,7 +1746,6 @@
   .v2-topbar-actions .v2-profile-button > span:nth-child(2) { display: none; }
   .v2-topbar-actions { gap: 0; }
   .v2-back-link { display: inline-flex; min-height: 44px; align-items: center; padding-inline: var(--space-xs); }
-  .v2-sample-pill { display: none; }
   .v2-profile-button { min-width: 44px; min-height: 44px; justify-content: center; }
   .v2-profile-button > svg { display: none; }
   .v2-page-title { margin-bottom: var(--space-sm); }

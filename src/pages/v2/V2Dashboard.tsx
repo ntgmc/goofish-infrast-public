@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
 import { useAppReducedMotion } from '../../lib/motion-preference'
 import { Activity, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, CalendarClock, Check, ChevronDown, ChevronRight, Download, Factory, FileClock, Gem, LayoutDashboard, Menu, RefreshCw, ScrollText, Settings2, ShieldCheck, Sparkles, Users, WalletCards, X, Zap } from 'lucide-react'
@@ -154,6 +154,13 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
     if (!await session.flushConfigSave()) { setNavigationError(text.saveFailed); return }
     await session.handleLogout()
   }
+  async function openLegacy(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    event.preventDefault()
+    if ((manualDirty || toolDirty) && !window.confirm(text.discardManual)) return
+    if (!await session.flushConfigSave()) { setNavigationError(text.saveFailed); return }
+    void navigate('/v1')
+  }
   const guardedSession = { ...session, handleLogout: logout }
   function closePanel() {
     setPanel(null)
@@ -202,7 +209,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
         <header className="v2-topbar">
           <div className="v2-breadcrumb"><button className="v2-menu-button v2-icon-button" type="button" onClick={() => setMobileNavigation(true)} aria-label={text.menu}><Menu size={21} /></button>
             <span>{text.workspace}</span><ChevronRight size={14} /><strong>{sectionLabels[section]}</strong></div>
-          <div className="v2-topbar-actions"><span className="v2-sample-pill"><span />{text.testVersion}</span>
+          <div className="v2-topbar-actions"><Link to="/v1" className="v2-sample-pill" onClick={openLegacy} aria-label={`${text.testVersion} · ${text.legacyEntry}`} title={text.legacyEntry}><span />{text.testVersion}</Link>
             {features.changelog && <Link to={v2Path('updates', session.activeProfile?.id)} className="v2-icon-button" aria-label={text.updates}><ScrollText size={19} /></Link>}
             <div className="v2-feature-content">{taskCenterAction}</div>
             <div className="v2-feature-content"><ThemeSwitcher iconOnly /></div>

@@ -4,6 +4,7 @@ export const v2Copy = {
   testVersion: 'V2',
   testEntry: '进入 V2 工作台',
   testEntryDescription: '在第二代工作台管理游戏账号、生成排班并使用工具。',
+  legacyEntry: '旧版入口（V1）',
   generation: '生成与计算',
   generationDescription: '选择生成选项，查看配置变化并生成或更新排班。',
   plansDescription: '保存常用配置、查看历史排班，并管理方案归档。',

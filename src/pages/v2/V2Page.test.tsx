@@ -63,7 +63,8 @@ afterEach(() => {
 })
 
 function RouteLocation() {
-  return <span data-testid="route-location">{useLocation().search}</span>
+  const location = useLocation()
+  return <span data-testid="route-location" data-pathname={location.pathname}>{location.search}</span>
 }
 
 function mount(path = '/v2') {
@@ -236,7 +237,10 @@ describe('V2 results-first workspace', () => {
     expect(screen.getByText(copy.v2.sampleSource)).toBeInTheDocument()
     expect(screen.getByText(copy.v2.brandDescription)).toBeInTheDocument()
     expect(screen.queryByText('可露希尔基建终端')).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: '返回 V1' })).not.toBeInTheDocument()
+    const legacyEntry = within(screen.getByRole('banner')).getByRole('link', { name: `${copy.v2.testVersion} · ${copy.v2.legacyEntry}` })
+    expect(legacyEntry).toHaveAttribute('href', '/v1')
+    expect(legacyEntry).toHaveAttribute('title', copy.v2.legacyEntry)
+    expect(legacyEntry).toHaveTextContent(copy.v2.testVersion)
     expect(screen.getByRole('tab', { name: /第 1 班/ })).toHaveAttribute('aria-selected', 'true')
     expect(mocks.workflow).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -245,7 +249,26 @@ describe('V2 results-first workspace', () => {
     ])
   })
 
+  it('waits for configuration saving before switching versions and stays in V2 when saving fails', async () => {
+    connect()
+    let finishSave!: (saved: boolean) => void
+    vi.mocked(session.flushConfigSave).mockReturnValueOnce(new Promise((resolve) => { finishSave = resolve }))
+    const user = userEvent.setup()
+    mount('/')
+    const badge = screen.getByRole('link', { name: `${copy.v2.testVersion} · ${copy.v2.legacyEntry}` })
+    await user.click(badge)
+    expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/')
+    await act(async () => finishSave(false))
+    expect(screen.getByRole('alert')).toHaveTextContent(copy.v2.saveFailed)
+    expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/')
+    await user.click(badge)
+    await waitFor(() => expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v1'))
+    expect(session.flushConfigSave).toHaveBeenCalledTimes(2)
+  })
+
   it.each([
+    '/?profile_id=profile-1',
+    '/?profile_id=profile-1&panel=operators',
     '/v2?profile_id=profile-1',
     '/v2?profile_id=profile-1&panel=operators',
     '/v2?section=profiles&profile_id=profile-1',
@@ -945,6 +968,10 @@ describe('V2 feature continuity', () => {
     await user.click(screen.getByRole('button', { name: copy.v2.regenerate }))
     expect(confirm).toHaveBeenCalledWith(copy.v2.discardManual)
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('link', { name: `${copy.v2.testVersion} · ${copy.v2.legacyEntry}` }))
+    expect(confirm).toHaveBeenCalledTimes(2)
+    expect(session.flushConfigSave).not.toHaveBeenCalled()
+    expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2')
     confirm.mockReturnValue(true)
     await user.click(screen.getByRole('button', { name: copy.v2.regenerate }))
     expect(workflow.handleGenerate).toHaveBeenCalledOnce()
