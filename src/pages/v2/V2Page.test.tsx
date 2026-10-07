@@ -68,7 +68,8 @@ function RouteLocation() {
 }
 
 function mount(path = '/v2') {
-  return render(<MemoryRouter initialEntries={[path]}><V2Page /><RouteLocation /></MemoryRouter>)
+  window.localStorage.setItem('maatool-reduce-motion', 'true')
+  return render(<MemoryRouter initialEntries={[path]}><V2Page /><RouteLocation /></MemoryRouter>, { wrapper: MotionPreferenceProvider })
 }
 
 async function dismissDrawer(user: ReturnType<typeof userEvent.setup>) {
@@ -692,6 +693,7 @@ describe('V2 results-first workspace', () => {
   })
 
   it.each(['overview', 'generation'])('cancels the current job from %s through the existing task controller while retaining the result', async (section) => {
+    if (section === 'generation') await import('./pages/Generation')
     const workflow = connect()
     workflow.loading = true
     workflow.progress = { mode: 'generate', startedAt: Date.now(), jobId: 'running-job', estimatePhase: 'running' }
