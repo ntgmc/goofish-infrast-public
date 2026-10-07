@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { Link } from 'react-router'
 import AuthForm from '../../components/AuthForm'
@@ -52,10 +52,11 @@ const descriptions: Partial<Record<V2Section, string>> = {
 const publicSections: V2Section[] = ['tools', 'depot', 'manual-tool', 'cultivation', 'announcements', 'help', 'updates', 'settings', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing']
 const workflowSections: V2Section[] = ['generation', 'plans', 'lab']
 
-export default function WorkspaceSections({ section, session, workflow, onAccountAdded, onToolDirtyChange, onOpenProfile, onNavigate, onConfig, generationDisabledReason }: {
+export default function WorkspaceSections({ section, session, workflow, generationProgress, onAccountAdded, onToolDirtyChange, onOpenProfile, onNavigate, onConfig, generationDisabledReason }: {
   section: V2Section
   session: V2Session
   workflow?: V2Workflow
+  generationProgress?: ReactNode
   onAccountAdded: (payload: AuthSuccessResponse) => Promise<void>
   onToolDirtyChange: (dirty: boolean) => void
   onOpenProfile: (profile: V2Session['profiles'][number]) => Promise<void>
@@ -101,7 +102,7 @@ export default function WorkspaceSections({ section, session, workflow, onAccoun
                 {section === 'status' && <Status />}
                 {section === 'updates' && <Updates />}
                 {section === 'plans' && workflow && <Plans workflow={workflow} />}
-                {section === 'generation' && workflow && <Generation workflow={workflow} disabledReason={generationDisabledReason} onNavigate={onNavigate} onConfig={onConfig} />}
+                {section === 'generation' && workflow && <Generation workflow={workflow} progress={generationProgress} disabledReason={generationDisabledReason} onNavigate={onNavigate} onConfig={onConfig} />}
                 {section === 'lab' && workflow && <Lab workflow={workflow} onConfig={onConfig} />}
               </>}
       </Suspense>

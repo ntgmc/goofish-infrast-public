@@ -37,12 +37,13 @@ type View = 'schedule' | 'analysis' | 'manual' | 'training'
 const ManualScheduleEditor = lazy(() => import('../../components/result-panel/ManualScheduleEditor'))
 const UpgradeSuggestions = lazy(() => import('../../components/UpgradeSuggestions'))
 
-export default function V2Dashboard({ session, workflow, taskCenterAction, result, operators, config, sample, configChanged, onUpdateConfig,
+export default function V2Dashboard({ session, workflow, taskCenterAction, generationProgress, result, operators, config, sample, configChanged, onUpdateConfig,
   onImportOperators, onGenerate, onExport, busy = false, loadingResult = false, generationDisabledReason, onRetryResult, error, notice,
   permission, onManualDirtyChange, canEditConfig = true, canViewAnalysis = true, canUseIntermediateConfig = true, children }: {
   session: V2Session
   workflow?: V2Workflow
   taskCenterAction?: ReactNode
+  generationProgress?: ReactNode
   result: OptimizeResult
   operators: LicenseOperator[]
   config: LicenseConfig
@@ -212,7 +213,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
           {navigationError && <p className="v2-feedback v2-feedback-error" role="alert">{navigationError}<button type="button" onClick={() => { session.retryConfigSave(); setNavigationError(null) }}>{text.loginRetry}</button></p>}
           <AnnouncementBanner announcement={session.banner} />
           <V2PageTransition motionKey={section} className="v2-page-transition">{(displayedSection) => <>
-          <WorkspaceSections section={displayedSection} session={guardedSession} workflow={workflow} onAccountAdded={accountAdded} onToolDirtyChange={setToolDirty} onOpenProfile={(profile) => openProfile(profile, section === 'manual-tool' ? 'manual-tool' : 'overview')} onNavigate={navigateSection} onConfig={() => openPanel('config')} generationDisabledReason={generationDisabledReason} />
+          <WorkspaceSections section={displayedSection} session={guardedSession} workflow={workflow} generationProgress={generationProgress} onAccountAdded={accountAdded} onToolDirtyChange={setToolDirty} onOpenProfile={(profile) => openProfile(profile, section === 'manual-tool' ? 'manual-tool' : 'overview')} onNavigate={navigateSection} onConfig={() => openPanel('config')} generationDisabledReason={generationDisabledReason} />
           <div hidden={displayedSection !== 'overview'}>
           <div className="v2-page-title"><h1>{text.title}</h1></div>
           <div className="v2-ready-banner">
@@ -231,6 +232,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, resul
             {error && onRetryResult && <button type="button" onClick={onRetryResult}>{text.retry}</button>}
           </div></FeedbackRegion>}
           </AnimatePresence>
+          {generationProgress}
           {children}
           <InventoryDepletionWarning result={result} />
           <StaggeredReveal className="v2-metrics">

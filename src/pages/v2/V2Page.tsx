@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { LoaderCircle, Square } from 'lucide-react'
 import { ResultErrorBoundary } from '../tool/optimize/ResultSection'
 import OptimizationTaskCenterDialog, { OptimizationTaskCenterButton } from '../tool/optimize/OptimizationTaskCenter'
 import { restoreScenarioComparisonJob } from '../tool/optimize/scenario-lab/useScenarioComparison'
@@ -188,9 +189,10 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
       void navigate(v2Path('overview', profile.id))
     })().catch((caught) => setError(caught instanceof Error ? caught.message : copy.v2.resultLoadFailed)) }} />
   const result = current ?? retained
-  const progress = workflow.progress && (workflow.progress.estimatePhase !== 'completed' || !current) && <div className="v2-progress"><ScheduleProgress progress={workflow.progress} />
-    {workflow.loading && activeJob && <button type="button" className="v2-button v2-button-secondary" disabled={tasks.busyJobId === activeJob.id || activeJob.cancellationRequested}
-      onClick={() => void tasks.cancel(activeJob)}>{tasks.busyJobId === activeJob.id || activeJob.cancellationRequested ? copy.v2.stopping : copy.v2.stopSchedule}</button>}
+  const stopping = Boolean(activeJob && (tasks.busyJobId === activeJob.id || activeJob.cancellationRequested))
+  const stopAction = workflow.loading && activeJob && <button type="button" className="v2-button v2-button-secondary v2-stop-schedule" disabled={stopping} aria-busy={stopping}
+    onClick={() => void tasks.cancel(activeJob)}>{stopping ? <LoaderCircle size={16} className="v2-spin" aria-hidden="true" /> : <Square size={16} aria-hidden="true" />}{stopping ? copy.v2.stopping : copy.v2.stopSchedule}</button>
+  const progress = workflow.progress && (workflow.progress.estimatePhase !== 'completed' || !current) && <div className="v2-progress"><ScheduleProgress progress={workflow.progress} action={stopAction} />
     {tasks.error && <p role="alert" className="v2-error">{tasks.error}</p>}
     {tasks.notice && <p role="status" className="v2-muted">{tasks.notice}</p>}
   </div>
@@ -208,7 +210,7 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
       if (generationDisabledReason) { setError(generationDisabledReason); return }
       if (!await session.flushConfigSave()) { setError(workflow.configValidation.ok ? copy.v2.saveFailed : workflow.configValidation.message); return }
       await workflow.handleIncrementalRecompute()
-    } }} taskCenterAction={taskCenterAction} result={result ?? SAMPLE_RESULT} operators={workflow.mergedOperators} config={workflow.activeConfig}
+    } }} taskCenterAction={taskCenterAction} generationProgress={progress} result={result ?? SAMPLE_RESULT} operators={workflow.mergedOperators} config={workflow.activeConfig}
     sample={!result} configChanged={Boolean(result && (operatorsChanged || workflow.configDiffRows.length > 0 || session.configOverride))}
     onUpdateConfig={workflow.updateConfig}
     onImportOperators={async (operators) => {
@@ -223,7 +225,6 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
     notice={workflow.workspaceNotice ?? (!features.features.schedule_generation ? copy.features.schedule_read_only : !result && !reading ? copy.v2.dataPending : null)}
     permission={workflow.permission} canEditConfig={workflow.userCanEditConfig} canViewAnalysis={workflow.userCanViewFullData && !result?.preview_limit}
     canUseIntermediateConfig={workflow.userCanUseIntermediateAutoConfig}>
-    {progress}
     {taskCenterDialog}
     {workflow.declarationDialog}
   </V2Dashboard></ResultErrorBoundary>

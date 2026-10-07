@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { motion } from 'motion/react'
 import { useAppReducedMotion } from '../lib/motion-preference'
 import { AnimatedValue } from './MotionPrimitives'
@@ -50,6 +50,7 @@ interface Props {
   progress: ScheduleProgressState;
   className?: string;
   variant?: 'embedded' | 'focus';
+  action?: ReactNode;
 }
 
 type TaskStatus = 'preparing' | 'queued' | 'retrying' | 'cancelling' | 'cancelled' | 'failed' | 'running' | 'overdue' | 'finishing' | 'completed'
@@ -57,7 +58,7 @@ type StepVisualState = 'done' | 'active' | 'pending' | 'failed'
 type TaskStepRole = 'submit' | 'queue' | 'schedule' | 'suggestions' | 'persist'
 type TaskStepDefinition = { label: string; detail: string; role: TaskStepRole }
 
-export default function ScheduleProgress({ progress, className = '', variant = 'embedded' }: Props) {
+export default function ScheduleProgress({ progress, className = '', variant = 'embedded', action }: Props) {
   const progressKey = `${progress.jobId ?? 'local'}:${progress.startedAt}`
   const [progressFrame, setProgressFrame] = useState(() => {
     const now = Date.now()
@@ -115,9 +116,12 @@ export default function ScheduleProgress({ progress, className = '', variant = '
               {formatBillingStatus(progress.billing)}
             </p>}
           </div>
-          <div className="shrink-0 text-left sm:text-right">
-            <p className="text-xs font-medium text-ink-muted">{task.meterLabel}</p>
-            <p className="mt-1 text-3xl font-semibold tabular-nums tracking-[-0.03em] text-ink-primary"><AnimatedValue value={`${percent}%`} /></p>
+          <div className="flex shrink-0 items-center justify-between gap-4 sm:justify-end">
+            <div className="text-left sm:text-right">
+              <p className="text-xs font-medium text-ink-muted">{task.meterLabel}</p>
+              <p className="mt-1 text-3xl font-semibold tabular-nums tracking-[-0.03em] text-ink-primary"><AnimatedValue value={`${percent}%`} /></p>
+            </div>
+            {action}
           </div>
         </div>
 

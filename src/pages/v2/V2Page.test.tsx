@@ -664,7 +664,7 @@ describe('V2 results-first workspace', () => {
     expect(mocks.session).toHaveBeenLastCalledWith('profile-2')
   })
 
-  it('cancels the current job through the existing task controller while retaining the result', async () => {
+  it.each(['overview', 'generation'])('cancels the current job from %s through the existing task controller while retaining the result', async (section) => {
     const workflow = connect()
     workflow.loading = true
     workflow.progress = { mode: 'generate', startedAt: Date.now(), jobId: 'running-job', estimatePhase: 'running' }
@@ -672,10 +672,19 @@ describe('V2 results-first workspace', () => {
     const cancel = vi.fn(async () => undefined)
     mocks.tasks.mockReturnValue({ jobs: [job], cancel, busyJobId: null, error: null, notice: null })
     const user = userEvent.setup()
-    mount()
-    await user.click(screen.getByRole('button', { name: copy.v2.stopSchedule }))
+    const view = mount(`/v2?section=${section}`)
+    const progress = within(await screen.findByRole('region', { name: copy.common.components_ScheduleProgress_001 }))
+    await user.click(progress.getByRole('button', { name: copy.v2.stopSchedule }))
     expect(cancel).toHaveBeenCalledWith(job)
-    expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('54,720')).toBeInTheDocument()
+    mocks.tasks.mockReturnValue({ jobs: [job], cancel, busyJobId: job.id, error: null, notice: null })
+    view.rerender(<MemoryRouter initialEntries={[`/v2?section=${section}`]}><V2Page /><RouteLocation /></MemoryRouter>)
+    const stopping = screen.getByRole('button', { name: copy.v2.stopping })
+    expect(stopping).toBeDisabled()
+    expect(stopping).toHaveAttribute('aria-busy', 'true')
+    await user.click(stopping)
+    expect(cancel).toHaveBeenCalledOnce()
+    if (section === 'generation') await user.click(screen.getByRole('button', { name: copy.v2.overview }))
+    await waitFor(() => expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('54,720')).toBeInTheDocument())
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 

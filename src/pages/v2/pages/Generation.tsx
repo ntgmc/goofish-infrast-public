@@ -1,10 +1,10 @@
+import type { ReactNode } from 'react'
 import { ArrowRight, Check, RefreshCw, Settings2, Users } from 'lucide-react'
 import { copy, CURRENT_LOCALE } from '../../../copy'
 import { SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../../../lib/config'
 import { formatResultHistorySummary, formatWorkspaceDate } from '../../../lib/workspace-history'
 import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../../lib/workspace-limits'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
-import ScheduleProgress from '../../../components/ScheduleProgress'
 import Link from '../../../components/InternalLink'
 import type { V2Workflow } from '../WorkspaceSections'
 import type { V2Section } from '../navigation'
@@ -12,7 +12,7 @@ import { Facts, Notice, SectionTitle } from '../components/WorkspaceUI'
 
 const text = copy.optimize
 
-export default function Generation({ workflow: w, disabledReason, onNavigate, onConfig }: { workflow: V2Workflow; disabledReason?: string | null; onNavigate: (section: V2Section) => void; onConfig: () => void }) {
+export default function Generation({ workflow: w, progress: progressContent, disabledReason, onNavigate, onConfig }: { workflow: V2Workflow; progress?: ReactNode; disabledReason?: string | null; onNavigate: (section: V2Section) => void; onConfig: () => void }) {
   const { features } = useSiteFeatures()
   const busy = w.loading || w.licenseSyncing
   const disabled = busy || !w.configValidation.ok || w.resultIsCurrent || Boolean(disabledReason)
@@ -41,7 +41,7 @@ export default function Generation({ workflow: w, disabledReason, onNavigate, on
         {w.resultIsCurrent && <p className="v2-muted">{text.pages_tool_optimize_GenerateControlBar_031}</p>}
       </section>
     </div>
-    {progress && (w.loading || progress.estimatePhase === 'cancelled') && <div className="v2-generation-progress"><ScheduleProgress progress={progress} variant="embedded" /></div>}
+    {progressContent && <div className="v2-generation-progress">{progressContent}</div>}
     <Notice error>{w.inlineError?.scope === 'generate' && <>{w.inlineError.message}<div className="v2-actions"><button className="v2-button v2-button-secondary" onClick={() => void w.handleGenerate()}>{copy.v2.retry}</button><button className="v2-text-button" onClick={w.onReset}>{copy.v2.operators}</button></div></>}</Notice>
     {w.isRestrictedPreview && <aside className="v2-generation-preview"><h2>{text.pages_tool_optimize_OverviewSection_024}</h2><Facts items={[[text.pages_tool_optimize_OverviewSection_026, text.pages_tool_optimize_OverviewSection_027], [text.pages_tool_optimize_OverviewSection_028, text.pages_tool_optimize_OverviewSection_029], [text.pages_tool_optimize_OverviewSection_030, text.pages_tool_optimize_OverviewSection_031]]} /><h3>{text.paid_preview.recompute}</h3><p>{text.paid_preview.recompute_detail}</p><div className="v2-actions"><button disabled className="v2-button v2-button-secondary">{text.paid_preview.recompute_action}</button>{features.pricing && <Link className="v2-text-button" to="/pricing">{text.paid_preview.compare}</Link>}</div></aside>}
     <section className="v2-generation-history"><SectionTitle title={text.pages_tool_optimize_OverviewSection_012} action={<button className="v2-text-button" onClick={() => onNavigate('plans')}>{text.pages_tool_optimize_OverviewSection_010}<ArrowRight size={16} /></button>} />

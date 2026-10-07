@@ -1199,6 +1199,23 @@
   margin-bottom: 18px;
 }
 
+.v2-stop-schedule {
+  color: var(--color-v2-error);
+  border-color: var(--color-v2-error);
+  background: transparent;
+}
+
+.v2-stop-schedule:hover:not(:disabled) {
+  color: var(--color-v2-error);
+  border-color: var(--color-v2-error);
+  background: var(--color-v2-error-soft);
+}
+
+.v2-stop-schedule:disabled {
+  color: var(--v2-muted);
+  border-color: var(--v2-line);
+}
+
 .v2-analysis {
   padding-bottom: 22px;
 }
