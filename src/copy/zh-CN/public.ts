@@ -1,8 +1,10 @@
 export const publicCopy = {
   // src/components/AnnouncementBanner.tsx
-  components_AnnouncementBanner_001: "站内横幅",
+  components_AnnouncementBanner_001: "站内公告",
   // src/components/AnnouncementBanner.tsx
-  components_AnnouncementBanner_002: "查看公告",
+  components_AnnouncementBanner_002: "查看详情",
+  // src/components/AnnouncementBanner.tsx
+  components_AnnouncementBanner_003: "收起详情",
   // src/components/AnnouncementBodyEditor.tsx
   components_AnnouncementBodyEditor_001: "正文",
   // src/components/AnnouncementBodyEditor.tsx
