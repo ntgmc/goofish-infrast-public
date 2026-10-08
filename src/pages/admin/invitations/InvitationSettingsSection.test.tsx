@@ -46,8 +46,10 @@ afterEach(() => cleanup())
 
 describe('InvitationSettingsSection', () => {
   it('shows invitation totals, activation rate, reward states and today counts', async () => {
+    const user = userEvent.setup()
     render(<InvitationSettingsSection />)
-    const stats = within(await screen.findByRole('region', { name: '邀请统计' }))
+    await user.click(await screen.findByRole('tab', { name: '邀请统计' }))
+    const stats = within(screen.getByRole('tabpanel', { name: '邀请统计' }))
     for (const [label, value] of [
       ['累计邀请注册', 20], ['累计激活', 10], ['累计已发奖', 7],
       ['待发奖', 1], ['发奖重试中', 1], ['发奖失败', 1],

@@ -8,6 +8,7 @@ import { Field, itemKindLabel, type InventoryPanelProps } from './InventoryEdito
 import { InventoryPacksPanel } from './InventoryPacksPanel'
 import { InventoryOnboardingPanel } from './InventoryOnboardingPanel'
 import { InventoryDistributionPanel } from './InventoryDistributionPanel'
+import { AdminTabs } from '../shared/AdminTabs'
 
 const ADMIN_TABS = [
   { id: 'catalog', label: '道具目录', description: '维护系统道具的展示信息和发放状态' },
@@ -89,44 +90,17 @@ export default function InventoryAdminSection() {
   </div>
 
   const props = { data, busy, run }
-  return <div className="min-w-0 space-y-6" aria-busy={busy}>
-    <section className="tool-panel min-w-0 p-5 sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="tool-eyebrow">统一道具系统</p>
-          <h2 className="mt-2 text-xl font-semibold text-ink-primary">道具与礼包</h2>
-        </div>
-        <button type="button" className="tool-secondary-action" disabled={busy} onClick={() => void refresh()}>{busy ? '处理中…' : '刷新道具数据'}</button>
-      </div>
-      <p className="mt-2 max-w-4xl text-sm leading-6 text-ink-secondary">选择道具并设置数量、有效期即可发放。礼包支持全部领取，宝箱支持随机或自选多项奖励；发布后可用于邀请奖励和新人任务。</p>
-      {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error}</div>}
-      {notice && <AdminToast message={notice} onDismiss={() => setNotice(null)} />}
-    </section>
-
-    <nav className="tool-panel min-w-0 overflow-x-auto p-2" aria-label="道具与礼包管理分区">
-      <div className="flex min-w-max gap-2" role="tablist" aria-label="道具管理">
-        {ADMIN_TABS.map((tab, index) => <button key={tab.id} id={`inventory-admin-tab-${tab.id}`}
-          type="button" role="tab" disabled={busy} tabIndex={activeTab === tab.id ? 0 : -1}
-          aria-selected={activeTab === tab.id} aria-controls={`inventory-admin-panel-${tab.id}`}
-          className={`min-w-32 rounded-xl px-4 py-3 text-left transition ${activeTab === tab.id ? 'bg-brand-500 text-primary-foreground shadow-sm' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}
-          onClick={() => selectTab(tab.id)} onKeyDown={(event) => {
-            const next = event.key === 'ArrowRight' ? (index + 1) % ADMIN_TABS.length
-              : event.key === 'ArrowLeft' ? (index + ADMIN_TABS.length - 1) % ADMIN_TABS.length
-                : event.key === 'Home' ? 0 : event.key === 'End' ? ADMIN_TABS.length - 1 : null
-            if (next === null) return
-            event.preventDefault()
-            const target = ADMIN_TABS[next].id
-            selectTab(target)
-            document.getElementById(`inventory-admin-tab-${target}`)?.focus()
-          }}>
-          <span className="block text-sm font-semibold">{tab.label}</span>
-          <span aria-hidden="true" className={`mt-1 hidden text-xs sm:block ${activeTab === tab.id ? 'text-primary-foreground/80' : 'text-ink-muted'}`}>{tab.description}</span>
-        </button>)}
-      </div>
-    </nav>
+  return <div className="min-w-0 space-y-5" aria-busy={busy}>
+    <nav aria-label="道具与礼包管理分区"><AdminTabs label="道具管理" items={ADMIN_TABS} value={activeTab} onChange={selectTab} disabled={busy} /></nav>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <p className="text-sm text-ink-muted">{ADMIN_TABS.find((tab) => tab.id === activeTab)?.description}</p>
+      <button type="button" className="tool-secondary-action" disabled={busy} onClick={() => void refresh()}>{busy ? '处理中…' : '刷新道具数据'}</button>
+    </div>
+    {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
+    {notice && <AdminToast message={notice} onDismiss={() => setNotice(null)} />}
 
     {ADMIN_TABS.map((tab) => <fieldset key={tab.id} id={`inventory-admin-panel-${tab.id}`} role="tabpanel"
-      aria-labelledby={`inventory-admin-tab-${tab.id}`} hidden={activeTab !== tab.id} disabled={busy}
+      aria-label={tab.label} hidden={activeTab !== tab.id} disabled={busy}
       tabIndex={0} className="m-0 min-w-0 border-0 p-0">
       {visited.includes(tab.id) && <>
         {tab.id === 'catalog' && <CatalogPanel {...props} />}
@@ -148,20 +122,10 @@ function CatalogPanel({ data, busy, run }: InventoryPanelProps) {
   }
   return <section className="tool-panel min-w-0 p-5 sm:p-6">
     <h3 className="text-base font-semibold text-ink-primary">道具目录</h3>
-    <div className="mt-4 overflow-x-auto">
-      <table className="min-w-full text-left text-sm">
-        <thead className="text-ink-muted"><tr>
-          {['道具', '类型', '用途', '发放状态', '操作'].map((heading) => <th key={heading} scope="col" className="p-2">{heading}</th>)}
-        </tr></thead>
-        <tbody>{data.definitions.map((definition) => <tr key={definition.code} className="border-t border-surface-3">
-          <td className="p-2">{definition.name}</td><td className="p-2">{itemKindLabel(definition.kind)}</td>
-          <td className="min-w-48 p-2">{definition.description}</td>
-          <td className="whitespace-nowrap p-2">{definition.issuance_enabled ? '允许' : '停用'}</td>
-          <td className="p-2"><button type="button" className="tool-secondary-action" onClick={() => setItemCode(definition.code)}>编辑</button></td>
-        </tr>)}</tbody>
-      </table>
-    </div>
-    {item && <form className="mt-5 grid min-w-0 gap-3 border-t border-surface-3 pt-5 lg:grid-cols-2" onSubmit={(event) => {
+    <div className="admin-catalog-layout admin-selection mt-4 items-start"><aside className="admin-selection-index" aria-label="选择道具">{data.definitions.map((definition) => <button key={definition.code} type="button" aria-pressed={definition.code === itemCode} onClick={() => setItemCode(definition.code)}>
+      <strong>{definition.name}</strong><small>{itemKindLabel(definition.kind)} · {definition.issuance_enabled ? '允许发放' : '停用'}</small>
+    </button>)}</aside>
+    {item && <form className="admin-catalog-editor grid min-w-0 max-w-3xl content-start gap-4" onSubmit={(event) => {
       event.preventDefault()
       const submittedItem = item
       void run('/api/admin/items', {
@@ -177,21 +141,20 @@ function CatalogPanel({ data, busy, run }: InventoryPanelProps) {
         })
       })
     }}>
-      <Field label="编辑道具">
-        <select className="tool-field mt-2 min-w-0" value={itemCode} onChange={(event) => setItemCode(event.currentTarget.value)}>
-          {data.definitions.map((definition) => <option key={definition.code} value={definition.code}>{definition.name} · {definition.code}</option>)}
-        </select>
-      </Field>
+      <div className="flex min-w-0 items-center gap-3 border-b border-surface-3 pb-4">
+        <img src={itemIconPath(item.icon_key)} alt="" width={48} height={48} className="h-12 w-12 shrink-0 object-contain" />
+        <div className="min-w-0"><h4 className="break-words font-semibold text-ink-primary">{item.name}</h4>
+          <p className="mt-1 break-all font-mono text-xs text-ink-muted">{item.code}</p></div>
+      </div>
       <Field label="名称"><input className="tool-field mt-2 min-w-0" required maxLength={80} value={item.name} onChange={(event) => update({ name: event.currentTarget.value })} /></Field>
-      <Field label="说明"><textarea className="tool-field mt-2 min-h-20 min-w-0" required maxLength={500} value={item.description} onChange={(event) => update({ description: event.currentTarget.value })} /></Field>
-      <div className="flex min-w-0 flex-col justify-between gap-3">
-        <img src={itemIconPath(item.icon_key)} alt={`${item.name}图标`} width={48} height={48} className="mt-3 h-12 w-12 object-contain" />
+      <Field label="说明"><textarea className="tool-field mt-2 min-h-32 min-w-0" required maxLength={500} value={item.description} onChange={(event) => update({ description: event.currentTarget.value })} /></Field>
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-t border-surface-3 pt-4">
         <label className="flex items-center gap-2 text-sm text-ink-secondary">
           <input type="checkbox" checked={item.issuance_enabled} onChange={(event) => update({ issuance_enabled: event.currentTarget.checked })} />允许新发放
         </label>
-        <button className="tool-secondary-action" disabled={busy || !item.name.trim() || !item.description.trim()}>保存目录展示信息</button>
+        <button className="tool-primary-action" disabled={busy || !item.name.trim() || !item.description.trim()}>保存目录展示信息</button>
       </div>
-    </form>}
+    </form>}</div>
     {data.definitions.length === 0 && <p className="mt-4 text-sm text-ink-muted">暂无道具。</p>}
   </section>
 }

@@ -63,7 +63,8 @@ it deliberately when changing the shared design.
   the current result, daily production, shift selection, and operator assignments.
 - Palette: mist paper, slate ink and navigation, copper accent. `tokens.css`
   defines `--color-v2-*`; `.v2-app` and `.v2-drawer` map those values to shared
-  semantic tokens. Other routes retain the canonical palette.
+  semantic tokens. Routes outside V2 and the management console retain the
+  canonical palette.
 - Light paper: `oklch(0.967 0.007 75)`; accent: `oklch(0.490 0.120 45)`.
   Dark paper: `oklch(0.205 0.016 255)`; accent: `oklch(0.770 0.125 45)`.
 - Keep Noto Sans SC display and Geist body fonts, with tabular numbers for
@@ -105,6 +106,34 @@ it deliberately when changing the shared design.
   surfaces, keyboard focus, 44px controls, and shared reduced-motion support.
 - Page coverage and verification: [V2 workspace redesign](docs/v2-workspace-redesign.md).
 
+### Management console (`/admin`)
+
+- Use the V2 mist, slate and copper palette with the canonical fonts and spacing.
+  `.admin-app` and `.admin-dialog` map V2 values to the shared semantic tokens;
+  admin dropdown and popover portals inherit the same palette.
+- Audience: administrators locating accounts, issuing entitlements, reviewing risk
+  and monitoring services. Group the existing routes by operation, entitlements,
+  service and security, and site configuration. Keep the account setup entry.
+- `AdminShell.tsx` owns navigation, headings, theme and current-page refresh.
+  `AdminDashboardView.tsx` composes domain sections. Load user and CDK records
+  only in their respective sections; keep visited sections mounted for drafts.
+- User maintenance leads with search, common filters and records. Expand advanced
+  filters on demand. Select a user to enter the detail workspace, then select
+  one profile; password reset belongs to that user context.
+- CDK opens with records; generation and distribution analysis are separate
+  tasks. Show batch actions only after selecting records on the current page.
+- Configuration and monitoring use keyboard-accessible task tabs. Risk pairs a
+  case index with one evidence region. Queue monitoring separates waiting,
+  running and recent tasks from service history and dead-letter handling.
+- Profile edits collect values and an audit reason in one dialog. Failed
+  submissions preserve inputs; explicit refresh updates the target version
+  before retry. Keep profile and workspace versions distinct.
+- `src/pages/admin/admin.css` owns layout beneath the admin shell and dialogs.
+  Collapse the rail and selection columns below 60rem and dense controls below
+  40rem. Tables scroll locally; page and portal controls retain visible focus,
+  44px targets and shared reduced-motion behavior.
+- Page coverage and verification: [Admin workspace redesign](docs/admin-workspace-redesign.md).
+
 ## CTA voice
 
 - Primary · accent fill · 7px radius · compact 12px/18px rhythm · concrete verb
@@ -131,7 +160,8 @@ theme; dark theme values are defined under `.dark` in `tokens.css`.
 ### V2 exports
 
 CSS source: the `--color-v2-*` token blocks and `.v2-app, .v2-drawer` mappings
-in `tokens.css`. Fonts, spacing, type scale, and easing use the canonical
+in `tokens.css`, shared by `.admin-app` and `.admin-dialog` for the management
+console. Fonts, spacing, type scale, and easing use the canonical
 exports below. The variant's portable core follows.
 
 ```css

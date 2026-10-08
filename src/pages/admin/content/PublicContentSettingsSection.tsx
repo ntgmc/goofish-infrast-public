@@ -14,6 +14,7 @@ import {
 } from '../../../lib/public-content'
 import { SortableMasterDetailList } from '../shared/SortableMasterDetailList'
 import { AdminToast } from '../shared/AdminToast'
+import { AdminTabs } from '../shared/AdminTabs'
 
 type TabId = 'qq' | 'purchase' | 'faq' | 'pricing' | 'thanks'
 type EditSettings = (updater: (draft: AdminPublicContentSettingsV1) => void) => void
@@ -161,29 +162,12 @@ export default function PublicContentSettingsSection() {
         {notice && <AdminToast message={notice} onDismiss={() => setNotice(null)} />}
       </section>
 
-      <div className="tool-panel p-3">
-        <div className="flex gap-2 overflow-x-auto" role="tablist" aria-label={copy.publicContent.admin_tabs_label}>
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              id={`public-content-tab-${tab.id}`}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab.id}
-              aria-controls={`public-content-panel-${tab.id}`}
-              onClick={() => setActiveTab(tab.id)}
-              className={`tool-nav-link shrink-0 px-4 ${activeTab === tab.id ? 'bg-surface-2 text-ink-primary' : ''}`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <AdminTabs label={copy.publicContent.admin_tabs_label} items={TABS} value={activeTab} onChange={setActiveTab} />
 
       <section
         id={`public-content-panel-${activeTab}`}
         role="tabpanel"
-        aria-labelledby={`public-content-tab-${activeTab}`}
+        aria-label={TABS.find((tab) => tab.id === activeTab)?.label}
         tabIndex={0}
         className="space-y-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60"
       >
@@ -194,7 +178,7 @@ export default function PublicContentSettingsSection() {
         {activeTab === 'thanks' && <ThanksEditor settings={settings} edit={edit} />}
       </section>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="admin-savebar"><span className="text-sm text-ink-muted">{dirty ? '有待发布的修改' : '已与线上内容同步'}</span>
         <button type="submit" disabled={saving} className="tool-primary-action">
           {saving ? copy.publicContent.admin_saving : copy.publicContent.admin_save}
         </button>

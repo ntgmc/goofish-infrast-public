@@ -8,6 +8,7 @@ import {
   formatDate,
 } from '../modules'
 import { SortableMasterDetailList } from '../shared/SortableMasterDetailList'
+import { AdminTabs } from '../shared/AdminTabs'
 
 interface AnnouncementSettingsSectionProps {
   banner: Announcement
@@ -50,6 +51,7 @@ export default function AnnouncementSettingsSection({
   onDelete,
   onReorder,
 }: AnnouncementSettingsSectionProps) {
+  const [view, setView] = useState<'announcements' | 'banner'>('announcements')
   const [selectedId, setSelectedId] = useState<string | null>(() => announcements[0]?.id ?? null)
   const selectedIndex = announcements.findIndex((item) => item.id === selectedId)
   const selected = selectedIndex >= 0 ? announcements[selectedIndex] : null
@@ -69,7 +71,8 @@ export default function AnnouncementSettingsSection({
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <section className="tool-panel p-5">
+      <AdminTabs label="公告管理任务" items={[{ id: 'announcements', label: '弹出式公告' }, { id: 'banner', label: '全局横幅' }]} value={view} onChange={setView} />
+      <section hidden={view !== 'banner'} role="tabpanel" aria-label="全局横幅" className="tool-panel p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-base font-semibold text-ink-primary">全局横幅</h2>
@@ -88,7 +91,7 @@ export default function AnnouncementSettingsSection({
         <p className="mt-3 text-xs text-ink-muted">更新时间：{formatDate(banner.updated_at)}</p>
       </section>
 
-      <section className="tool-panel p-5 sm:p-6">
+      <section hidden={view !== 'announcements'} role="tabpanel" aria-label="弹出式公告" className="tool-panel p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-base font-semibold text-ink-primary">弹出式公告</h2>
@@ -139,7 +142,8 @@ export default function AnnouncementSettingsSection({
           />
         </div>
 
-        <div className={`mt-5 flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between ${draftConflict || draftStatus === 'error' ? 'border-error/40 bg-error/10' : 'border-surface-3 bg-surface-1/70'}`}>
+      </section>
+        <div className={`admin-savebar ${draftConflict || draftStatus === 'error' ? 'border-error/40' : ''}`}>
           <div className="min-w-0">
             <p
               className={`text-sm font-medium ${draftConflict || draftStatus === 'error' ? 'text-error' : 'text-ink-secondary'}`}
@@ -156,12 +160,10 @@ export default function AnnouncementSettingsSection({
               {discarding ? '正在重新载入…' : '丢弃草稿并载入线上版本'}
             </button>
           )}
-        </div>
-
-        <button type="submit" disabled={saving || discarding} className="tool-primary-action mt-4">
+        <button type="submit" disabled={saving || discarding} className="tool-primary-action">
           {saving ? '发布中…' : draftConflict ? '发布并覆盖线上版本' : '发布横幅和公告'}
         </button>
-      </section>
+      </div>
     </form>
   )
 }

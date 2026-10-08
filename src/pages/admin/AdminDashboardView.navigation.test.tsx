@@ -100,7 +100,7 @@ describe('admin page loading and navigation', () => {
     await screen.findByRole('heading', { name: '运营概览', level: 2 })
     const header = document.querySelector('.tool-header')
     const navigation = screen.getByRole('navigation')
-    await user.click(screen.getByRole('button', { name: '功能开关' }))
+    await user.click(screen.getByRole('link', { name: '功能开关' }))
     expect(await screen.findByRole('status', { name: '正在加载功能开关…' })).toHaveAttribute('aria-busy', 'true')
     expect(screen.queryByRole('checkbox', { name: /用户注册/ })).not.toBeInTheDocument()
     expect(document.querySelector('.tool-header')).toBe(header)
@@ -108,7 +108,7 @@ describe('admin page loading and navigation', () => {
     const registration = await screen.findByRole('checkbox', { name: /用户注册/ })
     await user.click(registration)
     expect(registration).not.toBeChecked()
-    await user.click(screen.getByRole('button', { name: '总览' }))
+    await user.click(screen.getByRole('link', { name: '总览' }))
     await screen.findByRole('heading', { name: '运营概览', level: 2 })
     await act(async () => { await router.navigate(-1) })
     expect(await screen.findByRole('checkbox', { name: /用户注册/ })).toBe(registration)
@@ -124,5 +124,56 @@ describe('admin page loading and navigation', () => {
     expect(document.querySelector('.tool-header')).toBe(header)
     expect(screen.getByRole('navigation')).toBe(navigation)
     expect(api.json.mock.calls.filter(([url]) => url === '/api/admin/feature-settings')).toHaveLength(1)
+  })
+
+  it('loads only the user domain and hides management operations for a reviewer', async () => {
+    const implementation = api.json.getMockImplementation()!
+    api.json.mockImplementation(async (url: string) => url === '/api/admin/session'
+      ? { user: { username: 'reviewer', capabilities: ['risk_view', 'risk_review', 'usage_view', 'user_view'] } }
+      : implementation(url))
+    const router = mount('/admin/users')
+    await screen.findByRole('heading', { name: '注册用户' })
+    expect(screen.queryByRole('button', { name: '重置密码' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '重置用户密码' })).not.toBeInTheDocument()
+    expect(api.json.mock.calls.some(([url]) => /usage-stats|announcement|\/cdk|risk-settings/.test(url))).toBe(false)
+    await act(async () => { await router.navigate('/admin/features') })
+    await screen.findByRole('heading', { name: '运营概览', level: 2 })
+    expect(api.json.mock.calls.some(([url]) => url === '/api/admin/feature-settings')).toBe(false)
+  })
+
+  it('refreshes the selected user detail without loading another user list or domain', async () => {
+    const account = { id: 'user-1', email: 'user@example.test', status: 'active', profile_count: 0, profile_access: [], created_at: '2026-10-01T00:00:00.000Z' }
+    const implementation = api.json.getMockImplementation()!
+    api.json.mockImplementation(async (url: string) => {
+      if (url === '/api/admin/session') return { user: { username: 'admin', capabilities: ['user_view', 'sensitive_data_view', 'user_manage'] } }
+      if (url.startsWith('/api/admin/users?user_id=')) return { detail: { user: account, profiles: [], personal_use_declarations: [] } }
+      if (url.startsWith('/api/admin/users?')) return { app_users: [account] }
+      return implementation(url)
+    })
+    mount('/admin/users')
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: '详情' }))
+    await screen.findByRole('heading', { name: account.email })
+    api.json.mockClear()
+    await user.click(screen.getByRole('button', { name: '刷新当前页' }))
+    await waitFor(() => expect(api.json).toHaveBeenCalledTimes(1))
+    expect(api.json.mock.calls[0][0]).toBe('/api/admin/users?user_id=user-1&profile_page=1&profile_page_size=100')
+  })
+
+  it('aborts a user request when leaving the page and ignores its late result', async () => {
+    const pending = deferred<unknown>()
+    let signal: AbortSignal | undefined
+    const implementation = api.json.getMockImplementation()!
+    api.json.mockImplementation((url: string, options?: { signal?: AbortSignal }) => {
+      if (url.startsWith('/api/admin/users?')) { signal = options?.signal; return pending.promise }
+      return implementation(url)
+    })
+    const router = mount('/admin/users')
+    await screen.findByRole('status', { name: '正在加载用户维护…' })
+    await act(async () => { await router.navigate('/admin/features') })
+    expect(signal?.aborted).toBe(true)
+    await act(async () => { pending.resolve({ app_users: [{ email: 'late@example.test' }] }) })
+    await screen.findByRole('checkbox', { name: /用户注册/ })
+    expect(screen.queryByText('late@example.test')).not.toBeInTheDocument()
   })
 })

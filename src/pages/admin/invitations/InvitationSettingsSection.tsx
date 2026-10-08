@@ -19,6 +19,7 @@ import type {
 } from '../../../lib/types'
 import { AdminToast } from '../shared/AdminToast'
 import { SectionLoader } from '../../../components/SessionLoader'
+import { AdminTabs } from '../shared/AdminTabs'
 
 const DEFAULT_SETTINGS: InvitationSettings = {
   version: 2,
@@ -37,6 +38,7 @@ const DEFAULT_SETTINGS: InvitationSettings = {
 }
 
 export default function InvitationSettingsSection({ active = true }: { active?: boolean }) {
+  const [view, setView] = useState<'rules' | 'stats'>('rules')
   const [settings, setSettings] = useState<InvitationSettings>(DEFAULT_SETTINGS)
   const [savedSettings, setSavedSettings] = useState<InvitationSettings>(DEFAULT_SETTINGS)
   const [catalog, setCatalog] = useState<InvitationRewardCatalogItem[]>([])
@@ -138,11 +140,13 @@ export default function InvitationSettingsSection({ active = true }: { active?: 
 
   return (
     <form onSubmit={submit} className="space-y-5" noValidate>
+      <AdminTabs label="邀请管理任务" items={[{ id: 'rules', label: '奖励规则' }, { id: 'stats', label: '邀请统计' }]} value={view} onChange={(next) => { setView(next); setAddingFor(null) }} />
+      {view === 'stats' && !stats && <p className="tool-panel p-5 text-sm text-ink-muted">邀请统计暂不可用，请重新载入。</p>}
       {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
       {notice && <AdminToast message={notice} onDismiss={() => setNotice(null)} />}
 
       {stats && (
-        <section className="tool-panel p-5 sm:p-6" aria-labelledby="admin-invitation-stats-title">
+        <section hidden={view !== 'stats'} role="tabpanel" className="tool-panel p-5 sm:p-6" aria-labelledby="admin-invitation-stats-title">
           <h2 id="admin-invitation-stats-title" className="text-lg font-semibold text-ink-primary">邀请统计</h2>
           <p className="mt-2 text-sm leading-6 text-ink-secondary">统计全部邀请记录；今日数据按上海时间计算。至少一方收到奖励即计为已发奖，同一次邀请只计一次。</p>
           <dl className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -168,7 +172,7 @@ export default function InvitationSettingsSection({ active = true }: { active?: 
         </section>
       )}
 
-      <section className="tool-panel p-5 sm:p-6" aria-labelledby="admin-invitation-title">
+      <section hidden={view !== 'rules'} role="tabpanel" className="tool-panel p-5 sm:p-6" aria-labelledby="admin-invitation-title">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="tool-eyebrow">拉新活动</p>
@@ -214,12 +218,12 @@ export default function InvitationSettingsSection({ active = true }: { active?: 
           <p className="mt-2 text-xs text-ink-muted">可添加礼包、随机宝箱或自选宝箱；在“道具与礼包”中创建并发布后即可选择。保存时使用最新已发布版本，已经激活的邀请继续使用原奖励配置。</p>
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center gap-3">
+      </section>
+        <div className="admin-savebar">
           <button type="submit" disabled={cannotSave} className="tool-primary-action disabled:cursor-not-allowed disabled:opacity-50">{saving ? '保存中...' : dirty ? '保存邀请设置' : '已保存'}</button>
-          <button type="button" disabled={saving} onClick={() => void load()} className="tool-secondary-action">重新载入</button>
+          <button type="button" disabled={saving} onClick={() => { if (!dirty || window.confirm('重新载入将丢弃当前未保存的邀请设置，是否继续？')) void load() }} className="tool-secondary-action">重新载入</button>
           <span className="text-xs text-ink-muted" aria-live="polite">{dirty ? '有未保存修改' : `最近更新：${settings.updated_at ? new Date(settings.updated_at).toLocaleString('zh-CN') : '使用默认配置'}`}</span>
         </div>
-      </section>
 
       <ItemPickerDialog
         recipient={addingFor}

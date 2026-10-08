@@ -22,6 +22,7 @@ export function useAdminUserList(options: Options) {
   const [userPageSize, setUserPageSize] = useState(25)
   const [userPagination, setUserPagination] = useState<PaginationMeta>(EMPTY_PAGINATION)
   const [usersLoading, setUsersLoading] = useState(false)
+  const [usersLoaded, setUsersLoaded] = useState(false)
   const [userFilters, setUserFilters] = useState<AdminUserFilters>(DEFAULT_ADMIN_USER_FILTERS)
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
   const selectedUsers = useMemo(() => appUsers.filter((user) => selectedUserIds.includes(user.id)), [appUsers, selectedUserIds])
@@ -54,7 +55,7 @@ export function useAdminUserList(options: Options) {
       setUserPagination(data.pagination ?? { ...EMPTY_PAGINATION, page_size: userPageSize })
       if (data.pagination && data.pagination.page !== userPage) setUserPage(data.pagination.page)
     } finally {
-      if (!signal?.aborted) setUsersLoading(false)
+      if (!signal?.aborted) { setUsersLoading(false); setUsersLoaded(true) }
     }
   }, [userPage, userPageSize, userSearch, userFilters, setAdminUsers])
 
@@ -112,7 +113,7 @@ export function useAdminUserList(options: Options) {
 
   return {
     appUsers, setAppUsers, userSearchInput, setUserSearchInput, userPage, setUserPage, userPageSize, setUserPageSize,
-    userPagination, usersLoading, userFilters, setUserFilters, selectedUserIds, setSelectedUserIds,
+    userPagination, usersLoading, usersLoaded, setUsersLoaded, userFilters, setUserFilters, selectedUserIds, setSelectedUserIds,
     loadUsersPage, handleCopyUsers, handleExportUsers, handleBulkUsers,
   }
 }

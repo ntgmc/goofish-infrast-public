@@ -51,7 +51,7 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
         </div>
         <span className="text-sm text-ink-secondary">当前页已选 {selectedRecords.length} 个 CDK</span>
       </div>
-      <div className="flex flex-wrap items-end gap-2 border-b border-surface-3 p-4">
+      <div hidden={!selectedRecords.length} className="flex flex-wrap items-end gap-2 border-b border-surface-3 p-4">
         <label><span className="mb-1.5 block text-xs font-medium text-ink-muted">批量升级到</span>
           <select className="tool-field" value={bulkPermission} disabled={busy} onChange={(event) => setBulkPermission(event.currentTarget.value as GeneratedPermission)}>
             {cdkProductPermissions.map((permission) => <option key={permission} value={permission}>{permissionLabels[permission]}</option>)}
@@ -96,7 +96,7 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
       </fieldset>
         <div className="overflow-x-auto" aria-busy={loading}>
           {loading && <div className="border-b border-surface-3 px-4 py-2 text-sm text-ink-muted" role="status">正在加载…</div>}
-          <table className="w-full min-w-[1120px] table-fixed text-left text-sm">
+          <table className="w-full min-w-[960px] text-left text-sm">
             <thead className="bg-surface-2 text-xs uppercase tracking-wide text-ink-muted">
               <tr>
                 <th className="w-12 px-4 py-3"><input className="h-4 w-4 accent-brand-500" type="checkbox" disabled={busy} aria-label="选择当前页全部 CDK" checked={allSelected} onChange={(event) => onSelect(event.currentTarget.checked ? records.map((record) => record.code_hash) : [])} /></th>
@@ -105,7 +105,7 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
                 <th className="w-56 px-4 py-3">数据</th>
                 <th className="w-44 px-4 py-3">时间</th>
                 <th className="w-48 px-4 py-3">备注</th>
-                <th className="w-64 px-4 py-3">操作</th>
+                <th className="w-44 px-4 py-3">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-3">
@@ -158,6 +158,7 @@ function BinaryFilterSelect({ label, value, onChange }: { label: string; value: 
 }
 
 interface CdkDetailPanelProps {
+  canManage?: boolean;
   detail: AdminCdkDetail;
   busyAction: string | null;
   onClose: () => void;
@@ -175,6 +176,7 @@ export function CdkDetailDialog(props: CdkDetailPanelProps) {
 }
 
 function CdkDetailPanel({
+  canManage = true,
   detail,
   busyAction,
   onClose,
@@ -213,12 +215,12 @@ function CdkDetailPanel({
           <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">订单备注：{detail.order_note || '-'}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <SmallButton onClick={() => void onUpdateNote(detail)} loading={busyAction === `update_note:${detail.code_hash}`}>改备注</SmallButton>
+          {canManage && <><SmallButton onClick={() => void onUpdateNote(detail)} loading={busyAction === `update_note:${detail.code_hash}`}>改备注</SmallButton>
           {detail.cdk_type === 'profile' && detail.status !== 'revoked' && <SmallButton onClick={() => void onSetPermission(detail)} loading={busyAction === `set_permission:${detail.code_hash}`}>改授权</SmallButton>}
           {nextPermission && detail.status !== 'frozen' && detail.status !== 'revoked' && <SmallButton onClick={() => void onPatch(detail, 'upgrade', nextPermission)} loading={busyAction === `upgrade:${detail.code_hash}`}>升级</SmallButton>}
           {detail.status === 'frozen' && <SmallButton onClick={() => void onPatch(detail, 'unfreeze')} loading={busyAction === `unfreeze:${detail.code_hash}`} tone="success">解冻</SmallButton>}
           {(detail.status === 'used' || detail.status === 'frozen') && <SmallButton onClick={() => void onPatch(detail, 'revoke')} loading={busyAction === `revoke:${detail.code_hash}`} tone="danger">撤销</SmallButton>}
-          <SmallButton onClick={onClose} autoFocus>关闭</SmallButton>
+          </>}<SmallButton onClick={onClose} autoFocus>关闭</SmallButton>
         </div>
       </div>
 
@@ -237,7 +239,7 @@ function CdkDetailPanel({
             <DetailItem label="冻结时间" value={formatDate(detail.frozen_at ?? null)} />
             <DetailItem label="撤销时间" value={formatDate(detail.revoked_at)} />
           </dl>
-          {(detail.status === 'used' || detail.status === 'frozen') && baselineOptions.length > 0 && (
+          {canManage && (detail.status === 'used' || detail.status === 'frozen') && baselineOptions.length > 0 && (
             <div className="tool-inset mt-4 p-3">
               <label className="block">
                 <span className="mb-1.5 block text-xs font-medium text-ink-muted">新干员基线</span>
@@ -397,7 +399,7 @@ function RiskToggle({
   )
 }
 
-export function RiskTable({ records, pagination, loading, busyAction, onPageChange, onPageSizeChange, onPatch, onOpenDetail }: { records: AdminCdkRecord[]; pagination: PaginationMeta; loading: boolean; busyAction: string | null; onPageChange: (page: number) => void; onPageSizeChange: (pageSize: number) => void; onPatch: (record: AdminCdkRecord, action: string) => Promise<void>; onOpenDetail: (record: AdminCdkRecord) => Promise<void> }) {
+export function RiskTable({ records, pagination, loading, busyAction, canManage = false, onPageChange, onPageSizeChange, onPatch, onOpenDetail }: { records: AdminCdkRecord[]; pagination: PaginationMeta; loading: boolean; busyAction: string | null; canManage?: boolean; onPageChange: (page: number) => void; onPageSizeChange: (pageSize: number) => void; onPatch: (record: AdminCdkRecord, action: string) => Promise<void>; onOpenDetail: (record: AdminCdkRecord) => Promise<void> }) {
   return (
     <section className="tool-panel">
       <div className="tool-panel-header p-4">
@@ -414,7 +416,7 @@ export function RiskTable({ records, pagination, loading, busyAction, onPageChan
             </div>
             <div className="flex flex-wrap gap-2">
               <SmallButton onClick={() => void onOpenDetail(record)} loading={busyAction === `cdk-detail:${record.code_hash}`}>详情</SmallButton>
-              {record.status === 'frozen' && <SmallButton onClick={() => onPatch(record, 'unfreeze')} loading={busyAction === `unfreeze:${record.code_hash}`} tone="success">解冻</SmallButton>}
+              {canManage && record.status === 'frozen' && <SmallButton onClick={() => onPatch(record, 'unfreeze')} loading={busyAction === `unfreeze:${record.code_hash}`} tone="success">解冻</SmallButton>}
             </div>
           </div>
         ))}

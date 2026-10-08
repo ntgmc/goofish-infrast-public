@@ -7,6 +7,7 @@ import { copy } from '../../../copy/index'
 import { SectionLoader } from '../../../components/SessionLoader'
 import { AdminToast } from '../shared/AdminToast'
 import SklandIcon from '../../../components/SklandIcon'
+import { AdminTabs } from '../shared/AdminTabs'
 
 type FeatureSettingsResponse = {
   settings?: AdminSiteFeatureSettingsV1
@@ -24,6 +25,7 @@ const GROUPS: Array<{ label: string; features: SiteFeatureKey[] }> = [
 ]
 
 export default function FeatureSettingsSection() {
+  const [groupId, setGroupId] = useState('registration')
   const [settings, setSettings] = useState<AdminSiteFeatureSettingsV1 | null>(null)
   const [effective, setEffective] = useState<SiteFeatures | null>(null)
   const [loading, setLoading] = useState(true)
@@ -120,8 +122,9 @@ export default function FeatureSettingsSection() {
         {notice && <AdminToast message={notice} onDismiss={() => setNotice(null)} />}
       </section>
 
+      <AdminTabs label="功能配置任务" items={GROUPS.map((group) => ({ id: group.features[0], label: group.label }))} value={groupId} onChange={setGroupId} />
       {GROUPS.map((group) => (
-        <section key={group.label} className="tool-panel p-5 sm:p-6" aria-labelledby={`feature-group-${group.features[0]}`}>
+        <section key={group.label} hidden={group.features[0] !== groupId} role="tabpanel" className="tool-panel p-5 sm:p-6" aria-labelledby={`feature-group-${group.features[0]}`}>
           <h3 id={`feature-group-${group.features[0]}`} className="text-base font-semibold text-ink-primary">{group.label}</h3>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {group.features.filter((feature) => feature !== 'metered_billing' || METERED_BILLING_AVAILABLE).map((feature) => {
@@ -149,7 +152,7 @@ export default function FeatureSettingsSection() {
         </section>
       ))}
 
-      <div className="flex flex-wrap gap-3">
+      <div className="admin-savebar"><span className="text-sm text-ink-muted">{dirty ? '有待保存的修改' : '已与线上配置同步'}</span>
         <button type="button" onClick={() => void save()} disabled={saving} className="tool-primary-action">
           {saving ? copy.features.admin_saving : copy.features.admin_save}
         </button>

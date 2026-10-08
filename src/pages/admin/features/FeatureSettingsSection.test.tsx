@@ -4,7 +4,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../../../lib/api-client'
-import { DEFAULT_SITE_FEATURE_SETTINGS, SITE_FEATURE_KEYS, computeEffectiveSiteFeatures } from '../../../lib/site-features'
+import { DEFAULT_SITE_FEATURE_SETTINGS, computeEffectiveSiteFeatures } from '../../../lib/site-features'
 
 const { adminApiJson } = vi.hoisted(() => ({ adminApiJson: vi.fn() }))
 vi.mock('../../../lib/admin-api-client', () => ({ adminApiJson }))
@@ -29,7 +29,8 @@ describe('FeatureSettingsSection', () => {
   it('preserves child switches and displays effective dependency state', async () => {
     const user = userEvent.setup()
     render(<FeatureSettingsSection />)
-    const tools = await screen.findByRole('checkbox', { name: /公开工具中心/ })
+    await user.click(await screen.findByRole('tab', { name: '公开工具' }))
+    const tools = screen.getByRole('checkbox', { name: /公开工具中心/ })
     const depot = screen.getByRole('checkbox', { name: /基建价值分析/ })
     expect(tools).toBeChecked()
     expect(depot).toBeChecked()
@@ -41,8 +42,9 @@ describe('FeatureSettingsSection', () => {
   it('saves the complete feature map', async () => {
     const user = userEvent.setup()
     render(<FeatureSettingsSection />)
-    await screen.findByRole('checkbox', { name: /全站业务/ })
+    await screen.findByRole('checkbox', { name: /用户注册/ })
     await user.click(screen.getByRole('checkbox', { name: /用户注册/ }))
+    await user.click(screen.getByRole('tab', { name: '排班' }))
     const dailyShift = screen.getByRole('checkbox', { name: /一天一换/ })
     expect(dailyShift).not.toBeChecked()
     await user.click(dailyShift)
@@ -60,6 +62,7 @@ describe('FeatureSettingsSection', () => {
       method: 'PUT',
       json: { features: expect.objectContaining({ registration: false, login: true, site: true, one_shift_per_day: true }), expected_revision: 2 },
     })))
+    await user.click(screen.getByRole('tab', { name: '账号与档案' }))
     await user.click(screen.getByRole('checkbox', { name: /登录与普通会话/ }))
     await user.click(screen.getByRole('button', { name: '保存功能开关' }))
     await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/feature-settings', expect.objectContaining({
@@ -74,10 +77,13 @@ describe('FeatureSettingsSection', () => {
       version: 1, features: { site: true, tools: false, depot_value: false }, updated_at: null, revision: 5,
     } })
     render(<FeatureSettingsSection />)
-    const manual = await screen.findByRole('checkbox', { name: /手动排班与模拟/ })
+    await user.click(await screen.findByRole('tab', { name: '公开工具' }))
+    const manual = screen.getByRole('checkbox', { name: /手动排班与模拟/ })
     expect(manual).toBeChecked()
-    expect(screen.getByRole('checkbox', { name: /一天一换/ })).not.toBeChecked()
     expect(screen.getByRole('checkbox', { name: /公开工具中心/ })).not.toBeChecked()
+    await user.click(screen.getByRole('tab', { name: '排班' }))
+    expect(screen.getByRole('checkbox', { name: /一天一换/ })).not.toBeChecked()
+    await user.click(screen.getByRole('tab', { name: '页面' }))
     await user.click(screen.getByRole('checkbox', { name: /V2 工作台/ }))
     await user.click(screen.getByRole('button', { name: '保存功能开关' }))
     await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/feature-settings', expect.objectContaining({
@@ -95,7 +101,8 @@ describe('FeatureSettingsSection', () => {
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '保存功能开关' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '重新加载' }))
-    expect(await screen.findAllByRole('checkbox')).toHaveLength(SITE_FEATURE_KEYS.length - 1)
+    expect(await screen.findByRole('checkbox', { name: /用户注册/ })).toBeChecked()
+    await user.click(screen.getByRole('tab', { name: '排班' }))
     expect(screen.queryByRole('checkbox', { name: /按次排班与商用账户/ })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '保存功能开关' })).toBeInTheDocument()
   })

@@ -37,6 +37,7 @@ function emptyPage(): BehaviorRiskCasePageDto {
 }
 
 export default function BehaviorRiskPanel({ active = true }: { active?: boolean }) {
+  const [selectedCaseId, setSelectedCaseId] = useState('')
   const [status, setStatus] = useState<RiskStatus>('pending')
   const [page, setPage] = useState(1)
   const [data, setData] = useState<BehaviorRiskCasePageDto>(emptyPage)
@@ -177,10 +178,14 @@ export default function BehaviorRiskPanel({ active = true }: { active?: boolean 
       )}
       {notice && <AdminToast message={notice} onDismiss={() => setNotice(null)} />}
 
-      <div className="divide-y divide-surface-3" aria-busy={loading}>
+      <div className="admin-selection p-4" aria-busy={loading}>
+        <aside className="admin-selection-index" aria-label="选择复核单">{data.cases.map((riskCase) => <button key={riskCase.id} type="button"
+          aria-pressed={riskCase.id === (data.cases.find((item) => item.id === selectedCaseId)?.id ?? data.cases[0]?.id)} onClick={() => setSelectedCaseId(riskCase.id)}>
+          <strong>风险 {riskCase.score} · {statusLabel(riskCase.status)}</strong><small>{riskCase.members.length} 个关联账号 · {riskCase.id.slice(0, 12)}</small>
+        </button>)}</aside><div className="min-w-0">
         {loading && <div className="p-4 text-sm text-ink-muted" role="status">正在加载行为复核单…</div>}
         {!loading && !error && data.cases.length === 0 && <div className="p-8 text-center text-sm text-ink-muted">当前筛选下暂无行为风控复核单。</div>}
-        {!loading && !error && data.cases.map((riskCase) => (
+        {!loading && !error && data.cases.filter((riskCase) => riskCase.id === (data.cases.find((item) => item.id === selectedCaseId)?.id ?? data.cases[0]?.id)).map((riskCase) => (
           <article key={riskCase.id} className="space-y-4 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -314,7 +319,7 @@ export default function BehaviorRiskPanel({ active = true }: { active?: boolean 
             )}
           </article>
         ))}
-      </div>
+      </div></div>
 
       <div className="flex items-center justify-between gap-3 border-t border-surface-3 p-4 text-sm text-ink-muted">
         <span>共 {data.pagination.total} 单 · {data.pagination.total_pages === 0 ? '暂无分页' : `第 ${data.pagination.page}/${data.pagination.total_pages} 页`}</span>

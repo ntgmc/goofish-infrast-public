@@ -990,11 +990,11 @@ input[type="checkbox"]:focus-visible { outline: 2px solid var(--color-focus); ou
   display: none;
 }
 
-.admin-section:is([data-loading], :has(.admin-section-body .tool-section-loader)) > .admin-section-body {
+.admin-section:is([data-loading], :has(> .admin-section-body > .tool-section-loader)) > .admin-section-body {
   display: none;
 }
 
-.admin-section:is([data-loading], :has(.admin-section-body .tool-section-loader)) > .tool-section-loader {
+.admin-section:is([data-loading], :has(> .admin-section-body > .tool-section-loader)) > .tool-section-loader {
   display: flex;
 }
 
