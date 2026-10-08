@@ -336,6 +336,10 @@
   outline: none;
 }
 
+.v2-main > .tool-announcement {
+  margin-bottom: var(--space-md);
+}
+
 .v2-page-title {
   display: flex;
   align-items: center;
@@ -1737,6 +1741,7 @@
 
 @media (max-width: 40rem) {
   .v2-main { --v2-main-padding: var(--space-md); padding: var(--v2-main-padding) var(--space-sm); }
+  .v2-main > .tool-announcement { margin-bottom: var(--space-sm); }
   .v2-topbar { padding-inline: var(--space-xs); }
   .v2-breadcrumb { gap: var(--space-2xs); min-width: 0; }
   .v2-breadcrumb strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
