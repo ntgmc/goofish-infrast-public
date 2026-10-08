@@ -1023,7 +1023,7 @@ describe('V2 feature continuity', () => {
   it('opens full account settings inside V2 and shares the existing animation preferences', async () => {
     connect()
     const user = userEvent.setup()
-    render(<MotionPreferenceProvider><MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter></MotionPreferenceProvider>)
+    mount()
     await user.click(screen.getByRole('button', { name: copy.v2.settings }))
     expect(await screen.findByLabelText(copy.dashboard.pages_tool_dashboard_SettingsSection_018)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: copy.dashboard.settings.preferences }))
