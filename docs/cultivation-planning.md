@@ -109,7 +109,7 @@ PRTS 道具索引通过 `api.php?action=ask` 按 `itemId` 查询，再批量读�
 
 ## 首次部署导入
 
-网站不进行首次全量作业爬取。先在 qqbot_manager 生产环境完成一次全量刷新，
+网站服务不会自动进行首次全量作业爬取。先在 qqbot_manager 生产环境完成一次全量刷新，
 再把以下两个文件复制到部署环境：
 
 - 完整 SQLite 备份：默认原文件 `data/prts_difficulty.sqlite3`。
@@ -153,6 +153,31 @@ MAA_PRTS_PLANNING_PATH=/var/lib/maatool/cultivation/prts-planning.json
 导入/同步账号需有写权限。数据目录仅包含公开作业和游戏元数据，不包含用户库存或凭据。
 未导入时页面提示等待作业数据可用，不会自动回退到全量下载。
 
+## 手动全量刷新
+
+已有规划快照时，可在本地全量拉取公开作业，一次补齐发布时间、点赞、差评、浏览量
+与热度。脚本复用原快照的养成成本和游戏元数据，不需要刷新 qqbot 数据库：
+
+```sh
+node scripts/fetch-prts-planning.mjs \
+  --base /path/to/current-prts-planning.json \
+  --output /path/to/prts-planning-full.json
+```
+
+需要 Node.js 24 和源码目录的已安装依赖。`--base` 与 `--output` 必须不同。
+脚本从第一页开始遍历全部公开 PRTS 作业，每页 200 条，请求间隔至少 500 毫秒；
+临时请求失败最多重试 3 次。分页正文已经包含关卡、干员、替代组、练度要求和说明，
+规划不使用执行动作，因此无需逐份请求动作详情。分页交叠会去重，已隐藏或删除的
+作业不会沿用。发布时间沿用上游原值，按北京时间解析，不使用刷新时间代替。
+任一可用作业缺少有效发布时间、分页异常或请求持续失败时，保留原输出文件。
+全部拉取完成且通过快照校验后才原子写入，历史复查进度重置为第一页。
+
+上传生产时，先将输出传到持久化数据目录内的临时文件，核对 SHA-256 和作业数量，
+确认缺少发布时间的数量为 0。替换时独占生产快照的 `.lock` 文件，备份旧快照，
+再在同一目录原子重命名为 `MAA_PRTS_PLANNING_PATH` 指定的文件，并保留应用账号
+的读写权限。锁已占用时等待当前同步完成后重试；不要移除正在使用的锁。
+服务会自动读取新快照，无需重启。该脚本是手动维护工具，不随服务启动执行。
+
 ## 后续增量维护
 
 API 启动后每小时检查一次作业数据，超过 24 小时自动进行增量同步。
@@ -191,6 +216,6 @@ node scripts/sync-prts-planning.mjs \
 ## 验证
 
 ```sh
-node --test scripts/prts-planning.test.mjs
+node --test scripts/prts-planning.test.mjs scripts/fetch-prts-planning.test.mjs
 npm test -- src/lib/cultivation-planner.test.ts server/cultivation/data.test.ts server/handlers/cultivation-plan.test.ts src/pages/CultivationPlanPage.test.tsx
 ```
