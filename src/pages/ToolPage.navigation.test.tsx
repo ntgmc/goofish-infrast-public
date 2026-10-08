@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRouter, RouterProvider } from 'react-router'
@@ -143,7 +143,8 @@ describe('ToolPage route guards', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe(saved ? '/tool/profiles' : '/tool/setup/config'))
   })
 
-  it('shows the announcement banner after the /tool entry redirects to the dashboard', async () => {
+  it('shows an expandable announcement after the /tool entry redirects to the dashboard', async () => {
+    const user = userEvent.setup()
     const router = renderToolRoute('/tool', {
       banner: {
         id: 'banner-1',
@@ -156,9 +157,15 @@ describe('ToolPage route guards', () => {
     })
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/tool/profiles'))
-    const banner = await screen.findByRole('region', { name: '站内横幅' })
+    const banner = await screen.findByRole('region', { name: copy.public.components_AnnouncementBanner_001 })
     expect(banner).toHaveTextContent('维护公告')
-    expect(screen.getByText('今晚进行例行维护。')).toBeInTheDocument()
+    const body = within(banner).getByText('今晚进行例行维护。', { selector: 'p' })
+    expect(body).not.toBeVisible()
+
+    await user.click(within(banner).getByText(copy.public.components_AnnouncementBanner_002))
+    expect(body).toBeVisible()
+    await user.click(within(banner).getByText(copy.public.components_AnnouncementBanner_003))
+    expect(body).not.toBeVisible()
   })
 
   it('keeps the opened profile in the URL so a refresh can restore it', async () => {
