@@ -42,7 +42,7 @@ npm run start:server
 
 ```text
 DATABASE_URL=postgresql://<user>:<password>@127.0.0.1:5432/<database>
-PUBLIC_APP_URL=https://<public-origin>/
+# PUBLIC_APP_URL=https://<public-origin>/
 SKLAND_CREDENTIAL_SECRET=<stable local random value of at least 16 characters>
 FREE_PREVIEW_UID_HASH_SECRET=<stable local random value of at least 32 characters>
 USAGE_VISITOR_SECRET=<stable random value of at least 32 characters>
@@ -55,6 +55,8 @@ WEBSITE_RELEASE_CONFIRMATION_TOKEN=<different random value of at least 32 bytes>
 `SKLAND_CREDENTIAL_SECRET`（或其 keyring 配置）用于加密可刷新的森空岛凭证；`FREE_PREVIEW_UID_HASH_SECRET` 用于生成稳定的 UID HMAC、防止重复领取。两者都必须由密码学安全随机源生成、纳入受控密钥备份，并在所有 API 实例间保持一致。不要直接替换 UID HMAC 密钥；轮换前必须迁移现有 claim hash。凭证 keyring 轮换应保留旧解密密钥，完成 `scripts/rekey-skland-credentials.mjs` 重加密后再移除旧密钥。生产环境会在监听端口前校验这两类配置，缺失或长度不足时启动失败。
 
 `USAGE_VISITOR_SECRET` 用于签名匿名 usage visitor cookie，必须在所有 API 实例间保持一致。轮换时先配置新值，并将旧值放入 `USAGE_VISITOR_SECRET_PREVIOUS`；至少保留一个 visitor cookie 有效期（当前为 180 天）后再移除旧值。为兼容旧部署，服务端在未配置专用值时会回退到管理员签名密钥，但生产环境应使用独立 secret，避免不同安全域共用密钥。
+
+`PUBLIC_APP_URL` 在生产环境必填，必须是 HTTPS 源站地址。开发环境未配置时，横幅和公告仍可发布，但不会创建供 Bot 读取的公告通知事件。需要联调网站通知、事务邮件或版本发布确认时，再配置该地址。
 
 ### QQ Bot 网站集成与正式版本事件流
 
@@ -83,7 +85,7 @@ Content-Type: application/json
 
 个人排班通知、账号绑定和 MAA JSON 私聊下载使用独立的 `WEBSITE_QQBOT_TOKEN`。用户在账号安全页生成绑定码，私聊 bot 完成绑定后主动开启通知。网站会在排班成功时保存待发送通知，bot 负责轮询、私聊发送文件和确认送达；自动推送不会消耗体验券。接口、命令和重试契约见 [QQ Bot 接入交接文档](docs/qqbot-handoff.md)。bot 完成适配前保持该凭据未配置，部署时先迁移数据库 `2026-10-04.1`。
 
-公告从未启用状态首次保存为启用状态时，公告文档和 `announcement.published` 事件在同一 PostgreSQL 事务中提交；再次编辑已发布公告不会产生新事件。部署此功能前必须先运行 `npm run migrate:database`，创建 append-only 的 `website_notification_events` 表。
+配置 `PUBLIC_APP_URL` 后，公告从未启用状态首次保存为启用状态时，公告文档和 `announcement.published` 事件在同一 PostgreSQL 事务中提交；再次编辑已发布公告不会产生新事件。部署此功能前必须先运行 `npm run migrate:database`，创建 append-only 的 `website_notification_events` 表。
 
 正式生产版本不能在构建或服务启动时自动确认。部署、公开 changelog 和 `/api/health/ready` 健康检查全部成功后，CI/CD 使用独立写权限 Token 运行：
 

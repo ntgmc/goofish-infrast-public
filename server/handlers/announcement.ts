@@ -132,6 +132,7 @@ function buildAnnouncementPublicationEvents(
     announcement.active && currentById.get(announcement.id)?.active !== true
   ))
   if (newlyPublished.length === 0) return []
+  if (process.env.NODE_ENV !== 'production' && !process.env.PUBLIC_APP_URL?.trim()) return []
 
   const publicAppUrl = resolvePublicAppUrl()
   return newlyPublished.map((announcement) => {

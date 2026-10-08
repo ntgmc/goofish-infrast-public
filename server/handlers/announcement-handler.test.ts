@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   authenticateAdminRequest: vi.fn(),
@@ -40,6 +40,10 @@ beforeEach(() => {
   process.env.PUBLIC_APP_URL = 'https://example.test'
 })
 
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
+
 describe('announcement handler', () => {
   it('serves a side-effect-free cacheable public document with an ETag', async () => {
     const response = await handler(new Request('http://localhost/api/announcement'))
@@ -76,7 +80,34 @@ describe('announcement handler', () => {
     })
   })
 
-  it('conditionally publishes and atomically requests cleanup for deleted announcement ids', async () => {
+  it.each(['banner', 'popup'] as const)('publishes a local %s without a public URL or notification event', async (kind) => {
+    vi.stubEnv('NODE_ENV', 'development')
+    vi.stubEnv('PUBLIC_APP_URL', undefined)
+    const next = { ...popup, id: `${kind}-local`, kind }
+    mocks.getValidatedJson.mockResolvedValue({
+      banner: kind === 'banner' ? next : null,
+      announcements: kind === 'popup' ? [next] : [popup],
+      expected_revision: 3,
+    })
+
+    const response = await handler(new Request('http://localhost/api/admin/announcement', { method: 'PUT' }))
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ revision: 4 })
+    expect(mocks.set).toHaveBeenCalledWith(expect.any(Object), 3, expect.any(Array), [])
+  })
+
+  it('requires a public URL before publishing notification events in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('PUBLIC_APP_URL', undefined)
+    mocks.getValidatedJson.mockResolvedValue({ banner: null, announcements: [{ ...popup, id: 'popup-2' }], expected_revision: 3 })
+
+    await expect(handler(new Request('http://localhost/api/admin/announcement', { method: 'PUT' })))
+      .rejects.toThrow('PUBLIC_APP_URL is required before publishing website notifications.')
+    expect(mocks.set).not.toHaveBeenCalled()
+  })
+
+  it.each(['development', 'production'])('conditionally publishes notification events and requests cleanup in %s', async (environment) => {
+    vi.stubEnv('NODE_ENV', environment)
     const next = { ...popup, id: 'popup-2' }
     mocks.getValidatedJson.mockResolvedValue({ banner: null, announcements: [next], expected_revision: 3 })
     const response = await handler(new Request('http://localhost/api/admin/announcement', { method: 'PUT' }))
