@@ -19,6 +19,7 @@ import { SiteFeatureProvider } from './lib/site-feature-context'
 import { FeatureRoute } from './components/FeatureUnavailablePage'
 import AccountSafetyPage from './pages/AccountSafetyPage'
 import PublicContentRoute from './components/PublicContentRoute'
+import { PublicContentProvider } from './lib/public-content-context'
 import { apiVoid } from './lib/api-client'
 import { categorizeBehaviorRiskPath } from './lib/behavior-risk-client'
 import NotFoundPage from './components/NotFoundPage'
@@ -76,7 +77,7 @@ function AppContent() {
 
   const v2Page = <FeatureRoute feature="v2" renderPending={(status, retry) => <V2LoadingScreen
     error={status === 'error' ? copy.features.load_failed_body : null} onRetry={retry} retryLabel={copy.features.retry} />}>
-    <Suspense fallback={<V2LoadingScreen />}><V2Page /></Suspense></FeatureRoute>
+    <PublicContentProvider><Suspense fallback={<V2LoadingScreen />}><V2Page /></Suspense></PublicContentProvider></FeatureRoute>
 
   return (
     <div className="min-h-screen bg-surface-0 text-ink-primary">

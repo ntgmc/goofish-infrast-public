@@ -75,6 +75,30 @@ describe('cultivation tool interactions', () => {
     expect(screen.getByText('每份可减少本次缺口等效理智 · 10')).toBeInTheDocument()
   })
 
+  it('restores URL filters, searches the full stage catalog, and applies a query with current inventory', async () => {
+    const input = sample()
+    input.recommendation = { query: { scope: 'history', days: 0, coverage: 0.8, stageId: '', activity: '', category: '', profession: '', rarity: 0, search: '', includeClosed: false, includeAlternatives: true, includeUncertain: false }, families: 3, withoutActions: 0,
+      stages: Array.from({ length: 1002 }, (_, index) => ({ id: `main_${index}`, name: `测试关卡${index}`, activity: '测试活动', category: '主线' })), professions: ['WARRIOR'] }
+    mocks.api.mockResolvedValue(input)
+    render(<MemoryRouter initialEntries={['/tools/cultivation-plan?cultivation_scope=history&cultivation_days=0']}><CultivationPlanPage /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: '导入森空岛练度与仓库' }))
+    await screen.findByRole('heading', { name: '建议培养顺序' })
+    expect(mocks.api.mock.calls[0][1].json.recommendation).toMatchObject({ scope: 'history', days: 0 })
+    fireEvent.click(screen.getByText('选择活动、关卡与干员'))
+    const stage = screen.getByRole('combobox', { name: '关卡' })
+    fireEvent.focus(stage)
+    expect(screen.getAllByRole('option', { hidden: false }).filter((row) => row.tagName === 'LI')).toHaveLength(51)
+    fireEvent.change(stage, { target: { value: '1001 main' } })
+    fireEvent.keyDown(stage, { key: 'Enter' })
+    expect(stage).toHaveValue('测试关卡1001')
+    expect(mocks.api).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: '更新规划' }))
+    await waitFor(() => expect(mocks.api).toHaveBeenCalledTimes(2))
+    expect(mocks.api.mock.calls[1][1].json).toMatchObject({ profile_id: 'one', recommendation: { stageId: 'main_1001', scope: 'history' } })
+    fireEvent.click(screen.getByRole('button', { name: '清除关卡' }))
+    expect(stage).toHaveValue('')
+  })
+
   it('discards a late response when the selected profile changes', async () => {
     let finish: (value: CultivationData) => void = () => {}
     mocks.api.mockImplementationOnce(() => new Promise<CultivationData>((resolve) => { finish = resolve }))

@@ -53,12 +53,13 @@ export function cultivationCosts(snapshot: PrtsSnapshot, id: string, current: Cu
   if (target.moduleId) {
     if (current.modulesKnown === false) warnings.push('森空岛未返回当前模组数据')
     if (!module || module.charId !== id) warnings.push('模组与干员不匹配')
-    else for (let rank = (current.modules[target.moduleId] ?? 0) + 1; rank <= target.moduleLevel; rank++) {
+    else for (let rank = (current.modules[target.moduleId] ?? 0) + 1; rank <= (target.moduleLevel ?? 1); rank++) {
       const cost = asRecord(module.itemCost)[String(rank)]
       if (!Array.isArray(cost)) warnings.push('模组材料表不完整')
       else for (const item of asRows(cost)) add({ [String(item.id)]: item.count })
     }
-    if (target.moduleLevel < 1 || target.moduleLevel > 3) warnings.push('模组等级无效')
+    // Unknown homework ranks only budget opening the recommended module.
+    if (target.moduleLevel !== null && (target.moduleLevel < 1 || target.moduleLevel > 3)) warnings.push('模组等级无效')
   }
   if (target.potential > current.potential) warnings.push('潜能不足，需要另行获取信物或重复干员')
   return { items: Object.fromEntries(Object.entries(items).filter(([, count]) => count > 0)), warnings: [...new Set(warnings)] }

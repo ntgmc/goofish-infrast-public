@@ -8,6 +8,8 @@ import { copy } from '../../copy'
 import { MotionPreferenceProvider } from '../../lib/motion-preference'
 import { CONFIG_PRESETS, normalizeConfig, validateScheduleConfig } from '../../lib/config'
 import { DEFAULT_SITE_FEATURES } from '../../lib/site-features'
+import { cloneDefaultPublicContentSettings } from '../../lib/public-content'
+import { PublicContentProvider } from '../../lib/public-content-context'
 import type { OptimizeResult, UserGameAccount, WorkspaceResultHistorySummary } from '../../lib/types'
 import type { V2Session } from './OptionsDrawer'
 import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './sample-result'
@@ -95,10 +97,10 @@ function connect() {
     currentResult: null as OptimizeResult | null, finalResult: null, historyItem: { result: SAMPLE_RESULT },
     activeConfig: SAMPLE_CONFIG, mergedOperators: SAMPLE_OPERATORS, configDiffRows: [],
     updateConfig: vi.fn(), handleGenerate: vi.fn(async () => undefined), handleDownloadMAA: vi.fn(),
-    permission: 'ultimate', userCanEditConfig: true, userCanUseIntermediateAutoConfig: true,
+    permission: 'ultimate', userCanEditConfig: true, userCanUseIntermediateAutoConfig: true, userCanUseUpgradeFeatures: true,
     userCanViewFullData: true, userCanDownloadFullResult: true, handleDownloadFullResult: vi.fn(),
     configValidation: { ok: true } as ReturnType<typeof validateScheduleConfig>, configPresetLabel: '2-4-3', hasResult: true, resultIsCurrent: false,
-    resultHistory: [summary], loading: false, workspaceError: null, inlineError: null,
+    resultHistory: [summary], loading: false, isRestrictedPreview: false, workspaceError: null, inlineError: null,
     workspaceNotice: null, declarationDialog: null, configToast: null as { message: string } | null,
     billingQuote: null as { charge: string; available: string; tier: number | null; sufficient: boolean } | null,
     billingQuoteLoading: false, billingQuoteError: null as string | null, refreshBillingQuote: vi.fn(async () => undefined),
@@ -238,10 +240,9 @@ describe('V2 results-first workspace', () => {
     expect(screen.getByText(copy.v2.sampleSource)).toBeInTheDocument()
     expect(screen.getByText(copy.v2.brandDescription)).toBeInTheDocument()
     expect(screen.queryByText('可露希尔基建终端')).not.toBeInTheDocument()
-    const legacyEntry = within(screen.getByRole('banner')).getByRole('link', { name: `${copy.v2.testVersion} · ${copy.v2.legacyEntry}` })
+    const legacyEntry = within(screen.getByRole('banner')).getByRole('link', { name: copy.v2.legacyEntry })
     expect(legacyEntry).toHaveAttribute('href', '/v1')
-    expect(legacyEntry).toHaveAttribute('title', copy.v2.legacyEntry)
-    expect(legacyEntry).toHaveTextContent(copy.v2.testVersion)
+    expect(legacyEntry).toHaveTextContent(copy.v2.legacyEntry)
     expect(screen.getByRole('tab', { name: /第 1 班/ })).toHaveAttribute('aria-selected', 'true')
     expect(mocks.workflow).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -256,13 +257,13 @@ describe('V2 results-first workspace', () => {
     vi.mocked(session.flushConfigSave).mockReturnValueOnce(new Promise((resolve) => { finishSave = resolve }))
     const user = userEvent.setup()
     mount('/')
-    const badge = screen.getByRole('link', { name: `${copy.v2.testVersion} · ${copy.v2.legacyEntry}` })
-    await user.click(badge)
+    const legacyEntry = screen.getByRole('link', { name: copy.v2.legacyEntry })
+    await user.click(legacyEntry)
     expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/')
     await act(async () => finishSave(false))
     expect(screen.getByRole('alert')).toHaveTextContent(copy.v2.saveFailed)
     expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/')
-    await user.click(badge)
+    await user.click(legacyEntry)
     await waitFor(() => expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v1'))
     expect(session.flushConfigSave).toHaveBeenCalledTimes(2)
   })
@@ -970,7 +971,7 @@ describe('V2 feature continuity', () => {
     await user.click(screen.getByRole('button', { name: copy.v2.regenerate }))
     expect(confirm).toHaveBeenCalledWith(copy.v2.discardManual)
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('link', { name: `${copy.v2.testVersion} · ${copy.v2.legacyEntry}` }))
+    await user.click(screen.getByRole('link', { name: copy.v2.legacyEntry }))
     expect(confirm).toHaveBeenCalledTimes(2)
     expect(session.flushConfigSave).not.toHaveBeenCalled()
     expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2')
@@ -997,12 +998,26 @@ describe('V2 feature continuity', () => {
 
   it('keeps free-preview upload and manual-edit restrictions while allowing the standalone tool', async () => {
     const workflow = connect()
-    session.activeProfile = { ...session.activeProfile!, kind: 'free_preview' }
+    session.activeProfile = { ...session.activeProfile!, kind: 'free_preview', permission: 'growth' }
+    workflow.permission = 'growth'
     workflow.userCanEditConfig = false
+    workflow.userCanUseUpgradeFeatures = false
     workflow.activeConfig = normalizeConfig({ ...SAMPLE_CONFIG, schedule_mode: 'maa' })
+    mocks.manual.mockClear()
     const user = userEvent.setup()
     mount()
-    expect(screen.queryByRole('button', { name: copy.v2.manualTab })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: copy.v2.manualTab }))
+    expect(screen.getByRole('button', { name: copy.v2.manualTab })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText(copy.optimize.paid_preview.manual_description)).toBeInTheDocument()
+    expect(document.querySelector('[data-locked-capability-preview]')).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.getByRole('link', { name: copy.optimize.pages_tool_optimize_ResultSection_018 })).toHaveAttribute('href', '/v2?section=pricing&profile_id=profile-1')
+    expect(screen.getByRole('link', { name: copy.optimize.pages_tool_optimize_ResultSection_019 })).toHaveAttribute('href', '/v2?section=add-account&profile_id=profile-1')
+    expect(mocks.manual).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: copy.v2.trainingTab }))
+    expect(screen.getByRole('button', { name: copy.v2.trainingTab })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText(copy.optimize.pages_tool_optimize_ResultSection_017)).toBeInTheDocument()
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+    expect(workflow.updateConfig).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: copy.v2.operators }))
     const dialog = within(await screen.findByRole('dialog'))
     expect(dialog.getByRole('button', { name: copy.v2.uploadMaa })).toBeDisabled()
@@ -1010,6 +1025,8 @@ describe('V2 feature continuity', () => {
     await dismissDrawer(user)
     await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
     const configDialog = within(await screen.findByRole('dialog'))
+    expect(configDialog.getByText(/当前为 免费预览 权限/)).toBeInTheDocument()
+    expect(configDialog.queryByText(/当前为 练度提升卡 权限/)).not.toBeInTheDocument()
     const fixedHours = configDialog.getByRole('button', { name: copy.common.components_ConfigEditor_088 })
     expect(fixedHours).toBeEnabled()
     expect(configDialog.getByRole('button', { name: copy.common.components_ConfigEditor_091 })).toBeDisabled()
@@ -1018,6 +1035,47 @@ describe('V2 feature continuity', () => {
     await dismissDrawer(user)
     await user.click(screen.getByRole('button', { name: copy.v2.tools }))
     expect(await screen.findByRole('link', { name: new RegExp(copy.tools.manualSchedule.title) })).toHaveAttribute('href', expect.stringContaining('section=manual-tool'))
+  })
+
+  it.each(['free_preview', 'cdk'] as const)('opens pricing from the footer for a %s profile', async (kind) => {
+    connect()
+    session.activeProfile = { ...session.activeProfile!, kind }
+    const user = userEvent.setup()
+    mount()
+    const footer = within(document.querySelector('footer.v2-footer')!)
+    await user.click(footer.getByRole('link', { name: copy.v2.comparePlans }))
+    expect(await screen.findByRole('heading', { name: cloneDefaultPublicContentSettings().pricing.title, level: 1 })).toBeInTheDocument()
+    expect(screen.getByTestId('route-location')).toHaveTextContent('section=pricing&profile_id=profile-1')
+    expect(footer.getByRole('link', { name: copy.v2.comparePlans })).toBeInTheDocument()
+  })
+
+  it('uses configured purchase links after public content loads in the V2 pricing workspace', async () => {
+    const content = cloneDefaultPublicContentSettings()
+    content.pricing.plans.single_account_monthly.purchase_url = 'https://example.com/monthly'
+    content.pricing.plans.single_account_lifetime.purchase_url = 'https://example.com/lifetime'
+    content.pricing.lifetime_upgrade.purchase_url = 'https://example.com/upgrade'
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(content), { headers: { 'Content-Type': 'application/json' } }))
+    const user = userEvent.setup()
+    render(<MemoryRouter initialEntries={['/v2?section=pricing']}><PublicContentProvider><V2Page /></PublicContentProvider></MemoryRouter>, { wrapper: MotionPreferenceProvider })
+    const monthly = await screen.findByRole('link', { name: copy.public.pricing_purchase_labels.single_account_monthly })
+    expect(monthly).toHaveAttribute('href', 'https://example.com/monthly')
+    expect(monthly).toHaveAttribute('target', '_blank')
+    expect(monthly).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(screen.getByRole('link', { name: copy.public.pricing_upgrade_purchase })).toHaveAttribute('href', 'https://example.com/upgrade')
+    await user.click(within(screen.getByRole('group', { name: copy.v2.planChoice })).getByRole('button', { name: /终身/ }))
+    expect(screen.getByRole('link', { name: copy.public.pricing_purchase_labels.single_account_lifetime })).toHaveAttribute('href', 'https://example.com/lifetime')
+    expect(screen.queryByRole('button', { name: copy.public.pricing_purchase_unavailable })).not.toBeInTheDocument()
+  })
+
+  it('omits the redundant free-preview generation and recompute introduction', async () => {
+    const workflow = connect()
+    session.activeProfile = { ...session.activeProfile!, kind: 'free_preview', permission: 'growth' }
+    workflow.isRestrictedPreview = true
+    mount('/v2?section=generation')
+    expect(await screen.findByRole('button', { name: copy.optimize.pages_tool_optimize_GenerateControlBar_029 })).toBeInTheDocument()
+    expect(screen.queryByText(copy.optimize.pages_tool_optimize_OverviewSection_024)).not.toBeInTheDocument()
+    expect(screen.queryByText(copy.optimize.paid_preview.recompute)).not.toBeInTheDocument()
+    expect(document.querySelector('.v2-generation-preview')).not.toBeInTheDocument()
   })
 
   it('opens full account settings inside V2 and shares the existing animation preferences', async () => {

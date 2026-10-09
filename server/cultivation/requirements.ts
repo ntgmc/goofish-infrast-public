@@ -14,8 +14,6 @@ function textRequirement(text: string): Record<string, number | string> {
   const mastery = normalized.match(/专(?:精)?\s*([一二三123])/)
   if (mastery) result.skill_level = 7 + digit(mastery[1])
   else if (/无专精|不专|技能\s*7/.test(normalized)) result.skill_level = 7
-  const module = normalized.match(/(?:(?:模组?|module)\s*([一二三123])(?:级)?|([一二三123])级?模组)/i)
-  if (module) result.module_level = digit(module[1] || module[2])
   const moduleType = normalized.match(/([XYDABαΔ])\s*(?:模组?|module)/i)
   if (moduleType) result.module_type = ({ α: 'A', Δ: 'D' } as Record<string, string>)[moduleType[1]] ?? moduleType[1].toUpperCase()
   if (/无模组|无模|不带模组/.test(normalized)) { result.module = 0; delete result.module_level; delete result.module_type }
@@ -24,7 +22,17 @@ function textRequirement(text: string): Record<string, number | string> {
   return result
 }
 
-export function readHomeworkRequirements(content: Record<string, unknown>, snapshot: PrtsSnapshot, byName = new Map(Object.entries(snapshot.operators).map(([id, info]) => [info.name, { id, ...info }]))) {
+const operatorIndexes = new WeakMap<PrtsSnapshot, Map<string, Array<PrtsSnapshot['operators'][string] & { id: string }>>>()
+export function readHomeworkRequirements(content: Record<string, unknown>, snapshot: PrtsSnapshot) {
+  let byName = operatorIndexes.get(snapshot)
+  if (!byName) {
+    byName = new Map()
+    for (const [id, info] of Object.entries(snapshot.operators)) {
+      if (!id.startsWith('char_')) continue
+      byName.set(info.name, [...byName.get(info.name) ?? [], { id, ...info }])
+    }
+    operatorIndexes.set(snapshot, byName)
+  }
   const fixed = asRows(content.opers)
   const groups = asRows(content.groups).map((group) => asRows(group.opers))
   const names = [...fixed, ...groups.flat()].map((row) => String(row.name ?? ''))
@@ -45,7 +53,10 @@ export function readHomeworkRequirements(content: Record<string, unknown>, snaps
   }
   const parse = (row: Record<string, unknown>) => {
     const name = String(row.name ?? '')
-    const operator = byName.get(name)
+    const named = byName.get(name) ?? []
+    const role = String(row.role ?? 'Unknown').toUpperCase()
+    const matches = named.filter((info) => role === 'UNKNOWN' || !['TOKEN', 'TRAP'].includes(role) && (info.profession === role || !info.profession && named.length === 1))
+    const operator = matches.length === 1 ? matches[0] : undefined
     const fields: Record<string, number | string> = { ...global, ...specific[name] }
     const structured = asRecord(row.requirements)
     const unspecified = ['elite', 'level', 'skill_level', 'potentiality'].every((field) => !structured[field]) && [0, -1].includes(Number(structured.module ?? -1))
@@ -53,15 +64,16 @@ export function readHomeworkRequirements(content: Record<string, unknown>, snaps
       if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && (!['level', 'skill_level', 'potentiality'].includes(key) || value > 0)) fields[key] = value
     }
     const warnings: string[] = []
-    const skill = Number(row.skill ?? 1)
+    if (['elite', 'level', 'skill_level', 'potentiality'].some((key) => structured[key] !== undefined && (typeof structured[key] !== 'number' || !Number.isInteger(structured[key]) || Number(structured[key]) < 0))) warnings.push('作业练度字段无效')
+    const skill = operator?.skills.length === 0 ? 0 : Number(row.skill ?? 1)
     const moduleNumber = Number(fields.module ?? 0)
     const equips = operator ? snapshot.costs.modules.charEquip[operator.id] ?? [] : []
-    const moduleId = fields.module_type ? equips.find((id) => String(snapshot.costs.modules.equipDict[id]?.typeName2).toUpperCase() === fields.module_type) ?? null
-      : moduleNumber > 0 ? equips[moduleNumber] ?? null : null
-    if ((moduleNumber > 0 || fields.module_type) && !moduleId) warnings.push('作业模组编号无法识别')
-    if (fields.module_level && !moduleId) warnings.push('作业未注明所需模组类型')
-    if (!Number.isInteger(skill) || skill < 1 || skill > 3 || (operator && !operator.skills[skill - 1])) warnings.push('作业技能编号无效')
-    const skillLevel = Number(fields.skill_level ?? 1)
+    const moduleType = fields.module_type ?? (Number(content.version ?? 2) >= 3 ? ['', 'X', 'Y', 'A', 'D'][moduleNumber] : undefined)
+    const moduleId = moduleType ? equips.find((id) => String(snapshot.costs.modules.equipDict[id]?.typeName2).replace('α', 'A').replace('Δ', 'D').toUpperCase() === moduleType) ?? null
+      : moduleNumber > 0 && Number(content.version ?? 2) < 3 ? equips[moduleNumber] ?? null : null
+    const moduleUnresolved = Boolean((moduleNumber > 0 || fields.module_type) && !moduleId)
+    if (!Number.isInteger(skill) || skill < 0 || skill > 3 || skill === 0 && operator?.skills.length !== 0 || (operator && operator.skills.length > 0 && !operator.skills[skill - 1])) warnings.push('作业技能编号无效')
+    const skillLevel = skill === 0 ? 1 : Number(fields.skill_level ?? 1)
     let elite = Math.max(Number(fields.elite ?? 0), skill === 3 || skillLevel > 7 ? 2 : skill === 2 || skillLevel > 4 ? 1 : 0)
     let level = elite === Number(fields.elite ?? 0) ? Number(fields.level ?? 1) : 1
     const module = moduleId ? snapshot.costs.modules.equipDict[moduleId] : null
@@ -69,8 +81,12 @@ export function readHomeworkRequirements(content: Record<string, unknown>, snaps
       const phase = Number(String(module.unlockEvolvePhase ?? 'PHASE_2').slice(-1))
       if (elite <= phase) { level = Math.max(elite === phase ? level : 1, Number(module.unlockLevel)); elite = phase }
     }
-    const target: CultivationTarget = { elite, level, skill, skillLevel, moduleId, moduleLevel: moduleId ? Number(fields.module_level ?? 1) : 0, potential: Number(fields.potentiality ?? 1) }
-    return { name, operator, target, warnings, minimumOnly: Object.keys(fields).length === 0 }
+    const target: CultivationTarget = { elite, level, skill, skillLevel, moduleId, moduleLevel: moduleId ? null : 0, potential: Number(fields.potentiality ?? 1) }
+    if (operator) {
+      const maxima = snapshot.costs.levels.maxLevel[operator.rarity - 1]
+      if (!Number.isInteger(elite) || !Number.isInteger(level) || !maxima || elite < 0 || elite >= maxima.length || level < 1 || level > maxima[elite] || !Number.isInteger(skillLevel) || skillLevel < 1 || skillLevel > (operator.rarity <= 3 ? 7 : 10) || !Number.isInteger(target.potential) || target.potential < 1 || target.potential > 6) warnings.push('作业练度超过该干员上限')
+    }
+    return { name, operator, target, warnings, moduleUnresolved, specified: { training: fields.elite !== undefined && fields.level !== undefined, skill: skill > 0 && fields.skill_level !== undefined, module: !moduleUnresolved && (fields.module !== undefined && Number(fields.module) >= 0 || fields.module_type !== undefined) } }
   }
   return { fixed: fixed.map(parse), groups: groups.map((rows) => rows.map(parse)) }
 }

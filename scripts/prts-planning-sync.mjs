@@ -59,7 +59,8 @@ export async function syncPrtsPlanning(options = {}, request = (url) => fetchJso
       const homework = homeworkRow(id, content, hashContent(detail.content), detail)
       if (!homework) { byId.delete(id); changed++ }
       else {
-        const updated = { ...byId.get(id), ...homework }
+        const previous = byId.get(id)
+        const updated = { ...previous, ...homework, uploadedAt: previous?.uploadedAt && homework.uploadedAt ? (previous.uploadedAt < homework.uploadedAt ? previous.uploadedAt : homework.uploadedAt) : previous?.uploadedAt ?? homework.uploadedAt }
         if (JSON.stringify(updated) !== JSON.stringify(byId.get(id))) { byId.set(id, updated); changed++ }
       }
     }

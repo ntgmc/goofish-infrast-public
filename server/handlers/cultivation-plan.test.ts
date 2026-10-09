@@ -38,6 +38,8 @@ describe('cultivation planning authorization and data boundary', () => {
 
   it('rejects invalid inputs, archived profiles, and unavailable seed data', async () => {
     expect((await handler(request({ profile_id: 'mine', mode: 'invalid' }))).status).toBe(400)
+    expect((await handler(request({ profile_id: 'mine', recommendation: { scope: 'invalid' } }))).status).toBe(400)
+    expect((await handler(request({ profile_id: 'mine', recommendation: { coverage: 2 } }))).status).toBe(400)
     mocks.session.mockResolvedValueOnce({ profiles: [{ id: 'mine', status: 'active', archived_at: '2026-01-01' }] })
     expect((await handler(request())).status).toBe(403)
     mocks.snapshot.mockRejectedValueOnce(new Error('ENOENT'))
@@ -48,12 +50,13 @@ describe('cultivation planning authorization and data boundary', () => {
   })
 
   it('returns current cultivation data without UID or credentials and disables response caching', async () => {
-    const response = await handler(request())
+    const response = await handler(request({ profile_id: 'mine', recommendation: { stageId: 'main_01' } }))
     expect(response.status).toBe(200)
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     const text = await response.text()
     expect(text).not.toContain('private-credential')
     expect(text).not.toContain('player-uid')
+    expect(JSON.parse(text).recommendation.query).toMatchObject({ stageId: 'main_01', coverage: 0.8 })
     expect(JSON.parse(text).candidates[0]).toMatchObject({ operatorId: 'char_test', items: { rock: 2, book: 6, exp: 300, '4001': 130 } })
   })
 })

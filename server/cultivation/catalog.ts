@@ -20,7 +20,8 @@ export const prtsSnapshotSchema = z.object({
     views: z.number().int().nonnegative().optional(),
     hotScore: z.number().nonnegative().optional(),
   })),
-  operators: z.record(z.string(), z.object({ name: z.string(), rarity: z.number().int().min(1).max(6), skills: z.array(z.string()) })),
+  operators: z.record(z.string(), z.object({ name: z.string(), rarity: z.number().int().min(1).max(6), skills: z.array(z.string()), profession: z.string().optional() })),
+  stages: z.record(z.string(), z.object({ name: z.string(), activity: z.string(), category: z.string(), permanent: z.boolean(), open: z.boolean().nullable().optional() })).optional(),
   costs: z.object({
     cultivate: z.record(z.string(), record),
     levels: z.object({ maxLevel: z.array(z.array(z.number())), characterExp: z.array(z.array(z.number())), characterUpgradeCost: z.array(z.array(z.number())), eliteCost: z.array(z.array(z.number())) }),

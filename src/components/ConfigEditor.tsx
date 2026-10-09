@@ -475,7 +475,7 @@ export default function ConfigEditor({
               </div>
               <div>
                 <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_040}</p>
-                <div className="tool-inset grid gap-2 p-1 sm:grid-cols-3" role="group" aria-label={copy.common.components_ConfigEditor_041}>
+                <div className="config-dormitory-rules tool-inset grid gap-2 p-1 sm:grid-cols-3" role="group" aria-label={copy.common.components_ConfigEditor_041}>
                   {DORMITORY_RULE_OPTIONS.map((rule) => (
                     <button
                       key={rule}
@@ -715,7 +715,7 @@ export default function ConfigEditor({
                 <BedDouble aria-hidden="true" className="h-4 w-4 shrink-0 text-primary" />
                 {copy.common.components_ConfigEditor_063}
               </h4>
-              <div className="tool-inset grid gap-2 p-1 lg:grid-cols-3" role="group" aria-label={copy.common.components_ConfigEditor_064}>
+              <div className="config-dormitory-rules tool-inset grid gap-2 p-1 lg:grid-cols-3" role="group" aria-label={copy.common.components_ConfigEditor_064}>
                 {DORMITORY_RULE_OPTIONS.map((rule) => (
                   <button
                     key={rule}

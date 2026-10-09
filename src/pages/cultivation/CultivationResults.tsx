@@ -12,6 +12,12 @@ export function progress(row: CultivationCandidate, target = false) {
     : label.progress(row.current.elite, row.current.level, row.target.skill, row.current.skillLevel, row.current.masteries[row.skillId], row.target.moduleId ? row.current.modules[row.target.moduleId] ?? 0 : undefined)
 }
 
+export function CultivationEvidence({ row }: { row: CultivationCandidate }) {
+  if (!row.evidence) return null
+  const { status, families, coverage, completeness } = row.evidence
+  return <div className="mt-2 space-y-1 text-xs leading-5 text-ink-secondary"><p>{label.evidenceStates[status]} · {label.evidenceSummary(families, coverage)}</p><p>{label.completeness(completeness.training, completeness.skill, completeness.module)}</p>{row.target.moduleId && row.target.moduleLevel === null && <p>{label.moduleOpening}</p>}</div>
+}
+
 function Operator({ row, data }: { row: CultivationCandidate; data: CultivationData }) {
   return <div className="flex items-center gap-3">
     <img src={`/webp96/${encodeURIComponent(row.operatorId)}.webp`} alt="" width={48} height={48} loading="lazy" className="size-12 rounded-lg bg-surface-2 object-cover" />
@@ -58,9 +64,9 @@ export default memo(function CultivationResults({ data, plan, excluded, exclude 
             <button type="button" className="tool-secondary-action ml-auto inline-flex shrink-0 items-center gap-1.5 text-xs" onClick={() => exclude(row.operatorId, true)}><X size={14} />{label.exclude}</button>
           </div><p className="mt-3 text-xs text-ink-muted">{label.current} · {progress(row)}</p>
             <p className="mt-1 text-sm">{row.source === 'community' ? label.communityTarget : label.target} · {progress(row, true)}</p>
-            {row.moduleName && <p className="mt-1 text-xs text-ink-secondary">{row.moduleName} · {label.moduleRank(row.target.moduleLevel)}</p>}
+            {row.moduleName && <p className="mt-1 text-xs text-ink-secondary">{row.moduleName}{row.target.moduleLevel !== null && ` · ${label.moduleRank(row.target.moduleLevel)}`}</p>}
             <p className="mt-2 text-xs text-ink-secondary">{row.source === 'community' ? label.communityRate(row.communityRate ?? null) : `${label.demand} ${number(row.frequency)} · ${label.stageCount} ${row.stageCount}`}</p>
-            <Statistics row={row} data={data} />
+            <CultivationEvidence row={row} /><Statistics row={row} data={data} />
           </div>
           <div className="space-y-3 text-sm"><p>{label.cost} · <strong className="tabular-nums">{allocation.sanity === null ? label.unpriced : number(allocation.sanity)}</strong></p>
             <p className="text-xs text-ink-secondary">{label.materialDate} · {estimatedDate ?? label.pending}</p>
@@ -83,7 +89,7 @@ export default memo(function CultivationResults({ data, plan, excluded, exclude 
     </section>
     <details className="tool-panel p-5 sm:p-6"><summary className="cursor-pointer text-base font-semibold">{label.comparison}</summary><p className="my-3 text-xs leading-5 text-ink-muted">{label.comparisonHint}</p>
       <label className="mb-4 block"><span className="sr-only">{label.search}</span><input className="tool-field" placeholder={label.search} value={search} onChange={(event) => { setSearch(event.target.value); setVisible(50) }} /></label>
-      <div className="divide-y divide-surface-3">{rows.slice(0, visible).map((row) => <div key={row.key} className="grid gap-2 py-3 sm:grid-cols-[10rem_minmax(0,1fr)_minmax(0,1fr)]"><div><Operator row={row} data={data} /><span className="mt-1 block text-xs text-ink-muted">{row.satisfied ? label.matched : row.warnings.length ? label.check : label.needsTraining}</span></div><p className="text-xs leading-5 text-ink-secondary">{label.current} · {progress(row)}<br />{row.source === 'community' ? label.communityTarget : label.target} · {progress(row, true)}{row.moduleName && <span className="block">{row.moduleName}</span>}</p><div className="text-xs leading-5 text-ink-muted"><p>{row.source === 'community' ? label.communityRate(row.communityRate ?? null) : `${label.demand} · ${number(row.frequency)}`}</p>{row.warnings.map((warning) => <p key={warning} className="text-warning">{warning}</p>)}{excluded.includes(row.operatorId) && <button type="button" className="tool-secondary-action mt-2 inline-flex items-center gap-1.5 text-xs" onClick={() => exclude(row.operatorId, false)}><RotateCcw size={14} />{label.excluded}</button>}</div></div>)}</div>
+      <div className="divide-y divide-surface-3">{rows.slice(0, visible).map((row) => <div key={row.key} className="grid gap-2 py-3 sm:grid-cols-[10rem_minmax(0,1fr)_minmax(0,1fr)]"><div><Operator row={row} data={data} /><span className="mt-1 block text-xs text-ink-muted">{row.satisfied ? label.matched : row.warnings.length ? label.check : label.needsTraining}</span></div><p className="text-xs leading-5 text-ink-secondary">{label.current} · {progress(row)}<br />{row.source === 'community' ? label.communityTarget : label.target} · {progress(row, true)}{row.moduleName && <span className="block">{row.moduleName}</span>}</p><div className="text-xs leading-5 text-ink-muted"><p>{row.source === 'community' ? label.communityRate(row.communityRate ?? null) : `${label.demand} · ${number(row.frequency)}`}</p><CultivationEvidence row={row} />{row.warnings.map((warning) => <p key={warning} className="text-warning">{warning}</p>)}{excluded.includes(row.operatorId) && <button type="button" className="tool-secondary-action mt-2 inline-flex items-center gap-1.5 text-xs" onClick={() => exclude(row.operatorId, false)}><RotateCcw size={14} />{label.excluded}</button>}</div></div>)}</div>
       {rows.length > visible && <button type="button" className="tool-secondary-action mt-4" onClick={() => setVisible((value) => value + 50)}>{label.showMore}</button>}
     </details>
   </>

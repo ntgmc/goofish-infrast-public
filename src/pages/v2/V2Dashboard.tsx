@@ -16,7 +16,7 @@ import { hasCapability } from '../../lib/product-catalog'
 import { NotificationBell } from '../../components/NotificationCenter'
 import AnnouncementBanner from '../../components/AnnouncementBanner'
 import AnnouncementPopup from '../../components/AnnouncementPopup'
-import { UpgradeSuggestionStatusNotice } from '../tool/optimize/ResultSection'
+import { LockedCapabilityPreview, UpgradeSuggestionStatusNotice } from '../tool/optimize/ResultSection'
 import WorkspaceSections, { sectionLabels, type V2Workflow } from './WorkspaceSections'
 import { v2Path, v2Section, v2SectionAvailable, type V2Section } from './navigation'
 import { normalizeScheduleMode, parseShiftHours, SCHEDULE_MODE_LABELS } from '../../lib/config'
@@ -25,7 +25,7 @@ import ScheduleBoard, { Avatar } from './ScheduleBoard'
 import IncomeAnalysis from './IncomeAnalysis'
 import ResultExportDrawer from './ResultExportDrawer'
 import OptionsDrawer, { type OptionPanel, type V2Session } from './OptionsDrawer'
-import { sortOperatorsForPreview } from '../tool/tool-utils'
+import { isFreePreviewProfile, isFreePreviewTrialActive, sortOperatorsForPreview } from '../tool/tool-utils'
 import V2Transition, { V2PageTransition } from './V2Transition'
 import TradingIcon from './TradingIcon'
 import { useSiteFeatures } from '../../lib/site-feature-context'
@@ -109,14 +109,17 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const name = session.activeProfile?.display_name ?? text.guest
   const openPanel = useCallback((next: OptionPanel) => { setPanel(next); setMobileNavigation(false) }, [])
   const openRoom = useCallback((next: BoardRoom) => { setRoom(next); openPanel('room') }, [openPanel])
+  const restrictedPreview = Boolean(session.activeProfile && isFreePreviewProfile(session.activeProfile) && !isFreePreviewTrialActive(session.activeProfile))
   const canManual = Boolean(features.manual_schedule && !sample && session.activeProfile && session.activeProfile.kind !== 'free_preview' && !result.preview_limit
     && hasCapability({ kind: session.activeProfile.kind, permission }, 'edit_full_config') && result.plans.length)
+  const showManual = canManual || (features.manual_schedule && restrictedPreview)
+  const canViewTraining = Boolean(workflow?.userCanUseUpgradeFeatures || workflow?.suggestions?.length)
   const manualKey = useMemo(() => manualSourceKey(result), [result])
   const simulationBaseline = workflow?.historyItem?.config ? { id: workflow.historyItem.id, config: workflow.historyItem.config }
     : workflow?.progress?.historyResultId || workflow?.progress?.jobId || workflow?.latestWorkspaceResult?.id
       ? { id: workflow.progress?.historyResultId ?? workflow.progress?.jobId ?? workflow.latestWorkspaceResult!.id, config } : undefined
   useEffect(() => { setShift(0); setManualOpened(false); setManualDirty(false) }, [manualKey])
-  useEffect(() => { if (!canManual && view === 'manual') setView('schedule') }, [canManual, view])
+  useEffect(() => { if (!showManual && view === 'manual') setView('schedule') }, [showManual, view])
   useEffect(() => {
     const requested = params.get('panel')
     if (requested === 'operators' || requested === 'config') setPanel(requested)
@@ -187,7 +190,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
       </AnimatePresence>
       <aside className={`v2-sidebar ${mobileNavigation ? 'v2-sidebar-open' : ''}`}>
         <Link to={v2Path('overview', session.activeProfile?.id)} className="v2-brand"><span className="v2-brand-mark"><Building2 size={24} strokeWidth={1.8} /></span>
-          <span><strong>{text.brand}<sup>V2</sup></strong><small>{text.brandDescription}</small></span></Link>
+          <span><strong>{text.brand}</strong><small>{text.brandDescription}</small></span></Link>
         <button className="v2-mobile-close v2-icon-button" type="button" onClick={() => setMobileNavigation(false)} aria-label={text.close}><X size={20} /></button>
         <nav aria-label={text.navigation}>
           <p className="v2-nav-label">{text.workspace}</p>
@@ -209,13 +212,13 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
         <header className="v2-topbar">
           <div className="v2-breadcrumb"><button className="v2-menu-button v2-icon-button" type="button" onClick={() => setMobileNavigation(true)} aria-label={text.menu}><Menu size={21} /></button>
             <span>{text.workspace}</span><ChevronRight size={14} /><strong>{sectionLabels[section]}</strong></div>
-          <div className="v2-topbar-actions"><Link to="/v1" className="v2-sample-pill" onClick={openLegacy} aria-label={`${text.testVersion} · ${text.legacyEntry}`} title={text.legacyEntry}><span />{text.testVersion}</Link>
+          <div className="v2-topbar-actions"><Link to="/v1" className="v2-legacy-link" onClick={openLegacy}>{text.legacyEntry}</Link>
             {features.changelog && <Link to={v2Path('updates', session.activeProfile?.id)} className="v2-icon-button" aria-label={text.updates}><ScrollText size={19} /></Link>}
             <div className="v2-feature-content">{taskCenterAction}</div>
             <div className="v2-feature-content"><ThemeSwitcher iconOnly /></div>
             <NotificationBell iconOnly onInventory={() => navigateSection('inventory')} />
             <span className="v2-topbar-divider" />
-            <button className="v2-profile-button" type="button" onClick={() => openPanel('account')}><span className="v2-profile-avatar">{name.slice(0, 1)}</span><span>{name}</span><ChevronDown size={14} /></button>
+            <button className="v2-profile-button" type="button" aria-label={name} title={name} onClick={() => openPanel('account')}><span className="v2-profile-avatar" aria-hidden="true">{name.slice(0, 1)}</span><span>{name}</span><ChevronDown size={14} aria-hidden="true" /></button>
           </div>
         </header>
         <main className="v2-main motion-region-enter" tabIndex={-1} data-route-focus>
@@ -227,9 +230,9 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           <div className="v2-page-title"><h1>{text.title}</h1></div>
           <InventoryDepletionWarning result={result} className="v2-inventory-warning" action={<button type="button" className="v2-button v2-button-secondary" onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" />{text.configure}</button>} />
           <div className="v2-ready-banner">
-            <span className="v2-ready-icon"><Check size={25} strokeWidth={2} /></span>
-            <div><h2>{text.resultReady}<span className="v2-ready-tag">{sample ? text.sample : SCHEDULE_MODE_LABELS[resultMode]}</span></h2></div>
-            <div className="v2-banner-actions"><button type="button" className="v2-button v2-button-white" onClick={() => openPanel('config')}><Settings2 size={16} />{text.configure}</button>
+            <div className="v2-ready-status"><span className="v2-ready-icon"><Check size={22} strokeWidth={2} aria-hidden="true" /></span>
+              <h2>{text.resultReady}<span className="v2-ready-tag">{sample ? text.sample : SCHEDULE_MODE_LABELS[resultMode]}</span></h2></div>
+            <div className="v2-banner-actions"><button type="button" className="v2-button v2-button-white v2-config-button" aria-label={text.configure} title={text.configure} onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" /><span>{text.configure}</span></button>
               <button type="button" className="v2-button v2-button-primary" disabled={busy || loadingResult || Boolean(generationDisabledReason)} title={generationDisabledReason ?? undefined}
                 onClick={() => { if (onGenerate) onGenerate(); else openPanel('account') }}><RefreshCw size={16} className={busy ? 'v2-spin' : ''} />{busy ? text.generating : text.regenerate}</button>
               <button className="v2-button v2-button-secondary v2-export-button" type="button" disabled={busy || loadingResult}
@@ -260,17 +263,20 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           </StaggeredReveal>
           <p className="v2-metrics-note">{text.outputSubtitle}</p>
           <div className="v2-content-tabs" role="group" aria-label={text.resultTabs}>
-            {([['schedule', text.scheduleTab], ['analysis', text.analysisTab], ...(canManual ? [['manual', text.manualTab] as const] : []), ...(!sample && (workflow?.suggestions?.length || result.upgrade_suggestions_status) ? [['training', text.trainingTab] as const] : [])] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => { setView(id); if (id === 'manual') setManualOpened(true) }}>
+            {([['schedule', text.scheduleTab], ['analysis', text.analysisTab], ...(showManual ? [['manual', text.manualTab] as const] : []), ...(restrictedPreview || !sample && (workflow?.suggestions?.length || result.upgrade_suggestions_status) ? [['training', text.trainingTab] as const] : [])] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => { setView(id); if (id === 'manual') setManualOpened(true) }}>
               {label}{view === id && <MotionNavIndicator layoutId="result-tab" variant="underline" />}
             </button>)}
-            <span><ShieldCheck size={14} />{sample ? text.sampleSource : text.ownSource}</span>
+            <span><ShieldCheck size={14} aria-hidden="true" />{sample ? text.sampleSource : text.ownSource}</span>
           </div>
           <div className="v2-feature-content" hidden={view !== 'manual'}>
             {canManual && manualOpened && session.activeProfile && <Suspense fallback={<p role="status">{text.loading}</p>}><ManualScheduleEditor key={manualKey} source={result} profileId={session.activeProfile.id} operators={operators} simulationBaseline={simulationBaseline} onDirtyChange={setManualDirty} /></Suspense>}
+            {!canManual && restrictedPreview && view === 'manual' && <LockedCapabilityPreview title={copy.optimize.paid_preview.manual_title} description={copy.optimize.paid_preview.manual_description} />}
           </div>
           <V2Transition motionKey={view}>
           <div hidden={view === 'manual'} className={`v2-results-grid ${view !== 'schedule' || expanded ? 'v2-results-expanded' : ''}`}>
-            {view === 'training' ? <section className="v2-panel v2-feature-content v2-training-workspace v2-section-loading"><Suspense fallback={<p role="status">{text.loading}</p>}><UpgradeSuggestionStatusNotice result={result} /><UpgradeSuggestions suggestions={workflow?.suggestions ?? []} embedded /></Suspense></section> : view === 'analysis' ? (
+            {view === 'training' ? <section className="v2-panel v2-feature-content v2-training-workspace v2-section-loading">{canViewTraining
+              ? <Suspense fallback={<p role="status">{text.loading}</p>}><UpgradeSuggestionStatusNotice result={result} /><UpgradeSuggestions suggestions={workflow?.suggestions ?? []} embedded /></Suspense>
+              : <LockedCapabilityPreview title={copy.optimize.pages_tool_optimize_ResultSection_016} description={copy.optimize.pages_tool_optimize_ResultSection_017} />}</section> : view === 'analysis' ? (
               <section className="v2-panel v2-analysis"><div className="v2-panel-heading"><h2>{text.analysisTab}</h2><span className="v2-neutral-tag">24h</span></div>{canViewAnalysis
                 ? <IncomeAnalysis result={result} prepared={prepared} />
                 : <div className="v2-analysis-note"><ShieldCheck size={21} /><div><p>{text.previewAnalysis}</p>{features.pricing && <Link className="v2-text-button" to="/pricing">{text.comparePlans}<ArrowRight size={14} /></Link>}</div></div>}</section>
@@ -310,7 +316,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           <div className="v2-sample-notice"><span className="v2-notice-icon"><Sparkles size={16} /></span><p>{sample && <>{text.sampleHint} </>}{text.estimateNotice}</p>{sample && <button type="button" onClick={() => openPanel('account')}>{session.user ? text.account : text.login}<ArrowRight size={14} /></button>}</div>
           </div>
           </>}</V2PageTransition>
-          <footer className="v2-footer"><span>{text.brand}</span><nav>{(['status', 'support', 'terms', 'privacy', 'disclaimer'] as const).filter((entry) => v2SectionAvailable(entry, features)).map((entry) => <Link key={entry} to={v2Path(entry, session.activeProfile?.id)}>{sectionLabels[entry]}</Link>)}</nav></footer>
+          <footer className="v2-footer"><span>{text.brand}</span><nav>{(['pricing', 'status', 'support', 'terms', 'privacy', 'disclaimer'] as const).filter((entry) => v2SectionAvailable(entry, features)).map((entry) => <Link key={entry} to={v2Path(entry, session.activeProfile?.id)}>{sectionLabels[entry]}</Link>)}</nav></footer>
         </main>
       </div>
       <ResultExportDrawer key={`${session.activeProfile?.id ?? 'sample'}:${manualKey}`} open={exportOpen} onOpenChange={setExportOpen} result={result} prepared={prepared} shift={shift} busy={busy}
@@ -350,7 +356,7 @@ function FeedbackRegion({ children }: { children: ReactNode }) {
 }
 
 function Metric({ label, value, unit, hint, product, icon }: { label: string; value: string; unit: string; hint?: string; product?: string; icon?: ReactNode }) {
-  return <RevealItem className="v2-metric"><section aria-label={label}><div className="v2-metric-top"><span>{label}</span><span className="v2-metric-icon">{product ? <ProductIcon product={product} size={24} /> : icon}</span></div>
+  return <RevealItem className="v2-metric"><section aria-label={label}><div className="v2-metric-top"><span>{label}</span><span className="v2-metric-icon" aria-hidden="true">{product ? <ProductIcon product={product} size={24} /> : icon}</span></div>
     <p className="v2-metric-value"><AnimatedValue value={value} /><small>{unit}</small></p>{hint && <p className="v2-metric-hint">{hint}</p>}</section></RevealItem>
 }
 
