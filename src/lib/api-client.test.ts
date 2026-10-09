@@ -20,6 +20,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
   window.localStorage.removeItem(DEBUG_STORAGE_KEY)
 })
 
@@ -50,6 +51,35 @@ describe('API client boundary', () => {
     expect(apiEvents().map((event) => event.outcome)).toEqual([
       'invalid_response', 'invalid_response', 'invalid_response', 'success',
     ])
+  })
+
+  it.each([200, 503])('cancels an unread non-JSON response stream with HTTP status %s', async (status) => {
+    vi.useFakeTimers()
+    const cancel = vi.fn()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new ReadableStream({ cancel }), {
+      status, headers: { 'Content-Type': 'text/html' },
+    })))
+
+    await expect(apiJson('/api/unexpected')).rejects.toMatchObject({ status })
+    expect(cancel).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('cleans up the deadline and caller listener if request serialization fails', async () => {
+    vi.useFakeTimers()
+    const controller = new AbortController()
+    const removeListener = vi.spyOn(controller.signal, 'removeEventListener')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const json: Record<string, unknown> = {}
+    json.self = json
+
+    await expect(apiJson('/api/cyclic', { method: 'POST', json, signal: controller.signal })).rejects.toBeInstanceOf(ApiError)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(removeListener).toHaveBeenCalledWith('abort', expect.any(Function))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(vi.getTimerCount()).toBe(0)
   })
 
   it('exposes structured server diagnostics and Retry-After metadata', async () => {

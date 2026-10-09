@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { adminApiBlob as apiBlob, adminApiJson as apiJson } from '../../../lib/admin-api-client'
 import type { AdminOptimizationDeadLetter, AdminOptimizationDeadLetterDetail } from '../contracts'
 import { requestAdminOperationReason } from '../../../lib/admin-operation-reason'
@@ -8,6 +8,7 @@ import { SectionLoader } from '../../../components/SessionLoader'
 export default function DeadLetterPanel({ active = true }: { active?: boolean }) {
   const [records, setRecords] = useState<AdminOptimizationDeadLetter[]>([])
   const [details, setDetails] = useState<Record<string, AdminOptimizationDeadLetterDetail>>({})
+  const recordIdsRef = useRef(new Set<string>())
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null)
   const [loadingDetailIds, setLoadingDetailIds] = useState<Set<string>>(() => new Set())
   const [detailErrors, setDetailErrors] = useState<Record<string, string>>({})
@@ -21,7 +22,13 @@ export default function DeadLetterPanel({ active = true }: { active?: boolean })
     setLoading(true)
     try {
       const response = await apiJson<{ dead_letters?: AdminOptimizationDeadLetter[] }>('/api/admin/optimization?limit=50', { fallbackMessage: '加载优化死信失败' })
-      setRecords(response.dead_letters ?? [])
+      const nextRecords = response.dead_letters ?? []
+      const ids = new Set(nextRecords.map((record) => record.id))
+      recordIdsRef.current = ids
+      setRecords(nextRecords)
+      setDetails((current) => Object.fromEntries(Object.entries(current).filter(([id]) => ids.has(id))))
+      setDetailErrors((current) => Object.fromEntries(Object.entries(current).filter(([id]) => ids.has(id))))
+      setExpandedRecordId((current) => current && ids.has(current) ? current : null)
       setError(null)
     } catch (caught) {
       setError((caught as Error).message)
@@ -58,10 +65,11 @@ export default function DeadLetterPanel({ active = true }: { active?: boolean })
         `/api/admin/optimization?view=dead_letter&id=${encodeURIComponent(id)}`,
         { fallbackMessage: '加载死信完整数据失败' },
       )
+      if (!recordIdsRef.current.has(id)) return
       if (!response.dead_letter) throw new Error('接口未返回死信完整数据。')
       setDetails((current) => ({ ...current, [id]: response.dead_letter! }))
     } catch (caught) {
-      setDetailErrors((current) => ({ ...current, [id]: (caught as Error).message }))
+      if (recordIdsRef.current.has(id)) setDetailErrors((current) => ({ ...current, [id]: (caught as Error).message }))
     } finally {
       setLoadingDetailIds((current) => {
         const next = new Set(current)

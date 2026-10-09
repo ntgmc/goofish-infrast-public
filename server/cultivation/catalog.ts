@@ -40,12 +40,18 @@ export function prtsSnapshotPath() {
 }
 
 let cached: { path: string; modified: number; size: number; data: PrtsSnapshot } | null = null
+let pending: { path: string; modified: number; size: number; data: Promise<PrtsSnapshot> } | null = null
 export async function readPrtsSnapshot(): Promise<PrtsSnapshot> {
   const path = prtsSnapshotPath()
   const info = await stat(path)
   if (cached?.path === path && cached.modified === info.mtimeMs && cached.size === info.size) return cached.data
-  const data = prtsSnapshotSchema.parse(JSON.parse(await readFile(path, 'utf8')))
-  cached = { path, modified: info.mtimeMs, size: info.size, data }
+  if (pending?.path === path && pending.modified === info.mtimeMs && pending.size === info.size) return pending.data
+  const data = readFile(path, 'utf8').then((content) => {
+    const snapshot = prtsSnapshotSchema.parse(JSON.parse(content))
+    if (pending?.data === data) cached = { path, modified: info.mtimeMs, size: info.size, data: snapshot }
+    return snapshot
+  }).finally(() => { if (pending?.data === data) pending = null })
+  pending = { path, modified: info.mtimeMs, size: info.size, data }
   return data
 }
 

@@ -92,10 +92,10 @@ export function useOptimizationTaskCenter(
   }, [profileId])
 
   const queueRefresh = useCallback(() => {
-    if (refreshTimerRef.current !== null) return
+    if (document.visibilityState === 'hidden' || refreshTimerRef.current !== null) return
     refreshTimerRef.current = window.setTimeout(() => {
       refreshTimerRef.current = null
-      void load()
+      if (document.visibilityState !== 'hidden') void load()
     }, 250)
   }, [load])
 
@@ -126,13 +126,22 @@ export function useOptimizationTaskCenter(
 
   useEffect(() => {
     const intervalMs = dialogOpen || activeCount > 0 ? 10_000 : 30_000
-    const timer = window.setInterval(queueRefresh, intervalMs)
-    return () => window.clearInterval(timer)
+    const refreshWhenVisible = () => {
+      if (!requestControllerRef.current) queueRefresh()
+    }
+    const timer = window.setInterval(refreshWhenVisible, intervalMs)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
   }, [activeCount, dialogOpen, queueRefresh])
 
   useEffect(() => () => {
+    requestSequenceRef.current += 1
     requestControllerRef.current?.abort()
     if (refreshTimerRef.current !== null) window.clearTimeout(refreshTimerRef.current)
+    refreshTimerRef.current = null
   }, [])
 
   useEffect(() => {

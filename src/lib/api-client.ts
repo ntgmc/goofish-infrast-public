@@ -165,12 +165,11 @@ async function request(url: string, init: ApiRequestInit): Promise<PendingRespon
   )
   const requestInit: RequestInit = { ...rest, headers: requestHeaders, signal: deadline.signal }
 
-  if (json !== undefined) {
-    requestInit.body = JSON.stringify(json)
-    requestInit.headers = withJsonHeader(requestHeaders)
-  }
-
   try {
+    if (json !== undefined) {
+      requestInit.body = JSON.stringify(json)
+      requestInit.headers = withJsonHeader(requestHeaders)
+    }
     const response = await fetch(url, requestInit)
     diagnostics.setResponse(response)
     if (response.ok) {
@@ -264,6 +263,7 @@ async function parseJson<T>(response: Response, url: string, fallbackMessage?: s
     throw new ApiError(fallbackMessage || 'Expected a JSON response but received no content.', response.status, { code: 'invalid_response' }, url)
   }
   if (!isJsonContentType(response.headers.get('Content-Type'))) {
+    await response.body?.cancel()
     throw new ApiError(fallbackMessage || 'Expected a JSON response.', response.status, { code: 'invalid_response' }, url)
   }
   const text = await response.text()
@@ -278,7 +278,10 @@ async function parseJson<T>(response: Response, url: string, fallbackMessage?: s
 }
 
 async function readResponseData(response: Response): Promise<unknown> {
-  if (!isJsonContentType(response.headers.get('Content-Type'))) return null
+  if (!isJsonContentType(response.headers.get('Content-Type'))) {
+    await response.body?.cancel()
+    return null
+  }
   try {
     const text = await response.text()
     return text.trim() ? JSON.parse(text) : null

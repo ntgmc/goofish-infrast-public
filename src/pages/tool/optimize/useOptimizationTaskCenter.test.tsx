@@ -87,6 +87,37 @@ describe('useOptimizationTaskCenter', () => {
     expect(vi.mocked(listOptimizationJobs).mock.calls.map(([profileId]) => profileId)).toEqual(['profile-1', 'profile-2'])
   })
 
+  it('pauses queued and periodic refreshes while hidden and reconciles when visible', async () => {
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    renderHook(() => useOptimizationTaskCenter('profile-1', false))
+    await flushPromises()
+    const broadcast: OptimizationJobBroadcast = { type: 'job-updated', profileId: 'profile-1', jobId: 'job-1', status: 'running', kind: 'schedule', at: Date.now() }
+    act(() => broadcastListener?.(broadcast))
+    visibility.mockReturnValue('hidden')
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_250) })
+    act(() => broadcastListener?.(broadcast))
+    await act(async () => { await vi.advanceTimersByTimeAsync(250) })
+    expect(listOptimizationJobs).toHaveBeenCalledTimes(1)
+
+    visibility.mockReturnValue('visible')
+    act(() => document.dispatchEvent(new Event('visibilitychange')))
+    await act(async () => { await vi.advanceTimersByTimeAsync(250) })
+    expect(listOptimizationJobs).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not repeatedly abort a slow request at the periodic refresh interval', async () => {
+    let finish!: (value: { jobs: []; nextCursor: null }) => void
+    vi.mocked(listOptimizationJobs).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    renderHook(() => useOptimizationTaskCenter('profile-1', true))
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_250) })
+    expect(listOptimizationJobs).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(listOptimizationJobs).mock.calls[0][2]?.aborted).toBe(false)
+
+    await act(async () => { finish({ jobs: [], nextCursor: null }) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000) })
+    expect(listOptimizationJobs).toHaveBeenCalledTimes(2)
+  })
+
   it('summarizes active and attention states and updates the app badge', async () => {
     vi.mocked(listOptimizationJobs).mockResolvedValue({
       jobs: [

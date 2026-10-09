@@ -89,6 +89,21 @@ describe('cultivation planning with shared resources', () => {
     expect(buildCultivationPlan(input, options({ dailySanity: 17 })).remaining.some((task) => task.item === 'chip')).toBe(true)
   })
 
+  it('chooses the cheapest open farm for each weekday and preserves tied candidate order', () => {
+    const input = data({ candidates: [candidate('b', 1, { rock: 100 }), candidate('a', 1, { rock: 100 })], farms: {
+      rock: [
+        { stage: 'closed-cheapest', sanity: 2, quantity: 1, days: [1] },
+        { stage: 'weekday', sanity: 4, quantity: 1, days: [2] },
+        { stage: 'always', sanity: 6, quantity: 1, days: [1, 2, 3, 4, 5, 6, 7] },
+      ],
+    } })
+    const result = buildCultivationPlan(input, options({ limit: 1, days: 2 }))
+    expect(result.selected[0].candidate.key).toBe('a')
+    expect(result.days.map((day) => day.farms[0].stage)).toEqual(['weekday', 'always'])
+    expect(buildCultivationPlan(input, options({ limit: 1, days: 2, allOpen: true })).days.map((day) => day.farms[0].stage)).toEqual(['closed-cheapest', 'closed-cheapest'])
+    expect(input.farms.rock.map((farm) => farm.stage)).toEqual(['closed-cheapest', 'weekday', 'always'])
+  })
+
   it('uses opted-in potions once, excludes expired potions, and permits zero natural budget', () => {
     const input = data({ candidates: [candidate('a', 10, { rock: 12 })], potions: [
       { key: 'expired', name: 'expired', count: 10, sanity: 60, expiresAt: '2026-10-05T20:00:00Z' },

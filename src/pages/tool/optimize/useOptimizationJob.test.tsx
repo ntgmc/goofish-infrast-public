@@ -1,12 +1,15 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { CreateOptimizationJobRequest } from '../../../lib/optimization-contracts'
 import type { OptimizeJobAccepted, OptimizeJobStatusResponse } from '../../../lib/types'
+import { buildOptimizeJobStorageKey, readActiveOptimizeJob } from './job-progress'
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { useOptimizationJob } from './useOptimizationJob'
 
 const mocks = vi.hoisted(() => ({
   fetchOptimizationJob: vi.fn(),
+  submitOptimizationJob: vi.fn(),
   listener: null as ((event: {
     profileId: string
     jobId: string
@@ -19,7 +22,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./optimization-api', () => ({
   fetchOptimizationJob: (...args: unknown[]) => mocks.fetchOptimizationJob(...args),
   fetchOptimizationJobSnapshot: vi.fn(),
-  submitOptimizationJob: vi.fn(),
+  submitOptimizationJob: (...args: unknown[]) => mocks.submitOptimizationJob(...args),
 }))
 
 vi.mock('./optimization-job-events', () => ({
@@ -74,6 +77,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-07-10T00:00:00.000Z'))
   window.sessionStorage.clear()
   mocks.fetchOptimizationJob.mockResolvedValue(cancelled)
+  mocks.submitOptimizationJob.mockReset()
 })
 
 afterEach(() => {
@@ -84,6 +88,76 @@ afterEach(() => {
 })
 
 describe('useOptimizationJob cancellation synchronization', () => {
+  it.each(['unmount', 'switch profile'])('stops a new job polling loop on %s while retaining the resumable job', async (action) => {
+    mocks.submitOptimizationJob.mockResolvedValue(accepted)
+    const progressRef = { current: null as ScheduleProgressState | null }
+    const { result, unmount, rerender } = renderHook(({ profileId }) => useOptimizationJob({
+      profileId, orderHash: 'order-1', signature: 'signature-1', progressRef, setProgress: vi.fn(),
+    }), { initialProps: { profileId: 'profile-1' } })
+    let polling!: Promise<unknown>
+    await act(async () => {
+      polling = result.current.runOptimizationJob({} as CreateOptimizationJobRequest, 'generate', '同步任务失败')
+      await Promise.resolve()
+    })
+    const rejected = expect(polling).rejects.toMatchObject({ name: 'OptimizeJobPollCancelledError' })
+    expect(mocks.listener).not.toBeNull()
+
+    if (action === 'unmount') unmount()
+    else rerender({ profileId: 'profile-2' })
+    await act(async () => { await vi.advanceTimersByTimeAsync(250) })
+    await rejected
+
+    expect(mocks.fetchOptimizationJob).not.toHaveBeenCalled()
+    expect(mocks.listener).toBeNull()
+    expect(vi.getTimerCount()).toBe(0)
+    expect(readActiveOptimizeJob(buildOptimizeJobStorageKey('profile-1', 'order-1', 'signature-1', 'generate'))?.job.job_id).toBe(accepted.job_id)
+  })
+
+  it('persists a submission accepted after unmount without starting another polling loop', async () => {
+    let accept!: (job: OptimizeJobAccepted) => void
+    mocks.submitOptimizationJob.mockImplementation(() => new Promise<OptimizeJobAccepted>((resolve) => { accept = resolve }))
+    const { result, unmount } = renderHook(() => useOptimizationJob({
+      profileId: 'profile-1', orderHash: 'order-1', signature: 'signature-1',
+      progressRef: { current: null }, setProgress: vi.fn(),
+    }))
+    const running = result.current.runOptimizationJob({} as CreateOptimizationJobRequest, 'generate', '同步任务失败')
+    const rejected = expect(running).rejects.toMatchObject({ name: 'OptimizeJobPollCancelledError' })
+    unmount()
+    accept(accepted)
+    await rejected
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+
+    expect(readActiveOptimizeJob(buildOptimizeJobStorageKey('profile-1', 'order-1', 'signature-1', 'generate'))?.job.job_id).toBe(accepted.job_id)
+    expect(mocks.listener).toBeNull()
+    expect(mocks.fetchOptimizationJob).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('aborts an in-flight poll request and releases its subscription on unmount', async () => {
+    let signal!: AbortSignal
+    mocks.fetchOptimizationJob.mockImplementation((_id, _message, _token, requestSignal: AbortSignal) => {
+      signal = requestSignal
+      return new Promise((_resolve, reject) => {
+        requestSignal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true })
+      })
+    })
+    const { result, unmount } = renderHook(() => useOptimizationJob({
+      profileId: 'profile-1', orderHash: 'order-1', signature: 'signature-1',
+      progressRef: { current: null }, setProgress: vi.fn(),
+    }))
+    const polling = result.current.pollOptimizationJob({ ...accepted, poll_after_ms: 500 }, 'active-job-key', 'generate', '同步任务失败')
+    const rejected = expect(polling).rejects.toMatchObject({ name: 'OptimizeJobPollCancelledError' })
+    await act(async () => { await vi.advanceTimersByTimeAsync(500) })
+    expect(signal.aborted).toBe(false)
+    unmount()
+    await act(async () => { await vi.advanceTimersByTimeAsync(100) })
+    await rejected
+
+    expect(signal.aborted).toBe(true)
+    expect(mocks.listener).toBeNull()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   it('wakes polling and exposes cancelled progress after a task-center broadcast', async () => {
     const progressRef = { current: null as ScheduleProgressState | null }
     const setProgress = vi.fn()
