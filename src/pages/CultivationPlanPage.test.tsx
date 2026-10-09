@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CultivationPlanPage from './CultivationPlanPage'
+import Cultivation from './v2/pages/Cultivation'
 import type { CultivationData } from '../lib/cultivation-contract'
 
 const mocks = vi.hoisted(() => ({ api: vi.fn(), session: vi.fn() }))
@@ -30,6 +31,7 @@ describe('cultivation tool interactions', () => {
     render(<MemoryRouter><CultivationPlanPage /></MemoryRouter>)
     fireEvent.click(screen.getByRole('button', { name: '导入森空岛练度与仓库' }))
     await screen.findByRole('heading', { name: '建议培养顺序' })
+    fireEvent.click(screen.getByText('规划条件'))
     expect(screen.getAllByRole('heading', { level: 3 })[0].textContent).toBe('银灰')
     fireEvent.click(screen.getByRole('radio', { name: '满足材料优先' }))
     expect(screen.getAllByRole('heading', { level: 3 })[0].textContent).toBe('银灰')
@@ -43,6 +45,7 @@ describe('cultivation tool interactions', () => {
     render(<MemoryRouter><CultivationPlanPage /></MemoryRouter>)
     fireEvent.click(screen.getByRole('button', { name: '导入森空岛练度与仓库' }))
     await screen.findByRole('heading', { name: '建议培养顺序' })
+    fireEvent.click(screen.getByText('规划条件'))
     const budget = screen.getByRole('spinbutton', { name: '每日可用理智' })
     const prior = screen.getByRole('heading', { name: '每日刷取安排' }).parentElement?.textContent
     for (const value of ['', '0', '00', '000']) {
@@ -66,6 +69,7 @@ describe('cultivation tool interactions', () => {
     render(<MemoryRouter><CultivationPlanPage /></MemoryRouter>)
     fireEvent.click(screen.getByRole('button', { name: '导入森空岛练度与仓库' }))
     await screen.findByRole('heading', { name: '仓库养成道具' })
+    fireEvent.click(screen.getByText('规划条件'))
     fireEvent.click(screen.getByRole('button', { name: /材料自选包.*库存 2 份/ }))
     expect(screen.getByText('每份可减少本次缺口等效理智 · 15')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '推荐使用与领取' }).nextElementSibling?.textContent).toMatch(/^1源岩/)
@@ -77,13 +81,14 @@ describe('cultivation tool interactions', () => {
 
   it('restores URL filters, searches the full stage catalog, and applies a query with current inventory', async () => {
     const input = sample()
-    input.recommendation = { query: { scope: 'history', days: 0, coverage: 0.8, stageId: '', activity: '', category: '', profession: '', rarity: 0, search: '', includeClosed: false, includeAlternatives: true, includeUncertain: false }, families: 3, withoutActions: 0,
+    input.recommendation = { query: { scope: 'history', days: 0, coverage: 0.8, stageId: '', activity: '', category: '', profession: '', rarity: 0, rarityGroup: 'high', search: '', includeClosed: false, includeAlternatives: true, includeUncertain: false }, families: 3, withoutActions: 0,
       stages: Array.from({ length: 1002 }, (_, index) => ({ id: `main_${index}`, name: `测试关卡${index}`, activity: '测试活动', category: '主线' })), professions: ['WARRIOR'] }
     mocks.api.mockResolvedValue(input)
     render(<MemoryRouter initialEntries={['/tools/cultivation-plan?cultivation_scope=history&cultivation_days=0']}><CultivationPlanPage /></MemoryRouter>)
     fireEvent.click(screen.getByRole('button', { name: '导入森空岛练度与仓库' }))
     await screen.findByRole('heading', { name: '建议培养顺序' })
     expect(mocks.api.mock.calls[0][1].json.recommendation).toMatchObject({ scope: 'history', days: 0 })
+    fireEvent.click(screen.getByText('规划条件'))
     fireEvent.click(screen.getByText('选择活动、关卡与干员'))
     const stage = screen.getByRole('combobox', { name: '关卡' })
     fireEvent.focus(stage)
@@ -97,6 +102,55 @@ describe('cultivation tool interactions', () => {
     expect(mocks.api.mock.calls[1][1].json).toMatchObject({ profile_id: 'one', recommendation: { stageId: 'main_1001', scope: 'history' } })
     fireEvent.click(screen.getByRole('button', { name: '清除关卡' }))
     expect(stage).toHaveValue('')
+  })
+
+  it.each([false, true])('keeps filters expanded when cleared and applies rarity groups in V2=%s', async (v2) => {
+    const input = sample()
+    Object.assign(input.candidates[0], {
+      current: { elite: 2, level: 60, skillLevel: 7, masteries: { s1: 1 }, modules: {}, potential: 1 },
+      target: { elite: 2, level: 50, skill: 1, skillLevel: 10, moduleId: 'mod_x', moduleLevel: null, potential: 1 }, moduleName: '测试模组',
+      evidence: { status: 'current', families: 1224, recentFamilies: 10, recentStages: 3, usageShare: 1, coverage: 1, completeness: { training: 0.38, skill: 0.53, module: 0 } },
+    })
+    input.recommendation = { query: { scope: 'recent', days: 180, coverage: 0.8, stageId: '', activity: '', category: '', profession: '', rarity: 0, rarityGroup: 'high', search: '', includeClosed: false, includeAlternatives: true, includeUncertain: false }, families: 1, withoutActions: 0,
+      stages: [{ id: 'main_01', name: '1-1', activity: '第一章', category: '主线' }], professions: [] }
+    mocks.api.mockResolvedValue(input)
+    render(<MemoryRouter>{v2 ? <Cultivation session={mocks.session()} /> : <CultivationPlanPage />}</MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: '导入森空岛练度与仓库' }))
+    const conditions = (await screen.findByText('规划条件')).closest('details')!
+    expect(conditions.open).toBe(false)
+    fireEvent.click(screen.getByText('规划条件'))
+    const rarity = screen.getByRole('combobox', { name: '星级' })
+    expect(rarity).toHaveValue('high')
+    const upgrades = screen.getAllByRole('list', { name: '需要升级' })[0]
+    expect(upgrades).toHaveTextContent('1技能 · 专精3')
+    expect(upgrades).toHaveTextContent('测试模组 · 1级')
+    expect(upgrades).not.toHaveTextContent('精2 Lv.50')
+    expect(screen.getAllByText('来源完整度：等级 38% · 技能 53% · 模组 0%')[0].closest('details')!.open).toBe(false)
+    const disclosure = screen.getByText('选择活动、关卡与干员').closest('details')!
+    fireEvent.click(screen.getByText('选择活动、关卡与干员'))
+    await waitFor(() => expect(disclosure.open).toBe(true))
+    const search = within(disclosure).getByRole('textbox', { name: '搜索干员' })
+    fireEvent.change(search, { target: { value: '银灰' } })
+    fireEvent.change(search, { target: { value: '' } })
+    expect(disclosure.open).toBe(true)
+    const activity = screen.getByRole('combobox', { name: '活动或章节' })
+    fireEvent.focus(activity)
+    fireEvent.change(activity, { target: { value: '第一章' } })
+    fireEvent.keyDown(activity, { key: 'Enter' })
+    fireEvent.click(screen.getByRole('button', { name: '清除活动或章节' }))
+    expect(disclosure.open).toBe(true)
+    expect(activity).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('option', { name: '第一章' })).toBeInTheDocument()
+    fireEvent.blur(activity)
+    fireEvent.change(rarity, { target: { value: 'low' } })
+    fireEvent.click(screen.getByRole('button', { name: '更新规划' }))
+    await waitFor(() => expect(mocks.api).toHaveBeenCalledTimes(2))
+    expect(mocks.api.mock.calls[1][1].json.recommendation).toMatchObject({ rarity: 0, rarityGroup: 'low' })
+    fireEvent.click(screen.getByText('规划条件'))
+    expect(conditions.open).toBe(false)
+    expect(conditions.querySelector('summary')).toHaveTextContent('1–3星')
+    fireEvent.click(screen.getByText('规划条件'))
+    expect(rarity).toHaveValue('low')
   })
 
   it('discards a late response when the selected profile changes', async () => {

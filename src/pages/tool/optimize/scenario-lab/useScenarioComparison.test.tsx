@@ -26,9 +26,57 @@ afterEach(() => {
   cleanup()
   window.sessionStorage.clear()
   vi.mocked(apiJson).mockReset()
+  vi.useRealTimers()
+  vi.restoreAllMocks()
 })
 
 describe('useScenarioComparison', () => {
+  it.each(['unmount', 'switch profile'])('stops a newly submitted scenario polling loop on %s', async (action) => {
+    vi.useFakeTimers()
+    const job = { id: 'scenario-new', kind: 'scenario_comparison', status: 'queued', pollAfterMs: 10_000,
+      timestamps: { submittedAt: '2026-07-10T00:00:00.000Z' }, estimate: { phase: 'queued' }, priority: { kind: 'analysis' } }
+    vi.mocked(apiJson).mockResolvedValueOnce({ job } as never).mockResolvedValue(job as never)
+    const removeListener = vi.spyOn(window, 'removeEventListener')
+    const { result, unmount, rerender } = renderHook(({ profileId }) => useScenarioComparison({
+      profileId, operators: [], config: {} as LicenseConfig,
+    }), { initialProps: { profileId: 'profile-new' } })
+    let running!: Promise<void>
+    await act(async () => {
+      running = result.current.run()
+      for (let i = 0; i < 10; i++) await Promise.resolve()
+    })
+    expect(apiJson).toHaveBeenCalledTimes(2)
+
+    if (action === 'unmount') unmount()
+    else rerender({ profileId: 'profile-next' })
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); await running })
+
+    expect(apiJson).toHaveBeenCalledTimes(2)
+    expect(vi.getTimerCount()).toBe(0)
+    expect(removeListener).toHaveBeenCalledWith('maa:optimization-jobs:v1', expect.any(Function))
+    expect(JSON.parse(window.sessionStorage.getItem('maa:scenario-lab:v2:profile-new')!).activeJobId).toBe(job.id)
+    if (action === 'switch profile') expect(result.current.progress).toBeNull()
+  })
+
+  it('retains a job accepted after unmount without restarting polling', async () => {
+    vi.useFakeTimers()
+    let accept!: (response: never) => void
+    vi.mocked(apiJson).mockImplementationOnce(() => new Promise((resolve) => { accept = resolve }))
+    const { result, unmount } = renderHook(() => useScenarioComparison({
+      profileId: 'profile-pending', operators: [], config: {} as LicenseConfig,
+    }))
+    let running!: Promise<void>
+    await act(async () => { running = result.current.run(); await Promise.resolve() })
+    unmount()
+    accept({ job: { id: 'scenario-late', status: 'queued' } } as never)
+    await running
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+
+    expect(apiJson).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(0)
+    expect(JSON.parse(window.sessionStorage.getItem('maa:scenario-lab:v2:profile-pending')!).activeJobId).toBe('scenario-late')
+  })
+
   it('ignores the legacy unversioned session shape', () => {
     window.sessionStorage.setItem('maa:scenario-lab:profile-legacy', JSON.stringify({
       factors: { layouts: [], maaShiftHours: [6], includeRotation: false, droneStrategies: ['off'] },

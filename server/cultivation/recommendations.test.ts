@@ -104,6 +104,18 @@ describe('independent cultivation recommendation evidence', () => {
     expect(invalid.fixed[0].warnings).toContain('作业练度字段无效')
   })
 
+  it('separates high and low rarity recommendations while preserving exact-star filters', () => {
+    const input = snapshot([job(1), job(2), job(3)])
+    input.operators = Object.fromEntries([1, 2, 3, 4, 5, 6].map((rarity) => [`char_r${rarity}`, { name: `干员${rarity}`, rarity, skills: rarity <= 2 ? [] : ['s1'] }]))
+    input.costs.levels.maxLevel = [[2], [2], [2, 2], [2, 2, 3], [2, 2, 3], [2, 2, 3]]
+    for (const homework of input.homeworks) homework.content.opers = [1, 2, 3, 4, 5, 6].map((rarity) => ({ name: `干员${rarity}`, skill: rarity <= 2 ? 0 : 1, requirements: { elite: 0, level: 1, skill_level: 1, module: 0 } }))
+    const ids = (query = defaultCultivationQuery) => calculateCultivationRecommendations(input, query, now).recommendations.map((row) => row.operatorId).sort()
+    expect(ids()).toEqual(['char_r4', 'char_r5', 'char_r6'])
+    expect(ids({ ...defaultCultivationQuery, rarityGroup: 'low' })).toEqual(['char_r1', 'char_r2', 'char_r3'])
+    expect(ids({ ...defaultCultivationQuery, rarityGroup: 'all' })).toHaveLength(6)
+    expect(ids({ ...defaultCultivationQuery, rarity: 3 })).toEqual(['char_r3'])
+  })
+
   it('invalidates public recommendations for a replaced snapshot and supports skill-less operators', () => {
     const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
     const input = snapshot([job(1)])

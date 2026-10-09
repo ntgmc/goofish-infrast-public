@@ -59,14 +59,13 @@ export function buildCultivationPlan(data: CultivationData, options: Cultivation
   while (candidates.length && selected.length < Math.max(1, Math.min(30, options.limit))) {
     const ranked = candidates.map(remainingDemand).filter((candidate) => candidate.source === 'community' || candidate.frequency > 0).map((candidate) => ({ candidate, allocation: allocateCultivationMaterials(candidate.items, stock, data) }))
     if (!ranked.length) break
-    ranked.sort((a, b) => {
-      const left = score(a.candidate, a.allocation), right = score(b.candidate, b.allocation)
+    const next = ranked.reduce((best, row) => {
+      const left = score(row.candidate, row.allocation), right = score(best.candidate, best.allocation)
       for (let index = 0; index < left.length; index++) {
-        if (left[index] !== right[index]) return left[index] < right[index] ? -1 : 1
+        if (left[index] !== right[index]) return left[index] < right[index] ? row : best
       }
-      return a.candidate.key.localeCompare(b.candidate.key)
+      return row.candidate.key.localeCompare(best.candidate.key) < 0 ? row : best
     })
-    const next = ranked[0]
     selected.push({ ...next, estimatedDate: null })
     stock = next.allocation.stock
     const trained = cultivatedCurrent(next.candidate.current, next.candidate.target, next.candidate.skillId)
@@ -77,6 +76,10 @@ export function buildCultivationPlan(data: CultivationData, options: Cultivation
   }
   const tasks: FarmTask[] = selected.flatMap(({ candidate, allocation }) => Object.entries(allocation.missing).map(([item, quantity]) => ({ item, quantity, remaining: quantity, operator: candidate.key })))
   const blocked = tasks.filter((task) => !data.farms[task.item]?.length)
+  const farmItems = [...new Set(tasks.map((task) => task.item))]
+  const farmsByDay = Array.from({ length: 7 }, (_, index) => Object.fromEntries(farmItems.map((item) => [item,
+    (data.farms[item] ?? []).filter((farm) => options.allOpen || farm.days.includes(index + 1)).sort((a, b) => a.sanity / a.quantity - b.sanity / b.quantity)[0],
+  ])))
   const potionStock = data.potions.map((potion) => ({ ...potion, remaining: Math.max(0, Math.min(potion.count, Math.floor(options.potions[potion.key] ?? 0))) }))
     .filter((potion) => potion.sanity !== null)
     .sort((a, b) => (a.expiresAt ?? '9999').localeCompare(b.expiresAt ?? '9999'))
@@ -98,9 +101,9 @@ export function buildCultivationPlan(data: CultivationData, options: Cultivation
     let spent = 0
     const usedPotions: Array<{ name: string; count: number }> = []
     const farms: (typeof days)[number]['farms'] = []
-    const eligible = tasks.filter((task) => task.remaining > 1e-8 && data.farms[task.item]?.some((farm) => options.allOpen || farm.days.includes(weekday)))
-    for (const task of eligible) {
-      const farm = data.farms[task.item].filter((row) => options.allOpen || row.days.includes(weekday)).sort((a, b) => a.sanity / a.quantity - b.sanity / b.quantity)[0]
+    for (const task of tasks) {
+      const farm = farmsByDay[weekday - 1][task.item]
+      if (task.remaining <= 1e-8 || !farm) continue
       const neededRuns = Math.ceil((task.remaining - 1e-8) / farm.quantity)
       for (const potion of potionStock) {
         if (!potion.sanity || !potion.remaining || (potion.expiresAt && Date.parse(potion.expiresAt) <= timestamp)) continue
@@ -126,7 +129,7 @@ export function buildCultivationPlan(data: CultivationData, options: Cultivation
       }
     }
     for (const row of selected) {
-      if (!row.estimatedDate && tasks.filter((task) => task.operator === row.candidate.key).every((task) => task.remaining <= 1e-8)) row.estimatedDate = date
+      if (!row.estimatedDate && tasks.every((task) => task.operator !== row.candidate.key || task.remaining <= 1e-8)) row.estimatedDate = date
     }
     days.push({ date, budget, spent, potions: usedPotions, farms })
     if (tasks.every((task) => task.remaining <= 1e-8)) break

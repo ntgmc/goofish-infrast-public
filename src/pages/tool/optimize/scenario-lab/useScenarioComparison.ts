@@ -169,6 +169,7 @@ export function useScenarioComparison({
   }, [pollJob])
 
   const run = useCallback(async (useCoupon = false, billingQuote: IssuedMeteredScheduleQuote | null = null) => {
+    const runId = ++pollRunRef.current
     setError(null)
     setLoading(true)
     setResult(null)
@@ -202,16 +203,17 @@ export function useScenarioComparison({
         })
       ))
       const nextJob = response.job
+      writeSession(profileId, { factors, activeJobId: nextJob.id })
+      if (pollRunRef.current !== runId) return
       setJob(nextJob)
       publishOptimizationJobUpdate(profileId, nextJob)
-      writeSession(profileId, { factors, activeJobId: nextJob.id })
-      pollRunRef.current += 1
-      await pollJob(nextJob.id, pollRunRef.current, factors)
+      await pollJob(nextJob.id, runId, factors)
     } catch (caught) {
+      if (isOptimizeJobPollCancelled(caught) || pollRunRef.current !== runId) return
       setError(caught instanceof Error ? caught.message : copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_004)
       writeSession(profileId, { factors, pendingSubmission })
       await settleInventory(onSettled, setError)
-      setLoading(false)
+      if (pollRunRef.current === runId) setLoading(false)
     }
   }, [config, factors, onSettled, operators, pollJob, profileId])
 
@@ -244,7 +246,7 @@ export function useScenarioComparison({
     const runId = pollRunRef.current
     if (restored?.activeJobId) void pollJobRef.current(restored.activeJobId, runId, restoredFactors)
     return () => {
-      if (pollRunRef.current === runId) pollRunRef.current += 1
+      pollRunRef.current += 1
     }
   }, [profileId])
 

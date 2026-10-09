@@ -1,4 +1,4 @@
-import { defaultCultivationQuery, type CultivationQuery, type CultivationTarget, type CultivationCandidate } from '../../src/lib/cultivation-contract'
+import { defaultCultivationQuery, matchesCultivationRarity, type CultivationQuery, type CultivationTarget, type CultivationCandidate } from '../../src/lib/cultivation-contract'
 import { asRecord, asRows, type PrtsSnapshot } from './catalog'
 import { readHomeworkRequirements } from './requirements'
 
@@ -108,7 +108,9 @@ export function calculateCultivationRecommendations(snapshot: PrtsSnapshot, quer
     stageFamilies.set(key, (stageFamilies.get(key) ?? 0) + 1)
     const category = `${stage.permanent}:${stage.category}`
     const activities = categories.get(category) ?? new Map<string, Set<string>>()
-    activities.set(stage.activity, new Set([...activities.get(stage.activity) ?? [], key]))
+    const stages = activities.get(stage.activity) ?? new Set<string>()
+    stages.add(key)
+    activities.set(stage.activity, stages)
     categories.set(category, activities)
     const byVariant = new Map<string, Document>()
     for (const document of family.documents) {
@@ -119,7 +121,9 @@ export function calculateCultivationRecommendations(snapshot: PrtsSnapshot, quer
     variants.set(family, [...byVariant.values()])
     for (const document of byVariant.values()) {
       const key = `${stageKey(document)}:${ageBucket((now - family.published) / 86400000)}`
-      exposures.set(key, [...exposures.get(key) ?? [], Math.log1p(document.homework.views ?? 0)])
+      const values = exposures.get(key) ?? []
+      values.push(Math.log1p(document.homework.views ?? 0))
+      exposures.set(key, values)
     }
   }
   const baselines = new Map([...exposures].map(([key, values]) => [key, values.sort((a, b) => a - b)[Math.floor(values.length / 2)]]))
@@ -142,8 +146,10 @@ export function calculateCultivationRecommendations(snapshot: PrtsSnapshot, quer
     for (const member of document.members) {
       if (!query.includeAlternatives && member.group !== null) continue
       const operator = member.requirement.operator!
-      if (query.rarity && operator.rarity !== query.rarity || query.profession && operator.profession !== query.profession || query.search && !operator.name.toLowerCase().includes(query.search.trim().toLowerCase())) continue
-      byOperator.set(operator.id, [...byOperator.get(operator.id) ?? [], { ...member, document, family: family.key, weight: weight * member.share, recent: family.published >= cutoff, quality: lower }])
+      if (!matchesCultivationRarity(operator.rarity, query) || query.profession && operator.profession !== query.profession || query.search && !operator.name.toLowerCase().includes(query.search.trim().toLowerCase())) continue
+      const samples = byOperator.get(operator.id) ?? []
+      samples.push({ ...member, document, family: family.key, weight: weight * member.share, recent: family.published >= cutoff, quality: lower })
+      byOperator.set(operator.id, samples)
     }
   }
   const recommendations: Array<{ operatorId: string; target: CultivationTarget; samples: Sample[]; evidence: NonNullable<CultivationCandidate['evidence']> }> = []
@@ -161,7 +167,9 @@ export function calculateCultivationRecommendations(snapshot: PrtsSnapshot, quer
     const branches = new Map<string, Sample[]>()
     for (const sample of samples) {
       const target = sample.requirement.target, key = `${target.skill}:${target.moduleId}`
-      branches.set(key, [...branches.get(key) ?? [], sample])
+      const group = branches.get(key) ?? []
+      group.push(sample)
+      branches.set(key, group)
     }
     const total = samples.reduce((sum, row) => sum + row.weight, 0)
     for (const group of branches.values()) {

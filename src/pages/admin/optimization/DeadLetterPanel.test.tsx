@@ -58,6 +58,34 @@ describe('DeadLetterPanel', () => {
     )
   })
 
+  it.each([false, true])('evicts removed payloads and ignores late details when late=%s', async (late) => {
+    let visible = true
+    let resolveDetail!: (value: { dead_letter: AdminOptimizationDeadLetterDetail }) => void
+    let detailCalls = 0
+    adminApiJson.mockImplementation(async (url: string) => {
+      if (!url.includes('view=dead_letter')) return { dead_letters: visible ? [record()] : [] }
+      detailCalls += 1
+      if (late && detailCalls === 1) return new Promise((resolve) => { resolveDetail = resolve })
+      return { dead_letter: detail() }
+    })
+    render(<DeadLetterPanel />)
+    await screen.findByText(/任务 job-1/)
+    fireEvent.click(screen.getByRole('button', { name: '查看申请配置和干员数据' }))
+    if (!late) await screen.findByText('申请的基建配置')
+
+    visible = false
+    fireEvent.click(screen.getByRole('button', { name: '刷新死信' }))
+    await screen.findByText('暂无死信任务。')
+    if (late) await act(async () => { resolveDetail({ dead_letter: detail() }) })
+
+    visible = true
+    fireEvent.click(screen.getByRole('button', { name: '刷新死信' }))
+    await screen.findByText(/任务 job-1/)
+    fireEvent.click(screen.getByRole('button', { name: '查看申请配置和干员数据' }))
+    await screen.findByText('申请的基建配置')
+    expect(detailCalls).toBe(2)
+  })
+
   it('shows historical standalone suggestion dead letters as read-only audit records', async () => {
     adminApiJson.mockResolvedValue({ dead_letters: [record({ source: 'optimize_suggestions' })] })
 

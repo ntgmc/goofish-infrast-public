@@ -1,4 +1,4 @@
-import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
+import { useCallback, useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
 import type { CreateOptimizationJobRequest } from '../../../lib/optimization-contracts'
 import { getOptimizePollRetryDelayMs } from '../../../lib/optimize-poll'
 import type { OptimizeJobAccepted, OptimizeJobStatusResponse, OptimizeResult } from '../../../lib/types'
@@ -47,6 +47,9 @@ export function useOptimizationJob({
   progressRef,
   setProgress,
 }: UseOptimizationJobOptions) {
+  const lifecycleRef = useRef(0)
+  useEffect(() => () => { lifecycleRef.current += 1 }, [profileId, orderHash])
+
   const pollOptimizationJob = useCallback(async (
     job: OptimizeJobAccepted | OptimizeJobStatusResponse,
     storageKey: string,
@@ -54,9 +57,12 @@ export function useOptimizationJob({
     fallbackMessage: string,
     isCancelled?: () => boolean,
   ): Promise<OptimizeResult> => {
+    const lifecycle = lifecycleRef.current
+    const cancelled = () => lifecycleRef.current !== lifecycle || isCancelled?.() === true
     const throwIfCancelled = () => {
-      if (isCancelled?.()) throw new OptimizeJobPollCancelledError()
+      if (cancelled()) throw new OptimizeJobPollCancelledError()
     }
+    throwIfCancelled()
     let latestJob = job
     const updateProgress = (
       next: OptimizeJobAccepted | OptimizeJobStatusResponse,
@@ -104,7 +110,7 @@ export function useOptimizationJob({
 
       while (true) {
         throwIfCancelled()
-        await waitForOptimizePoll(pollAfterMs, isCancelled, () => {
+        await waitForOptimizePoll(pollAfterMs, cancelled, () => {
           if (!terminalRefreshRequested) return false
           terminalRefreshRequested = false
           return true
@@ -113,7 +119,8 @@ export function useOptimizationJob({
 
         let status: OptimizeJobStatusResponse
         try {
-          status = await fetchOptimizeJobStatus(job.job_id, fallbackMessage, latestJob.poll_token, isCancelled)
+          status = await fetchOptimizeJobStatus(job.job_id, fallbackMessage, latestJob.poll_token, cancelled)
+          throwIfCancelled()
           if (latestJob.poll_token) status.poll_token = latestJob.poll_token
         } catch (error) {
           throwIfCancelled()
@@ -150,6 +157,7 @@ export function useOptimizationJob({
     progressMode: ScheduleProgressState['mode'],
     fallbackMessage: string,
   ): Promise<OptimizeResult> => {
+    const lifecycle = lifecycleRef.current
     const storageKey = buildOptimizeJobStorageKey(profileId, orderHash, signature, progressMode)
     const idempotencyKey = getOrCreateOptimizeSubmissionKey(storageKey, payload)
     const accepted = await withOptimizationSubmissionLock(profileId || orderHash, async () => (
@@ -158,6 +166,7 @@ export function useOptimizationJob({
     writeActiveOptimizeJob(storageKey, accepted)
     clearOptimizeSubmissionKey(storageKey)
     try {
+      if (lifecycleRef.current !== lifecycle) throw new OptimizeJobPollCancelledError()
       return await pollOptimizationJob(accepted, storageKey, progressMode, fallbackMessage)
     } catch (error) {
       if (!isOptimizeJobPollCancelled(error)) clearActiveOptimizeJob(storageKey)
