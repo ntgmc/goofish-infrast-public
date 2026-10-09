@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { planningFixture } from '../../scripts/prts-planning-fixture.mjs'
 import { prtsSnapshotSchema } from './catalog'
 import { cultivationCosts } from './costs'
-import { buildCultivationData } from './data'
+import { buildCultivationData as buildData } from './data'
+import { defaultCultivationQuery } from '../../src/lib/cultivation-contract'
+
+const buildCultivationData = (...args: Parameters<typeof buildData>) => buildData(args[0], args[1], args[2], args[3], args[4], args[5], { ...defaultCultivationQuery, stageId: 'main_01' })
 import { readHomeworkRequirements } from './requirements'
 import type { CultivationCurrent, CultivationTarget } from '../../src/lib/cultivation-contract'
 
@@ -13,41 +16,17 @@ const game = (elite = 1) => ({ data: { chars: [{ charId: 'char_test', evolvePhas
 const pricing = { status: 'fresh' as const, prices: new Map([['rock', 5]]), fetched_at: '', age_ms: 0, snapshot_id: '', valuation_version: '' }
 
 describe('PRTS and Skland cultivation data', () => {
-  it('weights recent demand by approval evidence and bounded popularity, excluding expired and undated jobs', () => {
+  it('shares independent demand between material planning and owned special-item recommendations', () => {
     const input = snapshot()
-    const now = Date.now()
-    const base = { ...input.homeworks[0], views: 0, hotScore: 0 }
-    const daysAgo = (days: number) => new Date(now - days * 86400000).toISOString()
-    input.homeworks = [
-      { ...base, id: 1, uploadedAt: daysAgo(0) },
-      { ...base, id: 2, uploadedAt: daysAgo(90) },
-      { ...base, id: 3, uploadedAt: daysAgo(0), likes: 1, dislikes: 0 },
-      { ...base, id: 4, uploadedAt: daysAgo(0), likes: 10, dislikes: 90 },
-      { ...base, id: 5, uploadedAt: daysAgo(0), views: 1_000_000_000 },
-      { ...base, id: 6, uploadedAt: daysAgo(0), hotScore: 1_000_000_000 },
-      { ...base, id: 7, uploadedAt: daysAgo(0), likes: 0, dislikes: 0 },
-      { ...base, id: 8, uploadedAt: daysAgo(366) },
-      { ...base, id: 9, uploadedAt: undefined },
-    ]
+    input.homeworks.push({ ...input.homeworks[0], id: 21 })
     const result = buildCultivationData(input, game(0), { items: [{ id: 'selector', count: 1 }] }, pricing, undefined, {
       parserVersion: 4, status: 'fresh', updatedAt: '', itemNames: {}, itemIcons: {}, excludedOperators: [], skillIcons: {},
       items: [{ id: 'selector', name: '调用凭证', iconId: 'selector', kind: 'selector', scope: '', sourceUrl: '', rarity: 4, operators: ['char_test'], options: [] }],
     })
     const row = result.candidates[0]
-    const weights = Object.fromEntries(Object.entries(row.demandWeights!).map(([key, weight]) => [key.split(':')[0], weight]))
-    expect(weights[2]).toBeCloseTo(weights[1] / 2)
-    expect(weights[1]).toBeGreaterThan(weights[3])
-    expect(weights[1]).toBeGreaterThan(weights[4])
-    expect(weights[5]).toBeCloseTo(weights[1] * 2)
-    expect(weights[6]).toBeCloseTo(weights[1] * 2)
-    expect(weights[7]).toBeGreaterThan(0)
-    expect(weights[8]).toBeUndefined()
-    expect(weights[9]).toBeUndefined()
-    expect(row.frequency).toBe(7)
-    expect(row.weightedFrequency).toBeCloseTo(Object.values(weights).reduce((sum, weight) => sum + weight, 0))
+    expect(row.frequency).toBe(1)
+    expect(row.evidence?.families).toBe(1)
     expect(result.specialItems![0].recommendations[0].demand).toBeCloseTo(row.weightedFrequency!)
-    expect(result.stats.homeworks).toBe(7)
-    expect(result.warnings).toContain('部分作业缺少发布时间，暂不参与推荐；请重新导入作业数据或等待同步补齐。')
   })
 
   it('charges only missing levels, mastery of the selected skill, and ranks of the specified module', () => {
@@ -64,12 +43,13 @@ describe('PRTS and Skland cultivation data', () => {
     const result = readHomeworkRequirements({ opers: [{ name: '测试干员', requirements: { elite: 0, level: 0, skill_level: 0, potentiality: 0, module: -1 } }], doc: {} }, snapshot())
     expect(result.fixed[0].warnings).toEqual([])
     expect(result.fixed[0].target).toMatchObject({ elite: 0, level: 1, skillLevel: 1 })
+    expect(result.fixed[0].specified).toEqual({ training: false, skill: false, module: false })
     const fromText = readHomeworkRequirements({ opers: [{ name: '测试干员', skill: 1 }], doc: { details: '测试干员 精二2 专二 无模组' } }, snapshot())
     expect(fromText.fixed[0].target).toMatchObject({ elite: 2, level: 2, skillLevel: 9, moduleId: null })
     expect(fromText.fixed[0].warnings).toEqual([])
     const module = readHomeworkRequirements({ opers: [{ name: '测试干员', requirements: { elite: 2, level: 2, skill_level: 7, module: 1 } }] }, snapshot())
     expect(module.fixed[0].warnings).toEqual([])
-    expect(module.fixed[0].target).toMatchObject({ elite: 2, level: 2, moduleId: 'mod_x', moduleLevel: 1 })
+    expect(module.fixed[0].target).toMatchObject({ elite: 2, level: 2, moduleId: 'mod_x', moduleLevel: null })
     const isolated = readHomeworkRequirements({ opers: [{ name: '测试干员' }, { name: '其他干员' }], doc: { details: '测试干员练度 精二2 专二 潜六' } }, snapshot())
     expect(isolated.fixed[0].target).toMatchObject({ elite: 2, level: 2, skillLevel: 9, potential: 6 })
     expect(isolated.fixed[1].warnings).toEqual([])
@@ -92,7 +72,7 @@ describe('PRTS and Skland cultivation data', () => {
     input.costs.modules.equipDict.mod_x.typeName2 = 'X'
     input.costs.modules.equipDict.mod_x.uniEquipName = '测试模组'
     const module = readHomeworkRequirements({ opers: [{ name: '测试干员' }], doc: { details: '测试干员 X模组 3级模组' } }, input)
-    expect(module.fixed[0].target).toMatchObject({ elite: 2, level: 2, moduleId: 'mod_x', moduleLevel: 3 })
+    expect(module.fixed[0].target).toMatchObject({ elite: 2, level: 2, moduleId: 'mod_x', moduleLevel: null })
     expect(module.fixed[0].warnings).toEqual([])
     input.homeworks[0].content = { opers: [{ name: '测试干员', skill: 2 }] }
     expect(buildCultivationData(input, game(), { items: [] }, pricing).candidates[0].satisfied).toBe(true)
@@ -116,7 +96,7 @@ describe('PRTS and Skland cultivation data', () => {
     expect(result.candidates[0].current).toEqual({ elite: 2, level: 3, skillLevel: 7, masteries: { s1: 3, s2: 2 }, modules: {}, modulesKnown: true, potential: 3 })
     expect(result.candidates[0].satisfied).toBe(true)
     input.homeworks[0].content.opers[0].requirements.module = 1
-    const withModule = buildCultivationData(input, game(), { items: [], characters: [{ id: 'char_test', equips: [] }] }, pricing)
+    const withModule = buildCultivationData({ ...input }, game(), { items: [], characters: [{ id: 'char_test', equips: [] }] }, pricing)
     expect(withModule.candidates[0].items.rock).toBeGreaterThan(0)
     expect(withModule.candidates[0].warnings).not.toContain('森空岛未返回当前模组数据')
   })

@@ -7,13 +7,14 @@ export const hashContent = (content) => createHash('sha256').update(typeof conte
 
 export function homeworkRow(id, content, hash = hashContent(content), metadata = {}) {
   if (!Number.isSafeInteger(id) || id < 1 || !content || typeof content !== 'object' || Array.isArray(content)) throw new Error('Invalid PRTS homework')
+  if (metadata.type && metadata.type !== 'PRTS' || metadata.status && metadata.status !== 'PUBLIC' || metadata.available === false) return null
   if (content.type === 'SSS' || typeof content.stage_name !== 'string' || !content.stage_name) return null
   const mode = [1, 2, 3].includes(content.difficulty) ? content.difficulty : content.stage_name.includes('#f#') ? 2 : 1
   const statistics = {}
   for (const [key, value] of Object.entries({ likes: metadata.likes ?? metadata.like, dislikes: metadata.dislikes ?? metadata.dislike, views: metadata.views, hotScore: metadata.hotScore ?? metadata.hot_score })) {
     if (typeof value === 'number' && Number.isFinite(value) && value >= 0 && (key === 'hotScore' || Number.isSafeInteger(value))) statistics[key] = value
   }
-  const uploadedAt = metadata.uploadedAt ?? metadata.upload_time
+  const uploadedAt = metadata.firstUploadTime ?? metadata.first_upload_time ?? content.first_upload_time ?? metadata.uploadedAt ?? metadata.upload_time
   if (typeof uploadedAt === 'string' && /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/.test(uploadedAt)) {
     // PRTS returns China local time when the timestamp has no offset.
     const timestamp = Date.parse(uploadedAt.replace(' ', 'T') + (/(?:Z|[+-]\d{2}:\d{2})$/.test(uploadedAt) ? '' : '+08:00'))
@@ -76,7 +77,13 @@ export async function loadPlanningAssets(gameSha, signal) {
     fetchJson('https://penguin-stats.io/PenguinStats/api/v2/result/matrix?server=CN', { signal }),
   ])
   const operators = Object.fromEntries(Object.entries(characters).filter(([id]) => id.startsWith('char_')).map(([id, row]) => [id, {
-    name: row.name, rarity: typeof row.rarity === 'number' ? row.rarity + 1 : Number(String(row.rarity).replace('TIER_', '')), skills: (row.skills ?? []).map((skill) => skill.skillId),
+    name: row.name, profession: row.profession, rarity: typeof row.rarity === 'number' ? row.rarity + 1 : Number(String(row.rarity).replace('TIER_', '')), skills: (row.skills ?? []).map((skill) => skill.skillId),
+  }]))
+  const stageCatalog = Object.fromEntries(Object.entries(stages.stages).map(([id, stage]) => [id, {
+    name: `${stage.code ?? id} ${stage.name ?? ''}`.trim(),
+    activity: zones.zones?.[stage.zoneId]?.zoneNameSecond ?? zones.zones?.[stage.zoneId]?.zoneNameFirst ?? stage.zoneId ?? id,
+    category: ({ MAIN: '主线', SUB: '支线', DAILY: '资源收集', CAMPAIGN: '剿灭', ACTIVITY: '活动' })[stage.stageType] ?? stage.stageType ?? '未知类型',
+    permanent: ['MAIN', 'SUB', 'DAILY', 'CAMPAIGN'].includes(stage.stageType), open: null,
   }]))
   const recipes = {}
   for (const formula of [...Object.values(building.workshopFormulas), ...Object.values(building.manufactFormulas)]) {
@@ -114,7 +121,7 @@ export async function loadPlanningAssets(gameSha, signal) {
     }
   }
   for (const [id, options] of Object.entries(farms)) farms[id] = options.sort((a, b) => a.sanity / a.quantity - b.sanity / b.quantity).slice(0, 12)
-  return { operators, recipes, farms, itemNames, potionValues }
+  return { operators, stages: stageCatalog, recipes, farms, itemNames, potionValues }
 }
 
 export function cliOptions(argv, allowed) {

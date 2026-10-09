@@ -4,8 +4,28 @@ export type CultivationTarget = {
   skill: number
   skillLevel: number
   moduleId: string | null
-  moduleLevel: number
+  moduleLevel: number | null
   potential: number
+}
+
+export type CultivationQuery = {
+  scope: 'recent' | 'permanent' | 'history'
+  days: number
+  coverage: number
+  stageId: string
+  activity: string
+  category: string
+  profession: string
+  rarity: number
+  search: string
+  includeClosed: boolean
+  includeAlternatives: boolean
+  includeUncertain: boolean
+}
+
+export const defaultCultivationQuery: CultivationQuery = {
+  scope: 'recent', days: 180, coverage: 0.8, stageId: '', activity: '', category: '', profession: '', rarity: 0, search: '',
+  includeClosed: false, includeAlternatives: true, includeUncertain: false,
 }
 
 export type CultivationCurrent = {
@@ -31,6 +51,15 @@ export type CultivationCandidate = {
   weightedFrequency?: number
   source?: 'homework' | 'community'
   communityRate?: number
+  evidence?: {
+    status: 'current' | 'limited' | 'historical' | 'insufficient'
+    families: number
+    recentFamilies: number
+    recentStages: number
+    usageShare: number
+    coverage: number
+    completeness: { training: number; skill: number; module: number }
+  }
   frequency: number
   fixedFrequency: number
   stageCount: number
@@ -57,6 +86,13 @@ export type CultivationPotion = {
 
 export type CultivationData = {
   candidates: CultivationCandidate[]
+  recommendation?: {
+    query: CultivationQuery
+    families: number
+    withoutActions: number
+    stages: Array<{ id: string; name: string; activity: string; category: string }>
+    professions: string[]
+  }
   community?: { updatedAt: string | null; status: 'fresh' | 'stale' | 'unavailable'; operators: Record<string, CultivationStatistics> }
   specialItems?: CultivationSpecialItem[]
   specialItemsUpdatedAt?: string | null
@@ -78,6 +114,7 @@ export type CultivationData = {
 
 export type CultivationOptions = {
   preference: 'coverage' | 'materials' | 'cost' | 'community'
+  recommendation?: CultivationQuery
   dailySanity: number
   startDate: string
   days: number

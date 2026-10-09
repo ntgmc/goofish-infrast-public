@@ -1,3 +1,4 @@
+import { defaultCultivationQuery } from '../../src/lib/cultivation-contract'
 import { readPrtsSnapshot } from '../cultivation/catalog'
 import { buildCultivationData } from '../cultivation/data'
 import { getCultivationStatistics } from '../cultivation/references'
@@ -27,7 +28,7 @@ export default async function cultivationPlanHandler(req: Request): Promise<Resp
     catch { return jsonResponse({ error: '作业数据暂不可用，请等待管理员导入后重试。', code: 'prts_data_unavailable' }, 503) }
     const client = new SklandClient(decryptSklandCredential(binding.encrypted_cred))
     const [game, inventory, pricing, community, specialCatalog] = await Promise.all([client.getGamePlayerInfo(binding.uid), client.getCultivatePlayer(binding.uid), getYituliuPricing(), getCultivationStatistics(), getSpecialItemCatalog(snapshot.operators)])
-    const response = jsonResponse(buildCultivationData(snapshot, game, inventory, pricing, community, specialCatalog))
+    const response = jsonResponse(buildCultivationData(snapshot, game, inventory, pricing, community, specialCatalog, { ...defaultCultivationQuery, ...body.recommendation }))
     response.headers.set('Cache-Control', 'no-store')
     return response
   } catch (error) {

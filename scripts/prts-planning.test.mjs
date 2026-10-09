@@ -68,6 +68,10 @@ test('normalizes API and imported statistics without inventing missing dates or 
   assert.equal(row.dislikes, 2)
   assert.equal(row.hotScore, 1.5)
   assert.equal(homeworkRow(1, content, 'hash', { upload_time: '2026-10-07T12:00:00Z' }).uploadedAt, '2026-10-07T12:00:00.000Z')
+  assert.equal(homeworkRow(1, content, 'hash', { first_upload_time: '2026-01-01 12:00:00', upload_time: '2026-10-07T12:00:00Z' }).uploadedAt, '2026-01-01T04:00:00.000Z')
+  assert.equal(homeworkRow(1, { ...content, first_upload_time: '2026-01-01 12:00:00' }, 'hash', { upload_time: '2026-10-07T12:00:00Z' }).uploadedAt, '2026-01-01T04:00:00.000Z')
+  assert.equal(homeworkRow(1, content, 'hash', { type: 'VIDEO' }), null)
+  assert.equal(homeworkRow(1, content, 'hash', { status: 'PRIVATE' }), null)
   const invalid = homeworkRow(1, content, 'hash', { upload_time: 'invalid', likes: -1, dislikes: 1.5, views: Infinity, hotScore: '5' })
   assert.equal(invalid.uploadedAt, undefined)
   assert.equal(invalid.likes, undefined)
@@ -96,6 +100,9 @@ test('reconciles changing ratings with unchanged content and preserves metadata 
   metadata = {}
   await syncPrtsPlanning({ output, reconcile: '1' }, request, async () => {})
   assert.deepEqual(JSON.parse(await readFile(output, 'utf8')).homeworks, saved.homeworks)
+  metadata = { upload_time: '2099-01-01T00:00:00Z' }
+  await syncPrtsPlanning({ output, reconcile: '1' }, request, async () => {})
+  assert.equal(JSON.parse(await readFile(output, 'utf8')).homeworks[0].uploadedAt, fixture.homeworks[0].uploadedAt)
 }))
 
 test('failed sync preserves the entire old snapshot and releases the lock for retry', async () => sandbox(async (directory) => {

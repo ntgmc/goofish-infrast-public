@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import { copy } from '../copy/index'
 import { apiJson } from '../lib/api-client'
-import type { CultivationData, CultivationOptions } from '../lib/cultivation-contract'
+import { defaultCultivationQuery, type CultivationData, type CultivationOptions, type CultivationQuery } from '../lib/cultivation-contract'
 import { buildCultivationPlan } from '../lib/cultivation-planner'
 import { useToolSession } from './tool/useToolSession'
 import { v2Path } from './v2/navigation'
 import CultivationResults, { number } from './cultivation/CultivationResults'
 import CultivationSpecialItems from './cultivation/CultivationSpecialItems'
+import CultivationFilters from './cultivation/CultivationFilters'
 
 const label = copy.tools.cultivation
 const today = () => new Date(Date.now() + 4 * 3600000).toISOString().slice(0, 10)
@@ -32,7 +33,12 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
   const [data, setData] = useState<CultivationData | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [options, setOptions] = useState<CultivationOptions>({ preference: 'coverage', dailySanity: 240, startDate: today(), days: 30, limit: 5, excluded: [], potions: {}, allOpen: false })
+  const [searchParams, setSearchParams] = useSearchParams()
+  const queryFromUrl = () => Object.fromEntries(Object.entries(defaultCultivationQuery).map(([key, fallback]) => {
+    const value = searchParams.get(`cultivation_${key}`)
+    return [key, value === null ? fallback : typeof fallback === 'boolean' ? value === 'true' : typeof fallback === 'number' ? Number(value) : value]
+  })) as CultivationQuery
+  const [options, setOptions] = useState<CultivationOptions>({ recommendation: queryFromUrl(), preference: 'coverage', dailySanity: 240, startDate: today(), days: 30, limit: 5, excluded: [], potions: {}, allOpen: false })
   const [appliedOptions, setAppliedOptions] = useState(options)
   const [numbers, setNumbers] = useState({ dailySanity: '240', days: '30', limit: '5' })
   const [potionNumbers, setPotionNumbers] = useState<Record<string, string>>({})
@@ -52,7 +58,14 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
     return () => { generation.current++; request.current?.abort() }
   }, [profileId])
 
-  async function load() {
+  useEffect(() => {
+    const next = queryFromUrl()
+    setOptions((value) => JSON.stringify(value.recommendation) === JSON.stringify(next) ? value : { ...value, recommendation: next })
+    // URL navigation restores the recommendation filters without reading the player's inventory.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
+  async function load(recommendation = options.recommendation ?? defaultCultivationQuery, preserveSettings = false) {
     if (!profileId || busy) return
     const controller = new AbortController()
     request.current?.abort()
@@ -61,12 +74,13 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
     setBusy(true)
     setError(null)
     try {
-      const result = await apiJson<CultivationData>('/api/cultivation-plan', { method: 'POST', json: { profile_id: profileId }, signal: controller.signal, timeoutMs: 90000, fallbackMessage: label.failed })
+      const result = await apiJson<CultivationData>('/api/cultivation-plan', { method: 'POST', json: { profile_id: profileId, recommendation }, signal: controller.signal, timeoutMs: 90000, fallbackMessage: label.failed })
       if (generation.current === run) {
         setData(result)
-        setOptions((value) => ({ ...value, potions: {} }))
-        setAppliedOptions((value) => ({ ...value, potions: {} }))
-        setPotionNumbers({})
+        const update = (value: CultivationOptions) => ({ ...value, recommendation, potions: preserveSettings ? Object.fromEntries(result.potions.map((potion) => [potion.key, Math.min(potion.count, value.potions[potion.key] ?? 0)])) : {} })
+        setOptions(update)
+        setAppliedOptions(update)
+        setPotionNumbers((value) => preserveSettings ? Object.fromEntries(result.potions.map((potion) => [potion.key, String(Math.min(potion.count, Number(value[potion.key] ?? 0)))])) : {})
       }
     } catch (caught) {
       if (generation.current === run && !controller.signal.aborted) setError(caught instanceof Error ? caught.message : label.failed)
@@ -94,6 +108,13 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
     setAppliedOptions(next)
     setNumbers({ dailySanity: String(numeric.dailySanity), days: String(numeric.days), limit: String(numeric.limit) })
     setPotionNumbers(Object.fromEntries(Object.entries(next.potions).map(([key, value]) => [key, String(value)])))
+    const params = new URLSearchParams(searchParams)
+    for (const [key, value] of Object.entries(next.recommendation ?? defaultCultivationQuery)) {
+      if (value === defaultCultivationQuery[key as keyof CultivationQuery]) params.delete(`cultivation_${key}`)
+      else params.set(`cultivation_${key}`, String(value))
+    }
+    setSearchParams(params, { replace: true })
+    if (data && JSON.stringify(next.recommendation) !== JSON.stringify(data.recommendation?.query ?? defaultCultivationQuery)) void load(next.recommendation, true)
   }
 
   return { profiles, profileId, setChosenProfile, data, busy, error, options, setOptions, appliedOptions,
@@ -128,13 +149,14 @@ function CultivationContent({ session, embedded = false }: { session: ReturnType
         <dl className="workspace-cultivation-metrics grid grid-cols-2 gap-3 sm:grid-cols-4">{Object.entries({ homeworks: data.stats.homeworks, owned: data.stats.owned, satisfied: data.candidates.filter((row) => row.satisfied).length, incomplete: data.stats.incomplete }).map(([key, value]) => <div key={key} className="tool-inset p-4"><dt className="text-xs text-ink-secondary">{label.stats[key as keyof typeof label.stats]}</dt><dd className="mt-2 text-2xl font-semibold tabular-nums">{number(value)}</dd></div>)}</dl>
         {data.warnings.length > 0 && <ul className="tool-alert tool-alert--warning space-y-1 p-4 text-sm">{data.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
         <section className="workspace-cultivation-options tool-panel space-y-5 p-5 sm:p-6">
+          <CultivationFilters query={options.recommendation ?? defaultCultivationQuery} data={data} onChange={(recommendation) => setOptions((value) => ({ ...value, recommendation }))} />
           <fieldset><legend className="mb-3 text-base font-semibold">{label.preference}</legend><div className="flex flex-wrap gap-2">{Object.entries(label.preferences).map(([key, text]) => <label key={key} className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${options.preference === key ? 'border-brand-500 bg-brand-500/10 text-ink-primary' : 'border-surface-3 text-ink-secondary'}`}><input type="radio" name="preference" value={key} checked={options.preference === key} onChange={() => setOptions((value) => ({ ...value, preference: key as CultivationOptions['preference'] }))} />{text}</label>)}</div><p className="mt-3 text-sm leading-6 text-ink-muted">{label.preferenceHints[options.preference]}</p></fieldset>
           {options.preference === 'community' && data.community?.status !== 'fresh' && <p role="status" className="text-sm text-warning">{data.community?.status === 'stale' ? label.communityStale : label.communityUnavailable}</p>}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{field('dailySanity', label.daily, 0, 2000)}<label className="block space-y-2 text-sm"><span>{label.start}</span><input type="date" className="tool-field" value={options.startDate} onChange={(event) => setOptions((value) => ({ ...value, startDate: event.target.value }))} /></label>{field('days', label.days, 1, 180)}{field('limit', label.limit, 1, 30)}</div>
           <p className="text-xs leading-5 text-ink-muted">{label.dailyHint}</p>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={options.allOpen} onChange={(event) => setOptions((value) => ({ ...value, allOpen: event.target.checked }))} />{label.allOpen}</label><p className="text-xs leading-5 text-ink-muted">{label.allOpenHint}</p>
           <details className="tool-inset p-4"><summary className="cursor-pointer text-sm font-medium">{label.potions}</summary><p className="my-3 text-xs leading-5 text-ink-muted">{label.potionHint}</p>{!data.potions.length ? <p className="text-sm text-ink-secondary">{label.noPotions}</p> : <div className="grid gap-4 sm:grid-cols-2">{data.potions.map((potion) => <label key={potion.key} className="space-y-2 text-sm"><span className="block font-medium">{potion.name}</span><span className="block text-xs text-ink-muted">{label.potionAmount(potion.count, potion.sanity)} · {potion.expiresAt ? `${label.expiry} ${new Date(potion.expiresAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}` : label.expiryUnknown}</span><input type="number" min={0} max={potion.count} className="tool-field" disabled={potion.sanity === null || Boolean(potion.expiresAt && Date.parse(potion.expiresAt) <= Date.now())} value={potionNumbers[potion.key] ?? '0'} onChange={(event) => setPotionNumbers((prior) => ({ ...prior, [potion.key]: event.target.value }))} />{potion.sanity === null && <span className="block text-xs text-warning">{label.potionUnknown}</span>}</label>)}</div>}</details>
-          <div className="flex flex-wrap items-center gap-3"><button type="button" className="tool-primary-action" onClick={apply}>{label.apply}</button>{changed && <p role="status" className="text-sm text-ink-secondary">{label.settingsChanged}</p>}</div>
+          <div className="flex flex-wrap items-center gap-3"><button type="button" className="tool-primary-action" disabled={busy} onClick={apply}>{label.apply}</button>{changed && <p role="status" className="text-sm text-ink-secondary">{label.settingsChanged}</p>}</div>
         </section>
         <CultivationResults data={data} plan={plan} excluded={appliedOptions.excluded} exclude={exclude} />
         <CultivationSpecialItems key={profileId} data={data} plan={plan} preference={appliedOptions.preference} />
