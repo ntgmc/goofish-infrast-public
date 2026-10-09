@@ -1405,8 +1405,13 @@
   gap: 20px;
 }
 
-.v2-drawer .config-editor button {
-  white-space: nowrap;
+.v2-drawer .config-dormitory-rules {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.v2-drawer .config-dormitory-rules button {
+  display: block;
+  white-space: normal;
 }
 
 .v2-drawer .config-editor .tool-secondary-action {

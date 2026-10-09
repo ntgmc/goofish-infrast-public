@@ -120,8 +120,8 @@ textarea.v2-input { resize: vertical; }
 .v2-preparation-row { display: grid; grid-template-columns: 24px 20px minmax(0, 1fr); align-items: start; gap: var(--space-sm); padding-block: var(--space-lg); border-top: 1px solid var(--v2-line); > svg { color: var(--v2-muted); } > div { min-width: 0; } h3 { color: var(--v2-muted); font-size: var(--text-sm); font-weight: 400; margin-bottom: var(--space-xs); } > button { grid-column: 3; justify-self: start; } p { font-size: var(--text-xs); margin-top: var(--space-xs); } }
 .v2-coupon-option { display: flex; align-items: start; gap: var(--space-xs); padding-block: var(--space-sm); min-height: 44px; font-size: var(--text-sm); input { margin-top: var(--space-3xs); } strong, small { display: block; } small { margin-top: var(--space-2xs); } }
 .v2-generate-submit { width: 100%; margin-top: var(--space-md); }
-.v2-generation-progress, .v2-generation-history, .v2-generation-preview { margin-top: var(--space-xl); padding-top: var(--space-lg); border-top: 1px solid var(--v2-line); }
-.v2-generation-history > p, .v2-generation-preview > p { font-size: var(--text-sm); margin-top: var(--space-xs); }
+.v2-generation-progress, .v2-generation-history { margin-top: var(--space-xl); padding-top: var(--space-lg); border-top: 1px solid var(--v2-line); }
+.v2-generation-history > p { font-size: var(--text-sm); margin-top: var(--space-xs); }
 .v2-record-workspace { gap: var(--space-lg); grid-template-columns: minmax(0, 1.4fr) minmax(16rem, 1fr); }
 .v2-record { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-sm); padding: var(--space-sm); border-bottom: 1px solid var(--v2-line); &[aria-current="true"] { background: var(--v2-paper); box-shadow: inset 3px 0 var(--v2-accent); } }
 .v2-record-select { min-width: 0; text-align: left; display: flex; flex-direction: column; gap: var(--space-2xs); min-height: 72px; time, span { color: var(--v2-muted); font-size: var(--text-xs); } }

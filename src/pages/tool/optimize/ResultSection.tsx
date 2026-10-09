@@ -1,5 +1,5 @@
 import { Component, lazy, Suspense, type ErrorInfo, type FormEvent, type ReactNode } from 'react'
-import { Link } from 'react-router'
+import InternalLink from '../../../components/InternalLink'
 import type { LicenseOperator, OptimizeResult, UpgradeSuggestion, WorkspaceResultHistoryItem } from '../../../lib/types'
 import ScheduleProgress, { type ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { isMaaJsonDownloadable } from '../../../lib/workspace-history'
@@ -65,22 +65,18 @@ export default function ResultSection({
   manualEditProfile?: ResultPanelProps['manualEditProfile'];
   manualSimulationBaseline?: ResultPanelProps['manualSimulationBaseline'];
 }) {
-  const { content, isFallback } = usePublicContent()
-  const purchaseHref = isFallback ? undefined : resolveActivePurchaseChannel(content.cdk_purchase.xianyu_url)?.href ?? undefined
   const suggestionsSlot = suggestions.length > 0 ? (
     <Suspense fallback={<ResultFallback />}>
       <UpgradeSuggestions suggestions={suggestions} embedded />
     </Suspense>
   ) : !canViewUpgradeSuggestions ? (
     <LockedCapabilityPreview
-      purchaseHref={purchaseHref}
       title={copy.optimize.pages_tool_optimize_ResultSection_016}
       description={copy.optimize.pages_tool_optimize_ResultSection_017}
     />
   ) : null
   const manualPreviewSlot = previewProfile ? (
     <LockedCapabilityPreview
-      purchaseHref={purchaseHref}
       title={copy.optimize.paid_preview.manual_title}
       description={copy.optimize.paid_preview.manual_description}
     />
@@ -174,8 +170,10 @@ export default function ResultSection({
   )
 }
 
-function LockedCapabilityPreview({ purchaseHref, title, description }: { purchaseHref?: string; title: string; description: string }) {
+export function LockedCapabilityPreview({ title, description }: { title: string; description: string }) {
   const { features } = useSiteFeatures()
+  const { content, isFallback } = usePublicContent()
+  const purchaseHref = isFallback ? undefined : resolveActivePurchaseChannel(content.cdk_purchase.xianyu_url)?.href ?? undefined
   return (
     <div className="relative min-h-80 overflow-hidden rounded-xl">
       <div className="space-y-4 select-none opacity-50 blur-[3px]" aria-hidden="true" data-locked-capability-preview>
@@ -211,13 +209,13 @@ function LockedCapabilityPreview({ purchaseHref, title, description }: { purchas
                 {copy.optimize.pages_tool_optimize_ResultSection_018}
               </a>
             ) : features.pricing && (
-              <Link to="/pricing" className="tool-primary-action">
+              <InternalLink to="/pricing" className="tool-primary-action">
                 {copy.optimize.pages_tool_optimize_ResultSection_018}
-              </Link>
+              </InternalLink>
             )}
-            <Link to={dashboardPath('redeem')} className="tool-secondary-action">
+            <InternalLink to={dashboardPath('redeem')} className="tool-secondary-action">
               {copy.optimize.pages_tool_optimize_ResultSection_019}
-            </Link>
+            </InternalLink>
           </div>
         </div>
       </div>

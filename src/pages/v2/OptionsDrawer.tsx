@@ -132,6 +132,9 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
             <ConfigCapabilityPreview config={config} enabled={!canEditConfig}>
             <ConfigEditor profileId={session.activeProfile?.id} config={config} canEdit={canEditConfig} readOnly={configReadOnly} canEditIntermediateInventory={canUseIntermediateConfig}
               canSelectPreset={canUseIntermediateConfig} canEditFixedShiftHours={canEditConfig || Boolean(session.activeProfile && isFreePreviewProfile(session.activeProfile))} permission={permission}
+              note={session.activeProfile && isFreePreviewProfile(session.activeProfile) && !canEditConfig
+                ? `${copy.common.components_ConfigEditor_024}${getProfileAccessLabel(session.activeProfile)}${copy.common.components_ConfigEditor_025}`
+                : undefined}
               validation={validation} onUpdate={onUpdateConfig} embedded hideValidation />
             </ConfigCapabilityPreview>
             {hasPreviousResult && <aside className="v2-options-content">

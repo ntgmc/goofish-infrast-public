@@ -50,14 +50,12 @@ describe('App public content routing', () => {
   afterEach(() => cleanup())
 
   it.each([
-    '/',
     '/reset-password',
     '/account-safety',
     '/tool/profiles',
     '/tools/depot-value',
     '/admin/setup',
     '/admin/features',
-    '/v2',
   ])('does not load public content for non-content route %s', async (route) => {
     render(<MemoryRouter initialEntries={[route]}><App /></MemoryRouter>)
     await waitFor(() => expect(apiJson).toHaveBeenCalledWith('/api/site/features', expect.any(Object)))
@@ -65,6 +63,8 @@ describe('App public content routing', () => {
   })
 
   it.each([
+    '/',
+    '/v2',
     '/v1',
     '/changelog',
     '/faq',
@@ -88,7 +88,7 @@ describe('App public content routing', () => {
     expect(screen.queryByRole('heading', { name: copy.public.pages_LandingPage_023 })).not.toBeInTheDocument()
     await act(async () => resolveFeatures(DEFAULT_SITE_FEATURE_SETTINGS))
     expect(await screen.findByText('V2 test workspace')).toBeInTheDocument()
-    expect(apiJson.mock.calls.some(([url]) => url === '/api/site/public-content')).toBe(false)
+    await waitFor(() => expect(apiJson.mock.calls.some(([url]) => url === '/api/site/public-content')).toBe(true))
     expect(toolMount).not.toHaveBeenCalled()
   })
 
