@@ -218,7 +218,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
             <div className="v2-feature-content"><ThemeSwitcher iconOnly /></div>
             <NotificationBell iconOnly onInventory={() => navigateSection('inventory')} />
             <span className="v2-topbar-divider" />
-            <button className="v2-profile-button" type="button" onClick={() => openPanel('account')}><span className="v2-profile-avatar">{name.slice(0, 1)}</span><span>{name}</span><ChevronDown size={14} /></button>
+            <button className="v2-profile-button" type="button" aria-label={name} title={name} onClick={() => openPanel('account')}><span className="v2-profile-avatar" aria-hidden="true">{name.slice(0, 1)}</span><span>{name}</span><ChevronDown size={14} aria-hidden="true" /></button>
           </div>
         </header>
         <main className="v2-main motion-region-enter" tabIndex={-1} data-route-focus>
@@ -230,9 +230,9 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           <div className="v2-page-title"><h1>{text.title}</h1></div>
           <InventoryDepletionWarning result={result} className="v2-inventory-warning" action={<button type="button" className="v2-button v2-button-secondary" onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" />{text.configure}</button>} />
           <div className="v2-ready-banner">
-            <span className="v2-ready-icon"><Check size={25} strokeWidth={2} /></span>
-            <div><h2>{text.resultReady}<span className="v2-ready-tag">{sample ? text.sample : SCHEDULE_MODE_LABELS[resultMode]}</span></h2></div>
-            <div className="v2-banner-actions"><button type="button" className="v2-button v2-button-white" onClick={() => openPanel('config')}><Settings2 size={16} />{text.configure}</button>
+            <div className="v2-ready-status"><span className="v2-ready-icon"><Check size={22} strokeWidth={2} aria-hidden="true" /></span>
+              <h2>{text.resultReady}<span className="v2-ready-tag">{sample ? text.sample : SCHEDULE_MODE_LABELS[resultMode]}</span></h2></div>
+            <div className="v2-banner-actions"><button type="button" className="v2-button v2-button-white v2-config-button" aria-label={text.configure} title={text.configure} onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" /><span>{text.configure}</span></button>
               <button type="button" className="v2-button v2-button-primary" disabled={busy || loadingResult || Boolean(generationDisabledReason)} title={generationDisabledReason ?? undefined}
                 onClick={() => { if (onGenerate) onGenerate(); else openPanel('account') }}><RefreshCw size={16} className={busy ? 'v2-spin' : ''} />{busy ? text.generating : text.regenerate}</button>
               <button className="v2-button v2-button-secondary v2-export-button" type="button" disabled={busy || loadingResult}
@@ -266,7 +266,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
             {([['schedule', text.scheduleTab], ['analysis', text.analysisTab], ...(showManual ? [['manual', text.manualTab] as const] : []), ...(restrictedPreview || !sample && (workflow?.suggestions?.length || result.upgrade_suggestions_status) ? [['training', text.trainingTab] as const] : [])] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => { setView(id); if (id === 'manual') setManualOpened(true) }}>
               {label}{view === id && <MotionNavIndicator layoutId="result-tab" variant="underline" />}
             </button>)}
-            <span><ShieldCheck size={14} />{sample ? text.sampleSource : text.ownSource}</span>
+            <span><ShieldCheck size={14} aria-hidden="true" />{sample ? text.sampleSource : text.ownSource}</span>
           </div>
           <div className="v2-feature-content" hidden={view !== 'manual'}>
             {canManual && manualOpened && session.activeProfile && <Suspense fallback={<p role="status">{text.loading}</p>}><ManualScheduleEditor key={manualKey} source={result} profileId={session.activeProfile.id} operators={operators} simulationBaseline={simulationBaseline} onDirtyChange={setManualDirty} /></Suspense>}
@@ -356,7 +356,7 @@ function FeedbackRegion({ children }: { children: ReactNode }) {
 }
 
 function Metric({ label, value, unit, hint, product, icon }: { label: string; value: string; unit: string; hint?: string; product?: string; icon?: ReactNode }) {
-  return <RevealItem className="v2-metric"><section aria-label={label}><div className="v2-metric-top"><span>{label}</span><span className="v2-metric-icon">{product ? <ProductIcon product={product} size={24} /> : icon}</span></div>
+  return <RevealItem className="v2-metric"><section aria-label={label}><div className="v2-metric-top"><span>{label}</span><span className="v2-metric-icon" aria-hidden="true">{product ? <ProductIcon product={product} size={24} /> : icon}</span></div>
     <p className="v2-metric-value"><AnimatedValue value={value} /><small>{unit}</small></p>{hint && <p className="v2-metric-hint">{hint}</p>}</section></RevealItem>
 }
 
