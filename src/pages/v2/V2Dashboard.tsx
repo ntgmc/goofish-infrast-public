@@ -190,7 +190,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
       </AnimatePresence>
       <aside className={`v2-sidebar ${mobileNavigation ? 'v2-sidebar-open' : ''}`}>
         <Link to={v2Path('overview', session.activeProfile?.id)} className="v2-brand"><span className="v2-brand-mark"><Building2 size={24} strokeWidth={1.8} /></span>
-          <span><strong>{text.brand}<sup>V2</sup></strong><small>{text.brandDescription}</small></span></Link>
+          <span><strong>{text.brand}</strong><small>{text.brandDescription}</small></span></Link>
         <button className="v2-mobile-close v2-icon-button" type="button" onClick={() => setMobileNavigation(false)} aria-label={text.close}><X size={20} /></button>
         <nav aria-label={text.navigation}>
           <p className="v2-nav-label">{text.workspace}</p>
@@ -212,7 +212,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
         <header className="v2-topbar">
           <div className="v2-breadcrumb"><button className="v2-menu-button v2-icon-button" type="button" onClick={() => setMobileNavigation(true)} aria-label={text.menu}><Menu size={21} /></button>
             <span>{text.workspace}</span><ChevronRight size={14} /><strong>{sectionLabels[section]}</strong></div>
-          <div className="v2-topbar-actions"><Link to="/v1" className="v2-sample-pill" onClick={openLegacy} aria-label={`${text.testVersion} · ${text.legacyEntry}`} title={text.legacyEntry}><span />{text.testVersion}</Link>
+          <div className="v2-topbar-actions"><Link to="/v1" className="v2-legacy-link" onClick={openLegacy}>{text.legacyEntry}</Link>
             {features.changelog && <Link to={v2Path('updates', session.activeProfile?.id)} className="v2-icon-button" aria-label={text.updates}><ScrollText size={19} /></Link>}
             <div className="v2-feature-content">{taskCenterAction}</div>
             <div className="v2-feature-content"><ThemeSwitcher iconOnly /></div>
