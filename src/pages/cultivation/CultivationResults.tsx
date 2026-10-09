@@ -7,15 +7,30 @@ import type { buildCultivationPlan } from '../../lib/cultivation-planner'
 const label = copy.tools.cultivation
 export const number = (value: number) => new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 }).format(value)
 
-export function progress(row: CultivationCandidate, target = false) {
+function progress(row: CultivationCandidate, target = false) {
   return target ? label.targetProgress(row.target.elite, row.target.level, row.target.skill, row.target.skillLevel, row.target.moduleLevel)
     : label.progress(row.current.elite, row.current.level, row.target.skill, row.current.skillLevel, row.current.masteries[row.skillId], row.target.moduleId ? row.current.modules[row.target.moduleId] ?? 0 : undefined)
+}
+
+export function CultivationTraining({ row }: { row: CultivationCandidate }) {
+  const { current, target, skillId } = row
+  const upgrades = [
+    current.elite < target.elite || current.elite === target.elite && current.level < target.level ? label.levelTarget(target.elite, target.level) : null,
+    target.skillLevel > 1 && (current.skillLevel === null || current.skillLevel < Math.min(7, target.skillLevel) || target.skillLevel > 7 && (current.masteries[skillId] ?? -1) < target.skillLevel - 7) ? label.skillTarget(target.skill, target.skillLevel) : null,
+    target.moduleId && (current.modulesKnown === false || (current.modules[target.moduleId] ?? 0) < (target.moduleLevel ?? 1)) ? `${row.moduleName ?? label.module} · ${label.moduleRank(target.moduleLevel ?? 1)}` : null,
+    current.potential < target.potential ? label.potentialTarget(target.potential) : null,
+  ].filter((value): value is string => value !== null)
+  return <div className="mt-3 space-y-2">
+    {upgrades.length > 0 ? <><span className="text-xs text-ink-secondary">{label.upgrades}</span><ul aria-label={label.upgrades} className="flex flex-wrap gap-2">{upgrades.map((upgrade) => <li key={upgrade} className="rounded bg-brand-500/10 px-3 py-2 text-sm font-semibold text-brand-500">{upgrade}</li>)}</ul></> : <p className="text-sm">{row.source === 'community' ? label.communityTarget : label.target} · {progress(row, true)}</p>}
+    <p className="text-xs leading-5 text-ink-muted">{label.current} · {progress(row)}</p>
+    {target.moduleId && target.moduleLevel === null && <small className="text-ink-muted">{label.moduleOpening}</small>}
+  </div>
 }
 
 export function CultivationEvidence({ row }: { row: CultivationCandidate }) {
   if (!row.evidence) return null
   const { status, families, coverage, completeness } = row.evidence
-  return <div className="mt-2 space-y-1 text-xs leading-5 text-ink-secondary"><p>{label.evidenceStates[status]} · {label.evidenceSummary(families, coverage)}</p><p>{label.completeness(completeness.training, completeness.skill, completeness.module)}</p>{row.target.moduleId && row.target.moduleLevel === null && <p>{label.moduleOpening}</p>}</div>
+  return <details className="mt-2 text-xs leading-5 text-ink-muted"><summary className="min-h-11 cursor-pointer content-center">{label.evidenceDetails} · {label.evidenceStates[status]}</summary><p>{label.demand} {number(row.frequency)} · {label.stageCount} {row.stageCount} · {label.evidenceSummary(families, coverage)}</p><p>{label.completeness(completeness.training, completeness.skill, completeness.module)}</p></details>
 }
 
 function Operator({ row, data }: { row: CultivationCandidate; data: CultivationData }) {
@@ -62,10 +77,8 @@ export default memo(function CultivationResults({ data, plan, excluded, exclude 
         {plan.selected.map(({ candidate: row, allocation, estimatedDate }, index) => <li key={row.key} className="grid gap-4 py-5 lg:grid-cols-2">
           <div><div className="flex flex-wrap items-start gap-3"><span className="pt-2 text-lg font-semibold tabular-nums text-brand-500">{index + 1}</span><Operator row={row} data={data} />
             <button type="button" className="tool-secondary-action ml-auto inline-flex shrink-0 items-center gap-1.5 text-xs" onClick={() => exclude(row.operatorId, true)}><X size={14} />{label.exclude}</button>
-          </div><p className="mt-3 text-xs text-ink-muted">{label.current} · {progress(row)}</p>
-            <p className="mt-1 text-sm">{row.source === 'community' ? label.communityTarget : label.target} · {progress(row, true)}</p>
-            {row.moduleName && <p className="mt-1 text-xs text-ink-secondary">{row.moduleName}{row.target.moduleLevel !== null && ` · ${label.moduleRank(row.target.moduleLevel)}`}</p>}
-            <p className="mt-2 text-xs text-ink-secondary">{row.source === 'community' ? label.communityRate(row.communityRate ?? null) : `${label.demand} ${number(row.frequency)} · ${label.stageCount} ${row.stageCount}`}</p>
+          </div><CultivationTraining row={row} />
+            {row.source === 'community' && <p className="mt-2 text-xs text-ink-muted">{label.communityRate(row.communityRate ?? null)}</p>}
             <CultivationEvidence row={row} /><Statistics row={row} data={data} />
           </div>
           <div className="space-y-3 text-sm"><p>{label.cost} · <strong className="tabular-nums">{allocation.sanity === null ? label.unpriced : number(allocation.sanity)}</strong></p>
@@ -89,7 +102,7 @@ export default memo(function CultivationResults({ data, plan, excluded, exclude 
     </section>
     <details className="tool-panel p-5 sm:p-6"><summary className="cursor-pointer text-base font-semibold">{label.comparison}</summary><p className="my-3 text-xs leading-5 text-ink-muted">{label.comparisonHint}</p>
       <label className="mb-4 block"><span className="sr-only">{label.search}</span><input className="tool-field" placeholder={label.search} value={search} onChange={(event) => { setSearch(event.target.value); setVisible(50) }} /></label>
-      <div className="divide-y divide-surface-3">{rows.slice(0, visible).map((row) => <div key={row.key} className="grid gap-2 py-3 sm:grid-cols-[10rem_minmax(0,1fr)_minmax(0,1fr)]"><div><Operator row={row} data={data} /><span className="mt-1 block text-xs text-ink-muted">{row.satisfied ? label.matched : row.warnings.length ? label.check : label.needsTraining}</span></div><p className="text-xs leading-5 text-ink-secondary">{label.current} · {progress(row)}<br />{row.source === 'community' ? label.communityTarget : label.target} · {progress(row, true)}{row.moduleName && <span className="block">{row.moduleName}</span>}</p><div className="text-xs leading-5 text-ink-muted"><p>{row.source === 'community' ? label.communityRate(row.communityRate ?? null) : `${label.demand} · ${number(row.frequency)}`}</p><CultivationEvidence row={row} />{row.warnings.map((warning) => <p key={warning} className="text-warning">{warning}</p>)}{excluded.includes(row.operatorId) && <button type="button" className="tool-secondary-action mt-2 inline-flex items-center gap-1.5 text-xs" onClick={() => exclude(row.operatorId, false)}><RotateCcw size={14} />{label.excluded}</button>}</div></div>)}</div>
+      <div className="divide-y divide-surface-3">{rows.slice(0, visible).map((row) => <div key={row.key} className="grid gap-2 py-3 sm:grid-cols-[10rem_minmax(0,1fr)_minmax(0,1fr)]"><div><Operator row={row} data={data} /><span className="mt-1 block text-xs text-ink-muted">{row.satisfied ? label.matched : row.warnings.length ? label.check : label.needsTraining}</span></div><CultivationTraining row={row} /><div className="text-xs leading-5 text-ink-muted">{row.source === 'community' && <p>{label.communityRate(row.communityRate ?? null)}</p>}<CultivationEvidence row={row} />{row.warnings.map((warning) => <p key={warning} className="text-warning">{warning}</p>)}{excluded.includes(row.operatorId) && <button type="button" className="tool-secondary-action mt-2 inline-flex items-center gap-1.5 text-xs" onClick={() => exclude(row.operatorId, false)}><RotateCcw size={14} />{label.excluded}</button>}</div></div>)}</div>
       {rows.length > visible && <button type="button" className="tool-secondary-action mt-4" onClick={() => setVisible((value) => value + 50)}>{label.showMore}</button>}
     </details>
   </>

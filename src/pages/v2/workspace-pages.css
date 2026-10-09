@@ -150,8 +150,9 @@ textarea.v2-input { resize: vertical; }
 .v2-tool-number { color: var(--v2-muted); font-family: var(--font-mono); }
 .v2-tool-enter { display: grid; place-items: center; min-height: 44px; color: var(--v2-accent); }
 .v2-tool-source { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-md); padding-bottom: var(--space-lg); border-bottom: 1px solid var(--v2-line); > div:first-child { flex: 1 1 20rem; } p { font-size: var(--text-sm); max-width: 60ch; } .v2-field { flex: 1 1 12rem; margin: 0; max-width: 22rem; } }
-.v2-planning-workspace { display: grid; grid-template-columns: 17rem minmax(0, 1fr); gap: var(--space-xl); }
-.v2-planning-conditions { padding-right: var(--space-lg); border-right: 1px solid var(--v2-line); min-width: 0; }
+.v2-planning-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
+.v2-cultivation-conditions { margin-top: 0; padding-block: 0 var(--space-xs); }
+.v2-planning-conditions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 var(--space-sm); padding-top: var(--space-sm); min-width: 0; > :is(fieldset, .v2-notice, .v2-disclosure, .v2-muted, .v2-cultivation-availability, .v2-actions) { grid-column: 1 / -1; } > .v2-choice-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-xs); margin-top: var(--space-md); } .v2-field { margin-block: var(--space-2xs); } }
 .v2-choice-list { min-width: 0; legend { font-size: var(--text-sm); font-weight: 600; margin-bottom: var(--space-sm); } label { display: flex; align-items: start; gap: var(--space-xs); padding-block: var(--space-xs); } input { margin-top: var(--space-3xs); } strong, small { display: block; } strong { font-size: var(--text-sm); } small { margin-top: var(--space-2xs); } }
 .v2-planning-outcome { min-width: 0; }
 .v2-cultivation-priorities > li { display: grid; grid-template-columns: 20px minmax(0, 1fr) 44px; align-items: start; gap: var(--space-sm); padding-block: var(--space-lg); border-bottom: 1px solid var(--v2-line); > div { min-width: 0; } p { font-size: var(--text-sm); margin-top: var(--space-xs); } .v2-facts { margin-block: var(--space-sm); } }
@@ -230,8 +231,7 @@ textarea.v2-input { resize: vertical; }
 .v2-training-workspace { padding: var(--space-md); }
 
 @media (max-width: 80rem) {
-  .v2-planning-workspace { grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
-  .v2-planning-conditions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--space-md); padding: 0 0 var(--space-lg); border: 0; border-bottom: 1px solid var(--v2-line); > :is(.v2-block-title, .v2-choice-list, .v2-notice, .v2-disclosure, .v2-muted) { grid-column: 1 / -1; } }
+  .v2-planning-conditions { grid-template-columns: repeat(2, minmax(0, 1fr)); > .v2-choice-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .v2-choice-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-sm); }
   .v2-manual-preparation { grid-template-columns: repeat(2, minmax(0, 1fr)); > section:last-child { grid-column: 1 / -1; } }
   .v2-experiment-factors { grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
@@ -268,6 +268,7 @@ textarea.v2-input { resize: vertical; }
   .v2-experiment-options { grid-template-columns: minmax(0, 1fr); }
   .v2-planning-conditions, .v2-choice-list, .v2-manual-preparation, .v2-material-list, .v2-candidate-list article, .v2-cultivation-calendar article, .v2-pricing-selector, .v2-pricing-free, .v2-pricing-policy ul, .v2-service-components, .v2-support-information, .v2-balance-summary, .v2-balance-controls { grid-template-columns: minmax(0, 1fr); }
   .v2-manual-preparation > section:last-child { grid-column: 1; }
+  .v2-planning-conditions > .v2-choice-list { grid-template-columns: minmax(0, 1fr); }
   .v2-cultivation-priorities > li { grid-template-columns: 16px minmax(0, 1fr); gap: var(--space-xs); > button { grid-column: 2; justify-self: end; } }
   .v2-public-feed > article, .v2-service-incidents li { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
   .v2-entitlement-head, .v2-entitlement-comparison article { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-xs) var(--space-sm); > :first-child { grid-column: 1 / -1; } }

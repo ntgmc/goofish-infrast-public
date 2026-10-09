@@ -129,7 +129,7 @@ export const requestSchemas = {
     days: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(365)]).optional(),
     coverage: z.union([z.literal(0.6), z.literal(0.8), z.literal(0.9)]).optional(),
     stageId: z.string().trim().max(256).optional(), activity: z.string().trim().max(256).optional(), category: z.string().trim().max(128).optional(),
-    profession: z.string().trim().max(64).optional(), rarity: z.number().int().min(0).max(6).optional(), search: z.string().trim().max(128).optional(),
+    profession: z.string().trim().max(64).optional(), rarity: z.number().int().min(0).max(6).optional(), rarityGroup: z.enum(['high', 'low', 'all']).optional(), search: z.string().trim().max(128).optional(),
     includeClosed: z.boolean().optional(), includeAlternatives: z.boolean().optional(), includeUncertain: z.boolean().optional(),
   }).optional() }),
   depotValue: depotValueRequestSchema,

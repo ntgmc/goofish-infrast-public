@@ -17,6 +17,7 @@ export type CultivationQuery = {
   category: string
   profession: string
   rarity: number
+  rarityGroup: 'high' | 'low' | 'all'
   search: string
   includeClosed: boolean
   includeAlternatives: boolean
@@ -24,8 +25,12 @@ export type CultivationQuery = {
 }
 
 export const defaultCultivationQuery: CultivationQuery = {
-  scope: 'recent', days: 180, coverage: 0.8, stageId: '', activity: '', category: '', profession: '', rarity: 0, search: '',
+  scope: 'recent', days: 180, coverage: 0.8, stageId: '', activity: '', category: '', profession: '', rarity: 0, rarityGroup: 'high', search: '',
   includeClosed: false, includeAlternatives: true, includeUncertain: false,
+}
+
+export function matchesCultivationRarity(rarity: number, query: CultivationQuery) {
+  return query.rarity ? rarity === query.rarity : query.rarityGroup === 'high' ? rarity >= 4 : query.rarityGroup === 'low' ? rarity <= 3 : true
 }
 
 export type CultivationCurrent = {
