@@ -46,6 +46,7 @@ export async function readPrtsSnapshot(): Promise<PrtsSnapshot> {
   const info = await stat(path)
   if (cached?.path === path && cached.modified === info.mtimeMs && cached.size === info.size) return cached.data
   if (pending?.path === path && pending.modified === info.mtimeMs && pending.size === info.size) return pending.data
+  cached = null
   const data = readFile(path, 'utf8').then((content) => {
     const snapshot = prtsSnapshotSchema.parse(JSON.parse(content))
     if (pending?.data === data) cached = { path, modified: info.mtimeMs, size: info.size, data: snapshot }
@@ -53,6 +54,10 @@ export async function readPrtsSnapshot(): Promise<PrtsSnapshot> {
   }).finally(() => { if (pending?.data === data) pending = null })
   pending = { path, modified: info.mtimeMs, size: info.size, data }
   return data
+}
+
+export function releasePrtsSnapshot(): void {
+  cached = null
 }
 
 export function asRecord(value: unknown): Record<string, unknown> {

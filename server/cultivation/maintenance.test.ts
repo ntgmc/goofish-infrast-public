@@ -1,47 +1,47 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { initializeCultivationMaintenance, shutdownCultivationMaintenance } from './maintenance'
 
-const mocks = vi.hoisted(() => ({ read: vi.fn(), sync: vi.fn() }))
-vi.mock('./catalog', () => ({ readPrtsSnapshot: mocks.read }))
-vi.mock('../../scripts/prts-planning-sync.mjs', () => ({ syncPrtsPlanning: mocks.sync }))
+const mocks = vi.hoisted(() => ({ refresh: vi.fn(), shutdown: vi.fn() }))
+vi.mock('./worker-client', () => ({ refreshCultivationSnapshot: mocks.refresh, shutdownCultivationWorker: mocks.shutdown }))
 
 beforeEach(() => {
   vi.useFakeTimers()
-  vi.setSystemTime('2026-10-04T00:00:00Z')
   vi.clearAllMocks()
-  mocks.sync.mockResolvedValue({ changed: 0 })
+  mocks.refresh.mockReset().mockResolvedValue(undefined)
+  mocks.shutdown.mockResolvedValue(undefined)
 })
 afterEach(async () => { await shutdownCultivationMaintenance(); vi.useRealTimers() })
 
 describe('cultivation incremental maintenance', () => {
-  it('does not start a full crawl before the deployment seed exists', async () => {
-    mocks.read.mockRejectedValue(new Error('ENOENT'))
+  it('delegates snapshot reads and updates to the isolated reader once per hour', async () => {
+    initializeCultivationMaintenance()
     initializeCultivationMaintenance()
     await vi.advanceTimersByTimeAsync(3600000)
-    expect(mocks.sync).not.toHaveBeenCalled()
+    expect(mocks.refresh).toHaveBeenCalledTimes(2)
   })
 
-  it('updates stale data without overlapping updates and cancels on shutdown', async () => {
-    mocks.read.mockResolvedValue({ updatedAt: '2026-10-01T00:00:00Z' })
-    let resolve: () => void = () => {}
-    mocks.sync.mockImplementationOnce(() => new Promise<void>((done) => { resolve = done }))
+  it('does not overlap updates and releases the reader after cancellation', async () => {
+    let resolve!: () => void
+    mocks.refresh.mockImplementationOnce(() => new Promise<void>((done) => { resolve = done }))
     initializeCultivationMaintenance()
     await vi.advanceTimersByTimeAsync(7200000)
-    expect(mocks.sync).toHaveBeenCalledOnce()
+    expect(mocks.refresh).toHaveBeenCalledOnce()
     const stopped = shutdownCultivationMaintenance()
-    expect(mocks.sync.mock.calls[0][0].signal.aborted).toBe(true)
+    expect(mocks.refresh.mock.calls[0][0].aborted).toBe(true)
+    expect(mocks.shutdown).not.toHaveBeenCalled()
     resolve()
     await stopped
+    expect(mocks.shutdown).toHaveBeenCalledOnce()
     await vi.advanceTimersByTimeAsync(7200000)
-    expect(mocks.sync).toHaveBeenCalledOnce()
+    expect(mocks.refresh).toHaveBeenCalledOnce()
   })
 
-  it('keeps a fresh imported snapshot until its next update is due', async () => {
-    mocks.read.mockResolvedValue({ updatedAt: '2026-10-04T00:00:00Z' })
+  it('does not log absent seeds or a reader busy with a user request', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    mocks.refresh.mockRejectedValueOnce(Object.assign(new Error('absent'), { code: 'prts_data_unavailable' }))
+      .mockRejectedValueOnce(Object.assign(new Error('busy'), { code: 'cultivation_busy' }))
     initializeCultivationMaintenance()
-    await vi.advanceTimersByTimeAsync(23 * 3600000)
-    expect(mocks.sync).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(3600000)
-    expect(mocks.sync).toHaveBeenCalledOnce()
+    expect(warn).not.toHaveBeenCalled()
   })
 })

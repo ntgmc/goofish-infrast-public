@@ -97,8 +97,17 @@
 `rarityGroup` 为 `high`（4–6 星，默认）、`low`（1–3 星）或 `all`；
 `rarity` 为 1–6 时优先按指定星级筛选，保留旧链接的单星级含义。
 
-公开解析结果随快照缓存，每个快照最多缓存 64 组查询结果，15 分钟更新时效计算。
+快照读取、推荐计算、响应序列化和增量更新在独立线程执行，API 主线程只处理鉴权与
+返回响应。每个 API 进程最多运行一项养成读取或更新；忙碌时返回 `503 cultivation_busy`，
+读取超过 90 秒返回 `504 cultivation_timeout`。客户端断开会终止当前读取，线程异常或
+达到 512 MiB 老生代堆限制时本次请求失败，下一次读取重新建立线程；空闲 60 秒后释放线程。
+正常停机先取消增量更新并等待文件锁清理，再关闭线程。
+JSON 在独立线程序列化为 UTF-8，并转移字节缓冲区给 API，避免复制完整结果对象或大字符串。
+
+公开解析结果随快照缓存，只保留最近一组查询结果，15 分钟更新时效计算。
+动作与阵容身份使用 SHA-256 摘要，避免为每份作业长期保留重复的完整序列化字符串。
 替换快照后自动重建；缓存不包含个人练度、库存或凭据，HTTP 响应仍为 `no-store`。
+部署产物必须同时包含 `server/dist/cultivation-worker.js`，构建和发布清单会检查该文件。
 快照兼容旧格式。发布时间缺失的记录暂不参与推荐；导入优先使用 `first_upload_time`，
 上游没有首次发布时间时保留其提供的发布时间，后续同步不会将已有时间推迟。
 未注明时区的时间按北京时间解析，不用快照更新时间或作业 ID 推测。
@@ -267,5 +276,5 @@ node scripts/sync-prts-planning.mjs \
 
 ```sh
 node --test scripts/prts-planning.test.mjs scripts/fetch-prts-planning.test.mjs
-npm test -- src/lib/cultivation-planner.test.ts server/cultivation/recommendations.test.ts server/cultivation/data.test.ts server/handlers/cultivation-plan.test.ts src/pages/CultivationPlanPage.test.tsx
+npm test -- src/lib/cultivation-planner.test.ts server/cultivation server/handlers/cultivation-plan.test.ts server/process-hooks.test.ts src/pages/CultivationPlanPage.test.tsx
 ```

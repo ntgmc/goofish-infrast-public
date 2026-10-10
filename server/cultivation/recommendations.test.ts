@@ -116,6 +116,40 @@ describe('independent cultivation recommendation evidence', () => {
     expect(ids({ ...defaultCultivationQuery, rarity: 3 })).toEqual(['char_r3'])
   })
 
+  it('keeps compact strategy identities even when homework actions are large', () => {
+    const row = job(1)
+    row.content.actions = Array.from({ length: 200 }, (_, index) => ({ type: 'Deploy', name: '测试干员', location: [index, 0], direction: 'Right', pre_delay: index }))
+    const result = calculateCultivationRecommendations(snapshot([row]), { ...observing, stageId: row.stageId }, now)
+    const document = result.recommendations[0].samples[0].document
+    expect(document.skeleton).toHaveLength(64)
+    expect(document.variant).toHaveLength(64)
+  })
+
+  it('preserves the exhaustive joint-coverage frontier across many training combinations', () => {
+    const rows = Array.from({ length: 120 }, (_, index) => job(index + 1, { stageId: 'main_1', content: {
+      ...job(index + 1).content,
+      opers: [{ name: '测试干员', skill: 1, requirements: { elite: 2, level: 1 + index % 40, skill_level: 7 + index % 4, potentiality: 1 + index % 6, module: 0 } }],
+    } }))
+    const input = snapshot(rows)
+    input.costs.levels.maxLevel[3] = [50, 60, 90]
+    const targets = rows.map((row) => readHomeworkRequirements(row.content, input).fixed[0].target)
+    const covers = (left: typeof targets[number], right: typeof targets[number]) => left.level >= right.level && left.skillLevel >= right.skillLevel && left.potential >= right.potential
+    const values = (field: 'level' | 'skillLevel' | 'potential') => [...new Set(targets.map((row) => row[field]))].sort((a, b) => a - b)
+    const possible = values('level').flatMap((level) => values('skillLevel').flatMap((skillLevel) => values('potential').map((potential) => ({ ...targets[0], level, skillLevel, potential }))))
+      .filter((target) => targets.filter((row) => covers(target, row)).length / targets.length + 1e-9 >= 0.8)
+    const frontier = possible.filter((target) => !possible.some((other) => other !== target && covers(target, other)))
+    const result = calculateCultivationRecommendations(input, observing, now)
+    expect(result.recommendations.map((row) => row.target)).toEqual(frontier)
+  })
+
+  it('retains only the latest filter result instead of accumulating full sample graphs', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(now)
+    const input = snapshot([job(1), job(2), job(3)])
+    const first = getCultivationRecommendations(input, defaultCultivationQuery)
+    getCultivationRecommendations(input, { ...defaultCultivationQuery, stageId: 'main_1' })
+    expect(getCultivationRecommendations(input, defaultCultivationQuery)).not.toBe(first)
+  })
+
   it('invalidates public recommendations for a replaced snapshot and supports skill-less operators', () => {
     const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
     const input = snapshot([job(1)])

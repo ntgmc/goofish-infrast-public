@@ -5,6 +5,7 @@
     "server/index.ts",
     "server/migrate.ts",
     "server/routes.ts",
+    "server/cultivation/cultivation-worker.ts",
     "server/http-server.ts",
     "server/security/password.ts",
     "server/security/auth-rate-limit.ts",
