@@ -694,7 +694,6 @@ describe('V2 results-first workspace', () => {
   })
 
   it.each(['overview', 'generation'])('cancels the current job from %s through the existing task controller while retaining the result', async (section) => {
-    if (section === 'generation') await import('./pages/Generation')
     const workflow = connect()
     workflow.loading = true
     workflow.progress = { mode: 'generate', startedAt: Date.now(), jobId: 'running-job', estimatePhase: 'running' }
@@ -703,6 +702,7 @@ describe('V2 results-first workspace', () => {
     mocks.tasks.mockReturnValue({ jobs: [job], cancel, busyJobId: null, error: null, notice: null })
     const user = userEvent.setup()
     const view = mount(`/v2?section=${section}`)
+    await act(async () => { await vi.dynamicImportSettled() })
     const progress = within(await screen.findByRole('region', { name: copy.common.components_ScheduleProgress_001 }))
     await user.click(progress.getByRole('button', { name: copy.v2.stopSchedule }))
     expect(cancel).toHaveBeenCalledWith(job)
