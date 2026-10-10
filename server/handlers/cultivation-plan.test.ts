@@ -1,20 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import handler from './cultivation-plan'
-import { planningFixture } from '../../scripts/prts-planning-fixture.mjs'
-import { prtsSnapshotSchema } from '../cultivation/catalog'
+import { CultivationReadError } from '../cultivation/worker-client'
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), snapshot: vi.fn(), player: vi.fn(), inventory: vi.fn(), pricing: vi.fn(), gate: vi.fn() }))
+const mocks = vi.hoisted(() => ({ session: vi.fn(), read: vi.fn(), gate: vi.fn() }))
 vi.mock('./user-auth', () => ({ requireUserSession: mocks.session, jsonResponse: (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }) }))
 vi.mock('../feature-gate', () => ({ requireSiteFeatures: mocks.gate }))
-vi.mock('../cultivation/references', () => ({ getCultivationStatistics: async () => ({ status: 'unavailable', updatedAt: null, operators: {} }) }))
-vi.mock('../cultivation/special-items', async (original) => ({ ...await original<typeof import('../cultivation/special-items')>(), getSpecialItemCatalog: async () => ({ parserVersion: 4, status: 'fresh', updatedAt: '', items: [], itemNames: {}, itemIcons: {}, excludedOperators: [], skillIcons: {} }) }))
-vi.mock('../cultivation/catalog', async (original) => ({ ...await original<typeof import('../cultivation/catalog')>(), readPrtsSnapshot: mocks.snapshot }))
-vi.mock('./material-value', async (original) => ({ ...await original<typeof import('./material-value')>(), getYituliuPricing: mocks.pricing }))
-vi.mock('./skland-client', () => ({
-  decryptSklandCredential: () => 'private-credential',
-  SklandClientError: class extends Error {},
-  SklandClient: class { getGamePlayerInfo = mocks.player; getCultivatePlayer = mocks.inventory },
-}))
+vi.mock('../cultivation/worker-client', async (original) => ({ ...await original<typeof import('../cultivation/worker-client')>(), readCultivationPlan: mocks.read }))
+vi.mock('./skland-client', () => ({ decryptSklandCredential: () => 'private-credential' }))
 
 const request = (body: unknown = { profile_id: 'mine' }) => new Request('http://local/api/cultivation-plan', { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } })
 
@@ -22,10 +14,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.gate.mockResolvedValue(null)
   mocks.session.mockResolvedValue({ profiles: [{ id: 'mine', status: 'active', skland_binding: { uid: 'player-uid', encrypted_cred: 'encrypted' } }] })
-  mocks.snapshot.mockResolvedValue(prtsSnapshotSchema.parse(planningFixture()))
-  mocks.player.mockResolvedValue({ data: { chars: [{ charId: 'char_test', evolvePhase: 0, level: 1, mainSkillLvl: 1, skills: [{ skillId: 's1', specializeLevel: 0 }], equip: [], potentialRank: 0 }] } })
-  mocks.inventory.mockResolvedValue({ items: [{ id: 'rock', count: 2 }] })
-  mocks.pricing.mockResolvedValue({ status: 'fresh', prices: new Map([['rock', 5], ['book', 2]]), fetched_at: '', age_ms: 0, snapshot_id: '', valuation_version: '' })
+  mocks.read.mockResolvedValue(new TextEncoder().encode(JSON.stringify({ candidates: [], recommendation: { query: { rarityGroup: 'high' } } })).buffer)
 })
 
 describe('cultivation planning authorization and data boundary', () => {
@@ -33,37 +22,38 @@ describe('cultivation planning authorization and data boundary', () => {
     mocks.session.mockResolvedValueOnce(null)
     expect((await handler(request())).status).toBe(401)
     expect((await handler(request({ profile_id: 'someone-else' }))).status).toBe(404)
-    expect(mocks.player).not.toHaveBeenCalled()
+    expect(mocks.read).not.toHaveBeenCalled()
   })
 
-  it('rejects invalid inputs, archived profiles, and unavailable seed data', async () => {
-    expect((await handler(request({ profile_id: 'mine', mode: 'invalid' }))).status).toBe(400)
-    expect((await handler(request({ profile_id: 'mine', recommendation: { scope: 'invalid' } }))).status).toBe(400)
-    expect((await handler(request({ profile_id: 'mine', recommendation: { coverage: 2 } }))).status).toBe(400)
-    expect((await handler(request({ profile_id: 'mine', recommendation: { rarityGroup: 'invalid' } }))).status).toBe(400)
+  it('rejects invalid inputs and archived profiles before starting a reader', async () => {
+    for (const body of [{ profile_id: 'mine', mode: 'invalid' }, ...[{ scope: 'invalid' }, { coverage: 2 }, { rarityGroup: 'invalid' }].map((recommendation) => ({ profile_id: 'mine', recommendation }))]) {
+      expect((await handler(request(body))).status).toBe(400)
+    }
     mocks.session.mockResolvedValueOnce({ profiles: [{ id: 'mine', status: 'active', archived_at: '2026-01-01' }] })
     expect((await handler(request())).status).toBe(403)
-    mocks.snapshot.mockRejectedValueOnce(new Error('ENOENT'))
-    const unavailable = await handler(request())
-    expect(unavailable.status).toBe(503)
-    expect(await unavailable.json()).toMatchObject({ code: 'prts_data_unavailable' })
-    expect(mocks.player).not.toHaveBeenCalled()
+    expect(mocks.read).not.toHaveBeenCalled()
   })
 
-  it('applies low-rarity filtering at the HTTP boundary', async () => {
-    const response = await handler(request({ profile_id: 'mine', recommendation: { stageId: 'main_01', rarityGroup: 'low' } }))
-    expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({ recommendation: { query: { rarityGroup: 'low' } }, candidates: [] })
+  it.each([
+    [503, 'prts_data_unavailable'], [503, 'cultivation_busy'], [503, 'cultivation_unavailable'], [504, 'cultivation_timeout'], [502, 'invalid_credential'],
+  ])('returns a retryable HTTP boundary for reader failure %s/%s', async (status, code) => {
+    mocks.read.mockRejectedValueOnce(new CultivationReadError('读取暂不可用。', status, code))
+    const response = await handler(request())
+    expect(response.status).toBe(status)
+    expect(await response.json()).toMatchObject({ code })
   })
 
-  it('returns current cultivation data without UID or credentials and disables response caching', async () => {
-    const response = await handler(request({ profile_id: 'mine', recommendation: { stageId: 'main_01' } }))
+  it('passes filters and request cancellation to the isolated reader and keeps personal data uncached', async () => {
+    const req = request({ profile_id: 'mine', recommendation: { stageId: 'main_01', rarityGroup: 'low' } })
+    const response = await handler(req)
     expect(response.status).toBe(200)
     expect(response.headers.get('Cache-Control')).toBe('no-store')
+    expect(mocks.read).toHaveBeenCalledWith({ credential: 'private-credential', uid: 'player-uid',
+      query: expect.objectContaining({ stageId: 'main_01', rarityGroup: 'low', coverage: 0.8 }),
+    }, req.signal)
     const text = await response.text()
     expect(text).not.toContain('private-credential')
     expect(text).not.toContain('player-uid')
-    expect(JSON.parse(text).recommendation.query).toMatchObject({ stageId: 'main_01', coverage: 0.8, rarityGroup: 'high' })
-    expect(JSON.parse(text).candidates[0]).toMatchObject({ operatorId: 'char_test', items: { rock: 2, book: 6, exp: 300, '4001': 130 } })
+    expect(JSON.parse(text).candidates).toEqual([])
   })
 })

@@ -1,18 +1,15 @@
-import { syncPrtsPlanning } from '../../scripts/prts-planning-sync.mjs'
-import { readPrtsSnapshot } from './catalog'
+import { refreshCultivationSnapshot, shutdownCultivationWorker } from './worker-client'
 
 let timer: ReturnType<typeof setInterval> | null = null
 let running: Promise<void> | null = null
 let controller: AbortController | null = null
 
 async function updateIfStale(signal: AbortSignal) {
-  let snapshot
-  try { snapshot = await readPrtsSnapshot() }
-  catch { return }
-  if (Date.now() - Date.parse(snapshot.updatedAt) < 24 * 3600000 || signal.aborted) return
-  try { await syncPrtsPlanning({ signal }) }
+  try { await refreshCultivationSnapshot(signal) }
   catch (error) {
-    if (!signal.aborted) console.warn('PRTS cultivation incremental update failed:', error instanceof Error ? error.message : 'unknown')
+    if (!signal.aborted && !(error instanceof Error && 'code' in error && ['prts_data_unavailable', 'cultivation_busy'].includes(String(error.code)))) {
+      console.warn('PRTS cultivation incremental update failed:', error instanceof Error ? error.message : 'unknown')
+    }
   }
 }
 
@@ -31,5 +28,5 @@ export function shutdownCultivationMaintenance() {
   timer = null
   controller?.abort()
   controller = null
-  return running ?? Promise.resolve()
+  return (running ?? Promise.resolve()).finally(shutdownCultivationWorker)
 }

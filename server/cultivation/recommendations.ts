@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { defaultCultivationQuery, matchesCultivationRarity, type CultivationQuery, type CultivationTarget, type CultivationCandidate } from '../../src/lib/cultivation-contract'
 import { asRecord, asRows, type PrtsSnapshot } from './catalog'
 import { readHomeworkRequirements } from './requirements'
@@ -12,6 +13,10 @@ function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
   if (value && typeof value === 'object') return `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(',')}}`
   return JSON.stringify(value) ?? 'null'
+}
+
+function fingerprint(value: unknown): string {
+  return createHash('sha256').update(canonical(value)).digest('hex')
 }
 
 function wilson(likes: number, dislikes: number) {
@@ -31,7 +36,7 @@ function parse(snapshot: PrtsSnapshot, homework: PrtsSnapshot['homeworks'][numbe
   const members: Member[] = parsed.fixed.map((requirement) => ({ requirement, share: 1, group: null, options: [] }))
   const aliases = new Map(parsed.fixed.map((row) => [row.name, row.operator?.id ?? row.name]))
   for (const [index, rows] of parsed.groups.entries()) {
-    const group = canonical(rows.map((row) => [row.operator?.id ?? row.name, row.target]).sort((a, b) => canonical(a).localeCompare(canonical(b))))
+    const group = fingerprint(rows.map((row) => [row.operator?.id ?? row.name, row.target]).sort((a, b) => canonical(a).localeCompare(canonical(b))))
     aliases.set(String(asRows(homework.content.groups)[index]?.name ?? ''), group)
     for (const requirement of rows) members.push({ requirement, share: 1 / rows.length, group, options: rows })
   }
@@ -48,7 +53,7 @@ function parse(snapshot: PrtsSnapshot, homework: PrtsSnapshot['homeworks'][numbe
     return { ...action, type, direction, name: aliases.get(String(action.name)) ?? action.name }
   }).filter((action) => action.type !== 'Output')
   // ponytail: summaries without actions merge equal lineups; import action details to distinguish their strategies.
-  const skeleton = actions.length ? canonical(actions.map((action) => {
+  const skeleton = actions.length ? fingerprint(actions.map((action) => {
     const actor = String(action.name ?? '')
     if (!actors.has(actor)) actors.set(actor, actors.size)
     const row = asRecord(action)
@@ -57,7 +62,7 @@ function parse(snapshot: PrtsSnapshot, homework: PrtsSnapshot['homeworks'][numbe
   const executable = actions.map((action) => Object.fromEntries(Object.entries(action).filter(([key]) => !['doc', 'doc_color', '_id'].includes(key))))
   const controls = [...asRows(homework.content.opers), ...asRows(homework.content.groups).flatMap((group) => asRows(group.opers))]
     .map((row) => [aliases.get(String(row.name)) ?? row.name, row.skill_usage ?? 0, row.skill_times ?? 1]).sort((a, b) => canonical(a).localeCompare(canonical(b)))
-  const variant = canonical([[...unique].sort(([a], [b]) => a.localeCompare(b)).map(([id, row]) => [id, row.requirement.target, row.requirement.specified, row.share, row.group]), controls, executable])
+  const variant = fingerprint([[...unique].sort(([a], [b]) => a.localeCompare(b)).map(([id, row]) => [id, row.requirement.target, row.requirement.specified, row.share, row.group]), controls, executable])
   return { homework, members: [...unique.values()], skeleton, variant, published }
 }
 
@@ -176,22 +181,18 @@ export function calculateCultivationRecommendations(snapshot: PrtsSnapshot, quer
       const targets = [...new Map(group.map((row) => [canonical(row.requirement.target), row.requirement.target])).values()]
       const branchWeight = group.reduce((sum, row) => sum + row.weight, 0)
       const base = targets[0], operator = snapshot.operators[operatorId]
-      const elites = [...new Set(targets.map((row) => row.elite))]
-      const levels = [...new Set(targets.map((row) => row.level))]
-      const skills = [...new Set(targets.map((row) => row.skillLevel))]
-      const potentials = [...new Set(targets.map((row) => row.potential))]
-      const possible = elites.flatMap((elite) => levels.flatMap((level) => skills.flatMap((skillLevel) => potentials.map((potential) => ({ ...base, elite, level, skillLevel, potential })))))
-        .filter((target) => {
-          const maxima = snapshot.costs.levels.maxLevel[operator.rarity - 1]
-          const module = target.moduleId ? snapshot.costs.modules.equipDict[target.moduleId] : null
-          return target.level <= (maxima?.[target.elite] ?? 0) && target.elite >= Math.max(target.skill - 1, target.skillLevel > 7 ? 2 : target.skillLevel > 4 ? 1 : 0)
-            && (!module || target.elite >= Number(String(module.unlockEvolvePhase ?? 'PHASE_2').slice(-1)) && target.level >= Number(module.unlockLevel))
-        })
-        .map((target) => ({ target, covered: group.filter((row) => covers(target, row.requirement.target)) }))
-        .filter((row) => row.covered.reduce((sum, sample) => sum + sample.weight, 0) / branchWeight + 1e-9 >= query.coverage)
-      const frontier: typeof possible = []
-      for (const row of possible.sort((a, b) => a.target.elite - b.target.elite || a.target.level - b.target.level || a.target.skillLevel - b.target.skillLevel || a.target.potential - b.target.potential)) {
-        if (!frontier.some((other) => covers(row.target, other.target))) frontier.push(row)
+      const values = (field: 'elite' | 'level' | 'skillLevel' | 'potential') => [...new Set(targets.map((row) => row[field]))].sort((a, b) => a - b)
+      const elites = values('elite'), levels = values('level'), skills = values('skillLevel'), potentials = values('potential')
+      const maxima = snapshot.costs.levels.maxLevel[operator.rarity - 1]
+      const module = base.moduleId ? snapshot.costs.modules.equipDict[base.moduleId] : null
+      const frontier: Array<{ target: CultivationTarget; covered: Sample[] }> = []
+      for (const elite of elites) for (const level of levels) for (const skillLevel of skills) for (const potential of potentials) {
+        const target = { ...base, elite, level, skillLevel, potential }
+        if (level > (maxima?.[elite] ?? 0) || elite < Math.max(target.skill - 1, skillLevel > 7 ? 2 : skillLevel > 4 ? 1 : 0)
+          || module && (elite < Number(String(module.unlockEvolvePhase ?? 'PHASE_2').slice(-1)) || level < Number(module.unlockLevel))
+          || frontier.some((other) => covers(target, other.target))) continue
+        const covered = group.filter((row) => covers(target, row.requirement.target))
+        if (covered.reduce((sum, sample) => sum + sample.weight, 0) / branchWeight + 1e-9 >= query.coverage) frontier.push({ target, covered })
       }
       for (const row of frontier) {
         const completeness = (field: keyof Requirement['specified']) => group.filter((sample) => sample.requirement.specified[field]).reduce((sum, sample) => sum + sample.weight, 0) / branchWeight
@@ -211,17 +212,16 @@ export function calculateCultivationRecommendations(snapshot: PrtsSnapshot, quer
 }
 
 // Cache public evidence only; player training and inventory are always calculated per request.
-const cache = new WeakMap<PrtsSnapshot, { prepared: ReturnType<typeof prepareRecommendations>; expires: number; queries: Map<string, ReturnType<typeof calculateCultivationRecommendations>> }>()
+const cache = new WeakMap<PrtsSnapshot, { prepared: ReturnType<typeof prepareRecommendations>; expires: number; key?: string; result?: ReturnType<typeof calculateCultivationRecommendations> }>()
 export function getCultivationRecommendations(snapshot: PrtsSnapshot, query: CultivationQuery) {
   const now = Date.now(), key = canonical(query)
   let entry = cache.get(snapshot)
-  if (!entry) { entry = { prepared: prepareRecommendations(snapshot), expires: now + 15 * 60000, queries: new Map() }; cache.set(snapshot, entry) }
-  if (entry.expires <= now) { entry.queries.clear(); entry.expires = now + 15 * 60000 }
-  let result = entry.queries.get(key)
-  if (!result) {
-    result = calculateCultivationRecommendations(snapshot, query, now, entry.prepared)
-    if (entry.queries.size >= 64) entry.queries.delete(entry.queries.keys().next().value!)
-    entry.queries.set(key, result)
+  if (!entry) { entry = { prepared: prepareRecommendations(snapshot), expires: now + 15 * 60000 }; cache.set(snapshot, entry) }
+  if (entry.expires <= now) { entry.result = undefined; entry.expires = now + 15 * 60000 }
+  if (!entry.result || entry.key !== key) {
+    entry.result = undefined
+    entry.result = calculateCultivationRecommendations(snapshot, query, now, entry.prepared)
+    entry.key = key
   }
-  return result
+  return entry.result
 }

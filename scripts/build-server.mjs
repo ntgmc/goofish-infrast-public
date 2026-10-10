@@ -5,6 +5,7 @@ const entryPoints = {
   index: 'server/index.ts',
   migrate: 'server/migrate.ts',
   routes: 'server/routes.ts',
+  'cultivation-worker': 'server/cultivation/cultivation-worker.ts',
   'import-prts-planning': 'scripts/import-prts-planning.mjs',
   'sync-prts-planning': 'scripts/sync-prts-planning.mjs',
 }

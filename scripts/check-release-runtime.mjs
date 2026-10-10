@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const root = resolve(process.argv[2] || process.cwd())
-for (const path of ['server/dist/index.js', 'server/dist/migrate.js', 'server/dist/routes.js', 'server/dist/import-prts-planning.js', 'server/dist/sync-prts-planning.js']) {
+for (const path of ['server/dist/index.js', 'server/dist/migrate.js', 'server/dist/routes.js', 'server/dist/cultivation-worker.js', 'server/dist/import-prts-planning.js', 'server/dist/sync-prts-planning.js']) {
   const absolutePath = resolve(root, path)
   await access(absolutePath)
   const result = spawnSync(process.execPath, ['--check', absolutePath], { cwd: root, encoding: 'utf8' })

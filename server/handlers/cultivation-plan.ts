@@ -1,13 +1,9 @@
 import { defaultCultivationQuery } from '../../src/lib/cultivation-contract'
-import { readPrtsSnapshot } from '../cultivation/catalog'
-import { buildCultivationData } from '../cultivation/data'
-import { getCultivationStatistics } from '../cultivation/references'
-import { getSpecialItemCatalog } from '../cultivation/special-items'
+import { CultivationReadError, readCultivationPlan } from '../cultivation/worker-client'
 import { requireSiteFeatures } from '../feature-gate'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson, RequestInputError } from '../security/request-validation'
-import { getYituliuPricing } from './material-value'
-import { decryptSklandCredential, SklandClient, SklandClientError } from './skland-client'
+import { decryptSklandCredential } from './skland-client'
 import { requireUserSession, jsonResponse } from './user-auth'
 
 export default async function cultivationPlanHandler(req: Request): Promise<Response> {
@@ -23,17 +19,12 @@ export default async function cultivationPlanHandler(req: Request): Promise<Resp
     if (profile.status !== 'active' || profile.archived_at) return jsonResponse({ error: '当前档案不可用。' }, 403)
     const binding = profile.skland_binding
     if (!binding?.encrypted_cred) return jsonResponse({ error: '请先在档案中绑定森空岛，再导入练度和材料。' }, 400)
-    let snapshot
-    try { snapshot = await readPrtsSnapshot() }
-    catch { return jsonResponse({ error: '作业数据暂不可用，请等待管理员导入后重试。', code: 'prts_data_unavailable' }, 503) }
-    const client = new SklandClient(decryptSklandCredential(binding.encrypted_cred))
-    const [game, inventory, pricing, community, specialCatalog] = await Promise.all([client.getGamePlayerInfo(binding.uid), client.getCultivatePlayer(binding.uid), getYituliuPricing(), getCultivationStatistics(), getSpecialItemCatalog(snapshot.operators)])
-    const response = jsonResponse(buildCultivationData(snapshot, game, inventory, pricing, community, specialCatalog, { ...defaultCultivationQuery, ...body.recommendation }))
-    response.headers.set('Cache-Control', 'no-store')
-    return response
+    const data = await readCultivationPlan({ credential: decryptSklandCredential(binding.encrypted_cred), uid: binding.uid,
+      query: { ...defaultCultivationQuery, ...body.recommendation } }, req.signal)
+    return new Response(data, { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
   } catch (error) {
     if (error instanceof RequestInputError) return jsonResponse({ error: error.message, code: error.code }, error.status)
-    if (error instanceof SklandClientError) return jsonResponse({ error: error.message, code: error.code }, 502)
+    if (error instanceof CultivationReadError) return jsonResponse({ error: error.message, code: error.code }, error.status)
     console.error('cultivation planning data failed:', error instanceof Error ? error.name : 'unknown')
     return jsonResponse({ error: '读取养成数据失败，请稍后重试。' }, 502)
   }
