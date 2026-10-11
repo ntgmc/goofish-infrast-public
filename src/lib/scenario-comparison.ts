@@ -1,5 +1,6 @@
 import type { AppBuildMeta, LicenseConfig, OrundumEconomy } from './types'
 import { copy } from '../copy/index'
+import { CONFIG_PRESETS } from './config'
 
 
 const SCENARIO_COMPARISON_MAX_SCENARIOS = 24
@@ -8,7 +9,7 @@ const SCENARIO_COMPARISON_VERIFY_PER_COST = 3
 const SCENARIO_PARETO_EPSILON = 0.01
 export const SCENARIO_VARIABLE_SHIFT_CANDIDATE_LIMIT = 13
 
-export type ScenarioLayout = '153' | '243' | '333'
+export type ScenarioLayout = '153' | '243' | '252' | '252-1' | '252-full' | '333'
 export type ScenarioMaaSchedule = 'variable' | '8x3'
 export type ScenarioDroneStrategy =
   | 'off'
@@ -129,7 +130,19 @@ export interface ScenarioComparisonResult {
 const LAYOUT_COUNTS: Record<ScenarioLayout, { trading: number; manufacturing: number }> = {
   '153': { trading: 1, manufacturing: 5 },
   '243': { trading: 2, manufacturing: 4 },
+  '252': { trading: 2, manufacturing: 5 },
+  '252-1': { trading: 2, manufacturing: 5 },
+  '252-full': { trading: 2, manufacturing: 5 },
   '333': { trading: 3, manufacturing: 3 },
+}
+
+export const SCENARIO_LAYOUT_LABELS: Record<ScenarioLayout, string> = {
+  '153': '153',
+  '243': '243',
+  '252': CONFIG_PRESETS['252']!.desc,
+  '252-1': CONFIG_PRESETS['252-1']!.desc,
+  '252-full': CONFIG_PRESETS['252-full']!.desc,
+  '333': '333',
 }
 
 const SCHEDULES: Record<Exclude<ScenarioMaaSchedule, 'variable'>, number[]> = {
@@ -353,7 +366,13 @@ function buildScenario(
       ? [8, 8, 8]
       : [...SCHEDULES[scheduleStrategy]]
   const config = JSON.parse(JSON.stringify(baseConfig)) as LicenseConfig
-  config.layout = `${counts.trading}-${counts.manufacturing}-3`
+  const preset = CONFIG_PRESETS[layout]
+  config.layout = preset?.layout ?? `${counts.trading}-${counts.manufacturing}-3`
+  delete config.trading_station_levels
+  delete config.manufacturing_station_levels
+  delete config.facility_layout
+  if (preset?.trading_station_levels) config.trading_station_levels = [...preset.trading_station_levels]
+  if (preset?.manufacturing_station_levels) config.manufacturing_station_levels = [...preset.manufacturing_station_levels]
   config.desc = scenarioDescription(layout, plan, scheduleStrategy)
   config.trading_stations_count = counts.trading
   config.manufacturing_stations_count = counts.manufacturing
@@ -437,7 +456,7 @@ function compactCounts(counts: Record<string, number>): Record<string, number> {
 }
 
 function productionPlanLabel(layout: ScenarioLayout, plan: ScenarioProductionPlan): string {
-  return `${layout}${copy.domain.lib_scenario_comparison_033}${plan.trading.lmd}${copy.domain.lib_scenario_comparison_034}${plan.trading.orundum}${copy.domain.lib_scenario_comparison_035}${plan.manufacturing.pureGold}${copy.domain.lib_scenario_comparison_036}${plan.manufacturing.battleRecord}${copy.domain.lib_scenario_comparison_037}${plan.manufacturing.originiumShard}`
+  return `${SCENARIO_LAYOUT_LABELS[layout]}${copy.domain.lib_scenario_comparison_033}${plan.trading.lmd}${copy.domain.lib_scenario_comparison_034}${plan.trading.orundum}${copy.domain.lib_scenario_comparison_035}${plan.manufacturing.pureGold}${copy.domain.lib_scenario_comparison_036}${plan.manufacturing.battleRecord}${copy.domain.lib_scenario_comparison_037}${plan.manufacturing.originiumShard}`
 }
 
 function scenarioDescription(

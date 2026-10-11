@@ -121,7 +121,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
           <DialogTitle>{shownPanel === 'room' && room ? `${room.label} ${room.indexLabel}` : shownPanel ? titles[shownPanel] : ''}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
           {isConfig && <div className="v2-config-feedback">
-            {!validation.ok ? <p role="status" className="tool-alert tool-alert--warning">{validation.message}</p>
+            {!validation.ok ? <p id="v2-config-validation" role="status" className="tool-alert tool-alert--warning">{validation.message}</p>
               : error && session.configSyncStatus !== 'failed' ? <p role="alert" className="v2-feedback v2-feedback-error">{error}</p>
                 : session.user && <ConfigSaveStatus status={session.configSyncStatus} onRetry={session.retryConfigSave} />}
           </div>}
@@ -142,7 +142,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
               {configDiffRows?.length ? <dl>{configDiffRows.map((row) => <div key={row.label}><dt>{row.label}</dt><dd>{copy.optimize.pages_tool_optimize_ConfigSection_012}{row.before}<br />{copy.optimize.pages_tool_optimize_ConfigSection_013}{row.after}</dd></div>)}</dl>
                 : <p role="status">{copy.optimize.pages_tool_optimize_ConfigSection_014}</p>}
             </aside>}
-            <button type="button" className="v2-button v2-button-primary v2-drawer-done" onClick={onClose}><Check size={16} />{text.done}</button>
+            <button type="button" className="v2-button v2-button-primary v2-drawer-done" disabled={!validation.ok} aria-describedby={validation.ok ? undefined : 'v2-config-validation'} onClick={onClose}><Check size={16} />{text.done}</button>
           </>
         )}
         {shownPanel === 'operators' && (

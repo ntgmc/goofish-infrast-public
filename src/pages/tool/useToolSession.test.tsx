@@ -2,6 +2,8 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuthSuccessResponse, LicenseConfig } from '../../lib/types'
+import { CONFIG_PRESETS, normalizeConfig } from '../../lib/config'
+import { FACILITY_IDS } from '../../lib/facility-layout'
 import { useToolSession } from './useToolSession'
 
 const baseConfig = {
@@ -287,7 +289,7 @@ describe('useToolSession config synchronization', () => {
     expect(result.current.configSyncStatus).toBe('idle')
   })
 
-  it.each([false, true])('keeps invalid edits pending and saves after correction (in flight: %s)', async (inFlight) => {
+  it.each([false, true].flatMap((inFlight) => ['products', '252', '252-1', '252-full'].map((preset) => ({ inFlight, preset }))))('keeps invalid edits pending and saves after correction (type: $preset, in flight: $inFlight)', async ({ inFlight, preset }) => {
     let resolveFirst!: (response: Response) => void
     const firstResponse = new Promise<Response>((resolve) => { resolveFirst = resolve })
     const workspaceRequests: LicenseConfig[] = []
@@ -311,10 +313,10 @@ describe('useToolSession config synchronization', () => {
       })
       expect(workspaceRequests).toEqual([first])
     }
-    const invalid = {
+    const invalid = preset === 'products' ? {
       ...baseConfig,
       product_requirements: { ...baseConfig.product_requirements, manufacturing_stations: { gold: 3, exp: 2 } },
-    }
+    } : normalizeConfig(CONFIG_PRESETS[preset])
     act(() => result.current.setConfigOverride(invalid))
     await act(async () => {
       vi.advanceTimersByTime(600)
@@ -328,7 +330,7 @@ describe('useToolSession config synchronization', () => {
     expect(result.current.configSyncStatus).toBe('pending')
     expect(result.current.workspace?.config).toEqual(baseConfig)
 
-    const corrected = { ...baseConfig, desc: 'corrected' }
+    const corrected = preset === 'products' ? { ...baseConfig, desc: 'corrected' } : { ...invalid, facility_layout: [...FACILITY_IDS] }
     await act(async () => {
       result.current.setConfigOverride(corrected)
       vi.advanceTimersByTime(600)

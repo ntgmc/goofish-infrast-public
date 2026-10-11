@@ -12,7 +12,7 @@ import type {
   WorkspaceSavedConfigAction,
 } from '../../lib/types'
 import { apiJson, apiJsonOrNull, apiVoid } from '../../lib/api-client'
-import { normalizeConfig, validateConfig } from '../../lib/config'
+import { normalizeConfig, validateScheduleConfig } from '../../lib/config'
 import { createAccountLicense, isSchedulableProfile } from './tool-utils'
 import { copy } from '../../copy/index'
 
@@ -207,7 +207,7 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
   const runPendingConfigSave = useCallback((): Promise<void> => {
     if (configSaveInFlightRef.current) return configSaveInFlightRef.current
     const pending = pendingConfigRef.current
-    if (!pending || !validateConfig(normalizeConfig(pending.config)).ok) return Promise.resolve()
+    if (!pending || !validateScheduleConfig(normalizeConfig(pending.config)).ok) return Promise.resolve()
     const savePending = async () => {
       setConfigSyncStatus('saving')
       try {

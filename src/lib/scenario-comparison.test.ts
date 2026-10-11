@@ -9,7 +9,7 @@ import {
   type ScenarioMetrics,
   type ScenarioProductionPlan,
 } from './scenario-comparison'
-import { CONFIG_PRESETS } from './config'
+import { CONFIG_PRESETS, normalizeConfig, validateConfig } from './config'
 import { scenarioComparisonFactorsSchema } from './scenario-comparison-validation'
 
 const balancedPlan: ScenarioProductionPlan = {
@@ -77,6 +77,61 @@ describe('expandScenarioComparison', () => {
     const result = expandScenarioComparison(CONFIG_PRESETS['243'], factors)
     expect(result.scenarios).toHaveLength(3)
     expect(result.scenarios[0]?.config.product_requirements.trading_stations).toBeDefined()
+  })
+
+  it.each(['252', '252-1', '252-full'] as const)('builds %s with its own facility levels for every schedule', (layout) => {
+    const base = {
+      ...CONFIG_PRESETS['252-1']!,
+      facility_layout: ['power_1'],
+      intermediate_inventory: { 'Pure Gold': 800 },
+    }
+    const original = JSON.stringify(base)
+    const factors = scenarioComparisonFactorsSchema.parse({
+      layouts: [{ layout, plans: [{ ...balancedPlan, manufacturing: { pureGold: 2, battleRecord: 3, originiumShard: 0 } }] }],
+      maaSchedules: ['variable', '8x3'],
+      includeRotation: true,
+      droneStrategies: ['off'],
+    })
+    const result = expandScenarioComparison(base, factors)
+
+    expect(result.scenarios).toHaveLength(3)
+    for (const scenario of result.scenarios) {
+      expect(scenario.id).toMatch(new RegExp(`^${layout}-t2-0-m2-3-0-`))
+      expect(scenario.label).toContain(CONFIG_PRESETS[layout]!.desc)
+      expect(scenario.config).toMatchObject({
+        layout: '2-5-2',
+        trading_stations_count: 2,
+        manufacturing_stations_count: 5,
+        trading_station_levels: CONFIG_PRESETS[layout]!.trading_station_levels,
+        manufacturing_station_levels: CONFIG_PRESETS[layout]!.manufacturing_station_levels,
+        intermediate_inventory: { 'Pure Gold': 800 },
+      })
+      expect(scenario.config.facility_layout).toBeUndefined()
+      expect(scenario.config.trading_station_levels).not.toBe(CONFIG_PRESETS[layout]!.trading_station_levels)
+      expect(scenario.config.manufacturing_station_levels).not.toBe(CONFIG_PRESETS[layout]!.manufacturing_station_levels)
+      expect(validateConfig(normalizeConfig(scenario.config))).toEqual({ ok: true })
+    }
+    expect(JSON.stringify(base)).toBe(original)
+  })
+
+  it('clears 252 facility levels when comparing three-power-station layouts', () => {
+    const result = expandScenarioComparison({ ...CONFIG_PRESETS['252-full']!, facility_layout: ['power_1'] }, {
+      layouts: [
+        { layout: '153', plans: [{ trading: { lmd: 1, orundum: 0 }, manufacturing: { pureGold: 2, battleRecord: 3, originiumShard: 0 } }] },
+        { layout: '243', plans: [balancedPlan] },
+        { layout: '333', plans: [{ trading: { lmd: 3, orundum: 0 }, manufacturing: { pureGold: 2, battleRecord: 1, originiumShard: 0 } }] },
+      ],
+      maaSchedules: ['8x3'],
+      includeRotation: false,
+      droneStrategies: ['off'],
+    })
+    for (const { config } of result.scenarios) {
+      expect(config.layout).toMatch(/-3$/)
+      expect(config.trading_station_levels).toBeUndefined()
+      expect(config.manufacturing_station_levels).toBeUndefined()
+      expect(config.facility_layout).toBeUndefined()
+      expect(validateConfig(normalizeConfig(config))).toEqual({ ok: true })
+    }
   })
 
   it('skips each missing drone target with a specific reason', () => {

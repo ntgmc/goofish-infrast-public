@@ -6,13 +6,16 @@ import type {
   ScenarioMaaSchedule,
   ScenarioProductionPlan,
 } from '../../../../lib/scenario-comparison'
-import { SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS } from '../../../../lib/scenario-comparison'
+import { SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS, SCENARIO_LAYOUT_LABELS } from '../../../../lib/scenario-comparison'
 import { copy } from '../../../../copy/index'
 
 
 export const LAYOUTS: Array<{ id: ScenarioLayout; trading: number; manufacturing: number }> = [
   { id: '153', trading: 1, manufacturing: 5 },
   { id: '243', trading: 2, manufacturing: 4 },
+  { id: '252', trading: 2, manufacturing: 5 },
+  { id: '252-1', trading: 2, manufacturing: 5 },
+  { id: '252-full', trading: 2, manufacturing: 5 },
   { id: '333', trading: 3, manufacturing: 3 },
 ]
 
@@ -158,7 +161,7 @@ function LayoutPlanEditor({
   return (
     <section className="workspace-scenario-layout tool-inset min-w-0 p-3" aria-labelledby={`layout-${layout.id}-title`}>
       <div className="flex items-center justify-between gap-2">
-        <h4 id={`layout-${layout.id}-title`} className="text-sm font-semibold text-ink-primary">{layout.id}</h4>
+        <h4 id={`layout-${layout.id}-title`} className="text-sm font-semibold text-ink-primary">{SCENARIO_LAYOUT_LABELS[layout.id]}</h4>
         <span className="tool-status tabular-nums">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_019}{plans.length}</span>
       </div>
       <div className="workspace-scenario-fields mt-3 grid gap-3">
@@ -197,14 +200,14 @@ function LayoutPlanEditor({
         {duplicate ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_023 : !canAdd ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_034(SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS) : copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_024}
       </button>
       {plans.length > 0 && (
-        <ul className="mt-3 space-y-2" aria-label={`${layout.id}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_025}`}>
+        <ul className="mt-3 space-y-2" aria-label={`${SCENARIO_LAYOUT_LABELS[layout.id]}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_025}`}>
           {plans.map((plan) => (
             <li key={planKey(plan)} className="tool-inset flex min-h-11 items-center gap-2 px-3 py-2">
               <span className="min-w-0 flex-1 text-xs leading-5 text-ink-secondary">{planLabel(plan)}</span>
               <button
                 type="button"
                 onClick={() => onChange(plans.filter((item) => !samePlan(item, plan)))}
-                aria-label={`${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_026}${layout.id} ${planLabel(plan)}`}
+                aria-label={`${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_026}${SCENARIO_LAYOUT_LABELS[layout.id]} ${planLabel(plan)}`}
                 className="tool-secondary-action min-h-11 shrink-0 border-error/40 bg-error/10 px-3 text-xs text-error hover:border-error/60 hover:bg-error/15 hover:text-error"
               >
                 {copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_027}</button>

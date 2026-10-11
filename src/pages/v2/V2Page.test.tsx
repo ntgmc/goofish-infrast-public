@@ -678,6 +678,31 @@ describe('V2 results-first workspace', () => {
     expect(session.retryConfigSave).toHaveBeenCalledOnce()
   })
 
+  it.each([
+    copy.common.components_ConfigEditor_103,
+    copy.common.components_ConfigEditor_105,
+    copy.common.components_ConfigEditor_108,
+  ])('requires layout confirmation before completing %s configuration', async (preset) => {
+    const user = userEvent.setup()
+    mount('/v2?panel=config')
+    const dialog = within(await screen.findByRole('dialog'))
+    await user.click(dialog.getByRole('button', { name: preset }))
+    const done = dialog.getByRole('button', { name: copy.v2.done })
+    expect(done).toBeDisabled()
+    expect(dialog.getByText(copy.common.facilityLayoutRequired)).toBeInTheDocument()
+    await user.click(dialog.getByRole('button', { name: copy.common.facilityLayoutConfirm }))
+    expect(done).toBeDisabled()
+    await user.click(dialog.getByRole('button', { name: copy.common.facilityLayoutConfirmCollapse }))
+    expect(done).toBeEnabled()
+    expect(dialog.queryByText(copy.common.facilityLayoutRequired)).not.toBeInTheDocument()
+    await user.click(dialog.getByRole('button', { name: copy.common.facilityLayoutEdit }))
+    expect(done).toBeDisabled()
+    await user.click(dialog.getByRole('button', { name: '243 均衡' }))
+    expect(done).toBeEnabled()
+    await user.click(done)
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
   it('writes the successfully selected profile into the route for refresh restoration', async () => {
     connect()
     const second = { ...session.activeProfile!, id: 'profile-2', display_name: 'Second Doctor' }
