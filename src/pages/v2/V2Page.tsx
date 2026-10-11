@@ -29,7 +29,8 @@ import './workspace-pages.css'
 
 export default function V2Page() {
   const [params] = useSearchParams()
-  const session = useToolSession(params.get('profile_id'), true)
+  const { hash } = useLocation()
+  const session = useToolSession(params.get('profile_id'), true, v2Section(params, hash) !== 'announcements')
   const features = useSiteFeatures()
   const [config, setConfig] = useState<LicenseConfig>(() => normalizeConfig(SAMPLE_CONFIG))
   const [operators, setOperators] = useState(SAMPLE_OPERATORS)

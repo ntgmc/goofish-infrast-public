@@ -7,7 +7,7 @@ import { copy } from '../../../copy/index'
 
 
 
-export function useUserAnnouncements(onUnreadCountChange: (count: number) => void) {
+function useUserAnnouncements(onUnreadCountChange: (count: number) => void) {
   const [items, setItems] = useState<UserAnnouncementRead[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

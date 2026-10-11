@@ -67,6 +67,48 @@ describe('user announcements handler', () => {
       unread_count: 1,
     })
   })
+
+  it('filters unread announcements before paging and reports the full unread count', async () => {
+    const items = Array.from({ length: 23 }, (_, index) => ({
+      ...announcement, id: `popup-${index}`, updated_at: new Date(Date.UTC(2026, 7, 23 - index)).toISOString(),
+    }))
+    mocks.getActiveAnnouncements.mockResolvedValue([...items, { ...announcement, id: 'banner', kind: 'banner' }])
+    mocks.getAnnouncementReads.mockResolvedValue([{
+      announcement_id: items[0].id, announcement_version: items[0].updated_at, read_at: items[0].updated_at,
+    }])
+    const response = await handler(new Request('http://localhost/api/user/announcements?page=2&unread_only=1'))
+    const data = await response.json()
+    expect(data).toMatchObject({ page: 2, pageSize: 10, total: 22, unread_count: 22 })
+    expect(data.announcements).toHaveLength(10)
+    expect(data.announcements[0].announcement.id).toBe('popup-11')
+    expect(data.announcements.every((item: { read_at: string | null }) => item.read_at === null)).toBe(true)
+    expect(mocks.getActiveAnnouncements).toHaveBeenCalledWith(true)
+  })
+
+  it('marks all pages read while returning only the requested page', async () => {
+    const items = Array.from({ length: 23 }, (_, index) => ({ ...announcement, id: `popup-${index}` }))
+    mocks.getActiveAnnouncements.mockResolvedValue(items)
+    mocks.getValidatedJson.mockResolvedValue({ all: true })
+    mocks.markAnnouncementsRead.mockImplementation(async () => {
+      mocks.getAnnouncementReads.mockResolvedValue(items.map((item) => ({
+        announcement_id: item.id, announcement_version: item.updated_at, read_at: item.updated_at,
+      })))
+      return items.length
+    })
+    const response = await handler(new Request('http://localhost/api/user/announcements?page=2', { method: 'PATCH' }))
+    const data = await response.json()
+    expect(mocks.markAnnouncementsRead).toHaveBeenCalledWith('user-1', items)
+    expect(data).toMatchObject({ page: 2, total: 23, unread_count: 0, updated_count: 23 })
+    expect(data.announcements).toHaveLength(10)
+    expect(data.announcements.every((item: { read_at: string | null }) => item.read_at !== null)).toBe(true)
+  })
+
+  it('rejects invalid paging before a mutation or read lookup', async () => {
+    const response = await handler(new Request('http://localhost/api/user/announcements?page=0', { method: 'PATCH' }))
+    expect(response.status).toBe(400)
+    expect(mocks.markAnnouncementsRead).not.toHaveBeenCalled()
+    expect(mocks.getAnnouncementReads).not.toHaveBeenCalled()
+  })
 })
 
 function request(): Request {

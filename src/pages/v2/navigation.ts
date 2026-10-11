@@ -7,6 +7,7 @@ export type V2Section = typeof V2_SECTIONS[number]
 export function v2Section(params: URLSearchParams, hash = ''): V2Section {
   const section = params.get('section')
   if (!section && hash.startsWith('#release-')) return 'updates'
+  if (!section && hash.startsWith('#announcement-')) return 'announcements'
   return V2_SECTIONS.find((entry) => entry === section) ?? 'overview'
 }
 

@@ -881,6 +881,14 @@ export interface UserAnnouncementRead {
   read_at: string | null;
 }
 
+export interface AnnouncementPageResponse {
+  announcements: UserAnnouncementRead[];
+  page: number;
+  pageSize: number;
+  total: number;
+  unread_count?: number;
+}
+
 export interface UserNotificationItemGrantDetail {
   item_code: string;
   name: string;

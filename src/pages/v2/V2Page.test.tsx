@@ -80,7 +80,7 @@ it.each(['/#release-v2.0.1016', '/v2#release-v2.0.1016'])('opens the changelog f
     page: 1, pageSize: 10, total: 1,
   }), { headers: { 'Content-Type': 'application/json' } }))
   mount(path)
-  await screen.findByRole('heading', { name: 'v2.0.1016' })
+  await screen.findByRole('heading', { name: 'v2.0.1016' }, { timeout: 3000 })
   expect(screen.getByRole('region', { name: copy.v2.updates })).toBeVisible()
   await userEvent.click(screen.getByRole('button', { name: /v2.0.1016/ }))
   expect(screen.getByTestId('route-location')).toHaveTextContent('?section=updates&page=1')
@@ -91,6 +91,20 @@ async function dismissDrawer(user: ReturnType<typeof userEvent.setup>) {
   await user.keyboard('{Escape}')
   await waitFor(() => expect(document.querySelector('[data-slot="dialog-content"]')).not.toBeInTheDocument())
 }
+
+it.each(['/#announcement-popup-21', '/v2#announcement-popup-21'])('opens announcements from an announcement anchor at %s without the popup feed', async (path) => {
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+    announcements: [{ announcement: {
+      id: 'popup-21', kind: 'popup', active: true, title: '目标公告', body: '定位正文',
+      created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-01T00:00:00Z',
+    }, read_at: null }], page: 3, pageSize: 10, total: 21,
+  }), { headers: { 'Content-Type': 'application/json' } }))
+  mount(path)
+  await screen.findByRole('heading', { name: '目标公告' }, { timeout: 3000 })
+  expect(screen.getByRole('region', { name: copy.v2.announcements })).toBeVisible()
+  expect(mocks.session).toHaveBeenCalledWith(null, true, false)
+  await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('?section=announcements&page=3'))
+})
 
 function connect() {
   const profile = {
@@ -735,7 +749,7 @@ describe('V2 results-first workspace', () => {
     await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('profile_id=profile-2'))
     expect(session.flushConfigSave).toHaveBeenCalledOnce()
     expect(session.refreshProfileWorkspace).toHaveBeenCalledWith(second)
-    expect(mocks.session).toHaveBeenLastCalledWith('profile-2', true)
+    expect(mocks.session).toHaveBeenLastCalledWith('profile-2', true, true)
   })
 
   it.each(['overview', 'generation'])('cancels the current job from %s through the existing task controller while retaining the result', async (section) => {

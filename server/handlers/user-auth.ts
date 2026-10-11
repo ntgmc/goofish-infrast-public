@@ -862,12 +862,15 @@ export function scheduleInvitationSettlement(userId: string): void {
   })
 }
 
-export async function getActiveAnnouncements(): Promise<Announcement[]> {
+export async function getActiveAnnouncements(includeBanner = false): Promise<Announcement[]> {
   const store = createPostgresAnnouncementStore(ANNOUNCEMENT_KEY)
   const { data: value } = await store.get()
   if (!value || typeof value !== 'object' || !Array.isArray((value as { announcements?: unknown }).announcements)) return []
-  return ((value as { announcements: unknown[] }).announcements)
+  const document = value as { banner?: unknown; announcements: unknown[] }
+  const popups = document.announcements
     .filter((item): item is Announcement => isAnnouncement(item) && item.kind === 'popup' && item.active)
+  return includeBanner && isAnnouncement(document.banner) && document.banner.active
+    ? [document.banner, ...popups] : popups
 }
 
 export function clearSessionCookie(): string {

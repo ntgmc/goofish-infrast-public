@@ -333,7 +333,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
         if (profile.id !== session.activeProfile?.id) { try { await session.refreshProfileWorkspace(profile) } catch { return } }
         void navigate(v2Path('plans', profile.id))
       })() }} />}
-      {features.announcements && <AnnouncementPopup announcements={session.popups ?? []} userId={session.user?.id} onUnreadCountChange={session.setAnnouncementUnreadCount} announcementsPath={v2Path('announcements', session.activeProfile?.id)} />}
+      {features.announcements && section !== 'announcements' && <AnnouncementPopup announcements={session.popups ?? []} userId={session.user?.id} onUnreadCountChange={session.setAnnouncementUnreadCount} announcementsPath={v2Path('announcements', session.activeProfile?.id)} />}
     </div>
     </LayoutGroup>
   )

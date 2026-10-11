@@ -239,6 +239,8 @@ export const v2Copy = {
   updatesLoadFailed: '更新日志加载失败，请重试。',
   updatesNotFound: '未找到这个版本的更新日志。',
   updatesPagination: '更新日志分页',
+  announcementsNotFound: '公告不存在或已停用。',
+  announcementsPagination: '公告分页',
   previousPage: '上一页',
   nextPage: '下一页',
   pageNumber: (page: number, pages: number) => `第 ${page} / ${pages} 页`,
