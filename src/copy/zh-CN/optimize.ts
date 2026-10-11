@@ -604,8 +604,6 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
   pages_tool_optimize_scenario_lab_ScenarioFactors_003: "MAA 12 小时 × 2",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
-  pages_tool_optimize_scenario_lab_ScenarioFactors_004: "关闭",
-  // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
   pages_tool_optimize_scenario_lab_ScenarioFactors_005: "自动选择",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
   pages_tool_optimize_scenario_lab_ScenarioFactors_006: "龙门币",

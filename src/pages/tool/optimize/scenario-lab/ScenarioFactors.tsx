@@ -25,7 +25,6 @@ export const SCHEDULES: Array<{ id: ScenarioMaaSchedule; label: string }> = [
 ]
 
 export const DRONES: Array<{ id: ScenarioDroneStrategy; label: string }> = [
-  { id: 'off', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_004 },
   { id: 'auto', label: copy.common.droneAutoEfficiency },
   { id: 'inventory_balance', label: copy.common.droneAutoInventoryBalance },
   { id: 'lmd', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_006 },
