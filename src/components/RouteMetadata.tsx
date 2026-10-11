@@ -103,6 +103,11 @@ export default function RouteMetadata() {
     const metadata = resolveMetadata(location.pathname)
     const canonicalUrl = canonicalUrlFor(location.pathname)
     const socialImageUrl = new URL(SOCIAL_IMAGE_PATH, canonicalUrl).href
+    const icon = document.head.querySelector<HTMLLinkElement>('link[rel="icon"]') ?? document.createElement('link')
+    icon.rel = 'icon'
+    icon.type = location.pathname === '/v2' ? 'image/svg+xml' : 'image/png'
+    icon.href = location.pathname === '/v2' ? '/assets/maatool-v2-icon.svg' : '/favicon-32.png'
+    if (!icon.parentElement) document.head.append(icon)
 
     document.title = metadata.title
     setMetaByName('description', metadata.description)
