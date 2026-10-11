@@ -12,7 +12,7 @@ const PROFILE_A_FACTORS: ScenarioComparisonFactors = {
   layouts: [{ layout: '153', plans: [{ trading: { lmd: 1, orundum: 0 }, manufacturing: { pureGold: 2, battleRecord: 3, originiumShard: 0 } }] }],
   maaSchedules: ['variable'],
   includeRotation: false,
-  droneStrategies: ['off'],
+  droneStrategies: ['lmd'],
 }
 
 const PROFILE_B_FACTORS: ScenarioComparisonFactors = {
@@ -120,9 +120,33 @@ describe('useScenarioComparison', () => {
     expect(result.current.factors).toMatchObject({
       layouts: [{ layout: '243' }],
       maaSchedules: ['variable', '8x3'],
-      droneStrategies: ['off', 'auto'],
+      droneStrategies: ['auto'],
     })
     expect(window.sessionStorage.getItem(key)).toBeNull()
+  })
+
+  it.each([
+    { stored: ['off'], expected: ['auto'] },
+    { stored: ['off', 'auto', 'lmd'], expected: ['auto', 'lmd'] },
+    { stored: ['off', 'inventory_balance'], expected: ['inventory_balance'] },
+  ])('removes disabled drones from restored and submitted factors: $stored', async ({ stored, expected }) => {
+    const key = 'maa:scenario-lab:v2:profile-old-drones'
+    window.sessionStorage.setItem(key, JSON.stringify({
+      factors: { ...PROFILE_A_FACTORS, droneStrategies: stored },
+    }))
+    vi.mocked(apiJson).mockRejectedValue(new TypeError('network lost'))
+    const { result } = renderHook(() => useScenarioComparison({
+      profileId: 'profile-old-drones', operators: [], config: {} as LicenseConfig,
+    }))
+    const expectedFactors = { ...PROFILE_A_FACTORS, droneStrategies: expected }
+    expect(result.current.factors).toEqual(expectedFactors)
+
+    await act(async () => result.current.run())
+
+    expect(apiJson).toHaveBeenCalledWith('/api/optimization/jobs', expect.objectContaining({
+      method: 'POST', json: expect.objectContaining({ factors: expectedFactors }),
+    }))
+    expect(JSON.parse(window.sessionStorage.getItem(key)!).factors).toEqual(expectedFactors)
   })
 
   it('preserves the previous account session and restores the next account factors', async () => {

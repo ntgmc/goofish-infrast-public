@@ -9,6 +9,7 @@ import ConfigEditor from '../../components/ConfigEditor'
 import SklandBindingDialog from '../../components/SklandBindingDialog'
 import SklandIcon from '../../components/SklandIcon'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/dialog'
+import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover'
 import { copy } from '../../copy'
 import { validateScheduleConfig } from '../../lib/config'
 import { useSiteFeatures } from '../../lib/site-feature-context'
@@ -121,7 +122,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
           <DialogTitle>{shownPanel === 'room' && room ? `${room.label} ${room.indexLabel}` : shownPanel ? titles[shownPanel] : ''}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
           {isConfig && <div className="v2-config-feedback">
-            {!validation.ok ? <p role="status" className="tool-alert tool-alert--warning">{validation.message}</p>
+            {!validation.ok ? <p id="v2-config-validation" role="status" className="tool-alert tool-alert--warning">{validation.message}</p>
               : error && session.configSyncStatus !== 'failed' ? <p role="alert" className="v2-feedback v2-feedback-error">{error}</p>
                 : session.user && <ConfigSaveStatus status={session.configSyncStatus} onRetry={session.retryConfigSave} />}
           </div>}
@@ -142,7 +143,6 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
               {configDiffRows?.length ? <dl>{configDiffRows.map((row) => <div key={row.label}><dt>{row.label}</dt><dd>{copy.optimize.pages_tool_optimize_ConfigSection_012}{row.before}<br />{copy.optimize.pages_tool_optimize_ConfigSection_013}{row.after}</dd></div>)}</dl>
                 : <p role="status">{copy.optimize.pages_tool_optimize_ConfigSection_014}</p>}
             </aside>}
-            <button type="button" className="v2-button v2-button-primary v2-drawer-done" onClick={onClose}><Check size={16} />{text.done}</button>
           </>
         )}
         {shownPanel === 'operators' && (
@@ -222,6 +222,15 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
             : item}</li>)}</ul>
         </div>}
         </V2Transition>
+        {isConfig && <Popover>
+          <PopoverTrigger asChild>
+            <button type="button" className="v2-button v2-button-primary v2-drawer-done" aria-disabled={!validation.ok} aria-describedby={validation.ok ? undefined : 'v2-config-validation'}
+              onClick={(event) => { if (validation.ok) { event.preventDefault(); onClose() } }}><Check size={16} />{text.done}</button>
+          </PopoverTrigger>
+          {!validation.ok && <PopoverContent side="top" align="center" role="alert" className="v2-dialog v2-config-completion-hint" onOpenAutoFocus={(event) => event.preventDefault()}>
+            {validation.message}
+          </PopoverContent>}
+        </Popover>}
       </DialogContent>
       <SklandBindingDialog open={sklandOpen} profile={session.activeProfile} onOpenChange={setSklandOpen}
         onPayload={(payload) => {

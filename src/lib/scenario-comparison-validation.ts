@@ -37,7 +37,7 @@ const scenarioProductionPlanSchema: z.ZodType<ScenarioProductionPlan> = z.strict
 })
 
 const scenarioLayoutFactorSchema = z.strictObject({
-  layout: z.enum(['153', '243', '333']),
+  layout: z.enum(['153', '243', '252', '252-1', '252-full', '333']),
   plans: z.array(scenarioProductionPlanSchema).min(1).max(24),
 })
 
@@ -125,7 +125,7 @@ export const scenarioComparisonResultSchema: z.ZodType<ScenarioComparisonResult>
     id: boundedString(256),
     label: boundedString(1_000),
     config: extensibleLicenseConfigSchema,
-    layout: z.enum(['153', '243', '333']),
+    layout: z.enum(['153', '243', '252', '252-1', '252-full', '333']),
     productionPlan: scenarioProductionPlanSchema,
     scheduleMode: z.enum(['maa', 'rotation']),
     scheduleStrategy: z.enum(['variable', '8x3', 'rotation']),

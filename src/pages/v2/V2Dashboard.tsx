@@ -189,7 +189,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduceMotion ? 0 : motionTokens.duration.exit }} />}
       </AnimatePresence>
       <aside className={`v2-sidebar ${mobileNavigation ? 'v2-sidebar-open' : ''}`}>
-        <Link to={v2Path('overview', session.activeProfile?.id)} className="v2-brand"><span className="v2-brand-mark"><Building2 size={24} strokeWidth={1.8} /></span>
+        <Link to={v2Path('overview', session.activeProfile?.id)} className="v2-brand"><img className="v2-brand-mark" src="/assets/maatool-v2-icon.svg" width="44" height="44" alt="" />
           <span><strong>{text.brand}</strong><small>{text.brandDescription}</small></span></Link>
         <button className="v2-mobile-close v2-icon-button" type="button" onClick={() => setMobileNavigation(false)} aria-label={text.close}><X size={20} /></button>
         <nav aria-label={text.navigation}>

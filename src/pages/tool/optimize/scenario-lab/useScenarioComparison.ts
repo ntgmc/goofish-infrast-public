@@ -31,7 +31,7 @@ const DEFAULT_FACTORS: ScenarioComparisonFactors = {
   }],
   maaSchedules: ['variable', '8x3'],
   includeRotation: true,
-  droneStrategies: ['off', 'auto'],
+  droneStrategies: ['auto'],
 }
 
 interface StoredScenarioSession {
@@ -315,7 +315,12 @@ function normalizeStoredFactors(value: unknown): ScenarioComparisonFactors | nul
       ? maaSchedules
       : [...DEFAULT_FACTORS.maaSchedules],
   })
-  return parsed.success ? parsed.data : null
+  if (!parsed.success) return null
+  const droneStrategies = parsed.data.droneStrategies.filter((strategy) => strategy !== 'off')
+  return {
+    ...parsed.data,
+    droneStrategies: droneStrategies.length > 0 ? droneStrategies : [...DEFAULT_FACTORS.droneStrategies],
+  }
 }
 
 function clearInvalidSession(profileId: string): null {

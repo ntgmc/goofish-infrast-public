@@ -36,7 +36,7 @@ export const commonCopy = {
   facilityLayoutComplete: "布局已确认",
   facilityLayoutCompleteHelp: "可以继续生成排班，无需再次确认。设施有变化时，点击“修改布局”。",
   facilityLayoutEdit: "修改布局",
-  facilityLayoutRequired: "请先按游戏内布局选择并确认设施位置与等级，再生成排班。",
+  facilityLayoutRequired: "请先按游戏内布局选择并确认设施位置与等级，再保存配置或生成排班。",
   facilityLayoutUnique: "请为每个位置选择不同的设施。",
   scheduleProgressEstimated: "预计进度",
   scheduleProgressCompleted: "已完成",
@@ -352,7 +352,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_108: "满血252",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_109: "满血252需要右侧会客室、加工站、办公室、训练室依次为 1/3/1/3 级；游戏内这些设施无法降级，会客室和办公室须保持 1 级。贸易站为 3/2 级，制造站均为 3 级，默认 3 作战记录、2 赤金。右满252适用于右侧设施已升级的情况。",
+  components_ConfigEditor_109: "满血252要求右侧会客室、加工站、办公室、训练室依次为 1/3/1/3 级。游戏内这些设施无法降级，会客室和办公室请保持 1 级。贸易站为 3/2 级，制造站均为 3 级，默认 3 间生产作战记录、2 间生产赤金。右侧设施已升级时，可选右满252。网站的252配置统一按 1 级宿舍计算。右满252可将一间宿舍升至 2 级，差别不大，网站不单独适配。",
   components_ConfigEditor_110: "3 发电站",
   components_ConfigEditor_111: "2 发电站",
   // src/components/ConfigEditor.tsx

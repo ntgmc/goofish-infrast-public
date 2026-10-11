@@ -17,6 +17,7 @@ export default function V2LoadingScreen({ error, onRetry, retryLabel = copy.v2.r
 }) {
   return (
     <main className="v2-app v2-loading-screen" tabIndex={-1} data-route-focus>
+      <img className="v2-loading-brand" src="/assets/maatool-v2-icon.svg" width="64" height="64" alt={copy.v2.brand} />
       <div className="v2-loading-status" role={error ? 'alert' : 'status'} aria-live="polite" aria-busy={!error}>
         {!error && <LoadingSpinner />}
         <p>{error ?? copy.v2.loading}</p>

@@ -81,15 +81,10 @@
 }
 
 .v2-brand-mark {
-  display: grid;
-  width: 40px;
-  height: 40px;
+  display: block;
+  width: 44px;
+  height: 44px;
   flex: none;
-  place-items: center;
-  border: 1px solid var(--color-v2-rail-line);
-  border-radius: var(--radius-v2-control);
-  color: var(--color-v2-rail-accent);
-  background: var(--color-v2-rail-hover);
 }
 
 .v2-brand strong {
@@ -1428,6 +1423,13 @@
 
 .v2-drawer-wide {
   width: min(800px, 100%) !important;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.v2-drawer-wide .v2-drawer-body {
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .v2-drawer-body > .v2-transition-pane {
@@ -1484,10 +1486,21 @@
 }
 
 .v2-drawer-done {
-  position: sticky;
-  bottom: 0;
   width: 100%;
   min-height: 44px;
+}
+
+.v2-drawer-done[aria-disabled="true"] {
+  border-color: var(--color-v2-control);
+  background: var(--color-v2-inset);
+  color: var(--v2-secondary);
+  cursor: help;
+  transform: none;
+}
+
+.v2-config-completion-hint {
+  border-color: var(--color-caution-border);
+  line-height: 1.65;
 }
 
 .v2-options-content {

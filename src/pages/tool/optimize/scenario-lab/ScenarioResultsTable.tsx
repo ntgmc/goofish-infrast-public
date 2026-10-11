@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { formatShiftHours, type ScenarioComparisonPoint, type ScenarioMetrics } from '../../../../lib/scenario-comparison'
+import { formatShiftHours, SCENARIO_LAYOUT_LABELS, type ScenarioComparisonPoint, type ScenarioMetrics } from '../../../../lib/scenario-comparison'
 import { copy, CURRENT_LOCALE } from '../../../../copy/index'
 
 
@@ -170,7 +170,7 @@ function compare(left: ScenarioComparisonPoint, right: ScenarioComparisonPoint, 
 
 function productionPlanLabel(point: ScenarioComparisonPoint): string {
   const plan = point.productionPlan
-  return `${point.layout}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_032}${plan.trading.lmd}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_033}${plan.trading.orundum}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_034}${plan.manufacturing.pureGold}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_035}${plan.manufacturing.battleRecord}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_036}${plan.manufacturing.originiumShard}`
+  return `${SCENARIO_LAYOUT_LABELS[point.layout]}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_032}${plan.trading.lmd}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_033}${plan.trading.orundum}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_034}${plan.manufacturing.pureGold}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_035}${plan.manufacturing.battleRecord}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_036}${plan.manufacturing.originiumShard}`
 }
 
 function scheduleLabel(point: ScenarioComparisonPoint): string {
