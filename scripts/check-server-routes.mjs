@@ -10,6 +10,7 @@ const expectedRoutes = [
   '/api/admin/commercial',
   '/api/admin/usage-stats',
   '/api/announcement',
+  '/api/changelog',
   '/api/integrations/qqbot/events',
   '/api/integrations/qqbot/registration-invitations',
   ...['binding', 'account', 'notifications', 'notifications/ack', 'results', 'maa-export'].map((path) => `/api/integrations/qqbot/${path}`),

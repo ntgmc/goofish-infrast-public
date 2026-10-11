@@ -15,3 +15,10 @@ export interface ChangelogRelease {
   kind: 'baseline' | 'release'
   sections: readonly ChangelogSection[]
 }
+
+export interface ChangelogPageData {
+  releases: readonly ChangelogRelease[]
+  page: number
+  pageSize: number
+  total: number
+}

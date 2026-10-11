@@ -74,6 +74,19 @@ function mount(path = '/v2') {
   return render(<MemoryRouter initialEntries={[path]}><V2Page /><RouteLocation /></MemoryRouter>, { wrapper: MotionPreferenceProvider })
 }
 
+it.each(['/#release-v2.0.1016', '/v2#release-v2.0.1016'])('opens the changelog from a version anchor at %s', async (path) => {
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+    releases: [{ id: 'v2.0.1016', version: '2.0.1016', displayVersion: 'v2.0.1016', releasedAt: '2026-10-11', kind: 'release', sections: [] }],
+    page: 1, pageSize: 10, total: 1,
+  }), { headers: { 'Content-Type': 'application/json' } }))
+  mount(path)
+  await screen.findByRole('heading', { name: 'v2.0.1016' })
+  expect(screen.getByRole('region', { name: copy.v2.updates })).toBeVisible()
+  await userEvent.click(screen.getByRole('button', { name: /v2.0.1016/ }))
+  expect(screen.getByTestId('route-location')).toHaveTextContent('?section=updates&page=1')
+  expect(screen.getByRole('heading', { name: 'v2.0.1016' })).toBeInTheDocument()
+})
+
 async function dismissDrawer(user: ReturnType<typeof userEvent.setup>) {
   await user.keyboard('{Escape}')
   await waitFor(() => expect(document.querySelector('[data-slot="dialog-content"]')).not.toBeInTheDocument())

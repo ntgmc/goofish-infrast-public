@@ -108,6 +108,7 @@ describe('feature gate', () => {
   it.each([
     ['cultivation_plan', '/api/cultivation-plan', 'POST'],
     ['service_status', '/api/status', 'GET'],
+    ['changelog', '/api/changelog', 'GET'],
     ['notifications', '/api/user/notifications', 'GET'],
     ['qqbot', '/api/user/qqbot', 'POST'],
     ['qqbot', '/api/integrations/qqbot/binding', 'POST'],

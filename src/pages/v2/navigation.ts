@@ -4,8 +4,9 @@ import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
 const V2_SECTIONS = ['overview', 'generation', 'plans', 'lab', 'tools', 'manual-tool', 'cultivation', 'depot', 'profiles', 'add-account', 'inventory', 'commercial', 'balance', 'announcements', 'settings', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing'] as const
 export type V2Section = typeof V2_SECTIONS[number]
 
-export function v2Section(params: URLSearchParams): V2Section {
+export function v2Section(params: URLSearchParams, hash = ''): V2Section {
   const section = params.get('section')
+  if (!section && hash.startsWith('#release-')) return 'updates'
   return V2_SECTIONS.find((entry) => entry === section) ?? 'overview'
 }
 

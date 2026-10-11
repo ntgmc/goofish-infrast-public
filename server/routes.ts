@@ -19,6 +19,7 @@ import qqBotAccountHandler from './handlers/qqbot-account'
 import userQqBotHandler from './handlers/user-qqbot'
 import qqBotRegistrationInvitationsHandler from './handlers/qqbot-registration-invitations'
 import releaseConfirmationHandler from './handlers/release-confirmation'
+import changelogHandler from './handlers/changelog'
 import authHandler from './handlers/auth'
 import { EFFICIENCY_DATA, EFFICIENCY_DATA_METADATA } from './handlers/data'
 import depotValueHandler from './handlers/depot-value'
@@ -87,6 +88,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/auth/me', authHandler as unknown as ApiHandler],
   ['/api/site/features', siteFeaturesHandler as unknown as ApiHandler],
   ['/api/site/public-content', sitePublicContentHandler as unknown as ApiHandler],
+  ['/api/changelog', changelogHandler],
   ['/api/status', serviceStatusHandler as unknown as ApiHandler],
   ['/api/user/data/export', accountDataHandler as unknown as ApiHandler],
   ['/api/user/data/delete-request', accountDataHandler as unknown as ApiHandler],

@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useState, type 
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
 import { useAppReducedMotion } from '../../lib/motion-preference'
 import { Activity, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, CalendarClock, Check, ChevronDown, ChevronRight, Download, Factory, FileClock, Gem, LayoutDashboard, Menu, RefreshCw, ScrollText, Settings2, ShieldCheck, Sparkles, Users, WalletCards, X, Zap } from 'lucide-react'
-import { useNavigate, useSearchParams } from 'react-router'
+import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import Link from '../../components/InternalLink'
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
@@ -68,8 +68,9 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
 }) {
   const { features } = useSiteFeatures()
   const [params, setParams] = useSearchParams()
+  const { hash } = useLocation()
   const navigate = useNavigate()
-  const section = v2Section(params)
+  const section = v2Section(params, hash)
   const [navigationError, setNavigationError] = useState<string | null>(null)
   const [manualOpened, setManualOpened] = useState(false)
   const [manualDirty, setManualDirty] = useState(false)
