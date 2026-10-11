@@ -130,18 +130,20 @@ export default function FacilityLayoutEditor({ config, onUpdate, profileId, read
   }
   return (
     <section className="facility-layout mt-5 border-t border-surface-3/60 pt-5" aria-labelledby="facility-layout-heading">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 id="facility-layout-heading" className="font-semibold text-ink-primary">{copy.common.facilityLayoutTitle}</h3>
-        <span className={`tool-status ${savedLayout ? 'tool-status--success' : 'tool-status--warning'}`}>
-          {savedLayout ? copy.common.facilityLayoutSaved : copy.common.facilityLayoutDraft}
-        </span>
+      <div className="facility-layout-heading">
+        <div className="facility-layout-title">
+          <h3 id="facility-layout-heading" className="font-semibold text-ink-primary">{copy.common.facilityLayoutTitle}</h3>
+          <span className={`tool-status ${savedLayout ? 'tool-status--success' : 'tool-status--warning'}`}>
+            {savedLayout ? copy.common.facilityLayoutSaved : copy.common.facilityLayoutDraft}
+          </span>
+        </div>
+        {profileId && (
+          <button type="button" disabled={reading || readOnly} onClick={() => { void readFacilities() }} className="tool-secondary-action min-h-11 px-3">
+            <SklandIcon />
+            {reading ? copy.common.facilityLayoutReading : copy.common.facilityLayoutRead}
+          </button>
+        )}
       </div>
-      {profileId && (
-        <button type="button" disabled={reading || readOnly} onClick={() => { void readFacilities() }} className="tool-secondary-action mt-3 min-h-11 px-3">
-          <SklandIcon />
-          {reading ? copy.common.facilityLayoutReading : copy.common.facilityLayoutRead}
-        </button>
-      )}
       {readNotice && <p role="status" className="tool-alert mt-3">{readNotice}</p>}
       <fieldset disabled={reading || readOnly} className="min-w-0 border-0 p-0" aria-busy={reading}>
       {collapsed ? (
@@ -167,29 +169,37 @@ export default function FacilityLayoutEditor({ config, onUpdate, profileId, read
       <div id="facility-layout-editor" tabIndex={-1}>
       <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.common.facilityLayoutHelp}</p>
       <div className="facility-layout-grid">
-        {rooms.map((room, position) => {
-          const { label, icon: Icon } = FACILITIES[room.type]
-          return (
-            <div key={position} className={`facility-card facility-card--${room.type}`}>
-              <button type="button" className="facility-card-select"
-                aria-label={`${positionLabel(position)} · ${label} · ${room.level}${copy.common.facilityLayoutLevel}`}
-                aria-haspopup="dialog"
-                onClick={(event) => { triggerRef.current = event.currentTarget; setSelectedPosition(position) }}>
-                <span className="facility-card-position">{positionLabel(position)}<ChevronDown size={14} aria-hidden="true" /></span>
-                <Icon className="facility-card-icon" aria-hidden="true" />
-                <span className="facility-card-name">{label}</span>
-              </button>
-              <div className="facility-card-levels" role="group" aria-label={`${positionLabel(position)} · ${copy.common.facilityLayoutLevelLabel}`}>
-                {[1, 2, 3].map((level) => (
-                  <button key={level} type="button" aria-pressed={room.level === level}
-                    onClick={() => { if (room.level !== level) updateRoom(position, { level }) }}>
-                    {level}<span>{copy.common.facilityLayoutLevel}</span>
+        {[0, 1, 2].map((floor) => <div key={floor} className="facility-layout-floor">
+          <h4 className="facility-layout-floor-label">B{floor + 1}</h4>
+          <div className="facility-layout-floor-rooms">
+            {rooms.slice(floor * 3, floor * 3 + 3).map((room, column) => {
+              const position = floor * 3 + column
+              const { label, icon: Icon } = FACILITIES[room.type]
+              return (
+                <div key={position} className={`facility-card facility-card--${room.type}`}>
+                  <button type="button" className="facility-card-select"
+                    aria-label={`${positionLabel(position)} · ${label} · ${room.level}${copy.common.facilityLayoutLevel}`}
+                    aria-haspopup="dialog"
+                    onClick={(event) => { triggerRef.current = event.currentTarget; setSelectedPosition(position) }}>
+                    <span className="facility-card-position">{copy.common.facilityLayoutColumns[column]}<ChevronDown size={14} aria-hidden="true" /></span>
+                    <span className="facility-card-identity">
+                      <Icon className="facility-card-icon" aria-hidden="true" />
+                      <span className="facility-card-name">{label}</span>
+                    </span>
                   </button>
-                ))}
-              </div>
-            </div>
-          )
-        })}
+                  <div className="facility-card-levels" role="group" aria-label={`${positionLabel(position)} · ${copy.common.facilityLayoutLevelLabel}`}>
+                    {[1, 2, 3].map((level) => (
+                      <button key={level} type="button" aria-pressed={room.level === level}
+                        onClick={() => { if (room.level !== level) updateRoom(position, { level }) }}>
+                        {level}{copy.common.facilityLayoutLevel}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>)}
       </div>
       <div className="facility-layout-footer">
         <div className="facility-layout-counts" aria-label={copy.common.facilityLayoutCounts}>
