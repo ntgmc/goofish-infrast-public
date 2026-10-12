@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -77,7 +77,7 @@ it('opens an encoded old announcement directly and normalizes its page without a
   items[21].announcement.id = '公告/21'
   mount('/v2?section=announcements#announcement-%E5%85%AC%E5%91%8A%2F21')
   await screen.findByRole('heading', { name: 'Announcement 21' })
-  expect(screen.getByTestId('location')).toHaveTextContent('page=3#announcement-%E5%85%AC%E5%91%8A%2F21')
+  await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('page=3#announcement-%E5%85%AC%E5%91%8A%2F21'))
   expect(mocks.api).toHaveBeenCalledTimes(1)
   expect(mocks.api.mock.calls[0][0]).toBe('/api/announcement?page=1&announcement_id=%E5%85%AC%E5%91%8A%2F21')
   expect(screen.queryByText('Announcement 0')).not.toBeInTheDocument()

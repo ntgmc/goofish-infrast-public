@@ -6,17 +6,16 @@ const mocks = vi.hoisted(() => ({
   clearSessionCookie: vi.fn(),
   getProfileForUser: vi.fn(),
   getUserById: vi.fn(),
-  listProfilesForUser: vi.fn(),
+  listStoredProfilesForUser: vi.fn(),
   listProfileWorkspaces: vi.fn(),
   listOptimizationResultsForProfiles: vi.fn(),
-  toPublicWorkspace: vi.fn(),
   normalizeEmail: vi.fn(),
   PasswordWorkCapacityError: class PasswordWorkCapacityError extends Error {},
   query: vi.fn(),
   requestAccountDeletion: vi.fn(),
   listPersonalUseDeclarationAcceptancesForUser: vi.fn(),
   listPersonalUseDeclarationUsageEventsForUser: vi.fn(),
-  saveUserProfile: vi.fn(),
+  clearProfileSklandCredential: vi.fn(),
   requireUserSession: vi.fn(),
   exportUserNotifications: vi.fn(),
   verifyPasswordHash: vi.fn(),
@@ -25,10 +24,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../storage/user-store', () => ({
   getProfileForUser: mocks.getProfileForUser,
   getUserById: mocks.getUserById,
-  listProfilesForUser: mocks.listProfilesForUser,
+  listStoredProfilesForUser: mocks.listStoredProfilesForUser,
   listProfileWorkspaces: mocks.listProfileWorkspaces,
-  saveUserProfile: mocks.saveUserProfile,
-  toPublicWorkspace: mocks.toPublicWorkspace,
+  clearProfileSklandCredential: mocks.clearProfileSklandCredential,
 }))
 
 vi.mock('../storage/postgres', () => ({ query: mocks.query }))
@@ -74,17 +72,10 @@ const binding = {
 beforeEach(() => {
   mocks.requireUserSession.mockResolvedValue({ user: { id: 'user-1', email: 'user@example.test' } })
   mocks.query.mockResolvedValue({ rows: [] })
-  mocks.listProfilesForUser.mockResolvedValue([])
+  mocks.listStoredProfilesForUser.mockResolvedValue([])
   mocks.listProfileWorkspaces.mockResolvedValue(new Map())
   mocks.listOptimizationResultsForProfiles.mockResolvedValue(new Map())
-  mocks.toPublicWorkspace.mockImplementation((workspace: Record<string, unknown>) => ({
-    profile_id: workspace.profile_id,
-    latest_result: null,
-    result_history: [],
-    archived_results: [],
-    result_history_next_cursor: null,
-    archived_results_next_cursor: null,
-  }))
+  mocks.clearProfileSklandCredential.mockResolvedValue(true)
   mocks.getUserById.mockResolvedValue(null)
   mocks.listPersonalUseDeclarationAcceptancesForUser.mockResolvedValue([])
   mocks.listPersonalUseDeclarationUsageEventsForUser.mockResolvedValue([])
@@ -114,16 +105,7 @@ describe('account data Skland controls', () => {
     }))
 
     expect(response.status).toBe(200)
-    expect(mocks.saveUserProfile).toHaveBeenCalledWith(expect.objectContaining({
-      skland_binding: expect.objectContaining({
-        uid: binding.uid,
-        nickname: binding.nickname,
-        channel_name: binding.channel_name,
-        bound_at: binding.bound_at,
-        encrypted_cred: '',
-        credential_status: 'invalid',
-      }),
-    }))
+    expect(mocks.clearProfileSklandCredential).toHaveBeenCalledWith('user-1', 'profile-1')
   })
 
   it('does not expose an unlink action through the account data handler', async () => {
@@ -135,7 +117,7 @@ describe('account data Skland controls', () => {
 
     expect(response.status).toBe(404)
     await expect(response.json()).resolves.toEqual({ error: 'API route not found', code: 'route_not_found' })
-    expect(mocks.saveUserProfile).not.toHaveBeenCalled()
+    expect(mocks.clearProfileSklandCredential).not.toHaveBeenCalled()
   })
 
   it('does not expose depot sample revocation through the account data handler', async () => {
@@ -183,7 +165,7 @@ describe('account data Skland controls', () => {
   })
 
   it('uses one batch workspace query and exports the V4 coverage additions', async () => {
-    mocks.listProfilesForUser.mockResolvedValue([
+    mocks.listStoredProfilesForUser.mockResolvedValue([
       { id: 'profile-1', skland_binding: null, skland_pending_binding: null },
       { id: 'profile-2', skland_binding: null, skland_pending_binding: null },
     ])

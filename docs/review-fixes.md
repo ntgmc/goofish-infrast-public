@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | 1 | M01 HTTP 与安全边界 | D01 断连写出挂起；D02 IPv6 等价地址；D03 Expect 前置处理 | 已修复、验证通过 |
 | 2 | M03 数据库与迁移 | D01 回滚失败连接回池；D02 service file 引号；D03 CDK 内容验证 | 已修复、验证通过 |
-| 3 | M04 档案、工作区与账号数据 | D01 清除凭据覆盖冻结；D02 改名覆盖工作区；D03 导出截断与遗漏 | 待修复 |
+| 3 | M04 档案、工作区与账号数据 | D01 清除凭据覆盖冻结；D02 改名覆盖工作区；D03 导出截断与遗漏 | 已修复、验证通过 |
 | 4 | M06 排班任务 API 与契约 | D01 诊断券结果过滤；D02 取消投影；D03 轮班对比 schema；D04 输出错误分类 | 待修复 |
 | 5 | M07 队列、worker 与伸缩 | D01 领取阻塞；D02 取消恢复预约；D03 云响应超时；D04 关停迟到领取 | 待修复 |
 | 6 | M08 森空岛绑定与导入 | D01 旧确认写回；D02 临时 token 失效分类；D03 升级激活冻结档案 | 待修复 |
@@ -39,4 +39,14 @@
 - 最近验证：3 个普通文件、37 项；迁移验证器 3 项；备份/恢复契约；真实 PostgreSQL/libpq 3 项均通过。首次特殊密码测试因 Testcontainers 的 shell 健康检查超时，改用参数数组后通过。
 - 完整验证：`check:local` 重跑通过（244 个普通文件、1,945 项；构建、API、109 条路由和两项强制检查）；全量 PostgreSQL 19 个文件、212 项通过，包括受控迁移和真实验证器 CLI。初次完整普通测试的一项未改动公告页导航断言失败，单文件 7 项及完整重跑均通过。文档最后编辑后复跑架构、死代码及 whitespace 检查。
 - 未改变 schema SQL、版本或历史账本；没有连接生产库或执行真实灾备切流。
-- Commit message：`fix(storage): discard failed transactions and verify migration contents`。
+- Commit：`64d6ed74`，`fix(storage): discard failed transactions and verify migration contents`。
+
+## 第 3 轮：M04 档案、工作区与账号数据
+
+- D01：清除凭据通过带归属条件的原子 SQL 仅修改当前 binding 的凭据字段及更新时间，保留并发冻结、权限、备注和绑定身份。
+- D02：改名发现工作区缺失时，复用既有工作区事务锁，锁内重新读取；只初始化仍不存在的工作区。
+- D03：存储列表与界面合并列表分离；导出读取全部用户档案，包括保留的合并源，并输出完整 workspace，取消界面容量截断；仍剔除凭据并保留独立历史导出和 16 MiB 上限。
+- 最近验证：5 个普通文件、22 项及真实 PostgreSQL 4 项通过。真实 SELECT 后设置屏障，覆盖冻结先提交、工作区首次保存先提交；真实合并与扩容验证所有方案、源档案及源干员均被导出。
+- 完整验证：`check:local` 通过（244 个普通文件、1,945 项、完整构建/API/109 条路由）；全量 PostgreSQL 19 个文件、215 项通过。文档最后编辑后复跑架构、死代码及 whitespace 检查；未改变 schema SQL 或历史账本。
+- 必要的验证修正：公告页测试再次在内容渲染后、路由更新前断言 URL；改为等待 URL 的异步更新，单文件 7 项及完整门禁通过，公告应用逻辑未改。
+- Commit message：`fix(accounts): preserve concurrent profile updates and export complete workspaces`。

@@ -6,10 +6,9 @@ import {
 import {
   getProfileForUser,
   getUserById,
-  listProfilesForUser,
+  listStoredProfilesForUser,
   listProfileWorkspaces,
-  saveUserProfile,
-  toPublicWorkspace,
+  clearProfileSklandCredential,
 } from '../storage/user-store'
 import { listOptimizationResultsForProfiles } from '../storage/optimization-result-store'
 import { query } from '../storage/postgres'
@@ -59,7 +58,7 @@ export default async function accountDataHandler(req: Request): Promise<Response
 }
 
 async function exportData(userId: string): Promise<Response> {
-  const profiles = await listProfilesForUser(userId)
+  const profiles = await listStoredProfilesForUser(userId)
   const profileIds = profiles.map((profile) => profile.id)
   const ownerKeys = profileIds.flatMap((profileId) => [`profile:${profileId}`, `reorder-job:${profileId}`])
   const [
@@ -279,7 +278,14 @@ async function exportData(userId: string): Promise<Response> {
     profiles: safeProfiles,
     workspaces: profileIds.map((profileId) => {
       const workspace = workspaceMap.get(profileId)
-      return workspace ? toPublicWorkspace(workspace) : null
+      return workspace ? {
+        ...workspace,
+        latest_result: null,
+        result_history: [],
+        archived_results: [],
+        result_history_next_cursor: null,
+        archived_results_next_cursor: null,
+      } : null
     }),
     optimization_results: profileIds.flatMap((profileId) => optimizationResultsByProfile.get(profileId) ?? []),
     legacy_workspace: legacyWorkspace.rows[0]?.record_json ?? null,
@@ -369,16 +375,9 @@ async function clearCredential(req: Request, userId: string): Promise<Response> 
   if (!profile?.skland_binding) {
     return jsonResponse({ error: '森空岛绑定不存在。', code: 'skland_binding_not_found' }, 404)
   }
-  await saveUserProfile({
-    ...profile,
-    skland_binding: {
-      ...profile.skland_binding,
-      encrypted_cred: '',
-      credential_status: 'invalid',
-      credential_invalid_at: new Date().toISOString(),
-    },
-    updated_at: new Date().toISOString(),
-  })
+  if (!await clearProfileSklandCredential(userId, profile.id)) {
+    return jsonResponse({ error: '森空岛绑定不存在。', code: 'skland_binding_not_found' }, 404)
+  }
   return jsonResponse({ ok: true })
 }
 
