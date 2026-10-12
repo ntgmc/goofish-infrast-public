@@ -139,6 +139,10 @@ export const commonCopy = {
   components_DeploymentUpdatePrompt_005: "最新版本",
   // src/components/DeploymentUpdatePrompt.tsx
   components_DeploymentUpdatePrompt_006: "立即刷新",
+  // src/components/MobileBrowserPrompt.tsx
+  mobileBrowserTitle: "推荐在电脑上打开",
+  mobileBrowserDescription: "使用电脑浏览器打开，配置基建和查看排班会更方便。你也可以继续在手机上使用。",
+  mobileBrowserContinue: "仍要进入",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_001: "龙门币",
   // src/components/ConfigEditor.tsx
