@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto'
+import { Client } from 'pg'
+import { calculateServiceStatusCostEstimate } from '../../src/lib/service-status-cost'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { closePool, query } from './postgres'
 import { migrateDatabaseSchema } from './schema'
 import {
@@ -65,6 +67,64 @@ describe('PostgreSQL service status history', () => {
       audit: { actorUsername: 'postgres-test', reason: '测试成本并发冲突', requestId: randomUUID() },
     })).rejects.toMatchObject({ code: 'service_status_cost_config_conflict' })
     await query('delete from service_status_cost_config where component_id = $1', ['optimization'])
+  })
+
+  it('estimates sparse persisted history using its time range', async () => {
+    for (const [bucketStart, workerInstances] of [['2026-08-06T00:00:00.000Z', 3], ['2026-08-07T23:00:00.000Z', 1]] as const) {
+      await recordServiceStatusSample({ componentId: 'optimization', bucketStart, status: 'available', queued: 0, running: 0,
+        workerConcurrency: 1, workerInstances, sampledAt: bucketStart })
+    }
+    const history = await getAdminServiceStatusHistory('optimization', new Date('2026-08-08T00:00:00.000Z'))
+    expect(history.buckets).toHaveLength(2)
+    expect(calculateServiceStatusCostEstimate({ ...await getServiceStatusCostConfig(), resident_hourly_price_cny: 0.2, hourly_price_cny: 0.5 }, history.buckets, history.to))
+      .toMatchObject({ observed_24h_worker_hours: 1, observed_24h_sample_hours: 1, observed_24h_cost_cny: 0.7, projected_monthly_cost_cny: 504, observed_30d_worker_hours: 4 })
+    await query('delete from service_status_hourly')
+  })
+
+  it('serializes two first saves before version reads and commits only one audit', async () => {
+    const initial = await getServiceStatusCostConfig()
+    const blocker = new Client({ connectionString: container.getConnectionUri() })
+    await blocker.connect()
+    const ids = [randomUUID(), randomUUID()]
+    let saves: Promise<PromiseSettledResult<Awaited<ReturnType<typeof saveServiceStatusCostConfig>>>[]> | undefined
+    try {
+      await blocker.query('begin')
+      const pid = Number((await blocker.query('select pg_backend_pid() as pid')).rows[0].pid)
+      await blocker.query('lock table service_status_cost_config in share mode')
+      saves = Promise.allSettled(ids.map((requestId, index) => saveServiceStatusCostConfig({ config: { ...initial, hourly_price_cny: index ? 0.8 : 0.5 },
+        expectedUpdatedAt: null, audit: { actorUsername: 'postgres-test', reason: '首次成本并发保存', requestId } })))
+      await vi.waitFor(async () => {
+        const blocked = await query(`select pid, query from pg_stat_activity where wait_event_type = 'Lock' and query like '%service-status-cost-config:%'`)
+        expect(blocked.rowCount).toBe(1)
+        expect((await query('select 1 from pg_stat_activity where $1 = any(pg_blocking_pids(pid))', [pid])).rowCount).toBe(1)
+      }, { timeout: 5000, interval: 20 })
+      await blocker.query('commit')
+      const settled = await saves
+      expect(settled.filter((entry) => entry.status === 'fulfilled')).toHaveLength(1)
+      expect(settled.find((entry) => entry.status === 'rejected')).toMatchObject({ reason: { code: 'service_status_cost_config_conflict' } })
+      expect((await query('select 1 from admin_operation_audit where request_id = any($1::text[])', [ids])).rowCount).toBe(1)
+      const latest = await getServiceStatusCostConfig()
+      await expect(saveServiceStatusCostConfig({ config: latest, expectedUpdatedAt: null,
+        audit: { actorUsername: 'postgres-test', reason: '拒绝过期空版本', requestId: randomUUID() } })).rejects.toMatchObject({ code: 'service_status_cost_config_conflict' })
+      const updated = await saveServiceStatusCostConfig({ config: latest, expectedUpdatedAt: latest.updated_at,
+        audit: { actorUsername: 'postgres-test', reason: '使用最新版本保存', requestId: randomUUID() } })
+      expect(Date.parse(updated.updated_at!)).toBeGreaterThan(Date.parse(latest.updated_at!))
+    } finally {
+      await blocker.query('rollback')
+      await saves
+      await blocker.end()
+      await query('delete from service_status_cost_config')
+    }
+  })
+
+  it('rolls back a failed initial audit and releases the component lock for another first save', async () => {
+    const initial = await getServiceStatusCostConfig()
+    const audit = { actorUsername: 'postgres-test', reason: '', requestId: randomUUID() }
+    await expect(saveServiceStatusCostConfig({ config: { ...initial, hourly_price_cny: 0.5 }, expectedUpdatedAt: null, audit })).rejects.toThrow('audit reason')
+    expect((await getServiceStatusCostConfig()).updated_at).toBeNull()
+    expect((await query('select 1 from admin_operation_audit where request_id = $1', [audit.requestId])).rowCount).toBe(0)
+    await expect(saveServiceStatusCostConfig({ config: initial, expectedUpdatedAt: null, audit: { ...audit, reason: '回滚后首次保存' } })).resolves.toMatchObject({ updated_at: expect.any(String) })
+    await query('delete from service_status_cost_config')
   })
 
   it('prunes only buckets older than the retention cutoff', async () => {

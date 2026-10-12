@@ -219,6 +219,7 @@ export async function saveServiceStatusCostConfig(
 ): Promise<ServiceStatusCostConfig> {
   await ensureDatabaseSchema()
   return withTransaction(async (client) => {
+    await client.query("select pg_advisory_xact_lock(hashtextextended('service-status-cost-config:' || $1, 0))", [input.config.component_id])
     const currentResult = await client.query<ServiceStatusCostConfigRow>(
       `select component_id, billing_model, currency, resident_hourly_price_cny::text, hourly_price_cny::text, timezone,
               schedule_enabled, valley_worker_instances, peak_windows_json, updated_at::text
@@ -231,7 +232,7 @@ export async function saveServiceStatusCostConfig(
     if (normalizeTimestamp(current?.updated_at ?? '') !== normalizeTimestamp(input.expectedUpdatedAt ?? '')) {
       if (current || input.expectedUpdatedAt !== null) throw costConfigConflictError()
     }
-    const now = new Date().toISOString()
+    const now = new Date(Math.max(Date.now(), Date.parse(current?.updated_at ?? '') + 1 || 0)).toISOString()
     const config = normalizeServiceStatusCostConfig({ ...input.config, updated_at: now }, input.config.component_id)
     await client.query(
       `insert into service_status_cost_config

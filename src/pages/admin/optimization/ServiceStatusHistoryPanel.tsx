@@ -13,7 +13,7 @@ const EMPTY: AdminServiceStatusResponse = {
   generated_at: new Date(0).toISOString(), status: 'unavailable', queue: null,
   components: [{ id: 'optimization', status: 'unavailable' }], thresholds: { queue_congested_at: 5, queue_overloaded_at: 20 },
   history: { from: new Date(0).toISOString(), to: new Date(0).toISOString(), interval: 'hour', complete: false, buckets: [] }, incidents: [],
-  cost: { config: createDefaultServiceStatusCostConfig(), estimate: calculateServiceStatusCostEstimate(createDefaultServiceStatusCostConfig(), []), recommendation: { generated_at: new Date(0).toISOString(), source_sample_count: 0, confidence: 'none', valley_worker_instances: 0, peak_windows: [], hourly_worker_instances: Array.from({ length: 24 }, () => 0), rationale: [] } },
+  cost: { config: createDefaultServiceStatusCostConfig(), estimate: calculateServiceStatusCostEstimate(createDefaultServiceStatusCostConfig(), [], new Date(0).toISOString()), recommendation: { generated_at: new Date(0).toISOString(), source_sample_count: 0, confidence: 'none', valley_worker_instances: 0, peak_windows: [], hourly_worker_instances: Array.from({ length: 24 }, () => 0), rationale: [] } },
 }
 
 export default function ServiceStatusHistoryPanel() {
@@ -106,7 +106,7 @@ export default function ServiceStatusHistoryPanel() {
 
 function normalizeAdminStatusResponse(value: AdminServiceStatusResponse): AdminServiceStatusResponse {
   if (value.cost) {
-    const calculated = calculateServiceStatusCostEstimate(value.cost.config, value.history.buckets)
+    const calculated = calculateServiceStatusCostEstimate(value.cost.config, value.history.buckets, value.history.to)
     return { ...value, cost: { ...value.cost, estimate: { ...calculated, ...value.cost.estimate } } }
   }
   const config = createDefaultServiceStatusCostConfig()
@@ -114,7 +114,7 @@ function normalizeAdminStatusResponse(value: AdminServiceStatusResponse): AdminS
     ...value,
     cost: {
       config,
-      estimate: calculateServiceStatusCostEstimate(config, value.history.buckets),
+      estimate: calculateServiceStatusCostEstimate(config, value.history.buckets, value.history.to),
       recommendation: { generated_at: value.generated_at, source_sample_count: 0, confidence: 'none', valley_worker_instances: 0, peak_windows: [], hourly_worker_instances: Array.from({ length: 24 }, () => 0), rationale: [] },
     },
   }

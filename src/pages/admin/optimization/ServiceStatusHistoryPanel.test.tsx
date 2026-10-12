@@ -33,17 +33,38 @@ describe('ServiceStatusHistoryPanel', () => {
     })))
   })
 
-  it('saves resident and burst ECS prices and clears obsolete peak/valley settings', async () => {
+  it('disables price edits while saving resident and burst prices and clears obsolete peak/valley settings', async () => {
+    let finish!: () => void
+    adminApiJson.mockImplementation(async (_url: string, options?: { method?: string }) => {
+      if (options?.method) await new Promise<void>((resolve) => { finish = resolve })
+      return response()
+    })
     render(<ServiceStatusHistoryPanel />)
     const residentPrice = await screen.findByRole('spinbutton', { name: /常驻 Worker（2 核）每小时单价（元）/ })
     const burstPrice = screen.getByRole('spinbutton', { name: /Burst Worker（4 核）每小时单价（元）/ })
     fireEvent.change(residentPrice, { target: { value: '0.3' } })
     fireEvent.change(burstPrice, { target: { value: '0.9' } })
     fireEvent.click(screen.getByRole('button', { name: '保存计费单价' }))
+    expect(residentPrice).toBeDisabled()
+    expect(burstPrice).toBeDisabled()
     await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/service-status', expect.objectContaining({
       method: 'POST',
       json: expect.objectContaining({ action: 'save_cost_config', resident_hourly_price_cny: 0.3, hourly_price_cny: 0.9, schedule_enabled: false, valley_worker_instances: 0, peak_windows: [] }),
     })))
+    finish()
+    await waitFor(() => expect(burstPrice).toBeEnabled())
+  })
+
+  it('recalculates legacy sparse estimates against history.to', async () => {
+    const value = response()
+    adminApiJson.mockResolvedValue({ ...value, history: { ...value.history, buckets: [
+      { ...value.history.buckets[0], bucket_start: '2026-08-06T09:00:00.000Z', average_worker_instances: 3 },
+      { ...value.history.buckets[0], average_worker_instances: 1 },
+    ] }, cost: { ...value.cost, config: { ...value.cost.config, hourly_price_cny: 0.5 }, estimate: {} } })
+    render(<ServiceStatusHistoryPanel />)
+    expect(await screen.findByText('0.70 元')).toBeInTheDocument()
+    expect(screen.getByText('504.00 元')).toBeInTheDocument()
+    expect(screen.getByText('过去 24 小时实际费用').parentElement).not.toHaveTextContent('2.40 元')
   })
 
   it('keeps cost values available without rendering the retired recommendation controls', async () => {

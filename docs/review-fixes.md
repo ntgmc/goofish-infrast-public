@@ -18,7 +18,7 @@
 | 10 | M12 管理控制台 | D01 保存覆盖新编辑；D02 旧会话详情；D03 撤回遗漏预约 | 已修复、验证通过 |
 | 11 | M13 前端外壳 | D01 迁移草稿；D02 旧工作区响应；D03 清除凭据切换档案 | 已修复、验证通过 |
 | 12 | M14 前端排班与结果 | D01 历史配置竞争；D02 历史分页竞争；D03 对比遗漏券；D04 恢复动画清理 | 已修复、验证通过 |
-| 13 | M15 状态与监控 | D01 稀疏成本窗口；D02 首次成本保存竞争 | 待修复 |
+| 13 | M15 状态与监控 | D01 稀疏成本窗口；D02 首次成本保存竞争 | 已修复、验证通过 |
 | 14 | M16 构建与部署 | D01 删除跳过构建；D02 遗漏输入；D03 旧产物接受新清单 | 待修复 |
 
 ## 第 1 轮：M01 HTTP 与安全边界
@@ -134,4 +134,13 @@
 - D04：恢复和主生成在完成动画后复查生命周期，工作区刷新结果及错误也核对当前性，异步余额刷新结束后再检查才执行本地结算。不把页面离开当作取消服务端任务。
 - 最近验证：23 个排班/V2 文件、210 项通过。新增真实 session/workflow/client 组合验证历史逆序及自动 PATCH、查看/应用交错、换档案、两代券确认/取消选择/已含权益；恢复和生成均覆盖动画内卸载/换档案、刷新中卸载及正常完成。两种历史分页覆盖迟到成功/错误与新 loading 竞争。
 - 完整验证：`check:local` 通过（246 个普通文件、1,989 项；完整构建/API/109 条路由）。新增历史 fixture 的 summary/detail 类型对齐后重跑通过；最终文档编辑后复跑架构、死代码及 whitespace 检查。边界响应使用受控 fixture，未运行私有优化器或真实计费。
-- Commit message：`fix(optimization-ui): isolate history requests and honor comparison coupons`。
+- Commit：`fb97e8a4`，`fix(optimization-ui): isolate history requests and honor comparison coupons`。
+
+## 第 13 轮：M15 状态与监控
+
+- D01：共享成本 helper 显式接收 history.to，按 bucket_start 的 [to−窗口, to) 计算 24h/30d；服务器和客户端兼容重算均传入同一终点。只有旧数据时近期成本/实例小时为 null、覆盖为 0，不再用旧观测填补。
+- D02：版本读取前取得按 component 的事务 advisory lock，覆盖首次无行及已有行保存；updated_at 至少推进 1 ms。冲突沿用 409，审计只跟随成功写入。没有 schema/迁移改动。
+- M12-D01 关联变体：成本输入使用原生 disabled fieldset，保存和随后的刷新期间禁编辑，防止旧响应覆盖新草稿。
+- 最近验证：8 个普通文件、71 项及状态 PostgreSQL 文件 8 项通过。覆盖真实稀疏存储、排序/时间边界、两端费用卡、保存禁编辑、实际表锁阻塞的双首次保存（1 成功/1 冲突/1 审计）、旧版本、更新版本与审计失败回滚。
+- 完整验证：`check:local` 通过（246 个普通文件、1,991 项；完整构建/API/109 条路由）；全量 PostgreSQL 21 个文件、246 项、公开导出和临时数据库 check:migration/严格验证器均通过。公开导出首次有一条既有 V2 测试超过默认 5 秒，单文件及整个导出重跑通过。最终文档编辑后复跑架构、死代码及 whitespace 检查；容器/连接和临时源码副本已清理，未使用云账单或真实 ECS。
+- Commit message：`fix(status): bound cost windows and serialize initial configuration saves`。
