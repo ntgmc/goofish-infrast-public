@@ -31,8 +31,9 @@
 .admin-sidebar nav { overflow-y: auto; flex: 1; }
 .admin-nav-group { margin-bottom: var(--space-sm); }
 .admin-nav-group > p { margin: 0 12px 6px; font-size: 12px; color: var(--color-v2-rail-muted); }
-.admin-nav-link { display: flex; gap: var(--space-xs); align-items: center; min-height: 44px; padding: 8px 12px; border-radius: var(--radius-v2-control); font-size: 14px; color: var(--color-v2-rail-muted); }
-.admin-nav-link:hover, .admin-nav-link[aria-current="page"] { background: var(--color-v2-rail-hover); color: var(--color-v2-rail-ink); }
+.admin-nav-link { display: flex; gap: var(--space-xs); align-items: center; min-height: 44px; padding: 8px 12px; border-radius: var(--radius-v2-control); font-size: 14px; color: var(--color-v2-rail-muted); cursor: pointer; }
+.admin-nav-link:hover, .admin-nav-link:focus-visible, .admin-nav-link[aria-current="page"] { background: var(--color-v2-rail-hover); color: var(--color-v2-rail-ink); }
+.admin-sidebar nav .admin-nav-link:focus-visible { outline-offset: -2px; }
 .admin-nav-link:active { background: var(--color-v2-rail-hover); color: var(--color-v2-rail-accent); }
 .admin-nav-link[aria-current="page"] { box-shadow: inset 3px 0 var(--color-v2-rail-accent); }
 .admin-sidebar-bottom { display: grid; gap: 4px; border-top: 1px solid var(--color-v2-rail-line); padding-top: 12px; }

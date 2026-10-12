@@ -60,7 +60,7 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        'group/dropdown-menu-item relative flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink-secondary outline-none select-none focus:bg-surface-2 focus:text-ink-primary data-[highlighted]:bg-surface-2 data-[highlighted]:text-ink-primary data-inset:pl-9 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive data-[variant=destructive]:data-[highlighted]:bg-destructive/10 data-[variant=destructive]:data-[highlighted]:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50 dark:data-[variant=destructive]:focus:bg-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-4',
+        'group/dropdown-menu-item relative flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink-secondary outline-none select-none focus-visible:-outline-offset-2! focus:bg-surface-2 focus:text-ink-primary data-[highlighted]:bg-surface-2 data-[highlighted]:text-ink-primary data-inset:pl-9 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive data-[variant=destructive]:data-[highlighted]:bg-destructive/10 data-[variant=destructive]:data-[highlighted]:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50 dark:data-[variant=destructive]:focus:bg-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-4',
         className,
       )}
       {...props}
@@ -92,7 +92,7 @@ function DropdownMenuRadioItem({
       data-slot="dropdown-menu-radio-item"
       data-inset={inset}
       className={cn(
-        'relative flex min-h-11 cursor-pointer items-center gap-2 rounded-lg py-2 pr-10 pl-3 text-sm text-ink-secondary outline-none select-none focus:bg-surface-2 focus:text-ink-primary data-[highlighted]:bg-surface-2 data-[highlighted]:text-ink-primary data-inset:pl-9 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-4',
+        'relative flex min-h-11 cursor-pointer items-center gap-2 rounded-lg py-2 pr-10 pl-3 text-sm text-ink-secondary outline-none select-none focus-visible:-outline-offset-2! focus:bg-surface-2 focus:text-ink-primary data-[highlighted]:bg-surface-2 data-[highlighted]:text-ink-primary data-inset:pl-9 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*="size-"])]:size-4',
         className,
       )}
       {...props}

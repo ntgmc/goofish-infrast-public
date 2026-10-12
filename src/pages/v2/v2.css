@@ -1073,6 +1073,21 @@
   font-size: var(--text-sm);
 }
 
+@media (hover: hover) {
+  :is(.v2-content-tabs, .v2-view-toggle) > button:hover:not(:disabled),
+  .v2-shifts > button:hover:not([aria-selected="true"]):not(:disabled),
+  .v2-profile-option:hover:not(:disabled) {
+    background: var(--color-v2-hover);
+  }
+  .v2-text-button:hover:not(:disabled) { color: var(--color-v2-accent-hover); }
+}
+:is(.v2-content-tabs, .v2-view-toggle) > button:active:not(:disabled),
+.v2-shifts > button:active:not([aria-selected="true"]):not(:disabled),
+.v2-profile-option:active:not(:disabled) {
+  background: var(--v2-accent-soft);
+}
+.v2-text-button:active:not(:disabled) { color: var(--color-v2-accent-hover); }
+
 .v2-layout-preview {
   display: flex;
   gap: 5px;

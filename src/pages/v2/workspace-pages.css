@@ -75,6 +75,17 @@ textarea.v2-input { resize: vertical; }
     border-color var(--dur-fast) ease-out, box-shadow var(--dur-fast) ease-out;
 }
 
+@media (hover: hover) {
+  :is(.v2-view-switch, .v2-filter-group, .v2-account-methods, .v2-settings-index, .v2-special-items, .v2-inbox-index, .v2-release-index, .v2-term-choices) > button:hover:not(:disabled),
+  :is(.v2-account-choice, .v2-record-select):hover:not(:disabled) {
+    background: var(--color-v2-hover);
+  }
+}
+:is(.v2-view-switch, .v2-filter-group, .v2-account-methods, .v2-settings-index, .v2-special-items, .v2-inbox-index, .v2-release-index, .v2-term-choices) > button:active:not(:disabled),
+:is(.v2-account-choice, .v2-record-select):active:not(:disabled) {
+  background: var(--v2-accent-soft);
+}
+
 /* Select an account, then act on that account. */
 .v2-account-index { min-width: 0; }
 .v2-selection-list { margin-top: var(--space-sm); }

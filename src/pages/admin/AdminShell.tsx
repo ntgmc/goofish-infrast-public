@@ -48,8 +48,8 @@ export default function AdminShell({ section, username, capabilities, syncStatus
           </Link>
         })}
       </div>)}</nav>
-      <div className="admin-sidebar-bottom"><span>{username}</span>{canManage && <Link to="/admin/setup">管理员账号</Link>}
-        <button type="button" onClick={onLogout}>退出登录</button></div>
+      <div className="admin-sidebar-bottom"><span>{username}</span>{canManage && <Link to="/admin/setup" className="admin-nav-link">管理员账号</Link>}
+        <button type="button" className="admin-nav-link" onClick={onLogout}>退出登录</button></div>
     </aside>
     <main className="admin-workspace tool-workspace" tabIndex={-1} data-route-focus>
       <header className="admin-topbar tool-header">
