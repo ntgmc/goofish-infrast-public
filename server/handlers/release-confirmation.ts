@@ -40,7 +40,7 @@ export default async function releaseConfirmationHandler(req: Request): Promise<
       type: 'release.published',
       title: truncatePlainText(release.displayVersion, 120),
       summary: buildReleaseSummary(release.sections.flatMap((section) => section.items)),
-      url: resolveWebsitePublicUrl('/changelog', `release-${release.id}`),
+      url: resolveWebsitePublicUrl('/v2?section=updates', `release-${release.id}`),
       published_at: new Date(release.releasedAt).toISOString(),
       version: body.version,
     })

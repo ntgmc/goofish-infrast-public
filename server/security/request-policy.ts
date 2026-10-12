@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { feedbackRequestSchema } from '../../src/lib/feedback-contracts'
 import { giftPackOpeningRuleSchema } from '../../src/lib/admin-inventory-contracts'
 import {
   MAX_DEPOT_ITEM_COUNT,
@@ -33,6 +34,7 @@ export const REQUEST_BODY_LIMITS = Object.freeze({
   admin: 128 * 1024,
   compute: 256 * 1024,
   depot: 1024 * 1024,
+  feedback: 2 * 1024 * 1024,
 })
 
 export type RequestBodyProfile = keyof typeof REQUEST_BODY_LIMITS
@@ -133,6 +135,7 @@ export const requestSchemas = {
     includeClosed: z.boolean().optional(), includeAlternatives: z.boolean().optional(), includeUncertain: z.boolean().optional(),
   }).optional() }),
   depotValue: depotValueRequestSchema,
+  userFeedback: feedbackRequestSchema,
   adminSession: strict({ username: shortString(64), password: shortString(128) }),
   authRegister: strict({
     email: shortString(AUTH_EMAIL_MAX_LENGTH),
@@ -243,6 +246,7 @@ export const requestSchemas = {
     expected_revision: expectedRevisionSchema,
   }),
   adminRegistrationSettings: strict({
+    expected_updated_at: z.string().datetime().nullable(),
     email_verification_required: z.boolean(),
     invite_code_required: z.boolean(),
     bot_registration_enabled: z.boolean().optional(),
@@ -691,16 +695,19 @@ const SKLAND_PATHS: Record<string, z.ZodType> = {
   '/api/user/skland/login/start': requestSchemas.sklandProfile,
   '/api/user/skland/login/complete': requestSchemas.sklandScan,
   '/api/user/skland/login/confirm': requestSchemas.sklandConfirmation,
+  '/api/user/skland/pending/cancel': requestSchemas.sklandPendingCancel,
   '/api/user/skland/credential/preview': requestSchemas.sklandCredential,
   '/api/user/skland/account/select': requestSchemas.sklandSelection,
   '/api/user/skland/import/refresh': requestSchemas.sklandProfile,
   '/api/user/skland/facilities': requestSchemas.sklandProfile,
   '/api/user/skland/free-preview/login/complete': requestSchemas.freePreviewScanComplete,
   '/api/user/skland/free-preview/login/confirm': requestSchemas.freePreviewConfirmation,
+  '/api/user/skland/free-preview/pending/cancel': requestSchemas.profilelessSklandPendingCancel,
   '/api/user/skland/free-preview/credential/preview': requestSchemas.freePreviewCredential,
   '/api/user/skland/free-preview/account/select': requestSchemas.freePreviewSelection,
   '/api/user/skland/lifetime-voucher/login/complete': requestSchemas.lifetimeVoucherScanComplete,
   '/api/user/skland/lifetime-voucher/login/confirm': requestSchemas.lifetimeVoucherConfirmation,
+  '/api/user/skland/lifetime-voucher/pending/cancel': requestSchemas.profilelessSklandPendingCancel,
   '/api/user/skland/lifetime-voucher/credential/preview': requestSchemas.lifetimeVoucherCredential,
   '/api/user/skland/lifetime-voucher/account/select': requestSchemas.lifetimeVoucherSelection,
 }
@@ -745,6 +752,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/auth/me', route({ GET: none() }, ['profile_id'])],
   ['/api/site/features', route({ GET: none() })],
   ['/api/site/public-content', route({ GET: none() })],
+  ['/api/changelog', route({ GET: none() }, ['page', 'release'])],
   ['/api/status', route({ GET: none() })],
   ['/api/user/data/export', route({ GET: none() })],
   ['/api/user/data/delete-request', route({ POST: json('auth', requestSchemas.accountDelete) })],
@@ -769,6 +777,8 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/depot-value', route({ POST: json('depot', requestSchemas.depotValue) })],
   ['/api/cultivation-plan', route({ POST: json('standard', requestSchemas.cultivationPlan) })],
   ['/api/user/announcements', route({ GET: none(), PATCH: json('standard', requestSchemas.userAnnouncement) })],
+  ['/api/user/feedback', route({ POST: json('feedback', requestSchemas.userFeedback) })],
+  ['/api/admin/feedback', route({ GET: none() }, ['page', 'page_size', 'image_id'])],
   ['/api/user/notifications', route({ GET: none(), PATCH: json('standard', requestSchemas.userNotification) }, ['cursor', 'limit'])],
   ['/api/user/profiles', route({ GET: none(), PATCH: json('standard', requestSchemas.profilePatch) })],
   ['/api/user/profiles/depot-value', route({ POST: none() })],

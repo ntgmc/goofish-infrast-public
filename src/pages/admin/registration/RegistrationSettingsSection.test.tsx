@@ -73,6 +73,7 @@ describe('RegistrationSettingsSection', () => {
     await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/registration-settings', expect.objectContaining({
       method: 'PUT',
       json: {
+        expected_updated_at: null,
         email_verification_required: false,
         invite_code_required: true,
         bot_registration_enabled: false,
@@ -95,6 +96,7 @@ describe('RegistrationSettingsSection', () => {
     await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/registration-settings', expect.objectContaining({
       method: 'PUT',
       json: {
+        expected_updated_at: null,
         email_verification_required: true,
         invite_code_required: false,
         bot_registration_enabled: true,

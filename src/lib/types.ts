@@ -881,6 +881,14 @@ export interface UserAnnouncementRead {
   read_at: string | null;
 }
 
+export interface AnnouncementPageResponse {
+  announcements: UserAnnouncementRead[];
+  page: number;
+  pageSize: number;
+  total: number;
+  unread_count?: number;
+}
+
 export interface UserNotificationItemGrantDetail {
   item_code: string;
   name: string;
@@ -1233,5 +1241,6 @@ export interface PersonalDataExportV4 {
   };
   commercial_account: PersonalDataExportRecord | null;
   notifications: unknown[];
+  feedback: PersonalDataExportRecord[];
   deletion_request: PersonalDataExportRecord | null;
 }

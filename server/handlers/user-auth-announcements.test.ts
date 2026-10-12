@@ -38,5 +38,8 @@ describe('active user announcements', () => {
     })
 
     await expect(getActiveAnnouncements()).resolves.toEqual([activePopup])
+    await expect(getActiveAnnouncements(true)).resolves.toEqual([
+      { ...activePopup, id: 'banner', kind: 'banner' }, activePopup,
+    ])
   })
 })

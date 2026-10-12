@@ -3,6 +3,7 @@ import { MotionConfig } from 'motion/react'
 import { Route, Routes, useLocation, useNavigate } from 'react-router'
 import BuildMetaStrip from './components/BuildMetaStrip'
 import DeploymentUpdatePrompt from './components/DeploymentUpdatePrompt'
+import MobileBrowserPrompt from './components/MobileBrowserPrompt'
 import { motionTokens } from './components/MotionPrimitives'
 import RouteLifecycle from './components/RouteLifecycle'
 import RouteMetadata from './components/RouteMetadata'
@@ -112,6 +113,7 @@ function AppContent() {
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
       <DeploymentUpdatePrompt />
+      <MobileBrowserPrompt />
       {location.pathname !== '/' && location.pathname !== '/v2' && <BuildMetaStrip placement="corner" />}
     </div>
   )

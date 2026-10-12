@@ -9,6 +9,7 @@ import { purgeExpiredPersonalUseDeclarationAcceptances } from './storage/persona
 import { sendAccountDeletionCancellationEmail, sendAccountDeletionReceiptEmail } from './handlers/email'
 import { recordAccountDeletedBehaviorEvent } from './behavior-risk/service'
 import { releaseScheduleBalanceInTransaction } from './storage/balance-store'
+import { releaseOptimizationJobReservationsInTransaction } from './storage/optimize-job-store'
 
 const DELETION_DELAY_MS = 7 * 24 * 60 * 60 * 1000
 const DELETION_LEASE_MS = 5 * 60 * 1000
@@ -164,7 +165,7 @@ export async function requestAccountDeletion(
        )`,
       [user.id],
     )
-    const cancelledJobs = await client.query<{ id: string }>(
+    const cancelledJobs = await client.query<{ id: string; payload_json: unknown }>(
       `update optimize_jobs set status = 'failed', error_message = '账号已请求注销，任务已取消。',
          payload_json = payload_json - 'activeProfile', worker_id = null, heartbeat_at = null,
          lock_token = null, lock_expires_at = null,
@@ -178,10 +179,12 @@ export async function requestAccountDeletion(
              where user_id = $1
           ))
          and status in ('queued', 'running')
-       returning id`,
+       returning id, payload_json`,
       [user.id],
     )
-    for (const job of cancelledJobs.rows) await releaseScheduleBalanceInTransaction(client, job.id)
+    for (const job of cancelledJobs.rows) {
+      await releaseOptimizationJobReservationsInTransaction(client, job.id, job.payload_json, updatedAt)
+    }
     const remainingReservations = await client.query<{ job_id: string }>(
       `select job_id from user_balance_reservations
         where user_id = $1 and status = 'reserved' for update`,

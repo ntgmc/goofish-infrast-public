@@ -8,7 +8,9 @@ import {
   processDueAccountDeletions,
   requestAccountDeletion,
 } from './account-data-lifecycle'
-import { closePool, query } from './storage/postgres'
+import { closePool, query, withTransaction } from './storage/postgres'
+import { getItemBalance, grantItem, reserveItemsInTransaction } from './storage/inventory-store'
+import { createPostgresOptimizeJobStore } from './storage/optimize-job-store'
 import { ensureDatabaseSchema } from './storage/schema'
 import type { UserAccountRecord, UserGameAccountRecord } from './storage/user-store'
 
@@ -71,6 +73,59 @@ describe('account deletion PostgreSQL lifecycle', () => {
     expect(await countRows('user_sessions', 'user_id', user.id)).toBe(0)
     expect((await readUserStatus(user.id))).toBe('pending_deletion')
     expect(mocks.sendAccountDeletionCancellationEmail).not.toHaveBeenCalled()
+  })
+
+  it.each(['queued', 'running'])('releases every reservation when deletion cancels a %s job, including after withdrawal', async (status) => {
+    const now = new Date()
+    const timestamp = now.toISOString()
+    const user = await seedUser(`reservations-${status}@example.test`, now)
+    const profile = await seedProfile(user.id, now)
+    const jobId = randomUUID()
+    const key = `cdk/${randomUUID()}.json`
+    await query(
+      `insert into optimize_jobs (id, status, priority, owner_key, permission, source, payload_json,
+         profile_id, worker_id, lock_token, attempt_count, created_at, updated_at)
+       values ($1, $2, 0, $3, 'growth', 'account_profile', '{}', $4, 'worker-1', 'lock-1', 1, $5, $5)`,
+      [jobId, status, `profile:${profile.id}`, profile.id, timestamp],
+    )
+    await grantItem({
+      userId: user.id, itemCode: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' },
+      sourceType: 'test', sourceId: jobId, recipientRole: 'test',
+    })
+    await withTransaction((client) => reserveItemsInTransaction(
+      client, user.id, ['priority_compute_coupon'], 'optimization_job', jobId, profile.id, timestamp,
+    ))
+    await query(
+      `insert into profile_entitlements (profile_id, first_generated_at, free_revision_count, updated_at)
+       values ($1, $2, 1, $2)`, [profile.id, timestamp],
+    )
+    await query(
+      `insert into entitlement_ledger (id, profile_id, entitlement_type, status, reference_type, reference_id, created_at)
+       values ($1, $2, 'free_schedule', 'reserved', 'optimization_job', $3, $4)`,
+      [randomUUID(), profile.id, jobId, timestamp],
+    )
+    await query(
+      `insert into cdk_records (key, code_hash, status, permission, record_json) values ($1, $2, 'used', 'growth', $3::jsonb)`,
+      [key, randomUUID(), JSON.stringify({ status: 'used', permission: 'growth', schedule_generate_reserved_count: 1, scenario_comparison_reserved_count: 1 })],
+    )
+    for (const effect of ['cdk_schedule_quota', 'cdk_scenario_quota']) {
+      await query(
+        `insert into optimization_job_effects (job_id, effect_type, metadata_json, applied_at) values ($1, $2, $3::jsonb, $4)`,
+        [jobId, effect, JSON.stringify({ key, status: 'reserved' }), timestamp],
+      )
+    }
+    await requestAccountDeletion(user, now)
+    // Repeating the request must not refund or decrement counters twice.
+    await requestAccountDeletion(user, now)
+    expect(await cancelAccountDeletion(await readCancellationToken(user.id), now)).toBe(true)
+    expect(await getItemBalance(user.id, 'priority_compute_coupon')).toBe(1)
+    expect((await query('select status from entitlement_ledger where reference_id = $1', [jobId])).rows[0]?.status).toBe('released')
+    expect((await query('select free_revision_count, first_generated_at from profile_entitlements where profile_id = $1', [profile.id])).rows[0]).toEqual({ free_revision_count: 0, first_generated_at: null })
+    expect((await query('select record_json from cdk_records where key = $1', [key])).rows[0]?.record_json).toMatchObject({ schedule_generate_reserved_count: 0, scenario_comparison_reserved_count: 0 })
+    expect((await query("select metadata_json->>'status' as status from optimization_job_effects where job_id = $1", [jobId])).rows.map((row) => row.status)).toEqual(['released', 'released'])
+    expect(await createPostgresOptimizeJobStore().completeAttempt(jobId, 1, 'worker-1', 'lock-1', {})).toBe(false)
+    expect((await query('select status from optimize_jobs where id = $1', [jobId])).rows[0]?.status).toBe('failed')
+    await query('delete from cdk_records where key = $1', [key])
   })
 
   it('rolls back the request, outbox, account state, and session when the transaction fails', async () => {

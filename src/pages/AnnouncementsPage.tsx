@@ -7,7 +7,7 @@ import ThemeSwitcher from '../components/ThemeSwitcher'
 import { copy, CURRENT_LOCALE } from '../copy/index'
 
 
-export function usePublicAnnouncements() {
+function usePublicAnnouncements() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

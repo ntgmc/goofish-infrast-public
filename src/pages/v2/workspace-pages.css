@@ -35,7 +35,7 @@ textarea.v2-input { resize: vertical; }
 .v2-input[aria-invalid="true"] { border-color: var(--color-v2-error); }
 .v2-input:focus-visible { outline: 2px solid var(--color-v2-focus); outline-offset: 2px; }
 .v2-field-error { font-size: var(--text-sm); color: var(--color-v2-error) !important; }
-.v2-search { display: flex; min-width: 0; align-items: center; gap: var(--space-xs); padding-inline: var(--space-sm); min-height: 44px; background: var(--v2-paper); border: 1px solid var(--color-v2-control); border-radius: var(--radius-v2-control); color: var(--v2-muted); svg { flex: none; } input { width: 100%; min-width: 0; padding-block: var(--space-xs); color: var(--v2-ink); font-size: var(--text-sm); outline: none; } &:focus-within { outline: 2px solid var(--color-v2-focus); outline-offset: 2px; } }
+.v2-search { display: flex; min-width: 0; align-items: center; gap: var(--space-xs); padding-inline: var(--space-sm); min-height: 44px; background: var(--v2-paper); border: 1px solid var(--color-v2-control); border-radius: var(--radius-v2-control); color: var(--v2-muted); svg { flex: none; } input { width: 100%; min-width: 0; padding-block: var(--space-xs); color: var(--v2-ink); font-size: var(--text-sm); outline: none; } }
 .v2-notice { display: flex; align-items: start; gap: var(--space-xs); padding: var(--space-sm); margin-block: var(--space-sm); background: var(--v2-accent-soft); border-left: 2px solid var(--v2-accent); color: var(--v2-secondary); font-size: var(--text-sm); line-height: 1.75; > svg { flex: none; margin-top: var(--space-3xs); } > div { min-width: 0; } }
 .v2-notice-error { border-color: var(--color-v2-error); color: var(--color-v2-error); background: var(--color-v2-error-soft); }
 .v2-empty { display: flex; flex-direction: column; align-items: start; gap: var(--space-sm); padding: var(--space-xl) var(--space-lg); border-top: 1px solid var(--v2-line); color: var(--v2-muted); p { max-width: 50ch; font-size: var(--text-sm); } }
@@ -73,6 +73,17 @@ textarea.v2-input { resize: vertical; }
 .v2-page-section button[aria-pressed] {
   transition: color var(--dur-fast) ease-out, background-color var(--dur-fast) ease-out,
     border-color var(--dur-fast) ease-out, box-shadow var(--dur-fast) ease-out;
+}
+
+@media (hover: hover) {
+  :is(.v2-view-switch, .v2-filter-group, .v2-account-methods, .v2-settings-index, .v2-special-items, .v2-inbox-index, .v2-release-index, .v2-term-choices) > button:hover:not(:disabled),
+  :is(.v2-account-choice, .v2-record-select):hover:not(:disabled) {
+    background: var(--color-v2-hover);
+  }
+}
+:is(.v2-view-switch, .v2-filter-group, .v2-account-methods, .v2-settings-index, .v2-special-items, .v2-inbox-index, .v2-release-index, .v2-term-choices) > button:active:not(:disabled),
+:is(.v2-account-choice, .v2-record-select):active:not(:disabled) {
+  background: var(--v2-accent-soft);
 }
 
 /* Select an account, then act on that account. */
@@ -207,7 +218,6 @@ textarea.v2-input { resize: vertical; }
 .v2-inbox-layout { grid-template-columns: minmax(14rem, .8fr) minmax(0, 1.7fr); gap: var(--space-lg); }
 .v2-inbox-index > button { position: relative; display: flex; width: 100%; min-width: 0; flex-direction: column; text-align: left; gap: var(--space-xs); padding: var(--space-md); border-bottom: 1px solid var(--v2-line); time { font-size: var(--text-xs); color: var(--v2-muted); } strong { padding-right: var(--space-md); } svg { position: absolute; right: var(--space-sm); top: var(--space-md); color: var(--v2-accent); } &[aria-pressed="true"] { background: var(--v2-paper); } &[data-unread="true"] { box-shadow: inset 3px 0 var(--v2-accent); } }
 .v2-announcement-reading { padding: var(--space-lg); border: 1px solid var(--v2-line); background: var(--v2-paper); border-radius: var(--radius-v2-panel); > time { font-size: var(--text-xs); color: var(--v2-muted); } h2 { margin-block: var(--space-sm) var(--space-lg); } > button { margin-top: var(--space-lg); } }
-.v2-public-feed > article { display: grid; grid-template-columns: 11rem minmax(0, 1fr); gap: var(--space-lg); padding-block: var(--space-lg); border-bottom: 1px solid var(--v2-line); time { color: var(--v2-muted); font-size: var(--text-xs); } h2 { margin-bottom: var(--space-md); } }
 .v2-releases > p { margin-bottom: var(--space-lg); }
 .v2-release-index { display: flex; flex-direction: column; button { display: flex; flex-direction: column; gap: var(--space-xs); text-align: left; padding: var(--space-md); border-bottom: 1px solid var(--v2-line); } button[aria-pressed="true"] { background: var(--v2-paper); box-shadow: inset 3px 0 var(--v2-accent); } time { color: var(--v2-muted); font-size: var(--text-xs); } }
 .v2-release-detail { min-width: 0; > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-sm); padding-bottom: var(--space-lg); border-bottom: 1px solid var(--v2-line); } time, code { color: var(--v2-muted); font-size: var(--text-xs); } > section { padding-block: var(--space-lg); border-bottom: 1px solid var(--v2-line); } ul { list-style: disc; padding-left: var(--space-md); margin-top: var(--space-sm); } li { font-size: var(--text-sm); line-height: 1.9; margin-bottom: var(--space-xs); color: var(--v2-secondary); } }
@@ -291,7 +301,7 @@ textarea.v2-input { resize: vertical; }
   .v2-manual-preparation > section:last-child { grid-column: 1; }
   .v2-planning-conditions > .v2-choice-list { grid-template-columns: minmax(0, 1fr); }
   .v2-cultivation-priorities > li { grid-template-columns: 16px minmax(0, 1fr); gap: var(--space-xs); > button { grid-column: 2; justify-self: end; } }
-  .v2-public-feed > article, .v2-service-incidents li { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
+  .v2-service-incidents li { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
   .v2-entitlement-head, .v2-entitlement-comparison article { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-xs) var(--space-sm); > :first-child { grid-column: 1 / -1; } }
   .v2-service-summary { padding: var(--space-sm); gap: var(--space-sm); > div { flex-basis: calc(100% - 2rem); } }
   .v2-service-week > div { grid-template-columns: 2rem minmax(0, 1fr); > div { gap: 2px; } }

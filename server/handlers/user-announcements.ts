@@ -3,15 +3,26 @@ import { getAnnouncementReads, markAnnouncementsRead } from '../storage/user-sto
 import { getActiveAnnouncements, jsonResponse, requireUserSession } from './user-auth'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
+import { paginateAnnouncements, parseAnnouncementPage } from './announcement-pagination'
 
 export default async (req: Request): Promise<Response> => {
 
   try {
     const auth = await requireUserSession(req)
     if (!auth) return jsonResponse({ error: '请先登录。' }, 401, noStore())
+    const params = new URL(req.url).searchParams
+    const paginated = params.has('page') || params.has('announcement_id') || params.has('unread_only')
+    const options = parseAnnouncementPage(params)
+    if (paginated && !options) return jsonResponse({ error: 'Invalid announcement page' }, 400, noStore())
+    const payload = async () => {
+      const data = await buildAnnouncementPayload(auth.user.id, paginated)
+      return paginated && options
+        ? { ...paginateAnnouncements(data.announcements, options), unread_count: data.unread_count }
+        : data
+    }
 
     if (req.method === 'GET') {
-      return jsonResponse(await buildAnnouncementPayload(auth.user.id), 200, noStore())
+      return jsonResponse(await payload(), 200, noStore())
     }
 
     if (req.method === 'PATCH') {
@@ -25,7 +36,7 @@ export default async (req: Request): Promise<Response> => {
       }
       const updatedCount = await markAnnouncementsRead(auth.user.id, selected)
       return jsonResponse({
-        ...await buildAnnouncementPayload(auth.user.id),
+        ...await payload(),
         updated_count: updatedCount,
       }, 200, noStore())
     }
@@ -37,8 +48,8 @@ export default async (req: Request): Promise<Response> => {
   }
 }
 
-async function buildAnnouncementPayload(userId: string): Promise<{ announcements: UserAnnouncementRead[]; unread_count: number }> {
-  const [announcements, reads] = await Promise.all([getActiveAnnouncements(), getAnnouncementReads(userId)])
+async function buildAnnouncementPayload(userId: string, includeBanner = false): Promise<{ announcements: UserAnnouncementRead[]; unread_count: number }> {
+  const [announcements, reads] = await Promise.all([getActiveAnnouncements(includeBanner), getAnnouncementReads(userId)])
   const readMap = new Map(reads.map((read) => [
     announcementReadVersionKey(read.announcement_id, read.announcement_version),
     read.read_at,
@@ -49,7 +60,7 @@ async function buildAnnouncementPayload(userId: string): Promise<{ announcements
   }))
   return {
     announcements: items,
-    unread_count: items.filter((item) => !item.read_at).length,
+    unread_count: items.filter((item) => item.announcement.kind === 'popup' && !item.read_at).length,
   }
 }
 

@@ -41,7 +41,7 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
   const store = getOptimizeJobStore();
   try {
     const replayed = await findEarlyIdempotentJob(req, rawRequestBody, idempotencyKey, requestHash, legacyRequestHash)
-    if (replayed) return acceptedOptimizationJobResponse(replayed)
+    if (replayed) return acceptedOptimizationJobResponse(req, replayed)
   } catch (error) {
     if (error instanceof OptimizeJobAdmissionError) {
       return jsonResponse({ error: error.message, code: error.code }, error.status)
@@ -103,7 +103,7 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
       }
     }
 
-    return acceptedOptimizationJobResponse(admitted.job)
+    return acceptedOptimizationJobResponse(req, admitted.job)
   } catch (error) {
     if (error instanceof PersonalUseDeclarationRequiredError) {
       return jsonResponse({ error: error.message, code: error.code }, error.status);
@@ -151,9 +151,15 @@ async function findEarlyIdempotentJob(
   return store.findIdempotentJob(`profile:${profileId}`, idempotencyKey, requestHash, legacyRequestHash)
 }
 
-async function acceptedOptimizationJobResponse(job: OptimizeJobRecord): Promise<Response> {
+async function acceptedOptimizationJobResponse(req: Request, job: OptimizeJobRecord): Promise<Response> {
+  let subject = getJobCapabilitySubject(job)
+  if (job.profile_id || job.owner_key.startsWith('profile:')) {
+    const access = await canReadOptimizeJob(req, job)
+    if (!access.ok) return jsonResponse({ error: access.message }, access.status)
+    subject = access.subject
+  }
   return jsonResponse({
-    job: await buildOptimizeJobAccepted(job),
+    job: await buildOptimizeJobAccepted(job, subject),
     ...(!job.owner_key.startsWith('profile:') && { pollToken: createOptimizeJobPollToken(job) }),
   }, 202)
 }
@@ -274,13 +280,16 @@ async function canReadOptimizeJob(
   };
 }
 
-export async function buildOptimizeJobAccepted(job: OptimizeJobRecord): Promise<OptimizationJobSnapshot> {
+export async function buildOptimizeJobAccepted(
+  job: OptimizeJobRecord,
+  subject: CapabilitySubject = getJobCapabilitySubject(job),
+): Promise<OptimizationJobSnapshot> {
   const queueEstimate = await getOptimizeJobQueueEstimate(getOptimizeJobStore(), job.id);
   const estimate = getOptimizeJobEstimate(job);
   const runtimeEstimate = getOptimizeRuntimeEstimate(job, queueEstimate.queuePosition, estimate, new Date(), queueEstimate.estimatedWaitMs);
   return projectOptimizeJobSnapshot(
     formatOptimizationJobSnapshot(job, queueEstimate.queuePosition, estimate, runtimeEstimate),
-    getJobCapabilitySubject(job),
+    subject,
   );
 }
 

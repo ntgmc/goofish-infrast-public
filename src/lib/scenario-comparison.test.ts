@@ -114,6 +114,22 @@ describe('expandScenarioComparison', () => {
     expect(JSON.stringify(base)).toBe(original)
   })
 
+  it.each(['252', '252-1', '252-full'] as const)('rejects custom production allocations for %s even when station totals match', (layout) => {
+    const plans: ScenarioProductionPlan[] = [
+      { trading: { lmd: 1, orundum: 1 }, manufacturing: { pureGold: 2, battleRecord: 3, originiumShard: 0 } },
+      { trading: { lmd: 2, orundum: 0 }, manufacturing: { pureGold: 3, battleRecord: 2, originiumShard: 0 } },
+      { trading: { lmd: 2, orundum: 0 }, manufacturing: { pureGold: 2, battleRecord: 2, originiumShard: 1 } },
+    ]
+    for (const plan of plans) {
+      expect(() => expandScenarioComparison(CONFIG_PRESETS['243'], {
+        layouts: [{ layout, plans: [plan] }],
+        maaSchedules: ['8x3'],
+        includeRotation: false,
+        droneStrategies: ['auto'],
+      })).toThrow(/252 配置的各产物设施数量固定/)
+    }
+  })
+
   it('clears 252 facility levels when comparing three-power-station layouts', () => {
     const result = expandScenarioComparison({ ...CONFIG_PRESETS['252-full']!, facility_layout: ['power_1'] }, {
       layouts: [

@@ -13,6 +13,7 @@ import type { AnnouncementStats } from '../../src/lib/types'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
 import type { WebsiteNotificationEventInput } from '../storage/website-notification-event-store'
+import { paginateAnnouncements, parseAnnouncementPage } from './announcement-pagination'
 
 const ANNOUNCEMENT_KEY = 'current.json'
 const MAX_TITLE_LENGTH = 80
@@ -50,10 +51,18 @@ export default async (req: Request): Promise<Response> => {
 }
 
 async function handlePublicGet(req: Request): Promise<Response> {
+  const params = new URL(req.url).searchParams
+  const paginated = params.has('page') || params.has('announcement_id')
+  const options = parseAnnouncementPage(params)
+  if (paginated && !options) return jsonResponse({ error: 'Invalid announcement page' }, 400)
   const { data, revision } = await readAnnouncementDocument()
   const banner = data.banner?.active ? data.banner : null
   const announcements = data.announcements
     .filter((item) => item.active)
+  if (paginated && options) {
+    const items = [...(banner ? [banner] : []), ...announcements].map((announcement) => ({ announcement, read_at: null }))
+    return jsonResponse(paginateAnnouncements(items, options), 200, { 'Cache-Control': 'no-store' })
+  }
   const etag = `"announcements-${revision}"`
   const headers = {
     'Cache-Control': 'public, max-age=60, stale-while-revalidate=300',
@@ -136,7 +145,7 @@ function buildAnnouncementPublicationEvents(
 
   const publicAppUrl = resolvePublicAppUrl()
   return newlyPublished.map((announcement) => {
-    const url = new URL('/', publicAppUrl)
+    const url = new URL('/v2?section=announcements', publicAppUrl)
     url.hash = `announcement-${encodeURIComponent(announcement.id)}`
     return {
       id: createAnnouncementEventId(announcement.id),

@@ -61,6 +61,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   window.localStorage.removeItem('maatool-reduce-motion')
+  window.sessionStorage.clear()
   vi.restoreAllMocks()
 })
 
@@ -74,10 +75,37 @@ function mount(path = '/v2') {
   return render(<MemoryRouter initialEntries={[path]}><V2Page /><RouteLocation /></MemoryRouter>, { wrapper: MotionPreferenceProvider })
 }
 
+it.each(['/#release-v2.0.1016', '/v2#release-v2.0.1016'])('opens the changelog from a version anchor at %s', async (path) => {
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+    releases: [{ id: 'v2.0.1016', version: '2.0.1016', displayVersion: 'v2.0.1016', releasedAt: '2026-10-11', kind: 'release', sections: [] }],
+    page: 1, pageSize: 10, total: 1,
+  }), { headers: { 'Content-Type': 'application/json' } }))
+  mount(path)
+  await screen.findByRole('heading', { name: 'v2.0.1016' }, { timeout: 3000 })
+  expect(screen.getByRole('region', { name: copy.v2.updates })).toBeVisible()
+  await userEvent.click(screen.getByRole('button', { name: /v2.0.1016/ }))
+  expect(screen.getByTestId('route-location')).toHaveTextContent('?section=updates&page=1')
+  expect(screen.getByRole('heading', { name: 'v2.0.1016' })).toBeInTheDocument()
+})
+
 async function dismissDrawer(user: ReturnType<typeof userEvent.setup>) {
   await user.keyboard('{Escape}')
   await waitFor(() => expect(document.querySelector('[data-slot="dialog-content"]')).not.toBeInTheDocument())
 }
+
+it.each(['/#announcement-popup-21', '/v2#announcement-popup-21'])('opens announcements from an announcement anchor at %s without the popup feed', async (path) => {
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+    announcements: [{ announcement: {
+      id: 'popup-21', kind: 'popup', active: true, title: '目标公告', body: '定位正文',
+      created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-01T00:00:00Z',
+    }, read_at: null }], page: 3, pageSize: 10, total: 21,
+  }), { headers: { 'Content-Type': 'application/json' } }))
+  mount(path)
+  await screen.findByRole('heading', { name: '目标公告' }, { timeout: 3000 })
+  expect(screen.getByRole('region', { name: copy.v2.announcements })).toBeVisible()
+  expect(mocks.session).toHaveBeenCalledWith(null, true, false)
+  await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('?section=announcements&page=3'))
+})
 
 function connect() {
   const profile = {
@@ -98,6 +126,7 @@ function connect() {
     activeConfig: SAMPLE_CONFIG, mergedOperators: SAMPLE_OPERATORS, configDiffRows: [],
     updateConfig: vi.fn(), handleGenerate: vi.fn(async () => undefined), handleDownloadMAA: vi.fn(),
     permission: 'ultimate', userCanEditConfig: true, userCanUseIntermediateAutoConfig: true, userCanUseUpgradeFeatures: true,
+    userCanUseScenarioLab: true, refreshInventory: vi.fn(async () => undefined),
     userCanViewFullData: true, userCanDownloadFullResult: true, handleDownloadFullResult: vi.fn(),
     configValidation: { ok: true } as ReturnType<typeof validateScheduleConfig>, configPresetLabel: '2-4-3', hasResult: true, resultIsCurrent: false,
     resultHistory: [summary], loading: false, isRestrictedPreview: false, workspaceError: null, inlineError: null,
@@ -111,6 +140,79 @@ function connect() {
 }
 
 describe('V2 results-first workspace', () => {
+  it.each(['252', '252-1', '252-full'])('uses fixed production counts when switching a custom comparison draft to %s', async (layout) => {
+    connect()
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      tasks: [], notifications: [], unread_count: 0, next_cursor: null,
+    }), { headers: { 'Content-Type': 'application/json' } }))
+    const user = userEvent.setup()
+    mount('/v2?section=lab&profile_id=profile-1')
+    const layoutSelect = await screen.findByRole('combobox', { name: copy.v2.comparison.layout })
+    const orundum = screen.getByRole('combobox', { name: copy.v2.comparison.productCount('合成玉') })
+    const shard = screen.getByRole('combobox', { name: copy.v2.comparison.productCount('源石碎片') })
+    const gold = screen.getByRole('combobox', { name: copy.v2.comparison.productCount('赤金') })
+    await user.selectOptions(orundum, '1')
+    await user.selectOptions(shard, '1')
+    await user.selectOptions(gold, '1')
+
+    await user.selectOptions(layoutSelect, layout)
+    expect(orundum).toBeDisabled()
+    expect(shard).toBeDisabled()
+    expect(gold).toBeDisabled()
+    expect(orundum).toHaveValue('0')
+    expect(shard).toHaveValue('0')
+    expect(gold).toHaveValue('2')
+    await user.click(screen.getByRole('button', { name: copy.v2.comparison.addPlan }))
+    const stored = JSON.parse(window.sessionStorage.getItem('maa:scenario-lab:v2:profile-1')!)
+    expect(stored.factors.layouts.find((entry: { layout: string }) => entry.layout === layout)?.plans).toEqual([{
+      trading: { lmd: 2, orundum: 0 },
+      manufacturing: { pureGold: 2, battleRecord: 3, originiumShard: 0 },
+    }])
+
+    await user.selectOptions(layoutSelect, '243')
+    for (const select of [orundum, shard, gold]) {
+      expect(select).toBeEnabled()
+      expect(select).toHaveValue('1')
+    }
+  })
+
+  it('lists historical comparisons and opens them in place without submitting another calculation', async () => {
+    connect()
+    const refresh = vi.fn(async () => undefined)
+    const loadMore = vi.fn(async () => undefined)
+    const job = { id: 'historical-comparison', kind: 'scenario_comparison', status: 'succeeded', resultAvailable: true,
+      timestamps: { submittedAt: '2026-10-01T09:00:00Z', finishedAt: '2026-10-01T10:00:00Z' } }
+    mocks.tasks.mockReturnValue({ jobs: [job, { ...job, id: 'unavailable-comparison', resultAvailable: false },
+      { ...job, id: 'schedule', kind: 'schedule' }, { ...job, id: 'queued-comparison', status: 'queued' }],
+    refresh, loadMore, hasMore: true, loading: false, error: null, notice: null })
+    const historicalResult = {
+      kind: 'scenario_comparison', scenarioCount: 0, screeningCount: 0, verifiedCount: 0, failedCount: 0,
+      rawCombinationCount: 0, skipped: [], points: [], frontierScenarioIds: [], warnings: ['已恢复历史对比'],
+      frontierBasis: 'fast_top_3_per_actual_operation_cost_then_layout_aware_verification',
+      buildMeta: SAMPLE_RESULT.build_meta,
+    }
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input)
+      return new Response(JSON.stringify(url.includes('/api/optimization/jobs/historical-comparison')
+        ? { ...job, result: historicalResult }
+        : { tasks: [], notifications: [], unread_count: 0, next_cursor: null }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    })
+    mount('/v2?section=lab&profile_id=profile-1')
+    const history = within(await screen.findByRole('region', { name: copy.v2.comparison.historyTitle }))
+    const viewButtons = history.getAllByRole('button', { name: copy.optimize.pages_tool_optimize_OptimizationTaskCenter_037 })
+    expect(viewButtons).toHaveLength(2)
+    expect(viewButtons[1]).toBeDisabled()
+    await userEvent.click(viewButtons[0])
+    expect(await screen.findByText('已恢复历史对比')).toBeVisible()
+    expect(fetch).toHaveBeenCalledWith('/api/optimization/jobs/historical-comparison', expect.any(Object))
+    expect(fetch.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
+    expect(screen.getByTestId('route-location')).toHaveTextContent('section=lab')
+    await userEvent.click(history.getByRole('button', { name: copy.optimize.pages_tool_optimize_OptimizationTaskCenter_003 }))
+    await userEvent.click(history.getByRole('button', { name: copy.optimize.pages_tool_optimize_result_history_load_more }))
+    expect(refresh).toHaveBeenCalledOnce()
+    expect(loadMore).toHaveBeenCalledOnce()
+  })
+
   it('waits for service and login restoration before showing a confirmed guest example', () => {
     session.authStatus = 'loading'
     mocks.features.mockReturnValue({ status: 'loading', features: DEFAULT_SITE_FEATURES, retry: vi.fn() })
@@ -722,7 +824,7 @@ describe('V2 results-first workspace', () => {
     await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('profile_id=profile-2'))
     expect(session.flushConfigSave).toHaveBeenCalledOnce()
     expect(session.refreshProfileWorkspace).toHaveBeenCalledWith(second)
-    expect(mocks.session).toHaveBeenLastCalledWith('profile-2', true)
+    expect(mocks.session).toHaveBeenLastCalledWith('profile-2', true, true)
   })
 
   it.each(['overview', 'generation'])('cancels the current job from %s through the existing task controller while retaining the result', async (section) => {

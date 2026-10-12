@@ -18,6 +18,7 @@ import { meteredCopy } from './zh-CN/metered'
 import { debugCopy } from './zh-CN/debug'
 import { statusCopy } from './zh-CN/status'
 import { v2Copy } from './zh-CN/v2'
+import { feedbackCopy } from './zh-CN/feedback'
 
 export const CURRENT_LOCALE = 'zh-CN' as const
 
@@ -42,4 +43,5 @@ export const copy = {
   debug: debugCopy,
   status: statusCopy,
   v2: v2Copy,
+  feedback: feedbackCopy,
 } as const

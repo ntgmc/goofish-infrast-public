@@ -41,8 +41,7 @@
   opacity: .55;
 }
 
-.v2-app :focus-visible,
-.v2-drawer :focus-visible {
+:is(.v2-app, .v2-drawer, .v2-dialog) :focus-visible {
   outline: 2px solid var(--color-v2-focus);
   outline-offset: 3px;
 }
@@ -69,6 +68,10 @@
   border-right: 1px solid var(--color-v2-rail-line);
   background: var(--color-v2-rail);
   color: var(--color-v2-rail-ink);
+}
+
+.v2-sidebar :focus-visible {
+  outline-color: var(--color-v2-rail-accent);
 }
 
 .v2-brand {
@@ -1070,6 +1073,21 @@
   font-size: var(--text-sm);
 }
 
+@media (hover: hover) {
+  :is(.v2-content-tabs, .v2-view-toggle) > button:hover:not(:disabled),
+  .v2-shifts > button:hover:not([aria-selected="true"]):not(:disabled),
+  .v2-profile-option:hover:not(:disabled) {
+    background: var(--color-v2-hover);
+  }
+  .v2-text-button:hover:not(:disabled) { color: var(--color-v2-accent-hover); }
+}
+:is(.v2-content-tabs, .v2-view-toggle) > button:active:not(:disabled),
+.v2-shifts > button:active:not([aria-selected="true"]):not(:disabled),
+.v2-profile-option:active:not(:disabled) {
+  background: var(--v2-accent-soft);
+}
+.v2-text-button:active:not(:disabled) { color: var(--color-v2-accent-hover); }
+
 .v2-layout-preview {
   display: flex;
   gap: 5px;
@@ -1531,7 +1549,7 @@
   border-radius: 7px;
   background: var(--v2-bg);
   color: var(--v2-muted);
-  transition: border-color var(--dur-fast), box-shadow var(--dur-fast), background-color var(--dur-fast);
+  transition: background-color var(--dur-fast) var(--ease-out);
 }
 
 .v2-search-label {
@@ -1541,13 +1559,15 @@
 }
 .v2-search:focus-within {
   border-color: var(--color-v2-focus);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-v2-focus) 14%, transparent);
+  outline: 2px solid var(--color-v2-focus);
+  outline-offset: 2px;
   background: var(--v2-paper);
 }
-:is(.v2-app, .v2-drawer, .v2-dialog) :is(.tool-field, input:not([type="checkbox"]), textarea, select):focus-visible {
-  outline: none;
+:is(.v2-app, .v2-drawer, .v2-dialog) :is(.tool-field, .v2-input):focus-visible:not([aria-invalid="true"]) {
   border-color: var(--color-v2-focus);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-v2-focus) 14%, transparent);
+}
+:is(.v2-app, .v2-drawer, .v2-dialog) .tool-field[aria-invalid="true"] {
+  border-color: var(--color-v2-error);
 }
 .v2-search input {
   min-width: 0;
@@ -1557,7 +1577,7 @@
   color: var(--v2-ink);
 }
 
-.v2-drawer .v2-search input:focus-visible {
+:is(.v2-app, .v2-drawer, .v2-dialog) .v2-search input:focus-visible {
   outline: none;
   box-shadow: none;
 }
@@ -1900,4 +1920,3 @@
 @media (max-width: 40rem) { .v2-section-heading h1 { font-size: var(--text-xl); } }
 .v2-dialog { background: var(--v2-paper); border-color: var(--v2-line); border-radius: var(--radius-v2-control); }
 .v2-dialog :is(button, input, select, textarea) { font-family: inherit; }
-.v2-dialog :focus-visible { outline: 2px solid var(--color-v2-focus); outline-offset: 3px; }

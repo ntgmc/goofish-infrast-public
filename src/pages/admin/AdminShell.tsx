@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Activity, Bell, Boxes, CreditCard, FileText, Gauge, Gift, Settings2, ShieldCheck, UserPlus, Users } from 'lucide-react'
+import { Activity, Bell, Boxes, CreditCard, FileText, Gauge, Gift, MessageSquare, Settings2, ShieldCheck, UserPlus, Users } from 'lucide-react'
 import { Link } from 'react-router'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import CompactHeaderMenu from '../../components/CompactHeaderMenu'
@@ -8,18 +8,18 @@ import { adminPath } from '../../lib/app-routes'
 import { sectionLabels, type AdminCapability, type AdminSection } from './contracts'
 
 const groups: Array<{ label: string; sections: AdminSection[] }> = [
-  { label: '运营', sections: ['overview', 'users'] },
+  { label: '运营', sections: ['overview', 'users', 'feedback'] },
   { label: '权益与发放', sections: ['cdk', 'items', 'invitation'] },
   { label: '服务与安全', sections: ['queue', 'risk'] },
   { label: '站点管理', sections: ['features', 'registration', 'announcement', 'content'] },
 ]
 const icons = { overview: Gauge, users: Users, cdk: CreditCard, items: Boxes, invitation: Gift, queue: Activity,
-  risk: ShieldCheck, features: Settings2, registration: UserPlus, announcement: Bell, content: FileText }
+  risk: ShieldCheck, features: Settings2, registration: UserPlus, announcement: Bell, content: FileText, feedback: MessageSquare }
 
 export function canAccessAdminSection(section: AdminSection, capabilities: AdminCapability[]): boolean {
   if (section === 'overview') return capabilities.includes('usage_view') || capabilities.includes('risk_view')
   if (section === 'risk') return capabilities.includes('risk_view')
-  if (section === 'users') return capabilities.includes('user_view')
+  if (section === 'users' || section === 'feedback') return capabilities.includes('user_view')
   if (section === 'queue') return capabilities.includes('optimization_view')
   return capabilities.includes('admin_manage')
 }
@@ -48,8 +48,8 @@ export default function AdminShell({ section, username, capabilities, syncStatus
           </Link>
         })}
       </div>)}</nav>
-      <div className="admin-sidebar-bottom"><span>{username}</span>{canManage && <Link to="/admin/setup">管理员账号</Link>}
-        <button type="button" onClick={onLogout}>退出登录</button></div>
+      <div className="admin-sidebar-bottom"><span>{username}</span>{canManage && <Link to="/admin/setup" className="admin-nav-link">管理员账号</Link>}
+        <button type="button" className="admin-nav-link" onClick={onLogout}>退出登录</button></div>
     </aside>
     <main className="admin-workspace tool-workspace" tabIndex={-1} data-route-focus>
       <header className="admin-topbar tool-header">

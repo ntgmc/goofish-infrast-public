@@ -299,7 +299,7 @@ export const domainCopy = {
   // src/components/result-panel/ResultMetrics.tsx
   components_result_panel_ResultMetrics_027: "，预计合成玉 ",
   // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_030: "可持续抽数",
+  components_result_panel_ResultMetrics_030: "高产出期抽数",
   // src/components/result-panel/ResultMetrics.tsx
   components_result_panel_ResultMetrics_031: "等效理智",
   // src/components/result-panel/ResultMetrics.tsx
@@ -582,6 +582,8 @@ export const domainCopy = {
   lib_production_sanity_002: " + 贸易 ",
   // src/lib/production-sanity.ts
   lib_production_sanity_003: " - 消耗 ",
+  // src/lib/scenario-comparison.ts
+  scenario252FixedProduction: "252 配置的各产物设施数量固定，请使用预设生产方案。",
   // src/lib/scenario-comparison.ts
   lib_scenario_comparison_001: "无人机关闭",
   // src/lib/scenario-comparison.ts

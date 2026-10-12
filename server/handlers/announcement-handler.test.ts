@@ -80,6 +80,38 @@ describe('announcement handler', () => {
     })
   })
 
+  it('pages active announcements and resolves a direct link without sending other pages', async () => {
+    const items = Array.from({ length: 23 }, (_, index) => ({
+      ...popup, id: `popup-${index}`, updated_at: new Date(Date.UTC(2026, 7, 23 - index)).toISOString(),
+    }))
+    const banner = { ...popup, id: 'banner', kind: 'banner', updated_at: '2026-09-01T00:00:00.000Z' }
+    mocks.get.mockResolvedValue({ data: { banner, announcements: [...items, { ...popup, id: 'hidden', active: false }] }, revision: 3 })
+
+    const response = await handler(new Request('http://localhost/api/announcement?page=1'))
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    const data = await response.json()
+    expect(data).toMatchObject({ page: 1, pageSize: 10, total: 24 })
+    expect(data.announcements).toHaveLength(10)
+    expect(data.announcements[0].announcement.id).toBe('banner')
+    expect(data.popups).toBeUndefined()
+    expect(data.banner).toBeUndefined()
+
+    const direct = await handler(new Request('http://localhost/api/announcement?page=1&announcement_id=popup-20'))
+    const directData = await direct.json()
+    expect(directData).toMatchObject({ page: 3, total: 24 })
+    expect(directData.announcements).toHaveLength(4)
+    expect(directData.announcements.some((item: { announcement: { id: string } }) => item.announcement.id === 'popup-20')).toBe(true)
+
+    const oversized = await handler(new Request('http://localhost/api/announcement?page=999'))
+    await expect(oversized.json()).resolves.toMatchObject({ page: 3 })
+  })
+
+  it.each(['page=0', 'page=-1', 'page=1.5', 'page=9007199254740992', 'page=1&announcement_id='])('rejects invalid paging input (%s)', async (query) => {
+    const response = await handler(new Request(`http://localhost/api/announcement?${query}`))
+    expect(response.status).toBe(400)
+    expect(mocks.get).not.toHaveBeenCalled()
+  })
+
   it.each(['banner', 'popup'] as const)('publishes a local %s without a public URL or notification event', async (kind) => {
     vi.stubEnv('NODE_ENV', 'development')
     vi.stubEnv('PUBLIC_APP_URL', undefined)
@@ -125,7 +157,7 @@ describe('announcement handler', () => {
         type: 'announcement.published',
         title: '公告',
         summary: '正文',
-        url: 'https://example.test/#announcement-popup-2',
+        url: 'https://example.test/v2?section=announcements#announcement-popup-2',
         published_at: expect.any(String),
         version: null,
       }],

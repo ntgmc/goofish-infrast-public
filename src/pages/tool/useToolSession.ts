@@ -28,7 +28,7 @@ export type AuthStatus = 'loading' | 'authenticated' | 'anonymous' | 'error'
 
 const CONFIG_SAVE_DEBOUNCE_MS = 600
 
-export function useToolSession(requestedProfileId?: string | null, rememberLastProfile = false) {
+export function useToolSession(requestedProfileId?: string | null, rememberLastProfile = false, loadAnnouncementPopups = true) {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading')
   const [authError, setAuthError] = useState<Error | null>(null)
   const [authRequestVersion, setAuthRequestVersion] = useState(0)
@@ -114,14 +114,6 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
     setAuthError(null)
     setAuthStatus('loading')
 
-    void apiJsonOrNull<AnnouncementPublicResponse>('/api/announcement')
-      .then((data) => {
-        if (cancelled) return
-        setBanner(data?.banner ?? null)
-        setPopups(Array.isArray(data?.popups) ? data.popups : [])
-      })
-      .catch(console.error)
-
     const authUrl = requestedProfileId
       ? `/api/auth/me?profile_id=${encodeURIComponent(requestedProfileId)}`
       : '/api/auth/me'
@@ -161,6 +153,19 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
       cancelled = true
     }
   }, [applyAuthPayload, authRequestVersion, requestedProfileId, rememberLastProfile])
+
+  useEffect(() => {
+    if (!loadAnnouncementPopups) return
+    let cancelled = false
+    void apiJsonOrNull<AnnouncementPublicResponse>('/api/announcement')
+      .then((data) => {
+        if (cancelled) return
+        setBanner(data?.banner ?? null)
+        setPopups(Array.isArray(data?.popups) ? data.popups : [])
+      })
+      .catch(console.error)
+    return () => { cancelled = true }
+  }, [loadAnnouncementPopups, authRequestVersion, requestedProfileId])
 
   useEffect(() => () => {
     pendingConfigRef.current = null

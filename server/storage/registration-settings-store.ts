@@ -1,4 +1,5 @@
-import { query } from './postgres'
+import { query, withTransaction } from './postgres'
+import { SettingsConflictError } from './settings-conflict'
 import { ensureDatabaseSchema } from './schema'
 import type { BrevoQuotaAction, EmailProviderPriority } from '../../src/lib/types'
 
@@ -133,20 +134,32 @@ export async function getRegistrationSettings(): Promise<RegistrationSettingsV5>
   return normalizeRegistrationSettings(result.rows[0]?.record_json)
 }
 
-export async function saveRegistrationSettings(patch: RegistrationSettingsPatch): Promise<RegistrationSettingsV5> {
+export async function saveRegistrationSettings(
+  patch: RegistrationSettingsPatch,
+  expectedUpdatedAt: string | null,
+): Promise<RegistrationSettingsV5> {
   await ensureSchema()
-  const saved = normalizeRegistrationSettings({
-    ...await getRegistrationSettings(),
-    ...patch,
-    updated_at: new Date().toISOString(),
+  return withTransaction(async (client) => {
+    await client.query('select pg_advisory_xact_lock(hashtextextended($1, 0))', ['registration-settings'])
+    const result = await client.query<{ record_json: RegistrationSettingsV5 }>(
+      'select record_json from registration_settings where key = $1 for update', [REGISTRATION_SETTINGS_KEY],
+    )
+    const current = normalizeRegistrationSettings(result.rows[0]?.record_json)
+    if (current.updated_at !== expectedUpdatedAt) throw new SettingsConflictError()
+    const saved = normalizeRegistrationSettings({
+      ...current,
+      ...patch,
+      // Ensure even consecutive saves in one millisecond get distinct versions.
+      updated_at: new Date(Math.max(Date.now(), current.updated_at ? Date.parse(current.updated_at) + 1 : 0)).toISOString(),
+    })
+    await client.query(
+      `insert into registration_settings (key, record_json, updated_at)
+       values ($1, $2::jsonb, $3)
+       on conflict (key) do update set record_json = excluded.record_json, updated_at = excluded.updated_at`,
+      [REGISTRATION_SETTINGS_KEY, JSON.stringify(saved), saved.updated_at],
+    )
+    return saved
   })
-  await query(
-    `insert into registration_settings (key, record_json, updated_at)
-     values ($1, $2::jsonb, now())
-     on conflict (key) do update set record_json = excluded.record_json, updated_at = now()`,
-    [REGISTRATION_SETTINGS_KEY, JSON.stringify(saved)],
-  )
-  return saved
 }
 
 function isBrevoQuotaAction(value: unknown): value is BrevoQuotaAction {

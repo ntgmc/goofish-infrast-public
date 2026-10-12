@@ -7,7 +7,7 @@ import type { WorkspaceResultHistorySummary } from '../../lib/types'
 import { DialogSurfaceProvider } from '../../components/ui/dialog'
 import { NotificationCenterProvider } from '../../components/NotificationCenter'
 import { InternalLinkProvider } from '../../components/InternalLink'
-import { useNavigate, useSearchParams } from 'react-router'
+import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { copy } from '../../copy'
 import ScheduleProgress from '../../components/ScheduleProgress'
 import { normalizeConfig } from '../../lib/config'
@@ -29,7 +29,8 @@ import './workspace-pages.css'
 
 export default function V2Page() {
   const [params] = useSearchParams()
-  const session = useToolSession(params.get('profile_id'), true)
+  const { hash } = useLocation()
+  const session = useToolSession(params.get('profile_id'), true, v2Section(params, hash) !== 'announcements')
   const features = useSiteFeatures()
   const [config, setConfig] = useState<LicenseConfig>(() => normalizeConfig(SAMPLE_CONFIG))
   const [operators, setOperators] = useState(SAMPLE_OPERATORS)
@@ -92,6 +93,8 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
   const confirmResultChange = () => !manualDirty.current || window.confirm(copy.v2.discardManual)
   const navigate = useNavigate()
   const [params] = useSearchParams()
+  const { hash } = useLocation()
+  const section = v2Section(params, hash)
   const onSectionChange = useCallback((section: 'overview' | 'plans' | 'config' | 'result' | 'lab') => {
     if (section === 'result') {
       if (!readingLatest.current) void navigate(v2Path('overview', profile.id))
@@ -114,7 +117,7 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
     retryConfigSave: session.retryConfigSave,
     onWorkspacePatch: session.persistWorkspacePatch,
     onWorkspaceUpdated: session.applyWorkspaceSnapshot,
-    section: v2Section(params) === 'lab' ? 'lab' : v2Section(params) === 'plans' ? 'plans' : v2Section(params) === 'generation' ? 'overview' : 'result',
+    section: section === 'lab' ? 'lab' : section === 'plans' ? 'plans' : section === 'generation' ? 'overview' : 'result',
     onSectionChange,
     onReset,
     onLogout: session.handleLogout,
@@ -196,13 +199,13 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
     {tasks.error && <p role="alert" className="v2-error">{tasks.error}</p>}
     {tasks.notice && <p role="status" className="v2-muted">{tasks.notice}</p>}
   </div>
-  if (!result && latest && v2Section(params) === 'overview') {
+  if (!result && latest && section === 'overview') {
     const pending = reading || loadedId.current !== latest.id
     return <V2LoadingScreen error={pending ? null : error ?? workflow.workspaceError ?? copy.v2.resultLoadFailed} onRetry={() => void readLatestResult()}>
       {progress}
     </V2LoadingScreen>
   }
-  return <ResultErrorBoundary resetKey={[profile.id, workflow.historyItem?.id ?? workflow.progress?.jobId ?? 'none', v2Section(params)].join(':')} onDownloadDiagnostic={features.features.full_result_export && workflow.userCanDownloadFullResult ? workflow.handleDownloadFullResult : undefined} diagnosticDownloadBusy={Boolean(workflow.workspaceBusyAction?.startsWith('download'))}><V2Dashboard session={session} workflow={{ ...workflow, handleGenerate: generate, handleViewHistory: async (item) => {
+  return <ResultErrorBoundary resetKey={[profile.id, workflow.historyItem?.id ?? workflow.progress?.jobId ?? 'none', section].join(':')} onDownloadDiagnostic={features.features.full_result_export && workflow.userCanDownloadFullResult ? workflow.handleDownloadFullResult : undefined} diagnosticDownloadBusy={Boolean(workflow.workspaceBusyAction?.startsWith('download'))}><V2Dashboard session={session} workflow={{ ...workflow, optimizationTasks: tasks, handleGenerate: generate, handleViewHistory: async (item) => {
       if (!confirmResultChange()) return
       await workflow.handleViewHistory(item)
     }, handleIncrementalRecompute: async () => {

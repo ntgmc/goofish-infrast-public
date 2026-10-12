@@ -57,7 +57,7 @@ describe('release confirmation handler', () => {
       type: 'release.published',
       title: '2.1.0 正式版',
       summary: '新增批量操作；修复登录异常',
-      url: 'https://example.test/changelog#release-release-2.1.0',
+      url: 'https://example.test/v2?section=updates#release-release-2.1.0',
       published_at: '2026-08-04T08:00:00.000Z',
       version: '2.1.0',
     })

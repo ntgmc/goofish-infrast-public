@@ -907,9 +907,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
            where job_id = $1 and attempt_no = $2 and worker_id = $3 and lock_token = $4`,
           [id, attemptNo, workerId, lockToken, failure.internalMessage, now, failure.failureKind],
         )
-        await refundReservedItemsInTransaction(client, 'optimization_job', id, now)
-        await releaseQueuedEntitlementInTransaction(client, id, failed.rows[0]?.payload_json, now)
-        await releaseMeteredBillingInTransaction(client, id, now)
+        await releaseOptimizationJobReservationsInTransaction(client, id, failed.rows[0]?.payload_json, now)
         return true
       })
     },
@@ -994,9 +992,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
                next_attempt_at = null, expires_at = null, finished_at = $2, updated_at = $2
              where id = $1 and status = 'queued' returning *`, [id, now],
           )
-          await refundReservedItemsInTransaction(client, 'optimization_job', id, now)
-          await releaseQueuedEntitlementInTransaction(client, id, current.payload_json, now)
-          await releaseMeteredBillingInTransaction(client, id, now)
+          await releaseOptimizationJobReservationsInTransaction(client, id, current.payload_json, now)
           return cancelled.rows[0] ? fromRow(cancelled.rows[0]) : current
         }
         if (current.status === 'running' && !current.cancel_requested_at) {
@@ -1030,9 +1026,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
            where job_id = $1 and attempt_no = $2 and worker_id = $3 and lock_token = $4`,
           [id, attemptNo, workerId, lockToken, now],
         )
-        await refundReservedItemsInTransaction(client, 'optimization_job', id, now)
-        await releaseQueuedEntitlementInTransaction(client, id, cancelled.rows[0]?.payload_json, now)
-        await releaseMeteredBillingInTransaction(client, id, now)
+        await releaseOptimizationJobReservationsInTransaction(client, id, cancelled.rows[0]?.payload_json, now)
         return true
       })
     },
@@ -1128,9 +1122,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           [nowIso],
         )
         for (const job of expired.rows) {
-          await refundReservedItemsInTransaction(client, 'optimization_job', job.id, nowIso)
-          await releaseQueuedEntitlementInTransaction(client, job.id, job.payload_json, nowIso)
-          await releaseMeteredBillingInTransaction(client, job.id, nowIso)
+          await releaseOptimizationJobReservationsInTransaction(client, job.id, job.payload_json, nowIso)
         }
         return expired.rowCount ?? expired.rows.length
       })
@@ -2542,6 +2534,14 @@ function fromDeadLetterRow(row: OptimizationDeadLetterRow): OptimizationDeadLett
   }
 }
 
+export async function releaseOptimizationJobReservationsInTransaction(
+  client: PoolClient, jobId: string, payload: unknown, nowIso: string,
+): Promise<void> {
+  await refundReservedItemsInTransaction(client, 'optimization_job', jobId, nowIso)
+  await releaseQueuedEntitlementInTransaction(client, jobId, payload, nowIso)
+  await releaseMeteredBillingInTransaction(client, jobId, nowIso)
+}
+
 async function releaseQueuedEntitlementInTransaction(client: PoolClient, jobId: string, payload: unknown, nowIso: string): Promise<void> {
   await client.query(
     `update entitlement_ledger set status = 'released', settled_at = $2
@@ -2677,9 +2677,7 @@ async function failInvalidCompletionInTransaction(
      where job_id = $1 and attempt_no = $2 and worker_id = $3 and lock_token = $4`,
     [job.id, attemptNo, workerId, lockToken, internalMessage, nowIso],
   )
-  await refundReservedItemsInTransaction(client, 'optimization_job', job.id, nowIso)
-  await releaseQueuedEntitlementInTransaction(client, job.id, job.payload_json, nowIso)
-  await releaseMeteredBillingInTransaction(client, job.id, nowIso)
+  await releaseOptimizationJobReservationsInTransaction(client, job.id, job.payload_json, nowIso)
 }
 
 function normalizeTerminalFailure(input: string | OptimizeJobTerminalFailure): OptimizeJobTerminalFailure {

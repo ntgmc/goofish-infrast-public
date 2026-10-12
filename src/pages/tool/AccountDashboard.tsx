@@ -9,6 +9,7 @@ import GuidedTour, { hasCompletedTour, useFirstRunTour, type TourDefinition } fr
 import { MotionNavIndicator, PageTransition } from '../../components/MotionPrimitives'
 import { SectionLoader } from '../../components/SessionLoader'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
+import FeedbackButton from '../../components/FeedbackDialog'
 import { profileScopedPath, type DashboardSection } from '../../lib/app-routes'
 import type { Announcement, AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
 import { copy } from '../../copy/index'
@@ -200,6 +201,7 @@ export default function AccountDashboard({
               />
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <FeedbackButton iconOnly />
               <NotificationBell iconOnly />
               <ThemeSwitcher iconOnly />
             </div>
@@ -228,6 +230,7 @@ export default function AccountDashboard({
               >
                 {copy.dashboard.pages_tool_AccountDashboard_tour_001}
               </button>
+              <FeedbackButton />
               <NotificationBell />
               <ThemeSwitcher />
             </div>

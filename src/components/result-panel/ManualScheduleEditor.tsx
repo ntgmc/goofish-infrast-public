@@ -457,18 +457,18 @@ function ManualOperatorPicker({ operators, locked, rooms, roomType, selectedName
   return (
     <>
       <div className="space-y-2">
-        <div className="flex min-w-0 items-center rounded-lg border border-surface-3 bg-surface-2/40 transition-[border-color,box-shadow] duration-150 focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-500/20">
+        <div className="flex min-w-0 items-center rounded-lg border border-surface-3 bg-surface-2/40 transition-colors duration-150 focus-within:border-brand-500">
           <label className="flex min-w-0 flex-1 items-center gap-2 px-3">
             <Search size={16} className="shrink-0 text-ink-muted" aria-hidden="true" />
             <input type="search" value={search} onChange={(event) => setSearch(event.target.value)}
               onCompositionStart={() => setComposing(true)} onCompositionEnd={() => setComposing(false)}
-              placeholder={label.search} aria-label={label.search} style={{ outline: 'none' }}
+              placeholder={label.search} aria-label={label.search}
               className="min-h-11 min-w-0 w-full bg-transparent text-sm text-ink-primary placeholder:text-ink-muted" />
           </label>
           <label className="w-28 shrink-0 border-l border-surface-3 sm:w-36">
             <span className="sr-only">{copy.domain.building_skills.facility}</span>
             <select aria-label={copy.domain.building_skills.facility} value={facility}
-              className="min-h-11 w-full rounded-r-lg bg-transparent px-2 text-sm text-ink-primary focus-visible:outline-none"
+              className="min-h-11 w-full rounded-r-lg bg-transparent px-2 text-sm text-ink-primary"
               onChange={(event) => { setFacility(event.target.value); resetScroll() }}>
               <option value="">{copy.domain.building_skills.all_facilities}</option>
               {Object.entries(ROOM_LABELS).map(([type, name]) => <option key={type} value={type}>{name}</option>)}

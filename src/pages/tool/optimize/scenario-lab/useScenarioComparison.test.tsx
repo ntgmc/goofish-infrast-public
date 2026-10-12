@@ -2,9 +2,9 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apiJson } from '../../../../lib/api-client'
-import type { ScenarioComparisonFactors } from '../../../../lib/scenario-comparison'
+import type { ScenarioComparisonFactors, ScenarioComparisonResult } from '../../../../lib/scenario-comparison'
 import type { LicenseConfig } from '../../../../lib/types'
-import { useScenarioComparison } from './useScenarioComparison'
+import { restoreScenarioComparisonJob, useScenarioComparison } from './useScenarioComparison'
 
 vi.mock('../../../../lib/api-client', () => ({ apiJson: vi.fn() }))
 
@@ -31,6 +31,39 @@ afterEach(() => {
 })
 
 describe('useScenarioComparison', () => {
+  it('opens historical results while mounted, ignores other profiles and discards superseded responses', async () => {
+    const historicalResult: ScenarioComparisonResult = {
+      kind: 'scenario_comparison', scenarioCount: 0, screeningCount: 0, verifiedCount: 0, failedCount: 0,
+      rawCombinationCount: 0, skipped: [], points: [], frontierScenarioIds: [], warnings: [],
+      frontierBasis: 'fast_top_3_per_actual_operation_cost_then_layout_aware_verification',
+      buildMeta: { frontend_version: 'test', backend_version: 'test', data_version: 'test', generated_at: '2026-07-10T00:00:00.000Z', source_summary: '' },
+    }
+    let finishOlderRequest!: (value: never) => void
+    vi.mocked(apiJson).mockImplementationOnce(() => new Promise((resolve) => { finishOlderRequest = resolve }))
+      .mockResolvedValueOnce({ id: 'history-newer', status: 'succeeded', result: historicalResult } as never)
+    const options = { profileId: 'profile-history', operators: [], config: {} as LicenseConfig }
+    const { result, unmount } = renderHook(() => useScenarioComparison(options))
+
+    act(() => restoreScenarioComparisonJob('another-profile', 'unrelated'))
+    expect(apiJson).not.toHaveBeenCalled()
+    act(() => restoreScenarioComparisonJob(options.profileId, 'history-older'))
+    expect(result.current.loading).toBe(true)
+    act(() => restoreScenarioComparisonJob(options.profileId, 'history-newer'))
+    await waitFor(() => expect(result.current.result).toEqual(historicalResult))
+    expect(result.current.loading).toBe(false)
+
+    await act(async () => finishOlderRequest({ id: 'history-older', status: 'succeeded', result: { ...historicalResult, warnings: ['older'] } } as never))
+    expect(result.current.job?.id).toBe('history-newer')
+    expect(result.current.result).toEqual(historicalResult)
+    expect(vi.mocked(apiJson).mock.calls.map(([url]) => url)).toEqual([
+      '/api/optimization/jobs/history-older', '/api/optimization/jobs/history-newer',
+    ])
+    unmount()
+    const reopened = renderHook(() => useScenarioComparison(options))
+    expect(reopened.result.current.result).toEqual(historicalResult)
+    expect(apiJson).toHaveBeenCalledTimes(2)
+  })
+
   it.each(['unmount', 'switch profile'])('stops a newly submitted scenario polling loop on %s', async (action) => {
     vi.useFakeTimers()
     const job = { id: 'scenario-new', kind: 'scenario_comparison', status: 'queued', pollAfterMs: 10_000,

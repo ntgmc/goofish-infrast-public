@@ -6,6 +6,7 @@ import { copy } from '../../copy'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import { usePublicContent } from '../../lib/public-content-context'
 import type { useOptimizeWorkflow } from '../tool/optimize/useOptimizeWorkflow'
+import type { OptimizationTaskCenterController } from '../tool/optimize/useOptimizationTaskCenter'
 import type { AuthSuccessResponse } from '../../lib/types'
 import type { V2Session } from './OptionsDrawer'
 import { v2Path, v2SectionAvailable, type V2Section } from './navigation'
@@ -32,7 +33,9 @@ const Pricing = lazy(() => import('./pages/Pricing'))
 const Status = lazy(() => import('./pages/ServiceStatus'))
 const AnimationSettings = lazy(() => import('../../components/AnimationSettings'))
 
-export type V2Workflow = ReturnType<typeof useOptimizeWorkflow>
+export type V2Workflow = ReturnType<typeof useOptimizeWorkflow> & {
+  optimizationTasks?: OptimizationTaskCenterController
+}
 export const sectionLabels: Record<V2Section, string> = {
   overview: copy.v2.overview, generation: copy.v2.generation, plans: copy.v2.history,
   lab: copy.v2.lab, tools: copy.v2.tools, 'manual-tool': copy.tools.manualSchedule.title,

@@ -6,12 +6,15 @@ const mocks = vi.hoisted(() => ({
   getQueuePosition: vi.fn(),
   getProfileForUser: vi.fn(),
   requireUserSession: vi.fn(),
+  findIdempotentJob: vi.fn(),
+  resolveProfileAuthorization: vi.fn(),
 }))
 
 vi.mock('../../storage/optimize-job-store', () => ({
   OptimizeJobAdmissionError: class OptimizeJobAdmissionError extends Error {},
   getOptimizeJobStore: () => ({
     getJob: mocks.getJob,
+    findIdempotentJob: mocks.findIdempotentJob,
     listJobsByProfile: mocks.listJobsByProfile,
     getQueuePosition: mocks.getQueuePosition,
   }),
@@ -22,19 +25,19 @@ vi.mock('../../storage/user-store', () => ({
   normalizeProfileKind: (profile: { kind?: string }) => profile.kind ?? 'cdk',
 }))
 vi.mock('../../handlers/profile-authorization', () => ({
-  resolveProfileAuthorization: vi.fn(async (profile: { permission: string }) => ({
-    ok: true,
-    permission: profile.permission,
-    cdkRecord: null,
-  })),
+  resolveProfileAuthorization: mocks.resolveProfileAuthorization,
 }))
 
-import { getOptimizationJob, listOptimizationJobs } from './job-status'
+import { getOptimizationJob, listOptimizationJobs, submitOptimizationJob } from './job-status'
 
 describe('optimization job result projection', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.getJob.mockResolvedValue(jobRecord())
+    mocks.findIdempotentJob.mockResolvedValue(jobRecord())
+    mocks.resolveProfileAuthorization.mockImplementation(async (profile: { permission: string }) => ({
+      ok: true, permission: profile.permission, cdkRecord: null,
+    }))
     mocks.getQueuePosition.mockResolvedValue(null)
     mocks.listJobsByProfile.mockResolvedValue([{ job: jobRecord(), queuePosition: null }])
     mocks.requireUserSession.mockResolvedValue({ user: { id: 'user-1' } })
@@ -66,6 +69,24 @@ describe('optimization job result projection', () => {
     expect(snapshot.result).not.toHaveProperty('total_efficiency')
   })
 
+  it('projects an idempotent submission using the downgraded current permission', async () => {
+    const response = await submitOptimizationJob(replayRequest())
+    expect(response.status).toBe(202)
+    const { job } = await response.json()
+    expect(job.result.raw_results).toEqual([])
+    expect(job.result).not.toHaveProperty('daily_production')
+    expect(job.result).not.toHaveProperty('total_efficiency')
+  })
+
+  it('rejects both GET and submission replay after the profile is frozen', async () => {
+    mocks.resolveProfileAuthorization.mockResolvedValue({ ok: false, status: 403, message: '该游戏账号已冻结。' })
+    const replay = await submitOptimizationJob(replayRequest())
+    const read = await getOptimizationJob(request(), 'job-1')
+    expect(replay.status).toBe(403)
+    expect(await replay.json()).toEqual(await read.json())
+    expect(read.status).toBe(403)
+  })
+
   it('keeps complete result data for an advanced profile owner', async () => {
     mocks.getProfileForUser.mockResolvedValue({
       id: 'profile-1',
@@ -92,6 +113,14 @@ describe('optimization job result projection', () => {
     expect(snapshot.result.raw_results).toEqual([])
   })
 })
+
+function replayRequest(): Request {
+  return new Request('http://localhost/api/optimization/jobs', {
+    method: 'POST',
+    headers: { 'Idempotency-Key': 'previous-job' },
+    body: JSON.stringify({ identity: { type: 'profile', profileId: 'profile-1' } }),
+  })
+}
 
 function request(): Request {
   return new Request('http://localhost/api/optimization/jobs/job-1')

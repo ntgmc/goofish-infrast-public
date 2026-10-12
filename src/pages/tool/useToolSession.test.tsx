@@ -38,6 +38,19 @@ function errorResponse(status: number): Response {
 }
 
 describe('useToolSession config synchronization', () => {
+  it('skips the full popup feed on announcement pages and resumes it without reloading auth', async () => {
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === '/api/announcement') return new Response(null, { status: 204 })
+      return jsonResponse(authPayload(baseConfig))
+    })
+    vi.stubGlobal('fetch', fetch)
+    const { result, rerender } = renderHook(({ popups }) => useToolSession(null, true, popups), { initialProps: { popups: false } })
+    await waitFor(() => expect(result.current.authStatus).toBe('authenticated'))
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual(['/api/auth/me'])
+    rerender({ popups: true })
+    await waitFor(() => expect(fetch.mock.calls.map(([url]) => url)).toEqual(['/api/auth/me', '/api/announcement']))
+  })
+
   beforeEach(() => { vi.useRealTimers(); window.localStorage.clear() })
   afterEach(() => {
     vi.restoreAllMocks()

@@ -160,6 +160,22 @@ const DRONE_LABELS: Record<ScenarioDroneStrategy, string> = {
   originium_shard: copy.domain.lib_scenario_comparison_007,
 }
 
+export function getFixedScenarioProductionPlan(layout: ScenarioLayout): ScenarioProductionPlan | null {
+  if (!layout.startsWith('252')) return null
+  const requirements = CONFIG_PRESETS[layout]!.product_requirements
+  return {
+    trading: {
+      lmd: requirements.trading_stations.LMD ?? 0,
+      orundum: requirements.trading_stations.Orundum ?? 0,
+    },
+    manufacturing: {
+      pureGold: requirements.manufacturing_stations['Pure Gold'] ?? 0,
+      battleRecord: requirements.manufacturing_stations['Battle Record'] ?? 0,
+      originiumShard: requirements.manufacturing_stations['Originium Shard'] ?? 0,
+    },
+  }
+}
+
 export function expandScenarioComparison(
   baseConfig: LicenseConfig,
   factors: ScenarioComparisonFactors,
@@ -331,6 +347,16 @@ function validateProductionPlan(
   }
   if (plan.manufacturing.pureGold + plan.manufacturing.battleRecord + plan.manufacturing.originiumShard !== counts.manufacturing) {
     throw new Error(`${layout}${copy.domain.lib_scenario_comparison_030}${counts.manufacturing}。`)
+  }
+  const fixedPlan = getFixedScenarioProductionPlan(layout)
+  if (fixedPlan && (
+    plan.trading.lmd !== fixedPlan.trading.lmd
+    || plan.trading.orundum !== fixedPlan.trading.orundum
+    || plan.manufacturing.pureGold !== fixedPlan.manufacturing.pureGold
+    || plan.manufacturing.battleRecord !== fixedPlan.manufacturing.battleRecord
+    || plan.manufacturing.originiumShard !== fixedPlan.manufacturing.originiumShard
+  )) {
+    throw new Error(`${SCENARIO_LAYOUT_LABELS[layout]}：${copy.domain.scenario252FixedProduction}`)
   }
 }
 

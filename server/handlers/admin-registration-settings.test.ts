@@ -17,6 +17,7 @@ vi.mock('../storage/brevo-email-store', () => brevoStore)
 vi.mock('../brevo-quota', () => quota)
 
 import handler from './admin-registration-settings'
+import { SettingsConflictError } from '../storage/settings-conflict'
 
 const settings = {
   version: 5 as const,
@@ -71,6 +72,14 @@ describe('admin registration settings handler', () => {
     expect(JSON.stringify(body)).not.toMatch(/postgres password|brevo token/)
   })
 
+  it('passes the loaded version to storage and reports a stale save as 409', async () => {
+    settingsStore.saveRegistrationSettings.mockRejectedValueOnce(new SettingsConflictError())
+    const response = await handler(jsonRequest(settings))
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ code: 'settings_conflict' })
+    expect(settingsStore.saveRegistrationSettings).toHaveBeenCalledWith(expect.any(Object), null)
+  })
+
   it('does not classify save failures as validation errors', async () => {
     settingsStore.saveRegistrationSettings.mockRejectedValueOnce(new Error('connection detail leaked'))
     const response = await handler(jsonRequest(settings))
@@ -82,10 +91,11 @@ describe('admin registration settings handler', () => {
   })
 })
 
-function jsonRequest(body: unknown): Request {
+function jsonRequest(body: typeof settings): Request {
+  const { version: _version, updated_at, ...patch } = body
   return new Request('http://localhost/api/admin/registration-settings', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...patch, expected_updated_at: updated_at }),
   })
 }
