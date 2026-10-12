@@ -16,10 +16,13 @@
 .admin-app .tool-panel-header, .admin-dialog .tool-panel-header { background: transparent; }
 .admin-app .tool-inset, .admin-dialog .tool-inset { background: transparent; border-radius: 0; box-shadow: none; }
 .admin-app .tool-field, .admin-dialog .tool-field { background: var(--color-v2-surface); border-color: var(--color-v2-control); border-radius: var(--radius-v2-control); min-width: 0; }
+:is(.admin-app, .admin-dialog) .tool-field:focus-visible:not([aria-invalid="true"]) { border-color: var(--color-v2-focus); }
+:is(.admin-app, .admin-dialog) .tool-field[aria-invalid="true"] { border-color: var(--color-v2-error); }
 .admin-app :is(.tool-primary-action, .tool-secondary-action, .tool-danger-action), .admin-dialog :is(.tool-primary-action, .tool-secondary-action, .tool-danger-action) { min-height: 44px; border-radius: var(--radius-v2-control); }
 .admin-app .tool-eyebrow { display: none; }
 .admin-app [hidden], .admin-dialog [hidden] { display: none !important; }
 .admin-sidebar { position: fixed; inset: 0 auto 0 0; z-index: 30; width: var(--admin-rail-width); display: flex; flex-direction: column; padding: var(--space-md) var(--space-sm); background: var(--color-v2-rail); color: var(--color-v2-rail-ink); border: 0; }
+.admin-sidebar :focus-visible { outline-color: var(--color-v2-rail-accent); }
 .admin-brand { display: flex; align-items: center; gap: var(--space-xs); padding: 0 var(--space-2xs) var(--space-md); color: var(--color-v2-rail-ink); }
 .admin-brand > svg { color: var(--color-v2-rail-accent); }
 .admin-brand strong, .admin-brand small { display: block; }

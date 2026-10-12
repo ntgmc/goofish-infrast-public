@@ -5,7 +5,7 @@ import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  "group/button inline-flex h-11 shrink-0 touch-manipulation select-none items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-input)] border border-transparent px-4 text-sm font-semibold outline-none transition-[background-color,border-color,color,opacity,transform,box-shadow] duration-[var(--motion-instant)] ease-out focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 active:scale-[0.985] motion-reduce:transform-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-ink-muted disabled:active:scale-100 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex h-11 shrink-0 touch-manipulation select-none items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-input)] border border-transparent px-4 text-sm font-semibold transition-[background-color,border-color,color,opacity,transform] duration-[var(--motion-instant)] ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-[0.985] motion-reduce:transform-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-ink-muted disabled:active:scale-100 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {

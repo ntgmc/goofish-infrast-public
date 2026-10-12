@@ -41,8 +41,7 @@
   opacity: .55;
 }
 
-.v2-app :focus-visible,
-.v2-drawer :focus-visible {
+:is(.v2-app, .v2-drawer, .v2-dialog) :focus-visible {
   outline: 2px solid var(--color-v2-focus);
   outline-offset: 3px;
 }
@@ -69,6 +68,10 @@
   border-right: 1px solid var(--color-v2-rail-line);
   background: var(--color-v2-rail);
   color: var(--color-v2-rail-ink);
+}
+
+.v2-sidebar :focus-visible {
+  outline-color: var(--color-v2-rail-accent);
 }
 
 .v2-brand {
@@ -1545,10 +1548,11 @@
   outline-offset: 2px;
   background: var(--v2-paper);
 }
-:is(.v2-app, .v2-drawer, .v2-dialog) :is(.tool-field, input:not([type="checkbox"]), textarea, select):focus-visible {
-  outline: none;
+:is(.v2-app, .v2-drawer, .v2-dialog) :is(.tool-field, .v2-input):focus-visible:not([aria-invalid="true"]) {
   border-color: var(--color-v2-focus);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-v2-focus) 14%, transparent);
+}
+:is(.v2-app, .v2-drawer, .v2-dialog) .tool-field[aria-invalid="true"] {
+  border-color: var(--color-v2-error);
 }
 .v2-search input {
   min-width: 0;
@@ -1901,4 +1905,3 @@
 @media (max-width: 40rem) { .v2-section-heading h1 { font-size: var(--text-xl); } }
 .v2-dialog { background: var(--v2-paper); border-color: var(--v2-line); border-radius: var(--radius-v2-control); }
 .v2-dialog :is(button, input, select, textarea) { font-family: inherit; }
-.v2-dialog :focus-visible { outline: 2px solid var(--color-v2-focus); outline-offset: 3px; }
