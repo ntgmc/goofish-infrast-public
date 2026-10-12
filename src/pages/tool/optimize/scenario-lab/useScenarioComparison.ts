@@ -21,6 +21,8 @@ import { publishOptimizationJobUpdate, subscribeOptimizationJobUpdates, withOpti
 import { z } from 'zod'
 
 
+const RESTORE_SCENARIO_EVENT = 'maa:scenario-lab:restore'
+
 const DEFAULT_FACTORS: ScenarioComparisonFactors = {
   layouts: [{
     layout: '243',
@@ -233,20 +235,29 @@ export function useScenarioComparison({
   }, [cancelling, job, profileId])
 
   useEffect(() => {
-    const restored = readSession(profileId)
-    const restoredFactors = restored?.factors ?? DEFAULT_FACTORS
-    setFactorsState(restoredFactors)
-    setResult(restored?.result ?? null)
-    setError(null)
-    setJob(null)
-    setLoading(Boolean(restored?.activeJobId))
-    setConnectionStatus('connected')
-    setConsecutivePollFailures(0)
-    pollRunRef.current += 1
-    const runId = pollRunRef.current
-    if (restored?.activeJobId) void pollJobRef.current(restored.activeJobId, runId, restoredFactors)
+    const restore = (jobId?: string) => {
+      const restored = readSession(profileId)
+      const restoredFactors = restored?.factors ?? DEFAULT_FACTORS
+      const activeJobId = jobId ?? restored?.activeJobId
+      setFactorsState(restoredFactors)
+      setResult(restored?.result ?? null)
+      setError(null)
+      setJob(null)
+      setLoading(Boolean(activeJobId))
+      setConnectionStatus('connected')
+      setConsecutivePollFailures(0)
+      const runId = ++pollRunRef.current
+      if (activeJobId) void pollJobRef.current(activeJobId, runId, restoredFactors)
+    }
+    const onRestore = (event: Event) => {
+      const detail = (event as CustomEvent<{ profileId: string; jobId: string }>).detail
+      if (detail.profileId === profileId) restore(detail.jobId)
+    }
+    restore()
+    window.addEventListener(RESTORE_SCENARIO_EVENT, onRestore)
     return () => {
       pollRunRef.current += 1
+      window.removeEventListener(RESTORE_SCENARIO_EVENT, onRestore)
     }
   }, [profileId])
 
@@ -272,7 +283,7 @@ export function useScenarioComparison({
     cancellationRequested: job.cancellationRequested,
   } : null, [connectionStatus, consecutivePollFailures, job, loading])
 
-  return { factors, setFactors, result, error, loading, cancelling, canCancel: Boolean(job?.canCancel), progress, run, cancel }
+  return { factors, setFactors, result, job, error, loading, cancelling, canCancel: Boolean(job?.canCancel), progress, run, cancel }
 }
 
 function sessionKey(profileId: string): string {
@@ -285,6 +296,7 @@ export function restoreScenarioComparisonJob(profileId: string, jobId: string): 
     factors: current?.factors ?? DEFAULT_FACTORS,
     activeJobId: jobId,
   })
+  window.dispatchEvent(new CustomEvent(RESTORE_SCENARIO_EVENT, { detail: { profileId, jobId } }))
 }
 
 function readSession(profileId: string): StoredScenarioSession | null {

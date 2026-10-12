@@ -61,6 +61,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   window.localStorage.removeItem('maatool-reduce-motion')
+  window.sessionStorage.clear()
   vi.restoreAllMocks()
 })
 
@@ -125,6 +126,7 @@ function connect() {
     activeConfig: SAMPLE_CONFIG, mergedOperators: SAMPLE_OPERATORS, configDiffRows: [],
     updateConfig: vi.fn(), handleGenerate: vi.fn(async () => undefined), handleDownloadMAA: vi.fn(),
     permission: 'ultimate', userCanEditConfig: true, userCanUseIntermediateAutoConfig: true, userCanUseUpgradeFeatures: true,
+    userCanUseScenarioLab: true, refreshInventory: vi.fn(async () => undefined),
     userCanViewFullData: true, userCanDownloadFullResult: true, handleDownloadFullResult: vi.fn(),
     configValidation: { ok: true } as ReturnType<typeof validateScheduleConfig>, configPresetLabel: '2-4-3', hasResult: true, resultIsCurrent: false,
     resultHistory: [summary], loading: false, isRestrictedPreview: false, workspaceError: null, inlineError: null,
@@ -138,6 +140,43 @@ function connect() {
 }
 
 describe('V2 results-first workspace', () => {
+  it('lists historical comparisons and opens them in place without submitting another calculation', async () => {
+    connect()
+    const refresh = vi.fn(async () => undefined)
+    const loadMore = vi.fn(async () => undefined)
+    const job = { id: 'historical-comparison', kind: 'scenario_comparison', status: 'succeeded', resultAvailable: true,
+      timestamps: { submittedAt: '2026-10-01T09:00:00Z', finishedAt: '2026-10-01T10:00:00Z' } }
+    mocks.tasks.mockReturnValue({ jobs: [job, { ...job, id: 'unavailable-comparison', resultAvailable: false },
+      { ...job, id: 'schedule', kind: 'schedule' }, { ...job, id: 'queued-comparison', status: 'queued' }],
+    refresh, loadMore, hasMore: true, loading: false, error: null, notice: null })
+    const historicalResult = {
+      kind: 'scenario_comparison', scenarioCount: 0, screeningCount: 0, verifiedCount: 0, failedCount: 0,
+      rawCombinationCount: 0, skipped: [], points: [], frontierScenarioIds: [], warnings: ['已恢复历史对比'],
+      frontierBasis: 'fast_top_3_per_actual_operation_cost_then_layout_aware_verification',
+      buildMeta: SAMPLE_RESULT.build_meta,
+    }
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input)
+      return new Response(JSON.stringify(url.includes('/api/optimization/jobs/historical-comparison')
+        ? { ...job, result: historicalResult }
+        : { tasks: [], notifications: [], unread_count: 0, next_cursor: null }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    })
+    mount('/v2?section=lab&profile_id=profile-1')
+    const history = within(await screen.findByRole('region', { name: copy.v2.comparison.historyTitle }))
+    const viewButtons = history.getAllByRole('button', { name: copy.optimize.pages_tool_optimize_OptimizationTaskCenter_037 })
+    expect(viewButtons).toHaveLength(2)
+    expect(viewButtons[1]).toBeDisabled()
+    await userEvent.click(viewButtons[0])
+    expect(await screen.findByText('已恢复历史对比')).toBeVisible()
+    expect(fetch).toHaveBeenCalledWith('/api/optimization/jobs/historical-comparison', expect.any(Object))
+    expect(fetch.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
+    expect(screen.getByTestId('route-location')).toHaveTextContent('section=lab')
+    await userEvent.click(history.getByRole('button', { name: copy.optimize.pages_tool_optimize_OptimizationTaskCenter_003 }))
+    await userEvent.click(history.getByRole('button', { name: copy.optimize.pages_tool_optimize_result_history_load_more }))
+    expect(refresh).toHaveBeenCalledOnce()
+    expect(loadMore).toHaveBeenCalledOnce()
+  })
+
   it('waits for service and login restoration before showing a confirmed guest example', () => {
     session.authStatus = 'loading'
     mocks.features.mockReturnValue({ status: 'loading', features: DEFAULT_SITE_FEATURES, retry: vi.fn() })

@@ -2,14 +2,15 @@ import { useMemo, useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import { copy } from '../../../copy'
 import { expandScenarioComparison, SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS, SCENARIO_LAYOUT_LABELS, type ScenarioComparisonFactors, type ScenarioLayout, type ScenarioProductionPlan } from '../../../lib/scenario-comparison'
-import { useScenarioComparison } from '../../tool/optimize/scenario-lab/useScenarioComparison'
+import { restoreScenarioComparisonJob, useScenarioComparison } from '../../tool/optimize/scenario-lab/useScenarioComparison'
+import { formatWorkspaceDate } from '../../../lib/workspace-history'
 import { LAYOUTS, SCHEDULES, DRONES, buildPlan, planLabel, planKey } from '../../tool/optimize/scenario-lab/ScenarioFactors'
 import ComparisonResults from './ComparisonResults'
 import ScheduleProgress from '../../../components/ScheduleProgress'
 import ProductIcon from '../../../components/ProductIcon'
 import { PRODUCT_LABELS } from '../../../components/result-panel/labels'
 import type { V2Workflow } from '../WorkspaceSections'
-import { EmptyState, Notice, SectionTitle } from '../components/WorkspaceUI'
+import { EmptyState, Loading, Notice, SectionTitle } from '../components/WorkspaceUI'
 import Link from '../../../components/InternalLink'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import { productPolicies } from '../../../lib/product-catalog'
@@ -24,6 +25,8 @@ export default function Comparison({ workflow: w, onConfig }: { workflow: V2Work
 function ComparisonWorkspace({ workflow: w, onConfig }: { workflow: V2Workflow; onConfig: () => void }) {
   const model = useScenarioComparison({ profileId: w.profile.id, operators: w.mergedOperators, config: w.activeConfig, onSettled: w.refreshInventory })
   const expansion = useMemo(() => { try { return { value: expandScenarioComparison(w.activeConfig, model.factors), error: null } } catch (caught) { return { value: null, error: caught instanceof Error ? caught.message : String(caught) } } }, [w.activeConfig, model.factors])
+  const history = w.optimizationTasks
+  const historyResults = history?.jobs.filter((job) => job.kind === 'scenario_comparison' && job.status === 'succeeded') ?? []
   const skippedCount = expansion.value?.skipped.reduce((sum, item) => sum + item.count, 0) ?? 0
   const quoteUnavailable = w.scenarioQuoteRequired && (!w.scenarioBillingQuote || w.scenarioBillingQuoteLoading || !w.scenarioBillingQuote.sufficient)
   return <div className="v2-comparison-workspace"><section className="v2-experiment-builder"><SectionTitle title={copy.v2.comparison.builderTitle} description={copy.v2.comparison.builderDescription} /><Factors factors={model.factors} disabled={model.loading} onChange={model.setFactors} />
@@ -38,6 +41,18 @@ function ComparisonWorkspace({ workflow: w, onConfig }: { workflow: V2Workflow; 
   {model.progress && <div className="v2-experiment-progress"><ScheduleProgress progress={model.progress} variant="focus" />{model.canCancel && <button className="v2-button v2-button-secondary" disabled={model.cancelling} onClick={() => { if (window.confirm(text.pages_tool_optimize_ScenarioLabSection_052)) void model.cancel() }}>{model.cancelling ? text.pages_tool_optimize_ScenarioLabSection_053 : text.pages_tool_optimize_ScenarioLabSection_051}</button>}</div>}
   {!model.result && !model.progress && <EmptyState title={copy.v2.comparison.emptyTitle}>{copy.v2.comparison.emptyDescription}</EmptyState>}
   {model.result && <ComparisonResults result={model.result} disabled={w.loading || model.loading || !w.userCanEditConfig} onApply={(config) => { w.handleApplyScenarioConfig(config); onConfig() }} />}
+  {history && <section className="v2-generation-history" aria-label={ui.historyTitle}>
+    <SectionTitle title={ui.historyTitle} description={ui.historyDescription} action={<button type="button" className="v2-button v2-button-secondary" disabled={history.loading || history.refreshing || history.loadingMore} onClick={() => void history.refresh()}>{text.pages_tool_optimize_OptimizationTaskCenter_003}</button>} />
+    <Notice error>{history.error}</Notice>
+    {history.loading ? <Loading label={text.pages_tool_optimize_OptimizationTaskCenter_004} /> : <>
+      {historyResults.map((job) => <article key={job.id} className="v2-record" aria-current={model.job?.id === job.id ? 'true' : undefined}>
+        <div className="v2-record-select"><time dateTime={job.timestamps.finishedAt ?? job.timestamps.submittedAt}>{formatWorkspaceDate(job.timestamps.finishedAt ?? job.timestamps.submittedAt)}</time><strong>{ui.historyResult(formatWorkspaceDate(job.timestamps.submittedAt))}</strong>{!job.resultAvailable && <span>{text.pages_tool_optimize_OptimizationTaskCenter_041}</span>}</div>
+        <button type="button" className="v2-text-button" disabled={model.loading || !job.resultAvailable} onClick={() => restoreScenarioComparisonJob(w.profile.id, job.id)}>{text.pages_tool_optimize_OptimizationTaskCenter_037}</button>
+      </article>)}
+      {historyResults.length === 0 && !history.error && <EmptyState title={ui.historyEmpty} />}
+      {history.hasMore && <button type="button" className="v2-button v2-button-secondary" disabled={history.loadingMore || history.refreshing} onClick={() => void history.loadMore()}>{history.loadingMore ? text.pages_tool_optimize_result_history_loading : text.pages_tool_optimize_result_history_load_more}</button>}
+    </>}
+  </section>}
   </div>
 }
 
