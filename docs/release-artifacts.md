@@ -6,6 +6,13 @@ starting a clean runtime dependency check from the archive. The archive
 contains `package.json`, `package-lock.json`, and `release-sbom.cdx.json` so a
 rollback uses the same locked production dependency graph as the build.
 
+Vite writes build metadata into Web entry chunks, and esbuild writes it into
+each server entry. Manifest creation and verification require those compiled
+values to agree with the target SHA, versions, and candidate changelog. Rebuild
+both Web and server after changing generated metadata; regenerating metadata
+alone leaves the existing bundles at their previous version. Older bundles
+without compiled metadata must be rebuilt to pass this check.
+
 Do not trust `public.tgz.sha256` by itself because it is uploaded through the
 same channel as the archive. Before deployment, verify GitHub's OIDC-backed
 artifact attestation against this repository, then verify the local checksum:

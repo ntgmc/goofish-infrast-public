@@ -1,5 +1,6 @@
 export const BUILD_RELEVANT_FILES = Object.freeze([
   'index.html',
+  'tokens.css',
   'package.json',
   'package-lock.json',
   'tsconfig.server.json',
@@ -27,6 +28,7 @@ export const BUILD_RELEVANT_SCRIPTS = Object.freeze([
   'scripts/backup-postgres.sh',
   'scripts/build-server.mjs',
   'scripts/changelog-lib.mjs',
+  'scripts/changelog-git.mjs',
   'scripts/check-api-handlers.mjs',
   'scripts/check-architecture.mjs',
   'scripts/check-auth-security.mjs',
@@ -47,6 +49,7 @@ export const BUILD_RELEVANT_SCRIPTS = Object.freeze([
   'scripts/pr-changelog-analysis-lib.mjs',
   'scripts/pr-changelog-lib.mjs',
   'scripts/private-optimizer-sources.mjs',
+  'scripts/prts-planning-sync.mjs',
   'scripts/product-catalog-lib.mjs',
   'scripts/product-catalog.mjs',
   'scripts/record-pr-changelog.mjs',

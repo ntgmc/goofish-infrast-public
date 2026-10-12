@@ -1,5 +1,7 @@
 # 深度复审问题修复进度
 
+完成状态：第二轮 14 个模块、44/44 项确认问题已修复并验证，按模块完成 14 次独立提交。
+
 修复基线：`397df2b1`。依据 `docs/code-review/` 第二轮深度复审的 44 项确认问题，按模块逐轮修复、验证、总结并提交；M02、M05 尚未形成第二轮问题，不计入这份清单。原始报告及证据保留，首轮 R01～R09 的既有修复不重复统计。
 
 ## 模块进度
@@ -19,7 +21,7 @@
 | 11 | M13 前端外壳 | D01 迁移草稿；D02 旧工作区响应；D03 清除凭据切换档案 | 已修复、验证通过 |
 | 12 | M14 前端排班与结果 | D01 历史配置竞争；D02 历史分页竞争；D03 对比遗漏券；D04 恢复动画清理 | 已修复、验证通过 |
 | 13 | M15 状态与监控 | D01 稀疏成本窗口；D02 首次成本保存竞争 | 已修复、验证通过 |
-| 14 | M16 构建与部署 | D01 删除跳过构建；D02 遗漏输入；D03 旧产物接受新清单 | 待修复 |
+| 14 | M16 构建与部署 | D01 删除跳过构建；D02 遗漏输入；D03 旧产物接受新清单 | 已修复、验证通过 |
 
 ## 第 1 轮：M01 HTTP 与安全边界
 
@@ -143,4 +145,14 @@
 - M12-D01 关联变体：成本输入使用原生 disabled fieldset，保存和随后的刷新期间禁编辑，防止旧响应覆盖新草稿。
 - 最近验证：8 个普通文件、71 项及状态 PostgreSQL 文件 8 项通过。覆盖真实稀疏存储、排序/时间边界、两端费用卡、保存禁编辑、实际表锁阻塞的双首次保存（1 成功/1 冲突/1 审计）、旧版本、更新版本与审计失败回滚。
 - 完整验证：`check:local` 通过（246 个普通文件、1,991 项；完整构建/API/109 条路由）；全量 PostgreSQL 21 个文件、246 项、公开导出和临时数据库 check:migration/严格验证器均通过。公开导出首次有一条既有 V2 测试超过默认 5 秒，单文件及整个导出重跑通过。最终文档编辑后复跑架构、死代码及 whitespace 检查；容器/连接和临时源码副本已清理，未使用云账单或真实 ECS。
-- Commit message：`fix(status): bound cost windows and serialize initial configuration saves`。
+- Commit：`89a5dc32`，`fix(status): bound cost windows and serialize initial configuration saves`。
+
+## 第 14 轮：M16 构建与部署
+
+- D01：主 diff 和 fallback 均移除状态过滤，删除按原路径判断构建相关性，保持 0=skip / 1=build 约定。
+- D02：补入 tokens.css、changelog-git.mjs、prts-planning-sync.mjs；显式构建相关规则先于一般文档早退。保留商品目录修复，不引入依赖扫描框架。
+- D03：Vite Web 入口和 esbuild 六个 server 入口以原生 banner 写入编译时元数据。清单创建/验证从实际 JS 读取并要求各入口一致，匹配目标 SHA、版本和 candidate changelog；删除从当前源码文件推断已有产物版本的逻辑。文件面、哈希、私有源码隔离和 fallback 非 deployable 规则继续验证。
+- 最近验证：构建相关性 5 项（含 10 组隔离真实 Git/CLI 场景）；发布/staging 14 项通过。实际 Vite/esbuild 构建三个 fixture 版本，覆盖仅更新源元数据、两种单侧重建、完整重建，以及缺少 banner/单个入口过期/伪造 manifest。Vite 默认移除 banner 的问题由显式保留 legal comments 解决后重跑通过。
+- 完整验证：npm ci、`check:local`（246 个普通文件、1,991 项；完整构建/API/109 条路由）、release runtime、公开导出全部通过；最终文档编辑后复跑架构、死代码及 whitespace 检查。npm ci 报告 11 项依赖审计告警（2 moderate/8 high/1 critical），未变更依赖或在本清单外自动升级。
+- 发布兼容：缺少编译元数据的旧工件需重建后使用新校验器，已记录在 docs/release-artifacts.md。没有发布工件、切换流量、生产确认或修改真实 GitHub workflow 状态。
+- Commit message：`fix(build): include deleted inputs and verify compiled release metadata`。

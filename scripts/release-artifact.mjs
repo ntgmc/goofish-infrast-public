@@ -10,7 +10,6 @@ import { atomicWriteFile } from './atomic-write.mjs'
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const root = resolve(process.env.RELEASE_ROOT || repositoryRoot)
-const sourceRoot = resolve(process.env.RELEASE_SOURCE_ROOT || repositoryRoot)
 const allowSourceTree = process.env.RELEASE_ALLOW_SOURCE_TREE === 'true'
 const [command, ...rawArguments] = process.argv.slice(2)
 const argumentsMap = parseArguments(rawArguments)
@@ -27,12 +26,11 @@ if (command === 'create') {
 
 async function createReleaseManifest(kind) {
   const targetSha = requireSha(argumentsMap.sha || process.env.VERSION_SOURCE_SHA || process.env.GITHUB_SHA)
-  const buildMeta = readObjectLiteral(await readFile(join(sourceRoot, 'src/lib/.generated/build-meta.ts'), 'utf8'), 'APP_BUILD_META')
-  if (buildMeta.git_sha !== targetSha) throw new Error(`build metadata SHA mismatch: ${buildMeta.git_sha || 'missing'}`)
-  const changelog = await readChangelogEnvelope(root, targetSha, buildMeta)
-
   const files = await collectArtifactHashes(root, kind, false)
   assertArtifactFiles(kind, files)
+  const buildMeta = await readArtifactBuildMetadata(root, files)
+  if (buildMeta.git_sha !== targetSha) throw new Error(`compiled build metadata SHA mismatch: ${buildMeta.git_sha || 'missing'}`)
+  const changelog = await readChangelogEnvelope(root, targetSha, buildMeta)
   if (kind === 'public') {
     await assertPublicArtifactDoesNotLeakPrivateSources(root, files)
     await assertPublicRuntimeContract(root)
@@ -95,6 +93,8 @@ async function verifyReleaseManifest(kind) {
   for (const path of expectedPaths) {
     if (actualFiles[path] !== expectedFiles[path]) throw new Error(`artifact hash mismatch: ${path}`)
   }
+  const compiledBuildMeta = await readArtifactBuildMetadata(root, actualFiles)
+  if (JSON.stringify(compiledBuildMeta) !== JSON.stringify(manifest.build_meta)) throw new Error('compiled build metadata does not match manifest')
   if (kind === 'public') {
     await assertPublicArtifactDoesNotLeakPrivateSources(root, actualFiles)
     await assertPublicRuntimeContract(root)
@@ -242,11 +242,25 @@ async function walk(directory) {
   return files
 }
 
-function readObjectLiteral(content, exportName) {
-  const pattern = new RegExp(`export const ${exportName} = (\\{[\\s\\S]*?\\}) as const;`)
-  const match = content.match(pattern)
-  if (!match) throw new Error(`could not read ${exportName}`)
-  return JSON.parse(match[1])
+async function readArtifactBuildMetadata(base, files) {
+  const metadata = []
+  let frontendEntries = 0
+  for (const path of Object.keys(files).filter((path) => path.endsWith('.js') && (path.startsWith('dist/') || path.startsWith('server/dist/')))) {
+    const source = await readFile(join(base, path), 'utf8')
+    const match = source.match(/(?:^|\n)\/\*! APP_BUILD_META ([^\r\n]+) \*\//)
+    if (!match) {
+      if (path.startsWith('server/dist/')) throw new Error(`compiled build metadata is missing: ${path}`)
+      continue
+    }
+    metadata.push({ path, value: JSON.parse(match[1]) })
+    if (path.startsWith('dist/')) frontendEntries += 1
+  }
+  if (frontendEntries === 0) throw new Error('frontend compiled build metadata is missing')
+  const buildMeta = metadata[0].value
+  for (const entry of metadata) {
+    if (JSON.stringify(entry.value) !== JSON.stringify(buildMeta)) throw new Error(`compiled build metadata mismatch: ${entry.path}`)
+  }
+  return buildMeta
 }
 
 function parseArguments(values) {
