@@ -58,7 +58,7 @@ function invitationClient(bound: boolean) {
         }] }
       }
       if (sql.includes('select exists (select 1 from user_game_accounts')) {
-        expect(sql).toContain("record_json->'skland_binding' is not null")
+        expect(sql).toContain("jsonb_typeof(profile.record_json->'skland_binding') = 'object'")
         return { rows: [{ active: bound }] }
       }
       if (sql.includes('from invitation_settings')) return { rows: [] }

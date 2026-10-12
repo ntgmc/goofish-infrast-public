@@ -1,4 +1,4 @@
-export const BEHAVIOR_RISK_MODEL_VERSION = 'behavior-risk-v1.3.0'
+export const BEHAVIOR_RISK_MODEL_VERSION = 'behavior-risk-v1.3.1'
 const MULTI_IDENTITY_THRESHOLD = 3
 
 export type BehaviorRiskEventType =
@@ -98,13 +98,30 @@ export function evaluateBehaviorRiskEvents(
   input: BehaviorRiskEvent[],
   now = new Date(),
 ): BehaviorRiskEvaluation[] {
-  const events = input
+  const events = normalizeUidAliases(input
     .filter((event): event is IdentifiedEvent => Boolean(event.user_id) && Number.isFinite(Date.parse(event.occurred_at)))
-    .sort((left, right) => Date.parse(left.occurred_at) - Date.parse(right.occurred_at))
+    .sort((left, right) => Date.parse(left.occurred_at) - Date.parse(right.occurred_at)))
   if (events.length === 0) return []
 
   const components = buildAssociatedAccountGroups(events, now)
   return components.map((userIds) => evaluateGroup(events.filter((event) => userIds.includes(event.user_id)), userIds, now))
+}
+
+function normalizeUidAliases(events: IdentifiedEvent[]): IdentifiedEvent[] {
+  const parent = new Map<string, string>()
+  const find = (value: string): string => {
+    const next = parent.get(value)
+    if (!next || next === value) return value
+    const root = find(next)
+    parent.set(value, root)
+    return root
+  }
+  for (const event of events) {
+    const values = signalValues(event, 'uid', event.uid_hmac)
+    if (!values.length) continue
+    for (const value of values) parent.set(find(value), find(values[0]))
+  }
+  return events.map((event) => ({ ...event, uid_hmac: event.uid_hmac ? find(event.uid_hmac) : null }))
 }
 
 function buildAssociatedAccountGroups(events: IdentifiedEvent[], now: Date): string[][] {

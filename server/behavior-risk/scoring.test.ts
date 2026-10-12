@@ -52,6 +52,22 @@ describe('evaluateBehaviorRiskEvents', () => {
     expect(result.every((evaluation) => evaluation.createCase === false)).toBe(true)
   })
 
+  it.each([true, false])('counts overlapping UID aliases transitively with shared browser=%s', (browser) => {
+    const events = [
+      event('a', 'user-a', 'bind', 30, { uid_hmac: 'a-v1' }),
+      event('b', 'user-b', 'bind', 25, { uid_hmac: 'b-v1' }),
+      event('c', 'user-c', 'bind', 20, { uid_hmac: 'a-v2', signal_aliases: { uid: ['a-v1'] } }),
+      event('d', 'user-a', 'bind', 15, { uid_hmac: 'a-v3', signal_aliases: { uid: ['a-v2'] } }),
+      event('e', 'user-a', 'bind', 10, { uid_hmac: 'b-v2', signal_aliases: { uid: ['b-v1'] } }),
+      event('f', 'user-a', 'bind', 5, { uid_hmac: 'a-v1' }),
+    ].map((entry) => ({ ...entry, browser_hmac: browser ? 'shared' : entry.user_id }))
+    expect(evaluateBehaviorRiskEvents(events, now)[0].score).toBe(0)
+    const third = event('g', 'user-a', 'bind', 1, { uid_hmac: 'c-v3', browser_hmac: browser ? 'shared' : 'user-a' })
+    const rules = evaluateBehaviorRiskEvents([...events, third], now)[0].rules
+    expect(rules.map((rule) => rule.code)).toEqual([browser ? 'browser_identity_cluster' : 'environment_multi_uid', 'account_multi_uid'])
+    expect(rules[0].evidence.uid_count).toBe(3)
+  })
+
   it('does not score two accounts sharing only a network and user agent', () => {
     const result = evaluateBehaviorRiskEvents([
       event('a', 'user-a', 'register', 30, { browser_hmac: null }),

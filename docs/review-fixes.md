@@ -14,7 +14,7 @@
 | 6 | M08 森空岛绑定与导入 | D01 旧确认写回；D02 临时 token 失效分类；D03 升级激活冻结档案 | 已修复、验证通过 |
 | 7 | M09 养成与辅助计算 | D01 刷取余量；D02 加工龙门币；D03 仓库错误分类 | 已修复、验证通过 |
 | 8 | M10 公告与通知 | D01 Unicode 摘要；D02 旧内容标记已读；D03 分页竞争 | 已修复、验证通过 |
-| 9 | M11 风控、邀请与统计 | D01 邀请资格；D02 UID 轮换 alias；D03 审计链顺序 | 待修复 |
+| 9 | M11 风控、邀请与统计 | D01 邀请资格；D02 UID 轮换 alias；D03 审计链顺序 | 已修复、验证通过 |
 | 10 | M12 管理控制台 | D01 保存覆盖新编辑；D02 旧会话详情；D03 撤回遗漏预约 | 待修复 |
 | 11 | M13 前端外壳 | D01 迁移草稿；D02 旧工作区响应；D03 清除凭据切换档案 | 待修复 |
 | 12 | M14 前端排班与结果 | D01 历史配置竞争；D02 历史分页竞争；D03 对比遗漏券；D04 恢复动画清理 | 待修复 |
@@ -97,4 +97,13 @@
 - D03：刷新/已读操作中止并清理旧分页；响应、异常和 cleanup 按当前 AbortController 归属判断，不回写新首页或清除其他请求的加载状态。
 - 最近验证：10 个普通文件、96 项通过；发布 Unicode 新用例 5 项通过；真实 PostgreSQL 2 个文件、9 项通过，覆盖实际同来源发放/旧版本确认、公告已读单调推进和 Unicode 发布事务。首次数据库断言已按 pg 的 Date 返回类型修正。
 - 完整验证：`check:local` 通过（245 个普通文件、1,966 项；完整构建/API/109 条路由）。新增 UI 测试的 `.at()` 与项目编译目标不符，改为普通下标后重跑通过；最终文档编辑后复跑架构、死代码及 whitespace 检查。未修改 schema/迁移或执行真实发布/消息投递。
-- Commit message：`fix(notifications): bind read acknowledgements to displayed versions`。
+- Commit：`c2b97b8d`，`fix(notifications): bind read acknowledgements to displayed versions`。
+
+## 第 9 轮：M11 风控、邀请与统计
+
+- D01：所有邀请入口共用 active/未归档/未过期及关联 CDK 生效条件；被邀请人还需 binding 对象和非空 UID。结算复用邀请码资格查询，删除另一份宽松判断。
+- D02：评分前按重叠 UID alias 做传递合并，账号/设备/网络 UID 计数共用规范化身份；模型推进到 v1.3.1，沿既有重算流程处理旧待复核案件。
+- D03：链锁内使用数据库时间和上一位置 +1 ms 分配单调 created_at，摘要和持久化使用同一值；业务复核时间仍保留在案件/快照。不新增 schema、账本或迁移；事务回滚和现有保留期继续生效。
+- 最近验证：7 个普通文件、32 项及 2 个完整 PostgreSQL 文件、61 项通过。覆盖两真实 UID 跨两次轮换/第三个 UID、6 类资格拒绝的直接与后台路径、过期邀请人的邀请码与结算，以及实际案件行锁阻塞后的 B→A→C 审计链。现有单元 SQL 断言已更新为 binding 对象校验。
+- 完整验证：`check:local` 通过（245 个普通文件、1,968 项；完整构建/API/109 条路由）；最终文档编辑后复跑架构、死代码及 whitespace 检查。
+- Commit message：`fix(risk): validate invitation eligibility and normalize audit identity order`。

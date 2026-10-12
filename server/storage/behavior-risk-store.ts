@@ -720,12 +720,18 @@ async function insertBehaviorRiskReviewAudit(
   },
 ): Promise<void> {
   await client.query('select pg_advisory_xact_lock($1)', [AUDIT_CHAIN_LOCK_KEY])
-  const previous = await client.query<{ entry_hash: string | null }>(
-    `select entry_hash from behavior_risk_review_audit
+  const previous = await client.query<{ entry_hash: string | null; created_at: Date }>(
+    `select entry_hash, created_at from behavior_risk_review_audit
       where entry_hash is not null
       order by created_at desc, id desc
       limit 1`,
   )
+  // Allocate the chain position under its lock; review requests may have waited on case rows in any order.
+  const position = await client.query<{ created_at: Date }>(
+    "select greatest(date_trunc('milliseconds', clock_timestamp()), $1::timestamptz + interval '1 millisecond') as created_at",
+    [previous.rows[0]?.created_at ?? new Date(0)],
+  )
+  const createdAt = position.rows[0]!.created_at.toISOString()
   const id = randomUUID()
   const previousHash = previous.rows[0]?.entry_hash ?? null
   const payload = {
@@ -736,7 +742,7 @@ async function insertBehaviorRiskReviewAudit(
     note: input.note,
     actions: input.actions,
     case_snapshot: input.snapshot,
-    created_at: input.now.toISOString(),
+    created_at: createdAt,
   }
   const entryHash = createHash('sha256').update(`${previousHash ?? ''}:${JSON.stringify(payload)}`).digest('hex')
   await client.query(
@@ -754,7 +760,7 @@ async function insertBehaviorRiskReviewAudit(
       JSON.stringify(input.snapshot),
       previousHash,
       entryHash,
-      input.now.toISOString(),
+      createdAt,
       new Date(input.now.getTime() + AUDIT_RETENTION_MS).toISOString(),
     ],
   )

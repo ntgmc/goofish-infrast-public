@@ -341,8 +341,7 @@ export async function validateInvitationCode(value: unknown): Promise<ValidatedI
         and code.status = 'active'
         and exists (
           select 1 from user_game_accounts profile
-           where profile.user_id = code.user_id and profile.status = 'active'
-             and coalesce(profile.record_json->>'kind', 'cdk') in ('cdk', 'free_preview')
+           where profile.user_id = code.user_id and ${AVAILABLE_INVITATION_PROFILE}
         )`,
     [code],
   )
@@ -697,10 +696,7 @@ async function reconcileRegisteredInvitations(limit: number): Promise<number> {
           where invitation.status = 'registered'
             and exists (
               select 1 from user_game_accounts profile
-               where profile.user_id = invitation.invitee_user_id
-                 and profile.status = 'active'
-                 and coalesce(profile.kind, profile.record_json->>'kind', 'cdk') in ('cdk', 'free_preview')
-                 and profile.record_json->'skland_binding' is not null
+               where profile.user_id = invitation.invitee_user_id and ${BOUND_INVITATION_PROFILE}
             )
           order by invitation.registered_at asc, invitation.id asc
           for update skip locked
@@ -806,7 +802,7 @@ async function settleInvitationInTransaction(
       inviterStatus = 'inviter_ineligible'
     } else {
       const inviter = await client.query<{ status: string }>('select status from user_accounts where id = $1 for update', [invitation.inviter_user_id])
-      if (inviter.rows[0]?.status !== 'active' || !(await userHasActiveProfile(client, invitation.inviter_user_id))) {
+      if (inviter.rows[0]?.status !== 'active' || !(await userCanInviteInTransaction(client, invitation.inviter_user_id))) {
         inviterStatus = 'inviter_ineligible'
       } else {
         const daily = await client.query<{ count: string }>(
@@ -973,6 +969,19 @@ async function describeRewardsInTransaction(
   })
 }
 
+const AVAILABLE_INVITATION_PROFILE = `profile.status = 'active'
+  and coalesce(profile.kind, profile.record_json->>'kind', 'cdk') in ('cdk', 'free_preview')
+  and profile.archived_at is null
+  and (nullif(profile.record_json->>'expires_at', '') is null or (profile.record_json->>'expires_at')::timestamptz > now())
+  and (coalesce(profile.kind, profile.record_json->>'kind', 'cdk') = 'free_preview'
+    or (profile.cdk_key is null and profile.record_json->>'authorization_source' = 'admin_grant')
+    or exists (select 1 from cdk_records cdk where cdk.key = profile.cdk_key
+      and cdk.cdk_type = 'profile' and cdk.status = 'used'
+      and (nullif(cdk.record_json->>'profile_expires_at', '') is null or (cdk.record_json->>'profile_expires_at')::timestamptz > now())))`
+const BOUND_INVITATION_PROFILE = `${AVAILABLE_INVITATION_PROFILE}
+  and jsonb_typeof(profile.record_json->'skland_binding') = 'object'
+  and nullif(btrim(profile.record_json#>>'{skland_binding,uid}'), '') is not null`
+
 async function userCanInvite(userId: string): Promise<boolean> {
   await ensureSchema()
   const result = await query<{ eligible: boolean }>(
@@ -981,8 +990,7 @@ async function userCanInvite(userId: string): Promise<boolean> {
        where account.id = $1 and account.status = 'active'
          and exists (
            select 1 from user_game_accounts profile
-            where profile.user_id = account.id and profile.status = 'active'
-              and coalesce(profile.record_json->>'kind', 'cdk') in ('cdk', 'free_preview')
+            where profile.user_id = account.id and ${AVAILABLE_INVITATION_PROFILE}
          )
      ) as eligible`,
     [userId],
@@ -997,8 +1005,7 @@ async function userCanInviteInTransaction(client: PoolClient, userId: string): P
        where account.id = $1 and account.status = 'active'
          and exists (
            select 1 from user_game_accounts profile
-            where profile.user_id = account.id and profile.status = 'active'
-              and coalesce(profile.kind, profile.record_json->>'kind', 'cdk') in ('cdk', 'free_preview')
+            where profile.user_id = account.id and ${AVAILABLE_INVITATION_PROFILE}
          )
      ) as eligible`,
     [userId],
@@ -1006,23 +1013,10 @@ async function userCanInviteInTransaction(client: PoolClient, userId: string): P
   return result.rows[0]?.eligible === true
 }
 
-async function userHasActiveProfile(client: PoolClient, userId: string): Promise<boolean> {
-  const active = await client.query<{ active: boolean }>(
-    `select exists (select 1 from user_game_accounts
-      where user_id = $1 and status = 'active'
-        and coalesce(record_json->>'kind', 'cdk') in ('cdk', 'free_preview')) as active`,
-    [userId],
-  )
-  return active.rows[0]?.active === true
-}
-
 async function userHasActiveSklandProfile(client: PoolClient, userId: string): Promise<boolean> {
   const active = await client.query<{ active: boolean }>(
     `select exists (select 1 from user_game_accounts profile
-      where profile.user_id = $1
-        and profile.status = 'active'
-        and coalesce(profile.kind, profile.record_json->>'kind', 'cdk') in ('cdk', 'free_preview')
-        and profile.record_json->'skland_binding' is not null) as active`,
+      where profile.user_id = $1 and ${BOUND_INVITATION_PROFILE}) as active`,
     [userId],
   )
   return active.rows[0]?.active === true

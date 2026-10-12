@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { BEHAVIOR_RISK_MODEL_VERSION } from '../behavior-risk/scoring'
 import { closePool, getPool, query } from './postgres'
 import { migrateDatabaseSchema } from './schema'
@@ -340,6 +340,42 @@ describe('behavior risk PostgreSQL store', () => {
       auditLockHolder.release()
       await query('delete from behavior_risk_cases')
       await query('delete from behavior_risk_events where user_id = $1', [account.userId])
+      await query('delete from user_accounts where id = $1', [account.userId])
+    }
+  })
+
+  it('allocates audit chain order after case row waits, independent of review timestamps', async () => {
+    const account = await seedAccount('chain-order')
+    const cases = [randomUUID(), randomUUID(), randomUUID()]
+    const now = new Date()
+    for (const id of cases) await seedLegacyPendingCase(id, account.userId, now)
+    const blocker = await getPool().connect()
+    let delayed: Promise<unknown> | undefined
+    try {
+      await blocker.query('begin')
+      await blocker.query('select id from behavior_risk_cases where id = $1 for update', [cases[0]])
+      const pid = (await blocker.query('select pg_backend_pid() as pid')).rows[0].pid
+      const review = (id: string, time: Date) => reviewBehaviorRiskCase({ caseId: id, outcome: 'dismiss', note: 'Chain ordering regression',
+        actions: [], adminUsername: 'chain-reviewer', now: time })
+      delayed = review(cases[0], new Date(now.getTime() - 1000))
+      await vi.waitFor(async () => {
+        expect((await query('select 1 from pg_stat_activity where $1 = any(pg_blocking_pids(pid))', [pid])).rowCount).toBeGreaterThan(0)
+      })
+      await review(cases[1], now)
+      await blocker.query('commit')
+      await delayed
+      await review(cases[2], now)
+      const rows = (await query<{ case_id: string; entry_hash: string; previous_hash: string; created_at: Date }>(
+        'select case_id, entry_hash, previous_hash, created_at from behavior_risk_review_audit where case_id = any($1::text[]) order by created_at', [cases])).rows
+      expect(rows.map((row) => row.case_id)).toEqual([cases[1], cases[0], cases[2]])
+      expect(rows[1].previous_hash).toBe(rows[0].entry_hash)
+      expect(rows[2].previous_hash).toBe(rows[1].entry_hash)
+    } finally {
+      await blocker.query('rollback')
+      blocker.release()
+      await delayed
+      await query('delete from behavior_risk_review_audit where case_id = any($1::text[])', [cases])
+      await query('delete from behavior_risk_cases where id = any($1::text[])', [cases])
       await query('delete from user_accounts where id = $1', [account.userId])
     }
   })
