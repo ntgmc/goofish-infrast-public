@@ -135,7 +135,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
     if (busy || session.openingProfileId || ((manualDirty || toolDirty) && !window.confirm(text.discardManual))) return
     if (!await session.flushConfigSave()) { setNavigationError(text.saveFailed); return }
     try {
-      await session.refreshProfileWorkspace(profile)
+      if (!await session.refreshProfileWorkspace(profile)) return
       setManualDirty(false)
       setToolDirty(false)
       setPanel(null)
@@ -331,7 +331,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
       {session.user && features.profiles && <ProfileExpiryPrompt userId={session.user.id} profiles={session.cdkProfiles} onOpenExport={(profile) => { void (async () => {
         if ((manualDirty || toolDirty) && !window.confirm(text.discardManual)) return
         if (!await session.flushConfigSave()) { setNavigationError(text.saveFailed); return }
-        if (profile.id !== session.activeProfile?.id) { try { await session.refreshProfileWorkspace(profile) } catch { return } }
+        if (profile.id !== session.activeProfile?.id) { try { if (!await session.refreshProfileWorkspace(profile)) return } catch { return } }
         void navigate(v2Path('plans', profile.id))
       })() }} />}
       {features.announcements && section !== 'announcements' && <AnnouncementPopup announcements={session.popups ?? []} userId={session.user?.id} onUnreadCountChange={session.setAnnouncementUnreadCount} announcementsPath={v2Path('announcements', session.activeProfile?.id)} />}

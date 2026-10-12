@@ -16,7 +16,7 @@
 | 8 | M10 公告与通知 | D01 Unicode 摘要；D02 旧内容标记已读；D03 分页竞争 | 已修复、验证通过 |
 | 9 | M11 风控、邀请与统计 | D01 邀请资格；D02 UID 轮换 alias；D03 审计链顺序 | 已修复、验证通过 |
 | 10 | M12 管理控制台 | D01 保存覆盖新编辑；D02 旧会话详情；D03 撤回遗漏预约 | 已修复、验证通过 |
-| 11 | M13 前端外壳 | D01 迁移草稿；D02 旧工作区响应；D03 清除凭据切换档案 | 待修复 |
+| 11 | M13 前端外壳 | D01 迁移草稿；D02 旧工作区响应；D03 清除凭据切换档案 | 已修复、验证通过 |
 | 12 | M14 前端排班与结果 | D01 历史配置竞争；D02 历史分页竞争；D03 对比遗漏券；D04 恢复动画清理 | 待修复 |
 | 13 | M15 状态与监控 | D01 稀疏成本窗口；D02 首次成本保存竞争 | 待修复 |
 | 14 | M16 构建与部署 | D01 删除跳过构建；D02 遗漏输入；D03 旧产物接受新清单 | 待修复 |
@@ -115,4 +115,13 @@
 - D03：持有 grant 锁后检查 reserved；单批次返回 409，活动保留 granted/reversing 并在后续批次重试，预约未结算时不标为撤回完成。沿用现有退款独立批次语义，退款批次需独立撤回；不吞退款或回滚已 committed 道具。
 - 最近验证：5 个 UI 文件、86 项及完整库存 PostgreSQL 29 项通过，覆盖保存禁编辑、相同/不同管理员重登录、同会话新详情优先、两种撤回入口等待预约/退款后继续撤回。
 - 完整验证：`check:local` 通过（245 个普通文件、1,973 项；完整构建/API/109 条路由）。新增前端测试使用兼容项目编译目标的 Promise 屏障后重跑；最终文档编辑后复跑架构、死代码及 whitespace 检查。
-- Commit message：`fix(admin): isolate detail requests and wait for reserved inventory`。
+- Commit：`73a4ede9`，`fix(admin): isolate detail requests and wait for reserved inventory`。
+
+## 第 11 轮：M13 前端外壳
+
+- D01：桌面/移动 V2 入口共用 flush 后导航，包含 lazy fallback；失败时留在当前页面并保留草稿，保存中的请求结束后才跳转。保留修饰键打开新标签的链接行为。
+- D02：工作区 loader 中止旧请求并检查 controller/会话代次，过期响应返回 false，V1/V2 调用方据此停止导航。会话替换、auth 加载、退出和卸载都使旧请求失效，错误/finally 也检查归属。
+- D03：两代设置页共用的凭据清除刷新显式携带当前 activeProfileId，清除 A 的凭据时保持 B 工作区；账号安全页的独立调用继续兼容。
+- 最近验证：7 个前端文件、186 项通过；补充回归覆盖两种入口的失败/重试/等待保存、旧工作区与退出/新选择/会话替换竞争，以及同档案和其他档案凭据清理。
+- 完整验证：`check:local` 通过（245 个普通文件、1,979 项；完整构建/API/109 条路由）。修正新增 fixture 缺少必填 desc 后重跑通过；最终文档编辑后复跑架构、死代码及 whitespace 检查。
+- Commit message：`fix(session): flush workspace transitions and ignore stale profile loads`。

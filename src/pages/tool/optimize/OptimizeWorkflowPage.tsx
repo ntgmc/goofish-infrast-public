@@ -141,6 +141,7 @@ export default function OptimizeWorkflowPage(props: Props) {
         onOpenTour={openCurrentTour}
         onReset={onReset}
         onLogout={props.onLogout}
+        flushConfigSave={props.flushConfigSave}
       >{(displayedSection) => displayedSection === 'lab' && awaitingLabInventory ? <SectionLoader label={copy.inventory.loading} /> : <>
         {configToast && <ConfigValidationToast key={configToast.id} message={configToast.message} />}
         <div className="space-y-4">

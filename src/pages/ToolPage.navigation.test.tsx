@@ -172,7 +172,7 @@ describe('ToolPage route guards', () => {
     const user = userEvent.setup()
     const firstProfile = createProfile()
     const secondProfile = { ...createProfile(), id: 'profile-2', display_name: '第二个档案' }
-    const refreshProfileWorkspace = vi.fn().mockResolvedValue(undefined)
+    const refreshProfileWorkspace = vi.fn().mockResolvedValue(true)
     const router = renderToolRoute('/tool/profiles', {
       activeProfile: firstProfile,
       activeCdkProfile: firstProfile,
@@ -354,7 +354,7 @@ describe('single game account workspace entry', () => {
   function accountSession(profiles: UserGameAccount[]) {
     return {
       activeProfile: profiles[0], activeCdkProfile: profiles[0], cdkProfiles: profiles,
-      refreshProfileWorkspace: vi.fn().mockResolvedValue(undefined),
+      refreshProfileWorkspace: vi.fn().mockResolvedValue(true),
     }
   }
 
@@ -661,7 +661,7 @@ function createSession(overrides: Record<string, unknown> = {}) {
     openingProfileId: null,
     workspaceLoadError: null,
     applyAuthPayload: vi.fn(),
-    refreshProfileWorkspace: vi.fn(),
+    refreshProfileWorkspace: vi.fn().mockResolvedValue(true),
     persistWorkspacePatch: vi.fn(),
     handleLogout: vi.fn(),
     ...overrides,

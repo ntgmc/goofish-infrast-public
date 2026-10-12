@@ -1,3 +1,4 @@
+import type { MouseEventHandler } from 'react'
 import { Check, ChevronDown, MoreHorizontal } from 'lucide-react'
 import { Link } from 'react-router'
 import {
@@ -27,6 +28,7 @@ type CompactHeaderMenuItem =
       id: string
       label: string
       to: string
+      onClick?: MouseEventHandler<HTMLAnchorElement>
       current?: boolean
       badge?: string
       badgeLabel?: string
@@ -131,6 +133,7 @@ export default function CompactHeaderMenu({
               <DropdownMenuItem key={item.id} asChild variant={variant} className={intentClassName}>
                 <Link
                   to={item.to}
+                  onClick={item.onClick}
                   aria-label={ariaLabel}
                   aria-current={item.current ? 'page' : undefined}
                 >

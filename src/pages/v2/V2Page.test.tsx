@@ -53,7 +53,7 @@ beforeEach(() => {
     retryAuth: vi.fn(), setLicense: vi.fn(), applyAuthPayload: vi.fn(),
     setConfigOverride: vi.fn(), flushConfigSave: vi.fn(async () => true), retryConfigSave: vi.fn(),
     persistWorkspacePatch: vi.fn(async () => undefined), applyWorkspaceSnapshot: vi.fn(),
-    handleLogout: vi.fn(), refreshProfileWorkspace: vi.fn(),
+    handleLogout: vi.fn(), refreshProfileWorkspace: vi.fn().mockResolvedValue(true),
   } as unknown as V2Session
   mocks.session.mockImplementation(() => session)
 })
@@ -816,7 +816,7 @@ describe('V2 results-first workspace', () => {
     connect()
     const second = { ...session.activeProfile!, id: 'profile-2', display_name: 'Second Doctor' }
     session.cdkProfiles.push(second)
-    vi.mocked(session.refreshProfileWorkspace).mockResolvedValue(undefined)
+    vi.mocked(session.refreshProfileWorkspace).mockResolvedValue(true)
     const user = userEvent.setup()
     mount()
     await user.click(screen.getByRole('button', { name: /My Doctor/ }))

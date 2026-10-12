@@ -35,7 +35,7 @@ export interface Props {
   configOverride: LicenseConfig | null;
   setConfigOverride: (v: LicenseConfig | null) => void;
   configSyncStatus: ConfigSyncStatus;
-  flushConfigSave: () => void;
+  flushConfigSave: () => Promise<boolean>;
   retryConfigSave: () => void;
   onWorkspacePatch: (patch: WorkspacePatch) => Promise<AuthSuccessResponse | void>;
   onWorkspaceUpdated: (profileId: string, workspace: UserWorkspace) => void;

@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 import { LayoutGroup } from 'motion/react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { ArrowUpRight } from 'lucide-react'
 import BrandLogo from '../../../components/BrandLogo'
 import CompactHeaderMenu from '../../../components/CompactHeaderMenu'
@@ -29,6 +29,7 @@ export default function OptimizeShell({
   onOpenTour,
   onReset,
   onLogout,
+  flushConfigSave,
   children,
 }: {
   section: OptimizeSection
@@ -43,9 +44,16 @@ export default function OptimizeShell({
   onOpenTour: () => void
   onReset: () => void
   onLogout: () => void
+  flushConfigSave: () => Promise<boolean>
   children: ReactNode | ((section: OptimizeSection) => ReactNode)
 }) {
   const { features } = useSiteFeatures()
+  const navigate = useNavigate()
+  const openV2 = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.currentTarget.target === '_blank') return
+    event.preventDefault()
+    void flushConfigSave().then((saved) => { if (saved) void navigate(profileScopedPath('/v2', profileId)) })
+  }
   const sections = OPTIMIZE_SECTIONS.filter((item) => item.id !== 'lab' || showScenarioLab)
   const current = sections.find((item) => item.id === section) ?? sections[0]
 
@@ -82,7 +90,7 @@ export default function OptimizeShell({
         </LayoutGroup>
 
         <div className="mt-auto space-y-4 pt-8">
-          {features.v2 && <Link to={profileScopedPath('/v2', profileId)} className="tool-inset block p-3 text-sm text-ink-secondary">
+          {features.v2 && <Link to={profileScopedPath('/v2', profileId)} onClick={openV2} className="tool-inset block p-3 text-sm text-ink-secondary">
             <span className="flex min-h-11 items-center justify-between gap-2 font-medium text-brand-500">{copy.v2.testEntry}<ArrowUpRight size={16} /></span>
             <span className="block text-xs leading-5">{copy.v2.testEntryDescription}</span>
           </Link>}
@@ -116,7 +124,7 @@ export default function OptimizeShell({
                     onSelect: () => onSectionChange(item.id),
                   })),
                   { type: 'separator' as const, id: 'actions' },
-                  ...(features.v2 ? [{ type: 'link' as const, id: 'v2', label: copy.v2.testEntry, to: profileScopedPath('/v2', profileId) }] : []),
+                  ...(features.v2 ? [{ type: 'link' as const, id: 'v2', label: copy.v2.testEntry, to: profileScopedPath('/v2', profileId), onClick: openV2 }] : []),
                   { type: 'button' as const, id: 'tour', label: copy.optimize.pages_tool_optimize_tour_001, onSelect: onOpenTour },
                   { type: 'button' as const, id: 'reset', label: copy.optimize.pages_tool_optimize_OptimizeShell_005, onSelect: onReset },
                   { type: 'button' as const, id: 'logout', label: copy.common.pages_tool_AccountDashboard_013, intent: 'danger' as const, onSelect: onLogout },

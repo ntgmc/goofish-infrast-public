@@ -51,7 +51,7 @@ describe('SettingsSection privacy controls', () => {
     expect(screen.getAllByText('密码不能超过 128 位')).toHaveLength(3)
   })
 
-  it('refreshes the session and shows a completed credential state after clearing', async () => {
+  it.each(['profile-1', 'profile-2'])('preserves current profile %s when clearing a credential', async (activeProfileId) => {
     const user = userEvent.setup()
     const onPayload = vi.fn()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
@@ -72,7 +72,7 @@ describe('SettingsSection privacy controls', () => {
         uid: '12345678', nickname: '博士', channel_name: '官服', bound_at: '2026-01-01T00:00:00.000Z',
         last_imported_at: null, credential_status: 'available', credential_invalid_at: null, credential_invalid_reason: null,
       },
-    }]} onLogout={vi.fn()} onPayload={onPayload} />)
+    }]} activeProfileId={activeProfileId} onLogout={vi.fn()} onPayload={onPayload} />)
 
     await user.click(screen.getByRole('button', { name: '清除授权信息' }))
 
@@ -81,7 +81,7 @@ describe('SettingsSection privacy controls', () => {
     expect(screen.queryByRole('button', { name: '清除授权信息' })).not.toBeInTheDocument()
     expect(screen.getByText(/再次导入数据时，请使用相同 UID 重新授权/)).toBeInTheDocument()
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/user/data/credential/clear', expect.any(Object))
-    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/auth/me', expect.any(Object))
+    expect(fetchMock).toHaveBeenNthCalledWith(2, `/api/auth/me?profile_id=${activeProfileId}`, expect.any(Object))
   })
 
   it('shows the accepted deletion deadline before the user leaves the signed-out session', async () => {
