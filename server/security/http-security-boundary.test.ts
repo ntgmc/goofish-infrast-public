@@ -73,6 +73,29 @@ describe('HTTP security boundary', () => {
     }
   })
 
+  it.each([
+    ['GET', '/api/announcement?page=1'],
+    ['GET', '/api/announcement?page=2&announcement_id=%E5%85%AC%E5%91%8A%2F21'],
+    ['GET', '/api/user/announcements?page=1'],
+    ['GET', '/api/user/announcements?page=2&announcement_id=popup-21&unread_only=1'],
+    ['PATCH', '/api/user/announcements?page=2&announcement_id=popup-21&unread_only=1'],
+  ])('allows announcement feed requests through the HTTP boundary (%s %s)', (method, target) => {
+    const request = incomingGet(target, 'localhost:3001', '127.0.0.1', { 'content-type': 'application/json' })
+    request.method = method
+    expect(inspectIncomingRequest(request).allowed).toBe(true)
+  })
+
+  it.each(['/api/announcement', '/api/user/announcements'])('rejects unknown and duplicate announcement query parameters (%s)', async (path) => {
+    for (const query of ['page=1&unknown=value', 'page=1&page=2']) {
+      const decision = inspectIncomingRequest(incomingGet(`${path}?${query}`, 'localhost:3001'))
+      expect(decision.allowed).toBe(false)
+      if (!decision.allowed) {
+        expect(decision.response.status).toBe(400)
+        await expect(decision.response.json()).resolves.toMatchObject({ code: 'invalid_request' })
+      }
+    }
+  })
+
   it('allows the public service status endpoint without query parameters', () => {
     expect(inspectIncomingRequest(incomingGet('/api/status', 'localhost:3001', '127.0.0.1')).allowed).toBe(true)
     expect(inspectIncomingRequest(incomingGet('/api/status?unexpected=true', 'localhost:3001', '127.0.0.1')).allowed).toBe(false)

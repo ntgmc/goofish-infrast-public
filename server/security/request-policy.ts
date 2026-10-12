@@ -758,7 +758,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/data/delete-request', route({ POST: json('auth', requestSchemas.accountDelete) })],
   ['/api/user/data/cancel', route({ POST: json('auth', requestSchemas.deletionToken) })],
   ['/api/user/data/credential/clear', route({ POST: json('standard', requestSchemas.profileId) })],
-  ['/api/announcement', route({ GET: none() }, ['admin'])],
+  ['/api/announcement', route({ GET: none() }, ['admin', 'page', 'announcement_id'])],
   ['/api/admin/announcement', route({ GET: none(), PUT: json('admin', requestSchemas.announcement) }, ['admin'])],
   ['/api/integrations/qqbot/events', route({ GET: none() }, ['cursor', 'limit'])],
   ['/api/integrations/qqbot/registration-invitations', route({
@@ -776,7 +776,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/admin/usage-stats', route({ GET: none() }, ['admin', 'format', 'from', 'to', 'range'])],
   ['/api/depot-value', route({ POST: json('depot', requestSchemas.depotValue) })],
   ['/api/cultivation-plan', route({ POST: json('standard', requestSchemas.cultivationPlan) })],
-  ['/api/user/announcements', route({ GET: none(), PATCH: json('standard', requestSchemas.userAnnouncement) })],
+  ['/api/user/announcements', route({ GET: none(), PATCH: json('standard', requestSchemas.userAnnouncement) }, ['page', 'announcement_id', 'unread_only'])],
   ['/api/user/feedback', route({ POST: json('feedback', requestSchemas.userFeedback) })],
   ['/api/admin/feedback', route({ GET: none() }, ['page', 'page_size', 'image_id'])],
   ['/api/user/notifications', route({ GET: none(), PATCH: json('standard', requestSchemas.userNotification) }, ['cursor', 'limit'])],
