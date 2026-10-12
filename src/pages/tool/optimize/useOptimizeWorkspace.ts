@@ -1,4 +1,4 @@
-import { useCallback, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 import type { AuthSuccessResponse, LicenseConfig, OptimizeResult, UpgradeSuggestion, UserWorkspace, WorkspaceResultHistoryItem, WorkspaceResultHistorySummary, WorkspaceSavedConfig, WorkspaceSavedConfigAction } from '../../../lib/types'
 import { normalizeUpgradeSuggestions } from './workflow-utils'
 import type { WorkspacePatch } from '../useToolSession'
@@ -56,6 +56,16 @@ export function useOptimizeWorkspace({
   setSection,
   onDownloadMaaResult,
 }: UseOptimizeWorkspaceOptions) {
+  const historyRequest = useRef<AbortController | null>(null)
+  const invalidateHistoryRequest = useCallback(() => {
+    historyRequest.current?.abort()
+    historyRequest.current = null
+  }, [])
+  useEffect(() => {
+    setWorkspaceBusyAction(null)
+    return invalidateHistoryRequest
+  }, [profileId, invalidateHistoryRequest, setWorkspaceBusyAction])
+
   const runSavedConfigAction = useCallback(async (
     busyKey: string,
     action: WorkspaceSavedConfigAction,
@@ -108,6 +118,7 @@ export function useOptimizeWorkspace({
 
   const handleUseSavedConfig = useCallback((config: WorkspaceSavedConfig) => {
     if (isConfigReadOnly?.()) return
+    invalidateHistoryRequest()
     setConfigOverride(normalizeAllowedConfigOverride(config.config))
     setCurrentResult(null)
     setFinalResult(null)
@@ -122,25 +133,31 @@ export function useOptimizeWorkspace({
       type: 'touch',
       id: config.id,
     }, `${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_009}${config.name}”。`)
-  }, [isConfigReadOnly, normalizeAllowedConfigOverride, runSavedConfigAction, setConfigOverride, setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions, setWorkspaceNotice])
+  }, [invalidateHistoryRequest, isConfigReadOnly, normalizeAllowedConfigOverride, runSavedConfigAction, setConfigOverride, setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions, setWorkspaceNotice])
 
   const loadHistoryDetail = useCallback(async (item: WorkspaceResultHistorySummary) => {
+    invalidateHistoryRequest()
+    const controller = new AbortController()
+    historyRequest.current = controller
+    const current = () => historyRequest.current === controller && !controller.signal.aborted
     setWorkspaceBusyAction(`detail:${item.id}`)
     setWorkspaceError(null)
     try {
-      return await fetchResultHistoryDetail(profileId, item.id)
+      const detail = await fetchResultHistoryDetail(profileId, item.id, controller.signal)
+      return current() ? { item: detail, current } : null
     } catch (error) {
-      setWorkspaceError((error as Error).message)
+      if (current()) setWorkspaceError((error as Error).message)
       return null
     } finally {
-      setWorkspaceBusyAction(null)
+      if (current()) setWorkspaceBusyAction(null)
     }
-  }, [profileId, setWorkspaceBusyAction, setWorkspaceError])
+  }, [invalidateHistoryRequest, profileId, setWorkspaceBusyAction, setWorkspaceError])
 
   const handleViewHistory = useCallback(async (summary: WorkspaceResultHistorySummary) => {
     recordToolBehavior({ name: 'result_select', profile: profileId, subject: summary.id })
-    const item = await loadHistoryDetail(summary)
-    if (!item) return
+    const loaded = await loadHistoryDetail(summary)
+    if (!loaded?.current()) return
+    const { item } = loaded
     setCurrentResult(null)
     setFinalResult(null)
     setSuggestions(normalizeUpgradeSuggestions(item.result.upgrade_suggestions))
@@ -154,8 +171,9 @@ export function useOptimizeWorkspace({
   const handleUseHistoryConfig = useCallback(async (summary: WorkspaceResultHistorySummary) => {
     if (isConfigReadOnly?.()) return
     recordToolBehavior({ name: 'history_config_select', profile: profileId, subject: summary.id })
-    const item = await loadHistoryDetail(summary)
-    if (!item || isConfigReadOnly?.()) return
+    const loaded = await loadHistoryDetail(summary)
+    if (!loaded?.current() || isConfigReadOnly?.()) return
+    const { item } = loaded
     if (!item.config) {
       setWorkspaceError(copy.workspace.pages_tool_optimize_useOptimizeWorkspace_010)
       return

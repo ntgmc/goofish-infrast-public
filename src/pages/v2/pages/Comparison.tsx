@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import { copy } from '../../../copy'
 import { expandScenarioComparison, getFixedScenarioProductionPlan, SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS, SCENARIO_LAYOUT_LABELS, type ScenarioComparisonFactors, type ScenarioLayout, type ScenarioProductionPlan } from '../../../lib/scenario-comparison'
@@ -25,14 +25,24 @@ export default function Comparison({ workflow: w, onConfig }: { workflow: V2Work
 function ComparisonWorkspace({ workflow: w, onConfig }: { workflow: V2Workflow; onConfig: () => void }) {
   const model = useScenarioComparison({ profileId: w.profile.id, operators: w.mergedOperators, config: w.activeConfig, onSettled: w.refreshInventory })
   const expansion = useMemo(() => { try { return { value: expandScenarioComparison(w.activeConfig, model.factors), error: null } } catch (caught) { return { value: null, error: caught instanceof Error ? caught.message : String(caught) } } }, [w.activeConfig, model.factors])
+  const [useCoupon, setUseCoupon] = useState(false)
+  const couponBalance = w.itemBalances.scenario_simulation_coupon ?? 0
+  useEffect(() => {
+    if (!w.scenarioCouponRequired || couponBalance < 1) setUseCoupon(false)
+  }, [couponBalance, w.scenarioCouponRequired])
   const history = w.optimizationTasks
   const historyResults = history?.jobs.filter((job) => job.kind === 'scenario_comparison' && job.status === 'succeeded') ?? []
   const skippedCount = expansion.value?.skipped.reduce((sum, item) => sum + item.count, 0) ?? 0
   const quoteUnavailable = w.scenarioQuoteRequired && (!w.scenarioBillingQuote || w.scenarioBillingQuoteLoading || !w.scenarioBillingQuote.sufficient)
   return <div className="v2-comparison-workspace"><section className="v2-experiment-builder"><SectionTitle title={copy.v2.comparison.builderTitle} description={copy.v2.comparison.builderDescription} /><Factors factors={model.factors} disabled={model.loading} onChange={model.setFactors} />
+    {w.scenarioCouponRequired && <label className="v2-factor-choice">
+      <input type="checkbox" checked={useCoupon} disabled={model.loading || couponBalance < 1} onChange={(event) => setUseCoupon(event.currentTarget.checked)} />
+      <span><strong>{copy.inventory.scenario_coupon}</strong><small>{copy.inventory.scenario_coupon_help} {copy.inventory.coupon_available}{couponBalance}</small></span>
+    </label>}
+    {w.scenarioCouponRequired && !useCoupon && <Notice>{copy.inventory.scenario_coupon_required}</Notice>}
     <div className="v2-experiment-run">
       <div aria-live="polite">{expansion.value ? <strong>{ui.scenarioCount(expansion.value.scenarios.length)}</strong> : <Notice error>{expansion.error}</Notice>}</div>
-      <button type="button" className="v2-button v2-button-primary" disabled={model.loading || !expansion.value || quoteUnavailable} onClick={() => void model.run(false, w.scenarioBillingQuote)}>{model.loading ? ui.running : ui.run}</button>
+      <button type="button" className="v2-button v2-button-primary" disabled={model.loading || !expansion.value || (w.scenarioCouponRequired && (!useCoupon || couponBalance < 1)) || quoteUnavailable} onClick={() => void model.run(w.scenarioCouponRequired && useCoupon, w.scenarioBillingQuote)}>{model.loading ? ui.running : ui.run}</button>
     </div>
     {skippedCount > 0 && <details className="v2-comparison-skips"><summary>{ui.skippedCount(skippedCount)}</summary><ul>{expansion.value?.skipped.map((item) => <li key={`${item.code}:${item.droneStrategy}`}>{ui.skippedItem(item.message, item.count)}</li>)}</ul></details>}
     {w.scenarioQuoteRequired && <Notice>{w.scenarioBillingQuoteLoading ? text.pages_tool_optimize_ScenarioLabSection_055 : w.scenarioBillingQuoteError ?? (w.scenarioBillingQuote?.sufficient === false ? text.pages_tool_optimize_ScenarioLabSection_056 : text.pages_tool_optimize_ScenarioLabSection_057)}{w.scenarioBillingQuoteError && <button className="v2-text-button" onClick={() => void w.refreshScenarioBillingQuote()}>{text.pages_tool_optimize_ScenarioLabSection_058}</button>}</Notice>}

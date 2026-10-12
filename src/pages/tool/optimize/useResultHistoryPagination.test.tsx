@@ -15,6 +15,32 @@ describe('useResultHistoryPagination', () => {
     vi.clearAllMocks()
   })
 
+  it.each(['active', 'archived'] as const)('discards late %s pages and errors after a workspace refresh without clearing newer loading', async (scope) => {
+    for (const fail of [false, true]) {
+      let resolveOld!: (value: unknown) => void, rejectOld!: (error: Error) => void, resolveNew!: (value: unknown) => void
+      mocks.fetchResultHistoryPage.mockReset()
+        .mockReturnValueOnce(new Promise((resolve, reject) => { resolveOld = resolve; rejectOld = reject }))
+        .mockReturnValueOnce(new Promise((resolve) => { resolveNew = resolve }))
+      const initial = { ...workspace([summary('old')], 'old-cursor'), archived_results: [summary('old')], archived_results_next_cursor: 'old-cursor' }
+      const { result, rerender, unmount } = renderHook(({ snapshot }) => useResultHistoryPagination('profile-1', snapshot), { initialProps: { snapshot: initial } })
+      let old!: Promise<void>, fresh!: Promise<void>
+      act(() => { old = scope === 'active' ? result.current.loadMoreResultHistory() : result.current.loadMoreArchivedResults() })
+      const oldSignal = mocks.fetchResultHistoryPage.mock.calls[0]![3] as AbortSignal
+      rerender({ snapshot: { ...initial, result_history: [summary('fresh')], archived_results: [summary('fresh')], result_history_next_cursor: 'fresh-cursor', archived_results_next_cursor: 'fresh-cursor' } })
+      expect(oldSignal.aborted).toBe(true)
+      act(() => { fresh = scope === 'active' ? result.current.loadMoreResultHistory() : result.current.loadMoreArchivedResults() })
+      await act(async () => { if (fail) rejectOld(new Error('obsolete error')); else resolveOld({ items: [summary('deleted')], next_cursor: 'obsolete' }); await old })
+      expect(result.current.loadingScope).toBe(scope)
+      expect(result.current.error).toBeNull()
+      expect((scope === 'active' ? result.current.resultHistory : result.current.archivedResults).map((item) => item.id)).toEqual(['fresh'])
+      expect(mocks.fetchResultHistoryPage.mock.calls[1]![2]).toBe('fresh-cursor')
+      await act(async () => { resolveNew({ items: [summary('new-page')], next_cursor: null }); await fresh })
+      expect(result.current.loadingScope).toBeNull()
+      expect((scope === 'active' ? result.current.resultHistory : result.current.archivedResults).map((item) => item.id)).toEqual(['fresh', 'new-page'])
+      unmount()
+    }
+  })
+
   it('appends a cursor page without duplicate IDs and resets with a new workspace snapshot', async () => {
     const first = summary('result-1')
     const second = summary('result-2')
@@ -32,7 +58,7 @@ describe('useResultHistoryPagination', () => {
       await result.current.loadMoreResultHistory()
     })
 
-    expect(mocks.fetchResultHistoryPage).toHaveBeenCalledWith('profile-1', 'active', 'cursor-1')
+    expect(mocks.fetchResultHistoryPage).toHaveBeenCalledWith('profile-1', 'active', 'cursor-1', expect.any(AbortSignal))
     expect(result.current.resultHistory.map((item) => item.id)).toEqual(['result-1', 'result-2'])
     expect(result.current.resultHistoryHasMore).toBe(false)
 

@@ -17,7 +17,7 @@
 | 9 | M11 风控、邀请与统计 | D01 邀请资格；D02 UID 轮换 alias；D03 审计链顺序 | 已修复、验证通过 |
 | 10 | M12 管理控制台 | D01 保存覆盖新编辑；D02 旧会话详情；D03 撤回遗漏预约 | 已修复、验证通过 |
 | 11 | M13 前端外壳 | D01 迁移草稿；D02 旧工作区响应；D03 清除凭据切换档案 | 已修复、验证通过 |
-| 12 | M14 前端排班与结果 | D01 历史配置竞争；D02 历史分页竞争；D03 对比遗漏券；D04 恢复动画清理 | 待修复 |
+| 12 | M14 前端排班与结果 | D01 历史配置竞争；D02 历史分页竞争；D03 对比遗漏券；D04 恢复动画清理 | 已修复、验证通过 |
 | 13 | M15 状态与监控 | D01 稀疏成本窗口；D02 首次成本保存竞争 | 待修复 |
 | 14 | M16 构建与部署 | D01 删除跳过构建；D02 遗漏输入；D03 旧产物接受新清单 | 待修复 |
 
@@ -124,4 +124,14 @@
 - D03：两代设置页共用的凭据清除刷新显式携带当前 activeProfileId，清除 A 的凭据时保持 B 工作区；账号安全页的独立调用继续兼容。
 - 最近验证：7 个前端文件、186 项通过；补充回归覆盖两种入口的失败/重试/等待保存、旧工作区与退出/新选择/会话替换竞争，以及同档案和其他档案凭据清理。
 - 完整验证：`check:local` 通过（245 个普通文件、1,979 项；完整构建/API/109 条路由）。修正新增 fixture 缺少必填 desc 后重跑通过；最终文档编辑后复跑架构、死代码及 whitespace 检查。
-- Commit message：`fix(session): flush workspace transitions and ignore stale profile loads`。
+- Commit：`1836098a`，`fix(session): flush workspace transitions and ignore stale profile loads`。
+
+## 第 12 轮：M14 前端排班与结果
+
+- D01：历史查看和应用共用 AbortController，成功/错误/finally 及调用方的后续应用都检查当前请求。换档案、卸载和选择已存方案使旧请求失效；保留计算期间只读检查。
+- D02：profile/workspace 替换及卸载使旧分页失效；active/archived 沿用独立游标，旧页、旧错误和旧 finally 不能覆盖新页。ref 同时阻止同一事件轮内的重复分页。
+- D03：workflow 统一计算 scenarioCouponRequired，两代入口复用现有券说明并要求显式勾选，将实际 useCoupon 传给共享提交 hook；已含能力和报价路径无需用券。
+- D04：恢复和主生成在完成动画后复查生命周期，工作区刷新结果及错误也核对当前性，异步余额刷新结束后再检查才执行本地结算。不把页面离开当作取消服务端任务。
+- 最近验证：23 个排班/V2 文件、210 项通过。新增真实 session/workflow/client 组合验证历史逆序及自动 PATCH、查看/应用交错、换档案、两代券确认/取消选择/已含权益；恢复和生成均覆盖动画内卸载/换档案、刷新中卸载及正常完成。两种历史分页覆盖迟到成功/错误与新 loading 竞争。
+- 完整验证：`check:local` 通过（246 个普通文件、1,989 项；完整构建/API/109 条路由）。新增历史 fixture 的 summary/detail 类型对齐后重跑通过；最终文档编辑后复跑架构、死代码及 whitespace 检查。边界响应使用受控 fixture，未运行私有优化器或真实计费。
+- Commit message：`fix(optimization-ui): isolate history requests and honor comparison coupons`。

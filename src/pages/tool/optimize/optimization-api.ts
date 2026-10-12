@@ -75,10 +75,12 @@ export async function fetchResultHistoryPage(
   profileId: string,
   scope: 'active' | 'archived',
   cursor?: string | null,
+  signal?: AbortSignal,
 ): Promise<WorkspaceResultHistoryPage> {
   const params = new URLSearchParams({ profile_id: profileId, scope, limit: '20' })
   if (cursor) params.set('cursor', cursor)
   return await apiJson<WorkspaceResultHistoryPage>(`/api/user/results?${params.toString()}`, {
+    signal,
     fallbackMessage: copy.common.pages_tool_useToolSession_002,
   })
 }
@@ -86,11 +88,12 @@ export async function fetchResultHistoryPage(
 export async function fetchResultHistoryDetail(
   profileId: string,
   resultId: string,
+  signal?: AbortSignal,
 ): Promise<WorkspaceResultHistoryItem> {
   const params = new URLSearchParams({ profile_id: profileId })
   const response = await apiJson<{ item: WorkspaceResultHistoryItem }>(
     `/api/user/results/${encodeURIComponent(resultId)}?${params.toString()}`,
-    { fallbackMessage: copy.common.pages_tool_useToolSession_002 },
+    { signal, fallbackMessage: copy.common.pages_tool_useToolSession_002 },
   )
   return response.item
 }

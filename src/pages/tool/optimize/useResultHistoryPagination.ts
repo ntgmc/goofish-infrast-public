@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { UserWorkspace, WorkspaceResultHistorySummary } from '../../../lib/types'
 import { fetchResultHistoryPage } from './optimization-api'
 import { copy } from '../../../copy/index'
@@ -24,6 +24,7 @@ export function useResultHistoryPagination(
   const [loadingScope, setLoadingScope] = useState<ResultScope | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const request = useRef<AbortController | null>(null)
   useEffect(() => {
     setResultHistory(workspace?.result_history ?? [])
     setArchivedResults(workspace?.archived_results ?? [])
@@ -31,15 +32,23 @@ export function useResultHistoryPagination(
     setArchivedResultsCursor(workspace?.archived_results_next_cursor ?? null)
     setLoadingScope(null)
     setError(null)
+    return () => {
+      request.current?.abort()
+      request.current = null
+    }
   }, [profileId, workspace])
 
   const loadMore = useCallback(async (scope: ResultScope) => {
     const cursor = scope === 'active' ? resultHistoryCursor : archivedResultsCursor
-    if (!cursor || loadingScope) return
+    if (!cursor || request.current) return
+    const controller = new AbortController()
+    request.current = controller
+    const current = () => request.current === controller && !controller.signal.aborted
     setLoadingScope(scope)
     setError(null)
     try {
-      const page = await fetchResultHistoryPage(profileId, scope, cursor)
+      const page = await fetchResultHistoryPage(profileId, scope, cursor, controller.signal)
+      if (!current()) return
       const appendUnique = (
         current: WorkspaceResultHistorySummary[],
       ): WorkspaceResultHistorySummary[] => {
@@ -54,11 +63,14 @@ export function useResultHistoryPagination(
         setArchivedResultsCursor(page.next_cursor)
       }
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : copy.optimize.pages_tool_optimize_result_history_load_failed)
+      if (current()) setError(loadError instanceof Error ? loadError.message : copy.optimize.pages_tool_optimize_result_history_load_failed)
     } finally {
-      setLoadingScope(null)
+      if (current()) {
+        request.current = null
+        setLoadingScope(null)
+      }
     }
-  }, [archivedResultsCursor, loadingScope, profileId, resultHistoryCursor])
+  }, [archivedResultsCursor, profileId, resultHistoryCursor])
 
   return {
     resultHistory,
