@@ -52,9 +52,15 @@ export function getRequestClientIp(req: Request): string {
 
 function normalizeIp(value: string | undefined): string | null {
   if (!value) return null
-  let candidate = value.trim().toLowerCase()
-  if (candidate.startsWith('::ffff:') && isIP(candidate.slice(7)) === 4) {
-    candidate = candidate.slice(7)
+  const candidate = value.trim().toLowerCase()
+  const version = isIP(candidate)
+  if (version === 4) return candidate
+  if (version !== 6) return null
+  const [address, scope] = candidate.split('%')
+  const normalized = new URL(`http://[${address}]/`).hostname.slice(1, -1)
+  if (normalized.startsWith('::ffff:') && !scope) {
+    const [high, low] = normalized.slice(7).split(':').map((part) => Number.parseInt(part, 16))
+    return [high >>> 8, high & 255, low >>> 8, low & 255].join('.')
   }
-  return isIP(candidate) ? candidate : null
+  return scope ? `${normalized}%${scope}` : normalized
 }
