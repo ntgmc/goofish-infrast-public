@@ -1,4 +1,6 @@
 import adminCdkHandler from './handlers/admin-cdk'
+import adminFeedbackHandler from './handlers/admin-feedback'
+import userFeedbackHandler from './handlers/user-feedback'
 import adminRiskSettingsHandler from './handlers/admin-risk-settings'
 import adminBehaviorRiskHandler from './handlers/admin-behavior-risk'
 import adminInvitationSettingsHandler from './handlers/admin-invitation-settings'
@@ -107,6 +109,8 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/depot-value', depotValueHandler as unknown as ApiHandler],
   ['/api/user/announcements', userAnnouncementsHandler as unknown as ApiHandler],
   ['/api/user/notifications', userNotificationsHandler as unknown as ApiHandler],
+  ['/api/user/feedback', userFeedbackHandler],
+  ['/api/admin/feedback', adminFeedbackHandler],
   ['/api/user/profiles', userProfilesHandler as unknown as ApiHandler],
   ['/api/user/profiles/depot-value', userProfilesHandler as unknown as ApiHandler],
   ['/api/user/profiles/preview', userProfilesHandler as unknown as ApiHandler],

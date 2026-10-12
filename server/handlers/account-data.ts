@@ -99,6 +99,7 @@ async function exportData(userId: string): Promise<Response> {
     balanceReservations,
     commercialLimits,
     notifications,
+    feedback,
   ] = await Promise.all([
     getUserById(userId),
     listProfileWorkspaces(profileIds),
@@ -248,6 +249,8 @@ async function exportData(userId: string): Promise<Response> {
     query(`select active_profile_limit, total_profile_limit, suspended_at, suspension_reason, updated_at
              from commercial_account_limits where user_id = $1`, [userId]),
     exportUserNotifications(userId),
+    query(`select id, category, message, image_type, encode(image_data, 'base64') as image_base64, created_at
+             from user_feedback where user_id = $1 order by created_at asc, id asc`, [userId]),
   ])
 
   const safeProfiles = profiles.map((profile) => {
@@ -324,6 +327,7 @@ async function exportData(userId: string): Promise<Response> {
     },
     commercial_account: commercialLimits.rows[0] ?? null,
     notifications,
+    feedback: feedback.rows,
     deletion_request: deletion.rows[0] ?? null,
   } satisfies PersonalDataExportV4
 

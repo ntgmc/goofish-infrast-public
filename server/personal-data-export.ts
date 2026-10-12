@@ -65,6 +65,7 @@ export const PERSONAL_DATA_EXPORT_COVERAGE = {
   },
   metered_personal_claims: { disposition: 'export', field: 'metered_personal_claim' },
   user_notifications: { disposition: 'export', field: 'notifications' },
+  user_feedback: { disposition: 'export', field: 'feedback' },
   user_announcement_reads: { disposition: 'export', field: 'announcement_reads' },
   account_deletion_requests: { disposition: 'export', field: 'deletion_request' },
   personal_use_declaration_acceptances: { disposition: 'export', field: 'personal_use_declarations' },

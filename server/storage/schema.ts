@@ -587,6 +587,20 @@ BEGIN
   END IF;
 END $$;
 
+CREATE TABLE IF NOT EXISTS user_feedback (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  category TEXT NOT NULL CHECK (category IN ('account', 'schedule', 'import', 'payment', 'suggestion', 'other')),
+  message TEXT NOT NULL CHECK (char_length(btrim(message)) BETWEEN 1 AND 2000),
+  image_type TEXT,
+  image_data BYTEA,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK ((image_type IS NULL AND image_data IS NULL) OR
+    (image_type IS NOT NULL AND image_type IN ('image/jpeg', 'image/png', 'image/webp') AND image_data IS NOT NULL AND octet_length(image_data) BETWEEN 1 AND 1048576))
+);
+CREATE INDEX IF NOT EXISTS idx_user_feedback_created ON user_feedback(created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_user_feedback_user ON user_feedback(user_id);
+
 CREATE TABLE IF NOT EXISTS user_balance_accounts (
   user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
   available NUMERIC(20,2) NOT NULL DEFAULT 0 CHECK (available >= 0),
@@ -2585,6 +2599,7 @@ const API_ONLY_RUNTIME_TABLES = new Set([
   'user_balance_qualification_ledger',
   'commercial_account_limits',
   'user_notifications',
+  'user_feedback',
   'inventory_admin_operations',
   'admin_operation_audit',
   'service_status_hourly',

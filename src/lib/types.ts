@@ -1241,5 +1241,6 @@ export interface PersonalDataExportV4 {
   };
   commercial_account: PersonalDataExportRecord | null;
   notifications: unknown[];
+  feedback: PersonalDataExportRecord[];
   deletion_request: PersonalDataExportRecord | null;
 }

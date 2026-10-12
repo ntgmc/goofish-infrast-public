@@ -7,6 +7,7 @@ import CompactHeaderMenu from '../../../components/CompactHeaderMenu'
 import DeferredFeatureMenu from '../../../components/DeferredFeatureMenu'
 import { MotionNavIndicator, PageTransition } from '../../../components/MotionPrimitives'
 import ThemeSwitcher from '../../../components/ThemeSwitcher'
+import FeedbackButton from '../../../components/FeedbackDialog'
 import ToolBreadcrumbs from '../../../components/ToolBreadcrumbs'
 import { OPTIMIZE_SECTIONS, type OptimizeSection } from './types'
 import { copy } from '../../../copy/index'
@@ -124,6 +125,7 @@ export default function OptimizeShell({
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {compactHeaderActions}
+              <FeedbackButton iconOnly />
               <NotificationBell iconOnly />
               <ThemeSwitcher iconOnly />
               <DeferredFeatureMenu iconOnly />
@@ -154,6 +156,7 @@ export default function OptimizeShell({
                 {copy.optimize.pages_tool_optimize_tour_001}
               </button>
               {headerActions}
+              <FeedbackButton />
               <NotificationBell />
               <ThemeSwitcher />
               <DeferredFeatureMenu />

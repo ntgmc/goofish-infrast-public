@@ -30,6 +30,7 @@ import V2Transition, { V2PageTransition } from './V2Transition'
 import TradingIcon from './TradingIcon'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
+import FeedbackButton from '../../components/FeedbackDialog'
 import ProfileExpiryPrompt from '../tool/ProfileExpiryPrompt'
 
 const text = copy.v2
@@ -206,6 +207,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
             {entry === 'profiles' ? <UserIcon /> : entry === 'announcements' ? <Bell size={19} /> : entry === 'settings' ? <Settings2 size={19} /> : <WalletCards size={19} />}<span>{sectionLabels[entry]}</span>{entry === 'announcements' && session.announcementUnreadCount > 0 && <small>{session.announcementUnreadCount}</small>}</button>)}
         </nav>
         <div className="v2-sidebar-bottom">
+          {session.user && <FeedbackButton className="v2-help-link" />}
           {features.faq && <Link className="v2-help-link" to={v2Path('help', session.activeProfile?.id)}><BookOpen size={19} /><span>{text.helpAction}</span><ArrowUpRight size={14} /></Link>}
         </div>
       </aside>

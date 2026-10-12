@@ -15,6 +15,7 @@ import InventoryAdminSection from './inventory/InventoryAdminSection'
 import OverviewSection from './overview/OverviewSection'
 import CdkSection from './cdk/CdkSection'
 import UsersSection from './users/UsersSection'
+import FeedbackSection from './feedback/FeedbackSection'
 import RiskSection from './risk/RiskSection'
 import AdminShell, { canAccessAdminSection } from './AdminShell'
 import { useAdminController } from './useAdminController'
@@ -70,6 +71,7 @@ export default function AdminDashboardView() {
         <SectionLoader label={`正在加载${sectionLabels[section]}…`} /><div className="admin-section-body tool-page-content">
           {section === 'overview' && <OverviewSection model={c} />}
           {section === 'users' && <UsersSection model={c} active={displayedSection === 'users'} />}
+          {section === 'feedback' && <FeedbackSection active={displayedSection === 'feedback'} />}
           {section === 'cdk' && <CdkSection model={c} active={displayedSection === 'cdk'} />}
           {section === 'risk' && <RiskSection model={c} active={displayedSection === 'risk'} />}
           {section === 'queue' && <QueueMonitorPanel active={displayedSection === 'queue'} />}

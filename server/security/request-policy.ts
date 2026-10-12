@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { feedbackRequestSchema } from '../../src/lib/feedback-contracts'
 import { giftPackOpeningRuleSchema } from '../../src/lib/admin-inventory-contracts'
 import {
   MAX_DEPOT_ITEM_COUNT,
@@ -33,6 +34,7 @@ export const REQUEST_BODY_LIMITS = Object.freeze({
   admin: 128 * 1024,
   compute: 256 * 1024,
   depot: 1024 * 1024,
+  feedback: 2 * 1024 * 1024,
 })
 
 export type RequestBodyProfile = keyof typeof REQUEST_BODY_LIMITS
@@ -133,6 +135,7 @@ export const requestSchemas = {
     includeClosed: z.boolean().optional(), includeAlternatives: z.boolean().optional(), includeUncertain: z.boolean().optional(),
   }).optional() }),
   depotValue: depotValueRequestSchema,
+  userFeedback: feedbackRequestSchema,
   adminSession: strict({ username: shortString(64), password: shortString(128) }),
   authRegister: strict({
     email: shortString(AUTH_EMAIL_MAX_LENGTH),
@@ -774,6 +777,8 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/depot-value', route({ POST: json('depot', requestSchemas.depotValue) })],
   ['/api/cultivation-plan', route({ POST: json('standard', requestSchemas.cultivationPlan) })],
   ['/api/user/announcements', route({ GET: none(), PATCH: json('standard', requestSchemas.userAnnouncement) })],
+  ['/api/user/feedback', route({ POST: json('feedback', requestSchemas.userFeedback) })],
+  ['/api/admin/feedback', route({ GET: none() }, ['page', 'page_size', 'image_id'])],
   ['/api/user/notifications', route({ GET: none(), PATCH: json('standard', requestSchemas.userNotification) }, ['cursor', 'limit'])],
   ['/api/user/profiles', route({ GET: none(), PATCH: json('standard', requestSchemas.profilePatch) })],
   ['/api/user/profiles/depot-value', route({ POST: none() })],
