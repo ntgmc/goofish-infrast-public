@@ -434,10 +434,11 @@ export class SklandClient {
     const timestamp = `${Math.floor(Date.now() / 1000)}`
     const sign = generateSklandSign('', '/api/v1/auth/refresh', '', timestamp)
     const data = await fetchSklandRefreshToken(timestamp, sign, this.cred, this.baseHeaders(timestamp, sign))
-    if (data.code !== 0 || data.message !== 'OK' || !isRecord(data.data) || typeof data.data.token !== 'string') {
-      throw new SklandClientError('credential_invalid', '森空岛凭据已失效，请重新扫码绑定。')
+    const payload = getEnvelopeData(data, '森空岛暂时无法刷新登录状态，请稍后重试。')
+    if (!isRecord(payload) || typeof payload.token !== 'string' || !payload.token.trim()) {
+      throw new SklandClientError('request_failed', '森空岛登录状态响应异常，请稍后重试。')
     }
-    this.token = data.data.token
+    this.token = payload.token
     this.timestamp = stringValue(data.timestamp) || timestamp
   }
 
@@ -522,6 +523,7 @@ async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {
       'skland_upstream_http_error',
     )
   }
+  if (!isRecord(data)) throw new SklandClientError('request_failed', '鹰角或森空岛接口响应异常，请稍后重试。')
   return data as T
 }
 
@@ -560,6 +562,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function getEnvelopeData(envelope: ApiEnvelope, message: string): unknown {
+  if (!isRecord(envelope)) throw new SklandClientError('request_failed', message)
   if (envelope.code !== 0 || envelope.message !== 'OK' || envelope.data === undefined || envelope.data === null) {
     if (isCredentialInvalidEnvelope(envelope)) {
       throw new SklandClientError('credential_invalid', '森空岛凭据已失效，请重新扫码绑定。')

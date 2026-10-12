@@ -1,7 +1,8 @@
 import type { UserGameAccountRecord } from '../storage/user-store'
 
 export function isLifetimeVoucherUpgradeableProfile(
-  profile: Pick<UserGameAccountRecord, 'kind'>,
+  profile: Pick<UserGameAccountRecord, 'kind' | 'status' | 'archived_at'>,
 ): boolean {
-  return profile.kind === 'free_preview' || profile.kind === 'metered_personal'
+  return profile.status === 'active' && !profile.archived_at
+    && (profile.kind === 'free_preview' || profile.kind === 'metered_personal')
 }

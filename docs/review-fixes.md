@@ -11,7 +11,7 @@
 | 3 | M04 档案、工作区与账号数据 | D01 清除凭据覆盖冻结；D02 改名覆盖工作区；D03 导出截断与遗漏 | 已修复、验证通过 |
 | 4 | M06 排班任务 API 与契约 | D01 诊断券结果过滤；D02 取消投影；D03 轮班对比 schema；D04 输出错误分类 | 已修复、验证通过 |
 | 5 | M07 队列、worker 与伸缩 | D01 领取阻塞；D02 取消恢复预约；D03 云响应超时；D04 关停迟到领取 | 已修复、验证通过 |
-| 6 | M08 森空岛绑定与导入 | D01 旧确认写回；D02 临时 token 失效分类；D03 升级激活冻结档案 | 待修复 |
+| 6 | M08 森空岛绑定与导入 | D01 旧确认写回；D02 临时 token 失效分类；D03 升级激活冻结档案 | 已修复、验证通过 |
 | 7 | M09 养成与辅助计算 | D01 刷取余量；D02 加工龙门币；D03 仓库错误分类 | 待修复 |
 | 8 | M10 公告与通知 | D01 Unicode 摘要；D02 旧内容标记已读；D03 分页竞争 | 待修复 |
 | 9 | M11 风控、邀请与统计 | D01 邀请资格；D02 UID 轮换 alias；D03 审计链顺序 | 待修复 |
@@ -69,4 +69,14 @@
 - D04：线程、inline 以及抢占领取返回后复查关停状态；迟到 attempt 归还存储，不启动执行。
 - 最近验证：7 个普通文件、50 项及完整队列 PostgreSQL 47 项通过，覆盖公平 backoff/owner busy、三种取消恢复/真实道具退款、线程/inline 迟到 claim、挂起正文及后续请求。新增 fixture 的道具名和维护 cleanup 已纠正后复跑。
 - 完整验证：`check:local` 通过（244 个普通文件、1,954 项；完整构建/API/109 条路由）；完整队列 PostgreSQL 文件 47 项通过。最终编辑后复跑架构、死代码及 whitespace 检查；未调用真实 ECS 或私有求解器。
-- Commit message：`fix(workers): settle cancellation and prevent late claims after shutdown`。
+- Commit：`3e770ff0`，`fix(workers): settle cancellation and prevent late claims after shutdown`。
+
+## 第 6 轮：M08 森空岛绑定与导入
+
+- D01：普通和仓库估值确认在 profile 锁内重新核对 confirmation ID、stage 和期限；长期兑换卡先锁定并复查 pending，再建立授权和扣券。刷新保留无需 pending 的契约。
+- D02：token 刷新复用已有 envelope 错误分类，临时故障/缺 token/损坏正文返回 retry，明确认证失败才标记失效。
+- D03：原地升级要求锁内档案 active 且未归档，拒绝冻结/撤销；合法 active 升级仍保留档案 ID。
+- M04 关联：预览与失效标记改为锁内读最新档案更新目标字段；选择清理复用按 pending ID 的条件更新。失效标记检查凭据未被替换，避免污染新凭据。
+- 最近验证：3 个普通文件、12 项、Skland handler smoke 和真实 PostgreSQL 7 项通过。覆盖普通取消/替换、长期取消不扣券、并发冻结与兑换拒绝/正常升级、token 临时/异常/真实认证错误。测试首次错误码断言已纠正为既有 `skland_upstream_failed`。
+- 完整验证：`check:local` 通过（244 个普通文件、1,956 项；完整构建/API/109 条路由）；最终文档编辑后复跑架构、死代码及 whitespace 检查。第三方 fetch 使用受控 fixture，没有真实凭据或线上请求。
+- Commit message：`fix(skland): revalidate confirmations and preserve profile restrictions`。

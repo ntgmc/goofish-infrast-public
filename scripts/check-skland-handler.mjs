@@ -1580,6 +1580,10 @@ function memoryPostgresModule() {
         store.freePreviewPendingClaims.delete(values[1])
         return result([], 1)
       }
+      if (sql.startsWith('select record_json from lifetime_voucher_pending_bindings')) {
+        const pending = store.lifetimeVoucherPendingBindings.get(values[1])
+        return result(pending?.user_id === values[0] ? [{ record_json: pending }] : [])
+      }
       if (sql.startsWith('delete from lifetime_voucher_pending_bindings')) {
         const pending = store.lifetimeVoucherPendingBindings.get(values[1])
         if (pending?.user_id !== values[0]) return result([], 0)
