@@ -51,14 +51,21 @@ try {
     report.counts[storeName] = rows.totalCount
     report.key_sha256[storeName] = checksumKeys(rows.allKeys)
     if (expected) assertExpectedKeys(storeName, rows.allKeys, expected[storeName].map((entry) => entry.primaryKey))
-    if (storeName !== 'cdk_records') {
-      report.content_sha256[storeName] = checksumRows(rows.selectedRows)
-      if (expected) {
-        const expectedChecksum = checksumRows(expected[storeName])
-        if (report.content_sha256[storeName] !== expectedChecksum) throw new Error(`${storeName} content checksum does not match the migration export`)
-      }
+    report.content_sha256[storeName] = checksumRows(rows.selectedRows)
+    if (expected) {
+      const expectedChecksum = checksumRows(expected[storeName])
+      if (report.content_sha256[storeName] !== expectedChecksum) throw new Error(`${storeName} content checksum does not match the migration export`)
     }
   }
+  const inconsistentCdks = await query(
+    `select count(*)::int as count from cdk_records
+      where code_hash is distinct from record_json->>'code_hash'
+         or cdk_type is distinct from coalesce(record_json->>'cdk_type', 'profile')
+         or status is distinct from record_json->>'status'
+         or permission is distinct from record_json->>'permission'
+         or license_order_hash is distinct from record_json->>'license_order_hash'`,
+  )
+  if (inconsistentCdks.rows[0].count > 0) throw new Error('CDK typed columns do not match their JSON records')
   report.unvalidated_constraints = await assertIndexesAndConstraints()
   report.invalid_credential_formats = await countInvalidCredentialFormats()
   if (report.invalid_credential_formats > 0) throw new Error('stored Skland credentials contain an invalid encrypted format')

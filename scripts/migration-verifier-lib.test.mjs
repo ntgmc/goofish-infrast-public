@@ -18,6 +18,16 @@ test('validates migration export keys and normalizes admin usernames', () => {
   })
 })
 
+test('normalizes only migrated CDK permission and status while preserving business content', () => {
+  const record = { permission: 'premium', status: 'obsolete', profile_expires_at: '2020-01-31', order_note: 'keep', extension: { x: 1 } }
+  const normalized = validateMigrationExport({ stores: { cdk_records: [{ key: 'cdk/1', value: record }] } }).cdk_records
+  assert.deepEqual(normalized[0].value, { ...record, permission: 'advanced', status: 'revoked' })
+  const lostExpiry = { ...normalized[0].value }
+  delete lostExpiry.profile_expires_at
+  assert.notEqual(checksumRows(normalized), checksumRows([{ primaryKey: 'cdk/1', value: lostExpiry }]))
+  assert.equal(record.permission, 'premium')
+})
+
 test('rejects duplicate migration primary keys and computes order-independent checksums', () => {
   assert.throws(() => validateMigrationExport({
     stores: {

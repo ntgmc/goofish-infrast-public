@@ -162,6 +162,7 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
 
 export async function withTransaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await getPool().connect()
+  let discard = false
   try {
     await client.query('begin')
     const result = await work(client)
@@ -171,11 +172,12 @@ export async function withTransaction<T>(work: (client: PoolClient) => Promise<T
     try {
       await client.query('rollback')
     } catch {
-      // Preserve the original transaction failure.
+      // A failed rollback leaves transaction state unknown; preserve the original error.
+      discard = true
     }
     throw error
   } finally {
-    client.release()
+    client.release(discard)
   }
 }
 

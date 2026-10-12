@@ -7,7 +7,7 @@
 | 轮次 | 模块 | 问题 | 状态 |
 | --- | --- | --- | --- |
 | 1 | M01 HTTP 与安全边界 | D01 断连写出挂起；D02 IPv6 等价地址；D03 Expect 前置处理 | 已修复、验证通过 |
-| 2 | M03 数据库与迁移 | D01 回滚失败连接回池；D02 service file 引号；D03 CDK 内容验证 | 待修复 |
+| 2 | M03 数据库与迁移 | D01 回滚失败连接回池；D02 service file 引号；D03 CDK 内容验证 | 已修复、验证通过 |
 | 3 | M04 档案、工作区与账号数据 | D01 清除凭据覆盖冻结；D02 改名覆盖工作区；D03 导出截断与遗漏 | 待修复 |
 | 4 | M06 排班任务 API 与契约 | D01 诊断券结果过滤；D02 取消投影；D03 轮班对比 schema；D04 输出错误分类 | 待修复 |
 | 5 | M07 队列、worker 与伸缩 | D01 领取阻塞；D02 取消恢复预约；D03 云响应超时；D04 关停迟到领取 | 待修复 |
@@ -29,4 +29,14 @@
 - 回归：真实连接先断开后返回、正常大响应背压、展开/压缩/映射/带 scope 地址，以及未发送正文的原始 Expect 请求。
 - 验证：最近测试 6 个文件、80 项通过；`npm run check:local` 通过，含全量普通测试 244 个文件、1,944 项、完整构建、API、109 条路由、架构、死代码及脚本契约。文档最后编辑后复跑架构、死代码及 whitespace 检查。
 - 范围限制：IPv6 用实际 helper 验证；未执行线上代理/TLS 或公网慢连接测试。
-- Commit message：`fix(http): handle disconnected responses and normalize proxy boundaries`。
+- Commit：`90f7f15f`，`fix(http): handle disconnected responses and normalize proxy boundaries`。
+
+## 第 2 轮：M03 数据库与迁移
+
+- D01：回滚失败销毁连接，保留原异常；事务 callback 不重放。真实超时回归证明失败写入不会被后续事务提交，后续事务使用新的 PostgreSQL PID。
+- D02：service file 写字面值，拒绝换行/NUL并保持 0600；去除 IPv6 host 的 URL 括号。真实 libpq 验证包含引号、反斜杠、空格等字符的 fixture 密码可连接。
+- D03：所有 CDK JSON 参与内容 checksum；导出仅对 schema 已明确迁移的旧 permission/status 做预期归一化，保留到期和未知业务字段。另核对 CDK 关键 typed columns 与 JSON 是否一致。
+- 最近验证：3 个普通文件、37 项；迁移验证器 3 项；备份/恢复契约；真实 PostgreSQL/libpq 3 项均通过。首次特殊密码测试因 Testcontainers 的 shell 健康检查超时，改用参数数组后通过。
+- 完整验证：`check:local` 重跑通过（244 个普通文件、1,945 项；构建、API、109 条路由和两项强制检查）；全量 PostgreSQL 19 个文件、212 项通过，包括受控迁移和真实验证器 CLI。初次完整普通测试的一项未改动公告页导航断言失败，单文件 7 项及完整重跑均通过。文档最后编辑后复跑架构、死代码及 whitespace 检查。
+- 未改变 schema SQL、版本或历史账本；没有连接生产库或执行真实灾备切流。
+- Commit message：`fix(storage): discard failed transactions and verify migration contents`。
