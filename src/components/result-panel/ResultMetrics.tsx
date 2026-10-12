@@ -33,13 +33,12 @@ export default function ResultMetrics({
   } = prepared
   const isOrundum = Boolean(orundumEconomy) || productionStats.orundum > 0
   const shortTermOrundum = orundumEconomy?.short_term_orundum ?? productionStats.orundum
-  const sustainablePulls = orundumEconomy ? (orundumEconomy.sustainable_orundum * 30 / 600).toFixed(1) : '—'
-  const sustainablePullsNote = orundumEconomy
-    ? copy.v2.sustainablePullsHint(formatAmount(orundumEconomy.sustainable_orundum))
-    : copy.v2.sustainableOrundumUnavailable
+  const shortTermPulls = (shortTermOrundum * 30 / 600).toFixed(1)
   const inventoryBurstNote = orundumEconomy?.case === 'inventory_burst' && orundumEconomy.inventory_depletion_days !== null
     ? copy.v2.inventoryBurstHint(formatAmount(orundumEconomy.inventory_depletion_days))
     : ''
+  const shortTermPullsNote = copy.v2.shortTermPullsHint(formatAmount(shortTermOrundum),
+    inventoryBurstNote || (orundumEconomy ? copy.v2.orundumOutputSustainable : copy.v2.orundumDurationUnavailable))
   const showProductionMetrics = !isRotationMode || hasDailyProduction
   const showMaaDefaultComparison = Boolean(maaDefaultComparison) && !isRotationMode
   const orundumEconomyNote = orundumEconomy
@@ -88,9 +87,9 @@ export default function ResultMetrics({
             />
             <MetricCard
               label={isOrundum ? copy.domain.components_result_panel_ResultMetrics_030 : copy.domain.components_result_panel_ResultMetrics_031}
-              value={isOrundum ? sustainablePulls : formatAmount(productionSanity.value)}
+              value={isOrundum ? shortTermPulls : formatAmount(productionSanity.value)}
               suffix={isOrundum ? copy.domain.components_result_panel_ResultMetrics_032 : copy.domain.components_result_panel_ResultMetrics_033}
-              note={isOrundum ? sustainablePullsNote : summaryOnly ? undefined : productionSanityNote}
+              note={isOrundum ? shortTermPullsNote : summaryOnly ? undefined : productionSanityNote}
             />
           </>
         )}

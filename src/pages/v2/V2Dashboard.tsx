@@ -98,15 +98,14 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const isOrundum = Boolean(orundumEconomy) || prepared.productionStats.orundum > 0
   const showOrundum = isOrundum && battleRecords === 0
   const shortTermOrundum = orundumEconomy?.short_term_orundum ?? prepared.productionStats.orundum
-  const sustainablePulls = orundumEconomy ? (orundumEconomy.sustainable_orundum * 30 / 600).toFixed(1) : '—'
-  const sustainablePullsNote = orundumEconomy
-    ? text.sustainablePullsHint(formatAmount(orundumEconomy.sustainable_orundum))
-    : text.sustainableOrundumUnavailable
+  const shortTermPulls = (shortTermOrundum * 30 / 600).toFixed(1)
   const hasGoldNet = Number.isFinite(result.daily_production?.net?.['Pure Gold'])
   const inventorySummary = resultMode !== 'rotation' ? formatIntermediateDepletionSummary(prepared.intermediateDepletion) : ''
   const inventoryBurstNote = orundumEconomy?.case === 'inventory_burst' && orundumEconomy.inventory_depletion_days !== null
     ? text.inventoryBurstHint(formatAmount(orundumEconomy.inventory_depletion_days))
     : ''
+  const shortTermPullsNote = text.shortTermPullsHint(formatAmount(shortTermOrundum),
+    inventoryBurstNote || (orundumEconomy ? text.orundumOutputSustainable : text.orundumDurationUnavailable))
   const hours = parseShiftHours(config.shift_hours) ?? [8, 8, 8]
   const name = session.activeProfile?.display_name ?? text.guest
   const openPanel = useCallback((next: OptionPanel) => { setPanel(next); setMobileNavigation(false) }, [])
@@ -257,10 +256,10 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
               hint={showOrundum && orundumEconomy ? [text.shortTermOrundumHint, inventoryBurstNote].filter(Boolean).join(' · ') : undefined} />
             <Metric label={text.totalEfficiency} value={formatAmount(prepared.totalEff)} unit="%" hint={text.efficiencyHint} icon={<Activity size={20} />} />
             <Metric
-              label={isOrundum ? text.sustainablePulls : text.sanity}
-              value={isOrundum ? sustainablePulls : prepared.productionSanity.value.toFixed(1)}
+              label={isOrundum ? text.shortTermPulls : text.sanity}
+              value={isOrundum ? shortTermPulls : prepared.productionSanity.value.toFixed(1)}
               unit={isOrundum ? text.pullsPer30Days : text.daily}
-              hint={isOrundum ? sustainablePullsNote : text.sanityHint}
+              hint={isOrundum ? shortTermPullsNote : text.sanityHint}
               icon={<Gem size={20} />}
             />
           </StaggeredReveal>

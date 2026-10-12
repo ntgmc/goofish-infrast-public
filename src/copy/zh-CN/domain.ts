@@ -299,7 +299,7 @@ export const domainCopy = {
   // src/components/result-panel/ResultMetrics.tsx
   components_result_panel_ResultMetrics_027: "，预计合成玉 ",
   // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_030: "可持续抽数",
+  components_result_panel_ResultMetrics_030: "高产出期抽数",
   // src/components/result-panel/ResultMetrics.tsx
   components_result_panel_ResultMetrics_031: "等效理智",
   // src/components/result-panel/ResultMetrics.tsx
