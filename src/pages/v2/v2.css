@@ -1531,7 +1531,7 @@
   border-radius: 7px;
   background: var(--v2-bg);
   color: var(--v2-muted);
-  transition: border-color var(--dur-fast), box-shadow var(--dur-fast), background-color var(--dur-fast);
+  transition: background-color var(--dur-fast) var(--ease-out);
 }
 
 .v2-search-label {
@@ -1541,7 +1541,8 @@
 }
 .v2-search:focus-within {
   border-color: var(--color-v2-focus);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-v2-focus) 14%, transparent);
+  outline: 2px solid var(--color-v2-focus);
+  outline-offset: 2px;
   background: var(--v2-paper);
 }
 :is(.v2-app, .v2-drawer, .v2-dialog) :is(.tool-field, input:not([type="checkbox"]), textarea, select):focus-visible {
@@ -1557,7 +1558,7 @@
   color: var(--v2-ink);
 }
 
-.v2-drawer .v2-search input:focus-visible {
+:is(.v2-app, .v2-drawer, .v2-dialog) .v2-search input:focus-visible {
   outline: none;
   box-shadow: none;
 }
