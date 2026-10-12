@@ -140,6 +140,42 @@ function connect() {
 }
 
 describe('V2 results-first workspace', () => {
+  it.each(['252', '252-1', '252-full'])('uses fixed production counts when switching a custom comparison draft to %s', async (layout) => {
+    connect()
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      tasks: [], notifications: [], unread_count: 0, next_cursor: null,
+    }), { headers: { 'Content-Type': 'application/json' } }))
+    const user = userEvent.setup()
+    mount('/v2?section=lab&profile_id=profile-1')
+    const layoutSelect = await screen.findByRole('combobox', { name: copy.v2.comparison.layout })
+    const orundum = screen.getByRole('combobox', { name: copy.v2.comparison.productCount('合成玉') })
+    const shard = screen.getByRole('combobox', { name: copy.v2.comparison.productCount('源石碎片') })
+    const gold = screen.getByRole('combobox', { name: copy.v2.comparison.productCount('赤金') })
+    await user.selectOptions(orundum, '1')
+    await user.selectOptions(shard, '1')
+    await user.selectOptions(gold, '1')
+
+    await user.selectOptions(layoutSelect, layout)
+    expect(orundum).toBeDisabled()
+    expect(shard).toBeDisabled()
+    expect(gold).toBeDisabled()
+    expect(orundum).toHaveValue('0')
+    expect(shard).toHaveValue('0')
+    expect(gold).toHaveValue('2')
+    await user.click(screen.getByRole('button', { name: copy.v2.comparison.addPlan }))
+    const stored = JSON.parse(window.sessionStorage.getItem('maa:scenario-lab:v2:profile-1')!)
+    expect(stored.factors.layouts.find((entry: { layout: string }) => entry.layout === layout)?.plans).toEqual([{
+      trading: { lmd: 2, orundum: 0 },
+      manufacturing: { pureGold: 2, battleRecord: 3, originiumShard: 0 },
+    }])
+
+    await user.selectOptions(layoutSelect, '243')
+    for (const select of [orundum, shard, gold]) {
+      expect(select).toBeEnabled()
+      expect(select).toHaveValue('1')
+    }
+  })
+
   it('lists historical comparisons and opens them in place without submitting another calculation', async () => {
     connect()
     const refresh = vi.fn(async () => undefined)

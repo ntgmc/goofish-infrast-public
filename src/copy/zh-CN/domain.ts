@@ -583,6 +583,8 @@ export const domainCopy = {
   // src/lib/production-sanity.ts
   lib_production_sanity_003: " - 消耗 ",
   // src/lib/scenario-comparison.ts
+  scenario252FixedProduction: "252 配置的各产物设施数量固定，请使用预设生产方案。",
+  // src/lib/scenario-comparison.ts
   lib_scenario_comparison_001: "无人机关闭",
   // src/lib/scenario-comparison.ts
   lib_scenario_comparison_002: "无人机自动",

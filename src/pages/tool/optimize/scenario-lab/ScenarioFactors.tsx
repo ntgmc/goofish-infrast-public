@@ -6,7 +6,7 @@ import type {
   ScenarioMaaSchedule,
   ScenarioProductionPlan,
 } from '../../../../lib/scenario-comparison'
-import { SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS, SCENARIO_LAYOUT_LABELS } from '../../../../lib/scenario-comparison'
+import { getFixedScenarioProductionPlan, SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS, SCENARIO_LAYOUT_LABELS } from '../../../../lib/scenario-comparison'
 import { copy } from '../../../../copy/index'
 
 
@@ -154,7 +154,8 @@ function LayoutPlanEditor({
   const [pureGold, setPureGold] = useState(Math.min(2, layout.manufacturing))
   const maxPureGold = layout.manufacturing - originiumShard
   const boundedPureGold = Math.min(pureGold, maxPureGold)
-  const draft = buildPlan(layout, orundum, originiumShard, boundedPureGold)
+  const fixedPlan = getFixedScenarioProductionPlan(layout.id)
+  const draft = fixedPlan ?? buildPlan(layout, orundum, originiumShard, boundedPureGold)
   const duplicate = plans.some((plan) => samePlan(plan, draft))
 
   return (
@@ -163,18 +164,18 @@ function LayoutPlanEditor({
         <h4 id={`layout-${layout.id}-title`} className="text-sm font-semibold text-ink-primary">{SCENARIO_LAYOUT_LABELS[layout.id]}</h4>
         <span className="tool-status tabular-nums">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_019}{plans.length}</span>
       </div>
-      <div className="workspace-scenario-fields mt-3 grid gap-3">
+      <fieldset disabled={Boolean(fixedPlan)} className="workspace-scenario-fields mt-3 grid gap-3">
         <SelectField
           id={`layout-${layout.id}-orundum`}
           label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_020}
-          value={orundum}
+          value={draft.trading.orundum}
           max={layout.trading}
           onChange={setOrundum}
         />
         <SelectField
           id={`layout-${layout.id}-shard`}
           label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_021}
-          value={originiumShard}
+          value={draft.manufacturing.originiumShard}
           max={layout.manufacturing}
           onChange={(value) => {
             setOriginiumShard(value)
@@ -184,11 +185,12 @@ function LayoutPlanEditor({
         <SelectField
           id={`layout-${layout.id}-gold`}
           label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_022}
-          value={boundedPureGold}
+          value={draft.manufacturing.pureGold}
           max={maxPureGold}
           onChange={setPureGold}
         />
-      </div>
+      </fieldset>
+      {fixedPlan && <p className="mt-3 text-xs leading-5 text-ink-muted">{copy.domain.scenario252FixedProduction}</p>}
       <p className="mt-3 text-xs leading-5 text-ink-secondary">{planLabel(draft)}</p>
       <button
         type="button"

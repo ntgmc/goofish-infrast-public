@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import { copy } from '../../../copy'
-import { expandScenarioComparison, SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS, SCENARIO_LAYOUT_LABELS, type ScenarioComparisonFactors, type ScenarioLayout, type ScenarioProductionPlan } from '../../../lib/scenario-comparison'
+import { expandScenarioComparison, getFixedScenarioProductionPlan, SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS, SCENARIO_LAYOUT_LABELS, type ScenarioComparisonFactors, type ScenarioLayout, type ScenarioProductionPlan } from '../../../lib/scenario-comparison'
 import { restoreScenarioComparisonJob, useScenarioComparison } from '../../tool/optimize/scenario-lab/useScenarioComparison'
 import { formatWorkspaceDate } from '../../../lib/workspace-history'
 import { LAYOUTS, SCHEDULES, DRONES, buildPlan, planLabel, planKey } from '../../tool/optimize/scenario-lab/ScenarioFactors'
@@ -62,7 +62,8 @@ function Factors({ factors, disabled, onChange }: { factors: ScenarioComparisonF
   const [shard, setShard] = useState(0)
   const [gold, setGold] = useState(2)
   const layout = LAYOUTS.find((item) => item.id === layoutId)!
-  const draft = buildPlan(layout, Math.min(orundum, layout.trading), Math.min(shard, layout.manufacturing), Math.min(gold, layout.manufacturing - Math.min(shard, layout.manufacturing)))
+  const fixedPlan = getFixedScenarioProductionPlan(layoutId)
+  const draft = fixedPlan ?? buildPlan(layout, Math.min(orundum, layout.trading), Math.min(shard, layout.manufacturing), Math.min(gold, layout.manufacturing - Math.min(shard, layout.manufacturing)))
   const count = factors.layouts.reduce((sum, entry) => sum + entry.plans.length, 0)
   const duplicate = factors.layouts.find((entry) => entry.layout === layoutId)?.plans.some((plan) => planKey(plan) === planKey(draft))
   const hasMaa = factors.maaSchedules.length > 0
@@ -77,13 +78,13 @@ function Factors({ factors, disabled, onChange }: { factors: ScenarioComparisonF
             {LAYOUTS.map((item) => <option key={item.id} value={item.id}>{SCENARIO_LAYOUT_LABELS[item.id]}</option>)}
           </select>
         </label>
-        <fieldset className="v2-production-allocation"><legend>{ui.tradingStations}<small>{ui.stationCount(layout.trading)}</small></legend>
+        <fieldset className="v2-production-allocation" disabled={Boolean(fixedPlan)}><legend>{ui.tradingStations}<small>{ui.stationCount(layout.trading)}</small></legend>
           <div>
             <ProductCount product="Orundum" value={draft.trading.orundum} max={layout.trading} onChange={setOrundum} />
             <ProductCount product="LMD" value={draft.trading.lmd} />
           </div>
         </fieldset>
-        <fieldset className="v2-production-allocation"><legend>{ui.manufacturingStations}<small>{ui.stationCount(layout.manufacturing)}</small></legend>
+        <fieldset className="v2-production-allocation" disabled={Boolean(fixedPlan)}><legend>{ui.manufacturingStations}<small>{ui.stationCount(layout.manufacturing)}</small></legend>
           <div>
             <ProductCount product="Originium Shard" value={draft.manufacturing.originiumShard} max={layout.manufacturing} onChange={setShard} />
             <ProductCount product="Pure Gold" value={draft.manufacturing.pureGold} max={layout.manufacturing - draft.manufacturing.originiumShard} onChange={setGold} />
@@ -91,7 +92,7 @@ function Factors({ factors, disabled, onChange }: { factors: ScenarioComparisonF
           </div>
         </fieldset>
       </div>
-      <div className="v2-production-add"><p>{ui.allocationHelp}</p>
+      <div className="v2-production-add"><p>{fixedPlan ? copy.domain.scenario252FixedProduction : ui.allocationHelp}</p>
         <button type="button" className="v2-button v2-button-secondary" disabled={duplicate || count >= SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS} onClick={() => {
           const layouts = factors.layouts.filter((item) => item.layout !== layoutId)
           layouts.push({ layout: layoutId, plans: [...(factors.layouts.find((item) => item.layout === layoutId)?.plans ?? []), draft].sort((a, b) => planKey(a).localeCompare(planKey(b))) })
