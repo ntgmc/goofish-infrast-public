@@ -12,7 +12,7 @@
 | 4 | M06 排班任务 API 与契约 | D01 诊断券结果过滤；D02 取消投影；D03 轮班对比 schema；D04 输出错误分类 | 已修复、验证通过 |
 | 5 | M07 队列、worker 与伸缩 | D01 领取阻塞；D02 取消恢复预约；D03 云响应超时；D04 关停迟到领取 | 已修复、验证通过 |
 | 6 | M08 森空岛绑定与导入 | D01 旧确认写回；D02 临时 token 失效分类；D03 升级激活冻结档案 | 已修复、验证通过 |
-| 7 | M09 养成与辅助计算 | D01 刷取余量；D02 加工龙门币；D03 仓库错误分类 | 待修复 |
+| 7 | M09 养成与辅助计算 | D01 刷取余量；D02 加工龙门币；D03 仓库错误分类 | 已修复、验证通过 |
 | 8 | M10 公告与通知 | D01 Unicode 摘要；D02 旧内容标记已读；D03 分页竞争 | 待修复 |
 | 9 | M11 风控、邀请与统计 | D01 邀请资格；D02 UID 轮换 alias；D03 审计链顺序 | 待修复 |
 | 10 | M12 管理控制台 | D01 保存覆盖新编辑；D02 旧会话详情；D03 撤回遗漏预约 | 待修复 |
@@ -79,4 +79,13 @@
 - M04 关联：预览与失效标记改为锁内读最新档案更新目标字段；选择清理复用按 pending ID 的条件更新。失效标记检查凭据未被替换，避免污染新凭据。
 - 最近验证：3 个普通文件、12 项、Skland handler smoke 和真实 PostgreSQL 7 项通过。覆盖普通取消/替换、长期取消不扣券、并发冻结与兑换拒绝/正常升级、token 临时/异常/真实认证错误。测试首次错误码断言已纠正为既有 `skland_upstream_failed`。
 - 完整验证：`check:local` 通过（244 个普通文件、1,956 项；完整构建/API/109 条路由）；最终文档编辑后复跑架构、死代码及 whitespace 检查。第三方 fetch 使用受控 fixture，没有真实凭据或线上请求。
-- Commit message：`fix(skland): revalidate confirmations and preserve profile restrictions`。
+- Commit：`ab2cd0d4`，`fix(skland): revalidate confirmations and preserve profile restrictions`。
+
+## 第 7 轮：M09 养成与辅助计算
+
+- D01：刷取产出依已选顺序分配给全部同材料需求，保留每名干员完成日期、药剂使用和关卡开放日规则。
+- D02：诊断配方补齐加工现金；删除独立递归消耗实现，复用已有 allocator，把晋升现金和加工现金纳入同一库存。费用核对现有正式资产快照（100/200/300/400 龙门币），无需新增上游请求或运行时资产依赖。
+- D03：仓库边界保留已知 client/超时错误，分别返回重新绑定或重试的状态/代码，未知异常仍返回通用 500；不新增凭据状态写入。
+- 最近验证：12 个普通文件、75 项及 training cost smoke 通过，覆盖共享余量/跨日/药剂/关闭关卡、多级加工 300 龙门币缺口和真实 Skland client 的鉴权/临时/超时错误；depot smoke 虚拟模块的新错误类导出已补齐。
+- 完整验证：depot smoke 与 `check:local` 通过（245 个普通文件、1,961 项；完整构建/API/109 条路由）；最终文档编辑后复跑架构、死代码及 whitespace 检查。
+- Commit message：`fix(cultivation): share farm yields and account for crafting cash`。

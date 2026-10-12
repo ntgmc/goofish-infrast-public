@@ -1,4 +1,5 @@
 import levelData from './training-level-data.json'
+import { allocateCultivationMaterials } from '../../src/lib/cultivation-planner'
 import type { LicenseOperator, UpgradeTrainingCost } from '../../src/lib/types'
 import { decryptSklandCredential, SklandClient } from './skland-client'
 import {
@@ -85,44 +86,44 @@ type BucketSanityResult = {
 
 // ArknightsGameData zh_CN/gamedata/excel/building_data.json: workshopFormulas (F_EVOLVE, F_SKILL, F_ASC).
 const WORKSHOP_RECIPES: Record<string, [number, Record<string, number>]> = {
-  '30165': [1, { '31094': 2, '31084': 1, '31074': 1 }],
-  '30155': [1, { '31064': 1, '31054': 1, '31044': 2 }],
-  '30145': [1, { '31034': 1, '31014': 2, '31024': 1 }],
-  '30135': [1, { '30084': 1, '30094': 1, '30104': 1 }],
-  '30125': [1, { '30064': 1, '30074': 2 }],
-  '30115': [1, { '30014': 1, '30044': 1, '30054': 1 }],
-  '31114': [1, { '30063': 1, '31103': 1, '31113': 1 }],
-  '31104': [1, { '30053': 1, '31093': 1, '31103': 1 }],
-  '31094': [1, { '31093': 1, '31083': 1, '30023': 1 }],
-  '31084': [1, { '31083': 1, '31073': 1, '31063': 1 }],
-  '31074': [1, { '31073': 1, '30033': 2, '30013': 1 }],
-  '31064': [1, { '31063': 1, '31043': 1, '30023': 1 }],
-  '31044': [1, { '31043': 1, '31053': 1, '31013': 1 }],
-  '31054': [1, { '31053': 1, '31033': 1, '30103': 1 }],
-  '31034': [1, { '31033': 2, '31013': 1, '31023': 1 }],
-  '31024': [1, { '30063': 1, '30093': 1, '31023': 1 }],
-  '31014': [1, { '30043': 1, '31013': 1, '31023': 1 }],
-  '30104': [1, { '30103': 1, '30013': 2, '30053': 1 }],
-  '30094': [1, { '30093': 1, '30043': 1, '30063': 1 }],
-  '30084': [1, { '30083': 2, '30033': 1, '30073': 1 }],
-  '30074': [1, { '30073': 1, '30023': 1, '30103': 1 }],
-  '30062': [1, { '30061': 3 }],
-  '30063': [1, { '30062': 4 }],
-  '30064': [1, { '30063': 1, '30013': 2, '30093': 1 }],
-  '30052': [1, { '30051': 3 }],
-  '30053': [1, { '30052': 4 }],
-  '30054': [1, { '30053': 2, '30023': 1, '30083': 1 }],
-  '30042': [1, { '30041': 3 }],
-  '30043': [1, { '30042': 4 }],
-  '30044': [1, { '30043': 2, '30063': 1, '30033': 1 }],
-  '30032': [1, { '30031': 3 }],
-  '30033': [1, { '30032': 4 }],
-  '30034': [1, { '30033': 2, '30053': 1, '30073': 1 }],
-  '30022': [1, { '30021': 3 }],
-  '30023': [1, { '30022': 4 }],
-  '30024': [1, { '30023': 2, '30043': 1, '30083': 1 }],
-  '30012': [1, { '30011': 3 }],
-  '30013': [1, { '30012': 5 }],
+  '30165': [1, { '4001': 400, '31094': 2, '31084': 1, '31074': 1 }],
+  '30155': [1, { '4001': 400, '31064': 1, '31054': 1, '31044': 2 }],
+  '30145': [1, { '4001': 400, '31034': 1, '31014': 2, '31024': 1 }],
+  '30135': [1, { '4001': 400, '30084': 1, '30094': 1, '30104': 1 }],
+  '30125': [1, { '4001': 400, '30064': 1, '30074': 2 }],
+  '30115': [1, { '4001': 400, '30014': 1, '30044': 1, '30054': 1 }],
+  '31114': [1, { '4001': 300, '30063': 1, '31103': 1, '31113': 1 }],
+  '31104': [1, { '4001': 300, '30053': 1, '31093': 1, '31103': 1 }],
+  '31094': [1, { '4001': 300, '31093': 1, '31083': 1, '30023': 1 }],
+  '31084': [1, { '4001': 300, '31083': 1, '31073': 1, '31063': 1 }],
+  '31074': [1, { '4001': 300, '31073': 1, '30033': 2, '30013': 1 }],
+  '31064': [1, { '4001': 300, '31063': 1, '31043': 1, '30023': 1 }],
+  '31044': [1, { '4001': 300, '31043': 1, '31053': 1, '31013': 1 }],
+  '31054': [1, { '4001': 300, '31053': 1, '31033': 1, '30103': 1 }],
+  '31034': [1, { '4001': 300, '31033': 2, '31013': 1, '31023': 1 }],
+  '31024': [1, { '4001': 300, '30063': 1, '30093': 1, '31023': 1 }],
+  '31014': [1, { '4001': 300, '30043': 1, '31013': 1, '31023': 1 }],
+  '30104': [1, { '4001': 300, '30103': 1, '30013': 2, '30053': 1 }],
+  '30094': [1, { '4001': 300, '30093': 1, '30043': 1, '30063': 1 }],
+  '30084': [1, { '4001': 300, '30083': 2, '30033': 1, '30073': 1 }],
+  '30074': [1, { '4001': 300, '30073': 1, '30023': 1, '30103': 1 }],
+  '30062': [1, { '4001': 100, '30061': 3 }],
+  '30063': [1, { '4001': 200, '30062': 4 }],
+  '30064': [1, { '4001': 300, '30063': 1, '30013': 2, '30093': 1 }],
+  '30052': [1, { '4001': 100, '30051': 3 }],
+  '30053': [1, { '4001': 200, '30052': 4 }],
+  '30054': [1, { '4001': 300, '30053': 2, '30023': 1, '30083': 1 }],
+  '30042': [1, { '4001': 100, '30041': 3 }],
+  '30043': [1, { '4001': 200, '30042': 4 }],
+  '30044': [1, { '4001': 300, '30043': 2, '30063': 1, '30033': 1 }],
+  '30032': [1, { '4001': 100, '30031': 3 }],
+  '30033': [1, { '4001': 200, '30032': 4 }],
+  '30034': [1, { '4001': 300, '30033': 2, '30053': 1, '30073': 1 }],
+  '30022': [1, { '4001': 100, '30021': 3 }],
+  '30023': [1, { '4001': 200, '30022': 4 }],
+  '30024': [1, { '4001': 300, '30023': 2, '30043': 1, '30083': 1 }],
+  '30012': [1, { '4001': 100, '30011': 3 }],
+  '30013': [1, { '4001': 200, '30012': 5 }],
   '3302': [1, { '3301': 3 }],
   '3303': [1, { '3302': 3 }],
   '3231': [2, { '3261': 3 }],
@@ -450,40 +451,20 @@ function calculateMissingBucket(
   pricing: PricingState,
 ): CostBucket {
   const byId = new Map(inventory.map((item) => [item.id, item.count]))
-  const totalCash = byId.get('4001') ?? 0
   let totalExp = 0
   for (const [id, value] of Object.entries(EXP_ITEM_VALUES)) {
     totalExp += (byId.get(id) ?? 0) * value
   }
   const missing = emptyBucket()
-  missing.cash = Math.max(0, totals.cash - totalCash)
   missing.exp = Math.max(0, totals.exp - totalExp)
-  const remaining = totals.materials.map((material) => {
-    const stocked = Math.min(material.count, byId.get(material.id) ?? 0)
-    byId.set(material.id, (byId.get(material.id) ?? 0) - stocked)
-    return { ...material, count: material.count - stocked }
-  })
-  const consume = (id: string, count: number, seen: Set<string>): void => {
-    const stocked = Math.min(count, byId.get(id) ?? 0)
-    byId.set(id, (byId.get(id) ?? 0) - stocked)
-    const shortage = count - stocked
-    if (shortage === 0) return
-    const recipe = WORKSHOP_RECIPES[id]
-    if (recipe && !seen.has(id)) {
-      const [output, ingredients] = recipe
-      const batches = Math.ceil(shortage / output)
-      // Two-way chip conversions need the input chips in stock; otherwise they can loop into each other.
-      if (output === 1 || Object.entries(ingredients).every(([ingredient, amount]) => (byId.get(ingredient) ?? 0) >= amount * batches)) {
-        byId.set(id, (byId.get(id) ?? 0) + batches * output - shortage)
-        const next = new Set(seen).add(id)
-        for (const [ingredient, amount] of Object.entries(ingredients)) consume(ingredient, amount * batches, next)
-        return
-      }
-    }
-    mergeMaterials(missing.materials, [{ id, count: shortage, name: totals.materials.find((item) => item.id === id)?.name }], itemMeta)
-  }
-  for (const material of remaining) {
-    consume(material.id, material.count, new Set())
+  const allocation = allocateCultivationMaterials(
+    { ...Object.fromEntries(totals.materials.map((item) => [item.id, item.count])), '4001': totals.cash },
+    Object.fromEntries(byId),
+    { recipes: Object.fromEntries(Object.entries(WORKSHOP_RECIPES).map(([id, [count, items]]) => [id, { count, items }])), prices: {} },
+  )
+  missing.cash = allocation.missing['4001'] ?? 0
+  for (const [id, count] of Object.entries(allocation.missing)) {
+    if (id !== '4001') mergeMaterials(missing.materials, [{ id, count, name: totals.materials.find((item) => item.id === id)?.name }], itemMeta)
   }
   missing.equivalent_sanity = calculateBucketSanity(missing, pricing).value
   return missing
