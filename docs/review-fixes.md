@@ -15,7 +15,7 @@
 | 7 | M09 养成与辅助计算 | D01 刷取余量；D02 加工龙门币；D03 仓库错误分类 | 已修复、验证通过 |
 | 8 | M10 公告与通知 | D01 Unicode 摘要；D02 旧内容标记已读；D03 分页竞争 | 已修复、验证通过 |
 | 9 | M11 风控、邀请与统计 | D01 邀请资格；D02 UID 轮换 alias；D03 审计链顺序 | 已修复、验证通过 |
-| 10 | M12 管理控制台 | D01 保存覆盖新编辑；D02 旧会话详情；D03 撤回遗漏预约 | 待修复 |
+| 10 | M12 管理控制台 | D01 保存覆盖新编辑；D02 旧会话详情；D03 撤回遗漏预约 | 已修复、验证通过 |
 | 11 | M13 前端外壳 | D01 迁移草稿；D02 旧工作区响应；D03 清除凭据切换档案 | 待修复 |
 | 12 | M14 前端排班与结果 | D01 历史配置竞争；D02 历史分页竞争；D03 对比遗漏券；D04 恢复动画清理 | 待修复 |
 | 13 | M15 状态与监控 | D01 稀疏成本窗口；D02 首次成本保存竞争 | 待修复 |
@@ -106,4 +106,13 @@
 - D03：链锁内使用数据库时间和上一位置 +1 ms 分配单调 created_at，摘要和持久化使用同一值；业务复核时间仍保留在案件/快照。不新增 schema、账本或迁移；事务回滚和现有保留期继续生效。
 - 最近验证：7 个普通文件、32 项及 2 个完整 PostgreSQL 文件、61 项通过。覆盖两真实 UID 跨两次轮换/第三个 UID、6 类资格拒绝的直接与后台路径、过期邀请人的邀请码与结算，以及实际案件行锁阻塞后的 B→A→C 审计链。现有单元 SQL 断言已更新为 binding 对象校验。
 - 完整验证：`check:local` 通过（245 个普通文件、1,968 项；完整构建/API/109 条路由）；最终文档编辑后复跑架构、死代码及 whitespace 检查。
-- Commit message：`fix(risk): validate invitation eligibility and normalize audit identity order`。
+- Commit：`33626eb3`，`fix(risk): validate invitation eligibility and normalize audit identity order`。
+
+## 第 10 轮：M12 管理控制台
+
+- D01：功能开关在保存期间 disabled，公开内容编辑器使用原生 disabled fieldset，响应不会覆盖请求后新编辑。
+- D02：用户/CDK/干员手动 loader 共用当前详情 AbortController，重置/卸载中止，成功/失败/finally 均检查请求归属；相同管理员重新登录同样隔离。用户敏感详情展示检查当前 sensitive_data_view。
+- D03：持有 grant 锁后检查 reserved；单批次返回 409，活动保留 granted/reversing 并在后续批次重试，预约未结算时不标为撤回完成。沿用现有退款独立批次语义，退款批次需独立撤回；不吞退款或回滚已 committed 道具。
+- 最近验证：5 个 UI 文件、86 项及完整库存 PostgreSQL 29 项通过，覆盖保存禁编辑、相同/不同管理员重登录、同会话新详情优先、两种撤回入口等待预约/退款后继续撤回。
+- 完整验证：`check:local` 通过（245 个普通文件、1,973 项；完整构建/API/109 条路由）。新增前端测试使用兼容项目编译目标的 Promise 屏障后重跑；最终文档编辑后复跑架构、死代码及 whitespace 检查。
+- Commit message：`fix(admin): isolate detail requests and wait for reserved inventory`。

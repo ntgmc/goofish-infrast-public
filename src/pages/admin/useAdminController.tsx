@@ -30,6 +30,15 @@ export function useAdminController(section: AdminSection = 'overview') {
   const [overviewPartialFailure, setOverviewPartialFailure] = useState(false)
   const overviewRequestRef = useRef<{ sequence: number; controller: AbortController | null }>({ sequence: 0, controller: null })
 
+  const detailRequest = useRef<AbortController | null>(null)
+  const beginDetailRequest = () => {
+    detailRequest.current?.abort()
+    const controller = new AbortController()
+    detailRequest.current = controller
+    return controller
+  }
+  const isCurrentDetailRequest = (controller: AbortController) => detailRequest.current === controller && !controller.signal.aborted
+
   const [loginUser, setLoginUser] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
   const [authenticated, setAuthenticated] = useState(false)
@@ -126,6 +135,9 @@ export function useAdminController(section: AdminSection = 'overview') {
       setLastSuccessfulSyncAt(null)
       setOverviewPartialFailure(false)
       overviewRequestRef.current.controller?.abort()
+      detailRequest.current?.abort()
+      detailRequest.current = null
+      setBusyAction(null)
       cancelAdminOperation()
       setAuthenticated(false)
       resetCdkData()
@@ -239,6 +251,7 @@ export function useAdminController(section: AdminSection = 'overview') {
         })
       return () => {
         active = false
+        detailRequest.current?.abort()
       }
     }, [])
 
@@ -531,18 +544,20 @@ export function useAdminController(section: AdminSection = 'overview') {
     }
 
   const loadCdkDetail = async (record: AdminCdkRecord) => {
+      const controller = beginDetailRequest()
       setBusyAction(`cdk-detail:${record.code_hash}`)
       setError(null)
       try {
         const data = await apiJson<{ cdk?: AdminCdkDetail }>(`/api/admin/cdk?code_hash=${encodeURIComponent(record.code_hash)}${adminCapabilities.includes('admin_manage') ? '' : '&view=risk'}`, {
-          fallbackMessage: '加载 CDK 详情失败',
+          fallbackMessage: '加载 CDK 详情失败', signal: controller.signal,
         })
+        if (!isCurrentDetailRequest(controller)) return
         if (!data.cdk) throw new Error('加载 CDK 详情失败')
         setSelectedCdkDetail(data.cdk)
       } catch (caught) {
-        setError((caught as Error).message)
+        if (isCurrentDetailRequest(controller)) setError((caught as Error).message)
       } finally {
-        setBusyAction(null)
+        if (isCurrentDetailRequest(controller)) setBusyAction(null)
       }
     }
 
@@ -569,6 +584,7 @@ export function useAdminController(section: AdminSection = 'overview') {
     })
 
   const loadUserDetail = async (user: AppUserSummary, profilePage = 1) => {
+      const controller = beginDetailRequest()
       const profilePageSize = selectedUserDetail?.user.id === user.id
         ? selectedUserDetail.profile_pagination?.page_size ?? 100
         : 100
@@ -577,10 +593,11 @@ export function useAdminController(section: AdminSection = 'overview') {
       try {
         const [data, balance] = await Promise.all([
           apiJson<{ detail?: AdminUserDetail }>(`/api/admin/users?user_id=${encodeURIComponent(user.id)}&profile_page=${profilePage}&profile_page_size=${profilePageSize}`, {
-            fallbackMessage: '加载用户详情失败',
+            fallbackMessage: '加载用户详情失败', signal: controller.signal,
           }),
           METERED_BILLING_AVAILABLE ? fetchAdminUserBalance(user.id) : Promise.resolve(null),
         ])
+        if (!isCurrentDetailRequest(controller)) return null
         if (!data.detail) throw new Error('加载用户详情失败')
         setSelectedUserDetail(data.detail)
         setSelectedUserBalance(balance)
@@ -588,10 +605,10 @@ export function useAdminController(section: AdminSection = 'overview') {
         setExpandedOperatorProfileId(null)
         return data.detail
       } catch (caught) {
-        setError((caught as Error).message)
+        if (isCurrentDetailRequest(controller)) setError((caught as Error).message)
         return null
       } finally {
-        setBusyAction(null)
+        if (isCurrentDetailRequest(controller)) setBusyAction(null)
       }
     }
 
@@ -600,6 +617,7 @@ export function useAdminController(section: AdminSection = 'overview') {
       options: { expand?: boolean; busyKey?: string } = {},
     ): Promise<AdminProfileOperatorData | null> => {
       if (!selectedUserDetail) return null
+      const controller = beginDetailRequest()
       const busyKey = options.busyKey ?? `profile-operators:${profile.id}`
       setBusyAction(busyKey)
       setError(null)
@@ -608,9 +626,10 @@ export function useAdminController(section: AdminSection = 'overview') {
         const data = await apiJson<{ operator_data?: AdminProfileOperatorData }>(
           `/api/admin/users?user_id=${encodeURIComponent(selectedUserDetail.user.id)}&profile_id=${encodeURIComponent(profile.id)}&include=operators`,
           {
-            fallbackMessage: '加载干员数据失败',
+            fallbackMessage: '加载干员数据失败', signal: controller.signal,
           },
         )
+        if (!isCurrentDetailRequest(controller)) return null
         if (!data.operator_data) throw new Error('加载干员数据失败')
         setOperatorDataByProfileId((current) => ({
           ...current,
@@ -619,10 +638,10 @@ export function useAdminController(section: AdminSection = 'overview') {
         if (options.expand !== false) setExpandedOperatorProfileId(profile.id)
         return data.operator_data
       } catch (caught) {
-        setError((caught as Error).message)
+        if (isCurrentDetailRequest(controller)) setError((caught as Error).message)
         return null
       } finally {
-        setBusyAction(null)
+        if (isCurrentDetailRequest(controller)) setBusyAction(null)
       }
     }
 

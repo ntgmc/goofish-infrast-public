@@ -164,6 +164,7 @@ export default function PublicContentSettingsSection() {
 
       <AdminTabs label={copy.publicContent.admin_tabs_label} items={TABS} value={activeTab} onChange={setActiveTab} />
 
+      <fieldset disabled={saving} className="min-w-0 space-y-5">
       <section
         id={`public-content-panel-${activeTab}`}
         role="tabpanel"
@@ -177,6 +178,7 @@ export default function PublicContentSettingsSection() {
         {activeTab === 'pricing' && <PricingEditor settings={settings} edit={edit} />}
         {activeTab === 'thanks' && <ThanksEditor settings={settings} edit={edit} />}
       </section>
+      </fieldset>
 
       <div className="admin-savebar"><span className="text-sm text-ink-muted">{dirty ? '有待发布的修改' : '已与线上内容同步'}</span>
         <button type="submit" disabled={saving} className="tool-primary-action">

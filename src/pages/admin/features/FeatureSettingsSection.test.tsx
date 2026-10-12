@@ -39,6 +39,23 @@ describe('FeatureSettingsSection', () => {
     expect(screen.getAllByText(/上级功能关闭/).length).toBeGreaterThan(0)
   })
 
+  it('disables editing until a pending save settles', async () => {
+    const user = userEvent.setup()
+    render(<FeatureSettingsSection />)
+    const registration = await screen.findByRole('checkbox', { name: /用户注册/ })
+    await user.click(registration)
+    let resolve!: (value: unknown) => void
+    adminApiJson.mockReturnValueOnce(new Promise((done) => { resolve = done }))
+    await user.click(screen.getByRole('button', { name: '保存功能开关' }))
+    const login = screen.getByRole('checkbox', { name: /登录与普通会话/ })
+    expect(login).toBeDisabled()
+    await user.click(login)
+    expect(login).toBeChecked()
+    resolve({ settings: { ...DEFAULT_SITE_FEATURE_SETTINGS, features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, registration: false }, revision: 3 } })
+    await waitFor(() => expect(login).toBeEnabled())
+    expect(registration).not.toBeChecked()
+  })
+
   it('saves the complete feature map', async () => {
     const user = userEvent.setup()
     render(<FeatureSettingsSection />)

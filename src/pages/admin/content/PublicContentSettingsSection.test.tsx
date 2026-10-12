@@ -11,6 +11,22 @@ vi.mock('../../../lib/admin-api-client', () => ({ adminApiJson }))
 import PublicContentSettingsSection from './PublicContentSettingsSection'
 
 describe('PublicContentSettingsSection', () => {
+  it('disables all content editors until publication settles', async () => {
+    const user = userEvent.setup()
+    render(<PublicContentSettingsSection />)
+    const field = await screen.findByLabelText(/群名称/)
+    await user.clear(field)
+    await user.type(field, 'Submitted title')
+    let resolve!: (value: unknown) => void
+    adminApiJson.mockReturnValueOnce(new Promise((done) => { resolve = done }))
+    await user.click(screen.getByRole('button', { name: '保存并发布' }))
+    expect(field).toBeDisabled()
+    await user.type(field, 'Unsent title')
+    expect(field).toHaveValue('Submitted title')
+    resolve({ settings: { ...cloneDefaultPublicContentSettings(), qq_group: { ...cloneDefaultPublicContentSettings().qq_group, name: 'Submitted title' }, revision: 4 } })
+    await waitFor(() => expect(field).toBeEnabled())
+    expect(field).toHaveValue('Submitted title')
+  })
   it('publishes the manual lifetime upgrade listing and service fee', async () => {
     const user = userEvent.setup()
     render(<PublicContentSettingsSection />)

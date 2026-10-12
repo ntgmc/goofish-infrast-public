@@ -165,6 +165,39 @@ describe('useAdminController announcement drafts', () => {
     expect(adminApi.json.mock.calls.some(([url]) => url.startsWith('/api/admin/balance'))).toBe(false)
   })
 
+  it.each(['alice', 'bob'])('ignores old user details after resetting and logging in as %s', async (nextUser) => {
+    const implementation = adminApi.json.getMockImplementation()!
+    const pending = deferred<unknown>()
+    const detail = { user: { id: 'old-user', cdk_order_hash: 'sensitive-order' }, profiles: [] } as unknown as AdminUserDetail
+    adminApi.json.mockImplementation((url, init) => url.startsWith('/api/admin/users?user_id=') ? pending.promise : implementation(url, init))
+    const { result } = renderHook(() => useAdminController('users'))
+    await waitFor(() => expect(result.current.authenticated).toBe(true))
+    let request!: Promise<unknown>
+    act(() => { request = result.current.loadUserDetail(detail.user) })
+    act(() => window.dispatchEvent(new Event('goofish:admin-session-expired')))
+    sessionUsername = nextUser
+    act(() => { result.current.setLoginUser(nextUser); result.current.setLoginPassword('password') })
+    await act(async () => result.current.handleLogin(formEvent()))
+    await act(async () => { pending.resolve({ detail }); await request })
+    expect(result.current.selectedUserDetail).toBeNull()
+    expect(result.current.busyAction).toBeNull()
+  })
+
+  it('keeps the newest detail when two users are selected in one session', async () => {
+    const implementation = adminApi.json.getMockImplementation()!
+    const pending = deferred<unknown>()
+    const first = { user: { id: 'first' }, profiles: [] } as unknown as AdminUserDetail
+    const second = { user: { id: 'second' }, profiles: [] } as unknown as AdminUserDetail
+    adminApi.json.mockImplementation((url, init) => url.includes('user_id=first') ? pending.promise : url.includes('user_id=second') ? Promise.resolve({ detail: second }) : implementation(url, init))
+    const { result } = renderHook(() => useAdminController('users'))
+    await waitFor(() => expect(result.current.authenticated).toBe(true))
+    let request!: Promise<unknown>
+    act(() => { request = result.current.loadUserDetail(first.user) })
+    await act(async () => result.current.loadUserDetail(second.user))
+    await act(async () => { pending.resolve({ detail: first }); await request })
+    expect(result.current.selectedUserDetail?.user.id).toBe('second')
+  })
+
   it('flushes the latest edit before session reset and restores it after login', async () => {
     const { result } = renderHook(() => useAdminController())
     await waitForHydration(result)
