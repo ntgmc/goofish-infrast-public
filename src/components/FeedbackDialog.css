@@ -1,0 +1,88 @@
+/* Hallmark · component: feedback dialog · genre: modern-minimal · theme: design.md
+ * states: default, hover, focus, active, disabled, loading, error, success
+ * pre-emit critique: P5 H5 E4 S5 R5 V4 */
+.feedback-trigger {
+  gap: var(--space-xs);
+  border-radius: var(--radius-input);
+  white-space: nowrap;
+}
+.feedback-trigger > svg { flex: none; }
+.feedback-trigger.feedback-trigger-icon { width: 44px; padding-inline: 0; }
+.feedback-trigger.v2-help-link {
+  width: 100%;
+  margin-bottom: var(--space-xs);
+  text-align: left;
+  color: var(--color-v2-rail-ink);
+  transition: background-color var(--motion-instant) var(--motion-ease-enter), color var(--motion-instant) var(--motion-ease-enter), border-color var(--motion-instant) var(--motion-ease-enter);
+}
+.feedback-trigger.v2-help-link > svg { margin-left: 0; color: var(--color-v2-rail-accent); }
+.feedback-trigger.v2-help-link:active { background: var(--color-v2-rail-line); }
+.feedback-trigger.v2-help-link:focus-visible { outline: 2px solid var(--color-v2-rail-accent); outline-offset: 3px; }
+.feedback-dialog {
+  --feedback-surface: var(--v2-paper, var(--theme-surface-0));
+  --feedback-hover: var(--v2-bg, var(--theme-surface-2));
+  --feedback-ink: var(--v2-ink, var(--theme-ink-primary));
+  --feedback-muted: var(--v2-muted, var(--theme-ink-muted));
+  --feedback-border: var(--v2-line, var(--input));
+  --feedback-accent: var(--v2-accent, var(--primary));
+  --feedback-accent-hover: var(--color-brand-hover);
+  --feedback-on-accent: var(--primary-foreground);
+  --feedback-focus: var(--v2-accent, var(--color-focus));
+}
+.feedback-dialog.v2-dialog {
+  --feedback-border: var(--color-v2-control);
+  --feedback-accent-hover: var(--color-v2-accent-hover);
+  --feedback-on-accent: var(--color-v2-accent-ink);
+}
+.feedback-form, .feedback-label, .feedback-image-preview { display: grid; min-width: 0; gap: var(--space-xs); }
+.feedback-form { gap: var(--space-md); outline: none; }
+.feedback-label > :is(span, label) { color: var(--feedback-ink); font-weight: 500; }
+.feedback-dialog .feedback-field.tool-field {
+  border-color: var(--feedback-border);
+  background: var(--feedback-surface);
+  color: var(--feedback-ink);
+  resize: vertical;
+}
+.feedback-dialog .feedback-field.tool-field:focus-visible { border-color: var(--feedback-focus); }
+.feedback-dialog .feedback-field.tool-field:disabled { background: var(--feedback-hover); color: var(--feedback-muted); cursor: not-allowed; }
+.feedback-message-meta { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-sm); margin-top: var(--space-2xs); }
+.feedback-message-meta, .feedback-hint, .feedback-image-name { color: var(--feedback-muted); font-size: var(--text-xs); line-height: 1.65; }
+.feedback-count { margin-left: auto; flex: none; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.feedback-image-picker, .feedback-image-meta { display: flex; min-width: 0; align-items: center; gap: var(--space-sm); }
+.feedback-image-picker { padding: var(--space-xs); border: 1px solid var(--feedback-border); border-radius: var(--radius-input); }
+.feedback-image-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feedback-image-preview img { max-width: 100%; max-height: 12rem; justify-self: start; border-radius: var(--radius-input); object-fit: contain; }
+.feedback-image-meta { justify-content: space-between; flex-wrap: wrap; }
+.feedback-dialog .feedback-action {
+  display: inline-flex;
+  min-height: 44px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--feedback-border);
+  border-radius: var(--radius-input);
+  background: var(--feedback-surface);
+  color: var(--feedback-ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color var(--motion-instant) var(--motion-ease-enter), border-color var(--motion-instant) var(--motion-ease-enter), color var(--motion-instant) var(--motion-ease-enter);
+}
+.feedback-dialog .feedback-action-primary { border-color: transparent; background: var(--feedback-accent); color: var(--feedback-on-accent); }
+.feedback-dialog .feedback-action:active:not(:disabled) { background: var(--feedback-hover); }
+.feedback-dialog .feedback-action-primary:active:not(:disabled) { background: var(--feedback-accent-hover); }
+.feedback-dialog .feedback-action:disabled { background: var(--feedback-hover); color: var(--feedback-muted); cursor: not-allowed; opacity: .65; }
+.feedback-dialog :is(button, select, textarea, [role="alert"]):focus-visible { outline: 2px solid var(--feedback-focus); outline-offset: 3px; }
+.feedback-success { display: flex; align-items: flex-start; gap: var(--space-xs); color: var(--feedback-ink); }
+.feedback-success > svg { flex: none; color: var(--feedback-accent); }
+@media (hover: hover) {
+  .feedback-trigger.v2-help-link:hover { border-color: var(--color-v2-rail-accent); background: var(--color-v2-rail-line); color: var(--color-v2-rail-ink); }
+  .feedback-dialog .feedback-action:hover:not(:disabled),
+  .feedback-dialog [data-slot="dialog-close"]:hover { background: var(--feedback-hover); color: var(--feedback-ink); }
+  .feedback-dialog .feedback-action-primary:hover:not(:disabled) { background: var(--feedback-accent-hover); color: var(--feedback-on-accent); }
+  .feedback-dialog .feedback-field.tool-field:hover:not(:disabled) { background: var(--feedback-hover); }
+}
