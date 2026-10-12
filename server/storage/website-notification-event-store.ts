@@ -100,6 +100,8 @@ async function insertWebsiteNotificationEventInTransaction(
   rejectConflict: boolean,
 ): Promise<{ created: boolean; event: WebsiteNotificationEvent }> {
   const event = normalizeWebsiteNotificationEvent(rawEvent)
+  // Assign sequences in commit order so a cursor cannot skip a late transaction.
+  await client.query('select pg_advisory_xact_lock(hashtextextended($1, 0))', ['website-notification-events'])
   const inserted = await client.query<WebsiteNotificationEventRow>(
     `insert into website_notification_events
        (event_id, event_type, title, summary, url, version, published_at, created_at)

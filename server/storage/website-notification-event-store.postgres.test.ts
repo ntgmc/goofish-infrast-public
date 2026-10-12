@@ -1,13 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createPostgresAnnouncementStore } from './announcement-store'
-import { closePool, query } from './postgres'
+import { closePool, getPool, query } from './postgres'
 import { migrateDatabaseSchema } from './schema'
 import {
   createWebsiteNotificationEvent,
   getLatestWebsiteNotificationCursor,
   listWebsiteNotificationEvents,
+  insertWebsiteNotificationEventsInTransaction,
   WebsiteNotificationEventConflictError,
   type WebsiteNotificationEventInput,
 } from './website-notification-event-store'
@@ -57,6 +58,33 @@ describe('website notification events in PostgreSQL', () => {
 
     const persisted = await query('select key from announcements where key = $1', [key])
     expect(persisted.rows).toHaveLength(0)
+  })
+
+  it('holds later event writers until the earlier transaction commits so cursors miss no event', async () => {
+    const cursor = await getLatestWebsiteNotificationCursor()
+    const first = announcementEvent(randomUUID())
+    const second = releaseEvent(randomUUID(), '随后发布')
+    const client = await getPool().connect()
+    let later: ReturnType<typeof createWebsiteNotificationEvent> | undefined
+    try {
+      await client.query('begin')
+      await insertWebsiteNotificationEventsInTransaction(client, [first])
+      later = createWebsiteNotificationEvent(second)
+      await vi.waitFor(async () => {
+        const locks = await query("select 1 from pg_locks where locktype = 'advisory' and not granted")
+        expect(locks.rows).not.toHaveLength(0)
+      })
+      expect((await listWebsiteNotificationEvents(cursor, 100)).events).toEqual([])
+      await client.query('commit')
+      await later
+      const page = await listWebsiteNotificationEvents(cursor, 1)
+      expect(page.events.map((event) => event.id)).toEqual([first.id])
+      expect((await listWebsiteNotificationEvents(page.nextCursor, 100)).events.map((event) => event.id)).toEqual([second.id])
+    } finally {
+      await client.query('rollback')
+      client.release()
+      await later
+    }
   })
 
   it('paginates by opaque cursor and rejects conflicting release confirmations', async () => {

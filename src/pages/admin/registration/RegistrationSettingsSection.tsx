@@ -59,6 +59,7 @@ export default function RegistrationSettingsSection() {
       const data = await adminApiJson<RegistrationSettingsResponse>('/api/admin/registration-settings', {
         method: 'PUT',
         json: {
+          expected_updated_at: settings.updated_at,
           email_verification_required: settings.email_verification_required,
           invite_code_required: settings.invite_code_required,
           bot_registration_enabled: settings.bot_registration_enabled,

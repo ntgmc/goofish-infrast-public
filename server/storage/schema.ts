@@ -2654,7 +2654,13 @@ export async function migrateDatabaseSchema(): Promise<void> {
 
   const client = await getPool().connect()
   let migrationStarted = false
+  let originalStatementTimeout: string | undefined
   try {
+    const settings = await client.query<{ statement_timeout: string }>(
+      "select current_setting('statement_timeout') as statement_timeout",
+    )
+    originalStatementTimeout = settings.rows[0]?.statement_timeout
+    if (originalStatementTimeout === undefined) throw new Error('Migration connection statement timeout is unavailable')
     await client.query(
       "select set_config('statement_timeout', $1, false)",
       [`${MIGRATION_STATEMENT_TIMEOUT_MS}ms`],
@@ -2724,12 +2730,17 @@ export async function migrateDatabaseSchema(): Promise<void> {
     }
     throw error
   } finally {
+    let discardClient = false
     try {
       await client.query('select pg_advisory_unlock($1)', [MIGRATION_ADVISORY_LOCK_KEY])
+      if (originalStatementTimeout !== undefined) {
+        await client.query("select set_config('statement_timeout', $1, false)", [originalStatementTimeout])
+      }
     } catch {
-      // Releasing the client also releases a session-level advisory lock.
+      // End the session if cleanup fails; returning it could retain settings or locks.
+      discardClient = true
     }
-    client.release()
+    client.release(discardClient)
   }
 }
 

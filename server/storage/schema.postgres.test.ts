@@ -40,6 +40,25 @@ afterAll(async () => {
 })
 
 describe('PostgreSQL schema migration', () => {
+  it('restores a custom session timeout on the same pooled connection after both completed and new migrations', async () => {
+    const previousMax = process.env.POSTGRES_POOL_MAX
+    await closePool()
+    process.env.POSTGRES_POOL_MAX = '1'
+    try {
+      await query("select set_config('statement_timeout', '12345ms', false)")
+      const before = (await query("select pg_backend_pid() as pid, current_setting('statement_timeout') as timeout")).rows[0]
+      await migrateDatabaseSchema()
+      expect((await query("select pg_backend_pid() as pid, current_setting('statement_timeout') as timeout")).rows[0]).toEqual(before)
+      await markCurrentMigrationPending()
+      await migrateDatabaseSchema()
+      expect((await query("select pg_backend_pid() as pid, current_setting('statement_timeout') as timeout")).rows[0]).toEqual(before)
+    } finally {
+      await closePool()
+      if (previousMax === undefined) delete process.env.POSTGRES_POOL_MAX
+      else process.env.POSTGRES_POOL_MAX = previousMax
+    }
+  })
+
   it('backfills last seen from existing sessions once and preserves newer activity on rerun', async () => {
     const profile = await seedProfile()
     const sessionTime = '2026-10-02T08:00:00.000Z'

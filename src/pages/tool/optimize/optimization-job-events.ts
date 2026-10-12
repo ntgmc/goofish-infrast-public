@@ -84,17 +84,25 @@ export async function withOptimizationSubmissionLock<T>(profileId: string, opera
   }
 
   const key = `${SUBMIT_LEASE_PREFIX}${profileId}`
-  const now = Date.now()
-  const lease = readSubmitLease(key)
-  if (lease && lease.expiresAt > now && lease.owner !== TAB_ID) throw new OptimizationSubmissionLockedError()
-  const mine = { owner: TAB_ID, expiresAt: now + 45_000 }
-  localStorage.setItem(key, JSON.stringify(mine))
-  const confirmed = readSubmitLease(key)
-  if (!confirmed || confirmed.owner !== TAB_ID) throw new OptimizationSubmissionLockedError()
+  try {
+    const now = Date.now()
+    const lease = readSubmitLease(key)
+    if (lease && lease.expiresAt > now && lease.owner !== TAB_ID) throw new OptimizationSubmissionLockedError()
+    localStorage.setItem(key, JSON.stringify({ owner: TAB_ID, expiresAt: now + 45_000 }))
+    const confirmed = readSubmitLease(key)
+    if (!confirmed || confirmed.owner !== TAB_ID) throw new OptimizationSubmissionLockedError()
+  } catch (error) {
+    if (error instanceof OptimizationSubmissionLockedError) throw error
+    // Storage can be disabled; server admission still enforces concurrency.
+  }
   try {
     return await operation()
   } finally {
-    if (readSubmitLease(key)?.owner === TAB_ID) localStorage.removeItem(key)
+    try {
+      if (readSubmitLease(key)?.owner === TAB_ID) localStorage.removeItem(key)
+    } catch {
+      // Best-effort cleanup must not change the submission result.
+    }
   }
 }
 
@@ -169,8 +177,8 @@ function isTerminal(status: OptimizationJobSnapshot<unknown>['status']): boolean
 }
 
 function readSubmitLease(key: string): { owner: string; expiresAt: number } | null {
+  const raw = localStorage.getItem(key)
   try {
-    const raw = localStorage.getItem(key)
     const value = raw ? JSON.parse(raw) as { owner?: unknown; expiresAt?: unknown } : null
     return typeof value?.owner === 'string' && typeof value.expiresAt === 'number'
       ? { owner: value.owner, expiresAt: value.expiresAt }

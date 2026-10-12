@@ -25,6 +25,10 @@ vi.mock('../../storage/optimize-job-store', () => ({
 vi.mock('../../handlers/user-auth', () => ({ requireUserSession: mocks.requireUserSession }))
 vi.mock('../../storage/user-store', () => ({
   getProfileForUser: mocks.getProfileForUser,
+  normalizeProfileKind: (profile: { kind: string }) => profile.kind,
+}))
+vi.mock('../../handlers/profile-authorization', () => ({
+  resolveProfileAuthorization: async (profile: { permission: string }) => ({ ok: true, permission: profile.permission }),
 }))
 vi.mock('../../storage/personal-use-declaration-store', () => ({
   PersonalUseDeclarationRequiredError: class PersonalUseDeclarationRequiredError extends Error {
@@ -66,7 +70,7 @@ describe('personal-use optimization admission', () => {
     mocks.findIdempotentJob.mockResolvedValue(null)
     mocks.getQueuePosition.mockResolvedValue(1)
     mocks.requireUserSession.mockResolvedValue({ user: { id: 'user-1' } })
-    mocks.getProfileForUser.mockResolvedValue({ id: 'profile-1' })
+    mocks.getProfileForUser.mockResolvedValue({ id: 'profile-1', kind: 'cdk', permission: 'advanced' })
     mocks.recordRequestBehaviorEvent.mockResolvedValue(true)
   })
 

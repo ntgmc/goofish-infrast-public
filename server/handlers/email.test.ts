@@ -111,6 +111,24 @@ describe('email provider delivery accounting', () => {
     expect(store.markEmailDeliveryFailed).not.toHaveBeenCalled()
   })
 
+  it('bounds a hung Brevo send and retains uncertain quota without sending again through SES', async () => {
+    const controller = new AbortController()
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal)
+    vi.stubGlobal('fetch', vi.fn((_url: string, options: RequestInit) => new Promise((_resolve, reject) => {
+      options.signal!.addEventListener('abort', () => reject(options.signal!.reason), { once: true })
+    })))
+    const delivery = expect(sendAccountDeletionReceiptEmail('user@example.test', 'receipt-1'))
+      .rejects.toThrow('Brevo deadline')
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
+    expect(timeout).toHaveBeenCalledWith(10_000)
+    controller.abort(new DOMException('Brevo deadline', 'TimeoutError'))
+    await delivery
+    expect(store.markEmailDeliveryUncertain).toHaveBeenCalledOnce()
+    expect(store.markEmailDeliveryFailed).not.toHaveBeenCalled()
+    expect(store.markEmailDeliverySent).not.toHaveBeenCalled()
+    expect(ses.sendSesTemplateEmail).not.toHaveBeenCalled()
+  })
+
   it('reuses a registration reservation without reserving twice', async () => {
     const reservation: EmailDeliveryReservation = {
       id: 'registration-reservation',

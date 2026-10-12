@@ -16,6 +16,7 @@ export const BUILD_RELEVANT_FILES = Object.freeze([
 export const BUILD_RELEVANT_PREFIXES = Object.freeze([
   'src/',
   'public/',
+  'product/',
   'server/',
   'deploy/nginx/',
 ])

@@ -134,6 +134,30 @@ describe('database schema ownership', () => {
     expect(releaseMock).toHaveBeenCalledOnce()
   })
 
+  it.each(['success', 'completed', 'failure'])('restores the original timeout on %s before releasing the connection', async (outcome) => {
+    queryMock.mockImplementation(async (statement: string) => {
+      if (outcome === 'completed' && statement.includes('from goofish_schema_migrations')) {
+        return { rows: [{ checksum: DATABASE_SCHEMA_CHECKSUM, status: 'completed' }] }
+      }
+      if (outcome === 'failure' && statement.includes('CREATE TABLE IF NOT EXISTS cdk_records')) throw new Error('DDL failure')
+      return successfulSchemaQuery(statement)
+    })
+    if (outcome === 'failure') await expect(migrateDatabaseSchema()).rejects.toThrow('DDL failure')
+    else await migrateDatabaseSchema()
+    expect(queryMock).toHaveBeenLastCalledWith("select set_config('statement_timeout', $1, false)", ['25s'])
+    expect(releaseMock).toHaveBeenCalledWith(false)
+  })
+
+  it.each(['unlock', 'restore'])('discards the session if migration %s cleanup fails', async (step) => {
+    queryMock.mockImplementation(async (statement: string, values?: string[]) => {
+      if ((step === 'unlock' && statement.includes('pg_advisory_unlock'))
+        || (step === 'restore' && statement.includes('set_config') && values?.[0] === '25s')) throw new Error('cleanup failure')
+      return successfulSchemaQuery(statement)
+    })
+    await migrateDatabaseSchema()
+    expect(releaseMock).toHaveBeenCalledWith(true)
+  })
+
   it('retries only the migration phase that deadlocked', async () => {
     vi.useFakeTimers()
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
@@ -162,7 +186,7 @@ describe('database schema ownership', () => {
     const constraintError = Object.assign(new Error('duplicate data'), { code: '23505' })
     queryMock.mockImplementation(async (statement: string) => {
       if (statement.includes('ALTER TABLE reward_grants ADD COLUMN')) throw constraintError
-      return { rows: [] }
+      return successfulSchemaQuery(statement)
     })
 
     await expect(migrateDatabaseSchema()).rejects.toBe(constraintError)
@@ -301,6 +325,7 @@ function restoreEnvironment(name: 'APP_ROLE' | 'NODE_ENV', value: string | undef
 }
 
 function successfulSchemaQuery(statement: string): { rows: unknown[] } {
+  if (statement.includes("current_setting('statement_timeout')")) return { rows: [{ statement_timeout: '25s' }] }
   if (statement.includes('from goofish_schema_migrations')) {
     if (!statement.includes('minimum_app_version')) return { rows: [] }
     return {

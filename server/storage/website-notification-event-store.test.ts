@@ -61,6 +61,7 @@ describe('website notification event store', () => {
 
   it('treats an identical release confirmation as an idempotent replay', async () => {
     mocks.transactionQuery
+      .mockResolvedValueOnce({ rows: [] }) // Transaction lock.
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [eventRow('842', releaseEvent.id, releaseEvent.type)] })
 
@@ -69,6 +70,7 @@ describe('website notification event store', () => {
 
   it('rejects a reused release event ID with different content', async () => {
     mocks.transactionQuery
+      .mockResolvedValueOnce({ rows: [] }) // Transaction lock.
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [eventRow('842', releaseEvent.id, releaseEvent.type)] })
 

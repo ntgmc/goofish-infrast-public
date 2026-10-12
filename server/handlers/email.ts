@@ -19,6 +19,8 @@ import {
 export { BrevoDailyQuotaExceededError }
 export type { EmailDeliveryReservation }
 
+const BREVO_SEND_TIMEOUT_MS = 10_000
+
 interface SendPasswordResetEmailInput {
   email: string
   resetUrl: string
@@ -147,6 +149,7 @@ async function sendWithBrevo(
   try {
     response = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
+      signal: AbortSignal.timeout(BREVO_SEND_TIMEOUT_MS),
       headers,
       body: JSON.stringify({
         sender: {
