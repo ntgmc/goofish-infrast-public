@@ -8,6 +8,7 @@ import type { OptimizeResult } from './types'
 export function projectOptimizeResultForCapabilities(
   result: OptimizeResult,
   subject: CapabilitySubject,
+  upgradeSuggestionsAllowed = false,
 ): OptimizeResult {
   let projected = result
 
@@ -57,7 +58,7 @@ export function projectOptimizeResultForCapabilities(
     projected = { ...projected, raw_results: [] }
   }
 
-  if (!hasCapability(subject, 'view_upgrade_suggestions')) {
+  if (!upgradeSuggestionsAllowed && !hasCapability(subject, 'view_upgrade_suggestions')) {
     const {
       upgrade_suggestions: _upgradeSuggestions,
       upgrade_suggestions_status: _upgradeSuggestionsStatus,

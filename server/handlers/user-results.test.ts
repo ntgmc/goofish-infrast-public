@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   listProfileOptimizationResults: vi.fn(),
   mutateProfileOptimizationResultInTransaction: vi.fn(),
   withTransaction: vi.fn(),
+  query: vi.fn(),
   clientQuery: vi.fn(),
 }))
 
@@ -78,7 +79,7 @@ vi.mock('../storage/optimization-result-store', () => {
   }
 })
 
-vi.mock('../storage/postgres', () => ({ withTransaction: mocks.withTransaction }))
+vi.mock('../storage/postgres', () => ({ withTransaction: mocks.withTransaction, query: mocks.query }))
 vi.mock('../behavior-risk/service', () => ({
   recordTrackedExportBehaviorEvent: mocks.recordTrackedExportBehaviorEvent,
 }))
@@ -132,6 +133,7 @@ beforeEach(() => {
   mocks.getValidatedJson.mockResolvedValue(exportBody)
   mocks.getProfileForUser.mockResolvedValue(profile('cdk', 'advanced'))
   mocks.getProfileOptimizationResult.mockResolvedValue(storedHistoryItem())
+  mocks.query.mockResolvedValue({ rows: [{ entitled: false }] })
   mocks.listProfileOptimizationResults.mockResolvedValue({
     items: [historySummary()],
     next_cursor: 'next-page',
@@ -282,6 +284,20 @@ describe('result history reads', () => {
     expect(body.item.result.searched_state_count).toBe(123456)
     expect(body.item.result).not.toHaveProperty('daily_production')
     expect(mocks.getProfileOptimizationResult).toHaveBeenCalledWith('profile-1', 'result-1')
+  })
+
+  it('keeps diagnosis purchased for the saved job while retaining current data restrictions', async () => {
+    mocks.getProfileForUser.mockResolvedValue(profile('cdk', 'recommended'))
+    const stored = storedHistoryItem()
+    mocks.getProfileOptimizationResult.mockResolvedValue({ ...stored, result: { ...stored.result,
+      upgrade_suggestions: [{ type: 'single', name: 'Operator', current: 1, target: 2, gain: 1 }] } })
+    mocks.query.mockResolvedValue({ rows: [{ entitled: true }] })
+    const response = await userResultsHandler(new Request('http://localhost/api/user/results/result-1?profile_id=profile-1'))
+    expect(response.status).toBe(200)
+    const { item } = await response.json()
+    expect(item.result.upgrade_suggestions).toHaveLength(1)
+    expect(item.result.raw_results).toEqual([])
+    expect(item.result).not.toHaveProperty('daily_production')
   })
 
   it('does not query result storage when the profile is not owned by the session user', async () => {

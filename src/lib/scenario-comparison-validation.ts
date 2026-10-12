@@ -43,7 +43,7 @@ const scenarioLayoutFactorSchema = z.strictObject({
 
 export const scenarioComparisonFactorsSchema: z.ZodType<ScenarioComparisonFactors> = z.strictObject({
   layouts: z.array(scenarioLayoutFactorSchema).min(1).max(3),
-  maaSchedules: z.array(z.enum(['variable', '8x3'])).min(1).max(2),
+  maaSchedules: z.array(z.enum(['variable', '8x3'])).max(2),
   includeRotation: z.boolean(),
   droneStrategies: z.array(scenarioDroneStrategySchema).min(1).max(8),
 }).superRefine((factors, context) => {
@@ -67,6 +67,7 @@ export const scenarioComparisonFactorsSchema: z.ZodType<ScenarioComparisonFactor
     })
   }
   const scheduleCount = factors.maaSchedules.length + (factors.includeRotation ? 1 : 0)
+  if (scheduleCount === 0) context.addIssue({ code: 'custom', path: ['maaSchedules'], message: copy.domain.lib_scenario_comparison_019 })
   const rawCombinationCount = planCount * scheduleCount * factors.droneStrategies.length
   if (rawCombinationCount > MAX_RAW_SCENARIO_COMBINATIONS) {
     context.addIssue({

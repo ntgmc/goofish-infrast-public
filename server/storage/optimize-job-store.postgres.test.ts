@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { closePool, getPool, query, withTransaction } from './postgres'
@@ -25,6 +25,10 @@ import { adjustBalance, getBalanceSummary, reverseQualificationCredit } from './
 import { issueMeteredScheduleQuote } from './metered-billing-store'
 import { recordOperatorFingerprintInTransaction } from './cdk-store'
 import { SettingsConflictError } from './settings-conflict'
+import { grantItem } from './inventory-store'
+import { saveUserSession } from './user-store'
+import { getOptimizationJob, submitOptimizationJob } from '../optimization/jobs/job-status'
+import userResultsHandler from '../handlers/user-results'
 import {
   getLatestProfileOptimizationResult,
   insertProfileOptimizationResultInTransaction,
@@ -1363,6 +1367,56 @@ describe('PostgreSQL optimization job admission', () => {
       [admitted.job.id],
     )).rows[0]?.count).toBe('0')
     expect((await listProfileOptimizationResults(profileId, 'active')).items).toHaveLength(0)
+  })
+
+  it.each(['cdk', 'free_preview'] as const)('retains purchased diagnosis through %s completion, GET, replay and history', async (kind) => {
+    const store = createPostgresOptimizeJobStore()
+    const profileId = await seedProfile()
+    const userId = (await query('select user_id from user_game_accounts where id = $1', [profileId])).rows[0].user_id
+    const now = new Date().toISOString()
+    await query(`update user_accounts set record_json = record_json || $2::jsonb where id = $1`,
+      [userId, JSON.stringify({ status: 'active', permission: 'recommended', email: `${userId}@example.test`,
+        created_at: now, updated_at: now, email_verified_at: now })])
+    const profile = { version: 1, id: profileId, user_id: userId, kind, permission: 'recommended', status: 'active',
+      authorization_source: 'admin_grant', cdk_key: null, cdk_code_hash: null, cdk_order_hash: null,
+      display_name: 'diagnosis', note: '', created_at: now, updated_at: now }
+    await query(`update user_game_accounts set kind = $2, permission = 'recommended', record_json = $3::jsonb where id = $1`,
+      [profileId, kind, JSON.stringify(profile)])
+    await grantItem({ userId, itemCode: 'training_diagnosis_coupon', quantity: 1, expiry: { mode: 'never' },
+      sourceType: 'regression', sourceId: randomUUID(), recipientRole: 'user' })
+    const payload = { ...formalSchedulePayload(profileId), isPreviewProfile: kind === 'free_preview',
+      request: { include_upgrade_suggestions: true, upgrade_suggestions_allowed: true } }
+    const replayBody = JSON.stringify({ identity: { type: 'profile', profileId } })
+    const replayKey = randomUUID()
+    const admitted = await store.admitJob(input({ profile_id: profileId, owner_key: `profile:${profileId}`,
+      permission: 'recommended', priority: 2_000_000_000, source: kind === 'free_preview' ? 'free_preview' : 'account_profile',
+      payload_json: payload, reward_user_id: userId, reward_item_codes: ['training_diagnosis_coupon'],
+      idempotency_key: replayKey, request_hash: createHash('sha256').update(replayBody).digest('hex') }))
+    const claimed = await store.claimNextJob(`diagnosis-${randomUUID()}`, randomUUID(), new Date(Date.now() + 60_000).toISOString(), 100, 100)
+    expect(claimed?.id).toBe(admitted.job.id)
+    const result = { ...formalScheduleResult('diagnosis'), total_efficiency: 100,
+      raw_results: [{ total_efficiency: 100, assignment_detail: [] }],
+      upgrade_suggestions: [{ type: 'single' as const, name: 'Operator', current: 1, target: 2, gain: 1 }] }
+    expect(await store.completeAttempt(claimed!.id, claimed!.attempt_count, claimed!.worker_id!, claimed!.lock_token!, result)).toBe(true)
+    expect((await query('select status from reward_consumptions where optimization_job_id = $1', [claimed!.id])).rows[0].status).toBe('committed')
+    expect((await store.getJob(claimed!.id))?.result_json).toMatchObject({ upgrade_suggestions: result.upgrade_suggestions })
+    const token = randomUUID().replaceAll('-', '') + 'a'.repeat(11)
+    await saveUserSession({ version: 1, id: randomUUID(), user_id: userId,
+      token_hash: createHash('sha256').update(token).digest('hex'), created_at: now, last_seen_at: now,
+      expires_at: new Date(Date.now() + 60_000).toISOString() })
+    const headers = { Cookie: `maa_session=${token}` }
+    const read = await getOptimizationJob(new Request('http://localhost/api/optimization/jobs/' + claimed!.id, { headers }), claimed!.id)
+    const replay = await submitOptimizationJob(new Request('http://localhost/api/optimization/jobs', {
+      method: 'POST', headers: { ...headers, 'Idempotency-Key': replayKey }, body: replayBody }))
+    const history = await userResultsHandler(new Request(`http://localhost/api/user/results/${claimed!.id}?profile_id=${profileId}`, { headers }))
+    expect([read.status, replay.status, history.status]).toEqual([200, 202, 200])
+    for (const response of [read, replay, history]) {
+      const body = await response.json()
+      const projected = body.item?.result ?? body.job?.result ?? body.result
+      expect(projected.upgrade_suggestions).toHaveLength(1)
+      expect(projected.raw_results).toEqual([])
+      if (kind === 'cdk') expect(projected).not.toHaveProperty('total_efficiency')
+    }
   })
 
   it('commits and rolls back workspace and operator fingerprint updates together', async () => {

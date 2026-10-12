@@ -9,7 +9,7 @@
 | 1 | M01 HTTP 与安全边界 | D01 断连写出挂起；D02 IPv6 等价地址；D03 Expect 前置处理 | 已修复、验证通过 |
 | 2 | M03 数据库与迁移 | D01 回滚失败连接回池；D02 service file 引号；D03 CDK 内容验证 | 已修复、验证通过 |
 | 3 | M04 档案、工作区与账号数据 | D01 清除凭据覆盖冻结；D02 改名覆盖工作区；D03 导出截断与遗漏 | 已修复、验证通过 |
-| 4 | M06 排班任务 API 与契约 | D01 诊断券结果过滤；D02 取消投影；D03 轮班对比 schema；D04 输出错误分类 | 待修复 |
+| 4 | M06 排班任务 API 与契约 | D01 诊断券结果过滤；D02 取消投影；D03 轮班对比 schema；D04 输出错误分类 | 已修复、验证通过 |
 | 5 | M07 队列、worker 与伸缩 | D01 领取阻塞；D02 取消恢复预约；D03 云响应超时；D04 关停迟到领取 | 待修复 |
 | 6 | M08 森空岛绑定与导入 | D01 旧确认写回；D02 临时 token 失效分类；D03 升级激活冻结档案 | 待修复 |
 | 7 | M09 养成与辅助计算 | D01 刷取余量；D02 加工龙门币；D03 仓库错误分类 | 待修复 |
@@ -49,4 +49,14 @@
 - 最近验证：5 个普通文件、22 项及真实 PostgreSQL 4 项通过。真实 SELECT 后设置屏障，覆盖冻结先提交、工作区首次保存先提交；真实合并与扩容验证所有方案、源档案及源干员均被导出。
 - 完整验证：`check:local` 通过（244 个普通文件、1,945 项、完整构建/API/109 条路由）；全量 PostgreSQL 19 个文件、215 项通过。文档最后编辑后复跑架构、死代码及 whitespace 检查；未改变 schema SQL 或历史账本。
 - 必要的验证修正：公告页测试再次在内容渲染后、路由更新前断言 URL；改为等待 URL 的异步更新，单文件 7 项及完整门禁通过，公告应用逻辑未改。
-- Commit message：`fix(accounts): preserve concurrent profile updates and export complete workspaces`。
+- Commit：`3daee2a4`，`fix(accounts): preserve concurrent profile updates and export complete workspaces`。
+
+## 第 4 轮：M06 排班任务 API 与契约
+
+- D01：共用查询核对诊断券的服务端预约/消费记录；任务 GET、提交重放、历史详情及免费预览持久化都保留券对应的诊断字段，继续按当前权限限制完整指标和原始结果。
+- D02：取消返回的最新 snapshot 复用当前权限投影，完成竞争不再返回未经投影的结果。
+- D03：共享 factors schema 允许 rotation-only，要求至少一种排班模式；持久化 payload 同步采用该规则。
+- D04：优化器结果在本地加工前验证；诊断建议 type/ops 最小结构纳入 schema，缺 plans/ops 明确归为不可重试 validation 故障。
+- 最近验证：15 个普通文件、179 项通过；真实推荐 CDK/免费预览两种券消费、完成、GET/重放/历史回归通过（filter 执行 2 项，其余 40 项未混计）。
+- 完整验证：`check:local` 通过（244 个普通文件、1,951 项；完整构建/API/109 条路由）；完整队列 PostgreSQL 文件 42 项通过。架构检查首次将默认参数的 shorthand query 误报为未使用，显式别名引用后相关 39 项、架构和完整门禁均通过。文档最后编辑后复跑架构、死代码及 whitespace 检查；没有调用私有优化器。
+- Commit message：`fix(optimization): preserve diagnosis entitlements and validate result boundaries`。

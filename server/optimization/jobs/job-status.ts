@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
-import type { CapabilitySubject } from '../../../src/lib/product-catalog'
+import { hasCapability, type CapabilitySubject } from '../../../src/lib/product-catalog'
+import { hasTrainingDiagnosisEntitlement } from './entitlements'
 import type { LicenseConfig, OptimizeEstimateBucket, OptimizeResult } from "../../../src/lib/types";
 import { SCENARIO_VARIABLE_SHIFT_CANDIDATE_LIMIT } from '../../../src/lib/scenario-comparison';
 import type { OptimizationFailureSnapshot, OptimizationJobListItem, OptimizationJobListResponse, OptimizationJobSnapshot } from "../../../src/lib/optimization-contracts";
@@ -191,7 +192,7 @@ export async function getOptimizationJob(req: Request, rawJobId: string): Promis
   if (!access.ok) return jsonResponse({ error: access.message }, access.status);
 
   const queueEstimate = await getOptimizeJobQueueEstimate(store, job.id);
-  return jsonResponse(projectOptimizeJobSnapshot(
+  return jsonResponse(await projectOptimizeJobSnapshot(
     formatOptimizeJobStatus(job, queueEstimate.queuePosition, queueEstimate.estimatedWaitMs),
     access.subject,
   ));
@@ -251,7 +252,9 @@ export async function cancelOptimizationJob(req: Request, rawJobId: string): Pro
   if (!cancelled) return jsonResponse({ error: '任务不存在。' }, 404)
   requestOptimizeJobCancellation(jobId)
   return jsonResponse(
-    { job: formatOptimizeJobStatus(cancelled, (await getOptimizeJobQueueEstimate(store, jobId)).queuePosition) },
+    { job: await projectOptimizeJobSnapshot(
+      formatOptimizeJobStatus(cancelled, (await getOptimizeJobQueueEstimate(store, jobId)).queuePosition), access.subject,
+    ) },
     cancelled.status === 'cancelled' ? 200 : 202,
   )
 }
@@ -300,14 +303,15 @@ function getJobCapabilitySubject(job: OptimizeJobRecord): CapabilitySubject {
   }
 }
 
-function projectOptimizeJobSnapshot(
+async function projectOptimizeJobSnapshot(
   snapshot: OptimizationJobSnapshot,
   subject: CapabilitySubject,
-): OptimizationJobSnapshot {
+): Promise<OptimizationJobSnapshot> {
   if (snapshot.status !== 'succeeded' || snapshot.kind !== 'schedule') return snapshot
   return {
     ...snapshot,
-    result: projectOptimizeResultForCapabilities(snapshot.result, subject),
+    result: projectOptimizeResultForCapabilities(snapshot.result, subject,
+      hasCapability(subject, 'view_upgrade_suggestions') || await hasTrainingDiagnosisEntitlement(snapshot.id)),
   }
 }
 

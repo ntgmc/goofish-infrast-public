@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   getJob: vi.fn(),
+  requestCancel: vi.fn(),
+  query: vi.fn(),
   listJobsByProfile: vi.fn(),
   getQueuePosition: vi.fn(),
   getProfileForUser: vi.fn(),
@@ -14,6 +16,7 @@ vi.mock('../../storage/optimize-job-store', () => ({
   OptimizeJobAdmissionError: class OptimizeJobAdmissionError extends Error {},
   getOptimizeJobStore: () => ({
     getJob: mocks.getJob,
+    requestCancel: mocks.requestCancel,
     findIdempotentJob: mocks.findIdempotentJob,
     listJobsByProfile: mocks.listJobsByProfile,
     getQueuePosition: mocks.getQueuePosition,
@@ -28,12 +31,18 @@ vi.mock('../../handlers/profile-authorization', () => ({
   resolveProfileAuthorization: mocks.resolveProfileAuthorization,
 }))
 
-import { getOptimizationJob, listOptimizationJobs, submitOptimizationJob } from './job-status'
+vi.mock('../../storage/postgres', async (original) => ({
+  ...await original<typeof import('../../storage/postgres')>(), query: mocks.query,
+}))
+
+import { cancelOptimizationJob, getOptimizationJob, listOptimizationJobs, submitOptimizationJob } from './job-status'
 
 describe('optimization job result projection', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.getJob.mockResolvedValue(jobRecord())
+    mocks.requestCancel.mockResolvedValue(jobRecord())
+    mocks.query.mockResolvedValue({ rows: [{ entitled: false }] })
     mocks.findIdempotentJob.mockResolvedValue(jobRecord())
     mocks.resolveProfileAuthorization.mockImplementation(async (profile: { permission: string }) => ({
       ok: true, permission: profile.permission, cdkRecord: null,
@@ -76,6 +85,29 @@ describe('optimization job result projection', () => {
     expect(job.result.raw_results).toEqual([])
     expect(job.result).not.toHaveProperty('daily_production')
     expect(job.result).not.toHaveProperty('total_efficiency')
+  })
+
+  it('keeps purchased diagnosis in GET and replay without unlocking full data', async () => {
+    mocks.query.mockResolvedValue({ rows: [{ entitled: true }] })
+    for (const response of [await getOptimizationJob(request(), 'job-1'), await submitOptimizationJob(replayRequest())]) {
+      const body = await response.json()
+      const snapshot = body.job ?? body
+      expect(snapshot.result.upgrade_suggestions).toHaveLength(1)
+      expect(snapshot.result.raw_results).toEqual([])
+      expect(snapshot.result).not.toHaveProperty('total_efficiency')
+    }
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("reward_type = 'training_diagnosis_coupon'"), ['job-1'])
+  })
+
+  it('projects a successful result returned by cancellation after a running snapshot', async () => {
+    mocks.getJob.mockResolvedValue({ ...jobRecord(), status: 'running', result_json: null })
+    const response = await cancelOptimizationJob(request(), 'job-1')
+    expect(response.status).toBe(202)
+    const { job } = await response.json()
+    expect(job.status).toBe('succeeded')
+    expect(job.result.raw_results).toEqual([])
+    expect(job.result).not.toHaveProperty('total_efficiency')
+    expect(job.result).not.toHaveProperty('upgrade_suggestions')
   })
 
   it('rejects both GET and submission replay after the profile is frozen', async () => {
@@ -136,6 +168,7 @@ function jobRecord() {
       raw_results: [{ total_efficiency: 100, assignment_detail: [] }],
       daily_production: { manufacturing: { LMD: 1000 } },
       total_efficiency: 100,
+      upgrade_suggestions: [{ type: 'single', name: 'Operator', current: 1, target: 2, gain: 1 }],
     }, error_message: null, failure_kind: null,
     public_error_code: null, attempt_count: 1, failure_count: 0, worker_id: null, heartbeat_at: null,
     lock_token: null, lock_expires_at: null, next_attempt_at: null,

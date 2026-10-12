@@ -230,6 +230,29 @@ describe('optimization job dispatcher', () => {
       .resolves.toEqual(result)
   })
 
+  it.each([
+    { ...scheduleResult(), plans: undefined },
+    { ...scheduleResult(), upgrade_suggestions: [{ type: 'bundle', gain: 1 }] },
+  ])('classifies malformed output before local enrichment as permanent validation failure', async (result) => {
+    const port = fakePort({ executeSchedule: vi.fn(async () => result as unknown as OptimizeResult) })
+    await expect(executeOptimizationJobWithPort(job(schedulePayload()), context, port)).rejects.toMatchObject({
+      failure: { code: 'invalid_optimizer_result', kind: 'validation', retryable: false },
+    })
+  })
+
+  it('accepts rotation-only factors and rejects an empty set of schedule modes', async () => {
+    const payload = scenarioPayload()
+    payload.factors.maaSchedules = []
+    payload.factors.includeRotation = true
+    const port = fakePort()
+    await expect(executeOptimizationJobWithPort(job(payload), context, port)).resolves.toMatchObject({ kind: 'scenario_comparison' })
+    payload.factors.includeRotation = false
+    await expect(executeOptimizationJobWithPort(job(payload), context, port)).rejects.toMatchObject({
+      failure: { code: 'invalid_job_payload', retryable: false },
+    })
+    expect(port.executeScenarioComparison).toHaveBeenCalledOnce()
+  })
+
   it('still rejects non-finite optimizer result values', async () => {
     const port = fakePort({
       executeSchedule: vi.fn(async () => ({

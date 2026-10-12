@@ -17,7 +17,7 @@ import type { OptimizationBillingSnapshot } from '../../src/lib/optimization-con
 import { getMeteredBillingPolicy, getMeteredScheduleQuote } from '../../src/lib/metered-billing'
 import { BalanceError, releaseScheduleBalanceInTransaction, reserveScheduleBalanceInTransaction, settleScheduleBalanceInTransaction } from './balance-store'
 import { emptyWorkspace, updateProfileWorkspaceInTransaction } from './user-store'
-import { limitPreviewOptimizeResult } from '../optimization/jobs/entitlements'
+import { hasTrainingDiagnosisEntitlement, limitPreviewOptimizeResult } from '../optimization/jobs/entitlements'
 import { normalizePersistedOptimizationJobPayload, type OptimizationJobPayload, type OptimizeJobPayload } from '../optimization/jobs/shared'
 import { parseOptimizationJobResult } from '../optimization/jobs/runtime-contracts'
 import { confirmMeteredQuoteInTransaction, MeteredBillingQuoteError } from './metered-billing-store'
@@ -2601,7 +2601,7 @@ async function persistScheduleCompletionInTransaction(
 ): Promise<OptimizeResult> {
   const profileId = job.profile_id!
   const persistedResult = payload.isPreviewProfile && !payload.isPreviewTrial
-    ? limitPreviewOptimizeResult(result)
+    ? limitPreviewOptimizeResult(result, await hasTrainingDiagnosisEntitlement(job.id, client))
     : result
   const workspaceEffect = await client.query(
     `insert into optimization_job_effects (job_id, effect_type, metadata_json, applied_at)

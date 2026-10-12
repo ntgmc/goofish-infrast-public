@@ -37,6 +37,7 @@ import { buildMaaExportPayload, MaaExportValidationError } from '../optimization
 import { parseOptimizeResult } from '../optimization/jobs/runtime-contracts'
 import { resolveProfileAuthorization } from './profile-authorization'
 import { getRequestClientIp } from '../security/client-ip'
+import { hasTrainingDiagnosisEntitlement } from '../optimization/jobs/entitlements'
 
 export default async function userResultsHandler(req: Request): Promise<Response> {
   return handleUserResultsRequest(req, () => requireUserSession(req))
@@ -89,7 +90,7 @@ export async function handleUserResultsRequest(
           result: projectOptimizeResultForCapabilities(result, {
             kind: normalizeProfileKind(profile),
             permission: authorization.permission,
-          }),
+          }, Boolean(stored.job_id) && await hasTrainingDiagnosisEntitlement(stored.job_id!)),
         },
       })
     }
