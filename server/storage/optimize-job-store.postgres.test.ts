@@ -1419,6 +1419,49 @@ describe('PostgreSQL optimization job admission', () => {
     }
   })
 
+  it.each(['backoff', 'owner_busy'])('claims ready paid work when fairness candidates are ineligible (%s)', async (mode) => {
+    const store = createPostgresOptimizeJobStore()
+    const owner = `fairness-${randomUUID()}`
+    let busy: Awaited<ReturnType<typeof store.getJob>> = null
+    if (mode === 'owner_busy') {
+      const existing = await store.createJob(input({ owner_key: owner, priority: 2_000_000_000 }))
+      busy = await store.claimNextJob('fairness', randomUUID(), new Date(Date.now() + 60_000).toISOString(), 100, 100)
+      expect(busy?.id).toBe(existing.id)
+    }
+    const analysis = await store.createJob(input({ owner_key: owner, priority: 5, source: 'scenario_comparison' }))
+    if (mode === 'backoff') await query('update optimize_jobs set next_attempt_at = now() + interval \'1 minute\' where id = $1', [analysis.id])
+    const paid = await store.createJob(input({ priority: 2_000_000_000 }))
+    await query('update optimize_dispatch_state set prioritized_streak = 3 where id = true')
+    const next = await store.claimNextJob('fairness', randomUUID(), new Date(Date.now() + 60_000).toISOString(), 100, 100)
+    expect(next?.id).toBe(paid.id)
+    await store.requestCancel(analysis.id)
+    if (busy) {
+      await store.releaseInterruptedAttempt(busy.id, busy.attempt_count, busy.worker_id!, busy.lock_token!)
+      await store.requestCancel(busy.id)
+    }
+    await store.failAttempt(next!.id, next!.attempt_count, next!.worker_id!, next!.lock_token!, 'fixture complete')
+  })
+
+  it.each(['expired', 'interrupted', 'legacy_queued'])('settles cancellation and refunds reserved items during %s recovery', async (mode) => {
+    const store = createPostgresOptimizeJobStore()
+    const profileId = await seedProfile()
+    const userId = (await query('select user_id from user_game_accounts where id = $1', [profileId])).rows[0].user_id
+    await grantItem({ userId, itemCode: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' },
+      sourceType: 'cancel-regression', sourceId: randomUUID(), recipientRole: 'user' })
+    const admitted = await store.admitJob(input({ profile_id: profileId, priority: 2_000_000_000,
+      reward_user_id: userId, use_priority_coupon: true }))
+    const claimed = await store.claimNextJob('cancel-recovery', randomUUID(), new Date(Date.now() + 60_000).toISOString(), 100, 100)
+    expect(claimed?.id).toBe(admitted.job.id)
+    await store.requestCancel(claimed!.id)
+    if (mode === 'interrupted') await store.releaseInterruptedAttempt(claimed!.id, claimed!.attempt_count, claimed!.worker_id!, claimed!.lock_token!)
+    else {
+      if (mode === 'legacy_queued') await query("update optimize_jobs set status = 'queued' where id = $1", [claimed!.id])
+      await store.recoverExpiredAttempts(new Date(Date.now() + 61_000).toISOString(), 100)
+    }
+    await expect(store.getJob(claimed!.id)).resolves.toMatchObject({ status: 'cancelled', worker_id: null })
+    expect((await query('select status from reward_consumptions where optimization_job_id = $1', [claimed!.id])).rows[0].status).toBe('refunded')
+  })
+
   it('commits and rolls back workspace and operator fingerprint updates together', async () => {
     const profileId = await seedProfile()
     const codeHash = randomUUID().replaceAll('-', '')

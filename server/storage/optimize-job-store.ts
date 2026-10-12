@@ -622,8 +622,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         if (higherPriorityWorker.rows[0]?.has_higher_priority) return null
       const runningTotal = await client.query<{ count: string }>("select count(*)::text as count from optimize_jobs where status = 'running'")
       if (Number(runningTotal.rows[0]?.count ?? 0) >= maxGlobalRunning) return null
-      const waitingStandard = await client.query<{ count: string }>("select count(*)::text as count from optimize_jobs where status = 'queued' and priority > 0 and priority < 10 and failure_count < $1", [maxFailures])
-      const forceStandard = Number(state.rows[0]?.prioritized_streak ?? 0) >= 3 && Number(waitingStandard.rows[0]?.count ?? 0) > 0
+      const forceStandard = Number(state.rows[0]?.prioritized_streak ?? 0) >= 3
       const result = await client.query<OptimizeJobRow>([
         'with next_job as (',
         '  select id from optimize_jobs',
@@ -631,8 +630,8 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         "  and not exists (select 1 from optimize_jobs running where running.owner_key = optimize_jobs.owner_key and running.status = 'running')",
         "  and (coalesce(billing_json->>'billing_kind', '') <> 'metered_commercial'",
         "       or (select count(*) from optimize_jobs account_running where account_running.billing_user_id = optimize_jobs.billing_user_id and account_running.status = 'running') < 2)",
-        forceStandard ? '  and priority > 0 and priority < 10' : '',
-        '  order by (priority <= 0) asc, priority desc, created_at asc, id asc',
+        '  order by case when $8::boolean and priority > 0 and priority < 10 then 0 else 1 end,',
+        '    (priority <= 0) asc, priority desc, created_at asc, id asc',
         '  limit 1',
         '  for update skip locked',
         ')',
@@ -653,7 +652,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         'from next_job',
         'where job.id = next_job.id',
         'returning job.*',
-      ].join(' '), [workerId, lockToken, lockExpiresAt, maxFailures, now, 'queued', 'running'])
+      ].join(' '), [workerId, lockToken, lockExpiresAt, maxFailures, now, 'queued', 'running', forceStandard])
       const claimed = result.rows[0] ? fromRow(result.rows[0]) : null
       if (claimed) {
         await client.query(
@@ -958,23 +957,29 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       await ensureSchema()
       const now = new Date().toISOString()
       return withTransaction(async (client) => {
-        const released = await client.query(
+        const released = await client.query<{ status: string; payload_json: unknown }>(
           `update optimize_jobs
-           set status = 'queued', error_message = null, worker_id = null, heartbeat_at = null,
-               lock_token = null, lock_expires_at = null, next_attempt_at = $5,
+           set status = case when cancel_requested_at is not null then 'cancelled' else 'queued' end,
+               error_message = case when cancel_requested_at is not null then '任务已由用户取消。' else null end,
+               public_error_code = case when cancel_requested_at is not null then 'cancelled_by_user' else null end,
+               worker_id = null, heartbeat_at = null, lock_token = null, lock_expires_at = null,
+               next_attempt_at = case when cancel_requested_at is not null then null else $5::timestamptz end,
                expires_at = null, execution_stage = null, stage_updated_at = null,
-               finished_at = null, updated_at = $5
+               finished_at = case when cancel_requested_at is not null then $5::timestamptz else null end, updated_at = $5
            where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = 'running'
-           returning id`,
+           returning status, payload_json`,
           [id, attemptNo, workerId, lockToken, now],
         )
         if (!released.rowCount) return false
         await client.query(
           `update optimize_job_attempts
-           set status = 'interrupted', failure_kind = null, error_message = null, finished_at = $5, heartbeat_at = $5
+           set status = $6, failure_kind = null, error_message = null, finished_at = $5, heartbeat_at = $5
            where job_id = $1 and attempt_no = $2 and worker_id = $3 and lock_token = $4`,
-          [id, attemptNo, workerId, lockToken, now],
+          [id, attemptNo, workerId, lockToken, now, released.rows[0].status === 'cancelled' ? 'cancelled' : 'interrupted'],
         )
+        if (released.rows[0].status === 'cancelled') {
+          await releaseOptimizationJobReservationsInTransaction(client, id, released.rows[0].payload_json, now)
+        }
         return true
       })
     },
@@ -1034,6 +1039,23 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       await ensureSchema()
       return withTransaction(async (client) => {
         const hardTimeoutMs = getOptimizeJobHardTimeoutMs()
+        const cancellations = await client.query<OptimizeJobRow>(
+          `update optimize_jobs set status = 'cancelled', error_message = '任务已由用户取消。',
+             public_error_code = 'cancelled_by_user', failure_kind = null,
+             worker_id = null, heartbeat_at = null, lock_token = null, lock_expires_at = null,
+             next_attempt_at = null, expires_at = null, finished_at = $1, updated_at = $1
+           where id in (select id from optimize_jobs
+             where cancel_requested_at is not null and (status = 'queued'
+               or (status = 'running' and (lock_expires_at < $1
+                 or started_at <= $1::timestamptz - ($2::integer * interval '1 millisecond'))))
+             order by updated_at limit 100 for update skip locked)
+           returning *`, [nowIso, hardTimeoutMs],
+        )
+        for (const job of cancellations.rows) {
+          await client.query(`update optimize_job_attempts set status = 'cancelled', failure_kind = null,
+            finished_at = $2, heartbeat_at = $2 where job_id = $1 and status = 'running'`, [job.id, nowIso])
+          await releaseOptimizationJobReservationsInTransaction(client, job.id, job.payload_json, nowIso)
+        }
         const timedOutMessage = `任务计算超过${formatOptimizeJobHardTimeout()}上限，请重试。`
         const recovered = await client.query<OptimizeJobRow>(
           `update optimize_jobs
@@ -1080,7 +1102,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
                  else null
                end,
                updated_at = $1
-           where status = 'running' and (
+           where status = 'running' and cancel_requested_at is null and (
              (lock_expires_at is not null and lock_expires_at < $1)
              or (started_at is not null and started_at <= ($1::timestamptz - ($4::integer * interval '1 millisecond')))
            )
@@ -1106,7 +1128,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
             await releaseMeteredBillingInTransaction(client, job.id, nowIso)
           }
         }
-        return recovered.rowCount ?? recovered.rows.length
+        return cancellations.rows.length + (recovered.rowCount ?? recovered.rows.length)
       })
     },
     expireQueuedJobs: async (nowIso) => {
@@ -1696,21 +1718,23 @@ export function createMemoryOptimizeJobStore(
       const job = records.get(id)
       if (!ownsMemoryAttempt(job, attemptNo, workerId, lockToken)) return false
       const now = new Date().toISOString()
-      job.status = 'queued'
-      job.error_message = null
+      job.status = job.cancel_requested_at ? 'cancelled' : 'queued'
+      job.error_message = job.cancel_requested_at ? '任务已由用户取消。' : null
+      job.public_error_code = job.cancel_requested_at ? 'cancelled_by_user' : null
+      if (job.cancel_requested_at && job.billing_json) job.billing_json = { ...job.billing_json, status: 'released' }
       job.worker_id = null
       job.heartbeat_at = null
       job.lock_token = null
       job.lock_expires_at = null
-      job.next_attempt_at = now
+      job.next_attempt_at = job.cancel_requested_at ? null : now
       job.expires_at = null
       job.execution_stage = null
       job.stage_updated_at = null
-      job.finished_at = null
+      job.finished_at = job.cancel_requested_at ? now : null
       job.updated_at = now
       const attempt = attempts.get(`${id}:${attemptNo}`)
       if (attempt) {
-        attempt.status = 'interrupted'
+        attempt.status = job.cancel_requested_at ? 'cancelled' : 'interrupted'
         attempt.heartbeat_at = now
       }
       return true
@@ -1767,7 +1791,26 @@ export function createMemoryOptimizeJobStore(
       for (const job of records.values()) {
         const leaseExpired = Boolean(job.lock_expires_at) && Date.parse(job.lock_expires_at!) < nowMs
         const timedOut = isOptimizeJobExecutionTimedOut(job, nowMs)
-        if (job.status !== 'running' || (!leaseExpired && !timedOut)) continue
+        if (job.cancel_requested_at && (job.status === 'queued' || (job.status === 'running' && (leaseExpired || timedOut)))) {
+          recovered += 1
+          job.status = 'cancelled'
+          job.error_message = '任务已由用户取消。'
+          job.public_error_code = 'cancelled_by_user'
+          job.failure_kind = null
+          job.worker_id = null
+          job.heartbeat_at = null
+          job.lock_token = null
+          job.lock_expires_at = null
+          job.next_attempt_at = null
+          job.expires_at = null
+          job.finished_at = nowIso
+          job.updated_at = nowIso
+          if (job.billing_json) job.billing_json = { ...job.billing_json, status: 'released' }
+          const attempt = attempts.get(`${job.id}:${job.attempt_count}`)
+          if (attempt) { attempt.status = 'cancelled'; attempt.failure_kind = null; attempt.heartbeat_at = nowIso }
+          continue
+        }
+        if (job.cancel_requested_at || job.status !== 'running' || (!leaseExpired && !timedOut)) continue
         recovered += 1
         const failureKind: OptimizeJobFailureKind = timedOut ? 'timed_out' : 'lease_lost'
         const errorMessage = timedOut ? timedOutMessage : '任务执行租约已过期，请重试。'

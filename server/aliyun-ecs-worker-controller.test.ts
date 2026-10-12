@@ -56,6 +56,16 @@ describe('Aliyun ECS worker controller', () => {
     expect(actions[1]?.searchParams.get('ForceStop')).toBe('false')
   })
 
+  it('keeps the request deadline active while reading the response body and permits a later request', async () => {
+    const request = vi.fn(async (_input: unknown, init?: RequestInit) => new Response(new ReadableStream({
+      start(stream) { init!.signal!.addEventListener('abort', () => stream.error(new DOMException('aborted', 'AbortError')), { once: true }) },
+    })))
+    const controller = createAliyunEcsWorkerController({ ...baseOptions, timeoutMs: 20, fetch: request as typeof fetch })
+    await expect(controller.getStatus()).rejects.toThrow('request timed out')
+    request.mockImplementationOnce(async () => Response.json({ InstanceStatuses: { InstanceStatus: [{ Status: 'Running' }] } }))
+    await expect(controller.getStatus()).resolves.toBe('running')
+  })
+
   it('returns a bounded API error and validates all-or-none environment configuration', async () => {
     const controller = createAliyunEcsWorkerController({
       ...baseOptions,

@@ -10,7 +10,7 @@
 | 2 | M03 数据库与迁移 | D01 回滚失败连接回池；D02 service file 引号；D03 CDK 内容验证 | 已修复、验证通过 |
 | 3 | M04 档案、工作区与账号数据 | D01 清除凭据覆盖冻结；D02 改名覆盖工作区；D03 导出截断与遗漏 | 已修复、验证通过 |
 | 4 | M06 排班任务 API 与契约 | D01 诊断券结果过滤；D02 取消投影；D03 轮班对比 schema；D04 输出错误分类 | 已修复、验证通过 |
-| 5 | M07 队列、worker 与伸缩 | D01 领取阻塞；D02 取消恢复预约；D03 云响应超时；D04 关停迟到领取 | 待修复 |
+| 5 | M07 队列、worker 与伸缩 | D01 领取阻塞；D02 取消恢复预约；D03 云响应超时；D04 关停迟到领取 | 已修复、验证通过 |
 | 6 | M08 森空岛绑定与导入 | D01 旧确认写回；D02 临时 token 失效分类；D03 升级激活冻结档案 | 待修复 |
 | 7 | M09 养成与辅助计算 | D01 刷取余量；D02 加工龙门币；D03 仓库错误分类 | 待修复 |
 | 8 | M10 公告与通知 | D01 Unicode 摘要；D02 旧内容标记已读；D03 分页竞争 | 待修复 |
@@ -59,4 +59,14 @@
 - D04：优化器结果在本地加工前验证；诊断建议 type/ops 最小结构纳入 schema，缺 plans/ops 明确归为不可重试 validation 故障。
 - 最近验证：15 个普通文件、179 项通过；真实推荐 CDK/免费预览两种券消费、完成、GET/重放/历史回归通过（filter 执行 2 项，其余 40 项未混计）。
 - 完整验证：`check:local` 通过（244 个普通文件、1,951 项；完整构建/API/109 条路由）；完整队列 PostgreSQL 文件 42 项通过。架构检查首次将默认参数的 shorthand query 误报为未使用，显式别名引用后相关 39 项、架构和完整门禁均通过。文档最后编辑后复跑架构、死代码及 whitespace 检查；没有调用私有优化器。
-- Commit message：`fix(optimization): preserve diagnosis entitlements and validate result boundaries`。
+- Commit：`66b7f0c1`，`fix(optimization): preserve diagnosis entitlements and validate result boundaries`。
+
+## 第 5 轮：M07 队列、worker 与伸缩
+
+- D01：单次 eligible 候选查询以排序实现公平让行；没有可运行分析任务时直接领取其他任务，不再用宽松计数限制候选。
+- D02：中断事务按最新取消意图直接终结并释放预约；租约/硬期限恢复优先取消；每批最多 100 条修复遗留 queued + cancel_requested 记录。内存 store 同步状态语义。
+- D03：ECS 请求 deadline 保持到 JSON 正文读取结束，正文中止/损坏明确失败，保留实际云 API 错误。
+- D04：线程、inline 以及抢占领取返回后复查关停状态；迟到 attempt 归还存储，不启动执行。
+- 最近验证：7 个普通文件、50 项及完整队列 PostgreSQL 47 项通过，覆盖公平 backoff/owner busy、三种取消恢复/真实道具退款、线程/inline 迟到 claim、挂起正文及后续请求。新增 fixture 的道具名和维护 cleanup 已纠正后复跑。
+- 完整验证：`check:local` 通过（244 个普通文件、1,954 项；完整构建/API/109 条路由）；完整队列 PostgreSQL 文件 47 项通过。最终编辑后复跑架构、死代码及 whitespace 检查；未调用真实 ECS 或私有求解器。
+- Commit message：`fix(workers): settle cancellation and prevent late claims after shutdown`。
