@@ -67,7 +67,30 @@ describe('NotificationCenter', () => {
 
     await user.click(await screen.findByRole('button', { name: /获得新道具/ }))
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/tool/inventory'))
-    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'PATCH')).toBe(true)
+    const patch = fetchMock.mock.calls.find(([, init]) => init?.method === 'PATCH')
+    expect(JSON.parse(patch?.[1]?.body)).toEqual({ notification_id: 'notification-1', updated_at: page(3).notifications[0].updated_at })
+  })
+
+  it.each(['read', 'refresh'])('discards pagination and releases its loading state after %s', async (mode) => {
+    const stale = deferred<Response>()
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(page(1, 'old-cursor')))
+      .mockResolvedValueOnce(jsonResponse(page(1, 'old-cursor')))
+      .mockReturnValueOnce(stale.promise)
+      .mockResolvedValueOnce(jsonResponse(mode === 'read' ? { unread_count: 0 } : page(5, 'fresh-cursor')))
+      .mockResolvedValue(jsonResponse(page(mode === 'read' ? 0 : 5)))
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    renderCenter()
+    await user.click(await screen.findByRole('button', { name: '通知，1 条未读' }))
+    await user.click(await screen.findByRole('button', { name: '加载更多' }))
+    if (mode === 'read') await user.click(screen.getByRole('button', { name: '全部设为已读' }))
+    else window.dispatchEvent(new Event('focus'))
+    await screen.findByRole('button', { name: mode === 'read' ? '通知，无未读消息' : '通知，5 条未读' })
+    stale.resolve(jsonResponse(page(1, 'obsolete-cursor')))
+    await waitFor(() => expect(screen.getByRole('button', { name: '加载更多' })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: '加载更多' }))
+    expect(String(fetchMock.mock.calls[fetchMock.mock.calls.length - 1]?.[0])).toContain(mode === 'read' ? 'old-cursor' : 'fresh-cursor')
+    await screen.findByRole('button', { name: mode === 'read' ? '通知，无未读消息' : '通知，5 条未读' })
   })
 
   it('caps the badge at 99+ and marks all notifications read explicitly', async () => {

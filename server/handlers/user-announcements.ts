@@ -34,6 +34,9 @@ export default async (req: Request): Promise<Response> => {
       if (!('all' in body) && selected.length === 0) {
         return jsonResponse({ error: '公告不存在或已停用。' }, 404, noStore())
       }
+      if (!('all' in body) && selected.some((item) => Date.parse(item.updated_at) !== Date.parse(body.updated_at))) {
+        return jsonResponse({ error: '公告内容已更新，请刷新后阅读。', code: 'announcement_version_conflict' }, 409, noStore())
+      }
       const updatedCount = await markAnnouncementsRead(auth.user.id, selected)
       return jsonResponse({
         ...await payload(),

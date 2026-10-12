@@ -116,7 +116,7 @@ export default function AnnouncementPopup({ announcements, userId, onUnreadCount
       if (userId) {
         const payload = await apiJson<{ unread_count?: number }>('/api/user/announcements', {
           method: 'PATCH',
-          json: { announcement_id: current.id },
+          json: { announcement_id: current.id, updated_at: current.updated_at },
         })
         setServerReadVersions((versions) => new Set(versions ?? []).add(announcementVersionKey(current)))
         if (typeof payload.unread_count === 'number') onUnreadCountChange?.(payload.unread_count)

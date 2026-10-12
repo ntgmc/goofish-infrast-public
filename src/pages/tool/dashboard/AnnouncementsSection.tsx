@@ -39,7 +39,7 @@ function useUserAnnouncements(onUnreadCountChange: (count: number) => void) {
     try {
       const data = await apiJson<{ announcements?: UserAnnouncementRead[]; unread_count?: number }>('/api/user/announcements', {
         method: 'PATCH',
-        json: announcementId ? { announcement_id: announcementId } : { all: true },
+        json: announcementId ? { announcement_id: announcementId, updated_at: items.find((item) => item.announcement.id === announcementId)?.announcement.updated_at } : { all: true },
         fallbackMessage: copy.dashboard.pages_tool_dashboard_AnnouncementsSection_002,
       })
       if (Array.isArray(data.announcements)) setItems(data.announcements)

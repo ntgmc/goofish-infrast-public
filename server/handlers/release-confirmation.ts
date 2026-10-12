@@ -69,9 +69,8 @@ function buildReleaseSummary(items: readonly string[]): string | null {
 }
 
 function truncatePlainText(value: string, maximumLength: number): string {
-  return Array.from(value)
-    .slice(0, maximumLength)
-    .join('')
+  return value.slice(0, maximumLength)
+    .replace(/[\uD800-\uDBFF]$/, '')
     .replace(/[\u0000-\u001F\u007F]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()

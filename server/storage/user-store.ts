@@ -1623,7 +1623,8 @@ export async function markAnnouncementsRead(
      on conflict (user_id, announcement_id) do update set
        announcement_version = excluded.announcement_version,
        read_at = excluded.read_at
-     where user_announcement_reads.announcement_version is distinct from excluded.announcement_version`,
+     where user_announcement_reads.announcement_version is null
+        or user_announcement_reads.announcement_version < excluded.announcement_version`,
     [userId, announcements.map((item) => item.id), announcements.map((item) => item.updated_at), readAt],
     )
     return result.rowCount ?? 0

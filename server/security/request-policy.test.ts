@@ -336,7 +336,7 @@ describe('announcement request policy', () => {
     const announcement = { banner: null, announcements: [], expected_revision: 0 }
     expect(requestSchemas.announcement.safeParse(announcement).success).toBe(true)
     expect(requestSchemas.announcement.safeParse({ ...announcement, expected_revision: undefined }).success).toBe(false)
-    expect(requestSchemas.userAnnouncement.safeParse({ announcement_id: 'announcement-1' }).success).toBe(true)
+    expect(requestSchemas.userAnnouncement.safeParse({ announcement_id: 'announcement-1', updated_at: '2026-07-30T00:00:00.000Z' }).success).toBe(true)
     expect(requestSchemas.userAnnouncement.safeParse({ all: true }).success).toBe(true)
     expect(requestSchemas.userAnnouncement.safeParse({}).success).toBe(false)
     expect(requestSchemas.userAnnouncement.safeParse({ all: false }).success).toBe(false)

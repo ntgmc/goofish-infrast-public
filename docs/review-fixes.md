@@ -13,7 +13,7 @@
 | 5 | M07 队列、worker 与伸缩 | D01 领取阻塞；D02 取消恢复预约；D03 云响应超时；D04 关停迟到领取 | 已修复、验证通过 |
 | 6 | M08 森空岛绑定与导入 | D01 旧确认写回；D02 临时 token 失效分类；D03 升级激活冻结档案 | 已修复、验证通过 |
 | 7 | M09 养成与辅助计算 | D01 刷取余量；D02 加工龙门币；D03 仓库错误分类 | 已修复、验证通过 |
-| 8 | M10 公告与通知 | D01 Unicode 摘要；D02 旧内容标记已读；D03 分页竞争 | 待修复 |
+| 8 | M10 公告与通知 | D01 Unicode 摘要；D02 旧内容标记已读；D03 分页竞争 | 已修复、验证通过 |
 | 9 | M11 风控、邀请与统计 | D01 邀请资格；D02 UID 轮换 alias；D03 审计链顺序 | 待修复 |
 | 10 | M12 管理控制台 | D01 保存覆盖新编辑；D02 旧会话详情；D03 撤回遗漏预约 | 待修复 |
 | 11 | M13 前端外壳 | D01 迁移草稿；D02 旧工作区响应；D03 清除凭据切换档案 | 待修复 |
@@ -88,4 +88,13 @@
 - D03：仓库边界保留已知 client/超时错误，分别返回重新绑定或重试的状态/代码，未知异常仍返回通用 500；不新增凭据状态写入。
 - 最近验证：12 个普通文件、75 项及 training cost smoke 通过，覆盖共享余量/跨日/药剂/关闭关卡、多级加工 300 龙门币缺口和真实 Skland client 的鉴权/临时/超时错误；depot smoke 虚拟模块的新错误类导出已补齐。
 - 完整验证：depot smoke 与 `check:local` 通过（245 个普通文件、1,961 项；完整构建/API/109 条路由）；最终文档编辑后复跑架构、死代码及 whitespace 检查。
-- Commit message：`fix(cultivation): share farm yields and account for crafting cash`。
+- Commit：`eee1022a`，`fix(cultivation): share farm yields and account for crafting cash`。
+
+## 第 8 轮：M10 公告与通知
+
+- D01：公告/发布摘要统一 UTF-16 上限，裁剪后移除被切断的高代理字符，合法 emoji 正文可发布。
+- D02：单条确认要求展示时的 updated_at；通知用同一 SQL 条件校验，旧版本返回 409；公告确认拒绝已更新内容，已读版本只能向前推进。所有前端 caller 携带所展示版本，单条本地更新也检查版本。内容更新保证时间戳至少推进 1 ms，覆盖同毫秒发放。
+- D03：刷新/已读操作中止并清理旧分页；响应、异常和 cleanup 按当前 AbortController 归属判断，不回写新首页或清除其他请求的加载状态。
+- 最近验证：10 个普通文件、96 项通过；发布 Unicode 新用例 5 项通过；真实 PostgreSQL 2 个文件、9 项通过，覆盖实际同来源发放/旧版本确认、公告已读单调推进和 Unicode 发布事务。首次数据库断言已按 pg 的 Date 返回类型修正。
+- 完整验证：`check:local` 通过（245 个普通文件、1,966 项；完整构建/API/109 条路由）。新增 UI 测试的 `.at()` 与项目编译目标不符，改为普通下标后重跑通过；最终文档编辑后复跑架构、死代码及 whitespace 检查。未修改 schema/迁移或执行真实发布/消息投递。
+- Commit message：`fix(notifications): bind read acknowledgements to displayed versions`。

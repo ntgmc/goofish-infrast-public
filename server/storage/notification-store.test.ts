@@ -104,10 +104,10 @@ describe('notification store', () => {
     mocks.query
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'notification-1' }] })
       .mockResolvedValueOnce({ rows: [{ count: '0' }] })
-    await expect(markUserNotificationRead('user-1', 'notification-1')).resolves.toBe(0)
+    await expect(markUserNotificationRead('user-1', 'notification-1', '2026-07-30T00:00:00.000Z')).resolves.toBe(0)
 
-    mocks.query.mockResolvedValueOnce({ rowCount: 0, rows: [] })
-    await expect(markUserNotificationRead('user-1', 'missing')).rejects.toMatchObject({
+    mocks.query.mockResolvedValueOnce({ rowCount: 0, rows: [] }).mockResolvedValueOnce({ rowCount: 0, rows: [] })
+    await expect(markUserNotificationRead('user-1', 'missing', '2026-07-30T00:00:00.000Z')).rejects.toMatchObject({
       code: 'notification_not_found',
       status: 404,
     })

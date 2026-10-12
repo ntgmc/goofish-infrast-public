@@ -86,7 +86,7 @@ function AnnouncementFeed({ session }: { session: V2Session }) {
     setError(null)
     try {
       const result = await apiJson<AnnouncementPageResponse>(apiUrl, {
-        method: 'PATCH', json: id ? { announcement_id: id } : { all: true },
+        method: 'PATCH', json: id ? { announcement_id: id, updated_at: data?.announcements.find((item) => item.announcement.id === id)?.announcement.updated_at } : { all: true },
         fallbackMessage: text.pages_tool_dashboard_AnnouncementsSection_002,
       })
       if (version !== requestVersion.current) return

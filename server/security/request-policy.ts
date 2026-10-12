@@ -403,11 +403,11 @@ export const requestSchemas = {
     source: optionalString(120),
   }),
   userAnnouncement: z.union([
-    strict({ announcement_id: shortString(128) }),
+    strict({ announcement_id: shortString(128), updated_at: z.string().datetime() }),
     strict({ all: z.literal(true) }),
   ]),
   userNotification: z.union([
-    strict({ notification_id: shortString(128) }),
+    strict({ notification_id: shortString(128), updated_at: z.string().datetime() }),
     strict({ all: z.literal(true) }),
   ]),
   personalUseDeclarationConfirmation: strict({

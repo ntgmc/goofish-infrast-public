@@ -172,7 +172,7 @@ export function normalizeAnnouncementSummary(markdown: string): string | null {
     .replace(/\s+/g, ' ')
     .trim()
   if (!plainText) return null
-  return Array.from(plainText).slice(0, 500).join('')
+  return plainText.slice(0, 500).replace(/[\uD800-\uDBFF]$/, '')
 }
 
 function allAnnouncements(data: AnnouncementData): Announcement[] {
@@ -243,7 +243,7 @@ export function validateAnnouncementBanner(
   const id = typeof value.id === 'string' && value.id.trim() ? value.id.trim() : current?.id ?? createAnnouncementId()
   const createdAt = normalizeIsoString(value.created_at) ?? current?.created_at ?? now
   const updatedAt = hasAnnouncementChanged(current ?? undefined, { kind: 'banner', active, title, body })
-    ? now
+    ? new Date(Math.max(Date.parse(now), Date.parse(current?.updated_at ?? '1970-01-01') + 1)).toISOString()
     : normalizeIsoString(value.updated_at) ?? current?.updated_at ?? now
 
   return {
@@ -305,7 +305,7 @@ export function validateAnnouncementList(
     const previous = currentById.get(id)
     const createdAt = normalizeIsoString(item.created_at) ?? previous?.created_at ?? now
     const updatedAt = hasAnnouncementChanged(previous, { kind, active, title, body })
-      ? now
+      ? new Date(Math.max(Date.parse(now), Date.parse(previous?.updated_at ?? '1970-01-01') + 1)).toISOString()
       : normalizeIsoString(item.updated_at) ?? previous?.updated_at ?? now
 
     announcements.push({

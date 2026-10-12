@@ -50,10 +50,10 @@ describe('user notifications handler', () => {
   })
 
   it('marks one notification or all notifications read', async () => {
-    mocks.getValidatedJson.mockResolvedValueOnce({ notification_id: 'notification-1' })
+    mocks.getValidatedJson.mockResolvedValueOnce({ notification_id: 'notification-1', updated_at: '2026-07-30T00:00:00.000Z' })
     const one = await userNotificationsHandler(request('PATCH'))
     await expect(one.json()).resolves.toEqual({ unread_count: 2 })
-    expect(mocks.markUserNotificationRead).toHaveBeenCalledWith('user-1', 'notification-1')
+    expect(mocks.markUserNotificationRead).toHaveBeenCalledWith('user-1', 'notification-1', '2026-07-30T00:00:00.000Z')
 
     mocks.getValidatedJson.mockResolvedValueOnce({ all: true })
     const all = await userNotificationsHandler(request('PATCH'))
@@ -71,6 +71,6 @@ function request(method: string): Request {
   return new Request('http://localhost/api/user/notifications', {
     method,
     headers: { 'Content-Type': 'application/json' },
-    body: method === 'PATCH' ? JSON.stringify({ notification_id: 'notification-1' }) : undefined,
+    body: method === 'PATCH' ? JSON.stringify({ notification_id: 'notification-1', updated_at: '2026-07-30T00:00:00.000Z' }) : undefined,
   })
 }

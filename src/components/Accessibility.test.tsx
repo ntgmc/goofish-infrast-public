@@ -139,7 +139,7 @@ describe('AnnouncementPopup accessibility', () => {
     await user.click(await screen.findByRole('button', { name: '已读' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(apiJsonMock).toHaveBeenLastCalledWith('/api/user/announcements', {
-      method: 'PATCH', json: { announcement_id: 'server-read' },
+      method: 'PATCH', json: { announcement_id: 'server-read', updated_at: announcement.updated_at },
     })
     expect(onUnreadCountChange).toHaveBeenLastCalledWith(0)
     expect(window.localStorage.getItem('maa-announcement-read:server-read')).toBeNull()

@@ -29,7 +29,7 @@ export default async function userNotificationsHandler(req: Request): Promise<Re
       const body = await getValidatedJson(req, requestSchemas.userNotification)
       const unreadCount = 'all' in body
         ? await markAllUserNotificationsRead(auth.user.id)
-        : await markUserNotificationRead(auth.user.id, body.notification_id)
+        : await markUserNotificationRead(auth.user.id, body.notification_id, body.updated_at)
       return noStoreJson({ unread_count: unreadCount })
     }
 

@@ -8,6 +8,12 @@ import {
 } from './announcement'
 
 describe('announcement validation', () => {
+  it('bounds Unicode summaries to 500 UTF-16 units without splitting a character', () => {
+    expect(normalizeAnnouncementSummary('😀'.repeat(250))).toBe('😀'.repeat(250))
+    expect(normalizeAnnouncementSummary('😀'.repeat(251))).toBe('😀'.repeat(250))
+    expect(normalizeAnnouncementSummary('a' + '😀'.repeat(250))).toBe('a' + '😀'.repeat(249))
+  })
+
   it('normalizes Markdown into a bounded plain-text notification summary', () => {
     const summary = normalizeAnnouncementSummary(`# 标题\n\n[详情](https://example.test) **加粗**\n${'文'.repeat(600)}`)
 
