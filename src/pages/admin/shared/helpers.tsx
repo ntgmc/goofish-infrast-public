@@ -174,6 +174,7 @@ function normalizeAnnouncement(value: Announcement | null | undefined, kind: Ann
     active: value.active === true,
     title: typeof value.title === 'string' ? value.title : '',
     body: typeof value.body === 'string' ? value.body : '',
+    ...(kind === 'popup' && value.popup_until ? { popup_until: value.popup_until } : {}),
     created_at: typeof value.created_at === 'string' ? value.created_at : now,
     updated_at: typeof value.updated_at === 'string' ? value.updated_at : now,
   }

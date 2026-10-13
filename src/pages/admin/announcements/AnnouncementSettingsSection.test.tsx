@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
@@ -23,7 +23,7 @@ describe('AnnouncementSettingsSection', () => {
     const user = userEvent.setup()
     renderSection()
 
-    const list = screen.getByRole('list', { name: '弹出式公告列表' })
+    const list = screen.getByRole('list', { name: '站内公告列表' })
     expect(within(list).getAllByRole('listitem')).toHaveLength(2)
     expect(within(list).getAllByText(/^已启用 ·/)).toHaveLength(2)
     expect(screen.getByTestId('announcement-one')).toHaveTextContent('第一条正文')
@@ -37,7 +37,7 @@ describe('AnnouncementSettingsSection', () => {
   it('edits, reorders, deletes, adds, and submits through the supplied callbacks', async () => {
     const user = userEvent.setup()
     const callbacks = renderSection()
-    const list = screen.getByRole('list', { name: '弹出式公告列表' })
+    const list = screen.getByRole('list', { name: '站内公告列表' })
 
     await user.click(within(list).getByRole('button', { name: /第二条公告/, pressed: false }))
     await user.clear(screen.getByLabelText('标题'))
@@ -47,10 +47,24 @@ describe('AnnouncementSettingsSection', () => {
     expect(callbacks.onReorder).toHaveBeenCalledWith(1, 0)
     await user.click(screen.getByRole('button', { name: '删除' }))
     expect(callbacks.onDelete).toHaveBeenCalledWith('two')
-    await user.click(screen.getByRole('button', { name: '新增弹出式公告' }))
+    await user.click(screen.getByRole('button', { name: '新增公告' }))
     expect(callbacks.onAdd).toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: '发布横幅和公告' }))
     expect(callbacks.onSubmit).toHaveBeenCalled()
+  })
+
+  it('opts into visit reminders with a local deadline and allows clearing it', () => {
+    const callbacks = renderSection()
+    const field = screen.getByLabelText('访问提醒截止时间（可选）')
+    expect(field).toHaveValue('')
+    fireEvent.change(field, { target: { value: '2026-10-20T18:00' } })
+    expect(callbacks.onUpdate).toHaveBeenLastCalledWith('one', { popup_until: new Date('2026-10-20T18:00').toISOString() })
+    cleanup()
+    const populatedCallbacks = renderSection({ announcements: [{ ...announcements[0], popup_until: new Date('2026-10-20T18:00').toISOString() }] })
+    const populated = screen.getByLabelText('访问提醒截止时间（可选）')
+    expect(populated).toHaveValue('2026-10-20T18:00')
+    fireEvent.change(populated, { target: { value: '' } })
+    expect(populatedCallbacks.onUpdate).toHaveBeenLastCalledWith('one', { popup_until: null })
   })
 
   it('announces restored conflicts and exposes draft recovery actions', async () => {

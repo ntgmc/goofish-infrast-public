@@ -221,15 +221,17 @@ describe('useAdminController announcement drafts', () => {
     const { result } = renderHook(() => useAdminController('announcement'))
     await waitForHydration(result)
 
-    act(() => result.current.updateAnnouncement('popup-one', { body: '自动保存后的正文' }))
+    const popupUntil = '2026-10-20T18:00:00.000Z'
+    act(() => result.current.updateAnnouncement('popup-one', { body: '自动保存后的正文', popup_until: popupUntil }))
     await waitFor(() => expect(result.current.announcementDraftStatus).toBe('saved'), { timeout: 1_500 })
-    expect(readAnnouncementDraft('alice', window.localStorage).draft?.announcements[0].body).toBe('自动保存后的正文')
+    expect(readAnnouncementDraft('alice', window.localStorage).draft?.announcements[0]).toMatchObject({ body: '自动保存后的正文', popup_until: popupUntil })
 
     await act(async () => result.current.handleSaveAnnouncement(formEvent()))
     expect(result.current.notice).toBe('横幅和公告已发布')
+    expect(result.current.announcements[0].popup_until).toBe(popupUntil)
     expect(result.current.announcementDraftDirty).toBe(false)
     expect(window.localStorage.getItem(announcementDraftStorageKey('alice'))).toBeNull()
-    expect(adminApi.json).toHaveBeenCalledWith('/api/admin/announcement', expect.objectContaining({ method: 'PUT' }))
+    expect(adminApi.json).toHaveBeenCalledWith('/api/admin/announcement', expect.objectContaining({ method: 'PUT', json: expect.objectContaining({ announcements: expect.arrayContaining([expect.objectContaining({ popup_until: popupUntil })]) }) }))
   })
 
   it('keeps drafts isolated when another administrator logs in', async () => {

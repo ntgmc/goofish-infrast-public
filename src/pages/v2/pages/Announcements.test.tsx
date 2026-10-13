@@ -113,6 +113,16 @@ it.each(['missing', '%E0%A4%A'])('shows an unavailable or malformed announcement
   expect(screen.queryByText('Body 0')).not.toBeInTheDocument()
 })
 
+it('keeps expired reminders readable and unread until the user explicitly acknowledges them', async () => {
+  items[0].announcement.popup_until = new Date(Date.now() - 1000).toISOString()
+  mount('/v2?section=announcements', true)
+  await screen.findByRole('heading', { name: 'Announcement 0' })
+  expect(screen.getByText('Body 0')).toBeInTheDocument()
+  expect(screen.getAllByText(copy.public.announcement_reminder_ended)).toHaveLength(2)
+  expect(screen.getByRole('button', { name: copy.dashboard.pages_tool_dashboard_AnnouncementsSection_011 })).toBeEnabled()
+  expect(mocks.api.mock.calls.some(([, init]) => init.method === 'PATCH')).toBe(false)
+})
+
 it('filters unread announcements on the server and marks all pages read', async () => {
   const user = userEvent.setup()
   mount('/v2?section=announcements#announcement-popup-21', true)

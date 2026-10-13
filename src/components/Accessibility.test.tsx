@@ -15,15 +15,16 @@ const { apiJsonMock, apiVoidMock } = vi.hoisted(() => ({
   apiVoidMock: vi.fn(),
 }))
 
-vi.mock('../lib/api-client', () => ({
-  apiJson: apiJsonMock,
-  apiVoid: apiVoidMock,
-}))
+vi.mock('../lib/api-client', async (importOriginal) => {
+  const { getApiErrorMessage } = await importOriginal<typeof import('../lib/api-client')>()
+  return { apiJson: apiJsonMock, apiVoid: apiVoidMock, getApiErrorMessage }
+})
 
 beforeEach(() => {
-  apiJsonMock.mockResolvedValue({ invite_code_required: false })
-  apiVoidMock.mockResolvedValue(undefined)
+  apiJsonMock.mockReset().mockResolvedValue({ invite_code_required: false })
+  apiVoidMock.mockReset().mockResolvedValue(undefined)
   window.localStorage.clear()
+  window.sessionStorage.clear()
   document.documentElement.style.overflow = ''
 
   Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
@@ -48,7 +49,7 @@ afterEach(() => {
 })
 
 describe('AnnouncementPopup accessibility', () => {
-  it('opens modally, focuses the acknowledgement, and dismisses with Escape without marking read', async () => {
+  it('opens modally, focuses the defer action, and dismisses with Escape without marking read', async () => {
     const { container, opener } = createAppRoot()
     const announcement = createAnnouncement('escape-one', '第一条公告')
     const { rerender } = render(<MemoryRouter><AnnouncementPopup announcements={[announcement]} /></MemoryRouter>, { container })
@@ -57,7 +58,7 @@ describe('AnnouncementPopup accessibility', () => {
     expect(HTMLDialogElement.prototype.showModal).toHaveBeenCalledOnce()
     expect(dialog).toHaveClass('backdrop:bg-black/55')
     expect(dialog).not.toHaveClass('backdrop:bg-ink-primary/45')
-    expect(screen.getByRole('button', { name: '已读' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: '稍后查看' })).toHaveFocus()
     expect(document.documentElement).toHaveStyle({ overflow: 'hidden' })
 
     const cancelEvent = new Event('cancel', { cancelable: true })
@@ -76,22 +77,77 @@ describe('AnnouncementPopup accessibility', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
-  it('marks announcements read, advances the queue, and restores focus after the last one', async () => {
+  it('acknowledges only one reminder and keeps the other announcements unread across remounts', async () => {
     const user = userEvent.setup()
     const { container, opener } = createAppRoot()
     const first = createAnnouncement('one', '第一条公告')
     const second = createAnnouncement('two', '第二条公告')
-    render(<MemoryRouter><AnnouncementPopup announcements={[first, second]} /></MemoryRouter>, { container })
+    const { rerender } = render(<MemoryRouter><AnnouncementPopup announcements={[first, second]} /></MemoryRouter>, { container })
 
     await user.click(await screen.findByRole('button', { name: '已读' }))
     expect(window.localStorage.getItem('maa-announcement-read:one')).toBe(first.updated_at)
-    expect(await screen.findByRole('heading', { name: '第二条公告' })).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: '已读' }))
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(window.localStorage.getItem('maa-announcement-read:two')).toBe(second.updated_at)
-    await waitFor(() => expect(apiVoidMock).toHaveBeenCalledTimes(4))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(window.localStorage.getItem('maa-announcement-read:two')).toBeNull()
+    await waitFor(() => expect(apiVoidMock).toHaveBeenCalledTimes(2))
     expect(opener).toHaveFocus()
+
+    rerender(<MemoryRouter><AnnouncementPopup key="remounted" announcements={[second]} /></MemoryRouter>)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('leaves ordinary and expired announcements in the inbox without opening a modal', () => {
+    const ordinary = createAnnouncement('ordinary', '普通公告')
+    delete ordinary.popup_until
+    const ended = { ...createAnnouncement('ended', '过期公告'), popup_until: new Date(Date.now() - 1000).toISOString() }
+    render(<MemoryRouter><AnnouncementPopup announcements={[ordinary, ended]} /></MemoryRouter>)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(HTMLDialogElement.prototype.showModal).not.toHaveBeenCalled()
+    expect(window.sessionStorage.getItem('maa-announcement-popup-shown')).toBeNull()
+  })
+
+  it('defers without marking read or reappearing when the user signs in', async () => {
+    const user = userEvent.setup()
+    const first = createAnnouncement('defer-first', '稍后查看公告')
+    const second = createAnnouncement('defer-second', '其他公告')
+    const { rerender } = render(<MemoryRouter><AnnouncementPopup announcements={[first, second]} /></MemoryRouter>)
+    await user.click(await screen.findByRole('button', { name: '稍后查看' }))
+    expect(window.localStorage.getItem('maa-announcement-read:defer-first')).toBeNull()
+    rerender(<MemoryRouter><AnnouncementPopup announcements={[first, second]} userId="signed-in-after-defer" /></MemoryRouter>)
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(apiJsonMock).not.toHaveBeenCalled()
+  })
+
+  it('skips an acknowledged leading reminder instead of replaying older unread announcements', () => {
+    const first = createAnnouncement('already-read', '已读公告')
+    const second = createAnnouncement('older-unread', '较早公告')
+    window.localStorage.setItem('maa-announcement-read:already-read', first.updated_at)
+    render(<MemoryRouter><AnnouncementPopup announcements={[first, second]} /></MemoryRouter>)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('closes at the reminder deadline without marking the announcement read', async () => {
+    const announcement = { ...createAnnouncement('expires-open', '即将到期公告'), popup_until: new Date(Date.now() + 1000).toISOString() }
+    const { container, opener } = createAppRoot()
+    render(<MemoryRouter><AnnouncementPopup announcements={[announcement]} /></MemoryRouter>, { container })
+    await screen.findByRole('dialog')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument(), { timeout: 2000 })
+    expect(window.localStorage.getItem('maa-announcement-read:expires-open')).toBeNull()
+    expect(opener).toHaveFocus()
+    expect(document.documentElement.style.overflow).toBe('')
+  })
+
+  it('shows acknowledgement errors in the modal and permits deferring after failure', async () => {
+    const user = userEvent.setup()
+    const announcement = createAnnouncement('read-failure', '标记失败公告')
+    apiJsonMock.mockResolvedValueOnce({ announcements: [{ announcement, read_at: null }], unread_count: 1 })
+      .mockRejectedValueOnce(new Error('连接中断'))
+    render(<MemoryRouter><AnnouncementPopup announcements={[announcement]} userId="read-failure-user" /></MemoryRouter>)
+    await user.click(await screen.findByRole('button', { name: '已读' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('连接中断')
+    expect(screen.getByRole('button', { name: '已读' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: '稍后查看' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(apiVoidMock.mock.calls.some(([, init]) => init.json.event === 'announcement_read')).toBe(false)
   })
 
   it('dismisses the popup when an announcement link navigates inside the app', async () => {
@@ -240,6 +296,7 @@ function createAnnouncement(id: string, title: string): Announcement {
     active: true,
     title,
     body: `${title}正文`,
+    popup_until: new Date(Date.now() + 86_400_000).toISOString(),
     created_at: '2026-07-10T00:00:00.000Z',
     updated_at: '2026-07-10T01:00:00.000Z',
   }

@@ -146,6 +146,7 @@ export interface Announcement {
   active: boolean;
   title: string;
   body: string;
+  popup_until?: string | null;
   created_at: string;
   updated_at: string;
 }

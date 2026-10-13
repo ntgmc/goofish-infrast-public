@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import AnnouncementBodyEditor from '../../../components/AnnouncementBodyEditor'
+import { copy } from '../../../copy'
 import type { Announcement, AnnouncementStats } from '../../../lib/types'
 import type { AnnouncementDraftStatus } from './announcement-draft'
 import {
@@ -26,7 +27,7 @@ interface AnnouncementSettingsSectionProps {
   onDiscardDraft: () => void
   onUpdateBanner: (patch: Partial<Pick<Announcement, 'active' | 'title' | 'body'>>) => void
   onAdd: () => string
-  onUpdate: (id: string, patch: Partial<Pick<Announcement, 'active' | 'title' | 'body'>>) => void
+  onUpdate: (id: string, patch: Partial<Pick<Announcement, 'active' | 'title' | 'body' | 'popup_until'>>) => void
   onDelete: (id: string) => void
   onReorder: (from: number, to: number) => void
 }
@@ -71,7 +72,7 @@ export default function AnnouncementSettingsSection({
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <AdminTabs label="公告管理任务" items={[{ id: 'announcements', label: '弹出式公告' }, { id: 'banner', label: '全局横幅' }]} value={view} onChange={setView} />
+      <AdminTabs label="公告管理任务" items={[{ id: 'announcements', label: '站内公告' }, { id: 'banner', label: '全局横幅' }]} value={view} onChange={setView} />
       <section hidden={view !== 'banner'} role="tabpanel" aria-label="全局横幅" className="tool-panel p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -91,13 +92,13 @@ export default function AnnouncementSettingsSection({
         <p className="mt-3 text-xs text-ink-muted">更新时间：{formatDate(banner.updated_at)}</p>
       </section>
 
-      <section hidden={view !== 'announcements'} role="tabpanel" aria-label="弹出式公告" className="tool-panel p-5 sm:p-6">
+      <section hidden={view !== 'announcements'} role="tabpanel" aria-label="站内公告" className="tool-panel p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-base font-semibold text-ink-primary">弹出式公告</h2>
-            <p className="mt-1 text-sm leading-6 text-ink-secondary">拖动手柄改变前台展示顺序；点选公告后在右侧编辑详细内容。</p>
+            <h2 className="text-base font-semibold text-ink-primary">站内公告</h2>
+            <p className="mt-1 text-sm leading-6 text-ink-secondary">发布后可在公告中心查看。设置提醒截止时间可在用户访问时提醒；每次访问最多提醒一条，按列表顺序优先展示。</p>
           </div>
-          <button type="button" onClick={addAnnouncement} className="tool-secondary-action px-3 text-sm">新增弹出式公告</button>
+          <button type="button" onClick={addAnnouncement} className="tool-secondary-action px-3 text-sm">新增公告</button>
         </div>
 
         <div className="mt-5">
@@ -111,13 +112,13 @@ export default function AnnouncementSettingsSection({
             selectedId={selectedId}
             onSelect={setSelectedId}
             onReorder={(from, to) => onReorder(from, to)}
-            ariaLabel="弹出式公告列表"
-            emptyLabel="还没有弹出式公告。新增后会自动保存为本机草稿，发布后生效。"
+            ariaLabel="站内公告列表"
+            emptyLabel="还没有站内公告。新增后会自动保存为本机草稿，发布后生效。"
             detail={selected ? (
               <article className="tool-inset p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="tool-status">弹出式公告</span>
+                    <span className="tool-status">站内公告</span>
                     <label className="tool-inset flex min-h-11 items-center gap-2 px-3 text-sm font-medium text-ink-secondary">
                       <input type="checkbox" checked={selected.active} onChange={(event) => onUpdate(selected.id, { active: event.currentTarget.checked })} className="h-4 w-4 accent-brand-600" />
                       启用
@@ -135,6 +136,11 @@ export default function AnnouncementSettingsSection({
                   <span className="mb-2 block text-sm font-medium text-ink-secondary">标题</span>
                   <input value={selected.title} maxLength={80} onChange={(event) => onUpdate(selected.id, { title: event.currentTarget.value })} className="tool-field" />
                 </label>
+                <label className="mt-4 block">
+                  <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.public.announcement_reminder_deadline}</span>
+                  <input type="datetime-local" value={localDateTime(selected.popup_until)} onChange={(event) => onUpdate(selected.id, { popup_until: event.currentTarget.value ? new Date(event.currentTarget.value).toISOString() : null })} className="tool-field" aria-describedby="announcement-reminder-help" />
+                </label>
+                <p id="announcement-reminder-help" className="mt-2 text-sm leading-6 text-ink-secondary">{copy.public.announcement_reminder_help}</p>
                 <AnnouncementBodyEditor id={`announcement-${selected.id}`} value={selected.body} onChange={(body) => onUpdate(selected.id, { body })} />
                 <p className="mt-3 text-xs text-ink-muted">更新时间：{formatDate(selected.updated_at)}</p>
               </article>
@@ -166,6 +172,13 @@ export default function AnnouncementSettingsSection({
       </div>
     </form>
   )
+}
+
+function localDateTime(value: string | null | undefined): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return ''
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
 }
 
 function draftStatusMessage(

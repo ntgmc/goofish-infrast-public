@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import type { UserAnnouncementRead } from '../../../lib/types'
 import { apiJson } from '../../../lib/api-client'
+import { getAnnouncementReminderState } from '../../../lib/announcement-reminders'
 import { formatDate } from '../tool-utils'
 import AnnouncementMarkdown from '../../../components/AnnouncementMarkdown'
 import { copy } from '../../../copy/index'
@@ -84,6 +85,7 @@ export default function AnnouncementsSection({ onUnreadCountChange, loadingFallb
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-lg font-semibold text-ink-primary">{announcement.title}</h2>
                 {!read_at && <span className="tool-status tool-status--current">{copy.dashboard.pages_tool_dashboard_AnnouncementsSection_008}</span>}
+                {getAnnouncementReminderState(announcement) === 'ended' && <span className="tool-status">{copy.public.announcement_reminder_ended}</span>}
               </div>
               <AnnouncementMarkdown className="mt-2">{announcement.body}</AnnouncementMarkdown>
               <p className="mt-3 text-xs text-ink-muted">{copy.dashboard.pages_tool_dashboard_AnnouncementsSection_009}{formatDate(announcement.updated_at)}</p>

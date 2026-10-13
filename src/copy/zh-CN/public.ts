@@ -20,9 +20,15 @@ export const publicCopy = {
   // src/components/AnnouncementPopup.tsx
   components_AnnouncementPopup_001: "站内公告",
   // src/components/AnnouncementPopup.tsx
-  components_AnnouncementPopup_002: "历史",
+  components_AnnouncementPopup_002: "公告中心",
   // src/components/AnnouncementPopup.tsx
   components_AnnouncementPopup_003: "已读",
+  announcement_popup_later: "稍后查看",
+  announcement_popup_marking: "正在标记…",
+  announcement_popup_read_failed: "未能标记已读，请重试，或稍后到公告中心查看。",
+  announcement_reminder_ended: "提醒已结束",
+  announcement_reminder_deadline: "访问提醒截止时间（可选）",
+  announcement_reminder_help: "需要用户及时关注时填写；留空则在公告中心查看。到期后停止自动提醒，公告内容仍保留。",
   // src/components/PublicFooter.tsx
   components_PublicFooter_001: "常见问题",
   // src/components/PublicFooter.tsx
@@ -108,7 +114,7 @@ export const publicCopy = {
   // src/pages/AnnouncementsPage.tsx
   pages_AnnouncementsPage_008: "横幅",
   // src/pages/AnnouncementsPage.tsx
-  pages_AnnouncementsPage_009: "弹出式公告",
+  pages_AnnouncementsPage_009: "站内公告",
   // src/pages/LandingPage.tsx
   pages_LandingPage_001: "导入干员数据",
   // src/pages/LandingPage.tsx

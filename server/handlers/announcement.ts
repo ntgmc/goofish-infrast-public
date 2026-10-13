@@ -287,6 +287,10 @@ export function validateAnnouncementList(
     const title = typeof item.title === 'string' ? item.title.trim() : ''
     const body = typeof item.body === 'string' ? item.body : ''
     const active = item.active === true
+    const popupUntil = normalizeIsoString(item.popup_until)
+    if (item.popup_until != null && !popupUntil) {
+      return { ok: false, message: `第 ${index + 1} 条公告提醒截止时间不正确。` }
+    }
 
     if (title.length > MAX_TITLE_LENGTH) {
       return { ok: false, message: `第 ${index + 1} 条公告标题不能超过 ${MAX_TITLE_LENGTH} 字。` }
@@ -304,7 +308,7 @@ export function validateAnnouncementList(
 
     const previous = currentById.get(id)
     const createdAt = normalizeIsoString(item.created_at) ?? previous?.created_at ?? now
-    const updatedAt = hasAnnouncementChanged(previous, { kind, active, title, body })
+    const updatedAt = hasAnnouncementChanged(previous, { kind, active, title, body, popup_until: popupUntil })
       ? new Date(Math.max(Date.parse(now), Date.parse(previous?.updated_at ?? '1970-01-01') + 1)).toISOString()
       : normalizeIsoString(item.updated_at) ?? previous?.updated_at ?? now
 
@@ -314,6 +318,7 @@ export function validateAnnouncementList(
       active,
       title,
       body,
+      ...(popupUntil ? { popup_until: popupUntil } : {}),
       created_at: createdAt,
       updated_at: updatedAt,
     })
@@ -324,13 +329,14 @@ export function validateAnnouncementList(
 
 function hasAnnouncementChanged(
   previous: Announcement | undefined,
-  next: Pick<Announcement, 'kind' | 'active' | 'title' | 'body'>,
+  next: Pick<Announcement, 'kind' | 'active' | 'title' | 'body' | 'popup_until'>,
 ): boolean {
   if (!previous) return true
   return previous.kind !== next.kind
     || previous.active !== next.active
     || previous.title !== next.title
     || previous.body !== next.body
+    || (previous.popup_until ?? null) !== (next.popup_until ?? null)
 }
 
 async function readAnnouncementDocument(): Promise<{ data: AnnouncementData; revision: number }> {
@@ -373,6 +379,7 @@ function normalizeAnnouncementItem(value: unknown): Announcement | null {
   const title = typeof value.title === 'string' ? value.title.trim() : ''
   const body = typeof value.body === 'string' ? value.body : ''
   const now = new Date().toISOString()
+  const popupUntil = kind === 'popup' ? normalizeIsoString(value.popup_until) : null
 
   return {
     id,
@@ -380,6 +387,7 @@ function normalizeAnnouncementItem(value: unknown): Announcement | null {
     active: value.active === true,
     title,
     body,
+    ...(popupUntil ? { popup_until: popupUntil } : {}),
     created_at: normalizeIsoString(value.created_at) ?? normalizeIsoString(value.updated_at) ?? now,
     updated_at: normalizeIsoString(value.updated_at) ?? now,
   }
