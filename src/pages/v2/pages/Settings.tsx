@@ -16,7 +16,7 @@ const labels = copy.dashboard
 
 export default function Settings({ session }: { session: V2Session }) {
   const { features } = useSiteFeatures()
-  const model = useAccountSettings({ profiles: session.profiles, onPayload: session.applyAuthPayload })
+  const model = useAccountSettings({ profiles: session.profiles, activeProfileId: session.activeProfile?.id, onPayload: session.applyAuthPayload })
   const [section, setSection] = useState('security')
   const sections = [
     { id: 'security', label: text.security, icon: LockKeyhole, hint: text.password_help },

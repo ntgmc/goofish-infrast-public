@@ -4,6 +4,7 @@ import { ArrowRight } from 'lucide-react'
 import { copy } from '../../../copy'
 import AnnouncementMarkdown from '../../../components/AnnouncementMarkdown'
 import { apiJson, getApiErrorMessage } from '../../../lib/api-client'
+import { getAnnouncementReminderState } from '../../../lib/announcement-reminders'
 import type { AnnouncementPageResponse } from '../../../lib/types'
 import { formatShanghaiDateTime } from '../../tool/tool-utils'
 import type { V2Session } from '../OptionsDrawer'
@@ -86,7 +87,7 @@ function AnnouncementFeed({ session }: { session: V2Session }) {
     setError(null)
     try {
       const result = await apiJson<AnnouncementPageResponse>(apiUrl, {
-        method: 'PATCH', json: id ? { announcement_id: id } : { all: true },
+        method: 'PATCH', json: id ? { announcement_id: id, updated_at: data?.announcements.find((item) => item.announcement.id === id)?.announcement.updated_at } : { all: true },
         fallbackMessage: text.pages_tool_dashboard_AnnouncementsSection_002,
       })
       if (version !== requestVersion.current) return
@@ -119,11 +120,12 @@ function AnnouncementFeed({ session }: { session: V2Session }) {
         <nav className="v2-inbox-index" aria-label={copy.v2.announcements}>
           {data.announcements.map(({ announcement, read_at }) => {
             const unread = signedIn && announcement.kind === 'popup' && !read_at
-            return <button key={announcement.id} disabled={busy} aria-pressed={selected?.announcement.id === announcement.id} data-unread={unread} onClick={() => openPage(data.page, announcement.id)}><time dateTime={announcement.updated_at}>{formatShanghaiDateTime(announcement.updated_at)}</time><strong>{announcement.title}</strong>{unread && <small>{text.pages_tool_dashboard_AnnouncementsSection_008}</small>}<ArrowRight size={16} aria-hidden="true" /></button>
+            return <button key={announcement.id} disabled={busy} aria-pressed={selected?.announcement.id === announcement.id} data-unread={unread} onClick={() => openPage(data.page, announcement.id)}><time dateTime={announcement.updated_at}>{formatShanghaiDateTime(announcement.updated_at)}</time><strong>{announcement.title}</strong>{unread && <small>{text.pages_tool_dashboard_AnnouncementsSection_008}</small>}{getAnnouncementReminderState(announcement) === 'ended' && <small>{copy.public.announcement_reminder_ended}</small>}<ArrowRight size={16} aria-hidden="true" /></button>
           })}
         </nav>
         {selected ? <article key={selected.announcement.id} className="v2-announcement-reading">
           <time dateTime={selected.announcement.updated_at}>{formatShanghaiDateTime(selected.announcement.updated_at)}</time><h2>{selected.announcement.title}</h2>
+          {getAnnouncementReminderState(selected.announcement) === 'ended' && <p className="v2-muted">{copy.public.announcement_reminder_ended}</p>}
           <Markdown>{selected.announcement.body}</Markdown>
           {signedIn && selected.announcement.kind === 'popup' && !selected.read_at && <button className="v2-button v2-button-primary" disabled={busy} onClick={() => void markRead(selected.announcement.id)}>{marking === selected.announcement.id ? text.pages_tool_dashboard_AnnouncementsSection_010 : text.pages_tool_dashboard_AnnouncementsSection_011}</button>}
         </article> : !loading && !error && <EmptyState title={announcementId ? copy.v2.announcementsNotFound : text.pages_tool_dashboard_AnnouncementsSection_007} />}

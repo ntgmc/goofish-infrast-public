@@ -32,6 +32,60 @@ it('preserves the draft after failure, submits the chosen category, and clears i
   expect(screen.getByLabelText(copy.feedback.message)).toHaveValue('')
 })
 
+it('opens the saved feedback, keeps a failed follow-up draft, and blocks dismissal while sending', async () => {
+  const id = '764b3769-09e4-4261-83b8-d23896419a8f'
+  const item = { id, category: 'schedule', message: '原始问题', has_image: true, status: 'resolved', result: '已修复，请重试', revision: 2, created_at: '2026-10-13T00:00:00Z', updated_at: '2026-10-13T00:00:00Z' }
+  let finish!: (value: unknown) => void
+  let attempt = 0
+  mocks.api.mockImplementation(async (url, init) => {
+    if (init?.method === 'PATCH') {
+      if (++attempt === 1) throw new Error('稍后重试')
+      return new Promise((resolve) => { finish = resolve })
+    }
+    if (url.includes('feedback_id=')) return { feedback: item, entries: [{ revision: 2, actor: 'admin', message: '请补充操作步骤', previous_status: 'open', status: 'resolved', created_at: item.updated_at }], next_before_revision: null }
+    return { items: [item], pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 } }
+  })
+  const user = userEvent.setup()
+  render(<FeedbackButton />)
+  await user.click(screen.getByRole('button', { name: copy.feedback.title }))
+  screen.getByRole('tab', { name: copy.feedback.newFeedback }).focus()
+  await user.keyboard('{ArrowRight}')
+  expect(screen.getByRole('tab', { name: copy.feedback.myFeedback })).toHaveAttribute('aria-selected', 'true')
+  await user.click(await screen.findByRole('button', { name: /原始问题/ }))
+  await screen.findByText(item.result)
+  const thumbnail = screen.getByRole('button', { name: copy.feedback.enlargeImage })
+  expect(screen.getByRole('img', { name: copy.feedback.imagePreview })).toHaveAttribute('src', `/api/user/feedback?image_id=${id}`)
+  await user.click(thumbnail)
+  expect(screen.getByRole('dialog', { name: copy.feedback.imagePreview })).toBeVisible()
+  await user.keyboard('{Escape}')
+  await waitFor(() => expect(thumbnail).toHaveFocus())
+  expect(screen.getByRole('dialog', { name: copy.feedback.title })).toBeVisible()
+  fireEvent.change(screen.getByLabelText(copy.feedback.reply), { target: { value: '问题仍然存在' } })
+  await user.click(screen.getByRole('button', { name: copy.feedback.sendReply }))
+  await screen.findByRole('alert')
+  expect(screen.getByLabelText(copy.feedback.reply)).toHaveValue('问题仍然存在')
+  await user.click(screen.getByRole('button', { name: copy.feedback.sendReply }))
+  await user.keyboard('{Escape}')
+  expect(screen.getByRole('dialog')).toBeVisible()
+  finish({ id })
+  await screen.findByText(copy.feedback.replySaved)
+  expect(screen.getByLabelText(copy.feedback.reply)).toHaveValue('')
+  const requests = mocks.api.mock.calls.filter((call) => call[1]?.method === 'PATCH')
+  expect(requests[0]![1].json.request_key).toBe(requests[1]![1].json.request_key)
+})
+
+it('opens the referenced report from a notification even when its sidebar trigger is hidden', async () => {
+  const id = '764b3769-09e4-4261-83b8-d23896419a8f'
+  mocks.api.mockImplementation(async (url) => url.includes('feedback_id=')
+    ? { feedback: { id, category: 'other', message: '通知中的反馈', status: 'processing', result: null, revision: 1, created_at: '2026-10-13T00:00:00Z' }, entries: [], next_before_revision: null }
+    : { items: [], pagination: { page: 1, page_size: 25, total: 0, total_pages: 0 } })
+  render(<div hidden><FeedbackButton /></div>)
+  const trigger = screen.getByRole('button', { name: copy.feedback.title, hidden: true })
+  fireEvent(trigger, new CustomEvent('goofish:open-feedback', { detail: id }))
+  expect(await screen.findByText('通知中的反馈')).toBeVisible()
+  expect(screen.getByRole('dialog')).toBeVisible()
+})
+
 it('focuses the category on opening, traps Tab inside the dialog, and restores the trigger on Escape', async () => {
   const user = userEvent.setup()
   render(<FeedbackButton iconOnly className="v2-help-link" />)

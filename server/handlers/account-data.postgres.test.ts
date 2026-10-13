@@ -1,10 +1,20 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import accountDataHandler from './account-data'
-import { closePool, query } from '../storage/postgres'
+import userProfilesHandler from './user-profiles'
+import { closePool, getPool, query } from '../storage/postgres'
 import { ensureDatabaseSchema } from '../storage/schema'
-import type { UserAccountRecord, UserGameAccountRecord, UserSessionRecord } from '../storage/user-store'
+import {
+  emptyWorkspace, getProfileById, getProfileWorkspace, listProfilesForUser, saveUserProfile,
+  saveUserProfileByAdmin, updateProfileWorkspaceAtomically,
+  type UserAccountRecord, type UserGameAccountRecord, type UserSessionRecord,
+} from '../storage/user-store'
+
+const config = { layout: '2-4-3', desc: 'saved', schedule_mode: 'maa', dormitory_rule: 'fixed',
+  trading_stations_count: 2, manufacturing_stations_count: 4,
+  product_requirements: { trading_stations: { LMD: 2 }, manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 2 } },
+} as const
 
 let container: StartedPostgreSqlContainer | undefined
 
@@ -98,6 +108,119 @@ describe('personal data export V4 PostgreSQL contract', () => {
     expect(body.coverage.account_deletion_email_outbox).toMatchObject({ disposition: 'exclude' })
   })
 })
+
+describe('account data concurrent mutations and complete exports', () => {
+  it('clears only credentials after an administrator freezes the profile', async () => {
+    const now = new Date()
+    const user = await seedUser('clear-race@example.test', now)
+    const profile = await seedProfile(user.id, now)
+    const token = await seedSession(user.id, now)
+    await saveUserProfile({ ...profile, skland_binding: binding(now) })
+    const response = await afterRead(
+      (text) => text.includes('coalesce(target.record_json'),
+      () => accountDataHandler(userRequest(token, 'data/credential/clear', { profile_id: profile.id })),
+      () => saveUserProfileByAdmin({ ...profile, skland_binding: binding(now), status: 'frozen', note: 'reviewed',
+        updated_at: new Date(now.getTime() + 1).toISOString() }, {
+        expectedUpdatedAt: profile.updated_at,
+        audit: { actorUsername: 'fixture-admin', action: 'profile.freeze', targetType: 'profile',
+          targetId: profile.id, reason: 'concurrency regression', requestId: randomUUID() },
+      }),
+    )
+    expect(response.status).toBe(200)
+    expect(await getProfileById(profile.id)).toMatchObject({ status: 'frozen', note: 'reviewed',
+      skland_binding: { uid: 'fixture-uid', encrypted_cred: '', credential_status: 'invalid' } })
+  })
+
+  it('preserves a workspace saved after rename observed a missing workspace', async () => {
+    const now = new Date()
+    const user = await seedUser('rename-race@example.test', now)
+    const profile = await seedProfile(user.id, now)
+    await saveUserProfile({ ...profile, authorization_source: 'admin_grant' })
+    const token = await seedSession(user.id, now)
+    const response = await afterRead(
+      (text) => text.includes('select record_json from user_profile_workspaces where profile_id'),
+      () => userProfilesHandler(userRequest(token, 'profiles', { profile_id: profile.id, display_name: 'renamed' }, 'PATCH')),
+      () => updateProfileWorkspaceAtomically(profile.id, () => ({ ...emptyWorkspace(profile.id), config })),
+    )
+    expect(response.status).toBe(200)
+    expect((await getProfileWorkspace(profile.id))?.config).toEqual(config)
+  })
+
+  it('exports every saved plan and the retained merged source workspace without credentials', async () => {
+    const now = new Date()
+    const user = await seedUser('complete-export@example.test', now)
+    const target = { ...await seedProfile(user.id, now), permission: 'advanced' as const,
+      authorization_source: 'admin_grant' as const, skland_binding: binding(now) }
+    const source = { ...await seedProfile(user.id, now), kind: 'free_preview' as const,
+      skland_binding: binding(now) }
+    await saveUserProfile(target)
+    await saveUserProfile(source)
+    await updateProfileWorkspaceAtomically(source.id, () => ({ ...emptyWorkspace(source.id), config,
+      operators: [{ id: 'source-operator', name: 'source', own: true, elite: 1, rarity: 5 }] }))
+    await updateProfileWorkspaceAtomically(target.id, () => ({ ...emptyWorkspace(target.id), config,
+      saved_configs: Array.from({ length: 4 }, (_, index) => ({ id: `plan-${index}`, name: `plan ${index}`, config,
+        created_at: now.toISOString(), updated_at: now.toISOString(), last_used_at: null })) }))
+    await query(`insert into profile_entitlement_balances (profile_id, entitlement_type, units, updated_at)
+      values ($1, 'plan_slots', 1, now())`, [target.id])
+    await listProfilesForUser(user.id)
+    expect((await getProfileById(source.id))?.merged_into_profile_id).toBe(target.id)
+    const token = await seedSession(user.id, now)
+    const response = await accountDataHandler(userRequest(token, 'data/export'))
+    const exported = await response.json()
+    expect(response.status).toBe(200)
+    expect(exported.profiles.map((item: { id: string }) => item.id)).toEqual(expect.arrayContaining([target.id, source.id]))
+    expect(exported.workspaces.find((item: { profile_id: string }) => item.profile_id === target.id).saved_configs).toHaveLength(4)
+    expect(exported.workspaces.find((item: { profile_id: string }) => item.profile_id === source.id).operators[0].id).toBe('source-operator')
+    expect(JSON.stringify(exported)).not.toContain('fixture-encrypted-credential')
+  })
+})
+
+function binding(now: Date) {
+  return { uid: 'fixture-uid', nickname: 'fixture', channel_name: 'official', bound_at: now.toISOString(),
+    last_imported_at: null, encrypted_cred: 'fixture-encrypted-credential', credential_status: 'available' as const }
+}
+
+function userRequest(token: string, path: string, body?: unknown, method = body ? 'POST' : 'GET') {
+  return new Request(`http://localhost/api/user/${path}`, { method,
+    headers: { Cookie: `maa_session=${token}`, 'Content-Type': 'application/json' },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  })
+}
+
+async function afterRead(
+  matches: (text: string) => boolean,
+  start: () => Promise<Response>,
+  concurrent: () => Promise<unknown>,
+): Promise<Response> {
+  const pool = getPool()
+  const original = pool.query.bind(pool)
+  let observed!: () => void
+  let release!: () => void
+  const read = new Promise<void>((resolve) => { observed = resolve })
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  let intercepted = false
+  const spy = vi.spyOn(pool, 'query').mockImplementation((async (statement: string | { text: string; values?: unknown[] }, values?: unknown[]) => {
+    const result = typeof statement === 'string' ? await original(statement, values) : await original(statement)
+    if (!intercepted && matches(typeof statement === 'string' ? statement : statement.text)) {
+      intercepted = true
+      observed()
+      await gate
+    }
+    return result
+  }) as typeof pool.query)
+  const operation = start()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([read, operation.then(() => { throw new Error('Request completed before the read barrier') }),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Read barrier timed out')), 10_000) })])
+    await concurrent()
+  } finally {
+    clearTimeout(timer)
+    spy.mockRestore()
+    release()
+  }
+  return operation
+}
 
 async function seedUser(email: string, now: Date): Promise<UserAccountRecord> {
   const timestamp = now.toISOString()

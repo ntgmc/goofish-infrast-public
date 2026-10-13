@@ -600,6 +600,37 @@ CREATE TABLE IF NOT EXISTS user_feedback (
 );
 CREATE INDEX IF NOT EXISTS idx_user_feedback_created ON user_feedback(created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_user_feedback_user ON user_feedback(user_id);
+ALTER TABLE user_feedback ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'processing', 'waiting_user', 'resolved', 'closed'));
+ALTER TABLE user_feedback ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0);
+ALTER TABLE user_feedback ADD COLUMN IF NOT EXISTS assignee TEXT;
+ALTER TABLE user_feedback ADD COLUMN IF NOT EXISTS result TEXT;
+ALTER TABLE user_feedback ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+ALTER TABLE user_feedback ADD COLUMN IF NOT EXISTS public_updated_at TIMESTAMPTZ;
+UPDATE user_feedback SET updated_at = created_at WHERE updated_at IS NULL;
+UPDATE user_feedback SET public_updated_at = created_at WHERE public_updated_at IS NULL;
+ALTER TABLE user_feedback ALTER COLUMN updated_at SET DEFAULT now();
+ALTER TABLE user_feedback ALTER COLUMN updated_at SET NOT NULL;
+ALTER TABLE user_feedback ALTER COLUMN public_updated_at SET DEFAULT now();
+ALTER TABLE user_feedback ALTER COLUMN public_updated_at SET NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_user_feedback_queue ON user_feedback(status, updated_at DESC, id DESC);
+CREATE TABLE IF NOT EXISTS user_feedback_entries (
+  feedback_id TEXT NOT NULL REFERENCES user_feedback(id) ON DELETE CASCADE,
+  revision INTEGER NOT NULL CHECK (revision > 0),
+  actor TEXT NOT NULL CHECK (actor IN ('user', 'admin')),
+  actor_id TEXT NOT NULL,
+  message TEXT CHECK (message IS NULL OR char_length(btrim(message)) BETWEEN 1 AND 2000),
+  internal_note TEXT CHECK (internal_note IS NULL OR char_length(btrim(internal_note)) BETWEEN 1 AND 2000),
+  previous_status TEXT NOT NULL CHECK (previous_status IN ('open', 'processing', 'waiting_user', 'resolved', 'closed')),
+  status TEXT NOT NULL CHECK (status IN ('open', 'processing', 'waiting_user', 'resolved', 'closed')),
+  previous_assignee TEXT,
+  assignee TEXT,
+  request_key TEXT NOT NULL,
+  request_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (feedback_id, revision),
+  UNIQUE (feedback_id, actor, actor_id, request_key),
+  CHECK (actor = 'admin' OR (internal_note IS NULL AND message IS NOT NULL))
+);
 
 CREATE TABLE IF NOT EXISTS user_balance_accounts (
   user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
@@ -1677,13 +1708,15 @@ CREATE TABLE IF NOT EXISTS user_notifications (
 );
 ALTER TABLE user_notifications DROP CONSTRAINT IF EXISTS user_notifications_type_check;
 ALTER TABLE user_notifications ADD CONSTRAINT user_notifications_type_check
-  CHECK (type = 'item_grant') NOT VALID;
+  CHECK (type IN ('item_grant', 'feedback_update')) NOT VALID;
 ALTER TABLE user_notifications DROP CONSTRAINT IF EXISTS user_notifications_action_kind_check;
 ALTER TABLE user_notifications ADD CONSTRAINT user_notifications_action_kind_check
-  CHECK (action_kind = 'inventory') NOT VALID;
+  CHECK (action_kind IN ('inventory', 'feedback')) NOT VALID;
 ALTER TABLE user_notifications DROP CONSTRAINT IF EXISTS user_notifications_payload_kind_check;
 ALTER TABLE user_notifications ADD CONSTRAINT user_notifications_payload_kind_check
-  CHECK (payload_json->>'kind' = type AND jsonb_typeof(payload_json->'items') = 'array') NOT VALID;
+  CHECK (payload_json->>'kind' = type AND
+    ((type = 'item_grant' AND jsonb_typeof(payload_json->'items') = 'array') OR
+     (type = 'feedback_update' AND jsonb_typeof(payload_json->'feedback_id') = 'string'))) NOT VALID;
 CREATE INDEX IF NOT EXISTS idx_user_notifications_user_updated
   ON user_notifications(user_id, updated_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_user_notifications_user_unread
@@ -2600,6 +2633,7 @@ const API_ONLY_RUNTIME_TABLES = new Set([
   'commercial_account_limits',
   'user_notifications',
   'user_feedback',
+  'user_feedback_entries',
   'inventory_admin_operations',
   'admin_operation_audit',
   'service_status_hourly',

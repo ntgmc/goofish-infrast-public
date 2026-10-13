@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { closePool, getPool, query, withTransaction } from './postgres'
@@ -25,6 +25,10 @@ import { adjustBalance, getBalanceSummary, reverseQualificationCredit } from './
 import { issueMeteredScheduleQuote } from './metered-billing-store'
 import { recordOperatorFingerprintInTransaction } from './cdk-store'
 import { SettingsConflictError } from './settings-conflict'
+import { grantItem } from './inventory-store'
+import { saveUserSession } from './user-store'
+import { getOptimizationJob, submitOptimizationJob } from '../optimization/jobs/job-status'
+import userResultsHandler from '../handlers/user-results'
 import {
   getLatestProfileOptimizationResult,
   insertProfileOptimizationResultInTransaction,
@@ -358,6 +362,35 @@ describe('PostgreSQL optimization job admission', () => {
     expect((await getPriorityCouponBalances(inviter))[0].available).toBe(1)
     expect((await getPriorityCouponBalances(invitee))[0].available).toBe(1)
     expect((await query<{ count: string }>('select count(*)::text as count from reward_grants where source_type = $1 and user_id = $2', ['invitation', inviter])).rows[0]?.count).toBe('1')
+  })
+
+  it.each(['absent', 'json_null', 'blank_uid', 'expired', 'archived', 'missing_cdk'])('rejects %s invitation activation through direct and worker paths', async (mode) => {
+    const inviterProfile = await seedProfile()
+    const inviter = (await query('select user_id from user_game_accounts where id = $1', [inviterProfile])).rows[0].user_id
+    const code = await ensureInvitationCode(inviter)
+    const inviteeProfile = await seedProfile()
+    const invitee = (await query('select user_id from user_game_accounts where id = $1', [inviteeProfile])).rows[0].user_id
+    if (mode !== 'absent') await bindProfileToSkland(inviteeProfile)
+    const patch = mode === 'json_null' ? { skland_binding: null } : mode === 'blank_uid' ? { skland_binding: { uid: ' ' } }
+      : mode === 'expired' ? { expires_at: '1970-01-01T00:00:00.000Z' } : {}
+    await query('update user_game_accounts set record_json = record_json || $2::jsonb where id = $1', [inviteeProfile, JSON.stringify(patch)])
+    if (mode === 'archived') await query('update user_game_accounts set archived_at = now() where id = $1', [inviteeProfile])
+    if (mode === 'missing_cdk') await query("update user_game_accounts set kind = 'cdk', cdk_key = 'missing' where id = $1", [inviteeProfile])
+    await saveTestInvitationSettings({ rewards: [{ recipient: 'inviter', item_code: 'priority_compute_coupon', quantity: 1,
+      expiry: { mode: 'never' }, gift_pack_version_id: null }] })
+    await query("insert into invitations (id, inviter_user_id, invitee_user_id, invitation_code, status, registered_at, updated_at) values ($1,$2,$3,$4,'registered',now(),now())",
+      [randomUUID(), inviter, invitee, code])
+    expect(await activateInvitationForUser(invitee)).toBe(false)
+    await processInvitationSettlementBatch(100)
+    expect((await query('select status from invitations where invitee_user_id = $1', [invitee])).rows[0].status).toBe('registered')
+    await query("update user_game_accounts set kind = 'free_preview', cdk_key = null, archived_at = null, record_json = record_json - 'expires_at' where id = $1", [inviteeProfile])
+    await bindProfileToSkland(inviteeProfile)
+    expect(await activateInvitationForUser(invitee)).toBe(true)
+    await query("update user_game_accounts set record_json = record_json || '{\"expires_at\":\"1970-01-01T00:00:00.000Z\"}'::jsonb where id = $1", [inviterProfile])
+    expect((await getInvitationSummary(inviter)).can_invite).toBe(false)
+    await expect(validateInvitationCode(code)).rejects.toMatchObject({ code: 'invalid_invite_code' })
+    await processInvitationSettlementBatch(100)
+    expect((await query('select settlement_json from invitations where invitee_user_id = $1', [invitee])).rows[0].settlement_json.rewards.inviter.status).toBe('inviter_ineligible')
   })
 
   it('rejects a stale invitation settings revision', async () => {
@@ -1363,6 +1396,99 @@ describe('PostgreSQL optimization job admission', () => {
       [admitted.job.id],
     )).rows[0]?.count).toBe('0')
     expect((await listProfileOptimizationResults(profileId, 'active')).items).toHaveLength(0)
+  })
+
+  it.each(['cdk', 'free_preview'] as const)('retains purchased diagnosis through %s completion, GET, replay and history', async (kind) => {
+    const store = createPostgresOptimizeJobStore()
+    const profileId = await seedProfile()
+    const userId = (await query('select user_id from user_game_accounts where id = $1', [profileId])).rows[0].user_id
+    const now = new Date().toISOString()
+    await query(`update user_accounts set record_json = record_json || $2::jsonb where id = $1`,
+      [userId, JSON.stringify({ status: 'active', permission: 'recommended', email: `${userId}@example.test`,
+        created_at: now, updated_at: now, email_verified_at: now })])
+    const profile = { version: 1, id: profileId, user_id: userId, kind, permission: 'recommended', status: 'active',
+      authorization_source: 'admin_grant', cdk_key: null, cdk_code_hash: null, cdk_order_hash: null,
+      display_name: 'diagnosis', note: '', created_at: now, updated_at: now }
+    await query(`update user_game_accounts set kind = $2, permission = 'recommended', record_json = $3::jsonb where id = $1`,
+      [profileId, kind, JSON.stringify(profile)])
+    await grantItem({ userId, itemCode: 'training_diagnosis_coupon', quantity: 1, expiry: { mode: 'never' },
+      sourceType: 'regression', sourceId: randomUUID(), recipientRole: 'user' })
+    const payload = { ...formalSchedulePayload(profileId), isPreviewProfile: kind === 'free_preview',
+      request: { include_upgrade_suggestions: true, upgrade_suggestions_allowed: true } }
+    const replayBody = JSON.stringify({ identity: { type: 'profile', profileId } })
+    const replayKey = randomUUID()
+    const admitted = await store.admitJob(input({ profile_id: profileId, owner_key: `profile:${profileId}`,
+      permission: 'recommended', priority: 2_000_000_000, source: kind === 'free_preview' ? 'free_preview' : 'account_profile',
+      payload_json: payload, reward_user_id: userId, reward_item_codes: ['training_diagnosis_coupon'],
+      idempotency_key: replayKey, request_hash: createHash('sha256').update(replayBody).digest('hex') }))
+    const claimed = await store.claimNextJob(`diagnosis-${randomUUID()}`, randomUUID(), new Date(Date.now() + 60_000).toISOString(), 100, 100)
+    expect(claimed?.id).toBe(admitted.job.id)
+    const result = { ...formalScheduleResult('diagnosis'), total_efficiency: 100,
+      raw_results: [{ total_efficiency: 100, assignment_detail: [] }],
+      upgrade_suggestions: [{ type: 'single' as const, name: 'Operator', current: 1, target: 2, gain: 1 }] }
+    expect(await store.completeAttempt(claimed!.id, claimed!.attempt_count, claimed!.worker_id!, claimed!.lock_token!, result)).toBe(true)
+    expect((await query('select status from reward_consumptions where optimization_job_id = $1', [claimed!.id])).rows[0].status).toBe('committed')
+    expect((await store.getJob(claimed!.id))?.result_json).toMatchObject({ upgrade_suggestions: result.upgrade_suggestions })
+    const token = randomUUID().replaceAll('-', '') + 'a'.repeat(11)
+    await saveUserSession({ version: 1, id: randomUUID(), user_id: userId,
+      token_hash: createHash('sha256').update(token).digest('hex'), created_at: now, last_seen_at: now,
+      expires_at: new Date(Date.now() + 60_000).toISOString() })
+    const headers = { Cookie: `maa_session=${token}` }
+    const read = await getOptimizationJob(new Request('http://localhost/api/optimization/jobs/' + claimed!.id, { headers }), claimed!.id)
+    const replay = await submitOptimizationJob(new Request('http://localhost/api/optimization/jobs', {
+      method: 'POST', headers: { ...headers, 'Idempotency-Key': replayKey }, body: replayBody }))
+    const history = await userResultsHandler(new Request(`http://localhost/api/user/results/${claimed!.id}?profile_id=${profileId}`, { headers }))
+    expect([read.status, replay.status, history.status]).toEqual([200, 202, 200])
+    for (const response of [read, replay, history]) {
+      const body = await response.json()
+      const projected = body.item?.result ?? body.job?.result ?? body.result
+      expect(projected.upgrade_suggestions).toHaveLength(1)
+      expect(projected.raw_results).toEqual([])
+      if (kind === 'cdk') expect(projected).not.toHaveProperty('total_efficiency')
+    }
+  })
+
+  it.each(['backoff', 'owner_busy'])('claims ready paid work when fairness candidates are ineligible (%s)', async (mode) => {
+    const store = createPostgresOptimizeJobStore()
+    const owner = `fairness-${randomUUID()}`
+    let busy: Awaited<ReturnType<typeof store.getJob>> = null
+    if (mode === 'owner_busy') {
+      const existing = await store.createJob(input({ owner_key: owner, priority: 2_000_000_000 }))
+      busy = await store.claimNextJob('fairness', randomUUID(), new Date(Date.now() + 60_000).toISOString(), 100, 100)
+      expect(busy?.id).toBe(existing.id)
+    }
+    const analysis = await store.createJob(input({ owner_key: owner, priority: 5, source: 'scenario_comparison' }))
+    if (mode === 'backoff') await query('update optimize_jobs set next_attempt_at = now() + interval \'1 minute\' where id = $1', [analysis.id])
+    const paid = await store.createJob(input({ priority: 2_000_000_000 }))
+    await query('update optimize_dispatch_state set prioritized_streak = 3 where id = true')
+    const next = await store.claimNextJob('fairness', randomUUID(), new Date(Date.now() + 60_000).toISOString(), 100, 100)
+    expect(next?.id).toBe(paid.id)
+    await store.requestCancel(analysis.id)
+    if (busy) {
+      await store.releaseInterruptedAttempt(busy.id, busy.attempt_count, busy.worker_id!, busy.lock_token!)
+      await store.requestCancel(busy.id)
+    }
+    await store.failAttempt(next!.id, next!.attempt_count, next!.worker_id!, next!.lock_token!, 'fixture complete')
+  })
+
+  it.each(['expired', 'interrupted', 'legacy_queued'])('settles cancellation and refunds reserved items during %s recovery', async (mode) => {
+    const store = createPostgresOptimizeJobStore()
+    const profileId = await seedProfile()
+    const userId = (await query('select user_id from user_game_accounts where id = $1', [profileId])).rows[0].user_id
+    await grantItem({ userId, itemCode: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' },
+      sourceType: 'cancel-regression', sourceId: randomUUID(), recipientRole: 'user' })
+    const admitted = await store.admitJob(input({ profile_id: profileId, priority: 2_000_000_000,
+      reward_user_id: userId, use_priority_coupon: true }))
+    const claimed = await store.claimNextJob('cancel-recovery', randomUUID(), new Date(Date.now() + 60_000).toISOString(), 100, 100)
+    expect(claimed?.id).toBe(admitted.job.id)
+    await store.requestCancel(claimed!.id)
+    if (mode === 'interrupted') await store.releaseInterruptedAttempt(claimed!.id, claimed!.attempt_count, claimed!.worker_id!, claimed!.lock_token!)
+    else {
+      if (mode === 'legacy_queued') await query("update optimize_jobs set status = 'queued' where id = $1", [claimed!.id])
+      await store.recoverExpiredAttempts(new Date(Date.now() + 61_000).toISOString(), 100)
+    }
+    await expect(store.getJob(claimed!.id)).resolves.toMatchObject({ status: 'cancelled', worker_id: null })
+    expect((await query('select status from reward_consumptions where optimization_job_id = $1', [claimed!.id])).rows[0].status).toBe('refunded')
   })
 
   it('commits and rolls back workspace and operator fingerprint updates together', async () => {

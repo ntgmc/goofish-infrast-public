@@ -6,10 +6,9 @@ import {
 import {
   getProfileForUser,
   getUserById,
-  listProfilesForUser,
+  listStoredProfilesForUser,
   listProfileWorkspaces,
-  saveUserProfile,
-  toPublicWorkspace,
+  clearProfileSklandCredential,
 } from '../storage/user-store'
 import { listOptimizationResultsForProfiles } from '../storage/optimization-result-store'
 import { query } from '../storage/postgres'
@@ -59,7 +58,7 @@ export default async function accountDataHandler(req: Request): Promise<Response
 }
 
 async function exportData(userId: string): Promise<Response> {
-  const profiles = await listProfilesForUser(userId)
+  const profiles = await listStoredProfilesForUser(userId)
   const profileIds = profiles.map((profile) => profile.id)
   const ownerKeys = profileIds.flatMap((profileId) => [`profile:${profileId}`, `reorder-job:${profileId}`])
   const [
@@ -249,7 +248,12 @@ async function exportData(userId: string): Promise<Response> {
     query(`select active_profile_limit, total_profile_limit, suspended_at, suspension_reason, updated_at
              from commercial_account_limits where user_id = $1`, [userId]),
     exportUserNotifications(userId),
-    query(`select id, category, message, image_type, encode(image_data, 'base64') as image_base64, created_at
+    query(`select id, category, message, image_type, encode(image_data, 'base64') as image_base64,
+                  status, result, created_at, public_updated_at as updated_at,
+                  coalesce((select jsonb_agg(jsonb_build_object('actor', entry.actor, 'message', entry.message,
+                    'previous_status', entry.previous_status, 'status', entry.status, 'created_at', entry.created_at)
+                    order by entry.revision) from user_feedback_entries entry where entry.feedback_id = user_feedback.id
+                    and (entry.message is not null or entry.status <> entry.previous_status)), '[]'::jsonb) as follow_up
              from user_feedback where user_id = $1 order by created_at asc, id asc`, [userId]),
   ])
 
@@ -279,7 +283,14 @@ async function exportData(userId: string): Promise<Response> {
     profiles: safeProfiles,
     workspaces: profileIds.map((profileId) => {
       const workspace = workspaceMap.get(profileId)
-      return workspace ? toPublicWorkspace(workspace) : null
+      return workspace ? {
+        ...workspace,
+        latest_result: null,
+        result_history: [],
+        archived_results: [],
+        result_history_next_cursor: null,
+        archived_results_next_cursor: null,
+      } : null
     }),
     optimization_results: profileIds.flatMap((profileId) => optimizationResultsByProfile.get(profileId) ?? []),
     legacy_workspace: legacyWorkspace.rows[0]?.record_json ?? null,
@@ -369,16 +380,9 @@ async function clearCredential(req: Request, userId: string): Promise<Response> 
   if (!profile?.skland_binding) {
     return jsonResponse({ error: '森空岛绑定不存在。', code: 'skland_binding_not_found' }, 404)
   }
-  await saveUserProfile({
-    ...profile,
-    skland_binding: {
-      ...profile.skland_binding,
-      encrypted_cred: '',
-      credential_status: 'invalid',
-      credential_invalid_at: new Date().toISOString(),
-    },
-    updated_at: new Date().toISOString(),
-  })
+  if (!await clearProfileSklandCredential(userId, profile.id)) {
+    return jsonResponse({ error: '森空岛绑定不存在。', code: 'skland_binding_not_found' }, 404)
+  }
   return jsonResponse({ ok: true })
 }
 

@@ -16,7 +16,6 @@ import {
   updateProfileWorkspaceInTransaction,
   deleteLifetimeVoucherPendingBinding,
   saveFreePreviewPendingClaim,
-  saveUserProfile,
   saveLifetimeVoucherPendingBinding,
   type FreePreviewClaimRecord,
   type FreePreviewPendingAccountSelectionRecord,
@@ -676,6 +675,7 @@ async function persistPreparedSklandImportInTransaction(
   profileId: string,
   cred: string,
   prepared: PreparedSklandImport,
+  confirmationId?: string,
 ): Promise<SklandImportSummary> {
   const locked = await client.query<{ record_json: UserGameAccountRecord }>(
     `select record_json from user_game_accounts
@@ -685,6 +685,7 @@ async function persistPreparedSklandImportInTransaction(
   )
   const profile = locked.rows[0]?.record_json
   if (!profile) throw new SklandHttpError('profile_not_found', '账号档案不存在。', 404)
+  if (confirmationId) assertCurrentConfirmation(profile.skland_pending_binding, confirmationId)
   if (profile.archived_at) throw new SklandProfileError('profile_archived', '归档档案不能更新森空岛绑定或工作区。', 409)
   if (profile.status !== 'active') throw new SklandHttpError('profile_unavailable', '账号档案状态不可用。', 409)
   if (profile.skland_binding?.uid && profile.skland_binding.uid !== prepared.binding.uid) {
@@ -788,6 +789,15 @@ async function recordSklandOperatorFingerprint(
   await recordOperatorFingerprint(cdkRecord, buildOperatorFingerprint(operators))
 }
 
+function assertCurrentConfirmation<T extends { stage?: string; confirmation_id: string; expires_at: string; uid?: string }>(
+  pending: T | null | undefined, confirmationId: string,
+): asserts pending is T & { uid: string } {
+  if (!pending || (pending.stage && pending.stage !== 'confirmation') || !pending.uid || pending.confirmation_id !== confirmationId
+    || !Number.isFinite(Date.parse(pending.expires_at)) || Date.now() > Date.parse(pending.expires_at)) {
+    throw new SklandHttpError('skland_pending_expired', '森空岛绑定确认已失效，请重新授权。', 400, 'rebind')
+  }
+}
+
 async function confirmProfileSklandBinding(input: {
   user: AuthPayloadUser
   profile: UserGameAccountRecord
@@ -843,9 +853,8 @@ async function confirmProfileSklandBinding(input: {
       )
       const current = locked.rows[0]?.record_json
       const currentPending = current?.skland_pending_binding
-      if (!current || !isSklandConfirmationPending(currentPending) || currentPending.confirmation_id !== input.confirmationId) {
-        throw new SklandHttpError('skland_confirm_invalid', '森空岛绑定确认已失效，请重新登录森空岛。', 400, 'rebind')
-      }
+      if (!current) throw new SklandHttpError('profile_not_found', '账号档案不存在。', 404)
+      assertCurrentConfirmation(currentPending, input.confirmationId)
       if (current.archived_at) {
         throw new SklandProfileError('profile_archived', '归档档案不能更新森空岛绑定或工作区。', 409)
       }
@@ -874,6 +883,7 @@ async function confirmProfileSklandBinding(input: {
         input.profile.id,
         cred,
         prepared,
+        input.confirmationId,
       )
       const response = { profile_id: input.profile.id, imported }
       await completeSklandConfirmationOperation(client, operationId, response, prepared.importedAt)
@@ -1007,6 +1017,11 @@ async function confirmLifetimeVoucherBinding(
       [operationId, user.id, idempotencyKey, requestHash, now],
     )
     if (!inserted.rowCount) throw new InventoryError('operation_in_progress', '终身版绑定正在处理中。', 409)
+    const lockedPending = await client.query<{ record_json: LifetimeVoucherPendingBindingRecord }>(
+      'select record_json from lifetime_voucher_pending_bindings where user_id = $1 and confirmation_id = $2 for update',
+      [user.id, confirmationId],
+    )
+    assertCurrentConfirmation(lockedPending.rows[0]?.record_json, confirmationId)
     const uidProfiles = await lockSklandUidProfilesInTransaction(client, imported.binding.uid)
     const foreign = uidProfiles.find((profile) => profile.user_id !== user.id)
     if (foreign) throw new InventoryError('skland_uid_owned', '该森空岛 UID 已绑定其他网站账号。', 409)
@@ -1456,7 +1471,7 @@ async function createPendingSklandBindingFromCred(
       created_at: createdAt,
       expires_at: expiresAt,
     }
-    await saveUserProfile({ ...profile, skland_pending_binding: pending, updated_at: createdAt })
+    await updateSklandProfile(profile, (current) => ({ ...current, skland_pending_binding: pending, updated_at: createdAt }))
     return accountSelectionResponse(
       confirmationId,
       accounts,
@@ -1489,18 +1504,18 @@ async function selectSklandAccount(
     return jsonResponse({ error: '森空岛账号选择已失效，请重新授权。' }, 400)
   }
   if (Date.now() > Date.parse(pending.expires_at)) {
-    await saveUserProfile({ ...profile, skland_pending_binding: null, updated_at: new Date().toISOString() })
+    await clearProfileSklandPendingBinding(user.id, profile.id, selectionId)
     return jsonResponse({ error: '森空岛账号选择已过期，请重新授权。' }, 400)
   }
   if (!pending.accounts.some((account) => account.uid === uid)) {
-    await saveUserProfile({ ...profile, skland_pending_binding: null, updated_at: new Date().toISOString() })
+    await clearProfileSklandPendingBinding(user.id, profile.id, selectionId)
     return jsonResponse({ error: '所选森空岛账号无效，请重新授权。' }, 400)
   }
 
   const cred = decryptSklandCredential(pending.encrypted_cred)
   const currentAccounts = await listSklandArknightsBindingsByCred(cred)
   if (!currentAccounts.some((account) => account.uid === uid)) {
-    await saveUserProfile({ ...profile, skland_pending_binding: null, updated_at: new Date().toISOString() })
+    await clearProfileSklandPendingBinding(user.id, profile.id, selectionId)
     return jsonResponse({ error: '所选账号已不在森空岛绑定列表中，请重新授权。' }, 400)
   }
 
@@ -1539,20 +1554,26 @@ async function createPendingSklandConfirmationFromCred(
   const confirmationId = pendingOptions?.confirmationId ?? randomUUID()
   const createdAt = pendingOptions?.createdAt ?? now.toISOString()
   const expiresAt = pendingOptions?.expiresAt ?? new Date(now.getTime() + PENDING_BINDING_TTL_MS).toISOString()
-  await saveUserProfile({
-    ...profile,
-    skland_pending_binding: {
-      stage: 'confirmation',
-      confirmation_id: confirmationId,
-      uid: imported.binding.uid,
-      nickname: imported.binding.nickname,
-      channel_name: imported.binding.channel_name,
-      encrypted_cred: encryptSklandCredential(cred),
-      operator_count: operatorsCheck.operators.length,
-      created_at: createdAt,
-      expires_at: expiresAt,
-    },
-    updated_at: now.toISOString(),
+  await updateSklandProfile(profile, (current) => {
+    if (profile.skland_pending_binding?.stage === 'account_selection'
+      && pendingOptions && current.skland_pending_binding?.confirmation_id !== pendingOptions.confirmationId) {
+      throw new SklandHttpError('skland_pending_expired', '森空岛账号选择已失效，请重新授权。', 400, 'rebind')
+    }
+    return {
+      ...current,
+      skland_pending_binding: {
+        stage: 'confirmation',
+        confirmation_id: confirmationId,
+        uid: imported.binding.uid,
+        nickname: imported.binding.nickname,
+        channel_name: imported.binding.channel_name,
+        encrypted_cred: encryptSklandCredential(cred),
+        operator_count: operatorsCheck.operators.length,
+        created_at: createdAt,
+        expires_at: expiresAt,
+      },
+      updated_at: now.toISOString(),
+    }
   })
 
   return jsonResponse({
@@ -1710,24 +1731,34 @@ async function buildPayloadWithImport(
   }
 }
 
+async function updateSklandProfile(
+  profile: UserGameAccountRecord,
+  update: (current: UserGameAccountRecord) => UserGameAccountRecord,
+): Promise<UserGameAccountRecord> {
+  return withTransaction(async (client) => {
+    const selected = await client.query<{ record_json: UserGameAccountRecord }>(
+      'select record_json from user_game_accounts where id = $1 and user_id = $2 for update',
+      [profile.id, profile.user_id],
+    )
+    const current = selected.rows[0]?.record_json
+    if (!current) throw new SklandHttpError('profile_not_found', '账号档案不存在。', 404)
+    const next = update(current)
+    if (next !== current) await saveProfileInTransaction(client, next)
+    return next
+  })
+}
+
 async function markSklandCredentialInvalid(
   profile: UserGameAccountRecord,
   reason: SklandCredentialInvalidReason,
 ): Promise<UserGameAccountRecord> {
   if (!profile.skland_binding) return profile
   const now = new Date().toISOString()
-  const nextProfile: UserGameAccountRecord = {
-    ...profile,
-    skland_binding: {
-      ...profile.skland_binding,
-      credential_status: 'invalid',
-      credential_invalid_at: now,
-      credential_invalid_reason: reason,
-    },
-    updated_at: now,
-  }
-  await saveUserProfile(nextProfile)
-  return nextProfile
+  return updateSklandProfile(profile, (current) => {
+    if (!current.skland_binding || current.skland_binding.encrypted_cred !== profile.skland_binding?.encrypted_cred) return current
+    return { ...current, skland_binding: { ...current.skland_binding,
+      credential_status: 'invalid', credential_invalid_at: now, credential_invalid_reason: reason }, updated_at: now }
+  })
 }
 
 function isSklandCredentialInvalid(error: unknown): boolean {

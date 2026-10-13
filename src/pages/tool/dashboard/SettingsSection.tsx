@@ -21,8 +21,9 @@ import { WorkspaceEntrySettings, type WorkspaceEntryState } from '../WorkspaceEn
 type FieldErrors = Record<string, string>
 
 
-export function useAccountSettings({ profiles, onPayload, onDeletionStateChange }: {
+export function useAccountSettings({ profiles, activeProfileId, onPayload, onDeletionStateChange }: {
   profiles: UserGameAccount[]
+  activeProfileId?: string | null
   onPayload: (payload: AuthSuccessResponse) => void
   onDeletionStateChange?: (state: 'idle' | 'submitting' | 'accepted') => void
 }) {
@@ -102,7 +103,7 @@ export function useAccountSettings({ profiles, onPayload, onDeletionStateChange 
       cleared = true
       setClearedCredentialIds((current) => new Set(current).add(profile.id))
       setPrivacyStatus(copy.dashboard.pages_tool_dashboard_SettingsSection_036)
-      const payload = await apiJson<AuthSuccessResponse>('/api/auth/me')
+      const payload = await apiJson<AuthSuccessResponse>(activeProfileId ? `/api/auth/me?profile_id=${encodeURIComponent(activeProfileId)}` : '/api/auth/me')
       onPayload(payload)
     }
     catch (caught) {
@@ -139,8 +140,9 @@ export function useAccountSettings({ profiles, onPayload, onDeletionStateChange 
     deletePassword, setDeletePassword, deletion, deletionError, requestDeletion }
 }
 
-export default function SettingsSection({ profiles, onLogout, onPayload, workspaceEntry, safetyOnly = false, onDeletionStateChange }: {
+export default function SettingsSection({ profiles, activeProfileId, onLogout, onPayload, workspaceEntry, safetyOnly = false, onDeletionStateChange }: {
   profiles: UserGameAccount[]
+  activeProfileId?: string | null
   onLogout: () => void
   onPayload: (payload: AuthSuccessResponse) => void
   workspaceEntry?: WorkspaceEntryState
@@ -152,7 +154,7 @@ export default function SettingsSection({ profiles, onLogout, onPayload, workspa
   const { oldPassword, setOldPassword, newPassword, setNewPassword, confirmPassword, setConfirmPassword,
     status, error, fieldErrors, loading, submit, clearFieldError, boundProfiles, clearedCredentialIds,
     privacyLoading, privacyError, privacyStatus, clearCredential, deleteEmail, setDeleteEmail,
-    deletePassword, setDeletePassword, deletion, deletionError, requestDeletion } = useAccountSettings({ profiles, onPayload, onDeletionStateChange })
+    deletePassword, setDeletePassword, deletion, deletionError, requestDeletion } = useAccountSettings({ profiles, activeProfileId, onPayload, onDeletionStateChange })
   const openSection = (id: string) => {
     const section = document.getElementById(id)
     section?.scrollIntoView({ block: 'start' })

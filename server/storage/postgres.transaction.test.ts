@@ -12,6 +12,7 @@ vi.mock('pg', () => ({
   Pool: class {
     connect = mocks.connect
     on = vi.fn()
+    end = vi.fn(async () => undefined)
   },
 }))
 
@@ -40,5 +41,17 @@ describe('PostgreSQL transaction replay policy', () => {
     expect(mocks.query).toHaveBeenNthCalledWith(1, 'begin')
     expect(mocks.query).toHaveBeenNthCalledWith(2, 'rollback')
     expect(mocks.release).toHaveBeenCalledOnce()
+    expect(mocks.release).toHaveBeenCalledWith(false)
+  })
+
+  it('discards the connection when rollback fails and preserves the operation error', async () => {
+    const failure = new Error('operation failed')
+    mocks.query.mockResolvedValueOnce({ rows: [] }).mockRejectedValueOnce(new Error('rollback timeout'))
+    const work = vi.fn(async () => { throw failure })
+
+    await expect(withTransaction(work)).rejects.toBe(failure)
+
+    expect(work).toHaveBeenCalledOnce()
+    expect(mocks.release).toHaveBeenCalledExactlyOnceWith(true)
   })
 })

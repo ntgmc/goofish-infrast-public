@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { createServer, type Server } from 'node:http'
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { nodeRequestToWebRequest, releaseWebRequestResources, writeWebResponse } from './http-adapter'
 import { RequestBodyTooLargeError } from './request-body-limits'
 import { routeRequest } from './routes'
@@ -13,12 +13,17 @@ export function createApiServer(): Server {
     maxHeaderSize: 16 * 1024,
     requireHostHeader: true,
     rejectNonStandardBodyWrites: true,
-  }, async (req, res) => {
+  })
+  const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
     const requestId = randomUUID()
     let request: Request | null = null
     try {
       const boundary = inspectIncomingRequest(req)
       if (!boundary.allowed) {
+        if (req.headers.expect) {
+          res.shouldKeepAlive = false
+          boundary.response.headers.set('Connection', 'close')
+        }
         await sendResponse(req, res, boundary.response, requestId)
         return
       }
@@ -72,7 +77,10 @@ export function createApiServer(): Server {
     } finally {
       if (request) releaseWebRequestResources(request)
     }
-  })
+  }
+  server.on('request', handleRequest)
+  server.on('checkContinue', handleRequest)
+  server.on('checkExpectation', handleRequest)
 
   server.headersTimeout = 10_000
   server.requestTimeout = 30_000

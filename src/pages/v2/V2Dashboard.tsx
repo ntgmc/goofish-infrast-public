@@ -72,6 +72,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const { hash } = useLocation()
   const navigate = useNavigate()
   const section = v2Section(params, hash)
+  const startDisabledReason = generationDisabledReason ?? (!features.profiles || !features.schedule_generation ? copy.features.schedule_read_only : null)
   const [navigationError, setNavigationError] = useState<string | null>(null)
   const [manualOpened, setManualOpened] = useState(false)
   const [manualDirty, setManualDirty] = useState(false)
@@ -135,7 +136,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
     if (busy || session.openingProfileId || ((manualDirty || toolDirty) && !window.confirm(text.discardManual))) return
     if (!await session.flushConfigSave()) { setNavigationError(text.saveFailed); return }
     try {
-      await session.refreshProfileWorkspace(profile)
+      if (!await session.refreshProfileWorkspace(profile)) return
       setManualDirty(false)
       setToolDirty(false)
       setPanel(null)
@@ -151,7 +152,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
     const next = keepCurrent ? { ...payload, active_profile: session.activeProfile, workspace: session.workspace } : payload
     session.applyAuthPayload(next)
     setPanel(null)
-    void navigate(v2Path('profiles', next.active_profile?.id))
+    void navigate(v2Path(section === 'generation' ? 'generation' : 'profiles', next.active_profile?.id))
   }
   async function logout() {
     if ((manualDirty || toolDirty) && !window.confirm(text.discardManual)) return
@@ -227,16 +228,20 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           {navigationError && <p className="v2-feedback v2-feedback-error" role="alert">{navigationError}<button type="button" onClick={() => { session.retryConfigSave(); setNavigationError(null) }}>{text.loginRetry}</button></p>}
           <AnnouncementBanner announcement={session.banner} />
           <V2PageTransition motionKey={section} className="v2-page-transition">{(displayedSection) => <>
-          <WorkspaceSections section={displayedSection} session={guardedSession} workflow={workflow} generationProgress={generationProgress} onAccountAdded={accountAdded} onToolDirtyChange={setToolDirty} onOpenProfile={(profile) => openProfile(profile, section === 'manual-tool' ? 'manual-tool' : 'overview')} onNavigate={navigateSection} onConfig={() => openPanel('config')} generationDisabledReason={generationDisabledReason} />
+          <WorkspaceSections section={displayedSection} session={guardedSession} workflow={workflow} generationProgress={generationProgress} onAccountAdded={accountAdded} onToolDirtyChange={setToolDirty} onOpenProfile={(profile) => openProfile(profile, section === 'manual-tool' ? 'manual-tool' : 'overview')} onNavigate={navigateSection} onConfig={() => openPanel('config')} onOperators={() => openPanel('operators')} generationDisabledReason={generationDisabledReason} />
           <div hidden={displayedSection !== 'overview'}>
-          <div className="v2-page-title"><h1>{text.title}</h1></div>
+          {sample ? <div className="v2-page-title v2-start-schedule">
+            <div><h1>{text.startTitle}</h1><p>{text.startDescription}</p></div>
+            <button type="button" className="v2-button v2-button-primary" disabled={busy || loadingResult || Boolean(startDisabledReason)} aria-describedby={startDisabledReason ? 'v2-start-unavailable' : undefined} onClick={() => navigateSection('generation')}><ArrowRight size={18} aria-hidden="true" />{text.generateMine}</button>
+            {startDisabledReason && <p id="v2-start-unavailable" role="status">{startDisabledReason}</p>}
+          </div> : <div className="v2-page-title"><h1>{text.title}</h1></div>}
           <InventoryDepletionWarning result={result} className="v2-inventory-warning" action={<button type="button" className="v2-button v2-button-secondary" onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" />{text.configure}</button>} />
-          <div className="v2-ready-banner">
+          <div className={`v2-ready-banner${sample ? ' v2-example-banner' : ''}`}>
             <div className="v2-ready-status"><span className="v2-ready-icon"><Check size={22} strokeWidth={2} aria-hidden="true" /></span>
-              <h2>{text.resultReady}<span className="v2-ready-tag">{sample ? text.sample : SCHEDULE_MODE_LABELS[resultMode]}</span></h2></div>
+              <h2>{sample ? text.exampleSchedule : text.resultReady}<span className="v2-ready-tag">{sample ? text.sample : SCHEDULE_MODE_LABELS[resultMode]}</span></h2></div>
             <div className="v2-banner-actions"><button type="button" className="v2-button v2-button-white v2-config-button" aria-label={text.configure} title={text.configure} onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" /><span>{text.configure}</span></button>
-              <button type="button" className="v2-button v2-button-primary" disabled={busy || loadingResult || Boolean(generationDisabledReason)} title={generationDisabledReason ?? undefined}
-                onClick={() => { if (onGenerate) onGenerate(); else openPanel('account') }}><RefreshCw size={16} className={busy ? 'v2-spin' : ''} />{busy ? text.generating : text.regenerate}</button>
+              {!sample && <button type="button" className="v2-button v2-button-primary" disabled={busy || loadingResult || Boolean(generationDisabledReason)} title={generationDisabledReason ?? undefined}
+                onClick={() => onGenerate?.()}><RefreshCw size={16} className={busy ? 'v2-spin' : ''} />{busy ? text.generating : text.regenerate}</button>}
               <button className="v2-button v2-button-secondary v2-export-button" type="button" disabled={busy || loadingResult}
                 onClick={() => setExportOpen(true)}><Download size={16} />{text.export}</button></div>
           </div>
@@ -331,7 +336,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
       {session.user && features.profiles && <ProfileExpiryPrompt userId={session.user.id} profiles={session.cdkProfiles} onOpenExport={(profile) => { void (async () => {
         if ((manualDirty || toolDirty) && !window.confirm(text.discardManual)) return
         if (!await session.flushConfigSave()) { setNavigationError(text.saveFailed); return }
-        if (profile.id !== session.activeProfile?.id) { try { await session.refreshProfileWorkspace(profile) } catch { return } }
+        if (profile.id !== session.activeProfile?.id) { try { if (!await session.refreshProfileWorkspace(profile)) return } catch { return } }
         void navigate(v2Path('plans', profile.id))
       })() }} />}
       {features.announcements && section !== 'announcements' && <AnnouncementPopup announcements={session.popups ?? []} userId={session.user?.id} onUnreadCountChange={session.setAnnouncementUnreadCount} announcementsPath={v2Path('announcements', session.activeProfile?.id)} />}

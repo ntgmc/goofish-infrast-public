@@ -156,13 +156,13 @@ const craftInfo = { items: {
   '30012': { name: '固源岩', sortId: 2 },
   '30011': { name: '源岩碎片', sortId: 3 },
 } }
-const craft = (baseCount) => training.calculateEliteTrainingCostForTest({
+const craft = (baseCount, cash = 999999) => training.calculateEliteTrainingCostForTest({
   target: { id: 'char_test_a', name: '测试干员A', currentElite: 0, targetElite: 1 },
   operators,
   calInfo: craftInfo,
   calPlayer: {
     items: [
-      { id: '4001', count: 999999 },
+      { id: '4001', count: cash },
       { id: '2004', count: 999999 },
       { id: '30012', count: 5 },
       { id: '30011', count: baseCount },
@@ -175,6 +175,10 @@ const craft = (baseCount) => training.calculateEliteTrainingCostForTest({
 const craftable = craft(3)
 if (craftable.missing.materials.length !== 0 || craftable.available?.materials.some((item) => item.id === '30013')) {
   throw new Error('reserve directly needed materials, then craft from remaining inventory without claiming crafted materials are stocked')
+}
+const processingCash = craft(3, craftable.totals.cash)
+if (processingCash.missing.cash !== 300 || processingCash.missing.materials.length !== 0 || processingCash.missing.equivalent_sanity <= 0) {
+  throw new Error('recursive crafting must share cash stock with promotion and include both processing fees')
 }
 const insufficient = craft(2)
 if (insufficient.missing.materials.length !== 1 || insufficient.missing.materials[0]?.id !== '30011' || insufficient.missing.materials[0]?.count !== 1) {

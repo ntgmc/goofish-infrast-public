@@ -6,7 +6,7 @@ import {
   isDepotValueProfile,
   listProfileWorkspaces,
   listProfilesForUser,
-  saveProfileWorkspace,
+  updateProfileWorkspaceAtomically,
   toPublicProfile,
   updateUserProfileMetadata,
 } from '../storage/user-store'
@@ -88,7 +88,7 @@ export default async (req: Request): Promise<Response> => {
       const updated = await updateUserProfileMetadata(auth.user.id, profile.id, metadataPatch)
       if (!updated) return jsonResponse({ error: '账号档案不存在。' }, 404)
       if (!isDepotValueProfile(updated) && !(await getProfileWorkspace(updated.id))) {
-        await saveProfileWorkspace(emptyWorkspace(updated.id))
+        await updateProfileWorkspaceAtomically(updated.id, (current) => current ?? emptyWorkspace(updated.id))
       }
       return jsonResponse(await buildAuthPayload(auth.user, updated.id))
     }

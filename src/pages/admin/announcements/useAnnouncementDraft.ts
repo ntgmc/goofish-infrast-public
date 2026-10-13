@@ -308,7 +308,7 @@ export function useAnnouncementDraft() {
     return draft.id
   }
 
-  const updateAnnouncement = (id: string, patch: Partial<Pick<Announcement, 'active' | 'title' | 'body'>>) => {
+  const updateAnnouncement = (id: string, patch: Partial<Pick<Announcement, 'active' | 'title' | 'body' | 'popup_until'>>) => {
     setAnnouncements((current) => {
       const next = current.map((item) => item.id === id ? { ...item, ...patch, kind: 'popup' as const } : item)
       announcementsRef.current = next

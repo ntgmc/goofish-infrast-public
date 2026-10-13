@@ -8,6 +8,12 @@ import {
 } from './announcement'
 
 describe('announcement validation', () => {
+  it('bounds Unicode summaries to 500 UTF-16 units without splitting a character', () => {
+    expect(normalizeAnnouncementSummary('😀'.repeat(250))).toBe('😀'.repeat(250))
+    expect(normalizeAnnouncementSummary('😀'.repeat(251))).toBe('😀'.repeat(250))
+    expect(normalizeAnnouncementSummary('a' + '😀'.repeat(250))).toBe('a' + '😀'.repeat(249))
+  })
+
   it('normalizes Markdown into a bounded plain-text notification summary', () => {
     const summary = normalizeAnnouncementSummary(`# 标题\n\n[详情](https://example.test) **加粗**\n${'文'.repeat(600)}`)
 
@@ -58,6 +64,39 @@ describe('announcement validation', () => {
     expect(result).toEqual(expect.objectContaining({ ok: true }))
     if (!result.ok) throw new Error(result.message)
     expect(result.announcements[0].body).toBe(body)
+  })
+
+  it('preserves reminder deadlines and versions enabling, extending and clearing a reminder', () => {
+    const current = createAnnouncement('reminder', 'popup', '2026-07-01T00:00:00.000Z')
+    const deadline = '2026-10-20T18:00:00.000Z'
+    const enabled = validateAnnouncementList([{ ...current, popup_until: deadline }], [current])
+    expect(enabled.ok).toBe(true)
+    if (!enabled.ok) throw new Error(enabled.message)
+    const saved = enabled.announcements[0]
+    expect(saved.popup_until).toBe(deadline)
+    expect(saved.updated_at).not.toBe(current.updated_at)
+    expect(normalizeAnnouncementData({ announcements: [saved] }).announcements[0]).toEqual(saved)
+    const unchanged = validateAnnouncementList([saved], [saved])
+    expect(unchanged.ok && unchanged.announcements[0].updated_at).toBe(saved.updated_at)
+    for (const popup_until of ['2026-10-21T18:00:00.000Z', null]) {
+      const changed = validateAnnouncementList([{ ...saved, popup_until }], [saved])
+      expect(changed.ok).toBe(true)
+      if (!changed.ok) throw new Error(changed.message)
+      expect(changed.announcements[0].updated_at).not.toBe(saved.updated_at)
+      expect(changed.announcements[0].popup_until ?? null).toBe(popup_until)
+    }
+  })
+
+  it.each(['', 'not-a-date', 42, true, {}])('rejects an invalid reminder deadline %s', (popup_until) => {
+    const result = validateAnnouncementList([{ ...createAnnouncement('invalid-reminder', 'popup', '2026-07-01T00:00:00.000Z'), popup_until }], [])
+    expect(result).toEqual({ ok: false, message: '第 1 条公告提醒截止时间不正确。' })
+  })
+
+  it('keeps legacy announcements published without implicitly enabling visit reminders', () => {
+    const input = createAnnouncement('legacy', 'popup', '2026-07-01T00:00:00.000Z')
+    expect(normalizeAnnouncementData({ announcements: [input] }).announcements).toEqual([input])
+    const result = validateAnnouncementList([input], [input])
+    expect(result.ok && result.announcements).toEqual([input])
   })
 
   it('rejects a banner inside the ordinary announcement list', () => {

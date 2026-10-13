@@ -14,7 +14,7 @@ export default function UsersSection({ model: c, active }: { model: AdminControl
       onFilters={(filters) => { c.setUserFilters(filters); c.setUserPage(1) }} onSearch={c.setUserSearchInput} onSelect={c.setSelectedUserIds} onPage={c.setUserPage}
       onPageSize={(size) => { c.setUserPageSize(size); c.setUserPage(1) }} onCopy={c.handleCopyUsers} onExport={c.handleExportUsers} onBulk={c.handleBulkUsers}
       onDetail={async (user) => { await c.loadUserDetail(user); requestAnimationFrame(() => detailHeading.current?.focus()) }} onFreeze={c.handleFreezeAppUser} onUnfreeze={c.handleUnfreezeAppUser} /></div>
-    {c.selectedUserDetail && <div ref={detailHeading} tabIndex={-1} className="space-y-5" aria-label="用户详情工作区">
+    {c.adminCapabilities.includes('sensitive_data_view') && c.selectedUserDetail && <div ref={detailHeading} tabIndex={-1} className="space-y-5" aria-label="用户详情工作区">
       <div className="admin-actions"><button type="button" className="tool-secondary-action" onClick={() => { c.setSelectedUserDetail(null); setResetOpen(false) }}>返回用户列表</button>
         {c.adminCapabilities.includes('user_manage') && <button type="button" className="tool-secondary-action" aria-expanded={resetOpen} onClick={() => { c.setResetUserEmail(c.selectedUserDetail!.user.email); setResetOpen(!resetOpen) }}>重置密码</button>}</div>
       {resetOpen && c.adminCapabilities.includes('user_manage') && <form onSubmit={c.handleResetUserPassword} noValidate className="tool-panel p-5">

@@ -181,7 +181,8 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
             onOpenProfile={(profile) => {
               const openedAt = Date.now()
               void refreshProfileWorkspace(profile)
-                .then(() => {
+                .then((loaded) => {
+                  if (!loaded) return
                   workspaceEntry.recordOpen(profile, openedAt)
                   return navigate(profileScopedPath(workspaceSetupPath('operators'), profile.id))
                 })
@@ -248,7 +249,7 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
         <Suspense fallback={<OptimizeShell section={route.section} profileId={activeProfile.id} profileLabel={activeProfile.display_name}
           permissionLabel={getProfileAccessLabel(activeProfile)} showScenarioLab={route.section === 'lab' && features.scenario_comparison}
           onSectionChange={navigateOptimize} onOpenTour={() => undefined} onReset={() => { void navigateAfterConfigSave(profileScopedPath(workspaceSetupPath('operators'), activeProfile.id)) }}
-          onLogout={handleLogout}><SectionLoader label={copy.common.pages_ToolPage_002} /></OptimizeShell>}>
+          flushConfigSave={flushConfigSave} onLogout={handleLogout}><SectionLoader label={copy.common.pages_ToolPage_002} /></OptimizeShell>}>
           <OptimizePage
             profileId={activeProfile.id}
             profile={activeProfile}

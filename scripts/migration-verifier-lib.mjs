@@ -28,7 +28,16 @@ export function validateMigrationExport(payload) {
       if (!primaryKey) throw new Error(`${storeName}[${index}] resolves to an empty primary key`)
       if (seen.has(primaryKey)) throw new Error(`${storeName} contains duplicate primary key ${primaryKey}`)
       seen.add(primaryKey)
-      const value = storeName === 'admin_users' ? { ...entry.value, username: primaryKey } : entry.value
+      let value = entry.value
+      if (storeName === 'admin_users') value = { ...value, username: primaryKey }
+      if (storeName === 'cdk_records') {
+        const profile = !value.cdk_type || value.cdk_type === 'profile'
+        const permission = profile && !['recommended', 'growth', 'advanced', 'ultimate'].includes(value.permission)
+          ? (value.permission === 'basic' ? 'growth' : value.permission === 'premium' ? 'advanced' : 'recommended')
+          : (value.permission ?? null)
+        const status = ['unused', 'claiming', 'used', 'frozen', 'revoked'].includes(value.status) ? value.status : 'revoked'
+        value = { ...value, permission, status }
+      }
       return { primaryKey, value }
     })
   }

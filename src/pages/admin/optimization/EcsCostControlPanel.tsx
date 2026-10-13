@@ -38,7 +38,7 @@ export default function EcsCostControlPanel({
         <span className="tool-status">{currentWorkerState}</span>
       </div>
 
-      <div className="mt-5 grid gap-4 md:grid-cols-3">
+      <fieldset disabled={saving} className="mt-5 grid gap-4 md:grid-cols-3">
         <label className="block text-sm text-ink-secondary">
           <span className="mb-2 block">{copy.status.pages_AdminEcsCost_059}</span>
           <input
@@ -69,7 +69,7 @@ export default function EcsCostControlPanel({
           <p className="font-semibold text-ink-primary">{copy.status.pages_AdminEcsCost_049}</p>
           <p className="mt-2 leading-6">{copy.status.pages_AdminEcsCost_050}</p>
         </div>
-      </div>
+      </fieldset>
 
       <div className="mt-5 grid gap-3 border-t border-surface-3 pt-4 sm:grid-cols-2 xl:grid-cols-4">
         <CostSummary label={copy.status.pages_AdminEcsCost_027} value={formatHours(estimate.observed_24h_worker_hours)} hint={formatCoverage(estimate.observed_24h_sample_hours)} />

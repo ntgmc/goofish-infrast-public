@@ -2,11 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import { adminUserFiltersSchema, DEFAULT_ADMIN_USER_FILTERS, type AdminUserFilters } from '../../../lib/admin-user-filters'
 import { requestAdminOperationReason } from '../../../lib/admin-operation-reason'
-import { EMPTY_PAGINATION, type AdminUserSummary, type AppUserSummary, type PaginationMeta } from '../contracts'
+import { EMPTY_PAGINATION, type AppUserSummary, type PaginationMeta } from '../contracts'
 import { downloadBlob, formatAdminProfileAccess, formatDownloadTimestamp } from '../shared/helpers'
 
 interface Options {
-  setAdminUsers: (users: AdminUserSummary[]) => void
   setBusyAction: (action: string | null) => void
   setError: (error: string | null) => void
   setNotice: (notice: string | null) => void
@@ -14,7 +13,7 @@ interface Options {
 }
 
 export function useAdminUserList(options: Options) {
-  const { setAdminUsers, setBusyAction, setError, setNotice, closeDetail } = options
+  const { setBusyAction, setError, setNotice, closeDetail } = options
   const [appUsers, setAppUsers] = useState<AppUserSummary[]>([])
   const [userSearchInput, setUserSearchInput] = useState('')
   const [userSearch, setUserSearch] = useState('')
@@ -48,16 +47,15 @@ export function useAdminUserList(options: Options) {
     setUsersLoading(true)
     try {
       const params = new URLSearchParams({ page: String(userPage), page_size: String(userPageSize), search: userSearch, ...filters.data })
-      const data = await adminApiJson<{ users?: AdminUserSummary[]; app_users?: AppUserSummary[]; pagination?: PaginationMeta }>(`/api/admin/users?${params}`, { signal, fallbackMessage: '加载账号失败' })
+      const data = await adminApiJson<{ app_users?: AppUserSummary[]; pagination?: PaginationMeta }>(`/api/admin/users?${params}`, { signal, fallbackMessage: '加载账号失败' })
       if (signal?.aborted) return
-      setAdminUsers(data.users ?? [])
       setAppUsers(data.app_users ?? [])
       setUserPagination(data.pagination ?? { ...EMPTY_PAGINATION, page_size: userPageSize })
       if (data.pagination && data.pagination.page !== userPage) setUserPage(data.pagination.page)
     } finally {
       if (!signal?.aborted) { setUsersLoading(false); setUsersLoaded(true) }
     }
-  }, [userPage, userPageSize, userSearch, userFilters, setAdminUsers])
+  }, [userPage, userPageSize, userSearch, userFilters])
 
   const handleCopyUsers = async (field: 'id' | 'email') => {
     if (!selectedUsers.length || usersLoading) return

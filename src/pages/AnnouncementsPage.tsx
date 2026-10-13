@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import type { Announcement, AnnouncementPublicResponse } from '../lib/types'
 import { apiJson } from '../lib/api-client'
+import { getAnnouncementReminderState } from '../lib/announcement-reminders'
 import AnnouncementMarkdown from '../components/AnnouncementMarkdown'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import { copy, CURRENT_LOCALE } from '../copy/index'
@@ -69,6 +70,7 @@ export default function AnnouncementsPage({ embedded = false }: { embedded?: boo
                 <span className="tool-status">
                   {copy.public.pages_AnnouncementsPage_009}
                 </span>
+                {getAnnouncementReminderState(announcement) === 'ended' && <span className="tool-status">{copy.public.announcement_reminder_ended}</span>}
                 <time className="text-xs text-ink-muted">{formatDate(announcement.updated_at)}</time>
               </div>
               <h2 className="mt-3 text-base font-semibold text-ink-primary">{announcement.title}</h2>

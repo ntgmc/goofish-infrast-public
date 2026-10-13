@@ -13,6 +13,7 @@ type PendingScheduleEffectRow = {
   result_json: unknown
   profile_id: string | null
   started_at: string | Date | null
+  finished_at: string | Date | null
   user_id: string | null
   profile_record: Record<string, unknown> | null
 }
@@ -20,7 +21,7 @@ type PendingScheduleEffectRow = {
 export async function processPendingOptimizationJobEffects(jobId?: string): Promise<number> {
   if (!hasDatabaseUrl()) return 0
   const pending = await query<PendingScheduleEffectRow>(
-    `select effect.job_id, effect.effect_type, job.payload_json, job.result_json, job.profile_id, job.started_at,
+    `select effect.job_id, effect.effect_type, job.payload_json, job.result_json, job.profile_id, job.started_at, job.finished_at,
             profile.user_id, profile.record_json as profile_record
      from optimization_job_effects effect
      join optimize_jobs job on job.id = effect.job_id
@@ -79,6 +80,7 @@ async function applyScheduleCompletionEffect(row: PendingScheduleEffectRow): Pro
     },
     {
       submittedAt: payload.submittedAt,
+      ...(row.finished_at && { finishedAt: new Date(row.finished_at).getTime() }),
       ...(row.started_at && { attemptStartedAt: Date.parse(String(row.started_at)) }),
     },
     row.job_id,

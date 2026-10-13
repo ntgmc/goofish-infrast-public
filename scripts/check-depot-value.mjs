@@ -504,6 +504,7 @@ function memorySklandClientModule() {
       if (encrypted !== 'bound-secret') throw new Error('unexpected encrypted credential')
       return 'decrypted-skland-cred'
     }
+    export class SklandClientError extends Error {}
     export class SklandClient {
       constructor(cred) {
         globalThis.__depotClientCred = cred

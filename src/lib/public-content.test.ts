@@ -6,6 +6,7 @@ import {
   normalizePublicContentSettings,
   parsePublicContentDraft,
   resolvePublicContentSettings,
+  PUBLIC_CONTENT_DEFAULTS_REVISION,
   PUBLIC_PRICING_PLAN_IDS,
 } from './public-content'
 
@@ -51,7 +52,7 @@ describe('public content settings', () => {
     delete roi.single_account_monthly
 
     const migrated = normalizePublicContentSettings(legacy)
-    expect(migrated.defaults_revision).toBe(10)
+    expect(migrated.defaults_revision).toBe(PUBLIC_CONTENT_DEFAULTS_REVISION)
     expect(migrated.pricing.comparison_rows.find((row) => row.feature === '基建预设')).toMatchObject({
       id: preset.id,
       free_preview: '支持右满252（经验多 / 赤金多）与满血252',
@@ -149,6 +150,54 @@ describe('public content settings', () => {
     })
   })
 
+  it.each(['configured', 'display-only', 'current'] as const)('upgrades stored 49-yuan lifetime pricing with %s price fields', (mode) => {
+    const stored = {
+      ...cloneDefaultPublicContentSettings(),
+      defaults_revision: 10,
+      updated_at: '2026-10-01T00:00:00.000Z',
+    }
+    stored.pricing.intro = '先了解完整权益与限制，再选择适合自己的版本。公开产品包含免费预览与 49 元单账号终身版。'
+    const plan = stored.pricing.plans.single_account_lifetime
+    plan.purchase_url = 'https://example.com/lifetime'
+    if (mode !== 'current') {
+      plan.display_price = '49 元 / 长期'
+      if (mode === 'configured') plan.original_price = '49 元 / 长期'
+      else {
+        Reflect.deleteProperty(plan, 'original_price')
+        Reflect.deleteProperty(plan, 'discount_fold')
+      }
+    }
+    stored.pricing.disclosures = [
+      '早期已按 49 元购买的终身卡继续保留原有长期权益；当前公开终身卡价格为 59 元。',
+      '管理员自定义提醒',
+    ]
+    const original = structuredClone(stored)
+
+    const migrated = normalizePublicContentSettings(stored)
+    expect(migrated.defaults_revision).toBe(PUBLIC_CONTENT_DEFAULTS_REVISION)
+    expect(migrated.pricing.intro).toBe(DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.intro)
+    expect(migrated.pricing.plans.single_account_lifetime).toMatchObject({
+      original_price: '59 元 / 长期',
+      display_price: '59 元 / 长期',
+      discount_fold: 10,
+      purchase_url: 'https://example.com/lifetime',
+    })
+    expect(migrated.pricing.disclosures).toEqual(['已购终身卡继续保留原有长期权益。', '管理员自定义提醒'])
+    expect(migrated.pricing.plans.single_account_monthly).toEqual(original.pricing.plans.single_account_monthly)
+    expect(migrated.updated_at).toBe(stored.updated_at)
+    expect(migrated.faq).toEqual(stored.faq)
+    expect(normalizePublicContentSettings(migrated)).toEqual(migrated)
+    expect(stored).toEqual(original)
+  })
+
+  it('preserves custom pricing copy and discounts during the lifetime price upgrade', () => {
+    const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 10 }
+    stored.pricing.intro = '管理员自定义介绍'
+    stored.pricing.plans.single_account_lifetime.discount_fold = 8
+    stored.pricing.plans.single_account_lifetime.display_price = '47.2 元 / 长期'
+    expect(normalizePublicContentSettings(stored).pricing).toEqual(stored.pricing)
+  })
+
   it('rejects unsafe links, invalid group numbers, duplicate ids, and unknown fields', () => {
     const unsafePurchase = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
     unsafePurchase.cdk_purchase.xianyu_url = 'javascript:alert(1)'
@@ -227,7 +276,7 @@ describe('public content settings', () => {
     delete (intermediate as unknown as { defaults_revision?: number }).defaults_revision
     intermediate.thanks.sections[1].entries[0].avatar_url = 'https://avatars.githubusercontent.com/u/74061867?v=4'
     expect(normalizePublicContentSettings(intermediate)).toMatchObject({
-      defaults_revision: 10,
+      defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION,
       thanks: {
         sections: expect.arrayContaining([
           expect.objectContaining({
@@ -247,7 +296,7 @@ describe('public content settings', () => {
     legacy.pricing.intro = '先了解完整权益与限制，再选择适合自己的版本。现在提供月卡、半年卡、年卡、终身卡，以及个人和商用积分单次排班。'
 
     expect(normalizePublicContentSettings(legacy)).toMatchObject({
-      defaults_revision: 10,
+      defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION,
       pricing: {
         eyebrow: 'Pricing',
         intro: '个人维护方案有 30 天、90 天、365 天和终身卡可选，每份方案绑定一个游戏 UID。',
@@ -316,7 +365,7 @@ describe('public content settings', () => {
     delete (legacy as unknown as { cdk_purchase?: unknown }).cdk_purchase
 
     const migrated = normalizePublicContentSettings(legacy)
-    expect(migrated.defaults_revision).toBe(10)
+    expect(migrated.defaults_revision).toBe(PUBLIC_CONTENT_DEFAULTS_REVISION)
     expect(migrated.qq_group.name).toBe('管理员自定义群名')
     expect(migrated.cdk_purchase.xianyu_url).toBe(DEFAULT_PUBLIC_CONTENT_DRAFT.cdk_purchase.xianyu_url)
 
@@ -347,7 +396,7 @@ describe('public content settings', () => {
 
     const migrated = normalizePublicContentSettings(stored)
     expect(migrated.faq).toEqual(DEFAULT_PUBLIC_CONTENT_DRAFT.faq)
-    expect(migrated.defaults_revision).toBe(10)
+    expect(migrated.defaults_revision).toBe(PUBLIC_CONTENT_DEFAULTS_REVISION)
     expect(migrated.updated_at).toBe(stored.updated_at)
     expect(migrated.qq_group).toEqual(stored.qq_group)
     expect(migrated.pricing).toEqual(stored.pricing)

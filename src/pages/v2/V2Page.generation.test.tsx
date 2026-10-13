@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { StrictMode } from 'react'
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
@@ -73,6 +74,35 @@ afterEach(() => {
   window.sessionStorage.clear()
   window.localStorage.removeItem('maatool-reduce-motion')
   vi.resetAllMocks()
+})
+
+it.each([false, true])('loads the saved schedule on entry without a retry (StrictMode: %s)', async (strict) => {
+  let restoreHistory!: (payload: { item: typeof previous & { config: typeof SAMPLE_CONFIG; result: typeof newResult } }) => void
+  const historyResponse = new Promise<Parameters<typeof restoreHistory>[0]>((resolve) => { restoreHistory = resolve })
+  vi.mocked(apiJson).mockImplementation(async (url) => {
+    if (url === '/api/auth/me') return auth
+    if (url.startsWith('/api/user/results/previous-result?')) return historyResponse
+    if (url.startsWith('/api/optimization/jobs?')) return { jobs: [], nextCursor: null }
+    if (url.startsWith('/api/user/status?')) return {}
+    if (url === '/api/user/inventory') return { stacks: [], capacities: [], recent_events: [] }
+    if (url === '/api/user/priority-coupon-balance') return { balances: [] }
+    throw new Error(`Unexpected API request: ${url}`)
+  })
+  const page = <MemoryRouter initialEntries={['/']}><MotionPreferenceProvider><V2Page /></MotionPreferenceProvider></MemoryRouter>
+  render(strict ? <StrictMode>{page}</StrictMode> : page)
+  await waitFor(() => expect(apiJson).toHaveBeenCalledWith(
+    '/api/user/results/previous-result?profile_id=profile-1', expect.anything(),
+  ))
+  expect(screen.getByText(copy.v2.loading)).toBeInTheDocument()
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  expect(screen.queryByText(copy.v2.sampleSource)).not.toBeInTheDocument()
+
+  await act(async () => restoreHistory({ item: { ...previous, config: SAMPLE_CONFIG, result: newResult } }))
+  expect(await screen.findByText(copy.v2.ownSource)).toBeInTheDocument()
+  expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('12,345')).toBeInTheDocument()
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  expect(vi.mocked(apiJson).mock.calls.filter(([url]) => url.startsWith('/api/user/results/previous-result?'))).toHaveLength(1)
+  expect(vi.mocked(apiJson).mock.calls.some(([_url, options]) => options?.method === 'POST')).toBe(false)
 })
 
 it('waits for login and saved-result detail, then retries a failed read without showing example data', async () => {

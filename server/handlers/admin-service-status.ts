@@ -58,7 +58,7 @@ export default async function adminServiceStatusHandler(req: Request): Promise<R
         incidents,
         cost: {
           config: costConfig,
-          estimate: calculateServiceStatusCostEstimate(costConfig, history.buckets),
+          estimate: calculateServiceStatusCostEstimate(costConfig, history.buckets, history.to),
           recommendation: recommendServiceStatusCostPlan(history.buckets, costConfig, snapshot.snapshot_at),
         },
       }

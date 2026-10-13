@@ -23,13 +23,15 @@ export function calculatePlannedDailyWorkerHours(config: ServiceStatusCostConfig
 export function calculateServiceStatusCostEstimate(
   config: ServiceStatusCostConfig,
   buckets: AdminServiceStatusHistoryBucket[],
+  to: string,
 ): ServiceStatusCostEstimate {
   const plannedDaily = calculatePlannedDailyWorkerHours(config)
   const residentPrice = Number.isFinite(config.resident_hourly_price_cny) ? config.resident_hourly_price_cny : null
   const burstPrice = Number.isFinite(config.hourly_price_cny) ? config.hourly_price_cny : null
   const pricesConfigured = residentPrice !== null && burstPrice !== null
-  const observed24 = observedWorkerHours(buckets, 24)
-  const observed30d = observedWorkerHours(buckets, HOURS_PER_MONTH)
+  const end = Date.parse(to)
+  const observed24 = observedWorkerHours(buckets, 24, end)
+  const observed30d = observedWorkerHours(buckets, HOURS_PER_MONTH, end)
   const observed24Cost = !pricesConfigured || observed24 === null ? null : observedCost(observed24, residentPrice, burstPrice)
   const observed30dCost = !pricesConfigured || observed30d === null ? null : observedCost(observed30d, residentPrice, burstPrice)
   const projectedMonthly = !pricesConfigured || observed24 === null || observed24.sampleHours === 0
@@ -114,10 +116,12 @@ export function recommendServiceStatusCostPlan(
   }
 }
 
-function observedWorkerHours(buckets: AdminServiceStatusHistoryBucket[], hours: number): { workerHours: number; sampleHours: number } | null {
-  const samples = buckets
-    .slice(-hours)
-    .filter((bucket) => bucket.sample_count > 0 && typeof bucket.average_worker_instances === 'number')
+function observedWorkerHours(buckets: AdminServiceStatusHistoryBucket[], hours: number, end: number): { workerHours: number; sampleHours: number } | null {
+  const start = end - hours * 60 * 60 * 1000
+  const samples = buckets.filter((bucket) => {
+    const timestamp = Date.parse(bucket.bucket_start)
+    return timestamp >= start && timestamp < end && bucket.sample_count > 0 && typeof bucket.average_worker_instances === 'number'
+  })
   if (samples.length === 0) return null
   return {
     workerHours: roundHours(samples.reduce((sum, bucket) => sum + (bucket.average_worker_instances ?? 0), 0)),

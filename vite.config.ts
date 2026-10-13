@@ -2,9 +2,18 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
+import { APP_BUILD_META } from "./src/lib/.generated/build-meta.ts";
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), localDevCacheResetPlugin()],
+  build: {
+    rolldownOptions: {
+      output: {
+        comments: { legal: true },
+        banner: (chunk) => chunk.isEntry ? `/*! APP_BUILD_META ${JSON.stringify(APP_BUILD_META).replaceAll("*/", "*\\/")} */` : "",
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

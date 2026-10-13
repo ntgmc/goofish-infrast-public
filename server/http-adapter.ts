@@ -75,6 +75,10 @@ function resolveIncomingProtocol(req: IncomingMessage): 'http' | 'https' {
 }
 
 export async function writeWebResponse(res: ServerResponse, response: Response): Promise<void> {
+  if (res.destroyed || res.closed || res.writableEnded) {
+    await response.body?.cancel('Client connection closed').catch(() => undefined)
+    return
+  }
   res.statusCode = response.status
   res.statusMessage = response.statusText
   response.headers.forEach((value, key) => {
@@ -96,7 +100,7 @@ export async function writeWebResponse(res: ServerResponse, response: Response):
   try {
     while (!closed) {
       const chunk = await reader.read()
-      if (chunk.done) break
+      if (chunk.done || closed) break
       if (!res.write(chunk.value) && !await waitForDrain(res)) {
         closed = true
         break
@@ -113,6 +117,7 @@ export async function writeWebResponse(res: ServerResponse, response: Response):
 }
 
 function waitForDrain(res: ServerResponse): Promise<boolean> {
+  if (res.destroyed || res.closed || res.writableEnded) return Promise.resolve(false)
   return new Promise((resolve, reject) => {
     const cleanup = () => {
       res.off('drain', onDrain)

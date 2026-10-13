@@ -13,7 +13,7 @@ import { MAX_DEPOT_ITEM_COUNT } from '../../src/lib/depot-value-constraints'
 import { getValidatedJsonValue } from '../security/request-validation'
 import { requireUserSession } from './user-auth'
 import { requireSiteFeatures } from '../feature-gate'
-import { convertSklandCharactersToOperators, decryptSklandCredential, SklandClient } from './skland-client'
+import { convertSklandCharactersToOperators, decryptSklandCredential, SklandClient, SklandClientError } from './skland-client'
 import {
   getExpItemSanity,
   getNetLmdSanity,
@@ -187,6 +187,14 @@ export default async (req: Request): Promise<Response> => {
     return jsonResponse({ error: '请指定 source 为 upload 或 skland。' }, 400)
   } catch (error) {
     console.error('depot value error:', error instanceof Error ? error.message : error)
+    if (error instanceof SklandClientError) {
+      const invalid = error.code === 'credential_invalid' || error.code === 'credential_format_invalid'
+      return jsonResponse({ error: error.message, code: invalid ? 'skland_credential_invalid' : 'skland_upstream_failed',
+        action: invalid ? 'rebind' : 'retry' }, invalid ? 400 : 503)
+    }
+    if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+      return jsonResponse({ error: '森空岛响应超时，请稍后重试。', code: 'skland_upstream_failed', action: 'retry' }, 503)
+    }
     const status = isHandlerError(error) ? error.status ?? 500 : 500
     const message = isHandlerError(error) ? error.message : 'Internal server error'
     return jsonResponse({ error: message, ...(isHandlerError(error) && error.code ? { code: error.code } : {}) }, status)

@@ -287,6 +287,9 @@ export async function revokeGrant(adminUsername: string, grantId: string, reason
     )
     const row = grant.rows[0]
     if (!row) throw new InventoryError('grant_missing', '发放批次不存在。', 404)
+    if (await hasReservedGrantConsumption(client, grantId)) {
+      throw new InventoryError('grant_reserved', '该批次仍有道具正在使用中，请待相关操作结束后撤回。', 409)
+    }
     const revoked = Number(row.remaining_quantity)
     if (revoked <= 0) throw new InventoryError('grant_consumed', '该批次没有可撤回的未消费数量。', 409)
     const now = new Date().toISOString()
@@ -564,6 +567,11 @@ async function grantCampaignBatch(campaignId: string, limit: number): Promise<nu
   return claimed.recipients.length
 }
 
+async function hasReservedGrantConsumption(client: PoolClient, grantId: string): Promise<boolean> {
+  const reserved = await client.query("select 1 from reward_consumptions where grant_id = $1 and status = 'reserved' limit 1", [grantId])
+  return Boolean(reserved.rowCount)
+}
+
 async function reverseCampaignBatch(campaignId: string, limit: number): Promise<number> {
   return withTransaction(async (client) => {
     const recipients = await client.query<{ user_id: string; grant_id: string }>(
@@ -575,6 +583,7 @@ async function reverseCampaignBatch(campaignId: string, limit: number): Promise<
     const now = new Date().toISOString()
     for (const recipient of recipients.rows) {
       const grant = await client.query<{ remaining_quantity: number; reward_type: string }>('select remaining_quantity, reward_type from reward_grants where id = $1 for update', [recipient.grant_id])
+      if (await hasReservedGrantConsumption(client, recipient.grant_id)) continue
       const remaining = Number(grant.rows[0]?.remaining_quantity ?? 0)
       if (remaining > 0) {
         await client.query('update reward_grants set remaining_quantity = 0, revoked_quantity = revoked_quantity + $2 where id = $1', [recipient.grant_id, remaining])

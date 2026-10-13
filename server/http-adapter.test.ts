@@ -32,6 +32,44 @@ describe('Node HTTP adapter', () => {
     expect(arrayBufferSpy).not.toHaveBeenCalled()
   })
 
+  it('cancels a late response after the client has already disconnected', async () => {
+    let resolveClosed!: () => void
+    const closed = new Promise<void>((resolve) => { resolveClosed = resolve })
+    let resolveCreated!: () => void
+    const created = new Promise<void>((resolve) => { resolveCreated = resolve })
+    let response!: import('node:http').ServerResponse
+    const server = createServer((_request, res) => {
+      response = res
+      res.once('close', resolveClosed)
+      resolveCreated()
+    })
+    servers.push(server)
+    const port = await listen(server)
+    const request = httpGet(`http://127.0.0.1:${port}/late`)
+    request.on('error', () => undefined)
+    await created
+    request.destroy()
+    await closed
+    const cancel = vi.fn()
+    const webResponse = new Response(new ReadableStream({ cancel }))
+
+    await writeWebResponse(response, webResponse)
+
+    expect(cancel).toHaveBeenCalledOnce()
+    expect(response.listenerCount('drain')).toBe(0)
+  })
+
+  it('finishes a large response through backpressure', async () => {
+    const body = 'x'.repeat(256 * 1024)
+    const server = createServer(async (_request, response) => {
+      await writeWebResponse(response, new Response(body))
+    })
+    servers.push(server)
+    const port = await listen(server)
+    const response = await fetch(`http://127.0.0.1:${port}/large`)
+    await expect(response.text()).resolves.toBe(body)
+  })
+
   it('aborts the Web request when the client connection closes', async () => {
     let resolveCreated!: () => void
     const created = new Promise<void>((resolve) => { resolveCreated = resolve })

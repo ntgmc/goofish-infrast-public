@@ -44,6 +44,18 @@ describe('admin service status handler', () => {
     mocks.saveCost.mockResolvedValue({ component_id: 'optimization', billing_model: 'ecs_payg', currency: 'CNY', resident_hourly_price_cny: 0.2, hourly_price_cny: 0.8, timezone: 'Asia/Shanghai', schedule_enabled: true, valley_worker_instances: 1, peak_windows: [{ start: '09:00', end: '18:00', worker_instances: 3 }], updated_at: '2026-08-08T10:00:00.000Z' })
   })
 
+  it('anchors sparse cost observations to the returned history endpoint', async () => {
+    mocks.getCost.mockResolvedValue({ ...await mocks.getCost(), resident_hourly_price_cny: 0.2, hourly_price_cny: 0.5 })
+    mocks.getHistory.mockResolvedValue({ from: '2026-07-09T00:00:00.000Z', to: '2026-08-08T00:00:00.000Z', buckets: [
+      { bucket_start: '2026-08-06T00:00:00.000Z', sample_count: 12, average_worker_instances: 3 },
+      { bucket_start: '2026-08-07T23:00:00.000Z', sample_count: 12, average_worker_instances: 1 },
+    ] })
+    const response = await adminServiceStatusHandler(new Request('http://localhost/api/admin/service-status?view=history'))
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ cost: { estimate: { observed_24h_worker_hours: 1, observed_24h_sample_hours: 1,
+      observed_24h_cost_cny: 0.7, projected_monthly_cost_cny: 504, observed_30d_worker_hours: 4 } } })
+  })
+
   it('requires an authenticated viewer for history', async () => {
     mocks.authenticate.mockResolvedValue({ ok: false, response: new Response(JSON.stringify({ error: '登录' }), { status: 401 }) })
     const response = await adminServiceStatusHandler(new Request('http://localhost/api/admin/service-status?view=history'))

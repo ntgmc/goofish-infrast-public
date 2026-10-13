@@ -763,12 +763,16 @@ export async function updateUserPasswordAtomically(
 }
 
 export async function listProfilesForUser(userId: string): Promise<UserGameAccountRecord[]> {
+  return mergeDuplicateSklandProfiles(userId, await listStoredProfilesForUser(userId))
+}
+
+export async function listStoredProfilesForUser(userId: string): Promise<UserGameAccountRecord[]> {
   await ensureSchema()
   const result = await query<{ record_json: UserGameAccountRecord }>(
     'select record_json from user_game_accounts where user_id = $1 order by created_at asc',
     [userId],
   )
-  return mergeDuplicateSklandProfiles(userId, result.rows.map((row) => row.record_json))
+  return result.rows.map((row) => row.record_json)
 }
 
 export async function getProfileById(profileId: string): Promise<UserGameAccountRecord | null> {
@@ -796,6 +800,22 @@ export async function getProfileForUser(userId: string, profileId: string): Prom
 export async function saveUserProfile(profile: UserGameAccountRecord): Promise<void> {
   await ensureSchema()
   await saveUserProfileWithClient({ query }, profile)
+}
+
+export async function clearProfileSklandCredential(userId: string, profileId: string): Promise<boolean> {
+  await ensureSchema()
+  const updatedAt = new Date().toISOString()
+  const result = await query(
+    `update user_game_accounts
+        set record_json = jsonb_set(record_json, '{skland_binding}',
+              (record_json->'skland_binding') || $4::jsonb)
+              || jsonb_build_object('updated_at', $3::text),
+            updated_at = $3::timestamptz
+      where id = $1 and user_id = $2
+        and jsonb_typeof(record_json->'skland_binding') = 'object'`,
+    [profileId, userId, updatedAt, JSON.stringify({ encrypted_cred: '', credential_status: 'invalid', credential_invalid_at: updatedAt })],
+  )
+  return result.rowCount === 1
 }
 
 export class AdminProfileMutationConflictError extends Error {
@@ -1603,7 +1623,8 @@ export async function markAnnouncementsRead(
      on conflict (user_id, announcement_id) do update set
        announcement_version = excluded.announcement_version,
        read_at = excluded.read_at
-     where user_announcement_reads.announcement_version is distinct from excluded.announcement_version`,
+     where user_announcement_reads.announcement_version is null
+        or user_announcement_reads.announcement_version < excluded.announcement_version`,
     [userId, announcements.map((item) => item.id), announcements.map((item) => item.updated_at), readAt],
     )
     return result.rowCount ?? 0

@@ -88,7 +88,7 @@ describe('service status rules', () => {
   it('calculates ECS instance hours from a peak and valley schedule', () => {
     const config = { ...createDefaultServiceStatusCostConfig(), schedule_enabled: true, valley_worker_instances: 1, peak_windows: [{ start: '09:00', end: '18:00', worker_instances: 3 }] }
     expect(calculatePlannedDailyWorkerHours(config)).toBe(42)
-    expect(calculateServiceStatusCostEstimate({ ...config, resident_hourly_price_cny: 0.2, hourly_price_cny: 0.5 }, []).estimated_monthly_cost_cny).toBe(774)
+    expect(calculateServiceStatusCostEstimate({ ...config, resident_hourly_price_cny: 0.2, hourly_price_cny: 0.5 }, [], '2026-08-02T00:00:00.000Z').estimated_monthly_cost_cny).toBe(774)
   })
 
   it('keeps observed cost windows bounded when recent hourly samples are sparse', () => {
@@ -111,10 +111,19 @@ describe('service status rules', () => {
       peak_worker_instances: null,
       unavailable_samples: 0,
     }))
-    const estimate = calculateServiceStatusCostEstimate(config, buckets)
-    expect(estimate.observed_24h_worker_hours).toBe(1)
-    expect(estimate.observed_24h_sample_hours).toBe(1)
-    expect(estimate.observed_24h_cost_cny).toBe(0.7)
+    const to = '2026-08-02T02:00:00.000Z'
+    for (const history of [buckets, buckets.filter((bucket) => bucket.sample_count > 0).reverse()]) {
+      const estimate = calculateServiceStatusCostEstimate(config, history, to)
+      expect(estimate).toMatchObject({ observed_24h_worker_hours: 1, observed_24h_sample_hours: 1, observed_24h_cost_cny: 0.7,
+        observed_30d_worker_hours: 2, observed_30d_sample_hours: 2, projected_monthly_cost_cny: 504 })
+    }
+    expect(calculateServiceStatusCostEstimate(config, [buckets[0]!], to)).toMatchObject({
+      observed_24h_worker_hours: null, observed_24h_sample_hours: 0, observed_24h_cost_cny: null, projected_monthly_cost_cny: null,
+    })
+    const end = Date.parse(to)
+    const boundary = [721, 720, 25, 24, 0, -1].map((hours) => ({ ...buckets[0]!, bucket_start: new Date(end - hours * 3600000).toISOString() }))
+    expect(calculateServiceStatusCostEstimate(config, boundary, to)).toMatchObject({ observed_24h_worker_hours: 1, observed_24h_sample_hours: 1,
+      observed_30d_worker_hours: 3, observed_30d_sample_hours: 3 })
   })
 
   it('uses separate resident and burst prices and compares savings with both machines always running', () => {
@@ -138,7 +147,7 @@ describe('service status rules', () => {
       unavailable_samples: 0,
     }))
 
-    const estimate = calculateServiceStatusCostEstimate(config, buckets)
+    const estimate = calculateServiceStatusCostEstimate(config, buckets, '2026-08-02T00:00:00.000Z')
     expect(estimate).toMatchObject({
       observed_24h_worker_hours: 6,
       observed_24h_cost_cny: 9.6,

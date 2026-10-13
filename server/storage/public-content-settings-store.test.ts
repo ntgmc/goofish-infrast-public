@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_PUBLIC_CONTENT_DRAFT, cloneDefaultPublicContentSettings } from '../../src/lib/public-content'
+import { DEFAULT_PUBLIC_CONTENT_DRAFT, PUBLIC_CONTENT_DEFAULTS_REVISION, cloneDefaultPublicContentSettings } from '../../src/lib/public-content'
 
 const queryMock = vi.hoisted(() => vi.fn())
 const ensureDatabaseSchema = vi.hoisted(() => vi.fn())
@@ -35,7 +35,7 @@ describe('public content settings store', () => {
     const settings = await getPublicContentSettings()
     expect(settings).toMatchObject({
       version: 1,
-      defaults_revision: 10,
+      defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION,
       revision: 0,
       updated_at: null,
       cdk_purchase: { xianyu_url: DEFAULT_PUBLIC_CONTENT_DRAFT.cdk_purchase.xianyu_url },
@@ -91,7 +91,7 @@ describe('public content settings store', () => {
 
     const settings = await getPublicContentSettings()
 
-    expect(settings.defaults_revision).toBe(10)
+    expect(settings.defaults_revision).toBe(PUBLIC_CONTENT_DEFAULTS_REVISION)
     expect(settings.revision).toBe(7)
     expect(settings.cdk_purchase.xianyu_url).toBe(DEFAULT_PUBLIC_CONTENT_DRAFT.cdk_purchase.xianyu_url)
     expect(settings.qq_group.name).toBe('管理员自定义群名')

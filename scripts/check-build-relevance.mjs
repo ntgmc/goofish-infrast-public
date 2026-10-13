@@ -23,7 +23,7 @@ if (!baseRef || !headRef) {
   continueBuild('missing CACHED_COMMIT_REF or COMMIT_REF; unknown refs should build')
 }
 
-const diff = spawnSync('git', ['diff', '--name-only', '--diff-filter=ACMRTUXB', baseRef, headRef, '--'], {
+const diff = spawnSync('git', ['diff', '--name-only', baseRef, headRef, '--'], {
   encoding: 'utf8',
 })
 
@@ -42,14 +42,14 @@ if (changedFiles.length === 0) {
 
 const meaningfulChanges = changedFiles
 
-if (isDocumentationOnly(meaningfulChanges)) {
-  skipBuild(`documentation-only changes: ${meaningfulChanges.join(', ')}`, true)
-}
-
 const relevant = meaningfulChanges.filter(isBuildRelevant)
 
 if (relevant.length > 0) {
   continueBuild(`build-relevant files changed: ${relevant.join(', ')}`)
+}
+
+if (isDocumentationOnly(meaningfulChanges)) {
+  skipBuild(`documentation-only changes: ${meaningfulChanges.join(', ')}`, true)
 }
 
 const fallbackChanges = readFallbackChangedFiles(headRef)
@@ -66,7 +66,7 @@ function isBuildRelevant(file) {
 }
 
 function readFallbackChangedFiles(headRef) {
-  const diff = spawnSync('git', ['diff', '--name-only', '--diff-filter=ACMRTUXB', `${headRef}^`, headRef, '--'], {
+  const diff = spawnSync('git', ['diff', '--name-only', `${headRef}^`, headRef, '--'], {
     encoding: 'utf8',
   })
 

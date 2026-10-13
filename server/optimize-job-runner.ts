@@ -181,6 +181,10 @@ async function spawnAvailableWorkers(): Promise<void> {
     const lockToken = randomUUID()
     const job = await claimNext(store, lockToken)
     if (!job) break
+    if (!accepting) {
+      await store.releaseInterruptedAttempt(job.id, job.attempt_count, processWorkerId, lockToken)
+      break
+    }
     try {
       spawnClaimedWorker(job, lockToken)
     } catch (error) {
@@ -224,6 +228,10 @@ async function preemptLocalFreeAttemptForPaid(store: OptimizeJobStore): Promise<
     await victim.worker.terminate().catch(() => undefined)
     finishAttempt(victim)
   }
+  if (!accepting) {
+    await store.releaseInterruptedAttempt(preemption.job.id, preemption.job.attempt_count, processWorkerId, lockToken)
+    return false
+  }
   try {
     spawnClaimedWorker(preemption.job, lockToken)
   } catch (error) {
@@ -249,6 +257,10 @@ async function processInlineQueue(): Promise<void> {
       const lockToken = randomUUID()
       const job = await claimNext(store, lockToken)
       if (!job) return
+      if (!accepting) {
+        await store.releaseInterruptedAttempt(job.id, job.attempt_count, processWorkerId, lockToken)
+        return
+      }
       const context = executionContext(job, lockToken, (stage) => updateAttemptStage(store, job, lockToken, stage))
       try {
         const result = await runInlineExecutorWithTimeout(job, context)

@@ -1,6 +1,6 @@
 import type { IncomingMessage } from 'node:http'
 import { afterEach, describe, expect, it } from 'vitest'
-import { resolveClientIp, resolveTrustedProxyAddresses } from './client-ip'
+import { isLoopbackIpAddress, resolveClientIp, resolveTrustedProxyAddresses } from './client-ip'
 import { inspectIncomingRequest } from './http-boundary'
 import { applyHttpSecurityHeaders } from './http-security'
 
@@ -21,6 +21,27 @@ describe('HTTP security boundary', () => {
     })).toBe('203.0.113.8')
     expect(() => resolveTrustedProxyAddresses({ TRUSTED_PROXY_ADDRESSES: '127.0.0.1,not-an-ip' }))
       .toThrow('TRUSTED_PROXY_ADDRESSES must be a comma-separated list of IP addresses')
+  })
+
+  it.each([
+    ['0:0:0:0:0:0:0:1', '::1'],
+    ['2001:0DB8:0:0:0:0:0:1', '2001:db8::1'],
+    ['0:0:0:0:0:ffff:7f00:1', '127.0.0.1'],
+    ['::ffff:127.0.0.1', '::ffff:7f00:1'],
+    ['fe80:0:0:0:0:0:0:1%eth0', 'fe80::1%eth0'],
+  ])('matches equivalent proxy addresses (%s and %s)', (configured, remote) => {
+    const environment = { NODE_ENV: 'production', TRUSTED_PROXY_ADDRESSES: configured }
+    expect(resolveClientIp(remote, '203.0.113.8', environment)).toBe('203.0.113.8')
+    expect(resolveClientIp('2001:db8::2', '203.0.113.8', environment)).toBe('2001:db8::2')
+  })
+
+  it('recognizes expanded IPv6 and hexadecimal mapped loopback addresses', () => {
+    expect(isLoopbackIpAddress('0:0:0:0:0:0:0:1')).toBe(true)
+    expect(isLoopbackIpAddress('::ffff:7f00:1')).toBe(true)
+    expect(isLoopbackIpAddress('2001:db8::1')).toBe(false)
+    expect(resolveClientIp('fe80::1%eth1', '203.0.113.8', {
+      NODE_ENV: 'production', TRUSTED_PROXY_ADDRESSES: 'fe80::1%eth0',
+    })).toBe('fe80::1%eth1')
   })
 
   it('rejects a syntactically valid but unconfigured production Host', async () => {
@@ -70,6 +91,29 @@ describe('HTTP security boundary', () => {
     if (!rejected.allowed) {
       expect(rejected.response.status).toBe(400)
       await expect(rejected.response.json()).resolves.toMatchObject({ code: 'invalid_request' })
+    }
+  })
+
+  it.each([
+    ['GET', '/api/announcement?page=1'],
+    ['GET', '/api/announcement?page=2&announcement_id=%E5%85%AC%E5%91%8A%2F21'],
+    ['GET', '/api/user/announcements?page=1'],
+    ['GET', '/api/user/announcements?page=2&announcement_id=popup-21&unread_only=1'],
+    ['PATCH', '/api/user/announcements?page=2&announcement_id=popup-21&unread_only=1'],
+  ])('allows announcement feed requests through the HTTP boundary (%s %s)', (method, target) => {
+    const request = incomingGet(target, 'localhost:3001', '127.0.0.1', { 'content-type': 'application/json' })
+    request.method = method
+    expect(inspectIncomingRequest(request).allowed).toBe(true)
+  })
+
+  it.each(['/api/announcement', '/api/user/announcements'])('rejects unknown and duplicate announcement query parameters (%s)', async (path) => {
+    for (const query of ['page=1&unknown=value', 'page=1&page=2']) {
+      const decision = inspectIncomingRequest(incomingGet(`${path}?${query}`, 'localhost:3001'))
+      expect(decision.allowed).toBe(false)
+      if (!decision.allowed) {
+        expect(decision.response.status).toBe(400)
+        await expect(decision.response.json()).resolves.toMatchObject({ code: 'invalid_request' })
+      }
     }
   })
 

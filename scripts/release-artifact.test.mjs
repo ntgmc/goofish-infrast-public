@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { cp, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -89,6 +89,81 @@ test('rejects private optimizer sources embedded in a public sourcemap', async (
   }
 })
 
+test('binds real Web and server builds to their compiled metadata across partial rebuilds', async () => {
+  const fixture = await createFixture('public')
+  const compile = (command, args) => {
+    const result = spawnSync(command, args, { cwd: fixture.source, encoding: 'utf8', env: process.env })
+    assert.equal(result.status, 0, result.stderr || result.stdout)
+  }
+  const web = async () => {
+    compile(process.execPath, [join(root, 'node_modules/vite/bin/vite.js'), 'build'])
+    await rm(join(fixture.artifact, 'dist'), { recursive: true, force: true })
+    await cp(join(fixture.source, 'dist'), join(fixture.artifact, 'dist'), { recursive: true })
+  }
+  const server = async () => {
+    compile(process.execPath, ['scripts/build-server.mjs', '--scope', 'public'])
+    await rm(join(fixture.artifact, 'server/dist'), { recursive: true, force: true })
+    await cp(join(fixture.source, 'server/dist'), join(fixture.artifact, 'server/dist'), { recursive: true })
+  }
+  try {
+    await symlink(join(root, 'node_modules'), join(fixture.source, 'node_modules'), 'dir')
+    await mkdir(join(fixture.source, 'scripts'), { recursive: true })
+    await cp(join(root, 'vite.config.ts'), join(fixture.source, 'vite.config.ts'))
+    await cp(join(root, 'scripts/build-server.mjs'), join(fixture.source, 'scripts/build-server.mjs'))
+    await writeFile(join(fixture.source, 'index.html'), '<!doctype html><script type="module" src="/src/main.ts"></script>')
+    await writeFile(join(fixture.source, 'src/main.ts'), "import { APP_BUILD_META } from './lib/.generated/build-meta'; console.log(APP_BUILD_META)")
+    for (const entry of ['server/index.ts', 'server/routes.ts', 'server/migrate.ts', 'server/cultivation/cultivation-worker.ts', 'scripts/import-prts-planning.mjs', 'scripts/sync-prts-planning.mjs']) {
+      const target = join(fixture.source, entry)
+      await mkdir(dirname(target), { recursive: true })
+      const metadataImport = entry.includes('/cultivation/') ? '../../src/lib/.generated/build-meta.ts' : '../src/lib/.generated/build-meta.ts'
+      await writeFile(target, `import { APP_BUILD_META } from '${metadataImport}'; console.log(APP_BUILD_META)`)
+    }
+    await web(); await server()
+    run(fixture, ['create', '--kind', 'public', '--sha', sha])
+    run(fixture, ['verify', '--kind', 'public', '--sha', sha])
+    for (const [index, first] of [[2, web], [3, server]]) {
+      const target = String(index).repeat(40)
+      const version = `2.0.${index}`
+      const metadata = { ...buildMeta(), git_sha: target, frontend_version: version, backend_version: version, expected_backend_version: version, build_context: 'test */ escaped' }
+      await writeFile(join(fixture.source, 'src/lib/.generated/build-meta.ts'), `export const APP_BUILD_META = ${JSON.stringify(metadata)} as const;\n`)
+      const changelogPath = join(fixture.artifact, 'changelog-release.json')
+      const changelog = JSON.parse(await readFile(changelogPath, 'utf8'))
+      Object.assign(changelog.release, { targetSha: target, id: `v${version}`, version, displayVersion: `v${version}` })
+      await writeFile(changelogPath, JSON.stringify(changelog))
+      assert.throws(() => run(fixture, ['create', '--kind', 'public', '--sha', target]), /compiled build metadata SHA mismatch/)
+      await first()
+      assert.throws(() => run(fixture, ['create', '--kind', 'public', '--sha', target]), /compiled build metadata mismatch/)
+      await (first === web ? server : web)()
+      run(fixture, ['create', '--kind', 'public', '--sha', target])
+      run(fixture, ['verify', '--kind', 'public', '--sha', target])
+    }
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true })
+  }
+})
+
+test('rejects stale or unstamped compiled entries and forged manifest metadata', async () => {
+  const fixture = await createFixture('public')
+  try {
+    for (const path of ['dist/assets/main.js', 'server/dist/routes.js', 'server/dist/cultivation-worker.js']) {
+      const original = await readFile(join(fixture.artifact, path), 'utf8')
+      await writeFile(join(fixture.artifact, path), original.replace('"git_sha":"' + sha, '"git_sha":"' + 'b'.repeat(40)))
+      assert.throws(() => run(fixture, ['create', '--kind', 'public', '--sha', sha]), /compiled build metadata mismatch/)
+      await writeFile(join(fixture.artifact, path), 'export {}')
+      assert.throws(() => run(fixture, ['create', '--kind', 'public', '--sha', sha]), /compiled build metadata is missing/)
+      await writeFile(join(fixture.artifact, path), original)
+    }
+    run(fixture, ['create', '--kind', 'public', '--sha', sha])
+    const path = join(fixture.artifact, 'build-manifest.json')
+    const manifest = JSON.parse(await readFile(path, 'utf8'))
+    manifest.build_context = manifest.build_meta.build_context = 'forged'
+    await writeFile(path, JSON.stringify(manifest))
+    assert.throws(() => run(fixture, ['verify', '--kind', 'public', '--sha', sha]), /compiled build metadata does not match manifest/)
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true })
+  }
+})
+
 test('rejects changelog and build metadata that do not describe the target', async () => {
   const fixture = await createFixture('public')
   try {
@@ -161,18 +236,22 @@ async function createFixture(kind, sourceMode = 'full') {
   const artifact = join(fixtureRoot, 'artifact')
   await mkdir(join(source, 'src/lib/.generated'), { recursive: true })
   await mkdir(artifact, { recursive: true })
-  await writeFile(join(source, 'src/lib/.generated/build-meta.ts'), `export const APP_BUILD_META = ${JSON.stringify({
+  await writeFile(join(source, 'src/lib/.generated/build-meta.ts'), `export const APP_BUILD_META = ${JSON.stringify(buildMeta(sourceMode), null, 2)} as const;\n`, 'utf8')
+  await writeRequiredFiles(artifact, kind, sourceMode)
+  return { root: fixtureRoot, source, artifact }
+}
+
+function buildMeta(sourceMode = 'full') {
+  return {
     frontend_version: '2.0.1', backend_version: '2.0.1', data_version: 'data.1.0123456',
     expected_backend_version: '2.0.1', source_mode: sourceMode, source_schema_version: 1,
     data_content_sha256: 'a'.repeat(64), data_source_updated_at: '2026-07-18T00:00:00.000Z',
     build_generated_at: '2026-07-18T00:00:00.000Z', generated_at: '2026-07-18T00:00:00.000Z',
     source_summary: 'fixture', git_sha: sha, build_context: 'test',
-  }, null, 2)} as const;\n`, 'utf8')
-  await writeRequiredFiles(artifact, kind)
-  return { root: fixtureRoot, source, artifact }
+  }
 }
 
-async function writeRequiredFiles(artifact, kind) {
+async function writeRequiredFiles(artifact, kind, sourceMode = 'full') {
   for (const path of ARTIFACT_KINDS[kind].required) {
     const target = join(artifact, path)
     await mkdir(dirname(target), { recursive: true })
@@ -208,9 +287,11 @@ async function writeRequiredFiles(artifact, kind) {
     } else if (path === 'release-sbom.cdx.json') {
       await writeFile(target, `${JSON.stringify({ bomFormat: 'CycloneDX', specVersion: '1.6', components: [{ name: 'pg', version: '1.0.0' }] })}\n`, 'utf8')
     } else {
-      await writeFile(target, path.endsWith('.html') ? '<!doctype html>' : 'export {}', 'utf8')
+      await writeFile(target, path.endsWith('.html') ? '<!doctype html>' : path.endsWith('.js') ? `/*! APP_BUILD_META ${JSON.stringify(buildMeta(sourceMode))} */\nexport {}` : 'export {}', 'utf8')
     }
   }
+  await mkdir(join(artifact, 'dist/assets'), { recursive: true })
+  await writeFile(join(artifact, 'dist/assets/main.js'), `/*! APP_BUILD_META ${JSON.stringify(buildMeta(sourceMode))} */\nexport {}`)
 }
 
 function run(fixture, argumentsList, environment = {}) {

@@ -39,6 +39,10 @@ export async function executeOptimizationJobWithPort(
   }
   const dispatchedResult = await dispatchOptimizationJobPayload(payload, context, port)
   const result = await enrichScheduleTrainingCosts(payload, dispatchedResult, context)
+  return validateOptimizerResult(payload, result)
+}
+
+function validateOptimizerResult(payload: OptimizationJobPayload, result: unknown): OptimizationJobExecutionResult {
   try {
     return parseOptimizationJobResult(payload, result)
   } catch (error) {
@@ -132,7 +136,7 @@ async function dispatchOptimizationJobPayload(
         internalMessage: 'OptimizerPort does not support manual schedule simulation.',
       })
     }
-    const result = await port.executeSchedule(payload, context)
+    const result = validateOptimizerResult(payload, await port.executeSchedule(payload, context)) as OptimizeResult
     const inventoryWarnings = inventoryDepletionWarnings(result.intermediate_depletion)
     if (inventoryWarnings.length > 0) result.inventory_warnings = inventoryWarnings
     else delete result.inventory_warnings

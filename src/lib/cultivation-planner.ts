@@ -122,7 +122,14 @@ export function buildCultivationPlan(data: CultivationData, options: Cultivation
       const runs = Math.min(neededRuns, Math.floor((budget - spent) / farm.sanity))
       if (runs > 0) {
         spent += runs * farm.sanity
-        task.remaining = Math.max(0, task.remaining - runs * farm.quantity)
+        let produced = runs * farm.quantity
+        for (const demand of tasks) {
+          if (demand.item !== task.item) continue
+          const consumed = Math.min(demand.remaining, produced)
+          demand.remaining -= consumed
+          produced -= consumed
+          if (produced <= 1e-8) break
+        }
         const prior = farms.find((row) => row.item === task.item && row.stage === farm.stage)
         if (prior) { prior.runs += runs; prior.sanity += runs * farm.sanity; prior.expectedQuantity += runs * farm.quantity }
         else farms.push({ item: task.item, stage: farm.stage, runs, sanity: runs * farm.sanity, expectedQuantity: runs * farm.quantity })

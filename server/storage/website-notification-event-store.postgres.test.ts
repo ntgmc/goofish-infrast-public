@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createPostgresAnnouncementStore } from './announcement-store'
+import { normalizeAnnouncementSummary } from '../handlers/announcement'
 import { closePool, getPool, query } from './postgres'
 import { migrateDatabaseSchema } from './schema'
 import {
@@ -42,6 +43,13 @@ describe('website notification events in PostgreSQL', () => {
     )
     expect(stored).toMatchObject({ revision: 2, data: { announcements: [{ id: suffix }] } })
     expect(events.rows[0]?.count).toBe('1')
+  })
+
+  it.each(['😀'.repeat(250), '😀'.repeat(251), 'a' + '😀'.repeat(250)])('publishes a bounded Unicode summary for a valid body', async (body) => {
+    const suffix = randomUUID()
+    const store = createPostgresAnnouncementStore(`unicode:${suffix}`)
+    await expect(store.set({ announcements: [{ id: suffix, body }] }, 0, [suffix],
+      [{ ...announcementEvent(suffix), summary: normalizeAnnouncementSummary(body) }])).resolves.toBe(1)
   })
 
   it('rolls back an announcement mutation when its publication event is invalid', async () => {

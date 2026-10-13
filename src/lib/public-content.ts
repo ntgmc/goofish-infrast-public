@@ -3,7 +3,7 @@ import { copy } from '../copy/index'
 import { getSku, productPolicies } from './product-catalog'
 
 export const PUBLIC_CONTENT_VERSION = 1 as const
-export const PUBLIC_CONTENT_DEFAULTS_REVISION = 10 as const
+export const PUBLIC_CONTENT_DEFAULTS_REVISION = 11 as const
 export const PUBLIC_PRICING_PLAN_IDS = [
   'free_preview',
   'single_account_monthly',
@@ -370,6 +370,7 @@ export function resolvePublicContentSettings(value: unknown): { content: PublicC
     : normalizedDraft
   if (storedDefaultsRevision < 9) migratedDraft = migrateLegacyPricingCopy(migratedDraft)
   if (storedDefaultsRevision < 10) migratedDraft = migrateDefaultFaqContent(migratedDraft)
+  if (storedDefaultsRevision < 11) migratedDraft = migrateLegacyLifetimePricing(migratedDraft)
   return {
     content: {
       version: PUBLIC_CONTENT_VERSION,
@@ -453,6 +454,21 @@ function migrateDefaultFaqContent(draft: PublicContentDraftV1): PublicContentDra
       return item.id === old.id && item.question === old.question && item.answer === old.answer && item.action === old.action
     })
   if (unchangedItems) draft.faq.items = structuredClone(current.items)
+  return draft
+}
+
+function migrateLegacyLifetimePricing(draft: PublicContentDraftV1): PublicContentDraftV1 {
+  if (draft.pricing.intro === copy.publicContent.legacy_lifetime_pricing_intro) {
+    draft.pricing.intro = DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.intro
+  }
+  const plan = draft.pricing.plans.single_account_lifetime
+  if (plan.discount_fold === 10 && plan.display_price === copy.publicContent.legacy_lifetime_price
+    && (plan.original_price === copy.publicContent.legacy_lifetime_price || plan.original_price === singleAccountLifetime.original_display_price)) {
+    plan.original_price = singleAccountLifetime.original_display_price
+    plan.display_price = singleAccountLifetime.display_price
+  }
+  draft.pricing.disclosures = draft.pricing.disclosures.map((line) => line === copy.publicContent.legacy_lifetime_disclosure
+    ? copy.publicContent.lifetime_existing_rights_disclosure : line)
   return draft
 }
 

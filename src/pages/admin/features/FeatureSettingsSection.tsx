@@ -136,6 +136,7 @@ export default function FeatureSettingsSection() {
                     type="checkbox"
                     name={feature}
                     checked={rawEnabled}
+                    disabled={saving}
                     onChange={(event) => toggle(feature, event.currentTarget.checked)}
                     className="mt-1 h-4 w-4 accent-brand-600"
                   />

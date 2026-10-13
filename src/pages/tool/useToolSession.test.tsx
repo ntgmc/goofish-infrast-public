@@ -58,6 +58,23 @@ describe('useToolSession config synchronization', () => {
     vi.useRealTimers()
   })
 
+  it.each(['logout', 'switch', 'replacement'])('ignores stale workspace data after %s and tells callers to skip navigation', async (mode) => {
+    let resolve!: (value: Response) => void
+    const pending = new Promise<Response>((done) => { resolve = done })
+    vi.stubGlobal('fetch', vi.fn(async (input) => String(input).includes('/api/user/workspace?profile_id=old') ? pending
+      : jsonResponse(authPayload(baseConfig, String(input).includes('profile_id=new') ? 'new' : 'profile-1'))))
+    const { result } = renderHook(() => useToolSession('profile-1', false, false))
+    await waitFor(() => expect(result.current.authStatus).toBe('authenticated'))
+    let slow!: Promise<boolean>
+    act(() => { slow = result.current.refreshProfileWorkspace(authPayload(baseConfig, 'old').active_profile!) })
+    if (mode === 'logout') await act(async () => result.current.handleLogout())
+    else if (mode === 'switch') await act(async () => result.current.refreshProfileWorkspace(authPayload(baseConfig, 'new').active_profile!))
+    else act(() => result.current.applyAuthPayload(authPayload(baseConfig, 'new')))
+    await act(async () => { resolve(jsonResponse(authPayload(baseConfig, 'old'))); expect(await slow).toBe(false) })
+    expect(result.current.activeProfile?.id ?? null).toBe(mode === 'logout' ? null : 'new')
+    expect(result.current.openingProfileId).toBeNull()
+  })
+
   it('restores the last v2 profile before exposing the authenticated workspace and remembers switches', async () => {
     window.localStorage.setItem('maatool:v2:last-profile:user-1', 'profile-2')
     const requestedUrls: string[] = []

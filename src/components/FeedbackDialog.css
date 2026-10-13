@@ -18,7 +18,7 @@
 .feedback-trigger.v2-help-link > svg { margin-left: 0; color: var(--color-v2-rail-accent); }
 .feedback-trigger.v2-help-link:active { background: var(--color-v2-rail-line); }
 .feedback-trigger.v2-help-link:focus-visible { outline: 2px solid var(--color-v2-rail-accent); outline-offset: 3px; }
-.feedback-dialog {
+.feedback-dialog, .feedback-admin-workbench {
   --feedback-surface: var(--v2-paper, var(--theme-surface-0));
   --feedback-hover: var(--v2-bg, var(--theme-surface-2));
   --feedback-ink: var(--v2-ink, var(--theme-ink-primary));
@@ -29,6 +29,7 @@
   --feedback-on-accent: var(--primary-foreground);
   --feedback-focus: var(--v2-accent, var(--color-focus));
 }
+.feedback-dialog { transition: none; }
 .feedback-dialog.v2-dialog {
   --feedback-border: var(--color-v2-control);
   --feedback-accent-hover: var(--color-v2-accent-hover);
@@ -51,7 +52,22 @@
 .feedback-image-picker, .feedback-image-meta { display: flex; min-width: 0; align-items: center; gap: var(--space-sm); }
 .feedback-image-picker { padding: var(--space-xs); border: 1px solid var(--feedback-border); border-radius: var(--radius-input); }
 .feedback-image-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.feedback-image-preview img { max-width: 100%; max-height: 12rem; justify-self: start; border-radius: var(--radius-input); object-fit: contain; }
+.feedback-image-thumbnail {
+  display: block;
+  width: min(100%, 16rem);
+  aspect-ratio: 4 / 3;
+  margin-top: var(--space-xs);
+  overflow: hidden;
+  border: 1px solid var(--feedback-border);
+  border-radius: var(--radius-input);
+  background: var(--feedback-hover);
+  cursor: zoom-in;
+}
+.feedback-image-thumbnail img { width: 100%; height: 100%; object-fit: contain; }
+.feedback-image-thumbnail:active { border-color: var(--feedback-accent); }
+.feedback-image-thumbnail:focus-visible { outline: 2px solid var(--feedback-focus); outline-offset: 3px; }
+.feedback-image-dialog { max-width: 80rem; max-height: calc(100dvh - 2rem); }
+.feedback-image-dialog > img { display: block; max-width: 100%; max-height: calc(100dvh - 6rem); margin: auto; object-fit: contain; }
 .feedback-image-meta { justify-content: space-between; flex-wrap: wrap; }
 .feedback-dialog .feedback-action {
   display: inline-flex;
@@ -79,7 +95,51 @@
 .feedback-dialog :is(button, select, textarea, [role="alert"]):focus-visible { outline: 2px solid var(--feedback-focus); outline-offset: 3px; }
 .feedback-success { display: flex; align-items: flex-start; gap: var(--space-xs); color: var(--feedback-ink); }
 .feedback-success > svg { flex: none; color: var(--feedback-accent); }
+.feedback-tabs { display: flex; gap: var(--space-md); border-bottom: 1px solid var(--feedback-border); }
+.feedback-tab {
+  min-height: 44px;
+  padding: var(--space-xs) var(--space-2xs);
+  border-bottom: 2px solid transparent;
+  color: var(--feedback-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.feedback-tab[aria-selected="true"] { border-bottom-color: var(--feedback-accent); color: var(--feedback-accent); font-weight: 600; }
+.feedback-tab:active:not(:disabled) { background: var(--feedback-hover); }
+.feedback-tab:disabled { cursor: not-allowed; opacity: .65; }
+.feedback-tab-panel { min-width: 0; padding-top: var(--space-md); }
+.feedback-tab-panel[data-state="active"] { display: grid; gap: var(--space-sm); }
+.feedback-history { display: grid; min-width: 0; gap: var(--space-sm); }
+.feedback-list-item { display: block; width: 100%; min-width: 0; padding: var(--space-sm); text-align: left; font-size: var(--text-sm); color: var(--theme-ink-primary); border-radius: var(--radius-input); cursor: pointer; }
+.feedback-list-item[aria-pressed="true"] { background: var(--theme-surface-2); box-shadow: inset 3px 0 var(--primary); }
+.feedback-list-item:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.feedback-list-item:disabled { cursor: not-allowed; opacity: .65; }
+.feedback-timeline { min-width: 0; border-top: 1px solid var(--feedback-border); padding-top: var(--space-md); }
+.feedback-conversation { display: grid; min-width: 0; gap: var(--space-sm); margin-top: var(--space-sm); }
+.feedback-message { min-width: 0; width: 92%; padding: var(--space-sm); border-radius: var(--radius-input); color: var(--feedback-ink); }
+.feedback-message--user { justify-self: end; background: var(--feedback-hover); }
+.feedback-message--admin { justify-self: start; border: 1px solid var(--feedback-border); background: var(--feedback-surface); }
+.feedback-message-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2xs) var(--space-xs); color: var(--feedback-muted); font-size: var(--text-xs); line-height: 1.65; }
+.feedback-message-heading > span { font-weight: 600; }
+.feedback-event { min-width: 0; padding: var(--space-2xs) var(--space-sm); color: var(--feedback-muted); font-size: var(--text-xs); line-height: 1.65; }
+.feedback-reply-form { margin-top: var(--space-2xs); border-top: 1px solid var(--feedback-border); padding-top: var(--space-md); }
+.feedback-reply-form .feedback-label > span { font-weight: 600; }
+.feedback-result { border-left: 3px solid var(--feedback-accent); padding: var(--space-xs) var(--space-sm); background: var(--feedback-hover); }
+.feedback-admin-workbench { display: grid; grid-template-columns: minmax(0, 22rem) minmax(0, 1fr); gap: var(--space-md); }
+.feedback-admin-workbench nav { flex-direction: column; align-items: stretch; padding-inline: 0; }
+.feedback-admin-workbench nav > div { justify-content: space-between; }
+.feedback-admin-index { max-height: 40rem; overflow-y: auto; overscroll-behavior: contain; }
+.feedback-admin-detail { scroll-margin-top: var(--space-md); border-left: 1px solid var(--feedback-border); padding-left: var(--space-md); }
+@media (max-width: 60rem) {
+  .feedback-admin-workbench { grid-template-columns: minmax(0, 1fr); }
+  .feedback-admin-detail { border-left: 0; border-top: 1px solid var(--feedback-border); padding-left: 0; padding-top: var(--space-md); }
+}
+@media (hover: hover) { .feedback-list-item:hover:not(:disabled) { background: var(--theme-surface-2); } }
 @media (hover: hover) {
+  .feedback-tab:hover:not(:disabled) { color: var(--feedback-accent); }
+  .feedback-image-thumbnail:hover { border-color: var(--feedback-accent); }
   .feedback-trigger.v2-help-link:hover { border-color: var(--color-v2-rail-accent); background: var(--color-v2-rail-line); color: var(--color-v2-rail-ink); }
   .feedback-dialog .feedback-action:hover:not(:disabled),
   .feedback-dialog [data-slot="dialog-close"]:hover { background: var(--feedback-hover); color: var(--feedback-ink); }

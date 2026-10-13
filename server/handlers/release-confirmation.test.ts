@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   createWebsiteNotificationEvent: vi.fn(),
+  releaseItems: ['新增批量操作', '修复登录异常'],
   getValidatedJson: vi.fn(),
 }))
 
@@ -15,7 +16,7 @@ vi.mock('../../src/lib/changelog', () => ({
     displayVersion: '2.1.0 正式版',
     releasedAt: '2026-08-04T08:00:00.000Z',
     kind: 'release',
-    sections: [{ id: 'feature', kind: 'feature', items: ['新增批量操作', '修复登录异常'] }],
+    sections: [{ id: 'feature', kind: 'feature', items: mocks.releaseItems }],
   }],
 }))
 vi.mock('../security/request-policy', () => ({ requestSchemas: { releaseConfirmation: {} } }))
@@ -33,6 +34,7 @@ const originalPublicAppUrl = process.env.PUBLIC_APP_URL
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.releaseItems.splice(0, mocks.releaseItems.length, '新增批量操作', '修复登录异常')
   process.env.WEBSITE_RELEASE_CONFIRMATION_TOKEN = token
   process.env.PUBLIC_APP_URL = 'https://example.test'
   mocks.getValidatedJson.mockResolvedValue({ version: '2.1.0' })
@@ -62,6 +64,12 @@ describe('release confirmation handler', () => {
       version: '2.1.0',
     })
     await expect(response.json()).resolves.toEqual({ ok: true, created: true, event_id: 'release:2.1.0' })
+  })
+
+  it('limits Unicode release summaries to the event storage bound', async () => {
+    mocks.releaseItems.splice(0, mocks.releaseItems.length, '😀'.repeat(251))
+    expect((await handler(request())).status).toBe(201)
+    expect(mocks.createWebsiteNotificationEvent.mock.calls[0][0].summary).toBe('😀'.repeat(250))
   })
 
   it('returns an idempotent success when the release event already exists unchanged', async () => {

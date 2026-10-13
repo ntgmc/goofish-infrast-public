@@ -30,7 +30,7 @@ type NotificationCenterValue = {
   error: string | null
   refresh: () => Promise<void>
   loadMore: () => Promise<void>
-  markRead: (notificationId: string) => Promise<void>
+  markRead: (notification: UserNotification) => Promise<void>
   markAllRead: () => Promise<void>
 }
 
@@ -63,6 +63,9 @@ function EnabledNotificationCenterProvider({ userId, children }: { userId: strin
 
   const refresh = useCallback((): Promise<void> => {
     if (refreshInFlight.current) return refreshInFlight.current
+    loadMoreAbort.current?.abort()
+    loadMoreAbort.current = null
+    setLoadingMore(false)
     const requestedUserId = userId
     const requestedMutationVersion = mutationVersion.current
     const controller = new AbortController()
@@ -150,28 +153,33 @@ function EnabledNotificationCenterProvider({ userId, children }: { userId: strin
         `/api/user/notifications?limit=20&cursor=${encodeURIComponent(nextCursor)}`,
         { fallbackMessage: copy.notifications.loadError, signal: controller.signal },
       )
-      if (currentUserId.current !== requestedUserId || mutationVersion.current !== requestedMutationVersion) return
+      if (controller.signal.aborted || loadMoreAbort.current !== controller
+        || currentUserId.current !== requestedUserId || mutationVersion.current !== requestedMutationVersion) return
       setNotifications((current) => mergeNotifications(current, page.notifications))
       setUnreadCount(page.unread_count)
       setNextCursor(page.next_cursor)
       setError(null)
     } catch (caught) {
       if (currentUserId.current === requestedUserId && mutationVersion.current === requestedMutationVersion
-        && !isAbortError(caught)) {
+        && loadMoreAbort.current === controller && !controller.signal.aborted && !isAbortError(caught)) {
         setError(getApiErrorMessage(caught, copy.notifications.loadError))
       }
     } finally {
-      if (currentUserId.current === requestedUserId && mutationVersion.current === requestedMutationVersion) {
+      if (loadMoreAbort.current === controller) {
         setLoadingMore(false)
+        loadMoreAbort.current = null
       }
-      if (loadMoreAbort.current === controller) loadMoreAbort.current = null
     }
   }, [loadingMore, nextCursor, userId])
 
-  const markRead = useCallback(async (notificationId: string) => {
+  const markRead = useCallback(async (displayed: UserNotification) => {
+    const notificationId = displayed.id
     const requestedUserId = userId
     mutationVersion.current += 1
     const requestedMutationVersion = mutationVersion.current
+    loadMoreAbort.current?.abort()
+    loadMoreAbort.current = null
+    setLoadingMore(false)
     mutationAbort.current?.abort()
     const controller = new AbortController()
     mutationAbort.current = controller
@@ -179,7 +187,7 @@ function EnabledNotificationCenterProvider({ userId, children }: { userId: strin
     try {
       const result = await apiJson<{ unread_count: number }>('/api/user/notifications', {
         method: 'PATCH',
-        json: { notification_id: notificationId },
+        json: { notification_id: notificationId, updated_at: displayed.updated_at },
         fallbackMessage: copy.notifications.updateError,
         signal: controller.signal,
       })
@@ -188,7 +196,7 @@ function EnabledNotificationCenterProvider({ userId, children }: { userId: strin
       }
       const readAt = new Date().toISOString()
       setNotifications((current) => current.map((notification) => (
-        notification.id === notificationId && !notification.read_at
+        notification.id === notificationId && notification.updated_at === displayed.updated_at && !notification.read_at
           ? { ...notification, read_at: readAt }
           : notification
       )))
@@ -212,6 +220,9 @@ function EnabledNotificationCenterProvider({ userId, children }: { userId: strin
     const requestedUserId = userId
     mutationVersion.current += 1
     const requestedMutationVersion = mutationVersion.current
+    loadMoreAbort.current?.abort()
+    loadMoreAbort.current = null
+    setLoadingMore(false)
     mutationAbort.current?.abort()
     const controller = new AbortController()
     mutationAbort.current = controller
@@ -281,7 +292,7 @@ function NotificationBellContent({ center, iconOnly, onInventory }: { center: No
   const openNotification = async (notification: UserNotification) => {
     if (!notification.read_at) {
       try {
-        await center.markRead(notification.id)
+        await center.markRead(notification)
       } catch {
         return
       }
@@ -290,6 +301,11 @@ function NotificationBellContent({ center, iconOnly, onInventory }: { center: No
     if (notification.action?.kind === 'inventory') {
       if (onInventory) onInventory()
       else navigate('/tool/inventory')
+    } else if (notification.action?.kind === 'feedback') {
+      const triggers = [...document.querySelectorAll<HTMLButtonElement>('.feedback-trigger')]
+      const trigger = triggers.find((button) => button.getClientRects().length > 0) ?? triggers[0]
+      if (trigger) trigger.dispatchEvent(new CustomEvent('goofish:open-feedback', { detail: notification.action.feedback_id }))
+      else navigate(`/v2?feedback=${encodeURIComponent(notification.action.feedback_id)}`)
     }
   }
 
@@ -372,7 +388,7 @@ function NotificationBellContent({ center, iconOnly, onInventory }: { center: No
                 <span className="shrink-0 text-[11px] text-ink-muted">{formatNotificationTime(notification.updated_at)}</span>
               </span>
               <span className="mt-3 grid gap-2">
-                {notification.payload.items.map((item) => (
+                {notification.payload.kind === 'item_grant' && notification.payload.items.map((item) => (
                   <span key={`${item.item_code}:${item.expires_at ?? 'never'}`} className="flex items-center gap-3 rounded-xl bg-surface-2/70 p-2.5">
                     <img src={itemIconPath(item.icon_key)} alt="" width={40} height={40} className="size-10 shrink-0 object-contain" />
                     <span className="min-w-0 flex-1">

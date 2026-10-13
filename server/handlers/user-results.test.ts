@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   getProfileForUser: vi.fn(),
   getValidatedJson: vi.fn(),
   recordTrackedExportBehaviorEvent: vi.fn(),
+  recordMaaExport: vi.fn(),
   requireUserSession: vi.fn(),
   toPublicWorkspace: vi.fn(),
   updateProfileWorkspaceInTransaction: vi.fn(),
@@ -21,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   listProfileOptimizationResults: vi.fn(),
   mutateProfileOptimizationResultInTransaction: vi.fn(),
   withTransaction: vi.fn(),
+  query: vi.fn(),
   clientQuery: vi.fn(),
 }))
 
@@ -78,7 +80,7 @@ vi.mock('../storage/optimization-result-store', () => {
   }
 })
 
-vi.mock('../storage/postgres', () => ({ withTransaction: mocks.withTransaction }))
+vi.mock('../storage/postgres', () => ({ withTransaction: mocks.withTransaction, query: mocks.query }))
 vi.mock('../behavior-risk/service', () => ({
   recordTrackedExportBehaviorEvent: mocks.recordTrackedExportBehaviorEvent,
 }))
@@ -100,6 +102,7 @@ vi.mock('../security/request-validation', () => ({
   getValidatedJson: mocks.getValidatedJson,
   stableJsonStringify: (value: unknown) => JSON.stringify(value),
 }))
+vi.mock('./usage-stats', () => ({ recordMaaExport: mocks.recordMaaExport }))
 vi.mock('./user-auth', () => ({
   jsonResponse: (body: unknown, status = 200) => new Response(status === 204 ? null : JSON.stringify(body), {
     status,
@@ -132,6 +135,7 @@ beforeEach(() => {
   mocks.getValidatedJson.mockResolvedValue(exportBody)
   mocks.getProfileForUser.mockResolvedValue(profile('cdk', 'advanced'))
   mocks.getProfileOptimizationResult.mockResolvedValue(storedHistoryItem())
+  mocks.query.mockResolvedValue({ rows: [{ entitled: false }] })
   mocks.listProfileOptimizationResults.mockResolvedValue({
     items: [historySummary()],
     next_cursor: 'next-page',
@@ -284,6 +288,20 @@ describe('result history reads', () => {
     expect(mocks.getProfileOptimizationResult).toHaveBeenCalledWith('profile-1', 'result-1')
   })
 
+  it('keeps diagnosis purchased for the saved job while retaining current data restrictions', async () => {
+    mocks.getProfileForUser.mockResolvedValue(profile('cdk', 'recommended'))
+    const stored = storedHistoryItem()
+    mocks.getProfileOptimizationResult.mockResolvedValue({ ...stored, result: { ...stored.result,
+      upgrade_suggestions: [{ type: 'single', name: 'Operator', current: 1, target: 2, gain: 1 }] } })
+    mocks.query.mockResolvedValue({ rows: [{ entitled: true }] })
+    const response = await userResultsHandler(new Request('http://localhost/api/user/results/result-1?profile_id=profile-1'))
+    expect(response.status).toBe(200)
+    const { item } = await response.json()
+    expect(item.result.upgrade_suggestions).toHaveLength(1)
+    expect(item.result.raw_results).toEqual([])
+    expect(item.result).not.toHaveProperty('daily_production')
+  })
+
   it('does not query result storage when the profile is not owned by the session user', async () => {
     mocks.getProfileForUser.mockResolvedValue(null)
 
@@ -337,6 +355,7 @@ describe('MAA JSON export entitlement', () => {
       },
     })
     expect(mocks.consumeInventoryItemImmediately).not.toHaveBeenCalled()
+    expect(mocks.recordMaaExport).toHaveBeenCalledWith({ userId: 'user-1', profileId: 'profile-1', jobId: 'job-1', idempotencyKey: 'export-request-1' })
     expect(mocks.recordTrackedExportBehaviorEvent).toHaveBeenCalledWith(expect.objectContaining({
       eventKey: 'maa-export:user-1:export-request-1',
       jobId: 'job-1',
@@ -415,6 +434,7 @@ describe('MAA JSON export entitlement', () => {
       itemCode: 'maa_export_trial_coupon',
       profileId: 'profile-1',
     }))
+    expect(mocks.recordMaaExport).toHaveBeenCalledWith({ userId: 'user-1', profileId: 'profile-1', jobId: 'job-1', idempotencyKey: 'export-request-1' })
   })
 
   it('preserves the inventory error when an ordinary free preview has no coupon', async () => {
@@ -434,6 +454,7 @@ describe('MAA JSON export entitlement', () => {
       error: '没有可用的 MAA 导出体验券。',
       code: 'item_unavailable',
     })
+    expect(mocks.recordMaaExport).not.toHaveBeenCalled()
   })
 
   it('does not fail an entitled export when behavior tracking fails', async () => {

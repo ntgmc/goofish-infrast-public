@@ -3,7 +3,7 @@ import type { AnnouncementAdminResponse } from '../../lib/types'
 import type { AdminBalanceTransaction, BalancePage } from '../../lib/balance-contracts'
 import { ADMIN_SESSION_EXPIRED_EVENT, adminApiJson as apiJson, adminApiVoid as apiVoid } from '../../lib/admin-api-client'
 import { ApiError } from '../../lib/api-client'
-import { GeneratedPermission, CdkType, FieldErrors, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, AdminCdkDetail, RiskControlSettings, RiskControlSettingsPatch, AdminUserSummary, AdminSessionUser, AdminCapability, AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, DEFAULT_RISK_SETTINGS, cdkProductPermissions, MAX_CDK_BATCH_COUNT, normalizeRiskSettings, validateEmailInput, validatePasswordInput, normalizeGeneratedCdks, normalizeProductPermission, buildCurrentOpsReport, buildCurrentOpsReportCsv, buildGeneratedCdkCsv, downloadBlob, downloadOperatorsJson, formatDownloadTimestamp } from './modules'
+import { GeneratedPermission, CdkType, FieldErrors, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, AdminCdkDetail, RiskControlSettings, RiskControlSettingsPatch, AdminSessionUser, AdminCapability, AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, DEFAULT_RISK_SETTINGS, cdkProductPermissions, MAX_CDK_BATCH_COUNT, normalizeRiskSettings, validateEmailInput, validatePasswordInput, normalizeGeneratedCdks, normalizeProductPermission, buildGeneratedCdkCsv, downloadBlob, downloadOperatorsJson, formatDownloadTimestamp } from './modules'
 import type { AdminSection } from './contracts'
 import { useAdminCdkData } from './cdk/useAdminCdkData'
 import { useAdminOverview } from './overview/useAdminOverview'
@@ -16,6 +16,7 @@ import { cancelAdminOperation, requestAdminOperationEdit, requestAdminOperationR
 import { createAdminProfileActions } from './users/profile-actions'
 import { useAdminUserList } from './users/useAdminUserList'
 import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
+import { operationsOverviewCsv } from '../../lib/operations-overview'
 
 function errorMessage(value: unknown): string {
   return value instanceof Error && value.message ? value.message : '未知错误'
@@ -30,13 +31,20 @@ export function useAdminController(section: AdminSection = 'overview') {
   const [overviewPartialFailure, setOverviewPartialFailure] = useState(false)
   const overviewRequestRef = useRef<{ sequence: number; controller: AbortController | null }>({ sequence: 0, controller: null })
 
+  const detailRequest = useRef<AbortController | null>(null)
+  const beginDetailRequest = () => {
+    detailRequest.current?.abort()
+    const controller = new AbortController()
+    detailRequest.current = controller
+    return controller
+  }
+  const isCurrentDetailRequest = (controller: AbortController) => detailRequest.current === controller && !controller.signal.aborted
+
   const [loginUser, setLoginUser] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
   const [authenticated, setAuthenticated] = useState(false)
 
   const [sessionChecking, setSessionChecking] = useState(true)
-
-  const [users, setUsers] = useState<AdminUserSummary[]>([])
 
   const {
     banner,
@@ -103,16 +111,16 @@ export function useAdminController(section: AdminSection = 'overview') {
   const clearNotice = useCallback(() => setNotice(null), [])
 
   const userList = useAdminUserList({
-    setAdminUsers: setUsers, setBusyAction, setError, setNotice,
+    setBusyAction, setError, setNotice,
     closeDetail: () => setSelectedUserDetail(null),
   })
   const { setAppUsers, loadUsersPage, setSelectedUserIds, setUsersLoaded } = userList
 
   const cdkData = useAdminCdkData({ authenticated, capabilities: adminCapabilities, section, setError })
   const { records, cdkSearchInput, cdkPage, cdkPageSize, cdkSearch, statusFilter, permissionFilter, riskFilter, generatedFilter,
-    cdkTypeFilter, cdkFilters, cdkOpsSummary, loadCdkPage, loadRiskPage, loadCdkSummary, resetCdkData } = cdkData
-  const overview = useAdminOverview(records, users.length, cdkOpsSummary)
-  const { usageStats, usageRange, setUsageStats, loadUsageStats } = overview
+    cdkTypeFilter, cdkFilters, loadCdkPage, loadRiskPage, loadCdkSummary, resetCdkData } = cdkData
+  const overview = useAdminOverview()
+  const { businessOverview, setBusinessOverview, loadUsageStats } = overview
   const visibleRecords = records
 
   const selectedRecords = useMemo(() => {
@@ -126,14 +134,16 @@ export function useAdminController(section: AdminSection = 'overview') {
       setLastSuccessfulSyncAt(null)
       setOverviewPartialFailure(false)
       overviewRequestRef.current.controller?.abort()
+      detailRequest.current?.abort()
+      detailRequest.current = null
+      setBusyAction(null)
       cancelAdminOperation()
       setAuthenticated(false)
       resetCdkData()
-      setUsers([])
       setAppUsers([])
       setUsersLoaded(false)
       setSelectedUserIds([])
-      setUsageStats(null)
+      setBusinessOverview(null)
       setRiskSettings(DEFAULT_RISK_SETTINGS)
       setSelectedCdkHashes([])
       setSelectedCdkDetail(null)
@@ -163,10 +173,10 @@ export function useAdminController(section: AdminSection = 'overview') {
       const sequence = overviewRequestRef.current.sequence + 1
       overviewRequestRef.current = { sequence, controller }
       try {
-        const canManageAdminData = adminCapabilities.includes('admin_manage') && (section === 'overview' || section === 'announcement')
-        const canViewRisk = adminCapabilities.includes('risk_view') && (section === 'overview' || section === 'risk')
+        const canManageAdminData = adminCapabilities.includes('admin_manage') && section === 'announcement'
+        const canViewRisk = adminCapabilities.includes('risk_view') && section === 'risk'
         const canViewUsage = adminCapabilities.includes('usage_view') && section === 'overview'
-        const canViewCdkSummary = adminCapabilities.includes('admin_manage') && ['overview', 'cdk', 'risk'].includes(section)
+        const canViewCdkSummary = adminCapabilities.includes('admin_manage') && ['cdk', 'risk'].includes(section)
         const [usageResult, announcementResult, riskSettingsResult, cdkSummaryResult] = await Promise.allSettled([
           canViewUsage
             ? loadUsageStats(controller.signal)
@@ -239,6 +249,7 @@ export function useAdminController(section: AdminSection = 'overview') {
         })
       return () => {
         active = false
+        detailRequest.current?.abort()
       }
     }, [])
 
@@ -323,21 +334,19 @@ export function useAdminController(section: AdminSection = 'overview') {
 
   const handleExportUsageReport = async (format: 'csv' | 'json') => {
       if (!authenticated) return
-      if (!usageStats) {
-        setError('统计数据尚未加载完成')
+      if (!businessOverview || loading) {
+        setError('请等待当前报表加载完成后再导出。')
         return
       }
       setBusyAction(`report:${format}`)
       setError(null)
       setNotice(null)
       try {
-        const range = usageStats?.range
-        const filenameRange = range?.from && range?.to ? `${range.from}_${range.to}` : usageRange
-        const report = buildCurrentOpsReport(usageStats, cdkOpsSummary, banner, announcements, announcementStats)
+        const filenameRange = `${businessOverview.current.from}_${businessOverview.current.to}`
         const blob = format === 'json'
-          ? new Blob([JSON.stringify(report, null, 2)], { type: 'application/json;charset=utf-8' })
-          : new Blob([`\uFEFF${buildCurrentOpsReportCsv(report)}`], { type: 'text/csv;charset=utf-8' })
-        downloadBlob(blob, `admin-ops-report-${filenameRange}.${format}`)
+          ? new Blob([JSON.stringify(businessOverview, null, 2)], { type: 'application/json;charset=utf-8' })
+          : new Blob([`\uFEFF${operationsOverviewCsv(businessOverview)}`], { type: 'text/csv;charset=utf-8' })
+        downloadBlob(blob, `admin-business-report-${filenameRange}.${format}`)
         setNotice(format === 'csv' ? 'CSV 报表已导出' : 'JSON 报表已导出')
       } catch (caught) {
         setError((caught as Error).message)
@@ -531,18 +540,20 @@ export function useAdminController(section: AdminSection = 'overview') {
     }
 
   const loadCdkDetail = async (record: AdminCdkRecord) => {
+      const controller = beginDetailRequest()
       setBusyAction(`cdk-detail:${record.code_hash}`)
       setError(null)
       try {
         const data = await apiJson<{ cdk?: AdminCdkDetail }>(`/api/admin/cdk?code_hash=${encodeURIComponent(record.code_hash)}${adminCapabilities.includes('admin_manage') ? '' : '&view=risk'}`, {
-          fallbackMessage: '加载 CDK 详情失败',
+          fallbackMessage: '加载 CDK 详情失败', signal: controller.signal,
         })
+        if (!isCurrentDetailRequest(controller)) return
         if (!data.cdk) throw new Error('加载 CDK 详情失败')
         setSelectedCdkDetail(data.cdk)
       } catch (caught) {
-        setError((caught as Error).message)
+        if (isCurrentDetailRequest(controller)) setError((caught as Error).message)
       } finally {
-        setBusyAction(null)
+        if (isCurrentDetailRequest(controller)) setBusyAction(null)
       }
     }
 
@@ -569,6 +580,7 @@ export function useAdminController(section: AdminSection = 'overview') {
     })
 
   const loadUserDetail = async (user: AppUserSummary, profilePage = 1) => {
+      const controller = beginDetailRequest()
       const profilePageSize = selectedUserDetail?.user.id === user.id
         ? selectedUserDetail.profile_pagination?.page_size ?? 100
         : 100
@@ -577,10 +589,11 @@ export function useAdminController(section: AdminSection = 'overview') {
       try {
         const [data, balance] = await Promise.all([
           apiJson<{ detail?: AdminUserDetail }>(`/api/admin/users?user_id=${encodeURIComponent(user.id)}&profile_page=${profilePage}&profile_page_size=${profilePageSize}`, {
-            fallbackMessage: '加载用户详情失败',
+            fallbackMessage: '加载用户详情失败', signal: controller.signal,
           }),
           METERED_BILLING_AVAILABLE ? fetchAdminUserBalance(user.id) : Promise.resolve(null),
         ])
+        if (!isCurrentDetailRequest(controller)) return null
         if (!data.detail) throw new Error('加载用户详情失败')
         setSelectedUserDetail(data.detail)
         setSelectedUserBalance(balance)
@@ -588,10 +601,10 @@ export function useAdminController(section: AdminSection = 'overview') {
         setExpandedOperatorProfileId(null)
         return data.detail
       } catch (caught) {
-        setError((caught as Error).message)
+        if (isCurrentDetailRequest(controller)) setError((caught as Error).message)
         return null
       } finally {
-        setBusyAction(null)
+        if (isCurrentDetailRequest(controller)) setBusyAction(null)
       }
     }
 
@@ -600,6 +613,7 @@ export function useAdminController(section: AdminSection = 'overview') {
       options: { expand?: boolean; busyKey?: string } = {},
     ): Promise<AdminProfileOperatorData | null> => {
       if (!selectedUserDetail) return null
+      const controller = beginDetailRequest()
       const busyKey = options.busyKey ?? `profile-operators:${profile.id}`
       setBusyAction(busyKey)
       setError(null)
@@ -608,9 +622,10 @@ export function useAdminController(section: AdminSection = 'overview') {
         const data = await apiJson<{ operator_data?: AdminProfileOperatorData }>(
           `/api/admin/users?user_id=${encodeURIComponent(selectedUserDetail.user.id)}&profile_id=${encodeURIComponent(profile.id)}&include=operators`,
           {
-            fallbackMessage: '加载干员数据失败',
+            fallbackMessage: '加载干员数据失败', signal: controller.signal,
           },
         )
+        if (!isCurrentDetailRequest(controller)) return null
         if (!data.operator_data) throw new Error('加载干员数据失败')
         setOperatorDataByProfileId((current) => ({
           ...current,
@@ -619,10 +634,10 @@ export function useAdminController(section: AdminSection = 'overview') {
         if (options.expand !== false) setExpandedOperatorProfileId(profile.id)
         return data.operator_data
       } catch (caught) {
-        setError((caught as Error).message)
+        if (isCurrentDetailRequest(controller)) setError((caught as Error).message)
         return null
       } finally {
-        setBusyAction(null)
+        if (isCurrentDetailRequest(controller)) setBusyAction(null)
       }
     }
 

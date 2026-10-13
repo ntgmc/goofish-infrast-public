@@ -15,7 +15,7 @@ vi.mock('../storage/user-store', () => ({
   isDepotValueProfile: () => false,
   listProfileWorkspaces: mocks.listProfileWorkspaces,
   listProfilesForUser: mocks.listProfilesForUser,
-  saveProfileWorkspace: vi.fn(),
+  updateProfileWorkspaceAtomically: vi.fn(),
   toPublicProfile: (profile: { id: string }, workspace: unknown) => ({ id: profile.id, workspace }),
   updateUserProfileMetadata: vi.fn(),
 }))

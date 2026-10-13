@@ -1,3 +1,5 @@
+import type { PoolClient } from 'pg'
+import { query as postgresQuery } from '../../storage/postgres'
 import type { LicenseOperator, LicenseConfig, OptimizeResult } from "../../../src/lib/types";
 import { canonicalJson, type CdkRecord, incrementCdkScheduleGenerateCount } from "../../handlers/license-utils";
 import { recordUsageEvent } from "../../handlers/usage-stats";
@@ -11,9 +13,22 @@ export function getDownloadableHistoryResult(result: OptimizeResult): OptimizeRe
   return result;
 }
 
-export function limitPreviewOptimizeResult(result: OptimizeResult): OptimizeResult {
+export async function hasTrainingDiagnosisEntitlement(
+  jobId: string,
+  client: Pick<PoolClient, 'query'> = { query: postgresQuery },
+): Promise<boolean> {
+  const result = await client.query<{ entitled: boolean }>(
+    `select exists (select 1 from reward_consumptions
+      where reference_type = 'optimization_job' and reference_id = $1
+        and reward_type = 'training_diagnosis_coupon' and status in ('reserved', 'committed')) as entitled`,
+    [jobId],
+  )
+  return result.rows[0]?.entitled === true
+}
+
+export function limitPreviewOptimizeResult(result: OptimizeResult, upgradeSuggestionsAllowed = false): OptimizeResult {
   return {
-    ...projectOptimizeResultForCapabilities(result, { kind: 'free_preview', permission: 'recommended' }),
+    ...projectOptimizeResultForCapabilities(result, { kind: 'free_preview', permission: 'recommended' }, upgradeSuggestionsAllowed),
     plans: result.plans ?? [],
     raw_results: [],
     preview_limit: {
@@ -67,15 +82,17 @@ export async function recordScheduleGenerate(
 export async function applyScheduleGenerateEffects(
   cdkRecord: Pick<CdkRecord, 'code_hash'> | null,
   context: ScheduleUsageContext,
-  timing: { submittedAt: number; attemptStartedAt?: number },
+  timing: { submittedAt: number; attemptStartedAt?: number; finishedAt?: number },
   jobId: string,
   countCdkGeneration = true,
 ): Promise<void> {
+  const finishedAt = timing.finishedAt ?? Date.now()
   await recordUsageEvent("schedule_generate", {
+    created_at: new Date(finishedAt).toISOString(),
     status: context.status,
     reason_code: context.reason_code,
-    duration_ms: Date.now() - timing.submittedAt,
-    ...(timing.attemptStartedAt !== undefined && { compute_duration_ms: Date.now() - timing.attemptStartedAt }),
+    duration_ms: finishedAt - timing.submittedAt,
+    ...(timing.attemptStartedAt !== undefined && { compute_duration_ms: finishedAt - timing.attemptStartedAt }),
     permission: context.permission,
     profile_id: context.profile_id,
     cdk_status: context.cdk_status,

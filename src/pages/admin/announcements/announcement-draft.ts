@@ -146,6 +146,7 @@ function isAnnouncement(value: unknown, kind: Announcement['kind']): value is An
     && typeof value.active === 'boolean'
     && typeof value.title === 'string'
     && typeof value.body === 'string'
+    && (value.popup_until == null || isIsoString(value.popup_until))
     && isIsoString(value.created_at)
     && isIsoString(value.updated_at)
 }

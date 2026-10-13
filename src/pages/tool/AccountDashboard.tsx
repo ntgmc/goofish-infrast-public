@@ -254,7 +254,7 @@ export default function AccountDashboard({
               {displayedSection === 'inventory' && <InventorySection loadingFallback={<SectionLoader label={copy.inventory.loading} />} onPayload={onPayload} onLifetimeProfileCreated={() => onSectionChange('profiles', { replace: true })} onViewProfiles={() => onSectionChange('profiles')} />}
               {displayedSection === 'balance' && METERED_BILLING_AVAILABLE && features.metered_billing && <BalanceSection redemptionEnabled={features.cdk_redemption} />}
               {displayedSection === 'announcements' && <AnnouncementsSection loadingFallback={<SectionLoader label={copy.dashboard.pages_tool_dashboard_AnnouncementsSection_006} />} onUnreadCountChange={onAnnouncementUnreadCountChange} />}
-              {displayedSection === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} onPayload={onPayload} workspaceEntry={workspaceEntry} />}
+              {displayedSection === 'settings' && <SettingsSection profiles={profiles} activeProfileId={activeProfile?.id} onLogout={onLogout} onPayload={onPayload} workspaceEntry={workspaceEntry} />}
             </Suspense>
           </div>}</PageTransition>
         </div>

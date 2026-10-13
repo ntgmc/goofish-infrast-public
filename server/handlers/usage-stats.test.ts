@@ -1,8 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const authenticateAdminRequest = vi.hoisted(() => vi.fn())
+const getOperationsOverview = vi.hoisted(() => vi.fn())
 vi.mock('./admin-auth', () => ({ authenticateAdminRequest }))
-import usageStatsHandler, { getScheduleGenerateDurationStatsByBucket, recordUsageEvent, setUsageEventStoreForTesting } from './usage-stats'
+vi.mock('../storage/operations-overview-store', () => ({ getOperationsOverview }))
+import { createOperationsOverview } from '../../src/test/operations-overview-fixture'
+import { operationsDate, shiftOperationsDate } from '../../src/lib/operations-overview'
+import usageStatsHandler, { getScheduleGenerateDurationStatsByBucket, recordMaaExport, recordUsageEvent, setUsageEventStoreForTesting } from './usage-stats'
 import {
   buildUsageStats,
   type UsageEventRecord,
@@ -15,9 +19,61 @@ afterEach(() => {
 
 beforeEach(() => {
   authenticateAdminRequest.mockReset().mockResolvedValue({ ok: true, username: 'usage-viewer' })
+  getOperationsOverview.mockReset().mockResolvedValue(createOperationsOverview())
 })
 
 describe('usage stats handler', () => {
+  it('serves the Shanghai business snapshot and records tracking start behind the usage capability', async () => {
+    const set = vi.fn(async () => undefined)
+    setUsageEventStoreForTesting({ set, list: async () => [], getStats: async (dates) => buildUsageStats([], dates) })
+    const response = await usageStatsHandler(new Request('http://localhost/api/admin/usage-stats?view=business&range=30d'))
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+    expect(authenticateAdminRequest).toHaveBeenCalledWith(expect.any(Request), 'usage_view')
+    expect(getOperationsOverview).toHaveBeenCalledWith(shiftOperationsDate(operationsDate(), -29), operationsDate())
+    expect(set).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ event: 'business_metrics_started' }))
+    await expect(response.json()).resolves.toMatchObject({ metrics_version: 'business.v1', timezone: 'Asia/Shanghai' })
+  })
+
+  it('does not query or start tracking when the administrator lacks the usage capability', async () => {
+    authenticateAdminRequest.mockResolvedValue({ ok: false, response: new Response('没有权限', { status: 403 }) })
+    const response = await usageStatsHandler(new Request('http://localhost/api/admin/usage-stats?view=business'))
+    expect(response.status).toBe(403)
+    expect(getOperationsOverview).not.toHaveBeenCalled()
+  })
+
+  it.each(['range=bogus', 'from=0000-01-01&to=0000-01-07', 'from=2026-02-30&to=2026-03-01',
+    'from=2026-01-01', 'from=2026-03-01&to=2026-02-01', 'from=2026-01-01&to=2026-04-01', 'from=2099-01-01&to=2099-01-07'])('rejects invalid business ranges before querying (%s)', async (params) => {
+    const response = await usageStatsHandler(new Request(`http://localhost/api/admin/usage-stats?view=business&${params}`))
+    expect(response.status).toBe(400)
+    expect(getOperationsOverview).not.toHaveBeenCalled()
+  })
+
+  it('exports the same business contract for a custom period', async () => {
+    setUsageEventStoreForTesting({ set: async () => undefined, list: async () => [], getStats: async (dates) => buildUsageStats([], dates) })
+    const response = await usageStatsHandler(new Request('http://localhost/api/admin/usage-stats?view=business&from=2026-01-01&to=2026-01-07&format=csv'))
+    expect(response.status).toBe(200)
+    expect(getOperationsOverview).toHaveBeenCalledWith('2026-01-01', '2026-01-07')
+    expect(await response.text()).toContain('"metadata","metrics_version","","business.v1"')
+  })
+
+  it('keeps result exports idempotent and links them to the generated scheme', async () => {
+    const records = new Map<string, UsageEventRecord>()
+    setUsageEventStoreForTesting({ set: async (key, record) => { records.set(key, record) }, list: async () => [...records.values()], getStats: async (dates) => buildUsageStats([...records.values()], dates) })
+    await recordUsageEvent('schedule_generate', { status: 'success', profile_id: 'profile-1', created_at: '2026-01-01T16:00:00Z' }, 'optimize-job/job-1/schedule-generate')
+    const generation = [...records.values()][0]!
+    expect(generation.created_at).toBe('2026-01-01T16:00:00.000Z')
+    await recordMaaExport({ userId: 'user-1', profileId: 'profile-1', jobId: 'job-1', idempotencyKey: 'download-1' })
+    await recordMaaExport({ userId: 'user-1', profileId: 'profile-1', jobId: 'job-1', idempotencyKey: 'download-1' })
+    expect(records.size).toBe(3)
+    expect([...records.values()].find((record) => record.event === 'maa_export')).toMatchObject({ generation_id: generation.id, status: 'success', profile_id: 'profile-1' })
+  })
+
+  it.each(['maa_export', 'business_metrics_started'])('rejects client fabrication of server-owned business events (%s)', async (event) => {
+    const response = await usageStatsHandler(new Request('http://localhost/api/usage-stats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event }) }))
+    expect(response.status).toBe(400)
+  })
+
   it('requires the dedicated usage capability for administrator reports', async () => {
     const store: UsageEventStore = {
       set: async () => undefined,

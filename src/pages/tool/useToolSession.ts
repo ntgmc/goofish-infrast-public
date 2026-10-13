@@ -48,6 +48,14 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
   const workspacePatchQueueRef = useRef<Promise<void>>(Promise.resolve())
   const activeProfileRef = useRef<UserGameAccount | null>(null)
   const loadedAuthVersionRef = useRef(-1)
+  const sessionGeneration = useRef(0)
+  const workspaceRequest = useRef<AbortController | null>(null)
+  const invalidateWorkspaceRequest = useCallback(() => {
+    sessionGeneration.current += 1
+    workspaceRequest.current?.abort()
+    workspaceRequest.current = null
+    setOpeningProfileId(null)
+  }, [])
   const licenseRef = useRef<LicenseFile | null>(null)
   const configGenerationRef = useRef(0)
   const configSaveTimerRef = useRef<number | null>(null)
@@ -81,6 +89,7 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
     setUser(nextUser)
     setProfiles(nextProfiles)
     setActiveProfile(nextProfile)
+    activeProfileRef.current = nextProfile
     setWorkspace(nextWorkspace)
     setAnnouncementUnreadCount(payload?.announcement_unread_count ?? 0)
     setEliteOverridesState(nextWorkspace?.elite_overrides ?? {})
@@ -94,12 +103,13 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
   }, [cancelPendingConfigSave, rememberLastProfile])
 
   const applyAuthPayload = useCallback((payload: AuthSuccessResponse | null) => {
+    invalidateWorkspaceRequest()
     applyAuthPayloadInternal(payload, {
       preserveConfigDraft: Boolean(payload?.active_profile && pendingConfigRef.current?.profileId === payload.active_profile.id),
     })
     setAuthError(null)
     setAuthStatus(payload ? 'authenticated' : 'anonymous')
-  }, [applyAuthPayloadInternal])
+  }, [applyAuthPayloadInternal, invalidateWorkspaceRequest])
 
   const retryAuth = useCallback(() => {
     setAuthError(null)
@@ -110,7 +120,10 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
   useEffect(() => {
     if (requestedProfileId && activeProfileRef.current?.id === requestedProfileId && loadedAuthVersionRef.current === authRequestVersion) return
     loadedAuthVersionRef.current = authRequestVersion
+    invalidateWorkspaceRequest()
     let cancelled = false
+    const generation = sessionGeneration.current
+    const obsolete = () => cancelled || generation !== sessionGeneration.current
     setAuthError(null)
     setAuthStatus('loading')
 
@@ -119,7 +132,7 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
       : '/api/auth/me'
     void apiJson<Partial<AuthSuccessResponse> & { user: AuthUser | null }>(authUrl, { fallbackMessage: copy.common.pages_tool_useToolSession_001 })
       .then(async (data) => {
-        if (cancelled) return
+        if (obsolete()) return
         if (data.user === null) {
           applyAuthPayload(null)
           return
@@ -141,10 +154,10 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
           }
         }
         if (!data.user && data.user !== null) throw new Error(copy.common.pages_tool_useToolSession_001)
-        if (!cancelled) applyAuthPayload(data.user ? data as AuthSuccessResponse : null)
+        if (!obsolete()) applyAuthPayload(data.user ? data as AuthSuccessResponse : null)
       })
       .catch((caught: unknown) => {
-        if (cancelled) return
+        if (obsolete()) return
         setAuthError(caught instanceof Error ? caught : new Error(copy.common.pages_tool_useToolSession_001))
         setAuthStatus('error')
       })
@@ -152,7 +165,7 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
     return () => {
       cancelled = true
     }
-  }, [applyAuthPayload, authRequestVersion, requestedProfileId, rememberLastProfile])
+  }, [applyAuthPayload, authRequestVersion, invalidateWorkspaceRequest, requestedProfileId, rememberLastProfile])
 
   useEffect(() => {
     if (!loadAnnouncementPopups) return
@@ -169,24 +182,37 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
 
   useEffect(() => () => {
     pendingConfigRef.current = null
+    sessionGeneration.current += 1
+    workspaceRequest.current?.abort()
     if (configSaveTimerRef.current !== null) window.clearTimeout(configSaveTimerRef.current)
   }, [])
 
   const refreshProfileWorkspace = useCallback(async (profile: UserGameAccount) => {
+    workspaceRequest.current?.abort()
+    const controller = new AbortController()
+    workspaceRequest.current = controller
+    const generation = sessionGeneration.current
+    const current = () => workspaceRequest.current === controller && !controller.signal.aborted && generation === sessionGeneration.current
     cancelPendingConfigSave()
     setOpeningProfileId(profile.id)
     setWorkspaceLoadError(null)
     try {
       const data = await apiJson<AuthSuccessResponse>(`/api/user/workspace?profile_id=${encodeURIComponent(profile.id)}`, {
-        fallbackMessage: copy.common.pages_tool_useToolSession_002,
+        fallbackMessage: copy.common.pages_tool_useToolSession_002, signal: controller.signal,
       })
+      if (!current()) return false
       applyAuthPayload(data)
+      return true
     } catch (caught) {
+      if (!current()) return false
       const message = caught instanceof Error ? caught.message : copy.common.pages_tool_useToolSession_003
       setWorkspaceLoadError(message)
       throw caught
     } finally {
-      setOpeningProfileId(null)
+      if (current()) {
+        workspaceRequest.current = null
+        setOpeningProfileId(null)
+      }
     }
   }, [applyAuthPayload, cancelPendingConfigSave])
 
@@ -293,9 +319,10 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
   const handleLogout = useCallback(async () => {
     if (!await flushConfigSave()) return
     cancelPendingConfigSave()
+    invalidateWorkspaceRequest()
     await apiVoid('/api/auth/logout', { method: 'POST' })
     applyAuthPayload(null)
-  }, [applyAuthPayload, cancelPendingConfigSave, flushConfigSave])
+  }, [applyAuthPayload, cancelPendingConfigSave, flushConfigSave, invalidateWorkspaceRequest])
 
   const cdkProfiles = useMemo(() => profiles.filter(isSchedulableProfile), [profiles])
   const activeCdkProfile = activeProfile && isSchedulableProfile(activeProfile) ? activeProfile : cdkProfiles[0] ?? null

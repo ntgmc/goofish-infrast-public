@@ -9,6 +9,7 @@ import {
   createGiftPackDraft,
   processInventoryCampaignBatch,
   publishGiftPackVersion,
+  revokeGrant,
   recoverStaleInventoryCampaignRecipients,
   retryFailedCampaignRecipients,
   updateCampaignStatus,
@@ -205,6 +206,36 @@ describe('PostgreSQL unified inventory', () => {
       history_slots: expect.objectContaining({ used: 0 }),
       archive_slots: expect.objectContaining({ used: 0 }),
     })])
+  })
+
+  it.each(['grant', 'campaign'])('waits for reserved items before %s reversal', async (mode) => {
+    const { userId, profileId } = await seedUserProfile()
+    let grantId: string
+    let campaignId: string | undefined
+    if (mode === 'campaign') {
+      const created = await createDistributionCampaign('root', { itemCode: 'priority_compute_coupon', quantity: 2, validityDays: 0,
+        targetMode: 'user_ids', userIds: [userId], reason: 'reservation regression' })
+      campaignId = String(created.campaign_id)
+      await processInventoryCampaignBatch(100)
+      grantId = (await query('select grant_id from inventory_distribution_recipients where campaign_id = $1', [campaignId])).rows[0].grant_id
+    } else grantId = (await adminGrantItem('root', { userId, itemCode: 'priority_compute_coupon', quantity: 2, validityDays: 0, reason: 'reservation regression' }))!
+    const jobId = randomUUID()
+    await withTransaction((client) => reserveItemsInTransaction(client, userId, ['priority_compute_coupon'], 'test', jobId, profileId))
+    if (campaignId) {
+      await updateCampaignStatus('root', campaignId, 'reverse', 'regression reversal')
+      await processInventoryCampaignBatch(100)
+      expect((await query('select status from inventory_distribution_campaigns where id = $1', [campaignId])).rows[0].status).toBe('reversing')
+    } else await expect(revokeGrant('root', grantId, 'regression reversal')).rejects.toMatchObject({ code: 'grant_reserved' })
+    expect(await getItemBalance(userId, 'priority_compute_coupon')).toBe(1)
+    await withTransaction((client) => refundReservedItemsInTransaction(client, 'test', jobId))
+    expect(await getItemBalance(userId, 'priority_compute_coupon')).toBe(2)
+    if (campaignId) {
+      await processInventoryCampaignBatch(100)
+      expect((await query('select status from inventory_distribution_campaigns where id = $1', [campaignId])).rows[0].status).toBe('reversed')
+    } else await revokeGrant('root', grantId, 'settled reservation')
+    const returned = (await query('select refunded_grant_id from reward_consumptions where reference_id = $1', [jobId])).rows[0].refunded_grant_id
+    await revokeGrant('root', returned, 'revoke returned batch')
+    expect(await getItemBalance(userId, 'priority_compute_coupon')).toBe(0)
   })
 
   it('consumes the earliest expiring batch and refunds once with the original absolute expiry', async () => {

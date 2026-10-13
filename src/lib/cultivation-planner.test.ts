@@ -40,6 +40,23 @@ describe('cultivation planning with shared resources', () => {
     expect(result.selected.map((row) => [row.candidate.key, row.candidate.frequency, row.candidate.weightedFrequency])).toEqual([['a', 2, 6], ['c', 1, 0.5], ['b', 1, 0.1]])
   })
 
+  it('shares farm output between operators, including partial next-day demand and potions', () => {
+    const input = data({ candidates: [candidate('a', 2, { exp: 1000 }), candidate('b', 1, { exp: 7000 })],
+      farms: { exp: [{ stage: 'LS', quantity: 7400, sanity: 36, days: [1, 2, 3, 4, 5, 6, 7] }] }, prices: { exp: 0.0036 } })
+    const partial = buildCultivationPlan(input, options({ dailySanity: 36, days: 1 }))
+    expect(partial.remaining).toMatchObject([{ operator: 'b', remaining: 600 }])
+    expect(buildCultivationPlan(input, options({ dailySanity: 36 })).selected.map((row) => row.estimatedDate)).toEqual(['2026-10-06', '2026-10-07'])
+    input.candidates[1].items.exp = 1000
+    input.potions = [{ key: 'p', name: 'Potion', count: 1, sanity: 36, expiresAt: null }]
+    const complete = buildCultivationPlan(input, options({ dailySanity: 0, potions: { p: 1 }, days: 1 }))
+    expect(complete.remaining).toEqual([])
+    expect(complete.selected.map((row) => row.estimatedDate)).toEqual(['2026-10-06', '2026-10-06'])
+    expect(complete.days[0].spent).toBe(36)
+    expect(complete.days[0].potions).toEqual([{ name: 'Potion', count: 1 }])
+    input.farms.exp[0].days = [1]
+    expect(buildCultivationPlan(input, options({ dailySanity: 36, days: 1 })).remaining).toHaveLength(2)
+  })
+
   it('reserves shared direct requirements and includes crafting currency', () => {
     const input = data({ recipes: { high: { count: 1, items: { rock: 3, '4001': 100 } } }, prices: { rock: 5, '4001': 0.0036 } })
     const result = allocateCultivationMaterials({ high: 2, rock: 2 }, { rock: 6, '4001': 100 }, input)

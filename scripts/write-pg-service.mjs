@@ -17,7 +17,7 @@ if (!['postgres:', 'postgresql:'].includes(url.protocol)) throw new Error(`${env
 const database = decodeURIComponent(url.pathname.replace(/^\//, ''))
 const user = decodeURIComponent(url.username)
 const password = decodeURIComponent(url.password)
-const host = url.hostname
+const host = url.hostname.replace(/^\[|\]$/g, '')
 const port = url.port || '5432'
 for (const [label, value] of Object.entries({ database, user, host, port })) {
   if (!value || /[\r\n\0]/.test(value)) throw new Error(`PostgreSQL URL ${label} is invalid`)
@@ -35,12 +35,12 @@ for (const [name, value] of url.searchParams) {
 
 const serviceFile = [
   `[${serviceName}]`,
-  `host=${quoteServiceValue(host)}`,
-  `port=${quoteServiceValue(port)}`,
-  `dbname=${quoteServiceValue(database)}`,
-  `user=${quoteServiceValue(user)}`,
-  ...(password ? [`password=${quoteServiceValue(password)}`] : []),
-  ...serviceOptions.map(([name, value]) => `${name}=${quoteServiceValue(value)}`),
+  `host=${serviceValue(host)}`,
+  `port=${serviceValue(port)}`,
+  `dbname=${serviceValue(database)}`,
+  `user=${serviceValue(user)}`,
+  ...(password ? [`password=${serviceValue(password)}`] : []),
+  ...serviceOptions.map(([name, value]) => `${name}=${serviceValue(value)}`),
   '',
 ].join('\n')
 await atomicWriteFile(outputPath, serviceFile, { mode: 0o600 })
@@ -62,9 +62,9 @@ if (metadataPath) {
 }
 process.stdout.write(`${fingerprint}\n`)
 
-function quoteServiceValue(value) {
+function serviceValue(value) {
   if (/[\r\n\0]/.test(value)) throw new Error('PostgreSQL service values must not contain control characters')
-  return `'${value.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`
+  return value
 }
 
 function requireArgument(name) {

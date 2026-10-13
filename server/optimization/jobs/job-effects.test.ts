@@ -40,7 +40,7 @@ describe('optimization completion effect outbox', () => {
     expect(mocks.applyScheduleGenerateEffects).toHaveBeenCalledWith(
       null,
       expect.objectContaining({ status: 'success', reason_code: 'ok', profile_id: 'profile-1' }),
-      expect.objectContaining({ submittedAt: 1 }),
+      expect.objectContaining({ submittedAt: 1, attemptStartedAt: 10, finishedAt: 2_000 }),
       'job-1',
       true,
     )
@@ -61,6 +61,7 @@ function pendingEffect() {
     profile_id: 'profile-1',
     user_id: 'user-1',
     started_at: '1970-01-01T00:00:00.010Z',
+    finished_at: '1970-01-01T00:00:02.000Z',
     profile_record: { skland_binding: { uid: '123456' } },
     payload_json: {
       version: 3,

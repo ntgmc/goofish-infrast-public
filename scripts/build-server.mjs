@@ -1,5 +1,6 @@
 import { build } from 'esbuild'
 import { rm } from 'node:fs/promises'
+import { APP_BUILD_META } from '../src/lib/.generated/build-meta.ts'
 
 const entryPoints = {
   index: 'server/index.ts',
@@ -22,6 +23,7 @@ await build({
   target: 'node24',
   format: 'esm',
   sourcemap: true,
+  banner: { js: `/*! APP_BUILD_META ${JSON.stringify(APP_BUILD_META).replaceAll('*/', '*\\/')} */` },
   external: ['@aws-sdk/client-sesv2', '@node-rs/argon2', 'pg', 'qrcode'],
   logLevel: 'info',
 })

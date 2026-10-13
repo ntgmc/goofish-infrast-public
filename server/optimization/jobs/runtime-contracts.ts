@@ -103,6 +103,10 @@ const optimizeResultSchema: z.ZodType<OptimizeResult> = z.object({
       product: z.string().max(256).optional(),
     }).passthrough()).max(5_000),
   }).passthrough()).max(1_000),
+  upgrade_suggestions: z.array(z.discriminatedUnion('type', [
+    z.object({ type: z.literal('single'), name: boundedString(256), current: finiteNumber, target: finiteNumber, gain: finiteNumber }).passthrough(),
+    z.object({ type: z.literal('bundle'), ops: z.array(z.object({ name: boundedString(256) }).passthrough()).min(1).max(500), gain: finiteNumber }).passthrough(),
+  ])).max(5_000).optional(),
   build_meta: appBuildMetaSchema.optional(),
   inventory_warnings: z.array(z.strictObject({
     product: z.enum(['Pure Gold', 'Originium Shard', 'Orirock Cube']),

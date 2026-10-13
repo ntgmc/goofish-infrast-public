@@ -98,32 +98,31 @@ export function createAliyunEcsWorkerController(
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), timeoutMs)
     timeout.unref?.()
-    let response: Response
     try {
-      response = await requestFetch(url, {
+      const response = await requestFetch(url, {
         method: 'GET',
         headers: { Accept: 'application/json' },
         signal: controller.signal,
       })
+      const payload = await parseResponse(response)
+      if (!response.ok || typeof payload.Code === 'string') {
+        throw new AliyunEcsApiError(
+          action,
+          typeof payload.Code === 'string' ? payload.Code : `http_${response.status}`,
+          typeof payload.Message === 'string' ? payload.Message : `Aliyun ECS ${action} request failed`,
+          typeof payload.RequestId === 'string' ? payload.RequestId : undefined,
+        )
+      }
+      return payload
     } catch (error) {
-      const message = error instanceof Error && error.name === 'AbortError'
+      if (error instanceof AliyunEcsApiError) throw error
+      const message = controller.signal.aborted
         ? `Aliyun ECS ${action} request timed out`
         : `Aliyun ECS ${action} request failed`
       throw new AliyunEcsApiError(action, 'request_failed', message)
     } finally {
       clearTimeout(timeout)
     }
-
-    const payload = await parseResponse(response)
-    if (!response.ok || typeof payload.Code === 'string') {
-      throw new AliyunEcsApiError(
-        action,
-        typeof payload.Code === 'string' ? payload.Code : `http_${response.status}`,
-        typeof payload.Message === 'string' ? payload.Message : `Aliyun ECS ${action} request failed`,
-        typeof payload.RequestId === 'string' ? payload.RequestId : undefined,
-      )
-    }
-    return payload
   }
 }
 
@@ -218,12 +217,7 @@ type AliyunRpcResponse = {
 }
 
 async function parseResponse(response: Response): Promise<AliyunRpcResponse> {
-  try {
-    const payload = await response.json() as unknown
-    return payload && typeof payload === 'object' && !Array.isArray(payload)
-      ? payload as AliyunRpcResponse
-      : {}
-  } catch {
-    return {}
-  }
+  const payload = await response.json() as unknown
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('Invalid Aliyun ECS response')
+  return payload as AliyunRpcResponse
 }

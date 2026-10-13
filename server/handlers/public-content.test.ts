@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_PUBLIC_CONTENT_DRAFT, cloneDefaultPublicContentSettings } from '../../src/lib/public-content'
+import { DEFAULT_PUBLIC_CONTENT_DRAFT, PUBLIC_CONTENT_DEFAULTS_REVISION, cloneDefaultPublicContentSettings } from '../../src/lib/public-content'
 
 const auth = vi.hoisted(() => ({ authenticateAdminRequest: vi.fn() }))
 const store = vi.hoisted(() => ({ getPublicContentSettings: vi.fn(), savePublicContentSettings: vi.fn() }))
@@ -53,7 +53,7 @@ describe('public content handlers', () => {
     const body = await response.json()
     expect(body).toMatchObject({
       version: 1,
-      defaults_revision: 10,
+      defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION,
       cdk_purchase: { xianyu_url: DEFAULT_PUBLIC_CONTENT_DRAFT.cdk_purchase.xianyu_url },
       qq_group: { number: '891655477' },
     })

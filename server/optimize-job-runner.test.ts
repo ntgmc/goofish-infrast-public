@@ -7,7 +7,7 @@ import {
   initializeOptimizeJobProcessing,
   shutdownOptimizeJobProcessing,
 } from './optimize-job-runner'
-import { shutdownOptimizeQueueMaintenance } from './optimize-queue-maintenance'
+import { shutdownOptimizeQueueMaintenance, waitForOptimizeQueueMaintenanceIdle } from './optimize-queue-maintenance'
 import { requestOptimizeJobProcessing } from './optimize-job-signals'
 import {
   OPTIMIZER_PORT_VERSION,
@@ -29,6 +29,57 @@ afterAll(async () => {
 })
 
 describe('optimization dispatcher startup recovery', () => {
+  it.each([false, true])('releases a claim that arrives after shutdown without starting execution (threads=%s)', async (threads) => {
+    await shutdownOptimizeJobProcessing(0)
+    const store = createMemoryOptimizeJobStore()
+    globalThis.__maaOptimizeJobStoreForTesting = store
+    unregisterOptimizerPort?.()
+    unregisterOptimizerPort = registerOptimizerPort(fakePort())
+    if (threads) {
+      process.env.OPTIMIZE_FORCE_WORKER_THREADS_FOR_TESTING = '1'
+      process.env.OPTIMIZE_WORKER_ENTRY_FOR_TESTING = resolve('server/test-fixtures/optimize-busy-worker.mjs')
+    }
+    await initializeOptimizeJobProcessing()
+    const job = await store.createJob(input())
+    const original = store.claimNextJob
+    let claimed!: () => void
+    let release!: () => void
+    let done!: () => void
+    const claimStarted = new Promise<void>((resolve) => { claimed = resolve })
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const settled = new Promise<void>((resolve) => { done = resolve })
+    store.claimNextJob = async (...args) => {
+      const result = await original(...args)
+      claimed()
+      await gate
+      return result
+    }
+    const releaseOriginal = store.releaseInterruptedAttempt
+    store.releaseInterruptedAttempt = async (...args) => {
+      const result = await releaseOriginal(...args)
+      done()
+      return result
+    }
+    try {
+      requestOptimizeJobProcessing()
+      await claimStarted
+      await shutdownOptimizeJobProcessing(0)
+      release()
+      await settled
+      expect(getOptimizeJobProcessingState()).toMatchObject({ initialized: false, accepting: false, activeAttempts: 0 })
+      await expect(store.getJob(job.id)).resolves.toMatchObject({ status: 'queued', worker_id: null })
+    } finally {
+      release()
+      await shutdownOptimizeJobProcessing(0)
+      unregisterOptimizerPort?.()
+      unregisterOptimizerPort = null
+      shutdownOptimizeQueueMaintenance()
+      await waitForOptimizeQueueMaintenanceIdle()
+      delete process.env.OPTIMIZE_FORCE_WORKER_THREADS_FOR_TESTING
+      delete process.env.OPTIMIZE_WORKER_ENTRY_FOR_TESTING
+    }
+  })
+
   it('fails before initialization when no optimizer implementation is registered', async () => {
     await expect(initializeOptimizeJobProcessing()).rejects.toThrow('OptimizerPort is not registered')
     expect(getOptimizeJobProcessingState()).toMatchObject({ initialized: false, accepting: false })

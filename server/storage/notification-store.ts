@@ -6,6 +6,7 @@ import type {
   UserNotificationPage,
 } from '../../src/lib/types'
 import { notificationsCopy } from '../../src/copy/zh-CN/notifications'
+import { feedbackCopy } from '../../src/copy/zh-CN/feedback'
 import { ensureDatabaseSchema } from './schema'
 import { query, withTransaction } from './postgres'
 
@@ -28,7 +29,7 @@ type StoredNotification = {
 }
 
 export class NotificationError extends Error {
-  constructor(readonly code: string, message: string, readonly status: 400 | 404) {
+  constructor(readonly code: string, message: string, readonly status: 400 | 404 | 409) {
     super(message)
     this.name = 'NotificationError'
   }
@@ -122,9 +123,24 @@ export async function upsertItemGrantNotificationGroupInTransaction(client: Pool
   }
   await client.query(
     `update user_notifications
-        set title = $2, body = $3, payload_json = $4::jsonb, read_at = null, updated_at = $5
+        set title = $2, body = $3, payload_json = $4::jsonb, read_at = null,
+            updated_at = greatest($5::timestamptz, updated_at + interval '1 millisecond')
       where id = $1`,
     [row.id, notificationsCopy.itemGrantTitle, itemGrantBody(current.items), JSON.stringify(current), input.now],
+  )
+}
+
+export async function upsertFeedbackNotificationInTransaction(client: PoolClient, input: {
+  userId: string; feedbackId: string; now: string
+}): Promise<void> {
+  await client.query(
+    `insert into user_notifications
+      (id, user_id, type, source_type, source_id, title, body, action_kind, payload_json, created_at, updated_at)
+     values ($1, $2, 'feedback_update', 'feedback', $3, $4, $5, 'feedback', $6::jsonb, $7, $7)
+     on conflict (user_id, type, source_type, source_id) do update
+       set read_at = null, updated_at = greatest(excluded.updated_at, user_notifications.updated_at + interval '1 millisecond')`,
+    [randomUUID(), input.userId, input.feedbackId, feedbackCopy.notificationTitle, feedbackCopy.notificationBody,
+      JSON.stringify({ kind: 'feedback_update', feedback_id: input.feedbackId }), input.now],
   )
 }
 
@@ -165,14 +181,18 @@ export async function listUserNotifications(
   })
 }
 
-export async function markUserNotificationRead(userId: string, notificationId: string, now = new Date().toISOString()): Promise<number> {
+export async function markUserNotificationRead(userId: string, notificationId: string, updatedAt: string, now = new Date().toISOString()): Promise<number> {
   await ensureSchema()
   const updated = await query(
     `update user_notifications set read_at = coalesce(read_at, $3), updated_at = updated_at
-      where id = $1 and user_id = $2 returning id`,
-    [notificationId, userId, now],
+      where id = $1 and user_id = $2 and updated_at = $4::timestamptz returning id`,
+    [notificationId, userId, now, updatedAt],
   )
-  if (!updated.rowCount) throw new NotificationError('notification_not_found', notificationsCopy.apiNotFound, 404)
+  if (!updated.rowCount) {
+    const exists = await query('select 1 from user_notifications where id = $1 and user_id = $2', [notificationId, userId])
+    if (!exists.rowCount) throw new NotificationError('notification_not_found', notificationsCopy.apiNotFound, 404)
+    throw new NotificationError('notification_version_conflict', '通知内容已更新，请刷新后查看。', 409)
+  }
   return countUnread(userId)
 }
 
@@ -193,6 +213,16 @@ export async function exportUserNotifications(userId: string): Promise<UserNotif
 }
 
 function toPublicNotification(row: StoredNotification): UserNotification {
+  if (row.type === 'feedback_update' && row.action_kind === 'feedback') {
+    const payload = row.payload_json as Record<string, unknown> | null
+    if (payload?.kind !== 'feedback_update' || typeof payload.feedback_id !== 'string' || !payload.feedback_id) throw invalidNotification(row.id)
+    return {
+      id: row.id, type: 'feedback_update', title: row.title, body: row.body,
+      action: { kind: 'feedback', feedback_id: payload.feedback_id },
+      payload: { kind: 'feedback_update', feedback_id: payload.feedback_id },
+      read_at: row.read_at, created_at: row.created_at, updated_at: row.updated_at,
+    }
+  }
   if (row.type !== 'item_grant' || row.action_kind !== 'inventory') {
     throw invalidNotification(row.id)
   }

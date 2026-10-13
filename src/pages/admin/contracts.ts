@@ -133,123 +133,6 @@ export interface AdminCdkDetail extends AdminCdkRecord {
   linked_account?: { account_id: string; profile_id: string } | null;
 }
 
-export interface UsageTotals {
-  unique_visitors: number;
-  visits: number;
-  free_previews: number;
-  registers: number;
-  schedule_generates: number;
-  cdk_redeems: number;
-  account_additions: number;
-  failures: number;
-  schedule_failures: number;
-  cdk_redeem_failures: number;
-  skland_imports: number;
-  skland_import_failures: number;
-  announcement_impressions: number;
-  announcement_reads: number;
-}
-
-export interface UsageDay extends UsageTotals {
-  date: string;
-}
-
-export type UsageRangeMode = '7d' | '14d' | '30d' | 'custom'
-
-export interface UsageRange {
-  from: string;
-  to: string;
-  days: number;
-}
-
-export interface UsageFunnelStep {
-  key: string;
-  label: string;
-  count: number;
-  conversion_rate: number;
-  dropoff: number;
-}
-
-export interface UsageFailureReason {
-  reason_code: string;
-  count: number;
-  percentage: number;
-  last_seen_at: string | null;
-  events?: Record<string, number>;
-}
-
-export interface UsageFailureSample {
-  created_at: string;
-  event: string;
-  reason_code: string;
-  duration_ms: number | null;
-  permission: string | null;
-  cdk_status: string | null;
-  source: string | null;
-  has_profile: boolean;
-}
-
-export interface UsageLatencyStats {
-  average_ms: number;
-  p50_ms: number;
-  p95_ms: number;
-  max_ms: number;
-  sample_count: number;
-  days: Array<{ date: string; average_ms: number; p95_ms: number; sample_count: number }>;
-}
-
-export interface UsageSklandStats {
-  attempts: number;
-  success: number;
-  failed: number;
-  success_rate: number;
-  credential_invalid: number;
-  refresh_forbidden: number;
-  not_bound: number;
-  request_failed: number;
-  days: Array<{ date: string; attempts: number; success: number; failed: number; success_rate: number }>;
-}
-
-export interface UsageAnnouncementStats {
-  impressions: number;
-  reads: number;
-  unread: number;
-  read_rate: number;
-}
-
-export interface UsageCdkDistributionItem {
-  permission: string;
-  total: number;
-  success: number;
-  failure: number;
-  statuses: Record<string, number>;
-}
-
-export interface UsageStatsResponse {
-  metrics_version: string;
-  generated_at: string;
-  source: 'raw_events_and_authoritative_account_additions';
-  completeness: {
-    complete: boolean;
-    unknown_status_events: number;
-    retention_days: number;
-    raw_events_truncated: boolean;
-    raw_event_limit: number;
-  };
-  totals: UsageTotals;
-  days: UsageDay[];
-  range: UsageRange;
-  funnel: UsageFunnelStep[];
-  failure_reasons: UsageFailureReason[];
-  recent_failures: UsageFailureSample[];
-  latency: {
-    schedule_generate: UsageLatencyStats;
-  };
-  skland: UsageSklandStats;
-  announcement: UsageAnnouncementStats;
-  cdk_distribution: UsageCdkDistributionItem[];
-}
-
 export interface CdkPermissionDistribution {
   permission: Permission;
   total: number;
@@ -307,12 +190,6 @@ export interface RiskControlSettings {
 }
 
 export type RiskControlSettingsPatch = Partial<Pick<RiskControlSettings, 'operator_data_risk_enabled'>>
-
-export interface AdminUserSummary {
-  username: string;
-  created_at: string;
-  updated_at: string;
-}
 
 export interface AdminOptimizationDeadLetter {
   id: string;

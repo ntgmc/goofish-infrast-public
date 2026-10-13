@@ -372,6 +372,28 @@
   line-height: 1.2;
 }
 
+.v2-start-schedule {
+  flex-wrap: wrap;
+  padding-bottom: var(--space-sm);
+}
+
+.v2-start-schedule > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.v2-start-schedule p {
+  margin-top: var(--space-xs);
+  color: var(--v2-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.65;
+}
+
+.v2-start-schedule > p {
+  flex-basis: 100%;
+  margin-top: 0;
+}
+
 .v2-button {
   display: inline-flex;
   min-height: 44px;
@@ -1820,8 +1842,12 @@
   .v2-profile-button { min-width: 44px; min-height: 44px; justify-content: center; }
   .v2-profile-button > svg { display: none; }
   .v2-page-title { margin-bottom: var(--space-sm); }
+  .v2-start-schedule { align-items: stretch; flex-direction: column; gap: var(--space-sm); }
+  .v2-start-schedule h1 { font-size: var(--text-v2-title); }
+  .v2-start-schedule > p { flex-basis: auto; }
   .v2-ready-banner { gap: var(--space-xs); }
   .v2-banner-actions { display: grid; width: 100%; grid-template-columns: 44px repeat(2, minmax(0, 1fr)); gap: var(--space-2xs); }
+  .v2-example-banner .v2-banner-actions { grid-template-columns: 44px minmax(0, 1fr); }
   .v2-banner-actions .v2-button { min-width: 0; padding-inline: var(--space-2xs); }
   .v2-config-button > span { display: none; }
   .v2-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }

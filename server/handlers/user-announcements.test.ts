@@ -47,6 +47,13 @@ describe('user announcements handler', () => {
     expect(mocks.markAnnouncementsRead).not.toHaveBeenCalled()
   })
 
+  it('rejects confirmation of a version the user did not see', async () => {
+    mocks.getValidatedJson.mockResolvedValue({ announcement_id: announcement.id, updated_at: '2026-07-30T01:00:00.000Z' })
+    const response = await handler(request())
+    expect(response.status).toBe(409)
+    expect(mocks.markAnnouncementsRead).not.toHaveBeenCalled()
+  })
+
   it('treats an empty mark-all mutation as an idempotent success', async () => {
     mocks.getValidatedJson.mockResolvedValue({ all: true })
     mocks.getActiveAnnouncements.mockResolvedValue([])
