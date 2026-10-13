@@ -1,0 +1,50 @@
+/* Hallmark · component: deployment update dialog · genre: modern-minimal · theme: design.md V2
+ * states: default, hover, focus, active
+ * pre-emit critique: P5 H5 E4 S5 R5 V4 */
+.deployment-update-dialog.v2-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(30rem, calc(100% - 2rem));
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-sm);
+  border: 1px solid var(--color-v2-line);
+  border-radius: var(--radius-v2-panel);
+  background: var(--color-v2-surface);
+  color: var(--color-v2-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  text-align: left;
+}
+.deployment-update-dialog::backdrop { background: var(--color-v2-scrim); }
+.deployment-update-content { display: grid; min-width: 0; gap: var(--space-md); }
+.deployment-update-label { color: var(--color-v2-accent); font-size: var(--text-xs); font-weight: 600; }
+.deployment-update-dialog h2 {
+  min-width: 0;
+  margin-top: var(--space-2xs);
+  overflow-wrap: anywhere;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-style: normal;
+  font-weight: 650;
+  line-height: 1.4;
+}
+.deployment-update-description { color: var(--color-v2-secondary); }
+.deployment-update-versions { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); padding-block: var(--space-sm); border-block: 1px solid var(--color-v2-line); }
+.deployment-update-versions > div { min-width: 0; }
+.deployment-update-versions dt { color: var(--color-v2-muted); }
+.deployment-update-versions dd { margin-top: var(--space-3xs); overflow-wrap: anywhere; color: var(--color-v2-secondary); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.deployment-update-versions .deployment-update-latest { color: var(--color-v2-accent); font-weight: 600; }
+.deployment-update-actions { display: flex; justify-content: end; }
+.deployment-update-refresh { width: 100%; border-radius: var(--radius-v2-control); font-family: inherit; }
+.deployment-update-refresh > svg { flex: none; }
+.deployment-update-refresh:active { background: var(--color-v2-accent-hover); transform: none; }
+.deployment-update-refresh:focus-visible { outline: 2px solid var(--color-v2-focus); outline-offset: 3px; }
+@media (min-width: 40rem) {
+  .deployment-update-dialog.v2-dialog { padding: var(--space-md); }
+  .deployment-update-versions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .deployment-update-refresh { width: auto; }
+}

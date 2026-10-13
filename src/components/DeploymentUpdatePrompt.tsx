@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type SyntheticEvent } from 'react'
+import { RefreshCw } from 'lucide-react'
 import { APP_BUILD_META } from '../lib/build-meta'
 import type { AppBuildMeta } from '../lib/types'
 import { copy } from '../copy/index'
 import { AnimatedPresenceRegion } from './MotionPrimitives'
+import './DeploymentUpdatePrompt.css'
 
 const DEFAULT_POLL_INTERVAL_MS = 60_000
 
@@ -102,39 +104,40 @@ export default function DeploymentUpdatePrompt({
       aria-describedby="deployment-update-description"
       aria-modal="true"
       onCancel={handleCancel}
-      className="m-auto max-h-[calc(100dvh-4rem)] w-[calc(100%-2rem)] max-w-lg overflow-y-auto border-0 bg-transparent p-0 text-left backdrop:bg-black/55"
+      className="v2-dialog deployment-update-dialog"
     >
-      <section className="tool-panel w-full max-w-lg p-5 text-left shadow-xl">
-        <AnimatedPresenceRegion motionKey={deploymentIdentity(availableMeta)}>
-          <p className="tool-eyebrow">{copy.common.components_DeploymentUpdatePrompt_001}</p>
-          <h2 id="deployment-update-title" className="mt-1 text-lg font-semibold text-ink-primary">
+      <AnimatedPresenceRegion motionKey={deploymentIdentity(availableMeta)} className="deployment-update-content">
+        <header>
+          <p className="deployment-update-label">{copy.common.components_DeploymentUpdatePrompt_001}</p>
+          <h2 id="deployment-update-title">
             {copy.common.components_DeploymentUpdatePrompt_002}
           </h2>
-          <p id="deployment-update-description" className="mt-4 text-sm leading-7 text-ink-secondary">
-            {copy.common.components_DeploymentUpdatePrompt_003}
-          </p>
-          <dl className="tool-inset mt-4 grid gap-2 px-4 py-3 text-sm sm:grid-cols-2">
-            <div>
-              <dt className="text-ink-muted">{copy.common.components_DeploymentUpdatePrompt_004}</dt>
-              <dd className="mt-1 break-all font-mono text-xs text-ink-secondary">{meta.frontend_version}</dd>
-            </div>
-            <div>
-              <dt className="text-ink-muted">{copy.common.components_DeploymentUpdatePrompt_005}</dt>
-              <dd className="mt-1 break-all font-mono text-xs text-ink-secondary">{availableMeta.frontend_version}</dd>
-            </div>
-          </dl>
-          <div className="mt-6 flex justify-end">
-            <button
-              ref={refreshButtonRef}
-              type="button"
-              onClick={reloadPage}
-              className="tool-primary-action min-h-12"
-            >
-              {copy.common.components_DeploymentUpdatePrompt_006}
-            </button>
+        </header>
+        <p id="deployment-update-description" className="deployment-update-description">
+          {copy.common.components_DeploymentUpdatePrompt_003}
+        </p>
+        <dl className="deployment-update-versions">
+          <div>
+            <dt>{copy.common.components_DeploymentUpdatePrompt_004}</dt>
+            <dd>{meta.frontend_version}</dd>
           </div>
-        </AnimatedPresenceRegion>
-      </section>
+          <div>
+            <dt>{copy.common.components_DeploymentUpdatePrompt_005}</dt>
+            <dd className="deployment-update-latest">{availableMeta.frontend_version}</dd>
+          </div>
+        </dl>
+        <div className="deployment-update-actions">
+          <button
+            ref={refreshButtonRef}
+            type="button"
+            onClick={reloadPage}
+            className="tool-primary-action deployment-update-refresh"
+          >
+            <RefreshCw size={16} aria-hidden="true" />
+            {copy.common.components_DeploymentUpdatePrompt_006}
+          </button>
+        </div>
+      </AnimatedPresenceRegion>
     </dialog>
   )
 }

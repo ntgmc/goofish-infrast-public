@@ -1,7 +1,8 @@
 import { spawnSync } from 'node:child_process'
-import { cp, mkdir, mkdtemp, readdir, readlink, rm, symlink } from 'node:fs/promises'
+import { access, cp, mkdir, mkdtemp, readdir, readFile, readlink, rm, symlink } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parseSync } from 'vite'
 import { isPrivateOptimizerSource } from './private-optimizer-sources.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -30,6 +31,21 @@ try {
   await symlink(nodeModulesTarget, join(temporaryRoot, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir')
 
   runNpm(['run', 'build'], temporaryRoot)
+  const assetsRoot = join(temporaryRoot, 'dist/assets')
+  for (const file of await readdir(assetsRoot)) {
+    if (!file.endsWith('.js')) continue
+    const { program } = parseSync(file, await readFile(join(assetsRoot, file), 'utf8'))
+    for (const statement of program.body) {
+      if (!['ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration'].includes(statement.type)) continue
+      const dependency = statement.source?.value
+      if (!dependency?.startsWith('.')) continue
+      try {
+        await access(resolve(assetsRoot, dependency))
+      } catch (error) {
+        throw new Error(`frontend chunk ${file} references missing module ${dependency}`, { cause: error })
+      }
+    }
+  }
   runNpm(['run', 'check:architecture:public'], temporaryRoot)
   runNpm(['test'], temporaryRoot)
 
