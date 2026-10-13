@@ -17,9 +17,10 @@ export default function FeedbackSection({ active, canManage = false }: { active:
   const [revision, setRevision] = useState(0)
   const [data, setData] = useState<AdminFeedbackPage | null>(null)
   const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const thread = useFeedbackThread('admin', selected, active)
+  const saving = thread.saving
   const detailRegion = useRef<HTMLDivElement>(null)
   useEffect(() => { if (selected && window.matchMedia?.('(max-width: 60rem)').matches) detailRegion.current?.scrollIntoView({ block: 'start', behavior: 'instant' }) }, [selected])
   useEffect(() => {
@@ -35,7 +36,7 @@ export default function FeedbackSection({ active, canManage = false }: { active:
   }, [active, page, pageSize, status, revision])
   return <section className="tool-panel min-w-0 p-4 sm:p-6">
     <p className="text-sm leading-6 text-ink-secondary">{text.adminDescription}</p>
-    <div className="mt-4 flex flex-wrap items-end justify-between gap-3"><label className="grid gap-2 text-sm"><span>{text.status}</span><select className="tool-field" value={status} disabled={saving} onChange={(event) => { setStatus(event.target.value as FeedbackStatus | ''); setPage(1) }}><option value="">{text.allStatuses}</option>{FEEDBACK_STATUSES.map((value) => <option key={value} value={value}>{text.adminStatuses[value]}</option>)}</select></label><button type="button" className="tool-secondary-action" disabled={loading || saving} onClick={() => setRevision((current) => current + 1)}>{text.refresh}</button></div>
+    <div className="mt-4 flex flex-wrap items-end justify-between gap-3"><label className="grid gap-2 text-sm"><span>{text.status}</span><select className="tool-field" value={status} disabled={saving} onChange={(event) => { setStatus(event.target.value as FeedbackStatus | ''); setPage(1) }}><option value="">{text.allStatuses}</option>{FEEDBACK_STATUSES.map((value) => <option key={value} value={value}>{text.adminStatuses[value]}</option>)}</select></label><button type="button" className="tool-secondary-action" disabled={loading || thread.loading || saving} onClick={() => { setRevision((current) => current + 1); void thread.refresh() }}>{text.refresh}</button></div>
     {error && <p role="alert" className="tool-alert tool-alert--error mt-4">{error}</p>}
     {loading && <p role="status" className="mt-4 text-sm text-ink-muted">{text.loading}</p>}
     <div className="feedback-admin-workbench mt-5">
@@ -49,14 +50,13 @@ export default function FeedbackSection({ active, canManage = false }: { active:
         </button></li>)}</ul>
         {data && <PaginationControls pagination={data.pagination} loading={loading || saving} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1) }} />}
       </div>
-      <div ref={detailRegion} className="feedback-admin-detail min-w-0">{selected ? <FeedbackWorkspace key={selected} id={selected} active={active} canManage={canManage} onBusyChange={setSaving} onSaved={() => setRevision((current) => current + 1)} /> : <p className="py-8 text-sm text-ink-muted">{text.selectFeedback}</p>}</div>
+      <div ref={detailRegion} className="feedback-admin-detail min-w-0">{selected ? <FeedbackWorkspace key={selected} thread={thread} canManage={canManage} onSaved={() => setRevision((current) => current + 1)} /> : <p className="py-8 text-sm text-ink-muted">{text.selectFeedback}</p>}</div>
     </div>
   </section>
 }
 
-function FeedbackWorkspace({ id, active, canManage, onBusyChange, onSaved }: { id: string; active: boolean; canManage: boolean; onBusyChange: (busy: boolean) => void; onSaved: () => void }) {
+function FeedbackWorkspace({ thread, canManage, onSaved }: { thread: ReturnType<typeof useFeedbackThread>; canManage: boolean; onSaved: () => void }) {
   const text = copy.feedback
-  const thread = useFeedbackThread('admin', id, active)
   const formId = useId()
   const [draftStatus, setDraftStatus] = useState<FeedbackStatus | null>(null)
   const [assignment, setAssignment] = useState<'keep' | 'mine' | 'unassigned'>('keep')
@@ -64,10 +64,9 @@ function FeedbackWorkspace({ id, active, canManage, onBusyChange, onSaved }: { i
   const [internalNote, setInternalNote] = useState('')
   const [reason, setReason] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
-  useEffect(() => { onBusyChange(thread.saving); return () => onBusyChange(false) }, [onBusyChange, thread.saving])
   const feedback = thread.data?.feedback as AdminFeedback | undefined
   return <div className="grid gap-5">
-    <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-base font-semibold">{text.followUp}</h2><button type="button" className="tool-secondary-action" disabled={thread.loading || thread.saving} onClick={() => { setNotice(null); void thread.refresh() }}>{text.refresh}</button></div>
+    <h2 className="text-base font-semibold">{text.followUp}</h2>
     {thread.error && <p role="alert" className="tool-alert tool-alert--error">{thread.error}</p>}
     {thread.loading && <p role="status" className="text-sm text-ink-muted">{text.loading}</p>}
     {feedback && <>

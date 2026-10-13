@@ -36,8 +36,14 @@ it('preserves drafts on a conflict and uses the refreshed revision for an audite
   expect(screen.getByLabelText(copy.feedback.publicReply)).toHaveValue('已修复，请重新生成。')
   expect(screen.getByLabelText(copy.feedback.internalNote)).toHaveValue('关联任务 42')
   revision = 1
-  await user.click(screen.getAllByRole('button', { name: copy.feedback.refresh })[1]!)
+  const requestsBeforeRefresh = mocks.api.mock.calls.length
+  await user.click(screen.getByRole('button', { name: copy.feedback.refresh }))
   await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+  const refreshedUrls = mocks.api.mock.calls.slice(requestsBeforeRefresh).map(([url]) => url)
+  expect(refreshedUrls).toContain(`/api/admin/feedback?page=1&page_size=25&status=open`)
+  expect(refreshedUrls).toContain(`/api/admin/feedback?feedback_id=${feedback.id}`)
+  expect(screen.getByLabelText(copy.feedback.publicReply)).toHaveValue('已修复，请重新生成。')
+  expect(screen.getByLabelText(copy.feedback.internalNote)).toHaveValue('关联任务 42')
   conflicts = false
   await user.click(screen.getByRole('button', { name: copy.feedback.save }))
   await screen.findByText(copy.feedback.saved)
