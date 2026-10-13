@@ -14,6 +14,8 @@ import type { OptimizeResult, UserGameAccount, WorkspaceResultHistorySummary } f
 import type { V2Session } from './OptionsDrawer'
 import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './sample-result'
 import { SANITY_PER_LMD, SANITY_PER_PURE_GOLD } from '../../lib/orundum-economy'
+import { ApiError } from '../../lib/api-client'
+import type { ResultExportFailure } from '../tool/optimize/useResultDownloads'
 
 const mocks = vi.hoisted(() => ({
   session: vi.fn(),
@@ -130,7 +132,7 @@ function connect() {
     userCanViewFullData: true, userCanDownloadFullResult: true, handleDownloadFullResult: vi.fn(),
     configValidation: { ok: true } as ReturnType<typeof validateScheduleConfig>, configPresetLabel: '2-4-3', hasResult: true, resultIsCurrent: false,
     resultHistory: [summary], loading: false, isRestrictedPreview: false, workspaceError: null, inlineError: null,
-    workspaceNotice: null, declarationDialog: null, configToast: null as { message: string } | null,
+    workspaceNotice: null, declarationDialog: null, exportFailure: null as ResultExportFailure | null, configToast: null as { message: string } | null,
     billingQuote: null as { charge: string; available: string; tier: number | null; sufficient: boolean } | null,
     billingQuoteLoading: false, billingQuoteError: null as string | null, refreshBillingQuote: vi.fn(async () => undefined),
     progress: null as import('../../components/ScheduleProgress').ScheduleProgressState | null,
@@ -619,6 +621,56 @@ describe('V2 results-first workspace', () => {
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
+  it.each(['maa', 'full'] as const)('shows %s failures inside the drawer and retries the same export without losing the selected shift', async (format) => {
+    const workflow = connect()
+    workflow.exportFailure = { format, resultId: summary.id, error: new Error('连接中断，请检查网络。') }
+    const user = userEvent.setup()
+    const page = mount()
+    await user.click(screen.getByRole('tab', { name: /第 2 班/ }))
+    await user.click(screen.getByRole('button', { name: copy.v2.export }))
+    const dialog = within(await screen.findByRole('dialog', { name: copy.v2.exportTitle }))
+    expect(dialog.getByRole('alert')).toHaveTextContent('连接中断，请检查网络。')
+    expect(dialog.getByRole('alert')).toHaveTextContent(copy.v2.exportRetryHelp)
+    await user.click(dialog.getByRole('button', { name: copy.v2.exportRetry }))
+    expect(format === 'maa' ? workflow.handleDownloadMAA : workflow.handleDownloadFullResult).toHaveBeenCalledOnce()
+    workflow.exportFailure = null
+    page.rerender(<MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter>)
+    expect(dialog.queryByRole('alert')).not.toBeInTheDocument()
+    expect(dialog.getByText(copy.v2.imageShift(copy.v2.shift(2)))).toBeInTheDocument()
+  })
+
+  it.each([
+    ['maa_export_coupon_required', 403, 'inventory', copy.v2.exportInventoryAction],
+    ['result_not_found', 404, 'plans', copy.v2.exportPlansAction],
+    ['full_result_export_forbidden', 403, 'pricing', copy.v2.comparePlans],
+    ['maa_export_result_invalid', 422, 'generation', copy.v2.exportGenerateAction],
+    ['login_required', 401, 'generation', copy.v2.exportLoginAction],
+  ] as const)('offers recovery for %s without submitting another export', async (code, status, section, label) => {
+    const workflow = connect()
+    workflow.exportFailure = { format: 'maa', resultId: summary.id, error: new ApiError('本次导出失败', status, { code }, '/api/user/maa-export') }
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('button', { name: copy.v2.export }))
+    const dialog = within(await screen.findByRole('dialog', { name: copy.v2.exportTitle }))
+    expect(dialog.getByRole('alert')).toHaveTextContent('本次导出失败')
+    await user.click(dialog.getByRole('button', { name: label }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent(`section=${section}`))
+    if (status === 401) expect(session.retryAuth).toHaveBeenCalledOnce()
+    expect(workflow.handleDownloadMAA).not.toHaveBeenCalled()
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+  })
+
+  it('keeps failures attached to their original saved result when another result opens', async () => {
+    const workflow = connect()
+    workflow.exportFailure = { format: 'maa', resultId: 'another-result', error: new Error('另一份结果失败') }
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('button', { name: copy.v2.export }))
+    const dialog = within(await screen.findByRole('dialog', { name: copy.v2.exportTitle }))
+    expect(dialog.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it.each(['service', 'permission', 'analysis', 'preview'] as const)('keeps complete calculation exports gated by %s', async (restriction) => {
     const workflow = connect()
     if (restriction === 'service') mocks.features.mockReturnValue({ status: 'ready', features: { ...DEFAULT_SITE_FEATURES, full_result_export: false }, retry: vi.fn() })
@@ -662,11 +714,12 @@ describe('V2 results-first workspace', () => {
     const current = dialog.getByRole('button', { name: copy.domain.result_image.current })
     const all = dialog.getByRole('button', { name: copy.domain.result_image.all })
     await user.click(current)
-    expect(await dialog.findByRole('alert')).toHaveTextContent(copy.domain.result_image.failed)
+    expect(await dialog.findByRole('alert')).toHaveTextContent(copy.v2.exportImageCanvasFailed)
+    expect(dialog.getByRole('alert')).toHaveTextContent(copy.v2.exportImageHelp)
     expect(mocks.image).toHaveBeenCalledWith(expect.objectContaining({ version: 'v2', planIndex: 1, isRotationMode: false }))
     let finish!: () => void
     mocks.image.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve }))
-    await user.click(current)
+    await user.click(dialog.getByRole('button', { name: copy.v2.exportRetry }))
     expect(current).toBeDisabled()
     expect(all).toBeDisabled()
     expect(dialog.getByRole('status')).toHaveTextContent(copy.domain.result_image.busy)

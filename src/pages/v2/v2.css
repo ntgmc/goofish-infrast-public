@@ -1560,6 +1560,8 @@
 .v2-export-content .v2-error { color: var(--color-v2-error); }
 .v2-export-content .v2-button { justify-self: start; }
 .v2-export-actions { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+.v2-export-failure { display: grid; min-width: 0; gap: var(--space-xs); padding: var(--space-sm); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-control); background: var(--color-v2-inset); color: var(--v2-secondary); }
+.v2-export-failure p { overflow-wrap: anywhere; }
 .v2-export-guides summary { min-height: 44px; }
 
 .v2-search {

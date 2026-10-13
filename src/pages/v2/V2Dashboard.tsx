@@ -117,6 +117,8 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const showManual = canManual || (features.manual_schedule && restrictedPreview)
   const canViewTraining = Boolean(workflow?.userCanUseUpgradeFeatures || workflow?.suggestions?.length)
   const manualKey = useMemo(() => manualSourceKey(result), [result])
+  const exportResultId = workflow?.currentResult || workflow?.finalResult ? workflow.progress?.historyResultId ?? workflow.progress?.jobId : workflow?.historyItem?.id ?? workflow?.latestWorkspaceResult?.id
+  const exportFailure = !sample && workflow?.exportFailure?.resultId === exportResultId ? workflow?.exportFailure : null
   const simulationBaseline = workflow?.historyItem?.config ? { id: workflow.historyItem.id, config: workflow.historyItem.config }
     : workflow?.progress?.historyResultId || workflow?.progress?.jobId || workflow?.latestWorkspaceResult?.id
       ? { id: workflow.progress?.historyResultId ?? workflow.progress?.jobId ?? workflow.latestWorkspaceResult!.id, config } : undefined
@@ -326,7 +328,8 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           <footer className="v2-footer"><span>{text.brand}</span><nav>{(['pricing', 'status', 'support', 'terms', 'privacy', 'disclaimer'] as const).filter((entry) => v2SectionAvailable(entry, features)).map((entry) => <Link key={entry} to={v2Path(entry, session.activeProfile?.id)}>{sectionLabels[entry]}</Link>)}</nav></footer>
         </main>
       </div>
-      <ResultExportDrawer key={`${session.activeProfile?.id ?? 'sample'}:${manualKey}`} open={exportOpen} onOpenChange={setExportOpen} result={result} prepared={prepared} shift={shift} busy={busy}
+      <ResultExportDrawer key={`${session.activeProfile?.id ?? 'sample'}:${exportResultId ?? manualKey}`} open={exportOpen} onOpenChange={setExportOpen} result={result} prepared={prepared} shift={shift} busy={busy} failure={exportFailure}
+        onRecover={(action) => { setExportOpen(false); navigateSection(action === 'login' ? 'generation' : action); if (action === 'login') session.retryAuth() }}
         onDownloadMaa={!sample && features.maa_export ? onExport : undefined} onDownloadSample={sample ? downloadSample : undefined}
         onDownloadFullResult={!sample && canViewAnalysis && !result.preview_limit && features.full_result_export && workflow?.userCanDownloadFullResult ? workflow.handleDownloadFullResult : undefined} />
       <OptionsDrawer panel={panel} onClose={closePanel} onOpenProfile={openProfile} onNavigate={navigateSection} session={guardedSession} config={config} operators={sortedOperators}

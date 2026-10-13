@@ -21,6 +21,26 @@ afterEach(() => {
 })
 
 describe('usePersonalUseDeclaration', () => {
+  it.each(['load', 'confirm'])('routes %s failures to the protected operation’s error handler', async (stage) => {
+    const run = vi.fn()
+    const onError = vi.fn()
+    const onOperationError = vi.fn()
+    if (stage === 'load') mocks.apiJson.mockRejectedValueOnce(new Error('无法读取声明'))
+    else mocks.apiJson.mockResolvedValueOnce({ declaration, accepted: false, effective: true })
+      .mockRejectedValueOnce(new Error('确认失败'))
+      .mockResolvedValueOnce({ declaration, accepted: false, effective: true })
+    render(<Harness run={run} onError={onError} onOperationError={onOperationError} />)
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: '开始生成' }))
+    if (stage === 'confirm') {
+      await user.click(await screen.findByRole('checkbox'))
+      await user.click(screen.getByRole('button', { name: '确认并继续' }))
+    }
+    await waitFor(() => expect(onOperationError).toHaveBeenCalledWith(stage === 'load' ? '无法读取声明' : '确认失败'))
+    expect(run).not.toHaveBeenCalled()
+    expect(onError).not.toHaveBeenCalled()
+  })
+
   it('posts the server document identity and replays the protected operation', async () => {
     const run = vi.fn()
     const onError = vi.fn()
@@ -60,7 +80,7 @@ describe('usePersonalUseDeclaration', () => {
   })
 })
 
-function Harness({ run, onError }: { run: () => void; onError: (message: string) => void }) {
+function Harness({ run, onError, onOperationError }: { run: () => void; onError: (message: string) => void; onOperationError?: (message: string) => void }) {
   const { guard, declarationDialog } = usePersonalUseDeclaration({
     enabled: true,
     profileId: 'profile-1',
@@ -68,7 +88,7 @@ function Harness({ run, onError }: { run: () => void; onError: (message: string)
   })
   return (
     <>
-      <button type="button" onClick={() => void guard('optimization_generate', run)}>开始生成</button>
+      <button type="button" onClick={() => void guard('optimization_generate', run, undefined, onOperationError)}>开始生成</button>
       {declarationDialog}
     </>
   )

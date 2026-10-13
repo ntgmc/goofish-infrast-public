@@ -11,6 +11,7 @@ type PendingOperation = {
   action: PersonalUseDeclarationAction
   profileId: string | null
   run: () => void | Promise<void>
+  onError: (message: string) => void
 }
 
 type DeclarationStatus = {
@@ -45,6 +46,7 @@ export function usePersonalUseDeclaration({
     action: PersonalUseDeclarationAction,
     run: () => void | Promise<void>,
     operationProfileId: string | null = profileId ?? null,
+    onOperationError = onError,
   ) => {
     if (!enabled) {
       await run()
@@ -59,11 +61,11 @@ export function usePersonalUseDeclaration({
         await run()
         return
       }
-      pendingRef.current = { action, profileId: operationProfileId, run }
+      pendingRef.current = { action, profileId: operationProfileId, run, onError: onOperationError }
       setDeclaration(status.declaration)
       setOpen(true)
     } catch (error) {
-      onError(error instanceof Error && error.message ? error.message : copy.personalUse.confirmation_status_load_failed)
+      onOperationError(error instanceof Error && error.message ? error.message : copy.personalUse.confirmation_status_load_failed)
     }
   }, [enabled, onError, profileId])
 
@@ -115,12 +117,12 @@ export function usePersonalUseDeclaration({
       } catch {
         // Preserve the document already shown when refreshing the latest version fails.
       }
-      onError(error instanceof Error && error.message ? error.message : copy.personalUse.confirmation_submit_failed)
+      pending.onError(error instanceof Error && error.message ? error.message : copy.personalUse.confirmation_submit_failed)
     } finally {
       submittingRef.current = false
       setSubmitting(false)
     }
-  }, [declaration, onError])
+  }, [declaration])
 
   return {
     guard,
