@@ -1,11 +1,7 @@
 import type { Announcement, AnnouncementStats as AnnouncementReachStats } from '../../../lib/types'
 import type { ReactNode } from 'react'
 
-import { Permission, GeneratedPermission, CdkStatus, AppUserStatus, FieldErrors, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, UsageTotals, UsageDay, UsageRangeMode, UsageRange, UsageFunnelStep, UsageFailureReason, UsageFailureSample, UsageLatencyStats, UsageSklandStats, UsageAnnouncementStats, UsageCdkDistributionItem, UsageStatsResponse, CdkPermissionDistribution, CdkStatusDistribution, RiskReasonStats, RiskTrendDay, CdkOpsSummary, RiskControlSettings, AdminProfileAccessSummary, AdminProfileOperatorData, EMPTY_ANNOUNCEMENT_REACH_STATS, permissionLabels, statusLabels, appUserStatusLabels, cdkProductPermissions, cdkProductPermissionRank } from '../contracts'
-
-export function InfoRow({ label, value }: { label: string; value: string }) {
-return <div className="flex items-center justify-between gap-4 border-b border-surface-3 pb-2 last:border-0"><dt className="text-ink-muted">{label}</dt><dd className="font-medium text-ink-primary">{value}</dd></div>
-}
+import { Permission, GeneratedPermission, CdkStatus, AppUserStatus, FieldErrors, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, CdkPermissionDistribution, CdkStatusDistribution, RiskReasonStats, RiskTrendDay, CdkOpsSummary, RiskControlSettings, AdminProfileAccessSummary, AdminProfileOperatorData, permissionLabels, statusLabels, appUserStatusLabels, cdkProductPermissions, cdkProductPermissionRank } from '../contracts'
 
 export function DetailItem({ label, value }: { label: ReactNode; value: string }) {
   return (
@@ -49,33 +45,6 @@ export function SmallButton({ children, onClick, loading, tone = 'default', auto
       ? 'border-success/40 bg-success/10 text-success hover:border-success/60 hover:bg-success/20 hover:text-success'
       : ''
   return <button type="button" onClick={onClick} disabled={loading} data-dialog-initial-focus={autoFocus ? '' : undefined} className={`tool-secondary-action min-h-11 px-3 text-xs ${className}`}>{loading ? '处理中' : children}</button>
-}
-
-export function buildSummary(records: AdminCdkRecord[], usage?: UsageTotals, adminUsers = 0, ops?: CdkOpsSummary) {
-const totalCdks = ops?.status_distribution.reduce((sum, item) => sum + item.total, 0) ?? records.length
-const usedCdks = ops?.status_distribution.find((item) => item.status === 'used')?.total ?? records.filter((record) => record.status === 'used').length
-const frozenCdks = ops?.freezes ?? records.filter((record) => record.status === 'frozen').length
-const riskEvents = ops ? ops.risk_reasons.reduce((sum, item) => sum + item.count, 0) : records.reduce((sum, record) => sum + (record.risk_event_count ?? 0), 0)
-const scheduleGenerates = usage?.schedule_generates ?? 0
-const scheduleFailures = usage?.schedule_failures ?? 0
-const scheduleAttempts = scheduleGenerates + scheduleFailures
-  return {
-    totalCdks,
-    usedCdks,
-    frozenCdks,
-    riskEvents,
-    adminUsers,
-    uniqueVisitors: usage?.unique_visitors ?? 0,
-    visits: usage?.visits ?? 0,
-    freePreviews: usage?.free_previews ?? 0,
-    registers: usage?.registers ?? 0,
-    scheduleGenerates,
-    scheduleFailures,
-    scheduleAttempts,
-    scheduleSuccessRate: scheduleAttempts ? Math.round((scheduleGenerates / scheduleAttempts) * 1000) / 10 : 0,
-    cdkRedeems: usage?.cdk_redeems ?? 0,
-    redeemRate: usage?.visits ? Math.round(((usage?.cdk_redeems ?? 0) / usage.visits) * 1000) / 10 : 0,
-  }
 }
 
 export function buildCdkOpsSummary(records: AdminCdkRecord[]): CdkOpsSummary {
@@ -165,178 +134,6 @@ function buildRiskTrendDays(trendMap: Map<string, RiskTrendDay>): RiskTrendDay[]
     dates.push(date)
   }
   return dates.map((date) => trendMap.get(date) ?? { date, soft_blocks: 0, freezes: 0, escalations: 0, total: 0 })
-}
-
-export function buildUsageStatsQuery(range: UsageRangeMode, from: string, to: string): string | null {
-  if (range !== 'custom') return `range=${range}`
-  if (!isDateInputString(from) || !isDateInputString(to) || from > to) return null
-  return `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
-}
-
-export function getDateOffsetString(offset: number): string {
-  const now = new Date()
-  const date = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() - offset))
-  return date.toISOString().slice(0, 10)
-}
-
-function isDateInputString(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value)
-}
-
-function normalizeUsageTotals(value: Partial<UsageTotals> | undefined): UsageTotals {
-  const freePreviews = normalizeCount(value?.free_previews)
-  const cdkRedeems = normalizeCount(value?.cdk_redeems)
-  return {
-    unique_visitors: normalizeCount(value?.unique_visitors),
-    visits: normalizeCount(value?.visits),
-    free_previews: freePreviews,
-    registers: normalizeCount(value?.registers),
-    schedule_generates: normalizeCount(value?.schedule_generates),
-    cdk_redeems: cdkRedeems,
-    account_additions: value?.account_additions === undefined
-      ? freePreviews + cdkRedeems
-      : normalizeCount(value.account_additions),
-    failures: normalizeCount(value?.failures),
-    schedule_failures: normalizeCount(value?.schedule_failures),
-    cdk_redeem_failures: normalizeCount(value?.cdk_redeem_failures),
-    skland_imports: normalizeCount(value?.skland_imports),
-    skland_import_failures: normalizeCount(value?.skland_import_failures),
-    announcement_impressions: normalizeCount(value?.announcement_impressions),
-    announcement_reads: normalizeCount(value?.announcement_reads),
-  }
-}
-
-function normalizeUsageDay(day: Partial<UsageDay>): UsageDay {
-  return { date: typeof day.date === 'string' ? day.date : '', ...normalizeUsageTotals(day) }
-}
-
-export function normalizeUsageStats(value: Partial<UsageStatsResponse>): UsageStatsResponse {
-  const totals = normalizeUsageTotals(value.totals)
-  const days = Array.isArray(value.days) ? value.days.map(normalizeUsageDay) : []
-  return {
-    metrics_version: typeof value.metrics_version === 'string' ? value.metrics_version : 'unknown',
-    generated_at: typeof value.generated_at === 'string' ? value.generated_at : '',
-    source: 'raw_events_and_authoritative_account_additions',
-    completeness: {
-      complete: value.completeness?.complete === true,
-      unknown_status_events: normalizeCount(value.completeness?.unknown_status_events),
-      retention_days: normalizeCount(value.completeness?.retention_days),
-      raw_events_truncated: value.completeness?.raw_events_truncated === true,
-      raw_event_limit: normalizeCount(value.completeness?.raw_event_limit),
-    },
-    totals,
-    days,
-    range: normalizeUsageRange(value.range, days),
-    funnel: Array.isArray(value.funnel) ? value.funnel.map(normalizeFunnelStep) : [],
-    failure_reasons: Array.isArray(value.failure_reasons) ? value.failure_reasons.map(normalizeFailureReason) : [],
-    recent_failures: Array.isArray(value.recent_failures) ? value.recent_failures.map(normalizeFailureSample) : [],
-    latency: {
-      schedule_generate: normalizeLatencyStats(value.latency?.schedule_generate),
-    },
-    skland: normalizeSklandStats(value.skland),
-    announcement: normalizeAnnouncementStats(value.announcement),
-    cdk_distribution: Array.isArray(value.cdk_distribution) ? value.cdk_distribution.map(normalizeCdkDistributionItem) : [],
-  }
-}
-
-function normalizeUsageRange(value: Partial<UsageRange> | undefined, days: UsageDay[]): UsageRange {
-  return {
-    from: typeof value?.from === 'string' ? value.from : days[0]?.date ?? '',
-    to: typeof value?.to === 'string' ? value.to : days[days.length - 1]?.date ?? '',
-    days: normalizeCount(value?.days) || days.length,
-  }
-}
-
-function normalizeFunnelStep(value: Partial<UsageFunnelStep>): UsageFunnelStep {
-  return {
-    key: typeof value.key === 'string' ? value.key : '',
-    label: typeof value.label === 'string' ? value.label : '',
-    count: normalizeCount(value.count),
-    conversion_rate: normalizeNumber(value.conversion_rate),
-    dropoff: normalizeCount(value.dropoff),
-  }
-}
-
-function normalizeFailureReason(value: Partial<UsageFailureReason>): UsageFailureReason {
-  return {
-    reason_code: typeof value.reason_code === 'string' ? value.reason_code : 'unknown_failure',
-    count: normalizeCount(value.count),
-    percentage: normalizeNumber(value.percentage),
-    last_seen_at: typeof value.last_seen_at === 'string' ? value.last_seen_at : null,
-    events: value.events && typeof value.events === 'object' ? value.events : {},
-  }
-}
-
-function normalizeFailureSample(value: Partial<UsageFailureSample>): UsageFailureSample {
-  return {
-    created_at: typeof value.created_at === 'string' ? value.created_at : '',
-    event: typeof value.event === 'string' ? value.event : '',
-    reason_code: typeof value.reason_code === 'string' ? value.reason_code : 'unknown_failure',
-    duration_ms: typeof value.duration_ms === 'number' && Number.isFinite(value.duration_ms) ? value.duration_ms : null,
-    permission: typeof value.permission === 'string' ? value.permission : null,
-    cdk_status: typeof value.cdk_status === 'string' ? value.cdk_status : null,
-    source: typeof value.source === 'string' ? value.source : null,
-    has_profile: value.has_profile === true,
-  }
-}
-
-function normalizeLatencyStats(value: Partial<UsageLatencyStats> | undefined): UsageLatencyStats {
-  return {
-    average_ms: normalizeCount(value?.average_ms),
-    p50_ms: normalizeCount(value?.p50_ms),
-    p95_ms: normalizeCount(value?.p95_ms),
-    max_ms: normalizeCount(value?.max_ms),
-    sample_count: normalizeCount(value?.sample_count),
-    days: Array.isArray(value?.days)
-      ? value.days.map((day) => ({
-        date: typeof day.date === 'string' ? day.date : '',
-        average_ms: normalizeCount(day.average_ms),
-        p95_ms: normalizeCount(day.p95_ms),
-        sample_count: normalizeCount(day.sample_count),
-      }))
-      : [],
-  }
-}
-
-function normalizeSklandStats(value: Partial<UsageSklandStats> | undefined): UsageSklandStats {
-  return {
-    attempts: normalizeCount(value?.attempts),
-    success: normalizeCount(value?.success),
-    failed: normalizeCount(value?.failed),
-    success_rate: normalizeNumber(value?.success_rate),
-    credential_invalid: normalizeCount(value?.credential_invalid),
-    refresh_forbidden: normalizeCount(value?.refresh_forbidden),
-    not_bound: normalizeCount(value?.not_bound),
-    request_failed: normalizeCount(value?.request_failed),
-    days: Array.isArray(value?.days)
-      ? value.days.map((day) => ({
-        date: typeof day.date === 'string' ? day.date : '',
-        attempts: normalizeCount(day.attempts),
-        success: normalizeCount(day.success),
-        failed: normalizeCount(day.failed),
-        success_rate: normalizeNumber(day.success_rate),
-      }))
-      : [],
-  }
-}
-
-function normalizeAnnouncementStats(value: Partial<UsageAnnouncementStats> | undefined): UsageAnnouncementStats {
-  return {
-    impressions: normalizeCount(value?.impressions),
-    reads: normalizeCount(value?.reads),
-    unread: normalizeCount(value?.unread),
-    read_rate: normalizeNumber(value?.read_rate),
-  }
-}
-
-function normalizeCdkDistributionItem(value: Partial<UsageCdkDistributionItem>): UsageCdkDistributionItem {
-  return {
-    permission: typeof value.permission === 'string' ? value.permission : 'unknown',
-    total: normalizeCount(value.total),
-    success: normalizeCount(value.success),
-    failure: normalizeCount(value.failure),
-    statuses: value.statuses && typeof value.statuses === 'object' ? value.statuses : {},
-  }
 }
 
 export function normalizeRiskSettings(value: Partial<RiskControlSettings> | null | undefined): RiskControlSettings {
@@ -434,12 +231,6 @@ export function formatDate(value: string | null): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString('zh-CN', { hour12: false })
-}
-
-export function formatDuration(value: number): string {
-  if (!Number.isFinite(value) || value <= 0) return '-'
-  if (value < 1000) return `${Math.round(value)}ms`
-  return `${Math.round(value / 100) / 10}s`
 }
 
 export function validateEmailInput(value: string): string | null {
@@ -551,116 +342,6 @@ export function isAppUserStatus(status: string): status is AppUserStatus {
 
 export function formatNullableNumber(value: number | null | undefined): string {
   return typeof value === 'number' && Number.isFinite(value) ? String(value) : '-'
-}
-
-export function buildCurrentOpsReport(
-  usage: UsageStatsResponse,
-  cdk: CdkOpsSummary,
-  banner: Announcement,
-  announcements: Announcement[],
-  announcementStats: Record<string, AnnouncementReachStats>,
-) {
-  return {
-    generated_at: new Date().toISOString(),
-    metrics_version: usage.metrics_version,
-    statistics_generated_at: usage.generated_at,
-    source: usage.source,
-    completeness: usage.completeness,
-    range: usage.range,
-    totals: usage.totals,
-    days: usage.days,
-    funnel: usage.funnel,
-    failure_reasons: usage.failure_reasons,
-    latency: usage.latency,
-    skland: usage.skland,
-    announcement: usage.announcement,
-    banner_item: {
-      id: banner.id,
-      title: banner.title,
-      active: banner.active,
-      updated_at: banner.updated_at,
-    },
-    announcement_items: announcements.map((announcement) => ({
-      id: announcement.id,
-      kind: announcement.kind,
-      title: announcement.title,
-      active: announcement.active,
-      updated_at: announcement.updated_at,
-      stats: announcementStats[announcement.id] ?? EMPTY_ANNOUNCEMENT_REACH_STATS,
-    })),
-    cdk_permission_distribution: cdk.permission_distribution,
-    cdk_status_distribution: cdk.status_distribution,
-    risk_trend: cdk.risk_trend,
-    risk_reasons: cdk.risk_reasons.map((item) => ({
-      type: item.type,
-      reason: item.reason,
-      count: item.count,
-      last_seen_at: item.last_seen_at,
-      latest_cdk_id: item.latest_record?.cdk_id ?? null,
-    })),
-  }
-}
-
-export function buildCurrentOpsReportCsv(report: ReturnType<typeof buildCurrentOpsReport>): string {
-  const rows: string[][] = [
-    ['section', 'key', 'label', 'date', 'value', 'extra'],
-    ['metadata', 'metrics_version', 'Metrics version', '', report.metrics_version, ''],
-    ['metadata', 'statistics_generated_at', 'Statistics generated at', report.statistics_generated_at, '', 'timezone=UTC'],
-    ['metadata', 'source', 'Source', '', report.source, ''],
-    ['metadata', 'complete', 'Complete', '', String(report.completeness.complete), `unknown_status_events=${report.completeness.unknown_status_events};retention_days=${report.completeness.retention_days};raw_events_truncated=${report.completeness.raw_events_truncated};raw_event_limit=${report.completeness.raw_event_limit}`],
-    ['range', 'from', 'From', '', report.range.from, ''],
-    ['range', 'to', 'To', '', report.range.to, ''],
-    ['range', 'days', 'Days', '', String(report.range.days), ''],
-  ]
-  for (const [key, value] of Object.entries(report.totals)) {
-    rows.push(['totals', key, key, '', String(value), ''])
-  }
-  for (const day of report.days) {
-    for (const [key, value] of Object.entries(day)) {
-      if (key === 'date') continue
-      rows.push(['days', key, key, day.date, String(value), ''])
-    }
-  }
-  for (const item of report.funnel) {
-    rows.push(['event_counts', item.key, item.label, '', String(item.count), 'independent_event_total'])
-  }
-  for (const item of report.failure_reasons) {
-    rows.push(['failure_reasons', item.reason_code, item.reason_code, item.last_seen_at ?? '', String(item.count), `percentage=${item.percentage}`])
-  }
-  for (const item of report.cdk_permission_distribution) {
-    rows.push(['cdk_permission_distribution', String(item.permission), permissionLabels[item.permission] ?? String(item.permission), '', String(item.total), `unused=${item.unused};used=${item.used};frozen=${item.frozen};revoked=${item.revoked}`])
-  }
-  for (const item of report.cdk_status_distribution) {
-    rows.push(['cdk_status_distribution', item.status, statusLabels[item.status], '', String(item.total), ''])
-  }
-  for (const day of report.risk_trend) {
-    rows.push(['risk_trend', 'risk_events', 'Risk events', day.date, String(day.total), `soft=${day.soft_blocks};freeze=${day.freezes};escalation=${day.escalations}`])
-  }
-  for (const item of report.risk_reasons) {
-    rows.push(['risk_reasons', item.type, item.reason, item.last_seen_at ?? '', String(item.count), `latest_cdk=${item.latest_cdk_id ?? ''}`])
-  }
-  const latency = report.latency.schedule_generate
-  rows.push(['latency', 'average_ms', 'Average', '', String(latency.average_ms), ''])
-  rows.push(['latency', 'p50_ms', 'P50', '', String(latency.p50_ms), ''])
-  rows.push(['latency', 'p95_ms', 'P95', '', String(latency.p95_ms), ''])
-  rows.push(['latency', 'max_ms', 'Max', '', String(latency.max_ms), ''])
-  rows.push(['skland', 'success_rate', 'Success rate', '', String(report.skland.success_rate), `attempts=${report.skland.attempts};failed=${report.skland.failed}`])
-  rows.push(['announcement', 'read_rate', 'Read rate', '', String(report.announcement.read_rate), `impressions=${report.announcement.impressions};reads=${report.announcement.reads}`])
-  rows.push([
-    'banner',
-    'active',
-    report.banner_item.title,
-    report.banner_item.updated_at,
-    String(report.banner_item.active),
-    `id=${report.banner_item.id}`,
-  ])
-  for (const item of report.announcement_items) {
-    const extra = `id=${item.id};kind=${item.kind};active=${item.active};server_reads=${item.stats.server_reads};visitor_reads=${item.stats.visitor_reads}`
-    rows.push(['announcement_item', 'impressions', item.title, item.updated_at, String(item.stats.impressions), extra])
-    rows.push(['announcement_item', 'reads', item.title, item.updated_at, String(item.stats.reads), extra])
-    rows.push(['announcement_item', 'read_rate', item.title, item.updated_at, String(item.stats.read_rate), extra])
-  }
-  return rows.map((row) => row.map(csvCell).join(',')).join('\r\n')
 }
 
 export function buildGeneratedCdkCsv(cdks: GeneratedCdk[]): string {

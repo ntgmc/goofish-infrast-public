@@ -38,6 +38,7 @@ import { parseOptimizeResult } from '../optimization/jobs/runtime-contracts'
 import { resolveProfileAuthorization } from './profile-authorization'
 import { getRequestClientIp } from '../security/client-ip'
 import { hasTrainingDiagnosisEntitlement } from '../optimization/jobs/entitlements'
+import { recordMaaExport } from './usage-stats'
 
 export default async function userResultsHandler(req: Request): Promise<Response> {
   return handleUserResultsRequest(req, () => requireUserSession(req))
@@ -190,8 +191,12 @@ export async function handleUserResultsRequest(
         console.warn('MAA export behavior event skipped:', error instanceof Error ? error.message : 'unknown error')
         return false
       })
+      const recordExportUsage = () => recordMaaExport({
+        userId: auth.user.id, profileId: profile.id, jobId: historyItem.job_id, idempotencyKey: body.idempotency_key,
+      })
       if (canExportWithoutCoupon) {
         await recordExportBehavior()
+        await recordExportUsage()
         return jsonResponse({ result, result_id: historyItem.id, filename: `maa_schedule_${historyItem.id}.json`, consumed_coupon: false })
       }
       const requestHash = createHash('sha256').update(stableJsonStringify(body)).digest('hex')
@@ -205,6 +210,7 @@ export async function handleUserResultsRequest(
         response: { result, result_id: historyItem.id, filename: `maa_schedule_${historyItem.id}.json`, consumed_coupon: true },
       })
       await recordExportBehavior()
+      await recordExportUsage()
       return jsonResponse(response)
     }
 

@@ -82,15 +82,17 @@ export async function recordScheduleGenerate(
 export async function applyScheduleGenerateEffects(
   cdkRecord: Pick<CdkRecord, 'code_hash'> | null,
   context: ScheduleUsageContext,
-  timing: { submittedAt: number; attemptStartedAt?: number },
+  timing: { submittedAt: number; attemptStartedAt?: number; finishedAt?: number },
   jobId: string,
   countCdkGeneration = true,
 ): Promise<void> {
+  const finishedAt = timing.finishedAt ?? Date.now()
   await recordUsageEvent("schedule_generate", {
+    created_at: new Date(finishedAt).toISOString(),
     status: context.status,
     reason_code: context.reason_code,
-    duration_ms: Date.now() - timing.submittedAt,
-    ...(timing.attemptStartedAt !== undefined && { compute_duration_ms: Date.now() - timing.attemptStartedAt }),
+    duration_ms: finishedAt - timing.submittedAt,
+    ...(timing.attemptStartedAt !== undefined && { compute_duration_ms: finishedAt - timing.attemptStartedAt }),
     permission: context.permission,
     profile_id: context.profile_id,
     cdk_status: context.cdk_status,

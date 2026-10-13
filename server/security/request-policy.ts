@@ -773,7 +773,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/qqbot', route({ GET: none(), POST: none(), PATCH: json('standard', requestSchemas.qqBotPreferences), DELETE: none() })],
   ['/api/internal/releases/confirm', route({ POST: json('standard', requestSchemas.releaseConfirmation) })],
   ['/api/usage-stats', route({ POST: json('standard', requestSchemas.usageStats) }, ['admin'])],
-  ['/api/admin/usage-stats', route({ GET: none() }, ['admin', 'format', 'from', 'to', 'range'])],
+  ['/api/admin/usage-stats', route({ GET: none() }, ['admin', 'format', 'from', 'to', 'range', 'view'])],
   ['/api/depot-value', route({ POST: json('depot', requestSchemas.depotValue) })],
   ['/api/cultivation-plan', route({ POST: json('standard', requestSchemas.cultivationPlan) })],
   ['/api/user/announcements', route({ GET: none(), PATCH: json('standard', requestSchemas.userAnnouncement) }, ['page', 'announcement_id', 'unread_only'])],

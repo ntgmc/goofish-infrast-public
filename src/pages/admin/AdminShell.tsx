@@ -17,7 +17,7 @@ const icons = { overview: Gauge, users: Users, cdk: CreditCard, items: Boxes, in
   risk: ShieldCheck, features: Settings2, registration: UserPlus, announcement: Bell, content: FileText, feedback: MessageSquare }
 
 export function canAccessAdminSection(section: AdminSection, capabilities: AdminCapability[]): boolean {
-  if (section === 'overview') return capabilities.includes('usage_view') || capabilities.includes('risk_view')
+  if (section === 'overview') return capabilities.includes('usage_view')
   if (section === 'risk') return capabilities.includes('risk_view')
   if (section === 'users' || section === 'feedback') return capabilities.includes('user_view')
   if (section === 'queue') return capabilities.includes('optimization_view')

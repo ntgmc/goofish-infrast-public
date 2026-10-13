@@ -54,7 +54,7 @@ export default function AdminDashboardView() {
       </form></div>
   </main></DialogSurfaceProvider>
 
-  const sectionLoading = (section: AdminSection) => (c.loading && section === 'overview' && !c.usageStats)
+  const sectionLoading = (section: AdminSection) => (c.loading && section === 'overview' && !c.businessOverview)
     || (section === 'cdk' && c.cdkLoading && !c.cdkLoaded) || (section === 'users' && c.usersLoading && !c.usersLoaded)
   const syncStatus = c.loading ? '正在同步数据' : c.lastSuccessfulSyncAt ? `最近成功同步 ${formatDate(c.lastSuccessfulSyncAt)}${c.overviewPartialFailure ? '（部分数据失败）' : ''}` : '选择栏目查看数据'
   return <AdminShell section={activeSection} username={c.adminUsername} capabilities={c.adminCapabilities} syncStatus={syncStatus}

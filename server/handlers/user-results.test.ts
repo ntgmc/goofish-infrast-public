@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   getProfileForUser: vi.fn(),
   getValidatedJson: vi.fn(),
   recordTrackedExportBehaviorEvent: vi.fn(),
+  recordMaaExport: vi.fn(),
   requireUserSession: vi.fn(),
   toPublicWorkspace: vi.fn(),
   updateProfileWorkspaceInTransaction: vi.fn(),
@@ -101,6 +102,7 @@ vi.mock('../security/request-validation', () => ({
   getValidatedJson: mocks.getValidatedJson,
   stableJsonStringify: (value: unknown) => JSON.stringify(value),
 }))
+vi.mock('./usage-stats', () => ({ recordMaaExport: mocks.recordMaaExport }))
 vi.mock('./user-auth', () => ({
   jsonResponse: (body: unknown, status = 200) => new Response(status === 204 ? null : JSON.stringify(body), {
     status,
@@ -353,6 +355,7 @@ describe('MAA JSON export entitlement', () => {
       },
     })
     expect(mocks.consumeInventoryItemImmediately).not.toHaveBeenCalled()
+    expect(mocks.recordMaaExport).toHaveBeenCalledWith({ userId: 'user-1', profileId: 'profile-1', jobId: 'job-1', idempotencyKey: 'export-request-1' })
     expect(mocks.recordTrackedExportBehaviorEvent).toHaveBeenCalledWith(expect.objectContaining({
       eventKey: 'maa-export:user-1:export-request-1',
       jobId: 'job-1',
@@ -431,6 +434,7 @@ describe('MAA JSON export entitlement', () => {
       itemCode: 'maa_export_trial_coupon',
       profileId: 'profile-1',
     }))
+    expect(mocks.recordMaaExport).toHaveBeenCalledWith({ userId: 'user-1', profileId: 'profile-1', jobId: 'job-1', idempotencyKey: 'export-request-1' })
   })
 
   it('preserves the inventory error when an ordinary free preview has no coupon', async () => {
@@ -450,6 +454,7 @@ describe('MAA JSON export entitlement', () => {
       error: '没有可用的 MAA 导出体验券。',
       code: 'item_unavailable',
     })
+    expect(mocks.recordMaaExport).not.toHaveBeenCalled()
   })
 
   it('does not fail an entitled export when behavior tracking fails', async () => {

@@ -7,6 +7,7 @@ import { MotionPreferenceProvider } from '../../lib/motion-preference'
 import { DEFAULT_SITE_FEATURE_SETTINGS } from '../../lib/site-features'
 import { readFileSync } from 'node:fs'
 import AdminDashboardView from './AdminDashboardView'
+import { createOperationsOverview } from '../../test/operations-overview-fixture'
 
 const css = readFileSync('src/index.css', 'utf8')
 
@@ -30,7 +31,8 @@ beforeEach(() => {
     if (url === '/api/admin/feature-settings') return { settings: { ...DEFAULT_SITE_FEATURE_SETTINGS, revision: 3 } }
     if (url === '/api/admin/invitation-settings') return { catalog: [], stats: null }
     if (url === '/api/admin/announcement') return { banner: null, announcements: [], revision: 1, stats: {} }
-    if (url.startsWith('/api/admin/usage-stats') || url.startsWith('/api/admin/cdk') || url.startsWith('/api/admin/users')) return {}
+    if (url.startsWith('/api/admin/usage-stats')) return createOperationsOverview()
+    if (url.startsWith('/api/admin/cdk') || url.startsWith('/api/admin/users')) return {}
     throw new Error(`Unexpected request: ${url}`)
   })
 })
@@ -66,10 +68,10 @@ describe('admin page loading and navigation', () => {
     const navigation = screen.getByRole('navigation')
     expect(loading.closest('main')).toBe(main)
     expect(loading.querySelector('.page-loading-spinner')).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: '运营概览', level: 2 })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '有多少人真正用起来了？', level: 2 })).not.toBeInTheDocument()
     await act(async () => { pending.reject(new Error('统计暂不可用')) })
     expect(await screen.findByRole('alert')).toHaveTextContent('统计暂不可用')
-    expect(await screen.findByRole('heading', { name: '运营概览', level: 2 })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: '重新加载' })).toBeInTheDocument()
     expect(screen.queryByRole('status', { name: '正在加载总览…' })).not.toBeInTheDocument()
     expect(document.querySelector('.tool-header')).toBe(header)
     expect(screen.getByRole('navigation')).toBe(navigation)
@@ -84,7 +86,7 @@ describe('admin page loading and navigation', () => {
     await user.click(screen.getAllByRole('button', { name: '添加道具' })[0])
     await screen.findByRole('dialog')
     await act(async () => { await router.navigate('/admin/overview') })
-    await screen.findByRole('heading', { name: '运营概览', level: 2 })
+    await screen.findByRole('heading', { name: '有多少人真正用起来了？', level: 2 })
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     await act(async () => { await router.navigate(-1) })
     expect(await screen.findByRole('spinbutton', { name: /每日获奖邀请人数上限/ })).toHaveValue(25)
@@ -97,7 +99,7 @@ describe('admin page loading and navigation', () => {
     api.json.mockImplementation((url: string) => url === '/api/admin/feature-settings' ? pending.promise : implementation(url))
     const router = mount()
     const user = userEvent.setup()
-    await screen.findByRole('heading', { name: '运营概览', level: 2 })
+    await screen.findByRole('heading', { name: '有多少人真正用起来了？', level: 2 })
     const header = document.querySelector('.tool-header')
     const navigation = screen.getByRole('navigation')
     await user.click(screen.getByRole('link', { name: '功能开关' }))
@@ -109,12 +111,12 @@ describe('admin page loading and navigation', () => {
     await user.click(registration)
     expect(registration).not.toBeChecked()
     await user.click(screen.getByRole('link', { name: '总览' }))
-    await screen.findByRole('heading', { name: '运营概览', level: 2 })
+    await screen.findByRole('heading', { name: '有多少人真正用起来了？', level: 2 })
     await act(async () => { await router.navigate(-1) })
     expect(await screen.findByRole('checkbox', { name: /用户注册/ })).toBe(registration)
     expect(registration).not.toBeChecked()
     await act(async () => { await router.navigate(1) })
-    await screen.findByRole('heading', { name: '运营概览', level: 2 })
+    await screen.findByRole('heading', { name: '有多少人真正用起来了？', level: 2 })
     await act(async () => {
       await router.navigate('/admin/features')
       await router.navigate('/admin/overview')
@@ -137,7 +139,7 @@ describe('admin page loading and navigation', () => {
     expect(screen.queryByRole('heading', { name: '重置用户密码' })).not.toBeInTheDocument()
     expect(api.json.mock.calls.some(([url]) => /usage-stats|announcement|\/cdk|risk-settings/.test(url))).toBe(false)
     await act(async () => { await router.navigate('/admin/features') })
-    await screen.findByRole('heading', { name: '运营概览', level: 2 })
+    await screen.findByRole('heading', { name: '有多少人真正用起来了？', level: 2 })
     expect(api.json.mock.calls.some(([url]) => url === '/api/admin/feature-settings')).toBe(false)
   })
 

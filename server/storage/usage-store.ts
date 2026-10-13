@@ -1,6 +1,6 @@
 import { query } from './postgres'
 
-const USAGE_RETENTION_DAYS = 180
+export const USAGE_RETENTION_DAYS = 180
 const USAGE_CLEANUP_INTERVAL_MS = 60 * 60 * 1000
 const USAGE_CLEANUP_BATCH_SIZE = 2_000
 const USAGE_METRICS_VERSION = '2026-08-03.v2'
@@ -15,6 +15,8 @@ export type UsageEventName =
   | 'register'
   | 'cdk_redeem'
   | 'schedule_generate'
+  | 'maa_export'
+  | 'business_metrics_started'
   | 'metered_billing'
   | 'skland_import'
   | 'announcement_impression'
@@ -67,6 +69,7 @@ export interface UsageEventRecord {
   reason_code?: UsageReasonCode
   permission?: string
   profile_id?: string
+  generation_id?: string
   cdk_status?: string
   source?: string
   schedule_mode?: string
@@ -342,7 +345,7 @@ export function createPostgresUsageEventStore(): UsageEventStore {
   return {
     set: async (key, record) => {
       await maybeCleanupExpiredUsageEvents()
-      const expiresAt = new Date(
+      const expiresAt = record.event === 'business_metrics_started' ? 'infinity' : new Date(
         Date.parse(record.created_at) + USAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000,
       ).toISOString()
       await query(

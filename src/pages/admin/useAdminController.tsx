@@ -3,7 +3,7 @@ import type { AnnouncementAdminResponse } from '../../lib/types'
 import type { AdminBalanceTransaction, BalancePage } from '../../lib/balance-contracts'
 import { ADMIN_SESSION_EXPIRED_EVENT, adminApiJson as apiJson, adminApiVoid as apiVoid } from '../../lib/admin-api-client'
 import { ApiError } from '../../lib/api-client'
-import { GeneratedPermission, CdkType, FieldErrors, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, AdminCdkDetail, RiskControlSettings, RiskControlSettingsPatch, AdminUserSummary, AdminSessionUser, AdminCapability, AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, DEFAULT_RISK_SETTINGS, cdkProductPermissions, MAX_CDK_BATCH_COUNT, normalizeRiskSettings, validateEmailInput, validatePasswordInput, normalizeGeneratedCdks, normalizeProductPermission, buildCurrentOpsReport, buildCurrentOpsReportCsv, buildGeneratedCdkCsv, downloadBlob, downloadOperatorsJson, formatDownloadTimestamp } from './modules'
+import { GeneratedPermission, CdkType, FieldErrors, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, AdminCdkDetail, RiskControlSettings, RiskControlSettingsPatch, AdminSessionUser, AdminCapability, AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, DEFAULT_RISK_SETTINGS, cdkProductPermissions, MAX_CDK_BATCH_COUNT, normalizeRiskSettings, validateEmailInput, validatePasswordInput, normalizeGeneratedCdks, normalizeProductPermission, buildGeneratedCdkCsv, downloadBlob, downloadOperatorsJson, formatDownloadTimestamp } from './modules'
 import type { AdminSection } from './contracts'
 import { useAdminCdkData } from './cdk/useAdminCdkData'
 import { useAdminOverview } from './overview/useAdminOverview'
@@ -16,6 +16,7 @@ import { cancelAdminOperation, requestAdminOperationEdit, requestAdminOperationR
 import { createAdminProfileActions } from './users/profile-actions'
 import { useAdminUserList } from './users/useAdminUserList'
 import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
+import { operationsOverviewCsv } from '../../lib/operations-overview'
 
 function errorMessage(value: unknown): string {
   return value instanceof Error && value.message ? value.message : '未知错误'
@@ -44,8 +45,6 @@ export function useAdminController(section: AdminSection = 'overview') {
   const [authenticated, setAuthenticated] = useState(false)
 
   const [sessionChecking, setSessionChecking] = useState(true)
-
-  const [users, setUsers] = useState<AdminUserSummary[]>([])
 
   const {
     banner,
@@ -112,16 +111,16 @@ export function useAdminController(section: AdminSection = 'overview') {
   const clearNotice = useCallback(() => setNotice(null), [])
 
   const userList = useAdminUserList({
-    setAdminUsers: setUsers, setBusyAction, setError, setNotice,
+    setBusyAction, setError, setNotice,
     closeDetail: () => setSelectedUserDetail(null),
   })
   const { setAppUsers, loadUsersPage, setSelectedUserIds, setUsersLoaded } = userList
 
   const cdkData = useAdminCdkData({ authenticated, capabilities: adminCapabilities, section, setError })
   const { records, cdkSearchInput, cdkPage, cdkPageSize, cdkSearch, statusFilter, permissionFilter, riskFilter, generatedFilter,
-    cdkTypeFilter, cdkFilters, cdkOpsSummary, loadCdkPage, loadRiskPage, loadCdkSummary, resetCdkData } = cdkData
-  const overview = useAdminOverview(records, users.length, cdkOpsSummary)
-  const { usageStats, usageRange, setUsageStats, loadUsageStats } = overview
+    cdkTypeFilter, cdkFilters, loadCdkPage, loadRiskPage, loadCdkSummary, resetCdkData } = cdkData
+  const overview = useAdminOverview()
+  const { businessOverview, setBusinessOverview, loadUsageStats } = overview
   const visibleRecords = records
 
   const selectedRecords = useMemo(() => {
@@ -141,11 +140,10 @@ export function useAdminController(section: AdminSection = 'overview') {
       cancelAdminOperation()
       setAuthenticated(false)
       resetCdkData()
-      setUsers([])
       setAppUsers([])
       setUsersLoaded(false)
       setSelectedUserIds([])
-      setUsageStats(null)
+      setBusinessOverview(null)
       setRiskSettings(DEFAULT_RISK_SETTINGS)
       setSelectedCdkHashes([])
       setSelectedCdkDetail(null)
@@ -175,10 +173,10 @@ export function useAdminController(section: AdminSection = 'overview') {
       const sequence = overviewRequestRef.current.sequence + 1
       overviewRequestRef.current = { sequence, controller }
       try {
-        const canManageAdminData = adminCapabilities.includes('admin_manage') && (section === 'overview' || section === 'announcement')
-        const canViewRisk = adminCapabilities.includes('risk_view') && (section === 'overview' || section === 'risk')
+        const canManageAdminData = adminCapabilities.includes('admin_manage') && section === 'announcement'
+        const canViewRisk = adminCapabilities.includes('risk_view') && section === 'risk'
         const canViewUsage = adminCapabilities.includes('usage_view') && section === 'overview'
-        const canViewCdkSummary = adminCapabilities.includes('admin_manage') && ['overview', 'cdk', 'risk'].includes(section)
+        const canViewCdkSummary = adminCapabilities.includes('admin_manage') && ['cdk', 'risk'].includes(section)
         const [usageResult, announcementResult, riskSettingsResult, cdkSummaryResult] = await Promise.allSettled([
           canViewUsage
             ? loadUsageStats(controller.signal)
@@ -336,21 +334,19 @@ export function useAdminController(section: AdminSection = 'overview') {
 
   const handleExportUsageReport = async (format: 'csv' | 'json') => {
       if (!authenticated) return
-      if (!usageStats) {
-        setError('统计数据尚未加载完成')
+      if (!businessOverview || loading) {
+        setError('请等待当前报表加载完成后再导出。')
         return
       }
       setBusyAction(`report:${format}`)
       setError(null)
       setNotice(null)
       try {
-        const range = usageStats?.range
-        const filenameRange = range?.from && range?.to ? `${range.from}_${range.to}` : usageRange
-        const report = buildCurrentOpsReport(usageStats, cdkOpsSummary, banner, announcements, announcementStats)
+        const filenameRange = `${businessOverview.current.from}_${businessOverview.current.to}`
         const blob = format === 'json'
-          ? new Blob([JSON.stringify(report, null, 2)], { type: 'application/json;charset=utf-8' })
-          : new Blob([`\uFEFF${buildCurrentOpsReportCsv(report)}`], { type: 'text/csv;charset=utf-8' })
-        downloadBlob(blob, `admin-ops-report-${filenameRange}.${format}`)
+          ? new Blob([JSON.stringify(businessOverview, null, 2)], { type: 'application/json;charset=utf-8' })
+          : new Blob([`\uFEFF${operationsOverviewCsv(businessOverview)}`], { type: 'text/csv;charset=utf-8' })
+        downloadBlob(blob, `admin-business-report-${filenameRange}.${format}`)
         setNotice(format === 'csv' ? 'CSV 报表已导出' : 'JSON 报表已导出')
       } catch (caught) {
         setError((caught as Error).message)

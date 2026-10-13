@@ -1,6 +1,20 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { OptimizeResult } from '../../../src/lib/types'
-import { limitPreviewOptimizeResult } from './entitlements'
+import { applyScheduleGenerateEffects, limitPreviewOptimizeResult } from './entitlements'
+import { setUsageEventStoreForTesting } from '../../handlers/usage-stats'
+import { buildUsageStats } from '../../storage/usage-store'
+
+afterEach(() => setUsageEventStoreForTesting(null))
+
+it('records actual job completion and waiting time when an effect is delivered later', async () => {
+  const set = vi.fn(async () => undefined)
+  setUsageEventStoreForTesting({ set, list: async () => [], getStats: async (dates) => buildUsageStats([], dates) })
+  await applyScheduleGenerateEffects(null, { status: 'success', reason_code: 'ok', profile_id: 'profile-1' },
+    { submittedAt: 1_000, attemptStartedAt: 1_500, finishedAt: 2_000 }, 'job-1')
+  expect(set).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+    created_at: '1970-01-01T00:00:02.000Z', duration_ms: 1_000, compute_duration_ms: 500,
+  }))
+})
 
 describe('preview search statistics', () => {
   it.each([0, 123456])('preserves %s recorded states while removing advanced data', (count) => {

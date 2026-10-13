@@ -12,6 +12,7 @@ import {
   writeAnnouncementDraft,
 } from './announcements/announcement-draft'
 import { useAdminController } from './useAdminController'
+import { createOperationsOverview } from '../../test/operations-overview-fixture'
 
 const adminApi = vi.hoisted(() => ({
   blob: vi.fn(),
@@ -90,7 +91,7 @@ describe('useAdminController announcement drafts', () => {
       if (url.startsWith('/api/admin/usage-stats')) {
         const pending = deferredUsageResponses.shift()
         if (pending) return pending.promise
-        return { totals: { visits: usageVisits } }
+        return createOperationsOverview(usageVisits)
       }
       if (url === '/api/admin/risk-settings') return {}
       if (url.startsWith('/api/admin/cdk')) return {}
@@ -199,7 +200,7 @@ describe('useAdminController announcement drafts', () => {
   })
 
   it('flushes the latest edit before session reset and restores it after login', async () => {
-    const { result } = renderHook(() => useAdminController())
+    const { result } = renderHook(() => useAdminController('announcement'))
     await waitForHydration(result)
 
     act(() => result.current.updateBanner({ title: '会话过期前的草稿' }))
@@ -217,7 +218,7 @@ describe('useAdminController announcement drafts', () => {
   })
 
   it('autosaves after the debounce and clears the draft after publishing', async () => {
-    const { result } = renderHook(() => useAdminController())
+    const { result } = renderHook(() => useAdminController('announcement'))
     await waitForHydration(result)
 
     act(() => result.current.updateAnnouncement('popup-one', { body: '自动保存后的正文' }))
@@ -232,7 +233,7 @@ describe('useAdminController announcement drafts', () => {
   })
 
   it('keeps drafts isolated when another administrator logs in', async () => {
-    const { result } = renderHook(() => useAdminController())
+    const { result } = renderHook(() => useAdminController('announcement'))
     await waitForHydration(result)
 
     act(() => result.current.updateBanner({ title: 'Alice 的本机草稿' }))
@@ -253,7 +254,7 @@ describe('useAdminController announcement drafts', () => {
   })
 
   it('keeps a local draft when publishing fails and removes it after reverting to the server baseline', async () => {
-    const { result } = renderHook(() => useAdminController())
+    const { result } = renderHook(() => useAdminController('announcement'))
     await waitForHydration(result)
 
     act(() => result.current.updateBanner({ title: '尚未发布的草稿' }))
@@ -274,7 +275,7 @@ describe('useAdminController announcement drafts', () => {
       announcements: serverAnnouncements.announcements,
     }, window.localStorage, '2026-07-24T13:00:00.000Z')
 
-    const { result } = renderHook(() => useAdminController())
+    const { result } = renderHook(() => useAdminController('announcement'))
     await waitFor(() => expect(result.current.banner.title).toBe('本机冲突草稿'))
     expect(result.current.announcementDraftConflict).toBe(true)
     expect(result.current.announcementDraftRestored).toBe(true)
@@ -504,20 +505,48 @@ describe('useAdminController announcement drafts', () => {
     expect(result.current.error).toContain('用户已注销')
   })
 
-  it('keeps successful overview blocks when another block fails', async () => {
-    const { result } = renderHook(() => useAdminController())
-    await waitForHydration(result)
+  it('loads the business snapshot without coupling it to announcement, CDK or user list availability', async () => {
     usageVisits = 42
     failAnnouncementGet = true
+    failUserPageGet = true
+    const { result } = renderHook(() => useAdminController())
+    await waitForHydration(result)
 
-    await act(async () => result.current.loadDashboard())
-
-    expect(result.current.usageStats?.totals.visits).toBe(42)
-    expect(result.current.banner.title).toBe('线上横幅')
-    expect(result.current.overviewPartialFailure).toBe(true)
+    expect(result.current.businessOverview?.current.successful_users).toBe(42)
+    expect(result.current.overviewPartialFailure).toBe(false)
     expect(result.current.lastSuccessfulSyncAt).not.toBeNull()
-    expect(result.current.error).toContain('部分概览数据刷新失败')
-    expect(result.current.error).toContain('线上公告加载失败')
+    expect(result.current.error).toBeNull()
+    expect(adminApi.json.mock.calls.some(([url]) => url.includes('view=business') && url.includes('range=30d'))).toBe(true)
+    expect(adminApi.json.mock.calls.some(([url]) => url.startsWith('/api/admin/announcement') || url.startsWith('/api/admin/cdk') || url.startsWith('/api/admin/users'))).toBe(false)
+  })
+
+  it.each(['csv', 'json'] as const)('exports the completed business snapshot and blocks export during refresh (%s)', async (format) => {
+    const createObjectURL = vi.fn((_blob: Blob) => 'blob:business-report')
+    const revokeObjectURL = vi.fn()
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL })
+    let filename = ''
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { filename = this.download })
+    const { result } = renderHook(() => useAdminController())
+    await waitForHydration(result)
+    const pending = deferred<unknown>()
+    deferredUsageResponses.push(pending)
+    let refresh!: Promise<void>
+    act(() => { refresh = result.current.loadDashboard() })
+    await act(() => result.current.handleExportUsageReport(format))
+    expect(createObjectURL).not.toHaveBeenCalled()
+    const snapshot = createOperationsOverview(22)
+    await act(async () => { pending.resolve(snapshot); await refresh })
+    await act(() => result.current.handleExportUsageReport(format))
+    expect(filename).toBe(`admin-business-report-${snapshot.current.from}_${snapshot.current.to}.${format}`)
+    const blob = createObjectURL.mock.calls[0]?.[0] as unknown as Blob
+    const text = await new Promise<string>((resolve) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.readAsText(blob) })
+    if (format === 'json') expect(JSON.parse(text)).toEqual(snapshot)
+    else {
+      expect(text).toContain('"usage","successful_users","","22","32"')
+      expect(text).toContain('"coverage","complete","","true","true"')
+      expect(text).toContain('"metadata","metrics_version","","business.v1"')
+    }
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:business-report')
   })
 
   it('does not let an older overview response overwrite a newer range response', async () => {
@@ -534,15 +563,15 @@ describe('useAdminController announcement drafts', () => {
       newerLoad = result.current.loadDashboard()
     })
     await act(async () => {
-      newer.resolve({ totals: { visits: 22 } })
+      newer.resolve(createOperationsOverview(22))
       await newerLoad
     })
     await act(async () => {
-      older.resolve({ totals: { visits: 11 } })
+      older.resolve(createOperationsOverview(11))
       await olderLoad
     })
 
-    expect(result.current.usageStats?.totals.visits).toBe(22)
+    expect(result.current.businessOverview?.current.successful_users).toBe(22)
   })
 
   it('reports a successful user mutation separately from a failed background refresh', async () => {

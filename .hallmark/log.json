@@ -1,5 +1,18 @@
 [
   {
+    "date": "2026-10-13",
+    "scope": "admin/overview",
+    "macrostructure": "Workbench",
+    "theme": "existing V2 variant",
+    "theme_axes": "light and dark / geometric-sans / warm-copper",
+    "enrichment": "none",
+    "nav": "existing grouped side rail and mobile menu",
+    "variation": "business question hierarchy, outcome-first metrics, shared cohorts and observation states",
+    "brief": "Rebuild operations overview around successful usage, new user activation, reuse, generation experience and unit cost",
+    "design_system": "design.md",
+    "report": "docs/operations-overview.md"
+  },
+  {
     "date": "2026-10-07",
     "scope": "admin",
     "macrostructure": "Workbench",

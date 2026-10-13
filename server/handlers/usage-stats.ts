@@ -11,6 +11,8 @@ import {
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson, RequestInputError } from '../security/request-validation'
 import { getRequestClientIp } from '../security/client-ip'
+import { getOperationsOverview } from '../storage/operations-overview-store'
+import { isOperationsDate, operationsDate, operationsOverviewCsv, shiftOperationsDate } from '../../src/lib/operations-overview'
 
 const EVENT_PREFIX = 'events/'
 const VALID_VISITOR_ID = /^[A-Za-z0-9_-]{8,128}$/
@@ -24,12 +26,14 @@ const DEVELOPMENT_USAGE_SECRET = randomBytes(32).toString('base64url')
 type UsageEventInput = string | null | Partial<Pick<
   UsageEventRecord,
   | 'visitor_id'
+  | 'created_at'
   | 'status'
   | 'duration_ms'
   | 'compute_duration_ms'
   | 'reason_code'
   | 'permission'
   | 'profile_id'
+  | 'generation_id'
   | 'cdk_status'
   | 'source'
   | 'schedule_mode'
@@ -62,7 +66,8 @@ export default async (req: Request): Promise<Response> => {
 }
 
 export async function recordUsageEvent(event: UsageEventName, input: UsageEventInput = null, idempotencyKey?: string): Promise<void> {
-  const createdAt = new Date().toISOString()
+  const options = normalizeUsageEventInput(input)
+  const createdAt = options.created_at ?? new Date().toISOString()
   const date = createdAt.slice(0, 10)
   const id = idempotencyKey
     ? createHash('sha256').update(`${event}:${idempotencyKey}`).digest('hex')
@@ -70,7 +75,6 @@ export async function recordUsageEvent(event: UsageEventName, input: UsageEventI
   const key = idempotencyKey
     ? `${EVENT_PREFIX}idempotent/${id}.json`
     : `${EVENT_PREFIX}${date}/${createdAt.replace(/[:.]/g, '-')}-${id}.json`
-  const options = normalizeUsageEventInput(input)
   const record: UsageEventRecord = {
     id,
     event,
@@ -83,6 +87,7 @@ export async function recordUsageEvent(event: UsageEventName, input: UsageEventI
     ...(options.reason_code && { reason_code: options.reason_code }),
     ...(options.permission && { permission: options.permission }),
     ...(options.profile_id && { profile_id: options.profile_id }),
+    ...(options.generation_id && { generation_id: options.generation_id }),
     ...(options.cdk_status && { cdk_status: options.cdk_status }),
     ...(options.source && { source: options.source }),
     ...(options.schedule_mode && { schedule_mode: options.schedule_mode }),
@@ -94,6 +99,25 @@ export async function recordUsageEvent(event: UsageEventName, input: UsageEventI
   }
   const store = await getUsageEventStore()
   await store.set(key, record)
+}
+
+export async function recordMaaExport(input: {
+  userId: string; profileId: string; jobId: string | null; idempotencyKey: string
+}): Promise<void> {
+  try {
+    await startBusinessMetrics()
+    await recordUsageEvent('maa_export', {
+      status: 'success', reason_code: 'ok', profile_id: input.profileId,
+      ...(input.jobId && { generation_id: createHash('sha256').update(`schedule_generate:optimize-job/${input.jobId}/schedule-generate`).digest('hex') }),
+      source: 'server_result_export',
+    }, `maa-export/${input.userId}/${input.idempotencyKey}`)
+  } catch (error) {
+    console.warn('MAA export usage event skipped:', error instanceof Error ? error.name : 'UnknownError')
+  }
+}
+
+async function startBusinessMetrics(): Promise<void> {
+  await recordUsageEvent('business_metrics_started', { status: 'success', source: 'business.v1' }, 'business.v1/tracking-start')
 }
 
 async function handlePublicPost(req: Request): Promise<Response> {
@@ -203,8 +227,12 @@ async function handleAdminGet(req: Request): Promise<Response> {
   const authentication = await authenticateAdminRequest(req, 'usage_view')
   if (!authentication.ok) return authentication.response
 
+  const url = new URL(req.url)
+  const view = url.searchParams.get('view')
+  if (view === 'business') return handleBusinessReport(url)
+  if (view !== null) return jsonResponse({ error: '统计视图无效。' }, 400)
   const store = await getUsageEventStore()
-  const dateRange = parseDateRange(new URL(req.url))
+  const dateRange = parseDateRange(url)
   if (!dateRange.ok) {
     return jsonResponse({ error: dateRange.message }, 400)
   }
@@ -215,6 +243,27 @@ async function handleAdminGet(req: Request): Promise<Response> {
     return csvResponse(toUsageStatsCsv(stats), `admin-ops-report-${stats.range.from}_${stats.range.to}.csv`)
   }
   return jsonResponse(stats)
+}
+
+async function handleBusinessReport(url: URL): Promise<Response> {
+  const today = operationsDate()
+  const range = url.searchParams.get('range') ?? '7d'
+  const fromValue = url.searchParams.get('from')
+  const toValue = url.searchParams.get('to')
+  const from = fromValue ?? (VALID_RANGE_VALUES.has(range) ? shiftOperationsDate(today, -(Number.parseInt(range, 10) - 1)) : '')
+  const to = toValue ?? today
+  if ((fromValue !== null || toValue !== null) && (!fromValue || !toValue)
+    || !isOperationsDate(from) || !isOperationsDate(to) || from > to || to > today
+    || !fromValue && !VALID_RANGE_VALUES.has(range)
+    || Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`) >= MAX_CUSTOM_RANGE_DAYS * 86_400_000) {
+    return jsonResponse({ error: '请选择不晚于今天的 1 至 90 天日期范围。' }, 400)
+  }
+  await startBusinessMetrics()
+  const overview = await getOperationsOverview(from, to)
+  if (url.searchParams.get('format') === 'csv') {
+    return csvResponse(operationsOverviewCsv(overview), `admin-business-report-${from}_${to}.csv`)
+  }
+  return jsonResponse(overview, 200, { 'Cache-Control': 'private, no-store' })
 }
 
 function parseDateRange(url: URL): { ok: true; dates: string[] } | { ok: false; message: string } {
@@ -271,6 +320,7 @@ function normalizeUsageEventInput(input: UsageEventInput): Required<Pick<UsageEv
   const status = input.status === 'success' || input.status === 'failure' ? input.status : undefined
   return {
     visitor_id: normalizeNullableString(input.visitor_id, 128),
+    ...(normalizeIsoString(input.created_at) && { created_at: normalizeIsoString(input.created_at) as string }),
     ...(status && { status: status as UsageEventStatus }),
     ...(typeof input.duration_ms === 'number' && Number.isFinite(input.duration_ms)
       ? { duration_ms: Math.max(0, Math.round(input.duration_ms)) }
@@ -281,6 +331,7 @@ function normalizeUsageEventInput(input: UsageEventInput): Required<Pick<UsageEv
     ...(input.reason_code && { reason_code: input.reason_code }),
     ...(normalizeNullableString(input.permission, 40) && { permission: normalizeNullableString(input.permission, 40) as string }),
     ...(normalizeNullableString(input.profile_id, 80) && { profile_id: normalizeNullableString(input.profile_id, 80) as string }),
+    ...(normalizeNullableString(input.generation_id, 80) && { generation_id: normalizeNullableString(input.generation_id, 80) as string }),
     ...(normalizeNullableString(input.cdk_status, 40) && { cdk_status: normalizeNullableString(input.cdk_status, 40) as string }),
     ...(normalizeNullableString(input.source, 80) && { source: normalizeNullableString(input.source, 80) as string }),
     ...(normalizeNullableString(input.schedule_mode, 40) && { schedule_mode: normalizeNullableString(input.schedule_mode, 40) as string }),
@@ -317,6 +368,7 @@ function csvResponse(csv: string, filename: string): Response {
     status: 200,
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
+      'Cache-Control': 'private, no-store',
       'Content-Disposition': `attachment; filename="${filename}"`,
     },
   })
