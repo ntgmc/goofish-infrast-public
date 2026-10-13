@@ -3,14 +3,26 @@ import { FEEDBACK_IMAGE_MAX_BYTES, type FeedbackRequest } from '../../src/lib/fe
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson, RequestInputError, validateAndStoreJsonBody } from '../security/request-validation'
 import { reservePersistentRateLimit } from '../security/persistent-rate-limit'
-import { createFeedback } from '../storage/feedback-store'
+import { createFeedback, updateFeedback, FeedbackError } from '../storage/feedback-store'
+import { readFeedback } from './feedback-read'
+import { AdminPaginationError } from './admin-pagination'
 import { jsonResponse, requireUserSession } from './user-auth'
 
 export default async function userFeedbackHandler(req: Request): Promise<Response> {
   try {
-    if (req.method !== 'POST') return respond({ error: 'Method not allowed' }, 405)
+    if (!['GET', 'POST', 'PATCH'].includes(req.method)) return respond({ error: 'Method not allowed' }, 405)
     const auth = await requireUserSession(req)
     if (!auth) return respond({ error: text.loginRequired }, 401)
+    if (req.method === 'GET') return await readFeedback(req, auth.user.id)
+    if (req.method === 'PATCH') {
+      await validateAndStoreJsonBody(req, requestSchemas.userFeedbackReply, 'standard')
+      const body = await getValidatedJson(req, requestSchemas.userFeedbackReply, true)
+      const decision = await reservePersistentRateLimit('user-feedback', auth.user.id, 10, 60 * 60 * 1000)
+      if (!decision.allowed) return jsonResponse({ error: text.tooFrequent }, 429, { 'Cache-Control': 'no-store', 'Retry-After': String(decision.retryAfterSeconds) })
+      await updateFeedback(body, { userId: auth.user.id })
+      decision.attempt.retain()
+      return respond({ id: body.feedback_id })
+    }
     await validateAndStoreJsonBody(req, requestSchemas.userFeedback, 'feedback')
     const body = await getValidatedJson(req, requestSchemas.userFeedback, true)
     const image = decodeImage(body.image)
@@ -20,9 +32,10 @@ export default async function userFeedbackHandler(req: Request): Promise<Respons
     decision.attempt.retain()
     return respond({ id }, 201)
   } catch (error) {
-    if (error instanceof RequestInputError) return respond({ error: error.message, code: error.code }, error.status)
+    if (error instanceof RequestInputError || error instanceof FeedbackError) return respond({ error: error.message, code: error.code }, error.status)
+    if (error instanceof AdminPaginationError) return respond({ error: error.message }, 400)
     console.error('user feedback error:', error instanceof Error ? error.name : 'UnknownError')
-    return respond({ error: text.submitFailed }, 500)
+    return respond({ error: req.method === 'GET' ? text.loadFailed : req.method === 'PATCH' ? text.saveFailed : text.submitFailed }, 500)
   }
 }
 

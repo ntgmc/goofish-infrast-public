@@ -301,6 +301,11 @@ function NotificationBellContent({ center, iconOnly, onInventory }: { center: No
     if (notification.action?.kind === 'inventory') {
       if (onInventory) onInventory()
       else navigate('/tool/inventory')
+    } else if (notification.action?.kind === 'feedback') {
+      const triggers = [...document.querySelectorAll<HTMLButtonElement>('.feedback-trigger')]
+      const trigger = triggers.find((button) => button.getClientRects().length > 0) ?? triggers[0]
+      if (trigger) trigger.dispatchEvent(new CustomEvent('goofish:open-feedback', { detail: notification.action.feedback_id }))
+      else navigate(`/v2?feedback=${encodeURIComponent(notification.action.feedback_id)}`)
     }
   }
 
@@ -383,7 +388,7 @@ function NotificationBellContent({ center, iconOnly, onInventory }: { center: No
                 <span className="shrink-0 text-[11px] text-ink-muted">{formatNotificationTime(notification.updated_at)}</span>
               </span>
               <span className="mt-3 grid gap-2">
-                {notification.payload.items.map((item) => (
+                {notification.payload.kind === 'item_grant' && notification.payload.items.map((item) => (
                   <span key={`${item.item_code}:${item.expires_at ?? 'never'}`} className="flex items-center gap-3 rounded-xl bg-surface-2/70 p-2.5">
                     <img src={itemIconPath(item.icon_key)} alt="" width={40} height={40} className="size-10 shrink-0 object-contain" />
                     <span className="min-w-0 flex-1">

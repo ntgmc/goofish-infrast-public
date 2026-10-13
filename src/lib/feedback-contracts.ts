@@ -17,14 +17,57 @@ export const feedbackRequestSchema = z.strictObject({
 
 export type FeedbackRequest = z.infer<typeof feedbackRequestSchema>
 export type FeedbackCategory = FeedbackRequest['category']
-export type AdminFeedback = {
+export const FEEDBACK_STATUSES = ['open', 'processing', 'waiting_user', 'resolved', 'closed'] as const
+export type FeedbackStatus = typeof FEEDBACK_STATUSES[number]
+const followUpMessage = z.string().trim().max(FEEDBACK_MESSAGE_MAX_LENGTH)
+const mutationFields = {
+  feedback_id: z.uuid(),
+  expected_revision: z.number().int().nonnegative(),
+  request_key: z.uuid(),
+}
+export const feedbackReplySchema = z.strictObject({ ...mutationFields, message: followUpMessage.min(1) })
+export const adminFeedbackUpdateSchema = z.strictObject({
+  ...mutationFields,
+  status: z.enum(FEEDBACK_STATUSES),
+  message: followUpMessage,
+  internal_note: followUpMessage,
+  assignment: z.enum(['keep', 'mine', 'unassigned']),
+  reason: z.string().trim().min(2).max(500),
+})
+export type FeedbackReply = z.infer<typeof feedbackReplySchema>
+export type AdminFeedbackUpdate = z.infer<typeof adminFeedbackUpdateSchema>
+export type Feedback = {
   id: string
-  user_id: string
-  email: string
   category: FeedbackCategory
   message: string
   has_image: boolean
+  status: FeedbackStatus
+  result: string | null
+  revision: number
   created_at: string
+  updated_at: string
+}
+export type AdminFeedback = Feedback & { user_id: string; email: string; assignee: string | null }
+export type FeedbackEntry = {
+  revision: number
+  actor: 'user' | 'admin'
+  message: string | null
+  previous_status: FeedbackStatus
+  status: FeedbackStatus
+  created_at: string
+  actor_username?: string
+  internal_note?: string | null
+  previous_assignee?: string | null
+  assignee?: string | null
+}
+export type FeedbackDetail = {
+  feedback: Feedback | AdminFeedback
+  entries: FeedbackEntry[]
+  next_before_revision: number | null
+}
+export type FeedbackPage = {
+  items: Feedback[]
+  pagination: { page: number; page_size: number; total: number; total_pages: number }
 }
 export type AdminFeedbackPage = {
   items: AdminFeedback[]

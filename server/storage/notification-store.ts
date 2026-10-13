@@ -6,6 +6,7 @@ import type {
   UserNotificationPage,
 } from '../../src/lib/types'
 import { notificationsCopy } from '../../src/copy/zh-CN/notifications'
+import { feedbackCopy } from '../../src/copy/zh-CN/feedback'
 import { ensureDatabaseSchema } from './schema'
 import { query, withTransaction } from './postgres'
 
@@ -129,6 +130,20 @@ export async function upsertItemGrantNotificationGroupInTransaction(client: Pool
   )
 }
 
+export async function upsertFeedbackNotificationInTransaction(client: PoolClient, input: {
+  userId: string; feedbackId: string; now: string
+}): Promise<void> {
+  await client.query(
+    `insert into user_notifications
+      (id, user_id, type, source_type, source_id, title, body, action_kind, payload_json, created_at, updated_at)
+     values ($1, $2, 'feedback_update', 'feedback', $3, $4, $5, 'feedback', $6::jsonb, $7, $7)
+     on conflict (user_id, type, source_type, source_id) do update
+       set read_at = null, updated_at = greatest(excluded.updated_at, user_notifications.updated_at + interval '1 millisecond')`,
+    [randomUUID(), input.userId, input.feedbackId, feedbackCopy.notificationTitle, feedbackCopy.notificationBody,
+      JSON.stringify({ kind: 'feedback_update', feedback_id: input.feedbackId }), input.now],
+  )
+}
+
 export async function listUserNotifications(
   userId: string,
   options: { cursor?: string | null; limit?: number } = {},
@@ -198,6 +213,16 @@ export async function exportUserNotifications(userId: string): Promise<UserNotif
 }
 
 function toPublicNotification(row: StoredNotification): UserNotification {
+  if (row.type === 'feedback_update' && row.action_kind === 'feedback') {
+    const payload = row.payload_json as Record<string, unknown> | null
+    if (payload?.kind !== 'feedback_update' || typeof payload.feedback_id !== 'string' || !payload.feedback_id) throw invalidNotification(row.id)
+    return {
+      id: row.id, type: 'feedback_update', title: row.title, body: row.body,
+      action: { kind: 'feedback', feedback_id: payload.feedback_id },
+      payload: { kind: 'feedback_update', feedback_id: payload.feedback_id },
+      read_at: row.read_at, created_at: row.created_at, updated_at: row.updated_at,
+    }
+  }
   if (row.type !== 'item_grant' || row.action_kind !== 'inventory') {
     throw invalidNotification(row.id)
   }

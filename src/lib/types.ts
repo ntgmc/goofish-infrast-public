@@ -900,14 +900,14 @@ export interface UserNotificationItemGrantDetail {
 type UserNotificationPayload = {
   kind: 'item_grant';
   items: UserNotificationItemGrantDetail[];
-};
+} | { kind: 'feedback_update'; feedback_id: string };
 
 export interface UserNotification {
   id: string;
-  type: 'item_grant';
+  type: 'item_grant' | 'feedback_update';
   title: string;
   body: string;
-  action: { kind: 'inventory' } | null;
+  action: { kind: 'inventory' } | { kind: 'feedback'; feedback_id: string } | null;
   payload: UserNotificationPayload;
   read_at: string | null;
   created_at: string;

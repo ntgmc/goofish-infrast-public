@@ -5,6 +5,7 @@ import { apiJson, getApiErrorMessage } from '../lib/api-client'
 import { FEEDBACK_CATEGORIES, FEEDBACK_IMAGE_TYPES, FEEDBACK_MESSAGE_MAX_LENGTH, type FeedbackCategory } from '../lib/feedback-contracts'
 import { prepareFeedbackImage } from '../lib/feedback-image'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
+import FeedbackHistory from './FeedbackHistory'
 import './FeedbackDialog.css'
 
 export default function FeedbackButton({ iconOnly = false, className = 'tool-secondary-action' }: { iconOnly?: boolean; className?: string }) {
@@ -26,7 +27,24 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
-  const busy = processing || submitting
+  const [view, setView] = useState<'new' | 'history'>('new')
+  const [feedbackId, setFeedbackId] = useState<string | null>(null)
+  const [historyBusy, setHistoryBusy] = useState(false)
+  const busy = processing || submitting || historyBusy
+
+  useEffect(() => {
+    const button = trigger.current
+    function openHistory(event?: Event) {
+      const requestedId = event instanceof CustomEvent ? event.detail as string : new URLSearchParams(window.location.search).get('feedback')
+      if (!requestedId || !/^[0-9a-f-]{36}$/i.test(requestedId)) return
+      setFeedbackId(requestedId)
+      setView('history')
+      setOpen(true)
+    }
+    button?.addEventListener('goofish:open-feedback', openHistory)
+    if (document.querySelector('.feedback-trigger') === button) openHistory()
+    return () => button?.removeEventListener('goofish:open-feedback', openHistory)
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -54,7 +72,8 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
     setSubmitting(true)
     setError(null)
     try {
-      await apiJson('/api/user/feedback', { method: 'POST', json: { category, message: message.trim(), ...(attachment ? { image: attachment.image } : {}) }, fallbackMessage: text.submitFailed })
+      const created = await apiJson<{ id: string }>('/api/user/feedback', { method: 'POST', json: { category, message: message.trim(), ...(attachment ? { image: attachment.image } : {}) }, fallbackMessage: text.submitFailed })
+      setFeedbackId(created.id)
       setSuccess(true)
       setMessage('')
       setAttachment(null)
@@ -65,18 +84,20 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
   return <>
     <button ref={trigger} type="button" className={`${className} feedback-trigger${iconOnly ? ' feedback-trigger-icon' : ''}`} aria-label={text.title}
       aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? `${id}-dialog` : undefined} title={iconOnly ? text.title : undefined}
-      onClick={() => { setSuccess(false); setError(null); setOpen(true) }}>
+      onClick={() => { setSuccess(false); setError(null); setView('new'); setOpen(true) }}>
       <MessageSquare size={18} aria-hidden="true" />{!iconOnly && <span>{text.title}</span>}
     </button>
     <Dialog open={open} onOpenChange={(next) => { if (!busy) setOpen(next) }}>
       <DialogContent id={`${id}-dialog`} className="feedback-dialog"
-        onOpenAutoFocus={(event) => { event.preventDefault(); categoryInput.current?.focus() }}
+        onOpenAutoFocus={(event) => { if (view === 'new') { event.preventDefault(); categoryInput.current?.focus() } }}
         onCloseAutoFocus={(event) => { event.preventDefault(); trigger.current?.focus() }}
         {...(busy ? { showCloseButton: false as const } : { showCloseButton: true as const, closeLabel: text.close })}>
         <DialogTitle>{text.title}</DialogTitle><DialogDescription>{text.description}</DialogDescription>
-        {success ? <>
+        <div className="feedback-tabs" aria-label={text.title}><button type="button" className="feedback-action" aria-pressed={view === 'new'} disabled={busy} onClick={() => setView('new')}>{text.newFeedback}</button><button type="button" className="feedback-action" aria-pressed={view === 'history'} disabled={busy} onClick={() => { setFeedbackId(null); setView('history') }}>{text.myFeedback}</button></div>
+        {view === 'history' ? <FeedbackHistory key={feedbackId ?? 'list'} initialId={feedbackId} onBusyChange={setHistoryBusy} /> : success ? <>
           <p role="status" className="feedback-success"><Check size={20} aria-hidden="true" />{text.submitted}</p>
           <button ref={successClose} type="button" className="feedback-action feedback-action-primary" onClick={() => setOpen(false)}>{text.close}</button>
+          <button type="button" className="feedback-action" onClick={() => setView('history')}>{text.viewSubmitted}</button>
         </> : <form ref={form} tabIndex={-1} aria-busy={busy} onSubmit={submit} className="feedback-form">
           <label className="feedback-label"><span>{text.category}</span><select ref={categoryInput} className="tool-field feedback-field" value={category} disabled={busy} onChange={(event) => setCategory(event.target.value as FeedbackCategory)}>{FEEDBACK_CATEGORIES.map((value) => <option key={value} value={value}>{text.categories[value]}</option>)}</select></label>
           <div>

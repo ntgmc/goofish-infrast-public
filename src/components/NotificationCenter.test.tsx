@@ -93,6 +93,20 @@ describe('NotificationCenter', () => {
     await screen.findByRole('button', { name: mode === 'read' ? '通知，无未读消息' : '通知，5 条未读' })
   })
 
+  it('opens a feedback notification at its feedback history without treating it as an item grant', async () => {
+    const feedbackId = '764b3769-09e4-4261-83b8-d23896419a8f'
+    const result = page(1)
+    result.notifications[0] = { ...result.notifications[0]!, type: 'feedback_update', title: '你的反馈有新进展', body: '查看最新回复和处理进度。', action: { kind: 'feedback', feedback_id: feedbackId }, payload: { kind: 'feedback_update', feedback_id: feedbackId } }
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(result)).mockResolvedValueOnce(jsonResponse(result)).mockResolvedValueOnce(jsonResponse({ unread_count: 0 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    renderCenter()
+    await user.click(await screen.findByRole('button', { name: '通知，1 条未读' }))
+    await user.click(await screen.findByRole('button', { name: /你的反馈有新进展/ }))
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`/v2?feedback=${feedbackId}`))
+    expect(markInventoryStale).not.toHaveBeenCalled()
+  })
+
   it('caps the badge at 99+ and marks all notifications read explicitly', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse(page(120)))
@@ -217,7 +231,8 @@ function center(userId: string) {
 }
 
 function Location() {
-  return <span data-testid="location">{useLocation().pathname}</span>
+  const location = useLocation()
+  return <span data-testid="location">{location.pathname}{location.search}</span>
 }
 
 function page(unreadCount: number, nextCursor: string | null = null): UserNotificationPage {

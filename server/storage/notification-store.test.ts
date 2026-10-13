@@ -75,7 +75,10 @@ describe('notification store', () => {
     const page = await listUserNotifications('user-1', { limit: 1 })
 
     expect(page.notifications).toHaveLength(1)
-    expect(page.notifications[0]?.payload.items[0]).not.toHaveProperty('grant_ids')
+    const payload = page.notifications[0]!.payload
+    expect(payload.kind).toBe('item_grant')
+    if (payload.kind !== 'item_grant') throw new Error('Expected an item grant notification')
+    expect(payload.items[0]).not.toHaveProperty('grant_ids')
     expect(page.unread_count).toBe(2)
     expect(page.next_cursor).toEqual(expect.any(String))
     expect(mocks.query.mock.calls[0]?.[0]).toContain('updated_at <= $3::timestamptz')

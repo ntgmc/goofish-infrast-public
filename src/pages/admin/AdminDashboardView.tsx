@@ -71,7 +71,7 @@ export default function AdminDashboardView() {
         <SectionLoader label={`正在加载${sectionLabels[section]}…`} /><div className="admin-section-body tool-page-content">
           {section === 'overview' && <OverviewSection model={c} />}
           {section === 'users' && <UsersSection model={c} active={displayedSection === 'users'} />}
-          {section === 'feedback' && <FeedbackSection active={displayedSection === 'feedback'} />}
+          {section === 'feedback' && <FeedbackSection active={displayedSection === 'feedback'} canManage={c.adminCapabilities.includes('user_manage')} />}
           {section === 'cdk' && <CdkSection model={c} active={displayedSection === 'cdk'} />}
           {section === 'risk' && <RiskSection model={c} active={displayedSection === 'risk'} />}
           {section === 'queue' && <QueueMonitorPanel active={displayedSection === 'queue'} />}
