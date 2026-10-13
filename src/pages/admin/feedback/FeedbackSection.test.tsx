@@ -8,7 +8,7 @@ import FeedbackSection from './FeedbackSection'
 
 const mocks = vi.hoisted(() => ({ api: vi.fn() }))
 vi.mock('../../../lib/admin-api-client', () => ({ adminApiJson: mocks.api }))
-const feedback: AdminFeedback = { id: '764b3769-09e4-4261-83b8-d23896419a8f', user_id: 'user', email: 'user@example.com', assignee: null, category: 'schedule', message: '排班结果异常', status: 'open', result: null, revision: 0, has_image: false, created_at: '2026-10-13T00:00:00Z', updated_at: '2026-10-13T00:00:00Z' }
+const feedback: AdminFeedback = { id: '764b3769-09e4-4261-83b8-d23896419a8f', user_id: 'user', email: 'user@example.com', assignee: null, category: 'schedule', message: '排班结果异常', status: 'processing', result: null, revision: 0, has_image: false, created_at: '2026-10-13T00:00:00Z', updated_at: '2026-10-13T00:00:00Z' }
 beforeEach(() => vi.resetAllMocks())
 afterEach(cleanup)
 
@@ -25,6 +25,7 @@ it('preserves drafts on a conflict and uses the refreshed revision for an audite
   })
   const user = userEvent.setup()
   render(<FeedbackSection active canManage />)
+  expect(screen.getByLabelText(copy.feedback.status)).toHaveValue('')
   await user.click(await screen.findByRole('button', { name: /user@example.com/ }))
   await screen.findByLabelText(copy.feedback.publicReply)
   await user.selectOptions(screen.getAllByLabelText(copy.feedback.status)[1]!, 'resolved')
@@ -40,7 +41,7 @@ it('preserves drafts on a conflict and uses the refreshed revision for an audite
   await user.click(screen.getByRole('button', { name: copy.feedback.refresh }))
   await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
   const refreshedUrls = mocks.api.mock.calls.slice(requestsBeforeRefresh).map(([url]) => url)
-  expect(refreshedUrls).toContain(`/api/admin/feedback?page=1&page_size=25&status=open`)
+  expect(refreshedUrls).toContain('/api/admin/feedback?page=1&page_size=25')
   expect(refreshedUrls).toContain(`/api/admin/feedback?feedback_id=${feedback.id}`)
   expect(screen.getByLabelText(copy.feedback.publicReply)).toHaveValue('已修复，请重新生成。')
   expect(screen.getByLabelText(copy.feedback.internalNote)).toHaveValue('关联任务 42')
@@ -54,7 +55,7 @@ it('preserves drafts on a conflict and uses the refreshed revision for an audite
 
 it('lets viewers inspect follow-up records without mutation controls', async () => {
   mocks.api.mockImplementation(async (url) => url.includes('feedback_id=')
-    ? { feedback, entries: [{ revision: 1, actor: 'admin', actor_username: 'operator', message: null, internal_note: '排查情况', status: 'open', previous_status: 'open', assignee: null, previous_assignee: null, created_at: feedback.created_at }], next_before_revision: null }
+    ? { feedback, entries: [{ revision: 1, actor: 'admin', actor_username: 'operator', message: null, internal_note: '排查情况', status: 'processing', previous_status: 'processing', assignee: null, previous_assignee: null, created_at: feedback.created_at }], next_before_revision: null }
     : { items: [feedback], pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 } })
   const user = userEvent.setup()
   render(<FeedbackSection active />)

@@ -13,7 +13,7 @@ export default function FeedbackSection({ active, canManage = false }: { active:
   const text = copy.feedback
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
-  const [status, setStatus] = useState<FeedbackStatus | ''>('open')
+  const [status, setStatus] = useState<FeedbackStatus | ''>('')
   const [revision, setRevision] = useState(0)
   const [data, setData] = useState<AdminFeedbackPage | null>(null)
   const [loading, setLoading] = useState(false)
@@ -46,7 +46,7 @@ export default function FeedbackSection({ active, canManage = false }: { active:
           <span className="flex flex-wrap items-start justify-between gap-2"><strong className="min-w-0 break-all">{item.email}</strong><span className="tool-status">{text.adminStatuses[item.status]}</span></span>
           <span className="mt-2 block line-clamp-2 break-words leading-6">{item.message}</span>
           <span className="mt-2 block text-xs text-ink-muted">{text.categories[item.category]} · {item.assignee ?? text.unassigned}</span>
-          <time dateTime={item.created_at} className="mt-2 block text-xs text-ink-muted">{formatDate(item.created_at)}</time>
+          <time dateTime={item.updated_at} className="mt-2 block text-xs text-ink-muted">{formatDate(item.updated_at)}</time>
         </button></li>)}</ul>
         {data && <PaginationControls pagination={data.pagination} loading={loading || saving} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1) }} />}
       </div>
