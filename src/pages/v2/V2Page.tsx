@@ -48,7 +48,7 @@ export default function V2Page() {
   async function importOperators(next: LicenseOperator[]) {
     if (session.user && session.activeProfile) {
       if (!await session.flushConfigSave()) throw new Error(copy.v2.saveFailed)
-      await session.persistWorkspacePatch({ operators: next, elite_overrides: {} })
+      await session.persistWorkspacePatch({ operators: next, elite_overrides: {}, ...(!session.workspace?.config ? { config: activeConfig } : {}) })
     } else {
       setOperators(next)
       setChanged(true)

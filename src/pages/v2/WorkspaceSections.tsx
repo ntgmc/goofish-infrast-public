@@ -6,6 +6,7 @@ import { copy } from '../../copy'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import { usePublicContent } from '../../lib/public-content-context'
 import type { useOptimizeWorkflow } from '../tool/optimize/useOptimizeWorkflow'
+import { isSchedulableProfile } from '../tool/tool-utils'
 import type { OptimizationTaskCenterController } from '../tool/optimize/useOptimizationTaskCenter'
 import type { AuthSuccessResponse } from '../../lib/types'
 import type { V2Session } from './OptionsDrawer'
@@ -55,7 +56,7 @@ const descriptions: Partial<Record<V2Section, string>> = {
 const publicSections: V2Section[] = ['tools', 'depot', 'manual-tool', 'cultivation', 'announcements', 'help', 'updates', 'settings', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing']
 const workflowSections: V2Section[] = ['generation', 'plans', 'lab']
 
-export default function WorkspaceSections({ section, session, workflow, generationProgress, onAccountAdded, onToolDirtyChange, onOpenProfile, onNavigate, onConfig, generationDisabledReason }: {
+export default function WorkspaceSections({ section, session, workflow, generationProgress, onAccountAdded, onToolDirtyChange, onOpenProfile, onNavigate, onConfig, onOperators, generationDisabledReason }: {
   section: V2Section
   session: V2Session
   workflow?: V2Workflow
@@ -65,6 +66,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
   onOpenProfile: (profile: V2Session['profiles'][number]) => Promise<void>
   onNavigate: (section: V2Section) => void
   onConfig: () => void
+  onOperators: () => void
   generationDisabledReason?: string | null
 }) {
   const { features } = useSiteFeatures()
@@ -86,8 +88,12 @@ export default function WorkspaceSections({ section, session, workflow, generati
     <div className="v2-section-body">
       <Suspense fallback={<V2SectionLoading label={section === 'inventory' ? copy.inventory.loading : undefined} />}>
         {section === 'overview' ? null : !available ? <p className="v2-panel v2-section-loading" role="status">{copy.v2.featureUnavailable}</p>
-          : needsLogin ? <div className="v2-panel v2-login-panel"><p>{copy.v2.signInRequired}</p><AuthForm compact allowCdk={false} onAuthenticated={session.applyAuthPayload} submitClassName="v2-button v2-button-primary w-full" /></div>
-            : needsWorkspace ? <div className="v2-panel v2-section-loading"><p>{copy.v2.profileRequired}</p><button className="v2-button v2-button-primary" type="button" onClick={() => onNavigate('profiles')}>{copy.v2.account}</button></div>
+          : needsLogin ? <div className="v2-panel v2-login-panel"><p>{section === 'generation' ? copy.v2.generationSignIn : copy.v2.signInRequired}</p><AuthForm compact allowCdk={false} onAuthenticated={session.applyAuthPayload} submitClassName="v2-button v2-button-primary w-full" /></div>
+            : needsWorkspace ? section === 'generation' && session.activeProfile && isSchedulableProfile(session.activeProfile)
+              ? <div className="v2-panel v2-section-loading"><p>{copy.v2.generationImport}</p><button className="v2-button v2-button-primary" type="button" onClick={onOperators}>{copy.public.pages_LandingPage_001}</button></div>
+              : section === 'generation' && session.cdkProfiles.length === 0 && v2SectionAvailable('add-account', features)
+                ? <><p className="v2-lead">{copy.v2.profileRequired}</p><AddAccount onAdded={onAccountAdded} onInventory={() => onNavigate('inventory')} /></>
+                : <div className="v2-panel v2-section-loading"><p>{copy.v2.profileRequired}</p><button className="v2-button v2-button-primary" type="button" onClick={() => onNavigate('profiles')}>{copy.v2.account}</button></div>
               : <>
                 {section === 'profiles' && <Profiles session={session} onOpen={onOpenProfile} />}
                 {section === 'add-account' && <>

@@ -140,6 +140,63 @@ function connect() {
 }
 
 describe('V2 results-first workspace', () => {
+  it('continues from the homepage through login and account setup to generation without submitting early', async () => {
+    const guest = session
+    const workflow = connect()
+    const readySession = session
+    workflow.latestWorkspaceResult = null as unknown as typeof summary
+    workflow.historyItem = null as unknown as typeof workflow.historyItem
+    workflow.hasResult = false
+    session = guest
+    const loginPayload = { user: readySession.user!, profiles: [], active_profile: null, workspace: null }
+    const accountPayload = { ...loginPayload, profiles: readySession.profiles, active_profile: readySession.activeProfile,
+      workspace: { profile_id: 'profile-1', operators: null, config: null, elite_overrides: {}, latest_result: null,
+        saved_configs: [], result_history: [], archived_results: [], result_history_next_cursor: null,
+        archived_results_next_cursor: null, free_schedule_entitlement: null, updated_at: null } }
+    vi.mocked(session.applyAuthPayload).mockImplementation((payload) => {
+      if (!payload) return
+      session = { ...session, ...payload, activeProfile: payload.active_profile, authStatus: 'authenticated', cdkProfiles: payload.profiles,
+        license: payload.workspace?.operators && payload.workspace.config ? readySession.license : null }
+    })
+    vi.mocked(session.persistWorkspacePatch).mockImplementation(async (patch) => {
+      const workspace = { ...accountPayload.workspace, ...patch }
+      session = { ...session, workspace, license: readySession.license }
+      return { ...accountPayload, workspace }
+    })
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => new Response(JSON.stringify(
+      String(url) === '/api/auth/login' ? loginPayload
+        : String(url) === '/api/user/cdk/redeem' ? { redemption_type: 'profile', auth: accountPayload }
+          : { notifications: [], unread_count: 0, next_cursor: null },
+    ), { headers: { 'Content-Type': 'application/json' } }))
+    const user = userEvent.setup()
+    const page = mount('/')
+    await user.click(screen.getByRole('button', { name: copy.v2.generateMine }))
+    const login = await screen.findByText(copy.v2.generationSignIn)
+    const form = within(login.parentElement!)
+    await user.type(form.getByLabelText(copy.auth.components_AuthForm_011), 'doctor@example.test')
+    await user.type(form.getByLabelText(copy.auth.components_AuthForm_012), 'password123')
+    await user.click(form.getAllByRole('button', { name: copy.auth.components_AuthForm_020 }).find((button) => button.getAttribute('type') === 'submit')!)
+    await waitFor(() => expect(session.applyAuthPayload).toHaveBeenCalledWith(loginPayload))
+    page.rerender(<MemoryRouter initialEntries={['/']}><V2Page /><RouteLocation /></MemoryRouter>)
+    expect(screen.getByTestId('route-location')).toHaveTextContent('section=generation')
+    await user.click(await screen.findByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_005 }))
+    await user.type(screen.getByRole('textbox', { name: 'CDK' }), 'MAA-FIRST-ACCOUNT')
+    await user.click(screen.getByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_015 }))
+    await waitFor(() => expect(session.applyAuthPayload).toHaveBeenCalledWith(accountPayload))
+    page.rerender(<MemoryRouter initialEntries={['/']}><V2Page /><RouteLocation /></MemoryRouter>)
+    await screen.findByText(copy.v2.generationImport)
+    await user.click(screen.getByRole('button', { name: copy.public.pages_LandingPage_001 }))
+    await user.upload(screen.getByLabelText(copy.v2.uploadMaa, { selector: 'input' }), new File([JSON.stringify(SAMPLE_OPERATORS)], 'operators.json', { type: 'application/json' }))
+    await waitFor(() => expect(session.persistWorkspacePatch).toHaveBeenCalledWith(expect.objectContaining({ operators: SAMPLE_OPERATORS, config: expect.objectContaining({ layout: SAMPLE_CONFIG.layout }) })))
+    page.rerender(<MemoryRouter initialEntries={['/']}><V2Page /><RouteLocation /></MemoryRouter>)
+    await screen.findByText(copy.v2.prepare)
+    expect(screen.getByTestId('route-location')).toHaveTextContent('section=generation&profile_id=profile-1')
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+    expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/optimization/jobs'))).toBe(false)
+    await user.click(screen.getByRole('button', { name: copy.optimize.pages_tool_optimize_GenerateControlBar_030 }))
+    await waitFor(() => expect(workflow.handleGenerate).toHaveBeenCalledOnce())
+  })
+
   it.each(['252', '252-1', '252-full'])('uses fixed production counts when switching a custom comparison draft to %s', async (layout) => {
     connect()
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
@@ -242,7 +299,7 @@ describe('V2 results-first workspace', () => {
     expect(mocks.workflow).not.toHaveBeenCalled()
   })
 
-  it('shows an example once the personal workspace confirms there is no previous result', () => {
+  it('offers preparation before generating when the personal workspace has no previous result', async () => {
     const workflow = connect()
     workflow.latestWorkspaceResult = null as unknown as typeof summary
     workflow.historyItem = null as unknown as typeof workflow.historyItem
@@ -250,6 +307,9 @@ describe('V2 results-first workspace', () => {
     mount()
     expect(screen.getByText(copy.v2.sampleSource)).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent(copy.v2.dataPending)
+    await userEvent.click(screen.getByRole('button', { name: copy.v2.generateMine }))
+    await screen.findByText(copy.v2.prepare)
+    expect(screen.getByTestId('route-location')).toHaveTextContent('section=generation&profile_id=profile-1')
     expect(workflow.handleViewHistory).not.toHaveBeenCalled()
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
@@ -338,7 +398,7 @@ describe('V2 results-first workspace', () => {
 
   it('shows an explicitly marked result immediately without requiring login or a CDK', () => {
     mount()
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(copy.v2.title)
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(copy.v2.startTitle)
     expect(screen.getByText(copy.v2.sampleSource)).toBeInTheDocument()
     expect(screen.getByText(copy.v2.brandDescription)).toBeInTheDocument()
     expect(screen.queryByText('可露希尔基建终端')).not.toBeInTheDocument()
@@ -674,8 +734,9 @@ describe('V2 results-first workspace', () => {
     expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('54,720')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /第 1 班/ })).toBeInTheDocument()
     expect(session.persistWorkspacePatch).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: copy.v2.regenerate }))
-    expect(await screen.findByRole('dialog')).toHaveTextContent(copy.v2.account)
+    await user.click(screen.getByRole('button', { name: copy.v2.generateMine }))
+    expect(await screen.findByText(copy.v2.generationSignIn)).toBeVisible()
+    expect(screen.getByTestId('route-location')).toHaveTextContent('section=generation')
     expect(mocks.workflow).not.toHaveBeenCalled()
   })
 
@@ -725,7 +786,7 @@ describe('V2 results-first workspace', () => {
     mount()
     expect(screen.getByText(copy.v2.sampleSource)).toBeInTheDocument()
     expect(mocks.workflow).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: copy.v2.regenerate }))
+    await user.click(screen.getByRole('button', { name: 'Retired profile' }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).queryByRole('button', { name: /Retired profile/ })).not.toBeInTheDocument()
     expect(within(dialog).getByText(copy.v2.noProfiles)).toBeInTheDocument()

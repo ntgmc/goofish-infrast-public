@@ -171,7 +171,7 @@ html {
 }
 
 body {
-  min-width: 320px;
+  min-width: min(320px, 100%);
   background: var(--theme-surface-0);
   color: var(--theme-ink-primary);
   font-family: var(--font-body);
