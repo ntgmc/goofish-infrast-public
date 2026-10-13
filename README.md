@@ -194,7 +194,7 @@ npm run test:postgres
 
 `check:architecture` 默认使用 public scope，禁止公共 API、runner 和 worker runtime 导入私有优化器实现，并校验机器可读的私有组合产物契约。`check:public-export` 会在临时副本中验证公共源码能够独立构建和测试。
 
-PostgreSQL 集成测试使用 Testcontainers，需要可用的 Docker daemon。
+PostgreSQL 集成测试使用 Testcontainers，需要可用的 Docker daemon。分模块评审结论、修复提交与验证结果见 [代码评审与修复记录](docs/review-fixes.md)。
 
 ## OptimizerPort
 
