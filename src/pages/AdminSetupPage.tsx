@@ -6,7 +6,6 @@ import { copy } from '../copy/index'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import { SectionLoader } from '../components/SessionLoader'
 import { DialogSurfaceProvider } from '../components/ui/dialog'
-import './admin/admin.css'
 
 
 interface AdminUserSummary {

@@ -22,7 +22,6 @@ import { useAdminController } from './useAdminController'
 import { AdminToast } from './shared/AdminToast'
 import { formatDate, omitFieldError, inputClassName } from './shared/helpers'
 import { sectionLabels, type AdminSection } from './contracts'
-import './admin.css'
 
 export default function AdminDashboardView() {
   const location = useLocation()
