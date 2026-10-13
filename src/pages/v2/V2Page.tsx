@@ -155,7 +155,10 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
   useEffect(() => {
     if (!latest || loadedId.current === latest.id || workflow.loading) return
     if (workflow.currentResult || workflow.finalResult) { loadedId.current = latest.id; return }
-    void readLatestResult()
+    let cancelled = false
+    // Let mount effects settle before starting a request that StrictMode cleanup would abort.
+    queueMicrotask(() => { if (!cancelled) void readLatestResult() })
+    return () => { cancelled = true }
   }, [latest, readLatestResult, workflow.loading, workflow.currentResult, workflow.finalResult])
 
   async function generate() {
