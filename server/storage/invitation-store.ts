@@ -696,7 +696,18 @@ async function reconcileRegisteredInvitations(limit: number): Promise<number> {
           where invitation.status = 'registered'
             and exists (
               select 1 from user_game_accounts profile
-               where profile.user_id = invitation.invitee_user_id and ${BOUND_INVITATION_PROFILE}
+               where profile.user_id = invitation.invitee_user_id
+                 and profile.status = 'active'
+                 and coalesce(profile.kind, profile.record_json->>'kind', 'cdk') in ('cdk', 'free_preview')
+                 and profile.archived_at is null
+                 and (nullif(profile.record_json->>'expires_at', '') is null or (profile.record_json->>'expires_at')::timestamptz > now())
+                 and (coalesce(profile.kind, profile.record_json->>'kind', 'cdk') = 'free_preview'
+                   or (profile.cdk_key is null and profile.record_json->>'authorization_source' = 'admin_grant')
+                   or exists (select 1 from cdk_records cdk where cdk.key = profile.cdk_key
+                     and cdk.cdk_type = 'profile' and cdk.status = 'used'
+                     and (nullif(cdk.record_json->>'profile_expires_at', '') is null or (cdk.record_json->>'profile_expires_at')::timestamptz > now())))
+                 and jsonb_typeof(profile.record_json->'skland_binding') = 'object'
+                 and nullif(btrim(profile.record_json#>>'{skland_binding,uid}'), '') is not null
             )
           order by invitation.registered_at asc, invitation.id asc
           for update skip locked
