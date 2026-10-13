@@ -64,7 +64,6 @@ function FeedbackWorkspace({ id, active, canManage, onBusyChange, onSaved }: { i
   const [internalNote, setInternalNote] = useState('')
   const [reason, setReason] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
-  const [showImage, setShowImage] = useState(false)
   useEffect(() => { onBusyChange(thread.saving); return () => onBusyChange(false) }, [onBusyChange, thread.saving])
   const feedback = thread.data?.feedback as AdminFeedback | undefined
   return <div className="grid gap-5">
@@ -73,8 +72,6 @@ function FeedbackWorkspace({ id, active, canManage, onBusyChange, onSaved }: { i
     {thread.loading && <p role="status" className="text-sm text-ink-muted">{text.loading}</p>}
     {feedback && <>
       <div className="min-w-0"><p className="break-all text-sm font-semibold">{feedback.email}</p><p className="mt-2 text-xs text-ink-secondary">{text.categories[feedback.category]} · {text.adminStatuses[feedback.status]} · {text.assignee}：{feedback.assignee ?? text.unassigned}</p><p className="mt-2 text-xs text-ink-muted">{text.createdAt}：{formatDate(feedback.created_at)}</p></div>
-      <p className="whitespace-pre-wrap break-words text-sm leading-7">{feedback.message}</p>
-      {feedback.has_image && (showImage ? <a href={`/api/admin/feedback?image_id=${id}`} target="_blank" rel="noreferrer" aria-label={text.viewImage}><img src={`/api/admin/feedback?image_id=${id}`} alt={text.imagePreview} loading="lazy" className="max-h-80 max-w-full rounded object-contain" /></a> : <button type="button" className="tool-secondary-action justify-self-start" onClick={() => setShowImage(true)}>{text.viewImage}</button>)}
       {feedback.result && <div className="feedback-result"><h3 className="text-sm font-semibold">{text.result}</h3><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7">{feedback.result}</p></div>}
       <FeedbackTimeline data={thread.data!} admin loading={thread.loading} onOlder={() => void thread.loadOlder()} />
       {canManage && <form className="feedback-form border-t border-surface-3 pt-5" aria-busy={thread.saving} onSubmit={(event) => {

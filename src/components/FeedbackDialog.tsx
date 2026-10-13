@@ -5,7 +5,9 @@ import { apiJson, getApiErrorMessage } from '../lib/api-client'
 import { FEEDBACK_CATEGORIES, FEEDBACK_IMAGE_TYPES, FEEDBACK_MESSAGE_MAX_LENGTH, type FeedbackCategory } from '../lib/feedback-contracts'
 import { prepareFeedbackImage } from '../lib/feedback-image'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
+import { Tabs } from './ui/tabs'
 import FeedbackHistory from './FeedbackHistory'
+import FeedbackImage from './FeedbackImage'
 import './FeedbackDialog.css'
 
 export default function FeedbackButton({ iconOnly = false, className = 'tool-secondary-action' }: { iconOnly?: boolean; className?: string }) {
@@ -93,8 +95,14 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
         onCloseAutoFocus={(event) => { event.preventDefault(); trigger.current?.focus() }}
         {...(busy ? { showCloseButton: false as const } : { showCloseButton: true as const, closeLabel: text.close })}>
         <DialogTitle>{text.title}</DialogTitle><DialogDescription>{text.description}</DialogDescription>
-        <div className="feedback-tabs" aria-label={text.title}><button type="button" className="feedback-action" aria-pressed={view === 'new'} disabled={busy} onClick={() => setView('new')}>{text.newFeedback}</button><button type="button" className="feedback-action" aria-pressed={view === 'history'} disabled={busy} onClick={() => { setFeedbackId(null); setView('history') }}>{text.myFeedback}</button></div>
-        {view === 'history' ? <FeedbackHistory key={feedbackId ?? 'list'} initialId={feedbackId} onBusyChange={setHistoryBusy} /> : success ? <>
+        <Tabs.Root value={view} onValueChange={(value) => { if (value === 'history') setFeedbackId(null); setView(value as typeof view) }}>
+          <Tabs.List className="feedback-tabs" aria-label={text.title}>
+            <Tabs.Trigger value="new" className="feedback-tab" disabled={busy}>{text.newFeedback}</Tabs.Trigger>
+            <Tabs.Trigger value="history" className="feedback-tab" disabled={busy}>{text.myFeedback}</Tabs.Trigger>
+          </Tabs.List>
+          <Tabs.Content value="history" className="feedback-tab-panel"><FeedbackHistory key={feedbackId ?? 'list'} initialId={feedbackId} onBusyChange={setHistoryBusy} /></Tabs.Content>
+          <Tabs.Content value="new" className="feedback-tab-panel">
+        {success ? <>
           <p role="status" className="feedback-success"><Check size={20} aria-hidden="true" />{text.submitted}</p>
           <button ref={successClose} type="button" className="feedback-action feedback-action-primary" onClick={() => setOpen(false)}>{text.close}</button>
           <button type="button" className="feedback-action" onClick={() => setView('history')}>{text.viewSubmitted}</button>
@@ -116,7 +124,7 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
             <p id={`${id}-image-hint`} className="feedback-hint">{text.imageHint}</p>
             {processing && <p role="status" className="feedback-hint">{text.processingImage}</p>}
             {attachment && <div className="feedback-image-preview">
-              <img src={`data:${attachment.image.type};base64,${attachment.image.base64}`} alt={text.imagePreview} />
+              <FeedbackImage src={`data:${attachment.image.type};base64,${attachment.image.base64}`} />
               <div className="feedback-image-meta"><p role="status" className="feedback-hint">{attachment.compressed ? text.imageCompressed : text.imageReady} · {Math.ceil(attachment.bytes / 1024)} KB</p>
                 <button type="button" className="feedback-action" disabled={busy} onClick={() => { setAttachment(null); imageButton.current?.focus() }}><X size={16} aria-hidden="true" />{text.removeImage}</button>
               </div>
@@ -125,6 +133,8 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
           {error && <p ref={errorNotice} tabIndex={-1} role="alert" className="tool-alert tool-alert--error">{error}</p>}
           <button type="submit" className="feedback-action feedback-action-primary" disabled={busy || !message.trim()}>{submitting ? text.submitting : text.submit}</button>
         </form>}
+          </Tabs.Content>
+        </Tabs.Root>
       </DialogContent>
     </Dialog>
   </>

@@ -36,11 +36,9 @@ export default function FeedbackHistory({ initialId, onBusyChange }: { initialId
       <div className="flex flex-wrap justify-between gap-2"><button type="button" className="feedback-action" disabled={thread.saving} onClick={() => { setSelected(null); setReply(''); setNotice(null) }}>{text.backToList}</button><button type="button" className="feedback-action" disabled={thread.loading || thread.saving} onClick={() => { setNotice(null); void thread.refresh() }}>{text.refresh}</button></div>
       {feedback && <>
         <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">{text.categories[feedback.category]}</h2><span className="tool-status">{text.statuses[feedback.status]}</span></div>
-        <p className="whitespace-pre-wrap break-words text-sm leading-7">{feedback.message}</p>
-        {feedback.has_image && <a className="feedback-action" target="_blank" rel="noreferrer" href={`/api/user/feedback?image_id=${feedback.id}`}>{text.viewImage}</a>}
         {feedback.result && <div className="feedback-result"><h3 className="text-sm font-semibold">{text.result}</h3><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7">{feedback.result}</p></div>}
         <FeedbackTimeline data={thread.data!} loading={thread.loading} onOlder={() => void thread.loadOlder()} />
-        <form ref={replyForm} tabIndex={-1} className="feedback-form" aria-busy={thread.saving} onSubmit={(event) => { event.preventDefault(); void thread.save({ message: reply.trim() }).then((saved) => { if (saved) { setReply(''); setNotice(text.replySaved); setRevision((value) => value + 1) } }) }}>
+        <form ref={replyForm} tabIndex={-1} className="feedback-form feedback-reply-form" aria-busy={thread.saving} onSubmit={(event) => { event.preventDefault(); void thread.save({ message: reply.trim() }).then((saved) => { if (saved) { setReply(''); setNotice(text.replySaved); setRevision((value) => value + 1) } }) }}>
           <label className="feedback-label"><span>{text.reply}</span><textarea className="tool-field feedback-field" rows={3} required maxLength={FEEDBACK_MESSAGE_MAX_LENGTH} disabled={thread.saving} value={reply} placeholder={text.replyPlaceholder} onChange={(event) => { setReply(event.target.value); setNotice(null) }} /></label>
           <p className="feedback-hint">{text.replyHint}</p>
           {notice && <p role="status" className="text-sm text-ink-secondary">{notice}</p>}

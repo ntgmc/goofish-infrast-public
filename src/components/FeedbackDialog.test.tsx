@@ -34,7 +34,7 @@ it('preserves the draft after failure, submits the chosen category, and clears i
 
 it('opens the saved feedback, keeps a failed follow-up draft, and blocks dismissal while sending', async () => {
   const id = '764b3769-09e4-4261-83b8-d23896419a8f'
-  const item = { id, category: 'schedule', message: '原始问题', has_image: false, status: 'resolved', result: '已修复，请重试', revision: 2, created_at: '2026-10-13T00:00:00Z', updated_at: '2026-10-13T00:00:00Z' }
+  const item = { id, category: 'schedule', message: '原始问题', has_image: true, status: 'resolved', result: '已修复，请重试', revision: 2, created_at: '2026-10-13T00:00:00Z', updated_at: '2026-10-13T00:00:00Z' }
   let finish!: (value: unknown) => void
   let attempt = 0
   mocks.api.mockImplementation(async (url, init) => {
@@ -42,15 +42,24 @@ it('opens the saved feedback, keeps a failed follow-up draft, and blocks dismiss
       if (++attempt === 1) throw new Error('稍后重试')
       return new Promise((resolve) => { finish = resolve })
     }
-    if (url.includes('feedback_id=')) return { feedback: item, entries: [], next_before_revision: null }
+    if (url.includes('feedback_id=')) return { feedback: item, entries: [{ revision: 2, actor: 'admin', message: '请补充操作步骤', previous_status: 'open', status: 'resolved', created_at: item.updated_at }], next_before_revision: null }
     return { items: [item], pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 } }
   })
   const user = userEvent.setup()
   render(<FeedbackButton />)
   await user.click(screen.getByRole('button', { name: copy.feedback.title }))
-  await user.click(screen.getByRole('button', { name: copy.feedback.myFeedback }))
+  screen.getByRole('tab', { name: copy.feedback.newFeedback }).focus()
+  await user.keyboard('{ArrowRight}')
+  expect(screen.getByRole('tab', { name: copy.feedback.myFeedback })).toHaveAttribute('aria-selected', 'true')
   await user.click(await screen.findByRole('button', { name: /原始问题/ }))
   await screen.findByText(item.result)
+  const thumbnail = screen.getByRole('button', { name: copy.feedback.enlargeImage })
+  expect(screen.getByRole('img', { name: copy.feedback.imagePreview })).toHaveAttribute('src', `/api/user/feedback?image_id=${id}`)
+  await user.click(thumbnail)
+  expect(screen.getByRole('dialog', { name: copy.feedback.imagePreview })).toBeVisible()
+  await user.keyboard('{Escape}')
+  await waitFor(() => expect(thumbnail).toHaveFocus())
+  expect(screen.getByRole('dialog', { name: copy.feedback.title })).toBeVisible()
   fireEvent.change(screen.getByLabelText(copy.feedback.reply), { target: { value: '问题仍然存在' } })
   await user.click(screen.getByRole('button', { name: copy.feedback.sendReply }))
   await screen.findByRole('alert')
@@ -68,7 +77,7 @@ it('opens the saved feedback, keeps a failed follow-up draft, and blocks dismiss
 it('opens the referenced report from a notification even when its sidebar trigger is hidden', async () => {
   const id = '764b3769-09e4-4261-83b8-d23896419a8f'
   mocks.api.mockImplementation(async (url) => url.includes('feedback_id=')
-    ? { feedback: { id, category: 'other', message: '通知中的反馈', status: 'processing', result: null, revision: 1 }, entries: [], next_before_revision: null }
+    ? { feedback: { id, category: 'other', message: '通知中的反馈', status: 'processing', result: null, revision: 1, created_at: '2026-10-13T00:00:00Z' }, entries: [], next_before_revision: null }
     : { items: [], pagination: { page: 1, page_size: 25, total: 0, total_pages: 0 } })
   render(<div hidden><FeedbackButton /></div>)
   const trigger = screen.getByRole('button', { name: copy.feedback.title, hidden: true })
