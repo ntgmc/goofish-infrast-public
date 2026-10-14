@@ -448,13 +448,6 @@ export default function ConfigEditor({
         })}
       />}
 
-      <details className={`config-more-details ${mobile ? '' : 'config-more-details--desktop'}`} open={!mobile || !validation.ok}>
-        {mobile && <summary>
-          <span>{copy.v2.configMoreDetails}</span>
-          <small>{copy.v2.configMoreDetailsHint}</small>
-          {presetDifferences.length > 0 && <strong>{copy.v2.configChangedFromPreset}</strong>}
-        </summary>}
-
       {supported252PresetSelected && (
         <FacilityLayoutEditor key={JSON.stringify([profileId, config.trading_station_levels, config.manufacturing_station_levels])} profileId={profileId} config={config} readOnly={readOnly} onUpdate={onUpdate} />
       )}
@@ -463,6 +456,13 @@ export default function ConfigEditor({
           {copy.common.components_ConfigEditor_109}
         </p>
       )}
+
+      <details className={`config-more-details ${mobile ? '' : 'config-more-details--desktop'}`} open={!mobile || !validation.ok || presetDifferences.length > 0}>
+        {mobile && <summary>
+          <span>{copy.v2.configMoreDetails}</span>
+          <small>{copy.v2.configMoreDetailsHint}</small>
+          {presetDifferences.length > 0 && <strong>{copy.v2.configChangedFromPreset}</strong>}
+        </summary>}
 
       {supported252PresetSelected && !canEdit && !autoInventoryOnly ? (
         <div className="pt-5">
@@ -977,9 +977,9 @@ function dronePoliciesMatch(config: LicenseConfig, preset: LicenseConfig): boole
   const expected = preset.drones
   return (actual?.enable ?? false) === (expected?.enable ?? false)
     && (actual?.auto ?? false) === (expected?.auto ?? false)
-    && normalizeDroneAutoStrategy(actual?.auto_strategy) === normalizeDroneAutoStrategy(expected?.auto_strategy)
     && (actual?.order ?? 'pre') === (expected?.order ?? 'pre')
-    && numberOrStringArraysMatch(actual?.targets, expected?.targets)
+    && ((actual?.auto ?? false) && (expected?.auto ?? false)
+      || numberOrStringArraysMatch(actual?.targets, expected?.targets))
 }
 
 function numberOrStringArraysMatch(actual: string[] | undefined, expected: string[] | undefined): boolean {

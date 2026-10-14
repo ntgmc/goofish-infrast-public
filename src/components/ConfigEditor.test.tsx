@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CONFIG_PRESETS, cloneConfig, normalizeConfig } from '../lib/config'
+import { copy } from '../copy'
 import ConfigEditor from './ConfigEditor'
 
 const { featureSwitches } = vi.hoisted(() => ({ featureSwitches: { one_shift_per_day: false } }))
@@ -116,6 +117,31 @@ describe('ConfigEditor facility configuration', () => {
     expect(card).toHaveFocus()
     expect(onUpdate).not.toHaveBeenCalled()
   })
+  it('does not mark automatic drone defaults as a preset change', () => {
+    const config = normalizeConfig({
+      ...CONFIG_PRESETS['243'],
+      drones: { ...CONFIG_PRESETS['243'].drones, enable: true, auto: true, auto_strategy: 'inventory_balance', order: 'pre', targets: [] },
+    })
+    render(<ConfigEditor config={config} mobile canEdit validation={{ ok: true }} onUpdate={vi.fn()} />)
+
+    expect(screen.queryByText(copy.v2.configChangedFromPreset)).not.toBeInTheDocument()
+  })
+
+  it('keeps the required 252 facility editor outside mobile details', () => {
+    render(<ConfigEditor config={normalizeConfig(CONFIG_PRESETS['252'])} mobile canEdit validation={{ ok: true }} onUpdate={vi.fn()} />)
+
+    const details = screen.getByText(copy.v2.configMoreDetails).closest('details')
+    expect(screen.getByRole('heading', { name: copy.common.facilityLayoutTitle })).toBeInTheDocument()
+    expect(details).not.toHaveAttribute('open')
+  })
+
+  it('opens mobile details when a setting differs from the selected preset', () => {
+    const config = normalizeConfig({ ...CONFIG_PRESETS['243'], dormitory_rule: 'maa_autofill' })
+    render(<ConfigEditor config={config} mobile canEdit validation={{ ok: true }} onUpdate={vi.fn()} />)
+
+    expect(screen.getByText(copy.v2.configMoreDetails).closest('details')).toHaveAttribute('open')
+  })
+
   it('clears restored optimizer policy when applying a preset', async () => {
     const user = userEvent.setup()
     const config = {
