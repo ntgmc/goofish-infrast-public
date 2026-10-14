@@ -16,7 +16,6 @@
 .admin-app .tool-panel-header, .admin-dialog .tool-panel-header { background: transparent; }
 .admin-app .tool-inset, .admin-dialog .tool-inset { background: transparent; border-radius: 0; box-shadow: none; }
 .admin-app .tool-field, .admin-dialog .tool-field { background: var(--color-v2-surface); border-color: var(--color-v2-control); border-radius: var(--radius-v2-control); min-width: 0; }
-:is(.admin-app, .admin-dialog) .tool-field:focus-visible:not([aria-invalid="true"]) { border-color: var(--color-v2-focus); }
 :is(.admin-app, .admin-dialog) .tool-field[aria-invalid="true"] { border-color: var(--color-v2-error); }
 .admin-app :is(.tool-primary-action, .tool-secondary-action, .tool-danger-action), .admin-dialog :is(.tool-primary-action, .tool-secondary-action, .tool-danger-action) { min-height: 44px; border-radius: var(--radius-v2-control); }
 .admin-app .tool-eyebrow { display: none; }

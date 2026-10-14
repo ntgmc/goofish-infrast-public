@@ -1574,9 +1574,6 @@
   outline-offset: 2px;
   background: var(--v2-paper);
 }
-:is(.v2-app, .v2-drawer, .v2-dialog) :is(.tool-field, .v2-input):focus-visible:not([aria-invalid="true"]) {
-  border-color: var(--color-v2-focus);
-}
 :is(.v2-app, .v2-drawer, .v2-dialog) .tool-field[aria-invalid="true"] {
   border-color: var(--color-v2-error);
 }

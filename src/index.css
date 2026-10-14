@@ -190,6 +190,20 @@ body {
   outline-offset: 2px;
 }
 
+:is(.tool-field, .v2-input):focus-visible:not(:disabled) {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -1px;
+}
+
+:is(.tool-field, .v2-input):focus-visible:not(:disabled):not([aria-invalid="true"]) {
+  border-color: var(--color-focus);
+}
+
+:is(.tool-field, .v2-input)[aria-invalid="true"]:focus-visible:not(:disabled) {
+  border-color: var(--destructive);
+  outline-color: var(--destructive);
+}
+
 .number-input-clean {
   appearance: textfield;
   -moz-appearance: textfield;
@@ -315,7 +329,7 @@ body {
     line-height: 1.25rem;
     outline: 2px solid transparent;
     outline-offset: 1px;
-    transition: border-color 160ms ease-out, box-shadow 160ms ease-out, background-color 160ms ease-out;
+    transition: background-color var(--dur-fast) var(--ease-out);
   }
 
   .tool-field::placeholder {
@@ -324,11 +338,6 @@ body {
 
   .tool-field:hover:not(:disabled) {
     border-color: color-mix(in oklab, var(--theme-ink-primary) 28%, var(--input));
-  }
-
-  .tool-field:focus-visible {
-    border-color: var(--theme-brand-500);
-    outline-color: var(--color-focus);
   }
 
   .tool-field[aria-invalid="true"] {
