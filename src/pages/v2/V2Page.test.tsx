@@ -988,20 +988,6 @@ describe('V2 results-first workspace', () => {
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
-  it('flushes saved configuration before generating and blocks generation on a save failure', async () => {
-    const workflow = connect()
-    const user = userEvent.setup()
-    mount()
-    await waitFor(() => expect(screen.getByRole('button', { name: copy.v2.regenerate })).not.toBeDisabled())
-    vi.mocked(session.flushConfigSave).mockResolvedValueOnce(false)
-    await user.click(screen.getByRole('button', { name: copy.v2.regenerate }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(copy.v2.saveFailed)
-    expect(workflow.handleGenerate).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: copy.v2.regenerate }))
-    await waitFor(() => expect(workflow.handleGenerate).toHaveBeenCalledOnce())
-    expect(vi.mocked(session.flushConfigSave).mock.invocationCallOrder[1]).toBeLessThan(workflow.handleGenerate.mock.invocationCallOrder[0])
-  })
-
   it('lets a CDK profile generate without displaying or depending on a legacy billing quote', async () => {
     const workflow = connect()
     const user = userEvent.setup()

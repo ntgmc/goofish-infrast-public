@@ -166,7 +166,6 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
   async function generate() {
     if (!confirmResultChange()) return
     if (generationDisabledReason) { setError(generationDisabledReason); return }
-    if (!await session.flushConfigSave()) { setError(workflow.configValidation.ok ? copy.v2.saveFailed : workflow.configValidation.message); return }
     setError(null)
     await workflow.handleGenerate()
   }
@@ -216,7 +215,7 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
     }, handleIncrementalRecompute: async () => {
       if (!confirmResultChange()) return
       if (generationDisabledReason) { setError(generationDisabledReason); return }
-      if (!await session.flushConfigSave()) { setError(workflow.configValidation.ok ? copy.v2.saveFailed : workflow.configValidation.message); return }
+      setError(null)
       await workflow.handleIncrementalRecompute()
     } }} taskCenterAction={taskCenterAction} generationProgress={progress} result={result ?? SAMPLE_RESULT} operators={workflow.mergedOperators} config={workflow.activeConfig}
     sample={!result} configChanged={Boolean(result && (operatorsChanged || workflow.configDiffRows.length > 0 || session.configOverride))}

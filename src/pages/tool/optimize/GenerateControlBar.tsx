@@ -21,6 +21,7 @@ export default function GenerateControlBar({
   hasResult,
   resultIsCurrent,
   error,
+  errorRetry,
   priorityCoupon,
   additionalCoupons = [],
   extraDisabledReason,
@@ -40,6 +41,7 @@ export default function GenerateControlBar({
   hasResult: boolean
   resultIsCurrent: boolean
   error: string | null
+  errorRetry?: { onRetry: () => void; label: string; disabled: boolean }
   priorityCoupon: { balance: PriorityCouponBalance | null; selected: boolean; onChange: (selected: boolean) => void }
   additionalCoupons?: Array<{ id: string; label: string; help: string; balance: number; selected: boolean; onChange: (selected: boolean) => void }>
   extraDisabledReason?: string | null
@@ -170,7 +172,7 @@ export default function GenerateControlBar({
       )}
       {error && (
         <div className="tool-panel-header px-5 py-5 sm:px-6">
-          <InlineErrorPanel message={error} onRetry={onGenerate} onReset={onReset} />
+          <InlineErrorPanel message={error} onRetry={errorRetry?.onRetry ?? onGenerate} onReset={onReset} retryLabel={errorRetry?.label} retryDisabled={loading || syncing || errorRetry?.disabled} />
         </div>
       )}
     </section>

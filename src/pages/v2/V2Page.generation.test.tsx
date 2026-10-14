@@ -76,6 +76,7 @@ afterEach(() => {
   window.localStorage.removeItem('maatool-reduce-motion')
   window.localStorage.removeItem(FIRST_SCHEDULE_INTENT_KEY)
   vi.resetAllMocks()
+  vi.restoreAllMocks()
 })
 
 it('continues from login and Skland import through saved configuration to the first generation', async () => {
@@ -200,6 +201,70 @@ it('waits for login and saved-result detail, then retries a failed read without 
   expect(historyReads).toBe(2)
   expect(vi.mocked(apiJson).mock.calls.some(([_url, options]) => options?.method === 'POST')).toBe(false)
 })
+
+it.each(['generation', 'overview'])('shows a failed configuration save beside the %s action and retries without starting a task or losing input', async (section) => {
+  const user = userEvent.setup()
+  let failSave!: (error: Error) => void
+  const firstSave = new Promise<never>((_resolve, reject) => { failSave = reject })
+  let failRetry!: (error: Error) => void
+  const failedRetry = new Promise<never>((_resolve, reject) => { failRetry = reject })
+  let finishRetry!: (payload: AuthSuccessResponse) => void
+  const successfulRetry = new Promise<AuthSuccessResponse>((resolve) => { finishRetry = resolve })
+  const patches: Array<{ config: typeof SAMPLE_CONFIG }> = []
+  vi.mocked(apiJson).mockImplementation(async (url, options) => {
+    if (url === '/api/auth/me') return auth
+    if (url.startsWith('/api/user/results/previous-result?')) return { item: { ...previous, config: SAMPLE_CONFIG, result: SAMPLE_RESULT } }
+    if (url === '/api/user/workspace' && options?.method === 'PATCH') {
+      patches.push(options.json as { config: typeof SAMPLE_CONFIG })
+      return patches.length === 1 ? firstSave : patches.length === 2 ? failedRetry : successfulRetry
+    }
+    if (url.startsWith('/api/optimization/jobs?')) return { jobs: [], nextCursor: null }
+    if (url === '/api/optimization/jobs' && options?.method === 'POST') return { job: queued }
+    if (url === '/api/optimization/jobs/new-job') return new Promise(() => {})
+    if (url.startsWith('/api/user/status?')) return {}
+    if (url === '/api/user/inventory') return { stacks: [], capacities: [], recent_events: [] }
+    if (url === '/api/user/priority-coupon-balance') return { balances: [] }
+    throw new Error(`Unexpected API request: ${url}`)
+  })
+  const submissions = () => vi.mocked(apiJson).mock.calls.filter(([url, options]) => url === '/api/optimization/jobs' && options?.method === 'POST')
+  render(<MemoryRouter initialEntries={[`/v2?section=${section}`]}><MotionPreferenceProvider><V2Page /></MotionPreferenceProvider></MemoryRouter>)
+  await screen.findByText(copy.v2.ownSource)
+  await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
+  await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: copy.common.components_ConfigEditor_030 }))
+  await user.click(screen.getByRole('button', { name: copy.v2.done }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  await waitFor(() => expect(patches).toHaveLength(1))
+  const generateLabel = section === 'generation' ? copy.optimize.pages_tool_optimize_GenerateControlBar_029 : copy.v2.regenerate
+  await user.click(screen.getByRole('button', { name: generateLabel }))
+  expect(submissions()).toHaveLength(0)
+  const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+  await act(async () => failSave(new Error('Configuration save unavailable')))
+  const alert = await screen.findByRole('alert')
+  expect(alert).toBeVisible()
+  expect(alert).toHaveTextContent(copy.optimize.generation.save_failed)
+  const actionArea = section === 'generation' ? document.querySelector('.v2-generation-execution')!
+    : screen.getByRole('button', { name: generateLabel }).closest('.v2-ready-banner')!.parentElement!
+  expect(actionArea).toContainElement(alert)
+  expect(patches[0]!.config.layout).toBe('2-4-3')
+  expect(submissions()).toHaveLength(0)
+
+  await user.click(within(alert).getByRole('button', { name: copy.optimize.generation.retry_save }))
+  await waitFor(() => expect(patches).toHaveLength(2))
+  expect(within(alert).getByRole('button', { name: copy.optimize.generation.saving })).toBeDisabled()
+  expect(alert).toHaveTextContent(copy.optimize.generation.save_failed)
+  expect(submissions()).toHaveLength(0)
+  await act(async () => failRetry(new Error('Configuration save still unavailable')))
+  errors.mockRestore()
+  await user.click(within(alert).getByRole('button', { name: copy.optimize.generation.retry_save }))
+  await waitFor(() => expect(patches).toHaveLength(3))
+  expect(patches.map((patch) => patch.config)).toEqual([patches[0]!.config, patches[0]!.config, patches[0]!.config])
+  await act(async () => finishRetry({ ...auth, workspace: { ...workspace, config: patches[0]!.config } }))
+  await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+  expect(submissions()).toHaveLength(0)
+  await user.click(screen.getByRole('button', { name: generateLabel }))
+  await waitFor(() => expect(submissions()).toHaveLength(1))
+  expect(submissions()[0]![1]!.json).toEqual(expect.objectContaining({ config: patches[0]!.config }))
+}, 15_000)
 
 it.each(['submitted', 'restored'])('automatically displays a %s job result and dismisses completed progress', async (mode) => {
   let completeJob!: (job: OptimizationJobSnapshot) => void

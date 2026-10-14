@@ -29,6 +29,7 @@ export default function OverviewSection({
   hasResult,
   resultIsCurrent,
   error,
+  errorRetry,
   priorityCoupon,
   additionalCoupons,
   savedConfigCount,
@@ -60,6 +61,7 @@ export default function OverviewSection({
   hasResult: boolean;
   resultIsCurrent: boolean;
   error: string | null;
+  errorRetry?: { onRetry: () => void; label: string; disabled: boolean };
   priorityCoupon: { balance: PriorityCouponBalance | null; selected: boolean; onChange: (selected: boolean) => void };
   additionalCoupons?: Array<{ id: string; label: string; help: string; balance: number; selected: boolean; onChange: (selected: boolean) => void }>;
   savedConfigCount: number;
@@ -103,6 +105,7 @@ export default function OverviewSection({
         hasResult={hasResult}
         resultIsCurrent={resultIsCurrent}
         error={error}
+        errorRetry={errorRetry}
         priorityCoupon={priorityCoupon}
         additionalCoupons={additionalCoupons}
         extraDisabledReason={generationDisabledReason ?? null}

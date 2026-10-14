@@ -84,7 +84,10 @@ export function useOptimizeWorkflow(props: Props) {
     flushPendingSync: flushPendingLicenseSync,
   } = useLicenseSync(profileId, license.order_hash)
 
-  const [inlineError, setInlineError] = useState<{ scope: 'generate' | 'apply'; message: string } | null>(null)
+  const [inlineError, setInlineError] = useState<{ scope: 'generate' | 'apply'; message: string; retry?: 'save' } | null>(null)
+  useEffect(() => {
+    if (configSyncStatus === 'idle') setInlineError((error) => error?.retry === 'save' ? null : error)
+  }, [configSyncStatus])
   const [configToast, setConfigToast] = useState<{ id: number; message: string } | null>(null)
   const [workspaceNotice, setWorkspaceNotice] = useState<string | null>(null)
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
@@ -506,12 +509,19 @@ export function useOptimizeWorkflow(props: Props) {
         showConfigValidationToast(configValidationMessage)
         return
       }
-      flushConfigSave()
       optimizeInFlightRef.current = true
       setInlineError(null)
+      setLoading(true)
+      const saved = await flushConfigSave().catch(() => false)
+      if (!current()) return
+      if (!saved) {
+        setInlineError({ scope: 'generate', message: copy.optimize.generation.save_failed, retry: 'save' })
+        optimizeInFlightRef.current = false
+        setLoading(false)
+        return
+      }
       setHistoryItem(null)
       setPhase('idle')
-      setLoading(true)
       const startedAt = Date.now()
       const initialProgress: ScheduleProgressState = {
         mode: 'generate',

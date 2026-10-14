@@ -236,6 +236,11 @@ export default function OptimizeWorkflowPage(props: Props) {
               hasResult={hasResult}
               resultIsCurrent={resultIsCurrent}
               error={inlineError?.scope === 'generate' ? inlineError.message : null}
+              errorRetry={inlineError?.retry === 'save' ? {
+                onRetry: retryConfigSave,
+                label: configSyncStatus === 'pending' || configSyncStatus === 'saving' ? copy.optimize.generation.saving : copy.optimize.generation.retry_save,
+                disabled: configSyncStatus === 'pending' || configSyncStatus === 'saving',
+              } : undefined}
               priorityCoupon={{ balance: priorityCouponBalance, selected: usePriorityCoupon, onChange: setUsePriorityCoupon }}
               additionalCoupons={[
                 ...(!userCanUseUpgradeFeatures && (itemBalances.training_diagnosis_coupon ?? 0) > 0 ? [{

@@ -276,7 +276,9 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           {(loadingResult || error || notice || downloadNotice || configChanged) && <FeedbackRegion key="feedback">
           <div className={`v2-feedback ${error ? 'v2-feedback-error' : ''}`} role={error ? 'alert' : 'status'} aria-live="polite">
             {loadingResult ? text.loadingResult : error ?? notice ?? (downloadNotice ? text.exported : sample ? text.demoConfigChanged : text.configChanged)}
-            {error && onRetryResult && <button type="button" onClick={onRetryResult}>{text.retry}</button>}
+            {error && (workflow?.inlineError?.retry === 'save'
+              ? <button type="button" disabled={busy || session.configSyncStatus === 'pending' || session.configSyncStatus === 'saving'} onClick={session.retryConfigSave}>{session.configSyncStatus === 'pending' || session.configSyncStatus === 'saving' ? copy.optimize.generation.saving : copy.optimize.generation.retry_save}</button>
+              : onRetryResult && <button type="button" onClick={onRetryResult}>{text.retry}</button>)}
           </div></FeedbackRegion>}
           </AnimatePresence>
           {generationProgress}

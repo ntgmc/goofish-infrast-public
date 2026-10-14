@@ -120,6 +120,55 @@ const accepted: OptimizeJobAccepted = { job_id: 'race-job', status: 'queued', pr
   estimate_sample_count: 0, estimated_remaining_ms: 1000, estimated_total_ms: 1000, estimate_phase: 'queued', estimate_updated_at: '2026-10-01T00:00:00Z',
   calculation_stage: null, calculation_stage_updated_at: null, upgrade_suggestions_requested: false, upgrade_suggestions_allowed: false }
 
+it.each(['handleGenerate', 'handleIncrementalRecompute'] as const)('waits for configuration save and preserves the draft when %s cannot start', async (action) => {
+  const save = deferred<boolean>()
+  const props = propsFor()
+  props.configOverride = { ...config, desc: 'Unsaved draft' }
+  props.workspace = { ...workspace, latest_result: detail('previous') }
+  props.configSyncStatus = 'saving'
+  props.flushConfigSave = vi.fn(() => save.promise)
+  const submit = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => json({ stacks: [], capacities: [], balances: [] }))
+  vi.stubGlobal('fetch', submit)
+  const hook = renderHook((current) => useOptimizeWorkflow(current), { initialProps: props })
+  await waitFor(() => expect(hook.result.current.licenseSyncing).toBe(false))
+  let generation!: Promise<void>
+  act(() => {
+    generation = hook.result.current[action]()
+    void hook.result.current[action]()
+  })
+  await waitFor(() => expect(props.flushConfigSave).toHaveBeenCalledOnce())
+  expect(hook.result.current.loading).toBe(true)
+  expect(hook.result.current.progress).toBeNull()
+  expect(submit.mock.calls.some(([url, options]) => url === '/api/optimization/jobs' && options?.method === 'POST')).toBe(false)
+  await act(async () => { save.resolve(false); await generation })
+  hook.rerender({ ...props, configSyncStatus: 'failed' })
+  expect(hook.result.current.inlineError).toEqual({ scope: 'generate', message: copy.optimize.generation.save_failed, retry: 'save' })
+  expect(hook.result.current.loading).toBe(false)
+  expect(hook.result.current.progress).toBeNull()
+  expect(hook.result.current.activeConfig.desc).toBe('Unsaved draft')
+  expect(props.setConfigOverride).not.toHaveBeenCalled()
+  expect(submit.mock.calls.some(([url, options]) => url === '/api/optimization/jobs' && options?.method === 'POST')).toBe(false)
+  hook.rerender({ ...props, configSyncStatus: 'idle' })
+  expect(hook.result.current.inlineError).toBeNull()
+})
+
+it('does not submit a task when the profile changes while its configuration is saving', async () => {
+  const save = deferred<boolean>()
+  const props: Props = { ...propsFor(), flushConfigSave: vi.fn(() => save.promise) }
+  const requests: string[] = []
+  vi.stubGlobal('fetch', vi.fn(async (input) => { requests.push(String(input)); return json({ stacks: [], capacities: [], balances: [] }) }))
+  const hook = renderHook((current) => useOptimizeWorkflow(current), { initialProps: props })
+  await waitFor(() => expect(hook.result.current.licenseSyncing).toBe(false))
+  let generation!: Promise<void>
+  act(() => { generation = hook.result.current.handleGenerate() })
+  await waitFor(() => expect(props.flushConfigSave).toHaveBeenCalledOnce())
+  hook.rerender(propsFor({ ...profile, id: 'other-profile' }))
+  await act(async () => { save.resolve(true); await generation })
+  expect(requests).not.toContain('/api/optimization/jobs')
+  expect(hook.result.current.loading).toBe(false)
+  expect(hook.result.current.inlineError).toBeNull()
+})
+
 it.each(['restore', 'generate'])('stops %s callbacks if the workflow leaves during completion or workspace refresh', async (source) => {
   for (const leave of ['unmount', 'profile', 'refresh', 'none']) {
     vi.useFakeTimers()
