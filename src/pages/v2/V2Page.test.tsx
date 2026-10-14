@@ -1444,8 +1444,8 @@ describe('V2 feature continuity', () => {
     expect(await screen.findByRole('link', { name: new RegExp(copy.tools.manualSchedule.title) })).toHaveAttribute('href', expect.stringContaining('section=manual-tool'))
   })
 
-  it('opens pricing from the footer while retaining the active profile', async () => {
-    connect()
+  it('returns from pricing to generation while retaining the active profile without submitting a task', async () => {
+    const workflow = connect()
     const user = userEvent.setup()
     mount()
     const footer = within(document.querySelector('footer.v2-footer')!)
@@ -1453,6 +1453,17 @@ describe('V2 feature continuity', () => {
     expect(await screen.findByRole('heading', { name: cloneDefaultPublicContentSettings().pricing.title, level: 1 })).toBeInTheDocument()
     expect(screen.getByTestId('route-location')).toHaveTextContent('section=pricing&profile_id=profile-1')
     expect(footer.getByRole('link', { name: copy.v2.comparePlans })).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: copy.public.pricing_choice.free_action }))
+    expect(await screen.findByRole('heading', { name: copy.v2.generation, level: 1 })).toBeInTheDocument()
+    expect(screen.getByTestId('route-location')).toHaveTextContent('section=generation&profile_id=profile-1')
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+  })
+
+  it.each(['free_preview', 'skland', 'schedule_generation'] as const)('disables free start on pricing when %s is closed', async (feature) => {
+    mocks.features.mockReturnValue({ status: 'ready', features: { ...DEFAULT_SITE_FEATURES, [feature]: false }, retry: vi.fn() })
+    mount('/v2?section=pricing')
+    expect(await screen.findByRole('button', { name: copy.public.pricing_choice.free_unavailable })).toBeDisabled()
+    expect(screen.queryByRole('link', { name: copy.public.pricing_choice.free_action })).not.toBeInTheDocument()
   })
 
   it('uses configured purchase links after public content loads in the V2 pricing workspace', async () => {

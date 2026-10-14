@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Check, ArrowUpRight } from 'lucide-react'
+import { Check, ArrowUpRight, ChevronDown } from 'lucide-react'
 import { copy, CURRENT_LOCALE } from '../../../copy'
 import { PUBLIC_PRICING_PLAN_IDS } from '../../../lib/public-content'
 import { usePublicContent } from '../../../lib/public-content-context'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
 import { getMeteredBillingPolicy, getMeteredScheduleQuote } from '../../../lib/metered-billing'
+import { getSku, productPolicies } from '../../../lib/product-catalog'
 import Link from '../../../components/InternalLink'
 import { SupportGroupLink } from '../../../components/PublicFooter'
 import { Notice, SectionTitle } from '../components/WorkspaceUI'
@@ -20,12 +21,65 @@ export default function Pricing() {
   const [chosen, setChosen] = useState<(typeof planIds)[number]>('single_account_monthly')
   const plan = pricing.plans[chosen]
   const free = pricing.plans.free_preview
+  const choice = text.pricing_choice
+  const quota = productPolicies.free_preview
+  const freeAvailable = features.free_preview && features.skland && features.schedule_generation
   const term = (label: string) => label.replace(/^单账号\s*/u, '').replace(/\s*CDK$/u, '')
-  return <div className="v2-pricing-workspace"><p className="v2-lead">{pricing.intro}</p><div className="v2-pricing-selector"><section><SectionTitle title={copy.v2.planChoice} description={text.pages_PricingPage_016} /><div className="v2-term-choices" role="group" aria-label={copy.v2.planChoice}>{planIds.map((id) => <button key={id} aria-pressed={chosen === id} onClick={() => setChosen(id)}><span><strong>{term(pricing.plans[id].label)}</strong><small>{pricing.plans[id].badge}</small></span><b>{pricing.plans[id].display_price}</b>{chosen === id && <Check size={18} aria-hidden="true" />}</button>)}</div></section>
-    <article key={chosen} className="v2-pricing-selected"><span className="v2-label">{copy.v2.selectedPlan}</span><h2>{term(plan.label)}</h2><strong className="v2-plan-price">{plan.display_price}</strong>{plan.discount_fold < 10 && <small>{text.pages_PricingPage_017(plan.original_price, plan.discount_fold)}</small>}<p>{plan.summary}</p><p>{text.pricing_archive_gift(chosen === 'single_account_lifetime' ? 3 : 1)}</p><p className="v2-muted">{plan.account_scope}</p>{plan.purchase_url ? <a href={plan.purchase_url} target="_blank" rel="noopener noreferrer" className="v2-button v2-button-primary">{text.pricing_purchase_labels[chosen]}<ArrowUpRight size={16} /></a> : <button disabled className="v2-button v2-button-primary">{text.pricing_purchase_unavailable}</button>}</article>
-  </div>
-    <section className="v2-entitlement-comparison"><SectionTitle title={pricing.comparison_heading} /><div className="v2-entitlement-head"><span>{text.pages_PricingPage_008}</span><strong>{free.label}</strong><strong>{term(plan.label)}</strong></div>{pricing.comparison_rows.map((row) => <article key={row.id}><h3>{row.feature}</h3><p>{row.free_preview}</p><p>{row[chosen] ?? '—'}</p></article>)}</section>
-    <section className="v2-pricing-free"><div><h2>{free.label}</h2><strong>{free.display_price}</strong><span>{free.badge}</span></div><div><p>{free.summary}</p><p className="v2-muted">{free.account_scope}</p></div></section>
+  return <div className="v2-pricing-workspace">
+    <p className="v2-lead">{choice.intro}</p>
+    <div className="v2-pricing-paths">
+      <article aria-labelledby="pricing-free-title">
+        <div className="v2-pricing-path-heading"><h2 id="pricing-free-title">{choice.free_title}</h2><strong>{free.display_price}</strong></div>
+        <p>{choice.free_description}</p>
+        {freeAvailable ? <Link to="/tool/optimize/overview" className="v2-button v2-button-primary">{choice.free_action}</Link> : <button disabled className="v2-button v2-button-primary">{choice.free_unavailable}</button>}
+        <p className="v2-muted">{free.account_scope}</p>
+      </article>
+      <article aria-labelledby="pricing-paid-title">
+        <h2 id="pricing-paid-title">{choice.paid_title}</h2>
+        <p>{choice.paid_description}</p>
+        <a href="#pricing-terms" className="v2-button v2-button-secondary">{choice.paid_action}</a>
+        <p className="v2-muted">{text.pages_PricingPage_016}</p>
+      </article>
+    </div>
+    <section className="v2-pricing-highlights" aria-labelledby="pricing-highlights-title">
+      <h2 id="pricing-highlights-title">{choice.highlights_title}</h2>
+      <table className="v2-pricing-comparison" aria-labelledby="pricing-highlights-title">
+        <thead><tr><th scope="col">{text.pages_PricingPage_008}</th><th scope="col">{choice.free_title}</th><th scope="col">{choice.paid_title}</th></tr></thead>
+        <tbody>{choice.highlights(quota.submission_window_hours, quota.max_submissions_per_window).map((row) => <tr key={row.label}>
+          <th scope="row">{row.label}</th><td data-label={choice.free_title}>{row.free}</td><td data-label={choice.paid_title}>{row.paid}</td>
+        </tr>)}</tbody>
+      </table>
+      <p className="v2-muted">{choice.export_note}</p>
+      {!features.maa_export && <Notice>{choice.export_unavailable}</Notice>}
+    </section>
+    <section id="pricing-terms" className="v2-pricing-selector" aria-label={choice.paid_action} tabIndex={-1}>
+      <div>
+        <SectionTitle title={copy.v2.planChoice} description={pricing.intro} />
+        <div className="v2-term-choices" role="group" aria-label={copy.v2.planChoice}>{planIds.map((id) => <button type="button" key={id} aria-pressed={chosen === id} onClick={() => setChosen(id)}>
+          <span><strong>{choice.term_labels[id]}</strong><small>{pricing.plans[id].display_price.split('/')[0].trim()}</small></span>
+          {chosen === id && <Check size={18} aria-hidden="true" />}
+        </button>)}</div>
+      </div>
+      <article className="v2-pricing-selected" aria-labelledby="pricing-selected-title">
+        <h2 id="pricing-selected-title">{term(plan.label)}</h2>
+        <strong className="v2-plan-price">{plan.display_price}</strong>
+        {plan.discount_fold < 10 && <small>{text.pages_PricingPage_017(plan.original_price, plan.discount_fold)}</small>}
+        <p>{getSku(chosen).audience}</p>
+        <p>{plan.summary}</p>
+        <p>{text.pricing_archive_gift(chosen === 'single_account_lifetime' ? 3 : 1)}</p>
+        <p className="v2-muted">{plan.account_scope}</p>
+        {plan.purchase_url ? <a href={plan.purchase_url} target="_blank" rel="noopener noreferrer" className="v2-button v2-button-primary">{text.pricing_purchase_labels[chosen]}<ArrowUpRight size={16} aria-hidden="true" /></a> : <button disabled className="v2-button v2-button-primary">{text.pricing_purchase_unavailable}</button>}
+      </article>
+    </section>
+    <details className="v2-pricing-details">
+      <summary><h2>{choice.full_comparison}</h2><ChevronDown size={20} aria-hidden="true" /></summary>
+      <table className="v2-pricing-comparison" aria-label={pricing.comparison_heading}>
+        <thead><tr><th scope="col">{text.pages_PricingPage_008}</th><th scope="col">{free.label}</th><th scope="col">{term(plan.label)}</th></tr></thead>
+        <tbody>{pricing.comparison_rows.map((row) => <tr key={row.id}>
+          <th scope="row">{row.feature}</th><td data-label={choice.free_title}>{row.free_preview}</td><td data-label={choice.term_labels[chosen]}>{row[chosen] ?? '—'}</td>
+        </tr>)}</tbody>
+      </table>
+    </details>
     <section className="v2-pricing-upgrade"><SectionTitle title={text.pricing_upgrade_title} description={text.pricing_upgrade_description(pricing.lifetime_upgrade.service_fee)} /><p>{text.pricing_upgrade_process}</p><div className="v2-actions">{features.support && <Link to="/support" className="v2-button v2-button-secondary">{text.pricing_upgrade_contact}</Link>}{pricing.lifetime_upgrade.purchase_url ? <a href={pricing.lifetime_upgrade.purchase_url} target="_blank" rel="noopener noreferrer" className="v2-button v2-button-primary">{text.pricing_upgrade_purchase}</a> : <button disabled className="v2-button v2-button-primary">{text.pricing_upgrade_unavailable}</button>}</div></section>
     {METERED_BILLING_AVAILABLE && <MeteredPricing />}
     <section className="v2-pricing-policy"><SectionTitle title={pricing.policy_heading} /><ul>{pricing.disclosures.map((disclosure, index) => <li key={index}>{disclosure}</li>)}</ul></section>

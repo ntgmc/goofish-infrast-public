@@ -1,5 +1,17 @@
 [
   {
+    "date": "2026-10-14",
+    "scope": "v2/pricing",
+    "macrostructure": "Workbench",
+    "theme": "existing V2 variant",
+    "theme_axes": "light and dark / geometric-sans / warm-copper",
+    "enrichment": "none",
+    "nav": "existing side rail",
+    "footer": "Ft2 inline rule",
+    "brief": "Lead with free start and paid maintenance, key differences, compact terms and expandable full entitlements",
+    "design_system": "design.md"
+  },
+  {
     "date": "2026-10-13",
     "scope": "admin/overview",
     "macrostructure": "Workbench",
