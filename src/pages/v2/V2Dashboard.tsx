@@ -1,13 +1,13 @@
 import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
 import { useAppReducedMotion } from '../../lib/motion-preference'
-import { Activity, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, CalendarClock, Check, ChevronDown, ChevronRight, Download, Factory, FileClock, Gem, LayoutDashboard, Menu, RefreshCw, ScrollText, Settings2, ShieldCheck, Sparkles, Users, WalletCards, X, Zap } from 'lucide-react'
+import { Activity, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, CalendarClock, Check, ChevronDown, ChevronRight, Download, Factory, FileClock, LayoutDashboard, Menu, RefreshCw, ScrollText, Settings2, ShieldCheck, Sparkles, Users, WalletCards, X, Zap } from 'lucide-react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import Link from '../../components/InternalLink'
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
-import { AnimatedValue, MotionNavIndicator, RevealItem, StaggeredReveal, motionTokens } from '../../components/MotionPrimitives'
-import { formatAmount, formatIntermediateDepletionSummary, formatSigned, prepareResult } from '../../components/result-panel/formatters'
+import { AnimatedValue, MotionNavIndicator, motionTokens } from '../../components/MotionPrimitives'
+import { formatAmount, formatIntermediateDepletionSummary, prepareResult } from '../../components/result-panel/formatters'
 import { PRODUCT_LABELS } from '../../components/result-panel/labels'
 import InventoryDepletionWarning from '../../components/result-panel/InventoryDepletionWarning'
 import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
@@ -23,6 +23,7 @@ import { normalizeScheduleMode, parseShiftHours, SCHEDULE_MODE_LABELS } from '..
 import type { AuthSuccessResponse, LicenseConfig, LicenseOperator, OptimizeResult, PermissionMode } from '../../lib/types'
 import ScheduleBoard, { Avatar } from './ScheduleBoard'
 import IncomeAnalysis from './IncomeAnalysis'
+import ProductionSummary from './ProductionSummary'
 import ResultExportDrawer from './ResultExportDrawer'
 import OptionsDrawer, { type OptionPanel, type V2Session } from './OptionsDrawer'
 import { isFreePreviewProfile, isFreePreviewTrialActive, sortOperatorsForPreview } from '../tool/tool-utils'
@@ -94,19 +95,8 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const owned = useMemo(() => sortedOperators.filter((operator) => operator.own), [sortedOperators])
   const resultMode = normalizeScheduleMode(result.schedule_mode)
   const configMode = normalizeScheduleMode(config.schedule_mode)
-  const battleRecords = prepared.productionStats.manufacturing['Battle Record'] ?? 0
-  const orundumEconomy = prepared.orundumEconomy
-  const isOrundum = Boolean(orundumEconomy) || prepared.productionStats.orundum > 0
-  const showOrundum = isOrundum && battleRecords === 0
-  const shortTermOrundum = orundumEconomy?.short_term_orundum ?? prepared.productionStats.orundum
-  const shortTermPulls = (shortTermOrundum * 30 / 600).toFixed(1)
-  const hasGoldNet = Number.isFinite(result.daily_production?.net?.['Pure Gold'])
+  const shortTermOrundum = prepared.orundumEconomy?.short_term_orundum ?? prepared.productionStats.orundum
   const inventorySummary = resultMode !== 'rotation' ? formatIntermediateDepletionSummary(prepared.intermediateDepletion) : ''
-  const inventoryBurstNote = orundumEconomy?.case === 'inventory_burst' && orundumEconomy.inventory_depletion_days !== null
-    ? text.inventoryBurstHint(formatAmount(orundumEconomy.inventory_depletion_days))
-    : ''
-  const shortTermPullsNote = text.shortTermPullsHint(formatAmount(shortTermOrundum),
-    inventoryBurstNote || (orundumEconomy ? text.orundumOutputSustainable : text.orundumDurationUnavailable))
   const hours = parseShiftHours(config.shift_hours) ?? [8, 8, 8]
   const name = session.activeProfile?.display_name ?? text.guest
   const openPanel = useCallback((next: OptionPanel) => { setPanel(next); setMobileNavigation(false) }, [])
@@ -256,21 +246,8 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           </AnimatePresence>
           {generationProgress}
           {children}
-          <StaggeredReveal className="v2-metrics">
-            <Metric label={text.lmd} value={formatAmount(prepared.productionStats.lmd)} unit={text.daily} product="LMD" />
-            <Metric label={showOrundum ? text.orundum : text.exp} value={formatAmount(showOrundum ? shortTermOrundum : battleRecords * 1000)}
-              unit={showOrundum ? text.daily : text.expUnit} product={showOrundum ? 'Orundum' : 'Battle Record'}
-              hint={showOrundum && orundumEconomy ? [text.shortTermOrundumHint, inventoryBurstNote].filter(Boolean).join(' · ') : undefined} />
-            <Metric label={text.totalEfficiency} value={formatAmount(prepared.totalEff)} unit="%" hint={text.efficiencyHint} icon={<Activity size={20} />} />
-            <Metric
-              label={isOrundum ? text.shortTermPulls : text.sanity}
-              value={isOrundum ? shortTermPulls : prepared.productionSanity.value.toFixed(1)}
-              unit={isOrundum ? text.pullsPer30Days : text.daily}
-              hint={isOrundum ? shortTermPullsNote : text.sanityHint}
-              icon={<Gem size={20} />}
-            />
-          </StaggeredReveal>
-          <p className="v2-metrics-note">{text.outputSubtitle}</p>
+          <ProductionSummary result={result} prepared={prepared} sample={sample} profileId={session.activeProfile?.id} resultId={exportResultId}
+            history={[...(workflow?.resultHistory ?? []), ...(workflow?.archivedResults ?? [])]} newResult={Boolean(workflow?.currentResult || workflow?.finalResult)} />
           <div className="v2-content-tabs" role="group" aria-label={text.resultTabs}>
             {([['schedule', text.scheduleTab], ['analysis', text.analysisTab], ...(showManual ? [['manual', text.manualTab] as const] : []), ...(restrictedPreview || !sample && (workflow?.suggestions?.length || result.upgrade_suggestions_status) ? [['training', text.trainingTab] as const] : [])] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => { setView(id); if (id === 'manual') setManualOpened(true) }}>
               {label}{view === id && <MotionNavIndicator layoutId="result-tab" variant="underline" />}
@@ -296,17 +273,16 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
             {view === 'schedule' && !expanded && <aside className="v2-result-aside">
               <section className="v2-panel v2-production-panel">
                 <div className="v2-panel-heading"><h2>{text.dailyOutput}</h2><span className="v2-output-clock"><CalendarClock size={16} /></span></div>
-                <OutputRow product="LMD" value={prepared.productionStats.lmd} />
-                <OutputRow product="Battle Record" value={prepared.productionStats.manufacturing['Battle Record'] ?? 0} />
-                <OutputRow product="Pure Gold" value={prepared.productionStats.manufacturing['Pure Gold'] ?? 0} />
+                <OutputRow product="LMD" value={prepared.productionStats.lmd} available={prepared.hasDailyProduction} />
+                <OutputRow product="Battle Record" value={prepared.productionStats.manufacturing['Battle Record'] ?? 0} available={prepared.hasDailyProduction} />
+                <OutputRow product="Pure Gold" value={prepared.productionStats.manufacturing['Pure Gold'] ?? 0} available={prepared.hasDailyProduction} />
                 {Object.keys(PRODUCT_LABELS).filter((product) => !['LMD', 'Battle Record', 'Pure Gold'].includes(product)).map((product) => {
                   const value = (prepared.productionStats.manufacturing[product] ?? 0) + (product === 'Orundum' ? shortTermOrundum : result.daily_production?.trading?.[product] ?? 0)
                   return value !== 0 ? <OutputRow key={product} product={product} value={value} /> : null
                 })}
               </section>
-              {(hasGoldNet || inventorySummary) && <dl className="v2-inventory-summary" aria-label={text.intermediateInventory}>
-                {hasGoldNet && <div className="v2-inventory-net"><dt>{text.goldNetChange}</dt><dd data-decreasing={prepared.productionStats.goldNet < 0}><strong>{formatSigned(prepared.productionStats.goldNet)}</strong><span>{text.daily}</span></dd></div>}
-                {inventorySummary && <div><dt>{text.intermediateInventory}</dt><dd>{inventorySummary}</dd></div>}
+              {inventorySummary && <dl className="v2-inventory-summary" aria-label={text.intermediateInventory}>
+                <div><dt>{text.intermediateInventory}</dt><dd>{inventorySummary}</dd></div>
               </dl>}
               <section className="v2-panel v2-config-panel">
                 <div className="v2-panel-heading"><h2>{text.currentConfig}</h2><button className="v2-text-button" type="button" onClick={() => openPanel('config')}>{text.edit}<ArrowUpRight size={13} /></button></div>
@@ -365,11 +341,8 @@ function FeedbackRegion({ children }: { children: ReactNode }) {
   )
 }
 
-function Metric({ label, value, unit, hint, product, icon }: { label: string; value: string; unit: string; hint?: string; product?: string; icon?: ReactNode }) {
-  return <RevealItem className="v2-metric"><section aria-label={label}><div className="v2-metric-top"><span>{label}</span><span className="v2-metric-icon" aria-hidden="true">{product ? <ProductIcon product={product} size={24} /> : icon}</span></div>
-    <p className="v2-metric-value"><AnimatedValue value={value} /><small>{unit}</small></p>{hint && <p className="v2-metric-hint">{hint}</p>}</section></RevealItem>
-}
-
-function OutputRow({ product, value }: { product: string; value: number }) {
-  return <div className="v2-output-row"><span><ProductIcon product={product} size={29} /><span>{PRODUCT_LABELS[product] ?? product}</span></span><strong><AnimatedValue value={formatAmount(value)} /><small>{text.daily}</small></strong></div>
+function OutputRow({ product, value, available = true }: { product: string; value: number; available?: boolean }) {
+  const experience = product === 'Battle Record'
+  return <div className="v2-output-row"><span><ProductIcon product={product} size={29} /><span>{experience ? text.comparison.experience : PRODUCT_LABELS[product] ?? product}</span></span>
+    <strong><AnimatedValue value={available ? formatAmount(experience ? value * 1000 : value) : '—'} /><small>{experience ? text.expUnit : text.daily}</small></strong></div>
 }

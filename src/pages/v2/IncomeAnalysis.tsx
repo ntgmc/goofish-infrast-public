@@ -1,7 +1,6 @@
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
-import ResultMetrics from '../../components/result-panel/ResultMetrics'
-import type { PreparedResult } from '../../components/result-panel/formatters'
+import { formatAmount, type PreparedResult } from '../../components/result-panel/formatters'
 import { PRODUCT_LABELS, ROOM_LABELS } from '../../components/result-panel/labels'
 import { calculateProductionSanity } from '../../lib/production-sanity'
 import { SANITY_PER_BATTLE_RECORD, SANITY_PER_LMD, SANITY_PER_ORIGINIUM_SHARD, SANITY_PER_ORUNDUM, SANITY_PER_PURE_GOLD } from '../../lib/orundum-economy'
@@ -11,11 +10,14 @@ const text = copy.v2
 const amount = (value: number) => value.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
 const values: Record<string, { value: number; formula: string }> = {
   LMD: { value: SANITY_PER_LMD, formula: '36 ÷ 10,000' },
-  'Battle Record': { value: SANITY_PER_BATTLE_RECORD, formula: '36 ÷ 10,000 × 1,000' },
+  'Battle Record': { value: SANITY_PER_BATTLE_RECORD / 1000, formula: '36 ÷ 10,000' },
   'Pure Gold': { value: SANITY_PER_PURE_GOLD, formula: '36 ÷ 10,000 × 145 ÷ 229 × 50 ÷ 3 × 24' },
   Orundum: { value: SANITY_PER_ORUNDUM, formula: '3 ÷ 4' },
   'Originium Shard': { value: SANITY_PER_ORIGINIUM_SHARD, formula: '2 × 4.8 + 1,600 × 0.0036 + 60 ÷ 72 × ' + SANITY_PER_PURE_GOLD.toFixed(6) },
 }
+
+const outputAmount = (product: string, value: number) => product === 'Battle Record' ? value * 1000 : value
+const outputLabel = (product: string) => product === 'Battle Record' ? text.comparison.experience : PRODUCT_LABELS[product] ?? product
 
 function numericMap(raw: unknown): Record<string, number> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
@@ -52,8 +54,8 @@ export default function IncomeAnalysis({ result, prepared }: { result: OptimizeR
         <tbody>{rows.map((row, index) => <tr key={index}>
           <th scope="row">{ROOM_LABELS[row.roomType]} {row.roomIndex}</th>
           <td>{row.shift}{row.drones && <span className="v2-neutral-tag">{text.drones}</span>}{row.capacityLimited && <small>{text.capacityLimited}</small>}</td>
-          <td><span className="v2-product-amount"><ProductIcon product={row.product} size={20} />{PRODUCT_LABELS[row.product] ?? row.product} {amount(row.amount)}</span></td>
-          <td>{Object.entries(row.consume).map(([product, value]) => `${PRODUCT_LABELS[product] ?? product} ${amount(value)}`).join(' · ') || '—'}</td>
+          <td><span className="v2-product-amount"><ProductIcon product={row.product} size={20} />{outputLabel(row.product)} {amount(outputAmount(row.product, row.amount))}</span></td>
+          <td>{Object.entries(row.consume).map(([product, value]) => `${outputLabel(product)} ${amount(outputAmount(product, value))}`).join(' · ') || '—'}</td>
           <td>{row.sanity === null ? '—' : amount(row.sanity)}</td>
         </tr>)}</tbody></table>
     </div> : <p className="v2-analysis-note">{text.noStationOutput}</p>}
@@ -65,9 +67,10 @@ export default function IncomeAnalysis({ result, prepared }: { result: OptimizeR
         <table className="v2-income-table"><thead><tr><th>{text.product}</th><th>{text.conversion}</th><th>{text.outputValue}</th><th>{text.consumptionValue}</th></tr></thead>
           <tbody>{products.map((product) => {
             const unit = values[product]
-            const produced = (daily?.manufacturing?.[product] ?? 0) + (daily?.trading?.[product] ?? 0)
-            const consumed = daily?.consumption?.[product] ?? 0
-            return <tr key={product}><th scope="row">{PRODUCT_LABELS[product]}</th>
+            const rawProduced = (daily?.manufacturing?.[product] ?? 0) + (daily?.trading?.[product] ?? 0)
+            const produced = outputAmount(product, rawProduced)
+            const consumed = outputAmount(product, daily?.consumption?.[product] ?? 0)
+            return <tr key={product}><th scope="row">{outputLabel(product)}{product === 'Battle Record' && <small>{text.battleRecordEquivalent(amount(rawProduced))}</small>}</th>
               <td>{unit.value.toFixed(6)}<small>{unit.formula}</small></td>
               <td>{amount(produced)} × {unit.value.toFixed(6)} ≈ {amount(produced * unit.value)}</td>
               <td>{consumed ? `${amount(consumed)} × ${unit.value.toFixed(6)} ≈ ${amount(consumed * unit.value)}` : '—'}</td></tr>
@@ -75,8 +78,11 @@ export default function IncomeAnalysis({ result, prepared }: { result: OptimizeR
       </div><p className="v2-muted">{text.sanityCalculationNote}</p>
     </section>
     <details className="v2-analysis-details v2-feature-content">
-      <summary>{text.productionDetails}</summary>
-      <ResultMetrics prepared={prepared} isRotationMode={result.schedule_mode === 'rotation'} />
+      <summary>{text.efficiencyDetails}</summary>
+      <h3>{text.totalEfficiency} · {formatAmount(prepared.totalEff)}%</h3>
+      <p className="v2-muted">{text.efficiencyHint}</p>
+      {prepared.rotationStatsNote && <p>{prepared.rotationStatsNote}</p>}
+      {(result.raw_total_efficiency !== undefined || result.raw_results.length > 0) && Math.abs(prepared.totalEff - prepared.rawTotalEff) >= 0.05 && <p>{text.rawTotalEfficiency} · {formatAmount(prepared.rawTotalEff)}%</p>}
     </details>
   </div>
 }

@@ -351,24 +351,101 @@ describe('V2 results-first workspace', () => {
     const workflow = connect()
     workflow.historyItem = { result: { ...SAMPLE_RESULT, daily_production: {
       hours: 24, source_hours: 16, normalization_factor: 1.5,
-      manufacturing: { 'Pure Gold': 20 }, trading: { LMD: 3000 }, consumption: { 'Pure Gold': 6 },
+      manufacturing: { 'Pure Gold': 20, 'Battle Record': 32.4 }, trading: { LMD: 3000 }, consumption: { 'Pure Gold': 6 },
       details: [
         { shift: '早班', room_type: 'manufacture', room_index: 1, product: 'Pure Gold', amount: 20 },
+        { shift: '早班', room_type: 'manufacture', room_index: 2, product: 'Battle Record', amount: 32.4 },
         { shift: '早班', room_type: 'trading', room_index: 2, product: 'LMD', amount: 2500, consume: { 'Pure Gold': 5 } },
         { shift: '早班', room_type: 'trading', room_index: 2, product: 'LMD', source: 'drones', amount: 500, consume: { 'Pure Gold': 1 } },
       ],
     } } }
     const user = userEvent.setup()
     mount()
+    expect(screen.getByRole('region', { name: copy.v2.exp })).toHaveTextContent(`32,400${copy.v2.expUnit}`)
+    const output = within(screen.getByRole('heading', { name: copy.v2.dailyOutput }).closest('section')!)
+    expect(output.getByText('32,400').closest('.v2-output-row')).toHaveTextContent(`经验32,400${copy.v2.expUnit}`)
+    expect(screen.queryByText(copy.v2.totalEfficiency)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: copy.v2.analysisTab }))
     const station = within(await screen.findByRole('region', { name: copy.v2.stationOutput }))
     const rows = station.getAllByRole('row').slice(1)
-    expect(rows).toHaveLength(3)
+    expect(rows).toHaveLength(4)
     expect(rows[0]).toHaveTextContent('赤金 20')
-    expect(rows[1]).toHaveTextContent('贸易站 2早班龙门币 2,500赤金 5')
-    expect(rows[2]).toHaveTextContent(`贸易站 2早班${copy.v2.drones}龙门币 500赤金 1`)
-    const sanity = 3000 * SANITY_PER_LMD + 14 * SANITY_PER_PURE_GOLD
-    expect(screen.getByRole('region', { name: copy.v2.sanityCalculation })).toHaveTextContent(sanity.toFixed(2))
+    expect(rows[1]).toHaveTextContent('制造站 2早班经验 32,400')
+    expect(rows[2]).toHaveTextContent('贸易站 2早班龙门币 2,500赤金 5')
+    expect(rows[3]).toHaveTextContent(`贸易站 2早班${copy.v2.drones}龙门币 500赤金 1`)
+    const sanity = (3000 + 32400) * SANITY_PER_LMD + 14 * SANITY_PER_PURE_GOLD
+    const calculation = screen.getByRole('region', { name: copy.v2.sanityCalculation })
+    expect(calculation).toHaveTextContent(sanity.toFixed(2))
+    expect(calculation).toHaveTextContent('32,400 × 0.003600 ≈ 116.64')
+    expect(calculation).toHaveTextContent(copy.v2.battleRecordEquivalent('32.4'))
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+  })
+
+  it('compares the selected historical result with its predecessor and ignores a late response after switching results', async () => {
+    const workflow = connect()
+    const older = { ...summary, id: 'older', name: 'Older plan', created_at: '2026-09-30T10:00:00Z' }
+    const newer = { ...summary, id: 'newer', created_at: '2026-10-02T10:00:00Z' }
+    workflow.resultHistory = [newer, summary, older]
+    workflow.latestWorkspaceResult = newer
+    Object.assign(workflow.historyItem, { id: summary.id })
+    const priorResult = { ...SAMPLE_RESULT, daily_production: {
+      trading: { LMD: 51000 }, manufacturing: { 'Battle Record': 30 }, net: { 'Pure Gold': -1 },
+    } }
+    let finish!: (response: Response) => void
+    const delayed = new Promise<Response>((resolve) => { finish = resolve })
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => String(url).startsWith('/api/user/results/older?')
+      ? delayed : new Response(JSON.stringify({ notifications: [], unread_count: 0, next_cursor: null }), { status: 200 }))
+    const page = mount()
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/user/results/older?profile_id=profile-1', expect.anything()))
+    expect(screen.getByText(copy.v2.loadingPreviousProduction)).toBeInTheDocument()
+    await act(async () => finish(Response.json({ item: { ...older, result: priorResult } })))
+    expect(screen.getByRole('region', { name: copy.v2.lmd })).toHaveTextContent('比上次 +3,720 龙门币 / 天')
+    expect(screen.getByRole('region', { name: copy.v2.exp })).toHaveTextContent('比上次 +2,400 经验 / 天')
+    expect(screen.getByRole('region', { name: copy.v2.goldNetChange })).toHaveTextContent('比上次 +3.56 个 / 天')
+    expect(screen.getByRole('region', { name: copy.v2.goldNetChange })).toHaveTextContent('+2.56')
+    expect(screen.getByText(/与上次方案「Older plan」/)).toBeInTheDocument()
+
+    let finishNew!: (response: Response) => void
+    const delayedNew = new Promise<Response>((resolve) => { finishNew = resolve })
+    fetch.mockImplementation(async (url) => String(url).startsWith(`/api/user/results/${summary.id}?`)
+      ? delayedNew : new Response(JSON.stringify({ notifications: [], unread_count: 0, next_cursor: null }), { status: 200 }))
+    Object.assign(workflow.historyItem, { id: newer.id })
+    page.rerender(<MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter>)
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith(`/api/user/results/${summary.id}?profile_id=profile-1`, expect.anything()))
+    expect(screen.queryByText(/比上次/)).not.toBeInTheDocument()
+    Object.assign(workflow.historyItem, { id: older.id, result: priorResult })
+    page.rerender(<MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter>)
+    expect(screen.getByText(copy.v2.noPreviousProduction)).toBeInTheDocument()
+    await act(async () => finishNew(Response.json({ item: { ...summary, result: SAMPLE_RESULT } })))
+    expect(screen.queryByText(/比上次/)).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: copy.v2.goldNetChange })).toHaveTextContent(copy.v2.goldDeficit)
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+  })
+
+  it('retries a failed previous-result read and keeps missing production data distinct from zero yield', async () => {
+    const workflow = connect()
+    const older = { ...summary, id: 'older', created_at: '2026-09-30T10:00:00Z' }
+    workflow.resultHistory = [summary, older]
+    Object.assign(workflow.historyItem, { id: summary.id })
+    let historyReads = 0
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).startsWith('/api/user/results/older?')) {
+        historyReads += 1
+        return Response.json(historyReads === 1 ? { error: 'Read failed' } : { item: { ...older, result: { ...SAMPLE_RESULT, daily_production: undefined } } }, { status: historyReads === 1 ? 500 : 200 })
+      }
+      return new Response(JSON.stringify({ notifications: [], unread_count: 0, next_cursor: null }), { status: 200 })
+    })
+    const page = mount()
+    const failed = await screen.findByText(copy.v2.previousProductionFailed)
+    await userEvent.click(within(failed.closest('p')!).getByRole('button', { name: copy.v2.retry }))
+    await screen.findByText(copy.v2.previousProductionUnavailable)
+    expect(historyReads).toBe(2)
+    expect(screen.queryByText(/比上次/)).not.toBeInTheDocument()
+    workflow.historyItem = { result: { ...SAMPLE_RESULT, daily_production: undefined } }
+    page.rerender(<MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter>)
+    expect(screen.getByRole('region', { name: copy.v2.lmd })).toHaveTextContent('—')
+    expect(screen.getByRole('region', { name: copy.v2.exp })).toHaveTextContent('—')
+    expect(screen.getByRole('region', { name: copy.v2.goldNetChange })).toHaveTextContent(copy.v2.goldNetUnavailable)
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
@@ -1103,7 +1180,7 @@ describe('V2 results-first workspace', () => {
     } } }
     page.rerender(<MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter>)
     expect(screen.getByRole('region', { name: copy.v2.exp })).toHaveTextContent(`1,000${copy.v2.expUnit}`)
-    expect(screen.queryByRole('region', { name: copy.v2.orundum })).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: copy.v2.orundum })).toHaveTextContent(`103.5${copy.v2.daily}`)
     await user.click(screen.getByRole('button', { name: copy.v2.analysisTab }))
     expect(screen.queryByRole('region', { name: copy.v2.sanityCalculation })).not.toBeInTheDocument()
   })

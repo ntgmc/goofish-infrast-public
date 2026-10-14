@@ -192,6 +192,8 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and d
   await waitFor(() => expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('12,345')).toBeInTheDocument())
   expect(screen.queryByText(copy.common.components_ScheduleProgress_060)).not.toBeInTheDocument()
   await act(async () => refreshWorkspace({ ...auth, workspace: { ...workspace, latest_result: latest, result_history: [latest, previous] } }))
+  await within(screen.getByRole('region', { name: copy.v2.lmd })).findByText('比上次 -42,375 龙门币 / 天')
+  expect(screen.getByRole('region', { name: copy.v2.exp })).toHaveTextContent('比上次 -32,400 经验 / 天')
   await waitFor(() => expect(screen.getByRole('button', { name: copy.v2.regenerate })).not.toBeDisabled())
   fireEvent.click(screen.getByRole('button', { name: copy.v2.facilities }))
   const unlockedDialog = await screen.findByRole('dialog')
