@@ -208,6 +208,7 @@ export const v2Copy = {
   previewAnalysis: '免费预览可查看总体产出。各站点的产量明细与等效理智计算需要高级版权益。',
   comparePlans: '比较价格与权益',
   result: '排班安排',
+  currentShift: '当前班次',
   shiftTabs: '选择班次',
   shift: (index: number) => `第 ${index} 班`,
   shifts: (count: number) => `${count} 班轮换`,
