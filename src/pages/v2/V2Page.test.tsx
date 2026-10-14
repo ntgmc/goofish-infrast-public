@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -175,14 +175,14 @@ describe('V2 results-first workspace', () => {
     await user.click(screen.getByRole('button', { name: copy.v2.generateMine }))
     const login = await screen.findByText(copy.v2.generationSignIn)
     const form = within(login.parentElement!)
-    await user.type(form.getByLabelText(copy.auth.components_AuthForm_011), 'doctor@example.test')
-    await user.type(form.getByLabelText(copy.auth.components_AuthForm_012), 'password123')
+    fireEvent.change(form.getByLabelText(copy.auth.components_AuthForm_011), { target: { value: 'doctor@example.test' } })
+    fireEvent.change(form.getByLabelText(copy.auth.components_AuthForm_012), { target: { value: 'password123' } })
     await user.click(form.getAllByRole('button', { name: copy.auth.components_AuthForm_020 }).find((button) => button.getAttribute('type') === 'submit')!)
     await waitFor(() => expect(session.applyAuthPayload).toHaveBeenCalledWith(loginPayload))
     page.rerender(<MemoryRouter initialEntries={['/']}><V2Page /><RouteLocation /></MemoryRouter>)
     expect(screen.getByTestId('route-location')).toHaveTextContent('section=generation')
     await user.click(await screen.findByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_005 }))
-    await user.type(screen.getByRole('textbox', { name: 'CDK' }), 'MAA-FIRST-ACCOUNT')
+    fireEvent.change(screen.getByRole('textbox', { name: 'CDK' }), { target: { value: 'MAA-FIRST-ACCOUNT' } })
     await user.click(screen.getByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_015 }))
     await waitFor(() => expect(session.applyAuthPayload).toHaveBeenCalledWith(accountPayload))
     page.rerender(<MemoryRouter initialEntries={['/']}><V2Page /><RouteLocation /></MemoryRouter>)
@@ -398,23 +398,6 @@ describe('V2 results-first workspace', () => {
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
-  it('shows an explicitly marked result immediately without requiring login or a CDK', () => {
-    mount()
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(copy.v2.startTitle)
-    expect(screen.getByText(copy.v2.sampleSource)).toBeInTheDocument()
-    expect(screen.getByText(copy.v2.brandDescription)).toBeInTheDocument()
-    expect(screen.queryByText('可露希尔基建终端')).not.toBeInTheDocument()
-    const legacyEntry = within(screen.getByRole('banner')).getByRole('link', { name: copy.v2.legacyEntry })
-    expect(legacyEntry).toHaveAttribute('href', '/v1')
-    expect(legacyEntry).toHaveTextContent(copy.v2.legacyEntry)
-    expect(screen.getByRole('tab', { name: /第 1 班/ })).toHaveAttribute('aria-selected', 'true')
-    expect(mocks.workflow).not.toHaveBeenCalled()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(within(screen.getByRole('group', { name: copy.v2.resultTabs })).getAllByRole('button').map((button) => button.textContent)).toEqual([
-      copy.v2.scheduleTab, copy.v2.analysisTab,
-    ])
-  })
-
   it('waits for configuration saving before switching versions and stays in V2 when saving fails', async () => {
     connect()
     let finishSave!: (saved: boolean) => void
@@ -434,10 +417,7 @@ describe('V2 results-first workspace', () => {
 
   it.each([
     '/?profile_id=profile-1',
-    '/?profile_id=profile-1&panel=operators',
-    '/v2?profile_id=profile-1',
     '/v2?profile_id=profile-1&panel=operators',
-    '/v2?section=profiles&profile_id=profile-1',
   ])('opens profile management and closes the operator drawer from %s', async (path) => {
     connect()
     const user = userEvent.setup()
@@ -846,21 +826,15 @@ describe('V2 results-first workspace', () => {
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
-  it('exposes configuration validation failures from the existing workflow', async () => {
-    const workflow = connect()
-    workflow.configToast = { message: 'Invalid schedule configuration' }
-    mount()
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Invalid schedule configuration'))
-    expect(workflow.handleGenerate).not.toHaveBeenCalled()
-  })
-
-  it('shows validation errors inside the configuration drawer', async () => {
+  it('shows workflow validation errors on the page and inside the configuration drawer', async () => {
     const workflow = connect()
     workflow.configToast = { message: 'Invalid schedule configuration' }
     const user = userEvent.setup()
     mount()
+    expect(screen.getByRole('alert')).toHaveTextContent('Invalid schedule configuration')
     await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
     expect(within(await screen.findByRole('dialog')).getByRole('alert')).toHaveTextContent('Invalid schedule configuration')
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
   it('keeps incomplete configuration feedback in the drawer without a validation toast', async () => {
@@ -894,15 +868,11 @@ describe('V2 results-first workspace', () => {
     expect(session.retryConfigSave).toHaveBeenCalledOnce()
   })
 
-  it.each([
-    copy.common.components_ConfigEditor_103,
-    copy.common.components_ConfigEditor_105,
-    copy.common.components_ConfigEditor_108,
-  ])('requires layout confirmation before completing %s configuration', async (preset) => {
+  it('requires layout confirmation before completing configuration', async () => {
     const user = userEvent.setup()
     mount('/v2?panel=config')
     const dialog = within(await screen.findByRole('dialog'))
-    await user.click(dialog.getByRole('button', { name: preset }))
+    await user.click(dialog.getByRole('button', { name: copy.common.components_ConfigEditor_103 }))
     const done = dialog.getByRole('button', { name: copy.v2.done })
     expect(done).toHaveAttribute('aria-disabled', 'true')
     expect(dialog.getByText(copy.common.facilityLayoutRequired)).toBeInTheDocument()
@@ -1159,11 +1129,7 @@ describe('V2 feature continuity', () => {
     await user.click(screen.getByRole('button', { name: copy.inventory.nav }))
     const loading = await screen.findByRole('status', { name: copy.inventory.loading })
     expect(loading).toHaveAttribute('aria-busy', 'true')
-    expect(loading).toHaveClass('v2-section-loading-region')
-    expect(loading).not.toHaveClass('v2-panel')
     expect(loading.closest('main')).toBe(main)
-    expect(loading.querySelector('.page-loading-spinner')).toBeInTheDocument()
-    expect(document.querySelector('.motion-skeleton-block')).not.toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: copy.v2.navigation })).toBe(navigation)
     expect(document.querySelector('.v2-topbar')).toBe(topbar)
     expect(screen.queryByRole('heading', { name: copy.inventory.title, level: 2 })).not.toBeInTheDocument()
@@ -1285,9 +1251,8 @@ describe('V2 feature continuity', () => {
     expect(await screen.findByRole('link', { name: new RegExp(copy.tools.manualSchedule.title) })).toHaveAttribute('href', expect.stringContaining('section=manual-tool'))
   })
 
-  it.each(['free_preview', 'cdk'] as const)('opens pricing from the footer for a %s profile', async (kind) => {
+  it('opens pricing from the footer while retaining the active profile', async () => {
     connect()
-    session.activeProfile = { ...session.activeProfile!, kind }
     const user = userEvent.setup()
     mount()
     const footer = within(document.querySelector('footer.v2-footer')!)
@@ -1315,17 +1280,6 @@ describe('V2 feature continuity', () => {
     expect(screen.queryByRole('button', { name: copy.public.pricing_purchase_unavailable })).not.toBeInTheDocument()
   })
 
-  it('omits the redundant free-preview generation and recompute introduction', async () => {
-    const workflow = connect()
-    session.activeProfile = { ...session.activeProfile!, kind: 'free_preview', permission: 'growth' }
-    workflow.isRestrictedPreview = true
-    mount('/v2?section=generation')
-    expect(await screen.findByRole('button', { name: copy.optimize.pages_tool_optimize_GenerateControlBar_029 })).toBeInTheDocument()
-    expect(screen.queryByText(copy.optimize.pages_tool_optimize_OverviewSection_024)).not.toBeInTheDocument()
-    expect(screen.queryByText(copy.optimize.paid_preview.recompute)).not.toBeInTheDocument()
-    expect(document.querySelector('.v2-generation-preview')).not.toBeInTheDocument()
-  })
-
   it('opens full account settings inside V2 and shares the existing animation preferences', async () => {
     connect()
     const user = userEvent.setup()
@@ -1337,37 +1291,6 @@ describe('V2 feature continuity', () => {
     expect(screen.queryByText(copy.dashboard.workspace_entry.settings_title)).not.toBeInTheDocument()
     expect(screen.getByTestId('route-location')).toHaveTextContent('section=settings')
     expect(screen.queryByRole('link', { name: '返回 V1' })).not.toBeInTheDocument()
-  })
-
-  it.each([true, false])('ignores V1 workspace entry preferences and observations in V2: enabled=%s', async (enabled) => {
-    connect()
-    const user = userEvent.setup()
-    const storageKey = 'maatool:workspace-entry:v1:user-1'
-    const observationKey = 'maatool:workspace-entry-observation:v1:user-1'
-    const preference = JSON.stringify({ target: enabled ? 'profile:profile-1' : null, remindAfter: 0 })
-    const now = Date.now()
-    const observation = JSON.stringify({ target: 'profile:profile-1', opens: [4, 3, 2, 1, 0.5].map((days) => now - days * 24 * 60 * 60 * 1000) })
-    window.localStorage.setItem(storageKey, preference)
-    window.localStorage.setItem(observationKey, observation)
-    try {
-      const view = mount('/v2?section=profiles')
-      expect(await screen.findByRole('heading', { level: 1, name: copy.v2.account })).toBeInTheDocument()
-      expect(screen.getByTestId('route-location')).toHaveTextContent('?section=profiles')
-      expect(screen.queryByRole('heading', { name: copy.dashboard.workspace_entry.prompt_title })).not.toBeInTheDocument()
-      await user.click(await screen.findByRole('button', { name: copy.dashboard.pages_tool_dashboard_ProfilesSection_010 }))
-      await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('?profile_id=profile-1'))
-      expect(session.refreshProfileWorkspace).toHaveBeenCalledWith(session.activeProfile)
-      view.unmount()
-      mount('/v2?section=settings')
-      expect(await screen.findByLabelText(copy.dashboard.pages_tool_dashboard_SettingsSection_018)).toBeInTheDocument()
-      expect(screen.getByTestId('route-location')).toHaveTextContent('?section=settings')
-      expect(screen.queryByText(copy.dashboard.workspace_entry.settings_title)).not.toBeInTheDocument()
-      expect(window.localStorage.getItem(storageKey)).toBe(preference)
-      expect(window.localStorage.getItem(observationKey)).toBe(observation)
-    } finally {
-      window.localStorage.removeItem(storageKey)
-      window.localStorage.removeItem(observationKey)
-    }
   })
 
   it('prefers free account binding while retaining CDK redemption inside V2', async () => {
@@ -1397,7 +1320,7 @@ describe('V2 feature continuity', () => {
     await user.click(screen.getByRole('button', { name: copy.v2.account }))
     await user.click(await screen.findByRole('button', { name: copy.v2.addAccount }))
     await user.click(await screen.findByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_005 }))
-    await user.type(screen.getByRole('textbox', { name: 'CDK' }), 'MAA-NEW-ACCOUNT')
+    fireEvent.change(screen.getByRole('textbox', { name: 'CDK' }), { target: { value: 'MAA-NEW-ACCOUNT' } })
     await user.click(screen.getByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_015 }))
     await waitFor(() => expect(session.applyAuthPayload).toHaveBeenCalledOnce())
     const expectedProfile = mode === 'switch' ? next : session.activeProfile

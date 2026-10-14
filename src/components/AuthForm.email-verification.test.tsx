@@ -35,13 +35,15 @@ describe('AuthForm email verification', () => {
     await user.click(screen.getByRole('button', { name: '注册' }))
     await user.type(screen.getByLabelText('邮箱'), 'new@qq.com')
     await user.type(screen.getByLabelText('密码'), 'password123')
-    await user.click(screen.getByRole('button', { name: '创建账号' }))
+    vi.useFakeTimers()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '创建账号' })) })
 
-    expect(await screen.findByRole('status')).toHaveTextContent('如果可以注册')
+    expect(screen.getByRole('status')).toHaveTextContent('如果可以注册')
     expect(onAuthenticated).not.toHaveBeenCalled()
     const coolingButton = screen.getByRole('button', { name: '1 秒后可重新发送' })
     expect(coolingButton).toBeDisabled()
-    await act(async () => { await new Promise((resolve) => window.setTimeout(resolve, 1_050)) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000) })
+    vi.useRealTimers()
     await user.click(screen.getByRole('button', { name: '重新发送验证邮件' }))
     expect(await screen.findByText(/如果可以注册/)).toBeInTheDocument()
     expect(fetchMock).toHaveBeenLastCalledWith('/api/auth/resend-verification', expect.objectContaining({ method: 'POST' }))
@@ -79,31 +81,6 @@ describe('AuthForm email verification', () => {
     expect(screen.getByRole('button', { name: '重新发送验证邮件' })).toBeInTheDocument()
   })
 
-  it('applies shared email and password maximums with field-level errors', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
-    const user = userEvent.setup()
-    render(<AuthForm onAuthenticated={vi.fn()} />)
-
-    const email = screen.getByLabelText('邮箱')
-    const password = screen.getByLabelText('密码')
-    expect(email).toHaveAttribute('maxlength', '254')
-    expect(password).toHaveAttribute('maxlength', '128')
-
-    fireEvent.change(email, { target: { value: `${'a'.repeat(250)}@qq.com` } })
-    fireEvent.change(password, { target: { value: 'valid-password' } })
-    let loginButtons = screen.getAllByRole('button', { name: '登录' })
-    await user.click(loginButtons[loginButtons.length - 1])
-    expect(screen.getByText('邮箱不能超过 254 个字符')).toHaveAttribute('role', 'alert')
-
-    fireEvent.change(email, { target: { value: 'valid@qq.com' } })
-    fireEvent.change(password, { target: { value: 'p'.repeat(129) } })
-    loginButtons = screen.getAllByRole('button', { name: '登录' })
-    await user.click(loginButtons[loginButtons.length - 1])
-    expect(screen.getByText('密码不能超过 128 位')).toHaveAttribute('role', 'alert')
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
   it.each(['login', 'register', 'forgot'] as const)(
     'rejects oversized authentication fields in %s mode before submission',
     async (mode) => {
@@ -124,6 +101,8 @@ describe('AuthForm email verification', () => {
 
       const email = screen.getByLabelText('邮箱')
       const password = mode === 'forgot' ? null : screen.getByLabelText('密码')
+      expect(email).toHaveAttribute('maxlength', '254')
+      if (password) expect(password).toHaveAttribute('maxlength', '128')
       fireEvent.change(email, { target: { value: `${'a'.repeat(250)}@qq.com` } })
       if (mode !== 'forgot') {
         fireEvent.change(password!, { target: { value: 'valid-password' } })

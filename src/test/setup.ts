@@ -1,5 +1,6 @@
-import '@testing-library/jest-dom/vitest'
 import { beforeEach } from 'vitest'
+
+if (typeof window !== 'undefined') await import('@testing-library/jest-dom/vitest')
 
 const completedTourKeys = [
   'dashboard-overview',
