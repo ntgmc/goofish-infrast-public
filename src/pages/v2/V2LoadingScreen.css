@@ -56,6 +56,18 @@
   cursor: pointer;
 }
 
+.v2-loading-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-xs);
+}
+
+.v2-loading-links a {
+  display: inline-flex;
+  align-items: center;
+}
+
 .v2-loading-retry:focus-visible {
   outline: 2px solid var(--color-v2-focus);
   outline-offset: 3px;

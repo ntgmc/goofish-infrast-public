@@ -47,7 +47,7 @@ function RouteControls() {
 }
 
 function mount(path = '/v2?section=announcements&profile_id=doctor', signedIn = false) {
-  const session = { user: signedIn ? { id: 'user-1' } : null, setAnnouncementUnreadCount: mocks.unread, announcementUnreadCount: 23 } as unknown as V2Session
+  const session = { authStatus: signedIn ? 'authenticated' : 'anonymous', user: signedIn ? { id: 'user-1' } : null, setAnnouncementUnreadCount: mocks.unread, announcementUnreadCount: 23 } as unknown as V2Session
   return render(<MemoryRouter initialEntries={[path]}><Announcements session={session} /><RouteControls /></MemoryRouter>)
 }
 

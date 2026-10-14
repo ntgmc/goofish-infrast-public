@@ -296,9 +296,104 @@ describe('V2 results-first workspace', () => {
     mount()
     expect(screen.getByRole('alert')).toHaveTextContent(copy.common.pages_ToolPage_003)
     expect(screen.queryByText(copy.v2.sampleSource)).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: copy.v2.helpAction })).toHaveAttribute('href', '/v2?section=help')
+    expect(screen.getByRole('link', { name: copy.public.pages_PublicInfoPage_061 })).toHaveAttribute('href', '/v2?section=support')
+    expect(screen.getByRole('link', { name: copy.status.pages_StatusPage_002 })).toHaveAttribute('href', '/v2?section=status')
     await userEvent.click(screen.getByRole('button', { name: copy.common.pages_ToolPage_005 }))
     expect(session.retryAuth).toHaveBeenCalledOnce()
     expect(mocks.workflow).not.toHaveBeenCalled()
+  })
+
+  it.each(['loading', 'error'] as const)('keeps help and support usable while login status is %s', async (authStatus) => {
+    session.authStatus = authStatus
+    const user = userEvent.setup()
+    mount('/v2?section=help')
+    expect(await screen.findByRole('searchbox', { name: copy.public.faq_search_label })).toBeVisible()
+    if (authStatus === 'error') {
+      expect(screen.getByRole('alert')).toHaveTextContent(copy.v2.loginServiceUnavailable)
+      await user.click(screen.getByRole('button', { name: copy.common.pages_ToolPage_005 }))
+      expect(session.retryAuth).toHaveBeenCalledOnce()
+    }
+    await user.click(screen.getByRole('link', { name: copy.public.pages_PublicInfoPage_061 }))
+    expect(await screen.findByRole('heading', { name: copy.public.pages_PublicInfoPage_067 })).toBeVisible()
+    expect(screen.getByTestId('route-location')).toHaveTextContent('section=support')
+    expect(mocks.workflow).not.toHaveBeenCalled()
+  })
+
+  it('reads service status after a 503 login failure and keeps the page visible during recovery', async () => {
+    const { useToolSession } = await vi.importActual<typeof import('../tool/useToolSession')>('../tool/useToolSession')
+    mocks.session.mockImplementation(useToolSession)
+    let authReads = 0
+    let finishRetry!: (response: Response) => void
+    const retry = new Promise<Response>((resolve) => { finishRetry = resolve })
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url) === '/api/auth/me') {
+        authReads += 1
+        return authReads === 1 ? Response.json({ error: 'Service unavailable' }, { status: 503 }) : retry
+      }
+      return Response.json(String(url) === '/api/status' ? {
+        generated_at: '2026-08-08T09:00:00.000Z', status: 'available',
+        components: [{ id: 'optimization', status: 'available' }, { id: 'skland_import', status: 'available' }],
+      } : { banner: null, popups: [] })
+    })
+    const user = userEvent.setup()
+    mount()
+    expect(await screen.findByRole('alert')).toHaveTextContent(copy.common.pages_ToolPage_003)
+    await user.click(screen.getByRole('link', { name: copy.status.pages_StatusPage_002 }))
+    const statusHeading = await screen.findByRole('heading', { name: '当前服务运行正常。' })
+    expect(statusHeading).toBeVisible()
+    expect(screen.getByRole('grid', { name: copy.status.pages_StatusPage_043 })).toBeVisible()
+    expect(screen.getByRole('alert')).toHaveTextContent(copy.v2.loginServiceUnavailable)
+    expect(fetch).toHaveBeenCalledWith('/api/status', expect.any(Object))
+    await user.click(screen.getByRole('button', { name: copy.common.pages_ToolPage_005 }))
+    await waitFor(() => expect(authReads).toBe(2))
+    expect(screen.getByRole('heading', { name: '当前服务运行正常。' })).toBe(statusHeading)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await act(async () => { finishRetry(Response.json({ user: null })) })
+    expect(screen.getByRole('heading', { name: '当前服务运行正常。' })).toBe(statusHeading)
+    await user.click(screen.getByRole('button', { name: copy.v2.overview }))
+    expect(screen.getByText(copy.v2.sampleSource)).toBeVisible()
+    expect(mocks.workflow).not.toHaveBeenCalled()
+  })
+
+  it.each(['generation', 'profiles', 'plans', 'inventory', 'settings', 'lab'])('blocks %s after a failed login check even with a retained account', (section) => {
+    connect()
+    session.authStatus = 'error'
+    mount(`/v2?section=${section}`)
+    expect(screen.getByRole('alert')).toHaveTextContent(copy.common.pages_ToolPage_003)
+    expect(screen.queryByText(copy.v2.sampleSource)).not.toBeInTheDocument()
+    expect(mocks.workflow).not.toHaveBeenCalled()
+  })
+
+  it('uses the public announcement feed when a previous account is retained after login failure', async () => {
+    connect()
+    session.authStatus = 'error'
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({
+      announcements: [{ announcement: {
+        id: 'outage', kind: 'popup', active: true, title: '登录服务维护', body: '请稍后重试登录。',
+        created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-01T00:00:00Z',
+      }, read_at: null }], page: 1, pageSize: 10, total: 1,
+    }))
+    mount('/v2?section=announcements')
+    expect(await screen.findByRole('heading', { name: '登录服务维护' })).toBeVisible()
+    expect(fetch).toHaveBeenCalledWith('/api/announcement?page=1', expect.any(Object))
+    expect(fetch.mock.calls.some(([url]) => String(url).startsWith('/api/user/'))).toBe(false)
+    expect(screen.queryByRole('button', { name: copy.dashboard.pages_tool_dashboard_AnnouncementsSection_011 })).not.toBeInTheDocument()
+    expect(mocks.workflow).not.toHaveBeenCalled()
+  })
+
+  it('honors public service switches during login failure and hides disabled recovery links', async () => {
+    session.authStatus = 'error'
+    mocks.features.mockReturnValue({ status: 'ready', features: { ...DEFAULT_SITE_FEATURES, faq: false, support: false, service_status: false }, retry: vi.fn() })
+    const user = userEvent.setup()
+    mount('/v2?section=status')
+    expect(await screen.findByText(copy.v2.featureUnavailable)).toBeVisible()
+    expect(screen.queryByRole('grid')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: copy.v2.overview }))
+    expect(screen.getByRole('alert')).toHaveTextContent(copy.common.pages_ToolPage_003)
+    expect(screen.queryByRole('link', { name: copy.v2.helpAction })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: copy.public.pages_PublicInfoPage_061 })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: copy.status.pages_StatusPage_002 })).not.toBeInTheDocument()
   })
 
   it('offers preparation before generating when the personal workspace has no previous result', async () => {

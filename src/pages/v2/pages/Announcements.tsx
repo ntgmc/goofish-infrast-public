@@ -14,7 +14,7 @@ const text = copy.dashboard
 const Markdown = memo(AnnouncementMarkdown)
 
 export default function Announcements({ session }: { session: V2Session }) {
-  return <AnnouncementFeed key={session.user?.id ?? 'public'} session={session} />
+  return <AnnouncementFeed key={session.authStatus === 'authenticated' ? session.user?.id ?? 'public' : 'public'} session={session} />
 }
 
 function AnnouncementFeed({ session }: { session: V2Session }) {
@@ -23,7 +23,7 @@ function AnnouncementFeed({ session }: { session: V2Session }) {
   const search = new URLSearchParams(location.search)
   const rawPage = Number(search.get('page') ?? 1)
   const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1
-  const signedIn = Boolean(session.user)
+  const signedIn = session.authStatus === 'authenticated' && Boolean(session.user)
   const unreadOnly = signedIn && search.get('unread_only') === '1'
   let announcementId = location.hash.startsWith('#announcement-') ? location.hash.slice(14) : ''
   try { announcementId = decodeURIComponent(announcementId) } catch { /* Keep malformed anchors visible as missing announcements. */ }

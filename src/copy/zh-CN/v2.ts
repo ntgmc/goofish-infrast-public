@@ -302,6 +302,7 @@ export const v2Copy = {
   importOperators: '导入或同步干员',
   accountDescription: '登录后可查看已有档案和最近一次排班。',
   loginUnavailable: '账号服务暂不可用，可继续浏览示例，稍后重试登录。',
+  loginServiceUnavailable: '登录服务暂不可用，请稍后重新确认登录状态。',
   loginRetry: '重试账号连接',
   profiles: '我的游戏账号档案',
   manageProfiles: '管理档案',

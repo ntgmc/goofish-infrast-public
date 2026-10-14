@@ -10,7 +10,7 @@ import { isSchedulableProfile } from '../tool/tool-utils'
 import type { OptimizationTaskCenterController } from '../tool/optimize/useOptimizationTaskCenter'
 import type { AuthSuccessResponse } from '../../lib/types'
 import type { V2Session } from './OptionsDrawer'
-import { sectionLabels, v2Path, v2SectionAvailable, type V2Section } from './navigation'
+import { sectionLabels, V2_PUBLIC_SECTIONS, v2Path, v2SectionAvailable, type V2Section } from './navigation'
 import { V2SectionLoading } from './V2LoadingScreen'
 
 const Profiles = lazy(() => import('./pages/Accounts'))
@@ -43,7 +43,7 @@ const descriptions: Partial<Record<V2Section, string>> = {
   'add-account': copy.v2.addAccountDescription, settings: copy.v2.settingsDescription,
   inventory: copy.v2.inventoryDescription,
 }
-const publicSections: V2Section[] = ['tools', 'depot', 'manual-tool', 'cultivation', 'announcements', 'help', 'updates', 'settings', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing']
+const publicSections: V2Section[] = ['tools', 'depot', 'manual-tool', 'cultivation', 'settings', ...V2_PUBLIC_SECTIONS]
 const workflowSections: V2Section[] = ['generation', 'plans', 'lab']
 
 export default function WorkspaceSections({ section, session, workflow, generationProgress, onAccountAdded, onToolDirtyChange, onOpenProfile, onNavigate, onConfig, onOperators, generationDisabledReason }: {

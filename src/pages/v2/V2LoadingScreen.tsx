@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router'
 import { copy } from '../../copy'
+import { useSiteFeatures } from '../../lib/site-feature-context'
+import { sectionLabels, v2Path, v2SectionAvailable } from './navigation'
 import { LoadingSpinner } from '../../components/SessionLoader'
 import './V2LoadingScreen.css'
 
@@ -15,6 +18,7 @@ export default function V2LoadingScreen({ error, onRetry, retryLabel = copy.v2.r
   retryLabel?: string
   children?: ReactNode
 }) {
+  const { features } = useSiteFeatures()
   return (
     <main className="v2-app v2-loading-screen" tabIndex={-1} data-route-focus>
       <img className="v2-loading-brand" src="/assets/maatool-v2-icon.svg" width="64" height="64" alt={copy.v2.brand} />
@@ -23,6 +27,9 @@ export default function V2LoadingScreen({ error, onRetry, retryLabel = copy.v2.r
         <p>{error ?? copy.v2.loading}</p>
       </div>
       {error && onRetry && <button type="button" className="v2-loading-retry" onClick={onRetry}>{retryLabel}</button>}
+      {error && <nav className="v2-loading-links" aria-label={copy.v2.helpAction}>
+        {(['help', 'support', 'status'] as const).filter((section) => v2SectionAvailable(section, features)).map((section) => <Link key={section} className="v2-loading-retry" to={v2Path(section)}>{sectionLabels[section]}</Link>)}
+      </nav>}
       {children}
     </main>
   )

@@ -22,7 +22,7 @@ import V2Dashboard from './V2Dashboard'
 import V2LoadingScreen from './V2LoadingScreen'
 import type { V2Session } from './OptionsDrawer'
 import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './sample-result'
-import { v2Href, v2Path, v2Section } from './navigation'
+import { V2_PUBLIC_SECTIONS, v2Href, v2Path, v2Section } from './navigation'
 import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
 import './v2.css'
 import './workspace-pages.css'
@@ -30,7 +30,9 @@ import './workspace-pages.css'
 export default function V2Page() {
   const [params] = useSearchParams()
   const { hash } = useLocation()
-  const session = useToolSession(params.get('profile_id'), true, v2Section(params, hash) !== 'announcements')
+  const section = v2Section(params, hash)
+  const publicPage = V2_PUBLIC_SECTIONS.includes(section)
+  const session = useToolSession(params.get('profile_id'), true, section !== 'announcements')
   const features = useSiteFeatures()
   const [config, setConfig] = useState<LicenseConfig>(() => normalizeConfig(SAMPLE_CONFIG))
   const [operators, setOperators] = useState(SAMPLE_OPERATORS)
@@ -57,10 +59,10 @@ export default function V2Page() {
 
   if (features.status === 'loading') return <V2LoadingScreen />
   if (features.status === 'error') return <V2LoadingScreen error={copy.features.load_failed_body} onRetry={features.retry} retryLabel={copy.features.retry} />
-  if (session.authStatus === 'loading') return <V2LoadingScreen />
-  if (session.authStatus === 'error') return <V2LoadingScreen error={copy.common.pages_ToolPage_003} onRetry={session.retryAuth} retryLabel={copy.common.pages_ToolPage_005} />
+  if (!publicPage && session.authStatus === 'loading') return <V2LoadingScreen />
+  if (!publicPage && session.authStatus === 'error') return <V2LoadingScreen error={copy.common.pages_ToolPage_003} onRetry={session.retryAuth} retryLabel={copy.common.pages_ToolPage_005} />
 
-  if (features.features.site && features.features.profiles && session.user && session.activeProfile && session.license && isSchedulableProfile(session.activeProfile)) {
+  if (session.authStatus === 'authenticated' && features.features.site && features.features.profiles && session.user && session.activeProfile && session.license && isSchedulableProfile(session.activeProfile)) {
     return <SessionProviders session={session}><ConnectedDashboard key={session.activeProfile.id} session={session} /></SessionProviders>
   }
 
@@ -73,7 +75,7 @@ export default function V2Page() {
 
 function SessionProviders({ session, children }: { session: V2Session; children: ReactNode }) {
   const resolveHref = useCallback((href: string) => v2Href(href, session.activeProfile?.id), [session.activeProfile?.id])
-  return <InternalLinkProvider value={resolveHref}><DialogSurfaceProvider value="v2-dialog v2-feature-content">{session.user ? <NotificationCenterProvider userId={session.user.id}>{children}</NotificationCenterProvider> : children}</DialogSurfaceProvider></InternalLinkProvider>
+  return <InternalLinkProvider value={resolveHref}><DialogSurfaceProvider value="v2-dialog v2-feature-content">{session.authStatus === 'authenticated' && session.user ? <NotificationCenterProvider userId={session.user.id}>{children}</NotificationCenterProvider> : children}</DialogSurfaceProvider></InternalLinkProvider>
 }
 
 function ConnectedDashboard({ session }: { session: V2Session }) {

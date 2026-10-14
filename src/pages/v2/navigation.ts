@@ -5,6 +5,8 @@ import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
 const V2_SECTIONS = ['overview', 'generation', 'plans', 'lab', 'tools', 'manual-tool', 'cultivation', 'depot', 'profiles', 'add-account', 'inventory', 'commercial', 'balance', 'announcements', 'settings', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing'] as const
 export type V2Section = typeof V2_SECTIONS[number]
 
+export const V2_PUBLIC_SECTIONS: V2Section[] = ['announcements', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing']
+
 export const sectionLabels: Record<V2Section, string> = {
   overview: copy.v2.overview, generation: copy.v2.generation, plans: copy.v2.history,
   lab: copy.v2.lab, tools: copy.v2.tools, 'manual-tool': copy.tools.manualSchedule.title,
