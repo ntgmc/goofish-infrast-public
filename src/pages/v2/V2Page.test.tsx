@@ -376,6 +376,7 @@ describe('V2 results-first workspace', () => {
     const sanity = (3000 + 32400) * SANITY_PER_LMD + 14 * SANITY_PER_PURE_GOLD
     const calculation = screen.getByRole('region', { name: copy.v2.sanityCalculation })
     expect(calculation).toHaveTextContent(sanity.toFixed(2))
+    expect(screen.getByRole('region', { name: copy.v2.sanity })).toHaveTextContent(`${sanity.toFixed(2)} ${copy.v2.sanityUnit}`)
     expect(calculation).toHaveTextContent('32,400 × 0.003600 ≈ 116.64')
     expect(calculation).toHaveTextContent(copy.v2.battleRecordEquivalent('32.4'))
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
@@ -402,6 +403,7 @@ describe('V2 results-first workspace', () => {
     expect(screen.getByRole('region', { name: copy.v2.lmd })).toHaveTextContent('比上次 +3,720 龙门币 / 天')
     expect(screen.getByRole('region', { name: copy.v2.exp })).toHaveTextContent('比上次 +2,400 经验 / 天')
     expect(screen.getByRole('region', { name: copy.v2.goldNetChange })).toHaveTextContent('比上次 +3.56 个 / 天')
+    expect(screen.getByRole('region', { name: copy.v2.sanity })).toHaveTextContent('比上次 +24.37 理智 / 天')
     expect(screen.getByRole('region', { name: copy.v2.goldNetChange })).toHaveTextContent('+2.56')
     expect(screen.getByText(/与上次方案「Older plan」/)).toBeInTheDocument()
 
@@ -446,6 +448,7 @@ describe('V2 results-first workspace', () => {
     expect(screen.getByRole('region', { name: copy.v2.lmd })).toHaveTextContent('—')
     expect(screen.getByRole('region', { name: copy.v2.exp })).toHaveTextContent('—')
     expect(screen.getByRole('region', { name: copy.v2.goldNetChange })).toHaveTextContent(copy.v2.goldNetUnavailable)
+    expect(screen.getByRole('region', { name: copy.v2.sanity })).toHaveTextContent('—')
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 

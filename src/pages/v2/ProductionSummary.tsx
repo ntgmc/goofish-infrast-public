@@ -5,6 +5,7 @@ import ProductIcon from '../../components/ProductIcon'
 import { AnimatedValue, RevealItem, StaggeredReveal } from '../../components/MotionPrimitives'
 import { formatAmount, type PreparedResult } from '../../components/result-panel/formatters'
 import { fetchResultHistoryDetail } from '../tool/optimize/optimization-api'
+import { calculateProductionSanity } from '../../lib/production-sanity'
 import type { OptimizeResult, WorkspaceResultHistorySummary } from '../../lib/types'
 
 const text = copy.v2
@@ -75,6 +76,11 @@ export default function ProductionSummary({ result, prepared, sample, profileId,
             hint={economy ? [text.shortTermOrundumHint, burstNote].filter(Boolean).join(' · ') : undefined}
             change={change(orundum, baseline?.result?.orundum_economy?.short_term_orundum ?? priorDaily?.trading?.Orundum ?? (priorDaily ? 0 : undefined), text.orundumUnit)} />)}
     </StaggeredReveal>
+    <section className="v2-metrics-note" aria-label={text.sanity}>
+      <p><strong>{text.sanity} · {daily ? prepared.productionSanity.value.toFixed(2) : '—'} {text.sanityUnit}</strong>
+        {daily && priorDaily && <span> · {change(prepared.productionSanity.value, calculateProductionSanity(priorDaily).value, text.sanityUnit)}</span>}</p>
+      <p>{text.sanityHint}</p>
+    </section>
     <p className="v2-metrics-note">{text.outputSubtitle}</p>
     {!sample && <p className="v2-metrics-note" aria-live="polite">
       {!previous ? text.noPreviousProduction : !baseline ? text.loadingPreviousProduction : baseline.failed
