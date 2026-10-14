@@ -37,7 +37,7 @@ const titles: Record<OptionPanel, string> = {
 }
 
 export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigate, session, config, operators, onUpdateConfig, permission,
-  canEditConfig = true, canUseIntermediateConfig = true, configReadOnly = false, sample, busy, onImportOperators, onAccount, room, error, configDiffRows, hasPreviousResult }: {
+  canEditConfig = true, canUseIntermediateConfig = true, configReadOnly = false, sample, busy, onImportOperators, onAccount, room, error, configDiffRows, hasPreviousResult, onConfirmConfig, confirmingConfig = false }: {
   panel: OptionPanel | null
   onClose: () => void
   onOpenProfile: (profile: V2Session['profiles'][number]) => Promise<void>
@@ -58,6 +58,8 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
   error?: string | null
   configDiffRows?: ConfigDiffItem[]
   hasPreviousResult?: boolean
+  onConfirmConfig?: () => Promise<boolean>
+  confirmingConfig?: boolean
 }) {
   const [search, setSearch] = useState('')
   const [sklandOpen, setSklandOpen] = useState(false)
@@ -72,8 +74,9 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
   const shownPanel = panel ?? lastPanel
   const isConfig = shownPanel === 'config'
   const validation = validateScheduleConfig(config)
-  const description = shownPanel === 'settings' ? copy.dashboard.animation.description : isConfig ? sample ? text.demoConfigDescription : text.configDescription
-    : shownPanel === 'operators' ? sample ? text.sampleOperatorDescription : text.operatorDescription
+  const exampleData = sample && !session.license
+  const description = shownPanel === 'settings' ? copy.dashboard.animation.description : isConfig ? exampleData ? text.demoConfigDescription : text.configDescription
+    : shownPanel === 'operators' ? exampleData ? text.sampleOperatorDescription : text.operatorDescription
       : shownPanel === 'account' ? text.accountDescription : text.roomDescription
 
   const filteredOperators = search.trim() ? operators.filter((operator) => PinyinMatch.match(operator.name, search.trim())) : operators
@@ -225,7 +228,13 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
         {isConfig && <Popover>
           <PopoverTrigger asChild>
             <button type="button" className="v2-button v2-button-primary v2-drawer-done" aria-disabled={!validation.ok} aria-describedby={validation.ok ? undefined : 'v2-config-validation'}
-              onClick={(event) => { if (validation.ok) { event.preventDefault(); onClose() } }}><Check size={16} />{text.done}</button>
+              disabled={confirmingConfig} aria-busy={confirmingConfig}
+              onClick={(event) => {
+                if (!validation.ok) return
+                event.preventDefault()
+                if (onConfirmConfig) void onConfirmConfig().then((saved) => { if (saved) onClose() })
+                else onClose()
+              }}><Check size={16} />{confirmingConfig ? text.firstSchedule.confirming : onConfirmConfig ? text.firstSchedule.confirmConfig : text.done}</button>
           </PopoverTrigger>
           {!validation.ok && <PopoverContent side="top" align="center" role="alert" className="v2-dialog v2-config-completion-hint" onOpenAutoFocus={(event) => event.preventDefault()}>
             {validation.message}

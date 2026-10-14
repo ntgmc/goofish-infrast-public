@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { apiJson, apiJsonOrNull } from '../../lib/api-client'
 import { copy } from '../../copy'
+import { FIRST_SCHEDULE_INTENT_KEY } from '../../lib/first-schedule'
 import { MotionPreferenceProvider } from '../../lib/motion-preference'
 import type { OptimizationJobSnapshot } from '../../lib/optimization-contracts'
 import type { AuthSuccessResponse, OptimizeJobAccepted, UserGameAccount, UserWorkspace, WorkspaceResultHistorySummary } from '../../lib/types'
@@ -73,8 +74,60 @@ afterEach(() => {
   cleanup()
   window.sessionStorage.clear()
   window.localStorage.removeItem('maatool-reduce-motion')
+  window.localStorage.removeItem(FIRST_SCHEDULE_INTENT_KEY)
   vi.resetAllMocks()
 })
+
+it('continues from login and Skland import through saved configuration to the first generation', async () => {
+  const user = userEvent.setup()
+  const firstWorkspace = { ...workspace, latest_result: null, result_history: [] }
+  const firstProfile: UserGameAccount = { ...profile, kind: 'free_preview', skland_binding: { uid: '12345678', nickname: '首次博士', channel_name: '官服',
+    bound_at: profile.created_at, last_imported_at: profile.created_at, credential_status: 'available', credential_invalid_at: null, credential_invalid_reason: null } }
+  const firstAuth = { ...auth, active_profile: firstProfile, profiles: [firstProfile], workspace: firstWorkspace }
+  let signedIn = false
+  let saveConfig!: (payload: AuthSuccessResponse) => void
+  const configSave = new Promise<AuthSuccessResponse>((resolve) => { saveConfig = resolve })
+  vi.mocked(apiJson).mockImplementation(async (url, options) => {
+    if (url === '/api/auth/me') return signedIn ? { ...auth, profiles: [], active_profile: null, workspace: null } : { user: null }
+    if (url === '/api/auth/login') { signedIn = true; return { ...auth, profiles: [], active_profile: null, workspace: null } }
+    if (url.startsWith('/api/user/personal-use-declaration')) return { accepted: true }
+    if (url.startsWith('/api/user/notifications')) return { notifications: [], unread_count: 0, next_cursor: null }
+    if (url === '/api/user/skland/free-preview/credential/preview') return { status: 'confirm_required', confirmation_id: 'first-import',
+      skland_preview: { uid: '12345678', nickname: '首次博士', channel_name: '官服', operator_count: SAMPLE_OPERATORS.length } }
+    if (url === '/api/user/skland/free-preview/login/confirm') return firstAuth
+    if (url === '/api/user/workspace' && options?.method === 'PATCH') return configSave
+    if (url.startsWith('/api/user/status?')) return {}
+    if (url.startsWith('/api/optimization/jobs?')) return { jobs: [], nextCursor: null }
+    if (url === '/api/optimization/jobs' && options?.method === 'POST') return { job: queued }
+    if (url === '/api/optimization/jobs/new-job') return new Promise(() => {})
+    if (url === '/api/user/inventory') return { stacks: [], capacities: [], recent_events: [] }
+    if (url === '/api/user/priority-coupon-balance') return { balances: [] }
+    throw new Error(`Unexpected API request: ${url}`)
+  })
+  render(<MemoryRouter initialEntries={['/']}><MotionPreferenceProvider><V2Page /></MotionPreferenceProvider></MemoryRouter>)
+  await user.click(await screen.findByRole('button', { name: copy.v2.generateMine }))
+  fireEvent.change(screen.getByLabelText(copy.auth.components_AuthForm_011), { target: { value: 'doctor@example.test' } })
+  fireEvent.change(screen.getByLabelText(copy.auth.components_AuthForm_012), { target: { value: 'password123' } })
+  await user.click(document.querySelector('.v2-login-panel button[type="submit"]')!)
+  await user.click(await screen.findByRole('button', { name: copy.v2.firstSchedule.importAction }))
+  await user.click(await screen.findByRole('button', { name: copy.workspace.components_SklandBindingDialog_004 }))
+  fireEvent.change(screen.getByPlaceholderText(copy.workspace.components_SklandBindingDialog_037), { target: { value: 'test-credential' } })
+  await user.click(screen.getByRole('button', { name: copy.workspace.components_SklandBindingDialog_038 }))
+  await user.click(await screen.findByRole('button', { name: copy.workspace.components_SklandBindingDialog_024 }))
+  await user.click(await screen.findByRole('button', { name: copy.v2.firstSchedule.configAction }))
+  const dialog = within(await screen.findByRole('dialog'))
+  await user.click(dialog.getByRole('button', { name: copy.common.components_ConfigEditor_035 }))
+  await user.click(dialog.getByRole('button', { name: copy.v2.firstSchedule.confirmConfig }))
+  expect(screen.getByRole('button', { name: copy.v2.firstSchedule.confirming })).toBeDisabled()
+  expect(vi.mocked(apiJson).mock.calls.some(([url, options]) => url === '/api/optimization/jobs' && options?.method === 'POST')).toBe(false)
+  const patch = vi.mocked(apiJson).mock.calls.find(([url, options]) => url === '/api/user/workspace' && options?.method === 'PATCH')![1]!.json as { config: typeof SAMPLE_CONFIG }
+  await act(async () => saveConfig({ ...firstAuth, workspace: { ...firstWorkspace, config: patch.config } }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  expect(screen.getByRole('complementary', { name: copy.v2.firstSchedule.title }).querySelector('[aria-current="step"]')).toHaveTextContent(copy.v2.firstSchedule.generate)
+  await user.click(await screen.findByRole('button', { name: copy.optimize.pages_tool_optimize_GenerateControlBar_030 }))
+  await waitFor(() => expect(apiJson).toHaveBeenCalledWith('/api/optimization/jobs', expect.objectContaining({ method: 'POST' })))
+  expect(vi.mocked(apiJson).mock.calls.filter(([url, options]) => url === '/api/optimization/jobs' && options?.method === 'POST')).toHaveLength(1)
+}, 15_000)
 
 it.each([false, true])('loads the saved schedule on entry without a retry (StrictMode: %s)', async (strict) => {
   let restoreHistory!: (payload: { item: typeof previous & { config: typeof SAMPLE_CONFIG; result: typeof newResult } }) => void

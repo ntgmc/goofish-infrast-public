@@ -98,6 +98,41 @@ textarea.v2-input { resize: vertical; }
 .v2-account-methods { display: flex; flex-direction: column; gap: var(--space-sm); button { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: var(--space-xs) var(--space-sm); text-align: left; padding: var(--space-md); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-panel); } svg { color: var(--v2-accent); } span { grid-column: 2; color: var(--v2-muted); line-height: 1.7; font-size: var(--text-sm); } button[aria-pressed="true"] { border-color: var(--v2-accent); background: var(--v2-paper); } }
 .v2-account-registration { padding: var(--space-lg); background: var(--v2-paper); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-panel); }
 
+/* Hallmark · component: first schedule checklist · theme: existing V2
+ * states: current, completed, upcoming · pre-emit critique: P5 H5 E4 S5 R5 V4 */
+.v2-first-schedule-layout { display: grid; grid-template-columns: 15rem minmax(0, 1fr); align-items: start; gap: var(--space-lg) var(--space-xl); }
+.v2-first-schedule-layout > .v2-section-heading { grid-column: 1 / -1; margin-bottom: 0; }
+.v2-first-schedule-layout > .v2-section-body { min-width: 0; }
+.v2-first-schedule-guide { position: sticky; top: var(--space-lg); padding: var(--space-md); background: var(--v2-paper); color: var(--v2-ink); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-panel); }
+.v2-first-schedule-guide h2 { font-size: var(--text-base); }
+.v2-first-schedule-progress { margin-block: var(--space-2xs) var(--space-lg); font-size: var(--text-xs); }
+.v2-first-schedule-guide ol { list-style: none; padding: 0; }
+.v2-first-schedule-guide li { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: var(--space-xs); padding-bottom: var(--space-lg); color: var(--v2-muted); }
+.v2-first-schedule-guide li:not(:last-child)::before { content: ''; position: absolute; left: 13px; top: 28px; bottom: 0; width: 1px; background: var(--v2-line); }
+.v2-first-schedule-guide li:last-child { padding-bottom: 0; }
+.v2-first-schedule-guide strong { display: block; padding-top: var(--space-3xs); font-size: var(--text-sm); font-weight: 500; }
+.v2-first-schedule-guide li p { margin-top: var(--space-2xs); font-size: var(--text-xs); }
+.v2-first-schedule-node { position: relative; display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--v2-line); border-radius: var(--radius-pill); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.v2-first-schedule-guide li[aria-current="step"] { color: var(--v2-ink); }
+.v2-first-schedule-guide li[aria-current="step"] .v2-first-schedule-node { background: var(--v2-accent); color: var(--color-v2-accent-ink); border-color: var(--v2-accent); }
+.v2-first-schedule-guide li[data-complete="true"] .v2-first-schedule-node { background: var(--v2-accent-soft); color: var(--v2-accent); border-color: var(--v2-accent); }
+.v2-first-schedule-task { padding-block: var(--space-md); }
+.v2-first-account { min-width: 0; }
+.v2-first-schedule-layout .v2-generation-flow { grid-template-columns: minmax(0, 1fr); }
+.v2-first-schedule-layout .v2-generation-execution { border-left: 0; border-top: 1px solid var(--v2-line); }
+@media (max-width: 60rem) {
+  .v2-first-schedule-layout { grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
+  .v2-first-schedule-guide { position: static; }
+  .v2-first-schedule-guide { padding: var(--space-sm); }
+  .v2-first-schedule-guide h2 { display: inline; font-size: var(--text-sm); }
+  .v2-first-schedule-progress { float: right; margin: 0; }
+  .v2-first-schedule-guide ol { margin-top: var(--space-sm); }
+  .v2-first-schedule-guide li { grid-template-columns: 24px minmax(0, 1fr); padding-bottom: var(--space-xs); }
+  .v2-first-schedule-node { width: 24px; height: 24px; }
+  .v2-first-schedule-guide li:not(:last-child)::before { left: 11px; top: 24px; }
+  .v2-first-schedule-guide strong { padding-top: 0; }
+}
+
 /* Settings expose one task at a time and retain its form state. */
 .v2-settings-workspace { display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: var(--space-xl); }
 .v2-settings-index { display: flex; flex-direction: column; gap: var(--space-2xs); button { display: flex; align-items: start; gap: var(--space-sm); padding: var(--space-sm); min-height: 64px; text-align: left; border-radius: var(--radius-v2-control); } svg { flex: none; margin-top: var(--space-3xs); } strong, small { display: block; } small { margin-top: var(--space-3xs); } button[aria-pressed="true"] { color: var(--v2-accent); background: var(--v2-paper); box-shadow: inset 3px 0 var(--v2-accent); } }

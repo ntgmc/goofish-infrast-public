@@ -13,13 +13,15 @@ import InventoryDepletionWarning from '../../components/result-panel/InventoryDe
 import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
 import { manualSourceKey } from '../../lib/manual-schedule'
 import { hasCapability } from '../../lib/product-catalog'
+import { FIRST_SCHEDULE_INTENT_KEY } from '../../lib/first-schedule'
+import { canonicalJson } from '../../lib/crypto'
 import { NotificationBell } from '../../components/NotificationCenter'
 import AnnouncementBanner from '../../components/AnnouncementBanner'
 import AnnouncementPopup from '../../components/AnnouncementPopup'
 import { LockedCapabilityPreview, UpgradeSuggestionStatusNotice } from '../tool/optimize/ResultSection'
 import WorkspaceSections, { type V2Workflow } from './WorkspaceSections'
 import { sectionLabels, v2Path, v2Section, v2SectionAvailable, type V2Section } from './navigation'
-import { normalizeScheduleMode, parseShiftHours, SCHEDULE_MODE_LABELS } from '../../lib/config'
+import { normalizeScheduleMode, parseShiftHours, SCHEDULE_MODE_LABELS, validateScheduleConfig } from '../../lib/config'
 import type { AuthSuccessResponse, LicenseConfig, LicenseOperator, OptimizeResult, PermissionMode } from '../../lib/types'
 import ScheduleBoard, { Avatar } from './ScheduleBoard'
 import IncomeAnalysis from './IncomeAnalysis'
@@ -79,6 +81,20 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const [manualDirty, setManualDirty] = useState(false)
   const [toolDirty, setToolDirty] = useState(false)
   useEffect(() => { onManualDirtyChange?.(manualDirty) }, [manualDirty, onManualDirtyChange])
+  const firstSchedule = sample && !workflow?.hasResult && !workflow?.latestWorkspaceResult && !session.workspace?.latest_result
+    && !workflow?.archivedResults?.length && !session.workspace?.archived_results?.length && !session.workspace?.free_schedule_entitlement?.first_generated_at
+  const confirmationKey = `maatool:first-schedule:config:${session.user?.id}:${session.activeProfile?.id}`
+  const [confirmedConfig, setConfirmedConfig] = useState(() => {
+    try { return window.sessionStorage.getItem(confirmationKey) } catch { return null }
+  })
+  const [confirmingConfig, setConfirmingConfig] = useState(false)
+  const configConfirmed = confirmedConfig === canonicalJson(config)
+  useEffect(() => {
+    try {
+      if (firstSchedule && section === 'generation' && !session.user) window.localStorage.setItem(FIRST_SCHEDULE_INTENT_KEY, 'true')
+      if (!sample) window.localStorage.removeItem(FIRST_SCHEDULE_INTENT_KEY)
+    } catch { /* Storage may be disabled. */ }
+  }, [firstSchedule, section, session.user, sample])
   const [panel, setPanel] = useState<OptionPanel | null>(null)
   const [room, setRoom] = useState<BoardRoom | null>(null)
   const [view, setView] = useState<View>('schedule')
@@ -163,6 +179,23 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
     setPanel(null)
     if (params.has('panel')) setParams((current) => { const next = new URLSearchParams(current); next.delete('panel'); return next }, { replace: true })
   }
+  async function confirmConfig() {
+    if (confirmingConfig) return false
+    setConfirmingConfig(true)
+    try {
+      const validation = validateScheduleConfig(config)
+      if (!validation.ok) { setNavigationError(validation.message); return false }
+      if (!await session.flushConfigSave()) { setNavigationError(text.firstSchedule.configFailed); return false }
+      const confirmed = canonicalJson(config)
+      setConfirmedConfig(confirmed)
+      try { window.sessionStorage.setItem(confirmationKey, confirmed) } catch { /* Storage may be disabled. */ }
+      setNavigationError(null)
+      return true
+    } catch (caught) {
+      setNavigationError(caught instanceof Error ? caught.message : text.firstSchedule.configFailed)
+      return false
+    } finally { setConfirmingConfig(false) }
+  }
   function downloadSample() {
     const url = URL.createObjectURL(new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' }))
     const link = document.createElement('a')
@@ -221,7 +254,8 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           {navigationError && <p className="v2-feedback v2-feedback-error" role="alert">{navigationError}<button type="button" onClick={() => { session.retryConfigSave(); setNavigationError(null) }}>{text.loginRetry}</button></p>}
           <AnnouncementBanner announcement={session.banner} />
           <V2PageTransition motionKey={section} className="v2-page-transition">{(displayedSection) => <>
-          <WorkspaceSections section={displayedSection} session={guardedSession} workflow={workflow} generationProgress={generationProgress} onAccountAdded={accountAdded} onToolDirtyChange={setToolDirty} onOpenProfile={(profile) => openProfile(profile, section === 'manual-tool' ? 'manual-tool' : 'overview')} onNavigate={navigateSection} onConfig={() => openPanel('config')} onOperators={() => openPanel('operators')} generationDisabledReason={generationDisabledReason} />
+          <WorkspaceSections section={displayedSection} session={guardedSession} workflow={workflow} generationProgress={generationProgress} onAccountAdded={accountAdded} onToolDirtyChange={setToolDirty} onOpenProfile={(profile) => openProfile(profile, section === 'manual-tool' ? 'manual-tool' : 'overview')} onNavigate={navigateSection} onConfig={() => openPanel('config')} onOperators={() => openPanel('operators')} generationDisabledReason={generationDisabledReason}
+            firstSchedule={firstSchedule} configConfirmed={configConfirmed} />
           <div hidden={displayedSection !== 'overview'}>
           {sample ? <div className="v2-page-title v2-start-schedule">
             <div><h1>{text.startTitle}</h1><p>{text.startDescription}</p></div>
@@ -312,7 +346,8 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
       <OptionsDrawer panel={panel} onClose={closePanel} onOpenProfile={openProfile} onNavigate={navigateSection} session={guardedSession} config={config} operators={sortedOperators}
         onUpdateConfig={onUpdateConfig} permission={permission} canEditConfig={canEditConfig} canUseIntermediateConfig={canUseIntermediateConfig}
         sample={sample} busy={busy} configReadOnly={workflow?.loading} onImportOperators={onImportOperators} configDiffRows={workflow?.configDiffRows} hasPreviousResult={Boolean(workflow?.latestWorkspaceResult)}
-        onAccount={() => openPanel('account')} room={room} error={error} />
+        onAccount={() => openPanel('account')} room={room} error={navigationError ?? error}
+        onConfirmConfig={firstSchedule && section === 'generation' && session.license ? confirmConfig : undefined} confirmingConfig={confirmingConfig} />
       {session.user && features.profiles && <ProfileExpiryPrompt userId={session.user.id} profiles={session.cdkProfiles} onOpenExport={(profile) => { void (async () => {
         if ((manualDirty || toolDirty) && !window.confirm(text.discardManual)) return
         if (!await session.flushConfigSave()) { setNavigationError(text.saveFailed); return }

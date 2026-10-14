@@ -3,6 +3,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import type { AuthSuccessResponse } from '../lib/types'
 import { apiJson } from '../lib/api-client'
 import { copy } from '../copy/index'
+import { FIRST_SCHEDULE_INTENT_KEY } from '../lib/first-schedule'
+import { v2Path } from './v2/navigation'
 
 type VerificationState = 'loading' | 'success' | 'error'
 
@@ -35,6 +37,10 @@ export default function VerifyEmailPage() {
   const [state, setState] = useState<VerificationState>(token ? 'loading' : 'error')
   const [error, setError] = useState<string | null>(token ? null : copy.auth.pages_VerifyEmailPage_001)
   const attemptRef = useRef(0)
+  const [returnPath] = useState(() => {
+    try { if (window.localStorage.getItem(FIRST_SCHEDULE_INTENT_KEY) === 'true') return v2Path('generation') } catch { /* Storage may be disabled. */ }
+    return '/tool/profiles'
+  })
 
   const verify = useCallback((isCancelled: () => boolean = () => false) => {
     if (!token) return
@@ -62,9 +68,9 @@ export default function VerifyEmailPage() {
   }, [token, verify])
   useEffect(() => {
     if (state !== 'success') return
-    const timer = window.setTimeout(() => navigate('/tool/profiles', { replace: true }), 500)
+    const timer = window.setTimeout(() => navigate(returnPath, { replace: true }), 500)
     return () => window.clearTimeout(timer)
-  }, [navigate, state])
+  }, [navigate, returnPath, state])
 
   return (
     <main className="mx-auto flex min-h-[70vh] w-full max-w-xl items-center px-5 py-12 sm:px-8" tabIndex={-1} data-route-focus>
@@ -83,7 +89,7 @@ export default function VerifyEmailPage() {
           </button>
         )}
         {state === 'error' && (
-          <Link to="/tool/profiles" className="tool-secondary-action mt-3 flex min-h-11 w-full items-center justify-center px-4 text-sm">
+          <Link to={returnPath} className="tool-secondary-action mt-3 flex min-h-11 w-full items-center justify-center px-4 text-sm">
             {copy.auth.pages_VerifyEmailPage_008}
           </Link>
         )}

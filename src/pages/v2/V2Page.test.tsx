@@ -15,6 +15,7 @@ import type { V2Session } from './OptionsDrawer'
 import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './sample-result'
 import { SANITY_PER_LMD, SANITY_PER_PURE_GOLD } from '../../lib/orundum-economy'
 import { ApiError } from '../../lib/api-client'
+import { FIRST_SCHEDULE_INTENT_KEY } from '../../lib/first-schedule'
 import type { ResultExportFailure } from '../tool/optimize/useResultDownloads'
 
 const mocks = vi.hoisted(() => ({
@@ -63,6 +64,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   window.localStorage.removeItem('maatool-reduce-motion')
+  window.localStorage.removeItem(FIRST_SCHEDULE_INTENT_KEY)
   window.sessionStorage.clear()
   vi.restoreAllMocks()
 })
@@ -171,9 +173,12 @@ describe('V2 results-first workspace', () => {
           : { notifications: [], unread_count: 0, next_cursor: null },
     ), { headers: { 'Content-Type': 'application/json' } }))
     const user = userEvent.setup()
-    const page = mount('/')
+    let page = mount('/')
     await user.click(screen.getByRole('button', { name: copy.v2.generateMine }))
     const login = await screen.findByText(copy.v2.generationSignIn)
+    const guide = () => screen.getByRole('complementary', { name: copy.v2.firstSchedule.title })
+    expect(guide().querySelector('[aria-current="step"]')).toHaveTextContent(copy.v2.firstSchedule.login)
+    expect(window.localStorage.getItem(FIRST_SCHEDULE_INTENT_KEY)).toBe('true')
     const form = within(login.parentElement!)
     fireEvent.change(form.getByLabelText(copy.auth.components_AuthForm_011), { target: { value: 'doctor@example.test' } })
     fireEvent.change(form.getByLabelText(copy.auth.components_AuthForm_012), { target: { value: 'password123' } })
@@ -181,7 +186,11 @@ describe('V2 results-first workspace', () => {
     await waitFor(() => expect(session.applyAuthPayload).toHaveBeenCalledWith(loginPayload))
     page.rerender(<MemoryRouter initialEntries={['/']}><V2Page /><RouteLocation /></MemoryRouter>)
     expect(screen.getByTestId('route-location')).toHaveTextContent('section=generation')
+    expect(guide().querySelector('[aria-current="step"]')).toHaveTextContent(copy.v2.firstSchedule.import)
+    expect(await screen.findByRole('button', { name: copy.v2.firstSchedule.importAction })).toBeVisible()
+    await user.click(screen.getByText(copy.v2.firstSchedule.accountOptions))
     await user.click(await screen.findByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_005 }))
+    expect(fetch.mock.calls.some(([url]) => String(url).includes('/personal-use-declaration'))).toBe(false)
     fireEvent.change(screen.getByRole('textbox', { name: 'CDK' }), { target: { value: 'MAA-FIRST-ACCOUNT' } })
     await user.click(screen.getByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_015 }))
     await waitFor(() => expect(session.applyAuthPayload).toHaveBeenCalledWith(accountPayload))
@@ -191,13 +200,35 @@ describe('V2 results-first workspace', () => {
     await user.upload(screen.getByLabelText(copy.v2.uploadMaa, { selector: 'input' }), new File([JSON.stringify(SAMPLE_OPERATORS)], 'operators.json', { type: 'application/json' }))
     await waitFor(() => expect(session.persistWorkspacePatch).toHaveBeenCalledWith(expect.objectContaining({ operators: SAMPLE_OPERATORS, config: expect.objectContaining({ layout: SAMPLE_CONFIG.layout }) })))
     page.rerender(<MemoryRouter initialEntries={['/']}><V2Page /><RouteLocation /></MemoryRouter>)
+    await screen.findByText(copy.v2.firstSchedule.configTitle)
+    expect(guide().querySelector('[aria-current="step"]')).toHaveTextContent(copy.v2.firstSchedule.config)
+    expect(screen.queryByRole('button', { name: copy.optimize.pages_tool_optimize_GenerateControlBar_030 })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: copy.v2.firstSchedule.configAction }))
+    vi.mocked(session.flushConfigSave).mockResolvedValueOnce(false)
+    await user.click(screen.getByRole('button', { name: copy.v2.firstSchedule.confirmConfig }))
+    expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent(copy.v2.firstSchedule.configFailed)
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: copy.v2.firstSchedule.confirmConfig }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     await screen.findByText(copy.v2.prepare)
+    expect(guide().querySelector('[aria-current="step"]')).toHaveTextContent(copy.v2.firstSchedule.generate)
+    page.unmount()
+    // Server snapshots may return the same configuration with a different key order.
+    workflow.activeConfig = normalizeConfig(Object.fromEntries(Object.entries(SAMPLE_CONFIG).reverse()) as typeof SAMPLE_CONFIG)
+    page = mount('/v2?section=generation&profile_id=profile-1')
+    await screen.findByText(copy.v2.prepare)
+    expect(guide().querySelector('[aria-current="step"]')).toHaveTextContent(copy.v2.firstSchedule.generate)
     expect(screen.getByTestId('route-location')).toHaveTextContent('section=generation&profile_id=profile-1')
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
     expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/optimization/jobs'))).toBe(false)
     await user.click(screen.getByRole('button', { name: copy.optimize.pages_tool_optimize_GenerateControlBar_030 }))
     await waitFor(() => expect(workflow.handleGenerate).toHaveBeenCalledOnce())
-  })
+    workflow.currentResult = SAMPLE_RESULT
+    workflow.hasResult = true
+    page.rerender(<MemoryRouter initialEntries={['/']}><V2Page /><RouteLocation /></MemoryRouter>)
+    expect(screen.queryByRole('complementary', { name: copy.v2.firstSchedule.title })).not.toBeInTheDocument()
+    expect(window.localStorage.getItem(FIRST_SCHEDULE_INTENT_KEY)).toBeNull()
+  }, 15_000)
 
   it.each(['252', '252-1', '252-full'])('uses fixed production counts when switching a custom comparison draft to %s', async (layout) => {
     connect()
