@@ -363,17 +363,4 @@ export const v2Copy = {
   importSuccess: '干员数据已导入。点击「重新排班」生成新的方案。',
   sampleImportSuccess: '干员数据已导入，示例排班保持原样。登录后可生成个人方案。',
   uploadFailed: '文件读取失败，请检查干员 JSON 格式。',
-  sampleOperators: {
-    silverash: '银灰', degenbrecher: '锏', gnosis: '灵知', proviso: '但书',
-    tequila: '龙舌兰', shamare: '巫恋', exusiai: '能天使', texas: '德克萨斯',
-    lappland: '拉普兰德', arene: '芳汀', steward: '史都华德', midnight: '月见夜',
-    dorothy: '多萝西', silence: '赫默', ptilopsis: '白面鸮', vermeil: '红云',
-    scene: '稀音', ceobe: '刻俄柏', gravel: '砾', spot: '斑点', haze: '夜烟',
-    weedy: '温蒂', passenger: '异客', eunectes: '森蚺', frostleaf: '霜叶',
-    vigna: '红豆', shirayuki: '白雪', conviction: '断罪者', castle: 'Castle-3',
-    wildmane: '野鬃', amiya: '阿米娅', kaltsit: '凯尔希', mlynar: '玛恩纳',
-    siege: '推进之王', chen: '陈', greyy: '格雷伊', liskarm: '雷蛇',
-    ifrit: '伊芙利特', mostima: '莫斯提马', indigo: '深靛', lumen: '流明',
-    fiammetta: '菲亚梅塔',
-  },
 } as const

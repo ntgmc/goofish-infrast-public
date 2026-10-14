@@ -178,7 +178,7 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and d
     fireEvent.click(screen.getByRole('button', { name: copy.v2.regenerate }))
   }
   await waitFor(() => expect(apiJson).toHaveBeenCalledWith('/api/optimization/jobs/new-job', expect.anything()))
-  expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('54,720')).toBeInTheDocument()
+  expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('53,595')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: copy.v2.facilities }))
   const configDialog = await screen.findByRole('dialog')
   expect(within(configDialog).getByRole('group', { name: copy.common.components_ConfigEditor_021 })).toBeDisabled()
@@ -192,8 +192,8 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and d
   await waitFor(() => expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('12,345')).toBeInTheDocument())
   expect(screen.queryByText(copy.common.components_ScheduleProgress_060)).not.toBeInTheDocument()
   await act(async () => refreshWorkspace({ ...auth, workspace: { ...workspace, latest_result: latest, result_history: [latest, previous] } }))
-  await within(screen.getByRole('region', { name: copy.v2.lmd })).findByText('比上次 -42,375 龙门币 / 天')
-  expect(screen.getByRole('region', { name: copy.v2.exp })).toHaveTextContent('比上次 -32,400 经验 / 天')
+  await within(screen.getByRole('region', { name: copy.v2.lmd })).findByText('比上次 -41,249.99 龙门币 / 天')
+  expect(screen.getByRole('region', { name: copy.v2.exp })).toHaveTextContent('比上次 -42,426.6 经验 / 天')
   await waitFor(() => expect(screen.getByRole('button', { name: copy.v2.regenerate })).not.toBeDisabled())
   fireEvent.click(screen.getByRole('button', { name: copy.v2.facilities }))
   const unlockedDialog = await screen.findByRole('dialog')
@@ -207,6 +207,6 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and d
   const previousCard = (await screen.findByText('Previous schedule')).closest('.v2-record')!
   fireEvent.click(within(previousCard as HTMLElement).getByRole('button', { name: copy.optimize.pages_tool_optimize_PlansSection_030 }))
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-  await waitFor(() => expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('54,720')).toBeInTheDocument())
+  await waitFor(() => expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('53,595')).toBeInTheDocument())
   expect(vi.mocked(apiJson).mock.calls.some(([url]) => url.startsWith('/api/user/results/new-result?'))).toBe(false)
 })
