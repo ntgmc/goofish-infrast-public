@@ -322,6 +322,27 @@ describe('V2 results-first workspace', () => {
     expect(mocks.workflow).not.toHaveBeenCalled()
   })
 
+  it('shows the guest configuration as an example and keeps low-frequency details collapsed', async () => {
+    const user = userEvent.setup()
+    mount('/v2')
+    await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
+    const dialog = within(await screen.findByRole('dialog'))
+    expect(dialog.getByText(copy.workspace.config_sample, { exact: true })).toBeInTheDocument()
+    expect(dialog.queryByText(copy.common.components_ConfigEditor_023)).not.toBeInTheDocument()
+    expect(dialog.getByText(copy.v2.configEssentialsTitle)).toBeInTheDocument()
+    const details = dialog.getByText(copy.v2.configMoreDetails).closest('details')
+    expect(details).not.toHaveAttribute('open')
+  })
+
+  it('uses compact save states in the mobile configuration drawer', async () => {
+    connect()
+    session.configSyncStatus = 'pending'
+    const user = userEvent.setup()
+    mount('/v2')
+    await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
+    expect(within(await screen.findByRole('dialog')).getByText(copy.workspace.config_save_pending_short, { exact: true })).toBeInTheDocument()
+  })
+
   it('offers login recovery instead of switching to example data after a session error', async () => {
     session.authStatus = 'error'
     mount()
@@ -1056,7 +1077,7 @@ describe('V2 results-first workspace', () => {
     const user = userEvent.setup()
     mount('/v2?panel=config')
     const dialog = await screen.findByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: copy.workspace.config_save_failed }))
+    await user.click(within(dialog).getByRole('button', { name: copy.workspace.config_save_failed_short }))
     expect(session.retryConfigSave).toHaveBeenCalledOnce()
   })
 

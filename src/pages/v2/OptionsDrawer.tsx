@@ -127,7 +127,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
           {isConfig && <div className="v2-config-feedback">
             {!validation.ok ? <p id="v2-config-validation" role="status" className="tool-alert tool-alert--warning">{validation.message}</p>
               : error && session.configSyncStatus !== 'failed' ? <p role="alert" className="v2-feedback v2-feedback-error">{error}</p>
-                : session.user && <ConfigSaveStatus status={session.configSyncStatus} onRetry={session.retryConfigSave} />}
+                : <ConfigSaveStatus status={session.configSyncStatus} onRetry={session.retryConfigSave} sample={exampleData} compact />}
           </div>}
         </div>
         <V2Transition motionKey={isConfig ? 'config' : shownPanel === 'room' ? `room-${room?.key}` : shownPanel ?? 'closed'} className="v2-drawer-body">
@@ -136,10 +136,12 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
             <ConfigCapabilityPreview config={config} enabled={!canEditConfig}>
             <ConfigEditor profileId={session.activeProfile?.id} config={config} canEdit={canEditConfig} readOnly={configReadOnly} canEditIntermediateInventory={canUseIntermediateConfig}
               canSelectPreset={canUseIntermediateConfig} canEditFixedShiftHours={canEditConfig || Boolean(session.activeProfile && isFreePreviewProfile(session.activeProfile))} permission={permission}
-              note={session.activeProfile && isFreePreviewProfile(session.activeProfile) && !canEditConfig
-                ? `${copy.common.components_ConfigEditor_024}${getProfileAccessLabel(session.activeProfile)}${copy.common.components_ConfigEditor_025}`
-                : undefined}
-              validation={validation} onUpdate={onUpdateConfig} embedded hideValidation />
+              note={exampleData
+                ? text.demoConfigDescription
+                : session.activeProfile && isFreePreviewProfile(session.activeProfile) && !canEditConfig
+                  ? `${copy.common.components_ConfigEditor_024}${getProfileAccessLabel(session.activeProfile)}${copy.common.components_ConfigEditor_025}`
+                  : undefined}
+              validation={validation} onUpdate={onUpdateConfig} embedded mobile hideValidation />
             </ConfigCapabilityPreview>
             {hasPreviousResult && <aside className="v2-options-content">
               <h3>{copy.optimize.pages_tool_optimize_ConfigSection_010}</h3>

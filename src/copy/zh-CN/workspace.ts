@@ -491,6 +491,11 @@ export const workspaceCopy = {
   config_saving: "正在保存配置…",
   config_saved: "配置已保存",
   config_save_failed: "配置保存失败，点击重试",
+  config_save_failed_short: "保存失败，点击重试",
+  config_sample: "仅调整示例",
+  config_save_pending_short: "正在保存",
+  config_saving_short: "正在保存",
+  config_saved_short: "已保存",
   // src/pages/tool/WorkspaceSetupPage.tsx
   workspace_proceed_note: "进入排班页后，点击「生成排班」开始计算。",
   // src/pages/tool/WorkspaceSetupPage.tsx
