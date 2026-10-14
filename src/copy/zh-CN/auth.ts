@@ -142,6 +142,10 @@ export const authCopy = {
   components_AuthForm_047: "正在加载注册要求...",
   // src/components/AuthForm.tsx
   components_AuthForm_048: "重试",
+  registration_email_hint: "请使用 QQ、163、Gmail 等常用公共邮箱，不支持企业、自建、临时或别名邮箱；地址中不要使用“+”，Gmail 用户名中不要使用“.”。",
+  registration_password_hint: (min: number, max: number) => `密码需为 ${min}–${max} 位。`,
+  show_password: "显示密码",
+  hide_password: "隐藏密码",
   // src/pages/VerifyEmailPage.tsx
   pages_VerifyEmailPage_001: "验证链接无效或已过期，请返回登录页重新发送验证邮件。",
   // src/pages/VerifyEmailPage.tsx

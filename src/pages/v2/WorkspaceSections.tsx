@@ -10,7 +10,7 @@ import { isSchedulableProfile } from '../tool/tool-utils'
 import type { OptimizationTaskCenterController } from '../tool/optimize/useOptimizationTaskCenter'
 import type { AuthSuccessResponse } from '../../lib/types'
 import type { V2Session } from './OptionsDrawer'
-import { v2Path, v2SectionAvailable, type V2Section } from './navigation'
+import { sectionLabels, v2Path, v2SectionAvailable, type V2Section } from './navigation'
 import { V2SectionLoading } from './V2LoadingScreen'
 
 const Profiles = lazy(() => import('./pages/Accounts'))
@@ -36,16 +36,6 @@ const AnimationSettings = lazy(() => import('../../components/AnimationSettings'
 
 export type V2Workflow = ReturnType<typeof useOptimizeWorkflow> & {
   optimizationTasks?: OptimizationTaskCenterController
-}
-export const sectionLabels: Record<V2Section, string> = {
-  overview: copy.v2.overview, generation: copy.v2.generation, plans: copy.v2.history,
-  lab: copy.v2.lab, tools: copy.v2.tools, 'manual-tool': copy.tools.manualSchedule.title,
-  cultivation: copy.tools.cultivation.title, depot: copy.dashboard.pages_tool_dashboard_ToolsSection_001,
-  profiles: copy.v2.account, 'add-account': copy.v2.addAccount, inventory: copy.inventory.nav,
-  commercial: copy.metered.commercial_nav, balance: copy.balance.nav,
-  announcements: copy.v2.announcements, settings: copy.v2.settings, help: copy.v2.helpAction, updates: copy.v2.updates,
-  terms: copy.v2.terms, privacy: copy.v2.privacy, disclaimer: copy.public.pages_PublicInfoPage_055,
-  support: copy.public.pages_PublicInfoPage_061, status: copy.status.pages_StatusPage_002, pricing: copy.v2.comparePlans,
 }
 const descriptions: Partial<Record<V2Section, string>> = {
   generation: copy.v2.generationDescription, plans: copy.v2.plansDescription,

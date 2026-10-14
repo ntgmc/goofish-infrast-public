@@ -12,7 +12,7 @@ afterEach(() => {
 })
 
 describe('AuthForm registration email policy', () => {
-  it('shows the public-email restriction only after registration email validation fails', async () => {
+  it('shows registration rules before typing, toggles password visibility, and retains email errors', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ invite_code_required: false })))
     const user = userEvent.setup()
 
@@ -21,14 +21,28 @@ describe('AuthForm registration email policy', () => {
 
     const restriction = '请使用常用公共邮箱注册，暂不支持企业、自建、临时或别名邮箱。'
     const emailField = screen.getByLabelText('邮箱')
-    expect(screen.queryByText(restriction)).not.toBeInTheDocument()
-    expect(emailField).not.toHaveAttribute('aria-describedby')
+    expect(screen.getByText(/请使用 QQ、163、Gmail/)).toHaveAttribute('id', 'auth-email-hint')
+    expect(emailField).toHaveAttribute('aria-describedby', 'auth-email-hint')
+    expect(screen.getByText('密码需为 8–128 位。')).toHaveAttribute('id', 'auth-password-hint')
+    const passwordField = screen.getByLabelText('密码')
+    expect(passwordField).toHaveAttribute('aria-describedby', 'auth-password-hint')
+    await user.type(passwordField, 'password123')
+    await user.click(screen.getByRole('button', { name: '显示密码' }))
+    expect(passwordField).toHaveAttribute('type', 'text')
+    expect(passwordField).toHaveValue('password123')
+    expect(screen.getByRole('button', { name: '隐藏密码' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('button', { name: '隐藏密码' }))
+    expect(passwordField).toHaveAttribute('type', 'password')
 
     await user.type(emailField, 'user@company.example')
     await user.tab()
 
     expect(await screen.findByText(restriction)).toHaveAttribute('role', 'alert')
-    expect(emailField).toHaveAttribute('aria-describedby', 'auth-email-error')
+    expect(emailField).toHaveAttribute('aria-describedby', 'auth-email-hint auth-email-error')
+    await user.click(screen.getByRole('button', { name: '显示密码' }))
+    await user.click(screen.getAllByRole('button', { name: '登录' })[0])
+    expect(passwordField).toHaveAttribute('type', 'password')
+    expect(screen.queryByText(/请使用 QQ、163、Gmail/)).not.toBeInTheDocument()
   })
 
   it('blocks a typo on blur, lets the user apply its suggestion, and waits for submit before requesting registration', async () => {

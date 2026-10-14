@@ -491,6 +491,8 @@ export const publicCopy = {
   pages_PublicInfoPage_099: "联系客服时需要提供哪些信息？",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_100: "请提供账号标识、订单或 CDK 的安全标识、报错时间、错误描述和操作步骤，以及相关浏览器、MAA 或游戏版本。截图先遮盖个人信息，勿发送密码、完整 CDK、二维码、Cookie 或森空岛凭据。材料齐全后，客服会按支持页说明的时限首次回复。",
+  faq_groups_label: "按使用步骤查看问题",
+  faq_groups: { gettingStarted: "首次使用", import: "导入", generation: "生成", export: "导出", account: "账号问题", other: "其他问题" },
   faq_search_label: "搜索问题和答案",
   faq_search_placeholder: "试试“森空岛”“MAA 导出”或“草稿”",
   faq_search_clear: "清空",
