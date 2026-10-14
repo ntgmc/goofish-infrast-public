@@ -1,5 +1,4 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Gem } from 'lucide-react'
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
 import { AnimatedValue, RevealItem, StaggeredReveal } from '../../components/MotionPrimitives'
@@ -57,7 +56,7 @@ export default function ProductionSummary({ result, prepared, sample, profileId,
   }
 
   return <>
-    <StaggeredReveal className={`v2-metrics${isOrundum ? '' : ' v2-metrics-primary'}`}>
+    <StaggeredReveal className="v2-metrics">
       <Metric label={text.lmd} value={daily ? formatAmount(prepared.productionStats.lmd) : '—'} unit={text.daily} product="LMD"
         change={change(prepared.productionStats.lmd, priorDaily?.trading?.LMD ?? (priorDaily ? 0 : undefined), `${text.comparison.lmd} ${text.daily}`)} />
       <Metric label={showOrundum ? text.orundum : text.exp} value={daily ? formatAmount(showOrundum ? orundum : experience) : '—'}
@@ -69,18 +68,10 @@ export default function ProductionSummary({ result, prepared, sample, profileId,
       <Metric label={text.goldNetChange} value={hasGoldNet ? signedAmount(goldNet) : '—'} unit={text.goldUnit} product="Pure Gold"
         hint={hasGoldNet ? goldNet < 0 ? text.goldDeficit : goldNet > 0 ? text.goldSurplus : text.goldBalanced : text.goldNetUnavailable}
         change={hasGoldNet ? change(goldNet, priorDaily?.net?.['Pure Gold'], text.goldUnit) : undefined} />
-      {isOrundum && (showOrundum
-        ? <Metric label={text.shortTermPulls} value={(orundum * 30 / 600).toFixed(1)} unit={text.pullsPer30Days} icon={<Gem size={20} />}
-            hint={text.shortTermPullsHint(formatAmount(orundum), burstNote || (economy ? text.orundumOutputSustainable : text.orundumDurationUnavailable))} />
-        : <Metric label={text.orundum} value={formatAmount(orundum)} unit={text.daily} product="Orundum"
-            hint={economy ? [text.shortTermOrundumHint, burstNote].filter(Boolean).join(' · ') : undefined}
-            change={change(orundum, baseline?.result?.orundum_economy?.short_term_orundum ?? priorDaily?.trading?.Orundum ?? (priorDaily ? 0 : undefined), text.orundumUnit)} />)}
+      <Metric label={text.sanity} value={daily ? prepared.productionSanity.value.toFixed(2) : '—'} unit={text.sanityUnit}
+        icon={<img src="/assets/products/AP_GAMEPLAY.png" alt="" width={24} height={24} decoding="async" />}
+        change={priorDaily ? change(prepared.productionSanity.value, calculateProductionSanity(priorDaily).value, text.sanityUnit) : undefined} />
     </StaggeredReveal>
-    <section className="v2-metrics-note" aria-label={text.sanity}>
-      <p><strong>{text.sanity} · {daily ? prepared.productionSanity.value.toFixed(2) : '—'} {text.sanityUnit}</strong>
-        {daily && priorDaily && <span> · {change(prepared.productionSanity.value, calculateProductionSanity(priorDaily).value, text.sanityUnit)}</span>}</p>
-      <p>{text.sanityHint}</p>
-    </section>
     <p className="v2-metrics-note">{text.outputSubtitle}</p>
     {!sample && <p className="v2-metrics-note" aria-live="polite">
       {!previous ? text.noPreviousProduction : !baseline ? text.loadingPreviousProduction : baseline.failed

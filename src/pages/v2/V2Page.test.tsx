@@ -376,7 +376,7 @@ describe('V2 results-first workspace', () => {
     const sanity = (3000 + 32400) * SANITY_PER_LMD + 14 * SANITY_PER_PURE_GOLD
     const calculation = screen.getByRole('region', { name: copy.v2.sanityCalculation })
     expect(calculation).toHaveTextContent(sanity.toFixed(2))
-    expect(screen.getByRole('region', { name: copy.v2.sanity })).toHaveTextContent(`${sanity.toFixed(2)} ${copy.v2.sanityUnit}`)
+    expect(screen.getByRole('region', { name: copy.v2.sanity })).toHaveTextContent(`${sanity.toFixed(2)}${copy.v2.sanityUnit}`)
     expect(calculation).toHaveTextContent('32,400 × 0.003600 ≈ 116.64')
     expect(calculation).toHaveTextContent(copy.v2.battleRecordEquivalent('32.4'))
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
@@ -1183,7 +1183,8 @@ describe('V2 results-first workspace', () => {
     } } }
     page.rerender(<MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter>)
     expect(screen.getByRole('region', { name: copy.v2.exp })).toHaveTextContent(`1,000${copy.v2.expUnit}`)
-    expect(screen.getByRole('region', { name: copy.v2.orundum })).toHaveTextContent(`103.5${copy.v2.daily}`)
+    expect(screen.queryByRole('region', { name: copy.v2.orundum })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('heading', { name: copy.v2.dailyOutput }).closest('section')!).getByText('103.5')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: copy.v2.analysisTab }))
     expect(screen.queryByRole('region', { name: copy.v2.sanityCalculation })).not.toBeInTheDocument()
   })

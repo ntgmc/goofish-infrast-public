@@ -515,10 +515,6 @@
   background: var(--v2-paper);
 }
 
-.v2-metrics-primary {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
 .v2-metric {
   min-width: 0;
   padding: var(--space-md);
@@ -1847,7 +1843,6 @@
   .v2-metric { padding: var(--space-xs); }
   .v2-metric:nth-child(odd) { border-left: 0; }
   .v2-metric:nth-child(n + 3) { border-top: 1px solid var(--v2-line); }
-  .v2-metrics-primary .v2-metric:last-child { grid-column: 1 / -1; }
   .v2-metric-top { gap: var(--space-3xs); font-size: var(--text-xs); }
   .v2-metric-icon { width: 24px; height: 24px; }
   .v2-metric-value { display: grid; gap: var(--space-3xs); margin-top: var(--space-2xs); font-size: clamp(1.5rem, 7vw, 1.75rem); letter-spacing: -.025em; overflow-wrap: anywhere; }

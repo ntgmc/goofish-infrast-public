@@ -194,7 +194,6 @@ export const v2Copy = {
   totalEfficiency: '总生产效率',
   sanity: '等效理智',
   sanityUnit: '理智 / 天',
-  sanityHint: '每日收益的理智折算值，便于比较不同产出的方案。',
   shortTermPulls: '高产出期抽数',
   pullsPer30Days: '抽 / 30 天',
   shortTermPullsHint: (amount: string, duration: string) => `每日产出 ${amount} 合成玉 · ${duration}`,
