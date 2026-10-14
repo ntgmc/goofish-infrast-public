@@ -20,6 +20,29 @@ describe('restricted profile presets', () => {
     expect(resolveFreePreviewConfig(config)).toMatchObject({ ok: false })
   })
 
+  it.each(['maa', 'rotation'])('preserves imported inventory across %s permission resolution and mode changes', (scheduleMode) => {
+    const config = {
+      ...structuredClone(CONFIG_PRESETS['243']),
+      schedule_mode: scheduleMode,
+      intermediate_inventory: { 'Originium Shard': 45, 'Pure Gold': 123, 'Orirock Cube': 7658 },
+      auto_balance_source: 'intermediate_inventory',
+    }
+    for (const resolve of [
+      resolveConfigForPermission.bind(null, 'recommended'),
+      resolveFreePreviewConfig,
+    ]) {
+      const result = resolve(config)
+      expect(result).toMatchObject({ ok: true, config: {
+        schedule_mode: scheduleMode,
+        intermediate_inventory: config.intermediate_inventory,
+        auto_balance_source: 'intermediate_inventory',
+      } })
+      if (!result.ok) throw new Error(result.message)
+      expect(resolve({ ...result.config, schedule_mode: scheduleMode === 'maa' ? 'rotation' : 'maa' }))
+        .toMatchObject({ ok: true, config: { intermediate_inventory: config.intermediate_inventory } })
+    }
+  })
+
   it('preserves facility positions for restricted profiles and free preview', () => {
     const config = {
       ...CONFIG_PRESETS['252-full'],

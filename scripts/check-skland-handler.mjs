@@ -38,6 +38,7 @@ await assertOversizedCredentialPreview()
 await assertConfirmImport()
 await assertProfileImportTransactionRollback()
 await assertNoConfigImportCreatesDefaultConfig()
+await assertRestrictedRotationImport()
 await assertInventoryFailureStillImportsOperators()
 await assertDepotValueConfirmDoesNotWriteWorkspace()
 await assertRefreshImport()
@@ -571,8 +572,46 @@ async function assertNoConfigImportCreatesDefaultConfig() {
   }
 }
 
+async function assertRestrictedRotationImport() {
+  const profileId = 'profile-restricted-rotation'
+  seedProfile({ id: profileId, status: 'active', permission: 'recommended' })
+  store.workspaces.get(profileId).config.schedule_mode = 'rotation'
+  setFetchMode('complete')
+  const preview = await callSkland('/api/user/skland/credential/preview', {
+    profile_id: profileId,
+    credential_text: 'manual-skland-cred',
+    source: 'manual',
+  })
+  const confirmed = await callSkland('/api/user/skland/login/confirm', {
+    profile_id: profileId,
+    confirmation_id: preview.body.confirmation_id,
+    idempotency_key: `${profileId}-confirm`,
+  })
+  assertInventorySynced(confirmed, { 'Pure Gold': 123, 'Originium Shard': 45, 'Orirock Cube': 7658 })
+  if (confirmed.body.workspace.config.schedule_mode !== 'rotation') throw new Error('inventory import changed schedule mode')
+  setFetchMode('refresh')
+  const refreshed = await callSkland('/api/user/skland/import/refresh', { profile_id: profileId })
+  assertInventorySynced(refreshed, { 'Pure Gold': 9, 'Originium Shard': 8, 'Orirock Cube': 76 })
+}
+
+function assertInventorySynced(result, inventory) {
+  const workspace = store.workspaces.get(result.body.active_profile?.id)
+  if (result.status !== 200 || !result.body.skland_import?.inventory_synced || !result.body.skland_import?.config_saved) {
+    throw new Error(`expected successful inventory sync, got ${result.status}`)
+  }
+  for (const [product, count] of Object.entries(inventory)) {
+    if (workspace?.config?.intermediate_inventory?.[product] !== count
+      || result.body.workspace?.config?.intermediate_inventory?.[product] !== count
+      || result.body.skland_import?.intermediate_inventory?.[product] !== count) {
+      throw new Error(`inventory sync lost ${product} between import, persistence and response`)
+    }
+  }
+}
+
 async function assertInventoryFailureStillImportsOperators() {
   seedProfile({ id: 'profile-inventory-fail', status: 'active' })
+  const existingInventory = { 'Pure Gold': 12, 'Originium Shard': 34, 'Orirock Cube': 56 }
+  store.workspaces.get('profile-inventory-fail').config.intermediate_inventory = existingInventory
   setFetchMode('inventory-fail')
   const preview = await callSkland('/api/user/skland/credential/preview', {
     profile_id: 'profile-inventory-fail',
@@ -596,6 +635,9 @@ async function assertInventoryFailureStillImportsOperators() {
   }
   if (workspace.config?.auto_balance_source === 'intermediate_inventory') {
     throw new Error('inventory failure import: should not mark config as inventory-balanced without inventory')
+  }
+  if (JSON.stringify(workspace.config?.intermediate_inventory) !== JSON.stringify(existingInventory)) {
+    throw new Error('inventory failure import: should preserve existing inventory')
   }
 }
 
@@ -936,6 +978,7 @@ async function assertFreePreviewScanClaim() {
   if (confirm.body.active_profile?.skland_binding?.uid !== '130761348' || confirm.body.skland_import?.operator_count !== 2) {
     throw new Error('免费档案扫码确认：缺少绑定或导入摘要')
   }
+  assertInventorySynced(confirm, { 'Pure Gold': 123, 'Originium Shard': 45, 'Orirock Cube': 7658 })
   const declarationUsage = store.personalUseDeclarationUsageEvents.at(-1)
   if (
     store.personalUseDeclarationUsageEvents.length !== declarationUsageCountBefore + 1
@@ -989,14 +1032,28 @@ async function assertFreePreviewScanClaim() {
     ...store.workspaces.get(profileId),
     free_schedule_entitlement: entitlement,
   })
+  store.workspaces.get(profileId).config.schedule_mode = 'rotation'
   setFetchMode('blank-default-uid')
   const refresh = await callSkland('/api/user/skland/import/refresh', { profile_id: profileId })
+  assertInventorySynced(refresh, { 'Pure Gold': 123, 'Originium Shard': 45, 'Orirock Cube': 7658 })
   if (refresh.status !== 200) {
     throw new Error(`免费档案森空岛刷新：预期 200，实际 ${refresh.status}`)
   }
   if (JSON.stringify(store.workspaces.get(profileId)?.free_schedule_entitlement) !== JSON.stringify(entitlement)) {
     throw new Error('免费档案森空岛刷新：不应重置免费完整排班权益')
   }
+  const rebindPreview = await callSkland('/api/user/skland/credential/preview', {
+    profile_id: profileId,
+    credential_text: 'manual-skland-cred',
+    source: 'bookmarklet',
+  })
+  const rebound = await callSkland('/api/user/skland/login/confirm', {
+    profile_id: profileId,
+    confirmation_id: rebindPreview.body.confirmation_id,
+    idempotency_key: 'free-scan-rebind',
+  })
+  assertInventorySynced(rebound, { 'Pure Gold': 123, 'Originium Shard': 45, 'Orirock Cube': 7658 })
+  if (rebound.body.workspace.config.schedule_mode !== 'rotation') throw new Error('rebind changed schedule mode')
 }
 
 async function assertFreePreviewMultiAccountSelection() {
@@ -1074,6 +1131,7 @@ async function assertFreePreviewCredentialClaimAndUidUniqueness() {
     if (confirm.body.active_profile?.skland_binding?.uid !== '87654321') {
       throw new Error('免费档案凭据确认：预期 mismatch-mode UID 绑定')
     }
+    assertInventorySynced(confirm, { 'Pure Gold': 123, 'Originium Shard': 45, 'Orirock Cube': 7658 })
 
     store.user = {
       ...originalUser,
@@ -1413,6 +1471,9 @@ function memoryStorePlugin() {
       build.onResolve({ filter: /(^|[\\/])user-auth(\.ts)?$/ }, () => ({
         path: 'memory-user-auth',
         namespace: 'skland-smoke',
+      }))
+      build.onResolve({ filter: /^real-license-utils$/ }, () => ({
+        path: resolve('server/handlers/license-utils.ts'),
       }))
       build.onResolve({ filter: /(^|[\\/])license-utils(\.ts)?$/ }, () => ({
         path: 'memory-license-utils',
@@ -1882,6 +1943,7 @@ function memoryLicenseUtilsModule() {
 
 function memoryLicenseUtilsModuleFixed() {
   return `
+    export { validateConfig, resolveConfigForPermission, resolveFreePreviewConfig } from 'real-license-utils'
     const store = globalThis.__sklandHandlerSmokeStore
     export function buildOperatorFingerprint(operators) {
       const snapshot = Object.fromEntries(operators.map((operator) => [String(operator.id || operator.name), {
@@ -1953,40 +2015,10 @@ function memoryLicenseUtilsModuleFixed() {
       }
       return { ok: true, operators }
     }
-    export function validateConfig(config) {
-      if (!config || typeof config !== 'object' || !config.layout || !config.product_requirements) {
-        return { ok: false, message: 'invalid config' }
-      }
-      if (!Number.isInteger(config.trading_stations_count) || !Number.isInteger(config.manufacturing_stations_count)) {
-        return { ok: false, message: 'invalid station counts' }
-      }
-      const trading = config.product_requirements.trading_stations
-      const manufacturing = config.product_requirements.manufacturing_stations
-      if (!isCountRecord(trading) || !isCountRecord(manufacturing)) {
-        return { ok: false, message: 'invalid product requirements' }
-      }
-      if (sumCounts(trading) !== config.trading_stations_count || sumCounts(manufacturing) !== config.manufacturing_stations_count) {
-        return { ok: false, message: 'product count mismatch' }
-      }
-      return { ok: true, config }
-    }
-    export function resolveConfigForPermission(permission, config) {
-      return { ok: true, config }
-    }
-    export function resolveFreePreviewConfig(config) {
-      return validateConfig(config)
-    }
     export function requireEnv(name) {
       const value = process.env[name] || 'secret'
       if (!value) throw new Error(name + ' is required')
       return value
-    }
-    function isCountRecord(value) {
-      if (!value || typeof value !== 'object') return false
-      return Object.values(value).every((item) => Number.isInteger(item) && item >= 0)
-    }
-    function sumCounts(counts) {
-      return Object.values(counts).reduce((sum, value) => sum + value, 0)
     }
   `
 }

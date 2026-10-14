@@ -518,6 +518,8 @@ function cloneConfig(config: LicenseConfig): LicenseConfig {
 
 function resolvePresetMode(config: LicenseConfig, preset: LicenseConfig): LicenseConfig {
   const resolved = cloneConfig(preset)
+  resolved.intermediate_inventory = config.intermediate_inventory
+  resolved.auto_balance_source = config.auto_balance_source
   resolved.allow_product_rebalance = config.allow_product_rebalance
   if (resolved.layout === '2-5-2') resolved.facility_layout = config.facility_layout?.slice()
   resolved.dormitory_rule = normalizeDormitoryRule(config.dormitory_rule)
@@ -525,8 +527,6 @@ function resolvePresetMode(config: LicenseConfig, preset: LicenseConfig): Licens
   if (normalizeScheduleMode(config.schedule_mode) === 'rotation') {
     resolved.schedule_mode = 'rotation'
   } else if (isIntermediateAutoConfig(config)) {
-    resolved.intermediate_inventory = config.intermediate_inventory
-    resolved.auto_balance_source = config.auto_balance_source
     resolved.drones = cloneConfig(config).drones
     if (resolved.drones) {
       resolved.drones.auto_strategy = normalizeDroneAutoStrategy(resolved.drones.auto_strategy)
@@ -538,6 +538,8 @@ function resolvePresetMode(config: LicenseConfig, preset: LicenseConfig): Licens
 
 function resolveFreePreviewPresetMode(config: LicenseConfig, preset: LicenseConfig): LicenseConfig {
   const resolved = cloneConfig(preset)
+  resolved.intermediate_inventory = config.intermediate_inventory
+  resolved.auto_balance_source = config.auto_balance_source
   resolved.allow_product_rebalance = config.allow_product_rebalance
   if (resolved.layout === '2-5-2') resolved.facility_layout = config.facility_layout?.slice()
   resolved.dormitory_rule = normalizeDormitoryRule(config.dormitory_rule)
@@ -546,8 +548,6 @@ function resolveFreePreviewPresetMode(config: LicenseConfig, preset: LicenseConf
   if (normalizeScheduleMode(config.schedule_mode) === 'rotation') {
     resolved.schedule_mode = 'rotation'
   } else if (isIntermediateAutoConfig(config)) {
-    resolved.intermediate_inventory = config.intermediate_inventory
-    resolved.auto_balance_source = config.auto_balance_source
     resolved.drones = {
       ...(resolved.drones ?? { order: 'pre', targets: [] }),
       enable: true,
