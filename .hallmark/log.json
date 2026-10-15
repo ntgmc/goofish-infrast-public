@@ -1,5 +1,17 @@
 [
   {
+    "date": "2026-10-15",
+    "scope": "configuration editor",
+    "macrostructure": "Workbench",
+    "theme": "existing application variants",
+    "enrichment": "none",
+    "nav": "existing application shell",
+    "footer": "existing application shell",
+    "variation": "four task tabs, preserved drafts, compact shift and dormitory selectors, product-colored preset buttons",
+    "brief": "Reduce configuration scrolling with focused common, room, inventory and policy views",
+    "design_system": "design.md"
+  },
+  {
     "date": "2026-10-14",
     "scope": "v2/pricing",
     "macrostructure": "Workbench",
