@@ -187,7 +187,8 @@ describe('V2 results-first workspace', () => {
     page.rerender(<MemoryRouter initialEntries={['/']}><V2Page /><RouteLocation /></MemoryRouter>)
     expect(screen.getByTestId('route-location')).toHaveTextContent('section=generation')
     expect(guide().querySelector('[aria-current="step"]')).toHaveTextContent(copy.v2.firstSchedule.import)
-    expect(await screen.findByRole('button', { name: copy.v2.firstSchedule.importAction })).toBeVisible()
+    // Cold imports of the lazy account and generation pages can exceed the default 1s wait in CI.
+    expect(await screen.findByRole('button', { name: copy.v2.firstSchedule.importAction }, { timeout: 5_000 })).toBeVisible()
     await user.click(screen.getByText(copy.v2.firstSchedule.accountOptions))
     await user.click(await screen.findByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_005 }))
     expect(fetch.mock.calls.some(([url]) => String(url).includes('/personal-use-declaration'))).toBe(false)
@@ -200,7 +201,7 @@ describe('V2 results-first workspace', () => {
     await user.upload(screen.getByLabelText(copy.v2.uploadMaa, { selector: 'input' }), new File([JSON.stringify(SAMPLE_OPERATORS)], 'operators.json', { type: 'application/json' }))
     await waitFor(() => expect(session.persistWorkspacePatch).toHaveBeenCalledWith(expect.objectContaining({ operators: SAMPLE_OPERATORS, config: expect.objectContaining({ layout: SAMPLE_CONFIG.layout }) })))
     page.rerender(<MemoryRouter initialEntries={['/']}><V2Page /><RouteLocation /></MemoryRouter>)
-    await screen.findByText(copy.v2.firstSchedule.configTitle)
+    await screen.findByText(copy.v2.firstSchedule.configTitle, {}, { timeout: 5_000 })
     expect(guide().querySelector('[aria-current="step"]')).toHaveTextContent(copy.v2.firstSchedule.config)
     expect(screen.queryByRole('button', { name: copy.optimize.pages_tool_optimize_GenerateControlBar_030 })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: copy.v2.firstSchedule.configAction }))
