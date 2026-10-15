@@ -369,7 +369,6 @@ async function requestDeletion(req: Request, auth: AuthContext): Promise<Respons
   return jsonResponse({
     ok: true,
     scheduled_for: accepted.scheduledFor,
-    cancellation_email: accepted.cancellationEmail,
   }, 202, { 'Set-Cookie': clearSessionCookie() })
 }
 

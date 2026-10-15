@@ -1179,7 +1179,6 @@ export type DepotValueProfileResponse = AuthSuccessResponse & {
 export interface AccountDeletionAccepted {
   ok: true;
   scheduled_for: string;
-  cancellation_email: 'queued' | 'sent' | 'delayed';
 }
 
 type PersonalDataExportRecord = Record<string, unknown>;

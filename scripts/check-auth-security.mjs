@@ -1689,7 +1689,7 @@ function userAuthMigrationPlugin() {
   return {
     name: 'auth-security-user-migration-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'inventory-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email']) {
+      for (const moduleName of ['user-store', 'inventory-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email', 'account-data-lifecycle']) {
         build.onResolve({ filter: new RegExp(`(^|[\\\\/])${moduleName}(\\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-user-migration',
@@ -1697,6 +1697,7 @@ function userAuthMigrationPlugin() {
       }
       build.onLoad({ filter: /.*/, namespace: 'auth-security-user-migration' }, (args) => {
         const mocks = {
+          'account-data-lifecycle': 'export async function cancelAccountDeletionOnLogin() { return null }',
           'user-store': userStoreMigrationMock(),
           'inventory-store': inventoryStoreMock(),
           'announcement-store': announcementStoreMock(),
@@ -1717,7 +1718,7 @@ function userRegistrationCdkPlugin() {
   return {
     name: 'auth-security-user-registration-cdk-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'inventory-store', 'password', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email']) {
+      for (const moduleName of ['user-store', 'inventory-store', 'password', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email', 'account-data-lifecycle']) {
         build.onResolve({ filter: new RegExp(`(^|[\\\\/])${moduleName}(\\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-user-registration-cdk',
@@ -1725,6 +1726,7 @@ function userRegistrationCdkPlugin() {
       }
       build.onLoad({ filter: /.*/, namespace: 'auth-security-user-registration-cdk' }, (args) => {
         const mocks = {
+          'account-data-lifecycle': 'export async function cancelAccountDeletionOnLogin() { return null }',
           'user-store': userRegistrationCdkStoreMock(),
           'inventory-store': inventoryStoreMock(),
           password: userRegistrationPasswordMock(),
@@ -1746,7 +1748,7 @@ function userSessionAuthPlugin() {
   return {
     name: 'auth-security-user-session-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'optimization-result-store', 'inventory-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email']) {
+      for (const moduleName of ['user-store', 'optimization-result-store', 'inventory-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email', 'account-data-lifecycle']) {
         build.onResolve({ filter: new RegExp(`(^|[\\\\/])${moduleName}(\\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-user-session',
@@ -1754,6 +1756,7 @@ function userSessionAuthPlugin() {
       }
       build.onLoad({ filter: /.*/, namespace: 'auth-security-user-session' }, (args) => {
         const mocks = {
+          'account-data-lifecycle': 'export async function cancelAccountDeletionOnLogin() { return null }',
           'user-store': userSessionAuthStoreMock(),
           'optimization-result-store': userSessionOptimizationResultStoreMock(),
           'inventory-store': inventoryStoreMock(),
@@ -1795,7 +1798,7 @@ function passwordResetAuthPlugin() {
   return {
     name: 'auth-security-password-reset-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'inventory-store', 'password', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email']) {
+      for (const moduleName of ['user-store', 'inventory-store', 'password', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email', 'account-data-lifecycle']) {
         build.onResolve({ filter: new RegExp(`(^|[\\/])${moduleName}(\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-password-reset',
@@ -1803,6 +1806,7 @@ function passwordResetAuthPlugin() {
       }
       build.onLoad({ filter: /.*/, namespace: 'auth-security-password-reset' }, (args) => {
         const mocks = {
+          'account-data-lifecycle': 'export async function cancelAccountDeletionOnLogin() { return null }',
           'user-store': passwordResetAuthStoreMock(),
           'inventory-store': inventoryStoreMock(),
           password: passwordResetPasswordMock(),

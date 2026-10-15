@@ -1,5 +1,4 @@
 import { copy } from '../copy/index'
-import type { AccountDeletionAccepted } from './types'
 import { ApiError, getApiErrorCode, getApiRetryAfterSeconds } from './api-client'
 
 export function accountLifecycleErrorMessage(error: unknown, fallback: string): string {
@@ -17,14 +16,8 @@ export function accountLifecycleErrorMessage(error: unknown, fallback: string): 
   return error.message || fallback
 }
 
-export function deletionEmailMessage(status: AccountDeletionAccepted['cancellation_email']): string {
-  if (status === 'sent') return copy.features.delete_email_sent
-  if (status === 'delayed') return copy.features.delete_email_delayed
-  return copy.features.delete_email_queued
-}
-
 export function formatAccountDeletionDeadline(value: string): string {
   const timestamp = Date.parse(value)
   if (!Number.isFinite(timestamp)) return value
-  return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'long', timeStyle: 'short' }).format(timestamp)
+  return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'long', timeStyle: 'long' }).format(timestamp)
 }

@@ -85,7 +85,6 @@ beforeEach(() => {
   mocks.verifyPasswordHash.mockResolvedValue({ verified: true })
   mocks.requestAccountDeletion.mockResolvedValue({
     scheduledFor: '2026-08-07T00:00:00.000Z',
-    cancellationEmail: 'queued',
   })
   mocks.getProfileForUser.mockResolvedValue({
     id: 'profile-1',
@@ -246,10 +245,10 @@ describe('account data Skland controls', () => {
     }))
 
     expect(response.status).toBe(202)
+    expect(response.headers.get('Set-Cookie')).toBe('session=; Max-Age=0')
     await expect(response.json()).resolves.toEqual({
       ok: true,
       scheduled_for: '2026-08-07T00:00:00.000Z',
-      cancellation_email: 'queued',
     })
   })
 

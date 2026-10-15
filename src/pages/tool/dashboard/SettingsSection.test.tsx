@@ -1,11 +1,19 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render as renderUi, screen, waitFor } from '@testing-library/react'
+import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router'
+import type { ReactNode } from 'react'
+import AccountSafetyPage from '../../AccountSafetyPage'
+import { formatAccountDeletionDeadline } from '../../../lib/account-lifecycle-client'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import SettingsSection from './SettingsSection'
 import { disableDebugMode } from '../../../lib/debug-diagnostics'
 
 vi.mock('../../../components/QqBotSettingsPanel', () => ({ default: () => null }))
+
+function render(ui: ReactNode) {
+  return renderUi(<MemoryRouter>{ui}</MemoryRouter>)
+}
 
 afterEach(() => {
   cleanup()
@@ -18,7 +26,7 @@ describe('SettingsSection privacy controls', () => {
   it('collapses inactive diagnostics and keeps active diagnostics and feedback expanded', async () => {
     disableDebugMode()
     const user = userEvent.setup()
-    const props = { profiles: [], onLogout: vi.fn(), onPayload: vi.fn() }
+    const props = { profiles: [], onPayload: vi.fn() }
     const { unmount } = render(<SettingsSection {...props} />)
     const toggle = screen.getByText('调试模式').closest('summary')!
     expect(toggle.closest('details')).not.toHaveAttribute('open')
@@ -38,7 +46,7 @@ describe('SettingsSection privacy controls', () => {
 
   it('limits all change-password fields and reports oversized passwords', async () => {
     const user = userEvent.setup()
-    render(<SettingsSection profiles={[]} onLogout={vi.fn()} onPayload={vi.fn()} />)
+    render(<SettingsSection profiles={[]} onPayload={vi.fn()} />)
     const oldPassword = screen.getByLabelText('当前密码', { selector: '#settings-old-password' })
     const newPassword = screen.getByLabelText('新密码')
     const confirmation = screen.getByLabelText('确认新密码')
@@ -72,7 +80,7 @@ describe('SettingsSection privacy controls', () => {
         uid: '12345678', nickname: '博士', channel_name: '官服', bound_at: '2026-01-01T00:00:00.000Z',
         last_imported_at: null, credential_status: 'available', credential_invalid_at: null, credential_invalid_reason: null,
       },
-    }]} activeProfileId={activeProfileId} onLogout={vi.fn()} onPayload={onPayload} />)
+    }]} activeProfileId={activeProfileId} onPayload={onPayload} />)
 
     await user.click(screen.getByRole('button', { name: '清除授权信息' }))
 
@@ -84,16 +92,18 @@ describe('SettingsSection privacy controls', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(2, `/api/auth/me?profile_id=${activeProfileId}`, expect.any(Object))
   })
 
-  it('shows the accepted deletion deadline before the user leaves the signed-out session', async () => {
+  it('automatically leaves settings and shows the server deletion deadline after signing out', async () => {
     const user = userEvent.setup()
-    const onLogout = vi.fn()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
       ok: true,
-      scheduled_for: '2026-08-07T00:00:00.000Z',
-      cancellation_email: 'queued',
+      scheduled_for: '2026-08-07T00:00:42.000Z',
     }), { status: 202, headers: { 'Content-Type': 'application/json' } })))
-    render(<SettingsSection profiles={[]} onLogout={onLogout} onPayload={vi.fn()} />)
+    const router = createMemoryRouter([
+      { path: '/tool/settings', element: <SettingsSection profiles={[]} onPayload={vi.fn()} /> },
+      { path: '/account-safety', element: <AccountSafetyPage /> },
+    ], { initialEntries: ['/tool/settings'] })
+    renderUi(<RouterProvider router={router} />)
 
     await user.click(screen.getByText('注销账号'))
     const email = screen.getByLabelText('确认邮箱')
@@ -104,10 +114,12 @@ describe('SettingsSection privacy controls', () => {
     await user.click(screen.getByRole('button', { name: '申请注销账号' }))
 
     expect(await screen.findByText('注销申请已受理')).toBeInTheDocument()
-    expect(screen.getByText(/撤销邮件正在发送/)).toBeInTheDocument()
-    expect(onLogout).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: '返回首页' }))
-    expect(onLogout).toHaveBeenCalledOnce()
+    expect(router.state.location.pathname).toBe('/account-safety')
+    expect(router.state.historyAction).toBe('REPLACE')
+    expect(screen.getByText(formatAccountDeletionDeadline('2026-08-07T00:00:42.000Z'))).toBeInTheDocument()
+    expect(screen.getByText('你已退出登录，注销申请已生效。')).toBeInTheDocument()
+    expect(screen.getByText(/7 天内重新登录会自动取消注销/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '申请注销账号' })).not.toBeInTheDocument()
   })
 
   it('keeps deletion feedback and entered credentials available when a request fails', async () => {
@@ -117,7 +129,7 @@ describe('SettingsSection privacy controls', () => {
       status: 503, headers: { 'Content-Type': 'application/json' },
     })))
     const onDeletionStateChange = vi.fn()
-    render(<SettingsSection profiles={[]} onLogout={vi.fn()} onPayload={vi.fn()} onDeletionStateChange={onDeletionStateChange} />)
+    render(<SettingsSection profiles={[]} onPayload={vi.fn()} onDeletionStateChange={onDeletionStateChange} />)
     await user.click(screen.getByText('注销账号'))
     await user.type(screen.getByLabelText('确认邮箱'), 'user@example.test')
     const password = screen.getByLabelText('当前密码', { selector: '#settings-delete-password' })

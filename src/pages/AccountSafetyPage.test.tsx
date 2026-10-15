@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AccountSafetyPage from './AccountSafetyPage'
 import { useSiteFeatures } from '../lib/site-feature-context'
 import { DEFAULT_SITE_FEATURES } from '../lib/site-features'
+import { formatAccountDeletionDeadline } from '../lib/account-lifecycle-client'
 
 vi.mock('../lib/site-feature-context', () => ({ useSiteFeatures: vi.fn() }))
 
@@ -22,13 +23,12 @@ afterEach(() => {
 })
 
 describe('AccountSafetyPage lifecycle controls', () => {
-  it('shows the scheduled deletion and queued cancellation email before leaving', async () => {
+  it('automatically shows the scheduled deletion after submission while service is paused', async () => {
     const user = userEvent.setup()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     vi.stubGlobal('fetch', vi.fn().mockImplementation((url) => Promise.resolve(new Response(JSON.stringify(url === '/api/user/qqbot' ? { available: false, binding: null } : {
       ok: true,
       scheduled_for: '2026-08-07T00:00:00.000Z',
-      cancellation_email: 'queued',
     }), { status: 202, headers: { 'Content-Type': 'application/json' } }))))
     renderPage()
 
@@ -42,9 +42,20 @@ describe('AccountSafetyPage lifecycle controls', () => {
     await user.click(screen.getByRole('button', { name: '申请注销账号' }))
 
     expect(await screen.findByText('注销申请已受理')).toBeInTheDocument()
-    expect(screen.getByText(/撤销邮件正在发送/)).toBeInTheDocument()
+    expect(screen.getByText(formatAccountDeletionDeadline('2026-08-07T00:00:00.000Z'))).toBeInTheDocument()
+    expect(screen.getByText('你已退出登录，注销申请已生效。')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '申请注销账号' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '安全退出' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: '安全退出' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the signed-out receipt visible after reload when the service is open', async () => {
+    vi.mocked(useSiteFeatures).mockReturnValue({
+      status: 'ready', features: DEFAULT_SITE_FEATURES, updatedAt: null, retry: vi.fn(),
+    })
+    const router = renderPage('/account-safety?scheduled_for=2026-08-07T00%3A00%3A42.000Z')
+    expect(screen.getByText('注销申请已受理')).toBeInTheDocument()
+    expect(screen.getByText(formatAccountDeletionDeadline('2026-08-07T00:00:42.000Z'))).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/account-safety')
   })
 
   it('replaces the legacy entry with settings when the service is open', async () => {
@@ -74,11 +85,11 @@ describe('AccountSafetyPage lifecycle controls', () => {
   })
 })
 
-function renderPage() {
+function renderPage(initialEntry = '/account-safety') {
   const router = createMemoryRouter([
     { path: '/account-safety', element: <AccountSafetyPage /> },
     { path: '/tool/settings', element: <main>Settings destination</main> },
-  ], { initialEntries: ['/account-safety'] })
+  ], { initialEntries: [initialEntry] })
   render(<RouterProvider router={router} />)
   return router
 }

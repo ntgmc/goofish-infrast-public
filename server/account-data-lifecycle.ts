@@ -6,7 +6,7 @@ import {
   type UserAccountRecord,
 } from './storage/user-store'
 import { purgeExpiredPersonalUseDeclarationAcceptances } from './storage/personal-use-declaration-store'
-import { sendAccountDeletionCancellationEmail, sendAccountDeletionReceiptEmail } from './handlers/email'
+import { sendAccountDeletionReceiptEmail } from './handlers/email'
 import { recordAccountDeletedBehaviorEvent } from './behavior-risk/service'
 import { releaseScheduleBalanceInTransaction } from './storage/balance-store'
 import { releaseOptimizationJobReservationsInTransaction } from './storage/optimize-job-store'
@@ -57,7 +57,6 @@ type AccountDeletionEmailOutbox = {
 
 export type AccountDeletionAccepted = {
   scheduledFor: string
-  cancellationEmail: 'queued' | 'sent' | 'delayed'
 }
 
 type AccountDeletionMaintenanceResult = {
@@ -83,19 +82,7 @@ export async function requestAccountDeletion(
     )
     const existingRequest = existing.rows[0]
     if (existingRequest) {
-      const outbox = await client.query<{ status: AccountDeletionEmailOutbox['status'] }>(
-        `select status from account_deletion_email_outbox
-          where deletion_request_id = $1 and kind = 'cancellation'`,
-        [existingRequest.id],
-      )
-      return {
-        scheduledFor: new Date(existingRequest.scheduled_for).toISOString(),
-        cancellationEmail: outbox.rows[0]?.status === 'dead_letter'
-          ? 'delayed'
-          : outbox.rows[0]
-            ? 'queued'
-            : 'sent',
-      }
+      return { scheduledFor: new Date(existingRequest.scheduled_for).toISOString() }
     }
 
     const current = await client.query<{ record_json: UserAccountRecord }>(
@@ -111,8 +98,6 @@ export async function requestAccountDeletion(
     const requestId = randomUUID()
     const updatedAt = now.toISOString()
     const scheduledFor = new Date(now.getTime() + DELETION_DELAY_MS).toISOString()
-    const deleteAfter = new Date(now.getTime() + OUTBOX_RETENTION_MS).toISOString()
-    const cancelUrl = buildCancellationUrl(token)
     const pendingUser: UserAccountRecord = {
       ...currentUser,
       status: 'pending_deletion',
@@ -125,14 +110,6 @@ export async function requestAccountDeletion(
          lease_token, lease_expires_at, last_error, created_at, updated_at)
        values ($1, $2, $3, $4, 'pending', 0, $5, null, null, null, $5, $5)`,
       [requestId, user.id, hashToken(token), scheduledFor, updatedAt],
-    )
-    await client.query(
-      `insert into account_deletion_email_outbox
-        (id, deletion_request_id, kind, recipient_email, payload_json, status, attempts,
-         next_attempt_at, lease_token, lease_expires_at, last_error, created_at, updated_at, delete_after)
-       values ($1, $2, 'cancellation', $3, $4::jsonb, 'pending', 0,
-               $5, null, null, null, $5, $5, $6)`,
-      [randomUUID(), requestId, currentUser.email, JSON.stringify({ cancel_url: cancelUrl }), updatedAt, deleteAfter],
     )
     await client.query(
       `update user_accounts set status = $2, record_json = $3::jsonb, updated_at = $4 where id = $1`,
@@ -194,11 +171,22 @@ export async function requestAccountDeletion(
       await releaseScheduleBalanceInTransaction(client, reservation.job_id)
     }
 
-    return { scheduledFor, cancellationEmail: 'queued' }
+    return { scheduledFor }
   })
 }
 
 export async function cancelAccountDeletion(token: string, now = new Date()): Promise<boolean> {
+  return Boolean(await restorePendingAccountDeletion({ token }, now))
+}
+
+export async function cancelAccountDeletionOnLogin(user: UserAccountRecord, now = new Date()): Promise<UserAccountRecord | null> {
+  return restorePendingAccountDeletion({ user }, now)
+}
+
+async function restorePendingAccountDeletion(
+  input: { token: string } | { user: UserAccountRecord },
+  now: Date,
+): Promise<UserAccountRecord | null> {
   await ensureDatabaseSchema()
   return withTransaction(async (client) => {
     const result = await client.query<AccountDeletionRequest & { record_json: UserAccountRecord }>(
@@ -210,14 +198,20 @@ export async function cancelAccountDeletion(token: string, now = new Date()): Pr
               account.record_json
          from account_deletion_requests request
          join user_accounts account on account.id = request.user_id
-        where request.cancel_token_hash = $1
+        where (request.cancel_token_hash = $1
+               or (request.user_id = $3 and account.password_hash = $4))
           and request.status = 'pending'
           and request.scheduled_for > $2
         for update of request, account`,
-      [hashToken(token), now.toISOString()],
+      [
+        'token' in input ? hashToken(input.token) : null,
+        now.toISOString(),
+        'user' in input ? input.user.id : null,
+        'user' in input ? input.user.password_hash : null,
+      ],
     )
     const request = result.rows[0]
-    if (!request || request.record_json.status !== 'pending_deletion') return false
+    if (!request || request.record_json.status !== 'pending_deletion') return null
 
     const updatedAt = now.toISOString()
     const restored: UserAccountRecord = {
@@ -231,7 +225,7 @@ export async function cancelAccountDeletion(token: string, now = new Date()): Pr
         where id = $1 and status = 'pending_deletion'`,
       [request.user_id, JSON.stringify(restored), updatedAt],
     )
-    if (restoredUser.rowCount !== 1) return false
+    if (restoredUser.rowCount !== 1) return null
     await client.query(
       `delete from account_deletion_email_outbox
         where deletion_request_id = $1 and kind = 'cancellation'`,
@@ -242,7 +236,8 @@ export async function cancelAccountDeletion(token: string, now = new Date()): Pr
         where id = $1 and status = 'pending'`,
       [request.id],
     )
-    return deleted.rowCount === 1
+    if (deleted.rowCount !== 1) throw new AccountDeletionStateError('注销状态已发生变化，请重新登录。')
+    return restored
   })
 }
 
@@ -290,6 +285,7 @@ export async function processDueAccountDeletions(now = new Date()): Promise<numb
 
 export async function processAccountDeletionEmailOutbox(now = new Date()): Promise<number> {
   await ensureDatabaseSchema()
+  await query("delete from account_deletion_email_outbox where kind = 'cancellation'")
   let sent = 0
   for (let index = 0; index < MAINTENANCE_BATCH_SIZE; index += 1) {
     const claimed = await claimAccountDeletionEmail(now)
@@ -510,12 +506,6 @@ async function claimAccountDeletionEmail(now: Date): Promise<AccountDeletionEmai
 }
 
 async function deliverAccountDeletionEmail(outbox: AccountDeletionEmailOutbox): Promise<void> {
-  if (outbox.kind === 'cancellation') {
-    const cancelUrl = outbox.payload_json.cancel_url
-    if (typeof cancelUrl !== 'string' || !cancelUrl) throw new Error('Cancellation email payload is invalid')
-    await sendAccountDeletionCancellationEmail(outbox.recipient_email, cancelUrl)
-    return
-  }
   const receiptId = outbox.payload_json.receipt_id
   if (typeof receiptId !== 'string' || !receiptId) throw new Error('Receipt email payload is invalid')
   await sendAccountDeletionReceiptEmail(outbox.recipient_email, receiptId)
@@ -556,12 +546,4 @@ function safeErrorSummary(error: unknown): string {
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
-}
-
-function buildCancellationUrl(token: string): string {
-  const baseUrl = process.env.PUBLIC_APP_URL?.trim()
-  if (!baseUrl) throw new Error('PUBLIC_APP_URL not configured')
-  const url = new URL('/cancel-account-deletion', baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`)
-  url.searchParams.set('token', token)
-  return url.toString()
 }
