@@ -52,8 +52,9 @@ export default function ProductionSummary({ result, prepared, sample, profileId,
   const burstNote = economy?.case === 'inventory_burst' && economy.inventory_depletion_days !== null
     ? text.inventoryBurstHint(formatAmount(economy.inventory_depletion_days)) : ''
   function change(value: number, before: number | undefined, unit: string) {
-    return daily && priorDaily && typeof before === 'number' && Number.isFinite(before)
-      ? text.changeSincePrevious(`${signedAmount(value - before)} ${unit}`) : undefined
+    if (!daily || !priorDaily || typeof before !== 'number' || !Number.isFinite(before)) return undefined
+    const amount = signedAmount(value - before)
+    return amount === '0' ? text.sameAsPrevious : text.changeSincePrevious(`${amount} ${unit}`)
   }
 
   return <>

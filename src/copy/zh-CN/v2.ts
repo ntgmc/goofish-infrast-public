@@ -276,6 +276,7 @@ export const v2Copy = {
   goldBalanced: '每日产出与消耗持平',
   goldNetUnavailable: '当前结果未提供赤金净变化',
   changeSincePrevious: (change: string) => `比上次 ${change}`,
+  sameAsPrevious: '和上次相同',
   previousProductionBaseline: (name: string, date: string) => `与上次方案「${name}」（${date}）比较每日收益。`,
   noPreviousProduction: '暂无上次方案可比较。',
   loadingPreviousProduction: '正在读取上次方案收益…',
