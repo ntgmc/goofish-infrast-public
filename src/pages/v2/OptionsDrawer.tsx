@@ -37,7 +37,7 @@ const titles: Record<OptionPanel, string> = {
 }
 
 export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigate, session, config, operators, onUpdateConfig, permission,
-  canEditConfig = true, canUseIntermediateConfig = true, configReadOnly = false, sample, busy, onImportOperators, onAccount, room, error, configDiffRows, hasPreviousResult }: {
+  canEditConfig = true, canUseIntermediateConfig = true, configReadOnly = false, sample, busy, onImportOperators, onAccount, room, error, configDiffRows, hasPreviousResult, onConfirmConfig, confirmingConfig = false }: {
   panel: OptionPanel | null
   onClose: () => void
   onOpenProfile: (profile: V2Session['profiles'][number]) => Promise<void>
@@ -58,6 +58,8 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
   error?: string | null
   configDiffRows?: ConfigDiffItem[]
   hasPreviousResult?: boolean
+  onConfirmConfig?: () => Promise<boolean>
+  confirmingConfig?: boolean
 }) {
   const [search, setSearch] = useState('')
   const [sklandOpen, setSklandOpen] = useState(false)
@@ -72,8 +74,9 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
   const shownPanel = panel ?? lastPanel
   const isConfig = shownPanel === 'config'
   const validation = validateScheduleConfig(config)
-  const description = shownPanel === 'settings' ? copy.dashboard.animation.description : isConfig ? sample ? text.demoConfigDescription : text.configDescription
-    : shownPanel === 'operators' ? sample ? text.sampleOperatorDescription : text.operatorDescription
+  const exampleData = sample && !session.license
+  const description = shownPanel === 'settings' ? copy.dashboard.animation.description : isConfig ? exampleData ? text.demoConfigDescription : text.configDescription
+    : shownPanel === 'operators' ? exampleData ? text.sampleOperatorDescription : text.operatorDescription
       : shownPanel === 'account' ? text.accountDescription : text.roomDescription
 
   const filteredOperators = search.trim() ? operators.filter((operator) => PinyinMatch.match(operator.name, search.trim())) : operators
@@ -124,7 +127,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
           {isConfig && <div className="v2-config-feedback">
             {!validation.ok ? <p id="v2-config-validation" role="status" className="tool-alert tool-alert--warning">{validation.message}</p>
               : error && session.configSyncStatus !== 'failed' ? <p role="alert" className="v2-feedback v2-feedback-error">{error}</p>
-                : session.user && <ConfigSaveStatus status={session.configSyncStatus} onRetry={session.retryConfigSave} />}
+                : <ConfigSaveStatus status={session.configSyncStatus} onRetry={session.retryConfigSave} sample={exampleData} compact />}
           </div>}
         </div>
         <V2Transition motionKey={isConfig ? 'config' : shownPanel === 'room' ? `room-${room?.key}` : shownPanel ?? 'closed'} className="v2-drawer-body">
@@ -133,10 +136,12 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
             <ConfigCapabilityPreview config={config} enabled={!canEditConfig}>
             <ConfigEditor profileId={session.activeProfile?.id} config={config} canEdit={canEditConfig} readOnly={configReadOnly} canEditIntermediateInventory={canUseIntermediateConfig}
               canSelectPreset={canUseIntermediateConfig} canEditFixedShiftHours={canEditConfig || Boolean(session.activeProfile && isFreePreviewProfile(session.activeProfile))} permission={permission}
-              note={session.activeProfile && isFreePreviewProfile(session.activeProfile) && !canEditConfig
-                ? `${copy.common.components_ConfigEditor_024}${getProfileAccessLabel(session.activeProfile)}${copy.common.components_ConfigEditor_025}`
-                : undefined}
-              validation={validation} onUpdate={onUpdateConfig} embedded hideValidation />
+              note={exampleData
+                ? text.demoConfigDescription
+                : session.activeProfile && isFreePreviewProfile(session.activeProfile) && !canEditConfig
+                  ? `${copy.common.components_ConfigEditor_024}${getProfileAccessLabel(session.activeProfile)}${copy.common.components_ConfigEditor_025}`
+                  : undefined}
+              validation={validation} onUpdate={onUpdateConfig} embedded mobile hideValidation />
             </ConfigCapabilityPreview>
             {hasPreviousResult && <aside className="v2-options-content">
               <h3>{copy.optimize.pages_tool_optimize_ConfigSection_010}</h3>
@@ -225,7 +230,13 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
         {isConfig && <Popover>
           <PopoverTrigger asChild>
             <button type="button" className="v2-button v2-button-primary v2-drawer-done" aria-disabled={!validation.ok} aria-describedby={validation.ok ? undefined : 'v2-config-validation'}
-              onClick={(event) => { if (validation.ok) { event.preventDefault(); onClose() } }}><Check size={16} />{text.done}</button>
+              disabled={confirmingConfig} aria-busy={confirmingConfig}
+              onClick={(event) => {
+                if (!validation.ok) return
+                event.preventDefault()
+                if (onConfirmConfig) void onConfirmConfig().then((saved) => { if (saved) onClose() })
+                else onClose()
+              }}><Check size={16} />{confirmingConfig ? text.firstSchedule.confirming : onConfirmConfig ? text.firstSchedule.confirmConfig : text.done}</button>
           </PopoverTrigger>
           {!validation.ok && <PopoverContent side="top" align="center" role="alert" className="v2-dialog v2-config-completion-hint" onOpenAutoFocus={(event) => event.preventDefault()}>
             {validation.message}

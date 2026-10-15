@@ -29,6 +29,30 @@ describe('RouteMetadata', () => {
     expect(document.head.querySelectorAll('link[rel="canonical"]')).toHaveLength(1)
   })
 
+  it.each(['/', '/v2'])('updates V2 titles on query navigation and browser history at %s', async (pathname) => {
+    const router = createRouter(`${pathname}?section=help`)
+    render(<RouterProvider router={router} />)
+
+    await waitFor(() => expect(document.title).toBe('使用指南 | MaaTool'))
+    expect(metaByProperty('og:title')).toBe(document.title)
+    expect(metaByName('robots')).toBe('noindex, nofollow')
+
+    await act(async () => router.navigate(`${pathname}?section=pricing&profile_id=example`))
+    expect(document.title).toBe('比较价格与权益 | MaaTool')
+    expect(metaByName('twitter:title')).toBe(document.title)
+    expect(document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href).toBe(currentUrl(pathname))
+
+    await act(async () => router.navigate(-1))
+    expect(document.title).toBe('使用指南 | MaaTool')
+    await act(async () => router.navigate(1))
+    expect(document.title).toBe('比较价格与权益 | MaaTool')
+
+    await act(async () => router.navigate(`${pathname}#release-example`))
+    expect(document.title).toBe('更新日志 | MaaTool')
+    await act(async () => router.navigate(`${pathname}?section=unknown`))
+    expect(document.title).toBe(pathname === '/' ? 'MAA 基建排班优化器 | MaaTool' : '基建排班工具 | MaaTool · V2')
+  })
+
   it('keeps public information pages indexable and excludes private routes', async () => {
     const router = createRouter('/terms')
     render(<RouterProvider router={router} />)

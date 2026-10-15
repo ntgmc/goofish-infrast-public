@@ -80,7 +80,10 @@ export function useDepotValue(session?: ReturnType<typeof useToolSession>) {
   }, [applyAuthData, authLoadRevision, session?.user, session?.profiles, session?.activeProfile, session?.workspace, session?.authLoading, session?.authError])
 
   useEffect(() => {
-    if (result) drawShareCard(canvasRef.current, result)
+    if (!result) return
+    drawShareCard(canvasRef.current, result)
+    const timer = window.setTimeout(() => document.getElementById('depot-result')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+    return () => window.clearTimeout(timer)
   }, [result])
 
   const sklandProfiles = useMemo(
@@ -102,7 +105,6 @@ export function useDepotValue(session?: ReturnType<typeof useToolSession>) {
         fallbackMessage: copy.tools.pages_DepotValuePage_001,
       })
       setResult(data)
-      window.setTimeout(() => document.getElementById('depot-result')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
     } catch (caught) {
       setResult(null)
       setError((caught as Error).message)

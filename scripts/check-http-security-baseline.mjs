@@ -298,16 +298,12 @@ async function assertNoServerCorsHeaders() {
 }
 
 async function assertDeploymentDocumentation() {
-  for (const path of ['README.md']) {
-    const contents = await readFile(path, 'utf8')
-    assert(contents.includes('goofish-security-headers.conf'), `${path} should install the security header snippet`)
-    assert(contents.includes('goofish-static-files.conf'), `${path} should install the static Nginx snippet`)
-    assert(/HTTPS|TLS/i.test(contents), `${path} should limit the security snippet to TLS`)
-  }
-  for (const path of ['README.md']) {
-    const contents = await readFile(path, 'utf8')
-    assert(contents.includes('goofish-server-hardening.conf'), `${path} should install and include server hardening`)
-  }
+  const path = 'docs/nginx-deployment.md'
+  const contents = await readFile(path, 'utf8')
+  assert(contents.includes('goofish-security-headers.conf'), `${path} should install the security header snippet`)
+  assert(contents.includes('goofish-static-files.conf'), `${path} should install the static Nginx snippet`)
+  assert(/HTTPS|TLS/i.test(contents), `${path} should limit the security snippet to TLS`)
+  assert(contents.includes('goofish-server-hardening.conf'), `${path} should install and include server hardening`)
 }
 
 async function assertNoRawRequestParsing() {

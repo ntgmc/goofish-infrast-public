@@ -17,3 +17,4 @@ Mappings were checked against `Kengxxiao/ArknightsGameData`:
 | Battle Record (tier 3) | 2003 | sprite_exp_card_t3.png |
 | Originium Shard | 3141 | MTL_DIAMOND_SHD.png |
 | Orirock Cube | 30012 | MTL_SL_G2.png |
+| Sanity | AP_GAMEPLAY | AP_GAMEPLAY.png |

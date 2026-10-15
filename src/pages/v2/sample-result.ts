@@ -1,113 +1,39 @@
-import { copy } from '../../copy'
+import buildingSkills from '../../data/building-skills.json'
 import { CONFIG_PRESETS, normalizeConfig } from '../../lib/config'
-import type { LicenseOperator, OptimizeResult, ShiftRoom } from '../../lib/types'
+import type { LicenseOperator, OptimizeResult } from '../../lib/types'
+import sampleResult from './sample-result.json'
 
-const names = copy.v2.sampleOperators
-const operatorEntries: Array<[keyof typeof names, string]> = [
-  ['silverash', 'char_172_svrash'], ['degenbrecher', 'char_4116_blkkgt'],
-  ['gnosis', 'char_206_gnosis'], ['proviso', 'char_4032_provs'],
-  ['tequila', 'char_486_takila'], ['shamare', 'char_254_vodfox'],
-  ['exusiai', 'char_103_angel'], ['texas', 'char_102_texas'],
-  ['lappland', 'char_140_whitew'], ['arene', 'char_271_spikes'],
-  ['steward', 'char_502_nblade'], ['midnight', 'char_283_midn'],
-  ['dorothy', 'char_4048_doroth'], ['ptilopsis', 'char_128_plosis'],
-  ['silence', 'char_108_silent'], ['vermeil', 'char_190_clour'],
-  ['scene', 'char_336_folivo'], ['ceobe', 'char_2013_cerber'],
-  ['gravel', 'char_237_gravel'], ['spot', 'char_284_spot'],
-  ['haze', 'char_141_nights'], ['weedy', 'char_400_weedy'],
-  ['passenger', 'char_472_pasngr'], ['eunectes', 'char_416_zumama'],
-  ['frostleaf', 'char_193_frostl'], ['vigna', 'char_290_vigna'],
-  ['shirayuki', 'char_118_yuki'], ['conviction', 'char_159_peacok'],
-  ['castle', 'char_286_cast3'], ['wildmane', 'char_496_wildmn'],
-  ['amiya', 'char_002_amiya'], ['kaltsit', 'char_003_kalts'],
-  ['mlynar', 'char_4064_mlynar'], ['siege', 'char_112_siege'],
-  ['chen', 'char_010_chen'], ['greyy', 'char_253_greyy'],
-  ['liskarm', 'char_107_liskam'], ['ifrit', 'char_134_ifrit'],
-  ['mostima', 'char_213_mostma'], ['indigo', 'char_469_indigo'],
-  ['lumen', 'char_4042_lumen'], ['fiammetta', 'char_300_phenxi'],
+export const SAMPLE_RESULT = sampleResult as unknown as OptimizeResult
+
+const operatorEntries: Array<[keyof typeof buildingSkills.operators, number, number]> = [
+  ['char_4032_provs', 2, 4], ['char_112_siege', 2, 5], ['char_4065_judge', 2, 5],
+  ['char_249_mlyss', 2, 5], ['char_1027_greyy2', 2, 4], ['char_4186_tmoris', 2, 4],
+  ['char_4179_monstr', 2, 5], ['char_002_amiya', 2, 4], ['char_322_lmlee', 2, 5],
+  ['char_4110_delphn', 2, 4], ['char_4194_rmixer', 2, 5], ['char_4036_forcer', 2, 4],
+  ['char_154_morgan', 2, 4], ['char_4228_closur', 2, 5], ['char_427_vigil', 2, 5],
+  ['char_300_phenxi', 2, 5], ['char_128_plosis', 2, 4], ['char_4048_doroth', 1, 5],
+  ['char_108_silent', 2, 4], ['char_248_mgllan', 2, 5], ['char_242_otter', 0, 4],
+  ['char_180_amgoat', 2, 5], ['char_253_greyy', 2, 3], ['char_4182_oblvns', 2, 5],
+  ['char_4087_ines', 2, 5], ['char_290_vigna', 2, 3], ['char_193_frostl', 2, 3],
+  ['char_163_hpsts', 2, 4], ['char_381_bubble', 2, 3], ['char_003_kalts', 2, 5],
+  ['char_308_swire', 2, 4], ['char_1048_orchd2', 2, 5], ['char_010_chen', 2, 5],
+  ['char_4063_quartz', 2, 3], ['char_214_kafka', 2, 4], ['char_400_weedy', 2, 5],
+  ['char_385_finlpp', 2, 3], ['char_4208_wintim', 2, 3], ['char_243_waaifu', 2, 4],
+  ['char_446_aroma', 2, 4], ['char_159_peacok', 2, 3], ['char_1051_headb2', 2, 5],
+  ['char_118_yuki', 2, 3], ['char_190_clour', 2, 3], ['char_336_folivo', 2, 4],
+  ['char_1031_slent2', 2, 5], ['char_4062_totter', 2, 3], ['char_486_takila', 2, 4],
+  ['char_254_vodfox', 2, 4], ['char_141_nights', 2, 3], ['char_437_mizuki', 2, 5],
+  ['char_4066_highmo', 2, 4], ['char_241_panda', 0, 4], ['char_4203_kichi', 0, 4],
+  ['char_4015_spuria', 0, 4], ['char_145_prove', 0, 4],
 ]
 
-export const SAMPLE_OPERATORS: LicenseOperator[] = operatorEntries.map(([key, id]) => ({
-  id, name: names[key], own: true, elite: 2, rarity: 5,
+export const SAMPLE_OPERATORS: LicenseOperator[] = operatorEntries.map(([id, elite, rarity]) => ({
+  id, name: buildingSkills.operators[id].name, own: true, elite, rarity,
 }))
 
 export const SAMPLE_CONFIG = normalizeConfig({
-  ...CONFIG_PRESETS['243'],
-  shift_hours: [8, 8, 8],
-  Fiammetta: { enable: false },
+  ...CONFIG_PRESETS['252-1'],
+  facility_layout: SAMPLE_RESULT.facility_layout,
+  shift_hours: SAMPLE_RESULT.shift_hours,
+  drones: { enable: true, auto: true, auto_strategy: 'inventory_balance', order: 'pre', targets: ['Pure Gold', 'Pure Gold', 'Pure Gold'] },
 })
-
-function room(keys: Array<keyof typeof names>, efficiency: number, product?: string): ShiftRoom {
-  return { operators: keys.map((key) => names[key]), level: keys.includes('amiya') ? 5 : 3, efficiency, product }
-}
-
-// These fixed example plans illustrate the interface; they are never presented as a computed personal result.
-export const SAMPLE_RESULT: OptimizeResult = {
-  author: copy.v2.brand,
-  title: copy.v2.sampleHistory,
-  description: copy.v2.sampleNotice,
-  buildingType: 243,
-  planTimes: '8h-8h-8h',
-  schedule_mode: 'maa',
-  shift_hours: [8, 8, 8],
-  total_schedule_hours: 24,
-  total_efficiency: 1536,
-  raw_results: [],
-  daily_production: {
-    hours: 24,
-    manufacturing: { 'Pure Gold': 112, 'Battle Record': 32.4 },
-    trading: { LMD: 54720 },
-    consumption: { 'Pure Gold': 109.44 },
-    net: { 'Pure Gold': 2.56 },
-  },
-  plans: [
-    {
-      name: copy.v2.shift(1), shift_hours: 8,
-      rooms: {
-        trading: [room(['silverash', 'degenbrecher', 'gnosis'], 140, 'LMD'), room(['shamare', 'tequila', 'proviso'], 162, 'LMD')],
-        manufacture: [
-          room(['dorothy', 'ptilopsis', 'silence'], 125, 'Pure Gold'),
-          room(['vermeil', 'scene', 'ceobe'], 110, 'Pure Gold'),
-          room(['weedy', 'passenger', 'eunectes'], 145, 'Battle Record'),
-          room(['frostleaf', 'vigna', 'shirayuki'], 95, 'Battle Record'),
-        ],
-        control: [room(['amiya', 'kaltsit', 'mlynar', 'siege', 'chen'], 0)],
-        power: [room(['greyy'], 20), room(['liskarm'], 20), room(['ifrit'], 15)],
-        dormitory: [{ level: 5, autofill: true, operators: [] }],
-      },
-      drones: { enable: true, room: 'trading', index: 2, order: 'pre', mode: 'auto' },
-    },
-    {
-      name: copy.v2.shift(2), shift_hours: 8,
-      rooms: {
-        trading: [room(['exusiai', 'texas', 'lappland'], 100, 'LMD'), room(['arene', 'steward', 'midnight'], 90, 'LMD')],
-        manufacture: [
-          room(['gravel', 'spot', 'haze'], 95, 'Pure Gold'),
-          room(['dorothy', 'ptilopsis', 'silence'], 125, 'Pure Gold'),
-          room(['conviction', 'castle', 'wildmane'], 100, 'Battle Record'),
-          room(['vermeil', 'scene', 'ceobe'], 110, 'Battle Record'),
-        ],
-        control: [room(['amiya', 'kaltsit', 'mlynar', 'siege', 'chen'], 0)],
-        power: [room(['mostima'], 20), room(['indigo'], 15), room(['lumen'], 15)],
-        dormitory: [{ level: 5, autofill: true, operators: [] }],
-      },
-      drones: { enable: true, room: 'trading', index: 1, order: 'pre', mode: 'auto' },
-    },
-    {
-      name: copy.v2.shift(3), shift_hours: 8,
-      rooms: {
-        trading: [room(['silverash', 'degenbrecher', 'gnosis'], 140, 'LMD'), room(['shamare', 'tequila', 'proviso'], 162, 'LMD')],
-        manufacture: [
-          room(['weedy', 'passenger', 'eunectes'], 145, 'Pure Gold'),
-          room(['gravel', 'spot', 'haze'], 95, 'Pure Gold'),
-          room(['frostleaf', 'vigna', 'shirayuki'], 95, 'Battle Record'),
-          room(['conviction', 'castle', 'wildmane'], 100, 'Battle Record'),
-        ],
-        control: [room(['amiya', 'kaltsit', 'mlynar', 'siege', 'chen'], 0)],
-        power: [room(['greyy'], 20), room(['liskarm'], 20), room(['ifrit'], 15)],
-        dormitory: [{ level: 5, autofill: true, operators: [] }],
-      },
-      drones: { enable: true, room: 'trading', index: 2, order: 'pre', mode: 'auto' },
-    },
-  ],
-}

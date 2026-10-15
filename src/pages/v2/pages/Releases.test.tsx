@@ -62,10 +62,9 @@ it('loads ten versions at a time, selects locally, and restores selection throug
 it('opens an old release directly and keeps its anchor when normalizing the page', async () => {
   mount('/v2?section=updates#release-v2.0.1016')
   await screen.findByRole('heading', { name: 'v2.0.1016' })
-  expect(screen.getByTestId('location')).toHaveTextContent('/v2?section=updates&page=2#release-v2.0.1016')
+  await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/v2?section=updates&page=2#release-v2.0.1016'))
   expect(screen.queryByText('v2.0.1028')).not.toBeInTheDocument()
-  expect(mocks.api).toHaveBeenCalledTimes(1)
-  expect(mocks.api.mock.calls[0][0]).toBe('/api/changelog?page=1&release=v2.0.1016')
+  expect(mocks.api).toHaveBeenCalledExactlyOnceWith('/api/changelog?page=1&release=v2.0.1016', expect.anything())
 })
 
 it('ignores an earlier response after navigation changes the requested page', async () => {

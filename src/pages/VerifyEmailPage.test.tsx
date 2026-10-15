@@ -6,10 +6,12 @@ import userEvent from '@testing-library/user-event'
 import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import VerifyEmailPage from './VerifyEmailPage'
+import { FIRST_SCHEDULE_INTENT_KEY } from '../lib/first-schedule'
 
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  window.localStorage.removeItem(FIRST_SCHEDULE_INTENT_KEY)
 })
 
 describe('VerifyEmailPage', () => {
@@ -34,6 +36,16 @@ describe('VerifyEmailPage', () => {
     expect(await screen.findByText('邮箱验证成功，正在进入工作台。')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith('/api/auth/verify-email', expect.objectContaining({ method: 'POST' }))
     expect(await screen.findByText('账号工作台')).toBeInTheDocument()
+  })
+
+  it('resumes the first schedule after registration is verified in another tab', async () => {
+    window.localStorage.setItem(FIRST_SCHEDULE_INTENT_KEY, 'true')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(successResponse()))
+    render(<MemoryRouter initialEntries={['/verify-email?token=first-schedule-token']}><Routes>
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/v2" element={<div>继续生成第一份排班</div>} />
+    </Routes></MemoryRouter>)
+    expect(await screen.findByText('继续生成第一份排班')).toBeInTheDocument()
   })
 
   it('shares one in-flight POST across StrictMode effect replay', async () => {

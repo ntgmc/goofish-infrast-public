@@ -66,6 +66,55 @@ describe('useResultDownloads', () => {
 
     expect(requestMaaExport).not.toHaveBeenCalled()
     expect(options.setWorkspaceError).toHaveBeenCalledWith(copy.inventory.maa_export_coupon_unavailable)
+    expect(result.current.exportFailure).toMatchObject({ format: 'maa', resultId: 'result-1', error: { code: 'maa_export_coupon_required' } })
+  })
+
+  it('reports declaration errors for the requested export without making a download request', async () => {
+    const { result } = renderDownloads({ guardExport: async (_run, onError) => onError('声明状态加载失败') })
+    await act(async () => { await result.current.downloadFullResult('result-1') })
+    expect(result.current.exportFailure).toMatchObject({ format: 'full', resultId: 'result-1', error: { message: '声明状态加载失败' } })
+    expect(requestFullResultExport).not.toHaveBeenCalled()
+  })
+
+  it('clears a full-result failure after retrying the same request successfully', async () => {
+    requestFullResultExport.mockRejectedValueOnce(new Error('完整数据下载失败')).mockResolvedValueOnce(undefined)
+    const { result } = renderDownloads()
+    await act(async () => { await result.current.downloadFullResult('result-1') })
+    expect(result.current.exportFailure).toMatchObject({ format: 'full', resultId: 'result-1', error: { message: '完整数据下载失败' } })
+    await act(async () => { await result.current.downloadFullResult('result-1') })
+    expect(requestFullResultExport.mock.calls[1]?.[2]).toBe(requestFullResultExport.mock.calls[0]?.[2])
+    expect(result.current.exportFailure).toBeNull()
+  })
+
+  it('reports missing saved results instead of silently ignoring the download', async () => {
+    const { result } = renderDownloads()
+    await act(async () => { await result.current.downloadFullResult(undefined) })
+    expect(result.current.exportFailure).toMatchObject({ format: 'full', error: { code: 'result_not_found' } })
+    expect(requestFullResultExport).not.toHaveBeenCalled()
+  })
+
+  it('does not attach a previous profile’s delayed failure to the new profile', async () => {
+    let reject!: (error: Error) => void
+    requestFullResultExport.mockImplementationOnce(() => new Promise((_resolve, rejectRequest) => { reject = rejectRequest }))
+    const { options, result, rerender } = renderDownloads()
+    let pending!: Promise<void>
+    act(() => { pending = result.current.downloadFullResult('result-1') })
+    await act(async () => { await Promise.resolve() })
+    options.profileId = 'profile-2'
+    rerender()
+    await act(async () => { reject(new Error('Old profile failed')); await pending })
+    expect(result.current.exportFailure).toBeNull()
+    expect(options.setWorkspaceError).not.toHaveBeenCalledWith('Old profile failed')
+  })
+
+  it('does not report a successful coupon export as failed when refreshing inventory fails', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    requestMaaExport.mockResolvedValueOnce({ consumed_coupon: true })
+    const { options, result } = renderDownloads({ maaExportCouponBalance: 1, refreshInventory: vi.fn().mockRejectedValue(new Error('库存刷新失败')) })
+    await act(async () => { await result.current.downloadMaaResult('result-1') })
+    expect(result.current.exportFailure).toBeNull()
+    expect(options.setWorkspaceNotice).toHaveBeenCalledWith(copy.inventory.maa_export_coupon_consumed)
+    expect(requestMaaExport).toHaveBeenCalledOnce()
   })
 
   it('reuses the pending key after an unknown outcome and refreshes inventory after consumption', async () => {
@@ -74,14 +123,19 @@ describe('useResultDownloads', () => {
       .mockRejectedValueOnce(new Error('network outcome unknown'))
       .mockResolvedValueOnce({ consumed_coupon: true })
     const refreshInventory = vi.fn()
-    const { options, result } = renderDownloads({
+    const { options, result, rerender } = renderDownloads({
       maaExportCouponBalance: 2,
       refreshInventory,
     })
 
     await act(async () => { await result.current.downloadMaaResult('result-1') })
+    expect(result.current.exportFailure).toMatchObject({ format: 'maa', resultId: 'result-1', error: { message: 'network outcome unknown' } })
+    options.maaExportCouponBalance = 0
+    rerender()
     await act(async () => { await result.current.downloadMaaResult('result-1') })
+    expect(result.current.exportFailure).toBeNull()
 
+    expect(window.confirm).toHaveBeenCalledOnce()
     expect(window.confirm).toHaveBeenCalledWith(copy.inventory.maa_export_coupon_confirm(2))
     expect(requestMaaExport).toHaveBeenCalledTimes(2)
     expect(requestMaaExport.mock.calls[1]?.[2].idempotencyKey).toBe(

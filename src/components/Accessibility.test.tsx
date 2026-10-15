@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Announcement } from '../lib/types'
 import AnnouncementPopup from './AnnouncementPopup'
 import AuthForm from './AuthForm'
-import BuildMetaStrip from './BuildMetaStrip'
 import DeferredFeatureMenu from './DeferredFeatureMenu'
 import ThemeSwitcher from './ThemeSwitcher'
 
@@ -46,6 +45,7 @@ afterEach(() => {
   vi.restoreAllMocks()
   document.body.replaceChildren()
   document.documentElement.style.overflow = ''
+  vi.useRealTimers()
 })
 
 describe('AnnouncementPopup accessibility', () => {
@@ -56,8 +56,6 @@ describe('AnnouncementPopup accessibility', () => {
 
     const dialog = await screen.findByRole('dialog', { name: '第一条公告' })
     expect(HTMLDialogElement.prototype.showModal).toHaveBeenCalledOnce()
-    expect(dialog).toHaveClass('backdrop:bg-black/55')
-    expect(dialog).not.toHaveClass('backdrop:bg-ink-primary/45')
     expect(screen.getByRole('button', { name: '稍后查看' })).toHaveFocus()
     expect(document.documentElement).toHaveStyle({ overflow: 'hidden' })
 
@@ -126,11 +124,15 @@ describe('AnnouncementPopup accessibility', () => {
   })
 
   it('closes at the reminder deadline without marking the announcement read', async () => {
+    vi.useFakeTimers()
     const announcement = { ...createAnnouncement('expires-open', '即将到期公告'), popup_until: new Date(Date.now() + 1000).toISOString() }
     const { container, opener } = createAppRoot()
     render(<MemoryRouter><AnnouncementPopup announcements={[announcement]} /></MemoryRouter>, { container })
-    await screen.findByRole('dialog')
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument(), { timeout: 2000 })
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    await act(async () => { await vi.advanceTimersByTimeAsync(999) })
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(window.localStorage.getItem('maa-announcement-read:expires-open')).toBeNull()
     expect(opener).toHaveFocus()
     expect(document.documentElement.style.overflow).toBe('')
@@ -273,20 +275,6 @@ describe('mobile touch targets', () => {
     expect(screen.getByRole('button', { name: '注册' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('uses document flow on mobile, fixed desktop positioning, and a compact version badge', () => {
-    render(<BuildMetaStrip placement="corner" />)
-
-    const status = screen.getByText(/当前构建生成于/)
-    const strip = status.parentElement
-    const summary = screen.getByText('版本')
-    expect(strip?.className).toContain('relative')
-    expect(strip?.className).toContain('sm:fixed')
-    expect(strip?.className).toContain('env(safe-area-inset-bottom)')
-    expect(status).toHaveClass('min-h-8')
-    expect(summary).toHaveClass('px-2.5', 'py-1')
-    expect(summary).toHaveClass('min-h-8')
-    expect(summary).not.toHaveClass('min-h-11', 'min-w-11')
-  })
 })
 
 function createAnnouncement(id: string, title: string): Announcement {

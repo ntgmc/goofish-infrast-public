@@ -1,3 +1,4 @@
+import { ArrowLeft, RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { copy } from '../copy'
 import { apiJson, getApiErrorMessage } from '../lib/api-client'
@@ -33,7 +34,10 @@ export default function FeedbackHistory({ initialId, onBusyChange }: { initialId
     {(selected ? thread.error : listError) && <p role="alert" className="tool-alert tool-alert--error">{selected ? thread.error : listError}</p>}
     {(selected ? thread.loading : listLoading) && <p role="status" className="feedback-hint">{text.loading}</p>}
     {selected ? <>
-      <div className="flex flex-wrap justify-between gap-2"><button type="button" className="feedback-action" disabled={thread.saving} onClick={() => { setSelected(null); setReply(''); setNotice(null) }}>{text.backToList}</button><button type="button" className="feedback-action" disabled={thread.loading || thread.saving} onClick={() => { setNotice(null); void thread.refresh() }}>{text.refresh}</button></div>
+      <div className="feedback-history-toolbar">
+        <button type="button" className="feedback-action feedback-action-quiet" disabled={thread.saving} onClick={() => { setSelected(null); setReply(''); setNotice(null) }}><ArrowLeft size={16} aria-hidden="true" />{text.backToList}</button>
+        <button type="button" className="feedback-action" aria-busy={thread.loading} disabled={thread.loading || thread.saving} onClick={() => { setNotice(null); void thread.refresh() }}><RefreshCw size={16} aria-hidden="true" className={thread.loading ? 'feedback-refresh-icon--loading' : undefined} />{text.refresh}</button>
+      </div>
       {feedback && <>
         <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">{text.categories[feedback.category]}</h2><span className="tool-status">{text.statuses[feedback.status]}</span></div>
         {feedback.result && <div className="feedback-result"><h3 className="text-sm font-semibold">{text.result}</h3><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7">{feedback.result}</p></div>}
@@ -46,7 +50,10 @@ export default function FeedbackHistory({ initialId, onBusyChange }: { initialId
         </form>
       </>}
     </> : <>
-      <button type="button" className="feedback-action self-end" disabled={listLoading} onClick={() => setRevision((value) => value + 1)}>{text.refresh}</button>
+      <div className="feedback-history-toolbar">
+        <h2 className="feedback-history-heading">{text.myFeedback}</h2>
+        <button type="button" className="feedback-action" aria-busy={listLoading} disabled={listLoading} onClick={() => setRevision((value) => value + 1)}><RefreshCw size={16} aria-hidden="true" className={listLoading ? 'feedback-refresh-icon--loading' : undefined} />{text.refresh}</button>
+      </div>
       {list?.items.length === 0 && <p className="py-5 text-sm leading-7 text-ink-secondary">{text.myEmpty}</p>}
       <ul className="divide-y divide-surface-3">{list?.items.map((item) => <li key={item.id}><button type="button" className="feedback-list-item" onClick={() => { setSelected(item.id); setNotice(null) }}><span className="flex flex-wrap justify-between gap-2"><strong>{text.categories[item.category]}</strong><span className="tool-status">{text.statuses[item.status]}</span></span><span className="mt-2 block line-clamp-2 break-words leading-6">{item.message}</span><time dateTime={item.updated_at} className="mt-2 block text-xs text-ink-muted">{new Date(item.updated_at).toLocaleString('zh-CN')}</time></button></li>)}</ul>
       {list && list.pagination.total_pages > 1 && <nav aria-label={text.myFeedback} className="flex flex-wrap items-center justify-between gap-2"><button type="button" className="feedback-action" disabled={listLoading || list.pagination.page <= 1} onClick={() => setPage(list.pagination.page - 1)}>{text.previousPage}</button><span className="text-xs text-ink-muted">{list.pagination.page} / {list.pagination.total_pages}</span><button type="button" className="feedback-action" disabled={listLoading || list.pagination.page >= list.pagination.total_pages} onClick={() => setPage(list.pagination.page + 1)}>{text.nextPage}</button></nav>}

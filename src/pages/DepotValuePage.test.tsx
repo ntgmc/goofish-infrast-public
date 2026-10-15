@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, renderHook, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuthMeResponse, DepotValueResponse } from '../lib/types'
-import DepotValuePage from './DepotValuePage'
+import DepotValuePage, { useDepotValue } from './DepotValuePage'
 
 const mocks = vi.hoisted(() => ({
   apiJson: vi.fn(),
@@ -30,10 +30,26 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
   vi.restoreAllMocks()
 })
 
 describe('DepotValuePage', () => {
+  it('cancels delayed result scrolling after leaving the page', async () => {
+    vi.useFakeTimers()
+    mocks.apiJsonOrNull.mockResolvedValue(authPayload())
+    mocks.apiJson.mockResolvedValue(depotResult())
+    const page = renderHook(() => useDepotValue())
+    await act(async () => { await Promise.resolve() })
+    expect(page.result.current.selectedSklandProfile?.id).toBe('profile-1')
+    await act(async () => { await page.result.current.analyzeSkland() })
+    expect(page.result.current.result).toMatchObject({ source: 'skland' })
+    const findElement = vi.spyOn(document, 'getElementById')
+    page.unmount()
+    act(() => vi.runOnlyPendingTimers())
+    expect(findElement).not.toHaveBeenCalled()
+  })
+
   it('shows auth service failures separately from logged-out state and retries', async () => {
     const user = userEvent.setup()
     mocks.apiJsonOrNull.mockRejectedValue(new TypeError('network lost'))

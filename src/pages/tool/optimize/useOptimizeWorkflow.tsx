@@ -84,7 +84,10 @@ export function useOptimizeWorkflow(props: Props) {
     flushPendingSync: flushPendingLicenseSync,
   } = useLicenseSync(profileId, license.order_hash)
 
-  const [inlineError, setInlineError] = useState<{ scope: 'generate' | 'apply'; message: string } | null>(null)
+  const [inlineError, setInlineError] = useState<{ scope: 'generate' | 'apply'; message: string; retry?: 'save' } | null>(null)
+  useEffect(() => {
+    if (configSyncStatus === 'idle') setInlineError((error) => error?.retry === 'save' ? null : error)
+  }, [configSyncStatus])
   const [configToast, setConfigToast] = useState<{ id: number; message: string } | null>(null)
   const [workspaceNotice, setWorkspaceNotice] = useState<string | null>(null)
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
@@ -132,9 +135,9 @@ export function useOptimizeWorkflow(props: Props) {
     profileId,
     onError: setWorkspaceError,
   })
-  const guardGeneratedResultExport = useCallback(async (run: () => void | Promise<void>) => {
-    await guardPersonalUseDeclaration('generated_result_export', run)
-  }, [guardPersonalUseDeclaration])
+  const guardGeneratedResultExport = useCallback(async (run: () => void | Promise<void>, onError: (message: string) => void) => {
+    await guardPersonalUseDeclaration('generated_result_export', run, profileId, onError)
+  }, [guardPersonalUseDeclaration, profileId])
 
   const permission = getPermissionMode(license)
   const userCanEditConfig = canEditConfig(license)
@@ -312,7 +315,7 @@ export function useOptimizeWorkflow(props: Props) {
     if (current() && data.workspace) onWorkspaceUpdated(profileId, data.workspace)
   }, [onWorkspaceUpdated, profileId])
 
-  const { downloadMaaResult, downloadFullResult } = useResultDownloads({
+  const { downloadMaaResult, downloadFullResult, exportFailure } = useResultDownloads({
     profileId,
     guardExport: guardGeneratedResultExport,
     canExportMaaWithoutCoupon: userCanExportMaaWithoutCoupon,
@@ -506,12 +509,19 @@ export function useOptimizeWorkflow(props: Props) {
         showConfigValidationToast(configValidationMessage)
         return
       }
-      flushConfigSave()
       optimizeInFlightRef.current = true
       setInlineError(null)
+      setLoading(true)
+      const saved = await flushConfigSave().catch(() => false)
+      if (!current()) return
+      if (!saved) {
+        setInlineError({ scope: 'generate', message: copy.optimize.generation.save_failed, retry: 'save' })
+        optimizeInFlightRef.current = false
+        setLoading(false)
+        return
+      }
       setHistoryItem(null)
       setPhase('idle')
-      setLoading(true)
       const startedAt = Date.now()
       const initialProgress: ScheduleProgressState = {
         mode: 'generate',
@@ -588,7 +598,6 @@ export function useOptimizeWorkflow(props: Props) {
       const resultId = currentResult || finalResult
         ? progress?.historyResultId ?? progress?.jobId
         : historyItem?.id ?? latestWorkspaceResult?.id
-      if (!resultId) return
       void downloadMaaResult(resultId)
     }, [currentResult, downloadMaaResult, finalResult, historyItem?.id, latestWorkspaceResult?.id, progress?.historyResultId, progress?.jobId])
 
@@ -596,7 +605,6 @@ export function useOptimizeWorkflow(props: Props) {
       const resultId = currentResult || finalResult
         ? progress?.historyResultId ?? progress?.jobId
         : historyItem?.id ?? latestWorkspaceResult?.id
-      if (!resultId) return
       void downloadFullResult(resultId)
     }, [currentResult, downloadFullResult, finalResult, historyItem?.id, latestWorkspaceResult?.id, progress?.historyResultId, progress?.jobId])
 
@@ -627,5 +635,5 @@ export function useOptimizeWorkflow(props: Props) {
       }
     }, [isPreviewProfile, onProfileUpgraded, profileId, upgradeCdk, upgradeLoading])
 
-  return { license, progress, profile, onReset, announcement, redeemedNotice, permission, billingQuote, billingQuoteLoading, billingQuoteError, refreshBillingQuote: loadBillingQuote, addOnQuoteRequired, incrementalBillingQuote, incrementalBillingQuoteLoading, incrementalBillingQuoteError, refreshIncrementalBillingQuote, scenarioQuoteRequired, scenarioCouponRequired, scenarioBillingQuote, scenarioBillingQuoteLoading, scenarioBillingQuoteError, refreshScenarioBillingQuote, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk: handleUpgradeCdkChange, upgradeLoading, upgradeError, priorityCouponBalance, priorityCouponLoading, priorityCouponError, refreshRewardBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, inventoryLoaded, inventoryLoading, inventoryError, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, refreshInventory, isPreviewProfile, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userCanDownloadFullResult, userCanViewFullData, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults, resultHistoryHasMore, archivedResultsHasMore, resultHistoryLoadingScope, resultHistoryError, loadMoreResultHistory, loadMoreArchivedResults, latestWorkspaceResult, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleRenameArchivedHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleGenerate, handleIncrementalRecompute, handleDownloadMAA, handleDownloadFullResult, handleUpgradePreviewProfile, declarationDialog }
+  return { license, progress, profile, onReset, announcement, redeemedNotice, permission, billingQuote, billingQuoteLoading, billingQuoteError, refreshBillingQuote: loadBillingQuote, addOnQuoteRequired, incrementalBillingQuote, incrementalBillingQuoteLoading, incrementalBillingQuoteError, refreshIncrementalBillingQuote, scenarioQuoteRequired, scenarioCouponRequired, scenarioBillingQuote, scenarioBillingQuoteLoading, scenarioBillingQuoteError, refreshScenarioBillingQuote, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk: handleUpgradeCdkChange, upgradeLoading, upgradeError, priorityCouponBalance, priorityCouponLoading, priorityCouponError, refreshRewardBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, inventoryLoaded, inventoryLoading, inventoryError, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, refreshInventory, isPreviewProfile, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userCanDownloadFullResult, userCanViewFullData, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults, resultHistoryHasMore, archivedResultsHasMore, resultHistoryLoadingScope, resultHistoryError, loadMoreResultHistory, loadMoreArchivedResults, latestWorkspaceResult, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleRenameArchivedHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleGenerate, handleIncrementalRecompute, handleDownloadMAA, handleDownloadFullResult, exportFailure, handleUpgradePreviewProfile, declarationDialog }
 }

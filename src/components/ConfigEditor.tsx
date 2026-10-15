@@ -247,6 +247,7 @@ interface ConfigEditorProps {
   hideHeader?: boolean;
   hidePresetActions?: boolean;
   hideValidation?: boolean;
+  mobile?: boolean;
 }
 
 export default function ConfigEditor({
@@ -266,6 +267,7 @@ export default function ConfigEditor({
   hideHeader = false,
   hidePresetActions = false,
   hideValidation = false,
+  mobile = false,
 }: ConfigEditorProps) {
   const canUseIntermediateInventory = canEdit || Boolean(canEditIntermediateInventory)
   const autoInventoryOnly = !canEdit && canUseIntermediateInventory
@@ -289,6 +291,8 @@ export default function ConfigEditor({
   const showOrundumPlanning =
     (config.product_requirements.trading_stations.Orundum ?? 0) > 0 ||
     (config.product_requirements.manufacturing_stations['Originium Shard'] ?? 0) > 0
+  const preset = findConfigPreset(config)
+  const presetDifferences = preset ? getPresetDifferences(config, preset.preset) : [copy.v2.configCustomPreset]
 
   const applyPreset = (preset: LicenseConfig) => {
     onUpdate((next) => {
@@ -386,7 +390,7 @@ export default function ConfigEditor({
   }
 
   return (
-<fieldset disabled={readOnly} className={`config-editor min-w-0 ${embedded ? '' : 'tool-panel p-5 sm:p-6'}`} aria-label={copy.common.components_ConfigEditor_021}>
+<fieldset disabled={readOnly} className={`config-editor min-w-0 ${mobile ? 'config-editor--mobile' : ''} ${embedded ? '' : 'tool-panel p-5 sm:p-6'}`} aria-label={copy.common.components_ConfigEditor_021}>
       {readOnly && <p className="tool-alert tool-alert--info mb-4" role="status">{copy.common.configGenerationReadOnly}</p>}
       {!hideHeader && (
 <div className="config-editor-header flex flex-col gap-4 border-b border-surface-3/60 pb-5">
@@ -406,11 +410,43 @@ export default function ConfigEditor({
                 : `${copy.common.components_ConfigEditor_027}${permission ? PERMISSION_LABELS[permission] : copy.common.components_ConfigEditor_029}${copy.common.components_ConfigEditor_028}`)}
           </p>
         </div>
-        {!hidePresetActions && (canEdit || canSelectPreset) && (
-          <PresetActions onSelect={applyPreset} autoInventoryOnly={autoInventoryOnly} />
+        {!mobile && !hidePresetActions && (canEdit || canSelectPreset) && (
+          <PresetActions onSelect={applyPreset} autoInventoryOnly={autoInventoryOnly} selectedId={preset?.id} />
         )}
       </div>
       )}
+
+      {mobile && <MobileConfigEssentials
+        config={config}
+        canEdit={canEdit}
+        canEditFixedShiftHours={canEditFixedShiftHours}
+        canSelectPreset={canSelectPreset}
+        autoInventoryOnly={autoInventoryOnly}
+        rotationMode={rotationMode}
+        variableShiftMode={variableShiftMode}
+        isScheduleModeSelected={isScheduleModeSelected}
+        onChangeMode={(mode) => onUpdate((next) => {
+          next.schedule_mode = mode
+          applyCounts(next)
+        })}
+        preset={preset}
+        differences={presetDifferences}
+        onSelectPreset={applyPreset}
+        onSelectVariable={() => onUpdate((next) => {
+          next.schedule_mode = 'variable'
+          next.shift_hours = [8, 8, 8]
+          next.Fiammetta = { ...(next.Fiammetta ?? { enable: false }), enable: false }
+          next.variable_shift_schedule = { ...(next.variable_shift_schedule ?? {}), ...VARIABLE_SHIFT_SCHEDULE_DEFAULTS }
+          applyCounts(next)
+        })}
+        onChangeHours={(hours) => onUpdate((next) => {
+          next.schedule_mode = 'maa'
+          next.shift_hours = hours
+          if (!isFiammettaShiftHoursSupported(hours)) next.Fiammetta = { ...(next.Fiammetta ?? { enable: false }), enable: false }
+          next.variable_shift_schedule = { ...(next.variable_shift_schedule ?? {}), enable: false, enabled: false }
+          applyCounts(next)
+        })}
+      />}
 
       {supported252PresetSelected && (
         <FacilityLayoutEditor key={JSON.stringify([profileId, config.trading_station_levels, config.manufacturing_station_levels])} profileId={profileId} config={config} readOnly={readOnly} onUpdate={onUpdate} />
@@ -420,6 +456,13 @@ export default function ConfigEditor({
           {copy.common.components_ConfigEditor_109}
         </p>
       )}
+
+      <details className={`config-more-details ${mobile ? '' : 'config-more-details--desktop'}`} open={!mobile || !validation.ok || presetDifferences.length > 0}>
+        {mobile && <summary>
+          <span>{copy.v2.configMoreDetails}</span>
+          <small>{copy.v2.configMoreDetailsHint}</small>
+          {presetDifferences.length > 0 && <strong>{copy.v2.configChangedFromPreset}</strong>}
+        </summary>}
 
       {supported252PresetSelected && !canEdit && !autoInventoryOnly ? (
         <div className="pt-5">
@@ -436,7 +479,7 @@ export default function ConfigEditor({
             <p className="mt-1 text-sm leading-6 text-ink-secondary">
               {copy.common.components_ConfigEditor_034}</p>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div>
+              {!mobile && <div>
                 <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_038}</p>
                 <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label={copy.common.components_ConfigEditor_039}>
                   {(['maa', 'rotation'] as const).map((mode) => (
@@ -472,7 +515,7 @@ export default function ConfigEditor({
                       applyCounts(next)
                     })} />
                 </div>}
-              </div>
+              </div>}
               <div>
                 <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_040}</p>
                 <div className="config-dormitory-rules tool-inset grid gap-2 p-1 sm:grid-cols-3" role="group" aria-label={copy.common.components_ConfigEditor_041}>
@@ -645,7 +688,7 @@ export default function ConfigEditor({
                 </details>
               </section>
             )}
-            <section aria-labelledby="config-schedule-heading" className="min-w-0 space-y-5 border-l-2 border-border bg-surface-2/50 px-4 py-4 sm:px-5">
+            {!mobile && <section aria-labelledby="config-schedule-heading" className="min-w-0 space-y-5 border-l-2 border-border bg-surface-2/50 px-4 py-4 sm:px-5">
               <div>
                 <h4 id="config-schedule-heading" className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-primary">
                   <CalendarClock aria-hidden="true" className="h-4 w-4 shrink-0 text-brand-500" />
@@ -678,7 +721,7 @@ export default function ConfigEditor({
                     : copy.common.components_ConfigEditor_095}
                 </p>
               </div>
-              {!rotationMode && (
+              {!mobile && !rotationMode && (
                 <ShiftHoursEditor
                   value={config.shift_hours}
                   variableMode={variableShiftMode}
@@ -709,7 +752,7 @@ export default function ConfigEditor({
                   })}
                 />
             )}
-            </section>
+            </section>}
             <section aria-labelledby="config-dormitory-heading" className="min-w-0 border-l-2 border-border bg-surface-2/50 px-4 py-4 sm:px-5">
               <h4 id="config-dormitory-heading" className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-primary">
                 <BedDouble aria-hidden="true" className="h-4 w-4 shrink-0 text-primary" />
@@ -875,6 +918,7 @@ export default function ConfigEditor({
         </div>
       </div>
       )}
+      </details>
       {validationMessage && (
         <p className="tool-alert tool-alert--warning mt-4" role="alert">{validationMessage}</p>
       )}
@@ -882,13 +926,153 @@ export default function ConfigEditor({
   )
 }
 
+type ConfigPresetMatch = { id: string; preset: LicenseConfig }
+
+function findConfigPreset(config: LicenseConfig): ConfigPresetMatch | null {
+  const entries = Object.entries(CONFIG_PRESETS)
+  const exact = entries.find(([, preset]) => presetFoundationMatches(config, preset) && productCountsMatch(config, preset))
+  const base = exact ?? entries.find(([, preset]) => presetFoundationMatches(config, preset))
+  return base ? { id: base[0], preset: base[1] } : null
+}
+
+function presetFoundationMatches(config: LicenseConfig, preset: LicenseConfig): boolean {
+  return config.layout === preset.layout
+    && config.trading_stations_count === preset.trading_stations_count
+    && config.manufacturing_stations_count === preset.manufacturing_stations_count
+    && numberArraysMatch(config.trading_station_levels, preset.trading_station_levels)
+    && numberArraysMatch(config.manufacturing_station_levels, preset.manufacturing_station_levels)
+}
+
+function productCountsMatch(config: LicenseConfig, preset: LicenseConfig): boolean {
+  return recordsMatch(config.product_requirements.trading_stations, preset.product_requirements.trading_stations)
+    && recordsMatch(config.product_requirements.manufacturing_stations, preset.product_requirements.manufacturing_stations)
+}
+
+function numberArraysMatch(actual: number[] | undefined, expected: number[] | undefined): boolean {
+  if (!actual && !expected) return true
+  return actual?.length === expected?.length && actual?.every((value, index) => value === expected?.[index]) === true
+}
+
+function recordsMatch(actual: Record<string, number> | undefined, expected: Record<string, number> | undefined): boolean {
+  const keys = new Set([...Object.keys(actual ?? {}), ...Object.keys(expected ?? {})])
+  return [...keys].every((key) => (actual?.[key] ?? 0) === (expected?.[key] ?? 0))
+}
+
+function getPresetDifferences(config: LicenseConfig, preset: LicenseConfig): string[] {
+  const differences: string[] = []
+  if (!presetFoundationMatches(config, preset)) differences.push(copy.common.components_ConfigEditor_042)
+  if (!productCountsMatch(config, preset)) differences.push(copy.common.components_ConfigEditor_048)
+  if (normalizeScheduleMode(config.schedule_mode) !== normalizeScheduleMode(preset.schedule_mode)) differences.push(copy.common.components_ConfigEditor_060)
+  const shiftHours = parseShiftHours(config.shift_hours) ?? [8, 8, 8]
+  const presetShiftHours = parseShiftHours(preset.shift_hours) ?? [8, 8, 8]
+  if (!numberArraysMatch(shiftHours, presetShiftHours)) differences.push(copy.common.components_ConfigEditor_086)
+  if (normalizeDormitoryRule(config.dormitory_rule) !== normalizeDormitoryRule(preset.dormitory_rule)) differences.push(copy.common.components_ConfigEditor_063)
+  if ((config.Fiammetta?.enable ?? false) !== (preset.Fiammetta?.enable ?? false)) differences.push(copy.common.components_ConfigEditor_068)
+  if (!dronePoliciesMatch(config, preset)) differences.push(copy.common.components_ConfigEditor_071)
+  return differences
+}
+
+function dronePoliciesMatch(config: LicenseConfig, preset: LicenseConfig): boolean {
+  const actual = config.drones
+  const expected = preset.drones
+  return (actual?.enable ?? false) === (expected?.enable ?? false)
+    && (actual?.auto ?? false) === (expected?.auto ?? false)
+    && (actual?.order ?? 'pre') === (expected?.order ?? 'pre')
+    && ((actual?.auto ?? false) && (expected?.auto ?? false)
+      || numberOrStringArraysMatch(actual?.targets, expected?.targets))
+}
+
+function numberOrStringArraysMatch(actual: string[] | undefined, expected: string[] | undefined): boolean {
+  if (!actual && !expected) return true
+  return actual?.length === expected?.length && actual?.every((value, index) => value === expected?.[index]) === true
+}
+
+function MobileConfigEssentials({
+  config,
+  canEdit,
+  canEditFixedShiftHours,
+  canSelectPreset,
+  autoInventoryOnly,
+  rotationMode,
+  variableShiftMode,
+  isScheduleModeSelected,
+  preset,
+  differences,
+  onSelectPreset,
+  onChangeMode,
+  onSelectVariable,
+  onChangeHours,
+}: {
+  config: LicenseConfig
+  canEdit: boolean
+  canEditFixedShiftHours: boolean
+  canSelectPreset: boolean
+  autoInventoryOnly: boolean
+  rotationMode: boolean
+  variableShiftMode: boolean
+  isScheduleModeSelected: (mode: 'maa' | 'rotation') => boolean
+  preset: ConfigPresetMatch | null
+  differences: string[]
+  onSelectPreset: (preset: LicenseConfig) => void
+  onChangeMode: (mode: 'maa' | 'rotation') => void
+  onSelectVariable: () => void
+  onChangeHours: (hours: number[]) => void
+}) {
+  return (
+    <section className="config-mobile-essentials" aria-labelledby="config-mobile-essentials-title">
+      <div className="config-mobile-essentials-heading">
+        <div>
+          <p className="config-mobile-kicker">{copy.v2.configEssentialsTitle}</p>
+          <h3 id="config-mobile-essentials-title">{preset ? copy.v2.configPresetBase(preset.preset.desc) : copy.v2.configCustomPreset}</h3>
+        </div>
+        {differences.length > 0 && <span className="config-mobile-difference-label">{copy.v2.configChangedFromPreset}</span>}
+      </div>
+      <div className="config-mobile-choice config-mobile-choice--preset">
+        <h4>{copy.v2.configPreset}</h4>
+        {canSelectPreset || canEdit ? <PresetActions onSelect={onSelectPreset} autoInventoryOnly={autoInventoryOnly} selectedId={preset?.id} /> : <p>{copy.v2.configCustomPreset}</p>}
+      </div>
+      <div className="config-mobile-primary-grid">
+        <section className="config-mobile-choice">
+          <h4>{copy.v2.configExecution}</h4>
+          <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label={copy.common.components_ConfigEditor_039}>
+            {(['maa', 'rotation'] as const).map((mode) => (
+              <button key={mode} type="button" aria-pressed={isScheduleModeSelected(mode)}
+                onClick={() => onChangeMode(mode)} className={`tool-secondary-action min-h-11 px-3 text-sm ${isScheduleModeSelected(mode)
+                  ? 'tool-option-selected' : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'}`}>
+                {SCHEDULE_MODE_LABELS[mode]}
+              </button>
+            ))}
+          </div>
+          <p className="config-mobile-help">{rotationMode ? copy.common.components_ConfigEditor_062 : copy.common.components_ConfigEditor_095}</p>
+        </section>
+        <section className="config-mobile-choice">
+          <h4>{copy.v2.configShiftFrequency}</h4>
+          {rotationMode ? <p className="config-mobile-help">{copy.common.components_ConfigEditor_065}</p> : <ShiftHoursEditor
+            value={config.shift_hours}
+            variableMode={variableShiftMode}
+            canEdit={canEdit}
+            canEditFixedShiftHours={canEditFixedShiftHours}
+            onSelectVariable={onSelectVariable}
+            onChange={onChangeHours}
+          />}
+        </section>
+      </div>
+      {differences.length > 0 && <ul className="config-mobile-differences" aria-label={copy.v2.configChangedFromPreset}>
+        {differences.map((difference) => <li key={difference}><span>{copy.v2.configAdjusted}</span>{difference}</li>)}
+      </ul>}
+    </section>
+  )
+}
+
 function PresetActions({
   onSelect,
   autoInventoryOnly = false,
+  selectedId,
   className = '',
 }: {
   onSelect: (preset: LicenseConfig) => void;
   autoInventoryOnly?: boolean;
+  selectedId?: string;
   className?: string;
 }) {
   const groups = [
@@ -917,7 +1101,7 @@ function PresetActions({
         <div key={group.label} role="group" aria-label={group.label} className="flex flex-wrap items-center gap-2">
           <span className="mr-1 text-xs font-medium text-ink-muted">{group.label}</span>
           {group.presets.map(([id, label, tone, products]) => (
-            <PresetButton key={id} label={label} tone={tone} products={products} onClick={() => onSelect(CONFIG_PRESETS[id])} />
+            <PresetButton key={id} label={label} tone={tone} products={products} selected={selectedId === id} onClick={() => onSelect(CONFIG_PRESETS[id])} />
           ))}
         </div>
       ))}
@@ -925,16 +1109,18 @@ function PresetActions({
   )
 }
 
-function PresetButton({ label, tone, products, onClick }: {
+function PresetButton({ label, tone, products, selected = false, onClick }: {
   label: string;
   tone: 'balanced' | 'gold' | 'experience' | 'orundum';
   products: readonly string[];
+  selected?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={selected}
       className={`tool-secondary-action config-preset config-preset--${tone} px-3 py-2 text-sm`}
     >
       <span className="flex shrink-0 items-center gap-0.5">

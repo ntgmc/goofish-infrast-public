@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router'
 import { copy } from '../copy/index'
+import { sectionLabels, v2Section } from '../pages/v2/navigation'
 
 
 const DEFAULT_DESCRIPTION = copy.metadata.components_RouteMetadata_001
@@ -100,7 +101,7 @@ export default function RouteMetadata() {
   const location = useLocation()
 
   useEffect(() => {
-    const metadata = resolveMetadata(location.pathname)
+    const metadata = resolveMetadata(location.pathname, location.search, location.hash)
     const canonicalUrl = canonicalUrlFor(location.pathname)
     const socialImageUrl = new URL(SOCIAL_IMAGE_PATH, canonicalUrl).href
     const icon = document.head.querySelector<HTMLLinkElement>('link[rel="icon"]') ?? document.createElement('link')
@@ -122,14 +123,18 @@ export default function RouteMetadata() {
     setMetaByName('twitter:description', metadata.description)
     setMetaByName('twitter:image', socialImageUrl)
     setCanonical(canonicalUrl)
-  }, [location.pathname])
+  }, [location.pathname, location.search, location.hash])
 
   return null
 }
 
-function resolveMetadata(pathname: string): Metadata {
-  if (PUBLIC_METADATA[pathname]) return PUBLIC_METADATA[pathname]
-  return PRIVATE_METADATA
+function resolveMetadata(pathname: string, search: string, hash: string): Metadata {
+  const metadata = PUBLIC_METADATA[pathname] ?? PRIVATE_METADATA
+  if (pathname === '/' || pathname === '/v2') {
+    const section = v2Section(new URLSearchParams(search), hash)
+    if (section !== 'overview') return { ...metadata, title: `${sectionLabels[section]} | ${copy.v2.brand}`, indexable: false }
+  }
+  return metadata
 }
 
 function canonicalUrlFor(pathname: string): string {

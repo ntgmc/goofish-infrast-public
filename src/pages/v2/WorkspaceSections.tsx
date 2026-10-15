@@ -10,8 +10,9 @@ import { isSchedulableProfile } from '../tool/tool-utils'
 import type { OptimizationTaskCenterController } from '../tool/optimize/useOptimizationTaskCenter'
 import type { AuthSuccessResponse } from '../../lib/types'
 import type { V2Session } from './OptionsDrawer'
-import { v2Path, v2SectionAvailable, type V2Section } from './navigation'
+import { sectionLabels, V2_PUBLIC_SECTIONS, v2Path, v2SectionAvailable, type V2Section } from './navigation'
 import { V2SectionLoading } from './V2LoadingScreen'
+import FirstScheduleGuide from './FirstScheduleGuide'
 
 const Profiles = lazy(() => import('./pages/Accounts'))
 const AddAccount = lazy(() => import('./pages/AddAccount'))
@@ -37,26 +38,16 @@ const AnimationSettings = lazy(() => import('../../components/AnimationSettings'
 export type V2Workflow = ReturnType<typeof useOptimizeWorkflow> & {
   optimizationTasks?: OptimizationTaskCenterController
 }
-export const sectionLabels: Record<V2Section, string> = {
-  overview: copy.v2.overview, generation: copy.v2.generation, plans: copy.v2.history,
-  lab: copy.v2.lab, tools: copy.v2.tools, 'manual-tool': copy.tools.manualSchedule.title,
-  cultivation: copy.tools.cultivation.title, depot: copy.dashboard.pages_tool_dashboard_ToolsSection_001,
-  profiles: copy.v2.account, 'add-account': copy.v2.addAccount, inventory: copy.inventory.nav,
-  commercial: copy.metered.commercial_nav, balance: copy.balance.nav,
-  announcements: copy.v2.announcements, settings: copy.v2.settings, help: copy.v2.helpAction, updates: copy.v2.updates,
-  terms: copy.v2.terms, privacy: copy.v2.privacy, disclaimer: copy.public.pages_PublicInfoPage_055,
-  support: copy.public.pages_PublicInfoPage_061, status: copy.status.pages_StatusPage_002, pricing: copy.v2.comparePlans,
-}
 const descriptions: Partial<Record<V2Section, string>> = {
   generation: copy.v2.generationDescription, plans: copy.v2.plansDescription,
   tools: copy.v2.toolsDescription, profiles: copy.v2.profilesDescription,
   'add-account': copy.v2.addAccountDescription, settings: copy.v2.settingsDescription,
   inventory: copy.v2.inventoryDescription,
 }
-const publicSections: V2Section[] = ['tools', 'depot', 'manual-tool', 'cultivation', 'announcements', 'help', 'updates', 'settings', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing']
+const publicSections: V2Section[] = ['tools', 'depot', 'manual-tool', 'cultivation', 'settings', ...V2_PUBLIC_SECTIONS]
 const workflowSections: V2Section[] = ['generation', 'plans', 'lab']
 
-export default function WorkspaceSections({ section, session, workflow, generationProgress, onAccountAdded, onToolDirtyChange, onOpenProfile, onNavigate, onConfig, onOperators, generationDisabledReason }: {
+export default function WorkspaceSections({ section, session, workflow, generationProgress, onAccountAdded, onToolDirtyChange, onOpenProfile, onNavigate, onConfig, onOperators, generationDisabledReason, firstSchedule = false, configConfirmed = false }: {
   section: V2Section
   session: V2Session
   workflow?: V2Workflow
@@ -68,6 +59,8 @@ export default function WorkspaceSections({ section, session, workflow, generati
   onConfig: () => void
   onOperators: () => void
   generationDisabledReason?: string | null
+  firstSchedule?: boolean
+  configConfirmed?: boolean
 }) {
   const { features } = useSiteFeatures()
   const { content } = usePublicContent()
@@ -80,11 +73,15 @@ export default function WorkspaceSections({ section, session, workflow, generati
   const signedIn = Boolean(session.user)
   const needsLogin = !signedIn && !publicSections.includes(section)
   const needsWorkspace = workflowSections.includes(section) && !workflow
-  return <section hidden={section === 'overview'} className="v2-feature-content v2-page-section" data-v2-section={section} aria-label={title}>
-    <div className="v2-section-heading"><div><h1>{title}</h1>{descriptions[section] && <p>{descriptions[section]}</p>}</div>
+  const guided = firstSchedule && section === 'generation' && available
+  const operatorsReady = Boolean(session.license?.operators.some((operator) => operator.own))
+  const step = !signedIn ? 0 : !workflow || !operatorsReady ? 1 : !configConfirmed ? 2 : 3
+  return <section hidden={section === 'overview'} className={`v2-feature-content v2-page-section${guided ? ' v2-first-schedule-layout' : ''}`} data-v2-section={section} aria-label={title}>
+    <div className="v2-section-heading"><div><h1>{guided ? copy.v2.firstSchedule.title : title}</h1>{guided ? <p>{copy.v2.firstSchedule.description}</p> : descriptions[section] && <p>{descriptions[section]}</p>}</div>
       {['manual-tool', 'cultivation', 'depot'].includes(section) && <Link className="v2-button v2-button-secondary" to={v2Path('tools', session.activeProfile?.id)}><ArrowLeft size={16} />{copy.v2.backToTools}</Link>}
       {section === 'profiles' && v2SectionAvailable('add-account', features) && <button type="button" className="v2-button v2-button-primary" onClick={() => onNavigate('add-account')}>{copy.v2.addAccount}<ArrowRight size={16} /></button>}
     </div>
+    {guided && <FirstScheduleGuide step={step} />}
     <div className="v2-section-body">
       <Suspense fallback={<V2SectionLoading label={section === 'inventory' ? copy.inventory.loading : undefined} />}>
         {section === 'overview' ? null : !available ? <p className="v2-panel v2-section-loading" role="status">{copy.v2.featureUnavailable}</p>
@@ -92,7 +89,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
             : needsWorkspace ? section === 'generation' && session.activeProfile && isSchedulableProfile(session.activeProfile)
               ? <div className="v2-panel v2-section-loading"><p>{copy.v2.generationImport}</p><button className="v2-button v2-button-primary" type="button" onClick={onOperators}>{copy.public.pages_LandingPage_001}</button></div>
               : section === 'generation' && session.cdkProfiles.length === 0 && v2SectionAvailable('add-account', features)
-                ? <><p className="v2-lead">{copy.v2.profileRequired}</p><AddAccount onAdded={onAccountAdded} onInventory={() => onNavigate('inventory')} /></>
+                ? <>{!guided && <p className="v2-lead">{copy.v2.profileRequired}</p>}<AddAccount guided={guided} onAdded={onAccountAdded} onInventory={() => onNavigate('inventory')} /></>
                 : <div className="v2-panel v2-section-loading"><p>{copy.v2.profileRequired}</p><button className="v2-button v2-button-primary" type="button" onClick={() => onNavigate('profiles')}>{copy.v2.account}</button></div>
               : <>
                 {section === 'profiles' && <Profiles session={session} onOpen={onOpenProfile} />}
@@ -111,7 +108,8 @@ export default function WorkspaceSections({ section, session, workflow, generati
                 {section === 'status' && <Status />}
                 {section === 'updates' && <Updates />}
                 {section === 'plans' && workflow && <Plans workflow={workflow} />}
-                {section === 'generation' && workflow && <Generation workflow={workflow} progress={generationProgress} disabledReason={generationDisabledReason} onNavigate={onNavigate} onConfig={onConfig} />}
+                {section === 'generation' && workflow && <Generation workflow={workflow} progress={generationProgress} disabledReason={generationDisabledReason}
+                  preparationStep={guided ? step : undefined} onOperators={onOperators} onNavigate={onNavigate} onConfig={onConfig} />}
                 {section === 'lab' && workflow && <Lab workflow={workflow} onConfig={onConfig} />}
               </>}
       </Suspense>

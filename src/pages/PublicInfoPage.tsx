@@ -8,6 +8,7 @@ import { Link } from 'react-router'
 import { copy } from '../copy/index'
 import { productPolicies } from '../lib/product-catalog'
 import { usePublicContent } from '../lib/public-content-context'
+import { groupFaqItems } from '../lib/faq-groups'
 import { PERSONAL_USE_DECLARATION } from '../lib/personal-use-declaration'
 import { useSiteFeatures } from '../lib/site-feature-context'
 
@@ -196,6 +197,7 @@ function FaqContent() {
     const text = `${item.question}\n${item.answer}`.toLocaleLowerCase()
     return terms.every((term) => text.includes(term))
   })
+  const groups = groupFaqItems(items)
   return (
     <section className="document-faq" aria-label={copy.public.pages_PublicInfoPage_064}>
       <div className="document-faq-search mb-4 pt-6">
@@ -216,8 +218,13 @@ function FaqContent() {
         <p className="font-medium text-ink-primary">{copy.public.faq_search_empty}</p>
         <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.public.faq_search_empty_hint}</p>
       </div>}
+      <nav aria-label={copy.public.faq_groups_label} className="mb-6 flex flex-wrap gap-2">
+        {groups.map((group) => <a key={group.id} href={`#faq-${group.id}`} className="tool-secondary-action whitespace-nowrap">{group.title}<span className="text-ink-muted">{group.items.length}</span></a>)}
+      </nav>
       <div className="document-faq-results">
-        {items.map((item) => (
+        {groups.map((group) => <section key={group.id} id={`faq-${group.id}`} aria-labelledby={`faq-${group.id}-title`} tabIndex={-1} className="mb-8 scroll-mt-6">
+          <h2 id={`faq-${group.id}-title`} className="mb-2 text-xl font-semibold text-ink-primary">{group.title}</h2>
+          {group.items.map((item) => (
           <details key={item.id} open={terms.length > 0 || undefined} className="group border-b border-surface-3 py-3 transition-colors has-[summary:focus-visible]:border-brand-500/55 has-[summary:focus-visible]:bg-surface-1">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-5 rounded-lg text-base font-semibold text-ink-primary focus-visible:outline-none">
               {item.question}
@@ -228,7 +235,8 @@ function FaqContent() {
               {item.action === 'qq_group' && <SupportGroupLink className="tool-secondary-action mt-3" />}
             </div>
           </details>
-        ))}
+          ))}
+        </section>)}
       </div>
       <div className="public-prose-section">
         <h2 className="text-lg font-semibold text-ink-primary">{content.faq.cta_heading}</h2>

@@ -43,6 +43,7 @@ export default function AuthForm({
       : features.login ? 'login' : features.registration ? 'register' : 'forgot')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [passwordVisible, setPasswordVisible] = useState(false)
   const [cdk, setCdk] = useState('')
   const [inviteCode, setInviteCode] = useState(initialInviteCode)
   const [inviteCodeRequired, setInviteCodeRequired] = useState<boolean | null>(null)
@@ -85,6 +86,7 @@ export default function AuthForm({
 
   useEffect(() => {
     if (mode !== 'register') setEmailSuggestion(null)
+    setPasswordVisible(false)
   }, [mode])
 
   useEffect(() => {
@@ -226,9 +228,15 @@ export default function AuthForm({
   }
 
   const emailDescriptionIds = [
+    mode === 'register' ? 'auth-email-hint' : null,
     fieldErrors.email ? 'auth-email-error' : null,
     emailSuggestion ? 'auth-email-suggestion' : null,
   ].filter(Boolean).join(' ') || undefined
+  const passwordDescriptionIds = [
+    mode === 'register' ? 'auth-password-hint' : null,
+    fieldErrors.password ? 'auth-password-error' : null,
+  ].filter(Boolean).join(' ') || undefined
+  const passwordId = compact ? 'depot-auth-password' : 'auth-password'
 
   return (
     <form onSubmit={handleSubmit} noValidate className={compact ? 'space-y-4' : 'tool-panel space-y-5 p-6 sm:p-8'}>
@@ -271,6 +279,7 @@ export default function AuthForm({
         />
         <FieldMessage id="auth-email-error" message={fieldErrors.email} />
       </label>
+      {mode === 'register' && <p id="auth-email-hint" className="-mt-3 text-sm leading-6 text-ink-muted">{copy.auth.registration_email_hint}</p>}
       {emailSuggestion && (
         <div id="auth-email-suggestion" className="-mt-3 flex flex-wrap items-center gap-2 text-sm text-ink-secondary">
           <span>{copy.auth.components_AuthForm_040} {emailSuggestion}</span>
@@ -281,25 +290,31 @@ export default function AuthForm({
       )}
 
       {mode !== 'forgot' && (
-        <label className="block">
-          <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.auth.components_AuthForm_012}</span>
-          <input
-            id={compact ? 'depot-auth-password' : 'auth-password'}
-            type="password"
-            value={password}
-            maxLength={AUTH_PASSWORD_MAX_LENGTH}
-            onChange={(event) => {
-              setPassword(event.currentTarget.value)
-              clearFieldError('password')
-            }}
-            onFocus={() => clearFieldError('password')}
-            className={inputClassName(Boolean(fieldErrors.password))}
-            aria-invalid={Boolean(fieldErrors.password)}
-            aria-describedby={fieldErrors.password ? 'auth-password-error' : undefined}
-            autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-          />
+        <div>
+          <label htmlFor={passwordId} className="mb-2 block text-sm font-medium text-ink-secondary">{copy.auth.components_AuthForm_012}</label>
+          <div className="flex items-center gap-2">
+            <input
+              id={passwordId}
+              type={passwordVisible ? 'text' : 'password'}
+              value={password}
+              maxLength={AUTH_PASSWORD_MAX_LENGTH}
+              onChange={(event) => {
+                setPassword(event.currentTarget.value)
+                clearFieldError('password')
+              }}
+              onFocus={() => clearFieldError('password')}
+              className={`${inputClassName(Boolean(fieldErrors.password))} min-w-0 flex-1`}
+              aria-invalid={Boolean(fieldErrors.password)}
+              aria-describedby={passwordDescriptionIds}
+              autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+            />
+            <button type="button" className="tool-secondary-action min-h-11 shrink-0 whitespace-nowrap px-3 text-sm" aria-controls={passwordId} aria-pressed={passwordVisible} onClick={() => setPasswordVisible((current) => !current)}>
+              {passwordVisible ? copy.auth.hide_password : copy.auth.show_password}
+            </button>
+          </div>
+          {mode === 'register' && <p id="auth-password-hint" className="mt-2 text-sm leading-6 text-ink-muted">{copy.auth.registration_password_hint(AUTH_PASSWORD_MIN_LENGTH, AUTH_PASSWORD_MAX_LENGTH)}</p>}
           <FieldMessage id="auth-password-error" message={fieldErrors.password} />
-        </label>
+        </div>
       )}
 
       {allowCdk && features.cdk_redemption && mode === 'register' && (

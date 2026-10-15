@@ -1,4 +1,9 @@
 export const optimizeCopy = {
+  generation: {
+    save_failed: '配置未保存成功，暂未开始生成。当前输入已保留，请重试保存；保存成功后点击生成。',
+    retry_save: '重试保存',
+    saving: '正在保存配置…',
+  },
   paid_preview: {
     title: '按需选择自定义配置、收益分析和导出功能',
     description: '免费版可生成基础排班。需要调整基建布局、数据变化后重算、分析收益或导出文件时，可查看高级版权益。',

@@ -82,10 +82,14 @@ export function InlineErrorPanel({
   message,
   onRetry,
   onReset,
+  retryLabel = copy.optimize.pages_tool_optimize_feedback_007,
+  retryDisabled = false,
 }: {
   message: string;
   onRetry: () => void;
   onReset: () => void;
+  retryLabel?: string;
+  retryDisabled?: boolean;
 }) {
   return (
     <div className="tool-alert tool-alert--error mt-4" role="alert">
@@ -95,9 +99,10 @@ export function InlineErrorPanel({
         <button
           type="button"
           onClick={onRetry}
+          disabled={retryDisabled}
           className="tool-primary-action"
         >
-          {copy.optimize.pages_tool_optimize_feedback_007}</button>
+          {retryLabel}</button>
         <button
           type="button"
           onClick={onReset}

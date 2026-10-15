@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, X } from 'lucide-react'
+import { ArrowRight, ChartNoAxesCombined, Clock3, LockKeyhole, Plus, X } from 'lucide-react'
 import { copy } from '../../../copy'
 import { expandScenarioComparison, getFixedScenarioProductionPlan, SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS, SCENARIO_LAYOUT_LABELS, type ScenarioComparisonFactors, type ScenarioLayout, type ScenarioProductionPlan } from '../../../lib/scenario-comparison'
 import { restoreScenarioComparisonJob, useScenarioComparison } from '../../tool/optimize/scenario-lab/useScenarioComparison'
@@ -19,7 +19,7 @@ const text = copy.optimize
 const ui = copy.v2.comparison
 
 export default function Comparison({ workflow: w, onConfig }: { workflow: V2Workflow; onConfig: () => void }) {
-  return w.userCanUseScenarioLab ? <ComparisonWorkspace key={w.profile.id} workflow={w} onConfig={onConfig} /> : <ComparisonPreview />
+  return w.userCanUseScenarioLab ? <ComparisonWorkspace key={w.profile.id} workflow={w} onConfig={onConfig} /> : <ComparisonPreview baseline={w.configPresetLabel} />
 }
 
 function ComparisonWorkspace({ workflow: w, onConfig }: { workflow: V2Workflow; onConfig: () => void }) {
@@ -159,7 +159,33 @@ function ProductionSummary({ plan }: { plan: ScenarioProductionPlan }) {
   ] as const).filter(([, count]) => count > 0).map(([product, count]) => <span key={product}><ProductIcon product={product} size={20} />{PRODUCT_LABELS[product]}<b>×{count}</b></span>)}</div>
 }
 
-function ComparisonPreview() {
+function ComparisonPreview({ baseline }: { baseline: string }) {
   const { features } = useSiteFeatures()
-  return <div className="v2-comparison-preview"><SectionTitle title={text.paid_preview.lab_title} description={text.paid_preview.lab_description} /><fieldset disabled className="v2-preview-fields"><legend>{text.paid_preview.readonly}</legend><label className="v2-field"><span>{text.paid_preview.baseline}</span><input className="v2-input" value={text.paid_preview.baseline} readOnly /></label><label className="v2-field"><span>{text.paid_preview.alternative}</span><select className="v2-input"><option>{text.paid_preview.add}</option></select></label><button className="v2-button v2-button-secondary">{text.paid_preview.run}</button></fieldset><Notice>{text.paid_preview.pending}</Notice><p>{text.paid_preview.lab_detail}</p><p>{text.paid_preview.quotas(productPolicies.metered_billing.scenario_quotas.month, productPolicies.metered_billing.scenario_quotas.half_year, productPolicies.metered_billing.scenario_quotas.year)}</p>{features.pricing && <Link className="v2-text-button" to="/pricing">{text.paid_preview.compare}</Link>}</div>
+  const preview = ui.preview
+  return <div className="v2-comparison-preview">
+    <SectionTitle title={preview.title} description={preview.description} action={<span className="v2-comparison-preview-badge"><LockKeyhole size={14} aria-hidden="true" />{preview.readonly}</span>} />
+    <div className="v2-comparison-preview-panel">
+      <section className="v2-comparison-preview-settings" aria-label={ui.builderTitle}>
+        <h3>{ui.builderTitle}</h3>
+        <fieldset disabled className="v2-preview-fields">
+          <legend className="sr-only">{text.paid_preview.readonly}</legend>
+          <label className="v2-field"><span>{text.paid_preview.baseline}</span><input className="v2-input" value={baseline} readOnly /><small>{preview.baselineHelp}</small></label>
+          <label className="v2-field"><span>{text.paid_preview.alternative}</span><select className="v2-input"><option>{text.paid_preview.add}</option></select><small>{preview.alternativeHelp}</small></label>
+          <div className="v2-comparison-preview-run"><button type="button" className="v2-button v2-button-secondary"><LockKeyhole size={16} aria-hidden="true" />{text.paid_preview.run}</button><small>{preview.runHelp}</small></div>
+        </fieldset>
+      </section>
+      <section className="v2-comparison-preview-results" aria-label={ui.results}>
+        <div className="v2-comparison-preview-results-heading"><h3>{ui.results}</h3><span>{preview.pending}</span></div>
+        <dl className="v2-comparison-preview-metrics">
+          <div><dt><ChartNoAxesCombined size={18} aria-hidden="true" />{preview.income}</dt><dd>—</dd><dd>{preview.incomeHelp}</dd></div>
+          <div><dt><Clock3 size={18} aria-hidden="true" />{preview.operations}</dt><dd>—</dd><dd>{preview.operationsHelp}</dd></div>
+        </dl>
+        <div className="v2-comparison-preview-tradeoff"><ChartNoAxesCombined size={20} aria-hidden="true" /><div><h4>{preview.tradeoff}</h4><p>{preview.tradeoffHelp}</p></div></div>
+      </section>
+    </div>
+    <div className="v2-comparison-preview-entitlement">
+      <div><strong>{preview.entitlement}</strong><span className="v2-comparison-preview-badge">{text.paid_preview.advanced}</span><p>{text.paid_preview.quotas(productPolicies.metered_billing.scenario_quotas.month, productPolicies.metered_billing.scenario_quotas.half_year, productPolicies.metered_billing.scenario_quotas.year)}</p></div>
+      {features.pricing && <Link className="v2-button v2-button-primary" to="/pricing">{text.paid_preview.compare}<ArrowRight size={16} aria-hidden="true" /></Link>}
+    </div>
+  </div>
 }
