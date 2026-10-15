@@ -404,7 +404,7 @@ describe('public content settings', () => {
     expect(stored.faq.items).toHaveLength(19)
   })
 
-  it.each(['edited', 'reordered', 'removed', 'added', 'empty', 'full'] as const)('preserves a %s FAQ list during the default upgrade', (change) => {
+  it.each(['edited', 'reordered', 'removed', 'added', 'empty', 'full'] as const)('preserves %s FAQ content while restoring missing presets during the default upgrade', (change) => {
     const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 9 }
     Object.assign(stored.faq, structuredClone(copy.publicContent.legacy_faq))
     stored.faq.intro = '管理员自定义介绍'
@@ -418,7 +418,54 @@ describe('public content settings', () => {
     if (change === 'full') stored.faq.items = Array.from({ length: 50 }, (_, index) => ({ id: `custom-${index}`, question: '自定义问题', answer: '自定义答案', action: 'none' }))
 
     const migrated = normalizePublicContentSettings(stored)
-    expect(migrated.faq).toEqual(stored.faq)
+    const missingItems = DEFAULT_PUBLIC_CONTENT_DRAFT.faq.items.filter((item) => !stored.faq.items.some((existing) => existing.id === item.id))
+    expect(migrated.faq).toEqual({
+      ...stored.faq,
+      items: change === 'empty' || change === 'full'
+        ? stored.faq.items
+        : [...stored.faq.items, ...missingItems],
+    })
+    expect(normalizePublicContentSettings(migrated)).toEqual(migrated)
+  })
+
+  it.each([9, 10, 11])('restores the forty-eight presets from a revision-%i historical overwrite without losing the custom FAQ', (revision) => {
+    const stored = {
+      ...cloneDefaultPublicContentSettings(),
+      defaults_revision: revision,
+      updated_at: '2026-10-10T03:59:56.422Z',
+    }
+    stored.faq.items = structuredClone([...copy.publicContent.legacy_faq.items])
+    stored.faq.items[0].answer = '管理员自定义答案'
+    stored.faq.items.splice(11, 0, { id: 'custom-dormitory', question: '宿舍规则有什么区别？', answer: '管理员补充的宿舍说明', action: 'none' })
+    const original = structuredClone(stored)
+
+    const resolved = resolvePublicContentSettings(stored)
+    const migrated = resolved.content
+    expect(resolved.isFallback).toBe(false)
+    expect(migrated.faq.items).toHaveLength(49)
+    expect(migrated.faq.items.slice(0, 20)).toEqual(original.faq.items)
+    expect(new Set(migrated.faq.items.map((item) => item.id))).toEqual(new Set([
+      ...DEFAULT_PUBLIC_CONTENT_DRAFT.faq.items.map((item) => item.id), 'custom-dormitory',
+    ]))
+    expect(migrated).toEqual({ ...original, defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION, faq: migrated.faq })
+    expect(normalizePublicContentSettings(migrated)).toEqual(migrated)
+    expect(stored).toEqual(original)
+
+    migrated.faq.items = migrated.faq.items.filter((item) => item.id !== 'requirements')
+    expect(normalizePublicContentSettings(migrated).faq).toEqual(migrated.faq)
+  })
+
+  it('keeps FAQ backfilling within the item limit without dropping existing entries', () => {
+    const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 11 }
+    stored.faq.items = [stored.faq.items[0], ...Array.from({ length: 48 }, (_, index) => ({
+      id: `custom-${index}`, question: '自定义问题', answer: '自定义答案', action: 'none' as const,
+    }))]
+
+    const migrated = normalizePublicContentSettings(stored)
+    expect(migrated.faq.items).toHaveLength(50)
+    expect(migrated.faq.items.slice(0, 49)).toEqual(stored.faq.items)
+    expect(migrated.faq.items[49].id).toBe('account-concepts')
+    expect(() => parsePublicContentDraft({ ...DEFAULT_PUBLIC_CONTENT_DRAFT, faq: migrated.faq })).not.toThrow()
     expect(normalizePublicContentSettings(migrated)).toEqual(migrated)
   })
 

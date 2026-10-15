@@ -3,7 +3,7 @@ import { copy } from '../copy/index'
 import { getSku, productPolicies } from './product-catalog'
 
 export const PUBLIC_CONTENT_VERSION = 1 as const
-export const PUBLIC_CONTENT_DEFAULTS_REVISION = 11 as const
+export const PUBLIC_CONTENT_DEFAULTS_REVISION = 12 as const
 export const PUBLIC_PRICING_PLAN_IDS = [
   'free_preview',
   'single_account_monthly',
@@ -369,8 +369,8 @@ export function resolvePublicContentSettings(value: unknown): { content: PublicC
     ? migrateDefaultPricingContent(migrateLegacyDefaultCredits(normalizedDraft))
     : normalizedDraft
   if (storedDefaultsRevision < 9) migratedDraft = migrateLegacyPricingCopy(migratedDraft)
-  if (storedDefaultsRevision < 10) migratedDraft = migrateDefaultFaqContent(migratedDraft)
   if (storedDefaultsRevision < 11) migratedDraft = migrateLegacyLifetimePricing(migratedDraft)
+  if (storedDefaultsRevision < 12) migratedDraft = migrateDefaultFaqContent(migratedDraft)
   return {
     content: {
       version: PUBLIC_CONTENT_VERSION,
@@ -454,6 +454,13 @@ function migrateDefaultFaqContent(draft: PublicContentDraftV1): PublicContentDra
       return item.id === old.id && item.question === old.question && item.answer === old.answer && item.action === old.action
     })
   if (unchangedItems) draft.faq.items = structuredClone(current.items)
+  else {
+    const existingIds = new Set(draft.faq.items.map((item) => item.id))
+    if (current.items.some((item) => existingIds.has(item.id))) {
+      const missingItems = current.items.filter((item) => !existingIds.has(item.id))
+      draft.faq.items.push(...structuredClone(missingItems.slice(0, PUBLIC_CONTENT_LIMITS.faqItems - draft.faq.items.length)))
+    }
+  }
   return draft
 }
 
