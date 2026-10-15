@@ -10,7 +10,7 @@ export const dashboardCopy = {
     credentials: "森空岛授权",
     no_credentials: "暂无森空岛绑定账号。导入游戏数据后，可在这里管理授权信息。",
     privacy_details: "个人数据的保存与删除",
-    deletion_help: "提交后立即退出登录，7 天内可通过邮件撤销。",
+    deletion_help: "提交后立即退出登录，7 天内重新登录会自动取消注销。",
   },
   animation: {
     title: "动画效果",
@@ -245,7 +245,7 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_013: "失败，请稍后重试。",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_014: "提交注销申请后会立即退出登录。你可以在 7 天内通过邮件撤销；到期后账号和个人数据将永久删除。确定继续吗？",
+  pages_tool_dashboard_SettingsSection_014: "提交注销申请后会显示注销时间并立即退出登录。7 天内重新登录会自动取消注销；到期后账号和个人数据将永久删除。确定继续吗？",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_015: "暂时无法提交注销申请，请确认邮箱和当前密码后重试。",
   // src/pages/tool/dashboard/SettingsSection.tsx
@@ -265,7 +265,7 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_029: "注销账号",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_030: "提交后会立即退出登录，并向你的邮箱发送撤销链接。7 天内可以撤销；到期后将永久删除账号、档案、授权信息、仓库样本、任务和常规使用记录。用于安全风控和法律留存的少量记录会按隐私政策所列期限自动删除。",
+  pages_tool_dashboard_SettingsSection_030: "提交后会显示注销时间并立即退出登录。7 天内重新登录会自动取消注销；到期后将永久删除账号、档案、授权信息、仓库样本、任务和常规使用记录。用于安全风控和法律留存的少量记录会按隐私政策所列期限自动删除。",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_031: "确认邮箱",
   // src/pages/tool/dashboard/SettingsSection.tsx

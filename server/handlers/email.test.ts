@@ -32,7 +32,6 @@ vi.mock('../storage/registration-settings-store', () => settings)
 vi.mock('../ses-email', () => ses)
 
 import {
-  sendAccountDeletionCancellationEmail,
   sendAccountDeletionReceiptEmail,
   sendEmailVerificationEmail,
   sendPasswordResetEmail,
@@ -46,7 +45,6 @@ describe('email provider delivery accounting', () => {
     process.env.BREVO_SENDER_EMAIL = 'sender@example.test'
     process.env.BREVO_RESET_TEMPLATE_ID = '1'
     process.env.BREVO_VERIFY_EMAIL_TEMPLATE_ID = '2'
-    process.env.BREVO_ACCOUNT_DELETION_CANCEL_TEMPLATE_ID = '3'
     process.env.BREVO_ACCOUNT_DELETION_RECEIPT_TEMPLATE_ID = '4'
     settings.getRegistrationSettings.mockResolvedValue({ email_provider_priority: ['brevo', 'ses'] })
     quota.reserveBrevoEmailWithOfficialQuota.mockImplementation(async (purpose) => ({
@@ -72,7 +70,7 @@ describe('email provider delivery accounting', () => {
     vi.restoreAllMocks()
   })
 
-  it('maps all five email types to quota purposes and marks them sent', async () => {
+  it('maps all four email types to quota purposes and marks them sent', async () => {
     await sendEmailVerificationEmail({ email: 'user@example.test', verificationUrl: 'https://example.test/verify', expiresHours: 24 })
     await sendEmailVerificationEmail(
       { email: 'invited@example.test', verificationUrl: 'https://example.test/verify-admin', expiresHours: 24 },
@@ -80,17 +78,15 @@ describe('email provider delivery accounting', () => {
       'admin_invite_verification',
     )
     await sendPasswordResetEmail({ email: 'user@example.test', resetUrl: 'https://example.test/reset', expiresMinutes: 30 })
-    await sendAccountDeletionCancellationEmail('user@example.test', 'https://example.test/cancel')
     await sendAccountDeletionReceiptEmail('user@example.test', 'receipt-1')
 
     expect(quota.reserveBrevoEmailWithOfficialQuota.mock.calls.map(([purpose]) => purpose)).toEqual([
       'email_verification',
       'admin_invite_verification',
       'password_reset',
-      'account_deletion_cancellation',
       'account_deletion_receipt',
     ])
-    expect(store.markEmailDeliverySent).toHaveBeenCalledTimes(5)
+    expect(store.markEmailDeliverySent).toHaveBeenCalledTimes(4)
   })
 
   it('releases a reservation after a definite Brevo rejection', async () => {
@@ -211,10 +207,7 @@ describe('email provider delivery accounting', () => {
     settings.getRegistrationSettings.mockResolvedValueOnce({ email_provider_priority: ['ses', 'brevo'] })
     ses.sendSesTemplateEmail.mockRejectedValueOnce(new Error('connection lost'))
 
-    await expect(sendAccountDeletionCancellationEmail(
-      'user@example.test',
-      'https://example.test/cancel',
-    )).rejects.toThrow('connection lost')
+    await expect(sendAccountDeletionReceiptEmail('user@example.test', 'receipt-1')).rejects.toThrow('connection lost')
     expect(store.markEmailDeliveryUncertain).toHaveBeenCalledOnce()
     expect(store.markEmailDeliveryFailed).not.toHaveBeenCalled()
   })

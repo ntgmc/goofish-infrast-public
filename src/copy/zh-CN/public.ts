@@ -272,7 +272,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_016: "如何删除我的账号和数据？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_017: "在账号设置中选择“注销账号”，按提示填写邮箱和当前密码。提交后会立即退出登录，邮箱会收到撤销链接；7 天内可以撤销，到期后永久删除账号、档案、工作区、授权信息及相关常规数据。安全风控记录和个人使用声明记录按隐私政策中的期限保留。\n无法自行操作时，可以到 MaaTool 官方 QQ 群申请协助，处理前可能需要核验身份。请勿在群内发送密码、完整 CDK、二维码、Cookie 或森空岛凭据。",
+  pages_PublicInfoPage_017: "在账号设置中选择“注销账号”，按提示填写邮箱和当前密码。提交后会显示注销时间并立即退出登录；7 天内重新登录会自动取消注销，到期后永久删除账号、档案、工作区、授权信息及相关常规数据。安全风控记录和个人使用声明记录按隐私政策中的期限保留。\n无法自行操作时，可以到 MaaTool 官方 QQ 群申请协助，处理前可能需要核验身份。请勿在群内发送密码、完整 CDK、二维码、Cookie 或森空岛凭据。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_018: "我们处理的信息",
   // src/pages/PublicInfoPage.tsx

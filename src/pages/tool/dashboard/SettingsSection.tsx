@@ -1,15 +1,12 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router'
 import { Bell, ChevronDown, LockKeyhole, ShieldCheck, SlidersHorizontal } from 'lucide-react'
 import { apiJson, apiVoid } from '../../../lib/api-client'
 import { inputClassName, validatePasswordInput } from '../tool-utils'
 import type { AccountDeletionAccepted, AuthSuccessResponse, UserGameAccount } from '../../../lib/types'
 import { copy } from '../../../copy/index'
 import { AUTH_EMAIL_MAX_LENGTH, AUTH_PASSWORD_MAX_LENGTH } from '../../../lib/auth-constraints'
-import {
-  accountLifecycleErrorMessage,
-  deletionEmailMessage,
-  formatAccountDeletionDeadline,
-} from '../../../lib/account-lifecycle-client'
+import { accountLifecycleErrorMessage } from '../../../lib/account-lifecycle-client'
 import DebugModePanel from '../../../components/DebugModePanel'
 import AnimationSettings from '../../../components/AnimationSettings'
 import QqBotSettingsPanel from '../../../components/QqBotSettingsPanel'
@@ -27,6 +24,7 @@ export function useAccountSettings({ profiles, activeProfileId, onPayload, onDel
   onPayload: (payload: AuthSuccessResponse) => void
   onDeletionStateChange?: (state: 'idle' | 'submitting' | 'accepted') => void
 }) {
+  const navigate = useNavigate()
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -40,7 +38,6 @@ export function useAccountSettings({ profiles, activeProfileId, onPayload, onDel
   const [clearedCredentialIds, setClearedCredentialIds] = useState<Set<string>>(() => new Set())
   const [deleteEmail, setDeleteEmail] = useState('')
   const [deletePassword, setDeletePassword] = useState('')
-  const [deletion, setDeletion] = useState<AccountDeletionAccepted | null>(null)
   const [deletionError, setDeletionError] = useState<string | null>(null)
   const boundProfiles = profiles.filter((profile) => profile.skland_binding)
 
@@ -125,9 +122,9 @@ export function useAccountSettings({ profiles, activeProfileId, onPayload, onDel
         json: { email: deleteEmail, password: deletePassword },
         fallbackMessage: copy.dashboard.pages_tool_dashboard_SettingsSection_015,
       })
-      setDeletion(accepted)
       setDeletePassword('')
       onDeletionStateChange?.('accepted')
+      void navigate(`/account-safety?scheduled_for=${encodeURIComponent(accepted.scheduled_for)}`, { replace: true })
     } catch (caught) {
       setDeletionError(accountLifecycleErrorMessage(caught, copy.dashboard.pages_tool_dashboard_SettingsSection_015))
       onDeletionStateChange?.('idle')
@@ -137,13 +134,12 @@ export function useAccountSettings({ profiles, activeProfileId, onPayload, onDel
   return { oldPassword, setOldPassword, newPassword, setNewPassword, confirmPassword, setConfirmPassword,
     status, error, fieldErrors, loading, submit, clearFieldError, boundProfiles, clearedCredentialIds,
     privacyLoading, privacyError, privacyStatus, clearCredential, deleteEmail, setDeleteEmail,
-    deletePassword, setDeletePassword, deletion, deletionError, requestDeletion }
+    deletePassword, setDeletePassword, deletionError, requestDeletion }
 }
 
-export default function SettingsSection({ profiles, activeProfileId, onLogout, onPayload, workspaceEntry, safetyOnly = false, onDeletionStateChange }: {
+export default function SettingsSection({ profiles, activeProfileId, onPayload, workspaceEntry, safetyOnly = false, onDeletionStateChange }: {
   profiles: UserGameAccount[]
   activeProfileId?: string | null
-  onLogout: () => void
   onPayload: (payload: AuthSuccessResponse) => void
   workspaceEntry?: WorkspaceEntryState
   safetyOnly?: boolean
@@ -154,7 +150,7 @@ export default function SettingsSection({ profiles, activeProfileId, onLogout, o
   const { oldPassword, setOldPassword, newPassword, setNewPassword, confirmPassword, setConfirmPassword,
     status, error, fieldErrors, loading, submit, clearFieldError, boundProfiles, clearedCredentialIds,
     privacyLoading, privacyError, privacyStatus, clearCredential, deleteEmail, setDeleteEmail,
-    deletePassword, setDeletePassword, deletion, deletionError, requestDeletion } = useAccountSettings({ profiles, activeProfileId, onPayload, onDeletionStateChange })
+    deletePassword, setDeletePassword, deletionError, requestDeletion } = useAccountSettings({ profiles, activeProfileId, onPayload, onDeletionStateChange })
   const openSection = (id: string) => {
     const section = document.getElementById(id)
     section?.scrollIntoView({ block: 'start' })
@@ -288,7 +284,7 @@ export default function SettingsSection({ profiles, activeProfileId, onLogout, o
             <summary className="min-h-11 cursor-pointer content-center text-sm font-medium text-ink-secondary">{text.privacy_details}</summary>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-ink-secondary">{copy.dashboard.pages_tool_dashboard_SettingsSection_023}</p>
           </details>
-          <details open={Boolean(deletion)} className="group mt-4 border-t border-surface-3 pt-4">
+          <details className="group mt-4 border-t border-surface-3 pt-4">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 [&::-webkit-details-marker]:hidden">
               <span className="min-w-0">
                 <span className="block font-semibold text-error">{copy.dashboard.pages_tool_dashboard_SettingsSection_029}</span>
@@ -298,28 +294,17 @@ export default function SettingsSection({ profiles, activeProfileId, onLogout, o
             </summary>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-ink-secondary">{copy.dashboard.pages_tool_dashboard_SettingsSection_030}</p>
             {deletionError && <div className="tool-alert tool-alert--error mt-4" role="alert">{deletionError}</div>}
-            {deletion ? (
-              <div className="mt-4" role="status" aria-live="polite">
-                <p className="font-medium text-ink-primary">{copy.features.delete_accepted_title}</p>
-                <p className="mt-2 text-sm leading-6 text-ink-secondary">
-                  {copy.features.delete_accepted_before}<strong>{formatAccountDeletionDeadline(deletion.scheduled_for)}</strong>{copy.features.delete_accepted_after}
-                </p>
-                <p className="mt-2 text-sm leading-6 text-ink-secondary">{deletionEmailMessage(deletion.cancellation_email)}</p>
-                <button type="button" onClick={onLogout} className="tool-primary-action mt-4">{copy.features.delete_accepted_leave}</button>
-              </div>
-            ) : (
-              <div className="mt-4 max-w-lg">
-                <label className="mt-3 block" htmlFor="settings-delete-email">
-                  <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.dashboard.pages_tool_dashboard_SettingsSection_031}</span>
-                  <input id="settings-delete-email" value={deleteEmail} maxLength={AUTH_EMAIL_MAX_LENGTH} onChange={(event) => setDeleteEmail(event.currentTarget.value)} type="email" autoComplete="email" className="tool-field" />
-                </label>
-                <label className="mt-3 block" htmlFor="settings-delete-password">
-                  <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.dashboard.pages_tool_dashboard_SettingsSection_032}</span>
-                  <input id="settings-delete-password" value={deletePassword} maxLength={AUTH_PASSWORD_MAX_LENGTH} onChange={(event) => setDeletePassword(event.currentTarget.value)} type="password" autoComplete="current-password" className="tool-field" />
-                </label>
-                <button type="button" onClick={() => void requestDeletion()} disabled={privacyLoading !== null || !deleteEmail || !deletePassword} className="tool-danger-action mt-4">{privacyLoading === 'delete' ? copy.dashboard.pages_tool_dashboard_SettingsSection_033 : copy.dashboard.pages_tool_dashboard_SettingsSection_034}</button>
-              </div>
-            )}
+            <div className="mt-4 max-w-lg">
+              <label className="mt-3 block" htmlFor="settings-delete-email">
+                <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.dashboard.pages_tool_dashboard_SettingsSection_031}</span>
+                <input id="settings-delete-email" value={deleteEmail} maxLength={AUTH_EMAIL_MAX_LENGTH} onChange={(event) => setDeleteEmail(event.currentTarget.value)} type="email" autoComplete="email" className="tool-field" />
+              </label>
+              <label className="mt-3 block" htmlFor="settings-delete-password">
+                <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.dashboard.pages_tool_dashboard_SettingsSection_032}</span>
+                <input id="settings-delete-password" value={deletePassword} maxLength={AUTH_PASSWORD_MAX_LENGTH} onChange={(event) => setDeletePassword(event.currentTarget.value)} type="password" autoComplete="current-password" className="tool-field" />
+              </label>
+              <button type="button" onClick={() => void requestDeletion()} disabled={privacyLoading !== null || !deleteEmail || !deletePassword} className="tool-danger-action mt-4">{privacyLoading === 'delete' ? copy.dashboard.pages_tool_dashboard_SettingsSection_033 : copy.dashboard.pages_tool_dashboard_SettingsSection_034}</button>
+            </div>
           </details>
         </section>
       </div>

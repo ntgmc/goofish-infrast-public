@@ -1,8 +1,9 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   cancelAccountDeletion,
+  cancelAccountDeletionOnLogin,
   getAccountDeletionConfigurationHealth,
   processAccountDeletionEmailOutbox,
   processDueAccountDeletions,
@@ -13,15 +14,15 @@ import { getItemBalance, grantItem, reserveItemsInTransaction } from './storage/
 import { createPostgresOptimizeJobStore } from './storage/optimize-job-store'
 import { ensureDatabaseSchema } from './storage/schema'
 import type { UserAccountRecord, UserGameAccountRecord } from './storage/user-store'
+import { createPasswordHash } from './security/password'
+import { loginUser } from './handlers/user-auth'
 
 const mocks = vi.hoisted(() => ({
   recordAccountDeletedBehaviorEvent: vi.fn(),
-  sendAccountDeletionCancellationEmail: vi.fn(),
   sendAccountDeletionReceiptEmail: vi.fn(),
 }))
 
 vi.mock('./handlers/email', () => ({
-  sendAccountDeletionCancellationEmail: mocks.sendAccountDeletionCancellationEmail,
   sendAccountDeletionReceiptEmail: mocks.sendAccountDeletionReceiptEmail,
 }))
 
@@ -44,7 +45,6 @@ beforeAll(async () => {
 beforeEach(async () => {
   await query('truncate table account_deletion_email_outbox, user_accounts cascade')
   mocks.recordAccountDeletedBehaviorEvent.mockReset().mockResolvedValue(undefined)
-  mocks.sendAccountDeletionCancellationEmail.mockReset().mockResolvedValue(undefined)
   mocks.sendAccountDeletionReceiptEmail.mockReset().mockResolvedValue(undefined)
 })
 
@@ -56,10 +56,11 @@ afterAll(async () => {
 })
 
 describe('account deletion PostgreSQL lifecycle', () => {
-  it('creates one request and one cancellation email for concurrent retries', async () => {
+  it('creates one request without cancellation email or a public URL for concurrent retries', async () => {
     const now = new Date('2026-07-31T00:00:00.000Z')
     const user = await seedUser('concurrent-request@example.test', now)
     await seedSession(user.id, now)
+    delete process.env.PUBLIC_APP_URL
 
     const results = await Promise.all([
       requestAccountDeletion(user, now),
@@ -67,12 +68,67 @@ describe('account deletion PostgreSQL lifecycle', () => {
     ])
 
     expect(results[0]).toEqual(results[1])
-    expect(results[0]).toMatchObject({ cancellationEmail: 'queued' })
+    expect(results[0]).toEqual({ scheduledFor: '2026-08-07T00:00:00.000Z' })
     expect(await countRows('account_deletion_requests', 'user_id', user.id)).toBe(1)
-    expect(await countRows('account_deletion_email_outbox', 'kind', 'cancellation')).toBe(1)
+    expect(await countRows('account_deletion_email_outbox', 'kind', 'cancellation')).toBe(0)
     expect(await countRows('user_sessions', 'user_id', user.id)).toBe(0)
     expect((await readUserStatus(user.id))).toBe('pending_deletion')
-    expect(mocks.sendAccountDeletionCancellationEmail).not.toHaveBeenCalled()
+  })
+
+  it('cancels deletion only after a successful password login and creates a new session', async () => {
+    const now = new Date()
+    const user = await seedUser('login-cancellation@example.test', now)
+    await requestAccountDeletion(user, now)
+
+    expect(await loginUser(user.email, 'wrong-password')).toMatchObject({ ok: false, status: 401 })
+    expect(await readUserStatus(user.id)).toBe('pending_deletion')
+    expect(await countRows('user_sessions', 'user_id', user.id)).toBe(0)
+
+    expect(await loginUser(user.email, 'correct-password')).toMatchObject({
+      ok: true, user: { id: user.id, status: 'active' }, cookie: expect.stringContaining('maa_session='),
+    })
+    expect(await readUserStatus(user.id)).toBe('active')
+    expect(await countRows('account_deletion_requests', 'user_id', user.id)).toBe(0)
+    expect(await countRows('user_sessions', 'user_id', user.id)).toBe(1)
+    expect(await processDueAccountDeletions(new Date(now.getTime() + 8 * 86_400_000))).toBe(0)
+  })
+
+  it('rejects login at the deletion deadline even before the deletion worker runs', async () => {
+    const now = new Date(Date.now() - 7 * 86_400_000)
+    const user = await seedUser('expired-login@example.test', now)
+    const accepted = await requestAccountDeletion(user, now)
+
+    expect(await cancelAccountDeletionOnLogin(user, new Date(accepted.scheduledFor))).toBeNull()
+    expect(await loginUser(user.email, 'correct-password')).toMatchObject({ ok: false, status: 403 })
+    expect(await readUserStatus(user.id)).toBe('pending_deletion')
+    expect(await countRows('user_sessions', 'user_id', user.id)).toBe(0)
+  })
+
+  it('does not restore a frozen account or accept an outdated password hash', async () => {
+    const now = new Date()
+    const user = await seedUser('changed-login@example.test', now)
+    await requestAccountDeletion(user, now)
+    expect(await cancelAccountDeletionOnLogin({ ...user, password_hash: 'outdated-hash' }, now)).toBeNull()
+    await query(`update user_accounts set status = 'frozen',
+      record_json = jsonb_set(record_json, '{status}', '"frozen"') where id = $1`, [user.id])
+    expect(await cancelAccountDeletionOnLogin(user, now)).toBeNull()
+    expect(await loginUser(user.email, 'correct-password')).toMatchObject({ ok: false, status: 403 })
+    expect(await readUserStatus(user.id)).toBe('frozen')
+  })
+
+  it('honors previously issued cancellation links and discards queued cancellation emails', async () => {
+    const now = new Date()
+    const user = await seedUser('legacy-cancellation@example.test', now)
+    await requestAccountDeletion(user, now)
+    await seedEmail(user.id, user.email, now, 'cancellation')
+    expect(await processAccountDeletionEmailOutbox(now)).toBe(0)
+    expect(await countRows('account_deletion_email_outbox', 'kind', 'cancellation')).toBe(0)
+    const token = 'previously-issued-token'
+    await query('update account_deletion_requests set cancel_token_hash = $2 where user_id = $1',
+      [user.id, createHash('sha256').update(token).digest('hex')])
+    expect(await cancelAccountDeletion(token, now)).toBe(true)
+    expect(await cancelAccountDeletion(token, now)).toBe(false)
+    expect(await readUserStatus(user.id)).toBe('active')
   })
 
   it.each(['queued', 'running'])('releases every reservation when deletion cancels a %s job, including after withdrawal', async (status) => {
@@ -117,7 +173,7 @@ describe('account deletion PostgreSQL lifecycle', () => {
     await requestAccountDeletion(user, now)
     // Repeating the request must not refund or decrement counters twice.
     await requestAccountDeletion(user, now)
-    expect(await cancelAccountDeletion(await readCancellationToken(user.id), now)).toBe(true)
+    expect(await cancelAccountDeletionOnLogin(user, now)).toMatchObject({ id: user.id, status: 'active' })
     expect(await getItemBalance(user.id, 'priority_compute_coupon')).toBe(1)
     expect((await query('select status from entitlement_ledger where reference_id = $1', [jobId])).rows[0]?.status).toBe('released')
     expect((await query('select free_revision_count, first_generated_at from profile_entitlements where profile_id = $1', [profile.id])).rows[0]).toEqual({ free_revision_count: 0, first_generated_at: null })
@@ -163,17 +219,16 @@ describe('account deletion PostgreSQL lifecycle', () => {
     const now = new Date('2026-07-31T02:00:00.000Z')
     const user = await seedUser('cancel-race@example.test', now)
     const accepted = await requestAccountDeletion(user, now)
-    const token = await readCancellationToken(user.id)
     const dueAt = new Date(accepted.scheduledFor)
     const beforeDue = new Date(dueAt.getTime() - 1)
 
     const [cancelled, deleted] = await Promise.all([
-      cancelAccountDeletion(token, beforeDue),
+      cancelAccountDeletionOnLogin(user, beforeDue),
       processDueAccountDeletions(dueAt),
     ])
     const status = await readUserStatus(user.id)
 
-    expect(Number(cancelled) + deleted).toBe(1)
+    expect(Number(Boolean(cancelled)) + deleted).toBe(1)
     if (cancelled) {
       expect(status).toBe('active')
       expect(await countRows('account_deletion_requests', 'user_id', user.id)).toBe(0)
@@ -249,22 +304,24 @@ describe('account deletion PostgreSQL lifecycle', () => {
   it('persists email failures and removes short-lived recipient data after a retry succeeds', async () => {
     const now = new Date('2026-07-31T04:00:00.000Z')
     const user = await seedUser('outbox-retry@example.test', now)
-    await requestAccountDeletion(user, now)
-    mocks.sendAccountDeletionCancellationEmail.mockRejectedValueOnce(new Error('temporary provider failure'))
+    const accepted = await requestAccountDeletion(user, now)
+    const dueAt = new Date(accepted.scheduledFor)
+    await processDueAccountDeletions(dueAt)
+    mocks.sendAccountDeletionReceiptEmail.mockRejectedValueOnce(new Error('temporary provider failure'))
 
-    expect(await processAccountDeletionEmailOutbox(now)).toBe(0)
+    expect(await processAccountDeletionEmailOutbox(dueAt)).toBe(0)
     const failed = await query<{ status: string; attempts: number; last_error: string | null }>(
       `select status, attempts, last_error
          from account_deletion_email_outbox
-        where kind = 'cancellation'`,
+        where kind = 'receipt'`,
     )
     expect(failed.rows[0]).toMatchObject({ status: 'pending', attempts: 1 })
     expect(failed.rows[0]?.last_error).toContain('temporary provider failure')
 
-    const retryAt = new Date(now.getTime() + 61_000)
+    const retryAt = new Date(dueAt.getTime() + 61_000)
     expect(await processAccountDeletionEmailOutbox(retryAt)).toBe(1)
-    expect(await countRows('account_deletion_email_outbox', 'kind', 'cancellation')).toBe(0)
-    expect(mocks.sendAccountDeletionCancellationEmail).toHaveBeenCalledTimes(2)
+    expect(await countRows('account_deletion_email_outbox', 'kind', 'receipt')).toBe(0)
+    expect(mocks.sendAccountDeletionReceiptEmail).toHaveBeenCalledTimes(2)
   })
 
   it('reports whether the physical deletion dependency is configured', () => {
@@ -276,6 +333,7 @@ describe('account deletion PostgreSQL lifecycle', () => {
     const now = new Date('2026-07-31T05:00:00.000Z')
     const user = await seedUser('expired-lease@example.test', now)
     const accepted = await requestAccountDeletion(user, now)
+    await seedEmail(user.id, user.email, now, 'receipt')
     const expiredAt = new Date(now.getTime() - 1).toISOString()
     await query(
       `update account_deletion_requests
@@ -286,7 +344,7 @@ describe('account deletion PostgreSQL lifecycle', () => {
     await query(
       `update account_deletion_email_outbox
           set status = 'processing', attempts = 10, lease_token = 'expired-email', lease_expires_at = $2
-        where kind = 'cancellation' and deletion_request_id in (
+        where kind = 'receipt' and deletion_request_id in (
           select id from account_deletion_requests where user_id = $1
         )`,
       [user.id, expiredAt],
@@ -317,9 +375,7 @@ async function seedUser(email: string, now: Date): Promise<UserAccountRecord> {
     version: 1,
     id: randomUUID(),
     email,
-    password_hash: 'password-hash',
-    salt: 'salt',
-    iterations: 1,
+    ...await createPasswordHash('correct-password'),
     permission: 'growth',
     status: 'active',
     cdk_key: null,
@@ -423,19 +479,15 @@ async function seedDepotSample(uidHash: string, contributorProfileId: string | n
   )
 }
 
-async function readCancellationToken(userId: string): Promise<string> {
-  const result = await query<{ cancel_url: string }>(
-    `select outbox.payload_json->>'cancel_url' as cancel_url
-       from account_deletion_email_outbox outbox
-       join account_deletion_requests request on request.id = outbox.deletion_request_id
-      where request.user_id = $1 and outbox.kind = 'cancellation'`,
-    [userId],
+async function seedEmail(userId: string, email: string, now: Date, kind: 'cancellation' | 'receipt'): Promise<void> {
+  await query(
+    `insert into account_deletion_email_outbox
+      (id, deletion_request_id, kind, recipient_email, payload_json, status, attempts,
+       next_attempt_at, created_at, updated_at, delete_after)
+     select $1, id, $2, $3, jsonb_build_object('receipt_id', id), 'pending', 0, $4, $4, $4, $5
+       from account_deletion_requests where user_id = $6`,
+    [randomUUID(), kind, email, now.toISOString(), new Date(now.getTime() + 30 * 86_400_000).toISOString(), userId],
   )
-  const url = result.rows[0]?.cancel_url
-  if (!url) throw new Error('Cancellation URL was not created')
-  const token = new URL(url).searchParams.get('token')
-  if (!token) throw new Error('Cancellation token was not created')
-  return token
 }
 
 async function readUserStatus(userId: string): Promise<string | null> {

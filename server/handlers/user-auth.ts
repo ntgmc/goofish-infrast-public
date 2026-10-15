@@ -97,6 +97,7 @@ import {
 } from '../storage/admin-registration-invitation-store'
 import { selectAuthPayloadProfiles } from './auth-payload-profiles'
 import { projectExpiredFreePreviewWorkspace } from '../free-preview-workspace'
+import { cancelAccountDeletionOnLogin } from '../account-data-lifecycle'
 
 const SESSION_COOKIE = 'maa_session'
 const SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/
@@ -305,6 +306,11 @@ export async function loginUser(
   const passwordVerification = await verifyPasswordHashOrDummy(password, user)
   if (!user || !passwordVerification.verified) {
     return { ok: false, status: 401, message: authCopy.api_credentials_invalid }
+  }
+  if (user.status === 'pending_deletion' && user.email_verified_at !== null) {
+    const restored = await cancelAccountDeletionOnLogin(user)
+    if (!restored) return { ok: false, status: 403, message: authCopy.api_account_inactive }
+    user = restored
   }
   if (user.status !== 'active') {
     return { ok: false, status: 403, message: authCopy.api_account_inactive }

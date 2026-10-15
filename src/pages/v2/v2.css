@@ -1464,27 +1464,22 @@
   overflow-y: auto;
 }
 
+.v2-drawer-wide .v2-drawer-heading {
+  padding: 0 0 var(--space-xs);
+}
+
+.v2-drawer-wide .v2-drawer-heading h2 {
+  margin-top: 0;
+}
+
+.v2-drawer-wide .v2-drawer-heading > p {
+  margin-top: var(--space-2xs);
+}
+
 .v2-drawer-body > .v2-transition-pane {
   display: flex;
   flex-direction: column;
   gap: 20px;
-}
-
-.v2-drawer .config-dormitory-rules {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.v2-drawer .config-dormitory-rules button {
-  display: block;
-  white-space: normal;
-}
-
-.v2-drawer .config-editor .tool-secondary-action {
-  padding-inline: var(--space-xs);
-}
-
-.v2-drawer [aria-labelledby="config-shift-schedule-label"] {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .v2-drawer-heading {
@@ -1506,10 +1501,9 @@
 
 .v2-config-feedback {
   display: flex;
-  height: 64px;
+  min-height: 24px;
   align-items: center;
-  margin-top: 12px;
-  overflow-y: auto;
+  margin-top: var(--space-xs);
 }
 
 .v2-drawer-heading .v2-config-feedback p {
@@ -1546,198 +1540,34 @@
   font-weight: 600;
 }
 
-.config-editor--mobile {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-}
-
-.config-editor--mobile .config-editor-header {
-  gap: var(--space-sm);
-  padding-bottom: var(--space-md);
-}
-
-.config-editor--mobile .config-editor-header > div:first-child > p {
-  margin-top: var(--space-2xs);
+.v2-config-changes {
+  border-top: 1px solid var(--v2-line);
   color: var(--v2-secondary);
-  font-size: var(--text-sm);
-  line-height: 1.7;
+  font-size: var(--text-xs);
 }
 
-.config-mobile-essentials {
-  display: grid;
-  gap: var(--space-md);
-  padding: var(--space-md);
-  border: 1px solid var(--v2-accent);
-  border-radius: var(--radius-v2-panel);
-  background: var(--v2-accent-soft);
-}
-
-.config-mobile-essentials-heading {
+.v2-config-changes summary {
   display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: var(--space-sm);
-}
-
-.config-mobile-essentials-heading h3 {
-  margin-top: var(--space-2xs);
-  color: var(--v2-ink);
-  font-size: var(--text-base);
-}
-
-.config-mobile-kicker {
-  color: var(--v2-accent);
-  font-size: var(--text-xs);
-  font-weight: 600;
-}
-
-.config-mobile-difference-label,
-.config-mobile-differences span {
-  flex: none;
-  padding: var(--space-3xs) var(--space-2xs);
-  border-radius: var(--radius-v2-control);
-  background: var(--v2-paper);
-  color: var(--v2-accent);
-  font-size: var(--text-xs);
-  font-weight: 600;
-}
-
-.config-mobile-choice {
-  min-width: 0;
-}
-
-.config-mobile-choice h4 {
-  margin-bottom: var(--space-xs);
-  color: var(--v2-secondary);
-  font-size: var(--text-sm);
-  font-weight: 600;
-}
-
-.config-mobile-choice--preset {
-  padding-top: var(--space-sm);
-  border-top: 1px solid color-mix(in oklab, var(--v2-accent) 28%, transparent);
-}
-
-.config-mobile-choice--preset .config-preset-actions {
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.config-mobile-choice--preset .config-preset-actions > div {
-  align-items: stretch;
-}
-
-.config-mobile-choice--preset .config-preset-actions > div > span {
-  width: 100%;
-  margin: 0 0 var(--space-2xs);
-  color: var(--v2-muted);
-}
-
-.config-mobile-choice--preset .config-preset {
   min-height: 44px;
-  flex: 1 1 8rem;
-}
-
-.config-mobile-choice--preset .config-preset[aria-pressed="true"] {
-  border-color: var(--v2-accent);
-  background: var(--v2-paper);
-  color: var(--v2-accent);
-  box-shadow: inset 3px 0 var(--v2-accent);
-}
-
-.config-mobile-primary-grid {
-  display: grid;
-  gap: var(--space-md);
-  padding-top: var(--space-sm);
-  border-top: 1px solid color-mix(in oklab, var(--v2-accent) 28%, transparent);
-}
-
-.config-mobile-help {
-  margin-top: var(--space-xs);
-  color: var(--v2-muted);
-  font-size: var(--text-xs);
-  line-height: 1.65;
-}
-
-.config-mobile-differences {
-  display: flex;
-  flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-2xs);
-  padding-top: var(--space-sm);
-  border-top: 1px solid color-mix(in oklab, var(--v2-accent) 28%, transparent);
-  color: var(--v2-secondary);
-  font-size: var(--text-xs);
-}
-
-.config-mobile-differences li {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2xs);
-}
-
-.config-more-details {
-  min-width: 0;
-}
-
-.config-more-details > summary {
-  display: grid;
-  gap: var(--space-3xs);
-  min-height: 56px;
-  align-content: center;
-  padding: var(--space-xs) var(--space-sm);
-  border: 1px solid var(--v2-line);
-  border-radius: var(--radius-v2-control);
-  background: var(--v2-paper);
-  color: var(--v2-ink);
   cursor: pointer;
-  list-style: none;
 }
 
-.config-more-details > summary::-webkit-details-marker {
-  display: none;
+.v2-config-changes dl > div {
+  padding-block: var(--space-xs);
+  border-top: 1px solid var(--v2-line);
 }
 
-.config-more-details > summary::after {
-  content: '+';
-  position: absolute;
-  right: var(--space-sm);
-  color: var(--v2-accent);
-  font-size: var(--text-lg);
-}
-
-.config-more-details > summary {
-  position: relative;
-  padding-right: var(--space-xl);
-}
-
-.config-more-details[open] > summary::after {
-  content: '−';
-}
-
-.config-more-details > summary span {
-  font-size: var(--text-sm);
-  font-weight: 600;
-}
-
-.config-more-details > summary small {
-  color: var(--v2-muted);
-  font-size: var(--text-xs);
-}
-
-.config-more-details > summary strong {
-  position: absolute;
-  right: var(--space-xl);
-  top: var(--space-xs);
-  color: var(--v2-accent);
-  font-size: var(--text-xs);
+.v2-config-changes dt {
+  color: var(--v2-ink);
   font-weight: 500;
 }
 
-.config-more-details--desktop > summary {
-  display: none;
+.v2-config-changes dd {
+  margin-top: var(--space-2xs);
+  line-height: 1.65;
 }
 
 .v2-export-content > section { display: grid; min-width: 0; gap: var(--space-xs); }
@@ -2117,7 +1947,6 @@
   .v2-footer nav { flex-wrap: wrap; gap: var(--space-xs) var(--space-sm); }
   .v2-footer a { display: inline-flex; min-height: 44px; align-items: center; }
   .v2-drawer { padding: var(--space-sm) !important; padding-bottom: max(var(--space-sm), env(safe-area-inset-bottom)) !important; border-radius: 0 !important; }
-  .v2-drawer [aria-labelledby="config-shift-schedule-label"] { grid-template-columns: minmax(0, 1fr); }
   .v2-import-actions { grid-template-columns: minmax(0, 1fr); }
   .v2-operator-row { flex-wrap: wrap; }
 }

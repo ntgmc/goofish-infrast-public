@@ -103,7 +103,7 @@ describe('ConfigSection', () => {
     expect(screen.queryByRole('button', { name: /恢复/ })).not.toBeInTheDocument()
   })
 
-  it.each(['243', '252', '252-1', '252-full'])('keeps free preset selection in the header for %s', async (preset) => {
+  it.each(['243', '252', '252-1', '252-full'])('keeps free preset selection available for %s', async (preset) => {
     const user = userEvent.setup()
     const updateConfig = vi.fn()
     render(
@@ -129,7 +129,7 @@ describe('ConfigSection', () => {
     expect(screen.queryByText(/当前为 练度提升卡 权限/)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '当前免费配置' }))
     await user.click(await screen.findByRole('button', { name: '右满252（经验多）' }))
-    expect(screen.getByRole('button', { name: '右满252（经验多）' }).closest('.config-editor-header')).not.toBeNull()
+    expect(screen.getByRole('tab', { name: /房间/ })).toHaveAttribute('aria-selected', 'true')
 
     expect(updateConfig).toHaveBeenCalledOnce()
   })

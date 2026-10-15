@@ -81,14 +81,6 @@ export async function sendEmailVerificationEmail(
   })
 }
 
-export async function sendAccountDeletionCancellationEmail(email: string, cancelUrl: string): Promise<void> {
-  await sendLifecycleEmail({
-    email,
-    params: { cancel_url: cancelUrl, expires_days: 7 },
-    purpose: 'account_deletion_cancellation',
-  })
-}
-
 export async function sendAccountDeletionReceiptEmail(email: string, receiptId: string): Promise<void> {
   await sendLifecycleEmail({
     email,

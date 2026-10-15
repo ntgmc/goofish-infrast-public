@@ -1,6 +1,8 @@
-import { useEffect, useId, useState } from 'react'
-import { BedDouble, CalendarClock, Flame, Gem, Zap } from 'lucide-react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { BedDouble, Factory, Flame, Store, Zap } from 'lucide-react'
+import { Tabs } from './ui/tabs'
 import {
+  CONFIG_PRESETS,
   allowsInventoryProductRebalance,
   getRightFull252Variant,
   isFullBlood252Config,
@@ -14,6 +16,7 @@ import {
   parseShiftHours,
   resolveConfigLayout,
 } from '../lib/config'
+import { facilityLayoutSchema } from '../lib/facility-layout'
 import { BASE_DAILY_SANITY_BUDGET, MONTHLY_CARD_DAILY_SANITY_BONUS, normalizeOrundumPlanning } from '../lib/orundum-economy'
 import type { IntermediateProduct, LicenseConfig, PermissionMode } from '../lib/types'
 import { useSiteFeatures } from '../lib/site-feature-context'
@@ -24,11 +27,10 @@ import ProductIcon from './ProductIcon'
 import { Switch } from './ui/switch'
 import './ConfigEditor.css'
 
-
-type ProductGroup = 'trading_stations' | 'manufacturing_stations'
-
+const text = copy.v2.configEditor
 const TRADING_PRODUCTS = ['LMD', 'Orundum']
 const MANUFACTURING_PRODUCTS = ['Pure Gold', 'Battle Record', 'Originium Shard']
+const STATION_ICONS = { trading: Store, manufacturing: Factory }
 const PRODUCT_LABELS: Record<string, string> = {
   LMD: copy.common.components_ConfigEditor_001,
   Orundum: copy.common.components_ConfigEditor_002,
@@ -36,32 +38,15 @@ const PRODUCT_LABELS: Record<string, string> = {
   'Battle Record': copy.common.components_ConfigEditor_004,
   'Originium Shard': copy.common.components_ConfigEditor_005,
 }
-
-const SCHEDULE_MODE_LABELS: Record<string, string> = {
+const SCHEDULE_MODE_LABELS = {
   maa: copy.common.components_ConfigEditor_006,
   rotation: copy.common.components_ConfigEditor_007,
-  variable: copy.common.components_ConfigEditor_008,
 }
-
-const DORMITORY_RULE_LABELS: Record<string, string> = {
+const DORMITORY_RULE_LABELS = {
   fixed: copy.common.components_ConfigEditor_009,
   maa_autofill: copy.common.components_ConfigEditor_010,
   maa_pure_autofill: copy.common.components_ConfigEditor_097,
 }
-
-const DORMITORY_RULE_OPTIONS = ['fixed', 'maa_autofill', 'maa_pure_autofill'] as const
-
-const VARIABLE_SHIFT_SCHEDULE_DEFAULTS = {
-  enable: true,
-  enabled: true,
-  max_shifts: 4,
-  shift_step_minutes: 60,
-  min_low_hours: 3,
-  beam_width: 4,
-  trace_variable_shifts: false,
-  trace_mood_cycle: false,
-} satisfies NonNullable<LicenseConfig['variable_shift_schedule']>
-
 const SHIFT_SCHEDULE_OPTIONS = [
   { id: '8x3', label: copy.common.components_ConfigEditor_087, hours: [8, 8, 8] },
   { id: '12x3', label: copy.common.components_ConfigEditor_088, hours: [12, 12, 12] },
@@ -69,9 +54,6 @@ const SHIFT_SCHEDULE_OPTIONS = [
   { id: 'variable', label: copy.common.components_ConfigEditor_090 },
   { id: 'custom', label: copy.common.components_ConfigEditor_091 },
 ] as const
-
-type ShiftScheduleChoice = typeof SHIFT_SCHEDULE_OPTIONS[number]['id']
-
 const PERMISSION_LABELS: Record<PermissionMode, string> = {
   recommended: copy.common.components_ConfigEditor_011,
   growth: copy.common.components_ConfigEditor_012,
@@ -80,134 +62,34 @@ const PERMISSION_LABELS: Record<PermissionMode, string> = {
   ultimate: copy.common.components_ConfigEditor_014,
   admin: copy.common.components_ConfigEditor_015,
 }
+const PRESET_GROUPS = [
+  { label: copy.common.components_ConfigEditor_110, presets: [
+    ['243', copy.common.components_ConfigEditor_030, 'balanced', ['Pure Gold', 'Battle Record']],
+    ['243-1', copy.common.components_ConfigEditor_031, 'orundum', ['Orundum']],
+    ['333-lmd', copy.common.components_ConfigEditor_107, 'gold', ['LMD']],
+    ['333', copy.common.components_ConfigEditor_032, 'orundum', ['Orundum']],
+  ] },
+  { label: copy.common.components_ConfigEditor_111, presets: [
+    ['252', copy.common.components_ConfigEditor_103, 'experience', ['Battle Record']],
+    ['252-1', copy.common.components_ConfigEditor_105, 'gold', ['Pure Gold']],
+    ['252-full', copy.common.components_ConfigEditor_108, 'balanced', ['Pure Gold', 'Battle Record']],
+  ] },
+] as const
 
-const CONFIG_PRESETS: Record<string, LicenseConfig> = {
-  '243': {
-    layout: '2-4-3',
-    desc: copy.common.components_ConfigEditor_016,
-    schedule_mode: 'maa',
-    dormitory_rule: 'fixed',
-    trading_stations_count: 2,
-    manufacturing_stations_count: 4,
-    product_requirements: {
-      trading_stations: { LMD: 2 },
-      manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 2 },
-    },
-    Fiammetta: { enable: true },
-    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
-  },
-  '243-1': {
-    layout: '2-4-3',
-    desc: copy.common.components_ConfigEditor_017,
-    schedule_mode: 'maa',
-    dormitory_rule: 'fixed',
-    trading_stations_count: 2,
-    manufacturing_stations_count: 4,
-    product_requirements: {
-      trading_stations: { LMD: 1, Orundum: 1 },
-      manufacturing_stations: { 'Pure Gold': 2, 'Originium Shard': 2 },
-    },
-    Fiammetta: { enable: true },
-    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
-  },
-  '252': {
-    layout: '2-5-2',
-    desc: copy.common.components_ConfigEditor_102,
-    schedule_mode: 'maa',
-    dormitory_rule: 'fixed',
-    trading_stations_count: 2,
-    manufacturing_stations_count: 5,
-    trading_station_levels: [3, 1],
-    manufacturing_station_levels: [2, 2, 3, 3, 2],
-    product_requirements: {
-      trading_stations: { LMD: 2 },
-      manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 3 },
-    },
-    Fiammetta: { enable: true },
-    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'Battle Record'] },
-  },
-  '252-1': {
-    layout: '2-5-2',
-    desc: copy.common.components_ConfigEditor_104,
-    schedule_mode: 'maa',
-    dormitory_rule: 'fixed',
-    trading_stations_count: 2,
-    manufacturing_stations_count: 5,
-    trading_station_levels: [3, 2],
-    manufacturing_station_levels: [3, 2, 3, 2, 2],
-    product_requirements: {
-      trading_stations: { LMD: 2 },
-      manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 3 },
-    },
-    Fiammetta: { enable: true },
-    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'Battle Record'] },
-  },
-  '252-full': {
-    layout: '2-5-2',
-    desc: copy.common.components_ConfigEditor_108,
-    schedule_mode: 'maa',
-    dormitory_rule: 'fixed',
-    trading_stations_count: 2,
-    manufacturing_stations_count: 5,
-    trading_station_levels: [3, 2],
-    manufacturing_station_levels: [3, 3, 3, 3, 3],
-    product_requirements: {
-      trading_stations: { LMD: 2 },
-      manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 3 },
-    },
-    Fiammetta: { enable: true },
-    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'Battle Record'] },
-  },
-  '333-lmd': {
-    layout: '3-3-3',
-    desc: copy.common.components_ConfigEditor_106,
-    schedule_mode: 'maa',
-    dormitory_rule: 'fixed',
-    trading_stations_count: 3,
-    manufacturing_stations_count: 3,
-    product_requirements: {
-      trading_stations: { LMD: 3 },
-      manufacturing_stations: { 'Pure Gold': 3 },
-    },
-    Fiammetta: { enable: true },
-    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
-  },
-  '333': {
-    layout: '3-3-3',
-    desc: copy.common.components_ConfigEditor_018,
-    schedule_mode: 'maa',
-    dormitory_rule: 'fixed',
-    trading_stations_count: 3,
-    manufacturing_stations_count: 3,
-    product_requirements: {
-      trading_stations: { LMD: 2, Orundum: 1 },
-      manufacturing_stations: { 'Pure Gold': 2, 'Originium Shard': 1 },
-    },
-    Fiammetta: { enable: true },
-    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
-  },
-}
-
-function applyCounts(config: LicenseConfig): LicenseConfig {
-  const rightFull252Variant = getRightFull252Variant(config)
+function applyCounts(config: LicenseConfig): void {
+  const variant = getRightFull252Variant(config)
   config.layout = resolveConfigLayout(config)
   config.desc = isFullBlood252Config(config)
     ? copy.common.components_ConfigEditor_108
-    : rightFull252Variant
-    ? rightFull252Variant === '252' ? copy.common.components_ConfigEditor_102 : copy.common.components_ConfigEditor_104
-    : `${config.layout}${copy.common.components_ConfigEditor_019}`
-  return config
+    : variant
+      ? CONFIG_PRESETS[variant].desc
+      : `${config.layout}${copy.common.components_ConfigEditor_019}`
 }
 
-function normalizeIntermediateInventory(value: unknown): Record<IntermediateProduct, number> {
-  const source = value && typeof value === 'object' ? value as Record<string, unknown> : {}
-  const next: Record<IntermediateProduct, number> = {
-    'Originium Shard': 0,
-    'Pure Gold': 0,
-    'Orirock Cube': 0,
-  }
+function normalizeIntermediateInventory(value: LicenseConfig['intermediate_inventory']): Record<IntermediateProduct, number> {
+  const next: Record<IntermediateProduct, number> = { 'Originium Shard': 0, 'Pure Gold': 0, 'Orirock Cube': 0 }
   for (const product of Object.keys(next) as IntermediateProduct[]) {
-    const count = Number(source[product])
+    const count = Number(value?.[product])
     next[product] = Number.isFinite(count) ? Math.max(0, Math.round(count * 100) / 100) : 0
   }
   return next
@@ -215,7 +97,7 @@ function normalizeIntermediateInventory(value: unknown): Record<IntermediateProd
 
 function bindAutoDrones(config: LicenseConfig): void {
   config.drones = {
-    ...(config.drones ?? { order: 'pre', targets: [] }),
+    ...config.drones,
     enable: true,
     auto: true,
     auto_strategy: normalizeDroneAutoStrategy(config.drones?.auto_strategy),
@@ -225,1111 +107,408 @@ function bindAutoDrones(config: LicenseConfig): void {
   delete config.drones.auto_target_product
 }
 
-function markIntermediateInventoryForOptimizer(config: LicenseConfig): void {
-  config.auto_balance_source = 'intermediate_inventory'
-  bindAutoDrones(config)
-}
-
 interface ConfigEditorProps {
-  profileId?: string;
-  config: LicenseConfig;
-  canEdit: boolean;
-  readOnly?: boolean;
-  canEditIntermediateInventory?: boolean;
-  canSelectPreset?: boolean;
-  canEditFixedShiftHours?: boolean;
-  changed?: boolean;
-  permission?: PermissionMode;
-  validation: { ok: true } | { ok: false; message: string };
-  onUpdate: (mutate: (config: LicenseConfig) => void) => void;
-  note?: string;
-  embedded?: boolean;
-  hideHeader?: boolean;
-  hidePresetActions?: boolean;
-  hideValidation?: boolean;
-  mobile?: boolean;
+  profileId?: string
+  config: LicenseConfig
+  canEdit: boolean
+  readOnly?: boolean
+  readOnlyMessage?: string
+  canEditIntermediateInventory?: boolean
+  canSelectPreset?: boolean
+  canEditFixedShiftHours?: boolean
+  changed?: boolean
+  permission?: PermissionMode
+  validation: { ok: true } | { ok: false; message: string }
+  onUpdate: (mutate: (config: LicenseConfig) => void) => void
+  note?: string
+  embedded?: boolean
+  hideHeader?: boolean
+  hidePresetActions?: boolean
+  hideValidation?: boolean
 }
 
 export default function ConfigEditor({
-  profileId,
-  config,
-  canEdit,
-  readOnly = false,
-  canEditIntermediateInventory,
-  canSelectPreset = false,
-  canEditFixedShiftHours = false,
-  changed = false,
-  permission,
-  validation,
-  onUpdate,
-  note,
-  embedded = false,
-  hideHeader = false,
-  hidePresetActions = false,
-  hideValidation = false,
-  mobile = false,
+  profileId, config, canEdit, readOnly = false, readOnlyMessage = copy.common.configGenerationReadOnly, canEditIntermediateInventory,
+  canSelectPreset = false, canEditFixedShiftHours = false, changed = false, permission,
+  validation, onUpdate, note, embedded = false, hideHeader = false,
+  hidePresetActions = false, hideValidation = false,
 }: ConfigEditorProps) {
+  const [section, setSection] = useState('common')
+  const roomsTabRef = useRef<HTMLButtonElement>(null)
   const canUseIntermediateInventory = canEdit || Boolean(canEditIntermediateInventory)
-  const autoInventoryOnly = !canEdit && canUseIntermediateInventory
-  const supported252PresetSelected = getRightFull252Variant(config) !== null || isFullBlood252Config(config)
-  const tradingProducts = uniqueProducts(TRADING_PRODUCTS, config.product_requirements.trading_stations)
-  const manufacturingProducts = uniqueProducts(MANUFACTURING_PRODUCTS, config.product_requirements.manufacturing_stations)
-  const droneTargets = formatDroneTargetsInput(config.drones?.targets ?? [])
-  const scheduleMode = normalizeScheduleMode(config.schedule_mode)
-  const rotationMode = scheduleMode === 'rotation'
-  const isScheduleModeSelected = (mode: 'maa' | 'rotation') => mode === 'maa' ? !rotationMode : scheduleMode === mode
+  const supported252 = getRightFull252Variant(config) !== null || isFullBlood252Config(config)
+  const needsLayout = supported252 && !facilityLayoutSchema.safeParse(config.facility_layout).success
+  const tradingProducts = [...new Set([...TRADING_PRODUCTS, ...Object.keys(config.product_requirements.trading_stations)])]
+  const manufacturingProducts = [...new Set([...MANUFACTURING_PRODUCTS, ...Object.keys(config.product_requirements.manufacturing_stations)])]
+  const rotationMode = normalizeScheduleMode(config.schedule_mode) === 'rotation'
   const variableShiftMode = isVariableShiftScheduleEnabled(config)
   const dormitoryRule = normalizeDormitoryRule(config.dormitory_rule)
-  const fiammettaShiftHoursSupported = !variableShiftMode && isFiammettaShiftHoursSupported(config.shift_hours)
-  const fiammettaShiftInterval = fiammettaShiftHoursSupported
+  const fiammettaSupported = !variableShiftMode && isFiammettaShiftHoursSupported(config.shift_hours)
+  const fiammettaInterval = fiammettaSupported
     ? `${Math.max(...(parseShiftHours(config.shift_hours) ?? [8]))}${copy.common.components_ConfigEditor_099}`
     : copy.common.components_ConfigEditor_100
-  const validationMessage = !hideValidation && validation.ok === false ? validation.message : null
-  const intermediateInventory = normalizeIntermediateInventory(config.intermediate_inventory)
-  const allowProductRebalance = allowsInventoryProductRebalance(config, canEdit)
+  const inventory = normalizeIntermediateInventory(config.intermediate_inventory)
   const orundumPlanning = normalizeOrundumPlanning(config)
-  const showOrundumPlanning =
-    (config.product_requirements.trading_stations.Orundum ?? 0) > 0 ||
-    (config.product_requirements.manufacturing_stations['Originium Shard'] ?? 0) > 0
-  const preset = findConfigPreset(config)
-  const presetDifferences = preset ? getPresetDifferences(config, preset.preset) : [copy.v2.configCustomPreset]
+  const showOrundum = (config.product_requirements.trading_stations.Orundum ?? 0) > 0
+    || (config.product_requirements.manufacturing_stations['Originium Shard'] ?? 0) > 0
+  const presetId = Object.keys(CONFIG_PRESETS).find((id) => presetMatches(config, CONFIG_PRESETS[id])) ?? ''
 
-  const applyPreset = (preset: LicenseConfig) => {
-    onUpdate((next) => {
-      const intermediateInventory = normalizeIntermediateInventory(next.intermediate_inventory)
-      const autoBalanceEnabled =
-        next.allow_product_rebalance !== undefined ||
-        next.auto_balance_source === 'intermediate_inventory' ||
-        next.auto_balance_source === 'limited_config'
+  const update = (mutate: (next: LicenseConfig) => void) => {
+    if (!readOnly) onUpdate(mutate)
+  }
+  const showRooms = () => {
+    setSection('rooms')
+    requestAnimationFrame(() => {
+      const tab = roomsTabRef.current
+      if (tab?.getAttribute('aria-selected') === 'true') tab.focus({ preventScroll: true })
+    })
+  }
+  const applyPreset = (id: string) => {
+    const preset = CONFIG_PRESETS[id]
+    if (!preset) return
+    update((next) => {
+      const stock = normalizeIntermediateInventory(next.intermediate_inventory)
+      const autoBalanceEnabled = next.allow_product_rebalance !== undefined
+        || next.auto_balance_source === 'intermediate_inventory' || next.auto_balance_source === 'limited_config'
       const droneStrategy = normalizeDroneAutoStrategy(next.drones?.auto_strategy)
-      const copy = normalizeConfig(preset)
-      copy.drones!.auto_strategy = droneStrategy
+      const normalized = normalizeConfig(preset)
+      normalized.drones!.auto_strategy = droneStrategy
       delete next.trading_station_levels
       delete next.manufacturing_station_levels
       delete next.facility_layout
       delete next.optimization_mode
       delete next.optimizer_search
-      Object.assign(next, copy)
-      next.intermediate_inventory = intermediateInventory
+      Object.assign(next, normalized)
+      next.intermediate_inventory = stock
       if (autoBalanceEnabled) {
-        markIntermediateInventoryForOptimizer(next)
+        next.auto_balance_source = 'intermediate_inventory'
+        bindAutoDrones(next)
       }
     })
+    if (preset.layout === '2-5-2') showRooms()
   }
-
-  const setStationCounts = (tradingCount: number, manufacturingCount: number) => {
-    onUpdate((next) => {
-      next.trading_stations_count = tradingCount
-      next.manufacturing_stations_count = manufacturingCount
-      delete next.trading_station_levels
-      delete next.manufacturing_station_levels
-      next.product_requirements.trading_stations = fitProductCounts(
-        next.product_requirements.trading_stations,
-        tradingProducts,
-        tradingCount,
-        'LMD'
-      )
-      next.product_requirements.manufacturing_stations = fitProductCounts(
-        next.product_requirements.manufacturing_stations,
-        manufacturingProducts,
-        manufacturingCount,
-        'Pure Gold'
-      )
-      applyCounts(next)
-    })
-  }
-
-  const setProductCount = (group: ProductGroup, product: string, value: number) => {
-    onUpdate((next) => {
-      next.product_requirements[group][product] = Math.max(0, Math.min(6, value))
-      applyCounts(next)
-    })
-  }
-
-  const setIntermediateInventory = (product: IntermediateProduct, value: number) => {
-    onUpdate((next) => {
-      const stock = Number.isFinite(value) ? Math.max(0, value) : 0
-      next.intermediate_inventory = {
-        ...normalizeIntermediateInventory(next.intermediate_inventory),
-        [product]: stock,
-      }
-      next.allow_product_rebalance = allowsInventoryProductRebalance(next, canEdit)
-      markIntermediateInventoryForOptimizer(next)
-      applyCounts(next)
-    })
-  }
-
-  const setProductRebalance = (enabled: boolean) => {
-    onUpdate((next) => {
-      next.allow_product_rebalance = enabled
-      next.auto_balance_source = enabled ? 'intermediate_inventory' : 'limited_config'
-      next.intermediate_inventory = normalizeIntermediateInventory(next.intermediate_inventory)
-      applyCounts(next)
-    })
-  }
-
-  const setOrundumDailySanityBudget = (value: number) => {
-    onUpdate((next) => {
-      next.orundum_planning = {
-        ...(next.orundum_planning ?? {}),
-        daily_sanity_budget: Number.isFinite(value) ? Math.max(0, value) : BASE_DAILY_SANITY_BUDGET,
-      }
-      applyCounts(next)
-    })
-  }
-
-  const setOrundumMonthlyCard = (enabled: boolean) => {
-    onUpdate((next) => {
-      next.orundum_planning = {
-        ...(next.orundum_planning ?? {}),
-        daily_sanity_budget: normalizeOrundumPlanning(next).daily_sanity_budget,
-        monthly_card: enabled,
-      }
-      applyCounts(next)
-    })
-  }
+  const setStationCounts = (trading: number, manufacturing: number) => update((next) => {
+    next.trading_stations_count = trading
+    next.manufacturing_stations_count = manufacturing
+    delete next.trading_station_levels
+    delete next.manufacturing_station_levels
+    next.product_requirements.trading_stations = fitProductCounts(next.product_requirements.trading_stations, tradingProducts, trading, 'LMD')
+    next.product_requirements.manufacturing_stations = fitProductCounts(next.product_requirements.manufacturing_stations, manufacturingProducts, manufacturing, 'Pure Gold')
+    applyCounts(next)
+  })
+  const changeHours = (hours: number[]) => update((next) => {
+    next.schedule_mode = 'maa'
+    next.shift_hours = hours
+    if (!isFiammettaShiftHoursSupported(hours)) next.Fiammetta = { ...(next.Fiammetta ?? {}), enable: false }
+    next.variable_shift_schedule = { ...next.variable_shift_schedule, enable: false, enabled: false }
+    applyCounts(next)
+  })
 
   return (
-<fieldset disabled={readOnly} className={`config-editor min-w-0 ${mobile ? 'config-editor--mobile' : ''} ${embedded ? '' : 'tool-panel p-5 sm:p-6'}`} aria-label={copy.common.components_ConfigEditor_021}>
-      {readOnly && <p className="tool-alert tool-alert--info mb-4" role="status">{copy.common.configGenerationReadOnly}</p>}
-      {!hideHeader && (
-<div className="config-editor-header flex flex-col gap-4 border-b border-surface-3/60 pb-5">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold text-ink-primary">{copy.common.components_ConfigEditor_021}</h2>
-            {changed && (
-              <span className="tool-status tool-status--warning">
-                {copy.common.components_ConfigEditor_022}</span>
-            )}
-          </div>
-          <p className="mt-1 text-sm text-ink-secondary">
-            {note ?? (canEdit
-              ? copy.common.components_ConfigEditor_023
-              : autoInventoryOnly
-                ? `${copy.common.components_ConfigEditor_024}${permission ? PERMISSION_LABELS[permission] : copy.common.components_ConfigEditor_026}${copy.common.components_ConfigEditor_025}`
-                : `${copy.common.components_ConfigEditor_027}${permission ? PERMISSION_LABELS[permission] : copy.common.components_ConfigEditor_029}${copy.common.components_ConfigEditor_028}`)}
-          </p>
+    <Tabs.Root value={section} onValueChange={setSection} className={`config-editor min-w-0 ${embedded ? '' : 'tool-panel p-5 sm:p-6'}`}>
+      {!hideHeader && <header className="config-editor-header">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-lg font-semibold text-ink-primary">{copy.common.components_ConfigEditor_021}</h2>
+          {changed && <span className="tool-status tool-status--warning">{copy.common.components_ConfigEditor_022}</span>}
         </div>
-        {!mobile && !hidePresetActions && (canEdit || canSelectPreset) && (
-          <PresetActions onSelect={applyPreset} autoInventoryOnly={autoInventoryOnly} selectedId={preset?.id} />
-        )}
-      </div>
-      )}
-
-      {mobile && <MobileConfigEssentials
-        config={config}
-        canEdit={canEdit}
-        canEditFixedShiftHours={canEditFixedShiftHours}
-        canSelectPreset={canSelectPreset}
-        autoInventoryOnly={autoInventoryOnly}
-        rotationMode={rotationMode}
-        variableShiftMode={variableShiftMode}
-        isScheduleModeSelected={isScheduleModeSelected}
-        onChangeMode={(mode) => onUpdate((next) => {
-          next.schedule_mode = mode
-          applyCounts(next)
-        })}
-        preset={preset}
-        differences={presetDifferences}
-        onSelectPreset={applyPreset}
-        onSelectVariable={() => onUpdate((next) => {
-          next.schedule_mode = 'variable'
-          next.shift_hours = [8, 8, 8]
-          next.Fiammetta = { ...(next.Fiammetta ?? { enable: false }), enable: false }
-          next.variable_shift_schedule = { ...(next.variable_shift_schedule ?? {}), ...VARIABLE_SHIFT_SCHEDULE_DEFAULTS }
-          applyCounts(next)
-        })}
-        onChangeHours={(hours) => onUpdate((next) => {
-          next.schedule_mode = 'maa'
-          next.shift_hours = hours
-          if (!isFiammettaShiftHoursSupported(hours)) next.Fiammetta = { ...(next.Fiammetta ?? { enable: false }), enable: false }
-          next.variable_shift_schedule = { ...(next.variable_shift_schedule ?? {}), enable: false, enabled: false }
-          applyCounts(next)
-        })}
-      />}
-
-      {supported252PresetSelected && (
-        <FacilityLayoutEditor key={JSON.stringify([profileId, config.trading_station_levels, config.manufacturing_station_levels])} profileId={profileId} config={config} readOnly={readOnly} onUpdate={onUpdate} />
-      )}
-      {supported252PresetSelected && (
-        <p className="tool-alert tool-alert--warning mt-3 px-3 py-2 text-xs leading-5" role="note">
-          {copy.common.components_ConfigEditor_109}
-        </p>
-      )}
-
-      <details className={`config-more-details ${mobile ? '' : 'config-more-details--desktop'}`} open={!mobile || !validation.ok || presetDifferences.length > 0}>
-        {mobile && <summary>
-          <span>{copy.v2.configMoreDetails}</span>
-          <small>{copy.v2.configMoreDetailsHint}</small>
-          {presetDifferences.length > 0 && <strong>{copy.v2.configChangedFromPreset}</strong>}
-        </summary>}
-
-      {supported252PresetSelected && !canEdit && !autoInventoryOnly ? (
-        <div className="pt-5">
-          <div className="tool-inset bg-surface-2/60 p-4" role="status">
-            <p className="text-sm leading-6 text-ink-secondary">
-              {SCHEDULE_MODE_LABELS[scheduleMode]} · {config.layout} · {config.desc}
-            </p>
-          </div>
-        </div>
-      ) : autoInventoryOnly ? (
-        <div className="pt-5">
-          <div className="tool-inset p-4">
-            <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_033}</h3>
-            <p className="mt-1 text-sm leading-6 text-ink-secondary">
-              {copy.common.components_ConfigEditor_034}</p>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              {!mobile && <div>
-                <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_038}</p>
-                <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label={copy.common.components_ConfigEditor_039}>
-                  {(['maa', 'rotation'] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      aria-pressed={isScheduleModeSelected(mode)}
-                      onClick={() => onUpdate((next) => {
-                        next.schedule_mode = mode
-                        applyCounts(next)
-                      })}
-                      className={`tool-secondary-action min-h-11 px-3 text-sm ${
-                        isScheduleModeSelected(mode)
-                          ? 'tool-option-selected'
-                          : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'
-                      }`}
-                    >
-                      {SCHEDULE_MODE_LABELS[mode]}
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-2 text-xs leading-5 text-ink-muted">
-                  {rotationMode
-                    ? copy.common.components_ConfigEditor_062
-                    : copy.common.components_ConfigEditor_095}
-                </p>
-                {!rotationMode && canEditFixedShiftHours && <div className="mt-4">
-                  <ShiftHoursEditor value={config.shift_hours} variableMode={variableShiftMode} canEdit={false} canEditFixedShiftHours
-                    onSelectVariable={() => undefined} onChange={(hours) => onUpdate((next) => {
-                      next.schedule_mode = 'maa'
-                      next.shift_hours = hours
-                      next.variable_shift_schedule = { ...(next.variable_shift_schedule ?? {}), enable: false, enabled: false }
-                      applyCounts(next)
-                    })} />
-                </div>}
-              </div>}
-              <div>
-                <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_040}</p>
-                <div className="config-dormitory-rules tool-inset grid gap-2 p-1 sm:grid-cols-3" role="group" aria-label={copy.common.components_ConfigEditor_041}>
-                  {DORMITORY_RULE_OPTIONS.map((rule) => (
-                    <button
-                      key={rule}
-                      type="button"
-                      aria-pressed={dormitoryRule === rule}
-                      disabled={rotationMode}
-                      onClick={() => onUpdate((next) => {
-                        next.dormitory_rule = rule
-                        applyCounts(next)
-                      })}
-                      className={`tool-secondary-action min-h-11 min-w-0 whitespace-normal px-3 py-2 text-sm leading-5 disabled:cursor-not-allowed ${
-                        dormitoryRule === rule
-                          ? 'tool-option-selected'
-                          : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary disabled:text-ink-muted'
-                      }`}
-                    >
-                      <span>{DORMITORY_RULE_LABELS[rule]}</span>
-                      {rule === 'fixed' && (
-                        <span className="ml-1 text-xs text-brand-600">{copy.common.components_ConfigEditor_096}</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-2 text-xs leading-5 text-ink-muted">
-                  {rotationMode
-                    ? copy.common.components_ConfigEditor_065
-                    : dormitoryRule === 'maa_pure_autofill'
-                      ? copy.common.components_ConfigEditor_098
-                      : dormitoryRule === 'maa_autofill'
-                        ? copy.common.components_ConfigEditor_066
-                        : copy.common.components_ConfigEditor_067}
-                </p>
+        <p>{note ?? (canEdit ? copy.common.components_ConfigEditor_023
+          : canUseIntermediateInventory
+            ? `${copy.common.components_ConfigEditor_024}${permission ? PERMISSION_LABELS[permission] : copy.common.components_ConfigEditor_026}${copy.common.components_ConfigEditor_025}`
+            : `${copy.common.components_ConfigEditor_027}${permission ? PERMISSION_LABELS[permission] : copy.common.components_ConfigEditor_029}${copy.common.components_ConfigEditor_028}`)}</p>
+      </header>}
+      {hideHeader && note && <p className="config-help">{note}</p>}
+      {readOnly && <p className="tool-alert tool-alert--info" role="status">{readOnlyMessage}</p>}
+      <Tabs.List className="config-task-tabs" aria-label={text.navigation}>
+        <Tabs.Trigger value="common">{text.common}</Tabs.Trigger>
+        <Tabs.Trigger ref={roomsTabRef} value="rooms">{text.rooms}{needsLayout && <span className="config-task-pending" aria-label={text.needsLayout} />}</Tabs.Trigger>
+        <Tabs.Trigger value="inventory">{text.inventory}</Tabs.Trigger>
+        <Tabs.Trigger value="strategy">{text.strategy}</Tabs.Trigger>
+      </Tabs.List>
+      <fieldset disabled={readOnly} className="config-editor-fields" aria-label={copy.common.components_ConfigEditor_021}>
+        <Tabs.Content value="common" forceMount hidden={section !== 'common'} className="config-task-panel config-task-panel--common">
+          <h3 className="sr-only">{text.commonTitle}</h3>
+          {!hidePresetActions && <section className="config-field config-preset-section" data-tour-target="config-preset-actions" aria-label={copy.v2.configPreset}>
+            <h4>{copy.v2.configPreset}</h4>
+            <div className="config-preset-groups">
+              {PRESET_GROUPS.map((group) => <div key={group.label} className="config-preset-group" role="group" aria-label={group.label}>
+                <span>{group.label}</span>
+                <div>{group.presets.map(([id, label, tone, products]) => <button key={id} type="button"
+                  className={`tool-secondary-action config-preset config-preset--${tone}`} aria-pressed={presetId === id}
+                  disabled={!canEdit && !canSelectPreset} onClick={() => applyPreset(id)}>
+                  <span className="config-preset-icons">{products.map((product) => <ProductIcon key={product} product={product} size={20} />)}</span>
+                  {label}
+                </button>)}</div>
+              </div>)}
+            </div>
+            {!presetId && <p className="config-help">{copy.v2.configCustomPreset}</p>}
+          </section>}
+          <section aria-labelledby="config-schedule-heading" className="config-field config-execution-field">
+            <h4 id="config-schedule-heading">{copy.v2.configExecution}</h4>
+            <div className="config-execution-options" role="group" aria-label={copy.common.components_ConfigEditor_061}>
+              {(['maa', 'rotation'] as const).map((mode) => <button key={mode} type="button"
+                aria-pressed={mode === 'rotation' ? rotationMode : !rotationMode}
+                className={`tool-secondary-action ${rotationMode === (mode === 'rotation') ? 'tool-option-selected' : ''}`}
+                onClick={() => update((next) => { next.schedule_mode = mode; applyCounts(next) })}>
+                {SCHEDULE_MODE_LABELS[mode]}
+              </button>)}
+            </div>
+            <p className="config-help">{rotationMode ? copy.common.components_ConfigEditor_062 : text.maaHelp}</p>
+          </section>
+          {!rotationMode && <ShiftHoursEditor value={config.shift_hours} variableMode={variableShiftMode} canEdit={canEdit}
+            canEditFixedShiftHours={canEditFixedShiftHours} onChange={changeHours}
+            onSelectVariable={() => update((next) => {
+              next.schedule_mode = 'variable'
+              next.shift_hours = [8, 8, 8]
+              next.Fiammetta = { ...next.Fiammetta, enable: false }
+              next.variable_shift_schedule = {
+                ...next.variable_shift_schedule, enable: true, enabled: true, max_shifts: 4,
+                shift_step_minutes: 60, min_low_hours: 3, beam_width: 4,
+                trace_variable_shifts: false, trace_mood_cycle: false,
+              }
+              applyCounts(next)
+            })} />}
+          {needsLayout && <button type="button" className="tool-secondary-action config-layout-notice" onClick={showRooms}>
+            {text.confirmLayout}
+          </button>}
+        </Tabs.Content>
+        <Tabs.Content value="rooms" forceMount hidden={section !== 'rooms'} className="config-task-panel">
+          {supported252 ? <>
+            <FacilityLayoutEditor key={JSON.stringify([profileId, config.trading_station_levels, config.manufacturing_station_levels])}
+              profileId={profileId} config={config} readOnly={readOnly} onUpdate={update} />
+            <p className="tool-alert tool-alert--warning text-xs leading-5" role="note">{copy.common.components_ConfigEditor_109}</p>
+          </> : <section aria-labelledby="config-room-layout-heading">
+            <h3 id="config-room-layout-heading" className="config-section-title">{copy.common.components_ConfigEditor_042}</h3>
+            <div className="config-room-counts">
+              <CounterField station="trading" id="trading-stations-count" label={copy.common.components_ConfigEditor_044} value={config.trading_stations_count}
+                canEdit={canEdit} onChange={(value) => setStationCounts(value, 6 - value)} />
+              <CounterField station="manufacturing" id="manufacturing-stations-count" label={copy.common.components_ConfigEditor_045} value={config.manufacturing_stations_count}
+                canEdit={canEdit} onChange={(value) => setStationCounts(6 - value, value)} />
+              <div className="config-field config-station config-station--power">
+                <span className="config-station-heading"><Zap aria-hidden="true" />{copy.common.components_ConfigEditor_094}</span>
+                <strong className="config-station-count">{config.layout.split('-')[2]}</strong>
               </div>
             </div>
-            <div className="mt-4">
-              <IntermediateInventoryEditor
-                canEdit={canUseIntermediateInventory}
-                inventory={intermediateInventory}
-                showOrirock={showOrundumPlanning}
-                allowProductRebalance={allowProductRebalance}
-                rotationMode={rotationMode}
-                onProductRebalanceChange={setProductRebalance}
-                onChange={setIntermediateInventory}
-              />
+          </section>}
+          <section aria-labelledby="config-product-counts-heading">
+            <h3 id="config-product-counts-heading" className="config-section-title">{copy.common.components_ConfigEditor_048}</h3>
+            <div className="config-product-groups">
+              <ProductGroupEditor station="trading" label={copy.common.components_ConfigEditor_049} products={tradingProducts}
+                counts={config.product_requirements.trading_stations} canEdit={canEdit && !supported252}
+                onChange={(product, value) => update((next) => { next.product_requirements.trading_stations[product] = value; applyCounts(next) })} />
+              <ProductGroupEditor station="manufacturing" label={copy.common.components_ConfigEditor_050} products={manufacturingProducts}
+                counts={config.product_requirements.manufacturing_stations} canEdit={canEdit && !supported252}
+                onChange={(product, value) => update((next) => { next.product_requirements.manufacturing_stations[product] = value; applyCounts(next) })} />
             </div>
-          </div>
-        </div>
-      ) : (
-      <div className="space-y-5 pt-5">
-        <div className="border-b border-surface-3/60 pb-6">
-          <div className="grid gap-5 lg:grid-cols-[minmax(14rem,0.85fr)_minmax(0,2.15fr)]">
-            <section aria-labelledby="config-room-layout-heading">
-              <div className="mb-4">
-                <h3 id="config-room-layout-heading" className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_042}</h3>
-                <p className="mt-1 text-xs text-ink-muted">{copy.common.components_ConfigEditor_043}{config.layout}</p>
-              </div>
-              {canEdit && !supported252PresetSelected ? (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                  <CounterField
-                    station="trading"
-                    id="trading-stations-count"
-                    label={copy.common.components_ConfigEditor_044}
-                    value={config.trading_stations_count}
-                    min={1}
-                    max={5}
-                    onChange={(value) => setStationCounts(value, 6 - value)}
-                  />
-                  <CounterField
-                    station="manufacturing"
-                    id="manufacturing-stations-count"
-                    label={copy.common.components_ConfigEditor_045}
-                    value={config.manufacturing_stations_count}
-                    min={1}
-                    max={5}
-                    onChange={(value) => setStationCounts(6 - value, value)}
-                  />
-                </div>
-              ) : (
-                <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-1">
-                  <ReadOnlyMetric station="trading" label={copy.common.components_ConfigEditor_046} value={config.trading_stations_count} />
-                  <ReadOnlyMetric station="manufacturing" label={copy.common.components_ConfigEditor_047} value={config.manufacturing_stations_count} />
-                </dl>
-              )}
-              <dl className="mt-3 text-sm">
-                <ReadOnlyMetric station="power" label={copy.common.components_ConfigEditor_094} value={config.layout.split('-')[2]} />
-              </dl>
-            </section>
-
-            <section
-              aria-labelledby="config-product-counts-heading"
-              className="border-t border-surface-3/60 pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0"
-            >
-              <h3 id="config-product-counts-heading" className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_048}</h3>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <ProductGroupEditor
-                  station="trading"
-                  label={copy.common.components_ConfigEditor_049}
-                  products={tradingProducts}
-                  counts={config.product_requirements.trading_stations}
-                  canEdit={canEdit && !supported252PresetSelected}
-                  onChange={(product, value) => setProductCount('trading_stations', product, value)}
-                />
-                <ProductGroupEditor
-                  station="manufacturing"
-                  label={copy.common.components_ConfigEditor_050}
-                  products={manufacturingProducts}
-                  counts={config.product_requirements.manufacturing_stations}
-                  canEdit={canEdit && !supported252PresetSelected}
-                  onChange={(product, value) => setProductCount('manufacturing_stations', product, value)}
-                />
-              </div>
-            </section>
-          </div>
-
-          <div className="mt-5 border-t border-surface-3/60 pt-5">
-            <IntermediateInventoryEditor
-              canEdit={canEdit}
-              inventory={intermediateInventory}
-              showOrirock={showOrundumPlanning}
-              allowProductRebalance={allowProductRebalance}
-              rotationMode={rotationMode}
-              onProductRebalanceChange={setProductRebalance}
-              onChange={setIntermediateInventory}
-            />
-          </div>
-        </div>
-
-        <div>
-          <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_051}</h3>
-          <div className="mt-5 space-y-6">
-            {showOrundumPlanning && (
-              <section aria-labelledby="config-orundum-heading" className="min-w-0 border-l-2 border-border bg-surface-2/50 px-4 py-4 sm:px-5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <h4 id="config-orundum-heading" className="flex items-center gap-2 text-sm font-semibold text-ink-primary">
-                    <Gem aria-hidden="true" className="h-4 w-4 shrink-0 text-primary" />
-                    {copy.common.components_ConfigEditor_052}
-                  </h4>
-                  <label className="flex min-h-11 items-center justify-between gap-3 text-sm text-ink-secondary sm:min-w-36">
-                    <span>{copy.common.components_ConfigEditor_056}</span>
-                    <Switch
-                      checked={orundumPlanning.monthly_card}
-                      disabled={!canEdit}
-                      onChange={(event) => setOrundumMonthlyCard(event.currentTarget.checked)}
-                    />
-                  </label>
-                </div>
-                <label className="mt-2 flex min-h-11 items-center justify-between gap-3 text-sm text-ink-secondary">
-                  <span>{copy.common.components_ConfigEditor_057}</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={orundumPlanning.daily_sanity_budget}
-                    disabled={!canEdit}
-                    onChange={(event) => setOrundumDailySanityBudget(Number(event.currentTarget.value))}
-                    className="number-input-clean tool-field w-24 px-3 py-1 text-right disabled:text-ink-muted"
-                  />
-                </label>
-                <details className="mt-2 border-t border-surface-3/60">
-                  <summary className="min-h-11 cursor-pointer py-3 text-xs font-medium leading-5 text-ink-secondary">
-                    {copy.common.components_ConfigEditor_059_details_summary}
-                  </summary>
-                  <div className="space-y-1 pb-3 text-xs leading-5 text-ink-muted">
-                    <p>{copy.common.components_ConfigEditor_053}{BASE_DAILY_SANITY_BUDGET}{copy.common.components_ConfigEditor_054}{MONTHLY_CARD_DAILY_SANITY_BONUS}{copy.common.components_ConfigEditor_055}</p>
-                    <p>{copy.common.components_ConfigEditor_058}{orundumPlanning.total_daily_sanity_budget}{copy.common.components_ConfigEditor_059}</p>
-                  </div>
-                </details>
-              </section>
-            )}
-            {!mobile && <section aria-labelledby="config-schedule-heading" className="min-w-0 space-y-5 border-l-2 border-border bg-surface-2/50 px-4 py-4 sm:px-5">
-              <div>
-                <h4 id="config-schedule-heading" className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-primary">
-                  <CalendarClock aria-hidden="true" className="h-4 w-4 shrink-0 text-brand-500" />
-                  {copy.common.components_ConfigEditor_060}
-                </h4>
-                <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label={copy.common.components_ConfigEditor_061}>
-                  {(['maa', 'rotation'] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      aria-pressed={isScheduleModeSelected(mode)}
-                      disabled={false}
-                      onClick={() => onUpdate((next) => {
-                        next.schedule_mode = mode
-                        applyCounts(next)
-                      })}
-                      className={`tool-secondary-action min-h-11 px-3 text-sm ${
-                        isScheduleModeSelected(mode)
-                          ? 'tool-option-selected'
-                          : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'
-                      }`}
-                    >
-                      {SCHEDULE_MODE_LABELS[mode]}
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-2 text-xs leading-5 text-ink-muted">
-                  {rotationMode
-                    ? copy.common.components_ConfigEditor_062
-                    : copy.common.components_ConfigEditor_095}
-                </p>
-              </div>
-              {!mobile && !rotationMode && (
-                <ShiftHoursEditor
-                  value={config.shift_hours}
-                  variableMode={variableShiftMode}
-                  canEdit={canEdit}
-                  canEditFixedShiftHours={canEditFixedShiftHours}
-                  onSelectVariable={() => onUpdate((next) => {
-                    next.schedule_mode = 'variable'
-                    next.shift_hours = [8, 8, 8]
-                    next.Fiammetta = { ...(next.Fiammetta ?? { enable: false }), enable: false }
-                    next.variable_shift_schedule = {
-                      ...(next.variable_shift_schedule ?? {}),
-                      ...VARIABLE_SHIFT_SCHEDULE_DEFAULTS,
-                    }
+          </section>
+        </Tabs.Content>
+        <Tabs.Content value="inventory" forceMount hidden={section !== 'inventory'} className="config-task-panel">
+          <section aria-labelledby="config-inventory-heading">
+            <h3 id="config-inventory-heading" className="config-section-title">{copy.common.components_ConfigEditor_077}</h3>
+            <div className="config-inventory-grid">
+              {(['Originium Shard', 'Pure Gold', ...(showOrundum ? ['Orirock Cube'] as const : [])] as const).map((product) => <IntermediateInventoryField
+                key={product} product={product} label={product === 'Orirock Cube' ? copy.common.components_ConfigEditor_080 : PRODUCT_LABELS[product]}
+                value={inventory[product]} canEdit={canUseIntermediateInventory}
+                onChange={(product, value) => update((next) => {
+                  next.intermediate_inventory = { ...normalizeIntermediateInventory(next.intermediate_inventory), [product]: Number.isFinite(value) ? Math.max(0, value) : 0 }
+                  next.allow_product_rebalance = allowsInventoryProductRebalance(next, canEdit)
+                  next.auto_balance_source = 'intermediate_inventory'
+                  bindAutoDrones(next)
+                  applyCounts(next)
+                })} />)}
+            </div>
+            <label className="config-switch-row">
+              <span>{copy.common.inventoryProductRebalanceLabel}</span>
+              <Switch checked={allowsInventoryProductRebalance(config, canEdit)} disabled={!canUseIntermediateInventory || rotationMode}
+                onChange={(event) => {
+                  const enabled = event.currentTarget.checked
+                  update((next) => {
+                    next.allow_product_rebalance = enabled
+                    next.auto_balance_source = enabled ? 'intermediate_inventory' : 'limited_config'
+                    next.intermediate_inventory = normalizeIntermediateInventory(next.intermediate_inventory)
                     applyCounts(next)
-                  })}
-                  onChange={(hours) => onUpdate((next) => {
-                    next.schedule_mode = 'maa'
-                    next.shift_hours = hours
-                    if (!isFiammettaShiftHoursSupported(hours)) {
-                      next.Fiammetta = { ...(next.Fiammetta ?? { enable: false }), enable: false }
-                    }
-                    next.variable_shift_schedule = {
-                      ...(next.variable_shift_schedule ?? {}),
-                      enable: false,
-                      enabled: false,
-                    }
+                  })
+                }} />
+            </label>
+            <p className="config-help">{rotationMode ? copy.common.inventoryProductRebalanceRotation : copy.common.inventoryProductRebalanceHelp}</p>
+          </section>
+          {showOrundum && <section aria-labelledby="config-orundum-heading" className="config-section-divider">
+            <h3 id="config-orundum-heading" className="config-section-title">{copy.common.components_ConfigEditor_052}</h3>
+            <label className="config-switch-row"><span>{copy.common.components_ConfigEditor_056}</span>
+              <Switch checked={orundumPlanning.monthly_card} disabled={!canEdit} onChange={(event) => {
+                const enabled = event.currentTarget.checked
+                update((next) => {
+                  next.orundum_planning = { ...next.orundum_planning, daily_sanity_budget: normalizeOrundumPlanning(next).daily_sanity_budget, monthly_card: enabled }
+                  applyCounts(next)
+                })
+              }} />
+            </label>
+            <label className="config-switch-row"><span>{copy.common.components_ConfigEditor_057}</span>
+              <input type="number" min={0} step={1} value={orundumPlanning.daily_sanity_budget} disabled={!canEdit}
+                className="number-input-clean tool-field w-24 text-right" onChange={(event) => {
+                  const value = Number(event.currentTarget.value)
+                  update((next) => {
+                    next.orundum_planning = { ...next.orundum_planning, daily_sanity_budget: Number.isFinite(value) ? Math.max(0, value) : BASE_DAILY_SANITY_BUDGET }
                     applyCounts(next)
-                  })}
-                />
-            )}
-            </section>}
-            <section aria-labelledby="config-dormitory-heading" className="min-w-0 border-l-2 border-border bg-surface-2/50 px-4 py-4 sm:px-5">
-              <h4 id="config-dormitory-heading" className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-primary">
-                <BedDouble aria-hidden="true" className="h-4 w-4 shrink-0 text-primary" />
-                {copy.common.components_ConfigEditor_063}
-              </h4>
-              <div className="config-dormitory-rules tool-inset grid gap-2 p-1 lg:grid-cols-3" role="group" aria-label={copy.common.components_ConfigEditor_064}>
-                {DORMITORY_RULE_OPTIONS.map((rule) => (
-                  <button
-                    key={rule}
-                    type="button"
-                    aria-pressed={dormitoryRule === rule}
-                    disabled={rotationMode}
-                    onClick={() => onUpdate((next) => {
-                      next.dormitory_rule = rule
-                      applyCounts(next)
-                    })}
-                    className={`tool-secondary-action min-h-11 min-w-0 whitespace-normal px-3 py-2 text-sm leading-5 disabled:cursor-not-allowed ${
-                      dormitoryRule === rule
-                        ? 'tool-option-selected'
-                        : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary disabled:text-ink-muted'
-                    }`}
-                  >
-                    <span>{DORMITORY_RULE_LABELS[rule]}</span>
-                    {rule === 'fixed' && (
-                      <span className="ml-1 text-xs text-brand-600">{copy.common.components_ConfigEditor_096}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-              <p className="mt-2 text-xs leading-5 text-ink-muted">
-                {rotationMode
-                  ? copy.common.components_ConfigEditor_065
-                  : dormitoryRule === 'maa_pure_autofill'
-                    ? copy.common.components_ConfigEditor_098
-                    : dormitoryRule === 'maa_autofill'
-                      ? copy.common.components_ConfigEditor_066
-                      : copy.common.components_ConfigEditor_067}
-              </p>
-            </section>
-            <section aria-labelledby="config-fiammetta-heading" className="min-w-0 space-y-3 border-l-2 border-border bg-surface-2/50 px-4 py-4 sm:px-5">
-              <div className="flex min-h-11 items-center justify-between gap-3">
-                <h4 id="config-fiammetta-heading" className="flex items-center gap-2 text-sm font-semibold text-ink-primary">
-                  <Flame aria-hidden="true" className="h-4 w-4 shrink-0 text-primary" />
-                  <label className="flex min-h-11 cursor-pointer items-center" htmlFor="config-fiammetta-enabled">{copy.common.components_ConfigEditor_068}</label>
-                </h4>
-                <Switch
-                  id="config-fiammetta-enabled"
-                  checked={!rotationMode && fiammettaShiftHoursSupported && (config.Fiammetta?.enable ?? false)}
-                  disabled={!canEdit || rotationMode || !fiammettaShiftHoursSupported}
-                  onChange={(event) => onUpdate((next) => {
-                    next.Fiammetta = { enable: event.currentTarget.checked }
+                  })
+                }} />
+            </label>
+            <details className="config-explanation"><summary>{copy.common.components_ConfigEditor_059_details_summary}</summary>
+              <p>{copy.common.components_ConfigEditor_053}{BASE_DAILY_SANITY_BUDGET}{copy.common.components_ConfigEditor_054}{MONTHLY_CARD_DAILY_SANITY_BONUS}{copy.common.components_ConfigEditor_055}</p>
+              <p>{copy.common.components_ConfigEditor_058}{orundumPlanning.total_daily_sanity_budget}{copy.common.components_ConfigEditor_059}</p>
+            </details>
+          </section>}
+        </Tabs.Content>
+        <Tabs.Content value="strategy" forceMount hidden={section !== 'strategy'} className="config-task-panel config-strategy-panel">
+          <section aria-labelledby="config-dormitory-heading" className="config-field config-strategy-section config-strategy-section--dormitory">
+            <h3 id="config-dormitory-heading" className="config-strategy-heading"><BedDouble aria-hidden="true" />{copy.common.components_ConfigEditor_063}</h3>
+            <select className="tool-field" aria-label={copy.common.components_ConfigEditor_063} value={dormitoryRule}
+              disabled={rotationMode || (!canEdit && !canUseIntermediateInventory)} onChange={(event) => {
+                const rule = normalizeDormitoryRule(event.currentTarget.value)
+                update((next) => { next.dormitory_rule = rule; applyCounts(next) })
+              }}>
+              {Object.entries(DORMITORY_RULE_LABELS).map(([rule, label]) => <option key={rule} value={rule}>{label}</option>)}
+            </select>
+            <p className="config-help">{rotationMode ? copy.common.components_ConfigEditor_065
+              : dormitoryRule === 'maa_pure_autofill' ? copy.common.components_ConfigEditor_098
+                : dormitoryRule === 'maa_autofill' ? copy.common.components_ConfigEditor_066 : copy.common.components_ConfigEditor_067}</p>
+          </section>
+          <section aria-labelledby="config-fiammetta-heading" className="config-strategy-section config-strategy-section--fiammetta">
+            <div className="config-switch-row">
+              <h3 id="config-fiammetta-heading"><label htmlFor="config-fiammetta-enabled" className="config-strategy-heading"><Flame aria-hidden="true" />{copy.common.components_ConfigEditor_068}</label></h3>
+              <Switch id="config-fiammetta-enabled" checked={!rotationMode && fiammettaSupported && (config.Fiammetta?.enable ?? false)}
+                disabled={!canEdit || rotationMode || !fiammettaSupported} onChange={(event) => {
+                  const enabled = event.currentTarget.checked
+                  update((next) => { next.Fiammetta = { enable: enabled }; applyCounts(next) })
+                }} />
+            </div>
+            {rotationMode ? <p className="config-help">{copy.common.components_ConfigEditor_069}</p>
+              : (!fiammettaSupported || config.Fiammetta?.enable) && <p className="tool-alert tool-alert--error mt-2 text-xs leading-5" role="note">{copy.common.components_ConfigEditor_070(fiammettaInterval)}</p>}
+          </section>
+          <section aria-labelledby="config-drones-heading" className="config-strategy-section config-strategy-section--drones">
+            <div className="config-switch-row">
+              <h3 id="config-drones-heading"><label htmlFor="config-drones-enabled" className="config-strategy-heading"><Zap aria-hidden="true" />{copy.common.components_ConfigEditor_071}</label></h3>
+              <Switch id="config-drones-enabled" checked={!rotationMode && (config.drones?.enable ?? false)} disabled={!canEdit || rotationMode}
+                onChange={(event) => {
+                  const enabled = event.currentTarget.checked
+                  update((next) => {
+                    next.drones = { ...next.drones, order: next.drones?.order ?? 'pre', targets: next.drones?.targets ?? [], enable: enabled, auto: next.drones?.auto ?? true }
                     applyCounts(next)
-                  })}
-                />
-              </div>
-              {rotationMode ? (
-                <p className="tool-inset px-3 py-2 text-xs leading-5 text-ink-muted">
-                  {copy.common.components_ConfigEditor_069}</p>
-              ) : (!fiammettaShiftHoursSupported || config.Fiammetta?.enable) && (
-                <p className="tool-alert tool-alert--warning px-3 py-2 text-xs leading-5">
-                  {copy.common.components_ConfigEditor_070(fiammettaShiftInterval)}</p>
-              )}
-            </section>
-            <section aria-labelledby="config-drones-heading" className="min-w-0 space-y-4 border-l-2 border-border bg-surface-2/50 px-4 py-4 sm:px-5">
-              <div className="flex min-h-11 items-center justify-between gap-3">
-                <h4 id="config-drones-heading" className="flex items-center gap-2 text-sm font-semibold text-ink-primary">
-                  <Zap aria-hidden="true" className="h-4 w-4 shrink-0 text-primary" />
-                  <label className="flex min-h-11 cursor-pointer items-center" htmlFor="config-drones-enabled">{copy.common.components_ConfigEditor_071}</label>
-                </h4>
-                <Switch
-                  id="config-drones-enabled"
-                    checked={!rotationMode && (config.drones?.enable ?? false)}
-                    disabled={!canEdit || rotationMode}
-                  onChange={(event) => onUpdate((next) => {
-                    next.drones = {
-                      ...(next.drones ?? { order: 'pre', targets: [] }),
-                      enable: event.currentTarget.checked,
-                      auto: next.drones?.auto ?? true,
-                    }
-                    applyCounts(next)
-                  })}
-                />
-              </div>
-              <label className="flex min-h-11 items-center justify-between gap-3 border-t border-surface-3/60 pt-3 text-sm text-ink-secondary">
-                <span>{copy.common.components_ConfigEditor_072}</span>
-                <Switch
-                    checked={!rotationMode && (config.drones?.auto ?? false)}
-                    disabled={!canEdit || rotationMode || !config.drones?.enable}
-                  onChange={(event) => onUpdate((next) => {
-                    next.drones = {
-                      ...(next.drones ?? { enable: true, order: 'pre', targets: [] }),
-                      auto: event.currentTarget.checked,
-                    }
-                    applyCounts(next)
-                  })}
-                />
+                  })
+                }} />
+            </div>
+            {rotationMode ? <p className="config-help">{copy.common.components_ConfigEditor_065}</p> : config.drones?.enable && <div className="config-drone-fields">
+              <label className="config-switch-row config-drone-auto-row"><span>{copy.common.components_ConfigEditor_072}</span>
+                <Switch checked={config.drones.auto ?? false} disabled={!canEdit} onChange={(event) => {
+                  const auto = event.currentTarget.checked
+                  update((next) => { next.drones = { ...next.drones!, auto }; applyCounts(next) })
+                }} />
               </label>
-              {config.drones?.auto && (
-                <div>
-                  <label className="mb-2 block text-xs font-medium text-ink-muted" htmlFor="drone-auto-strategy">
-                    {copy.common.droneAutoStrategyLabel}</label>
-                  <select
-                    id="drone-auto-strategy"
-                    value={normalizeDroneAutoStrategy(config.drones.auto_strategy)}
-                    disabled={!canEdit || rotationMode || !config.drones.enable}
-                    onChange={(event) => onUpdate((next) => {
-                      bindAutoDrones(next)
-                      next.drones!.auto_strategy = event.currentTarget.value
-                      applyCounts(next)
-                    })}
-                    className="tool-field disabled:text-ink-muted"
-                  >
-                    <option value="efficiency">{copy.common.droneAutoEfficiency}</option>
-                    <option value="inventory_balance">{copy.common.droneAutoInventoryBalance}</option>
-                  </select>
-                  <p className="mt-2 text-xs leading-5 text-ink-muted">
-                    {normalizeDroneAutoStrategy(config.drones.auto_strategy) === 'inventory_balance'
-                      ? copy.common.droneAutoInventoryBalanceHelp
-                      : copy.common.droneAutoEfficiencyHelp}
-                  </p>
-                </div>
-              )}
-              <div className={`grid min-w-0 gap-4 ${config.drones?.auto ? '' : 'md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]'}`}>
-                <div>
-                  <label className="mb-2 block text-xs font-medium text-ink-muted" htmlFor="drone-order">
-                    {copy.common.components_ConfigEditor_073}</label>
-                  <select
-                    id="drone-order"
-                    value={config.drones?.order ?? 'pre'}
-                    disabled={!canEdit || rotationMode || !config.drones?.enable}
-                    onChange={(event) => onUpdate((next) => {
-                      next.drones = {
-                        ...(next.drones ?? { enable: true, targets: [] }),
-                        order: event.currentTarget.value,
-                      }
-                      applyCounts(next)
-                    })}
-                    className="tool-field disabled:text-ink-muted"
-                  >
-                    <option value="pre">{copy.common.components_ConfigEditor_074}</option>
-                    <option value="post">{copy.common.components_ConfigEditor_075}</option>
-                  </select>
-                </div>
-                {!config.drones?.auto && <div>
-                  <label className="mb-2 block text-xs font-medium text-ink-muted" htmlFor="drone-targets">
-                    {copy.common.components_ConfigEditor_076}</label>
-                    <DroneTargetsInput
-                      id="drone-targets"
-                      value={droneTargets}
-                    disabled={!canEdit || rotationMode || !config.drones?.enable}
-                      onChange={(value) => onUpdate((next) => {
-                        next.drones = {
-                          ...(next.drones ?? { enable: true, order: 'pre' }),
-                        targets: parseDroneTargetsInput(value),
-                        }
-                        applyCounts(next)
-                      })}
-                    />
-                </div>}
+              {config.drones.auto && <div className="config-field">
+                <label htmlFor="drone-auto-strategy">{copy.common.droneAutoStrategyLabel}</label>
+                <select id="drone-auto-strategy" className="tool-field" value={normalizeDroneAutoStrategy(config.drones.auto_strategy)} disabled={!canEdit}
+                  onChange={(event) => {
+                    const strategy = event.currentTarget.value
+                    update((next) => { bindAutoDrones(next); next.drones!.auto_strategy = strategy; applyCounts(next) })
+                  }}>
+                  <option value="efficiency">{copy.common.droneAutoEfficiency}</option>
+                  <option value="inventory_balance">{copy.common.droneAutoInventoryBalance}</option>
+                </select>
+                <p className="config-help">{normalizeDroneAutoStrategy(config.drones.auto_strategy) === 'inventory_balance'
+                  ? copy.common.droneAutoInventoryBalanceHelp : copy.common.droneAutoEfficiencyHelp}</p>
+              </div>}
+              <div className="config-field"><label htmlFor="drone-order">{copy.common.components_ConfigEditor_073}</label>
+                <select id="drone-order" className="tool-field" value={config.drones.order ?? 'pre'} disabled={!canEdit} onChange={(event) => {
+                  const order = event.currentTarget.value
+                  update((next) => { next.drones = { ...next.drones!, order }; applyCounts(next) })
+                }}>
+                  <option value="pre">{copy.common.components_ConfigEditor_074}</option>
+                  <option value="post">{copy.common.components_ConfigEditor_075}</option>
+                </select>
               </div>
-            </section>
-          </div>
-        </div>
-      </div>
-      )}
-      </details>
-      {validationMessage && (
-        <p className="tool-alert tool-alert--warning mt-4" role="alert">{validationMessage}</p>
-      )}
-    </fieldset>
+              {!config.drones.auto && <div className="config-field"><label htmlFor="drone-targets">{copy.common.components_ConfigEditor_076}</label>
+                <DroneTargetsInput value={(config.drones.targets ?? []).map((product) => PRODUCT_LABELS[product] ?? product).join('，')} disabled={!canEdit}
+                  onChange={(value) => update((next) => {
+                    next.drones = { ...next.drones!, targets: value.split(/[，,]/).map((item) => {
+                      const name = item.trim()
+                      return Object.entries(PRODUCT_LABELS).find(([key, label]) => key === name || label === name)?.[0] ?? name
+                    }).filter(Boolean) }
+                    applyCounts(next)
+                  })} />
+              </div>}
+            </div>}
+          </section>
+        </Tabs.Content>
+      </fieldset>
+      {!hideValidation && !validation.ok && <p className="tool-alert tool-alert--warning" role="alert">{validation.message}</p>}
+    </Tabs.Root>
   )
 }
 
-type ConfigPresetMatch = { id: string; preset: LicenseConfig }
-
-function findConfigPreset(config: LicenseConfig): ConfigPresetMatch | null {
-  const entries = Object.entries(CONFIG_PRESETS)
-  const exact = entries.find(([, preset]) => presetFoundationMatches(config, preset) && productCountsMatch(config, preset))
-  const base = exact ?? entries.find(([, preset]) => presetFoundationMatches(config, preset))
-  return base ? { id: base[0], preset: base[1] } : null
-}
-
-function presetFoundationMatches(config: LicenseConfig, preset: LicenseConfig): boolean {
+function presetMatches(config: LicenseConfig, preset: LicenseConfig): boolean {
+  const arraysMatch = (actual: number[] | undefined, expected: number[] | undefined) =>
+    !actual && !expected || actual?.length === expected?.length && actual?.every((value, index) => value === expected?.[index]) === true
+  const countsMatch = (actual: Record<string, number>, expected: Record<string, number>) =>
+    [...new Set([...Object.keys(actual), ...Object.keys(expected)])].every((key) => (actual[key] ?? 0) === (expected[key] ?? 0))
   return config.layout === preset.layout
     && config.trading_stations_count === preset.trading_stations_count
     && config.manufacturing_stations_count === preset.manufacturing_stations_count
-    && numberArraysMatch(config.trading_station_levels, preset.trading_station_levels)
-    && numberArraysMatch(config.manufacturing_station_levels, preset.manufacturing_station_levels)
+    && arraysMatch(config.trading_station_levels, preset.trading_station_levels)
+    && arraysMatch(config.manufacturing_station_levels, preset.manufacturing_station_levels)
+    && countsMatch(config.product_requirements.trading_stations, preset.product_requirements.trading_stations)
+    && countsMatch(config.product_requirements.manufacturing_stations, preset.product_requirements.manufacturing_stations)
 }
 
-function productCountsMatch(config: LicenseConfig, preset: LicenseConfig): boolean {
-  return recordsMatch(config.product_requirements.trading_stations, preset.product_requirements.trading_stations)
-    && recordsMatch(config.product_requirements.manufacturing_stations, preset.product_requirements.manufacturing_stations)
-}
-
-function numberArraysMatch(actual: number[] | undefined, expected: number[] | undefined): boolean {
-  if (!actual && !expected) return true
-  return actual?.length === expected?.length && actual?.every((value, index) => value === expected?.[index]) === true
-}
-
-function recordsMatch(actual: Record<string, number> | undefined, expected: Record<string, number> | undefined): boolean {
-  const keys = new Set([...Object.keys(actual ?? {}), ...Object.keys(expected ?? {})])
-  return [...keys].every((key) => (actual?.[key] ?? 0) === (expected?.[key] ?? 0))
-}
-
-function getPresetDifferences(config: LicenseConfig, preset: LicenseConfig): string[] {
-  const differences: string[] = []
-  if (!presetFoundationMatches(config, preset)) differences.push(copy.common.components_ConfigEditor_042)
-  if (!productCountsMatch(config, preset)) differences.push(copy.common.components_ConfigEditor_048)
-  if (normalizeScheduleMode(config.schedule_mode) !== normalizeScheduleMode(preset.schedule_mode)) differences.push(copy.common.components_ConfigEditor_060)
-  const shiftHours = parseShiftHours(config.shift_hours) ?? [8, 8, 8]
-  const presetShiftHours = parseShiftHours(preset.shift_hours) ?? [8, 8, 8]
-  if (!numberArraysMatch(shiftHours, presetShiftHours)) differences.push(copy.common.components_ConfigEditor_086)
-  if (normalizeDormitoryRule(config.dormitory_rule) !== normalizeDormitoryRule(preset.dormitory_rule)) differences.push(copy.common.components_ConfigEditor_063)
-  if ((config.Fiammetta?.enable ?? false) !== (preset.Fiammetta?.enable ?? false)) differences.push(copy.common.components_ConfigEditor_068)
-  if (!dronePoliciesMatch(config, preset)) differences.push(copy.common.components_ConfigEditor_071)
-  return differences
-}
-
-function dronePoliciesMatch(config: LicenseConfig, preset: LicenseConfig): boolean {
-  const actual = config.drones
-  const expected = preset.drones
-  return (actual?.enable ?? false) === (expected?.enable ?? false)
-    && (actual?.auto ?? false) === (expected?.auto ?? false)
-    && (actual?.order ?? 'pre') === (expected?.order ?? 'pre')
-    && ((actual?.auto ?? false) && (expected?.auto ?? false)
-      || numberOrStringArraysMatch(actual?.targets, expected?.targets))
-}
-
-function numberOrStringArraysMatch(actual: string[] | undefined, expected: string[] | undefined): boolean {
-  if (!actual && !expected) return true
-  return actual?.length === expected?.length && actual?.every((value, index) => value === expected?.[index]) === true
-}
-
-function MobileConfigEssentials({
-  config,
-  canEdit,
-  canEditFixedShiftHours,
-  canSelectPreset,
-  autoInventoryOnly,
-  rotationMode,
-  variableShiftMode,
-  isScheduleModeSelected,
-  preset,
-  differences,
-  onSelectPreset,
-  onChangeMode,
-  onSelectVariable,
-  onChangeHours,
-}: {
-  config: LicenseConfig
-  canEdit: boolean
-  canEditFixedShiftHours: boolean
-  canSelectPreset: boolean
-  autoInventoryOnly: boolean
-  rotationMode: boolean
-  variableShiftMode: boolean
-  isScheduleModeSelected: (mode: 'maa' | 'rotation') => boolean
-  preset: ConfigPresetMatch | null
-  differences: string[]
-  onSelectPreset: (preset: LicenseConfig) => void
-  onChangeMode: (mode: 'maa' | 'rotation') => void
-  onSelectVariable: () => void
-  onChangeHours: (hours: number[]) => void
-}) {
-  return (
-    <section className="config-mobile-essentials" aria-labelledby="config-mobile-essentials-title">
-      <div className="config-mobile-essentials-heading">
-        <div>
-          <p className="config-mobile-kicker">{copy.v2.configEssentialsTitle}</p>
-          <h3 id="config-mobile-essentials-title">{preset ? copy.v2.configPresetBase(preset.preset.desc) : copy.v2.configCustomPreset}</h3>
-        </div>
-        {differences.length > 0 && <span className="config-mobile-difference-label">{copy.v2.configChangedFromPreset}</span>}
-      </div>
-      <div className="config-mobile-choice config-mobile-choice--preset">
-        <h4>{copy.v2.configPreset}</h4>
-        {canSelectPreset || canEdit ? <PresetActions onSelect={onSelectPreset} autoInventoryOnly={autoInventoryOnly} selectedId={preset?.id} /> : <p>{copy.v2.configCustomPreset}</p>}
-      </div>
-      <div className="config-mobile-primary-grid">
-        <section className="config-mobile-choice">
-          <h4>{copy.v2.configExecution}</h4>
-          <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label={copy.common.components_ConfigEditor_039}>
-            {(['maa', 'rotation'] as const).map((mode) => (
-              <button key={mode} type="button" aria-pressed={isScheduleModeSelected(mode)}
-                onClick={() => onChangeMode(mode)} className={`tool-secondary-action min-h-11 px-3 text-sm ${isScheduleModeSelected(mode)
-                  ? 'tool-option-selected' : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'}`}>
-                {SCHEDULE_MODE_LABELS[mode]}
-              </button>
-            ))}
-          </div>
-          <p className="config-mobile-help">{rotationMode ? copy.common.components_ConfigEditor_062 : copy.common.components_ConfigEditor_095}</p>
-        </section>
-        <section className="config-mobile-choice">
-          <h4>{copy.v2.configShiftFrequency}</h4>
-          {rotationMode ? <p className="config-mobile-help">{copy.common.components_ConfigEditor_065}</p> : <ShiftHoursEditor
-            value={config.shift_hours}
-            variableMode={variableShiftMode}
-            canEdit={canEdit}
-            canEditFixedShiftHours={canEditFixedShiftHours}
-            onSelectVariable={onSelectVariable}
-            onChange={onChangeHours}
-          />}
-        </section>
-      </div>
-      {differences.length > 0 && <ul className="config-mobile-differences" aria-label={copy.v2.configChangedFromPreset}>
-        {differences.map((difference) => <li key={difference}><span>{copy.v2.configAdjusted}</span>{difference}</li>)}
-      </ul>}
-    </section>
-  )
-}
-
-function PresetActions({
-  onSelect,
-  autoInventoryOnly = false,
-  selectedId,
-  className = '',
-}: {
-  onSelect: (preset: LicenseConfig) => void;
-  autoInventoryOnly?: boolean;
-  selectedId?: string;
-  className?: string;
-}) {
-  const groups = [
-    {
-      label: copy.common.components_ConfigEditor_110,
-      presets: [
-        ['243', autoInventoryOnly ? copy.common.components_ConfigEditor_035 : copy.common.components_ConfigEditor_030, 'balanced', ['Pure Gold', 'Battle Record']],
-        ['243-1', autoInventoryOnly ? copy.common.components_ConfigEditor_036 : copy.common.components_ConfigEditor_031, 'orundum', ['Orundum']],
-        ['333-lmd', copy.common.components_ConfigEditor_107, 'gold', ['LMD']],
-        ['333', autoInventoryOnly ? copy.common.components_ConfigEditor_037 : copy.common.components_ConfigEditor_032, 'orundum', ['Orundum']],
-      ],
-    },
-    {
-      label: copy.common.components_ConfigEditor_111,
-      presets: [
-        ['252', copy.common.components_ConfigEditor_103, 'experience', ['Battle Record']],
-        ['252-1', copy.common.components_ConfigEditor_105, 'gold', ['Pure Gold']],
-        ['252-full', copy.common.components_ConfigEditor_108, 'balanced', ['Pure Gold', 'Battle Record']],
-      ],
-    },
-  ] as const
-
-  return (
-    <div className={`config-preset-actions flex min-w-0 flex-col gap-2 ${className}`} data-tour-target="config-preset-actions">
-      {groups.map((group) => (
-        <div key={group.label} role="group" aria-label={group.label} className="flex flex-wrap items-center gap-2">
-          <span className="mr-1 text-xs font-medium text-ink-muted">{group.label}</span>
-          {group.presets.map(([id, label, tone, products]) => (
-            <PresetButton key={id} label={label} tone={tone} products={products} selected={selectedId === id} onClick={() => onSelect(CONFIG_PRESETS[id])} />
-          ))}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function PresetButton({ label, tone, products, selected = false, onClick }: {
-  label: string;
-  tone: 'balanced' | 'gold' | 'experience' | 'orundum';
-  products: readonly string[];
-  selected?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={selected}
-      className={`tool-secondary-action config-preset config-preset--${tone} px-3 py-2 text-sm`}
-    >
-      <span className="flex shrink-0 items-center gap-0.5">
-        {products.map((product) => <ProductIcon key={product} product={product} size={20} />)}
-      </span>
-      {label}
-    </button>
-  )
-}
-
-function uniqueProducts(defaults: string[], counts: Record<string, number>): string[] {
-  return Array.from(new Set([...defaults, ...Object.keys(counts ?? {})]))
-}
-
-function fitProductCounts(
-  current: Record<string, number>,
-  products: string[],
-  total: number,
-  fallbackProduct: string
-): Record<string, number> {
+function fitProductCounts(current: Record<string, number>, products: string[], total: number, fallbackProduct: string): Record<string, number> {
   const next: Record<string, number> = {}
   let remaining = total
   for (const product of products) {
     const count = Math.max(0, Math.min(remaining, current[product] ?? 0))
-    if (count > 0) {
-      next[product] = count
-      remaining -= count
-    }
+    if (count > 0) { next[product] = count; remaining -= count }
   }
-  if (remaining > 0) {
-    next[fallbackProduct] = (next[fallbackProduct] ?? 0) + remaining
-  }
+  if (remaining > 0) next[fallbackProduct] = (next[fallbackProduct] ?? 0) + remaining
   return next
 }
 
-function formatProductName(product: string): string {
-  return PRODUCT_LABELS[product] ?? product
-}
-
-function parseProductName(value: string): string {
-  const text = value.trim()
-  if (!text) return ''
-  const matched = Object.entries(PRODUCT_LABELS).find(([key, label]) => key === text || label === text)
-  return matched?.[0] ?? text
-}
-
-function formatDroneTargetsInput(targets: string[]): string {
-  return targets.map(formatProductName).join('，')
-}
-
-function parseDroneTargetsInput(value: string): string[] {
-  return value.split(/[，,]/).map(parseProductName).filter(Boolean)
-}
-
-const DRONE_TARGET_OPTIONS = ['LMD', 'Orundum', 'Pure Gold', 'Battle Record', 'Originium Shard']
-
-function formatStockValue(value: number | null): string {
-  return value === null ? '' : String(value)
-}
-
-function IntermediateInventoryEditor({
-  canEdit,
-  inventory,
-  showOrirock,
-  allowProductRebalance,
-  rotationMode,
-  onProductRebalanceChange,
-  onChange,
-}: {
-  canEdit: boolean;
-  inventory: Record<IntermediateProduct, number>;
-  showOrirock: boolean;
-  allowProductRebalance: boolean;
-  rotationMode: boolean;
-  onProductRebalanceChange: (enabled: boolean) => void;
-  onChange: (product: IntermediateProduct, value: number) => void;
+function IntermediateInventoryField({ label, product, value, canEdit, onChange }: {
+  label: string; product: IntermediateProduct; value: number; canEdit: boolean
+  onChange: (product: IntermediateProduct, value: number) => void
 }) {
-  const helpId = useId()
-  return (
-    <div>
-      <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_077}</p>
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        <IntermediateInventoryField
-          label={copy.common.components_ConfigEditor_078}
-          product="Originium Shard"
-          value={inventory['Originium Shard']}
-          canEdit={canEdit}
-          onChange={onChange}
-        />
-        <IntermediateInventoryField
-          label={copy.common.components_ConfigEditor_079}
-          product="Pure Gold"
-          value={inventory['Pure Gold']}
-          canEdit={canEdit}
-          onChange={onChange}
-        />
-        {showOrirock && (
-          <IntermediateInventoryField
-            label={copy.common.components_ConfigEditor_080}
-            product="Orirock Cube"
-            value={inventory['Orirock Cube']}
-            canEdit={canEdit}
-            onChange={onChange}
-          />
-        )}
-      </div>
-      <label className="mt-3 flex min-h-11 items-center justify-between gap-3 text-sm text-ink-secondary">
-        <span>{copy.common.inventoryProductRebalanceLabel}</span>
-        <Switch checked={allowProductRebalance} disabled={!canEdit || rotationMode} aria-describedby={helpId}
-          onChange={(event) => onProductRebalanceChange(event.currentTarget.checked)} />
-      </label>
-      <p id={helpId} className="mt-1 text-xs leading-5 text-ink-muted">
-        {rotationMode ? copy.common.inventoryProductRebalanceRotation : copy.common.inventoryProductRebalanceHelp}
-      </p>
-    </div>
-  )
-}
-
-function IntermediateInventoryField({
-  label,
-  product,
-  value,
-  canEdit,
-  onChange,
-}: {
-  label: string;
-  product: IntermediateProduct;
-  value: number;
-  canEdit: boolean;
-  onChange: (product: IntermediateProduct, value: number) => void;
-}) {
-  const [draftValue, setDraftValue] = useState(() => formatStockValue(value))
-
-  useEffect(() => {
-    setDraftValue(formatStockValue(value))
-  }, [value])
-
+  const [draftValue, setDraftValue] = useState(String(value))
+  useEffect(() => { setDraftValue(String(value)) }, [value])
   const commitDraft = () => {
     if (!canEdit) return
-    const nextValue = draftValue.trim() === '' ? 0 : Number(draftValue)
-    if (Number.isFinite(nextValue) && nextValue !== value) {
-      onChange(product, nextValue)
-    } else {
-      setDraftValue(formatStockValue(value))
-    }
+    const next = draftValue.trim() === '' ? 0 : Number(draftValue)
+    if (Number.isFinite(next) && next !== value) onChange(product, next)
+    else setDraftValue(String(value))
   }
-
-  return (
-    <label className="tool-inset block px-3 py-3 text-sm">
-      <span className="flex items-center justify-between gap-3">
-        <span className="flex min-w-0 items-center gap-2 text-ink-secondary">
-          <ProductIcon product={product} />
-          <span>{label}</span>
-        </span>
-        <input
-          type="number"
-          min={0}
-          step={1}
-          value={draftValue}
-          disabled={!canEdit}
-          onChange={(event) => {
-            const nextDraftValue = event.currentTarget.value
-            setDraftValue(nextDraftValue)
-            if (!canEdit || nextDraftValue.trim() === '') return
-            const nextValue = Number(nextDraftValue)
-            if (Number.isFinite(nextValue) && nextValue !== value) onChange(product, nextValue)
-          }}
-          onBlur={commitDraft}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.currentTarget.blur()
-            }
-          }}
-          className="number-input-clean tool-field w-24 px-3 py-1 text-right disabled:text-ink-muted"
-        />
-      </span>
-    </label>
-  )
+  return <label className="config-stock-field">
+    <span><ProductIcon product={product} />{label}</span>
+    <input type="number" min={0} step={1} value={draftValue} disabled={!canEdit}
+      className="number-input-clean tool-field" onChange={(event) => {
+        const draft = event.currentTarget.value
+        setDraftValue(draft)
+        if (!canEdit || !draft.trim()) return
+        const next = Number(draft)
+        if (Number.isFinite(next) && next !== value) onChange(product, next)
+      }} onBlur={commitDraft} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }} />
+  </label>
 }
 
-function ShiftHoursEditor({
-  value,
-  variableMode,
-  canEdit,
-  canEditFixedShiftHours,
-  onSelectVariable,
-  onChange,
-}: {
-  value: LicenseConfig['shift_hours'];
-  variableMode: boolean;
-  canEdit: boolean;
-  canEditFixedShiftHours: boolean;
-  onSelectVariable: () => void;
-  onChange: (hours: number[]) => void;
+function ShiftHoursEditor({ value, variableMode, canEdit, canEditFixedShiftHours, onSelectVariable, onChange }: {
+  value: LicenseConfig['shift_hours']; variableMode: boolean; canEdit: boolean; canEditFixedShiftHours: boolean
+  onSelectVariable: () => void; onChange: (hours: number[]) => void
 }) {
   const { features } = useSiteFeatures()
+  const id = useId()
   const normalized = parseShiftHours(value) ?? [8, 8, 8]
   const formatted = normalized.join('-')
   const [draftValue, setDraftValue] = useState(formatted)
   const [error, setError] = useState<string | null>(null)
   const [customSelected, setCustomSelected] = useState(false)
-  const inferredChoice = variableMode ? 'variable' : inferShiftScheduleChoice(normalized)
-  const selectedChoice: ShiftScheduleChoice = customSelected ? 'custom' : inferredChoice
-
-  useEffect(() => {
-    setDraftValue(formatted)
-    setError(null)
-  }, [formatted])
-
+  const inferred = variableMode ? 'variable' : SHIFT_SCHEDULE_OPTIONS.find((choice) => 'hours' in choice
+    && choice.hours.length === normalized.length && choice.hours.every((hours, index) => Math.abs(hours - normalized[index]!) <= 0.0001))?.id ?? 'custom'
+  const selected = customSelected ? 'custom' : inferred
+  useEffect(() => { setDraftValue(formatted); setError(null) }, [formatted])
   const commitDraft = () => {
     if (!canEdit) return
     const parsed = parseShiftHours(draftValue)
@@ -1337,268 +516,71 @@ function ShiftHoursEditor({
       setError(copy.common.components_ConfigEditor_101)
       return
     }
-    if (!parsed || !isValidShiftHours(parsed)) {
-      setError(copy.common.components_ConfigEditor_081)
-      return
-    }
+    if (!parsed || !isValidShiftHours(parsed)) { setError(copy.common.components_ConfigEditor_081); return }
     setError(null)
     setDraftValue(parsed.join('-'))
-    if (variableMode
-      || parsed.some((hours, index) => Math.abs(hours - (normalized[index] ?? -1)) > 0.0001)
-      || parsed.length !== normalized.length) {
-      onChange(parsed)
-    }
+    if (variableMode || parsed.length !== normalized.length || parsed.some((hours, index) => Math.abs(hours - normalized[index]!) > 0.0001)) onChange(parsed)
   }
-
-  const isChoiceDisabled = (choice: typeof SHIFT_SCHEDULE_OPTIONS[number]) => choice.id === '24x3'
-    ? !canEdit || !features.one_shift_per_day
-    : !canEdit && !(canEditFixedShiftHours && 'hours' in choice)
-
-  const selectChoice = (choice: typeof SHIFT_SCHEDULE_OPTIONS[number]) => {
-    if (isChoiceDisabled(choice)) return
-    if (choice.id === 'custom') {
-      setCustomSelected(true)
-      return
-    }
-    setCustomSelected(false)
-    if (choice.id === 'variable') {
-      onSelectVariable()
-      return
-    }
-    onChange([...choice.hours])
-  }
-
-  return (
-    <div>
-      <p id="config-shift-schedule-label" className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_086}</p>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5" role="group" aria-labelledby="config-shift-schedule-label">
-        {SHIFT_SCHEDULE_OPTIONS.map((choice) => (
-          <button
-            key={choice.id}
-            type="button"
-            aria-pressed={selectedChoice === choice.id}
-            disabled={isChoiceDisabled(choice)}
-            onClick={() => selectChoice(choice)}
-            className={`tool-secondary-action min-h-11 whitespace-normal px-2 py-2 text-xs leading-5 disabled:cursor-not-allowed disabled:text-ink-muted sm:text-sm ${
-              selectedChoice === choice.id
-                ? 'tool-option-selected'
-                : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'
-            }`}
-          >
-            {choice.label}
-          </button>
-        ))}
+  return <div className="config-field config-shift-field">
+    <label htmlFor={id}>{copy.v2.configShiftFrequency}</label>
+    <select id={id} className="tool-field" value={selected} disabled={!canEdit && !canEditFixedShiftHours} onChange={(event) => {
+      const choice = SHIFT_SCHEDULE_OPTIONS.find((choice) => choice.id === event.currentTarget.value)
+      if (!choice) return
+      setCustomSelected(choice.id === 'custom')
+      setError(null)
+      if (choice.id === 'variable') onSelectVariable()
+      else if ('hours' in choice) onChange([...choice.hours])
+    }}>
+      {SHIFT_SCHEDULE_OPTIONS.map((choice) => <option key={choice.id} value={choice.id}
+        disabled={choice.id === '24x3' ? !canEdit || !features.one_shift_per_day : !canEdit && !(canEditFixedShiftHours && 'hours' in choice)}>
+        {choice.id === '24x3' && !features.one_shift_per_day ? text.oneShiftDisabled : choice.label}
+      </option>)}
+    </select>
+    {selected === 'custom' ? <div className="config-field">
+      <label htmlFor={`${id}-custom`}>{copy.common.components_ConfigEditor_082}</label>
+      <div className="config-custom-hours">
+        <input id={`${id}-custom`} type="text" inputMode="decimal" value={draftValue} disabled={!canEdit} aria-invalid={Boolean(error)}
+          aria-describedby={`${id}-help`} className="tool-field" onChange={(event) => setDraftValue(event.currentTarget.value)}
+          onKeyDown={(event) => { if (event.key === 'Enter') commitDraft() }} />
+        {canEdit && <button type="button" className="tool-secondary-action" onClick={commitDraft}>{copy.common.components_ConfigEditor_083}</button>}
       </div>
-      {selectedChoice === 'custom' && (
-        <div className="mt-3">
-          <label htmlFor="config-shift-hours" className="mb-2 block text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_082}</label>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              id="config-shift-hours"
-              type="text"
-              inputMode="decimal"
-              value={draftValue}
-              disabled={!canEdit}
-              aria-invalid={Boolean(error)}
-              aria-describedby="config-shift-hours-help"
-              onChange={(event) => setDraftValue(event.currentTarget.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') commitDraft()
-              }}
-              className="tool-field min-w-0 flex-1 tabular-nums"
-            />
-            {canEdit && (
-              <button
-                type="button"
-                onClick={commitDraft}
-                className="tool-secondary-action"
-              >
-                {copy.common.components_ConfigEditor_083}</button>
-            )}
-          </div>
-          <p id="config-shift-hours-help" role={error ? 'alert' : undefined} className={`mt-2 text-xs leading-5 ${error ? 'text-error' : 'text-ink-muted'}`}>
-            {error ?? copy.common.components_ConfigEditor_084}
-          </p>
-        </div>
-      )}
-      {selectedChoice !== 'custom' && (
-        <p className="mt-2 text-xs leading-5 text-ink-muted">
-          {selectedChoice === 'variable'
-            ? copy.common.components_ConfigEditor_092
-            : copy.common.components_ConfigEditor_093}
-        </p>
-      )}
-      {!features.one_shift_per_day && (
-        <p className="mt-2 text-xs leading-5 text-ink-muted">
-          {copy.common.components_ConfigEditor_101}
-        </p>
-      )}
-    </div>
-  )
+      <p id={`${id}-help`} role={error ? 'alert' : undefined} className={`config-help ${error ? 'text-error' : ''}`}>{error ?? copy.common.components_ConfigEditor_084}</p>
+    </div> : selected === 'variable' && <p className="config-help">{copy.common.components_ConfigEditor_092}</p>}
+  </div>
 }
 
-function inferShiftScheduleChoice(hours: number[]): ShiftScheduleChoice {
-  for (const choice of SHIFT_SCHEDULE_OPTIONS) {
-    if (!('hours' in choice)) continue
-    if (choice.hours.length === hours.length
-      && choice.hours.every((value, index) => Math.abs(value - hours[index]!) <= 0.0001)) {
-      return choice.id
-    }
-  }
-  return 'custom'
-}
-
-function DroneTargetsInput({
-  id,
-  value,
-  disabled,
-  onChange,
-}: {
-  id: string;
-  value: string;
-  disabled: boolean;
-  onChange: (value: string) => void;
-}) {
+function DroneTargetsInput({ value, disabled, onChange }: { value: string; disabled: boolean; onChange: (value: string) => void }) {
   const [draftValue, setDraftValue] = useState(value)
-
-  useEffect(() => {
-    setDraftValue(value)
-  }, [value])
-
-  const commitDraft = () => {
-    if (disabled) return
-    if (draftValue !== value) {
-      onChange(draftValue)
-    }
-  }
-
-  return (
-    <>
-      <input
-      id={id}
-      type="text"
-      list={`${id}-options`}
-      value={draftValue}
-      disabled={disabled}
-      onChange={(event) => setDraftValue(event.currentTarget.value)}
-      onBlur={commitDraft}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter') {
-          event.currentTarget.blur()
-        }
-      }}
-      placeholder={copy.common.components_ConfigEditor_085}
-      className="tool-field placeholder:text-ink-muted disabled:text-ink-muted"
-      />
-      <datalist id={`${id}-options`}>
-        {DRONE_TARGET_OPTIONS.map((product) => (
-          <option key={product} value={formatProductName(product)} />
-        ))}
-      </datalist>
-    </>
-  )
+  useEffect(() => { setDraftValue(value) }, [value])
+  return <>
+    <input id="drone-targets" type="text" list="drone-targets-options" value={draftValue} disabled={disabled}
+      onChange={(event) => setDraftValue(event.currentTarget.value)} onBlur={() => { if (!disabled && draftValue !== value) onChange(draftValue) }}
+      onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }}
+      placeholder={copy.common.components_ConfigEditor_085} className="tool-field" />
+    <datalist id="drone-targets-options">{[...TRADING_PRODUCTS, ...MANUFACTURING_PRODUCTS].map((product) => <option key={product} value={PRODUCT_LABELS[product]} />)}</datalist>
+  </>
 }
 
-function CounterField({
-  station,
-  id,
-  label,
-  value,
-  min,
-  max,
-  onChange,
-}: {
-  station: 'trading' | 'manufacturing';
-  id: string;
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  onChange: (value: number) => void;
+function CounterField({ station, id, label, value, canEdit, onChange }: {
+  station: keyof typeof STATION_ICONS; id: string; label: string; value: number; canEdit: boolean; onChange: (value: number) => void
 }) {
-  return (
-    <div className={`config-station config-station--${station}`}>
-      <label htmlFor={id} className="mb-2 block text-xs font-medium text-ink-muted">{label}</label>
-      <InputNumber
-        id={id}
-        label={label}
-        value={value}
-        min={min}
-        max={max}
-        onChange={onChange}
-        className="w-full"
-      />
-    </div>
-  )
+  const Icon = STATION_ICONS[station]
+  return <div className={`config-field config-station config-station--${station}`}>
+    <label htmlFor={id} className="config-station-heading"><Icon aria-hidden="true" />{label}</label>
+    {canEdit ? <InputNumber id={id} label={label} value={value} min={1} max={5} onChange={onChange} /> : <strong className="config-station-count">{value}</strong>}
+  </div>
 }
 
-function ReadOnlyMetric({ station, label, value }: { station: 'trading' | 'manufacturing' | 'power'; label: string; value: number | string }) {
-  return (
-    <div className={`config-station config-station--${station}`}>
-      <dt className="text-xs text-ink-muted">{label}</dt>
-      <dd className="mt-1 font-semibold text-ink-primary">{value}</dd>
-    </div>
-  )
-}
-
-function ProductGroupEditor({
-  station,
-  label,
-  products,
-  counts,
-  canEdit,
-  onChange,
-}: {
-  station: 'trading' | 'manufacturing';
-  label: string;
-  products: string[];
-  counts: Record<string, number>;
-  canEdit: boolean;
-  onChange: (product: string, value: number) => void;
+function ProductGroupEditor({ station, label, products, counts, canEdit, onChange }: {
+  station: keyof typeof STATION_ICONS; label: string; products: string[]; counts: Record<string, number>; canEdit: boolean; onChange: (product: string, value: number) => void
 }) {
-  return (
-    <div className={`config-station config-station--${station}`}>
-      <p className="mb-2 text-xs font-medium text-ink-muted">{label}</p>
-      <div className="grid gap-2">
-        {products.map((product) => (
-          <div key={product} className="tool-inset flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
-            <span className="flex items-center gap-2 text-ink-secondary">
-              <ProductIcon product={product} />
-              <span className="whitespace-nowrap">{PRODUCT_LABELS[product] ?? product}</span>
-            </span>
-          {canEdit ? (
-            <ProductCountInput
-              label={PRODUCT_LABELS[product] ?? product}
-              value={counts[product] ?? 0}
-              onChange={(value) => onChange(product, value)}
-            />
-          ) : (
-            <span className="font-semibold text-ink-primary">{counts[product] ?? 0}</span>
-          )}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function ProductCountInput({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <InputNumber
-      label={label}
-      value={value}
-      min={0}
-      max={6}
-      onChange={onChange}
-      className="ml-auto w-36 max-w-full shrink-0"
-    />
-  )
+  const Icon = STATION_ICONS[station]
+  return <div className={`config-product-group config-station config-station--${station}`}>
+    <h4 className="config-station-heading"><Icon aria-hidden="true" />{label}</h4>
+    {products.filter((product) => canEdit || (counts[product] ?? 0) > 0).map((product) => <div key={product} className="config-product-row">
+      <span><ProductIcon product={product} />{PRODUCT_LABELS[product] ?? product}</span>
+      {canEdit ? <InputNumber label={PRODUCT_LABELS[product] ?? product} value={counts[product] ?? 0} min={0} max={6}
+        className="config-product-count" onChange={(value) => onChange(product, Math.max(0, Math.min(6, value)))} /> : <strong>{counts[product]}</strong>}
+    </div>)}
+  </div>
 }

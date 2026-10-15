@@ -28,9 +28,9 @@ export default function ConfigCapabilityPreview({ config, enabled, children }: {
             <p className="mt-1 text-sm leading-6 text-ink-secondary">{text.config_description}</p>
             {features.pricing && <Link to="/pricing" className="mt-2 inline-block text-sm text-primary underline">{text.compare}</Link>}
           </div>
-          <fieldset disabled className="min-w-0" aria-label={text.readonly}>
-            <ConfigEditor config={config} canEdit validation={{ ok: true }} onUpdate={() => {}} embedded note={text.readonly} />
-          </fieldset>
+          <div role="group" className="min-w-0" aria-label={text.readonly}>
+            <ConfigEditor config={config} canEdit readOnly validation={{ ok: true }} onUpdate={() => {}} embedded hideHeader readOnlyMessage={text.readonly} />
+          </div>
         </section>
       ) : children}
     </div>

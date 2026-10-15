@@ -1,16 +1,18 @@
 import { useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
+import { Link, Navigate, useSearchParams } from 'react-router'
 import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import SessionLoader from '../components/SessionLoader'
 import SettingsSection from './tool/dashboard/SettingsSection'
 import { apiVoid } from '../lib/api-client'
+import { formatAccountDeletionDeadline } from '../lib/account-lifecycle-client'
 import { dashboardPath } from '../lib/app-routes'
 import { useSiteFeatures } from '../lib/site-feature-context'
 import { copy } from '../copy/index'
 
 export default function AccountSafetyPage() {
-  const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const scheduledFor = params.get('scheduled_for')
   const featureState = useSiteFeatures()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -28,6 +30,22 @@ export default function AccountSafetyPage() {
     } finally {
       setBusy(false)
     }
+  }
+
+  if (scheduledFor && Number.isFinite(Date.parse(scheduledFor))) {
+    return (
+      <main className="tool-page" tabIndex={-1} data-route-focus>
+        <section className="tool-panel mx-auto max-w-2xl p-6 sm:p-8" aria-labelledby="deletion-accepted-title">
+          <div className="flex items-center justify-between gap-4"><BrandLogo size="md" /><ThemeSwitcher /></div>
+          <div className="mt-6" role="status">
+            <h1 id="deletion-accepted-title" className="display-title text-2xl text-ink-primary">{copy.features.delete_accepted_title}</h1>
+            <p className="mt-3 text-sm leading-6 text-ink-secondary">{copy.features.delete_signed_out}</p>
+            <p className="mt-3 text-sm leading-6 text-ink-secondary">{copy.features.delete_accepted_before}<strong>{formatAccountDeletionDeadline(scheduledFor)}</strong>{copy.features.delete_accepted_after}</p>
+          </div>
+          <Link to="/" className="tool-primary-action mt-6">{copy.features.delete_accepted_leave}</Link>
+        </section>
+      </main>
+    )
   }
 
   if (featureState.status === 'loading') return <SessionLoader label={copy.features.loading} />
@@ -51,7 +69,7 @@ export default function AccountSafetyPage() {
           </div>
         </section>
         <fieldset disabled={busy} className="min-w-0">
-          <SettingsSection safetyOnly profiles={[]} onPayload={() => undefined} onDeletionStateChange={setDeletionState} onLogout={() => { void navigate('/', { replace: true }) }} />
+          <SettingsSection safetyOnly profiles={[]} onPayload={() => undefined} onDeletionStateChange={setDeletionState} />
         </fieldset>
         <Link to="/" className="tool-secondary-action">{copy.features.back_home}</Link>
       </div>

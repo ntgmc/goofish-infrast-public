@@ -136,18 +136,16 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
             <ConfigCapabilityPreview config={config} enabled={!canEditConfig}>
             <ConfigEditor profileId={session.activeProfile?.id} config={config} canEdit={canEditConfig} readOnly={configReadOnly} canEditIntermediateInventory={canUseIntermediateConfig}
               canSelectPreset={canUseIntermediateConfig} canEditFixedShiftHours={canEditConfig || Boolean(session.activeProfile && isFreePreviewProfile(session.activeProfile))} permission={permission}
-              note={exampleData
-                ? text.demoConfigDescription
-                : session.activeProfile && isFreePreviewProfile(session.activeProfile) && !canEditConfig
-                  ? `${copy.common.components_ConfigEditor_024}${getProfileAccessLabel(session.activeProfile)}${copy.common.components_ConfigEditor_025}`
-                  : undefined}
-              validation={validation} onUpdate={onUpdateConfig} embedded mobile hideValidation />
+              note={session.activeProfile && isFreePreviewProfile(session.activeProfile) && !canEditConfig
+                ? `${copy.common.components_ConfigEditor_024}${getProfileAccessLabel(session.activeProfile)}${copy.common.components_ConfigEditor_025}`
+                : undefined}
+              validation={validation} onUpdate={onUpdateConfig} embedded hideHeader hideValidation />
             </ConfigCapabilityPreview>
-            {hasPreviousResult && <aside className="v2-options-content">
-              <h3>{copy.optimize.pages_tool_optimize_ConfigSection_010}</h3>
+            {hasPreviousResult && <details className="v2-config-changes">
+              <summary>{text.configEditor.changes}{Boolean(configDiffRows?.length) && <span>{configDiffRows!.length}</span>}</summary>
               {configDiffRows?.length ? <dl>{configDiffRows.map((row) => <div key={row.label}><dt>{row.label}</dt><dd>{copy.optimize.pages_tool_optimize_ConfigSection_012}{row.before}<br />{copy.optimize.pages_tool_optimize_ConfigSection_013}{row.after}</dd></div>)}</dl>
                 : <p role="status">{copy.optimize.pages_tool_optimize_ConfigSection_014}</p>}
-            </aside>}
+            </details>}
           </>
         )}
         {shownPanel === 'operators' && (

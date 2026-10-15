@@ -14,7 +14,7 @@
   p { color: var(--v2-secondary); line-height: 1.75; }
   small { color: var(--v2-muted); font-size: var(--text-xs); line-height: 1.6; }
   :is(time, dl, b) { font-variant-numeric: tabular-nums; }
-  input:is([type="checkbox"], [type="radio"]) { accent-color: var(--v2-accent); flex: none; width: 16px; height: 16px; }
+  input:is([type="checkbox"], [type="radio"]):not([role="switch"]) { accent-color: var(--v2-accent); flex: none; width: 16px; height: 16px; }
   .v2-section-heading { align-items: start; padding-bottom: var(--space-md); border-bottom: 1px solid var(--v2-line); }
   .v2-section-heading h1 { font-size: var(--text-v2-title); line-height: 1.2; }
   .v2-section-heading p { max-width: 65ch; }

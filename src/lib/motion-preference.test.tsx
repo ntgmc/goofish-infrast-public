@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import AnimationSettings from '../components/AnimationSettings'
 import SettingsSection from '../pages/tool/dashboard/SettingsSection'
@@ -43,10 +44,10 @@ function mockFrames() {
 }
 
 function mountSettings() {
-  return render(<MotionPreferenceProvider>
-    <SettingsSection profiles={[]} onLogout={vi.fn()} onPayload={vi.fn()} />
+  return render(<MemoryRouter><MotionPreferenceProvider>
+    <SettingsSection profiles={[]} onPayload={vi.fn()} />
     <Probe />
-  </MotionPreferenceProvider>)
+  </MotionPreferenceProvider></MemoryRouter>)
 }
 
 it('shares and persists the account setting across mounted settings controls and page reloads', async () => {

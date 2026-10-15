@@ -6,6 +6,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import { CONFIG_PRESETS, normalizeConfig } from '../lib/config'
 import ConfigCapabilityPreview from './ConfigCapabilityPreview'
+import { copy } from '../copy'
 
 afterEach(cleanup)
 
@@ -27,9 +28,10 @@ it('opens on free configuration and previews full configuration without allowing
   await user.click(previewButton)
   expect(previewButton).toHaveAttribute('aria-pressed', 'true')
   const preview = screen.getByRole('group', { name: '高级配置只读预览' })
-  expect(within(preview).getByRole('region', { name: '排班模式' })).toBeInTheDocument()
+  expect(within(preview).getByRole('region', { name: copy.v2.configExecution })).toBeInTheDocument()
+  await user.click(within(preview).getByRole('tab', { name: /房间/ }))
   expect(within(preview).getByRole('region', { name: '产物数量' })).toBeInTheDocument()
-  const controls = preview.querySelectorAll('button, input, select')
+  const controls = preview.querySelectorAll('.config-editor-fields button, .config-editor-fields input, .config-editor-fields select')
   expect(controls.length).toBeGreaterThan(10)
   controls.forEach((control) => expect(control).toBeDisabled())
   const input = preview.querySelector('input')
