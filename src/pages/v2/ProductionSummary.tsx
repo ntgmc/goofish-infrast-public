@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { Gem } from 'lucide-react'
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
 import { AnimatedValue, RevealItem, StaggeredReveal } from '../../components/MotionPrimitives'
@@ -68,9 +69,12 @@ export default function ProductionSummary({ result, prepared, sample, profileId,
       <Metric label={text.goldNetChange} value={hasGoldNet ? signedAmount(goldNet) : '—'} unit={text.goldUnit} product="Pure Gold"
         hint={hasGoldNet ? goldNet < 0 ? text.goldDeficit : goldNet > 0 ? text.goldSurplus : text.goldBalanced : text.goldNetUnavailable}
         change={hasGoldNet ? change(goldNet, priorDaily?.net?.['Pure Gold'], text.goldUnit) : undefined} />
-      <Metric label={text.sanity} value={daily ? prepared.productionSanity.value.toFixed(2) : '—'} unit={text.sanityUnit}
-        icon={<img src="/assets/products/AP_GAMEPLAY.png" alt="" width={24} height={24} decoding="async" />}
-        change={priorDaily ? change(prepared.productionSanity.value, calculateProductionSanity(priorDaily).value, text.sanityUnit) : undefined} />
+      {isOrundum ? <Metric label={text.shortTermPulls} value={daily ? (orundum * 30 / 600).toFixed(1) : '—'} unit={text.pullsPer30Days}
+        icon={<Gem size={20} />}
+        hint={text.shortTermPullsHint(formatAmount(orundum), burstNote || (economy ? text.orundumOutputSustainable : text.orundumDurationUnavailable))} />
+        : <Metric label={text.sanity} value={daily ? prepared.productionSanity.value.toFixed(2) : '—'} unit={text.sanityUnit}
+          icon={<img src="/assets/products/AP_GAMEPLAY.png" alt="" width={24} height={24} decoding="async" />}
+          change={priorDaily ? change(prepared.productionSanity.value, calculateProductionSanity(priorDaily).value, text.sanityUnit) : undefined} />}
     </StaggeredReveal>
     <p className="v2-metrics-note">{text.outputSubtitle}</p>
     {!sample && <p className="v2-metrics-note" aria-live="polite">
