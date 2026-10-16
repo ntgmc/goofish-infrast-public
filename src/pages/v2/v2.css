@@ -128,6 +128,7 @@
   border-radius: var(--radius-v2-control);
   color: var(--color-v2-rail-muted);
   text-align: left;
+  white-space: nowrap;
   transition: background-color var(--dur-fast) ease-out, color var(--dur-fast) ease-out;
 }
 
@@ -169,6 +170,27 @@
 
 .v2-nav-dot {
   margin-left: auto;
+}
+
+.v2-nav-disclosure {
+  margin-top: var(--space-md);
+}
+
+.v2-nav-disclosure > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.v2-nav-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.v2-nav-disclosure > summary > small {
+  background: none;
+}
+
+.v2-nav-disclosure[open] .v2-nav-chevron {
+  transform: rotate(90deg);
 }
 
 .v2-sidebar-menu-links {

@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
 import { useAppReducedMotion } from '../../lib/motion-preference'
-import { Activity, ArrowRight, ArrowUpRight, Bell, BookOpen, Building2, CalendarClock, Check, ChevronDown, ChevronRight, Download, Factory, FileClock, LayoutDashboard, LogIn, Menu, RefreshCw, ScrollText, Settings2, ShieldCheck, Sparkles, Users, WalletCards, X, Zap } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, CalendarClock, Check, ChevronDown, ChevronRight, Download, Factory, LogIn, Menu, RefreshCw, Settings2, ShieldCheck, Sparkles, X, Zap } from 'lucide-react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import Link from '../../components/InternalLink'
 import { copy } from '../../copy'
@@ -22,6 +22,7 @@ import AnnouncementPopup from '../../components/AnnouncementPopup'
 import { LockedCapabilityPreview, UpgradeSuggestionStatusNotice } from '../tool/optimize/ResultSection'
 import WorkspaceSections, { type V2Workflow } from './WorkspaceSections'
 import { sectionLabels, v2Path, v2Section, v2SectionAvailable, type V2Section } from './navigation'
+import V2Navigation from './V2Navigation'
 import { normalizeScheduleMode, parseShiftHours, SCHEDULE_MODE_LABELS, validateScheduleConfig } from '../../lib/config'
 import type { AuthSuccessResponse, LicenseConfig, LicenseOperator, OptimizeResult, PermissionMode } from '../../lib/types'
 import ScheduleBoard, { Avatar } from './ScheduleBoard'
@@ -34,7 +35,6 @@ import V2Transition, { V2PageTransition } from './V2Transition'
 import TradingIcon from './TradingIcon'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
-import FeedbackButton from '../../components/FeedbackDialog'
 import ProfileExpiryPrompt from '../tool/ProfileExpiryPrompt'
 
 const text = copy.v2
@@ -43,7 +43,7 @@ const ManualScheduleEditor = lazy(() => import('../../components/result-panel/Ma
 const UpgradeSuggestions = lazy(() => import('../../components/UpgradeSuggestions'))
 
 export default function V2Dashboard({ session, workflow, taskCenterAction, generationProgress, result, operators, config, sample, configChanged, onUpdateConfig,
-  onImportOperators, onGenerate, onExport, busy = false, loadingResult = false, generationDisabledReason, onRetryResult, error, notice,
+  onImportOperators, onGenerate, onExport, sampleOperators = false, busy = false, loadingResult = false, generationDisabledReason, onRetryResult, error, notice,
   permission, onManualDirtyChange, canEditConfig = true, canViewAnalysis = true, canUseIntermediateConfig = true, children }: {
   session: V2Session
   workflow?: V2Workflow
@@ -53,6 +53,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   operators: LicenseOperator[]
   config: LicenseConfig
   sample: boolean
+  sampleOperators?: boolean
   configChanged: boolean
   onUpdateConfig: (mutate: (config: LicenseConfig) => void) => void
   onImportOperators: (operators: LicenseOperator[]) => Promise<void>
@@ -220,34 +221,16 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
         {mobileNavigation && <motion.button key="navigation-scrim" className="v2-nav-scrim" type="button" onClick={() => setMobileNavigation(false)} aria-label={text.close}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduceMotion ? 0 : motionTokens.duration.exit }} />}
       </AnimatePresence>
-      <aside className={`v2-sidebar ${mobileNavigation ? 'v2-sidebar-open' : ''}`}>
+      <aside id="v2-navigation" className={`v2-sidebar ${mobileNavigation ? 'v2-sidebar-open' : ''}`}>
         <Link to={v2Path('overview', session.activeProfile?.id)} className="v2-brand"><img className="v2-brand-mark" src="/assets/maatool-v2-icon.svg" width="44" height="44" alt="" />
           <span><strong>{text.brand}</strong><small>{text.brandDescription}</small></span></Link>
         <button className="v2-mobile-close v2-icon-button" type="button" onClick={() => setMobileNavigation(false)} aria-label={text.close}><X size={20} /></button>
-        <nav aria-label={text.navigation}>
-          <p className="v2-nav-label">{text.workspace}</p>
-          {(['overview', 'generation', 'plans', 'lab', 'tools'] as const).filter((entry) => v2SectionAvailable(entry, features)).map((entry) => <button type="button" key={entry} className={`v2-nav-item ${section === entry ? 'v2-nav-active' : ''}`} aria-current={section === entry ? 'page' : undefined} onClick={() => navigateSection(entry)}>
-            {entry === 'overview' ? <LayoutDashboard size={19} /> : entry === 'plans' ? <FileClock size={19} /> : entry === 'generation' ? <RefreshCw size={19} /> : entry === 'lab' ? <Activity size={19} /> : <CalendarClock size={19} />}<span>{sectionLabels[entry]}</span>{section === entry && <span className="v2-nav-dot" />}</button>)}
-          <p className="v2-nav-label">{text.configuration}</p>
-          <button type="button" className="v2-nav-item" aria-label={text.operators} onClick={() => openPanel('operators')}><Users size={19} /><span>{text.operators}</span><small>{owned.length}</small></button>
-          <button type="button" className="v2-nav-item" onClick={() => openPanel('config')}><Building2 size={19} /><span>{text.facilities}</span></button>
-          <p className="v2-nav-label">{text.personal}</p>
-          <button type="button" className="v2-nav-item" onClick={() => openPanel('settings')}><Settings2 size={19} /><span>{copy.dashboard.animation.settings}</span></button>
-          {(['profiles', 'inventory', 'commercial', 'balance', 'announcements', 'settings'] as const).filter((entry) => v2SectionAvailable(entry, features)).map((entry) => <button type="button" key={entry} className={`v2-nav-item ${section === entry ? 'v2-nav-active' : ''}`} aria-current={section === entry ? 'page' : undefined} onClick={() => navigateSection(entry)}>
-            {entry === 'profiles' ? <UserIcon /> : entry === 'announcements' ? <Bell size={19} /> : entry === 'settings' ? <Settings2 size={19} /> : <WalletCards size={19} />}<span>{sectionLabels[entry]}</span>{entry === 'announcements' && session.announcementUnreadCount > 0 && <small>{session.announcementUnreadCount}</small>}</button>)}
-          <div className="v2-sidebar-menu-links">
-            {features.changelog && <Link className="v2-nav-item" to={v2Path('updates', session.activeProfile?.id)} onClick={() => setMobileNavigation(false)}><ScrollText size={19} /><span>{text.updates}</span></Link>}
-            <Link className="v2-nav-item" to="/v1" onClick={openLegacy}><ArrowUpRight size={19} /><span>{text.legacyEntry}</span></Link>
-          </div>
-        </nav>
-        <div className="v2-sidebar-bottom">
-          {session.user && <FeedbackButton className="v2-help-link" />}
-          {features.faq && <Link className="v2-help-link" to={v2Path('help', session.activeProfile?.id)}><BookOpen size={19} /><span>{text.helpAction}</span><ArrowUpRight size={14} /></Link>}
-        </div>
+        <V2Navigation section={section} session={session} operatorCount={owned.length} sampleOperators={sampleOperators}
+          onNavigate={navigateSection} onPanel={openPanel} onClose={() => setMobileNavigation(false)} onLegacy={openLegacy} />
       </aside>
       <div className="v2-workspace">
         <header className="v2-topbar">
-          <div className="v2-breadcrumb"><button className="v2-menu-button v2-icon-button" type="button" onClick={() => setMobileNavigation(true)} aria-label={text.menu}><Menu size={21} /></button>
+          <div className="v2-breadcrumb"><button className="v2-menu-button v2-icon-button" type="button" onClick={() => setMobileNavigation(true)} aria-label={text.menu} aria-expanded={mobileNavigation} aria-controls="v2-navigation"><Menu size={21} /></button>
             <span>{text.workspace}</span><ChevronRight size={14} /><strong>{sectionLabels[section]}</strong></div>
           <div className="v2-topbar-actions"><div className="v2-feature-content">{taskCenterAction}</div>
             <div className="v2-feature-content"><ThemeSwitcher iconOnly /></div>
@@ -339,7 +322,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
                 </div>
                 <dl className="v2-config-summary"><div><dt>{text.layout}</dt><dd>{config.layout}</dd></div><div><dt>{text.mode}</dt><dd>{SCHEDULE_MODE_LABELS[configMode]}</dd></div>
                   <div><dt>{text.duration}</dt><dd>{hours.join(' / ')}h</dd></div><div><dt>{text.drones}</dt><dd>{config.drones?.enable ? config.drones.auto ? text.automatic : text.manual : text.disabled}</dd></div></dl>
-                <button className="v2-operator-summary" type="button" onClick={() => openPanel('operators')}><div className="v2-avatar-stack">{owned.slice(0, 4).map((operator) => <Avatar key={operator.id} operator={operator} small />)}</div><span><strong>{text.operatorData}</strong><small>{text.owned(owned.length)}</small></span><ChevronRight size={15} /></button>
+                <button className="v2-operator-summary" type="button" onClick={() => openPanel('operators')}><div className="v2-avatar-stack">{owned.slice(0, 4).map((operator) => <Avatar key={operator.id} operator={operator} small />)}</div><span><strong>{text.operatorData}</strong><small>{sampleOperators ? text.guestNavigation.sampleOwned(owned.length) : text.owned(owned.length)}</small></span><ChevronRight size={15} /></button>
               </section>
             </aside>}
           </div>
@@ -369,10 +352,6 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
     </div>
     </LayoutGroup>
   )
-}
-
-function UserIcon() {
-  return <span className="v2-user-nav-icon"><Users size={18} /></span>
 }
 
 function FeedbackRegion({ children }: { children: ReactNode }) {

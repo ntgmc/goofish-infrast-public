@@ -322,6 +322,26 @@ describe('V2 results-first workspace', () => {
     expect(screen.getByText(copy.v2.sampleSource)).toBeInTheDocument()
     expect(screen.queryByText(copy.v2.loading)).not.toBeInTheDocument()
     expect(mocks.workflow).not.toHaveBeenCalled()
+    const navigation = within(screen.getByRole('navigation', { name: copy.v2.navigation }))
+    expect(navigation.getAllByRole('link').slice(0, 4).map((link) => link.textContent)).toEqual([
+      copy.v2.guestNavigation.example, copy.v2.generateMine, copy.v2.guestNavigation.pricing, copy.v2.helpAction,
+    ])
+    const count = SAMPLE_OPERATORS.filter((operator) => operator.own).length
+    expect(navigation.getByRole('button', { name: copy.v2.operators })).toHaveTextContent(copy.v2.guestNavigation.operatorCount(count))
+    expect(screen.getByText(copy.v2.guestNavigation.sampleOwned(count))).toBeVisible()
+    expect(navigation.getByText(copy.v2.guestNavigation.personal).closest('details')).not.toHaveAttribute('open')
+
+    const workflow = connect()
+    workflow.mergedOperators = [{ ...SAMPLE_OPERATORS[0], own: true }]
+    workflow.historyItem = null as unknown as typeof workflow.historyItem
+    workflow.latestWorkspaceResult = null as unknown as typeof summary
+    page.rerender(<MemoryRouter><V2Page /></MemoryRouter>)
+    const personalNavigation = within(screen.getByRole('navigation', { name: copy.v2.navigation }))
+    expect(personalNavigation.queryByRole('link', { name: copy.v2.guestNavigation.example })).not.toBeInTheDocument()
+    expect(personalNavigation.getByRole('button', { name: copy.v2.history })).toBeVisible()
+    expect(personalNavigation.getByRole('button', { name: copy.v2.operators }).querySelector('small')).toHaveTextContent(/^1$/)
+    expect(screen.getByText(copy.v2.owned(1))).toBeVisible()
+    expect(screen.queryByText(copy.v2.guestNavigation.sampleOwned(1))).not.toBeInTheDocument()
   })
 
   it('shows common configuration first and opens other tasks on demand', async () => {
@@ -370,7 +390,8 @@ describe('V2 results-first workspace', () => {
       await user.click(screen.getByRole('button', { name: copy.common.pages_ToolPage_005 }))
       expect(session.retryAuth).toHaveBeenCalledOnce()
     }
-    await user.click(screen.getByRole('link', { name: copy.public.pages_PublicInfoPage_061 }))
+    const navigation = within(screen.getByRole('navigation', { name: copy.v2.navigation }))
+    await user.click(navigation.getByRole('link', { name: copy.public.pages_PublicInfoPage_061 }))
     expect(await screen.findByRole('heading', { name: copy.public.pages_PublicInfoPage_067 })).toBeVisible()
     expect(screen.getByTestId('route-location')).toHaveTextContent('section=support')
     expect(mocks.workflow).not.toHaveBeenCalled()
@@ -407,7 +428,7 @@ describe('V2 results-first workspace', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     await act(async () => { finishRetry(Response.json({ user: null })) })
     expect(screen.getByRole('heading', { name: '当前服务运行正常。' })).toBe(statusHeading)
-    await user.click(screen.getByRole('button', { name: copy.v2.overview }))
+    await user.click(within(screen.getByRole('navigation', { name: copy.v2.navigation })).getByRole('link', { name: copy.v2.guestNavigation.example }))
     expect(screen.getByText(copy.v2.sampleSource)).toBeVisible()
     expect(mocks.workflow).not.toHaveBeenCalled()
   })
@@ -445,7 +466,7 @@ describe('V2 results-first workspace', () => {
     mount('/v2?section=status')
     expect(await screen.findByText(copy.v2.featureUnavailable)).toBeVisible()
     expect(screen.queryByRole('grid')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: copy.v2.overview }))
+    await user.click(within(screen.getByRole('navigation', { name: copy.v2.navigation })).getByRole('link', { name: copy.v2.guestNavigation.example }))
     expect(screen.getByRole('alert')).toHaveTextContent(copy.common.pages_ToolPage_003)
     expect(screen.queryByRole('link', { name: copy.v2.helpAction })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: copy.public.pages_PublicInfoPage_061 })).not.toBeInTheDocument()
