@@ -82,7 +82,7 @@ afterEach(() => {
 it('continues from login and Skland import through saved configuration to the first generation', async () => {
   const user = userEvent.setup()
   const firstWorkspace = { ...workspace, latest_result: null, result_history: [] }
-  const firstProfile: UserGameAccount = { ...profile, kind: 'free_preview', skland_binding: { uid: '12345678', nickname: '首次博士', channel_name: '官服',
+  const firstProfile: UserGameAccount = { ...profile, kind: 'free_preview', permission: 'growth', skland_binding: { uid: '12345678', nickname: '首次博士', channel_name: '官服',
     bound_at: profile.created_at, last_imported_at: profile.created_at, credential_status: 'available', credential_invalid_at: null, credential_invalid_reason: null } }
   const firstAuth = { ...auth, active_profile: firstProfile, profiles: [firstProfile], workspace: firstWorkspace }
   let signedIn = false
@@ -126,6 +126,7 @@ it('continues from login and Skland import through saved configuration to the fi
   await act(async () => saveConfig({ ...firstAuth, workspace: { ...firstWorkspace, config: patch.config } }))
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   expect(screen.getByRole('complementary', { name: copy.v2.firstSchedule.title }).querySelector('[aria-current="step"]')).toHaveTextContent(copy.v2.firstSchedule.generate)
+  expect(await screen.findByText(copy.optimize.maa_export.free)).toBeVisible()
   await user.click(await screen.findByRole('button', { name: copy.optimize.pages_tool_optimize_GenerateControlBar_030 }))
   await waitFor(() => expect(apiJson).toHaveBeenCalledWith('/api/optimization/jobs', expect.objectContaining({ method: 'POST' })))
   expect(vi.mocked(apiJson).mock.calls.filter(([url, options]) => url === '/api/optimization/jobs' && options?.method === 'POST')).toHaveLength(1)

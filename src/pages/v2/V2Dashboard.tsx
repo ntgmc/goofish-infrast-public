@@ -11,6 +11,7 @@ import { formatAmount, formatIntermediateDepletionSummary, prepareResult } from 
 import { PRODUCT_LABELS } from '../../components/result-panel/labels'
 import InventoryDepletionWarning from '../../components/result-panel/InventoryDepletionWarning'
 import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
+import { getMaaExportNotice } from '../tool/optimize/maa-export-notice'
 import { manualSourceKey } from '../../lib/manual-schedule'
 import { hasCapability } from '../../lib/product-catalog'
 import { FIRST_SCHEDULE_INTENT_KEY } from '../../lib/first-schedule'
@@ -127,6 +128,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const manualKey = useMemo(() => manualSourceKey(result), [result])
   const exportResultId = workflow?.currentResult || workflow?.finalResult ? workflow.progress?.historyResultId ?? workflow.progress?.jobId : workflow?.historyItem?.id ?? workflow?.latestWorkspaceResult?.id
   const exportFailure = !sample && workflow?.exportFailure?.resultId === exportResultId ? workflow?.exportFailure : null
+  const exportNotice = getMaaExportNotice(sample ? config.schedule_mode : result.schedule_mode, features.maa_export, workflow)
   const simulationBaseline = workflow?.historyItem?.config ? { id: workflow.historyItem.id, config: workflow.historyItem.config }
     : workflow?.progress?.historyResultId || workflow?.progress?.jobId || workflow?.latestWorkspaceResult?.id
       ? { id: workflow.progress?.historyResultId ?? workflow.progress?.jobId ?? workflow.latestWorkspaceResult!.id, config } : undefined
@@ -348,7 +350,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           <footer className="v2-footer"><span>{text.brand}</span><nav>{(['pricing', 'status', 'support', 'terms', 'privacy', 'disclaimer'] as const).filter((entry) => v2SectionAvailable(entry, features)).map((entry) => <Link key={entry} to={v2Path(entry, session.activeProfile?.id)}>{sectionLabels[entry]}</Link>)}</nav></footer>
         </main>
       </div>
-      <ResultExportDrawer key={`${session.activeProfile?.id ?? 'sample'}:${exportResultId ?? manualKey}`} open={exportOpen} onOpenChange={setExportOpen} result={result} prepared={prepared} shift={shift} busy={busy} failure={exportFailure}
+      <ResultExportDrawer key={`${session.activeProfile?.id ?? 'sample'}:${exportResultId ?? manualKey}`} open={exportOpen} onOpenChange={setExportOpen} result={result} prepared={prepared} shift={shift} busy={busy} failure={exportFailure} exportNotice={exportNotice}
         onRecover={(action) => { setExportOpen(false); navigateSection(action === 'login' ? 'generation' : action); if (action === 'login') session.retryAuth() }}
         onDownloadMaa={!sample && features.maa_export ? onExport : undefined} onDownloadSample={sample ? downloadSample : undefined}
         onDownloadFullResult={!sample && canViewAnalysis && !result.preview_limit && features.full_result_export && workflow?.userCanDownloadFullResult ? workflow.handleDownloadFullResult : undefined} />

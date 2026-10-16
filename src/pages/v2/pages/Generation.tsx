@@ -5,6 +5,7 @@ import { SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../../../lib/config
 import { formatResultHistorySummary, formatWorkspaceDate } from '../../../lib/workspace-history'
 import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../../lib/workspace-limits'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
+import { getMaaExportNotice } from '../../tool/optimize/maa-export-notice'
 import type { V2Workflow } from '../WorkspaceSections'
 import type { V2Section } from '../navigation'
 import { Facts, Notice, SectionTitle } from '../components/WorkspaceUI'
@@ -13,6 +14,7 @@ const text = copy.optimize
 
 export default function Generation({ workflow: w, progress: progressContent, disabledReason, preparationStep, onOperators, onNavigate, onConfig }: { workflow: V2Workflow; progress?: ReactNode; disabledReason?: string | null; preparationStep?: number; onOperators: () => void; onNavigate: (section: V2Section) => void; onConfig: () => void }) {
   const { features } = useSiteFeatures()
+  const exportNotice = getMaaExportNotice(w.activeConfig.schedule_mode, features.maa_export, w)
   const saving = w.configSyncStatus === 'pending' || w.configSyncStatus === 'saving'
   const error = w.inlineError?.scope === 'generate' ? w.inlineError : null
   const busy = w.loading || w.licenseSyncing || (error?.retry === 'save' && saving)
@@ -25,6 +27,7 @@ export default function Generation({ workflow: w, progress: progressContent, dis
   if (preparationStep === 1 || preparationStep === 2) return <section className="v2-first-schedule-task">
     <SectionTitle title={preparationStep === 1 ? copy.v2.firstSchedule.import : copy.v2.firstSchedule.configTitle}
       description={preparationStep === 1 ? copy.v2.generationImport : copy.v2.firstSchedule.configHelp} />
+    <Notice>{exportNotice}</Notice>
     {preparationStep === 2 && <Facts items={[[copy.v2.operators, copy.v2.owned(w.mergedOperators.filter((operator) => operator.own).length)], [copy.v2.facilities, configLabel]]} />}
     <button type="button" className="v2-button v2-button-primary" disabled={busy} onClick={preparationStep === 1 ? onOperators : onConfig}>
       {preparationStep === 1 ? <Users size={18} /> : <Settings2 size={18} />}{preparationStep === 1 ? copy.public.pages_LandingPage_001 : copy.v2.firstSchedule.configAction}
@@ -40,6 +43,7 @@ export default function Generation({ workflow: w, progress: progressContent, dis
         <Notice error>{w.inventoryError ?? w.priorityCouponError}{(w.inventoryError || w.priorityCouponError) && <button className="v2-text-button" disabled={w.inventoryLoading || w.priorityCouponLoading} onClick={() => { void w.refreshInventory(); void w.refreshRewardBalance() }}>{text.pages_tool_optimize_OptimizeWorkflowPage_006}</button>}</Notice>
       </section>
       <section className="v2-generation-execution"><SectionTitle title={copy.v2.execute} />
+        <Notice>{exportNotice}</Notice>
         <label className="v2-coupon-option"><input type="checkbox" checked={w.usePriorityCoupon} disabled={(w.priorityCouponBalance?.available ?? 0) < 1 || busy} onChange={(event) => w.setUsePriorityCoupon(event.target.checked)} /><span><strong>{text.pages_tool_optimize_GenerateControlBar_021}</strong><small>{text.pages_tool_optimize_GenerateControlBar_023}</small><small>{text.pages_tool_optimize_GenerateControlBar_024}{w.priorityCouponBalance?.available ?? 0}{w.priorityCouponBalance?.next_expiry_at ? ` · ${text.pages_tool_optimize_GenerateControlBar_026}${new Date(w.priorityCouponBalance.next_expiry_at).toLocaleDateString(CURRENT_LOCALE)}` : ''}</small></span></label>
         {!w.userCanUseUpgradeFeatures && (w.itemBalances.training_diagnosis_coupon ?? 0) > 0 && <label className="v2-coupon-option"><input type="checkbox" checked={w.useTrainingDiagnosisCoupon} disabled={busy} onChange={(event) => w.setUseTrainingDiagnosisCoupon(event.target.checked)} /><span><strong>{copy.inventory.training_coupon}</strong><small>{copy.inventory.training_coupon_help}</small><small>{copy.inventory.coupon_available}{w.itemBalances.training_diagnosis_coupon}</small></span></label>}
         {w.billingQuote && <Notice>{copy.metered.quote.summary(w.billingQuote.charge, w.billingQuote.available, w.billingQuote.tier, w.billingQuote.sufficient)}</Notice>}

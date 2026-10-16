@@ -27,7 +27,7 @@ it('shows benefits by default and offers a working preview for every feature', a
   expect(recompute).toHaveAttribute('aria-expanded', 'false')
   await user.click(screen.getByRole('button', { name: '查看功能：MAA 干员识别文件导入' }))
   expect(screen.getByRole('button', { name: 'MAA 干员识别文件导入 · 高级版可用' })).toBeDisabled()
-  expect(screen.getByText(/免费档案在高级体验期或使用导出体验券时/)).toBeInTheDocument()
+  expect(screen.getByText(/免费版可生成排班并保存图片，不支持 MAA 导出/)).toBeInTheDocument()
   expect(screen.getByRole('link', { name: '比较价格与权益' })).toHaveAttribute('href', '/pricing')
 })
 

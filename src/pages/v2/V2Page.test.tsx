@@ -124,7 +124,8 @@ function connect() {
     license: { version: 2, order_hash: 'order', operators: SAMPLE_OPERATORS, config: SAMPLE_CONFIG, issued_at: '', sig: '' },
   }
   const workflow = {
-    profile, savedConfigs: [], archivedResults: [], suggestions: [], itemBalances: {},
+    profile, savedConfigs: [], archivedResults: [], suggestions: [], itemBalances: {} as Partial<Record<import('../../lib/inventory-contracts').SystemItemCode, number>>,
+    userCanExportMaaWithoutCoupon: true, inventoryLoaded: true, inventoryError: null as string | null,
     latestWorkspaceResult: summary, handleViewHistory: vi.fn(async () => undefined),
     currentResult: null as OptimizeResult | null, finalResult: null, historyItem: { result: SAMPLE_RESULT },
     activeConfig: SAMPLE_CONFIG, mergedOperators: SAMPLE_OPERATORS, configDiffRows: [],
@@ -831,6 +832,47 @@ describe('V2 results-first workspace', () => {
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
+  it.each([
+    { name: 'free', direct: false, balance: 0, loaded: true, error: null, enabled: true, mode: 'maa', message: copy.optimize.maa_export.free, available: false },
+    { name: 'coupon', direct: false, balance: 1, loaded: true, error: null, enabled: true, mode: 'maa', message: copy.optimize.maa_export.coupon, available: true },
+    { name: 'paid or active trial', direct: true, balance: 0, loaded: false, error: null, enabled: true, mode: 'maa', message: copy.optimize.maa_export.direct, available: true },
+    { name: 'inventory loading', direct: false, balance: 0, loaded: false, error: null, enabled: true, mode: 'maa', message: copy.optimize.maa_export.checking, available: false },
+    { name: 'inventory failed with stale coupon', direct: false, balance: 1, loaded: true, error: 'Inventory unavailable', enabled: true, mode: 'maa', message: copy.optimize.maa_export.failed, available: false },
+    { name: 'service unavailable', direct: true, balance: 1, loaded: true, error: null, enabled: false, mode: 'maa', message: copy.optimize.maa_export.disabled, available: false },
+    { name: 'rotation with export rights', direct: true, balance: 1, loaded: true, error: null, enabled: true, mode: 'rotation', message: copy.optimize.maa_export.rotation, available: false },
+  ] as const)('explains $name exports before generation and inside the export drawer', async ({ direct, balance, loaded, error, enabled, mode, message, available }) => {
+    const workflow = connect()
+    workflow.userCanExportMaaWithoutCoupon = direct
+    workflow.itemBalances = { maa_export_trial_coupon: balance }
+    workflow.inventoryLoaded = loaded
+    workflow.inventoryError = error
+    workflow.activeConfig = { ...SAMPLE_CONFIG, schedule_mode: mode }
+    workflow.historyItem = { result: { ...SAMPLE_RESULT, schedule_mode: mode } }
+    mocks.features.mockReturnValue({ status: 'ready', features: { ...DEFAULT_SITE_FEATURES, maa_export: enabled }, retry: vi.fn() })
+    const user = userEvent.setup()
+    mount('/v2?section=generation')
+    const generation = await screen.findByRole('region', { name: copy.v2.generation })
+    expect(await within(generation).findByText(message)).toBeVisible()
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: copy.v2.overview }))
+    await user.click(screen.getByRole('button', { name: copy.v2.export }))
+    const dialog = within(await screen.findByRole('dialog', { name: copy.v2.exportTitle }))
+    expect(dialog.getByText(message)).toBeVisible()
+    const download = dialog.queryByRole('button', { name: copy.v2.exportMaa })
+    if (!enabled) expect(download).not.toBeInTheDocument()
+    else if (mode === 'rotation') expect(download).toBeDisabled()
+    else {
+      expect(download).toBeEnabled()
+      if (available) {
+        await user.click(download!)
+        expect(workflow.handleDownloadMAA).toHaveBeenCalledOnce()
+      }
+    }
+    if (!available) expect(workflow.handleDownloadMAA).not.toHaveBeenCalled()
+    expect(dialog.getByRole('button', { name: copy.domain.result_image.all })).toBeEnabled()
+    expect(session.persistWorkspacePatch).not.toHaveBeenCalled()
+  })
+
   it.each(['maa', 'full'] as const)('shows %s failures inside the drawer and retries the same export without losing the selected shift', async (format) => {
     const workflow = connect()
     workflow.exportFailure = { format, resultId: summary.id, error: new Error('连接中断，请检查网络。') }
@@ -904,7 +946,7 @@ describe('V2 results-first workspace', () => {
     await user.click(screen.getByRole('button', { name: copy.v2.export }))
     const dialog = within(await screen.findByRole('dialog', { name: copy.v2.exportTitle }))
     expect(dialog.getByRole('button', { name: copy.v2.exportMaa })).toBeDisabled()
-    expect(dialog.getByText(copy.v2.exportUnavailable)).toBeInTheDocument()
+    expect(dialog.getByText(copy.optimize.maa_export.rotation)).toBeInTheDocument()
     expect(dialog.getByRole('button', { name: copy.domain.result_image.all })).toBeEnabled()
     expect(dialog.getByText(copy.domain.components_result_panel_Guides_001)).toBeInTheDocument()
     mocks.features.mockReturnValue({ status: 'ready', features: { ...DEFAULT_SITE_FEATURES, maa_export: false }, retry: vi.fn() })
@@ -932,7 +974,7 @@ describe('V2 results-first workspace', () => {
     await user.click(dialog.getByRole('button', { name: copy.v2.exportRetry }))
     expect(current).toBeDisabled()
     expect(all).toBeDisabled()
-    expect(dialog.getByRole('status')).toHaveTextContent(copy.domain.result_image.busy)
+    expect(dialog.getByText(copy.domain.result_image.busy)).toHaveAttribute('role', 'status')
     await user.click(all)
     expect(mocks.image).toHaveBeenCalledTimes(2)
     await act(async () => { finish() })

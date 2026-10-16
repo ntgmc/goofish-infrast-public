@@ -25,6 +25,7 @@ export default function GenerateControlBar({
   priorityCoupon,
   additionalCoupons = [],
   extraDisabledReason,
+  exportNotice,
   onGenerate,
   onReset,
   onOpenConfig,
@@ -45,6 +46,7 @@ export default function GenerateControlBar({
   priorityCoupon: { balance: PriorityCouponBalance | null; selected: boolean; onChange: (selected: boolean) => void }
   additionalCoupons?: Array<{ id: string; label: string; help: string; balance: number; selected: boolean; onChange: (selected: boolean) => void }>
   extraDisabledReason?: string | null
+  exportNotice?: string
   onGenerate: () => void
   onReset: () => void
   onOpenConfig: () => void
@@ -99,6 +101,7 @@ export default function GenerateControlBar({
         </div>
 
         <div className="workspace-generation-actions flex min-w-0 flex-col gap-2">
+          {exportNotice && <p className="text-sm leading-6 text-ink-secondary" role="status">{exportNotice}</p>}
           <div className="tool-inset flex items-start gap-3 px-3 py-3 text-sm text-ink-secondary">
             <input
               id="use-priority-coupon"
