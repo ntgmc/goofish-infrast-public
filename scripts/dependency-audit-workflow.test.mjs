@@ -12,6 +12,12 @@ test('reports the production dependency audit for every pull request to main', (
   assert.match(workflow, /^    name: Audit Production Dependencies$/m)
 })
 
+test('audits production and development dependencies without lowering the severity threshold', () => {
+  assert.match(workflow, /^        run: npm audit --omit=dev$/m)
+  assert.match(workflow, /^        run: npm audit$/m)
+  assert.doesNotMatch(workflow, /--audit-level|continue-on-error/)
+})
+
 test('keeps push audits scoped to dependency and workflow changes', () => {
   const pushTrigger = readTriggerBlock('push')
 
