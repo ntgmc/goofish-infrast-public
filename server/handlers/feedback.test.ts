@@ -111,6 +111,15 @@ describe('feedback authorization and upload boundary', () => {
     expect(mocks.image).not.toHaveBeenCalled()
     expect(mocks.admin).toHaveBeenCalledWith(expect.any(Request), 'user_view')
   })
+  it('routes admin todos to their exact list and rejects them on user history', async () => {
+    expect((await adminFeedbackHandler(new Request('http://localhost/api/admin/feedback?todo=reply'))).status).toBe(200)
+    expect(mocks.list).toHaveBeenCalledWith(1, 25, undefined, 'reply')
+    expect((await adminFeedbackHandler(new Request('http://localhost/api/admin/feedback?todo=unassigned'))).status).toBe(200)
+    expect(mocks.list).toHaveBeenCalledWith(1, 25, undefined, 'unassigned')
+    expect((await userFeedbackHandler(new Request('http://localhost/api/user/feedback?todo=reply'))).status).toBe(400)
+    expect((await adminFeedbackHandler(new Request('http://localhost/api/admin/feedback?todo=unknown'))).status).toBe(400)
+  })
+
   it('returns paginated feedback and restricts page size', async () => {
     expect((await adminFeedbackHandler(new Request('http://localhost/api/admin/feedback?page=2&page_size=50'))).status).toBe(200)
     expect(mocks.list).toHaveBeenCalledWith(2, 50, undefined)

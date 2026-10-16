@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import { adminUserFiltersSchema, DEFAULT_ADMIN_USER_FILTERS, type AdminUserFilters } from '../../../lib/admin-user-filters'
+import { operationsDrilldownSchema } from '../../../lib/operations-drilldown'
 import { requestAdminOperationReason } from '../../../lib/admin-operation-reason'
 import { EMPTY_PAGINATION, type AppUserSummary, type PaginationMeta } from '../contracts'
 import { downloadBlob, formatAdminProfileAccess, formatDownloadTimestamp } from '../shared/helpers'
@@ -12,7 +13,7 @@ interface Options {
   closeDetail: () => void
 }
 
-export function useAdminUserList(options: Options) {
+export function useAdminUserList(options: Options, operationsSearch = '') {
   const { setBusyAction, setError, setNotice, closeDetail } = options
   const [appUsers, setAppUsers] = useState<AppUserSummary[]>([])
   const [userSearchInput, setUserSearchInput] = useState('')
@@ -25,6 +26,23 @@ export function useAdminUserList(options: Options) {
   const [userFilters, setUserFilters] = useState<AdminUserFilters>(DEFAULT_ADMIN_USER_FILTERS)
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
   const selectedUsers = useMemo(() => appUsers.filter((user) => selectedUserIds.includes(user.id)), [appUsers, selectedUserIds])
+  const operations = useMemo(() => {
+    const params = new URLSearchParams(operationsSearch)
+    return params.has('cohort') ? operationsDrilldownSchema.safeParse(Object.fromEntries(params)) : null
+  }, [operationsSearch])
+
+  useEffect(() => {
+    setAppUsers([])
+    setUserPagination(EMPTY_PAGINATION)
+    setUsersLoaded(false)
+    setError(null)
+    setUserPage(1)
+    setSelectedUserIds([])
+    setUserSearchInput('')
+    setUserSearch('')
+    setUserFilters(DEFAULT_ADMIN_USER_FILTERS)
+    closeDetail()
+  }, [operationsSearch])
 
   useEffect(() => {
     setSelectedUserIds([])
@@ -39,14 +57,16 @@ export function useAdminUserList(options: Options) {
 
   const loadUsersPage = useCallback(async (signal?: AbortSignal) => {
     const filters = adminUserFiltersSchema.safeParse(userFilters)
-    if (!filters.success) {
+    if (!filters.success || operations && !operations.success) {
       setAppUsers([])
       setUsersLoading(false)
-      throw new Error(filters.error.issues.map((issue) => issue.message).join('；'))
+      setUsersLoaded(true)
+      throw new Error(!filters.success ? filters.error.issues.map((issue) => issue.message).join('；') : '运营名单筛选无效，请从运营看板重新打开。')
     }
     setUsersLoading(true)
     try {
-      const params = new URLSearchParams({ page: String(userPage), page_size: String(userPageSize), search: userSearch, ...filters.data })
+      const params = new URLSearchParams({ page: String(userPage), page_size: String(userPageSize), search: userSearch, ...filters.data,
+        ...(operations?.success ? operations.data : {}) })
       const data = await adminApiJson<{ app_users?: AppUserSummary[]; pagination?: PaginationMeta }>(`/api/admin/users?${params}`, { signal, fallbackMessage: '加载账号失败' })
       if (signal?.aborted) return
       setAppUsers(data.app_users ?? [])
@@ -55,7 +75,7 @@ export function useAdminUserList(options: Options) {
     } finally {
       if (!signal?.aborted) { setUsersLoading(false); setUsersLoaded(true) }
     }
-  }, [userPage, userPageSize, userSearch, userFilters])
+  }, [userPage, userPageSize, userSearch, userFilters, operations])
 
   const handleCopyUsers = async (field: 'id' | 'email') => {
     if (!selectedUsers.length || usersLoading) return
@@ -112,6 +132,7 @@ export function useAdminUserList(options: Options) {
   return {
     appUsers, setAppUsers, userSearchInput, setUserSearchInput, userPage, setUserPage, userPageSize, setUserPageSize,
     userPagination, usersLoading, usersLoaded, setUsersLoaded, userFilters, setUserFilters, selectedUserIds, setSelectedUserIds,
+    operationsDrilldown: operations?.success ? operations.data : null,
     loadUsersPage, handleCopyUsers, handleExportUsers, handleBulkUsers,
   }
 }

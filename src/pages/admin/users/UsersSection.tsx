@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router'
+import { adminPath } from '../../../lib/app-routes'
+import { operationsCohortLabels, operationsFailureLabels } from '../../../lib/operations-drilldown'
 import type { AdminController } from '../useAdminController'
 import { UserTable } from './UserTable'
 import { UserDetailDialog } from './components'
@@ -9,7 +12,16 @@ export default function UsersSection({ model: c, active }: { model: AdminControl
   const detailHeading = useRef<HTMLDivElement>(null)
   useEffect(() => { setResetOpen(false); c.setResetPassword('') }, [c.selectedUserDetail?.user.id, c.setResetPassword])
   return <section className="space-y-5">
-    <div hidden={Boolean(c.selectedUserDetail)}><UserTable users={c.appUsers} selected={c.selectedUserIds} filters={c.userFilters} search={c.userSearchInput}
+    <div hidden={Boolean(c.selectedUserDetail)}>
+      {c.operationsDrilldown && <div className="tool-panel mb-5 p-4" role="status">
+        <h2 className="text-base font-semibold">{operationsCohortLabels[c.operationsDrilldown.cohort]}</h2>
+        <p className="mt-2 text-sm text-ink-secondary">{c.operationsDrilldown.from} 至 {c.operationsDrilldown.to} · 北京时间 · 观察截至 {new Date(c.operationsDrilldown.observed_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })}</p>
+        {c.operationsDrilldown.reason && <p className="mt-2 text-sm">{operationsFailureLabels[c.operationsDrilldown.reason] ?? '其他生成问题'}</p>}
+        {c.operationsDrilldown.cohort.startsWith('maa_') && <p className="mt-2 text-sm text-ink-muted">按方案的文件获取情况筛选，同一用户的多个方案合并为一行。</p>}
+        <Link className="ops-text-link mt-3 inline-block" to={adminPath('overview')}>返回运营看板 →</Link>
+        <Link className="ml-4 text-sm text-brand-600" to={adminPath('users')}>查看全部用户</Link>
+      </div>}
+      <UserTable users={c.appUsers} selected={c.selectedUserIds} filters={c.userFilters} search={c.userSearchInput}
       pagination={c.userPagination} loading={c.usersLoading} busyAction={c.busyAction} capabilities={c.adminCapabilities}
       onFilters={(filters) => { c.setUserFilters(filters); c.setUserPage(1) }} onSearch={c.setUserSearchInput} onSelect={c.setSelectedUserIds} onPage={c.setUserPage}
       onPageSize={(size) => { c.setUserPageSize(size); c.setUserPage(1) }} onCopy={c.handleCopyUsers} onExport={c.handleExportUsers} onBulk={c.handleBulkUsers}

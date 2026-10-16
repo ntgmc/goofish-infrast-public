@@ -116,6 +116,18 @@ describe('BehaviorRiskPanel review form', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('restores the pending list when an overview todo opens a previously visited panel', async () => {
+    const user = userEvent.setup()
+    const view = render(<BehaviorRiskPanel />)
+    await screen.findByText('采集与评估健康：正常')
+    const status = screen.getAllByRole('combobox')[0]
+    await user.selectOptions(status, 'actioned')
+    await waitFor(() => expect(apiJsonMock.mock.calls[apiJsonMock.mock.calls.length - 1]?.[0]).toContain('status=actioned'))
+    view.rerender(<BehaviorRiskPanel search="?status=pending" />)
+    await waitFor(() => expect(status).toHaveValue('pending'))
+    await waitFor(() => expect(apiJsonMock.mock.calls[apiJsonMock.mock.calls.length - 1]?.[0]).toContain('status=pending&page=1'))
+  })
+
   it('labels repeated Skland UID mismatches in the member evidence', async () => {
     apiJsonMock.mockResolvedValueOnce(buildCasePage({
       id: 'mismatch-case',

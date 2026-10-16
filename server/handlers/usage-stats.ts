@@ -12,6 +12,7 @@ import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson, RequestInputError } from '../security/request-validation'
 import { getRequestClientIp } from '../security/client-ip'
 import { getOperationsOverview } from '../storage/operations-overview-store'
+import { getOperationsTodos } from '../storage/operations-todos-store'
 import { isOperationsDate, operationsDate, operationsOverviewCsv, shiftOperationsDate } from '../../src/lib/operations-overview'
 
 const EVENT_PREFIX = 'events/'
@@ -230,6 +231,7 @@ async function handleAdminGet(req: Request): Promise<Response> {
   const url = new URL(req.url)
   const view = url.searchParams.get('view')
   if (view === 'business') return handleBusinessReport(url)
+  if (view === 'todos') return jsonResponse(await getOperationsTodos(authentication.capabilities), 200, { 'Cache-Control': 'private, no-store' })
   if (view !== null) return jsonResponse({ error: '统计视图无效。' }, 400)
   const store = await getUsageEventStore()
   const dateRange = parseDateRange(url)

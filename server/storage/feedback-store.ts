@@ -6,6 +6,7 @@ import { recordAdminOperationAuditInTransaction, type AdminOperationAuditInput }
 import { upsertFeedbackNotificationInTransaction } from './notification-store'
 import { ensureDatabaseSchema } from './schema'
 import { query, withTransaction } from './postgres'
+import { FEEDBACK_TODO_SQL } from './feedback-todo-sql'
 
 export class FeedbackError extends Error {
   constructor(readonly code: string, message: string, readonly status: 400 | 404 | 409) {
@@ -30,17 +31,17 @@ export async function createFeedback(userId: string, input: FeedbackRequest, ima
   return id
 }
 
-export async function listAdminFeedback(page: number, pageSize: number, status?: FeedbackStatus): Promise<AdminFeedbackPage> {
-  return listFeedback(page, pageSize, null, status) as Promise<AdminFeedbackPage>
+export async function listAdminFeedback(page: number, pageSize: number, status?: FeedbackStatus, todo?: keyof typeof FEEDBACK_TODO_SQL): Promise<AdminFeedbackPage> {
+  return listFeedback(page, pageSize, null, status, todo) as Promise<AdminFeedbackPage>
 }
 export async function listUserFeedback(userId: string, page: number, pageSize: number): Promise<FeedbackPage> {
   return listFeedback(page, pageSize, userId)
 }
-async function listFeedback(page: number, pageSize: number, userId: string | null, status?: FeedbackStatus): Promise<FeedbackPage> {
+async function listFeedback(page: number, pageSize: number, userId: string | null, status?: FeedbackStatus, todo?: keyof typeof FEEDBACK_TODO_SQL): Promise<FeedbackPage> {
   await ensureDatabaseSchema()
   return withTransaction(async (client) => {
     await client.query('set transaction isolation level repeatable read read only')
-    const where = 'where ($1::text is null or feedback.user_id = $1) and ($2::text is null or feedback.status = $2)'
+    const where = `where ($1::text is null or feedback.user_id = $1) and ($2::text is null or feedback.status = $2)${todo ? ` and (${FEEDBACK_TODO_SQL[todo]})` : ''}`
     const params = [userId, status ?? null]
     const count = await client.query<{ total: string }>(`select count(*)::text as total from user_feedback feedback ${where}`, params)
     const pagination = buildAdminPagination(page, pageSize, Number(count.rows[0]!.total))

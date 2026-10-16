@@ -31,6 +31,7 @@ beforeEach(() => {
     if (url === '/api/admin/feature-settings') return { settings: { ...DEFAULT_SITE_FEATURE_SETTINGS, revision: 3 } }
     if (url === '/api/admin/invitation-settings') return { catalog: [], stats: null }
     if (url === '/api/admin/announcement') return { banner: null, announcements: [], revision: 1, stats: {} }
+    if (url === '/api/admin/usage-stats?view=todos') return { generated_at: new Date().toISOString(), feedback_unassigned: 2, feedback_reply: 3, risk_pending: null, abnormal_jobs: null }
     if (url.startsWith('/api/admin/usage-stats')) return createOperationsOverview()
     if (url.startsWith('/api/admin/cdk') || url.startsWith('/api/admin/users')) return {}
     throw new Error(`Unexpected request: ${url}`)
@@ -60,7 +61,7 @@ describe('admin page loading and navigation', () => {
   it('keeps the shell while overview data loads and restores content after a failed request', async () => {
     const pending = deferred<unknown>()
     const implementation = api.json.getMockImplementation()!
-    api.json.mockImplementation((url: string) => url.startsWith('/api/admin/usage-stats') ? pending.promise : implementation(url))
+    api.json.mockImplementation((url: string) => url.includes('view=business') ? pending.promise : implementation(url))
     mount()
     const loading = await screen.findByRole('status', { name: '正在加载总览…' })
     const main = screen.getByRole('main')
@@ -160,6 +161,47 @@ describe('admin page loading and navigation', () => {
     await user.click(screen.getByRole('button', { name: '刷新当前页' }))
     await waitFor(() => expect(api.json).toHaveBeenCalledTimes(1))
     expect(api.json.mock.calls[0][0]).toBe('/api/admin/users?user_id=user-1&profile_page=1&profile_page_size=100')
+  })
+
+  it('opens an exact operational cohort and a feedback todo without a manual search', async () => {
+    const overview = createOperationsOverview()
+    const account = { id: 'stopped-user', email: 'stopped@example.test', status: 'active', profile_count: 1, profile_access: [], created_at: overview.current.from,
+      operations_progress: { stage: 'no_generation', failure_reason: 'optimizer_runtime_error', failure_at: overview.generated_at } }
+    const implementation = api.json.getMockImplementation()!
+    api.json.mockImplementation(async (url: string) => {
+      if (url === '/api/admin/session') return { user: { username: 'reviewer', capabilities: ['usage_view', 'user_view'] } }
+      if (url.includes('view=business')) return overview
+      if (url.startsWith('/api/admin/users?')) return { app_users: [account], pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 } }
+      if (url.startsWith('/api/admin/feedback?')) return { items: [], pagination: { page: 1, page_size: 25, total: 0, total_pages: 0 } }
+      return implementation(url)
+    })
+    const router = mount()
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('link', { name: '查看添加了账号但未完成首次排班的用户 →' }))
+    expect(await screen.findByText(account.email)).toBeInTheDocument()
+    expect(screen.getByText(/最近失败：排班计算失败/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '详情' })).not.toBeInTheDocument()
+    const target = new URLSearchParams(router.state.location.search)
+    expect(Object.fromEntries(target)).toMatchObject({ cohort: 'activation_no_generation', from: overview.current.from, to: overview.current.to, observed_at: overview.generated_at })
+    const request = api.json.mock.calls.find(([url]) => url.startsWith('/api/admin/users?'))![0]
+    const sent = new URL(request, 'http://localhost').searchParams
+    expect(Object.fromEntries(sent)).toMatchObject({ ...Object.fromEntries(target), search: '', page: '1', status: 'all' })
+    await user.click(await screen.findByRole('link', { name: '返回运营看板 →' }))
+    await user.click(await screen.findByRole('link', { name: /待回复反馈/ }))
+    expect(await screen.findByRole('combobox', { name: '待办' })).toHaveValue('reply')
+    await waitFor(() => expect(api.json.mock.calls.some(([url]) => url.startsWith('/api/admin/feedback?') && url.includes('todo=reply'))).toBe(true))
+  })
+
+  it('hides operational user lists and unauthorized todos from a risk viewer', async () => {
+    const implementation = api.json.getMockImplementation()!
+    api.json.mockImplementation(async (url: string) => url === '/api/admin/session'
+      ? { user: { username: 'viewer', capabilities: ['usage_view', 'risk_view'] } }
+      : implementation(url))
+    mount()
+    await screen.findByRole('heading', { name: '有多少人真正用起来了？', level: 2 })
+    expect(screen.queryByRole('link', { name: /查看.*用户/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /待回复反馈|待认领反馈|异常任务/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /待复核风险/ })).toHaveAttribute('href', '/admin/risk?status=pending')
   })
 
   it('aborts a user request when leaving the page and ignores its late result', async () => {

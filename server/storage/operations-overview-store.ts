@@ -9,7 +9,7 @@ export async function getOperationsOverview(from: string, to: string, now = new 
 }
 
 // Aggregate in PostgreSQL so traffic volume cannot truncate a user cohort.
-const OVERVIEW_SQL = `
+export const OPERATIONS_COHORT_SQL = `
 with bounds as (
   select $1::date as from_day, $2::date as to_day,
          $1::date::timestamp at time zone 'Asia/Shanghai' as start_at,
@@ -100,7 +100,9 @@ with bounds as (
     and t.started_at is not null and s.created_at < p.end_at and s.schedule_mode = 'maa'
   left join exports e on e.generation_id = s.id and e.exported_at >= s.created_at
   group by p.name, p.start_at, t.started_at
-), cost as (
+)`
+
+const OVERVIEW_SQL = `${OPERATIONS_COHORT_SQL}, cost as (
   select p.name,
          count(h.bucket_start)::integer as recorded_hours,
          greatest(0, extract(epoch from (date_trunc('hour', p.end_at, 'UTC') - p.start_at)) / 3600)::integer as expected_hours,

@@ -9,11 +9,13 @@ import '../../../components/FeedbackDialog.css'
 import { formatDate } from '../shared/helpers'
 import { PaginationControls } from '../shared/PaginationControls'
 
-export default function FeedbackSection({ active, canManage = false }: { active: boolean; canManage?: boolean }) {
+export default function FeedbackSection({ active, canManage = false, search = '' }: { active: boolean; canManage?: boolean; search?: string }) {
   const text = copy.feedback
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [status, setStatus] = useState<FeedbackStatus | ''>('')
+  const requestedTodo = new URLSearchParams(search).get('todo')
+  const [todo, setTodo] = useState(requestedTodo === 'unassigned' || requestedTodo === 'reply' ? requestedTodo : '')
   const [revision, setRevision] = useState(0)
   const [data, setData] = useState<AdminFeedbackPage | null>(null)
   const [loading, setLoading] = useState(false)
@@ -22,21 +24,30 @@ export default function FeedbackSection({ active, canManage = false }: { active:
   const thread = useFeedbackThread('admin', selected, active)
   const saving = thread.saving
   const detailRegion = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    setTodo(requestedTodo === 'unassigned' || requestedTodo === 'reply' ? requestedTodo : '')
+    setStatus('')
+    setPage(1)
+    setSelected(null)
+    setData(null)
+  }, [search])
   useEffect(() => { if (selected && window.matchMedia?.('(max-width: 60rem)').matches) detailRegion.current?.scrollIntoView({ block: 'start', behavior: 'instant' }) }, [selected])
   useEffect(() => {
     if (!active) return
     const controller = new AbortController()
     setLoading(true)
     setError(null)
-    void adminApiJson<AdminFeedbackPage>(`/api/admin/feedback?page=${page}&page_size=${pageSize}${status ? `&status=${status}` : ''}`, { signal: controller.signal })
+    void adminApiJson<AdminFeedbackPage>(`/api/admin/feedback?page=${page}&page_size=${pageSize}${status ? `&status=${status}` : ''}${todo ? `&todo=${todo}` : ''}`, { signal: controller.signal })
       .then((result) => { if (!controller.signal.aborted) setData(result) })
       .catch((caught) => { if (!controller.signal.aborted) setError(getApiErrorMessage(caught, text.loadFailed)) })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [active, page, pageSize, status, revision])
+  }, [active, page, pageSize, status, todo, revision])
   return <section className="tool-panel min-w-0 p-4 sm:p-6">
     <p className="text-sm leading-6 text-ink-secondary">{text.adminDescription}</p>
-    <div className="mt-4 flex flex-wrap items-end justify-between gap-3"><label className="grid gap-2 text-sm"><span>{text.status}</span><select className="tool-field" value={status} disabled={saving} onChange={(event) => { setStatus(event.target.value as FeedbackStatus | ''); setPage(1) }}><option value="">{text.allStatuses}</option>{FEEDBACK_STATUSES.map((value) => <option key={value} value={value}>{text.adminStatuses[value]}</option>)}</select></label><button type="button" className="tool-secondary-action" disabled={loading || thread.loading || saving} onClick={() => { setRevision((current) => current + 1); void thread.refresh() }}>{text.refresh}</button></div>
+    <div className="mt-4 flex flex-wrap items-end gap-3">
+      <label className="grid gap-2 text-sm"><span>待办</span><select className="tool-field" value={todo} disabled={saving} onChange={(event) => { setTodo(event.target.value); setPage(1); setSelected(null); setData(null) }}><option value="">全部反馈</option><option value="unassigned">待认领反馈</option><option value="reply">待回复反馈</option></select></label>
+      <label className="grid gap-2 text-sm"><span>{text.status}</span><select className="tool-field" value={status} disabled={saving} onChange={(event) => { setStatus(event.target.value as FeedbackStatus | ''); setPage(1) }}><option value="">{text.allStatuses}</option>{FEEDBACK_STATUSES.map((value) => <option key={value} value={value}>{text.adminStatuses[value]}</option>)}</select></label><button type="button" className="tool-secondary-action" disabled={loading || thread.loading || saving} onClick={() => { setRevision((current) => current + 1); void thread.refresh() }}>{text.refresh}</button></div>
     {error && <p role="alert" className="tool-alert tool-alert--error mt-4">{error}</p>}
     {loading && <p role="status" className="mt-4 text-sm text-ink-muted">{text.loading}</p>}
     <div className="feedback-admin-workbench mt-5">

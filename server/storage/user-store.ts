@@ -1,6 +1,10 @@
 import { createHash, createHmac } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import type { AdminUserFilters } from '../../src/lib/admin-user-filters'
+import type { OperationsDrilldown, OperationsUserProgress } from '../../src/lib/operations-drilldown'
+import { OPERATIONS_COHORT_SQL } from './operations-overview-store'
+import { OPERATIONS_MEMBERS_SQL } from './operations-members-sql'
+import { USAGE_RETENTION_DAYS } from './usage-store'
 import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import { mergeDuplicateSklandProfiles } from './profile-merge-store'
@@ -1253,7 +1257,7 @@ export async function saveProfileWorkspace(workspace: UserWorkspaceRecord): Prom
 }
 
 export interface AdminUserAccountPage {
-  users: UserAccountRecord[]
+  users: Array<UserAccountRecord & { operations_progress?: OperationsUserProgress }>
   profiles: UserGameAccountRecord[]
   total: number
   page: number
@@ -1265,10 +1269,15 @@ export async function listAdminUserAccountsPage(options: {
   pageSize: number
   search: string
   filters?: AdminUserFilters
+  operations?: OperationsDrilldown
 }): Promise<AdminUserAccountPage> {
   await ensureSchema()
-  const values: unknown[] = []
-  const conditions: string[] = []
+  const operations = options.operations
+  const prefix = operations ? `${OPERATIONS_COHORT_SQL}${OPERATIONS_MEMBERS_SQL}` : ''
+  const values: unknown[] = operations
+    ? [operations.from, operations.to, operations.observed_at, USAGE_RETENTION_DAYS, operations.cohort, operations.reason ?? null]
+    : []
+  const conditions: string[] = operations ? ['exists (select 1 from operations_members m where m.user_id = user_accounts.id)'] : []
   const add = (value: unknown) => {
     values.push(value)
     return `$${values.length}`
@@ -1321,7 +1330,7 @@ export async function listAdminUserAccountsPage(options: {
   const order = sort.startsWith('last_seen') ? 'last_seen_at' : 'created_at'
   const direction = sort.endsWith('asc') ? 'asc' : 'desc'
   const countResult = await query<{ total: string }>(
-    `select count(*)::text as total from user_accounts ${where}`,
+    `${prefix} select count(*)::text as total from user_accounts ${where}`,
     values,
   )
   const total = Number(countResult.rows[0]?.total ?? 0)
@@ -1331,8 +1340,10 @@ export async function listAdminUserAccountsPage(options: {
   const totalPages = total === 0 ? 0 : Math.ceil(total / options.pageSize)
   const page = totalPages === 0 ? 1 : Math.min(options.page, totalPages)
   values.push(options.pageSize, (page - 1) * options.pageSize)
-  const usersResult = await query<{ record_json: UserAccountRecord }>(
-    `select record_json || jsonb_build_object('last_seen_at', last_seen_at) as record_json from user_accounts ${where}
+  const usersResult = await query<{ record_json: AdminUserAccountPage['users'][number] }>(
+    `${prefix} select record_json || jsonb_build_object('last_seen_at', last_seen_at)
+       ${operations ? "|| jsonb_build_object('operations_progress', (select m.progress from operations_members m where m.user_id = user_accounts.id))" : ''}
+       as record_json from user_accounts ${where}
      order by ${order} ${direction} nulls last, id asc limit $${values.length - 1} offset $${values.length}`,
     values,
   )

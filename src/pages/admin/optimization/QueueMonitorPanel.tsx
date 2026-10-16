@@ -22,16 +22,24 @@ type Filters = {
 
 const DEFAULT_FILTERS: Filters = { query: '', status: 'all', source: 'all', priority: 'all' }
 
-export default function QueueMonitorPanel({ active = true }: { active?: boolean }) {
-  const [view, setView] = useState<'tasks' | 'history' | 'dead'>('tasks')
+export default function QueueMonitorPanel({ active = true, search = '' }: { active?: boolean; search?: string }) {
+  const requestedView = new URLSearchParams(search).get('view')
+  const [view, setView] = useState<'tasks' | 'history' | 'dead'>(requestedView === 'dead' || requestedView === 'history' ? requestedView : 'tasks')
   const [jobView, setJobView] = useState<'queued' | 'running' | 'recent'>('queued')
-  const [visited, setVisited] = useState<string[]>(['tasks'])
+  const [visited, setVisited] = useState<string[]>([view])
   const [snapshot, setSnapshot] = useState<AdminOptimizationQueueSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(() => new Set())
   const requestRef = useRef<AbortController | null>(null)
+  useEffect(() => {
+    const next = new URLSearchParams(search).get('view')
+    if (next === 'dead' || next === 'history') {
+      setView(next)
+      setVisited((current) => current.includes(next) ? current : [...current, next])
+    }
+  }, [search])
 
   const loadSnapshot = useCallback(async () => {
     requestRef.current?.abort()
@@ -88,7 +96,7 @@ export default function QueueMonitorPanel({ active = true }: { active?: boolean 
     setExpandedJobs((current) => current.has(id) ? new Set() : new Set([id]))
   }
 
-  if (!snapshot && !error) return <SectionLoader label="正在加载异步队列…" />
+  if (view === 'tasks' && !snapshot && !error) return <SectionLoader label="正在加载异步队列…" />
 
   return (
     <section className="space-y-5" aria-label="服务与任务监控">
@@ -180,7 +188,7 @@ export default function QueueMonitorPanel({ active = true }: { active?: boolean 
 
       </div>
       <div hidden={view !== 'history'} role="tabpanel" aria-label="服务历史与事件">{visited.includes('history') && <ServiceStatusHistoryPanel />}</div>
-      <div hidden={view !== 'dead'} role="tabpanel" aria-label="死信处理">{visited.includes('dead') && <DeadLetterPanel active={active && view === 'dead'} />}</div>
+      <div hidden={view !== 'dead'} role="tabpanel" aria-label="死信处理">{visited.includes('dead') && <DeadLetterPanel active={active && view === 'dead'} pendingOnly={new URLSearchParams(search).get('status') === 'pending_review'} />}</div>
     </section>
   )
 }

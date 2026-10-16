@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { adminUserFiltersSchema } from '../../src/lib/admin-user-filters'
+import { operationsDrilldownSchema } from '../../src/lib/operations-drilldown'
 import {
   authenticateAdminRequest,
   createAdminUser,
@@ -150,7 +151,11 @@ export default async (req: Request): Promise<Response> => {
       const request = parseAdminPageRequest(url)
       const filters = adminUserFiltersSchema.safeParse(Object.fromEntries(url.searchParams))
       if (!filters.success) return jsonResponse({ error: filters.error.issues.map((issue) => issue.message).join('；') }, 400)
-      const result = await listAdminUserAccountsPage({ ...request, filters: filters.data })
+      const operations = url.searchParams.has('cohort') ? operationsDrilldownSchema.safeParse(Object.fromEntries(url.searchParams)) : null
+      if (operations && (!operations.success || Date.parse(operations.data.observed_at) > Date.now())) {
+        return jsonResponse({ error: '运营名单筛选无效，请从运营看板重新打开。' }, 400)
+      }
+      const result = await listAdminUserAccountsPage({ ...request, filters: filters.data, ...(operations?.success && { operations: operations.data }) })
       const profilesByUser = new Map<string, UserGameAccountRecord[]>()
       for (const profile of result.profiles) {
         const profiles = profilesByUser.get(profile.user_id) ?? []
@@ -159,7 +164,8 @@ export default async (req: Request): Promise<Response> => {
       }
       const appUsers = result.users.map((user) => {
         const profiles = profilesByUser.get(user.id) ?? []
-        return { ...toAdminAppUser(user, profiles), profile_count: profiles.length }
+        return { ...toAdminAppUser(user, profiles), profile_count: profiles.length,
+          ...(user.operations_progress && { operations_progress: user.operations_progress }) }
       })
       return jsonResponse({
         users: await listAdminUsers(),

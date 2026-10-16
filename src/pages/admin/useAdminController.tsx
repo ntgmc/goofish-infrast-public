@@ -24,7 +24,7 @@ function errorMessage(value: unknown): string {
 
 export type AdminController = ReturnType<typeof useAdminController>
 
-export function useAdminController(section: AdminSection = 'overview') {
+export function useAdminController(section: AdminSection = 'overview', search = '') {
   const [adminUsername, setAdminUsername] = useState<string | null>(null)
   const [adminCapabilities, setAdminCapabilities] = useState<AdminCapability[]>([])
   const [lastSuccessfulSyncAt, setLastSuccessfulSyncAt] = useState<string | null>(null)
@@ -112,8 +112,8 @@ export function useAdminController(section: AdminSection = 'overview') {
 
   const userList = useAdminUserList({
     setBusyAction, setError, setNotice,
-    closeDetail: () => setSelectedUserDetail(null),
-  })
+    closeDetail: () => { detailRequest.current?.abort(); setSelectedUserDetail(null) },
+  }, section === 'users' ? search : '')
   const { setAppUsers, loadUsersPage, setSelectedUserIds, setUsersLoaded } = userList
 
   const cdkData = useAdminCdkData({ authenticated, capabilities: adminCapabilities, section, setError })
