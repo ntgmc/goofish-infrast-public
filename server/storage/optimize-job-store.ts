@@ -2190,7 +2190,8 @@ export async function getAdminOptimizationQueueSnapshot(
       `select coalesce(sum(concurrency), 0)::text as worker_concurrency,
               count(*)::text as worker_instances,
               count(*) filter (
-                where not capabilities @> array['runtime:local_fallback']::text[]
+                where capabilities @> array['billing:burst']::text[]
+                   or not capabilities && array['billing:resident', 'runtime:local_fallback', 'worker-claim-priority:0']::text[]
               )::text as billable_worker_instances,
               max(heartbeat_interval_ms)::text as heartbeat_interval_ms,
               max(stale_after_ms)::text as stale_after_ms

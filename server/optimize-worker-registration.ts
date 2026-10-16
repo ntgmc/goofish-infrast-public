@@ -70,7 +70,13 @@ function buildSha(): string | null {
 }
 
 function workerCapabilities(): string[] {
-  const runtimeKind = resolveAppRole() === 'all' ? 'runtime:local_fallback' : 'runtime:ecs_worker'
+  const isCombined = resolveAppRole() === 'all'
+  const runtimeKind = isCombined ? 'runtime:local_fallback' : 'runtime:ecs_worker'
+  const priority = getOptimizeWorkerClaimPriority()
+  const billingRole = process.env.OPTIMIZE_WORKER_BILLING_ROLE?.trim() || (isCombined || priority === 0 ? 'resident' : 'burst')
+  if (billingRole !== 'resident' && billingRole !== 'burst') {
+    throw new Error('OPTIMIZE_WORKER_BILLING_ROLE must be resident or burst')
+  }
   return [
     'optimize_jobs',
     'optimize_queue',
@@ -78,6 +84,7 @@ function workerCapabilities(): string[] {
     'invitation_settlement',
     'behavior_risk',
     runtimeKind,
-    `worker-claim-priority:${getOptimizeWorkerClaimPriority()}`,
+    `billing:${billingRole}`,
+    `worker-claim-priority:${priority}`,
   ]
 }

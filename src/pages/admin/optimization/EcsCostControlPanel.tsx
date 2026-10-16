@@ -22,7 +22,7 @@ export default function EcsCostControlPanel({
   onSave,
 }: EcsCostControlPanelProps) {
   const currentWorkerState = billableWorkerInstances === undefined
-    ? copy.status.pages_AdminEcsCost_046
+    ? copy.status.pages_AdminEcsCost_065
     : billableWorkerInstances > 0
       ? `${copy.status.pages_AdminEcsCost_047}（${billableWorkerInstances}）`
       : copy.status.pages_AdminEcsCost_048
@@ -72,14 +72,17 @@ export default function EcsCostControlPanel({
       </fieldset>
 
       <div className="mt-5 grid gap-3 border-t border-surface-3 pt-4 sm:grid-cols-2 xl:grid-cols-4">
-        <CostSummary label={copy.status.pages_AdminEcsCost_027} value={formatHours(estimate.observed_24h_worker_hours)} hint={formatCoverage(estimate.observed_24h_sample_hours)} />
-        <CostSummary label={copy.status.pages_AdminEcsCost_028} value={formatHours(estimate.observed_30d_worker_hours)} hint={formatCoverage(estimate.observed_30d_sample_hours)} />
-        <CostSummary label={copy.status.pages_AdminEcsCost_051} value={formatMoney(estimate.observed_24h_cost_cny)} />
-        <CostSummary label={copy.status.pages_AdminEcsCost_052} value={formatMoney(estimate.observed_30d_cost_cny)} />
+        <CostSummary label={copy.status.pages_AdminEcsCost_060} value={formatHours(estimate.observed_24h_sample_hours || null)} hint={copy.status.pages_AdminEcsCost_062(formatMoney(estimate.observed_24h_resident_cost_cny))} />
+        <CostSummary label={copy.status.pages_AdminEcsCost_027} value={formatHours(estimate.observed_24h_worker_hours)} hint={copy.status.pages_AdminEcsCost_062(formatMoney(estimate.observed_24h_burst_cost_cny))} />
+        <CostSummary label={copy.status.pages_AdminEcsCost_061} value={formatHours(estimate.observed_30d_sample_hours || null)} hint={copy.status.pages_AdminEcsCost_062(formatMoney(estimate.observed_30d_resident_cost_cny))} />
+        <CostSummary label={copy.status.pages_AdminEcsCost_028} value={formatHours(estimate.observed_30d_worker_hours)} hint={copy.status.pages_AdminEcsCost_062(formatMoney(estimate.observed_30d_burst_cost_cny))} />
+        <CostSummary label={copy.status.pages_AdminEcsCost_051} value={formatMoney(estimate.observed_24h_cost_cny)} hint={formatCoverage(estimate.observed_24h_sample_hours)} />
+        <CostSummary label={copy.status.pages_AdminEcsCost_052} value={formatMoney(estimate.observed_30d_cost_cny)} hint={formatCoverage(estimate.observed_30d_sample_hours)} />
         <CostSummary label={copy.status.pages_AdminEcsCost_053} value={formatMoney(estimate.projected_monthly_cost_cny)} />
         <CostSummary label={copy.status.pages_AdminEcsCost_055} value={formatMoney(estimate.observed_savings_cny)} />
       </div>
       <p className="mt-4 text-xs leading-6 text-ink-muted">{copy.status.pages_AdminEcsCost_056}</p>
+      <p className="mt-1 text-xs leading-6 text-ink-muted">{copy.status.pages_AdminEcsCost_064} {copy.status.pages_AdminEcsCost_063}</p>
       <button type="button" className="tool-primary-action mt-5" onClick={onSave} disabled={saving}>{saving ? copy.status.pages_AdminEcsCost_034 : copy.status.pages_AdminEcsCost_033}</button>
     </section>
   )
@@ -94,7 +97,7 @@ function formatHours(value: number | null): string {
 }
 
 function formatMoney(value: number | null): string {
-  return value === null ? copy.status.pages_AdminEcsCost_006 : `${value.toFixed(2)} ${copy.status.pages_AdminEcsCost_036}`
+  return value === null ? '—' : `${value.toFixed(2)} ${copy.status.pages_AdminEcsCost_036}`
 }
 
 function formatCoverage(value: number): string {

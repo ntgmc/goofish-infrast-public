@@ -60,6 +60,10 @@ export interface ServiceStatusCostEstimate {
   observed_30d_worker_hours: number | null
   observed_24h_sample_hours: number
   observed_30d_sample_hours: number
+  observed_24h_resident_cost_cny: number | null
+  observed_30d_resident_cost_cny: number | null
+  observed_24h_burst_cost_cny: number | null
+  observed_30d_burst_cost_cny: number | null
   observed_24h_cost_cny: number | null
   observed_30d_cost_cny: number | null
   projected_monthly_cost_cny: number | null
