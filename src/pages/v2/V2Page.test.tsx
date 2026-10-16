@@ -849,12 +849,16 @@ describe('V2 results-first workspace', () => {
   })
 
   it('applies the shared reduced-animation setting from V2 without generating or losing the selected team', async () => {
+    // Keep CI frame delays from automatically enabling reduced motion before the manual toggle.
+    vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(0)
     const user = userEvent.setup()
     render(<MotionPreferenceProvider><MemoryRouter initialEntries={['/v2']}><V2Page /></MemoryRouter></MotionPreferenceProvider>)
     await user.click(screen.getByRole('tab', { name: /第2班/ }))
     await user.click(screen.getByRole('button', { name: copy.dashboard.animation.settings }))
     const dialog = within(await screen.findByRole('dialog', { name: copy.dashboard.animation.settings }))
-    await user.click(dialog.getByRole('switch', { name: copy.dashboard.animation.reduce }))
+    const toggle = dialog.getByRole('switch', { name: copy.dashboard.animation.reduce })
+    expect(toggle).not.toBeChecked()
+    await user.click(toggle)
     expect(document.documentElement).toHaveAttribute('data-reduced-motion')
     expect(window.localStorage.getItem('maatool-reduce-motion')).toBe('true')
     await dismissDrawer(user)
