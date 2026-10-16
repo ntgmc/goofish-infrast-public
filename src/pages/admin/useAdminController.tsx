@@ -579,7 +579,7 @@ export function useAdminController(section: AdminSection = 'overview', search = 
       clearSelectedDetail: () => setSelectedCdkDetail(null), refresh: refreshAdminData,
     })
 
-  const loadUserDetail = async (user: AppUserSummary, profilePage = 1) => {
+  const loadUserDetail = async (user: Pick<AppUserSummary, 'id'>, profilePage = 1, profileId?: string) => {
       const controller = beginDetailRequest()
       const profilePageSize = selectedUserDetail?.user.id === user.id
         ? selectedUserDetail.profile_pagination?.page_size ?? 100
@@ -588,7 +588,7 @@ export function useAdminController(section: AdminSection = 'overview', search = 
       setError(null)
       try {
         const [data, balance] = await Promise.all([
-          apiJson<{ detail?: AdminUserDetail }>(`/api/admin/users?user_id=${encodeURIComponent(user.id)}&profile_page=${profilePage}&profile_page_size=${profilePageSize}`, {
+          apiJson<{ detail?: AdminUserDetail }>(`/api/admin/users?user_id=${encodeURIComponent(user.id)}&profile_page=${profilePage}&profile_page_size=${profilePageSize}${profileId ? `&profile_id=${encodeURIComponent(profileId)}` : ''}`, {
             fallbackMessage: '加载用户详情失败', signal: controller.signal,
           }),
           METERED_BILLING_AVAILABLE ? fetchAdminUserBalance(user.id) : Promise.resolve(null),

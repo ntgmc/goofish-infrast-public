@@ -1,6 +1,5 @@
 import { Link } from 'react-router'
 import { copy } from '../copy/index'
-import { usePublicContent } from '../lib/public-content-context'
 import { useSiteFeatures } from '../lib/site-feature-context'
 import type { SiteFeatureKey } from '../lib/site-features'
 
@@ -22,7 +21,6 @@ interface PublicFooterProps {
 }
 
 export default function PublicFooter({ className = '', variant = 'landing' }: PublicFooterProps) {
-  const { content } = usePublicContent()
   const { features } = useSiteFeatures()
   const linkClassName = 'inline-flex min-h-11 items-center text-sm text-ink-secondary underline-offset-4 transition-colors hover:text-ink-primary hover:underline'
   const iconLinkClassName = 'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-ink-secondary transition-colors hover:bg-surface-2 hover:text-ink-primary'
@@ -35,13 +33,7 @@ export default function PublicFooter({ className = '', variant = 'landing' }: Pu
         </div>
         <nav className="flex flex-wrap items-center gap-x-5 gap-y-3" aria-label={copy.public.components_PublicFooter_008}>
           {features.faq && <Link className={linkClassName} to="/faq">{copy.public.components_PublicFooter_009}</Link>}
-          <a
-            className={linkClassName}
-            href={content.qq_group.join_url}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {content.qq_group.link_label} · {content.qq_group.number}</a>
+          {features.support && <Link className={linkClassName} to="/support">{copy.feedback.title}</Link>}
           {footerLinks.filter((link) => !link.feature || features[link.feature]).map((link) => (
             <Link key={link.to} className={linkClassName} to={link.to}>
               {link.label}
@@ -77,16 +69,11 @@ function GitHubIcon({ className = '' }: { className?: string }) {
   )
 }
 
-export function SupportGroupLink({ className = '', children }: { className?: string; children?: React.ReactNode }) {
-  const { content } = usePublicContent()
-  return (
-    <a
-      className={className}
-      href={content.qq_group.join_url}
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      {children ?? <>{content.qq_group.link_label} · {content.qq_group.number}</>}
-    </a>
-  )
+export function FeedbackLink({ className = '', children }: { className?: string; children?: React.ReactNode }) {
+  const { features } = useSiteFeatures()
+  return <Link className={className} to={features.v2 ? '/v2?feedback=new' : '/tool/profiles?feedback=new'} onClick={(event) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    const trigger = document.querySelector('.feedback-trigger')
+    if (trigger) { event.preventDefault(); trigger.dispatchEvent(new CustomEvent('goofish:open-feedback', { detail: 'new' })) }
+  }}>{children ?? copy.feedback.submit}</Link>
 }

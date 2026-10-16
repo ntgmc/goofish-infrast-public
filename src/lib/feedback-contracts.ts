@@ -6,7 +6,25 @@ export const FEEDBACK_SOURCE_IMAGE_MAX_BYTES = 20 * 1024 * 1024
 export const FEEDBACK_MESSAGE_MAX_LENGTH = 2000
 export const FEEDBACK_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
 
+const feedbackContextSchema = z.strictObject({
+  profile_id: z.string().trim().min(1).max(120).optional(),
+  result_id: z.string().trim().min(1).max(120).optional(),
+  job_id: z.string().trim().min(1).max(120).optional(),
+})
+type FeedbackContext = z.infer<typeof feedbackContextSchema>
+export const FEEDBACK_TODOS = ['mine', 'unassigned', 'reply', 'supplement'] as const
+export const adminFeedbackFiltersSchema = z.strictObject({
+  todo: z.enum(FEEDBACK_TODOS).optional(),
+  category: z.enum(FEEDBACK_CATEGORIES).optional(),
+  email: z.string().trim().max(254).optional(),
+  min_wait_hours: z.coerce.number().int().min(1).max(8760).optional(),
+  user_id: z.string().trim().min(1).max(120).optional(),
+})
+export type AdminFeedbackFilters = z.infer<typeof adminFeedbackFiltersSchema> & { status?: FeedbackStatus }
+export type FeedbackOperation = { source: 'admin' | 'inventory'; id: string; action: string; reason: string; created_at: string }
+
 export const feedbackRequestSchema = z.strictObject({
+  context: feedbackContextSchema.optional(),
   category: z.enum(FEEDBACK_CATEGORIES),
   message: z.string().trim().min(1).max(FEEDBACK_MESSAGE_MAX_LENGTH),
   image: z.strictObject({
@@ -33,6 +51,7 @@ export const adminFeedbackUpdateSchema = z.strictObject({
   internal_note: followUpMessage,
   assignment: z.enum(['keep', 'mine', 'unassigned']),
   reason: z.string().trim().min(2).max(500),
+  related_operation: z.strictObject({ source: z.enum(['admin', 'inventory']), id: z.uuid() }).optional(),
 })
 export type FeedbackReply = z.infer<typeof feedbackReplySchema>
 export type AdminFeedbackUpdate = z.infer<typeof adminFeedbackUpdateSchema>
@@ -41,13 +60,14 @@ export type Feedback = {
   category: FeedbackCategory
   message: string
   has_image: boolean
+  context?: FeedbackContext
   status: FeedbackStatus
   result: string | null
   revision: number
   created_at: string
   updated_at: string
 }
-export type AdminFeedback = Feedback & { user_id: string; email: string; assignee: string | null }
+export type AdminFeedback = Feedback & { user_id: string; email: string; assignee: string | null; waiting_since?: string | null }
 export type FeedbackEntry = {
   revision: number
   actor: 'user' | 'admin'
@@ -57,6 +77,7 @@ export type FeedbackEntry = {
   created_at: string
   actor_username?: string
   internal_note?: string | null
+  related_operation?: FeedbackOperation | null
   previous_assignee?: string | null
   assignee?: string | null
 }
@@ -64,6 +85,7 @@ export type FeedbackDetail = {
   feedback: Feedback | AdminFeedback
   entries: FeedbackEntry[]
   next_before_revision: number | null
+  recent_operations?: FeedbackOperation[]
 }
 export type FeedbackPage = {
   items: Feedback[]
@@ -71,5 +93,6 @@ export type FeedbackPage = {
 }
 export type AdminFeedbackPage = {
   items: AdminFeedback[]
+  metrics?: { first_response_seconds: number | null; longest_wait_seconds: number | null; reopened_count: number }
   pagination: { page: number; page_size: number; total: number; total_pages: number }
 }

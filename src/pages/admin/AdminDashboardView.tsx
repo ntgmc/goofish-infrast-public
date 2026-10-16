@@ -69,8 +69,8 @@ export default function AdminDashboardView() {
         hidden={section !== displayedSection} className="admin-section tool-section-content" data-loading={sectionLoading(section) || undefined}>
         <SectionLoader label={`正在加载${sectionLabels[section]}…`} /><div className="admin-section-body tool-page-content">
           {section === 'overview' && <OverviewSection model={c} active={displayedSection === 'overview'} />}
-          {section === 'users' && <UsersSection model={c} active={displayedSection === 'users'} />}
-          {section === 'feedback' && <FeedbackSection search={activeSection === 'feedback' ? location.search : ''} active={displayedSection === 'feedback'} canManage={c.adminCapabilities.includes('user_manage')} />}
+          {section === 'users' && <UsersSection model={c} active={displayedSection === 'users'} search={activeSection === 'users' ? location.search : ''} />}
+          {section === 'feedback' && <FeedbackSection search={activeSection === 'feedback' ? location.search : ''} active={displayedSection === 'feedback'} canManage={c.adminCapabilities.includes('user_manage')} canViewUser={c.adminCapabilities.includes('sensitive_data_view')} canViewTasks={c.adminCapabilities.includes('optimization_view')} />}
           {section === 'cdk' && <CdkSection model={c} active={displayedSection === 'cdk'} />}
           {section === 'risk' && <RiskSection model={c} search={activeSection === 'risk' ? location.search : ''} active={displayedSection === 'risk'} />}
           {section === 'queue' && <QueueMonitorPanel search={activeSection === 'queue' ? location.search : ''} active={displayedSection === 'queue'} />}

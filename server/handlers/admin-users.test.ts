@@ -458,6 +458,19 @@ describe('admin user profile pagination', () => {
     expect(mocks.getCdk).not.toHaveBeenCalled()
   })
 
+  it('opens the page containing a linked profile and rejects a profile owned by another user', async () => {
+    const profiles = Array.from({ length: 150 }, (_, index) => ({ ...profile, id: `linked-profile-${index}`, cdk_key: null, cdk_code_hash: null }))
+    mocks.listProfilesForUser.mockResolvedValue(profiles)
+    mocks.getProfileById.mockResolvedValue(profiles[149])
+    const response = await adminUsersHandler(new Request(`http://localhost/api/admin/users?user_id=${user.id}&profile_id=linked-profile-149`))
+    const body = await response.json()
+    expect(response.status).toBe(200)
+    expect(body.detail.profile_pagination.page).toBe(2)
+    expect(body.detail.profiles.map((item: { id: string }) => item.id)).toContain('linked-profile-149')
+    mocks.getProfileById.mockResolvedValue({ ...profiles[149], user_id: 'another-user' })
+    expect((await adminUsersHandler(new Request(`http://localhost/api/admin/users?user_id=${user.id}&profile_id=linked-profile-149`))).status).toBe(404)
+  })
+
   it('rejects unsafe profile page values before querying profile data', async () => {
     const response = await adminUsersHandler(new Request(
       `http://localhost/api/admin/users?user_id=${user.id}&profile_page=999999999999999999999`,

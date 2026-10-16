@@ -40,7 +40,7 @@ describe('PricingPage', () => {
     expect(link).toHaveAttribute('target', '_blank')
     expect(link).toHaveAttribute('rel', 'noopener noreferrer')
     expect(screen.getByText(/另收 5 元手续费/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '联系客服确认补款' })).toHaveAttribute('href', '/support')
+    expect(screen.getByRole('link', { name: '提交反馈确认补款' })).toHaveAttribute('href', '/support')
 
     content.pricing.lifetime_upgrade.purchase_url = ''
     rerender(<MemoryRouter><PricingPage /></MemoryRouter>)

@@ -86,7 +86,7 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
       </div>
     </nav>
     {signedIn && <div className="v2-sidebar-bottom">
-      <FeedbackButton className="v2-help-link" />
+      <FeedbackButton className="v2-help-link" profileId={session.activeProfile?.id} />
       {features.faq && <Link className="v2-help-link" to={v2Path('help', session.activeProfile?.id)} onClick={onClose}><BookOpen size={19} aria-hidden="true" /><span>{text.helpAction}</span><ArrowUpRight size={14} aria-hidden="true" /></Link>}
     </div>}
   </>

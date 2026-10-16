@@ -423,7 +423,7 @@ describe('public content settings', () => {
       ...stored.faq,
       items: change === 'empty' || change === 'full'
         ? stored.faq.items
-        : [...stored.faq.items, ...missingItems],
+        : [...stored.faq.items, ...missingItems].map((item) => item.id === 'qq-group' ? DEFAULT_PUBLIC_CONTENT_DRAFT.faq.items.find((entry) => entry.id === 'qq-group') : item),
     })
     expect(normalizePublicContentSettings(migrated)).toEqual(migrated)
   })
@@ -443,7 +443,7 @@ describe('public content settings', () => {
     const migrated = resolved.content
     expect(resolved.isFallback).toBe(false)
     expect(migrated.faq.items).toHaveLength(49)
-    expect(migrated.faq.items.slice(0, 20)).toEqual(original.faq.items)
+    expect(migrated.faq.items.slice(0, 20)).toEqual(original.faq.items.map((item) => item.id === 'qq-group' ? DEFAULT_PUBLIC_CONTENT_DRAFT.faq.items.find((entry) => entry.id === 'qq-group') : item))
     expect(new Set(migrated.faq.items.map((item) => item.id))).toEqual(new Set([
       ...DEFAULT_PUBLIC_CONTENT_DRAFT.faq.items.map((item) => item.id), 'custom-dormitory',
     ]))
@@ -467,6 +467,20 @@ describe('public content settings', () => {
     expect(migrated.faq.items[49].id).toBe('account-concepts')
     expect(() => parsePublicContentDraft({ ...DEFAULT_PUBLIC_CONTENT_DRAFT, faq: migrated.faq })).not.toThrow()
     expect(normalizePublicContentSettings(migrated)).toEqual(migrated)
+  })
+
+  it('moves default contact copy to website feedback while preserving custom answers and community configuration', () => {
+    const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 12 }
+    stored.faq.cta_body = copy.publicContent.legacy_feedback_cta
+    const contact = stored.faq.items.find((item) => item.id === 'qq-group')!
+    contact.question = copy.publicContent.legacy_faq.items.find((item) => item.id === 'qq-group')!.question
+    contact.answer = copy.publicContent.legacy_feedback_join_answer
+    const migrated = normalizePublicContentSettings(stored)
+    expect(migrated.faq.cta_body).toBe(DEFAULT_PUBLIC_CONTENT_DRAFT.faq.cta_body)
+    expect(migrated.faq.items.find((item) => item.id === 'qq-group')?.question).toBe(copy.publicContent.faq_join_question)
+    expect(migrated.qq_group).toEqual(stored.qq_group)
+    contact.answer = '管理员自定义的联系说明'
+    expect(normalizePublicContentSettings(stored).faq.items.find((item) => item.id === 'qq-group')?.answer).toBe(contact.answer)
   })
 
   it('does not reapply the FAQ upgrade after an administrator restores earlier copy', () => {

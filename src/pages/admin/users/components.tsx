@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { ChevronDown } from 'lucide-react'
+import { Link } from 'react-router'
+import { adminPath } from '../../../lib/app-routes'
 import SklandIcon from '../../../components/SklandIcon'
 import type { AdminBalanceTransaction, BalancePage } from '../../../lib/balance-contracts'
 import { normalizePointsAmount } from '../../../lib/balance-contracts'
@@ -13,6 +15,7 @@ import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
 
 export interface UserDetailPanelProps {
   inline?: boolean;
+  initialProfileId?: string;
   active?: boolean;
   capabilities?: AdminCapability[];
   detail: AdminUserDetail;
@@ -50,6 +53,7 @@ export function UserDetailDialog(props: UserDetailPanelProps) {
 
 function UserDetailPanel({
   active = true,
+  initialProfileId,
   capabilities = [],
   detail,
   busyAction,
@@ -76,8 +80,9 @@ function UserDetailPanel({
 }: UserDetailPanelProps) {
   const [workspaceExportOpen, setWorkspaceExportOpen] = useState(false)
   const [view, setView] = useState('profiles')
-  const [profileId, setProfileId] = useState(detail.profiles[0]?.id ?? '')
+  const [profileId, setProfileId] = useState(initialProfileId ?? detail.profiles[0]?.id ?? '')
   const selectedProfile = detail.profiles.find((profile) => profile.id === profileId) ?? detail.profiles[0]
+  useEffect(() => { if (initialProfileId) setProfileId(initialProfileId) }, [initialProfileId])
   const canManage = capabilities.includes('user_manage')
   useEffect(() => { if (!active) setWorkspaceExportOpen(false) }, [active])
   const user = detail.user
@@ -93,6 +98,8 @@ function UserDetailPanel({
           <p className="mt-2 break-all text-sm text-ink-muted">用户 ID：{user.id}</p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Link className="tool-secondary-action" to={`${adminPath('feedback')}?${new URLSearchParams({ user_id: user.id })}`}>相关反馈</Link>
+          {capabilities.includes('optimization_view') && <Link className="tool-secondary-action" to={`${adminPath('queue')}?${new URLSearchParams({ query: user.email })}`}>相关任务</Link>}
           <SmallButton onClick={() => setWorkspaceExportOpen(true)}>导出工作区</SmallButton>
           {canManage && user.status === 'active' && <SmallButton onClick={() => void onFreezeUser(user)} loading={busyAction === `app-user:freeze_account:${user.id}`}>冻结用户</SmallButton>}
           {canManage && user.status === 'frozen' && <SmallButton onClick={() => void onUnfreezeUser(user)} loading={busyAction === `app-user:unfreeze_account:${user.id}`} tone="success">解冻用户</SmallButton>}

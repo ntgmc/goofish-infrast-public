@@ -12,9 +12,9 @@ export const metadataCopy = {
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_006: "了解 MaaTool 的账号、CDK、森空岛导入、MAA JSON 和仓库估值使用方式。",
   // src/components/RouteMetadata.tsx
-  components_RouteMetadata_007: "联系客服 | MaaTool",
+  components_RouteMetadata_007: "反馈 | MaaTool",
   // src/components/RouteMetadata.tsx
-  components_RouteMetadata_008: "通过 MaaTool QQ 群获取使用帮助、提交问题反馈或申请删除账号与工作台数据。",
+  components_RouteMetadata_008: "通过 MaaTool 网站提交问题、补充信息，查看回复和处理进度。",
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_009: "隐私政策 | MaaTool",
   // src/components/RouteMetadata.tsx

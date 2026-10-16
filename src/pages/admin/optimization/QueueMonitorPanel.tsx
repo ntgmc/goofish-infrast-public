@@ -25,12 +25,14 @@ const DEFAULT_FILTERS: Filters = { query: '', status: 'all', source: 'all', prio
 export default function QueueMonitorPanel({ active = true, search = '' }: { active?: boolean; search?: string }) {
   const requestedView = new URLSearchParams(search).get('view')
   const [view, setView] = useState<'tasks' | 'history' | 'dead'>(requestedView === 'dead' || requestedView === 'history' ? requestedView : 'tasks')
-  const [jobView, setJobView] = useState<'queued' | 'running' | 'recent'>('queued')
+  const requestedJob = new URLSearchParams(search).get('job_id')
+  const relatedQuery = new URLSearchParams(search).get('query') ?? ''
+  const [jobView, setJobView] = useState<'queued' | 'running' | 'recent'>(relatedQuery ? 'recent' : 'queued')
   const [visited, setVisited] = useState<string[]>([view])
   const [snapshot, setSnapshot] = useState<AdminOptimizationQueueSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
+  const [filters, setFilters] = useState<Filters>({ ...DEFAULT_FILTERS, query: new URLSearchParams(search).get('query') ?? '' })
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(() => new Set())
   const requestRef = useRef<AbortController | null>(null)
   useEffect(() => {
@@ -38,8 +40,13 @@ export default function QueueMonitorPanel({ active = true, search = '' }: { acti
     if (next === 'dead' || next === 'history') {
       setView(next)
       setVisited((current) => current.includes(next) ? current : [...current, next])
+    } else {
+      setView('tasks')
+      setFilters({ ...DEFAULT_FILTERS, query: new URLSearchParams(search).get('query') ?? '' })
+      setExpandedJobs(requestedJob ? new Set([requestedJob]) : new Set())
+      setJobView(relatedQuery ? 'recent' : 'queued')
     }
-  }, [search])
+  }, [search, requestedJob, relatedQuery])
 
   const loadSnapshot = useCallback(async () => {
     requestRef.current?.abort()
@@ -47,7 +54,7 @@ export default function QueueMonitorPanel({ active = true, search = '' }: { acti
     requestRef.current = controller
     setRefreshing(true)
     try {
-      const data = await adminApiJson<AdminOptimizationQueueSnapshot>('/api/admin/optimization?view=queue', {
+      const data = await adminApiJson<AdminOptimizationQueueSnapshot>(`/api/admin/optimization?view=queue${relatedQuery ? `&related=${encodeURIComponent(relatedQuery)}` : ''}`, {
         signal: controller.signal,
         fallbackMessage: '加载异步队列失败',
       })
@@ -63,7 +70,7 @@ export default function QueueMonitorPanel({ active = true, search = '' }: { acti
         setRefreshing(false)
       }
     }
-  }, [])
+  }, [relatedQuery])
 
   useEffect(() => {
     if (!active || view !== 'tasks') return
@@ -85,6 +92,10 @@ export default function QueueMonitorPanel({ active = true, search = '' }: { acti
   const allJobs = useMemo(() => snapshot
     ? [...snapshot.queued_jobs, ...snapshot.running_jobs, ...snapshot.recent_jobs]
     : [], [snapshot])
+  useEffect(() => {
+    if (!requestedJob || !snapshot) return
+    setJobView(snapshot.queued_jobs.some((job) => job.id === requestedJob) ? 'queued' : snapshot.running_jobs.some((job) => job.id === requestedJob) ? 'running' : 'recent')
+  }, [requestedJob, snapshot])
   const sources = useMemo(() => [...new Set(allJobs.map((job) => job.source))].sort(), [allJobs])
   const filtered = useMemo(() => ({
     queued: snapshot?.queued_jobs.filter((job) => matchesFilters(job, filters)) ?? [],
@@ -177,7 +188,7 @@ export default function QueueMonitorPanel({ active = true, search = '' }: { acti
           {jobView === 'recent' && <QueueJobsSection
             id="queue-recent"
             title="最近结束"
-            description="最近 20 条成功、失败、取消或死信任务。"
+            description={relatedQuery ? '关联账号、档案或任务的最近 20 条已结束记录。' : '最近 20 条成功、失败、取消或死信任务。'}
             jobs={filtered.recent}
             total={snapshot.recent_jobs.length}
             expandedJobs={expandedJobs}

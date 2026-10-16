@@ -134,10 +134,10 @@ describe('PublicContentSettingsSection', () => {
     const list = within(panel).getByRole('list', { name: 'FAQ 条目' })
     const itemButtons = within(list).getAllByRole('button', { pressed: false })
     expect(itemButtons.length).toBeGreaterThan(1)
-    expect(within(panel).getAllByLabelText(/问题/)).toHaveLength(1)
+    expect(within(panel).getAllByRole('textbox', { name: /^问题（必填）$/ })).toHaveLength(1)
 
     await user.click(itemButtons[0])
-    const selectedQuestion = within(panel).getByLabelText(/问题/)
+    const selectedQuestion = within(panel).getByRole('textbox', { name: /^问题（必填）$/ })
     const originalQuestion = (selectedQuestion as HTMLInputElement).value
     await user.clear(selectedQuestion)
     await user.type(selectedQuestion, '更新后的第二个问题')

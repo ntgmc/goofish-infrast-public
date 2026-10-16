@@ -7,7 +7,16 @@ import { UserTable } from './UserTable'
 import { UserDetailDialog } from './components'
 import { omitFieldError, inputClassName } from '../shared/helpers'
 
-export default function UsersSection({ model: c, active }: { model: AdminController; active: boolean }) {
+export default function UsersSection({ model: c, active, search = '' }: { model: AdminController; active: boolean; search?: string }) {
+  const requestedUser = new URLSearchParams(search).get('user_id')
+  const requestedProfile = new URLSearchParams(search).get('profile_id')
+  const openedUser = useRef<string | null>(null)
+  useEffect(() => {
+    if (!requestedUser) { openedUser.current = null; return }
+    if (!active || !c.adminCapabilities.includes('sensitive_data_view') || openedUser.current === `${requestedUser}:${requestedProfile}`) return
+    openedUser.current = `${requestedUser}:${requestedProfile}`
+    void c.loadUserDetail({ id: requestedUser }, 1, requestedProfile ?? undefined)
+  }, [active, requestedUser, requestedProfile, c.adminCapabilities, c.loadUserDetail])
   const [resetOpen, setResetOpen] = useState(false)
   const detailHeading = useRef<HTMLDivElement>(null)
   useEffect(() => { setResetOpen(false); c.setResetPassword('') }, [c.selectedUserDetail?.user.id, c.setResetPassword])
@@ -39,7 +48,7 @@ export default function UsersSection({ model: c, active }: { model: AdminControl
             {c.resetFieldErrors.resetPassword && <p id="admin-reset-password-error" className="mt-2 text-sm text-error" role="alert">{c.resetFieldErrors.resetPassword}</p>}</label>
           <button type="submit" disabled={c.busyAction === 'reset-password'} className="tool-primary-action">{c.busyAction === 'reset-password' ? '重置中…' : '确认重置'}</button></div>
       </form>}
-      <UserDetailDialog inline active={active} capabilities={c.adminCapabilities} detail={c.selectedUserDetail} balance={c.selectedUserBalance} balanceLoading={c.userBalanceLoading}
+      <UserDetailDialog inline active={active} initialProfileId={requestedProfile ?? undefined} capabilities={c.adminCapabilities} detail={c.selectedUserDetail} balance={c.selectedUserBalance} balanceLoading={c.userBalanceLoading}
         busyAction={c.busyAction} operatorDataByProfileId={c.operatorDataByProfileId} expandedOperatorProfileId={c.expandedOperatorProfileId}
         onClose={() => { c.setSelectedUserDetail(null); c.setSelectedUserBalance(null); c.setOperatorDataByProfileId({}); c.setExpandedOperatorProfileId(null); setResetOpen(false) }}
         onUpdateProfile={c.handleUpdateProfile} onSetProfileStatus={c.handleSetProfileStatus} onSetProfilePermission={c.handleSetProfilePermission} onUpgradePreviewProfile={c.handleUpgradePreviewProfile}

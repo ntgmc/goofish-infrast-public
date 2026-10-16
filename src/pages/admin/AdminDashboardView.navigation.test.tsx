@@ -3,6 +3,7 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { copy } from '../../copy'
 import { MotionPreferenceProvider } from '../../lib/motion-preference'
 import { DEFAULT_SITE_FEATURE_SETTINGS } from '../../lib/site-features'
 import { readFileSync } from 'node:fs'
@@ -188,7 +189,7 @@ describe('admin page loading and navigation', () => {
     expect(Object.fromEntries(sent)).toMatchObject({ ...Object.fromEntries(target), search: '', page: '1', status: 'all' })
     await user.click(await screen.findByRole('link', { name: '返回运营看板 →' }))
     await user.click(await screen.findByRole('link', { name: /待回复反馈/ }))
-    expect(await screen.findByRole('combobox', { name: '待办' })).toHaveValue('reply')
+    expect(await screen.findByRole('button', { name: copy.feedback.todos.reply })).toHaveAttribute('aria-pressed', 'true')
     await waitFor(() => expect(api.json.mock.calls.some(([url]) => url.startsWith('/api/admin/feedback?') && url.includes('todo=reply'))).toBe(true))
   })
 

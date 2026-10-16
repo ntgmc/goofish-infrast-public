@@ -3,7 +3,7 @@ import { copy } from '../copy/index'
 import { getSku, productPolicies } from './product-catalog'
 
 export const PUBLIC_CONTENT_VERSION = 1 as const
-export const PUBLIC_CONTENT_DEFAULTS_REVISION = 12 as const
+export const PUBLIC_CONTENT_DEFAULTS_REVISION = 13 as const
 export const PUBLIC_PRICING_PLAN_IDS = [
   'free_preview',
   'single_account_monthly',
@@ -371,6 +371,15 @@ export function resolvePublicContentSettings(value: unknown): { content: PublicC
   if (storedDefaultsRevision < 9) migratedDraft = migrateLegacyPricingCopy(migratedDraft)
   if (storedDefaultsRevision < 11) migratedDraft = migrateLegacyLifetimePricing(migratedDraft)
   if (storedDefaultsRevision < 12) migratedDraft = migrateDefaultFaqContent(migratedDraft)
+  if (storedDefaultsRevision < 13) {
+    if (migratedDraft.faq.cta_body === copy.publicContent.legacy_feedback_cta) {
+      migratedDraft.faq.cta_body = DEFAULT_PUBLIC_CONTENT_DRAFT.faq.cta_body
+    }
+    const previousContact = copy.publicContent.legacy_faq.items.find((item) => item.id === 'qq-group')!
+    migratedDraft.faq.items = migratedDraft.faq.items.map((item) => item.id === previousContact.id && item.question === previousContact.question
+      && (item.answer === previousContact.answer || item.answer === copy.publicContent.legacy_feedback_join_answer)
+      ? { ...item, question: copy.publicContent.faq_join_question, answer: copy.publicContent.faq_join_answer } : item)
+  }
   return {
     content: {
       version: PUBLIC_CONTENT_VERSION,

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { copy } from '../../../copy'
 import type { AdminFeedback, FeedbackDetail } from '../../../lib/feedback-contracts'
@@ -24,7 +25,7 @@ it('preserves drafts on a conflict and uses the refreshed revision for an audite
     return { items: [feedback], pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 } }
   })
   const user = userEvent.setup()
-  render(<FeedbackSection active canManage />)
+  render(<MemoryRouter><FeedbackSection active canManage /></MemoryRouter>)
   expect(screen.getByLabelText(copy.feedback.status)).toHaveValue('')
   await user.click(await screen.findByRole('button', { name: /user@example.com/ }))
   await screen.findByLabelText(copy.feedback.publicReply)
@@ -58,9 +59,35 @@ it('lets viewers inspect follow-up records without mutation controls', async () 
     ? { feedback, entries: [{ revision: 1, actor: 'admin', actor_username: 'operator', message: null, internal_note: '排查情况', status: 'processing', previous_status: 'processing', assignee: null, previous_assignee: null, created_at: feedback.created_at }], next_before_revision: null }
     : { items: [feedback], pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 } })
   const user = userEvent.setup()
-  render(<FeedbackSection active />)
+  render(<MemoryRouter><FeedbackSection active /></MemoryRouter>)
   await user.click(await screen.findByRole('button', { name: /user@example.com/ }))
   await screen.findByText('排查情况')
   expect(screen.queryByLabelText(copy.feedback.publicReply)).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: copy.feedback.save })).not.toBeInTheDocument()
+})
+
+it('combines quick filters, opens related records, and persists a selected operation with the feedback revision', async () => {
+  const operation = { source: 'inventory' as const, id: feedback.id, action: 'grant_item', reason: '补发缺少的道具', created_at: feedback.created_at }
+  mocks.api.mockImplementation(async (url, init) => {
+    if (init?.method === 'PATCH') return { id: feedback.id }
+    if (url.includes('feedback_id=')) return { feedback: { ...feedback, context: { profile_id: 'profile-42', job_id: 'job-42' } }, entries: [], next_before_revision: null, recent_operations: [operation] }
+    return { items: [feedback], pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 }, metrics: { first_response_seconds: 7200, longest_wait_seconds: 86400, reopened_count: 3 } }
+  })
+  const user = userEvent.setup()
+  render(<MemoryRouter><FeedbackSection active canManage canViewUser canViewTasks /></MemoryRouter>)
+  await screen.findByText('2 小时 0 分钟')
+  await user.click(screen.getByRole('button', { name: copy.feedback.todos.mine }))
+  await user.selectOptions(screen.getByLabelText(copy.feedback.category), 'payment')
+  fireEvent.change(screen.getByLabelText(copy.feedback.emailFilter), { target: { value: 'user@example.com' } })
+  await user.selectOptions(screen.getByLabelText(copy.feedback.waitFilter), '24')
+  await waitFor(() => expect(mocks.api).toHaveBeenCalledWith('/api/admin/feedback?page=1&page_size=25&todo=mine&category=payment&email=user%40example.com&min_wait_hours=24', expect.anything()))
+  await user.click(await screen.findByRole('button', { name: /user@example.com/ }))
+  expect(await screen.findByRole('link', { name: copy.feedback.openUser })).toHaveAttribute('href', '/admin/users?user_id=user')
+  expect(screen.getByRole('link', { name: copy.feedback.openProfile })).toHaveAttribute('href', '/admin/users?user_id=user&profile_id=profile-42')
+  expect(screen.getByRole('link', { name: copy.feedback.openJobs })).toHaveAttribute('href', '/admin/queue?query=job-42&job_id=job-42')
+  await user.selectOptions(screen.getByLabelText(copy.feedback.relatedOperation), `inventory:${operation.id}`)
+  fireEvent.change(screen.getByLabelText(copy.feedback.reason), { target: { value: '记录补发操作' } })
+  await user.click(screen.getByRole('button', { name: copy.feedback.save }))
+  await screen.findByText(copy.feedback.saved)
+  expect(mocks.api).toHaveBeenCalledWith('/api/admin/feedback', expect.objectContaining({ method: 'PATCH', json: expect.objectContaining({ expected_revision: 0, related_operation: { source: 'inventory', id: operation.id } }) }))
 })

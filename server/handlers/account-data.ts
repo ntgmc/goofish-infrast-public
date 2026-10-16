@@ -249,7 +249,7 @@ async function exportData(userId: string): Promise<Response> {
              from commercial_account_limits where user_id = $1`, [userId]),
     exportUserNotifications(userId),
     query(`select id, category, message, image_type, encode(image_data, 'base64') as image_base64,
-                  status, result, created_at, public_updated_at as updated_at,
+                  status, result, context_json as context, created_at, public_updated_at as updated_at,
                   coalesce((select jsonb_agg(jsonb_build_object('actor', entry.actor, 'message', entry.message,
                     'previous_status', entry.previous_status, 'status', entry.status, 'created_at', entry.created_at)
                     order by entry.revision) from user_feedback_entries entry where entry.feedback_id = user_feedback.id

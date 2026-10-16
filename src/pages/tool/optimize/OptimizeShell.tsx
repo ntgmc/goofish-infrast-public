@@ -133,7 +133,7 @@ export default function OptimizeShell({
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {compactHeaderActions}
-              <FeedbackButton iconOnly />
+              <FeedbackButton iconOnly profileId={profileId} />
               <NotificationBell iconOnly />
               <ThemeSwitcher iconOnly />
               <DeferredFeatureMenu iconOnly />
@@ -164,7 +164,7 @@ export default function OptimizeShell({
                 {copy.optimize.pages_tool_optimize_tour_001}
               </button>
               {headerActions}
-              <FeedbackButton />
+              <FeedbackButton profileId={profileId} />
               <NotificationBell />
               <ThemeSwitcher />
               <DeferredFeatureMenu />

@@ -732,7 +732,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
     PATCH: json('admin', requestSchemas.adminRegistrationInvitationPatch),
   }, ['page', 'page_size', 'status'])],
   ['/api/admin/invitation-settlements', route({ POST: json('admin', requestSchemas.adminInvitationSettlement) })],
-  ['/api/admin/optimization', route({ GET: none(), POST: json('admin', requestSchemas.adminOptimization) }, ['view', 'status', 'limit', 'id'])],
+  ['/api/admin/optimization', route({ GET: none(), POST: json('admin', requestSchemas.adminOptimization) }, ['view', 'status', 'limit', 'id', 'related'])],
   ['/api/admin/service-status', route({
     GET: none(),
     POST: json('admin', requestSchemas.adminServiceStatusCreate),
@@ -780,7 +780,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/cultivation-plan', route({ POST: json('standard', requestSchemas.cultivationPlan) })],
   ['/api/user/announcements', route({ GET: none(), PATCH: json('standard', requestSchemas.userAnnouncement) }, ['page', 'announcement_id', 'unread_only'])],
   ['/api/user/feedback', route({ GET: none(), POST: json('feedback', requestSchemas.userFeedback), PATCH: json('standard', requestSchemas.userFeedbackReply) }, ['page', 'page_size', 'feedback_id', 'image_id', 'before_revision'])],
-  ['/api/admin/feedback', route({ GET: none(), PATCH: json('standard', requestSchemas.adminFeedbackUpdate) }, ['page', 'page_size', 'status', 'feedback_id', 'image_id', 'before_revision'])],
+  ['/api/admin/feedback', route({ GET: none(), PATCH: json('standard', requestSchemas.adminFeedbackUpdate) }, ['page', 'page_size', 'status', 'todo', 'category', 'email', 'min_wait_hours', 'user_id', 'feedback_id', 'image_id', 'before_revision'])],
   ['/api/user/notifications', route({ GET: none(), PATCH: json('standard', requestSchemas.userNotification) }, ['cursor', 'limit'])],
   ['/api/user/profiles', route({ GET: none(), PATCH: json('standard', requestSchemas.profilePatch) })],
   ['/api/user/profiles/depot-value', route({ POST: none() })],

@@ -113,16 +113,27 @@ describe('feedback authorization and upload boundary', () => {
   })
   it('routes admin todos to their exact list and rejects them on user history', async () => {
     expect((await adminFeedbackHandler(new Request('http://localhost/api/admin/feedback?todo=reply'))).status).toBe(200)
-    expect(mocks.list).toHaveBeenCalledWith(1, 25, undefined, 'reply')
+    expect(mocks.list).toHaveBeenCalledWith(1, 25, undefined, 'reply', {}, 'operator')
     expect((await adminFeedbackHandler(new Request('http://localhost/api/admin/feedback?todo=unassigned'))).status).toBe(200)
-    expect(mocks.list).toHaveBeenCalledWith(1, 25, undefined, 'unassigned')
+    expect(mocks.list).toHaveBeenCalledWith(1, 25, undefined, 'unassigned', {}, 'operator')
     expect((await userFeedbackHandler(new Request('http://localhost/api/user/feedback?todo=reply'))).status).toBe(400)
     expect((await adminFeedbackHandler(new Request('http://localhost/api/admin/feedback?todo=unknown'))).status).toBe(400)
   })
 
+  it('validates workbench filters and uses the authenticated operator for personal todos', async () => {
+    expect((await adminFeedbackHandler(new Request('http://localhost/api/admin/feedback?todo=mine&category=payment&email=USER%40example.com&min_wait_hours=24&user_id=account'))).status).toBe(200)
+    expect(mocks.list).toHaveBeenCalledWith(1, 25, undefined, 'mine', { category: 'payment', email: 'USER@example.com', min_wait_hours: 24, user_id: 'account' }, 'operator')
+    for (const params of ['category=unknown', 'min_wait_hours=0', 'min_wait_hours=1.5', 'min_wait_hours=99999', 'assignee=another', `feedback_id=${id}&email=someone`]) {
+      expect((await adminFeedbackHandler(new Request(`http://localhost/api/admin/feedback?${params}`))).status).toBe(400)
+    }
+    for (const params of ['category=payment', 'email=someone', 'min_wait_hours=1', 'user_id=another']) {
+      expect((await userFeedbackHandler(new Request(`http://localhost/api/user/feedback?${params}`))).status).toBe(400)
+    }
+  })
+
   it('returns paginated feedback and restricts page size', async () => {
     expect((await adminFeedbackHandler(new Request('http://localhost/api/admin/feedback?page=2&page_size=50'))).status).toBe(200)
-    expect(mocks.list).toHaveBeenCalledWith(2, 50, undefined)
+    expect(mocks.list).toHaveBeenCalledWith(2, 50, undefined, undefined, {}, 'operator')
     expect((await adminFeedbackHandler(new Request('http://localhost/api/admin/feedback?page_size=1000'))).status).toBe(400)
   })
   it('serves authenticated images with their validated MIME type and without caching', async () => {

@@ -8,7 +8,7 @@ import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
 import { getMeteredBillingPolicy, getMeteredScheduleQuote } from '../../../lib/metered-billing'
 import { getSku, productPolicies } from '../../../lib/product-catalog'
 import Link from '../../../components/InternalLink'
-import { SupportGroupLink } from '../../../components/PublicFooter'
+import { FeedbackLink } from '../../../components/PublicFooter'
 import { Notice, SectionTitle } from '../components/WorkspaceUI'
 
 const text = copy.public
@@ -91,7 +91,7 @@ export default function Pricing() {
     <section className="v2-pricing-upgrade"><SectionTitle title={text.pricing_upgrade_title} description={text.pricing_upgrade_description(pricing.lifetime_upgrade.service_fee)} /><p>{text.pricing_upgrade_process}</p><div className="v2-actions">{features.support && <Link to="/support" className="v2-button v2-button-secondary">{text.pricing_upgrade_contact}</Link>}{pricing.lifetime_upgrade.purchase_url ? <a href={pricing.lifetime_upgrade.purchase_url} target="_blank" rel="noopener noreferrer" className="v2-button v2-button-primary">{text.pricing_upgrade_purchase}</a> : <button disabled className="v2-button v2-button-primary">{text.pricing_upgrade_unavailable}</button>}</div></section>
     {METERED_BILLING_AVAILABLE && <MeteredPricing />}
     <section className="v2-pricing-policy"><SectionTitle title={pricing.policy_heading} /><ul>{pricing.disclosures.map((disclosure, index) => <li key={index}>{disclosure}</li>)}</ul></section>
-    <section className="v2-pricing-support"><SectionTitle title={pricing.support_heading} description={`${content.qq_group.name}（${content.qq_group.number}） · ${pricing.support_body}`} /><SupportGroupLink className="v2-button v2-button-secondary">{text.pages_PricingPage_010}</SupportGroupLink></section>
+    <section className="v2-pricing-support"><SectionTitle title={pricing.support_heading} description={pricing.support_body} /><FeedbackLink className="v2-button v2-button-secondary">{text.pages_PricingPage_010}</FeedbackLink></section>
   </div>
 }
 

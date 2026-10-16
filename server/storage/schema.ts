@@ -603,6 +603,7 @@ CREATE INDEX IF NOT EXISTS idx_user_feedback_user ON user_feedback(user_id);
 ALTER TABLE user_feedback ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'processing', 'waiting_user', 'resolved', 'closed'));
 ALTER TABLE user_feedback ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0);
 ALTER TABLE user_feedback ADD COLUMN IF NOT EXISTS assignee TEXT;
+ALTER TABLE user_feedback ADD COLUMN IF NOT EXISTS context_json JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(context_json) = 'object');
 ALTER TABLE user_feedback ADD COLUMN IF NOT EXISTS result TEXT;
 ALTER TABLE user_feedback ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
 ALTER TABLE user_feedback ADD COLUMN IF NOT EXISTS public_updated_at TIMESTAMPTZ;
@@ -631,6 +632,8 @@ CREATE TABLE IF NOT EXISTS user_feedback_entries (
   UNIQUE (feedback_id, actor, actor_id, request_key),
   CHECK (actor = 'admin' OR (internal_note IS NULL AND message IS NOT NULL))
 );
+
+ALTER TABLE user_feedback_entries ADD COLUMN IF NOT EXISTS related_operation JSONB CHECK (related_operation IS NULL OR (actor = 'admin' AND jsonb_typeof(related_operation) = 'object'));
 
 CREATE TABLE IF NOT EXISTS user_balance_accounts (
   user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,

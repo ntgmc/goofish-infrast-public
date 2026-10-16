@@ -14,7 +14,7 @@ export default async function adminFeedbackHandler(req: Request): Promise<Respon
   if (!authentication.ok) return authentication.response
   if (!['GET', 'PATCH'].includes(req.method)) return respond({ error: 'Method not allowed' }, 405)
   try {
-    if (req.method === 'GET') return await readFeedback(req, null)
+    if (req.method === 'GET') return await readFeedback(req, null, authentication.username)
     await validateAndStoreJsonBody(req, requestSchemas.adminFeedbackUpdate, 'standard')
     const body = await getValidatedJson(req, requestSchemas.adminFeedbackUpdate, true)
     await updateFeedback(body, {

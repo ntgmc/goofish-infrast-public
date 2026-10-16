@@ -97,7 +97,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
       if (!sample) window.localStorage.removeItem(FIRST_SCHEDULE_INTENT_KEY)
     } catch { /* Storage may be disabled. */ }
   }, [firstSchedule, section, session.user, sample])
-  const [panel, setPanel] = useState<OptionPanel | null>(null)
+  const [panel, setPanel] = useState<OptionPanel | null>(() => params.get('feedback') === 'new' && !session.user ? 'account' : null)
   const [room, setRoom] = useState<BoardRoom | null>(null)
   const [view, setView] = useState<View>('schedule')
   const [expanded, setExpanded] = useState(false)

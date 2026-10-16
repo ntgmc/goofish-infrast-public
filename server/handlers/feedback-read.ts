@@ -1,24 +1,24 @@
 import { z } from 'zod'
-import { FEEDBACK_STATUSES } from '../../src/lib/feedback-contracts'
+import { FEEDBACK_STATUSES, adminFeedbackFiltersSchema } from '../../src/lib/feedback-contracts'
 import { feedbackCopy as text } from '../../src/copy/zh-CN/feedback'
 import { getFeedbackDetail, getFeedbackImage, listAdminFeedback, listUserFeedback } from '../storage/feedback-store'
 import { parseAdminPageRequest } from './admin-pagination'
 import { RequestInputError } from '../security/request-validation'
 import { jsonResponse } from './license-utils'
 
-const readQuery = z.strictObject({
+const readQuery = adminFeedbackFiltersSchema.extend({
   feedback_id: z.uuid().optional(), image_id: z.uuid().optional(),
   before_revision: z.coerce.number().int().positive().optional(),
   status: z.enum(FEEDBACK_STATUSES).optional(),
-  todo: z.enum(['unassigned', 'reply']).optional(),
 })
 
-export async function readFeedback(req: Request, userId: string | null): Promise<Response> {
+export async function readFeedback(req: Request, userId: string | null, username = ''): Promise<Response> {
   const url = new URL(req.url)
   const input = readQuery.safeParse(Object.fromEntries([...url.searchParams].filter(([key]) => !['page', 'page_size'].includes(key))))
   if (!input.success) throw new RequestInputError('反馈查询参数无效。')
-  const { feedback_id: id, image_id: imageId, before_revision: before, status, todo } = input.data
-  if ((id && imageId) || (before && !id) || (userId && (status || todo))) throw new RequestInputError('反馈查询参数无效。')
+  const { feedback_id: id, image_id: imageId, before_revision: before, status, todo, ...filters } = input.data
+  const hasFilters = status || todo || Object.keys(filters).length > 0
+  if ((id && imageId) || (before && !id) || ((userId || id || imageId) && hasFilters)) throw new RequestInputError('反馈查询参数无效。')
   if (imageId) {
     const image = await getFeedbackImage(imageId, userId)
     if (!image) return jsonResponse({ error: text.imageNotFound }, 404, { 'Cache-Control': 'no-store' })
@@ -29,5 +29,5 @@ export async function readFeedback(req: Request, userId: string | null): Promise
   }
   if (id) return jsonResponse(await getFeedbackDetail(id, userId, before), 200, { 'Cache-Control': 'no-store' })
   const { page, pageSize } = parseAdminPageRequest(url)
-  return jsonResponse(userId ? await listUserFeedback(userId, page, pageSize) : await (todo ? listAdminFeedback(page, pageSize, status, todo) : listAdminFeedback(page, pageSize, status)), 200, { 'Cache-Control': 'no-store' })
+  return jsonResponse(userId ? await listUserFeedback(userId, page, pageSize) : await listAdminFeedback(page, pageSize, status, todo, filters, username), 200, { 'Cache-Control': 'no-store' })
 }

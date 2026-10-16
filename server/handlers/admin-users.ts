@@ -146,7 +146,8 @@ export default async (req: Request): Promise<Response> => {
           targetId: user.id,
           reason: '管理员查看用户敏感详情。',
         })
-        return jsonResponse({ detail: await buildAdminUserDetail(user, profilePage) })
+        if (profileId && !await findTargetProfile({ profile_id: profileId }, user)) return jsonResponse({ error: '账号档案不存在。' }, 404)
+        return jsonResponse({ detail: await buildAdminUserDetail(user, profilePage, profileId ?? undefined) })
       }
       const request = parseAdminPageRequest(url)
       const filters = adminUserFiltersSchema.safeParse(Object.fromEntries(url.searchParams))
@@ -604,13 +605,15 @@ async function exportAdminUserWorkspaces(user: UserAccountRecord, selectedProfil
 async function buildAdminUserDetail(
   user: UserAccountRecord,
   profilePage: AdminProfilePageRequest = { page: 1, pageSize: 100 },
+  profileId?: string,
 ) {
   const [allProfiles, personalUseDeclarations, personalUseUsageEvents] = await Promise.all([
     listProfilesForUser(user.id),
     listPersonalUseDeclarationAcceptancesForUser(user.id),
     listPersonalUseDeclarationUsageEventsForUser(user.id),
   ])
-  const pagination = buildAdminPagination(profilePage.page, profilePage.pageSize, allProfiles.length)
+  const profileIndex = profileId ? allProfiles.findIndex((profile) => profile.id === profileId) : -1
+  const pagination = buildAdminPagination(profileIndex >= 0 ? Math.floor(profileIndex / profilePage.pageSize) + 1 : profilePage.page, profilePage.pageSize, allProfiles.length)
   const profileOffset = (pagination.page - 1) * pagination.page_size
   const profiles = allProfiles.slice(profileOffset, profileOffset + pagination.page_size)
   const [workspaceMap, cdkMap, latestResults] = await Promise.all([
