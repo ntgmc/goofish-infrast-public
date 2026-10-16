@@ -38,6 +38,7 @@ export default function OverviewSection({
   resultHistoryLimit = WORKSPACE_RESULT_HISTORY_LIMIT,
   latestResult,
   generationDisabledReason,
+  exportNotice,
   freeSchedule,
   onGenerate,
   incrementalRecompute,
@@ -70,6 +71,7 @@ export default function OverviewSection({
   resultHistoryLimit?: number;
   latestResult: WorkspaceResultHistorySummary | null;
   generationDisabledReason?: string | null;
+  exportNotice?: string;
   freeSchedule?: FreeScheduleViewState;
   onGenerate: () => void;
   incrementalRecompute?: {
@@ -109,6 +111,7 @@ export default function OverviewSection({
         priorityCoupon={priorityCoupon}
         additionalCoupons={additionalCoupons}
         extraDisabledReason={generationDisabledReason ?? null}
+        exportNotice={exportNotice}
         onGenerate={onGenerate}
         onReset={onReset}
         onOpenConfig={onOpenConfig}

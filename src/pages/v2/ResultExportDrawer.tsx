@@ -11,7 +11,7 @@ import type { ResultExportFailure } from '../tool/optimize/useResultDownloads'
 const text = copy.v2
 const imageCopy = copy.domain.result_image
 
-export default function ResultExportDrawer({ open, onOpenChange, result, prepared, shift, busy, failure, onRecover, onDownloadMaa, onDownloadFullResult, onDownloadSample }: {
+export default function ResultExportDrawer({ open, onOpenChange, result, prepared, shift, busy, failure, exportNotice, onRecover, onDownloadMaa, onDownloadFullResult, onDownloadSample }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   result: OptimizeResult
@@ -19,6 +19,7 @@ export default function ResultExportDrawer({ open, onOpenChange, result, prepare
   shift: number
   busy: boolean
   failure?: ResultExportFailure | null
+  exportNotice: string
   onRecover: (action: 'inventory' | 'plans' | 'pricing' | 'generation' | 'login' | 'support') => void
   onDownloadMaa?: () => void
   onDownloadFullResult?: () => void
@@ -66,14 +67,14 @@ export default function ResultExportDrawer({ open, onOpenChange, result, prepare
         <DialogDescription>{text.exportDescription}</DialogDescription>
       </div>
       <div className="v2-drawer-body v2-options-content v2-feature-content v2-export-content">
-        {onDownloadMaa && <section>
+        <section>
           <h3>{text.maaFile}</h3><p>{text.maaFileDescription}</p>
-          <button type="button" className="v2-button v2-button-primary" disabled={busy || isRotationMode} aria-busy={busy} onClick={onDownloadMaa}>
+          <p role="status">{exportNotice}</p>
+          {onDownloadMaa && <button type="button" className="v2-button v2-button-primary" disabled={busy || isRotationMode} aria-busy={busy} onClick={onDownloadMaa}>
             <Download size={16} />{busy ? copy.inventory.export_downloading : text.exportMaa}
-          </button>
-          {isRotationMode && <p className="v2-muted">{text.exportUnavailable}</p>}
-          {failure?.format === 'maa' && <ExportFailure failure={failure} busy={busy} onRetry={onDownloadMaa} onRecover={onRecover} />}
-        </section>}
+          </button>}
+          {failure?.format === 'maa' && onDownloadMaa && <ExportFailure failure={failure} busy={busy} onRetry={onDownloadMaa} onRecover={onRecover} />}
+        </section>
         <section>
           <h3>{text.scheduleImages}</h3><p>{text.scheduleImagesDescription}</p>
           <p className="v2-muted">{text.imageShift(prepared.plans[selected]?.name || text.shift(selected + 1))}</p>

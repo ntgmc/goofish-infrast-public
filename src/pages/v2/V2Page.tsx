@@ -67,7 +67,7 @@ export default function V2Page() {
   }
 
   return <SessionProviders session={session}><V2Dashboard session={session} result={SAMPLE_RESULT} operators={session.workspace?.operators ?? operators} config={activeConfig}
-    sample configChanged={changed} onUpdateConfig={updateConfig} onImportOperators={importOperators}
+    sample sampleOperators={!session.workspace?.operators && operators === SAMPLE_OPERATORS} configChanged={changed} onUpdateConfig={updateConfig} onImportOperators={importOperators}
     permission={permission} canEditConfig={!profile || hasCapability({ permission }, 'edit_full_config')}
     canUseIntermediateConfig={!profile || isFreePreviewProfile(profile) || hasCapability({ permission }, 'use_intermediate_auto_config')}
     canViewAnalysis={!profile || hasCapability({ kind: profile.kind, permission }, 'view_full_data')} /></SessionProviders>

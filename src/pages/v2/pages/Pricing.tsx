@@ -24,6 +24,7 @@ export default function Pricing() {
   const choice = text.pricing_choice
   const quota = productPolicies.free_preview
   const freeAvailable = features.free_preview && features.skland && features.schedule_generation
+  const redemptionAvailable = features.site && features.profiles && features.cdk_redemption
   const term = (label: string) => label.replace(/^单账号\s*/u, '').replace(/\s*CDK$/u, '')
   return <div className="v2-pricing-workspace">
     <p className="v2-lead">{choice.intro}</p>
@@ -67,8 +68,15 @@ export default function Pricing() {
         <p>{getSku(chosen).audience}</p>
         <p>{plan.summary}</p>
         <p>{text.pricing_archive_gift(chosen === 'single_account_lifetime' ? 3 : 1)}</p>
-        <p className="v2-muted">{plan.account_scope}</p>
-        {plan.purchase_url ? <a href={plan.purchase_url} target="_blank" rel="noopener noreferrer" className="v2-button v2-button-primary">{text.pricing_purchase_labels[chosen]}<ArrowUpRight size={16} aria-hidden="true" /></a> : <button disabled className="v2-button v2-button-primary">{text.pricing_purchase_unavailable}</button>}
+        <div className="v2-pricing-purchase">
+          <p id="pricing-purchase-terms">{plan.account_scope}<br />{text.pricing_redemption.activation}</p>
+          <p id="pricing-purchase-flow">{text.pricing_redemption.flow}</p>
+          <p className="v2-muted">{text.pricing_redemption.instructions}</p>
+          <div className="v2-actions">
+            {plan.purchase_url ? <a href={plan.purchase_url} target="_blank" rel="noopener noreferrer" aria-describedby="pricing-purchase-terms pricing-purchase-flow" className="v2-button v2-button-primary">{text.pricing_purchase_labels[chosen]}<ArrowUpRight size={16} aria-hidden="true" /></a> : <button disabled className="v2-button v2-button-primary">{text.pricing_purchase_unavailable}</button>}
+            {redemptionAvailable ? <Link to="/tool/redeem?mode=cdk" className="v2-button v2-button-secondary">{text.pricing_redemption.action}</Link> : <span className="v2-muted">{text.pricing_redemption.unavailable}</span>}
+          </div>
+        </div>
       </article>
     </section>
     <details className="v2-pricing-details">

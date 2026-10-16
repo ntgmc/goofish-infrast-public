@@ -150,9 +150,41 @@ describe('service status rules', () => {
     const estimate = calculateServiceStatusCostEstimate(config, buckets, '2026-08-02T00:00:00.000Z')
     expect(estimate).toMatchObject({
       observed_24h_worker_hours: 6,
+      observed_24h_resident_cost_cny: 4.8,
+      observed_24h_burst_cost_cny: 4.8,
       observed_24h_cost_cny: 9.6,
       projected_monthly_cost_cny: 288,
       observed_savings_cny: 14.4,
+    })
+  })
+
+  it('charges only resident usage when burst is stopped, even without a burst price', () => {
+    const config = { ...createDefaultServiceStatusCostConfig(), resident_hourly_price_cny: 0.2 }
+    const residentOnly = Array.from({ length: 24 }, (_, index) => historyBucketFromAggregate(aggregateServiceStatusSample(null, {
+      componentId: 'optimization', bucketStart: new Date(Date.UTC(2026, 7, 1, index)).toISOString(),
+      status: 'available', queued: 0, running: 0, workerConcurrency: 1, workerInstances: 0,
+      sampledAt: new Date(Date.UTC(2026, 7, 1, index, 5)).toISOString(),
+    })))
+    const to = '2026-08-02T00:00:00.000Z'
+    expect(calculateServiceStatusCostEstimate(config, residentOnly, to)).toMatchObject({
+      observed_24h_worker_hours: 0, observed_24h_sample_hours: 24,
+      observed_24h_resident_cost_cny: 4.8, observed_24h_burst_cost_cny: 0,
+      observed_24h_cost_cny: 4.8, observed_30d_cost_cny: 4.8,
+      projected_monthly_cost_cny: 144, estimated_monthly_cost_cny: 144,
+      observed_savings_cny: null,
+    })
+    const burstUsed = [{ ...residentOnly[0]!, average_worker_instances: 0.5 }]
+    expect(calculateServiceStatusCostEstimate(config, burstUsed, to)).toMatchObject({
+      observed_24h_resident_cost_cny: 0.2, observed_24h_burst_cost_cny: null,
+      observed_24h_cost_cny: null, projected_monthly_cost_cny: null,
+    })
+    expect(calculateServiceStatusCostEstimate({ ...config, resident_hourly_price_cny: null, hourly_price_cny: 0 }, burstUsed, to)).toMatchObject({
+      observed_24h_resident_cost_cny: null, observed_24h_burst_cost_cny: 0, observed_24h_cost_cny: null,
+    })
+    expect(calculateServiceStatusCostEstimate(config, [], to)).toMatchObject({
+      observed_24h_worker_hours: null, observed_24h_sample_hours: 0,
+      observed_24h_resident_cost_cny: null, observed_24h_burst_cost_cny: null,
+      observed_24h_cost_cny: null, projected_monthly_cost_cny: null,
     })
   })
 

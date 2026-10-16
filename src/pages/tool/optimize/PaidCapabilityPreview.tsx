@@ -40,7 +40,6 @@ export default function PaidCapabilityPreview({ onOpen, showScenarioLab }: { onO
           </div>
         ))}
       </dl>
-      <p className="mt-4 text-xs leading-5 text-ink-muted"><span className="font-medium">{text.trial_export}</span> · {text.trial_export_detail}</p>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-surface-3/60 pt-4">
         <p className="text-sm leading-6 text-ink-secondary">{text.conclusion}</p>
         {features.pricing && <Link to="/pricing" className="tool-primary-action">{text.compare}</Link>}

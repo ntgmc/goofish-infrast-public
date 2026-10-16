@@ -361,7 +361,7 @@ export const domainCopy = {
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_027: "排班方案已就绪",
   // src/components/result-panel/ResultPanel.tsx
-  components_result_panel_ResultPanel_028: "按下方结果设置完整的游戏内轮换。免费个人排班不包含导出和高级分析。",
+  components_result_panel_ResultPanel_028: "按下方结果设置完整的游戏内轮换，也可保存排班图片。免费版不支持 MAA 导出和高级分析。",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_030: "按下方预设队列在游戏内逐个设施设置，平时使用队列轮换的快速切换按钮。",
   // src/components/result-panel/ResultPanel.tsx

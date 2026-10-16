@@ -264,7 +264,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_012: "免费仓库估值和排班功能有什么区别？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_013: "仓库估值把库存换算为等效理智，帮助你了解材料价值。排班功能根据干员、房间、生产目标和策略生成方案及收益指标。下载 MAA JSON 需要相应档案权益、有效体验期或导出体验券；完整计算 JSON 是高级版提供的另一份分析和排障文件。",
+  pages_PublicInfoPage_013: "仓库估值把库存换算为等效理智，帮助你了解材料价值。排班功能根据干员、房间、生产目标和策略生成方案及收益指标。免费版可生成排班并保存图片，不支持 MAA JSON 下载；高级版可导出 MAA 排班模式的执行文件，也可下载用于分析和排障的完整计算 JSON。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_014: "授权或导入失败怎么办？",
   // src/pages/PublicInfoPage.tsx
@@ -455,11 +455,18 @@ export const publicCopy = {
     highlights: (hours: number, submissions: number) => [
       { label: "干员导入", free: "绑定森空岛 UID 后导入", paid: "森空岛或 MAA 识别文件" },
       { label: "排班生成", free: `每 ${hours} 小时可提交 ${submissions} 次，繁忙时排队`, paid: "有效期内不限次数，优先处理" },
-      { label: "MAA 导出", free: "高级体验期或导出体验券可用", paid: "维护权益内可用" },
+      { label: "MAA 导出", free: "不支持", paid: "维护权益内可用" },
       { label: "自定义配置", free: "使用基础基建预设", paid: "可调整完整排班配置" },
     ],
   },
   pricing_purchase_unavailable: "暂未开放购买",
+  pricing_redemption: {
+    flow: "前往闲鱼购买 → 获取 CDK → 回站兑换 → 绑定游戏账号",
+    instructions: "付款后在闲鱼获取 CDK，回站登录后兑换，再通过森空岛或 MAA 干员识别文件绑定游戏账号。",
+    activation: "权益在兑换成功后生效，限时方案随即开始连续计时。",
+    action: "已有 CDK，去兑换",
+    unavailable: "CDK 兑换暂未开放",
+  },
   pricing_archive_gift: (count: number) => `赠送 ${count} 个封存资格，绑定后自动生效${count === 1 ? '，续费不叠加' : ''}。`,
   pricing_recommendation_monthly: "尝鲜首选",
   pricing_recommendation_lifetime: "最多人选",
@@ -488,7 +495,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_085: "免费档案和付费维护卡有什么区别？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_086: "免费档案通过森空岛确认 UID 后领取，同一个游戏 UID 全站只能领取一次。可以生成并查看完整游戏内轮换；轻量 MAA JSON 可在有效高级体验期内或使用导出体验券下载，完整计算数据和高级分析需要高级权限。\n付费方案有 30 天尝鲜维护包、90 天版本维护卡、365 天年度维护卡和终身卡，均支持森空岛导入或 MAA 干员 JSON 初始化，并在有效期内提供完整高级能力。具体价格、期限和权益可查看“价格与权益”页。",
+  pages_PublicInfoPage_086: "免费档案通过森空岛确认 UID 后领取，同一个游戏 UID 全站只能领取一次。可以生成并查看完整游戏内轮换、保存排班图片；不支持 MAA JSON 下载，完整计算数据和高级分析需要高级权限。\n付费方案有 30 天尝鲜维护包、90 天版本维护卡、365 天年度维护卡和终身卡，均支持森空岛导入或 MAA 干员 JSON 初始化，并在有效期内提供完整高级能力。具体价格、期限和权益可查看“价格与权益”页。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_087: "森空岛授权后会立即保存账号吗？",
   // src/pages/PublicInfoPage.tsx
@@ -500,7 +507,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_091: "为什么结果页没有 MAA JSON 下载？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_092: "先检查排班模式，再检查当前档案的导出权益。MAA 排班模式才能生成 MAA JSON；游戏内轮换不生成该文件。正式档案需具备导出权益，免费档案可通过有效高级体验期或导出体验券使用。\n完整计算 JSON 是另一项高级版下载，用于分析普通历史、封存历史和轮换结果，不能导入 MAA。",
+  pages_PublicInfoPage_092: "先检查排班模式，再检查当前档案的导出权益。MAA 排班模式才能生成 MAA JSON；游戏内轮换不生成该文件。免费版不支持 MAA 导出，可保存排班图片；高级版支持导出 MAA 排班模式的执行文件。\n完整计算 JSON 是另一项高级版下载，用于分析普通历史、封存历史和轮换结果，不能导入 MAA。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_093: "MAA 排班和游戏内轮换有什么区别？",
   // src/pages/PublicInfoPage.tsx

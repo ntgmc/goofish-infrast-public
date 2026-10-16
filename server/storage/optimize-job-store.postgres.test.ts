@@ -245,6 +245,41 @@ describe('PostgreSQL optimization job admission', () => {
     }
   })
 
+  it('counts only burst workers for variable costs while retaining all live capacity', async () => {
+    const prefix = `billing-${randomUUID()}`
+    const workers = [
+      ['resident', ['runtime:ecs_worker', 'billing:resident', 'worker-claim-priority:10']],
+      ['legacy-resident', ['runtime:ecs_worker', 'worker-claim-priority:0']],
+      ['local', ['runtime:local_fallback']],
+      ['burst', ['runtime:ecs_worker', 'billing:burst', 'worker-claim-priority:0']],
+      ['legacy-burst', ['runtime:ecs_worker', 'worker-claim-priority:10']],
+    ] as const
+    try {
+      for (const [name, capabilities] of workers) {
+        await query(
+          `insert into optimize_worker_registry
+            (worker_id, concurrency, heartbeat_interval_ms, stale_after_ms, capabilities,
+             started_at, heartbeat_at, draining)
+           values ($1, 1, 10000, 30000, $2::text[], now(), now(), false)`,
+          [`${prefix}-${name}`, capabilities],
+        )
+      }
+      expect((await getAdminOptimizationQueueSnapshot()).capacity).toMatchObject({
+        worker_instances: 5, worker_concurrency: 5, billable_worker_instances: 2,
+      })
+      await query("update optimize_worker_registry set draining = true where worker_id = any($1::text[])", [[`${prefix}-burst`, `${prefix}-legacy-burst`]])
+      expect((await getAdminOptimizationQueueSnapshot()).capacity).toMatchObject({
+        worker_instances: 3, worker_concurrency: 3, billable_worker_instances: 0,
+      })
+      await query("update optimize_worker_registry set heartbeat_at = now() - interval '1 minute' where worker_id = $1", [`${prefix}-resident`])
+      expect((await getAdminOptimizationQueueSnapshot()).capacity).toMatchObject({
+        worker_instances: 2, worker_concurrency: 2, billable_worker_instances: 0,
+      })
+    } finally {
+      await query('delete from optimize_worker_registry where worker_id like $1', [`${prefix}-%`])
+    }
+  })
+
   it('allows exactly one concurrent free job without reserving a generation entitlement', async () => {
     const profileId = await seedProfile()
     const store = createPostgresOptimizeJobStore()

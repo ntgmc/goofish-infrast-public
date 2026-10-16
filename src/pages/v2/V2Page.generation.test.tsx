@@ -82,7 +82,7 @@ afterEach(() => {
 it('continues from login and Skland import through saved configuration to the first generation', async () => {
   const user = userEvent.setup()
   const firstWorkspace = { ...workspace, latest_result: null, result_history: [] }
-  const firstProfile: UserGameAccount = { ...profile, kind: 'free_preview', skland_binding: { uid: '12345678', nickname: '首次博士', channel_name: '官服',
+  const firstProfile: UserGameAccount = { ...profile, kind: 'free_preview', permission: 'growth', skland_binding: { uid: '12345678', nickname: '首次博士', channel_name: '官服',
     bound_at: profile.created_at, last_imported_at: profile.created_at, credential_status: 'available', credential_invalid_at: null, credential_invalid_reason: null } }
   const firstAuth = { ...auth, active_profile: firstProfile, profiles: [firstProfile], workspace: firstWorkspace }
   let signedIn = false
@@ -126,6 +126,7 @@ it('continues from login and Skland import through saved configuration to the fi
   await act(async () => saveConfig({ ...firstAuth, workspace: { ...firstWorkspace, config: patch.config } }))
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   expect(screen.getByRole('complementary', { name: copy.v2.firstSchedule.title }).querySelector('[aria-current="step"]')).toHaveTextContent(copy.v2.firstSchedule.generate)
+  expect(await screen.findByText(copy.optimize.maa_export.free)).toBeVisible()
   await user.click(await screen.findByRole('button', { name: copy.optimize.pages_tool_optimize_GenerateControlBar_030 }))
   await waitFor(() => expect(apiJson).toHaveBeenCalledWith('/api/optimization/jobs', expect.objectContaining({ method: 'POST' })))
   expect(vi.mocked(apiJson).mock.calls.filter(([url, options]) => url === '/api/optimization/jobs' && options?.method === 'POST')).toHaveLength(1)
@@ -311,8 +312,17 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and d
   await waitFor(() => expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('12,345')).toBeInTheDocument())
   expect(screen.queryByText(copy.common.components_ScheduleProgress_060)).not.toBeInTheDocument()
   await act(async () => refreshWorkspace({ ...auth, workspace: { ...workspace, latest_result: latest, result_history: [latest, previous] } }))
-  await within(screen.getByRole('region', { name: copy.v2.lmd })).findByText('比上次 -41,249.99 龙门币 / 天')
-  expect(screen.getByRole('region', { name: copy.v2.exp })).toHaveTextContent('比上次 -42,426.6 经验 / 天')
+  await waitFor(() => expect(screen.getByRole('region', { name: copy.v2.lmd })).toHaveTextContent('-41,249.99'))
+  expect(screen.queryByRole('region', { name: copy.v2.productionChanges })).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: copy.v2.comparePrevious }))
+  const comparison = within(await screen.findByRole('dialog', { name: copy.v2.resultComparison }))
+  const changes = within(comparison.getByRole('region', { name: copy.v2.productionChanges }))
+  await changes.findByText('-41,249.99 龙门币 / 天')
+  expect(changes.getByText('-42,426.6 经验 / 天')).toBeInTheDocument()
+  expect(comparison.getByRole('region', { name: copy.v2.resultConfigChanges })).toHaveTextContent(copy.v2.resultConfigUnchanged)
+  fireEvent.click(comparison.getByRole('button', { name: copy.v2.close }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  expect(screen.getByRole('button', { name: copy.v2.comparePrevious })).toHaveFocus()
   await waitFor(() => expect(screen.getByRole('button', { name: copy.v2.regenerate })).not.toBeDisabled())
   fireEvent.click(screen.getByRole('button', { name: copy.v2.facilities }))
   const unlockedDialog = await screen.findByRole('dialog')
@@ -321,11 +331,11 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and d
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   expect(vi.mocked(apiJson).mock.calls.filter(([url, options]) => url === '/api/optimization/jobs' && options?.method === 'POST'))
     .toHaveLength(mode === 'submitted' ? 1 : 0)
-  expect(vi.mocked(apiJson).mock.calls.some(([url]) => url.startsWith('/api/user/results/new-result?'))).toBe(false)
+  expect(vi.mocked(apiJson).mock.calls.filter(([url]) => url.startsWith('/api/user/results/new-result?'))).toHaveLength(1)
   fireEvent.click(screen.getByRole('button', { name: copy.v2.history }))
   const previousCard = (await screen.findByText('Previous schedule')).closest('.v2-record')!
   fireEvent.click(within(previousCard as HTMLElement).getByRole('button', { name: copy.optimize.pages_tool_optimize_PlansSection_030 }))
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   await waitFor(() => expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('53,595')).toBeInTheDocument())
-  expect(vi.mocked(apiJson).mock.calls.some(([url]) => url.startsWith('/api/user/results/new-result?'))).toBe(false)
-})
+  expect(vi.mocked(apiJson).mock.calls.filter(([url]) => url.startsWith('/api/user/results/new-result?'))).toHaveLength(1)
+}, 15_000)

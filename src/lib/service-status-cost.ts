@@ -28,44 +28,50 @@ export function calculateServiceStatusCostEstimate(
   const plannedDaily = calculatePlannedDailyWorkerHours(config)
   const residentPrice = Number.isFinite(config.resident_hourly_price_cny) ? config.resident_hourly_price_cny : null
   const burstPrice = Number.isFinite(config.hourly_price_cny) ? config.hourly_price_cny : null
-  const pricesConfigured = residentPrice !== null && burstPrice !== null
   const end = Date.parse(to)
   const observed24 = observedWorkerHours(buckets, 24, end)
   const observed30d = observedWorkerHours(buckets, HOURS_PER_MONTH, end)
-  const observed24Cost = !pricesConfigured || observed24 === null ? null : observedCost(observed24, residentPrice, burstPrice)
-  const observed30dCost = !pricesConfigured || observed30d === null ? null : observedCost(observed30d, residentPrice, burstPrice)
-  const projectedMonthly = !pricesConfigured || observed24 === null || observed24.sampleHours === 0
+  const resident24Cost = componentCost(observed24?.sampleHours ?? null, residentPrice)
+  const resident30dCost = componentCost(observed30d?.sampleHours ?? null, residentPrice)
+  const burst24Cost = componentCost(observed24?.workerHours ?? null, burstPrice)
+  const burst30dCost = componentCost(observed30d?.workerHours ?? null, burstPrice)
+  const observed24Cost = totalCost(resident24Cost, burst24Cost)
+  const observed30dCost = totalCost(resident30dCost, burst30dCost)
+  const projectedMonthly = observed24 === null
     ? null
-    : roundMoney((residentPrice + (observed24.workerHours / observed24.sampleHours) * burstPrice) * HOURS_PER_MONTH)
-  const observedSavings = !pricesConfigured || observed30d === null
+    : totalCost(componentCost(HOURS_PER_MONTH, residentPrice), componentCost(observed24.workerHours / observed24.sampleHours * HOURS_PER_MONTH, burstPrice))
+  const observedSavings = burstPrice === null || observed30d === null
     ? null
-    : roundMoney(Math.max(0,
-      observed30d.sampleHours * (residentPrice + burstPrice)
-      - observed30d.sampleHours * residentPrice
-      - observed30d.workerHours * burstPrice,
-    ))
+    : roundMoney(Math.max(0, observed30d.sampleHours - observed30d.workerHours) * burstPrice)
+  const estimatedDailyCost = totalCost(componentCost(24, residentPrice), componentCost(plannedDaily, burstPrice))
   return {
     observed_24h_worker_hours: observed24?.workerHours ?? null,
     observed_30d_worker_hours: observed30d?.workerHours ?? null,
     observed_24h_sample_hours: observed24?.sampleHours ?? 0,
     observed_30d_sample_hours: observed30d?.sampleHours ?? 0,
+    observed_24h_resident_cost_cny: resident24Cost,
+    observed_30d_resident_cost_cny: resident30dCost,
+    observed_24h_burst_cost_cny: burst24Cost,
+    observed_30d_burst_cost_cny: burst30dCost,
     observed_24h_cost_cny: observed24Cost,
     observed_30d_cost_cny: observed30dCost,
     projected_monthly_cost_cny: projectedMonthly,
     observed_savings_cny: observedSavings,
     planned_daily_worker_hours: plannedDaily,
     planned_monthly_worker_hours: roundHours(plannedDaily * 30),
-    estimated_daily_cost_cny: !pricesConfigured ? null : roundMoney(24 * residentPrice + plannedDaily * burstPrice),
-    estimated_monthly_cost_cny: !pricesConfigured ? null : roundMoney((24 * residentPrice + plannedDaily * burstPrice) * 30),
+    estimated_daily_cost_cny: estimatedDailyCost,
+    estimated_monthly_cost_cny: totalCost(componentCost(HOURS_PER_MONTH, residentPrice), componentCost(plannedDaily * 30, burstPrice)),
   }
 }
 
-function observedCost(
-  observed: { workerHours: number; sampleHours: number },
-  residentPrice: number,
-  burstPrice: number,
-): number {
-  return roundMoney(observed.sampleHours * residentPrice + observed.workerHours * burstPrice)
+function componentCost(hours: number | null, price: number | null): number | null {
+  if (hours === null) return null
+  if (hours === 0) return 0
+  return price === null ? null : roundMoney(hours * price)
+}
+
+function totalCost(resident: number | null, burst: number | null): number | null {
+  return resident === null || burst === null ? null : roundMoney(resident + burst)
 }
 
 export function recommendServiceStatusCostPlan(

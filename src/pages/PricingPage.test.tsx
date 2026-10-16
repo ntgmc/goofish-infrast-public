@@ -59,7 +59,7 @@ describe('PricingPage', () => {
     expect(screen.getByText('赠送 3 个封存资格，绑定后自动生效。')).toBeInTheDocument()
   })
 
-  it('links each plan to its own purchase URL and disables only cleared plans', () => {
+  it('links each plan to its purchase and redemption with nearby terms, disabling only cleared purchases', () => {
     const content = cloneDefaultPublicContentSettings()
     const ids = PUBLIC_PRICING_PLAN_IDS.filter((id) => id !== 'free_preview')
     const labels = ['购买 30 天', '购买 90 天', '购买 365 天', '购买终身卡']
@@ -73,7 +73,12 @@ describe('PricingPage', () => {
       expect(link).toHaveAttribute('href', `https://example.com/${id}`)
       expect(link).toHaveAttribute('target', '_blank')
       expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+      expect(link).toHaveAccessibleDescription(expect.stringContaining(content.pricing.plans[id].account_scope))
+      expect(link).toHaveAccessibleDescription(expect.stringContaining('权益在兑换成功后生效，限时方案随即开始连续计时。'))
     })
+    const redemptionLinks = screen.getAllByRole('link', { name: '已有 CDK，去兑换' })
+    expect(redemptionLinks).toHaveLength(4)
+    redemptionLinks.forEach((link) => expect(link).toHaveAttribute('href', '/tool/redeem?mode=cdk'))
     content.pricing.plans.single_account_half_year.purchase_url = ''
     rerender(<MemoryRouter><PricingPage /></MemoryRouter>)
     expect(screen.queryByRole('link', { name: '购买 90 天' })).not.toBeInTheDocument()
