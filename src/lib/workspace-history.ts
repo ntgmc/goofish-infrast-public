@@ -15,6 +15,7 @@ const PRODUCT_LABELS: Record<string, string> = {
   'Pure Gold': copy.common.lib_workspace_history_003,
   'Battle Record': copy.common.lib_workspace_history_004,
   'Originium Shard': copy.common.lib_workspace_history_005,
+  'Orirock Cube': copy.common.components_ConfigEditor_080,
 }
 
 const SCHEDULE_MODE_LABELS: Record<string, string> = {
