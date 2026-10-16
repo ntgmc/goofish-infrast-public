@@ -460,6 +460,13 @@ export const publicCopy = {
     ],
   },
   pricing_purchase_unavailable: "暂未开放购买",
+  pricing_redemption: {
+    flow: "前往闲鱼购买 → 获取 CDK → 回站兑换 → 绑定游戏账号",
+    instructions: "付款后在闲鱼获取 CDK，回站登录后兑换，再通过森空岛或 MAA 干员识别文件绑定游戏账号。",
+    activation: "权益在兑换成功后生效，限时方案随即开始连续计时。",
+    action: "已有 CDK，去兑换",
+    unavailable: "CDK 兑换暂未开放",
+  },
   pricing_archive_gift: (count: number) => `赠送 ${count} 个封存资格，绑定后自动生效${count === 1 ? '，续费不叠加' : ''}。`,
   pricing_recommendation_monthly: "尝鲜首选",
   pricing_recommendation_lifetime: "最多人选",

@@ -17,6 +17,7 @@ export default function PricingPage({ embedded = false }: { embedded?: boolean }
   const freePlan = pricing.plans.free_preview
   const cdkPlans = PUBLIC_PRICING_PLAN_IDS.filter((id) => id !== 'free_preview').map((id) => ({ id, ...pricing.plans[id] }))
   const featureState = useSiteFeatures()
+  const redemptionAvailable = featureState.features.site && featureState.features.profiles && featureState.features.cdk_redemption
   const metered = getMeteredBillingPolicy()
   const commercialTiers = metered.commercial.tiers.map((tier) => ({
     ...tier,
@@ -74,6 +75,7 @@ export default function PricingPage({ embedded = false }: { embedded?: boolean }
           <div className="mt-10 flex flex-col gap-8">
             <section aria-labelledby="single-account-pricing-title">
               <h2 id="single-account-pricing-title" className="text-xl font-semibold text-ink-primary">{copy.public.pages_PricingPage_012}</h2>
+              <p className="mt-3 text-sm leading-6 text-ink-secondary">{copy.public.pricing_redemption.instructions}</p>
               <div className="workspace-pricing-plans mt-7 grid grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2 xl:grid-cols-4">
                 {cdkPlans.map((plan) => (
                   <article key={plan.id} className="workspace-pricing-plan tool-panel relative flex min-w-0 flex-col p-5 pt-7" aria-labelledby={`${plan.id}-title`}>
@@ -91,21 +93,26 @@ export default function PricingPage({ embedded = false }: { embedded?: boolean }
                     <div className="workspace-pricing-description">
                     <p className="mt-4 whitespace-pre-line text-sm leading-7 text-ink-secondary">{plan.summary}</p>
                     <p className="mt-3 text-sm leading-6 text-ink-secondary">{copy.public.pricing_archive_gift(plan.id === 'single_account_lifetime' ? 3 : 1)}</p>
-                    <p className="mt-4 whitespace-pre-line border-t border-surface-3 pt-4 text-sm leading-6 text-ink-muted">{plan.account_scope}</p>
                     </div>
                     <div className="workspace-pricing-purchase mt-auto pt-5">
+                      <p id={`${plan.id}-purchase-terms`} className="whitespace-pre-line border-t border-surface-3 pt-4 text-sm leading-6 text-ink-secondary">{plan.account_scope}<br />{copy.public.pricing_redemption.activation}</p>
+                      <p id={`${plan.id}-purchase-flow`} className="mt-3 text-sm leading-6 text-ink-secondary">{copy.public.pricing_redemption.flow}</p>
                       {plan.purchase_url ? (
-                        <a href={plan.purchase_url} target="_blank" rel="noopener noreferrer" className="tool-primary-action flex w-full items-center justify-center whitespace-nowrap">
+                        <a href={plan.purchase_url} target="_blank" rel="noopener noreferrer" aria-describedby={`${plan.id}-purchase-terms ${plan.id}-purchase-flow`} className="tool-primary-action mt-4 flex w-full items-center justify-center whitespace-nowrap">
                           {copy.public.pricing_purchase_labels[plan.id]}
                         </a>
                       ) : (
-                        <button type="button" disabled className="tool-primary-action w-full whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50">{copy.public.pricing_purchase_unavailable}</button>
+                        <button type="button" disabled className="tool-primary-action mt-4 w-full whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50">{copy.public.pricing_purchase_unavailable}</button>
+                      )}
+                      {redemptionAvailable ? (
+                        <Link to="/tool/redeem?mode=cdk" className="tool-secondary-action mt-3 flex w-full items-center justify-center whitespace-nowrap">{copy.public.pricing_redemption.action}</Link>
+                      ) : (
+                        <p className="mt-3 text-center text-sm leading-6 text-ink-muted">{copy.public.pricing_redemption.unavailable}</p>
                       )}
                     </div>
                   </article>
                 ))}
               </div>
-              <p className="mt-5 border-t border-surface-3 pt-4 text-sm leading-6 text-ink-muted">{copy.public.pages_PricingPage_016}</p>
               <aside className="mt-5 rounded-lg border border-brand-500/25 bg-brand-500/5 p-5" aria-labelledby="lifetime-upgrade-title">
                 <h3 id="lifetime-upgrade-title" className="font-semibold text-ink-primary">{copy.public.pricing_upgrade_title}</h3>
                 <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.public.pricing_upgrade_description(pricing.lifetime_upgrade.service_fee)}</p>

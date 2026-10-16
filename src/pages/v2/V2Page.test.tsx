@@ -1514,6 +1514,43 @@ describe('V2 feature continuity', () => {
     expect(screen.queryByRole('button', { name: copy.public.pricing_purchase_unavailable })).not.toBeInTheDocument()
   })
 
+  it.each([true, false])('opens CDK redemption from pricing and retains the destination through login: signed in %s', async (signedIn) => {
+    const guest = session
+    const workflow = connect()
+    const authenticated = session
+    if (!signedIn) session = guest
+    const payload = { user: authenticated.user!, profiles: authenticated.profiles, active_profile: authenticated.activeProfile, workspace: null }
+    vi.mocked(session.applyAuthPayload).mockImplementation(() => { session = authenticated })
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => Response.json(
+      String(url) === '/api/auth/login' ? payload : { notifications: [], unread_count: 0, next_cursor: null },
+    ))
+    const user = userEvent.setup()
+    const page = mount(signedIn ? '/v2?section=pricing&profile_id=profile-1' : '/v2?section=pricing')
+    const redemption = await screen.findByRole('link', { name: copy.public.pricing_redemption.action })
+    expect(redemption).toHaveAttribute('href', signedIn ? '/v2?section=add-account&profile_id=profile-1&mode=cdk' : '/v2?section=add-account&mode=cdk')
+    await user.click(redemption)
+    if (!signedIn) {
+      const form = within((await screen.findByText(copy.v2.signInRequired)).parentElement!)
+      fireEvent.change(form.getByLabelText(copy.auth.components_AuthForm_011), { target: { value: 'doctor@example.test' } })
+      fireEvent.change(form.getByLabelText(copy.auth.components_AuthForm_012), { target: { value: 'password123' } })
+      await user.click(form.getAllByRole('button', { name: copy.auth.components_AuthForm_020 }).find((button) => button.getAttribute('type') === 'submit')!)
+      await waitFor(() => expect(session.applyAuthPayload).toHaveBeenCalledWith(payload))
+      page.rerender(<MemoryRouter><V2Page /><RouteLocation /></MemoryRouter>)
+    }
+    expect(await screen.findByRole('textbox', { name: 'CDK' })).toBeVisible()
+    expect(screen.getByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_005 })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('route-location')).toHaveTextContent('mode=cdk')
+    expect(fetch.mock.calls.some(([url]) => String(url).includes('/cdk/redeem'))).toBe(false)
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+  })
+
+  it('keeps redemption availability separate from purchase availability', async () => {
+    mocks.features.mockReturnValue({ status: 'ready', features: { ...DEFAULT_SITE_FEATURES, cdk_redemption: false }, retry: vi.fn() })
+    mount('/v2?section=pricing')
+    expect(await screen.findByText(copy.public.pricing_redemption.unavailable)).toBeVisible()
+    expect(screen.queryByRole('link', { name: copy.public.pricing_redemption.action })).not.toBeInTheDocument()
+  })
+
   it('opens full account settings inside V2 and shares the existing animation preferences', async () => {
     connect()
     const user = userEvent.setup()

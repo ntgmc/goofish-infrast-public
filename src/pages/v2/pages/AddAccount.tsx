@@ -1,4 +1,5 @@
 import { KeyRound } from 'lucide-react'
+import { useSearchParams } from 'react-router'
 import { copy } from '../../../copy'
 import type { AuthSuccessResponse } from '../../../lib/types'
 import SklandBindingDialog from '../../../components/SklandBindingDialog'
@@ -9,7 +10,8 @@ import { Field, Notice, SectionTitle } from '../components/WorkspaceUI'
 const text = copy.dashboard
 
 export default function AddAccount({ onAdded, onInventory, guided = false }: { onAdded: (payload: AuthSuccessResponse) => Promise<void>; onInventory: () => void; guided?: boolean }) {
-  const model = useAccountRedemption({ onRedeemed: (payload) => void onAdded(payload), onInventoryRedeemed: onInventory, preferPreview: true, autoStartTour: false })
+  const [params] = useSearchParams()
+  const model = useAccountRedemption({ onRedeemed: (payload) => void onAdded(payload), onInventoryRedeemed: onInventory, preferPreview: params.get('mode') !== 'cdk', autoStartTour: false })
   const choices = [
     ...(model.features.free_preview ? [{ id: 'preview' as const, label: text.pages_tool_dashboard_RedeemSection_006, description: text.pages_tool_dashboard_RedeemSection_007, icon: SklandIcon }] : []),
     ...(model.features.cdk_redemption ? [{ id: 'cdk' as const, label: text.pages_tool_dashboard_RedeemSection_005, description: text.pages_tool_dashboard_RedeemSection_003, icon: KeyRound }] : []),
