@@ -1,5 +1,6 @@
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
+import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
 import { formatAmount, type PreparedResult } from '../../components/result-panel/formatters'
 import { PRODUCT_LABELS, ROOM_LABELS } from '../../components/result-panel/labels'
 import { calculateProductionSanity } from '../../lib/production-sanity'
@@ -42,6 +43,18 @@ function stationProductionRows(daily: DailyProduction | undefined) {
   })
 }
 
+function ProductionAmount({ product, value }: { product: string; value: number }) {
+  return <span className="v2-product-amount"><ProductIcon product={product} size={20} />{outputLabel(product)} {amount(outputAmount(product, value))}</span>
+}
+
+export function RoomProduction({ daily, room, shift }: { daily: DailyProduction; room: BoardRoom; shift?: string }) {
+  const rows = stationProductionRows(daily).filter((row) => row.roomType === room.roomType && row.roomIndex === room.roomIndex + 1 && row.shift === shift)
+  if (!rows.length) return null
+  return <div><dt>{text.estimatedAmount}</dt><dd>{rows.map((row, index) => <div key={index}>
+    <ProductionAmount product={row.product} value={row.amount} />{row.drones && <span className="v2-neutral-tag">{text.drones}</span>}
+  </div>)}</dd></div>
+}
+
 export default function IncomeAnalysis({ result, prepared }: { result: OptimizeResult; prepared: PreparedResult }) {
   const daily = result.daily_production
   const rows = stationProductionRows(daily)
@@ -54,7 +67,7 @@ export default function IncomeAnalysis({ result, prepared }: { result: OptimizeR
         <tbody>{rows.map((row, index) => <tr key={index}>
           <th scope="row">{ROOM_LABELS[row.roomType]} {row.roomIndex}</th>
           <td>{row.shift}{row.drones && <span className="v2-neutral-tag">{text.drones}</span>}{row.capacityLimited && <small>{text.capacityLimited}</small>}</td>
-          <td><span className="v2-product-amount"><ProductIcon product={row.product} size={20} />{outputLabel(row.product)} {amount(outputAmount(row.product, row.amount))}</span></td>
+          <td><ProductionAmount product={row.product} value={row.amount} /></td>
           <td>{Object.entries(row.consume).map(([product, value]) => `${outputLabel(product)} ${amount(outputAmount(product, value))}`).join(' · ') || '—'}</td>
           <td>{row.sanity === null ? '—' : amount(row.sanity)}</td>
         </tr>)}</tbody></table>

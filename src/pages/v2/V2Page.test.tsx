@@ -574,6 +574,53 @@ describe('V2 results-first workspace', () => {
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
+  it('shows the selected room and shift output with the same units and drone amounts as income analysis', async () => {
+    const workflow = connect()
+    const result = structuredClone(SAMPLE_RESULT)
+    result.plans[0].name = '早班'
+    result.plans[1].name = '晚班'
+    result.daily_production = { hours: 24, source_hours: 16, normalization_factor: 1.5, details: [
+      { shift: '早班', room_type: 'manufacture', room_index: 1, product: 'Battle Record', amount: 32.4 },
+      { shift: '早班', room_type: 'manufacture', room_index: 1, product: 'Battle Record', source: 'drones', amount: 0.5 },
+      { shift: '早班', room_type: 'manufacture', room_index: 2, product: 'Pure Gold', amount: 999 },
+      { shift: '早班', room_type: 'trading', room_index: 1, product: 'LMD', amount: 2500 },
+      { shift: '晚班', room_type: 'manufacture', room_index: 1, product: 'Battle Record', amount: 7.5 },
+    ] }
+    workflow.historyItem = { result }
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getAllByRole('button', { name: /制造站/ })[0])
+    let dialog = within(await screen.findByRole('dialog'))
+    let output = within(dialog.getByText(copy.v2.estimatedAmount).parentElement!)
+    expect(output.getByText('经验 32,400')).toBeInTheDocument()
+    expect(output.getByText('经验 500')).toBeInTheDocument()
+    expect(output.getByText(copy.v2.drones)).toBeInTheDocument()
+    expect(output.queryByText(/999|2,500|7,500/)).not.toBeInTheDocument()
+    await dismissDrawer(user)
+    await user.click(screen.getByRole('tab', { name: /晚班/ }))
+    await user.click(screen.getAllByRole('button', { name: /制造站/ })[0])
+    dialog = within(await screen.findByRole('dialog'))
+    output = within(dialog.getByText(copy.v2.estimatedAmount).parentElement!)
+    expect(output.getByText('经验 7,500')).toBeInTheDocument()
+    expect(output.queryByText(copy.v2.drones)).not.toBeInTheDocument()
+    await dismissDrawer(user)
+    await user.click(screen.getAllByRole('button', { name: /贸易站/ })[0])
+    expect(within(await screen.findByRole('dialog')).queryByText(copy.v2.estimatedAmount)).not.toBeInTheDocument()
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+  })
+
+  it.each(['free', 'preview', 'sample', 'missing'] as const)('hides room production for %s results', async (restriction) => {
+    if (restriction !== 'sample') {
+      const workflow = connect()
+      if (restriction === 'free') workflow.userCanViewFullData = false
+      if (restriction === 'preview') workflow.historyItem = { result: { ...SAMPLE_RESULT, preview_limit: { room_limit: 1, hidden_room_count: 1, notice: 'Preview' } } }
+      if (restriction === 'missing') workflow.historyItem = { result: { ...SAMPLE_RESULT, daily_production: undefined } }
+    }
+    mount()
+    await userEvent.click(screen.getAllByRole('button', { name: /制造站/ })[0])
+    expect(within(await screen.findByRole('dialog')).queryByText(copy.v2.estimatedAmount)).not.toBeInTheDocument()
+  })
+
   it('compares the selected historical result with its predecessor and ignores a late response after switching results', async () => {
     const workflow = connect()
     const older = { ...summary, id: 'older', name: 'Older plan', created_at: '2026-09-30T10:00:00Z' }

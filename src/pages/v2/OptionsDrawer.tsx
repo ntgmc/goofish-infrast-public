@@ -15,7 +15,7 @@ import { validateScheduleConfig } from '../../lib/config'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
 import { extensibleLicenseOperatorsSchema } from '../../lib/workspace-validation'
-import type { LicenseConfig, LicenseOperator, PermissionMode } from '../../lib/types'
+import type { DailyProduction, LicenseConfig, LicenseOperator, PermissionMode } from '../../lib/types'
 import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
 import type { useToolSession } from '../tool/useToolSession'
 import { Avatar, roomLevelLabel } from './ScheduleBoard'
@@ -25,6 +25,7 @@ import type { SklandPayload } from '../../components/SklandBindingDialog'
 import ConfigSaveStatus from '../tool/workspace/ConfigSaveStatus'
 import V2Transition from './V2Transition'
 import BuildingSkills from './BuildingSkills'
+import { RoomProduction } from './IncomeAnalysis'
 import type { V2Section } from './navigation'
 
 const text = copy.v2
@@ -37,7 +38,7 @@ const titles: Record<OptionPanel, string> = {
 }
 
 export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigate, session, config, operators, onUpdateConfig, permission,
-  canEditConfig = true, canUseIntermediateConfig = true, configReadOnly = false, sample, busy, onImportOperators, onAccount, room, error, configDiffRows, hasPreviousResult, onConfirmConfig, confirmingConfig = false }: {
+  canEditConfig = true, canUseIntermediateConfig = true, configReadOnly = false, sample, busy, onImportOperators, onAccount, room, dailyProduction, shiftName, error, configDiffRows, hasPreviousResult, onConfirmConfig, confirmingConfig = false }: {
   panel: OptionPanel | null
   onClose: () => void
   onOpenProfile: (profile: V2Session['profiles'][number]) => Promise<void>
@@ -55,6 +56,8 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
   onImportOperators: (operators: LicenseOperator[]) => Promise<void>
   onAccount: () => void
   room: BoardRoom | null
+  dailyProduction?: DailyProduction
+  shiftName?: string
   error?: string | null
   configDiffRows?: ConfigDiffItem[]
   hasPreviousResult?: boolean
@@ -218,7 +221,8 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
             </section>
           })}</div>
           <dl className="v2-detail-data"><div><dt>{text.level}</dt><dd>{roomLevelLabel(room)}</dd></div>
-            <div><dt>{text.product}</dt><dd>{room.product}</dd></div><div><dt>{room.roomType === 'trading' ? text.equivalentEfficiency : text.efficiency}</dt><dd>{room.row?.efficiency ?? '—'}</dd></div></dl>
+            <div><dt>{text.product}</dt><dd>{room.product}</dd></div><div><dt>{room.roomType === 'trading' ? text.equivalentEfficiency : text.efficiency}</dt><dd>{room.row?.efficiency ?? '—'}</dd></div>
+            {dailyProduction && <RoomProduction daily={dailyProduction} room={room} shift={shiftName} />}</dl>
           <h3>{text.roomDetails}</h3><ul className="v2-room-detail-list">{room.row?.detailItems.map((item, index) => <li key={item}>{room.roomType === 'trading'
             ? index === 0 ? `${text.equivalentEfficiency} ${room.row?.efficiency}`
               : item.startsWith(copy.domain.components_result_panel_formatters_023) ? `${text.expectedFullOrders}${room.data?.overflow?.time}` : item
