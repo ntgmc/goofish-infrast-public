@@ -18,3 +18,4 @@ Mappings were checked against `Kengxxiao/ArknightsGameData`:
 | Originium Shard | 3141 | MTL_DIAMOND_SHD.png |
 | Orirock Cube | 30012 | MTL_SL_G2.png |
 | Sanity | AP_GAMEPLAY | AP_GAMEPLAY.png |
+| Headhunting Permit | 7003 | TKT_GACHA.png |

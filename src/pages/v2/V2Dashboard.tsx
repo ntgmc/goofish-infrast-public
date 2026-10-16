@@ -338,6 +338,8 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
         onUpdateConfig={onUpdateConfig} permission={permission} canEditConfig={canEditConfig} canUseIntermediateConfig={canUseIntermediateConfig}
         sample={sample} busy={busy} configReadOnly={workflow?.loading} onImportOperators={onImportOperators} configDiffRows={workflow?.configDiffRows} hasPreviousResult={Boolean(workflow?.latestWorkspaceResult)}
         onAccount={() => openPanel('account')} room={room} error={navigationError ?? error}
+        dailyProduction={!sample && canViewAnalysis && !result.preview_limit ? result.daily_production : undefined}
+        shiftName={result.plans[Math.min(shift, Math.max(result.plans.length - 1, 0))]?.name}
         onConfirmConfig={firstSchedule && section === 'generation' && session.license ? confirmConfig : undefined} confirmingConfig={confirmingConfig} />
       {session.user && features.profiles && <ProfileExpiryPrompt userId={session.user.id} profiles={session.cdkProfiles} onOpenExport={(profile) => { void (async () => {
         if ((manualDirty || toolDirty) && !window.confirm(text.discardManual)) return

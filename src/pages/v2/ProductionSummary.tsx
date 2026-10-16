@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ArrowRightLeft, Gem, Settings2 } from 'lucide-react'
+import { ArrowRightLeft, Settings2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/dialog'
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
@@ -101,7 +101,7 @@ export default function ProductionSummary({ result, prepared, sample, profileId,
         </button>
       </Metric>
       {isOrundum ? <Metric label={text.shortTermPulls} value={daily ? (orundum * 30 / 600).toFixed(1) : '—'} unit={text.pullsPer30Days}
-        icon={<Gem size={20} />}
+        icon={<img src="/assets/products/TKT_GACHA.png" alt="" width={24} height={24} decoding="async" />}
         hint={text.shortTermPullsHint(formatAmount(orundum), burstNote || (economy ? text.orundumOutputSustainable : text.orundumDurationUnavailable))} />
         : <Metric label={text.sanity} value={daily ? prepared.productionSanity.value.toFixed(2) : '—'} unit={text.sanityUnit}
           icon={<img src="/assets/products/AP_GAMEPLAY.png" alt="" width={24} height={24} decoding="async" />}
