@@ -519,6 +519,26 @@ describe('V2 results-first workspace', () => {
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
+  it.each([
+    [129.02, copy.v2.goldInventoryDuration('129')],
+    [0.5, copy.v2.goldInventoryToday],
+    [0, copy.v2.goldInventoryDepleted],
+    [null, copy.v2.goldInventoryUnknown],
+  ])('keeps gold consumption, inventory duration (%s days), and configuration together without requiring analysis access', async (days, hint) => {
+    const workflow = connect()
+    workflow.userCanViewFullData = false
+    workflow.historyItem = { result: { ...SAMPLE_RESULT, inventory_warnings: undefined,
+      intermediate_depletion: [{ product: 'Pure Gold', stock: 772, net_per_day: -5.98, days_remaining: days }],
+    } }
+    mount()
+    const gold = within(screen.getByRole('region', { name: copy.v2.goldNetChange }))
+    expect(gold.getByText('-5.98')).toBeInTheDocument()
+    expect(gold.getByText(hint)).toBeInTheDocument()
+    await userEvent.click(gold.getByRole('button', { name: new RegExp(copy.v2.adjustProduction) }))
+    expect(await screen.findByRole('dialog', { name: copy.v2.facilities })).toBeInTheDocument()
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+  })
+
   it('uses normalized backend station output and drone consumption without rescaling or averaging', async () => {
     const workflow = connect()
     workflow.historyItem = { result: { ...SAMPLE_RESULT, daily_production: {
@@ -560,7 +580,9 @@ describe('V2 results-first workspace', () => {
     const newer = { ...summary, id: 'newer', created_at: '2026-10-02T10:00:00Z' }
     workflow.resultHistory = [newer, summary, older]
     workflow.latestWorkspaceResult = newer
-    Object.assign(workflow.historyItem, { id: summary.id })
+    Object.assign(workflow.historyItem, { id: summary.id, config: SAMPLE_CONFIG })
+    workflow.activeConfig = normalizeConfig({ ...SAMPLE_CONFIG, layout: 'unsaved-draft' })
+    const priorConfig = normalizeConfig({ ...SAMPLE_CONFIG, drones: { ...SAMPLE_CONFIG.drones!, enable: false } })
     const priorResult = { ...SAMPLE_RESULT, daily_production: {
       trading: { LMD: 51000 }, manufacturing: { 'Battle Record': 30 }, net: { 'Pure Gold': -1 },
     } }
@@ -569,15 +591,25 @@ describe('V2 results-first workspace', () => {
     const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => String(url).startsWith('/api/user/results/older?')
       ? delayed : new Response(JSON.stringify({ notifications: [], unread_count: 0, next_cursor: null }), { status: 200 }))
     const page = mount()
+    const goldMetric = screen.getByRole('region', { name: copy.v2.goldNetChange })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: copy.v2.productionChanges })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: copy.v2.comparePrevious }))
     await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/user/results/older?profile_id=profile-1', expect.anything()))
     expect(screen.getByText(copy.v2.loadingPreviousProduction)).toBeInTheDocument()
-    await act(async () => finish(Response.json({ item: { ...older, result: priorResult } })))
-    expect(screen.getByRole('region', { name: copy.v2.lmd })).toHaveTextContent('比上次 +2,594.99 龙门币 / 天')
-    expect(screen.getByRole('region', { name: copy.v2.exp })).toHaveTextContent('比上次 +12,426.6 经验 / 天')
-    expect(screen.getByRole('region', { name: copy.v2.goldNetChange })).toHaveTextContent('比上次 -4.98 个 / 天')
-    expect(screen.getByRole('region', { name: copy.v2.sanity })).toHaveTextContent('比上次 +48.63 理智 / 天')
-    expect(screen.getByRole('region', { name: copy.v2.goldNetChange })).toHaveTextContent('-5.98')
-    expect(screen.getByText(/与上次方案「Older plan」/)).toBeInTheDocument()
+    await act(async () => finish(Response.json({ item: { ...older, config: priorConfig, result: priorResult } })))
+    const changes = screen.getByRole('region', { name: copy.v2.productionChanges })
+    expect(changes).toHaveTextContent('龙门币+2,594.99 龙门币 / 天')
+    expect(changes).toHaveTextContent('经验+12,426.6 经验 / 天')
+    expect(changes).toHaveTextContent('赤金净变化-4.98 个 / 天')
+    expect(changes).toHaveTextContent(`${copy.v2.sanity}+48.63 理智 / 天`)
+    expect(goldMetric).toHaveTextContent('-5.98')
+    const comparison = within(screen.getByRole('dialog', { name: copy.v2.resultComparison }))
+    expect(comparison.getByText(/与「Older plan」/)).toBeInTheDocument()
+    const configChanges = comparison.getByRole('region', { name: copy.v2.resultConfigChanges })
+    expect(configChanges).toHaveTextContent(copy.common.lib_workspace_history_024)
+    expect(configChanges).toHaveTextContent(copy.common.lib_workspace_history_037)
+    expect(configChanges).not.toHaveTextContent('unsaved-draft')
 
     let finishNew!: (response: Response) => void
     const delayedNew = new Promise<Response>((resolve) => { finishNew = resolve })
@@ -586,13 +618,38 @@ describe('V2 results-first workspace', () => {
     Object.assign(workflow.historyItem, { id: newer.id })
     page.rerender(<MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter>)
     await waitFor(() => expect(fetch).toHaveBeenCalledWith(`/api/user/results/${summary.id}?profile_id=profile-1`, expect.anything()))
-    expect(screen.queryByText(/比上次/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: copy.v2.productionChanges })).not.toBeInTheDocument()
     Object.assign(workflow.historyItem, { id: older.id, result: priorResult })
     page.rerender(<MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter>)
     expect(screen.getByText(copy.v2.noPreviousProduction)).toBeInTheDocument()
     await act(async () => finishNew(Response.json({ item: { ...summary, result: SAMPLE_RESULT } })))
-    expect(screen.queryByText(/比上次/)).not.toBeInTheDocument()
-    expect(screen.getByRole('region', { name: copy.v2.goldNetChange })).toHaveTextContent(copy.v2.goldDeficit)
+    expect(screen.queryByRole('region', { name: copy.v2.productionChanges })).not.toBeInTheDocument()
+    await dismissDrawer(userEvent.setup())
+    expect(screen.getByRole('region', { name: copy.v2.goldNetChange })).toHaveTextContent(copy.v2.goldInventoryDuration('129'))
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+  })
+
+  it('keeps yield comparisons available when reading the current saved configuration fails and retries the read', async () => {
+    const workflow = connect()
+    const older = { ...summary, id: 'older', created_at: '2026-09-30T10:00:00Z' }
+    workflow.resultHistory = [summary, older]
+    Object.assign(workflow.historyItem, { id: summary.id })
+    let configReads = 0
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).startsWith(`/api/user/results/${summary.id}?`)) {
+        configReads += 1
+        return Response.json(configReads === 1 ? { error: 'Read failed' } : { item: { ...summary, config: SAMPLE_CONFIG, result: SAMPLE_RESULT } }, { status: configReads === 1 ? 500 : 200 })
+      }
+      if (String(url).startsWith('/api/user/results/older?')) return Response.json({ item: { ...older, config: SAMPLE_CONFIG, result: SAMPLE_RESULT } })
+      return Response.json({ notifications: [], unread_count: 0, next_cursor: null })
+    })
+    mount()
+    await userEvent.click(screen.getByRole('button', { name: copy.v2.comparePrevious }))
+    await screen.findByText(copy.v2.resultConfigReadFailed)
+    expect(screen.getByRole('region', { name: copy.v2.productionChanges })).toHaveTextContent(copy.v2.sameAsPrevious)
+    await userEvent.click(within(screen.getByRole('region', { name: copy.v2.resultConfigChanges })).getByRole('button', { name: copy.v2.retry }))
+    await screen.findByText(copy.v2.resultConfigUnchanged)
+    expect(configReads).toBe(2)
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
@@ -600,21 +657,24 @@ describe('V2 results-first workspace', () => {
     const workflow = connect()
     const older = { ...summary, id: 'older', created_at: '2026-09-30T10:00:00Z' }
     workflow.resultHistory = [summary, older]
-    Object.assign(workflow.historyItem, { id: summary.id })
+    Object.assign(workflow.historyItem, { id: summary.id, config: SAMPLE_CONFIG })
     let historyReads = 0
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
       if (String(url).startsWith('/api/user/results/older?')) {
         historyReads += 1
-        return Response.json(historyReads === 1 ? { error: 'Read failed' } : { item: { ...older, result: { ...SAMPLE_RESULT, daily_production: undefined } } }, { status: historyReads === 1 ? 500 : 200 })
+        return Response.json(historyReads === 1 ? { error: 'Read failed' } : { item: { ...older, config: null, result: { ...SAMPLE_RESULT, daily_production: undefined } } }, { status: historyReads === 1 ? 500 : 200 })
       }
       return new Response(JSON.stringify({ notifications: [], unread_count: 0, next_cursor: null }), { status: 200 })
     })
     const page = mount()
+    await userEvent.click(screen.getByRole('button', { name: copy.v2.comparePrevious }))
     const failed = await screen.findByText(copy.v2.previousProductionFailed)
     await userEvent.click(within(failed.closest('p')!).getByRole('button', { name: copy.v2.retry }))
     await screen.findByText(copy.v2.previousProductionUnavailable)
+    expect(screen.getByRole('region', { name: copy.v2.resultConfigChanges })).toHaveTextContent(copy.v2.resultConfigUnavailable)
     expect(historyReads).toBe(2)
-    expect(screen.queryByText(/比上次/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: copy.v2.productionChanges })).toHaveTextContent(copy.v2.previousProductionUnavailable)
+    await dismissDrawer(userEvent.setup())
     workflow.historyItem = { result: { ...SAMPLE_RESULT, daily_production: undefined } }
     page.rerender(<MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter>)
     expect(screen.getByRole('region', { name: copy.v2.lmd })).toHaveTextContent('—')

@@ -7,7 +7,7 @@ import Link from '../../components/InternalLink'
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
 import { AnimatedValue, MotionNavIndicator, motionTokens } from '../../components/MotionPrimitives'
-import { formatAmount, formatIntermediateDepletionSummary, prepareResult } from '../../components/result-panel/formatters'
+import { formatAmount, prepareResult } from '../../components/result-panel/formatters'
 import { PRODUCT_LABELS } from '../../components/result-panel/labels'
 import InventoryDepletionWarning from '../../components/result-panel/InventoryDepletionWarning'
 import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
@@ -114,7 +114,6 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const resultMode = normalizeScheduleMode(result.schedule_mode)
   const configMode = normalizeScheduleMode(config.schedule_mode)
   const shortTermOrundum = prepared.orundumEconomy?.short_term_orundum ?? prepared.productionStats.orundum
-  const inventorySummary = resultMode !== 'rotation' ? formatIntermediateDepletionSummary(prepared.intermediateDepletion) : ''
   const hours = parseShiftHours(config.shift_hours) ?? [8, 8, 8]
   const profileName = session.activeProfile?.display_name
   const signedIn = Boolean(session.user)
@@ -275,7 +274,8 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           {generationProgress}
           {children}
           <ProductionSummary result={result} prepared={prepared} sample={sample} profileId={session.activeProfile?.id} resultId={exportResultId}
-            history={[...(workflow?.resultHistory ?? []), ...(workflow?.archivedResults ?? [])]} newResult={Boolean(workflow?.currentResult || workflow?.finalResult)} />
+            resultConfig={workflow?.historyItem?.result === result ? workflow.historyItem.config : undefined}
+            history={[...(workflow?.resultHistory ?? []), ...(workflow?.archivedResults ?? [])]} newResult={Boolean(workflow?.currentResult || workflow?.finalResult)} onConfigure={() => openPanel('config')} />
           <div className="v2-content-tabs" role="group" aria-label={text.resultTabs}>
             {([['schedule', text.scheduleTab], ['analysis', text.analysisTab], ...(showManual ? [['manual', text.manualTab] as const] : []), ...(restrictedPreview || !sample && (workflow?.suggestions?.length || result.upgrade_suggestions_status) ? [['training', text.trainingTab] as const] : [])] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => { setView(id); if (id === 'manual') setManualOpened(true) }}>
               {label}{view === id && <MotionNavIndicator layoutId="result-tab" variant="underline" />}
@@ -310,9 +310,6 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
                   return value !== 0 ? <OutputRow key={product} product={product} value={value} /> : null
                 })}
               </section>
-              {inventorySummary && <dl className="v2-inventory-summary" aria-label={text.intermediateInventory}>
-                <div><dt>{text.intermediateInventory}</dt><dd>{inventorySummary}</dd></div>
-              </dl>}
               <section className="v2-panel v2-config-panel">
                 <div className="v2-panel-heading"><h2>{text.currentConfig}</h2><button className="v2-text-button" type="button" onClick={() => openPanel('config')}>{text.edit}<ArrowUpRight size={13} /></button></div>
                 <div className="v2-layout-preview">
