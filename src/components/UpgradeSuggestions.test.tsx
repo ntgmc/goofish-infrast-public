@@ -51,7 +51,7 @@ describe('UpgradeSuggestions', () => {
     renderComponent([suggestion('upgrade-a', '干员 A', true)])
 
     const card = screen.getByRole('article')
-    expect(within(card).getAllByText('成本不完整')).toHaveLength(2)
+    expect(within(card).getByText('成本不完整')).toBeInTheDocument()
     expect(within(card).queryByText('材料已够')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '查看解释' }))
     expect(screen.getByText('目标干员数据不完整。')).toBeInTheDocument()
@@ -86,11 +86,11 @@ describe('UpgradeSuggestions', () => {
       operators: [],
     }
     const { rerender } = renderComponent([{ ...base, training_cost: cost }])
-    expect(screen.getAllByText('材料可合成')).toHaveLength(2)
+    expect(screen.getByText('材料可合成')).toBeInTheDocument()
     rerender(<UpgradeSuggestions suggestions={[{ ...base, training_cost: {
       ...cost, missing: { ...emptyBucket(), materials: [material] },
     } }]} />)
-    expect(screen.getAllByText('仍有缺口')).toHaveLength(2)
+    expect(screen.getByText('仍有缺口')).toBeInTheDocument()
   })
 
   it('keeps optimizer scores out of suggestion metrics and partial outcomes', async () => {
