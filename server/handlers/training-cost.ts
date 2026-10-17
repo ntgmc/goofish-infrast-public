@@ -1,4 +1,5 @@
-import levelData from './training-level-data.json'
+import levelData from '../../src/data/training-level-data.json'
+import { calculateTrainingCost } from '../../src/lib/training-ratio'
 import { allocateCultivationMaterials } from '../../src/lib/cultivation-planner'
 import type { LicenseOperator, UpgradeTrainingCost } from '../../src/lib/types'
 import { decryptSklandCredential, SklandClient } from './skland-client'
@@ -318,26 +319,15 @@ function calculateOperatorCost(
     }
   }
 
-  for (let phase = currentElite, level = currentLevel; phase <= targetElite; phase += 1) {
-    while (phase < targetElite && level < (maxLevels[phase] ?? level)) {
-      totals.exp += positiveArrayValue(LEVEL.characterExpMap[phase], level - 1)
-      totals.cash += positiveArrayValue(LEVEL.characterUpgradeCostMap[phase], level - 1)
-      level += 1
-    }
-    while (phase === targetElite && level < targetLevel) {
-      totals.exp += positiveArrayValue(LEVEL.characterExpMap[phase], level - 1)
-      totals.cash += positiveArrayValue(LEVEL.characterUpgradeCostMap[phase], level - 1)
-      level += 1
-    }
-    level = 1
-  }
+  const training = calculateTrainingCost({ rarity: rarity + 1, currentElite, currentLevel, targetElite, targetLevel }, LEVEL)
+  totals.exp = training.exp
+  totals.cash = training.lmd
 
   const evolveCosts = Array.isArray(characterCost.evolvePhaseCost) ? characterCost.evolvePhaseCost : []
   let status: OperatorCost['status'] = 'complete'
   let errorCode: OperatorCost['error_code']
   let missingPromotionMaterials = false
   for (let phase = currentElite; phase < targetElite; phase += 1) {
-    totals.cash += positiveArrayValue(LEVEL.evolveGoldCost[rarity], phase)
     const phaseCost = evolveCosts[phase]
     if (!isRecord(phaseCost) || !Array.isArray(phaseCost.items)) {
       if (rarity > 2) missingPromotionMaterials = true
@@ -677,11 +667,6 @@ function createItemMeta(value: unknown): Record<string, unknown> {
     return map
   }
   return ensureRecord(value)
-}
-
-function positiveArrayValue(values: number[] | undefined, index: number): number {
-  const value = values?.[index] ?? 0
-  return value > 0 ? value : 0
 }
 
 function normalizeRarity(value: number | null): number | null {

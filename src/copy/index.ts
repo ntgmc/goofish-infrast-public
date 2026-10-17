@@ -20,6 +20,7 @@ import { statusCopy } from './zh-CN/status'
 import { v2Copy } from './zh-CN/v2'
 import { feedbackCopy } from './zh-CN/feedback'
 import { cultivationProjectsCopy } from './zh-CN/cultivation-projects'
+import { trainingRatioCopy } from './zh-CN/training-ratio'
 
 export const CURRENT_LOCALE = 'zh-CN' as const
 
@@ -46,4 +47,5 @@ export const copy = {
   v2: v2Copy,
   feedback: feedbackCopy,
   cultivationProjects: cultivationProjectsCopy,
+  trainingRatio: trainingRatioCopy,
 } as const

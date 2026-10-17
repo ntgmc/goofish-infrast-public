@@ -7,6 +7,10 @@ export default function ToolsSection() {
   const { features } = useSiteFeatures()
   return (
     <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+      {features.tools && <Link to="/tools/training-ratio" className="tool-panel group overflow-hidden transition-colors hover:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+        <div aria-hidden="true" className="flex aspect-video items-center justify-center border-b border-surface-3 bg-surface-1 text-5xl font-semibold tabular-nums text-ink-primary">{copy.trainingRatio.referenceValue}</div>
+        <div className="p-5"><h2 className="text-lg font-semibold text-ink-primary">{copy.trainingRatio.title}</h2><p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.trainingRatio.description}</p></div>
+      </Link>}
       {features.cultivation_plan && <Link to="/tools/cultivation-plan" className="tool-panel group flex flex-col overflow-hidden transition-colors hover:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
         <div aria-hidden="true" className="flex aspect-video flex-col justify-center gap-3 border-b border-surface-3 bg-surface-1 px-8">
           {[76, 52, 32].map((width, index) => <div key={width} className="flex items-center gap-3"><span className="text-xs tabular-nums text-ink-muted">0{index + 1}</span><div className="h-3 rounded-sm bg-brand-400" style={{ width: `${width}%`, opacity: 1 - index * 0.25 }} /></div>)}

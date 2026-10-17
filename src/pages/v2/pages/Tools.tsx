@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarDays, CalendarClock, Gem } from 'lucide-react'
+import { ArrowRight, Calculator, CalendarDays, CalendarClock, Gem } from 'lucide-react'
 import { copy } from '../../../copy'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import { CONFIG_PRESETS } from '../../../lib/config'
@@ -15,6 +15,7 @@ import { Field, Notice, SectionTitle } from '../components/WorkspaceUI'
 export default function Tools({ profileId }: { profileId?: string }) {
   const { features } = useSiteFeatures()
   const tools = [
+    { section: 'training-ratio' as const, enabled: features.tools, icon: Calculator, title: copy.trainingRatio.title, description: copy.trainingRatio.description },
     { section: 'manual-tool' as const, enabled: features.manual_schedule, icon: CalendarClock, title: copy.tools.manualSchedule.title, description: copy.tools.manualSchedule.description },
     { section: 'cultivation-projects' as const, enabled: features.cultivation_plan, icon: CalendarDays, title: copy.cultivationProjects.title, description: copy.cultivationProjects.description },
     { section: 'cultivation' as const, enabled: features.cultivation_plan, icon: CalendarDays, title: copy.tools.cultivation.title, description: copy.tools.cultivation.description },

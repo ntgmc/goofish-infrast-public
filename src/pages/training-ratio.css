@@ -1,0 +1,57 @@
+/* Hallmark · component: inventory balance · genre: modern-minimal · theme: existing tokens
+ * states: editable, loading, error, empty, advice, focus, disabled
+ * Hallmark · pre-emit critique: P5 H4 E4 S5 R5 V4
+ */
+.training-ratio { min-width: 0; color: var(--color-ink); }
+.training-ratio--standalone { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+.training-ratio-header, .training-ratio-header > div { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.training-ratio-header { margin-bottom: 32px; }
+.training-ratio h1 { font-family: var(--font-display); font-size: 28px; font-weight: 650; }
+.training-ratio h2 { margin-bottom: 16px; font-family: var(--font-display); font-size: 18px; font-weight: 650; }
+.training-ratio h3 { margin: 20px 0 12px; font-size: 14px; font-weight: 650; }
+.training-ratio p { margin: 12px 0; color: var(--color-ink-2); font-size: 13px; line-height: 1.75; overflow-wrap: anywhere; }
+.training-ratio-lead { max-width: 65ch; }
+.training-ratio-reference { margin: 24px 0; padding: 16px 0; border-block: 1px solid var(--color-rule); }
+.training-ratio-reference > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 20px; }
+.training-ratio-reference strong { font-size: 30px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.training-ratio-reference span { font-size: 13px; }
+.training-ratio-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.training-ratio-inputs, .training-ratio-results { min-width: 0; padding: 24px; }
+.training-ratio button, .training-ratio select, .training-ratio input, .training-ratio-header a { min-height: 44px; }
+.training-ratio button { max-width: 100%; white-space: nowrap; }
+.training-ratio-link { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; color: var(--color-brand-primary); font-size: 13px; white-space: nowrap; }
+.training-ratio-link:hover { text-decoration: underline; }
+.training-ratio-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }
+.training-ratio-field { display: grid; min-width: 0; gap: 6px; font-size: 13px; }
+.training-ratio-field input, .training-ratio-field select { width: 100%; min-width: 0; font-variant-numeric: tabular-nums; }
+.training-ratio-check { display: flex; align-items: center; gap: 10px; min-height: 44px; margin: 8px 0; font-size: 13px; }
+.training-ratio-check input { flex: 0 0 auto; width: 18px; min-height: 18px; }
+.training-ratio-facts { min-width: 0; margin-top: 16px; font-size: 13px; }
+.training-ratio-facts > div { display: flex; justify-content: space-between; gap: 16px; padding-block: 10px; border-bottom: 1px solid var(--color-rule); }
+.training-ratio-facts dt { min-width: 0; color: var(--color-ink-2); overflow-wrap: anywhere; }
+.training-ratio-facts dd { flex-shrink: 0; max-width: 65%; margin: 0; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.training-ratio-verdict { padding: 16px 0; border-block: 1px solid var(--color-rule); }
+.training-ratio-verdict strong { font-size: 20px; line-height: 1.5; font-weight: 650; }
+.training-ratio .training-ratio-value { color: var(--color-ink); font-size: 24px; font-variant-numeric: tabular-nums; }
+.training-ratio .training-ratio-error { font-weight: 600; }
+.training-ratio-import { margin-top: 16px; }
+.training-ratio-manual { margin-top: 20px; padding-top: 8px; border-top: 1px solid var(--color-rule); }
+.training-ratio-manual summary { min-height: 44px; align-content: center; cursor: pointer; font-size: 13px; font-weight: 600; }
+.training-ratio-source { margin-top: -8px; }
+.training-ratio-supplement { margin-top: 16px; padding-top: 4px; border-top: 1px solid var(--color-rule); }
+.training-ratio-evidence { margin-top: 24px; padding: 12px 24px; }
+.training-ratio-evidence summary { min-height: 44px; align-content: center; cursor: pointer; font-size: 14px; font-weight: 600; }
+.training-ratio-table { overflow-x: auto; margin-block: 16px; }
+.training-ratio-table table { width: 100%; min-width: 540px; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.training-ratio-table th, .training-ratio-table td { padding: 12px; border-bottom: 1px solid var(--color-rule); text-align: right; white-space: nowrap; }
+.training-ratio-table th:first-child { text-align: left; }
+.training-ratio :is(button, a, input, select, summary):focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+@media (max-width: 60rem) {
+  .training-ratio-columns { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 40rem) {
+  .training-ratio-inputs, .training-ratio-results { padding: 16px; }
+  .training-ratio-evidence { padding-inline: 16px; }
+  .training-ratio-reference > div { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .training-ratio-header, .training-ratio-header > div { gap: 8px; }
+}

@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { prtsSnapshotSchema } from '../server/cultivation/catalog.ts'
-import levelData from '../server/handlers/training-level-data.json' with { type: 'json' }
+import levelData from '../src/data/training-level-data.json' with { type: 'json' }
 
 export const hashContent = (content) => createHash('sha256').update(typeof content === 'string' ? content : JSON.stringify(content)).digest('hex')
 
