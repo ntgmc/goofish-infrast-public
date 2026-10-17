@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Bell, LockKeyhole, ShieldCheck, SlidersHorizontal } from 'lucide-react'
+import { NotificationSettingsIcon as Bell, SecurityIcon as LockKeyhole, PersonalDataIcon as ShieldCheck, PreferencesIcon as SlidersHorizontal } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { AUTH_EMAIL_MAX_LENGTH, AUTH_PASSWORD_MAX_LENGTH } from '../../../lib/auth-constraints'
 import { useSiteFeatures } from '../../../lib/site-feature-context'

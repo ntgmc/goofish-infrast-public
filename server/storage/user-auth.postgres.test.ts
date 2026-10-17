@@ -457,6 +457,7 @@ describe('authentication data maintenance', () => {
       emailVerificationTokens: 500,
       freePreviewWorkspaces: 100,
       sklandPendingBindings: 0,
+      sklandSnapshots: 0,
     })
     expect(await runAuthDataMaintenance(now)).toEqual({
       expiredSessions: 1,
@@ -464,6 +465,7 @@ describe('authentication data maintenance', () => {
       emailVerificationTokens: 1,
       freePreviewWorkspaces: 1,
       sklandPendingBindings: 0,
+      sklandSnapshots: 0,
     })
     expect(await runAuthDataMaintenance(now)).toEqual({
       expiredSessions: 0,
@@ -471,6 +473,7 @@ describe('authentication data maintenance', () => {
       emailVerificationTokens: 0,
       freePreviewWorkspaces: 0,
       sklandPendingBindings: 0,
+      sklandSnapshots: 0,
     })
 
     expect(await getSessionByTokenHash('maintenance-session-active')).not.toBeNull()

@@ -4,6 +4,8 @@ import { closePool, query } from './postgres'
 import { migrateDatabaseSchema } from './schema'
 import { getOperationsOverview } from './operations-overview-store'
 import { createPostgresUsageEventStore } from './usage-store'
+import { listAdminUserAccountsPage } from './user-store'
+import type { OperationsCohort } from '../../src/lib/operations-drilldown'
 
 let container: PostgreSqlContainer
 const now = new Date('2030-02-01T08:00:00Z')
@@ -18,7 +20,7 @@ beforeAll(async () => {
     ['old', '2030-01-01T00:00:00Z', true],
   ] as const) {
     await query(`insert into user_accounts (id, email, password_hash, salt, iterations, permission, status, record_json, created_at, updated_at, email_verified_at)
-      values ($1, $1 || '@example.test', 'fixture', 'fixture', 1, 'recommended', 'active', '{}', $2, $2, $3)`, [id, created, verified ? created : null])
+      values ($1, $1 || '@example.test', 'fixture', 'fixture', 1, 'recommended', 'active', jsonb_build_object('id', $1::text), $2, $2, $3)`, [id, created, verified ? created : null])
     await query(`insert into user_game_accounts (id, user_id, permission, status, kind, display_name, note, record_json, created_at, updated_at)
       values ($1 || '-profile', $1, 'recommended', 'active', 'free_preview', 'fixture', '', '{}', $2, $2)`, [id, created])
   }
@@ -80,6 +82,33 @@ describe('business operations aggregates', () => {
     expect(JSON.stringify(data)).not.toContain('a-profile')
   })
 
+  it('opens the same cohorts as the report with pagination, progress and failure attribution', async () => {
+    const report = await getOperationsOverview('2030-01-20', '2030-01-31', now)
+    const cohorts: Array<[OperationsCohort, string[]]> = [
+      ['registered', ['a', 'b', 'c', 'pending']], ['successful', ['a', 'b', 'c', 'old']],
+      ['activation_missing_profile', []], ['activation_no_generation', ['b']], ['activated', ['a']],
+      ['reuse_missing', ['old']], ['reused', ['a']], ['maa_missing', ['a', 'c']], ['maa_exported', ['a', 'old']], ['failed', ['a']],
+    ]
+    for (const [cohort, ids] of cohorts) {
+      const page = await listAdminUserAccountsPage({ page: 1, pageSize: 100, search: '', operations: {
+        cohort, from: report.current.from, to: report.current.to, observed_at: report.generated_at,
+      } })
+      expect(page.users.map((user) => user.id).sort(), cohort).toEqual(ids)
+      expect(page.total, cohort).toBe(ids.length)
+      if (cohort === 'activated') expect(page.users[0]?.operations_progress).toMatchObject({ stage: 'activated', failure_reason: 'optimizer_runtime_error' })
+      if (cohort === 'activation_no_generation') expect(page.users[0]?.operations_progress).toMatchObject({ stage: 'no_generation', failure_reason: null })
+    }
+    const second = await listAdminUserAccountsPage({ page: 2, pageSize: 1, search: '', operations: {
+      cohort: 'registered', from: report.current.from, to: report.current.to, observed_at: report.generated_at,
+    } })
+    expect(second).toMatchObject({ total: report.current.registered_users, page: 2, totalPages: 4 })
+    expect(second.users).toHaveLength(1)
+    const noFailure = await listAdminUserAccountsPage({ page: 1, pageSize: 25, search: '', operations: {
+      cohort: 'failed', from: report.current.from, to: report.current.to, observed_at: report.generated_at, reason: 'validation_failed',
+    } })
+    expect(noFailure.total).toBe(0)
+  })
+
   it('keeps Shanghai ranges and fixed observation durations independent of the database session timezone', async () => {
     const expected = await getOperationsOverview('2030-01-20', '2030-01-31', now)
     try {
@@ -101,6 +130,14 @@ describe('business operations aggregates', () => {
     expect(data.current.reuse).toMatchObject({ eligible: 0, pending: 1, rate: null })
     const mature = await getOperationsOverview('2030-01-20', '2030-01-21', new Date('2030-01-27T16:00:00Z'))
     expect(mature.current.reuse).toMatchObject({ eligible: 1, pending: 0, reused: 1, rate: 100 })
+    const before = await listAdminUserAccountsPage({ page: 1, pageSize: 25, search: '', operations: {
+      cohort: 'reused', from: data.current.from, to: data.current.to, observed_at: data.generated_at,
+    } })
+    const after = await listAdminUserAccountsPage({ page: 1, pageSize: 25, search: '', operations: {
+      cohort: 'reused', from: mature.current.from, to: mature.current.to, observed_at: mature.generated_at,
+    } })
+    expect(before.total).toBe(data.current.reuse.reused)
+    expect(after.total).toBe(mature.current.reuse.reused)
   })
 
   it('preserves completed activation when the account verification timestamp later changes', async () => {

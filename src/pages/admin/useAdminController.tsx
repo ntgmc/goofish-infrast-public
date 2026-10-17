@@ -24,7 +24,7 @@ function errorMessage(value: unknown): string {
 
 export type AdminController = ReturnType<typeof useAdminController>
 
-export function useAdminController(section: AdminSection = 'overview') {
+export function useAdminController(section: AdminSection = 'overview', search = '') {
   const [adminUsername, setAdminUsername] = useState<string | null>(null)
   const [adminCapabilities, setAdminCapabilities] = useState<AdminCapability[]>([])
   const [lastSuccessfulSyncAt, setLastSuccessfulSyncAt] = useState<string | null>(null)
@@ -112,8 +112,8 @@ export function useAdminController(section: AdminSection = 'overview') {
 
   const userList = useAdminUserList({
     setBusyAction, setError, setNotice,
-    closeDetail: () => setSelectedUserDetail(null),
-  })
+    closeDetail: () => { detailRequest.current?.abort(); setSelectedUserDetail(null) },
+  }, section === 'users' ? search : '')
   const { setAppUsers, loadUsersPage, setSelectedUserIds, setUsersLoaded } = userList
 
   const cdkData = useAdminCdkData({ authenticated, capabilities: adminCapabilities, section, setError })
@@ -579,7 +579,7 @@ export function useAdminController(section: AdminSection = 'overview') {
       clearSelectedDetail: () => setSelectedCdkDetail(null), refresh: refreshAdminData,
     })
 
-  const loadUserDetail = async (user: AppUserSummary, profilePage = 1) => {
+  const loadUserDetail = async (user: Pick<AppUserSummary, 'id'>, profilePage = 1, profileId?: string) => {
       const controller = beginDetailRequest()
       const profilePageSize = selectedUserDetail?.user.id === user.id
         ? selectedUserDetail.profile_pagination?.page_size ?? 100
@@ -588,7 +588,7 @@ export function useAdminController(section: AdminSection = 'overview') {
       setError(null)
       try {
         const [data, balance] = await Promise.all([
-          apiJson<{ detail?: AdminUserDetail }>(`/api/admin/users?user_id=${encodeURIComponent(user.id)}&profile_page=${profilePage}&profile_page_size=${profilePageSize}`, {
+          apiJson<{ detail?: AdminUserDetail }>(`/api/admin/users?user_id=${encodeURIComponent(user.id)}&profile_page=${profilePage}&profile_page_size=${profilePageSize}${profileId ? `&profile_id=${encodeURIComponent(profileId)}` : ''}`, {
             fallbackMessage: '加载用户详情失败', signal: controller.signal,
           }),
           METERED_BILLING_AVAILABLE ? fetchAdminUserBalance(user.id) : Promise.resolve(null),

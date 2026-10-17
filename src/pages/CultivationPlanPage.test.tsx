@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CultivationPlanPage from './CultivationPlanPage'
 import Cultivation from './v2/pages/Cultivation'
 import type { CultivationData } from '../lib/cultivation-contract'
+import { copy } from '../copy'
 
-const mocks = vi.hoisted(() => ({ api: vi.fn(), session: vi.fn() }))
+const mocks = vi.hoisted(() => ({ api: vi.fn(), session: vi.fn(), snapshot: vi.fn(), refresh: vi.fn() }))
+vi.mock('../hooks/useSklandSnapshot', () => ({ useSklandSnapshot: mocks.snapshot }))
 vi.mock('../lib/api-client', () => ({ apiJson: mocks.api }))
 vi.mock('./tool/useToolSession', () => ({ useToolSession: mocks.session }))
 vi.mock('../components/ThemeSwitcher', () => ({ default: () => null }))
@@ -20,16 +22,31 @@ const sample = (): CultivationData => ({
 })
 
 beforeEach(() => {
+  localStorage.clear()
   vi.clearAllMocks()
+  mocks.snapshot.mockReturnValue({ data: null, busy: false, error: '', refresh: mocks.refresh })
   mocks.session.mockReturnValue({ authLoading: false, authStatus: 'authenticated', activeProfile: { id: 'one' }, profiles: [{ id: 'one', display_name: '档案一', status: 'active', skland_binding: {} }, { id: 'two', display_name: '档案二', status: 'active', skland_binding: {} }] })
   mocks.api.mockResolvedValue(sample())
 })
 afterEach(cleanup)
 
 describe('cultivation tool interactions', () => {
+  it('recalculates from shared snapshot versions without refreshing upstream or replacing input drafts', async () => {
+    mocks.snapshot.mockReturnValue({ data: { version: '1' }, busy: false, error: '', refresh: mocks.refresh })
+    const page = render(<MemoryRouter><CultivationPlanPage /></MemoryRouter>)
+    await screen.findByRole('heading', { name: '建议培养顺序' })
+    fireEvent.click(screen.getByText('规划条件'))
+    fireEvent.change(screen.getByRole('spinbutton', { name: '每日可用理智' }), { target: { value: '123' } })
+    mocks.snapshot.mockReturnValue({ data: { version: '2' }, busy: false, error: '', refresh: mocks.refresh })
+    page.rerender(<MemoryRouter><CultivationPlanPage /></MemoryRouter>)
+    await waitFor(() => expect(mocks.api).toHaveBeenCalledTimes(2))
+    expect(mocks.refresh).not.toHaveBeenCalled()
+    expect(screen.getByRole('spinbutton', { name: '每日可用理智' })).toHaveValue(123)
+  })
+
   it('recalculates recommendation order locally and leaves potions opt-in', async () => {
     render(<MemoryRouter><CultivationPlanPage /></MemoryRouter>)
-    fireEvent.click(screen.getByRole('button', { name: '导入森空岛练度与仓库' }))
+    fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
     await screen.findByRole('heading', { name: '建议培养顺序' })
     fireEvent.click(screen.getByText('规划条件'))
     expect(screen.getAllByRole('heading', { level: 3 })[0].textContent).toBe('银灰')
@@ -43,7 +60,7 @@ describe('cultivation tool interactions', () => {
 
   it('keeps the current plan while numeric fields are cleared and typed, then applies once', async () => {
     render(<MemoryRouter><CultivationPlanPage /></MemoryRouter>)
-    fireEvent.click(screen.getByRole('button', { name: '导入森空岛练度与仓库' }))
+    fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
     await screen.findByRole('heading', { name: '建议培养顺序' })
     fireEvent.click(screen.getByText('规划条件'))
     const budget = screen.getByRole('spinbutton', { name: '每日可用理智' })
@@ -67,7 +84,7 @@ describe('cultivation tool interactions', () => {
     ] }]
     mocks.api.mockResolvedValueOnce(input)
     render(<MemoryRouter><CultivationPlanPage /></MemoryRouter>)
-    fireEvent.click(screen.getByRole('button', { name: '导入森空岛练度与仓库' }))
+    fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
     await screen.findByRole('heading', { name: '仓库养成道具' })
     fireEvent.click(screen.getByText('规划条件'))
     fireEvent.click(screen.getByRole('button', { name: /材料自选包.*库存 2 份/ }))
@@ -85,7 +102,7 @@ describe('cultivation tool interactions', () => {
       stages: Array.from({ length: 1002 }, (_, index) => ({ id: `main_${index}`, name: `测试关卡${index}`, activity: '测试活动', category: '主线' })), professions: ['WARRIOR'] }
     mocks.api.mockResolvedValue(input)
     render(<MemoryRouter initialEntries={['/tools/cultivation-plan?cultivation_scope=history&cultivation_days=0']}><CultivationPlanPage /></MemoryRouter>)
-    fireEvent.click(screen.getByRole('button', { name: '导入森空岛练度与仓库' }))
+    fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
     await screen.findByRole('heading', { name: '建议培养顺序' })
     expect(mocks.api.mock.calls[0][1].json.recommendation).toMatchObject({ scope: 'history', days: 0 })
     fireEvent.click(screen.getByText('规划条件'))
@@ -115,7 +132,7 @@ describe('cultivation tool interactions', () => {
       stages: [{ id: 'main_01', name: '1-1', activity: '第一章', category: '主线' }], professions: [] }
     mocks.api.mockResolvedValue(input)
     render(<MemoryRouter>{v2 ? <Cultivation session={mocks.session()} /> : <CultivationPlanPage />}</MemoryRouter>)
-    fireEvent.click(screen.getByRole('button', { name: '导入森空岛练度与仓库' }))
+    fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
     const conditions = (await screen.findByText('规划条件')).closest('details')!
     expect(conditions.open).toBe(false)
     fireEvent.click(screen.getByText('规划条件'))
@@ -153,11 +170,34 @@ describe('cultivation tool interactions', () => {
     expect(rarity).toHaveValue('low')
   })
 
+  it.each([false, true])('imports selected cultivation targets with their skill levels into the chosen profile in V2=%s', async (v2) => {
+    mocks.session.mockReturnValue({ ...mocks.session(), user: { id: 'doctor' } })
+    const input = sample()
+    input.candidates[0].target = { ...input.candidates[0].target, elite: 2, level: 60, skill: 3, skillLevel: 10, moduleId: 'mod_x', moduleLevel: 3 }
+    input.candidates[0].skillId = 's3'
+    mocks.api.mockResolvedValue(input)
+    render(<MemoryRouter>{v2 ? <Cultivation session={mocks.session()} /> : <CultivationPlanPage />}</MemoryRouter>)
+    fireEvent.change(screen.getByRole('combobox', { name: '游戏档案' }), { target: { value: 'two' } })
+    fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
+    const button = await screen.findByRole('button', { name: copy.cultivationProjects.importBatch })
+    fireEvent.click(button)
+    expect(await screen.findByText(copy.cultivationProjects.imported(2, 0))).toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem('maatool:cultivation-projects:doctor:two')!)).toEqual([
+      { operatorId: 'a', elite: 2, level: 60, skill: 3, skillLevel: 10, paused: false, deadline: '' },
+      { operatorId: 'b', elite: 1, level: 1, skill: 1, skillLevel: 7, paused: false, deadline: '' },
+    ])
+    expect(localStorage.getItem('maatool:cultivation-projects:doctor:one')).toBeNull()
+    expect(screen.getByRole('link', { name: copy.cultivationProjects.openProjects })).toHaveAttribute('href', '/v2?section=cultivation-projects&profile_id=two')
+    expect(screen.getAllByText(copy.cultivationProjects.importScopeHint).length).toBeGreaterThan(0)
+    expect(mocks.api).toHaveBeenCalledOnce()
+  })
+
   it('discards a late response when the selected profile changes', async () => {
     let finish: (value: CultivationData) => void = () => {}
     mocks.api.mockImplementationOnce(() => new Promise<CultivationData>((resolve) => { finish = resolve }))
     render(<MemoryRouter><CultivationPlanPage /></MemoryRouter>)
-    fireEvent.click(screen.getByRole('button', { name: '导入森空岛练度与仓库' }))
+    fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
+    await waitFor(() => expect(mocks.api).toHaveBeenCalledOnce())
     fireEvent.change(screen.getByRole('combobox', { name: '游戏档案' }), { target: { value: 'two' } })
     await act(async () => finish(sample()))
     await waitFor(() => expect(screen.queryByRole('heading', { name: '建议培养顺序' })).not.toBeInTheDocument())

@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { Bell } from 'lucide-react'
+import { NotificationIcon as Bell } from './icons'
 import { useNavigate } from 'react-router'
 import { copy, CURRENT_LOCALE } from '../copy'
 import { apiJson, getApiErrorMessage } from '../lib/api-client'

@@ -12,6 +12,7 @@ import { copy } from '../../../copy/index'
 import { LockedResultPreview } from './PaidCapabilityPreview'
 import { recordDebugError } from '../../../lib/debug-diagnostics'
 import type { ResultPanelProps } from '../../../components/result-panel/types'
+import type { CultivationProjectScope } from '../../../lib/cultivation-project-import'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 
 
@@ -41,6 +42,7 @@ export default function ResultSection({
   fullDataAvailable = true,
   manualEditProfile,
   manualSimulationBaseline,
+  projectScope,
 }: {
   phase: OptimizePhase;
   historyItem: WorkspaceResultHistoryItem | null;
@@ -64,10 +66,11 @@ export default function ResultSection({
   fullDataAvailable?: boolean;
   manualEditProfile?: ResultPanelProps['manualEditProfile'];
   manualSimulationBaseline?: ResultPanelProps['manualSimulationBaseline'];
+  projectScope?: CultivationProjectScope;
 }) {
   const suggestionsSlot = suggestions.length > 0 ? (
     <Suspense fallback={<ResultFallback />}>
-      <UpgradeSuggestions suggestions={suggestions} embedded />
+      <UpgradeSuggestions suggestions={suggestions} embedded projectScope={projectScope} />
     </Suspense>
   ) : !canViewUpgradeSuggestions ? (
     <LockedCapabilityPreview

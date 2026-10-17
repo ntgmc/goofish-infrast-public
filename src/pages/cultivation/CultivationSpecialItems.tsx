@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from 'react'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLinkIcon as ExternalLink } from '../../components/icons'
 import { copy } from '../../copy/index'
 import type { CultivationData, CultivationOptions } from '../../lib/cultivation-contract'
 import { allocateCultivationMaterials, type buildCultivationPlan } from '../../lib/cultivation-planner'

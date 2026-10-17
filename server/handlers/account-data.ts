@@ -99,6 +99,7 @@ async function exportData(userId: string): Promise<Response> {
     commercialLimits,
     notifications,
     feedback,
+    sklandSnapshots,
   ] = await Promise.all([
     getUserById(userId),
     listProfileWorkspaces(profileIds),
@@ -249,12 +250,13 @@ async function exportData(userId: string): Promise<Response> {
              from commercial_account_limits where user_id = $1`, [userId]),
     exportUserNotifications(userId),
     query(`select id, category, message, image_type, encode(image_data, 'base64') as image_base64,
-                  status, result, created_at, public_updated_at as updated_at,
+                  status, result, context_json as context, created_at, public_updated_at as updated_at,
                   coalesce((select jsonb_agg(jsonb_build_object('actor', entry.actor, 'message', entry.message,
                     'previous_status', entry.previous_status, 'status', entry.status, 'created_at', entry.created_at)
                     order by entry.revision) from user_feedback_entries entry where entry.feedback_id = user_feedback.id
                     and (entry.message is not null or entry.status <> entry.previous_status)), '[]'::jsonb) as follow_up
              from user_feedback where user_id = $1 order by created_at asc, id asc`, [userId]),
+    query('select uid, version::text, record_json, updated_at from skland_snapshots where user_id = $1 order by uid', [userId]),
   ])
 
   const safeProfiles = profiles.map((profile) => {
@@ -281,6 +283,7 @@ async function exportData(userId: string): Promise<Response> {
     coverage: PERSONAL_DATA_EXPORT_COVERAGE,
     user: publicUser,
     profiles: safeProfiles,
+    skland_snapshots: sklandSnapshots.rows,
     workspaces: profileIds.map((profileId) => {
       const workspace = workspaceMap.get(profileId)
       return workspace ? {

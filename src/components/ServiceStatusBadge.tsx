@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, CircleX, RefreshCw } from 'lucide-react'
+import { ServiceAvailableIcon, ServiceBusyIcon, ServiceCongestedIcon, ServiceOverloadedIcon, ServiceScalingIcon, ServiceUnavailableIcon } from './icons'
 import { copy } from '../copy/index'
 import type { ServiceStatusLevel } from '../lib/service-status'
 
@@ -21,10 +21,17 @@ const STATUS_COMPONENT_LABELS: Record<ServiceStatusLevel, string> = {
 }
 
 export default function ServiceStatusBadge({ level, compact = false }: { level: ServiceStatusLevel; compact?: boolean }) {
-  const Icon = level === 'unavailable' ? CircleX : level === 'available' || level === 'busy' ? CircleCheck : level === 'scaling' ? RefreshCw : CircleAlert
+  const Icon = {
+    available: ServiceAvailableIcon,
+    scaling: ServiceScalingIcon,
+    busy: ServiceBusyIcon,
+    congested: ServiceCongestedIcon,
+    overloaded: ServiceOverloadedIcon,
+    unavailable: ServiceUnavailableIcon,
+  }[level]
   return (
     <span className={`service-status-badge service-status-badge--${level} ${compact ? 'service-status-badge--compact' : ''}`}>
-      <Icon aria-hidden="true" className={`size-4 shrink-0 ${level === 'scaling' ? 'animate-spin motion-reduce:animate-none' : ''}`} />
+      <Icon aria-hidden="true" className="size-4 shrink-0" />
       <span>{compact ? STATUS_COMPONENT_LABELS[level] : STATUS_LABELS[level]}</span>
     </span>
   )

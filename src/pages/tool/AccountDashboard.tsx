@@ -1,7 +1,7 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
 import { LayoutGroup } from 'motion/react'
 import { Link } from 'react-router'
-import { ArrowUpRight } from 'lucide-react'
+import { WorkspaceEntryIcon as ArrowUpRight } from '../../components/icons'
 import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
 import CompactHeaderMenu from '../../components/CompactHeaderMenu'
@@ -201,7 +201,7 @@ export default function AccountDashboard({
               />
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <FeedbackButton iconOnly />
+              <FeedbackButton iconOnly profileId={activeProfile?.id} />
               <NotificationBell iconOnly />
               <ThemeSwitcher iconOnly />
             </div>
@@ -230,7 +230,7 @@ export default function AccountDashboard({
               >
                 {copy.dashboard.pages_tool_AccountDashboard_tour_001}
               </button>
-              <FeedbackButton />
+              <FeedbackButton profileId={activeProfile?.id} />
               <NotificationBell />
               <ThemeSwitcher />
             </div>

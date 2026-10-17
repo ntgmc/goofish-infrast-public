@@ -3,6 +3,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import FeedbackButton from './FeedbackDialog'
+import { MemoryRouter } from 'react-router'
+import { FeedbackLink } from './PublicFooter'
 import { copy } from '../copy'
 
 const mocks = vi.hoisted(() => ({ api: vi.fn(), prepareImage: vi.fn() }))
@@ -30,6 +32,22 @@ it('preserves the draft after failure, submits the chosen category, and clears i
   await waitFor(() => expect(screen.getByRole('button', { name: copy.feedback.title })).toHaveFocus())
   await user.click(screen.getByRole('button', { name: copy.feedback.title }))
   expect(screen.getByLabelText(copy.feedback.message)).toHaveValue('')
+})
+
+it('opens website feedback and submits only the context the user chose to attach', async () => {
+  mocks.api.mockResolvedValue({ id: 'feedback' })
+  const user = userEvent.setup()
+  render(<MemoryRouter><FeedbackButton profileId="profile-42" /><FeedbackLink /></MemoryRouter>)
+  expect(screen.getByRole('link', { name: copy.feedback.submit })).toHaveAttribute('href', '/v2?feedback=new')
+  await user.click(screen.getByRole('link', { name: copy.feedback.submit }))
+  expect(screen.getByRole('dialog', { name: copy.feedback.title })).toBeVisible()
+  await user.click(screen.getByLabelText(copy.feedback.attachProfile))
+  fireEvent.change(screen.getByLabelText(copy.feedback.resultId), { target: { value: 'result-42' } })
+  fireEvent.change(screen.getByLabelText(copy.feedback.jobId), { target: { value: 'job-42' } })
+  fireEvent.change(screen.getByLabelText(copy.feedback.message), { target: { value: '这个结果存在问题' } })
+  await user.click(screen.getByRole('button', { name: copy.feedback.submit }))
+  await screen.findByText(copy.feedback.submitted)
+  expect(mocks.api).toHaveBeenCalledWith('/api/user/feedback', expect.objectContaining({ json: { category: 'schedule', message: '这个结果存在问题', context: { profile_id: 'profile-42', result_id: 'result-42', job_id: 'job-42' } } }))
 })
 
 it('opens the saved feedback, keeps a failed follow-up draft, and blocks dismissal while sending', async () => {

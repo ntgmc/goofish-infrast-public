@@ -1,4 +1,4 @@
-import { ChevronDown, Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
+import { ExpandIcon as ChevronDown, SystemThemeIcon as Monitor, DarkThemeIcon as Moon, LightThemeIcon as Sun, type LucideIcon } from './icons'
 import { useState } from 'react'
 import { copy } from '../copy'
 import { ThemeProvider, useOptionalTheme, useTheme, type ThemePreference } from '../lib/theme'

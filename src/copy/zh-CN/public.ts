@@ -268,11 +268,11 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_014: "授权或导入失败怎么办？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_015: "记录报错时间和提示，检查网络、森空岛登录状态，以及所选角色是否与当前档案的 UID 一致。授权过期或凭据失效时，重新授权同一账号；森空岛暂时不可用时，稍后重试。仍然失败的话，请带上操作步骤和遮盖个人信息的报错截图到 QQ 群反馈。",
+  pages_PublicInfoPage_015: "记录报错时间和提示，检查网络、森空岛登录状态，以及所选角色是否与当前档案的 UID 一致。授权过期或凭据失效时，重新授权同一账号；森空岛暂时不可用时，稍后重试。仍然失败的话，请通过网站反馈提交操作步骤和遮盖个人信息的报错截图。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_016: "如何删除我的账号和数据？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_017: "在账号设置中选择“注销账号”，按提示填写邮箱和当前密码。提交后会显示注销时间并立即退出登录；7 天内重新登录会自动取消注销，到期后永久删除账号、档案、工作区、授权信息及相关常规数据。安全风控记录和个人使用声明记录按隐私政策中的期限保留。\n无法自行操作时，可以到 MaaTool 官方 QQ 群申请协助，处理前可能需要核验身份。请勿在群内发送密码、完整 CDK、二维码、Cookie 或森空岛凭据。",
+  pages_PublicInfoPage_017: "在账号设置中选择“注销账号”，按提示填写邮箱和当前密码。提交后会显示注销时间并立即退出登录；7 天内重新登录会自动取消注销，到期后永久删除账号、档案、工作区、授权信息及相关常规数据。安全风控记录和个人使用声明记录按隐私政策中的期限保留。\n无法自行操作时，可以通过网站反馈申请协助，处理前可能需要核验身份。请勿提交密码、完整 CDK、二维码、Cookie 或森空岛凭据。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_018: "我们处理的信息",
   // src/pages/PublicInfoPage.tsx
@@ -292,7 +292,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_026: "数据保存在提供服务所需的系统中。我们通过访问控制、密码安全存储、登录保护和加密传输降低未经授权访问的风险，但任何网络服务均无法保证绝对安全。",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_027: "你可以通过 QQ 群联系 MaaTool 官方，咨询、更正或申请删除账号及相关工作台数据。为保护账号安全，处理前可能需要完成必要的身份核验。",
+  pages_PublicInfoPage_027: "你可以通过网站反馈联系 MaaTool 官方，咨询、更正或申请删除账号及相关工作台数据。为保护账号安全，处理前可能需要完成必要的身份核验。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_028: "服务说明",
   // src/pages/PublicInfoPage.tsx
@@ -330,11 +330,11 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_045: "从注册、导入到排班和导出，遇到问题可以在这里查找处理方法。输入关键词，也能搜索答案中的内容。",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_046: "联系客服",
+  pages_PublicInfoPage_046: "反馈",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_047: "MaaTool 交流群",
+  pages_PublicInfoPage_047: "MaaTool 反馈",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_048: "加入 QQ 群获取使用帮助、反馈问题或申请删除账号及工作台数据。",
+  pages_PublicInfoPage_048: "在网站提交问题、补充信息，查看回复和处理进度。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_049: "隐私政策",
   // src/pages/PublicInfoPage.tsx
@@ -360,7 +360,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_060: "公开页面导航",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_061: "客服",
+  pages_PublicInfoPage_061: "反馈",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_062: "返回首页",
   // src/pages/PublicInfoPage.tsx
@@ -370,11 +370,11 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_065: "还没找到答案？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_066: "可以到 QQ 交流群反馈。请说明在哪个页面、做了哪些操作、出现什么提示，并附上遮盖个人信息的截图。",
+  pages_PublicInfoPage_066: "通过网站提交问题描述、操作步骤和截图，并在“我的反馈”查看回复和处理进度。",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_067: "加入 MaaTool 交流群",
+  pages_PublicInfoPage_067: "通过网站反馈问题",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_068: "可以在群内反馈问题、查看公告或申请删除账号和工作台数据。反馈前请查看常见问题，并准备好出错时的操作步骤。",
+  pages_PublicInfoPage_068: "登录后提交反馈，可附带当前档案、结果或任务编号。后续回复和处理进度可在“我的反馈”查看；需要补充信息时，直接在原反馈中回复。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_069: "反馈前请准备",
   // src/pages/PublicInfoPage.tsx
@@ -384,7 +384,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_072: "浏览器、MAA 或游戏相关版本信息",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_073: "不要在群内发送",
+  pages_PublicInfoPage_073: "请勿提交敏感信息",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_074: "登录密码、CDK 或订单完整信息",
   // src/pages/PublicInfoPage.tsx
@@ -394,7 +394,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_077: "联系我们",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_078: "对页面内容或数据处理有疑问时，请通过 MaaTool QQ 群联系我们。",
+  pages_PublicInfoPage_078: "对页面内容或数据处理有疑问时，请通过网站反馈联系我们。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_101: "行为风控与保留期限",
   // src/pages/PublicInfoPage.tsx
@@ -422,7 +422,7 @@ export const publicCopy = {
   // src/pages/PricingPage.tsx
   pages_PricingPage_009: "售后与申诉",
   // src/pages/PricingPage.tsx
-  pages_PricingPage_010: "联系客服",
+  pages_PricingPage_010: "提交反馈",
   // src/pages/PricingPage.tsx
   pages_PricingPage_011: "返回首页",
   // src/pages/PricingPage.tsx
@@ -472,8 +472,8 @@ export const publicCopy = {
   pricing_recommendation_lifetime: "最多人选",
   pricing_upgrade_title: "补差价升级终身卡",
   pricing_upgrade_description: (serviceFee: string) => `30 天、90 天和 365 天维护卡均可升级为同一游戏账号的终身卡。补款按终身卡当前售价减原订单实付金额计算，另收 ${serviceFee}手续费。`,
-  pricing_upgrade_process: "先联系客服核对原订单和补款金额，再到闲鱼拍下升级商品。付款后，客服会为原游戏账号升级权限。",
-  pricing_upgrade_contact: "联系客服确认补款",
+  pricing_upgrade_process: "先提交反馈核对原订单和补款金额，再到闲鱼拍下升级商品。付款后，我们会为原游戏账号升级权限。",
+  pricing_upgrade_contact: "提交反馈确认补款",
   pricing_upgrade_purchase: "前往闲鱼补差价",
   pricing_upgrade_unavailable: "升级商品待上架",
   // src/pages/PricingPage.tsx
@@ -515,7 +515,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_095: "绑定后可以自行更换游戏 UID 吗？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_096: "绑定后不能自行更换 UID。免费档案和各类付费维护卡都用于同一个游戏账号，通过森空岛或 JSON 初始化均适用。预览时发现角色选错，可以返回重新选择；已经确认绑定或遇到异常拦截时，请到官方 QQ 群申请人工核验，不要反复导入其他账号。",
+  pages_PublicInfoPage_096: "绑定后不能自行更换 UID。免费档案和各类付费维护卡都用于同一个游戏账号，通过森空岛或 JSON 初始化均适用。预览时发现角色选错，可以返回重新选择；已经确认绑定或遇到异常拦截时，请通过网站反馈申请人工核验，不要反复导入其他账号。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_097: "MaaTool 如何保护账号和授权数据？",
   // src/pages/PublicInfoPage.tsx
@@ -532,24 +532,24 @@ export const publicCopy = {
   faq_search_results: (count: number) => `找到 ${count} 个相关问题`,
   faq_total: (count: number) => `共 ${count} 个问题，点击问题查看答案`,
   faq_search_empty: "没有找到相关问题",
-  faq_search_empty_hint: "换个关键词试试，也可以到下方的 QQ 交流群反馈。",
+  faq_search_empty_hint: "换个关键词试试，也可以通过下方入口提交反馈。",
   faq_additional_items: [
     { id: 'registration', question: '注册时必须填写 CDK 或邀请码吗？', answer: 'CDK 可以留空，注册后再领取免费档案或兑换正式档案。邀请码是否必填取决于当前注册规则；需要邀请码时，注册页会提示。完成邮箱验证后，再按页面提示进入工作台。' },
-    { id: 'password-reset', question: '忘记登录密码，或收不到验证邮件怎么办？', answer: '忘记密码时，从登录页申请密码重置邮件。收不到邮件时，先核对邮箱地址并查看垃圾邮件；链接过期后重新申请。若仍无法收到邮件，请到 QQ 群反馈，不要发送密码或邮件中的完整验证链接。' },
+    { id: 'password-reset', question: '忘记登录密码，或收不到验证邮件怎么办？', answer: '忘记密码时，从登录页申请密码重置邮件。收不到邮件时，先核对邮箱地址并查看垃圾邮件；链接过期后重新申请。若仍无法收到邮件，请通过网站反馈申请协助，不要提交密码或邮件中的完整验证链接。' },
     { id: 'multiple-profiles', question: '一个 MaaTool 账号能管理多个游戏账号吗？', answer: '可以在账号列表中分别添加游戏账号档案，并在操作前确认当前档案。每份维护卡只用于一个游戏 UID，各档案的数据、配置和结果分别保存；同一个游戏 UID 的免费档案全站只能领取一次。可添加的数量以账号页提示为准。' },
     { id: 'free-limits', question: '免费排班有次数限制吗？为什么提示稍后再试？', answer: '免费档案每 6 小时可提交 2 次完整个人排班，同一档案同时只能有一份进行中的计算。次数用完或已有计算时，按页面提示等待。免费排班在空闲时自动开始，繁忙时会排队。' },
     { id: 'profile-upgrade', question: '免费档案升级付费版后，需要重新导入吗？', answer: '在原档案上升级 CDK 权益，可以保留干员、森空岛绑定、基建配置和历史记录。兑换前确认目标档案，升级后检查权益状态即可；如果游戏数据已经变化，仍需刷新数据再排班。' },
-    { id: 'profile-expiry', question: '维护卡或高级体验到期后怎么办？会自动续费吗？', answer: '30 天、90 天和 365 天维护卡为一次性预付，不自动续费。正式档案到期后需续期才能继续使用；免费档案的高级体验结束后恢复免费预览权限。到期前请下载需要保留的结果和备份，续期方式可到官方 QQ 群咨询。终身卡用于服务持续提供且授权正常时，长期维护同一游戏账号。' },
+    { id: 'profile-expiry', question: '维护卡或高级体验到期后怎么办？会自动续费吗？', answer: '30 天、90 天和 365 天维护卡为一次性预付，不自动续费。正式档案到期后需续期才能继续使用；免费档案的高级体验结束后恢复免费预览权限。到期前请下载需要保留的结果和备份，续期方式可通过网站反馈咨询。终身卡用于服务持续提供且授权正常时，长期维护同一游戏账号。' },
     { id: 'lifetime-upgrade', question: '已有维护卡，能补差价升级终身卡吗？', answer: '可以查看“价格与权益”页的补差价升级说明，通过客服核对原订单、升级手续费和补款金额。核对时使用订单或 CDK 的安全标识，不要在群内发送完整兑换码。' },
     { id: 'import-files', question: 'MAA 干员识别文件、仓库文件和排班 JSON 能混用吗？', answer: '请按用途选择文件：干员识别 JSON 用于导入干员及练度；仓库 JSON 用于库存分析；MAA 排班 JSON 用于 MAA 自定义基建执行；完整计算 JSON 用于分析和排障。免费档案只能通过森空岛更新干员数据，正式 CDK 档案也可上传 MAA 干员识别文件。' },
     { id: 'missing-operators', question: '导入后缺少干员，或练度和游戏里不一致怎么办？', answer: '核对所选角色的 UID 和数据更新时间。森空岛数据需要重新刷新，MAA 识别文件则需重新识别并上传。还应检查是否使用了旧文件或其他游戏账号的数据。出现干员归属或练度异常提示时，请按提示申请核验。' },
     { id: 'manual-operators', question: '可以手动修改干员数据，或导入别人的干员池吗？', answer: '请导入当前档案对应游戏账号的数据。免费档案通过森空岛更新干员，正式档案可按权限使用 MAA 识别文件；干员归属、练度或干员池出现异常变化时可能被拦截。个人权益仅限本人使用，不能用来为他人代做排班。' },
     { id: 'partial-import', question: '提示“干员已导入，库存同步失败”，需要全部重来吗？', answer: '干员数据已经导入，可以稍后再刷新库存。先检查当前账号和已有干员数据，不必因为库存同步失败就重新创建档案。涉及材料缺口和培养成本的分析，需要核对库存是否已经更新。' },
     { id: 'config-layout', question: '252、243 等基建布局该怎么选？', answer: '按游戏中实际的贸易站、制造站、发电站及房间等级配置。使用预设后也要核对生产目标、房间等级和换班方式；预设不会修改游戏内的房间。可用预设和自定义范围取决于当前权益。' },
-    { id: 'config-validation', question: '为什么“开始排班”按钮不能点击？', answer: '先查看按钮附近的提示。常见原因包括未导入干员、房间配置不完整、配置尚未同步、已有计算、次数已用完或服务暂时不可用。按提示补齐数据或等待同步后再提交；无法判断时，记录提示文字并到 QQ 群反馈。' },
+    { id: 'config-validation', question: '为什么“开始排班”按钮不能点击？', answer: '先查看按钮附近的提示。常见原因包括未导入干员、房间配置不完整、配置尚未同步、已有计算、次数已用完或服务暂时不可用。按提示补齐数据或等待同步后再提交；无法判断时，请通过网站反馈提交提示文字。' },
     { id: 'saved-configs', question: '修改配置会立刻改变结果吗？常用配置如何保存？', answer: '配置修改并同步后，会用于下一次计算，已有结果保留原来的计算条件。需要新结果时，回到总览重新排班。常用配置可以命名保存，之后载入再计算；从历史结果载入配置时，旧记录若未保存当时的配置，则只能查看或下载。' },
     { id: 'waiting', question: '排队很久或进度暂时不动，需要反复提交吗？', answer: '排队中的计算会自动等待，运行中的计算也可能在同一阶段停留一段时间。可以查看“后台计算”中的状态，无需重复提交。维护卡和优先计算券会让计算优先处理，繁忙时仍需等待；预估时间可能随实际情况变化。' },
-    { id: 'task-failure', question: '排班失败、取消或超时后，下一步怎么做？', answer: '查看失败提示，确认干员数据和配置，再按页面指引重试。主动取消后，正在运行的计算可能需要稍等才能停止。优先计算券在任务失败、取消或最终超时时自动返还。反复失败时，请记录时间、报错和操作步骤到 QQ 群反馈。' },
+    { id: 'task-failure', question: '排班失败、取消或超时后，下一步怎么做？', answer: '查看失败提示，确认干员数据和配置，再按页面指引重试。主动取消后，正在运行的计算可能需要稍等才能停止。优先计算券在任务失败、取消或最终超时时自动返还。反复失败时，请通过网站反馈提交时间、报错和操作步骤。' },
     { id: 'background-task', question: '刷新或离开页面后，还能查看计算结果吗？', answer: '已提交的排班和场景分析在后台执行，可以返回工作台的“后台计算”查看状态。已结束的计算记录保留 7 天，排班结果能否继续查看以历史记录和封存区为准。离开手动排班页前，仍需保存本地草稿或下载备份。' },
     { id: 'incremental-recompute', question: '培养干员后，增量重算和重新生成该用哪个？', answer: '先更新干员和库存数据。已有成功排班且当前权益支持时，可以从概览使用增量重算；免费档案可以重新生成完整排班。若当前干员和配置没有变化，页面可能提示无需重算。增量重算的收益仍需按新结果判断。' },
     { id: 'history-archive', question: '历史结果会一直保留吗？封存有什么用？', answer: '普通历史达到档案容量上限时，会清理最旧的记录。需要长期保留的结果可以移入封存区，封存后不会随普通历史自动清理。封存区也有容量限制，可取消封存或按页面提示扩容。删除结果无法恢复，重要文件建议另存到本地。' },
@@ -561,8 +561,8 @@ export const publicCopy = {
     { id: 'coupons', question: '背包里的体验券和计算券在哪里使用？', answer: '查看道具详情中的用途和有效期，在对应功能中选择使用。优先计算券用于提交排班，练度诊断券用于本次排班的培养分析，情景推演券用于场景比较，MAA 导出体验券用于下载符合条件的 MAA 文件。礼包和扩容道具按背包提示操作，不同道具不能互相替代。' },
     { id: 'invitation-rewards', question: '邀请好友后，为什么还没有收到奖励？', answer: '好友需要在注册时填写你的邀请码，并通过森空岛绑定成功激活有效档案，邀请才算完成。双方奖励按当前活动规则发放，你的奖励受每日名额限制。活动暂停时，已完成的邀请会在恢复后自动发奖；可以在“邀请有礼”查看进度和奖励。' },
     { id: 'personal-use', question: '个人维护卡能用于代练、代做排班或转售吗？', answer: '个人权益仅用于本人非商业使用，不可用于批量代办、代做排班或转售。MaaTool 账号、CDK 和档案均不可转让或转售。使用前请阅读个人使用声明和服务协议。' },
-    { id: 'risk-review', question: '档案被限制，或干员数据被误拦截怎么办？', answer: '记录页面提示、报错时间和操作步骤，带上账号及订单或 CDK 的安全标识到官方 QQ 群申请人工核验。不要反复导入其他游戏账号的数据。服务会综合异常信号并由管理员复核，共用网络或一次快速操作不会单独作为限制依据。' },
-    { id: 'browser-support', question: '手机能用吗？页面打不开或显示异常怎么办？', answer: '可以用手机浏览器查看页面、配置和结果，MAA 文件仍需在运行 MAA 的设备上使用。页面异常时，先记录报错，检查网络并刷新。清理浏览器数据前，请下载需要保留的手动草稿备份；仍无法使用时，提供浏览器版本和截图到 QQ 群反馈。' },
+    { id: 'risk-review', question: '档案被限制，或干员数据被误拦截怎么办？', answer: '记录页面提示、报错时间和操作步骤，通过网站反馈附上账号及订单或 CDK 的安全标识，申请人工核验。不要反复导入其他游戏账号的数据。服务会综合异常信号并由管理员复核，共用网络或一次快速操作不会单独作为限制依据。' },
+    { id: 'browser-support', question: '手机能用吗？页面打不开或显示异常怎么办？', answer: '可以用手机浏览器查看页面、配置和结果，MAA 文件仍需在运行 MAA 的设备上使用。页面异常时，先记录报错，检查网络并刷新。清理浏览器数据前，请下载需要保留的手动草稿备份；仍无法使用时，通过网站反馈提交浏览器版本和截图。' },
   ],
   // src/components/PublicFooter.tsx
   components_PublicFooter_012: "价格与权益",

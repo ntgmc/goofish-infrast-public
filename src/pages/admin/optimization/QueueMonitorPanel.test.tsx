@@ -50,6 +50,16 @@ describe('QueueMonitorPanel', () => {
     expect(screen.getByRole('heading', { name: '异步优化死信队列' })).toBeInTheDocument()
   })
 
+  it('opens pending abnormal tasks directly even before a queue snapshot has loaded', async () => {
+    adminApiJson.mockClear()
+    render(<QueueMonitorPanel search="?view=dead&status=pending_review" />)
+    await act(async () => { await Promise.resolve() })
+    expect(screen.getByRole('tab', { name: '死信处理' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('heading', { name: '异步优化死信队列' })).toBeInTheDocument()
+    expect(adminApiJson.mock.calls.some(([url]) => url === '/api/admin/optimization?limit=50&status=pending_review')).toBe(true)
+    expect(adminApiJson.mock.calls.some(([url]) => url.includes('view=queue'))).toBe(false)
+  })
+
   it('pauses both queue polls while another admin section is active and preserves local edits', async () => {
     const view = render(<QueueMonitorPanel />)
     await act(async () => { await Promise.resolve() })

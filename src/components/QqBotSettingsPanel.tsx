@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Bell } from 'lucide-react'
+import { NotificationSettingsIcon as Bell } from './icons'
 import { apiJson } from '../lib/api-client'
 import { copy } from '../copy/index'
 import { useSiteFeatures } from '../lib/site-feature-context'

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, ChartNoAxesCombined, Clock3, LockKeyhole, Plus, X } from 'lucide-react'
+import { NextIcon as ArrowRight, RevenueIcon as ChartNoAxesCombined, OperationTimeIcon as Clock3, RestrictedIcon as LockKeyhole, AddIcon as Plus, RemoveIcon as X, TradeoffIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { expandScenarioComparison, getFixedScenarioProductionPlan, SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS, SCENARIO_LAYOUT_LABELS, type ScenarioComparisonFactors, type ScenarioLayout, type ScenarioProductionPlan } from '../../../lib/scenario-comparison'
 import { restoreScenarioComparisonJob, useScenarioComparison } from '../../tool/optimize/scenario-lab/useScenarioComparison'
@@ -180,7 +180,7 @@ function ComparisonPreview({ baseline }: { baseline: string }) {
           <div><dt><ChartNoAxesCombined size={18} aria-hidden="true" />{preview.income}</dt><dd>—</dd><dd>{preview.incomeHelp}</dd></div>
           <div><dt><Clock3 size={18} aria-hidden="true" />{preview.operations}</dt><dd>—</dd><dd>{preview.operationsHelp}</dd></div>
         </dl>
-        <div className="v2-comparison-preview-tradeoff"><ChartNoAxesCombined size={20} aria-hidden="true" /><div><h4>{preview.tradeoff}</h4><p>{preview.tradeoffHelp}</p></div></div>
+        <div className="v2-comparison-preview-tradeoff"><TradeoffIcon size={20} aria-hidden="true" /><div><h4>{preview.tradeoff}</h4><p>{preview.tradeoffHelp}</p></div></div>
       </section>
     </div>
     <div className="v2-comparison-preview-entitlement">

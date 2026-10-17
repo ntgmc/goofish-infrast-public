@@ -175,6 +175,7 @@ function productionPlanLabel(point: ScenarioComparisonPoint): string {
 
 function scheduleLabel(point: ScenarioComparisonPoint): string {
   if (point.scheduleMode === 'rotation') return copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_037
+  if (point.scheduleStrategy === '8x3') return copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_002
   const prefix = point.scheduleStrategy === 'variable' ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_038 : 'MAA'
   const fallback = point.variableShiftFallback ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_039 : ''
   return `${prefix} ${formatShiftHours(point.shiftHours)}${fallback}`

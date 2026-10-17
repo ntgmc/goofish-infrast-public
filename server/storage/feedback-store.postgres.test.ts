@@ -5,6 +5,7 @@ import { createFeedback, getFeedbackImage, listAdminFeedback, listUserFeedback, 
 import { listUserNotifications, markUserNotificationRead } from './notification-store'
 import { closePool, query } from './postgres'
 import { migrateDatabaseSchema } from './schema'
+import { getOperationsTodos } from './operations-todos-store'
 
 let container: StartedPostgreSqlContainer
 beforeAll(async () => {
@@ -42,6 +43,10 @@ it('keeps private notes private, requires a public outcome, reopens on user foll
   const actor = { username: 'operator', audit: { actorUsername: 'operator', action: 'feedback.follow_up', targetType: 'feedback', targetId: id, reason: '跟进排查', requestId: randomUUID() } }
   const draft = { feedback_id: id, expected_revision: 0, request_key: randomUUID(), status: 'open' as const, assignment: 'mine' as const, message: '', internal_note: '私密任务编号 42', reason: '跟进排查' }
   const before = await getFeedbackDetail(id, userId)
+  expect(await getOperationsTodos(['user_view', 'risk_view', 'optimization_view'])).toMatchObject({ feedback_unassigned: 1, feedback_reply: 1, risk_pending: 0, abnormal_jobs: 0 })
+  expect((await listAdminFeedback(1, 25, undefined, 'unassigned')).items.map((item) => item.id)).toEqual([id])
+  expect((await listAdminFeedback(1, 25, undefined, 'reply')).items.map((item) => item.id)).toEqual([id])
+  expect(await getOperationsTodos(['risk_view'])).toMatchObject({ feedback_unassigned: null, feedback_reply: null, risk_pending: 0, abnormal_jobs: null })
   await updateFeedback(draft, actor)
   await updateFeedback(draft, actor)
   const userView = await getFeedbackDetail(id, userId)
@@ -50,6 +55,9 @@ it('keeps private notes private, requires a public outcome, reopens on user foll
   expect(JSON.stringify(userView)).not.toMatch(/operator|私密|assignee|actor_username|user_id|email|request_key/)
   expect((await getFeedbackDetail(id, null)).entries[0]).toMatchObject({ internal_note: '私密任务编号 42', assignee: 'operator' })
   expect((await listUserNotifications(userId)).notifications).toEqual([])
+  expect(await getOperationsTodos(['user_view'])).toMatchObject({ feedback_unassigned: 0, feedback_reply: 1 })
+  expect((await listAdminFeedback(1, 25, undefined, 'unassigned')).pagination.total).toBe(0)
+  expect((await listAdminFeedback(1, 25, undefined, 'reply')).pagination.total).toBe(1)
   expect(await getFeedbackImage(id, otherId)).toBeNull()
   expect((await listUserFeedback(otherId, 1, 25)).items).toEqual([])
   await expect(getFeedbackDetail(id, otherId)).rejects.toMatchObject({ status: 404 })
@@ -59,6 +67,7 @@ it('keeps private notes private, requires a public outcome, reopens on user foll
   await updateFeedback(resolve, actor)
   await updateFeedback({ ...resolve, expected_revision: 2 }, actor)
   expect((await getFeedbackDetail(id, userId)).feedback).toMatchObject({ status: 'resolved', revision: 2, result: resolve.message })
+  expect(await getOperationsTodos(['user_view'])).toMatchObject({ feedback_unassigned: 0, feedback_reply: 0 })
   let notifications = await listUserNotifications(userId)
   expect(notifications.notifications).toHaveLength(1)
   expect(notifications.notifications[0]).toMatchObject({ type: 'feedback_update', action: { kind: 'feedback', feedback_id: id } })
@@ -67,14 +76,70 @@ it('keeps private notes private, requires a public outcome, reopens on user foll
   expect((await listUserNotifications(userId)).unread_count).toBe(0)
   await updateFeedback({ feedback_id: id, expected_revision: 2, request_key: randomUUID(), message: '仍然异常，步骤如下' }, { userId })
   expect((await getFeedbackDetail(id, userId)).feedback).toMatchObject({ status: 'processing', revision: 3, result: null })
+  expect(await getOperationsTodos(['user_view'])).toMatchObject({ feedback_reply: 1 })
+  expect((await listAdminFeedback(1, 25, undefined, 'reply')).items.map((item) => item.id)).toEqual([id])
   await updateFeedback({ ...draft, expected_revision: 3, request_key: randomUUID(), status: 'waiting_user', message: '请提供账号版本。', internal_note: '' }, actor)
   notifications = await listUserNotifications(userId)
   expect(notifications.unread_count).toBe(1)
   expect(notifications.notifications).toHaveLength(1)
+  expect(await getOperationsTodos(['user_view'])).toMatchObject({ feedback_reply: 0 })
   expect(notifications.notifications[0]!.updated_at).not.toBe(notification.updated_at)
   expect((await query('select * from admin_operation_audit where target_id = $1', [id])).rows).toHaveLength(3)
   await query('delete from user_accounts where id = any($1::text[])', [[userId, otherId]])
   expect((await query('select * from user_feedback_entries where feedback_id = $1', [id])).rows).toEqual([])
+})
+
+it('scopes linked context and operations, filters pending replies, and measures response and reopening without private updates resetting the wait', async () => {
+  const userId = randomUUID(), otherId = randomUUID(), profileId = randomUUID(), otherProfile = randomUUID()
+  const jobId = randomUUID(), otherJob = randomUUID(), resultId = randomUUID(), operationId = randomUUID(), foreignOperation = randomUUID()
+  for (const accountId of [userId, otherId]) await query(`insert into user_accounts (id, email, password_hash, salt, iterations, permission, status, record_json, created_at, updated_at)
+    values ($1, $2, 'hash', 'salt', 1, 'recommended', 'active', '{}'::jsonb, now(), now())`, [accountId, `${accountId}@example.com`])
+  for (const [accountId, accountProfile] of [[userId, profileId], [otherId, otherProfile]]) await query(`insert into user_game_accounts
+    (id, user_id, permission, status, display_name, note, record_json, created_at, updated_at, kind)
+    values ($1, $2, 'recommended', 'active', '反馈档案', '', '{}'::jsonb, now(), now(), 'cdk')`, [accountProfile, accountId])
+  for (const [job, profile] of [[jobId, profileId], [otherJob, otherProfile]]) await query(`insert into optimize_jobs
+    (id, status, priority, owner_key, source, payload_json, profile_id, created_at, updated_at)
+    values ($1, 'succeeded', 0, $2, 'account_profile', '{}'::jsonb, $3, now(), now())`, [job, `profile:${profile}`, profile])
+  await query(`insert into optimization_result_history (profile_id, id, name, created_at, result_json, source)
+    values ($1, $2, '关联结果', now()::text, '{}'::jsonb, 'generated')`, [profileId, resultId])
+  for (const [accountId, auditId] of [[userId, operationId], [otherId, foreignOperation]]) await query(`insert into inventory_admin_audit
+    (id, admin_username, action, target_type, target_id, reason, created_at)
+    values ($1, 'operator', 'grant_item', 'user', $2, '补发完成', now())`, [auditId, accountId])
+  for (const context of [{ profile_id: otherProfile }, { job_id: otherJob }, { result_id: resultId, profile_id: otherProfile }, { result_id: 'missing' }]) {
+    await expect(createFeedback(userId, { category: 'other', message: '越权关联', context }, null)).rejects.toMatchObject({ code: 'feedback_context_invalid', status: 400 })
+  }
+  expect((await listUserFeedback(userId, 1, 25)).items).toEqual([])
+  const id = await createFeedback(userId, { category: 'schedule', message: '结果异常', context: { result_id: resultId, job_id: jobId } }, null)
+  expect((await getFeedbackDetail(id, userId)).feedback.context).toEqual({ profile_id: profileId, result_id: resultId, job_id: jobId })
+  await query("update user_feedback set created_at = now() - interval '10 hours', updated_at = now() - interval '10 hours', public_updated_at = now() - interval '10 hours' where id = $1", [id])
+  const actor = { username: 'operator', audit: { actorUsername: 'operator', action: 'feedback.follow_up', targetType: 'feedback', targetId: id, reason: '处理反馈', requestId: randomUUID() } }
+  const draft = { feedback_id: id, expected_revision: 0, request_key: randomUUID(), status: 'processing' as const, assignment: 'mine' as const, message: '', internal_note: '开始排查', reason: '处理反馈' }
+  await updateFeedback(draft, actor)
+  const pending = await listAdminFeedback(1, 25, undefined, 'mine', { category: 'schedule', email: userId.toUpperCase(), min_wait_hours: 4 }, 'operator')
+  expect(pending.items.map((item) => item.id)).toEqual([id])
+  expect(pending.metrics).toMatchObject({ first_response_seconds: null, reopened_count: 0 })
+  expect(pending.metrics!.longest_wait_seconds).toBeGreaterThanOrEqual(36000)
+  expect((await listAdminFeedback(1, 25, undefined, 'mine', {}, 'another')).items).toEqual([])
+  expect((await listAdminFeedback(1, 25, undefined, 'supplement')).items).toEqual([])
+  expect((await listAdminFeedback(1, 25, undefined, undefined, { category: 'payment' })).items).toEqual([])
+  expect((await listAdminFeedback(1, 25, undefined, undefined, { user_id: otherId })).items).toEqual([])
+  const detail = await getFeedbackDetail(id, null)
+  expect(detail.recent_operations?.map((item) => item.id)).toContain(operationId)
+  expect(detail.recent_operations?.map((item) => item.id)).not.toContain(foreignOperation)
+  await expect(updateFeedback({ ...draft, expected_revision: 1, request_key: randomUUID(), related_operation: { source: 'inventory', id: foreignOperation } }, actor)).rejects.toMatchObject({ code: 'feedback_operation_invalid' })
+  expect((await getFeedbackDetail(id, null)).feedback.revision).toBe(1)
+  await updateFeedback({ ...draft, expected_revision: 1, request_key: randomUUID(), status: 'resolved', message: '已补发，请重试', internal_note: '', related_operation: { source: 'inventory', id: operationId } }, actor)
+  await query("update user_feedback_entries set created_at = (select created_at + interval '2 hours' from user_feedback where id = $1) where feedback_id = $1 and revision = 2", [id])
+  expect((await getFeedbackDetail(id, null)).entries[1]?.related_operation).toMatchObject({ source: 'inventory', id: operationId, action: 'grant_item', reason: '补发完成' })
+  const publicView = await getFeedbackDetail(id, userId)
+  expect(JSON.stringify(publicView)).not.toMatch(/related_operation|recent_operations|补发完成|operator/)
+  expect((await listAdminFeedback(1, 25)).metrics).toMatchObject({ first_response_seconds: 7200, longest_wait_seconds: null, reopened_count: 0 })
+  await updateFeedback({ feedback_id: id, expected_revision: 2, request_key: randomUUID(), message: '仍然异常' }, { userId })
+  expect((await listAdminFeedback(1, 25, undefined, 'supplement')).items.map((item) => item.id)).toEqual([id])
+  expect((await listAdminFeedback(1, 25, undefined, undefined, { min_wait_hours: 1 })).items).toEqual([])
+  expect((await listAdminFeedback(1, 25)).metrics).toMatchObject({ first_response_seconds: 7200, reopened_count: 1 })
+  await query('delete from user_accounts where id = any($1::text[])', [[userId, otherId]])
+  await query('delete from optimize_jobs where id = any($1::text[])', [[jobId, otherJob]])
 })
 
 it('rejects stale parallel writes, rolls back audit failures, and paginates complete follow-up records', async () => {
@@ -90,6 +155,8 @@ it('rejects stale parallel writes, rolls back audit failures, and paginates comp
   const race = await Promise.allSettled([updateFeedback(draft, actor), updateFeedback({ ...draft, request_key: randomUUID(), message: '另一位管理员排查' }, { ...actor, username: 'another' })])
   expect(race.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
   expect(race.find((result) => result.status === 'rejected')).toMatchObject({ reason: { status: 409 } })
+  expect(await getOperationsTodos(['user_view'])).toMatchObject({ feedback_reply: 0 })
+  expect((await listAdminFeedback(1, 25, undefined, 'reply')).pagination.total).toBe(0)
   await expect(updateFeedback({ ...draft, message: '改写已提交内容' }, actor)).rejects.toMatchObject({ status: 409 })
   for (let revision = 1; revision <= 27; revision++) await updateFeedback({ feedback_id: id, expected_revision: revision, request_key: randomUUID(), message: `补充 ${revision}` }, { userId })
   const recent = await getFeedbackDetail(id, userId)

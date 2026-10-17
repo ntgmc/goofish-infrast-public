@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link2, Plus } from 'lucide-react'
+import { LinkedOperatorIcon as Link2, AddIcon as Plus } from '../icons'
 import { copy } from '../../copy'
 import type { RoomOperator } from './types'
 import { operatorProfession, RECOVERY_SUPPORT_ICON_SRC } from './building-skills'

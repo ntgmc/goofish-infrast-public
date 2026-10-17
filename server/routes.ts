@@ -33,6 +33,7 @@ import userProfilesHandler from './handlers/user-profiles'
 import userMeteredProfilesHandler from './handlers/user-metered-profiles'
 import userBillingHandler from './handlers/user-billing'
 import userSklandHandler from './handlers/user-skland'
+import sklandSnapshotHandler from './handlers/skland-snapshot'
 import userStatusHandler from './handlers/user-status'
 import userWorkspaceHandler from './handlers/user-workspace'
 import userBehaviorRiskHandler from './handlers/user-behavior-risk'
@@ -137,6 +138,8 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/skland/lifetime-voucher/pending/cancel', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/lifetime-voucher/credential/preview', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/lifetime-voucher/account/select', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/snapshot', sklandSnapshotHandler],
+  ['/api/user/skland/snapshot/refresh', sklandSnapshotHandler],
   ['/api/user/skland/import/refresh', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/facilities', userSklandHandler as unknown as ApiHandler],
   ['/api/user/status', userStatusHandler as unknown as ApiHandler],

@@ -1,7 +1,7 @@
 import type { MouseEvent, ReactNode } from 'react'
 import { LayoutGroup } from 'motion/react'
 import { Link, useNavigate } from 'react-router'
-import { ArrowUpRight } from 'lucide-react'
+import { WorkspaceEntryIcon as ArrowUpRight } from '../../../components/icons'
 import BrandLogo from '../../../components/BrandLogo'
 import CompactHeaderMenu from '../../../components/CompactHeaderMenu'
 import DeferredFeatureMenu from '../../../components/DeferredFeatureMenu'
@@ -133,7 +133,7 @@ export default function OptimizeShell({
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {compactHeaderActions}
-              <FeedbackButton iconOnly />
+              <FeedbackButton iconOnly profileId={profileId} />
               <NotificationBell iconOnly />
               <ThemeSwitcher iconOnly />
               <DeferredFeatureMenu iconOnly />
@@ -164,7 +164,7 @@ export default function OptimizeShell({
                 {copy.optimize.pages_tool_optimize_tour_001}
               </button>
               {headerActions}
-              <FeedbackButton />
+              <FeedbackButton profileId={profileId} />
               <NotificationBell />
               <ThemeSwitcher />
               <DeferredFeatureMenu />

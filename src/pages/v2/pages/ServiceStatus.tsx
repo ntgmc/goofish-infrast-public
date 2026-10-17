@@ -1,4 +1,4 @@
-import { RefreshCw } from 'lucide-react'
+import { RefreshIcon as RefreshCw } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { useServiceStatus, createHistoryCells, historyCellLabel, statusLabel, incidentStatusLabel, incidentImpactLabel, formatUpdatedAt } from '../../StatusPage'
 import ServiceStatusBadge from '../../../components/ServiceStatusBadge'

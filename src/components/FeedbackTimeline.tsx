@@ -26,6 +26,7 @@ export default function FeedbackTimeline({ data, admin = false, loading, onOlder
       {entry.previous_status !== entry.status && <p className="mt-2 text-xs text-ink-secondary">{statuses[entry.previous_status]} → {statuses[entry.status]}</p>}
       {admin && entry.previous_assignee !== entry.assignee && <p className="mt-2 break-words text-xs text-ink-secondary">{text.assignmentUpdated}：{entry.assignee ?? text.unassigned}</p>}
       {entry.message && <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7">{entry.message}</p>}
+      {admin && entry.related_operation && <div className="mt-3 border-l-2 border-surface-3 pl-3"><p className="text-xs font-semibold">{text.relatedOperation} · {text.operationActions[entry.related_operation.action as keyof typeof text.operationActions] ?? entry.related_operation.action}</p><p className="mt-1 break-words text-sm">{entry.related_operation.reason}</p><p className="mt-1 break-all text-xs text-ink-muted">{entry.related_operation.id} · {feedbackTime(entry.related_operation.created_at)}</p></div>}
       {admin && entry.internal_note && <div className="mt-3 border-l-2 border-surface-3 pl-3"><p className="text-xs font-semibold text-ink-secondary">{text.internalOnly}</p><p className="mt-1 whitespace-pre-wrap break-words text-sm leading-7">{entry.internal_note}</p></div>}
     </li>)}</ol>
   </section>

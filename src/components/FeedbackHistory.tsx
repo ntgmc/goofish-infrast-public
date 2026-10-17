@@ -1,4 +1,4 @@
-import { ArrowLeft, RefreshCw } from 'lucide-react'
+import { BackIcon as ArrowLeft, RefreshIcon as RefreshCw } from './icons'
 import { useEffect, useRef, useState } from 'react'
 import { copy } from '../copy'
 import { apiJson, getApiErrorMessage } from '../lib/api-client'

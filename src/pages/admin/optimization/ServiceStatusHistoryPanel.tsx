@@ -1,4 +1,4 @@
-import { RefreshCw } from 'lucide-react'
+import { RefreshIcon as RefreshCw } from '../../../components/icons'
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { adminApiJson } from '../../../lib/admin-api-client'

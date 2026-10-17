@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ArrowRightLeft, Settings2 } from 'lucide-react'
+import { ComparePreviousIcon as ArrowRightLeft, ConfigIcon as Settings2 } from '../../components/icons'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/dialog'
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'

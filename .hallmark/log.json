@@ -1,5 +1,30 @@
 [
   {
+    "date": "2026-10-17",
+    "scope": "v2/cultivation-projects",
+    "macrostructure": "Workbench",
+    "theme": "existing V2 variant",
+    "theme_axes": "light and dark / geometric-sans / warm-copper",
+    "enrichment": "none",
+    "nav": "existing side rail",
+    "footer": "Ft2 inline rule",
+    "variation": "goal-led main panel, inset editor and settings, prominent readiness dates, separate route summary and data sections",
+    "brief": "Clarify visual hierarchy between cultivation goals, editing, preparation settings and resource results",
+    "design_system": "design.md"
+  },
+  {
+    "date": "2026-10-17",
+    "scope": "v2/cultivation-projects",
+    "macrostructure": "Workbench",
+    "theme": "existing V2 variant",
+    "theme_axes": "light and dark / geometric-sans / warm-copper",
+    "enrichment": "none",
+    "nav": "existing side rail",
+    "footer": "Ft2 inline rule",
+    "brief": "Prepare player-selected cultivation goals from shared stock, daily sanity and measured base production",
+    "design_system": "design.md"
+  },
+  {
     "date": "2026-10-15",
     "scope": "configuration editor",
     "macrostructure": "Workbench",

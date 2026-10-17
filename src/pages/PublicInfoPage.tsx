@@ -1,9 +1,9 @@
 import BrandLogo from '../components/BrandLogo'
 import CompactHeaderMenu from '../components/CompactHeaderMenu'
-import PublicFooter, { SupportGroupLink } from '../components/PublicFooter'
+import PublicFooter, { FeedbackLink } from '../components/PublicFooter'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import { useRef, useState } from 'react'
-import { Search } from 'lucide-react'
+import { SearchIcon as Search } from '../components/icons'
 import { Link } from 'react-router'
 import { copy } from '../copy/index'
 import { productPolicies } from '../lib/product-catalog'
@@ -232,7 +232,7 @@ function FaqContent() {
             </summary>
             <div className="max-w-3xl pb-3 pt-2">
               <p className="whitespace-pre-line text-sm leading-7 text-ink-secondary">{item.answer}</p>
-              {item.action === 'qq_group' && <SupportGroupLink className="tool-secondary-action mt-3" />}
+              {item.action === 'qq_group' && <FeedbackLink className="tool-secondary-action mt-3" />}
             </div>
           </details>
           ))}
@@ -241,7 +241,7 @@ function FaqContent() {
       <div className="public-prose-section">
         <h2 className="text-lg font-semibold text-ink-primary">{content.faq.cta_heading}</h2>
         <p className="mt-2 whitespace-pre-line text-sm leading-6 text-ink-secondary">{content.faq.cta_body}</p>
-        <SupportGroupLink className="tool-primary-action mt-4" />
+        <FeedbackLink className="tool-primary-action mt-4" />
       </div>
     </section>
   )
@@ -255,7 +255,7 @@ function SupportContent() {
           <h2 className="text-xl font-semibold text-ink-primary">{copy.public.pages_PublicInfoPage_067}</h2>
           <p className="mt-3 text-sm leading-7 text-ink-secondary">{copy.public.pages_PublicInfoPage_068}</p>
         </div>
-        <SupportGroupLink className="tool-primary-action mt-6 sm:mt-0" />
+        <FeedbackLink className="tool-primary-action mt-6 sm:mt-0" />
       </div>
       <div className="document-support-guidance grid border-b border-surface-3 sm:grid-cols-2">
         <div className="py-6 sm:pr-6">
@@ -312,7 +312,7 @@ function LegalContent({ sections, withContents = false }: { sections: readonly L
       <section className="public-prose-section">
         <h2 className="text-base font-semibold text-ink-primary">{copy.public.pages_PublicInfoPage_077}</h2>
         <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.public.pages_PublicInfoPage_078}</p>
-        <SupportGroupLink className="tool-secondary-action mt-4" />
+        <FeedbackLink className="tool-secondary-action mt-4" />
       </section>
       </div>
     </div>

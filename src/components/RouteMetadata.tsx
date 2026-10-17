@@ -14,6 +14,11 @@ type Metadata = {
 }
 
 const PUBLIC_METADATA: Record<string, Metadata> = {
+  '/tools/training-ratio': {
+    title: copy.trainingRatio.title,
+    description: copy.trainingRatio.description,
+    indexable: false,
+  },
   '/tools/cultivation-plan': {
     title: copy.tools.cultivation.title,
     description: copy.tools.cultivation.description,

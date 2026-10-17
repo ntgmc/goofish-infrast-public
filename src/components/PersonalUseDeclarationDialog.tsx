@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ShieldCheck } from 'lucide-react'
+import { PersonalDeclarationIcon as ShieldCheck } from './icons'
 import { copy } from '../copy/index'
 import type { PublicPersonalUseDeclaration } from '../lib/personal-use-declaration'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'

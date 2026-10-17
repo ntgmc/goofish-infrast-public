@@ -11,11 +11,15 @@ import { getUpgradeSuggestionId } from '../lib/upgrade-suggestion-id'
 import { getUpgradePaybackDays } from '../lib/upgrade-suggestion-roi'
 import { copy, CURRENT_LOCALE } from '../copy/index'
 import { PRODUCT_LABELS } from './result-panel/labels'
+import { projectsFromUpgradeSuggestion, type CultivationProjectScope } from '../lib/cultivation-project-import'
+import CultivationProjectImport from './CultivationProjectImport'
+import './upgrade-suggestions.css'
 
 
 interface Props {
   suggestions: UpgradeSuggestion[];
   embedded?: boolean;
+  projectScope?: CultivationProjectScope;
 }
 
 type SortMode = 'payback' | 'gain' | 'stock'
@@ -26,7 +30,7 @@ const SORT_OPTIONS: { id: SortMode; label: string }[] = [
   { id: 'stock', label: copy.optimize.components_UpgradeSuggestions_003 },
 ]
 
-export default function UpgradeSuggestions({ suggestions, embedded = false }: Props) {
+export default function UpgradeSuggestions({ suggestions, embedded = false, projectScope }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [sortMode, setSortMode] = useState<SortMode>('payback')
   const [singleOnly, setSingleOnly] = useState(false)
@@ -57,8 +61,8 @@ export default function UpgradeSuggestions({ suggestions, embedded = false }: Pr
   }, [])
 
   return (
-    <div className={embedded ? 'space-y-4' : 'tool-panel space-y-6 p-5 sm:p-6'}>
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+    <div className={`upgrade-suggestions ${embedded ? 'space-y-4' : 'tool-panel space-y-6 p-3 sm:p-6'}`}>
+      <div className="upgrade-suggestions-toolbar">
         <div>
           {!embedded && (
             <h2 className="mb-2 text-xl font-semibold text-ink-primary">
@@ -67,15 +71,15 @@ export default function UpgradeSuggestions({ suggestions, embedded = false }: Pr
           <p className="text-sm leading-6 text-ink-secondary">
             {copy.optimize.components_UpgradeSuggestions_005}</p>
         </div>
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center xl:flex-shrink-0">
-          <div className="tool-inset inline-flex w-full overflow-hidden p-1 lg:w-auto" role="group" aria-label={copy.optimize.components_UpgradeSuggestions_006}>
+        <div className="upgrade-suggestions-filters">
+          <div className="upgrade-suggestions-sort" role="group" aria-label={copy.optimize.components_UpgradeSuggestions_006}>
             {SORT_OPTIONS.map((option) => (
               <button
                 key={option.id}
                 type="button"
                 onClick={() => setSortMode(option.id)}
                 aria-pressed={sortMode === option.id}
-                className={`tool-secondary-action min-h-11 flex-1 whitespace-nowrap px-3 text-sm lg:flex-none ${
+                className={`tool-secondary-action ${
                   sortMode === option.id
                     ? 'tool-option-selected'
                     : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'
@@ -85,7 +89,7 @@ export default function UpgradeSuggestions({ suggestions, embedded = false }: Pr
               </button>
             ))}
           </div>
-          <label className="tool-inset inline-flex min-h-11 items-center gap-2 px-3 text-sm font-semibold text-ink-secondary">
+          <label className="upgrade-suggestions-single">
             <input
               type="checkbox"
               checked={singleOnly}
@@ -105,6 +109,7 @@ export default function UpgradeSuggestions({ suggestions, embedded = false }: Pr
             expanded={expanded.has(id)}
             onToggleExpanded={() => toggleExpanded(id)}
             embedded={embedded}
+            projectScope={projectScope}
           />
         ))}
       </div>
@@ -123,64 +128,47 @@ function SuggestionCard({
   expanded,
   onToggleExpanded,
   embedded,
+  projectScope,
 }: {
   suggestion: UpgradeSuggestion;
   rank: number;
   expanded: boolean;
   onToggleExpanded: () => void;
   embedded: boolean;
+  projectScope?: CultivationProjectScope;
 }) {
   const title = suggestion.name || suggestion.ops?.map((op) => op.name).join(' + ') || copy.optimize.components_UpgradeSuggestions_017
   const cost = suggestion.training_cost
   const stockEnough = isStockEnough(cost)
   const stockLabel = getStockLabel(cost)
+  const projects = projectScope ? projectsFromUpgradeSuggestion(suggestion) : []
 
   return (
-    <article className={`tool-panel transition-colors duration-150 ${embedded ? 'bg-surface-2/60' : ''} hover:border-surface-4`}>
-      <div className="grid gap-4 p-4 lg:grid-cols-[auto_1fr] lg:items-start">
-        <div className="flex items-start">
+    <article className={`tool-panel upgrade-suggestion ${embedded ? 'bg-surface-2/60' : ''}`}>
+      <header className="upgrade-suggestion-header">
+        <div className="upgrade-suggestion-identity">
           <OperatorPortraits suggestion={suggestion} />
-        </div>
-
-        <div className="min-w-0 space-y-4">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="tool-status">#{rank}</span>
-                <h3 className="text-base font-semibold text-ink-primary sm:text-lg">{title}</h3>
-                <span className={`tool-status ${stockEnough ? 'tool-status--success' : ''}`}>
-                  {stockLabel}
-                </span>
-              </div>
-              {suggestion.desc && (
-                <p className="mt-1 text-sm leading-6 text-ink-secondary">{suggestion.desc}</p>
-              )}
-              {(suggestion.rooms || suggestion.impact?.summary) && (
-                <p className="mt-1 text-xs leading-5 text-ink-muted">
-                  {suggestion.impact?.summary || `${copy.optimize.components_UpgradeSuggestions_020}${suggestion.rooms}`}
-                </p>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={onToggleExpanded}
-              className="tool-secondary-action px-3 text-sm xl:flex-shrink-0"
-              aria-expanded={expanded}
-            >
-              {expanded ? copy.optimize.components_UpgradeSuggestions_021 : copy.optimize.components_UpgradeSuggestions_022}
-            </button>
+          <div className="min-w-0">
+            <div className="upgrade-suggestion-title"><span className="upgrade-suggestion-rank">#{rank}</span><h3>{title}</h3></div>
+            <span className={`tool-status ${stockEnough ? 'tool-status--success' : ''}`}>{stockLabel}</span>
           </div>
-
-          <MetricGrid suggestion={suggestion} cost={cost} />
-
-          {expanded && (
-            <div className="space-y-3 border-t border-surface-3 pt-4">
-              <TrainingCostPanel cost={cost} />
-              <ImpactPanel suggestion={suggestion} />
-            </div>
-          )}
         </div>
-      </div>
+        <div className="upgrade-suggestion-actions">
+          {projectScope && <CultivationProjectImport key={`${projectScope.userId}:${projectScope.profileId}:${JSON.stringify(projects)}`} scope={projectScope} projects={projects} />}
+          <button type="button" onClick={onToggleExpanded} className="tool-secondary-action" aria-expanded={expanded}>
+            {expanded ? copy.optimize.components_UpgradeSuggestions_021 : copy.optimize.components_UpgradeSuggestions_022}
+          </button>
+        </div>
+      </header>
+      {(suggestion.desc || suggestion.rooms || suggestion.impact?.summary) && <div className="upgrade-suggestion-summary">
+        {suggestion.desc && <p className="text-sm leading-6 text-ink-secondary">{suggestion.desc}</p>}
+        {(suggestion.rooms || suggestion.impact?.summary) && <p className="text-xs leading-5 text-ink-muted">{suggestion.impact?.summary || `${copy.optimize.components_UpgradeSuggestions_020}${suggestion.rooms}`}</p>}
+      </div>}
+      <MetricGrid suggestion={suggestion} cost={cost} />
+      {expanded && <div className="space-y-3 border-t border-surface-3 pt-4">
+        <TrainingCostPanel cost={cost} />
+        <ImpactPanel suggestion={suggestion} />
+      </div>}
     </article>
   )
 }
@@ -236,13 +224,12 @@ function MetricGrid({ suggestion, cost }: { suggestion: UpgradeSuggestion; cost?
       : { label: copy.optimize.components_UpgradeSuggestions_028, value: formatPayback(getUpgradePaybackDays(suggestion)), tone: 'warning' as const },
     { label: copy.optimize.components_UpgradeSuggestions_029, value: formatSanity(totalSanity), tone: 'default' as const },
     { label: copy.optimize.components_UpgradeSuggestions_030, value: formatSanity(missingSanity), tone: 'default' as const },
-    { label: copy.optimize.components_UpgradeSuggestions_031, value: getStockLabel(cost), tone: isStockEnough(cost) ? 'success' as const : 'default' as const },
   ]
 
   return (
-    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+    <div className="upgrade-suggestion-metrics">
       {metrics.map((metric) => (
-        <div key={metric.label} className="tool-inset min-h-20 px-3 py-2">
+        <div key={metric.label}>
           <p className="text-xs font-medium text-ink-muted">{metric.label}</p>
           <p className={`mt-1 break-words text-sm font-semibold ${metricToneClass(metric.tone)}`}>{metric.value}</p>
         </div>

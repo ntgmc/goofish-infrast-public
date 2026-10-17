@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import ScheduleProgress, { type ScheduleProgressState } from '../../../components/ScheduleProgress'
 import InfoTooltip from '../../../components/InfoTooltip'
+import { LoadingIcon } from '../../../components/icons'
 import { SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../../../lib/config'
 import type { LicenseConfig, PriorityCouponBalance } from '../../../lib/types'
 import { InlineErrorPanel } from './feedback'
@@ -154,10 +155,7 @@ export default function GenerateControlBar({
           >
             {loading || syncing ? (
               <span className="inline-flex items-center justify-center gap-2">
-                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" aria-hidden="true">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
+                <LoadingIcon className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
                 {busyLabel}
               </span>
             ) : resultIsCurrent ? copy.optimize.pages_tool_optimize_GenerateControlBar_028 : hasResult ? copy.optimize.pages_tool_optimize_GenerateControlBar_029 : copy.optimize.pages_tool_optimize_GenerateControlBar_030}

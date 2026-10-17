@@ -27,7 +27,9 @@ export default async function adminOptimizationHandler(req: Request): Promise<Re
   try {
     if (req.method === 'GET') {
       if (view === 'queue') {
-        return noStore(jsonResponse(await getAdminOptimizationQueueSnapshot(undefined, 20)))
+        const related = url.searchParams.get('related')?.trim()
+        if (related && related.length > 254) return jsonResponse({ error: '关联查询参数过长。' }, 400)
+        return noStore(jsonResponse(await getAdminOptimizationQueueSnapshot(undefined, 20, related || undefined)))
       }
       if (view === 'dead_letter' || view === 'dead_letter_download') {
         const id = url.searchParams.get('id')?.trim() ?? ''

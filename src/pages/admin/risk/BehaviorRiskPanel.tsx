@@ -36,7 +36,7 @@ function emptyPage(): BehaviorRiskCasePageDto {
   }
 }
 
-export default function BehaviorRiskPanel({ active = true }: { active?: boolean }) {
+export default function BehaviorRiskPanel({ active = true, search = '' }: { active?: boolean; search?: string }) {
   const [selectedCaseId, setSelectedCaseId] = useState('')
   const [status, setStatus] = useState<RiskStatus>('pending')
   const [page, setPage] = useState(1)
@@ -50,6 +50,9 @@ export default function BehaviorRiskPanel({ active = true }: { active?: boolean 
   const [selections, setSelections] = useState<Record<string, ActionSelection>>({})
   const requestId = useRef(0)
   const abortController = useRef<AbortController | null>(null)
+  useEffect(() => {
+    if (new URLSearchParams(search).get('status') === 'pending') { setStatus('pending'); setPage(1); setSelectedCaseId('') }
+  }, [search])
 
   const load = useCallback(async () => {
     const currentRequestId = ++requestId.current

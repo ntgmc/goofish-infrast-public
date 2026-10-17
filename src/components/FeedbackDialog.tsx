@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
-import { Check, ImagePlus, MessageSquare, X } from 'lucide-react'
+import { SuccessIcon as Check, AddImageIcon as ImagePlus, FeedbackIcon as MessageSquare, RemoveIcon as X } from './icons'
 import { copy } from '../copy'
 import { apiJson, getApiErrorMessage } from '../lib/api-client'
 import { FEEDBACK_CATEGORIES, FEEDBACK_IMAGE_TYPES, FEEDBACK_MESSAGE_MAX_LENGTH, type FeedbackCategory } from '../lib/feedback-contracts'
@@ -10,7 +10,7 @@ import FeedbackHistory from './FeedbackHistory'
 import FeedbackImage from './FeedbackImage'
 import './FeedbackDialog.css'
 
-export default function FeedbackButton({ iconOnly = false, className = 'tool-secondary-action' }: { iconOnly?: boolean; className?: string }) {
+export default function FeedbackButton({ iconOnly = false, className = 'tool-secondary-action', profileId }: { iconOnly?: boolean; className?: string; profileId?: string }) {
   const text = copy.feedback
   const id = useId()
   const trigger = useRef<HTMLButtonElement>(null)
@@ -24,6 +24,9 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
   const [open, setOpen] = useState(false)
   const [category, setCategory] = useState<FeedbackCategory>('schedule')
   const [message, setMessage] = useState('')
+  const [attachProfile, setAttachProfile] = useState(false)
+  const [resultId, setResultId] = useState('')
+  const [jobId, setJobId] = useState('')
   const [attachment, setAttachment] = useState<(Awaited<ReturnType<typeof prepareFeedbackImage>> & { name: string }) | null>(null)
   const [processing, setProcessing] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -38,9 +41,9 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
     const button = trigger.current
     function openHistory(event?: Event) {
       const requestedId = event instanceof CustomEvent ? event.detail as string : new URLSearchParams(window.location.search).get('feedback')
-      if (!requestedId || !/^[0-9a-f-]{36}$/i.test(requestedId)) return
-      setFeedbackId(requestedId)
-      setView('history')
+      if (!requestedId || requestedId !== 'new' && !/^[0-9a-f-]{36}$/i.test(requestedId)) return
+      setFeedbackId(requestedId === 'new' ? null : requestedId)
+      setView(requestedId === 'new' ? 'new' : 'history')
       setOpen(true)
     }
     button?.addEventListener('goofish:open-feedback', openHistory)
@@ -74,11 +77,13 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
     setSubmitting(true)
     setError(null)
     try {
-      const created = await apiJson<{ id: string }>('/api/user/feedback', { method: 'POST', json: { category, message: message.trim(), ...(attachment ? { image: attachment.image } : {}) }, fallbackMessage: text.submitFailed })
+      const context = { ...(attachProfile && profileId ? { profile_id: profileId } : {}), ...(resultId.trim() ? { result_id: resultId.trim() } : {}), ...(jobId.trim() ? { job_id: jobId.trim() } : {}) }
+      const created = await apiJson<{ id: string }>('/api/user/feedback', { method: 'POST', json: { category, message: message.trim(), ...(Object.keys(context).length ? { context } : {}), ...(attachment ? { image: attachment.image } : {}) }, fallbackMessage: text.submitFailed })
       setFeedbackId(created.id)
       setSuccess(true)
       setMessage('')
       setAttachment(null)
+      setAttachProfile(false); setResultId(''); setJobId('')
     } catch (caught) { setError(getApiErrorMessage(caught, text.submitFailed)) }
     finally { setSubmitting(false) }
   }
@@ -112,6 +117,12 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
             <div className="feedback-label"><label htmlFor={`${id}-message`}>{text.message}</label><textarea id={`${id}-message`} className="tool-field feedback-field" rows={5} required maxLength={FEEDBACK_MESSAGE_MAX_LENGTH} value={message} disabled={busy} placeholder={text.placeholder} aria-describedby={`${id}-message-hint`} onChange={(event) => setMessage(event.target.value)} /></div>
             <div className="feedback-message-meta"><p id={`${id}-message-hint`}>{text.messageHint}</p><span className="feedback-count" aria-label={`${text.characterCount} ${message.length}/${FEEDBACK_MESSAGE_MAX_LENGTH}`}>{message.length}/{FEEDBACK_MESSAGE_MAX_LENGTH}</span></div>
           </div>
+          <fieldset className="grid min-w-0 gap-3"><legend className="mb-2 text-sm font-semibold">{text.context}</legend>
+            {profileId && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={attachProfile} disabled={busy} onChange={(event) => setAttachProfile(event.target.checked)} />{text.attachProfile}</label>}
+            <label className="feedback-label"><span>{text.resultId}</span><input className="tool-field feedback-field" maxLength={120} value={resultId} disabled={busy} onChange={(event) => setResultId(event.target.value)} /></label>
+            <label className="feedback-label"><span>{text.jobId}</span><input className="tool-field feedback-field" maxLength={120} value={jobId} disabled={busy} onChange={(event) => setJobId(event.target.value)} /></label>
+            <p className="feedback-hint">{text.contextHint}</p>
+          </fieldset>
           <div className="feedback-label">
             <span id={`${id}-image-label`}>{text.image}</span>
             <input ref={fileInput} type="file" hidden accept={FEEDBACK_IMAGE_TYPES.join(',')} disabled={busy} aria-label={text.image}

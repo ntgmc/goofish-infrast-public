@@ -50,9 +50,15 @@ describe('admin optimization handler', () => {
     const response = await adminOptimizationHandler(new Request('http://localhost/api/admin/optimization?view=queue'))
     expect(response.status).toBe(200)
     expect(response.headers.get('Cache-Control')).toBe('no-store')
-    expect(getQueueSnapshot).toHaveBeenCalledWith(undefined, 20)
+    expect(getQueueSnapshot).toHaveBeenCalledWith(undefined, 20, undefined)
     expect(authenticateAdminRequest).toHaveBeenCalledWith(expect.any(Request), 'optimization_view')
     await expect(response.json()).resolves.toMatchObject({ queued_jobs: [], running_jobs: [], recent_jobs: [] })
+  })
+
+  it('queries related task history before applying the recent limit and rejects oversized lookups', async () => {
+    expect((await adminOptimizationHandler(new Request('http://localhost/api/admin/optimization?view=queue&related=profile-42'))).status).toBe(200)
+    expect(getQueueSnapshot).toHaveBeenCalledWith(undefined, 20, 'profile-42')
+    expect((await adminOptimizationHandler(new Request(`http://localhost/api/admin/optimization?view=queue&related=${'x'.repeat(255)}`))).status).toBe(400)
   })
 
   it('returns the original persisted payload for one dead-letter detail', async () => {

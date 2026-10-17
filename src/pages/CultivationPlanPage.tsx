@@ -4,6 +4,7 @@ import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import { copy } from '../copy/index'
 import { apiJson } from '../lib/api-client'
+import { useSklandSnapshot } from '../hooks/useSklandSnapshot'
 import { defaultCultivationQuery, type CultivationData, type CultivationOptions, type CultivationQuery } from '../lib/cultivation-contract'
 import { buildCultivationPlan } from '../lib/cultivation-planner'
 import { useToolSession } from './tool/useToolSession'
@@ -30,6 +31,8 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
   const profiles = session.profiles.filter((row) => row.status === 'active' && !row.archived_at && row.skland_binding)
   const [chosenProfile, setChosenProfile] = useState('')
   const profileId = profiles.some((row) => row.id === chosenProfile) ? chosenProfile : profiles.find((row) => row.id === session.activeProfile?.id)?.id ?? profiles[0]?.id ?? ''
+  const snapshot = useSklandSnapshot(session.user?.id, profiles.find((row) => row.id === profileId))
+  const calculatedVersion = useRef('')
   const [data, setData] = useState<CultivationData | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -44,10 +47,11 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
   const [potionNumbers, setPotionNumbers] = useState<Record<string, string>>({})
   const request = useRef<AbortController | null>(null)
   const generation = useRef(0)
-  const plan = useMemo(() => data ? buildCultivationPlan(data, appliedOptions) : null, [data, appliedOptions])
+  const plan = useMemo(() => data && !snapshot.expired ? buildCultivationPlan(data, appliedOptions) : null, [data, appliedOptions, snapshot.expired])
 
   useEffect(() => {
     generation.current++
+    calculatedVersion.current = ''
     request.current?.abort()
     setData(null)
     setError(null)
@@ -59,13 +63,22 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
   }, [profileId])
 
   useEffect(() => {
+    if (snapshot.available === false) {
+      generation.current++
+      request.current?.abort()
+      setData(null)
+      setBusy(false)
+    }
+  }, [snapshot.available])
+
+  useEffect(() => {
     const next = queryFromUrl()
     setOptions((value) => JSON.stringify(value.recommendation) === JSON.stringify(next) ? value : { ...value, recommendation: next })
     // URL navigation restores the recommendation filters without reading the player's inventory.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
-  async function load(recommendation = options.recommendation ?? defaultCultivationQuery, preserveSettings = false) {
+  async function load(recommendation = options.recommendation ?? defaultCultivationQuery, preserveSettings = false, refresh = true) {
     if (!profileId || busy) return
     const controller = new AbortController()
     request.current?.abort()
@@ -74,11 +87,13 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
     setBusy(true)
     setError(null)
     try {
+      if (refresh) await snapshot.refresh()
+      if (controller.signal.aborted) return
       const result = await apiJson<CultivationData>('/api/cultivation-plan', { method: 'POST', json: { profile_id: profileId, recommendation }, signal: controller.signal, timeoutMs: 90000, fallbackMessage: label.failed })
       if (generation.current === run) {
         setData(result)
         const update = (value: CultivationOptions) => ({ ...value, recommendation, potions: preserveSettings ? Object.fromEntries(result.potions.map((potion) => [potion.key, Math.min(potion.count, value.potions[potion.key] ?? 0)])) : {} })
-        setOptions(update)
+        setOptions((value) => ({ ...update(value), recommendation: preserveSettings ? value.recommendation : recommendation }))
         setAppliedOptions(update)
         setPotionNumbers((value) => preserveSettings ? Object.fromEntries(result.potions.map((potion) => [potion.key, String(Math.min(potion.count, Number(value[potion.key] ?? 0)))])) : {})
       }
@@ -86,6 +101,13 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
       if (generation.current === run && !controller.signal.aborted) setError(caught instanceof Error ? caught.message : label.failed)
     } finally { if (generation.current === run) setBusy(false) }
   }
+
+  useEffect(() => {
+    const version = snapshot.data?.version
+    if (!version || busy || data?.snapshotVersion === version || calculatedVersion.current === `${profileId}:${version}`) return
+    calculatedVersion.current = `${profileId}:${version}`
+    void load(appliedOptions.recommendation ?? defaultCultivationQuery, true, false)
+  }, [snapshot.data?.version, busy, profileId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const exclude = useCallback((id: string, remove: boolean) => {
     const update = (value: CultivationOptions) => ({ ...value, excluded: remove ? [...new Set([...value.excluded, id])] : value.excluded.filter((entry) => entry !== id) })
@@ -114,10 +136,10 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
       else params.set(`cultivation_${key}`, String(value))
     }
     setSearchParams(params, { replace: true })
-    if (data && JSON.stringify(next.recommendation) !== JSON.stringify(data.recommendation?.query ?? defaultCultivationQuery)) void load(next.recommendation, true)
+    if (data && JSON.stringify(next.recommendation) !== JSON.stringify(data.recommendation?.query ?? defaultCultivationQuery)) void load(next.recommendation, true, false)
   }
 
-  return { profiles, profileId, setChosenProfile, data, busy, error, options, setOptions, appliedOptions,
+  return { profiles, profileId, setChosenProfile, data, busy: busy || snapshot.busy, error: error || snapshot.error || null, options, setOptions, appliedOptions,
     numbers, setNumbers, potionNumbers, setPotionNumbers, plan, load, exclude, changed, apply }
 }
 
@@ -142,7 +164,7 @@ function CultivationContent({ session, embedded = false }: { session: ReturnType
           : session.authStatus !== 'authenticated' || !profiles.length ? <div className="tool-inset space-y-3 p-4"><p className="text-sm">{session.authStatus !== 'authenticated' ? label.login : label.noProfile}</p><Link to={embedded ? v2Path('profiles', session.activeProfile?.id) : '/tool/profiles'} className="tool-secondary-action inline-flex">{label.loginAction}</Link></div>
             : <div className="flex flex-wrap items-end gap-4">
               <label className="min-w-0 flex-1 space-y-2 text-sm"><span className="block">{label.profile}</span><select className="tool-field" value={profileId} onChange={(event) => setChosenProfile(event.target.value)}>{profiles.map((row) => <option key={row.id} value={row.id}>{row.display_name}</option>)}</select></label>
-              <button className="tool-primary-action max-w-full whitespace-nowrap" disabled={busy} onClick={() => void load()}>{busy ? label.loadingData : label.load}</button>
+              <button className="tool-primary-action max-w-full whitespace-nowrap" disabled={busy} onClick={() => void load()}>{busy ? label.loadingData : copy.skland.refresh}</button>
             </div>}
         {error && <p role="alert" className="tool-alert tool-alert--warning p-3 text-sm">{error}</p>}
       </section>
@@ -161,7 +183,7 @@ function CultivationContent({ session, embedded = false }: { session: ReturnType
           <div className="flex flex-wrap items-center gap-3"><button type="button" className="tool-primary-action" disabled={busy} onClick={apply}>{label.apply}</button>{changed && <p role="status" className="text-sm text-ink-secondary">{label.settingsChanged}</p>}</div>
           </div>
         </details>
-        <CultivationResults data={data} plan={plan} excluded={appliedOptions.excluded} exclude={exclude} />
+        <CultivationResults data={data} plan={plan} excluded={appliedOptions.excluded} exclude={exclude} projectScope={session.user ? { userId: session.user.id, profileId } : undefined} />
         <CultivationSpecialItems key={profileId} data={data} plan={plan} preference={appliedOptions.preference} />
         <p className="text-xs leading-5 text-ink-muted">{label.dataDate} · {new Date(data.updatedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}<br />{label.importDate} · {new Date(data.importedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</p>
       </>}

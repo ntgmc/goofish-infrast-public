@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowRight, Package, Search } from 'lucide-react'
+import { NextIcon as ArrowRight, InventoryIcon as Package, SearchIcon as Search } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogClose } from '../../../components/ui/dialog'
 import SklandBindingDialog from '../../../components/SklandBindingDialog'

@@ -14,6 +14,7 @@ import { getValidatedJsonValue } from '../security/request-validation'
 import { requireUserSession } from './user-auth'
 import { requireSiteFeatures } from '../feature-gate'
 import { convertSklandCharactersToOperators, decryptSklandCredential, SklandClient, SklandClientError } from './skland-client'
+import { getSklandSnapshot, SklandSnapshotError } from '../skland-snapshot'
 import {
   getExpItemSanity,
   getNetLmdSanity,
@@ -49,9 +50,13 @@ type HandlerError = Error & {
 type SklandDepotRead = {
   inventory: DepotInventoryItem[]
   sample: SklandSampleData | null
+  importedAt: string
+  snapshotVersion: string
+  warnings: string[]
 }
 
 type SklandSampleData = {
+  fetchedAt?: string
   uid: string
   accountLevel: number | null
   operatorStats: DepotOperatorStats
@@ -178,15 +183,19 @@ export default async (req: Request): Promise<Response> => {
       if (gated) return gated
       const sampleConsent = body.sample_consent !== false
       const skland = await readSklandInventory(req, body.profile_id, sampleConsent)
-      return jsonResponse(await buildDepotValueResponse(skland.inventory, 'skland', undefined, {
+      const result = await buildDepotValueResponse(skland.inventory, 'skland', undefined, {
         sample: skland.sample,
         contributorProfileId: typeof body.profile_id === 'string' ? body.profile_id : null,
         sampleConsent,
-      }))
+      })
+      return jsonResponse({ ...result, imported_at: skland.importedAt, snapshot_version: skland.snapshotVersion,
+        warnings: [...result.warnings, ...skland.warnings] })
     }
     return jsonResponse({ error: '请指定 source 为 upload 或 skland。' }, 400)
   } catch (error) {
     console.error('depot value error:', error instanceof Error ? error.message : error)
+    if (error instanceof SklandSnapshotError) return jsonResponse({ error: error.message, code: error.code,
+      action: error.code === 'skland_credential_invalid' ? 'rebind' : 'retry' }, error.status)
     if (error instanceof SklandClientError) {
       const invalid = error.code === 'credential_invalid' || error.code === 'credential_format_invalid'
       return jsonResponse({ error: error.message, code: invalid ? 'skland_credential_invalid' : 'skland_upstream_failed',
@@ -345,7 +354,7 @@ async function saveDepotSampleIfRequested({
     const hashes = hashSklandUidCandidates(sample.uid)
     const currentHash = hashes[0]
     if (!currentHash) throw new Error('DEPOT_SAMPLE_HASH_SECRET is not configured')
-    const now = new Date().toISOString()
+    const now = sample.fetchedAt ?? new Date().toISOString()
     const record: DepotValueSampleRecord = {
       version: 2,
       uid_hash: currentHash.hash,
@@ -524,28 +533,18 @@ async function readSklandInventory(
   if (!binding?.encrypted_cred) throw createError('当前账号尚未绑定森空岛。', 404)
 
   const client = new SklandClient(decryptSklandCredential(binding.encrypted_cred))
-  const playerInfoPromise = includeSample
-    ? client.getGamePlayerInfo(binding.uid)
-      .then((value) => ({ ok: true as const, value }))
-      .catch((error) => ({ ok: false as const, error }))
-    : Promise.resolve(null)
-  const [calInfo, calPlayer] = await Promise.all([
-    client.getCultivateInfo(),
-    client.getCultivatePlayer(binding.uid),
-  ])
-  const playerInfo = await playerInfoPromise
-  const inventory = mergeDepotItems(readSklandPlayerItems(calInfo, calPlayer))
+  const snapshot = await getSklandSnapshot(profile, ['inventory'])
+  const calInfo = await client.getCultivateInfo()
+  const inventory = mergeDepotItems(readSklandPlayerItems(calInfo, snapshot.inventory!.data))
   let sample: SklandSampleData | null = null
-  if (playerInfo?.ok) {
+  if (includeSample && snapshot.game && Date.now() - Date.parse(snapshot.game.fetchedAt) < 24 * 3600_000) {
     try {
-      sample = buildSklandSampleData(binding.uid, playerInfo.value)
+      sample = { ...buildSklandSampleData(binding.uid, snapshot.game.data), fetchedAt: snapshot.inventory!.fetchedAt }
     } catch (error) {
-      console.warn('depot value skland sample parse failed:', error instanceof Error ? error.message : error)
+      console.warn('depot value skland sample parse failed:', error instanceof Error ? error.name : 'unknown')
     }
-  } else if (playerInfo && !playerInfo.ok) {
-    console.warn('depot value skland sample fetch failed:', playerInfo.error instanceof Error ? playerInfo.error.message : playerInfo.error)
   }
-  return { inventory, sample }
+  return { inventory, sample, importedAt: snapshot.inventory!.fetchedAt, snapshotVersion: snapshot.version, warnings: Object.values(snapshot.errors) }
 }
 
 function readSklandPlayerItems(calInfo: unknown, calPlayer: unknown): DepotInventoryItem[] {

@@ -495,6 +495,6 @@ function scenarioDescription(
 
 function scheduleLabel(strategy: ScenarioMaaSchedule | 'rotation'): string {
   if (strategy === 'variable') return copy.domain.lib_scenario_comparison_038
-  if (strategy === '8x3') return 'MAA 8h×3'
+  if (strategy === '8x3') return copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_002
   return copy.domain.lib_scenario_comparison_039
 }

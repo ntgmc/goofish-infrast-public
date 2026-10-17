@@ -1,5 +1,6 @@
 import type { AnnouncementStats as AnnouncementReachStats, LicenseOperator, ProductPermissionMode, RawPermissionMode, UserGameAccountKind } from '../../lib/types'
 import type { AdminSection } from '../../lib/app-routes'
+import type { OperationsUserProgress } from '../../lib/operations-drilldown'
 import { copy } from '../../copy/index'
 import { getPermissionProfile, getPermissionRank, listAdminIssuablePermissions, productPolicies } from '../../lib/product-catalog'
 
@@ -272,6 +273,7 @@ export interface AdminOptimizationQueueSnapshot {
 }
 
 export interface AppUserSummary {
+  operations_progress?: OperationsUserProgress
   id: string;
   email: string;
   email_verified_at: string | null;

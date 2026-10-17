@@ -5,6 +5,8 @@ import { encryptSklandCredential } from './skland-client'
 vi.mock('./user-auth', () => ({ requireUserSession: async () => ({ profiles: [{ id: 'profile', status: 'active',
   skland_binding: { uid: 'fixture', encrypted_cred: encryptSklandCredential('fixture-credential') } }] }) }))
 vi.mock('../feature-gate', () => ({ requireSiteFeatures: async () => null }))
+vi.mock('../skland-snapshot', async (original) => ({ ...await original<typeof import('../skland-snapshot')>(),
+  getSklandSnapshot: async () => ({ inventory: { data: { items: [] }, fetchedAt: new Date().toISOString() }, version: '1', errors: {} }) }))
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 
 it.each(['credential', 'temporary', 'timeout', 'unknown'])('maps %s failures at the depot boundary', async (mode) => {

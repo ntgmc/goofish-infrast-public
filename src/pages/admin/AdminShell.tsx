@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Activity, Bell, Boxes, CreditCard, FileText, Gauge, Gift, MessageSquare, Settings2, ShieldCheck, UserPlus, Users } from 'lucide-react'
+import { AdminIcon, AdminOverviewIcon, AdminUsersIcon, AnnouncementIcon, ContentManagementIcon, FeedbackIcon, InvitationIcon, ItemManagementIcon, QueueIcon, RedemptionIcon, RegistrationIcon, RiskIcon, SiteFeaturesIcon } from '../../components/icons'
 import { Link } from 'react-router'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import CompactHeaderMenu from '../../components/CompactHeaderMenu'
@@ -13,8 +13,8 @@ const groups: Array<{ label: string; sections: AdminSection[] }> = [
   { label: '服务与安全', sections: ['queue', 'risk'] },
   { label: '站点管理', sections: ['features', 'registration', 'announcement', 'content'] },
 ]
-const icons = { overview: Gauge, users: Users, cdk: CreditCard, items: Boxes, invitation: Gift, queue: Activity,
-  risk: ShieldCheck, features: Settings2, registration: UserPlus, announcement: Bell, content: FileText, feedback: MessageSquare }
+const icons = { overview: AdminOverviewIcon, users: AdminUsersIcon, cdk: RedemptionIcon, items: ItemManagementIcon, invitation: InvitationIcon, queue: QueueIcon,
+  risk: RiskIcon, features: SiteFeaturesIcon, registration: RegistrationIcon, announcement: AnnouncementIcon, content: ContentManagementIcon, feedback: FeedbackIcon }
 
 export function canAccessAdminSection(section: AdminSection, capabilities: AdminCapability[]): boolean {
   if (section === 'overview') return capabilities.includes('usage_view')
@@ -39,7 +39,7 @@ export default function AdminShell({ section, username, capabilities, syncStatus
   const canManage = capabilities.includes('admin_manage')
   return <DialogSurfaceProvider value="admin-dialog"><div className="admin-app tool-shell">
     <aside className="admin-sidebar tool-sidebar">
-      <Link to={adminPath('overview')} className="admin-brand"><ShieldCheck size={26} aria-hidden="true" /><span><strong>MAA 管理后台</strong><small>管理工作台</small></span></Link>
+      <Link to={adminPath('overview')} className="admin-brand"><AdminIcon size={26} aria-hidden="true" /><span><strong>MAA 管理后台</strong><small>管理工作台</small></span></Link>
       <nav aria-label="后台导航">{visibleGroups.map((group) => <div className="admin-nav-group" key={group.label}>
         <p>{group.label}</p>{group.sections.map((item) => {
           const Icon = icons[item]

@@ -131,8 +131,13 @@ it.each([{ code: 500, message: 'Service temporarily unavailable' }, { code: 0, m
   const first = await preview('', target.id)
   expect((await request('/login/confirm', { profile_id: target.id, confirmation_id: first.body.confirmation_id, idempotency_key: randomUUID() })).status).toBe(200)
   tokenResponse = failure
+  const cached = await request('/import/refresh', { profile_id: target.id })
+  expect(cached.status).toBe(200)
+  expect(cached.body.skland_import.inventory_warning).toBeTruthy()
+  await query('delete from skland_snapshots where user_id = $1', [userId])
   expect((await request('/import/refresh', { profile_id: target.id })).body.code).toBe('skland_upstream_failed')
   expect((await getProfileById(target.id))?.skland_binding?.credential_status).toBe('available')
+  await query('delete from skland_snapshots where user_id = $1', [userId])
   tokenResponse = { code: 401, message: 'Unauthorized' }
   expect((await request('/import/refresh', { profile_id: target.id })).body.code).toBe('skland_credential_invalid')
 })

@@ -612,7 +612,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
   pages_tool_optimize_scenario_lab_ScenarioFactors_001: "MAA 自动非固定间隔（3 到 4 班）",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
-  pages_tool_optimize_scenario_lab_ScenarioFactors_002: "MAA 8 小时 × 3",
+  pages_tool_optimize_scenario_lab_ScenarioFactors_002: "MAA 固定 8/12 小时",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
   pages_tool_optimize_scenario_lab_ScenarioFactors_003: "MAA 12 小时 × 2",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
@@ -1031,7 +1031,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
   pages_tool_optimize_scenario_lab_ScenarioResultsTable_059: "自动变间隔",
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
-  pages_tool_optimize_scenario_lab_ScenarioResultsTable_060: "固定 8×3",
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_060: "固定 8/12 小时",
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
   pages_tool_optimize_scenario_lab_ScenarioResultsTable_061: "不使用无人机",
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx

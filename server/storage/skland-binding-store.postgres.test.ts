@@ -6,6 +6,7 @@ import { getItemBalance, grantItem, useInventoryItem } from './inventory-store'
 import { createLifetimeVoucherProfileAuthorizationInTransaction, saveProfileInTransaction } from './cdk-redemption'
 import { closePool, query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
+import { readSklandSnapshot, saveSklandSnapshot } from './skland-snapshot-store'
 import { createPostgresOptimizeJobStore } from './optimize-job-store'
 import { selectAuthPayloadProfiles } from '../handlers/auth-payload-profiles'
 import { FREE_PREVIEW_LIMITED_CDK_ACTIVITY } from '../free-preview-trial'
@@ -15,6 +16,7 @@ import {
 } from './skland-binding-store'
 import {
   emptyWorkspace,
+  clearProfileSklandCredential,
   getProfileById,
   getProfileForUser,
   getProfileWorkspace,
@@ -457,6 +459,60 @@ async function seedMergeProfiles(userId: string): Promise<[UserGameAccountRecord
   })
   return [preview, cdk]
 }
+
+describe('shared Skland snapshot lifecycle', () => {
+  async function seedSnapshot() {
+    const user = await seedUser(`${randomUUID()}@example.test`)
+    const profile = profileRecord(user.id)
+    profile.skland_binding = { uid: 'snapshot-uid', nickname: 'Snapshot', channel_name: '官方', bound_at: profile.created_at,
+      last_imported_at: profile.created_at, encrypted_cred: 'test-encrypted-credential', credential_status: 'available',
+      credential_invalid_at: null, credential_invalid_reason: null }
+    await withTransaction((client) => saveProfileInTransaction(client, profile))
+    const snapshot = { game: { data: { chars: [] }, fetchedAt: profile.created_at },
+      inventory: { data: { items: [{ id: '4001', count: 99 }] }, fetchedAt: profile.created_at },
+      errors: {}, lastAttemptAt: profile.created_at, retryAt: null }
+    const stored = await withTransaction((client) => saveSklandSnapshot(client, profile, snapshot))
+    expect(stored).not.toBeNull()
+    return { user, profile, snapshot, stored: stored! }
+  }
+
+  it('persists account data with increasing versions and keeps normal workspace imports from invalidating it', async () => {
+    const { user, profile, snapshot, stored } = await seedSnapshot()
+    expect(await readSklandSnapshot(user.id, 'snapshot-uid')).toEqual(stored)
+    expect(await readSklandSnapshot('another-user', 'snapshot-uid')).toBeNull()
+    profile.skland_binding!.last_imported_at = new Date().toISOString()
+    await withTransaction((client) => saveProfileInTransaction(client, profile))
+    expect((await readSklandSnapshot(user.id, 'snapshot-uid'))?.version).toBe(stored.version)
+    const next = await withTransaction((client) => saveSklandSnapshot(client, profile, snapshot))
+    expect(BigInt(next!.version)).toBeGreaterThan(BigInt(stored.version))
+  })
+
+  it('clears cached personal data when authorization is cleared and rejects a late publication', async () => {
+    const { user, profile, snapshot } = await seedSnapshot()
+    await clearProfileSklandCredential(user.id, profile.id)
+    expect(await readSklandSnapshot(user.id, 'snapshot-uid')).toBeNull()
+    expect(await withTransaction((client) => saveSklandSnapshot(client, profile, snapshot))).toBeNull()
+  })
+
+  it.each(['credential', 'binding', 'frozen', 'archived', 'deleted'] as const)('invalidates snapshots on %s changes', async (change) => {
+    const { user, profile } = await seedSnapshot()
+    if (change === 'deleted') await query('delete from user_game_accounts where id = $1', [profile.id])
+    else {
+      if (change === 'credential') profile.skland_binding!.encrypted_cred = 'new-credential'
+      if (change === 'binding') profile.skland_binding!.uid = 'new-uid'
+      if (change === 'frozen') profile.status = 'frozen'
+      if (change === 'archived') profile.archived_at = new Date().toISOString()
+      await withTransaction((client) => saveProfileInTransaction(client, profile))
+    }
+    expect(await readSklandSnapshot(user.id, 'snapshot-uid')).toBeNull()
+  })
+
+  it('removes snapshots when their website account is deleted', async () => {
+    const { user } = await seedSnapshot()
+    await query('delete from user_accounts where id = $1', [user.id])
+    expect(await readSklandSnapshot(user.id, 'snapshot-uid')).toBeNull()
+  })
+})
 
 async function seedUser(email: string): Promise<UserAccountRecord> {
   const now = new Date().toISOString()

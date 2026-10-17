@@ -1,7 +1,7 @@
 import Link from '../components/InternalLink'
 import BrandLogo from '../components/BrandLogo'
 import CompactHeaderMenu from '../components/CompactHeaderMenu'
-import PublicFooter, { SupportGroupLink } from '../components/PublicFooter'
+import PublicFooter, { FeedbackLink } from '../components/PublicFooter'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import { copy, CURRENT_LOCALE } from '../copy/index'
 import { PUBLIC_PRICING_PLAN_IDS } from '../lib/public-content'
@@ -255,8 +255,8 @@ export default function PricingPage({ embedded = false }: { embedded?: boolean }
         </section>
 
         <section className="py-8 sm:flex sm:items-center sm:justify-between sm:gap-8">
-          <div><h2 className="text-lg font-semibold text-ink-primary">{pricing.support_heading}</h2><p className="mt-2 whitespace-pre-line text-sm leading-7 text-ink-secondary">{content.qq_group.name}（{content.qq_group.number}） · {pricing.support_body}</p></div>
-          <SupportGroupLink className="tool-primary-action mt-5 inline-flex items-center justify-center sm:mt-0">{copy.public.pages_PricingPage_010}</SupportGroupLink>
+          <div><h2 className="text-lg font-semibold text-ink-primary">{pricing.support_heading}</h2><p className="mt-2 whitespace-pre-line text-sm leading-7 text-ink-secondary">{pricing.support_body}</p></div>
+          <FeedbackLink className="tool-primary-action mt-5 inline-flex items-center justify-center sm:mt-0">{copy.public.pages_PricingPage_010}</FeedbackLink>
         </section>
       </div>
       {!embedded && <PublicFooter variant="tool" className="mt-10" />}

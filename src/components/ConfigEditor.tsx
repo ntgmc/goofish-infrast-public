@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { BedDouble, Factory, Flame, Store, Zap } from 'lucide-react'
+import { DormitoryIcon as BedDouble, ManufactureIcon as Factory, FiammettaIcon as Flame, TradingStationIcon as Store, PowerPlantIcon as Zap, DroneIcon } from './icons'
 import { Tabs } from './ui/tabs'
 import {
   CONFIG_PRESETS,
@@ -386,7 +386,7 @@ export default function ConfigEditor({
           </section>
           <section aria-labelledby="config-drones-heading" className="config-strategy-section config-strategy-section--drones">
             <div className="config-switch-row">
-              <h3 id="config-drones-heading"><label htmlFor="config-drones-enabled" className="config-strategy-heading"><Zap aria-hidden="true" />{copy.common.components_ConfigEditor_071}</label></h3>
+              <h3 id="config-drones-heading"><label htmlFor="config-drones-enabled" className="config-strategy-heading"><DroneIcon aria-hidden="true" />{copy.common.components_ConfigEditor_071}</label></h3>
               <Switch id="config-drones-enabled" checked={!rotationMode && (config.drones?.enable ?? false)} disabled={!canEdit || rotationMode}
                 onChange={(event) => {
                   const enabled = event.currentTarget.checked

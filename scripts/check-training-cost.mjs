@@ -14,6 +14,7 @@ await esbuild.build({
   platform: 'node',
   target: 'node20',
   format: 'esm',
+  packages: 'external',
   logLevel: 'silent',
 })
 

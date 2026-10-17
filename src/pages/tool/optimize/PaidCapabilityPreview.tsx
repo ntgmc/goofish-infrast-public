@@ -1,6 +1,6 @@
 import Link from '../../../components/InternalLink'
 import { useId, useState } from 'react'
-import { ArrowRight, ChevronDown, Sparkles } from 'lucide-react'
+import { NextIcon as ArrowRight, ExpandIcon as ChevronDown, PaidCapabilityIcon as Sparkles } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { productPolicies } from '../../../lib/product-catalog'
 import { useSiteFeatures } from '../../../lib/site-feature-context'

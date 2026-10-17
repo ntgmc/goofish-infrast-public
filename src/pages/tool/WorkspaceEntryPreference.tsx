@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import { X } from 'lucide-react'
+import { CloseIcon as X } from '../../components/icons'
 import { copy } from '../../copy/index'
 import { dashboardPath, profileScopedPath, resolveToolRoute, workspaceSetupPath } from '../../lib/app-routes'
 import type { UserGameAccount } from '../../lib/types'

@@ -58,7 +58,6 @@ import {
   getHypergryphTokenByScanCode,
   getScanCode,
   importSklandOperatorsByCred,
-  readSklandFacilitiesByCred,
   isSklandCredentialCurrent,
   listSklandArknightsBindingsByCred,
   SklandClientError,
@@ -68,6 +67,9 @@ import {
   type SklandImportSummary,
 } from './skland-client'
 import { buildAuthPayload, jsonResponse, requireUserSession, scheduleInvitationSettlement } from './user-auth'
+import { getSklandSnapshot, seedSklandSnapshot, SklandSnapshotError } from '../skland-snapshot'
+import { readSklandFacilityRooms } from './skland-facilities'
+import { sklandResourceState } from '../../src/lib/skland-snapshot'
 import { recordUsageEvent } from './usage-stats'
 import type { UsageReasonCode } from '../storage/usage-store'
 import { CURRENT_PERSONAL_USE_DECLARATION, isCurrentPersonalUseDeclarationEffective } from '../personal-use-declaration'
@@ -424,7 +426,8 @@ export default async (req: Request): Promise<Response> => {
       if (!binding?.encrypted_cred || !binding.uid) {
         return jsonResponse({ error: '请先为当前档案绑定森空岛账号。', code: 'skland_not_bound' }, 400)
       }
-      const rooms = await readSklandFacilitiesByCred(decryptSklandCredential(binding.encrypted_cred), binding.uid)
+      const snapshot = await getSklandSnapshot(profile, ['game'])
+      const rooms = readSklandFacilityRooms(snapshot.game!.data)
       return jsonResponse({ rooms }, 200, { 'Cache-Control': 'no-store' })
     }
 
@@ -479,6 +482,10 @@ export default async (req: Request): Promise<Response> => {
         code: error.code,
         recovery_action: 'contact_support',
       }, 503, { 'Cache-Control': 'no-store' })
+    }
+    if (error instanceof SklandSnapshotError) {
+      return jsonResponse({ error: error.message, code: error.code,
+        recovery_action: error.code === 'skland_credential_invalid' ? 'rebind' : 'retry' }, error.status, { 'Cache-Control': 'no-store' })
     }
     if (error instanceof SklandProfileError) {
       return jsonResponse({ error: error.message, code: error.code }, error.status)
@@ -573,6 +580,8 @@ type PreparedSklandImport = {
   intermediateInventory?: IntermediateInventory
   inventoryWarning?: string
   importedAt: string
+  snapshot?: { game: unknown; inventory?: unknown; fetchedAt: string }
+  expectedCredential?: string
 }
 
 async function getSklandConfirmationReplay(
@@ -649,9 +658,11 @@ async function prepareSklandImport(
   profile: UserGameAccountRecord,
   cred: string,
   uid: string,
+  snapshot?: { game: unknown; inventory?: unknown; fetchedAt: string },
 ): Promise<PreparedSklandImport> {
   if (profile.archived_at) throw new SklandProfileError('profile_archived', '归档档案不能更新森空岛绑定或工作区。', 409)
-  const imported = await importSklandOperatorsByCred(cred, { uid, includeInventory: true })
+  const imported = await importSklandOperatorsByCred(cred, { uid, includeInventory: snapshot ? snapshot.inventory !== undefined : true,
+    ...(snapshot ? { snapshot, binding: profile.skland_binding! } : {}) })
   const operatorsCheck = validateOperators(imported.operators)
   if (!operatorsCheck.ok) {
     throw new SklandHttpError('skland_operator_data_invalid', operatorsCheck.message, 400)
@@ -666,6 +677,7 @@ async function prepareSklandImport(
     intermediateInventory: imported.intermediateInventory,
     inventoryWarning: imported.inventoryWarning,
     importedAt: imported.importedAt,
+    ...(!snapshot && imported.snapshot ? { snapshot: imported.snapshot } : {}),
   }
 }
 
@@ -686,6 +698,10 @@ async function persistPreparedSklandImportInTransaction(
   const profile = locked.rows[0]?.record_json
   if (!profile) throw new SklandHttpError('profile_not_found', '账号档案不存在。', 404)
   if (confirmationId) assertCurrentConfirmation(profile.skland_pending_binding, confirmationId)
+  if (prepared.expectedCredential !== undefined && (profile.skland_binding?.encrypted_cred !== prepared.expectedCredential
+    || profile.skland_binding.credential_status === 'invalid')) {
+    throw new SklandHttpError('skland_binding_changed', '森空岛授权已变更，请重新读取当前账号。', 409, 'rebind')
+  }
   if (profile.archived_at) throw new SklandProfileError('profile_archived', '归档档案不能更新森空岛绑定或工作区。', 409)
   if (profile.status !== 'active') throw new SklandHttpError('profile_unavailable', '账号档案状态不可用。', 409)
   if (profile.skland_binding?.uid && profile.skland_binding.uid !== prepared.binding.uid) {
@@ -712,6 +728,7 @@ async function persistPreparedSklandImportInTransaction(
     }
   }
 
+  const updatedAt = new Date().toISOString()
   let configResult: ReturnType<typeof resolveSklandImportConfig> = { config: null }
   await updateProfileWorkspaceInTransaction(client, profile.id, (existingWorkspace) => {
     configResult = resolveSklandImportConfig(profile, existingWorkspace?.config ?? null, prepared.intermediateInventory)
@@ -720,12 +737,12 @@ async function persistPreparedSklandImportInTransaction(
       operators: prepared.operators,
       config: configResult.config ?? existingWorkspace?.config ?? null,
       elite_overrides: {},
-      updated_at: prepared.importedAt,
+      updated_at: updatedAt,
     }
   })
 
   const existingBinding = profile.skland_binding
-  await saveProfileInTransaction(client, {
+  const nextProfile: UserGameAccountRecord = {
     ...profile,
     skland_binding: {
       uid: prepared.binding.uid,
@@ -742,8 +759,10 @@ async function persistPreparedSklandImportInTransaction(
     },
     skland_pending_binding: null,
     skland_risk: { uid_mismatch_count: 0, last_mismatch_uid: null, last_mismatch_nickname: null, last_mismatch_at: null },
-    updated_at: prepared.importedAt,
-  })
+    updated_at: updatedAt,
+  }
+  await saveProfileInTransaction(client, nextProfile)
+  if (prepared.snapshot) await seedSklandSnapshot(client, nextProfile, prepared.snapshot)
 
   return {
     status: 'imported',
@@ -839,6 +858,7 @@ async function confirmProfileSklandBinding(input: {
   const now = new Date().toISOString()
   let operationResponse: SklandConfirmationOperationResponse
   if (isDepotValueProfile(input.profile)) {
+    const imported = await importSklandOperatorsByCred(decryptSklandCredential(pending.encrypted_cred), { uid: pending.uid, includeInventory: true })
     operationResponse = await withTransaction(async (client) => {
       const operationId = await beginSklandConfirmationOperation(client, {
         userId: input.user.id,
@@ -861,7 +881,9 @@ async function confirmProfileSklandBinding(input: {
       if (current.status !== 'active') {
         throw new SklandHttpError('profile_unavailable', '账号档案状态不可用。', 409)
       }
-      await saveProfileInTransaction(client, buildDepotValueSklandProfile(current, currentPending, now))
+      const nextProfile = buildDepotValueSklandProfile(current, currentPending, now)
+      await saveProfileInTransaction(client, nextProfile)
+      await seedSklandSnapshot(client, nextProfile, imported.snapshot)
       const response = { profile_id: current.id }
       await completeSklandConfirmationOperation(client, operationId, response, now)
       return response
@@ -1061,6 +1083,7 @@ async function confirmLifetimeVoucherBinding(
     }
     const configResult = resolveSklandImportConfig(nextProfile, currentWorkspace.config, imported.intermediateInventory)
     await saveProfileInTransaction(client, nextProfile)
+    if (imported.snapshot) await seedSklandSnapshot(client, nextProfile, imported.snapshot)
     await updateProfileWorkspaceInTransaction(client, profileId, () => ({
       ...currentWorkspace, profile_id: profileId, operators: operatorsCheck.operators,
       config: configResult.config ?? currentWorkspace.config, elite_overrides: {}, updated_at: now,
@@ -1646,7 +1669,12 @@ async function saveSklandImport(
   cred: string,
   uid: string,
 ): Promise<SklandImportSummary> {
-  const prepared = await prepareSklandImport(profile, cred, uid)
+  const snapshot = await getSklandSnapshot(profile, ['game'], { force: true, wait: true })
+  const inventoryState = sklandResourceState(snapshot.inventory?.fetchedAt ?? null)
+  const prepared = await prepareSklandImport(profile, cred, uid, { game: snapshot.game!.data,
+    inventory: inventoryState === 'fresh' || inventoryState === 'stale' ? snapshot.inventory?.data : undefined, fetchedAt: snapshot.game!.fetchedAt })
+  prepared.expectedCredential = profile.skland_binding!.encrypted_cred
+  prepared.inventoryWarning = [prepared.inventoryWarning, snapshot.errors.inventory].filter(Boolean).join(' ') || undefined
   const imported = await withTransaction((client) => persistPreparedSklandImportInTransaction(
     client,
     userId,
@@ -1756,14 +1784,15 @@ async function markSklandCredentialInvalid(
   const now = new Date().toISOString()
   return updateSklandProfile(profile, (current) => {
     if (!current.skland_binding || current.skland_binding.encrypted_cred !== profile.skland_binding?.encrypted_cred) return current
+    if (current.skland_binding.credential_status === 'invalid' && current.skland_binding.credential_invalid_reason) return current
     return { ...current, skland_binding: { ...current.skland_binding,
       credential_status: 'invalid', credential_invalid_at: now, credential_invalid_reason: reason }, updated_at: now }
   })
 }
 
 function isSklandCredentialInvalid(error: unknown): boolean {
-  return error instanceof SklandClientError
-    && (error.code === 'credential_invalid' || error.code === 'credential_format_invalid')
+  return error instanceof SklandSnapshotError && error.code === 'skland_credential_invalid'
+    || error instanceof SklandClientError && (error.code === 'credential_invalid' || error.code === 'credential_format_invalid')
 }
 
 function credentialInvalidReason(error: unknown): SklandCredentialInvalidReason {

@@ -126,7 +126,11 @@ const adminTargetProfileShape = {
 }
 
 export const requestSchemas = {
-  cultivationPlan: strict({ profile_id: shortString(128), recommendation: strict({
+  cultivationPlan: strict({ profile_id: shortString(128), projects: z.array(strict({
+    operatorId: shortString(128), elite: z.number().int().min(0).max(2), level: z.number().int().min(1).max(90),
+    skill: z.number().int().min(1).max(3), skillLevel: z.number().int().min(1).max(10), paused: z.boolean(),
+    deadline: z.union([z.literal(''), z.iso.date()]),
+  })).max(30).refine((rows) => new Set(rows.map((row) => row.operatorId)).size === rows.length, '每名干员只能设置一个目标。').optional(), recommendation: strict({
     scope: z.enum(['recent', 'permanent', 'history']).optional(),
     days: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(365)]).optional(),
     coverage: z.union([z.literal(0.6), z.literal(0.8), z.literal(0.9)]).optional(),
@@ -469,6 +473,7 @@ export const requestSchemas = {
     page_category: z.enum(['landing', 'auth', 'profiles', 'workspace', 'optimizer', 'result', 'account', 'public_info', 'other']),
   }),
   sklandProfile: strict({ profile_id: shortString(128) }),
+  sklandSnapshotRefresh: strict({ profile_id: shortString(128), force: z.boolean().optional() }),
   sklandScan: strict({ profile_id: shortString(128), scan_id: shortString(256) }),
   sklandCredential: strict({
     profile_id: shortString(128),
@@ -732,7 +737,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
     PATCH: json('admin', requestSchemas.adminRegistrationInvitationPatch),
   }, ['page', 'page_size', 'status'])],
   ['/api/admin/invitation-settlements', route({ POST: json('admin', requestSchemas.adminInvitationSettlement) })],
-  ['/api/admin/optimization', route({ GET: none(), POST: json('admin', requestSchemas.adminOptimization) }, ['view', 'status', 'limit', 'id'])],
+  ['/api/admin/optimization', route({ GET: none(), POST: json('admin', requestSchemas.adminOptimization) }, ['view', 'status', 'limit', 'id', 'related'])],
   ['/api/admin/service-status', route({
     GET: none(),
     POST: json('admin', requestSchemas.adminServiceStatusCreate),
@@ -778,9 +783,11 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/admin/usage-stats', route({ GET: none() }, ['admin', 'format', 'from', 'to', 'range', 'view'])],
   ['/api/depot-value', route({ POST: json('depot', requestSchemas.depotValue) })],
   ['/api/cultivation-plan', route({ POST: json('standard', requestSchemas.cultivationPlan) })],
+  ['/api/user/skland/snapshot', route({ GET: none() }, ['profile_id'])],
+  ['/api/user/skland/snapshot/refresh', route({ POST: json('standard', requestSchemas.sklandSnapshotRefresh) })],
   ['/api/user/announcements', route({ GET: none(), PATCH: json('standard', requestSchemas.userAnnouncement) }, ['page', 'announcement_id', 'unread_only'])],
   ['/api/user/feedback', route({ GET: none(), POST: json('feedback', requestSchemas.userFeedback), PATCH: json('standard', requestSchemas.userFeedbackReply) }, ['page', 'page_size', 'feedback_id', 'image_id', 'before_revision'])],
-  ['/api/admin/feedback', route({ GET: none(), PATCH: json('standard', requestSchemas.adminFeedbackUpdate) }, ['page', 'page_size', 'status', 'feedback_id', 'image_id', 'before_revision'])],
+  ['/api/admin/feedback', route({ GET: none(), PATCH: json('standard', requestSchemas.adminFeedbackUpdate) }, ['page', 'page_size', 'status', 'todo', 'category', 'email', 'min_wait_hours', 'user_id', 'feedback_id', 'image_id', 'before_revision'])],
   ['/api/user/notifications', route({ GET: none(), PATCH: json('standard', requestSchemas.userNotification) }, ['cursor', 'limit'])],
   ['/api/user/profiles', route({ GET: none(), PATCH: json('standard', requestSchemas.profilePatch) })],
   ['/api/user/profiles/depot-value', route({ POST: none() })],

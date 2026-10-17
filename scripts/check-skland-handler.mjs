@@ -709,6 +709,8 @@ async function assertFacilityRead() {
   setFetchMode('player-expired')
   const expired = await callSkland('/api/user/skland/facilities', { profile_id: 'profile-1' })
   if (expired.status !== 400 || expired.body.code !== 'skland_credential_invalid') throw new Error('facility read must reject expired credentials')
+  const binding = store.profiles.get('profile-1').skland_binding
+  Object.assign(binding, { credential_status: 'available', credential_invalid_at: null, credential_invalid_reason: null })
 }
 
 async function assertRefreshImport() {
@@ -1222,6 +1224,7 @@ function seedProfile({ id, status, archivedAt = null, permission = 'advanced' })
 }
 
 function setFetchMode(mode) {
+  store.snapshots.clear()
   store.fetchCalls = []
   globalThis.fetch = async (url) => {
     const textUrl = String(url)
@@ -1417,6 +1420,8 @@ function createMemoryStore() {
       updated_at: '2026-01-01T00:00:00.000Z',
     },
     profiles: new Map(),
+    snapshots: new Map(),
+    snapshotVersion: 0,
     workspaces: new Map(),
     cdks: new Map(),
     freePreviewClaims: new Map(),
@@ -1491,6 +1496,9 @@ function memoryStorePlugin() {
         path: 'memory-persistent-rate-limit',
         namespace: 'skland-smoke',
       }))
+      build.onResolve({ filter: /(^|[\\/])skland-snapshot-store(\.ts)?$/ }, () => ({
+        path: 'memory-skland-snapshot-store', namespace: 'skland-smoke',
+      }))
       build.onResolve({ filter: /(^|[\\/])postgres(\.ts)?$/ }, () => ({
         path: 'memory-postgres',
         namespace: 'skland-smoke',
@@ -1518,6 +1526,8 @@ function memoryStorePlugin() {
                 ? `export async function reserveSklandAttemptLayered() { return { allowed: true, attempt: { retainFailure() {} } } }`
                 : args.path === 'memory-persistent-rate-limit'
                   ? `export class RateLimitStoreError extends Error {}`
+                  : args.path === 'memory-skland-snapshot-store'
+                    ? memorySklandSnapshotStoreModule()
                   : args.path === 'memory-postgres'
                     ? memoryPostgresModule()
                   : args.path === 'memory-personal-use-declaration-store'
@@ -1540,17 +1550,33 @@ function memoryUsageStatsModule() {
   `
 }
 
+function memorySklandSnapshotStoreModule() {
+  return `
+    const store = globalThis.__sklandHandlerSmokeStore
+    export async function readSklandSnapshot(userId, uid) { return store.snapshots.get(userId + ':' + uid) ?? null }
+    export async function saveSklandSnapshot(_client, profile, snapshot) {
+      const current = store.profiles.get(profile.id)
+      if (current?.skland_binding?.encrypted_cred !== profile.skland_binding?.encrypted_cred || current.status !== 'active') return null
+      const result = { ...snapshot, version: String(++store.snapshotVersion) }
+      store.snapshots.set(profile.user_id + ':' + profile.skland_binding.uid, result)
+      return result
+    }
+  `
+}
+
 function memoryPostgresModule() {
   return `
     const store = globalThis.__sklandHandlerSmokeStore
     const result = (rows = [], rowCount = rows.length) => ({ rows, rowCount })
 
     export function hasDatabaseUrl() { return false }
+    export async function withPostgresAdvisoryLock(_key, work) { return { acquired: true, value: await work() } }
     export function getPool() { return { query: execute } }
     export async function query(text, values = []) { return execute(text, values) }
     export async function withTransaction(work) {
       const snapshot = {
         profiles: structuredClone([...store.profiles]),
+        snapshots: structuredClone([...store.snapshots]),
         workspaces: structuredClone([...store.workspaces]),
         freePreviewClaims: structuredClone([...store.freePreviewClaims]),
         freePreviewPendingClaims: structuredClone([...store.freePreviewPendingClaims]),
@@ -1564,6 +1590,7 @@ function memoryPostgresModule() {
         return await work({ query: execute })
       } catch (error) {
         restore(store.profiles, snapshot.profiles)
+        restore(store.snapshots, snapshot.snapshots)
         restore(store.workspaces, snapshot.workspaces)
         restore(store.freePreviewClaims, snapshot.freePreviewClaims)
         restore(store.freePreviewPendingClaims, snapshot.freePreviewPendingClaims)
@@ -1578,6 +1605,13 @@ function memoryPostgresModule() {
 
     async function execute(text, values = []) {
       const sql = text.replace(/\\s+/g, ' ').trim().toLowerCase()
+      if (sql.startsWith('update user_game_accounts set record_json = jsonb_set')) {
+        const profile = store.profiles.get(values[0])
+        if (profile?.skland_binding?.encrypted_cred !== values[1]) return result([], 0)
+        Object.assign(profile.skland_binding, { credential_status: 'invalid', credential_invalid_at: values[2], credential_invalid_reason: values[3] })
+        store.snapshots.delete(profile.user_id + ':' + profile.skland_binding.uid)
+        return result([], 1)
+      }
       if (sql.startsWith('select request_hash, response_json from inventory_operations')) {
         const operation = store.inventoryOperations.get(values[0] + ':' + values[1])
         return result(operation ? [{ request_hash: operation.request_hash, response_json: operation.response_json }] : [])

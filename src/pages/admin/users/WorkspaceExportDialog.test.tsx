@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router'
 import type { AdminProfileSummary, AdminUserDetail } from '../contracts'
 import { UserDetailDialog } from './components'
 import { WorkspaceExportDialog } from './WorkspaceExportDialog'
@@ -70,7 +71,7 @@ describe('workspace export dialog', () => {
       onUnfreezeUser: action,
       onDeleteUser: action,
     }
-    const { rerender } = render(<UserDetailDialog {...props} />)
+    const { rerender } = render(<MemoryRouter><UserDetailDialog {...props} /></MemoryRouter>)
     expect(screen.queryByText(/积分|商用账户控制/)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '确认调整' })).not.toBeInTheDocument()
     const trigger = screen.getByRole('button', { name: '导出工作区' })
@@ -80,12 +81,12 @@ describe('workspace export dialog', () => {
     expect(screen.getByRole('dialog', { name: '导出工作区' })).toBeInTheDocument()
     expect(screen.getByText(/导出的最近结果选用优化器排班/)).toBeInTheDocument()
 
-    rerender(<UserDetailDialog {...props} busyAction="user-detail:user-1" />)
+    rerender(<MemoryRouter><UserDetailDialog {...props} busyAction="user-detail:user-1" /></MemoryRouter>)
     expect(screen.getByRole('checkbox', { name: /账号 1/ })).toBeDisabled()
     fireEvent.keyDown(screen.getByRole('dialog', { name: '导出工作区' }), { key: 'Escape' })
     expect(screen.getByRole('dialog', { name: '导出工作区' })).toBeInTheDocument()
 
-    rerender(<UserDetailDialog {...props} />)
+    rerender(<MemoryRouter><UserDetailDialog {...props} /></MemoryRouter>)
     fireEvent.click(screen.getByRole('button', { name: '取消' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '导出工作区' })).not.toBeInTheDocument())
     expect(screen.getByRole('dialog', { name: 'test@example.com' })).toBeInTheDocument()

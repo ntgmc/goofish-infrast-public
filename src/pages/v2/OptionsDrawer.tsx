@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import PinyinMatch from 'pinyin-match'
 import ConfigCapabilityPreview from '../../components/ConfigCapabilityPreview'
 import type { ConfigDiffItem } from '../../lib/workspace-history'
-import { ArrowRight, Check, LogOut, RefreshCw, Search, Upload, UserRound } from 'lucide-react'
+import { NextIcon as ArrowRight, SelectedIcon as Check, LogoutIcon as LogOut, RefreshIcon as RefreshCw, SearchIcon as Search, UploadIcon as Upload, AccountIcon as UserRound, SuccessIcon } from '../../components/icons'
 import AuthForm from '../../components/AuthForm'
 import AnimationSettings from '../../components/AnimationSettings'
 import ConfigEditor from '../../components/ConfigEditor'
@@ -238,7 +238,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
                 event.preventDefault()
                 if (onConfirmConfig) void onConfirmConfig().then((saved) => { if (saved) onClose() })
                 else onClose()
-              }}><Check size={16} />{confirmingConfig ? text.firstSchedule.confirming : onConfirmConfig ? text.firstSchedule.confirmConfig : text.done}</button>
+              }}><SuccessIcon size={16} aria-hidden="true" />{confirmingConfig ? text.firstSchedule.confirming : onConfirmConfig ? text.firstSchedule.confirmConfig : text.done}</button>
           </PopoverTrigger>
           {!validation.ok && <PopoverContent side="top" align="center" role="alert" className="v2-dialog v2-config-completion-hint" onOpenAutoFocus={(event) => event.preventDefault()}>
             {validation.message}

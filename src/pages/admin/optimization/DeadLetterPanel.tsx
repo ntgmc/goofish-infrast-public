@@ -1,11 +1,11 @@
-import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
+import { ExpandIcon as ChevronDown, CollapsedIcon as ChevronRight, RefreshIcon as RefreshCw } from '../../../components/icons'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { adminApiBlob as apiBlob, adminApiJson as apiJson } from '../../../lib/admin-api-client'
 import type { AdminOptimizationDeadLetter, AdminOptimizationDeadLetterDetail } from '../contracts'
 import { requestAdminOperationReason } from '../../../lib/admin-operation-reason'
 import { SectionLoader } from '../../../components/SessionLoader'
 
-export default function DeadLetterPanel({ active = true }: { active?: boolean }) {
+export default function DeadLetterPanel({ active = true, pendingOnly = false }: { active?: boolean; pendingOnly?: boolean }) {
   const [records, setRecords] = useState<AdminOptimizationDeadLetter[]>([])
   const [details, setDetails] = useState<Record<string, AdminOptimizationDeadLetterDetail>>({})
   const recordIdsRef = useRef(new Set<string>())
@@ -18,10 +18,16 @@ export default function DeadLetterPanel({ active = true }: { active?: boolean })
   const [loaded, setLoaded] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const requestRef = useRef<AbortController | null>(null)
+  useEffect(() => { setRecords([]); setLoaded(false); recordIdsRef.current = new Set() }, [pendingOnly])
   const load = useCallback(async () => {
+    requestRef.current?.abort()
+    const controller = new AbortController()
+    requestRef.current = controller
     setLoading(true)
     try {
-      const response = await apiJson<{ dead_letters?: AdminOptimizationDeadLetter[] }>('/api/admin/optimization?limit=50', { fallbackMessage: '加载优化死信失败' })
+      const response = await apiJson<{ dead_letters?: AdminOptimizationDeadLetter[] }>(`/api/admin/optimization?limit=50${pendingOnly ? '&status=pending_review' : ''}`, { signal: controller.signal, fallbackMessage: '加载优化死信失败' })
+      if (controller.signal.aborted) return
       const nextRecords = response.dead_letters ?? []
       const ids = new Set(nextRecords.map((record) => record.id))
       recordIdsRef.current = ids
@@ -31,12 +37,11 @@ export default function DeadLetterPanel({ active = true }: { active?: boolean })
       setExpandedRecordId((current) => current && ids.has(current) ? current : null)
       setError(null)
     } catch (caught) {
-      setError((caught as Error).message)
+      if (!controller.signal.aborted) setError((caught as Error).message)
     } finally {
-      setLoading(false)
-      setLoaded(true)
+      if (!controller.signal.aborted) { setLoading(false); setLoaded(true) }
     }
-  }, [])
+  }, [pendingOnly])
   useEffect(() => {
     if (!active) return
     void load()
@@ -50,6 +55,7 @@ export default function DeadLetterPanel({ active = true }: { active?: boolean })
     return () => {
       window.clearInterval(poll)
       document.removeEventListener('visibilitychange', onVisibilityChange)
+      requestRef.current?.abort()
     }
   }, [active, load])
   const loadDetail = async (id: string) => {
@@ -167,6 +173,7 @@ export default function DeadLetterPanel({ active = true }: { active?: boolean })
         </div>
       </div>
       {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error}</div>}
+      {pendingOnly && <p className="mt-4 text-sm text-ink-secondary">待处理异常任务，按时间倒序显示最近 50 条；处理后刷新可继续查看。</p>}
       {notice && <div className="tool-alert tool-alert--success mt-4" role="status">{notice}</div>}
       {records.length === 0 ? <p className="mt-4 text-sm text-ink-muted">暂无死信任务。</p> : (
         <div className="mt-4 space-y-3">

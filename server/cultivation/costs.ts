@@ -1,4 +1,5 @@
 import type { CultivationCurrent, CultivationTarget } from '../../src/lib/cultivation-contract'
+import { calculateTrainingCost } from '../../src/lib/training-ratio'
 import { asRecord, asRows, type PrtsSnapshot } from './catalog'
 
 export { cultivationSatisfied } from '../../src/lib/cultivation-target'
@@ -26,19 +27,19 @@ export function cultivationCosts(snapshot: PrtsSnapshot, id: string, current: Cu
     if (elite <= phase) { level = Math.max(elite === phase ? level : 1, Number(module.unlockLevel)); elite = phase }
   }
   if (!maxima || elite < 0 || elite >= maxima.length || level < 1 || level > maxima[elite] || target.skillLevel < 1 || target.skillLevel > 10) return { items, warnings: ['目标练度超过该干员上限'] }
-  for (let phase = current.elite; phase <= elite; phase++) {
-    const startLevel = phase === current.elite ? current.level : 1
-    const endLevel = phase < elite ? maxima[phase] : level
-    for (let index = startLevel - 1; index < endLevel - 1; index++) {
-      const exp = levels.characterExp[phase]?.[index], lmd = levels.characterUpgradeCost[phase]?.[index]
-      if (exp === undefined || lmd === undefined) warnings.push('等级消耗表不完整')
-      else add({ exp, '4001': lmd })
-    }
-    if (phase < elite) {
-      add({ '4001': levels.eliteCost[info.rarity - 1]?.[phase] ?? 0 })
-      const promotions = Array.isArray(row.evolve) ? row.evolve : []
-      add(promotions[phase] ?? (info.rarity <= 3 ? {} : null))
-    }
+  if (elite >= current.elite) {
+    try {
+      const training = calculateTrainingCost({ rarity: info.rarity, currentElite: current.elite, currentLevel: current.level,
+        targetElite: elite, targetLevel: elite === current.elite ? Math.max(level, current.level) : level }, {
+        maxLevel: levels.maxLevel, characterExpMap: levels.characterExp,
+        characterUpgradeCostMap: levels.characterUpgradeCost, evolveGoldCost: levels.eliteCost,
+      })
+      add({ exp: training.exp, '4001': training.lmd })
+    } catch { warnings.push('等级消耗表不完整') }
+  }
+  for (let phase = current.elite; phase < elite; phase++) {
+    const promotions = Array.isArray(row.evolve) ? row.evolve : []
+    add(promotions[phase] ?? (info.rarity <= 3 ? {} : null))
   }
   if (current.skillLevel === null && target.skillLevel > 1) warnings.push('森空岛未返回当前技能等级')
   const skills = asRecord(row.skills)

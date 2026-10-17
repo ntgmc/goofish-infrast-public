@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const authenticateAdminRequest = vi.hoisted(() => vi.fn())
 const getOperationsOverview = vi.hoisted(() => vi.fn())
+const getOperationsTodos = vi.hoisted(() => vi.fn())
 vi.mock('./admin-auth', () => ({ authenticateAdminRequest }))
 vi.mock('../storage/operations-overview-store', () => ({ getOperationsOverview }))
+vi.mock('../storage/operations-todos-store', () => ({ getOperationsTodos }))
 import { createOperationsOverview } from '../../src/test/operations-overview-fixture'
 import { operationsDate, shiftOperationsDate } from '../../src/lib/operations-overview'
 import usageStatsHandler, { getScheduleGenerateDurationStatsByBucket, recordMaaExport, recordUsageEvent, setUsageEventStoreForTesting } from './usage-stats'
@@ -20,9 +22,24 @@ afterEach(() => {
 beforeEach(() => {
   authenticateAdminRequest.mockReset().mockResolvedValue({ ok: true, username: 'usage-viewer' })
   getOperationsOverview.mockReset().mockResolvedValue(createOperationsOverview())
+  getOperationsTodos.mockReset().mockResolvedValue({ feedback_unassigned: null, feedback_reply: null, risk_pending: 3, abnormal_jobs: null })
 })
 
 describe('usage stats handler', () => {
+  it('loads current todos using the authenticated capabilities and never caches the result', async () => {
+    authenticateAdminRequest.mockResolvedValue({ ok: true, username: 'viewer', capabilities: ['usage_view', 'risk_view'] })
+    const response = await usageStatsHandler(new Request('http://localhost/api/admin/usage-stats?view=todos'))
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+    expect(getOperationsTodos).toHaveBeenCalledWith(['usage_view', 'risk_view'])
+    expect(getOperationsOverview).not.toHaveBeenCalled()
+    await expect(response.json()).resolves.toMatchObject({ feedback_unassigned: null, risk_pending: 3 })
+    getOperationsTodos.mockClear()
+    authenticateAdminRequest.mockResolvedValue({ ok: false, response: new Response('没有权限', { status: 403 }) })
+    expect((await usageStatsHandler(new Request('http://localhost/api/admin/usage-stats?view=todos'))).status).toBe(403)
+    expect(getOperationsTodos).not.toHaveBeenCalled()
+  })
+
   it('serves the Shanghai business snapshot and records tracking start behind the usage capability', async () => {
     const set = vi.fn(async () => undefined)
     setUsageEventStoreForTesting({ set, list: async () => [], getStats: async (dates) => buildUsageStats([], dates) })

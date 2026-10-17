@@ -7,6 +7,8 @@ import SklandBindingDialog, { type SklandPayload } from '../components/SklandBin
 import SklandIcon from '../components/SklandIcon'
 import { getCurrentSiteUrl } from '../lib/site-url'
 import { apiJson, apiJsonOrNull } from '../lib/api-client'
+import { useSklandSnapshot } from '../hooks/useSklandSnapshot'
+import { syncSklandSnapshotSession } from '../lib/skland-snapshot-client'
 import { MAX_DEPOT_ITEM_COUNT, MAX_DEPOT_ITEM_TYPES } from '../lib/depot-value-constraints'
 import type { AuthMeResponse, DepotValueItem, DepotValueProfileResponse, DepotValueRequest, DepotValueResponse, UserGameAccount } from '../lib/types'
 import { copy, CURRENT_LOCALE } from '../copy/index'
@@ -41,8 +43,13 @@ export function useDepotValue(session?: ReturnType<typeof useToolSession>) {
   const [sklandDialogOpen, setSklandDialogOpen] = useState(false)
   const [sampleConsent, setSampleConsent] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const request = useRef<AbortController | null>(null)
+  const analyzedVersion = useRef('')
+  const selectedAccount = useRef('')
 
   const applyAuthData = useCallback((data: AuthMeResponse | null) => {
+    if (data?.user) syncSklandSnapshotSession({ user: data.user, profiles: data.profiles ?? [] })
+    else if (!session) syncSklandSnapshotSession(null)
     setAuth(data)
     const profiles = data?.profiles ?? []
     const firstSklandProfile = profiles.find((profile) => profile.skland_binding)
@@ -51,7 +58,7 @@ export function useDepotValue(session?: ReturnType<typeof useToolSession>) {
       if (current && profiles.some((profile) => profile.id === current && profile.skland_binding)) return current
       return firstSklandProfile?.id ?? ''
     })
-  }, [])
+  }, [Boolean(session)]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (session) {
@@ -95,23 +102,47 @@ export function useDepotValue(session?: ReturnType<typeof useToolSession>) {
     [selectedProfileId, sklandProfiles],
   )
 
+  const selectionKey = `${auth?.user?.id}:${selectedSklandProfile?.id}`
+  selectedAccount.current = selectionKey
+  const snapshot = useSklandSnapshot(auth?.user?.id, selectedSklandProfile)
+  useEffect(() => {
+    request.current?.abort()
+    analyzedVersion.current = ''
+    setResult((value) => value?.source === 'skland' ? null : value)
+    setLoading(null)
+    setError(null)
+    return () => request.current?.abort()
+  }, [auth?.user?.id, selectedSklandProfile?.id, snapshot.available])
+
   const analyze = useCallback(async (payload: DepotValueRequest) => {
+    request.current?.abort()
+    const controller = new AbortController()
+    request.current = controller
     setLoading(payload.source)
     setError(null)
     try {
       const data = await apiJson<DepotValueResponse>('/api/depot-value', {
         method: 'POST',
-        json: payload,
+        json: payload, signal: controller.signal,
         fallbackMessage: copy.tools.pages_DepotValuePage_001,
       })
-      setResult(data)
+      if (!controller.signal.aborted) setResult(data)
     } catch (caught) {
-      setResult(null)
-      setError((caught as Error).message)
+      if (!controller.signal.aborted) setError((caught as Error).message)
     } finally {
-      setLoading(null)
+      if (!controller.signal.aborted) setLoading(null)
     }
   }, [])
+
+  useEffect(() => {
+    const version = snapshot.data?.version
+    const profileId = selectedSklandProfile?.id
+    const key = `${profileId}:${version}`
+    if (!version || !profileId || snapshot.busy || loading || result?.source === 'upload' || depotText.trim()
+      || result?.snapshot_version === version || analyzedVersion.current === key) return
+    analyzedVersion.current = key
+    void analyze({ source: 'skland', profile_id: profileId, sample_consent: false })
+  }, [snapshot.data?.version, snapshot.busy, loading, selectedSklandProfile?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const ensureDepotProfile = useCallback(async (): Promise<UserGameAccount> => {
     setProfilePreparing(true)
@@ -182,6 +213,9 @@ export function useDepotValue(session?: ReturnType<typeof useToolSession>) {
         await openSklandBinding()
         return
       }
+      const next = await snapshot.refresh()
+      if (selectedAccount.current !== selectionKey) return
+      if (next) analyzedVersion.current = `${profileId}:${next.version}`
       await analyze({ source: 'skland', profile_id: profileId, sample_consent: sampleConsent })
       return
     }
@@ -229,8 +263,8 @@ export function useDepotValue(session?: ReturnType<typeof useToolSession>) {
   }
 
   return { canvasRef, depotText, setDepotText, auth, authLoading, authError, setAuthLoadRevision, depotProfile,
-    selectedProfileId, setSelectedProfileId, result, setResult, loading, profilePreparing, sklandDialogOpen, setSklandDialogOpen,
-    sampleConsent, setSampleConsent, error, setError, sklandProfiles, selectedSklandProfile, openSklandBinding,
+    selectedProfileId, setSelectedProfileId, result, setResult, loading: loading ?? (snapshot.busy ? 'skland' as const : null), profilePreparing, sklandDialogOpen, setSklandDialogOpen,
+    sampleConsent, setSampleConsent, error: error || snapshot.error || null, setError, sklandProfiles, selectedSklandProfile, openSklandBinding,
     readClipboard, analyzeUpload, analyzeSkland, handleAuthenticated, handleSklandPayload, handleSklandCompleted, downloadShareImage }
 }
 
@@ -387,7 +421,7 @@ export default function DepotValuePage({ embedded = false, session }: { embedded
                             ? copy.tools.pages_DepotValuePage_029
                             : selectedSklandProfile?.skland_binding?.credential_status === 'invalid'
                               ? copy.tools.pages_DepotValuePage_030
-                              : copy.tools.pages_DepotValuePage_031}
+                              : copy.skland.refresh}
                         </button>
                       </div>
                       {selectedSklandProfile?.skland_binding?.credential_status === 'invalid' && (
@@ -457,6 +491,7 @@ function ResultSummary({ result }: { result: DepotValueResponse }) {
   return (
     <section className="tool-panel border-brand-600/25 p-5 sm:p-6">
       <p className="section-index">{copy.tools.pages_DepotValuePage_041}</p>
+      {result.imported_at && <p className="mt-2 text-xs text-ink-muted">{copy.skland.updated(formatOptionalDate(result.imported_at))}</p>}
       <h2 className="mt-2 text-2xl font-semibold text-ink-primary">
         {copy.tools.pages_DepotValuePage_042}{result.percentile}{copy.tools.pages_DepotValuePage_043}</h2>
       <p className="tool-inset mt-3 px-3 py-2 text-sm leading-6 text-ink-secondary">

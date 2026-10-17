@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { adminUserFiltersSchema } from '../../src/lib/admin-user-filters'
+import { operationsDrilldownSchema } from '../../src/lib/operations-drilldown'
 import {
   authenticateAdminRequest,
   createAdminUser,
@@ -145,12 +146,17 @@ export default async (req: Request): Promise<Response> => {
           targetId: user.id,
           reason: '管理员查看用户敏感详情。',
         })
-        return jsonResponse({ detail: await buildAdminUserDetail(user, profilePage) })
+        if (profileId && !await findTargetProfile({ profile_id: profileId }, user)) return jsonResponse({ error: '账号档案不存在。' }, 404)
+        return jsonResponse({ detail: await buildAdminUserDetail(user, profilePage, profileId ?? undefined) })
       }
       const request = parseAdminPageRequest(url)
       const filters = adminUserFiltersSchema.safeParse(Object.fromEntries(url.searchParams))
       if (!filters.success) return jsonResponse({ error: filters.error.issues.map((issue) => issue.message).join('；') }, 400)
-      const result = await listAdminUserAccountsPage({ ...request, filters: filters.data })
+      const operations = url.searchParams.has('cohort') ? operationsDrilldownSchema.safeParse(Object.fromEntries(url.searchParams)) : null
+      if (operations && (!operations.success || Date.parse(operations.data.observed_at) > Date.now())) {
+        return jsonResponse({ error: '运营名单筛选无效，请从运营看板重新打开。' }, 400)
+      }
+      const result = await listAdminUserAccountsPage({ ...request, filters: filters.data, ...(operations?.success && { operations: operations.data }) })
       const profilesByUser = new Map<string, UserGameAccountRecord[]>()
       for (const profile of result.profiles) {
         const profiles = profilesByUser.get(profile.user_id) ?? []
@@ -159,7 +165,8 @@ export default async (req: Request): Promise<Response> => {
       }
       const appUsers = result.users.map((user) => {
         const profiles = profilesByUser.get(user.id) ?? []
-        return { ...toAdminAppUser(user, profiles), profile_count: profiles.length }
+        return { ...toAdminAppUser(user, profiles), profile_count: profiles.length,
+          ...(user.operations_progress && { operations_progress: user.operations_progress }) }
       })
       return jsonResponse({
         users: await listAdminUsers(),
@@ -598,13 +605,15 @@ async function exportAdminUserWorkspaces(user: UserAccountRecord, selectedProfil
 async function buildAdminUserDetail(
   user: UserAccountRecord,
   profilePage: AdminProfilePageRequest = { page: 1, pageSize: 100 },
+  profileId?: string,
 ) {
   const [allProfiles, personalUseDeclarations, personalUseUsageEvents] = await Promise.all([
     listProfilesForUser(user.id),
     listPersonalUseDeclarationAcceptancesForUser(user.id),
     listPersonalUseDeclarationUsageEventsForUser(user.id),
   ])
-  const pagination = buildAdminPagination(profilePage.page, profilePage.pageSize, allProfiles.length)
+  const profileIndex = profileId ? allProfiles.findIndex((profile) => profile.id === profileId) : -1
+  const pagination = buildAdminPagination(profileIndex >= 0 ? Math.floor(profileIndex / profilePage.pageSize) + 1 : profilePage.page, profilePage.pageSize, allProfiles.length)
   const profileOffset = (pagination.page - 1) * pagination.page_size
   const profiles = allProfiles.slice(profileOffset, profileOffset + pagination.page_size)
   const [workspaceMap, cdkMap, latestResults] = await Promise.all([

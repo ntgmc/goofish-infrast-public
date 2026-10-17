@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Bell, ChevronDown, LockKeyhole, ShieldCheck, SlidersHorizontal } from 'lucide-react'
+import { NotificationSettingsIcon as Bell, ExpandIcon as ChevronDown, SecurityIcon as LockKeyhole, PersonalDataIcon as ShieldCheck, PreferencesIcon as SlidersHorizontal } from '../../../components/icons'
 import { apiJson, apiVoid } from '../../../lib/api-client'
+import { clearSklandAccountSnapshot } from '../../../lib/skland-snapshot-client'
 import { inputClassName, validatePasswordInput } from '../tool-utils'
 import type { AccountDeletionAccepted, AuthSuccessResponse, UserGameAccount } from '../../../lib/types'
 import { copy } from '../../../copy/index'
@@ -98,6 +99,7 @@ export function useAccountSettings({ profiles, activeProfileId, onPayload, onDel
     try {
       await apiVoid('/api/user/data/credential/clear', { method: 'POST', json: { profile_id: profile.id } })
       cleared = true
+      if (profile.skland_binding) clearSklandAccountSnapshot(profile.skland_binding.uid)
       setClearedCredentialIds((current) => new Set(current).add(profile.id))
       setPrivacyStatus(copy.dashboard.pages_tool_dashboard_SettingsSection_036)
       const payload = await apiJson<AuthSuccessResponse>(activeProfileId ? `/api/auth/me?profile_id=${encodeURIComponent(activeProfileId)}` : '/api/auth/me')
@@ -161,7 +163,7 @@ export default function SettingsSection({ profiles, activeProfileId, onPayload, 
       {!safetyOnly && <div className="workspace-settings-navigation flex flex-col gap-4 border-b border-surface-3 pb-5">
         <p className="text-sm leading-6 text-ink-secondary">{text.description}</p>
         <nav aria-label={text.navigation} className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => openSection('settings-security')} className="tool-secondary-action text-sm"><ShieldCheck size={16} aria-hidden="true" />{text.security}</button>
+          <button type="button" onClick={() => openSection('settings-security')} className="tool-secondary-action text-sm"><LockKeyhole size={16} aria-hidden="true" />{text.security}</button>
           <button type="button" onClick={() => openSection('settings-preferences')} className="tool-secondary-action text-sm"><SlidersHorizontal size={16} aria-hidden="true" />{text.preferences}</button>
           {features.qqbot && <button type="button" onClick={() => openSection('settings-notifications')} className="tool-secondary-action text-sm"><Bell size={16} aria-hidden="true" />{copy.notifications.title}</button>}
           <button type="button" onClick={() => openSection('settings-data')} className="tool-secondary-action text-sm">{text.data}</button>

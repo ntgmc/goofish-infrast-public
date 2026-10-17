@@ -1,5 +1,6 @@
 import type { AdminUserFilters } from '../../../lib/admin-user-filters'
 import { DEFAULT_ADMIN_USER_FILTERS } from '../../../lib/admin-user-filters'
+import { operationsFailureLabels } from '../../../lib/operations-drilldown'
 import type { AdminCapability, AppUserSummary, PaginationMeta } from '../contracts'
 import { appUserStatusLabels, cdkProductPermissions, permissionLabels } from '../contracts'
 import { UserStatusPill, SmallButton, formatAdminProfileAccess, formatDate } from '../shared/helpers'
@@ -111,7 +112,12 @@ export function UserTable(props: Props) {
         <tbody className="divide-y divide-surface-3">
           {!users.length ? <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-muted">没有匹配的用户，请调整筛选条件。</td></tr> : users.map((user) => <tr key={user.id} className="hover:bg-surface-2/50">
             <td className="px-4 py-4"><input className="h-4 w-4 accent-brand-500" type="checkbox" aria-label={`选择用户 ${user.email}`} disabled={busy} checked={selected.includes(user.id)} onChange={(event) => props.onSelect(event.currentTarget.checked ? [...selected, user.id] : selected.filter((id) => id !== user.id))} /></td>
-            <td className="px-4 py-4 font-medium text-ink-primary">{user.email}<div className="mt-1 break-all font-mono text-xs text-ink-muted">{user.id}</div></td>
+            <td className="px-4 py-4 font-medium text-ink-primary">{user.email}<div className="mt-1 break-all font-mono text-xs text-ink-muted">{user.id}</div>
+              {user.operations_progress && <div className="mt-2 text-xs text-ink-secondary">
+                <p>{({ no_profile: '7 天内未添加账号', no_generation: '已添加账号，7 天内未完成首次排班', activated: '7 天内已完成首次排班', observing: '首次排班仍在观察期内', used: '已有排班记录' })[user.operations_progress.stage]}</p>
+                {user.operations_progress.failure_reason && <p className="mt-1 text-error">最近失败：{operationsFailureLabels[user.operations_progress.failure_reason] ?? '其他生成问题'}{user.operations_progress.failure_at && ` · ${formatDate(user.operations_progress.failure_at)}`}</p>}
+              </div>}
+            </td>
             <td className="px-4 py-4"><UserStatusPill status={user.status} emailVerifiedAt={user.email_verified_at} /></td>
             <td className="px-4 py-4 text-ink-secondary">{formatAdminProfileAccess(user.profile_access)}</td>
             <td className="px-4 py-4 text-ink-secondary">{user.profile_count}</td>

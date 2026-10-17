@@ -1,4 +1,4 @@
-import { Check } from 'lucide-react'
+import { SuccessIcon as Check } from '../../components/icons'
 import { copy } from '../../copy'
 
 const text = copy.v2.firstSchedule

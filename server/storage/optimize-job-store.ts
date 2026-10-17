@@ -2175,6 +2175,7 @@ function buildDeadLetterDiagnostic(job: OptimizeJobRecord): Record<string, unkno
 export async function getAdminOptimizationQueueSnapshot(
   configuredFallbackConcurrency?: number,
   recentLimit = 20,
+  related?: string,
 ): Promise<AdminOptimizationQueueSnapshot> {
   await ensureSchema()
   return withTransaction(async (client) => {
@@ -2213,9 +2214,10 @@ export async function getAdminOptimizationQueueSnapshot(
     const recent = await client.query<AdminOptimizationQueueRow>(
       `${adminOptimizationQueueSelect()}
        where job.status in ('succeeded', 'failed', 'cancelled', 'dead_lettered')
+         and ($2::text is null or job.id = $2 or profile.id = $2 or account.id = $2 or lower(account.email) = lower($2))
        order by coalesce(job.finished_at, job.updated_at) desc, job.id desc
        limit $1`,
-      [Math.max(1, Math.min(100, Math.floor(recentLimit)))],
+      [Math.max(1, Math.min(100, Math.floor(recentLimit))), related ?? null],
     )
 
     const queuedRows = active.rows.filter((row) => row.status === 'queued')

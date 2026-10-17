@@ -1,4 +1,19 @@
 export const adminCopy = {
+  operations_filter_invalid: '运营名单筛选无效，请从运营看板重新打开。',
+  operations_cohorts: {
+    registered: '新注册用户', successful: '成功排班用户',
+    activation_missing_profile: '7 天内未添加游戏账号', activation_no_generation: '添加了账号但未完成首次排班', activated: '7 天内完成首次排班',
+    reuse_missing: '7 日内未再次排班', reused: '7 日内再次排班',
+    maa_missing: '尚未获取 MAA 文件', maa_exported: '已获取 MAA 文件', failed: '生成失败用户',
+  },
+  operations_failure_labels: {
+    optimizer_runtime_error: '排班计算失败', workspace_save_failed: '排班结果保存失败',
+    validation_failed: '输入配置未通过检查', auth_required: '需要重新登录', auth_profile_missing: '缺少可用游戏账号',
+    profile_missing: '游戏账号不存在', profile_inactive: '游戏账号不可用', permission_denied: '当前权益不足',
+    risk_soft_blocked: '请求暂时受限', risk_frozen: '账号已受限制', cdk_missing: '兑换权益不存在',
+    cdk_frozen: '兑换权益已冻结', cdk_revoked: '兑换权益已撤销', cdk_status_invalid: '兑换权益不可用',
+    unknown_failure: '原因待核对', insufficient_balance: '可用余额不足',
+  },
   user_filter_date_invalid: '日期无效。',
   user_filter_registered_range_invalid: '注册时间范围无效。',
   user_filter_last_seen_range_invalid: '最近上线时间范围无效。',

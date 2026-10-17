@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type SyntheticEvent } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { RefreshIcon as RefreshCw } from './icons'
 import { APP_BUILD_META } from '../lib/build-meta'
 import type { AppBuildMeta } from '../lib/types'
 import { copy } from '../copy/index'

@@ -1,4 +1,4 @@
-import { Drone } from 'lucide-react'
+import { DroneIcon as Drone } from '../icons'
 import type { DroneAssignment } from '../../lib/types'
 import { copy } from '../../copy/index'
 

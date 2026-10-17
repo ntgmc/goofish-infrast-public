@@ -15,6 +15,7 @@ import { apiJson, apiJsonOrNull, apiVoid } from '../../lib/api-client'
 import { normalizeConfig, validateScheduleConfig } from '../../lib/config'
 import { createAccountLicense, isSchedulableProfile } from './tool-utils'
 import { copy } from '../../copy/index'
+import { syncSklandSnapshotSession } from '../../lib/skland-snapshot-client'
 
 
 export type WorkspacePatch = {
@@ -79,6 +80,7 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
     payload: AuthSuccessResponse | null,
     options: { preserveConfigDraft?: boolean } = {},
   ) => {
+    syncSklandSnapshotSession(payload)
     const nextUser = payload?.user ?? null
     const nextProfiles = payload?.profiles ?? []
     const nextProfile = payload?.active_profile ?? null

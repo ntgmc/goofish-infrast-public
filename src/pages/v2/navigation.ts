@@ -2,7 +2,7 @@ import { copy } from '../../copy'
 import type { SiteFeatures } from '../../lib/site-features'
 import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
 
-const V2_SECTIONS = ['overview', 'generation', 'plans', 'lab', 'tools', 'manual-tool', 'cultivation', 'depot', 'profiles', 'add-account', 'inventory', 'commercial', 'balance', 'announcements', 'settings', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing'] as const
+const V2_SECTIONS = ['overview', 'generation', 'plans', 'lab', 'tools', 'manual-tool', 'cultivation', 'cultivation-projects', 'training-ratio', 'depot', 'profiles', 'add-account', 'inventory', 'commercial', 'balance', 'announcements', 'settings', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing'] as const
 export type V2Section = typeof V2_SECTIONS[number]
 
 export const V2_PUBLIC_SECTIONS: V2Section[] = ['announcements', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing']
@@ -10,7 +10,8 @@ export const V2_PUBLIC_SECTIONS: V2Section[] = ['announcements', 'help', 'update
 export const sectionLabels: Record<V2Section, string> = {
   overview: copy.v2.overview, generation: copy.v2.generation, plans: copy.v2.history,
   lab: copy.v2.lab, tools: copy.v2.tools, 'manual-tool': copy.tools.manualSchedule.title,
-  cultivation: copy.tools.cultivation.title, depot: copy.dashboard.pages_tool_dashboard_ToolsSection_001,
+  'training-ratio': copy.trainingRatio.title,
+  cultivation: copy.tools.cultivation.title, 'cultivation-projects': copy.cultivationProjects.title, depot: copy.dashboard.pages_tool_dashboard_ToolsSection_001,
   profiles: copy.v2.account, 'add-account': copy.v2.addAccount, inventory: copy.inventory.nav,
   commercial: copy.metered.commercial_nav, balance: copy.balance.nav,
   announcements: copy.v2.announcements, settings: copy.v2.settings, help: copy.v2.helpAction, updates: copy.v2.updates,
@@ -34,13 +35,13 @@ export function v2Path(section: V2Section, profileId?: string | null): string {
 
 export function v2SectionAvailable(section: V2Section, features: SiteFeatures): boolean {
   switch (section) {
-    case 'tools': return features.site && features.tools
+    case 'tools': case 'training-ratio': return features.site && features.tools
     case 'profiles': return features.site && features.profiles
     case 'add-account': return features.site && features.profiles && (features.free_preview || features.cdk_redemption)
     case 'generation': case 'plans': return features.site && features.profiles
     case 'lab': return features.site && features.profiles && features.scenario_comparison
     case 'manual-tool': return features.site && features.manual_schedule
-    case 'cultivation': return features.site && features.cultivation_plan
+    case 'cultivation': case 'cultivation-projects': return features.site && features.cultivation_plan
     case 'depot': return features.site && features.depot_value
     case 'inventory': return features.site && features.inventory
     case 'commercial': case 'balance': return features.site && METERED_BILLING_AVAILABLE && features.metered_billing
@@ -62,6 +63,7 @@ const legacySections: Record<string, V2Section> = {
   '/tool/setup/operators': 'overview', '/tool/setup/config': 'overview', '/tool/setup/cdk': 'add-account',
   '/tool/optimize/overview': 'generation', '/tool/optimize/plans': 'plans', '/tool/optimize/config': 'overview',
   '/tool/optimize/result': 'overview', '/tool/optimize/lab': 'lab',
+  '/tools/training-ratio': 'training-ratio',
   '/tools/manual-schedule': 'manual-tool', '/tools/cultivation-plan': 'cultivation', '/tools/depot-value': 'depot',
   '/announcements': 'announcements', '/faq': 'help', '/changelog': 'updates', '/pricing': 'pricing',
   '/terms': 'terms', '/privacy': 'privacy', '/disclaimer': 'disclaimer', '/support': 'support', '/status': 'status',

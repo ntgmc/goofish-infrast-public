@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
 import { useAppReducedMotion } from '../../lib/motion-preference'
-import { ArrowRight, ArrowUpRight, CalendarClock, Check, ChevronDown, ChevronRight, Download, Factory, LogIn, Menu, RefreshCw, Settings2, ShieldCheck, Sparkles, X, Zap } from 'lucide-react'
+import { NextIcon as ArrowRight, EditIcon as ArrowUpRight, DailyOutputIcon as CalendarClock, SuccessIcon as Check, ExpandIcon as ChevronDown, BreadcrumbIcon, ExportIcon as Download, ManufactureIcon as Factory, LoginIcon as LogIn, MenuIcon as Menu, GenerateIcon, LoadingIcon, ConfigIcon as Settings2, DataSourceIcon as ShieldCheck, InfoIcon as Sparkles, CloseIcon as X, PowerPlantIcon as Zap, PreviewIcon, SampleIcon } from '../../components/icons'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import Link from '../../components/InternalLink'
 import { copy } from '../../copy'
@@ -97,7 +97,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
       if (!sample) window.localStorage.removeItem(FIRST_SCHEDULE_INTENT_KEY)
     } catch { /* Storage may be disabled. */ }
   }, [firstSchedule, section, session.user, sample])
-  const [panel, setPanel] = useState<OptionPanel | null>(null)
+  const [panel, setPanel] = useState<OptionPanel | null>(() => params.get('feedback') === 'new' && !session.user ? 'account' : null)
   const [room, setRoom] = useState<BoardRoom | null>(null)
   const [view, setView] = useState<View>('schedule')
   const [expanded, setExpanded] = useState(false)
@@ -230,7 +230,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
       <div className="v2-workspace">
         <header className="v2-topbar">
           <div className="v2-breadcrumb"><button className="v2-menu-button v2-icon-button" type="button" onClick={() => setMobileNavigation(true)} aria-label={text.menu} aria-expanded={mobileNavigation} aria-controls="v2-navigation"><Menu size={21} /></button>
-            <span>{text.workspace}</span><ChevronRight size={14} /><strong>{sectionLabels[section]}</strong></div>
+            <span>{text.workspace}</span><BreadcrumbIcon size={14} aria-hidden="true" /><strong>{sectionLabels[section]}</strong></div>
           <div className="v2-topbar-actions"><div className="v2-feature-content">{taskCenterAction}</div>
             <div className="v2-feature-content"><ThemeSwitcher iconOnly /></div>
             <NotificationBell iconOnly onInventory={() => navigateSection('inventory')} />
@@ -250,7 +250,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           <div hidden={displayedSection !== 'overview'}>
           {sample ? <div className="v2-page-title v2-start-schedule">
             <div><h1>{text.startTitle}</h1><p>{text.startDescription}</p></div>
-            <button type="button" className="v2-button v2-button-primary" disabled={busy || loadingResult || Boolean(startDisabledReason)} aria-describedby={startDisabledReason ? 'v2-start-unavailable' : undefined} onClick={() => navigateSection('generation')}><ArrowRight size={18} aria-hidden="true" />{text.generateMine}</button>
+            <button type="button" className="v2-button v2-button-primary" disabled={busy || loadingResult || Boolean(startDisabledReason)} aria-describedby={startDisabledReason ? 'v2-start-unavailable' : undefined} onClick={() => navigateSection('generation')}><GenerateIcon size={18} aria-hidden="true" />{text.generateMine}</button>
             {startDisabledReason && <p id="v2-start-unavailable" role="status">{startDisabledReason}</p>}
           </div> : <div className="v2-page-title"><h1>{text.title}</h1></div>}
           <InventoryDepletionWarning result={result} className="v2-inventory-warning" action={<button type="button" className="v2-button v2-button-secondary" onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" />{text.configure}</button>} />
@@ -259,7 +259,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
               <h2>{sample ? text.exampleSchedule : text.resultReady}<span className="v2-ready-tag">{sample ? text.sample : SCHEDULE_MODE_LABELS[resultMode]}</span></h2></div>
             <div className="v2-banner-actions"><button type="button" className="v2-button v2-button-white v2-config-button" aria-label={text.configure} title={text.configure} onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" /><span>{text.configure}</span></button>
               {!sample && <button type="button" className="v2-button v2-button-primary" disabled={busy || loadingResult || Boolean(generationDisabledReason)} title={generationDisabledReason ?? undefined}
-                onClick={() => onGenerate?.()}><RefreshCw size={16} className={busy ? 'v2-spin' : ''} />{busy ? text.generating : text.regenerate}</button>}
+                onClick={() => onGenerate?.()}>{busy ? <LoadingIcon size={16} className="v2-spin" aria-hidden="true" /> : <GenerateIcon size={16} aria-hidden="true" />}{busy ? text.generating : text.regenerate}</button>}
             </div>
           </div>
           <AnimatePresence initial={false}>
@@ -280,7 +280,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
             {([['schedule', text.scheduleTab], ['analysis', text.analysisTab], ...(showManual ? [['manual', text.manualTab] as const] : []), ...(restrictedPreview || !sample && (workflow?.suggestions?.length || result.upgrade_suggestions_status) ? [['training', text.trainingTab] as const] : [])] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => { setView(id); if (id === 'manual') setManualOpened(true) }}>
               {label}{view === id && <MotionNavIndicator layoutId="result-tab" variant="underline" />}
             </button>)}
-            <span><ShieldCheck size={14} aria-hidden="true" />{sample ? text.sampleSource : text.ownSource}</span>
+            <span>{sample ? <SampleIcon size={14} aria-hidden="true" /> : <ShieldCheck size={14} aria-hidden="true" />}{sample ? text.sampleSource : text.ownSource}</span>
             <ResultActions plans={result.plans} shift={shift} onShiftChange={setShift} onExport={() => setExportOpen(true)} busy={busy} loadingResult={loadingResult} />
           </div>
           <div className="v2-feature-content" hidden={view !== 'manual'}>
@@ -290,11 +290,11 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           <V2Transition motionKey={view}>
           <div hidden={view === 'manual'} className={`v2-results-grid ${view !== 'schedule' || expanded ? 'v2-results-expanded' : ''}`}>
             {view === 'training' ? <section className="v2-panel v2-feature-content v2-training-workspace v2-section-loading">{canViewTraining
-              ? <Suspense fallback={<p role="status">{text.loading}</p>}><UpgradeSuggestionStatusNotice result={result} /><UpgradeSuggestions suggestions={workflow?.suggestions ?? []} embedded /></Suspense>
+              ? <Suspense fallback={<p role="status">{text.loading}</p>}><UpgradeSuggestionStatusNotice result={result} /><UpgradeSuggestions suggestions={workflow?.suggestions ?? []} embedded projectScope={session.user && session.activeProfile ? { userId: session.user.id, profileId: session.activeProfile.id } : undefined} /></Suspense>
               : <LockedCapabilityPreview title={copy.optimize.pages_tool_optimize_ResultSection_016} description={copy.optimize.pages_tool_optimize_ResultSection_017} />}</section> : view === 'analysis' ? (
               <section className="v2-panel v2-analysis"><div className="v2-panel-heading"><h2>{text.analysisTab}</h2><span className="v2-neutral-tag">24h</span></div>{canViewAnalysis
                 ? <IncomeAnalysis result={result} prepared={prepared} />
-                : <div className="v2-analysis-note"><ShieldCheck size={21} /><div><p>{text.previewAnalysis}</p>{features.pricing && <Link className="v2-text-button" to="/pricing">{text.comparePlans}<ArrowRight size={14} /></Link>}</div></div>}</section>
+                : <div className="v2-analysis-note"><PreviewIcon size={21} aria-hidden="true" /><div><p>{text.previewAnalysis}</p>{features.pricing && <Link className="v2-text-button" to="/pricing">{text.comparePlans}<ArrowRight size={14} /></Link>}</div></div>}</section>
             ) : (
               <ScheduleBoard result={result} prepared={prepared} expanded={expanded} onExpandedChange={setExpanded} shift={shift} onShiftChange={setShift}
                 view={boardView} onViewChange={setBoardView} onRoom={openRoom} />
@@ -319,7 +319,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
                 </div>
                 <dl className="v2-config-summary"><div><dt>{text.layout}</dt><dd>{config.layout}</dd></div><div><dt>{text.mode}</dt><dd>{SCHEDULE_MODE_LABELS[configMode]}</dd></div>
                   <div><dt>{text.duration}</dt><dd>{hours.join(' / ')}h</dd></div><div><dt>{text.drones}</dt><dd>{config.drones?.enable ? config.drones.auto ? text.automatic : text.manual : text.disabled}</dd></div></dl>
-                <button className="v2-operator-summary" type="button" onClick={() => openPanel('operators')}><div className="v2-avatar-stack">{owned.slice(0, 4).map((operator) => <Avatar key={operator.id} operator={operator} small />)}</div><span><strong>{text.operatorData}</strong><small>{sampleOperators ? text.guestNavigation.sampleOwned(owned.length) : text.owned(owned.length)}</small></span><ChevronRight size={15} /></button>
+                <button className="v2-operator-summary" type="button" onClick={() => openPanel('operators')}><div className="v2-avatar-stack">{owned.slice(0, 4).map((operator) => <Avatar key={operator.id} operator={operator} small />)}</div><span><strong>{text.operatorData}</strong><small>{sampleOperators ? text.guestNavigation.sampleOwned(owned.length) : text.owned(owned.length)}</small></span><ArrowRight size={15} aria-hidden="true" /></button>
               </section>
             </aside>}
           </div>

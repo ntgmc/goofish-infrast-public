@@ -68,7 +68,7 @@ export const commonCopy = {
   // src/App.tsx
   App_003: "正在载入常见问题...",
   // src/App.tsx
-  App_004: "正在载入客服信息...",
+  App_004: "正在载入反馈信息...",
   // src/App.tsx
   App_005: "正在载入隐私政策...",
   // src/App.tsx

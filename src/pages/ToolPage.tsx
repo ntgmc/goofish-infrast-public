@@ -251,6 +251,7 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
           onSectionChange={navigateOptimize} onOpenTour={() => undefined} onReset={() => { void navigateAfterConfigSave(profileScopedPath(workspaceSetupPath('operators'), activeProfile.id)) }}
           flushConfigSave={flushConfigSave} onLogout={handleLogout}><SectionLoader label={copy.common.pages_ToolPage_002} /></OptimizeShell>}>
           <OptimizePage
+            projectUserId={user.id}
             profileId={activeProfile.id}
             profile={activeProfile}
             license={license}

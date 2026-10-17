@@ -1,5 +1,5 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import { Download, Eraser, LockKeyhole, Search, Upload } from 'lucide-react'
+import { ExportImageIcon as Download, ClearIcon as Eraser, LockedOperatorIcon as LockKeyhole, SearchIcon as Search, UploadIcon as Upload, BackupIcon } from '../icons'
 import PinyinMatch from 'pinyin-match'
 import type { LicenseConfig, LicenseOperator, OptimizeResult } from '../../lib/types'
 import { copy } from '../../copy/index'
@@ -292,7 +292,7 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
           <button type="button" className="tool-secondary-action" disabled={!stored || busy}
             onClick={() => dirty ? setConfirmation('restore') : stored && restore(stored)}>{label.restore}</button>
           <button type="button" className="tool-secondary-action" disabled={(!changed && !stored) || busy} onClick={() => setConfirmation('reset')}>{label.reset}</button>
-          <button type="button" className="tool-secondary-action" disabled={busy} onClick={() => void download('backup')}><Download size={14} aria-hidden="true" />{label.backup}</button>
+          <button type="button" className="tool-secondary-action" disabled={busy} onClick={() => void download('backup')}><BackupIcon size={14} aria-hidden="true" />{label.backup}</button>
           <button type="button" className="tool-secondary-action" disabled={busy} onClick={() => upload.current?.click()}><Upload size={14} aria-hidden="true" />{label.import}</button>
           <input ref={upload} type="file" accept=".json,application/json" className="hidden" aria-label={label.import} onChange={(event) => void importBackup(event.target.files?.[0])} />
         </div>

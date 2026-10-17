@@ -1,4 +1,4 @@
-import { CheckIcon } from 'lucide-react'
+import { SelectedIcon as CheckIcon } from '../icons'
 import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui'
 import * as React from 'react'
 

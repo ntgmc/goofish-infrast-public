@@ -330,6 +330,34 @@ describe('admin user workspace export', () => {
 })
 
 describe('admin user filters and batch status operations', () => {
+  it('validates the report cohort, keeps list permissions and returns only safe operational progress', async () => {
+    const progress = { stage: 'no_generation', failure_reason: 'validation_failed', failure_at: '2026-01-05T00:00:00Z' }
+    mocks.listAdminUserAccountsPage.mockResolvedValue({ users: [{ ...user, password_hash: 'private', operations_progress: progress }], profiles: [], page: 1, total: 1 })
+    const params = new URLSearchParams({ cohort: 'activation_no_generation', from: '2026-01-01', to: '2026-01-07', observed_at: '2026-01-15T00:00:00Z' })
+    const request = () => new Request(`http://localhost/api/admin/users?${params}`)
+    const response = await adminUsersHandler(request())
+    expect(response.status).toBe(200)
+    expect(mocks.authenticateAdminRequest).toHaveBeenCalledWith(expect.any(Request), 'user_view')
+    expect(mocks.listAdminUserAccountsPage).toHaveBeenCalledWith(expect.objectContaining({ operations: Object.fromEntries(params) }))
+    const body = await response.json()
+    expect(body.app_users[0].operations_progress).toEqual(progress)
+    expect(JSON.stringify(body)).not.toContain('private')
+    mocks.listAdminUserAccountsPage.mockClear()
+    mocks.authenticateAdminRequest.mockResolvedValue({ ok: false, response: new Response('没有权限', { status: 403 }) })
+    expect((await adminUsersHandler(request())).status).toBe(403)
+    expect(mocks.listAdminUserAccountsPage).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    'cohort=unknown', 'cohort=registered&from=2026-02-30',
+    'cohort=registered&from=2026-01-01&to=2026-01-07&observed_at=invalid',
+    'cohort=registered&from=2026-01-01&to=2026-04-01&observed_at=2026-04-02T00%3A00%3A00Z',
+    'cohort=registered&from=2026-01-01&to=2026-01-07&observed_at=2099-01-01T00%3A00%3A00Z',
+  ])('rejects invalid report cohorts before loading users: %s', async (params) => {
+    expect((await adminUsersHandler(new Request(`http://localhost/api/admin/users?${params}`))).status).toBe(400)
+    expect(mocks.listAdminUserAccountsPage).not.toHaveBeenCalled()
+  })
+
   it('passes validated combined filters to the paginated query and returns last seen time', async () => {
     mocks.listAdminUserAccountsPage.mockResolvedValue({
       users: [{ ...user, last_seen_at: '2026-10-02T08:00:00.000Z' }],
@@ -428,6 +456,19 @@ describe('admin user profile pagination', () => {
     expect(mocks.listCdkRecordsByKeys).toHaveBeenCalledWith([])
     expect(mocks.getProfileWorkspace).not.toHaveBeenCalled()
     expect(mocks.getCdk).not.toHaveBeenCalled()
+  })
+
+  it('opens the page containing a linked profile and rejects a profile owned by another user', async () => {
+    const profiles = Array.from({ length: 150 }, (_, index) => ({ ...profile, id: `linked-profile-${index}`, cdk_key: null, cdk_code_hash: null }))
+    mocks.listProfilesForUser.mockResolvedValue(profiles)
+    mocks.getProfileById.mockResolvedValue(profiles[149])
+    const response = await adminUsersHandler(new Request(`http://localhost/api/admin/users?user_id=${user.id}&profile_id=linked-profile-149`))
+    const body = await response.json()
+    expect(response.status).toBe(200)
+    expect(body.detail.profile_pagination.page).toBe(2)
+    expect(body.detail.profiles.map((item: { id: string }) => item.id)).toContain('linked-profile-149')
+    mocks.getProfileById.mockResolvedValue({ ...profiles[149], user_id: 'another-user' })
+    expect((await adminUsersHandler(new Request(`http://localhost/api/admin/users?user_id=${user.id}&profile_id=linked-profile-149`))).status).toBe(404)
   })
 
   it('rejects unsafe profile page values before querying profile data', async () => {

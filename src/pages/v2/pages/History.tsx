@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Archive, ArrowRight, FileClock, Search } from 'lucide-react'
+import { ArchiveIcon as Archive, NextIcon as ArrowRight, ResultHistoryIcon as FileClock, SearchIcon as Search } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import { formatPlanName, formatResultHistorySummary, formatWorkspaceDate } from '../../../lib/workspace-history'

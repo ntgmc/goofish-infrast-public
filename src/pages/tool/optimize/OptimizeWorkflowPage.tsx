@@ -22,7 +22,7 @@ import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
 
 
 import PaidCapabilityPreview, { LockedScenarioPreview } from './PaidCapabilityPreview'
-export default function OptimizeWorkflowPage(props: Props) {
+export default function OptimizeWorkflowPage(props: Props & { projectUserId?: string }) {
   const { features } = useSiteFeatures()
   const [taskCenterOpen, setTaskCenterOpen] = useState(false)
   const taskCenterButtonRef = useRef<HTMLButtonElement>(null)
@@ -363,6 +363,7 @@ export default function OptimizeWorkflowPage(props: Props) {
               fullResultDownloadBusy={workspaceBusyAction?.startsWith('download-full:') === true}
               fullDataAvailable={userCanViewFullData}
               manualEditProfile={{ id: profile.id, kind: profile.kind, permission }}
+              projectScope={props.projectUserId ? { userId: props.projectUserId, profileId: profile.id } : undefined}
               manualSimulationBaseline={progress?.historyResultId || progress?.jobId || latestWorkspaceResult?.id ? { id: progress?.historyResultId ?? progress?.jobId ?? latestWorkspaceResult!.id, config: activeConfig } : undefined}
             />
           )}

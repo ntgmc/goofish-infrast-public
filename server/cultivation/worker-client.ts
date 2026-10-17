@@ -1,7 +1,9 @@
 import { Worker } from 'node:worker_threads'
 import type { CultivationQuery } from '../../src/lib/cultivation-contract'
+import type { CultivationProject } from '../../src/lib/cultivation-projects'
 
-export type CultivationTask = { type: 'plan'; credential: string; uid: string; query: CultivationQuery } | { type: 'refresh' }
+export type CultivationTask = { type: 'plan'; game: unknown; inventory: unknown; importedAt: string; snapshotVersion: string;
+  warnings: string[]; query: CultivationQuery; projects?: CultivationProject[] } | { type: 'refresh' }
 export type CultivationWorkerReply = { ok: true; result: ArrayBuffer | null } | { ok: false; status: number; code: string; message: string }
 
 export class CultivationReadError extends Error {

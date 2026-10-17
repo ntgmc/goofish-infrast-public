@@ -6,6 +6,16 @@ import { readCultivationPlayer } from './player'
 import { getCultivationRecommendations } from './recommendations'
 import { buildSpecialItemRecommendations, type SpecialItemCatalog } from './special-items'
 
+export function cultivationResources(snapshot: PrtsSnapshot, player: ReturnType<typeof readCultivationPlayer>, pricing: PricingState) {
+  const prices = Object.fromEntries(pricing.prices)
+  prices.exp = getExpSanity(1)
+  prices['4001'] = getNetLmdSanity(pricing)
+  if (prices['4006'] !== undefined) prices['32001'] = prices['4006'] * 90
+  return { inventory: player.inventory, potions: player.potions, prices, recipes: snapshot.recipes, farms: snapshot.farms,
+    itemNames: { ...snapshot.itemNames, exp: '作战经验', '4001': '龙门币' },
+    updatedAt: snapshot.updatedAt, importedAt: new Date().toISOString(), pricingStatus: pricing.status }
+}
+
 export function buildCultivationData(snapshot: PrtsSnapshot, playerInfo: unknown, cultivatePlayer: unknown, pricing: PricingState, community?: CultivationData['community'], specialCatalog?: SpecialItemCatalog, query: CultivationQuery = defaultCultivationQuery): CultivationData {
   const player = readCultivationPlayer(playerInfo, cultivatePlayer, snapshot)
   const candidates = new Map<string, CultivationCandidate & { stages: Set<string> }>()
@@ -56,10 +66,6 @@ export function buildCultivationData(snapshot: PrtsSnapshot, playerInfo: unknown
     }
     if (entry?.frequency) candidates.set(key, entry)
   }
-  const prices = Object.fromEntries(pricing.prices)
-  prices.exp = getExpSanity(1)
-  prices['4001'] = getNetLmdSanity(pricing)
-  if (prices['4006'] !== undefined) prices['32001'] = prices['4006'] * 90
   const result: CultivationCandidate[] = [...candidates.values()].map(({ stages, ...candidate }) => ({ ...candidate, stageCount: stages.size, source: 'homework' }))
   for (const [id, current] of player.characters) {
     const statistics = community?.operators[id]
@@ -94,10 +100,10 @@ export function buildCultivationData(snapshot: PrtsSnapshot, playerInfo: unknown
     specialItemsUpdatedAt: specialCatalog?.updatedAt || null,
     skillIcons: specialCatalog?.skillIcons,
     itemIcons: specialCatalog?.itemIcons,
-    groups: [...groups.values()], inventory: player.inventory, potions: player.potions, prices,
-    itemNames: { ...snapshot.itemNames, ...specialCatalog?.itemNames, exp: '作战经验', '4001': '龙门币' }, recipes: snapshot.recipes, farms: snapshot.farms,
+    ...cultivationResources(snapshot, player, pricing),
+    groups: [...groups.values()],
+    itemNames: { ...snapshot.itemNames, ...specialCatalog?.itemNames, exp: '作战经验', '4001': '龙门币' },
     stats: { homeworks: recommendation.homeworks, owned: player.characters.size, missingOperators: missingOperators.size, incomplete: recommendation.invalid + [...candidates.values()].filter((row) => row.warnings.length).length },
-    updatedAt: snapshot.updatedAt, importedAt: new Date().toISOString(), pricingStatus: pricing.status,
     warnings: [...snapshot.warnings, ...(snapshot.homeworks.some((row) => !row.uploadedAt) ? ['部分作业缺少发布时间，暂不参与推荐；请重新导入作业数据或等待同步补齐。'] : []), ...(pricing.status === 'fresh' ? [] : [pricing.status === 'stale' ? '材料价格使用有效期内的历史价格' : '材料价格暂不可用，未估价材料不会按零成本处理']), ...(specialCatalog?.status === 'unavailable' ? ['道具资料暂不可用，请稍后重新导入。'] : specialCatalog?.status === 'stale' ? ['道具资料更新暂不可用，当前使用上次数据。'] : [])],
   }
 }
