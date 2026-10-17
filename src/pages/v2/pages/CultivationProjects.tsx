@@ -40,7 +40,7 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
     setApplied(true)
   }
   return <div className="v2-projects">
-    <div className="v2-tool-source"><div><span className="v2-label">{text.account} · {profile.display_name}</span><p>{text.description}</p><Link className="v2-text-button" to={v2Path('cultivation', profile.id)}>{text.suggestionsEntry}<ArrowRight size={14} /></Link></div><button className="v2-button v2-button-primary" disabled={m.busy} onClick={() => void m.load()}>{m.busy ? text.loading : m.data ? text.refresh : text.import}<ArrowRight size={16} /></button></div>
+    <div className="v2-tool-source v2-project-source"><div><span className="v2-label">{text.account} · {profile.display_name}</span><p>{text.description}</p><Link className="v2-text-button" to={v2Path('cultivation', profile.id)}>{text.suggestionsEntry}<ArrowRight size={14} /></Link></div><button className="v2-button v2-button-primary" disabled={m.busy} onClick={() => void m.load()}>{m.busy ? text.loading : m.data ? text.refresh : text.import}<ArrowRight size={16} /></button></div>
     <Notice error>{m.error}</Notice><Notice>{m.storageError ? text.storageFailed : null}</Notice>
     {m.data?.warnings.map((warning) => <Notice key={warning}>{warning}</Notice>)}
     {(m.data || m.projects.length > 0) && <>
@@ -52,12 +52,12 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
             const row = route?.rows.find((row) => row.project.operatorId === project.operatorId)
             const first = m.projects.find((row) => !row.paused)?.operatorId === project.operatorId
             const deadlineDays = row?.estimatedDate && project.deadline ? projectDaysEarlier(project.deadline, row.estimatedDate) : null
-            return <li key={project.operatorId} data-paused={project.paused}>
+            return <li key={project.operatorId} data-paused={project.paused} data-primary={first && !project.paused}>
               <img src={`/webp96/${encodeURIComponent(project.operatorId)}.webp`} alt="" width={48} height={48} />
-              <div className="v2-project-target-body"><h3>{name}<small>{project.paused ? text.paused : first ? text.main : ''}</small></h3>
+              <div className="v2-project-target-body"><h3>{name}{(project.paused || first) && <span className="v2-project-status">{project.paused ? text.paused : text.main}</span>}</h3>
                 <p>{text.targetDescription(text.elites[project.elite], project.level, project.skill, text.skillRank(project.skillLevel))}</p>
                 {operator && <small>{text.currentDescription(operator.current.elite, operator.current.level)}</small>}
-                {!project.paused && <p className="v2-project-ready">{text.goalReadyDate} · {m.pendingRefresh ? text.pendingRefresh : row?.estimatedDate ?? text.pending}</p>}
+                {!project.paused && <div className="v2-project-ready" data-ready={Boolean(row?.estimatedDate) && !m.pendingRefresh}><span>{text.goalReadyDate}</span><strong>{m.pendingRefresh ? text.pendingRefresh : row?.estimatedDate ?? text.pending}</strong></div>}
                 {!project.paused && project.deadline && <small>{project.deadline} · {deadlineDays === null ? text.deadlineUnknown : deadlineDays < 0 ? text.overdue(-deadlineDays) : text.onTime}</small>}
                 {!project.paused && !first && route && <small>{m.plans?.pauseGains[project.operatorId] == null ? text.pauseUnknown : text.pausePreview(m.plans.pauseGains[project.operatorId]!)}</small>}
                 {row?.candidate?.warnings.map((warning) => <Notice key={warning}>{warning}</Notice>)}
@@ -76,12 +76,14 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
           }} />}
           <p className="v2-data-date">{text.stored}</p>
         </section>
-        <section className="v2-project-conditions"><SectionTitle title={text.conditions} />
+        <aside className="v2-project-settings">
+          <section className="v2-project-conditions"><SectionTitle title={text.conditions} />
           <Field label={text.dailySanity} type="number" min={0} max={2000} step={1} value={m.dailySanity} onChange={(event) => m.setDailySanity(event.target.value)} help={text.dailyHint} />
           <Field label={text.start} type="date" value={m.startDate} onChange={(event) => m.setStartDate(event.target.value)} />
           <label className="v2-check"><input type="checkbox" checked={m.allOpen} onChange={(event) => m.setAllOpen(event.target.checked)} />{text.allOpen}</label><p className="v2-muted">{text.allOpenHint}</p>
           {!m.validSettings && <Notice error>{text.invalidSettings}</Notice>}
-          <SectionTitle title={text.production} description={text.incomeHint} />
+          </section>
+          <section className="v2-project-production"><SectionTitle title={text.production} description={text.incomeHint} />
           {select(text.normal, m.normalId, m.setNormalId, text.noResult)}
           {select(text.temporary, m.temporaryId, m.setTemporaryId, text.noTemporary)}
           {!m.production ? <Notice>{text.incomeLoading}</Notice> : m.production.error ? <Notice error>{m.production.error}<button className="v2-text-button" onClick={m.retryProduction}>{text.retry}</button></Notice> : m.productionInvalid ? <Notice>{text.incomeUnavailable}</Notice> : !m.normalIncome && <Notice>{text.noIncome}</Notice>}
@@ -89,12 +91,15 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
           {m.temporaryIncome && <Facts items={[[text.temporaryLmd, number(m.temporaryIncome.lmd)], [text.temporaryExp, number(m.temporaryIncome.exp)]]} />}
           {(m.normalIncome?.lmd && m.normalIncome.goldNet === null || m.temporaryIncome?.lmd && m.temporaryIncome.goldNet === null) ? <Notice>{text.goldUnknown}</Notice> : null}
           <div className="v2-actions"><Link className="v2-text-button" to={v2Path('generation', profile.id)}>{text.generate}<ArrowRight size={14} /></Link><button className="v2-text-button" onClick={onConfig}>{text.configure}</button></div>
+          </section>
+          <div className="v2-project-advice">
           {route && <><SectionTitle title={text.balance} /><p className="v2-project-focus">{!(route.missing.exp || route.missing['4001']) ? text.balanced : route.focus === 'exp' ? text.needExp : text.needLmd}</p><p className="v2-muted">{!(route.missing.exp || route.missing['4001']) ? text.readyAdvice : route.focus === 'exp' ? text.expAdvice : text.lmdAdvice}</p></>}
           {m.temporaryId && m.plans && <Notice>{m.plans.useTemporary ? m.plans.gain === null ? text.temporaryReady(m.plans.alternative!.rows[0].estimatedDate!) : text.temporaryBetter(m.plans.gain) : m.plans.gain === null ? text.compareUnknown : text.keepNormal}{m.plans.useTemporary && route?.switchDate && <p>{text.switchBack(route.switchDate)}</p>}</Notice>}
           {m.production?.temporary?.config && m.plans?.useTemporary && <><div className="v2-actions"><button className="v2-button v2-button-secondary" disabled={!session.license || !canEditConfig(session.license)} onClick={() => applyConfig(true)}>{text.apply}</button>{m.production.normal?.config && <button className="v2-text-button" disabled={!session.license || !canEditConfig(session.license)} onClick={() => applyConfig(false)}>{text.applyNormal}</button>}</div><p className="v2-muted">{text.applyHint}</p>{session.license && !canEditConfig(session.license) && <p className="v2-muted">{text.configUnavailable}</p>}</>}
           {proposedConfig && canConfigure && <><button className="v2-button v2-button-secondary" onClick={() => { session.setConfigOverride(proposedConfig); onConfig() }}>{route?.focus === 'exp' ? text.prepareExp : text.prepareLmd}</button><p className="v2-muted">{text.prepareHint}</p></>}
           {applied && <Notice error={session.configSyncStatus === 'failed'}>{session.configSyncStatus === 'failed' ? copy.common.pages_tool_useToolSession_002 : text.applied}</Notice>}
-        </section>
+          </div>
+        </aside>
       </div>
       {m.pendingRefresh && <Notice>{text.pendingRefresh}</Notice>}
       {m.data && route && route.rows.length > 0 && <ProjectResults key={`${m.normalId}:${m.temporaryId}`} route={route} data={m.data} useTemporary={Boolean(m.plans?.useTemporary)} />}
@@ -129,8 +134,10 @@ function GoalForm({ operators, projects, editing, busy, onSave, onCancel }: { op
   const select = (label: string, value: number, onChange: (value: number) => void, children: ReactNode) => <label className="v2-field"><span>{label}</span><select className="v2-input" value={value} onChange={(event) => onChange(Number(event.target.value))}>{children}</select></label>
   return <form className="v2-project-form" onSubmit={submit}>
     <h3>{editing ? text.edit : text.add}</h3>
-    {!editing && <Field label={text.search} value={search} onChange={(event) => setSearch(event.target.value)} />}
-    <label className="v2-field"><span>{text.operator}</span><select className="v2-input" value={goal.operatorId} disabled={Boolean(editing)} onChange={(event) => choose(event.target.value)}><option value="">{text.choose}</option>{choices.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
+    <div className="v2-project-form-picker">
+      {!editing && <Field label={text.search} value={search} onChange={(event) => setSearch(event.target.value)} />}
+      <label className="v2-field"><span>{text.operator}</span><select className="v2-input" value={goal.operatorId} disabled={Boolean(editing)} onChange={(event) => choose(event.target.value)}><option value="">{text.choose}</option>{choices.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
+    </div>
     {operator && <div className="v2-project-form-fields">
       {select(text.elite, goal.elite, (elite) => setGoal({ ...goal, elite, level: Math.min(goal.level, operator.maxLevels[elite]), skill: Math.min(goal.skill, elite + 1), skillLevel: Math.min(goal.skillLevel, elite === 2 ? 10 : elite === 1 ? 7 : 4) }), operator.maxLevels.map((_max, index) => <option key={index} value={index}>{text.elites[index]}</option>))}
       <Field label={text.level} type="number" min={1} max={operator.maxLevels[goal.elite]} value={goal.level} onChange={(event) => setGoal({ ...goal, level: Number(event.target.value) })} />
@@ -147,14 +154,15 @@ function GoalForm({ operators, projects, editing, busy, onSave, onCancel }: { op
 function ProjectResults({ route, data, useTemporary }: { route: ProjectRoute; data: CultivationData; useTemporary: boolean }) {
   const [visible, setVisible] = useState(7)
   const material = (id: string) => data.itemNames[id] ?? id
-  return <section className="v2-project-results"><SectionTitle title={text.route} /><Facts items={[[text.readyDate, route.readyDate ?? text.pending]]} /><p className="v2-muted">{text.dateHint}</p>
+  return <section className="v2-project-results">
+    <header className="v2-project-result-summary" data-ready={Boolean(route.readyDate)}><div><SectionTitle title={text.route} /><p className="v2-muted">{text.dateHint}</p></div><Facts items={[[text.readyDate, route.readyDate ?? text.pending]]} /></header>
     {(route.blocked.length > 0 || route.remaining.length > 0 || route.goldLimited) && <div className="v2-project-blockers"><h3>{text.bottlenecks}</h3>
       {route.blocked.length > 0 && <Notice>{text.noSource}{[...new Set(route.blocked.map((row) => material(row.item)))].join('、')}</Notice>}
       {route.goldLimited && <Notice>{text.goldLimited}</Notice>}
       {route.remaining.length > 0 && <Notice>{text.horizon}</Notice>}
     </div>}
-    <h3>{text.resources}</h3>
-    {Object.keys(route.missing).length ? <div className="v2-project-resource-scroll"><table><thead><tr>{[text.resource, text.shortage, text.fromBase, text.fromFarm, text.remaining].map((title) => <th key={title} scope="col">{title}</th>)}</tr></thead><tbody>{Object.entries(route.missing).map(([id, count]) => <tr key={id}><th scope="row">{material(id)}</th><td>{number(count)}</td><td>{number(route.supplied[id] ?? 0)}</td><td>{number(route.farmed[id] ?? 0)}</td><td>{number(route.remaining.filter((row) => row.item === id).reduce((sum, row) => sum + row.remaining, 0))}</td></tr>)}</tbody></table></div> : <p className="v2-muted">{text.noShortage}</p>}
-    {route.phases.length > 0 && <><h3>{text.calendar}</h3><ol className="v2-project-calendar">{route.phases.slice(0, visible).map((day) => <li key={day.date}><div><time dateTime={day.date}>{day.date}</time><small>{text.daySanity(day.spent)}</small>{useTemporary && <small>{day.temporary ? text.temporaryDay : text.normalDay}</small>}</div><div><p>{text.baseDay(number(day.income['4001']), number(day.income.exp))}</p>{day.farms.length ? day.farms.map((farm) => <p key={`${farm.item}:${farm.stage}`}><strong>{farm.stage}</strong> · {material(farm.item)}<small>{text.farmRuns(farm.runs, number(farm.quantity))}</small></p>) : <p className="v2-muted">{text.noFarms}</p>}</div></li>)}</ol>{visible < route.phases.length && <button className="v2-button v2-button-secondary" onClick={() => setVisible((value) => value + 14)}>{text.moreDays}</button>}</>}
+    <section className="v2-project-result-section"><h3>{text.resources}</h3>
+    {Object.keys(route.missing).length ? <div className="v2-project-resource-scroll"><table><thead><tr>{[text.resource, text.shortage, text.fromBase, text.fromFarm, text.remaining].map((title) => <th key={title} scope="col">{title}</th>)}</tr></thead><tbody>{Object.entries(route.missing).map(([id, count]) => <tr key={id}><th scope="row">{material(id)}</th><td>{number(count)}</td><td>{number(route.supplied[id] ?? 0)}</td><td>{number(route.farmed[id] ?? 0)}</td><td>{number(route.remaining.filter((row) => row.item === id).reduce((sum, row) => sum + row.remaining, 0))}</td></tr>)}</tbody></table></div> : <p className="v2-muted">{text.noShortage}</p>}</section>
+    {route.phases.length > 0 && <section className="v2-project-result-section"><h3>{text.calendar}</h3><ol className="v2-project-calendar">{route.phases.slice(0, visible).map((day) => <li key={day.date}><div><time dateTime={day.date}>{day.date}</time><small>{text.daySanity(day.spent)}</small>{useTemporary && <small>{day.temporary ? text.temporaryDay : text.normalDay}</small>}</div><div><p>{text.baseDay(number(day.income['4001']), number(day.income.exp))}</p>{day.farms.length ? day.farms.map((farm) => <p key={`${farm.item}:${farm.stage}`}><strong>{farm.stage}</strong> · {material(farm.item)}<small>{text.farmRuns(farm.runs, number(farm.quantity))}</small></p>) : <p className="v2-muted">{text.noFarms}</p>}</div></li>)}</ol>{visible < route.phases.length && <button className="v2-button v2-button-secondary" onClick={() => setVisible((value) => value + 14)}>{text.moreDays}</button>}</section>}
   </section>
 }
