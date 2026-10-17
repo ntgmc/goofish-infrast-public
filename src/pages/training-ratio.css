@@ -47,9 +47,11 @@
 .training-ratio-verdict p { margin-bottom: 0; color: var(--color-ink); }
 .training-ratio .training-ratio-value { color: var(--training-tone); font-size: 28px; font-variant-numeric: tabular-nums; }
 .training-ratio .training-ratio-error { font-weight: 600; }
-.training-ratio-import { display: inline-flex; align-items: center; gap: 8px; margin-top: 16px; }
-.training-ratio-manual { margin-top: 20px; padding-top: 8px; border-top: 1px solid var(--color-rule); }
-.training-ratio-manual summary { min-height: 44px; align-content: center; cursor: pointer; font-size: 13px; font-weight: 600; }
+.training-ratio-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
+.training-ratio-import { display: inline-flex; align-items: center; gap: 8px; }
+.training-ratio-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--color-rule-2); }
+.training-ratio-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 12px; border-bottom: 2px solid transparent; color: var(--color-ink-2); font-size: 13px; font-weight: 600; }
+.training-ratio-tabs [data-state="active"] { color: var(--color-brand-primary); border-bottom-color: var(--color-brand-primary); }
 .training-ratio-source { margin-top: -8px; }
 .training-ratio-supplement { margin-top: 16px; padding-top: 4px; border-top: 1px solid var(--color-rule); }
 .training-ratio-evidence { margin-top: 24px; padding: 12px 24px; }

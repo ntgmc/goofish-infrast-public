@@ -34,6 +34,7 @@ export function useTrainingRatio(session: ReturnType<typeof useToolSession>) {
     catch { setDraftFailed(true) }
   }, [draft, draftKey])
   const [source, setSource] = useState<'manual' | 'imported'>('imported')
+  const [manualInventory, setManualInventory] = useState<{ lmd: number; exp: number } | null>(null)
   const [data, setData] = useState<{ inventory: { lmd: number; exp: number }; importedAt: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -56,9 +57,13 @@ export function useTrainingRatio(session: ReturnType<typeof useToolSession>) {
     if (canImport) void load()
     return () => request.current?.abort()
   }, [canImport, load])
-  const valid = source === 'imported' ? Boolean(data) : trainingAmount(draft.lmd) && (draft.useBooks ? draft.books.every(trainingAmount) : trainingAmount(draft.exp))
-  const inventory = source === 'imported' ? data?.inventory ?? null : valid ? { lmd: Number(draft.lmd), exp: draft.useBooks
-    ? draft.books.reduce((sum, value, index) => sum + Number(value) * [200, 400, 1000, 2000][index], 0) : Number(draft.exp) } : null
+  const manualValid = trainingAmount(draft.lmd) && (draft.useBooks ? draft.books.every(trainingAmount) : trainingAmount(draft.exp))
+  function applyManual() {
+    if (!manualValid) return
+    setManualInventory({ lmd: Number(draft.lmd), exp: draft.useBooks
+      ? draft.books.reduce((sum, value, index) => sum + Number(value) * [200, 400, 1000, 2000][index], 0) : Number(draft.exp) })
+  }
+  const inventory = source === 'imported' ? data?.inventory ?? null : manualInventory
   const balance = inventory ? analyzeTrainingBalance(inventory) : null
-  return { draft, setDraft, draftFailed, source, setSource, data, busy, error, load, valid, inventory, balance, canImport }
+  return { draft, setDraft, draftFailed, source, setSource, data, busy, error, load, manualValid, applyManual, inventory, balance, canImport }
 }
