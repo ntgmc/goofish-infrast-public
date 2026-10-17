@@ -24,6 +24,7 @@ const Commercial = lazy(() => import('./pages/Billing').then((module) => ({ defa
 const Tools = lazy(() => import('./pages/Tools'))
 const ManualTool = lazy(() => import('./pages/Tools').then((module) => ({ default: module.ManualTool })))
 const Cultivation = lazy(() => import('./pages/Cultivation'))
+const CultivationProjects = lazy(() => import('./pages/CultivationProjects'))
 const Depot = lazy(() => import('./pages/Depot'))
 const Plans = lazy(() => import('./pages/History'))
 const Generation = lazy(() => import('./pages/Generation'))
@@ -44,7 +45,7 @@ const descriptions: Partial<Record<V2Section, string>> = {
   'add-account': copy.v2.addAccountDescription, settings: copy.v2.settingsDescription,
   inventory: copy.v2.inventoryDescription,
 }
-const publicSections: V2Section[] = ['tools', 'depot', 'manual-tool', 'cultivation', 'settings', ...V2_PUBLIC_SECTIONS]
+const publicSections: V2Section[] = ['tools', 'depot', 'manual-tool', 'cultivation', 'cultivation-projects', 'settings', ...V2_PUBLIC_SECTIONS]
 const workflowSections: V2Section[] = ['generation', 'plans', 'lab']
 
 export default function WorkspaceSections({ section, session, workflow, generationProgress, onAccountAdded, onToolDirtyChange, onOpenProfile, onNavigate, onConfig, onOperators, generationDisabledReason, firstSchedule = false, configConfirmed = false }: {
@@ -68,7 +69,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
   const available = v2SectionAvailable(section, features)
   const [openedTools, setOpenedTools] = useState<V2Section[]>([])
   useEffect(() => {
-    if (available && ['manual-tool', 'cultivation', 'depot'].includes(section)) setOpenedTools((current) => current.includes(section) ? current : [...current, section])
+    if (available && ['manual-tool', 'cultivation', 'cultivation-projects', 'depot'].includes(section)) setOpenedTools((current) => current.includes(section) ? current : [...current, section])
   }, [section, available])
   const signedIn = Boolean(session.user)
   const needsLogin = !signedIn && !publicSections.includes(section)
@@ -78,7 +79,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
   const step = !signedIn ? 0 : !workflow || !operatorsReady ? 1 : !configConfirmed ? 2 : 3
   return <section hidden={section === 'overview'} className={`v2-feature-content v2-page-section${guided ? ' v2-first-schedule-layout' : ''}`} data-v2-section={section} aria-label={title}>
     <div className="v2-section-heading"><div><h1>{guided ? copy.v2.firstSchedule.title : title}</h1>{guided ? <p>{copy.v2.firstSchedule.description}</p> : descriptions[section] && <p>{descriptions[section]}</p>}</div>
-      {['manual-tool', 'cultivation', 'depot'].includes(section) && <Link className="v2-button v2-button-secondary" to={v2Path('tools', session.activeProfile?.id)}><ArrowLeft size={16} />{copy.v2.backToTools}</Link>}
+      {['manual-tool', 'cultivation', 'cultivation-projects', 'depot'].includes(section) && <Link className="v2-button v2-button-secondary" to={v2Path('tools', session.activeProfile?.id)}><ArrowLeft size={16} />{copy.v2.backToTools}</Link>}
       {section === 'profiles' && v2SectionAvailable('add-account', features) && <button type="button" className="v2-button v2-button-primary" onClick={() => onNavigate('add-account')}>{copy.v2.addAccount}<ArrowRight size={16} /></button>}
     </div>
     {guided && <FirstScheduleGuide step={step} />}
@@ -118,6 +119,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
       <Suspense fallback={<V2SectionLoading />}>
         {tool === 'manual-tool' && v2SectionAvailable(tool, features) && <ManualTool session={session} onDirtyChange={onToolDirtyChange} onOpenProfile={onOpenProfile} />}
         {tool === 'cultivation' && v2SectionAvailable(tool, features) && <Cultivation session={session} />}
+        {tool === 'cultivation-projects' && v2SectionAvailable(tool, features) && <CultivationProjects session={session} onConfig={onConfig} />}
         {tool === 'depot' && v2SectionAvailable(tool, features) && <Depot session={session} />}
       </Suspense>
     </div>)}

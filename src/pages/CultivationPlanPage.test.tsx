@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CultivationPlanPage from './CultivationPlanPage'
 import Cultivation from './v2/pages/Cultivation'
 import type { CultivationData } from '../lib/cultivation-contract'
+import { copy } from '../copy'
 
 const mocks = vi.hoisted(() => ({ api: vi.fn(), session: vi.fn() }))
 vi.mock('../lib/api-client', () => ({ apiJson: mocks.api }))
@@ -20,6 +21,7 @@ const sample = (): CultivationData => ({
 })
 
 beforeEach(() => {
+  localStorage.clear()
   vi.clearAllMocks()
   mocks.session.mockReturnValue({ authLoading: false, authStatus: 'authenticated', activeProfile: { id: 'one' }, profiles: [{ id: 'one', display_name: '档案一', status: 'active', skland_binding: {} }, { id: 'two', display_name: '档案二', status: 'active', skland_binding: {} }] })
   mocks.api.mockResolvedValue(sample())
@@ -151,6 +153,28 @@ describe('cultivation tool interactions', () => {
     expect(conditions.querySelector('summary')).toHaveTextContent('1–3星')
     fireEvent.click(screen.getByText('规划条件'))
     expect(rarity).toHaveValue('low')
+  })
+
+  it.each([false, true])('imports selected cultivation targets with their skill levels into the chosen profile in V2=%s', async (v2) => {
+    mocks.session.mockReturnValue({ ...mocks.session(), user: { id: 'doctor' } })
+    const input = sample()
+    input.candidates[0].target = { ...input.candidates[0].target, elite: 2, level: 60, skill: 3, skillLevel: 10, moduleId: 'mod_x', moduleLevel: 3 }
+    input.candidates[0].skillId = 's3'
+    mocks.api.mockResolvedValue(input)
+    render(<MemoryRouter>{v2 ? <Cultivation session={mocks.session()} /> : <CultivationPlanPage />}</MemoryRouter>)
+    fireEvent.change(screen.getByRole('combobox', { name: '游戏档案' }), { target: { value: 'two' } })
+    fireEvent.click(screen.getByRole('button', { name: '导入森空岛练度与仓库' }))
+    const button = await screen.findByRole('button', { name: copy.cultivationProjects.importBatch })
+    fireEvent.click(button)
+    expect(await screen.findByText(copy.cultivationProjects.imported(2, 0))).toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem('maatool:cultivation-projects:doctor:two')!)).toEqual([
+      { operatorId: 'a', elite: 2, level: 60, skill: 3, skillLevel: 10, paused: false, deadline: '' },
+      { operatorId: 'b', elite: 1, level: 1, skill: 1, skillLevel: 7, paused: false, deadline: '' },
+    ])
+    expect(localStorage.getItem('maatool:cultivation-projects:doctor:one')).toBeNull()
+    expect(screen.getByRole('link', { name: copy.cultivationProjects.openProjects })).toHaveAttribute('href', '/v2?section=cultivation-projects&profile_id=two')
+    expect(screen.getAllByText(copy.cultivationProjects.importScopeHint).length).toBeGreaterThan(0)
+    expect(mocks.api).toHaveBeenCalledOnce()
   })
 
   it('discards a late response when the selected profile changes', async () => {

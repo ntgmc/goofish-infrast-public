@@ -8,11 +8,11 @@ import type { OptionPanel, V2Session } from './OptionsDrawer'
 import { sectionLabels, v2Path, v2SectionAvailable, type V2Section } from './navigation'
 
 const text = copy.v2
-const workspaceEntries = ['overview', 'generation', 'plans', 'lab', 'tools'] as const
+const workspaceEntries = ['overview', 'generation', 'plans', 'lab', 'cultivation-projects', 'tools'] as const
 const personalEntries = ['profiles', 'inventory', 'commercial', 'balance', 'announcements', 'settings'] as const
 const guestPersonalEntries = ['plans', 'lab', 'profiles', 'inventory', 'commercial', 'balance'] as const
 const icons = {
-  overview: LayoutDashboard, generation: RefreshCw, plans: FileClock, lab: Activity, tools: CalendarClock,
+  overview: LayoutDashboard, generation: RefreshCw, plans: FileClock, lab: Activity, 'cultivation-projects': CalendarClock, tools: CalendarClock,
   profiles: Users, inventory: WalletCards, commercial: WalletCards, balance: WalletCards, announcements: Bell, settings: Settings2,
   pricing: WalletCards, help: BookOpen, support: LifeBuoy, status: Activity, updates: ScrollText,
 }

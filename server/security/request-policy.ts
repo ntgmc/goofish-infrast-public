@@ -126,7 +126,11 @@ const adminTargetProfileShape = {
 }
 
 export const requestSchemas = {
-  cultivationPlan: strict({ profile_id: shortString(128), recommendation: strict({
+  cultivationPlan: strict({ profile_id: shortString(128), projects: z.array(strict({
+    operatorId: shortString(128), elite: z.number().int().min(0).max(2), level: z.number().int().min(1).max(90),
+    skill: z.number().int().min(1).max(3), skillLevel: z.number().int().min(1).max(10), paused: z.boolean(),
+    deadline: z.union([z.literal(''), z.iso.date()]),
+  })).max(30).refine((rows) => new Set(rows.map((row) => row.operatorId)).size === rows.length, '每名干员只能设置一个目标。').optional(), recommendation: strict({
     scope: z.enum(['recent', 'permanent', 'history']).optional(),
     days: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(365)]).optional(),
     coverage: z.union([z.literal(0.6), z.literal(0.8), z.literal(0.9)]).optional(),

@@ -43,6 +43,22 @@ describe('cultivation planning authorization and data boundary', () => {
     expect(await response.json()).toMatchObject({ code })
   })
 
+  it('validates player-selected targets and forwards them only for an authorized profile', async () => {
+    const target = { operatorId: 'char_test', elite: 2, level: 60, skill: 1, skillLevel: 10, paused: false, deadline: '2026-11-01' }
+    for (const projects of [[target, target], [{ ...target, level: 91 }], [{ ...target, deadline: '2026-02-30' }], Array.from({ length: 31 }, (_, index) => ({ ...target, operatorId: `char_${index}` }))]) {
+      expect((await handler(request({ profile_id: 'mine', projects }))).status).toBe(400)
+    }
+    expect((await handler(request({ profile_id: 'foreign', projects: [target] }))).status).toBe(404)
+    expect(mocks.read).not.toHaveBeenCalled()
+    const req = request({ profile_id: 'mine', projects: [target] })
+    const response = await handler(req)
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    expect(mocks.read).toHaveBeenCalledWith(expect.objectContaining({ projects: [target], uid: 'player-uid' }), req.signal)
+    expect((await handler(request({ profile_id: 'mine', projects: [] }))).status).toBe(200)
+    expect(mocks.read).toHaveBeenLastCalledWith(expect.objectContaining({ projects: [] }), expect.any(AbortSignal))
+  })
+
   it('passes filters and request cancellation to the isolated reader and keeps personal data uncached', async () => {
     const req = request({ profile_id: 'mine', recommendation: { stageId: 'main_01', rarityGroup: 'low' } })
     const response = await handler(req)

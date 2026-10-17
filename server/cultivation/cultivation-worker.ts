@@ -4,6 +4,8 @@ import { getYituliuPricing } from '../handlers/material-value'
 import { SklandClient, SklandClientError } from '../handlers/skland-client'
 import { readPrtsSnapshot, releasePrtsSnapshot } from './catalog'
 import { buildCultivationData } from './data'
+import { buildCultivationProjects } from './projects'
+import { readProjectCatalog } from './project-catalog'
 import { getCultivationStatistics } from './references'
 import { getSpecialItemCatalog } from './special-items'
 import { CultivationReadError, type CultivationTask, type CultivationWorkerReply } from './worker-client'
@@ -28,6 +30,18 @@ parentPort!.on('message', (task: CultivationTask | { type: 'cancel' }) => {
 })
 
 async function execute(task: CultivationTask, signal: AbortSignal): Promise<ArrayBuffer | null> {
+  if (task.type === 'plan' && task.projects !== undefined) {
+    let snapshot
+    try { snapshot = await readProjectCatalog(signal) }
+    catch {
+      signal.throwIfAborted()
+      throw new CultivationReadError('养成资料暂不可用，请稍后重试。', 503, 'cultivation_data_unavailable')
+    }
+    const client = new SklandClient(task.credential)
+    const [game, inventory, pricing] = await Promise.all([client.getGamePlayerInfo(task.uid), client.getCultivatePlayer(task.uid), getYituliuPricing()])
+    signal.throwIfAborted()
+    return new TextEncoder().encode(JSON.stringify(buildCultivationProjects(snapshot, game, inventory, pricing, task.projects))).buffer
+  }
   let snapshot
   try { snapshot = await readPrtsSnapshot() }
   catch { throw new CultivationReadError('作业数据暂不可用，请等待管理员导入后重试。', 503, 'prts_data_unavailable') }

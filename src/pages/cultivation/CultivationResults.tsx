@@ -3,6 +3,8 @@ import { ExternalLink, RotateCcw, X } from 'lucide-react'
 import { copy } from '../../copy/index'
 import type { CultivationCandidate, CultivationData } from '../../lib/cultivation-contract'
 import type { buildCultivationPlan } from '../../lib/cultivation-planner'
+import { projectFromCultivationCandidate, type CultivationProjectScope } from '../../lib/cultivation-project-import'
+import CultivationProjectImport from '../../components/CultivationProjectImport'
 
 const label = copy.tools.cultivation
 export const number = (value: number) => new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 }).format(value)
@@ -63,9 +65,9 @@ function Statistics({ row, data }: { row: CultivationCandidate; data: Cultivatio
   </details>
 }
 
-type Props = { data: CultivationData; plan: ReturnType<typeof buildCultivationPlan>; excluded: string[]; exclude: (id: string, excluded: boolean) => void }
+type Props = { data: CultivationData; plan: ReturnType<typeof buildCultivationPlan>; excluded: string[]; exclude: (id: string, excluded: boolean) => void; projectScope?: CultivationProjectScope }
 
-export default memo(function CultivationResults({ data, plan, excluded, exclude }: Props) {
+export default memo(function CultivationResults({ data, plan, excluded, exclude, projectScope }: Props) {
   const [search, setSearch] = useState('')
   const [visible, setVisible] = useState(50)
   const rows = useMemo(() => data.candidates.filter((row) => row.name.includes(search)).sort((a, b) => (b.weightedFrequency ?? b.frequency) - (a.weightedFrequency ?? a.frequency)), [data, search])
@@ -73,6 +75,7 @@ export default memo(function CultivationResults({ data, plan, excluded, exclude 
     <section className="workspace-cultivation-suggestions tool-panel p-5 sm:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-3"><h2 className="text-lg font-semibold">{label.suggestions}</h2><p className="text-sm text-ink-secondary">{label.total} · {plan.totalSanity === null ? label.unpriced : number(plan.totalSanity)}</p></div>
       <p className="my-3 text-xs leading-5 text-ink-muted">{label.adviceHint}</p>
+      {projectScope && <CultivationProjectImport key={`${projectScope.profileId}:${plan.selected.map(({ candidate }) => candidate.key).join(',')}`} scope={projectScope} projects={plan.selected.flatMap(({ candidate }) => { const project = projectFromCultivationCandidate(candidate); return project ? [project] : [] })} batch partial={plan.selected.some(({ candidate }) => Boolean(candidate.target.moduleId) || candidate.target.potential > candidate.current.potential)} />}
       {!plan.selected.length ? <p className="py-4 text-sm text-ink-secondary">{label.empty}</p> : <ol className="divide-y divide-surface-3">
         {plan.selected.map(({ candidate: row, allocation, estimatedDate }, index) => <li key={row.key} className="grid gap-4 py-5 lg:grid-cols-2">
           <div><div className="flex flex-wrap items-start gap-3"><span className="pt-2 text-lg font-semibold tabular-nums text-brand-500">{index + 1}</span><Operator row={row} data={data} />
@@ -80,6 +83,7 @@ export default memo(function CultivationResults({ data, plan, excluded, exclude 
           </div><CultivationTraining row={row} />
             {row.source === 'community' && <p className="mt-2 text-xs text-ink-muted">{label.communityRate(row.communityRate ?? null)}</p>}
             <CultivationEvidence row={row} /><Statistics row={row} data={data} />
+            {projectScope && projectFromCultivationCandidate(row) && <CultivationProjectImport key={row.key} scope={projectScope} projects={[projectFromCultivationCandidate(row)!]} partial={Boolean(row.target.moduleId) || row.target.potential > row.current.potential} />}
           </div>
           <div className="space-y-3 text-sm"><p>{label.cost} · <strong className="tabular-nums">{allocation.sanity === null ? label.unpriced : number(allocation.sanity)}</strong></p>
             <p className="text-xs text-ink-secondary">{label.materialDate} · {estimatedDate ?? label.pending}</p>

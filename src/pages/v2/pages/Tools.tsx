@@ -16,6 +16,7 @@ export default function Tools({ profileId }: { profileId?: string }) {
   const { features } = useSiteFeatures()
   const tools = [
     { section: 'manual-tool' as const, enabled: features.manual_schedule, icon: CalendarClock, title: copy.tools.manualSchedule.title, description: copy.tools.manualSchedule.description },
+    { section: 'cultivation-projects' as const, enabled: features.cultivation_plan, icon: CalendarDays, title: copy.cultivationProjects.title, description: copy.cultivationProjects.description },
     { section: 'cultivation' as const, enabled: features.cultivation_plan, icon: CalendarDays, title: copy.tools.cultivation.title, description: copy.tools.cultivation.description },
     { section: 'depot' as const, enabled: features.depot_value, icon: Gem, title: copy.dashboard.pages_tool_dashboard_ToolsSection_001, description: copy.tools.pages_DepotValuePage_011 },
   ].filter((tool) => tool.enabled)

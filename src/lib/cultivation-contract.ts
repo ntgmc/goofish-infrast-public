@@ -54,7 +54,7 @@ export type CultivationCandidate = {
   demandKeys?: string[]
   demandWeights?: Record<string, number>
   weightedFrequency?: number
-  source?: 'homework' | 'community'
+  source?: 'homework' | 'community' | 'project'
   communityRate?: number
   evidence?: {
     status: 'current' | 'limited' | 'historical' | 'insufficient'
@@ -91,6 +91,7 @@ export type CultivationPotion = {
 
 export type CultivationData = {
   candidates: CultivationCandidate[]
+  projectOperators?: import('./cultivation-projects').ProjectOperator[]
   recommendation?: {
     query: CultivationQuery
     families: number

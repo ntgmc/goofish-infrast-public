@@ -20,7 +20,7 @@ export default async function cultivationPlanHandler(req: Request): Promise<Resp
     const binding = profile.skland_binding
     if (!binding?.encrypted_cred) return jsonResponse({ error: '请先在档案中绑定森空岛，再导入练度和材料。' }, 400)
     const data = await readCultivationPlan({ credential: decryptSklandCredential(binding.encrypted_cred), uid: binding.uid,
-      query: { ...defaultCultivationQuery, ...body.recommendation } }, req.signal)
+      query: { ...defaultCultivationQuery, ...body.recommendation }, ...(body.projects !== undefined ? { projects: body.projects } : {}) }, req.signal)
     return new Response(data, { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
   } catch (error) {
     if (error instanceof RequestInputError) return jsonResponse({ error: error.message, code: error.code }, error.status)

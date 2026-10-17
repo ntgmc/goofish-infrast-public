@@ -7,7 +7,7 @@ import { test } from 'node:test'
 import { importPrtsPlanning } from './import-prts-planning.mjs'
 import { syncPrtsPlanning } from './sync-prts-planning.mjs'
 import { planningFixture } from './prts-planning-fixture.mjs'
-import { homeworkRow, writeSnapshot } from './prts-planning-lib.mjs'
+import { homeworkRow, loadPlanningAssets, writeSnapshot } from './prts-planning-lib.mjs'
 
 async function sandbox(operation) {
   const directory = await mkdtemp(join(tmpdir(), 'prts-planning-'))
@@ -125,3 +125,36 @@ test('a duplicate writer cannot replace a snapshot while import/sync holds its l
   await assert.rejects(syncPrtsPlanning({ output }), /already locked/)
   assert.equal(JSON.parse(await readFile(output, 'utf8')).cursor, 20)
 }))
+
+test('builds project promotion and mastery costs from the same pinned game tables as recipes and farms', async (context) => {
+  const urls = []
+  const tables = {
+    character_table: { char_test: { name: '测试干员', rarity: 'TIER_6', profession: 'SNIPER', phases: [
+      { evolveCost: null }, { evolveCost: [{ id: 'chip', count: 5 }] }, { evolveCost: [{ id: 'chip2', count: 4 }] },
+    ], allSkillLvlup: [{ lvlUpCost: [{ id: 'book', count: 5 }] }], skills: [
+      { skillId: 's1', levelUpCostCond: [{ levelUpCost: [{ id: 'book3', count: 6 }, { id: 'rock', count: 3 }] }] },
+    ] } },
+    building_data: { workshopFormulas: { high: { formulaType: 'F_EVOLVE', itemId: 'high', count: 1, goldCost: 300, costs: [{ id: 'rock', count: 3 }] } }, manufactFormulas: {} },
+    item_table: { items: { rock: { name: '源岩' }, ap_supply_lt_60: { name: '理智药', itemType: 'AP_SUPPLY' } } },
+    zone_table: { zones: { daily: { zoneNameFirst: '资源收集' } }, weeklyAdditionInfo: { daily: { daysOfWeek: [2, 4, 6, 7] } } },
+    stage_table: { stages: { stage: { code: 'CE-6', name: '龙门币', stageType: 'DAILY', difficulty: 'NORMAL', apCost: 36, zoneId: 'daily' } } },
+  }
+  context.mock.method(globalThis, 'fetch', async (url) => {
+    urls.push(url)
+    const key = String(url).split('/').at(-1).replace('.json', '')
+    return new Response(JSON.stringify(url.includes('penguin-stats') ? { matrix: [] } : tables[key]))
+  })
+  const sha = 'a'.repeat(40)
+  const assets = await loadPlanningAssets(sha, undefined, true)
+  assert.deepEqual(assets.costs.cultivate.test, {
+    evolve: [{ chip: 5 }, { chip2: 4 }], skills: { normal: [{ book: 5 }], elite: [{ cost: [{ book3: 6, rock: 3 }] }] },
+  })
+  assert.deepEqual(assets.costs.levels.maxLevel[5], [50, 80, 90])
+  assert.equal(assets.costs.levels.eliteCost[5][1], 180000)
+  assert.deepEqual(assets.recipes.high, { count: 1, items: { rock: 3, '4001': 300 } })
+  assert.deepEqual(assets.farms['4001'], [{ stage: 'CE-6', quantity: 10000, sanity: 36, days: [2, 4, 6, 7] }])
+  assert.equal(assets.potionValues.ap_supply_lt_60, 60)
+  assert.ok(urls.filter((url) => !url.includes('penguin-stats')).every((url) => url.startsWith(`https://cdn.jsdelivr.net/gh/Kengxxiao/ArknightsGameData@${sha}/`)))
+  assert.equal((await loadPlanningAssets(sha)).costs, undefined)
+  await assert.rejects(loadPlanningAssets('master', undefined, true), /pinned game_sha/)
+})

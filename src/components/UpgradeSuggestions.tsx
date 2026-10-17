@@ -11,11 +11,14 @@ import { getUpgradeSuggestionId } from '../lib/upgrade-suggestion-id'
 import { getUpgradePaybackDays } from '../lib/upgrade-suggestion-roi'
 import { copy, CURRENT_LOCALE } from '../copy/index'
 import { PRODUCT_LABELS } from './result-panel/labels'
+import { projectsFromUpgradeSuggestion, type CultivationProjectScope } from '../lib/cultivation-project-import'
+import CultivationProjectImport from './CultivationProjectImport'
 
 
 interface Props {
   suggestions: UpgradeSuggestion[];
   embedded?: boolean;
+  projectScope?: CultivationProjectScope;
 }
 
 type SortMode = 'payback' | 'gain' | 'stock'
@@ -26,7 +29,7 @@ const SORT_OPTIONS: { id: SortMode; label: string }[] = [
   { id: 'stock', label: copy.optimize.components_UpgradeSuggestions_003 },
 ]
 
-export default function UpgradeSuggestions({ suggestions, embedded = false }: Props) {
+export default function UpgradeSuggestions({ suggestions, embedded = false, projectScope }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [sortMode, setSortMode] = useState<SortMode>('payback')
   const [singleOnly, setSingleOnly] = useState(false)
@@ -105,6 +108,7 @@ export default function UpgradeSuggestions({ suggestions, embedded = false }: Pr
             expanded={expanded.has(id)}
             onToggleExpanded={() => toggleExpanded(id)}
             embedded={embedded}
+            projectScope={projectScope}
           />
         ))}
       </div>
@@ -123,17 +127,20 @@ function SuggestionCard({
   expanded,
   onToggleExpanded,
   embedded,
+  projectScope,
 }: {
   suggestion: UpgradeSuggestion;
   rank: number;
   expanded: boolean;
   onToggleExpanded: () => void;
   embedded: boolean;
+  projectScope?: CultivationProjectScope;
 }) {
   const title = suggestion.name || suggestion.ops?.map((op) => op.name).join(' + ') || copy.optimize.components_UpgradeSuggestions_017
   const cost = suggestion.training_cost
   const stockEnough = isStockEnough(cost)
   const stockLabel = getStockLabel(cost)
+  const projects = projectScope ? projectsFromUpgradeSuggestion(suggestion) : []
 
   return (
     <article className={`tool-panel transition-colors duration-150 ${embedded ? 'bg-surface-2/60' : ''} hover:border-surface-4`}>
@@ -172,6 +179,7 @@ function SuggestionCard({
           </div>
 
           <MetricGrid suggestion={suggestion} cost={cost} />
+          {projectScope && <CultivationProjectImport key={`${projectScope.userId}:${projectScope.profileId}:${JSON.stringify(projects)}`} scope={projectScope} projects={projects} />}
 
           {expanded && (
             <div className="space-y-3 border-t border-surface-3 pt-4">

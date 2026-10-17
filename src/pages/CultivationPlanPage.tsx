@@ -161,7 +161,7 @@ function CultivationContent({ session, embedded = false }: { session: ReturnType
           <div className="flex flex-wrap items-center gap-3"><button type="button" className="tool-primary-action" disabled={busy} onClick={apply}>{label.apply}</button>{changed && <p role="status" className="text-sm text-ink-secondary">{label.settingsChanged}</p>}</div>
           </div>
         </details>
-        <CultivationResults data={data} plan={plan} excluded={appliedOptions.excluded} exclude={exclude} />
+        <CultivationResults data={data} plan={plan} excluded={appliedOptions.excluded} exclude={exclude} projectScope={session.user ? { userId: session.user.id, profileId } : undefined} />
         <CultivationSpecialItems key={profileId} data={data} plan={plan} preference={appliedOptions.preference} />
         <p className="text-xs leading-5 text-ink-muted">{label.dataDate} · {new Date(data.updatedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}<br />{label.importDate} · {new Date(data.importedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</p>
       </>}

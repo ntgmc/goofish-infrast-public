@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { prtsSnapshotSchema } from '../server/cultivation/catalog.ts'
+import levelData from '../server/handlers/training-level-data.json' with { type: 'json' }
 
 export const hashContent = (content) => createHash('sha256').update(typeof content === 'string' ? content : JSON.stringify(content)).digest('hex')
 
@@ -69,9 +70,11 @@ export async function fetchJson(url, options = {}) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8'))
 }
 
-export async function loadPlanningAssets(gameSha, signal) {
+export async function loadPlanningAssets(gameSha, signal, includeCosts = false) {
   if (!/^[0-9a-f]{40}$/.test(gameSha)) throw new Error('Import requires the pinned game_sha in qqbot prts_costs_evidence-v3.json')
-  const base = `https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/${gameSha}/zh_CN/gamedata/excel`
+  const base = includeCosts
+    ? `https://cdn.jsdelivr.net/gh/Kengxxiao/ArknightsGameData@${gameSha}/zh_CN/gamedata/excel`
+    : `https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/${gameSha}/zh_CN/gamedata/excel`
   const [characters, building, items, zones, stages, drops] = await Promise.all([
     ...['character_table', 'building_data', 'item_table', 'zone_table', 'stage_table'].map((file) => fetchJson(`${base}/${file}.json`, { signal })),
     fetchJson('https://penguin-stats.io/PenguinStats/api/v2/result/matrix?server=CN', { signal }),
@@ -121,7 +124,20 @@ export async function loadPlanningAssets(gameSha, signal) {
     }
   }
   for (const [id, options] of Object.entries(farms)) farms[id] = options.sort((a, b) => a.sanity / a.quantity - b.sanity / b.quantity).slice(0, 12)
-  return { operators, stages: stageCatalog, recipes, farms, itemNames, potionValues }
+  const assets = { operators, stages: stageCatalog, recipes, farms, itemNames, potionValues }
+  if (!includeCosts) return assets
+  const materialCounts = (rows) => Array.isArray(rows) ? Object.fromEntries(rows.map((row) => [row.id, row.count])) : null
+  return { ...assets, costs: {
+    cultivate: Object.fromEntries(Object.entries(characters).filter(([id]) => id.startsWith('char_')).map(([id, row]) => [id.replace(/^char_/, ''), {
+      evolve: (row.phases ?? []).slice(1).map((phase) => materialCounts(phase.evolveCost)),
+      skills: {
+        normal: (row.allSkillLvlup ?? []).map((rank) => materialCounts(rank.lvlUpCost)),
+        elite: (row.skills ?? []).map((skill) => ({ cost: (skill.levelUpCostCond ?? []).map((rank) => materialCounts(rank.levelUpCost)) })),
+      },
+    }])),
+    levels: { maxLevel: levelData.maxLevel, characterExp: levelData.characterExpMap, characterUpgradeCost: levelData.characterUpgradeCostMap, eliteCost: levelData.evolveGoldCost },
+    modules: { equipDict: {}, charEquip: {} },
+  } }
 }
 
 export function cliOptions(argv, allowed) {
