@@ -5,7 +5,7 @@ import { CultivationReadError, readCultivationPlan, refreshCultivationSnapshot, 
 
 const mocks = vi.hoisted(() => ({ create: vi.fn() }))
 vi.mock('node:worker_threads', () => ({ Worker: class { constructor(...args: unknown[]) { return mocks.create(...args) } } }))
-const input = { credential: 'private', uid: 'uid', query: defaultCultivationQuery }
+const input = { game: {}, inventory: {}, importedAt: '2026-10-17T00:00:00Z', snapshotVersion: '1', warnings: [], query: defaultCultivationQuery }
 const payload = new TextEncoder().encode('{"candidates":[]}').buffer
 let worker: EventEmitter & { postMessage: ReturnType<typeof vi.fn>; terminate: ReturnType<typeof vi.fn>; ref: ReturnType<typeof vi.fn>; unref: ReturnType<typeof vi.fn> }
 

@@ -1,6 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto'
 import type { LicenseOperator } from '../../src/lib/types'
-import { readSklandFacilityRooms } from './skland-facilities'
 
 const APP_CODE = '4ca99fa6b56cc2ba'
 const HYPERGRYPH_BASE = 'https://as.hypergryph.com'
@@ -21,6 +20,7 @@ export class SklandClientError extends Error {
     message: string,
     readonly httpStatus?: number,
     readonly publicCode?: SklandClientPublicErrorCode,
+    readonly retryAfterMs?: number,
   ) {
     super(message)
     this.name = 'SklandClientError'
@@ -53,6 +53,8 @@ export type IntermediateInventory = Record<IntermediateProduct, number>
 type SklandImportOptions = {
   uid: string
   includeInventory?: boolean
+  snapshot?: { game: unknown; inventory?: unknown; fetchedAt: string }
+  binding?: SklandBindingSummary
 }
 
 type ApiEnvelope = {
@@ -128,20 +130,6 @@ export async function getCredByHypergryphToken(token: string): Promise<string> {
   return cred.data.cred
 }
 
-export async function readSklandFacilitiesByCred(cred: string, uid: string) {
-  const client = new SklandClient(cred)
-  const bindings = await client.getArknightsBindings()
-  if (!bindings.some((binding) => binding.uid === uid)) {
-    throw new SklandClientError('credential_invalid', '绑定账号已不在森空岛授权列表中，请重新绑定。')
-  }
-  const playerInfo = await client.getGamePlayerInfo(uid)
-  try {
-    return readSklandFacilityRooms(playerInfo)
-  } catch {
-    throw new SklandClientError('request_failed', '森空岛未返回完整的设施位置与等级，请稍后重试或手动填写。')
-  }
-}
-
 export async function listSklandArknightsBindingsByCred(cred: string): Promise<SklandAccountOption[]> {
   return new SklandClient(cred).getArknightsBindings()
 }
@@ -152,36 +140,40 @@ export async function importSklandOperatorsByCred(cred: string, options: SklandI
   importedAt: string
   intermediateInventory?: IntermediateInventory
   inventoryWarning?: string
+  snapshot: { game: unknown; inventory?: unknown; fetchedAt: string }
 }> {
   const selectedUid = stringValue(options.uid)
   if (!selectedUid) throw new Error('缺少要导入的森空岛 UID。')
   const client = new SklandClient(cred)
-  const bindings = await client.getArknightsBindings()
+  const bindings = options.binding ? [options.binding] : await client.getArknightsBindings()
   const binding = bindings.find((candidate) => candidate.uid === selectedUid)
   if (!binding) throw new Error('所选账号已不在森空岛绑定列表中，请重新授权。')
-  const playerInfo = await client.getGamePlayerInfo(binding.uid)
+  const playerInfo = options.snapshot?.game ?? await client.getGamePlayerInfo(binding.uid)
   const operators = convertSklandCharactersToOperators(playerInfo)
   const inventoryResult = options.includeInventory
-    ? await readIntermediateInventoryForImport(client, binding.uid)
+    ? await readIntermediateInventoryForImport(client, binding.uid, options.snapshot?.inventory)
     : {}
+  const importedAt = options.snapshot?.fetchedAt ?? new Date().toISOString()
   return {
-    binding,
+    binding: { uid: binding.uid, nickname: binding.nickname, channel_name: binding.channel_name },
     operators,
     ...inventoryResult,
-    importedAt: new Date().toISOString(),
+    importedAt,
+    snapshot: { game: playerInfo, inventory: inventoryResult.inventory, fetchedAt: importedAt },
   }
 }
 
 async function readIntermediateInventoryForImport(
   client: SklandClient,
   uid: string,
-): Promise<{ intermediateInventory?: IntermediateInventory; inventoryWarning?: string }> {
+  inventory?: unknown,
+): Promise<{ intermediateInventory?: IntermediateInventory; inventoryWarning?: string; inventory?: unknown }> {
   try {
     const [calInfo, calPlayer] = await Promise.all([
       client.getCultivateInfo(),
-      client.getCultivatePlayer(uid),
+      inventory === undefined ? client.getCultivatePlayer(uid) : Promise.resolve(inventory),
     ])
-    return { intermediateInventory: readSklandIntermediateInventory(calInfo, calPlayer) }
+    return { intermediateInventory: readSklandIntermediateInventory(calInfo, calPlayer), inventory: calPlayer }
   } catch (error) {
     if (error instanceof SklandClientError && (
       error.code === 'credential_invalid' ||
@@ -342,9 +334,22 @@ export function generateSklandSign(token: string, path: string, queryOrBody: str
   return createHash('md5').update(hmac, 'utf8').digest('hex') // nosemgrep: javascript.security.no-weak-cryptographic-hash
 }
 
+const publicData = new Map<string, { expiresAt: number; promise: Promise<unknown> }>()
+
+function readPublicSklandData(key: string, load: () => Promise<unknown>): Promise<unknown> {
+  const current = publicData.get(key)
+  if (current && current.expiresAt > Date.now()) return current.promise
+  if (publicData.size >= 600) publicData.delete(publicData.keys().next().value!)
+  const entry = { expiresAt: Date.now() + 24 * 3600_000, promise: load() }
+  publicData.set(key, entry)
+  void entry.promise.catch(() => { if (publicData.get(key) === entry) publicData.delete(key) })
+  return entry.promise
+}
+
 export class SklandClient {
   private token = ''
   private timestamp = ''
+  private tokenRequest: Promise<void> | null = null
 
   constructor(private readonly cred: string) {}
 
@@ -414,8 +419,10 @@ export class SklandClient {
   }
 
   async getCultivateInfo(): Promise<unknown> {
-    const data = await this.getSigned<ApiEnvelope>('/api/v1/game/cultivate/info')
-    return getEnvelopeData(data, '读取森空岛养成通用数据失败，请稍后重试。')
+    return readPublicSklandData('info', async () => {
+      const data = await this.getSigned<ApiEnvelope>('/api/v1/game/cultivate/info')
+      return getEnvelopeData(data, '读取森空岛养成通用数据失败，请稍后重试。')
+    })
   }
 
   async getCultivatePlayer(uid: string): Promise<unknown> {
@@ -425,9 +432,11 @@ export class SklandClient {
   }
 
   async getCultivateCharacter(characterId: string): Promise<unknown> {
-    const query = `characterId=${encodeURIComponent(characterId)}`
-    const data = await this.getSigned<ApiEnvelope>('/api/v1/game/cultivate/character', query)
-    return getEnvelopeData(data, '读取森空岛干员养成材料失败，请稍后重试。')
+    return readPublicSklandData(`character:${characterId}`, async () => {
+      const query = `characterId=${encodeURIComponent(characterId)}`
+      const data = await this.getSigned<ApiEnvelope>('/api/v1/game/cultivate/character', query)
+      return getEnvelopeData(data, '读取森空岛干员养成材料失败，请稍后重试。')
+    })
   }
 
   private async refreshToken(): Promise<void> {
@@ -443,7 +452,10 @@ export class SklandClient {
   }
 
   private async getSigned<T>(path: string, query = ''): Promise<T> {
-    if (!this.token) await this.refreshToken()
+    if (!this.token) {
+      this.tokenRequest ??= this.refreshToken().finally(() => { this.tokenRequest = null })
+      await this.tokenRequest
+    }
     const timestamp = this.timestamp || `${Math.floor(Date.now() / 1000)}`
     const sign = generateSklandSign(this.token, path, query, timestamp)
     const url = `${SKLAND_BASE}${path}${query ? `?${query}` : ''}`
@@ -504,6 +516,12 @@ async function fetchSklandRefreshToken(
   }
 }
 
+function readRetryAfter(value: string | null): number | undefined {
+  if (!value) return undefined
+  const milliseconds = /^\d+$/.test(value) ? Number(value) * 1000 : Date.parse(value) - Date.now()
+  return Number.isFinite(milliseconds) && milliseconds > 0 ? Math.min(milliseconds, 24 * 3600_000) : undefined
+}
+
 async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,
@@ -521,6 +539,7 @@ async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {
       `鹰角或森空岛接口返回 HTTP ${response.status}，请稍后重试。`,
       response.status,
       'skland_upstream_http_error',
+      readRetryAfter(response.headers.get('Retry-After')),
     )
   }
   if (!isRecord(data)) throw new SklandClientError('request_failed', '鹰角或森空岛接口响应异常，请稍后重试。')

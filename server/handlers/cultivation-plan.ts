@@ -3,7 +3,7 @@ import { CultivationReadError, readCultivationPlan } from '../cultivation/worker
 import { requireSiteFeatures } from '../feature-gate'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson, RequestInputError } from '../security/request-validation'
-import { decryptSklandCredential } from './skland-client'
+import { getSklandSnapshot, SklandSnapshotError } from '../skland-snapshot'
 import { requireUserSession, jsonResponse } from './user-auth'
 
 export default async function cultivationPlanHandler(req: Request): Promise<Response> {
@@ -19,11 +19,14 @@ export default async function cultivationPlanHandler(req: Request): Promise<Resp
     if (profile.status !== 'active' || profile.archived_at) return jsonResponse({ error: '当前档案不可用。' }, 403)
     const binding = profile.skland_binding
     if (!binding?.encrypted_cred) return jsonResponse({ error: '请先在档案中绑定森空岛，再导入练度和材料。' }, 400)
-    const data = await readCultivationPlan({ credential: decryptSklandCredential(binding.encrypted_cred), uid: binding.uid,
+    const snapshot = await getSklandSnapshot(profile)
+    const data = await readCultivationPlan({ game: snapshot.game!.data, inventory: snapshot.inventory!.data,
+      importedAt: snapshot.inventory!.fetchedAt, snapshotVersion: snapshot.version, warnings: Object.values(snapshot.errors),
       query: { ...defaultCultivationQuery, ...body.recommendation }, ...(body.projects !== undefined ? { projects: body.projects } : {}) }, req.signal)
     return new Response(data, { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
   } catch (error) {
     if (error instanceof RequestInputError) return jsonResponse({ error: error.message, code: error.code }, error.status)
+    if (error instanceof SklandSnapshotError) return jsonResponse({ error: error.message, code: error.code }, error.status)
     if (error instanceof CultivationReadError) return jsonResponse({ error: error.message, code: error.code }, error.status)
     console.error('cultivation planning data failed:', error instanceof Error ? error.name : 'unknown')
     return jsonResponse({ error: '读取养成数据失败，请稍后重试。' }, 502)

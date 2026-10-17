@@ -5,14 +5,18 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuthMeResponse, DepotValueResponse } from '../lib/types'
+import { copy } from '../copy'
 import DepotValuePage, { useDepotValue } from './DepotValuePage'
 
 const mocks = vi.hoisted(() => ({
   apiJson: vi.fn(),
   apiJsonOrNull: vi.fn(),
+  snapshot: vi.fn(),
+  refresh: vi.fn(),
 }))
+vi.mock('../hooks/useSklandSnapshot', () => ({ useSklandSnapshot: mocks.snapshot }))
 
-vi.mock('../lib/api-client', () => ({
+vi.mock('../lib/api-client', async (original) => ({ ...await original<typeof import('../lib/api-client')>(),
   apiJson: mocks.apiJson,
   apiJsonOrNull: mocks.apiJsonOrNull,
 }))
@@ -24,6 +28,7 @@ vi.mock('../components/SklandBindingDialog', () => ({
 beforeEach(() => {
   mocks.apiJson.mockReset()
   mocks.apiJsonOrNull.mockReset()
+  mocks.snapshot.mockReturnValue({ data: null, busy: false, error: '', refresh: mocks.refresh })
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
   HTMLElement.prototype.scrollIntoView = vi.fn()
 })
@@ -35,6 +40,32 @@ afterEach(() => {
 })
 
 describe('DepotValuePage', () => {
+  it('automatically analyzes shared inventory without contributing a statistical sample', async () => {
+    mocks.snapshot.mockReturnValue({ data: { version: '1' }, busy: false, error: '', refresh: mocks.refresh })
+    mocks.apiJsonOrNull.mockResolvedValue(authPayload())
+    mocks.apiJson.mockResolvedValue(depotResult())
+    renderHook(() => useDepotValue())
+    await waitFor(() => expect(mocks.apiJson).toHaveBeenCalledWith('/api/depot-value', expect.objectContaining({
+      json: { source: 'skland', profile_id: 'profile-1', sample_consent: false },
+    })))
+  })
+
+  it('ignores a refresh that completes after selecting another account', async () => {
+    let finish!: () => void
+    mocks.refresh.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve }))
+    const auth = authPayload()
+    auth.profiles!.push({ ...auth.profiles![0], id: 'profile-2', skland_binding: { ...auth.profiles![0].skland_binding!, uid: 'other' } })
+    mocks.apiJsonOrNull.mockResolvedValue(auth)
+    const page = renderHook(() => useDepotValue())
+    await waitFor(() => expect(page.result.current.selectedSklandProfile?.id).toBe('profile-1'))
+    let pending!: Promise<void>
+    act(() => { pending = page.result.current.analyzeSkland() })
+    act(() => page.result.current.setSelectedProfileId('profile-2'))
+    await act(async () => { finish(); await pending })
+    expect(mocks.apiJson).not.toHaveBeenCalled()
+    expect(page.result.current.result).toBeNull()
+  })
+
   it('cancels delayed result scrolling after leaving the page', async () => {
     vi.useFakeTimers()
     mocks.apiJsonOrNull.mockResolvedValue(authPayload())
@@ -70,7 +101,7 @@ describe('DepotValuePage', () => {
 
     renderPage()
 
-    const analyzeButton = await screen.findByRole('button', { name: '使用森空岛库存' })
+    const analyzeButton = await screen.findByRole('button', { name: copy.skland.refresh })
     await user.click(analyzeButton)
     expect(mocks.apiJson).toHaveBeenNthCalledWith(1, '/api/depot-value', expect.objectContaining({
       json: { source: 'skland', profile_id: 'profile-1', sample_consent: true },
@@ -79,7 +110,7 @@ describe('DepotValuePage', () => {
     expect(screen.getByText('snapshot-abcdef1')).toBeInTheDocument()
 
     await user.click(screen.getByRole('checkbox', { name: /默认勾选贡献处理后的统计样本/ }))
-    await user.click(screen.getByRole('button', { name: '使用森空岛库存' }))
+    await user.click(screen.getByRole('button', { name: copy.skland.refresh }))
     expect(mocks.apiJson).toHaveBeenNthCalledWith(2, '/api/depot-value', expect.objectContaining({
       json: { source: 'skland', profile_id: 'profile-1', sample_consent: false },
     }))

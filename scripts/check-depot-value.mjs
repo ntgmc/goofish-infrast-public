@@ -250,9 +250,8 @@ async function assertSklandFlow() {
 
   const declined = await callDepot({ source: 'skland', profile_id: 'bound-profile', sample_consent: false })
   if (declined.body.ranking.contribution_status !== 'declined'
-    || sampleStore.records.size !== 0
-    || (globalThis.__depotGameInfoCalls ?? 0) !== 0) {
-    throw new Error('skland import: explicit sample consent should be required before reading sample-only player data')
+    || sampleStore.records.size !== 0) {
+    throw new Error('skland import: explicit sample consent is required before contributing cached account data')
   }
 
   const imported = await callDepot({ source: 'skland', profile_id: 'bound-profile' })
@@ -415,6 +414,9 @@ function memorySklandPlugin() {
         path: 'memory-user-auth',
         namespace: 'depot-smoke',
       }))
+      build.onResolve({ filter: /(^|[\\/])skland-snapshot(\.ts)?$/ }, () => ({
+        path: 'memory-skland-snapshot', namespace: 'depot-smoke',
+      }))
       build.onResolve({ filter: /(^|[\\/])skland-client(\.ts)?$/ }, () => ({
         path: 'memory-skland-client',
         namespace: 'depot-smoke',
@@ -430,6 +432,8 @@ function memorySklandPlugin() {
       build.onLoad({ filter: /.*/, namespace: 'depot-smoke' }, (args) => ({
         contents: args.path === 'memory-user-auth'
           ? memoryUserAuthModule()
+          : args.path === 'memory-skland-snapshot'
+            ? memorySklandSnapshotModule()
           : args.path === 'memory-depot-value-sample-store'
             ? memoryDepotValueSampleStoreModule()
             : args.path === 'memory-feature-settings-store'
@@ -479,6 +483,21 @@ function memoryDepotValueSampleStoreModule() {
   return `
     export function getDepotValueSampleStore() {
       return globalThis.__maaDepotValueSampleStoreForTesting ?? null
+    }
+  `
+}
+
+function memorySklandSnapshotModule() {
+  return `
+    import { SklandClient, decryptSklandCredential } from './skland-client'
+    export class SklandSnapshotError extends Error {}
+    export async function getSklandSnapshot(profile) {
+      const client = new SklandClient(decryptSklandCredential(profile.skland_binding.encrypted_cred))
+      const fetchedAt = new Date().toISOString()
+      const [inventory, game] = await Promise.all([client.getCultivatePlayer(profile.skland_binding.uid),
+        client.getGamePlayerInfo(profile.skland_binding.uid).catch(() => null)])
+      return { version: 'fixture-1', inventory: { data: inventory, fetchedAt },
+        game: game ? { data: game, fetchedAt } : undefined, errors: {} }
     }
   `
 }

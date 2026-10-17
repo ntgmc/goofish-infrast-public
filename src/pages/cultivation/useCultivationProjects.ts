@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { copy } from '../../copy'
 import { apiJson } from '../../lib/api-client'
+import { useSklandSnapshot } from '../../hooks/useSklandSnapshot'
 import type { CultivationData } from '../../lib/cultivation-contract'
 import { buildProjectRoute, projectDaysEarlier, readProjectIncome, validProjectDate, type CultivationProject } from '../../lib/cultivation-projects'
 import { readCultivationProjects, saveCultivationProjects, subscribeCultivationProjects } from '../../lib/cultivation-project-import'
@@ -33,6 +34,8 @@ export function useCultivationProjects(session: V2Session, profile: UserGameAcco
     try { saveCultivationProjects(scope, next); setStorageError(false) }
     catch { setStorageError(true) }
   }
+  const snapshot = useSklandSnapshot(userId, profile)
+  const calculatedVersion = useRef('')
   const [data, setData] = useState<CultivationData | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -41,6 +44,9 @@ export function useCultivationProjects(session: V2Session, profile: UserGameAcco
   const [allOpen, setAllOpen] = useState(false)
   const request = useRef<AbortController | null>(null)
   useEffect(() => () => request.current?.abort(), [])
+  useEffect(() => {
+    if (snapshot.available === false) { request.current?.abort(); setData(null); setBusy(false) }
+  }, [snapshot.available])
   const history = session.workspace?.profile_id === profile.id ? session.workspace.result_history.filter((row) => row.source !== 'manual') : []
   const [normalId, setNormalId] = useState(history[0]?.id ?? '')
   const [temporaryId, setTemporaryId] = useState('')
@@ -64,7 +70,7 @@ export function useCultivationProjects(session: V2Session, profile: UserGameAcco
   const validSettings = dailySanity.trim() !== '' && Number.isInteger(Number(dailySanity)) && Number(dailySanity) >= 0 && Number(dailySanity) <= 2000 && validProjectDate(startDate)
   const settings = { dailySanity: Number(dailySanity), startDate, days: 180, allOpen }
   const plans = useMemo(() => {
-    if (!data || !validSettings || productionInvalid) return null
+    if (!data || snapshot.expired || !validSettings || productionInvalid) return null
     const baseline = buildProjectRoute(data, projects, settings, normalIncome)
     const alternative = temporaryIncome ? buildProjectRoute(data, projects, settings, normalIncome, temporaryIncome) : null
     const gain = alternative ? projectDaysEarlier(baseline.rows[0]?.estimatedDate ?? null, alternative.rows[0]?.estimatedDate ?? null) : null
@@ -80,10 +86,10 @@ export function useCultivationProjects(session: V2Session, profile: UserGameAcco
     return { baseline, alternative, gain, route, pauseGains, useTemporary }
     // Settings and income objects are small values; use their contents to avoid repeating simulations on unrelated renders.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, projects, validSettings, productionInvalid, dailySanity, startDate, allOpen, production])
+  }, [data, projects, validSettings, productionInvalid, dailySanity, startDate, allOpen, production, snapshot.expired])
   const pendingRefresh = Boolean(plans?.route.rows.some((row) => !row.candidate))
 
-  async function load(nextProjects = projects) {
+  async function load(nextProjects = projects, refresh = true) {
     if (busy) return
     request.current?.abort()
     const controller = new AbortController()
@@ -91,6 +97,8 @@ export function useCultivationProjects(session: V2Session, profile: UserGameAcco
     setBusy(true)
     setError(null)
     try {
+      if (refresh) await snapshot.refresh()
+      if (controller.signal.aborted) return
       const result = await apiJson<CultivationData>('/api/cultivation-plan', { method: 'POST', json: { profile_id: profile.id, projects: nextProjects },
         signal: controller.signal, timeoutMs: 90000, fallbackMessage: text.failed })
       if (!controller.signal.aborted) setData(result)
@@ -98,7 +106,17 @@ export function useCultivationProjects(session: V2Session, profile: UserGameAcco
       if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : text.failed)
     } finally { if (!controller.signal.aborted) setBusy(false) }
   }
-  return { projects, setProjects, data, busy, error, load, storageError, dailySanity, setDailySanity, startDate, setStartDate, allOpen, setAllOpen,
+  useEffect(() => {
+    const version = snapshot.data?.version
+    const matching = projects.every((project) => data?.candidates.some((row) => row.operatorId === project.operatorId
+      && row.target.elite === project.elite && row.target.level === project.level && row.target.skill === project.skill && row.target.skillLevel === project.skillLevel))
+    const key = `${version}:${JSON.stringify(projects.map(({ operatorId, elite, level, skill, skillLevel }) => ({ operatorId, elite, level, skill, skillLevel })))}`
+    if (!version || busy || data?.snapshotVersion === version && matching || calculatedVersion.current === key) return
+    calculatedVersion.current = key
+    void load(projectRef.current, false)
+  }, [snapshot.data?.version, busy, projects]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { projects, setProjects, data, busy: busy || snapshot.busy, error: error || snapshot.error || null, load, storageError, dailySanity, setDailySanity, startDate, setStartDate, allOpen, setAllOpen,
     history, normalId, setNormalId, temporaryId, setTemporaryId, production: currentProduction, productionInvalid, normalIncome, temporaryIncome,
     retryProduction: () => setProductionRetry((value) => value + 1), validSettings, plans, pendingRefresh }
 }

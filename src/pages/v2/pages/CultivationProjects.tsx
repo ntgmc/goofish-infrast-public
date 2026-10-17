@@ -40,7 +40,7 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
     setApplied(true)
   }
   return <div className="v2-projects">
-    <div className="v2-tool-source v2-project-source"><div><span className="v2-label">{text.account} · {profile.display_name}</span><p>{text.description}</p><Link className="v2-text-button" to={v2Path('cultivation', profile.id)}>{text.suggestionsEntry}<ArrowRight size={14} /></Link></div><button className="v2-button v2-button-primary" disabled={m.busy} onClick={() => void m.load()}>{m.busy ? text.loading : m.data ? text.refresh : text.import}<ArrowRight size={16} /></button></div>
+    <div className="v2-tool-source v2-project-source"><div><span className="v2-label">{text.account} · {profile.display_name}</span><p>{text.description}</p><Link className="v2-text-button" to={v2Path('cultivation', profile.id)}>{text.suggestionsEntry}<ArrowRight size={14} /></Link></div><button className="v2-button v2-button-primary" disabled={m.busy} onClick={() => void m.load()}>{m.busy ? text.loading : copy.skland.refresh}<ArrowRight size={16} /></button></div>
     <Notice error>{m.error}</Notice><Notice>{m.storageError ? text.storageFailed : null}</Notice>
     {m.data?.warnings.map((warning) => <Notice key={warning}>{warning}</Notice>)}
     {(m.data || m.projects.length > 0) && <>
@@ -72,7 +72,7 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
           {!m.projects.length && <p className="v2-muted">{text.emptyHint}</p>}
           {m.data && <GoalForm key={editing ? JSON.stringify(editing) : 'new'} operators={m.data.projectOperators ?? []} projects={m.projects} editing={editing} busy={m.busy} onCancel={() => setEditing(null)} onSave={(goal) => {
             const next = editing ? m.projects.map((row) => row.operatorId === editing.operatorId ? goal : row) : [...m.projects, goal]
-            m.setProjects(next); setEditing(null); void m.load(next)
+            m.setProjects(next); setEditing(null); void m.load(next, false)
           }} />}
           <p className="v2-data-date">{text.stored}</p>
         </section>

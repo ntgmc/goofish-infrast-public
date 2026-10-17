@@ -90,7 +90,8 @@ function createPostgresDepotValueSampleStore(): DepotValueSampleStore {
            unpriced_count = excluded.unpriced_count,
            sample_json = excluded.sample_json,
            sampled_at = excluded.sampled_at,
-           updated_at = excluded.updated_at`,
+           updated_at = excluded.updated_at
+         where depot_value_samples.sampled_at < excluded.sampled_at`,
         [
           record.uid_hash,
           record.uid_hash_key_version,

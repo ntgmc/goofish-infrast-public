@@ -473,6 +473,7 @@ export const requestSchemas = {
     page_category: z.enum(['landing', 'auth', 'profiles', 'workspace', 'optimizer', 'result', 'account', 'public_info', 'other']),
   }),
   sklandProfile: strict({ profile_id: shortString(128) }),
+  sklandSnapshotRefresh: strict({ profile_id: shortString(128), force: z.boolean().optional() }),
   sklandScan: strict({ profile_id: shortString(128), scan_id: shortString(256) }),
   sklandCredential: strict({
     profile_id: shortString(128),
@@ -782,6 +783,8 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/admin/usage-stats', route({ GET: none() }, ['admin', 'format', 'from', 'to', 'range', 'view'])],
   ['/api/depot-value', route({ POST: json('depot', requestSchemas.depotValue) })],
   ['/api/cultivation-plan', route({ POST: json('standard', requestSchemas.cultivationPlan) })],
+  ['/api/user/skland/snapshot', route({ GET: none() }, ['profile_id'])],
+  ['/api/user/skland/snapshot/refresh', route({ POST: json('standard', requestSchemas.sklandSnapshotRefresh) })],
   ['/api/user/announcements', route({ GET: none(), PATCH: json('standard', requestSchemas.userAnnouncement) }, ['page', 'announcement_id', 'unread_only'])],
   ['/api/user/feedback', route({ GET: none(), POST: json('feedback', requestSchemas.userFeedback), PATCH: json('standard', requestSchemas.userFeedbackReply) }, ['page', 'page_size', 'feedback_id', 'image_id', 'before_revision'])],
   ['/api/admin/feedback', route({ GET: none(), PATCH: json('standard', requestSchemas.adminFeedbackUpdate) }, ['page', 'page_size', 'status', 'todo', 'category', 'email', 'min_wait_hours', 'user_id', 'feedback_id', 'image_id', 'before_revision'])],

@@ -90,6 +90,7 @@ export type CultivationPotion = {
 }
 
 export type CultivationData = {
+  snapshotVersion?: string
   candidates: CultivationCandidate[]
   projectOperators?: import('./cultivation-projects').ProjectOperator[]
   recommendation?: {

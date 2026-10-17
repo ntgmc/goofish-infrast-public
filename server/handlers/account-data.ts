@@ -99,6 +99,7 @@ async function exportData(userId: string): Promise<Response> {
     commercialLimits,
     notifications,
     feedback,
+    sklandSnapshots,
   ] = await Promise.all([
     getUserById(userId),
     listProfileWorkspaces(profileIds),
@@ -255,6 +256,7 @@ async function exportData(userId: string): Promise<Response> {
                     order by entry.revision) from user_feedback_entries entry where entry.feedback_id = user_feedback.id
                     and (entry.message is not null or entry.status <> entry.previous_status)), '[]'::jsonb) as follow_up
              from user_feedback where user_id = $1 order by created_at asc, id asc`, [userId]),
+    query('select uid, version::text, record_json, updated_at from skland_snapshots where user_id = $1 order by uid', [userId]),
   ])
 
   const safeProfiles = profiles.map((profile) => {
@@ -281,6 +283,7 @@ async function exportData(userId: string): Promise<Response> {
     coverage: PERSONAL_DATA_EXPORT_COVERAGE,
     user: publicUser,
     profiles: safeProfiles,
+    skland_snapshots: sklandSnapshots.rows,
     workspaces: profileIds.map((profileId) => {
       const workspace = workspaceMap.get(profileId)
       return workspace ? {

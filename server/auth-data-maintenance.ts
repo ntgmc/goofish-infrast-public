@@ -20,6 +20,7 @@ export interface AuthDataMaintenanceResult {
   emailVerificationTokens: number
   freePreviewWorkspaces: number
   sklandPendingBindings: number
+  sklandSnapshots: number
 }
 
 let initialized = false
@@ -49,7 +50,8 @@ export async function runAuthDataMaintenance(now = new Date()): Promise<AuthData
   const emailVerificationTokens = await deleteRetainedEmailVerificationTokens(tokenRetentionCutoff)
   const freePreviewWorkspaces = await persistExpiredFreePreviewWorkspaces(now)
   const sklandPendingBindings = await deleteExpiredSklandPendingBindings(nowIso)
-  return { expiredSessions, passwordResetTokens, emailVerificationTokens, freePreviewWorkspaces, sklandPendingBindings }
+  const snapshots = await query('delete from skland_snapshots where updated_at <= $1', [new Date(now.getTime() - 24 * 3600_000).toISOString()])
+  return { expiredSessions, passwordResetTokens, emailVerificationTokens, freePreviewWorkspaces, sklandPendingBindings, sklandSnapshots: snapshots.rowCount ?? 0 }
 }
 
 async function runSafely(): Promise<void> {

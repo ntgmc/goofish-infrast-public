@@ -304,6 +304,8 @@ export interface DepotValueRanking {
 }
 
 export interface DepotValueResponse {
+  imported_at?: string;
+  snapshot_version?: string;
   source: DepotValueSource;
   item_count: number;
   priced_count: number;
@@ -1200,6 +1202,7 @@ export interface PersonalDataExportV4 {
     updated_at: string;
   } | null;
   profiles: PersonalDataExportRecord[];
+  skland_snapshots?: PersonalDataExportRecord[];
   workspaces: Array<UserWorkspace | null>;
   optimization_results: WorkspaceResultHistoryExportItem[];
   legacy_workspace: PersonalDataExportRecord | null;

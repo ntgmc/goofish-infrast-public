@@ -5,6 +5,7 @@ export type PersonalDataExportCoverageEntry =
 export const PERSONAL_DATA_EXPORT_COVERAGE = {
   user_accounts: { disposition: 'export', field: 'user' },
   user_game_accounts: { disposition: 'export', field: 'profiles' },
+  skland_snapshots: { disposition: 'export', field: 'skland_snapshots' },
   user_profile_workspaces: { disposition: 'export', field: 'workspaces' },
   optimization_result_history: { disposition: 'export', field: 'optimization_results' },
   user_workspaces: { disposition: 'export', field: 'legacy_workspace' },

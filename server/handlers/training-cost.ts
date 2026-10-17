@@ -3,6 +3,8 @@ import { calculateTrainingCost } from '../../src/lib/training-ratio'
 import { allocateCultivationMaterials } from '../../src/lib/cultivation-planner'
 import type { LicenseOperator, UpgradeTrainingCost } from '../../src/lib/types'
 import { decryptSklandCredential, SklandClient } from './skland-client'
+import { getSklandSnapshot } from '../skland-snapshot'
+import type { UserGameAccountRecord } from '../storage/user-store'
 import {
   EXP_ITEM_VALUES,
   getExpSanity,
@@ -25,8 +27,7 @@ type UpgradeSuggestionLike = Record<string, unknown>
 export type TrainingCostParams = {
   suggestions: UpgradeSuggestionLike[]
   operators: LicenseOperator[]
-  encryptedCred?: string | null
-  uid?: string | null
+  profile?: UserGameAccountRecord | null
 }
 
 type MaterialAmount = {
@@ -148,12 +149,11 @@ const WORKSHOP_RECIPES: Record<string, [number, Record<string, number>]> = {
 export async function attachTrainingCostsToUpgradeSuggestions({
   suggestions,
   operators,
-  encryptedCred,
-  uid,
+  profile,
 }: TrainingCostParams): Promise<UpgradeSuggestionLike[]> {
   if (suggestions.length === 0) return suggestions
 
-  if (!encryptedCred || !uid) {
+  if (!profile?.skland_binding?.encrypted_cred) {
     return suggestions.map((suggestion) => ({
       ...suggestion,
       training_cost: createUnavailableCost('当前档案未绑定森空岛，无法读取养成库存。'),
@@ -162,13 +162,10 @@ export async function attachTrainingCostsToUpgradeSuggestions({
 
   let context: CultivateContext
   try {
-    const cred = decryptSklandCredential(encryptedCred)
-    const client = new SklandClient(cred)
-    const [calInfo, calPlayer] = await Promise.all([
-      client.getCultivateInfo(),
-      client.getCultivatePlayer(uid),
-    ])
-    context = createCultivateContext(client, calInfo, calPlayer)
+    const client = new SklandClient(decryptSklandCredential(profile.skland_binding.encrypted_cred))
+    const snapshot = await getSklandSnapshot(profile, ['inventory'])
+    const calInfo = await client.getCultivateInfo()
+    context = createCultivateContext(client, calInfo, snapshot.inventory!.data)
   } catch {
     return suggestions.map((suggestion) => ({
       ...suggestion,

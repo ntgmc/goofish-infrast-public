@@ -46,6 +46,8 @@ const expectedRoutes = [
   '/api/user/profiles/metered-personal',
   '/api/user/profiles/preview',
   '/api/user/profiles/redeem',
+  '/api/user/skland/snapshot',
+  '/api/user/skland/snapshot/refresh',
   '/api/user/skland/account/select',
   '/api/user/skland/free-preview/account/select',
   '/api/user/skland/free-preview/credential/preview',

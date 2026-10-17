@@ -12,10 +12,11 @@ import CultivationProjects from './CultivationProjects'
 import UpgradeSuggestions from '../../../components/UpgradeSuggestions'
 import type { UpgradeSuggestion } from '../../../lib/types'
 
-const mocks = vi.hoisted(() => ({ api: vi.fn(), result: vi.fn() }))
+const mocks = vi.hoisted(() => ({ api: vi.fn(), result: vi.fn(), refresh: vi.fn() }))
+vi.mock('../../../hooks/useSklandSnapshot', () => ({ useSklandSnapshot: () => ({ data: null, busy: false, error: '', refresh: mocks.refresh }) }))
 vi.mock('../../../lib/api-client', () => ({ apiJson: mocks.api }))
 vi.mock('../../tool/optimize/optimization-api', () => ({ fetchResultHistoryDetail: mocks.result }))
-const text = copy.cultivationProjects
+const text = { ...copy.cultivationProjects, import: copy.skland.refresh, refresh: copy.skland.refresh }
 const data = (projects: CultivationProject[] = []): CultivationData => ({
   candidates: projects.map((project) => ({ operatorId: project.operatorId, key: project.operatorId, name: '测试干员',
     current: { elite: 0, level: 1, skillLevel: 1, masteries: {}, modules: {}, potential: 1 },
@@ -49,6 +50,7 @@ it('turns a selected goal into an income-linked route and changes configuration 
   await user.selectOptions(await screen.findByRole('combobox', { name: text.operator }), 'char_test')
   await user.click(screen.getByRole('button', { name: text.add }))
   await waitFor(() => expect(mocks.api).toHaveBeenCalledTimes(2))
+  expect(mocks.refresh).toHaveBeenCalledTimes(1)
   expect(screen.getByRole('combobox', { name: text.operator })).toHaveValue('')
   expect(screen.getByRole('button', { name: text.add })).toBeDisabled()
   const budget = screen.getByRole('spinbutton', { name: text.dailySanity })

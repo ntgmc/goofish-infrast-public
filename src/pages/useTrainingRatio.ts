@@ -1,12 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { copy } from '../copy'
-import { apiJson } from '../lib/api-client'
-import type { CultivationData } from '../lib/cultivation-contract'
+import { useEffect, useState } from 'react'
+import { useSklandSnapshot } from '../hooks/useSklandSnapshot'
 import { analyzeTrainingBalance } from '../lib/training-ratio'
 import { useSiteFeatures } from '../lib/site-feature-context'
 import type { useToolSession } from './tool/useToolSession'
 
-const text = copy.trainingRatio
 const initialDraft = { lmd: '0', exp: '0', books: ['0', '0', '0', '0'], useBooks: false }
 type Draft = typeof initialDraft
 export const trainingAmount = (value: string) => value.trim() !== '' && Number.isSafeInteger(Number(value)) && Number(value) >= 0 && Number(value) <= 1e12
@@ -35,28 +32,11 @@ export function useTrainingRatio(session: ReturnType<typeof useToolSession>) {
   }, [draft, draftKey])
   const [source, setSource] = useState<'manual' | 'imported'>('imported')
   const [manualInventory, setManualInventory] = useState<{ lmd: number; exp: number } | null>(null)
-  const [data, setData] = useState<{ inventory: { lmd: number; exp: number }; importedAt: string } | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const request = useRef<AbortController | null>(null)
-  const load = useCallback(async () => {
-    if (!profile || !canImport || request.current && !request.current.signal.aborted) return
-    request.current?.abort()
-    const controller = new AbortController()
-    request.current = controller
-    setBusy(true); setError('')
-    try {
-      const result = await apiJson<CultivationData>('/api/cultivation-plan', { method: 'POST', json: { profile_id: profile.id, projects: [] }, signal: controller.signal, timeoutMs: 90000, fallbackMessage: text.importFailed })
-      const inventory = { lmd: result.inventory['4001'] ?? 0, exp: result.inventory.exp ?? 0 }
-      analyzeTrainingBalance(inventory)
-      if (!controller.signal.aborted) setData({ inventory, importedAt: result.importedAt })
-    } catch (caught) { if (!controller.signal.aborted) setError(caught instanceof Error && caught.message !== 'invalid_training_resources' ? caught.message : text.importFailed) }
-    finally { if (!controller.signal.aborted) { setBusy(false); request.current = null } }
-  }, [canImport, profile?.id, session.user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (canImport) void load()
-    return () => request.current?.abort()
-  }, [canImport, load])
+  const snapshot = useSklandSnapshot(session.user?.id, profile, canImport)
+  const stock = snapshot.data?.inventory
+  const data = stock?.lmd !== null && stock?.exp !== null && stock?.fetchedAt
+    ? { inventory: { lmd: stock.lmd, exp: stock.exp }, importedAt: stock.fetchedAt } : null
+  const { busy, error, refresh: load } = snapshot
   const manualValid = trainingAmount(draft.lmd) && (draft.useBooks ? draft.books.every(trainingAmount) : trainingAmount(draft.exp))
   function applyManual() {
     if (!manualValid) return

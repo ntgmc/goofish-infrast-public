@@ -4,19 +4,24 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { copy } from '../copy'
-import type { CultivationData } from '../lib/cultivation-contract'
+import type { SklandSnapshot } from '../lib/skland-snapshot'
+import { syncSklandSnapshotSession } from '../lib/skland-snapshot-client'
 import type { useToolSession } from './tool/useToolSession'
 import TrainingRatioPage from './TrainingRatioPage'
 
 const mocks = vi.hoisted(() => ({ api: vi.fn() }))
-vi.mock('../lib/api-client', () => ({ apiJson: mocks.api }))
+vi.mock('../lib/api-client', async (original) => ({ ...await original<typeof import('../lib/api-client')>(), apiJson: mocks.api }))
 const text = copy.trainingRatio
 function session(id = 'first', bound = true) {
-  return { user: { id: 'user1' }, activeProfile: { id, display_name: id, status: 'active', skland_binding: bound ? {} : null }, profiles: [{ id, display_name: id, status: 'active' }] } as unknown as ReturnType<typeof useToolSession>
+  return { user: { id: 'user1' }, activeProfile: { id, display_name: id, status: 'active', skland_binding: bound ? { uid: id, credential_status: 'available' } : null }, profiles: [{ id, display_name: id, status: 'active' }] } as unknown as ReturnType<typeof useToolSession>
 }
 const view = (current = session()) => <MemoryRouter><TrainingRatioPage session={current} embedded /></MemoryRouter>
-const data = { inventory: { '4001': 200000, exp: 100000 }, importedAt: '2026-10-17T00:00:00Z' } as unknown as CultivationData
-beforeEach(() => { localStorage.clear(); sessionStorage.clear(); mocks.api.mockResolvedValue(data) })
+const data = { uid: 'first', version: '1', game: { state: 'fresh', fetchedAt: new Date().toISOString(), error: null },
+  inventory: { state: 'fresh', fetchedAt: new Date().toISOString(), error: null, items: { '4001': 200000, '2004': 50 }, lmd: 200000, exp: 100000 }, retryAt: null } as SklandSnapshot
+beforeEach(() => {
+  syncSklandSnapshotSession({ user: { id: 'reset' }, profiles: [] } as never); syncSklandSnapshotSession(null)
+  localStorage.clear(); sessionStorage.clear(); mocks.api.mockResolvedValue(data)
+})
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
 it('imports stock by default without targets and keeps imported data out of the manual draft', async () => {
@@ -25,12 +30,12 @@ it('imports stock by default without targets and keeps imported data out of the 
   render(view())
   expect(await screen.findByText(text.supplementExp('53,847'))).toBeInTheDocument()
   expect(mocks.api).toHaveBeenCalledTimes(1)
-  expect(mocks.api).toHaveBeenCalledWith('/api/cultivation-plan', expect.objectContaining({ json: { profile_id: 'first', projects: [] } }))
+  expect(mocks.api).toHaveBeenCalledWith('/api/user/skland/snapshot?profile_id=first', expect.any(Object))
   expect(screen.getByText(text.importedSource)).toBeInTheDocument()
   expect(screen.getByRole('spinbutton', { name: text.lmd, hidden: true })).not.toBeVisible()
   expect(localStorage.getItem('maatool:cultivation-projects:user1:first')).toBe('[broken')
   expect(sessionStorage.getItem('maatool:training-ratio:user1:first')).not.toContain('200000')
-  await user.click(screen.getByRole('button', { name: text.refresh }))
+  await user.click(screen.getByRole('button', { name: copy.skland.refresh }))
   expect(mocks.api).toHaveBeenCalledTimes(2)
 })
 
@@ -90,8 +95,8 @@ it('allows explicit manual advice without binding and after an automatic import 
 
 it('preserves the manual tab and its result when a pending import or a later refresh returns', async () => {
   const user = userEvent.setup()
-  let finish!: (value: CultivationData) => void
-  mocks.api.mockImplementationOnce(() => new Promise<CultivationData>((resolve) => { finish = resolve }))
+  let finish!: (value: SklandSnapshot) => void
+  mocks.api.mockImplementationOnce(() => new Promise<SklandSnapshot>((resolve) => { finish = resolve }))
   render(view())
   await user.click(screen.getByRole('tab', { name: text.manual }))
   await user.click(screen.getByRole('button', { name: text.applyManual }))
@@ -99,8 +104,8 @@ it('preserves the manual tab and its result when a pending import or a later ref
   expect(screen.getByText(text.manualSource)).toBeInTheDocument()
   expect(screen.getByText(text.focus.empty)).toBeInTheDocument()
   await user.click(screen.getByRole('tab', { name: text.accountInventory }))
-  mocks.api.mockImplementationOnce(() => new Promise<CultivationData>((resolve) => { finish = resolve }))
-  await user.click(screen.getByRole('button', { name: text.refresh }))
+  mocks.api.mockImplementationOnce(() => new Promise<SklandSnapshot>((resolve) => { finish = resolve }))
+  await user.click(screen.getByRole('button', { name: copy.skland.refresh }))
   await user.click(screen.getByRole('tab', { name: text.manual }))
   await act(async () => finish(data))
   expect(mocks.api).toHaveBeenCalledTimes(2)
@@ -111,15 +116,13 @@ it('preserves the manual tab and its result when a pending import or a later ref
   expect(screen.getByText(text.supplementExp('53,847'))).toBeInTheDocument()
 })
 
-it('aborts an automatic import on account changes and ignores the old response', async () => {
-  let finish!: (value: CultivationData) => void
-  let signal!: AbortSignal
-  mocks.api.mockImplementationOnce((_url, options) => { signal = options.signal; return new Promise<CultivationData>((resolve) => { finish = resolve }) })
+it('isolates account changes while allowing the shared request to finish for its original account', async () => {
+  let finish!: (value: SklandSnapshot) => void
+  mocks.api.mockImplementationOnce(() => new Promise<SklandSnapshot>((resolve) => { finish = resolve }))
   const rendered = render(view())
   rendered.rerender(view(session('second')))
-  expect(signal.aborted).toBe(true)
   await screen.findByText(text.supplementExp('53,847'))
-  await act(async () => finish({ ...data, inventory: { '4001': 0, exp: 100000 } }))
+  await act(async () => finish({ ...data, inventory: { ...data.inventory, lmd: 0, exp: 100000 } }))
   expect(screen.getByLabelText(text.result)).toHaveTextContent(text.focus.exp)
   expect(screen.getByLabelText(text.result)).not.toHaveTextContent(text.focus.lmd)
 })

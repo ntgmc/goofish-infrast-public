@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Bell, ChevronDown, LockKeyhole, ShieldCheck, SlidersHorizontal } from 'lucide-react'
 import { apiJson, apiVoid } from '../../../lib/api-client'
+import { clearSklandAccountSnapshot } from '../../../lib/skland-snapshot-client'
 import { inputClassName, validatePasswordInput } from '../tool-utils'
 import type { AccountDeletionAccepted, AuthSuccessResponse, UserGameAccount } from '../../../lib/types'
 import { copy } from '../../../copy/index'
@@ -98,6 +99,7 @@ export function useAccountSettings({ profiles, activeProfileId, onPayload, onDel
     try {
       await apiVoid('/api/user/data/credential/clear', { method: 'POST', json: { profile_id: profile.id } })
       cleared = true
+      if (profile.skland_binding) clearSklandAccountSnapshot(profile.skland_binding.uid)
       setClearedCredentialIds((current) => new Set(current).add(profile.id))
       setPrivacyStatus(copy.dashboard.pages_tool_dashboard_SettingsSection_036)
       const payload = await apiJson<AuthSuccessResponse>(activeProfileId ? `/api/auth/me?profile_id=${encodeURIComponent(activeProfileId)}` : '/api/auth/me')

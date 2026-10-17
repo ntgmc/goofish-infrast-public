@@ -1300,6 +1300,34 @@ CREATE INDEX IF NOT EXISTS idx_user_game_accounts_commercial_page
   ON user_game_accounts(user_id, archived_at, created_at DESC, id DESC)
   WHERE kind = 'metered_commercial';
 
+CREATE SEQUENCE IF NOT EXISTS skland_snapshot_version_seq;
+CREATE TABLE IF NOT EXISTS skland_snapshots (
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  uid TEXT NOT NULL,
+  version BIGINT NOT NULL DEFAULT nextval('skland_snapshot_version_seq'),
+  record_json JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (user_id, uid)
+);
+CREATE INDEX IF NOT EXISTS idx_skland_snapshots_updated ON skland_snapshots(updated_at);
+CREATE OR REPLACE FUNCTION invalidate_skland_snapshot() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    DELETE FROM skland_snapshots WHERE user_id = OLD.user_id AND uid = OLD.record_json->'skland_binding'->>'uid';
+    RETURN OLD;
+  END IF;
+  IF OLD.record_json->'skland_binding'->>'uid' IS DISTINCT FROM NEW.record_json->'skland_binding'->>'uid'
+     OR OLD.record_json->'skland_binding'->>'encrypted_cred' IS DISTINCT FROM NEW.record_json->'skland_binding'->>'encrypted_cred'
+     OR OLD.record_json->'skland_binding'->>'credential_status' IS DISTINCT FROM NEW.record_json->'skland_binding'->>'credential_status'
+     OR OLD.status IS DISTINCT FROM NEW.status OR OLD.archived_at IS DISTINCT FROM NEW.archived_at THEN
+    DELETE FROM skland_snapshots WHERE user_id = OLD.user_id AND uid = OLD.record_json->'skland_binding'->>'uid';
+  END IF;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS user_game_accounts_invalidate_skland_snapshot ON user_game_accounts;
+CREATE TRIGGER user_game_accounts_invalidate_skland_snapshot AFTER UPDATE OR DELETE ON user_game_accounts
+  FOR EACH ROW EXECUTE FUNCTION invalidate_skland_snapshot();
+
 CREATE TABLE IF NOT EXISTS metered_billing_quotes (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,

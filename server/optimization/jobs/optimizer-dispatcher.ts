@@ -81,8 +81,7 @@ async function enrichScheduleTrainingCosts(
   const enriched = await attachTrainingCostsToUpgradeSuggestions({
     suggestions,
     operators: payload.operators,
-    encryptedCred: profile?.skland_binding?.encrypted_cred ?? null,
-    uid: profile?.skland_binding?.uid ?? null,
+    profile,
   })
   return {
     ...resultWithSuggestionIds,
