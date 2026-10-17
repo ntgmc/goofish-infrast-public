@@ -1,17 +1,18 @@
 import { Children, useId, type InputHTMLAttributes, type ReactNode } from 'react'
-import { AlertCircle, ArrowRight, LoaderCircle } from 'lucide-react'
+import { EmptyIcon, ErrorIcon, InfoIcon, LoadingIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
 
 export function Notice({ children, error = false }: { children?: ReactNode; error?: boolean }) {
-  return Children.toArray(children).length > 0 ? <div className={`v2-notice ${error ? 'v2-notice-error' : ''}`} role={error ? 'alert' : 'status'}><AlertCircle size={18} aria-hidden="true" /><div>{children}</div></div> : null
+  const Icon = error ? ErrorIcon : InfoIcon
+  return Children.toArray(children).length > 0 ? <div className={`v2-notice ${error ? 'v2-notice-error' : ''}`} role={error ? 'alert' : 'status'}><Icon size={18} aria-hidden="true" /><div>{children}</div></div> : null
 }
 
 export function EmptyState({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
-  return <div className="v2-empty"><ArrowRight size={24} aria-hidden="true" /><h2>{title}</h2>{children && <p>{children}</p>}{action}</div>
+  return <div className="v2-empty"><EmptyIcon size={24} aria-hidden="true" /><h2>{title}</h2>{children && <p>{children}</p>}{action}</div>
 }
 
 export function Loading({ label = copy.v2.loading }: { label?: string }) {
-  return <div className="v2-loading" role="status"><LoaderCircle size={20} aria-hidden="true" className="v2-spin" />{label}</div>
+  return <div className="v2-loading" role="status"><LoadingIcon size={20} aria-hidden="true" className="v2-spin" />{label}</div>
 }
 
 export function SectionTitle({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {

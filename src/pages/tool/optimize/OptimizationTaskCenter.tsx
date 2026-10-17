@@ -1,4 +1,4 @@
-import { Activity } from 'lucide-react'
+import { TasksIcon as Activity } from '../../../components/icons'
 import { useEffect, useRef, type RefObject } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../../components/ui/dialog'
 import type { OptimizationJobListItem } from '../../../lib/optimization-contracts'

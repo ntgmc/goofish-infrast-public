@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { ArrowUpRight, Search } from 'lucide-react'
+import { SupportIcon as ArrowUpRight, SearchIcon as Search } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { legalContent, pageMeta, EFFECTIVE_DATE, type PublicInfoPageKind } from '../../PublicInfoPage'
 import { usePublicContent } from '../../../lib/public-content-context'

@@ -1,7 +1,7 @@
 import type { MouseEvent, ReactNode } from 'react'
 import { LayoutGroup } from 'motion/react'
 import { Link, useNavigate } from 'react-router'
-import { ArrowUpRight } from 'lucide-react'
+import { WorkspaceEntryIcon as ArrowUpRight } from '../../../components/icons'
 import BrandLogo from '../../../components/BrandLogo'
 import CompactHeaderMenu from '../../../components/CompactHeaderMenu'
 import DeferredFeatureMenu from '../../../components/DeferredFeatureMenu'

@@ -1,4 +1,4 @@
-import { ArrowRight, Calculator, CalendarDays, CalendarClock, Gem } from 'lucide-react'
+import { NextIcon as ArrowRight, TrainingRatioIcon as Calculator, ProjectsIcon, CultivationIcon, ManualScheduleIcon as CalendarClock, DepotValueIcon as Gem } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import { CONFIG_PRESETS } from '../../../lib/config'
@@ -17,8 +17,8 @@ export default function Tools({ profileId }: { profileId?: string }) {
   const tools = [
     { section: 'training-ratio' as const, enabled: features.tools, icon: Calculator, title: copy.trainingRatio.title, description: copy.trainingRatio.description },
     { section: 'manual-tool' as const, enabled: features.manual_schedule, icon: CalendarClock, title: copy.tools.manualSchedule.title, description: copy.tools.manualSchedule.description },
-    { section: 'cultivation-projects' as const, enabled: features.cultivation_plan, icon: CalendarDays, title: copy.cultivationProjects.title, description: copy.cultivationProjects.description },
-    { section: 'cultivation' as const, enabled: features.cultivation_plan, icon: CalendarDays, title: copy.tools.cultivation.title, description: copy.tools.cultivation.description },
+    { section: 'cultivation-projects' as const, enabled: features.cultivation_plan, icon: ProjectsIcon, title: copy.cultivationProjects.title, description: copy.cultivationProjects.description },
+    { section: 'cultivation' as const, enabled: features.cultivation_plan, icon: CultivationIcon, title: copy.tools.cultivation.title, description: copy.tools.cultivation.description },
     { section: 'depot' as const, enabled: features.depot_value, icon: Gem, title: copy.dashboard.pages_tool_dashboard_ToolsSection_001, description: copy.tools.pages_DepotValuePage_011 },
   ].filter((tool) => tool.enabled)
   return <div className="v2-tools-directory">{tools.map((tool, index) => <Link key={tool.section} to={v2Path(tool.section, profileId)}><span className="v2-tool-number">0{index + 1}</span><tool.icon size={28} aria-hidden="true" /><div><h2>{tool.title}</h2><p>{tool.description}</p></div><span className="v2-tool-enter"><ArrowRight size={22} aria-hidden="true" /></span></Link>)}{!tools.length && <Notice>{copy.v2.featureUnavailable}</Notice>}</div>

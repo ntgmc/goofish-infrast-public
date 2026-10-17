@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
+import { ExpandIcon as ChevronDown, CollapsedIcon as ChevronRight, RefreshIcon as RefreshCw } from '../../../components/icons'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { adminApiBlob as apiBlob, adminApiJson as apiJson } from '../../../lib/admin-api-client'
 import type { AdminOptimizationDeadLetter, AdminOptimizationDeadLetterDetail } from '../contracts'

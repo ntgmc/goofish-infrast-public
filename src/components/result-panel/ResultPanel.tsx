@@ -1,5 +1,5 @@
 import { lazy, Suspense, useMemo, useRef, useState } from 'react'
-import { Download } from 'lucide-react'
+import { ExportImageIcon as Download } from '../icons'
 import { LayoutGroup } from 'motion/react'
 import { AnimatedPresenceRegion, MotionNavIndicator } from '../MotionPrimitives'
 import { formatCompactNumber, prepareResult } from './formatters'

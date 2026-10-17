@@ -5,6 +5,7 @@ import { AnimatedValue } from './MotionPrimitives'
 import type { OptimizeCalculationStage, OptimizeJobPriority, OptimizeResult } from '../lib/types'
 import type { OptimizationBillingSnapshot } from '../lib/optimization-contracts'
 import { copy } from '../copy/index'
+import { SuccessIcon } from './icons'
 import { getScheduleProgressPercent, isScheduleProgressPaused } from './schedule-progress-model'
 import { METERED_BILLING_AVAILABLE } from '../lib/site-features'
 
@@ -181,7 +182,7 @@ function TaskStep({ label, detail, state }: { label: string; detail: string; sta
     <div data-state={state} className={`tool-inset h-full px-3 py-2.5 transition-colors duration-200 ${getStepClass(state)}`}>
       <div className="flex items-center gap-2">
         <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[11px] font-semibold ${getStepDotClass(state)}`}>
-          {state === 'done' ? <CheckIcon /> : state === 'failed' ? '!' : state === 'active' ? <span className="h-1.5 w-1.5 rounded-full bg-current" /> : null}
+          {state === 'done' ? <SuccessIcon className="h-3 w-3" aria-hidden="true" /> : state === 'failed' ? '!' : state === 'active' ? <span className="h-1.5 w-1.5 rounded-full bg-current" /> : null}
         </span>
         <span className="min-w-0 text-sm font-semibold text-ink-primary">{label}</span>
       </div>
@@ -190,13 +191,6 @@ function TaskStep({ label, detail, state }: { label: string; detail: string; sta
   )
 }
 
-function CheckIcon() {
-  return (
-    <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path d="M3.5 8.4 6.5 11 12.5 4.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
 
 const ESTIMATED_DURATION_MS = 10_000
 const PROGRESS_REFRESH_INTERVAL_MS = 250

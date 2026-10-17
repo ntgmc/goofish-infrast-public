@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from 'react'
-import { ExternalLink, RotateCcw, X } from 'lucide-react'
+import { ExternalLinkIcon as ExternalLink, UndoIcon as RotateCcw, ExcludeIcon as X } from '../../components/icons'
 import { copy } from '../../copy/index'
 import type { CultivationCandidate, CultivationData } from '../../lib/cultivation-contract'
 import type { buildCultivationPlan } from '../../lib/cultivation-planner'

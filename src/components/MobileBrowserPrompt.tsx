@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Monitor } from 'lucide-react'
+import { DesktopIcon as Monitor } from './icons'
 import { copy } from '../copy/index'
 import { Button } from './ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'

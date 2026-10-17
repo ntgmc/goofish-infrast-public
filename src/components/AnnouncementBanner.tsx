@@ -1,4 +1,4 @@
-import { ChevronDown, Megaphone } from 'lucide-react'
+import { ExpandIcon as ChevronDown, AnnouncementIcon as Megaphone } from './icons'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Announcement } from '../lib/types'

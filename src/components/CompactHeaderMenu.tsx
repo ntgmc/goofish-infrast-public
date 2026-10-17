@@ -1,5 +1,5 @@
 import type { MouseEventHandler } from 'react'
-import { Check, ChevronDown, MoreHorizontal } from 'lucide-react'
+import { SelectedIcon as Check, ExpandIcon as ChevronDown, MoreIcon as MoreHorizontal } from './icons'
 import { Link } from 'react-router'
 import {
   DropdownMenu,

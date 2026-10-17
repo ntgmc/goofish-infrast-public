@@ -1,5 +1,5 @@
 import { useId, type KeyboardEvent } from 'react'
-import { BedDouble, Building2, Drone, Factory, HandCoins, LockKeyhole, Users, Wrench, Zap, type LucideIcon } from 'lucide-react'
+import { DormitoryIcon as BedDouble, ControlRoomIcon as Building2, DroneIcon as Drone, ManufactureIcon as Factory, TradingStationIcon as HandCoins, LockedOperatorIcon as LockKeyhole, MeetingRoomIcon as Users, ProcessingRoomIcon as Wrench, PowerPlantIcon as Zap, RecruitmentIcon, TrainingRoomIcon, UnknownFacilityIcon, type LucideIcon } from '../icons'
 import { copy } from '../../copy/index'
 import DroneSummary from './DroneSummary'
 import { formatCompactNumber, formatProduct, type PreparedResult } from './formatters'
@@ -18,6 +18,8 @@ const ROOM_STYLES: Record<string, { icon: LucideIcon; tone: string }> = {
   power: { icon: Zap, tone: 'text-success' },
   meeting: { icon: Users, tone: 'text-ink-secondary' },
   processing: { icon: Wrench, tone: 'text-ink-secondary' },
+  hire: { icon: RecruitmentIcon, tone: 'text-ink-secondary' },
+  training: { icon: TrainingRoomIcon, tone: 'text-ink-secondary' },
   dormitory: { icon: BedDouble, tone: 'text-success' },
 }
 
@@ -184,7 +186,7 @@ export function buildBoardV2Rooms(plan: PreparedPlan | undefined, isRotationMode
 
 function RoomCard({ room, drones, editing, showProfession, className = '' }: { room: BoardRoom; drones?: DroneAssignment; editing?: BoardEditing; showProfession?: boolean; className?: string }) {
   const { row } = room
-  const { icon: Icon, tone } = ROOM_STYLES[room.roomType] ?? { icon: Building2, tone: 'text-ink-secondary' }
+  const { icon: Icon, tone } = ROOM_STYLES[room.roomType] ?? { icon: UnknownFacilityIcon, tone: 'text-ink-secondary' }
   const label = copy.domain.result_board_v2
   return (
     <article className={`tool-inset min-w-0 overflow-hidden p-3.5 sm:p-4 ${className}`}>

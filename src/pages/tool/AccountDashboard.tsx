@@ -1,7 +1,7 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
 import { LayoutGroup } from 'motion/react'
 import { Link } from 'react-router'
-import { ArrowUpRight } from 'lucide-react'
+import { WorkspaceEntryIcon as ArrowUpRight } from '../../components/icons'
 import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
 import CompactHeaderMenu from '../../components/CompactHeaderMenu'

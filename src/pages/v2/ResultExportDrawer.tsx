@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Download } from 'lucide-react'
+import { ExportMaaIcon, ExportImageIcon, ExportDataIcon } from '../../components/icons'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/dialog'
 import { GameQueueGuide, MaaImportGuide } from '../../components/result-panel/Guides'
 import type { PreparedResult } from '../../components/result-panel/formatters'
@@ -71,7 +71,7 @@ export default function ResultExportDrawer({ open, onOpenChange, result, prepare
           <h3>{text.maaFile}</h3><p>{text.maaFileDescription}</p>
           <p role="status">{exportNotice}</p>
           {onDownloadMaa && <button type="button" className="v2-button v2-button-primary" disabled={busy || isRotationMode} aria-busy={busy} onClick={onDownloadMaa}>
-            <Download size={16} />{busy ? copy.inventory.export_downloading : text.exportMaa}
+            <ExportMaaIcon size={16} aria-hidden="true" />{busy ? copy.inventory.export_downloading : text.exportMaa}
           </button>}
           {failure?.format === 'maa' && onDownloadMaa && <ExportFailure failure={failure} busy={busy} onRetry={onDownloadMaa} onRecover={onRecover} />}
         </section>
@@ -80,10 +80,10 @@ export default function ResultExportDrawer({ open, onOpenChange, result, prepare
           <p className="v2-muted">{text.imageShift(prepared.plans[selected]?.name || text.shift(selected + 1))}</p>
           <div className="v2-export-actions" aria-busy={imageExporting}>
             <button type="button" className="v2-button v2-button-secondary" disabled={busy || imageExporting || !prepared.plans.length} onClick={() => void exportImage(false)}>
-              <Download size={16} />{imageCopy.current}
+              <ExportImageIcon size={16} aria-hidden="true" />{imageCopy.current}
             </button>
             <button type="button" className="v2-button v2-button-secondary" disabled={busy || imageExporting || !prepared.plans.length} onClick={() => void exportImage(true)}>
-              <Download size={16} />{imageCopy.all}
+              <ExportImageIcon size={16} aria-hidden="true" />{imageCopy.all}
             </button>
           </div>
           {imageExporting && <p role="status">{imageCopy.busy}</p>}
@@ -93,13 +93,13 @@ export default function ResultExportDrawer({ open, onOpenChange, result, prepare
         </section>
         {onDownloadSample && <section>
           <h3>{text.sampleFile}</h3><p>{text.sampleNotice}</p>
-          <button type="button" className="v2-button v2-button-secondary" disabled={busy} onClick={() => void exportSample()}><Download size={16} />{text.sampleExport}</button>
+          <button type="button" className="v2-button v2-button-secondary" disabled={busy} onClick={() => void exportSample()}><ExportDataIcon size={16} aria-hidden="true" />{text.sampleExport}</button>
           {sampleError && <div className="v2-export-failure" role="alert"><p className="v2-error">{sampleError}</p><p>{text.exportRetryHelp}</p><button type="button" className="v2-button v2-button-secondary" disabled={busy} onClick={() => void exportSample()}>{text.exportRetry}</button></div>}
         </section>}
         {onDownloadFullResult && <section>
           <h3>{text.calculationFile}</h3><p>{copy.domain.components_result_panel_ResultPanel_041}</p>
           <button type="button" className="v2-button v2-button-secondary" disabled={busy} aria-busy={busy} onClick={onDownloadFullResult}>
-            <Download size={16} />{busy ? copy.inventory.export_downloading : copy.domain.components_result_panel_ResultPanel_039}
+            <ExportDataIcon size={16} aria-hidden="true" />{busy ? copy.inventory.export_downloading : copy.domain.components_result_panel_ResultPanel_039}
           </button>
           {failure?.format === 'full' && <ExportFailure failure={failure} busy={busy} onRetry={onDownloadFullResult} onRecover={onRecover} />}
         </section>}

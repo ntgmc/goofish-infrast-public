@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ExpandIcon as ChevronDown } from '../../../components/icons'
 import { Link } from 'react-router'
 import { adminPath } from '../../../lib/app-routes'
 import SklandIcon from '../../../components/SklandIcon'

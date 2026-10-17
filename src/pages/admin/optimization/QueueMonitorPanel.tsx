@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, RefreshCw, Search } from 'lucide-react'
+import { ExpandIcon as ChevronDown, CollapsedIcon as ChevronRight, RefreshIcon as RefreshCw, SearchIcon as Search } from '../../../components/icons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import type {

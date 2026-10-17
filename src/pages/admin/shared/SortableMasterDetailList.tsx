@@ -14,7 +14,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical } from 'lucide-react'
+import { DragIcon as GripVertical } from '../../../components/icons'
 import { copy } from '../../../copy/index'
 
 interface SortableMasterItem {

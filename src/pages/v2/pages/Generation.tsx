@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ArrowRight, Check, RefreshCw, Settings2, Users } from 'lucide-react'
+import { NextIcon as ArrowRight, SuccessIcon as Check, LoadingIcon as RefreshCw, ConfigIcon as Settings2, OperatorsIcon as Users, GenerateIcon } from '../../../components/icons'
 import { copy, CURRENT_LOCALE } from '../../../copy'
 import { SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../../../lib/config'
 import { formatResultHistorySummary, formatWorkspaceDate } from '../../../lib/workspace-history'
@@ -50,7 +50,7 @@ export default function Generation({ workflow: w, progress: progressContent, dis
         <Notice error>{w.billingQuoteError}{w.billingQuoteError && <button className="v2-text-button" onClick={() => void w.refreshBillingQuote()}>{copy.metered.quote.retry}</button>}</Notice>
         {w.billingQuote?.sufficient === false && <button className="v2-text-button" onClick={() => onNavigate('balance')}>{copy.metered.quote.go_to_balance}</button>}
         <Notice>{disabledReason}</Notice>
-        <button className="v2-button v2-button-primary v2-generate-submit" disabled={disabled} aria-busy={busy} onClick={() => void w.handleGenerate()}>{busy ? <RefreshCw size={18} className="v2-spin" aria-hidden="true" /> : w.resultIsCurrent ? <Check size={18} /> : <ArrowRight size={18} />}{busy ? busyLabel : w.resultIsCurrent ? text.pages_tool_optimize_GenerateControlBar_028 : w.hasResult ? text.pages_tool_optimize_GenerateControlBar_029 : text.pages_tool_optimize_GenerateControlBar_030}</button>
+        <button className="v2-button v2-button-primary v2-generate-submit" disabled={disabled} aria-busy={busy} onClick={() => void w.handleGenerate()}>{busy ? <RefreshCw size={18} className="v2-spin" aria-hidden="true" /> : w.resultIsCurrent ? <Check size={18} /> : <GenerateIcon size={18} aria-hidden="true" />}{busy ? busyLabel : w.resultIsCurrent ? text.pages_tool_optimize_GenerateControlBar_028 : w.hasResult ? text.pages_tool_optimize_GenerateControlBar_029 : text.pages_tool_optimize_GenerateControlBar_030}</button>
         {w.resultIsCurrent && <p className="v2-muted">{text.pages_tool_optimize_GenerateControlBar_031}</p>}
         <Notice error>{error && <>{error.message}<div className="v2-actions"><button type="button" className="v2-button v2-button-secondary" disabled={busy || saving} onClick={() => error.retry === 'save' ? w.retryConfigSave() : void w.handleGenerate()}>{saving ? text.generation.saving : error.retry === 'save' ? text.generation.retry_save : copy.v2.retry}</button>{error.retry !== 'save' && <button type="button" className="v2-text-button" onClick={onOperators}>{copy.v2.operators}</button>}</div></>}</Notice>
       </section>

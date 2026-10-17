@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import Link from './InternalLink'
-import { Sparkles } from 'lucide-react'
+import { ConfigIcon as Sparkles } from './icons'
 import type { LicenseConfig } from '../lib/types'
 import ConfigEditor from './ConfigEditor'
 import { copy } from '../copy'

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, ArrowUpRight, ChevronDown } from 'lucide-react'
+import { SelectedIcon as Check, ExternalLinkIcon as ArrowUpRight, ExpandIcon as ChevronDown } from '../../../components/icons'
 import { copy, CURRENT_LOCALE } from '../../../copy'
 import { PUBLIC_PRICING_PLAN_IDS } from '../../../lib/public-content'
 import { usePublicContent } from '../../../lib/public-content-context'

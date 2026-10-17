@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
-import { Check, ImagePlus, MessageSquare, X } from 'lucide-react'
+import { SuccessIcon as Check, AddImageIcon as ImagePlus, FeedbackIcon as MessageSquare, RemoveIcon as X } from './icons'
 import { copy } from '../copy'
 import { apiJson, getApiErrorMessage } from '../lib/api-client'
 import { FEEDBACK_CATEGORIES, FEEDBACK_IMAGE_TYPES, FEEDBACK_MESSAGE_MAX_LENGTH, type FeedbackCategory } from '../lib/feedback-contracts'

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown, Factory, Store, Zap } from 'lucide-react'
+import { SelectedIcon as Check, ExpandIcon as ChevronDown, ManufactureIcon as Factory, TradingStationIcon as Store, PowerPlantIcon as Zap, SuccessIcon } from './icons'
 import { copy } from '../copy'
 import { FACILITY_IDS, facilityLayoutSchema, facilityRoomsSchema } from '../lib/facility-layout'
 import { apiJson } from '../lib/api-client'
@@ -150,7 +150,7 @@ export default function FacilityLayoutEditor({ config, onUpdate, profileId, read
         <div className="tool-inset mt-3 flex flex-wrap items-center justify-between gap-3 p-4">
           <div role="status">
             <p className="flex items-center gap-2 font-semibold text-ink-primary">
-              <Check size={18} aria-hidden="true" />{copy.common.facilityLayoutComplete}
+              <SuccessIcon size={18} aria-hidden="true" />{copy.common.facilityLayoutComplete}
             </p>
             <p className="mt-1 text-sm text-ink-secondary">{copy.common.facilityLayoutCompleteHelp}</p>
           </div>

@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router'
-import { ArrowRight, Check, CircleHelp, RefreshCw, Scale, Wallet } from 'lucide-react'
+import { NextIcon as ArrowRight, BalancedResourcesIcon as Check, HelpHintIcon as CircleHelp, RefreshIcon as RefreshCw, ResourceRatioIcon as Scale, ResourceStockIcon as Wallet } from '../components/icons'
 import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import ProductIcon from '../components/ProductIcon'

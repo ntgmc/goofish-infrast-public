@@ -1,4 +1,4 @@
-import { KeyRound } from 'lucide-react'
+import { RedemptionIcon as KeyRound } from '../../../components/icons'
 import { useSearchParams } from 'react-router'
 import { copy } from '../../../copy'
 import type { AuthSuccessResponse } from '../../../lib/types'

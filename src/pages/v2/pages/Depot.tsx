@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowRight, Download, FileJson } from 'lucide-react'
+import { RefreshIcon as ArrowRight, ExportImageIcon as Download, JsonImportIcon as FileJson } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { useDepotValue, formatProfileLabel, formatNumber, formatRankingNote, formatPricingStatus, formatContributionStatus, formatOptionalDate, formatUnitSanityLabel, getUtf8ByteLength } from '../../DepotValuePage'
 import AuthForm from '../../../components/AuthForm'

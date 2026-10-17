@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import { ArrowRight } from 'lucide-react'
+import { NextIcon as ArrowRight } from '../../../components/icons'
 import { copy } from '../../../copy'
 import AnnouncementMarkdown from '../../../components/AnnouncementMarkdown'
 import { apiJson, getApiErrorMessage } from '../../../lib/api-client'

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { LoaderCircle, Square } from 'lucide-react'
+import { LoadingIcon as LoaderCircle, StopIcon as Square } from '../../components/icons'
 import { ResultErrorBoundary } from '../tool/optimize/ResultSection'
 import OptimizationTaskCenterDialog, { OptimizationTaskCenterButton } from '../tool/optimize/OptimizationTaskCenter'
 import { restoreScenarioComparisonJob } from '../tool/optimize/scenario-lab/useScenarioComparison'

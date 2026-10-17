@@ -5,6 +5,7 @@ import OperatorAvatarStrip from './OperatorAvatarStrip'
 import type { PreparedPlan, RoomRow } from './types'
 import { copy } from '../../copy/index'
 import ProductIcon from '../ProductIcon'
+import { ExpandIcon } from '../icons'
 
 
 type RotationRoomGroup = {
@@ -194,15 +195,7 @@ function EfficiencyDisclosure({ row, compact = false }: { row: RoomRow; compact?
         <span>{copy.domain.components_result_panel_ResultDetail_017}</span>
         <span className="inline-flex items-center gap-2 text-ink-muted">
           {row.efficiency}
-          <svg
-            className="h-3.5 w-3.5 transition-transform duration-150 group-open:rotate-180"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 9l6 6 6-6" />
-          </svg>
+          <ExpandIcon className="h-3.5 w-3.5 transition-transform duration-150 group-open:rotate-180" aria-hidden="true" />
         </span>
       </summary>
       <ul className="space-y-1 border-t border-surface-3/60 px-2.5 py-2.5 text-xs leading-5 text-ink-muted">

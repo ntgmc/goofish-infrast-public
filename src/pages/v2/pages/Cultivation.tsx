@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowRight, RotateCcw, X } from 'lucide-react'
+import { RefreshIcon as ArrowRight, UndoIcon as RotateCcw, ExcludeIcon as X } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { defaultCultivationQuery, type CultivationCandidate, type CultivationData, type CultivationOptions } from '../../../lib/cultivation-contract'
 import { useCultivation } from '../../CultivationPlanPage'

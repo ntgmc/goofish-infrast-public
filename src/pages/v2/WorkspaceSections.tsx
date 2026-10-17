@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { BackIcon as ArrowLeft, NextIcon as ArrowRight } from '../../components/icons'
 import { Link } from 'react-router'
 import AuthForm from '../../components/AuthForm'
 import { copy } from '../../copy'

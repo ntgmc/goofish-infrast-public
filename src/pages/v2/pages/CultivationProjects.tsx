@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { ArrowRight, Pause, Play, Plus, X } from 'lucide-react'
+import { NextIcon as ArrowRight, PauseIcon as Pause, ResumeIcon as Play, AddIcon as Plus, RemoveIcon as X, RefreshIcon, SaveIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { canEditConfig } from '../../../lib/license'
 import { isCultivationProject, prepareProjectProduction, projectDaysEarlier, type CultivationProject, type ProjectOperator, type ProjectRoute } from '../../../lib/cultivation-projects'
@@ -40,7 +40,7 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
     setApplied(true)
   }
   return <div className="v2-projects">
-    <div className="v2-tool-source v2-project-source"><div><span className="v2-label">{text.account} · {profile.display_name}</span><p>{text.description}</p><Link className="v2-text-button" to={v2Path('cultivation', profile.id)}>{text.suggestionsEntry}<ArrowRight size={14} /></Link></div><button className="v2-button v2-button-primary" disabled={m.busy} onClick={() => void m.load()}>{m.busy ? text.loading : copy.skland.refresh}<ArrowRight size={16} /></button></div>
+    <div className="v2-tool-source v2-project-source"><div><span className="v2-label">{text.account} · {profile.display_name}</span><p>{text.description}</p><Link className="v2-text-button" to={v2Path('cultivation', profile.id)}>{text.suggestionsEntry}<ArrowRight size={14} /></Link></div><button className="v2-button v2-button-primary" disabled={m.busy} onClick={() => void m.load()}>{m.busy ? text.loading : copy.skland.refresh}<RefreshIcon size={16} aria-hidden="true" /></button></div>
     <Notice error>{m.error}</Notice><Notice>{m.storageError ? text.storageFailed : null}</Notice>
     {m.data?.warnings.map((warning) => <Notice key={warning}>{warning}</Notice>)}
     {(m.data || m.projects.length > 0) && <>
@@ -146,7 +146,7 @@ function GoalForm({ operators, projects, editing, busy, onSave, onCancel }: { op
     </div>}
     <Field label={text.deadline} type="date" value={goal.deadline} onChange={(event) => setGoal({ ...goal, deadline: event.target.value })} />
     <Notice error>{error ? text.invalidTarget : null}</Notice>
-    <div className="v2-actions"><button type="submit" className="v2-button v2-button-primary" disabled={busy || !operator || !editing && projects.length >= 30}><Plus size={16} />{editing ? text.save : text.add}</button>{editing && <button type="button" className="v2-text-button" onClick={onCancel}>{text.cancel}</button>}</div>
+    <div className="v2-actions"><button type="submit" className="v2-button v2-button-primary" disabled={busy || !operator || !editing && projects.length >= 30}>{editing ? <SaveIcon size={16} aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}{editing ? text.save : text.add}</button>{editing && <button type="button" className="v2-text-button" onClick={onCancel}>{text.cancel}</button>}</div>
     {projects.length >= 30 && !editing && <p className="v2-muted">{text.targetLimit}</p>}
   </form>
 }

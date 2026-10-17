@@ -1,4 +1,4 @@
-import { ChevronRight } from 'lucide-react'
+import { BreadcrumbIcon as ChevronRight } from './icons'
 import { Link } from 'react-router'
 import { copy } from '../copy/index'
 

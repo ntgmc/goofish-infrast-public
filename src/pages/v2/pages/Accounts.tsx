@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowRight, Check, Search, UserRound } from 'lucide-react'
+import { NextIcon as ArrowRight, SelectedIcon as Check, SearchIcon as Search, AccountIcon as UserRound } from '../../../components/icons'
 import { copy } from '../../../copy'
 import type { V2Session } from '../OptionsDrawer'
 import { useProfiles, useProfileDetails } from '../../tool/dashboard/ProfilesSection'
