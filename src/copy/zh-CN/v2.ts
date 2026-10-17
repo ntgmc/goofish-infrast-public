@@ -45,7 +45,7 @@ export const v2Copy = {
     multipleChoice: '可多选',
     scheduleOptions: {
       variable: { label: '自动换班', detail: 'MAA · 每天 3–4 班，自动安排间隔' },
-      '8x3': { label: '固定 8 小时', detail: 'MAA · 每天 3 班' },
+      '8x3': { label: '固定 8/12 小时', detail: 'MAA · 每天 2–3 班' },
       rotation: { label: '游戏内轮换', detail: '每 12 小时轮换一次，不使用无人机' },
     },
     drones: '无人机用途',

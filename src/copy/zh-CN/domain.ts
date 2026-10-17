@@ -629,7 +629,7 @@ export const domainCopy = {
   // src/lib/scenario-comparison.ts
   lib_scenario_comparison_022: "布局或生产方案格式不正确。",
   // src/lib/scenario-comparison.ts
-  lib_scenario_comparison_023: "MAA 排班仅支持自动非固定、8×3 和 12×2。",
+  lib_scenario_comparison_023: "MAA 排班仅支持自动换班和固定 8/12 小时。",
   // src/lib/scenario-comparison.ts
   lib_scenario_comparison_024: "包含未知的无人机策略。",
   // src/lib/scenario-comparison.ts
