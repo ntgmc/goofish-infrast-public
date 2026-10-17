@@ -1730,13 +1730,14 @@ describe('V2 feature continuity', () => {
     const user = userEvent.setup()
     mount()
     await user.click(screen.getByRole('button', { name: copy.v2.settings }))
-    expect(await screen.findByLabelText(copy.dashboard.pages_tool_dashboard_SettingsSection_018)).toBeInTheDocument()
+    // Cold imports of the lazy settings page can exceed the default 1s wait in CI.
+    expect(await screen.findByLabelText(copy.dashboard.pages_tool_dashboard_SettingsSection_018, {}, { timeout: 5_000 })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: copy.dashboard.settings.preferences }))
     expect(screen.getByRole('switch', { name: copy.dashboard.animation.reduce })).toBeInTheDocument()
     expect(screen.queryByText(copy.dashboard.workspace_entry.settings_title)).not.toBeInTheDocument()
     expect(screen.getByTestId('route-location')).toHaveTextContent('section=settings')
     expect(screen.queryByRole('link', { name: '返回 V1' })).not.toBeInTheDocument()
-  })
+  }, 10_000)
 
   it('prefers free account binding while retaining CDK redemption inside V2', async () => {
     connect()
