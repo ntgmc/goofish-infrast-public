@@ -8,7 +8,7 @@ import CultivationProjectImport from '../../../components/CultivationProjectImpo
 import { projectFromCultivationCandidate } from '../../../lib/cultivation-project-import'
 import { number, CultivationTraining, CultivationEvidence } from '../../cultivation/CultivationResults'
 import CultivationFilters from '../../cultivation/CultivationFilters'
-import { useSpecialItems } from '../../cultivation/CultivationSpecialItems'
+import { SpecialItemRates, useSpecialItems } from '../../cultivation/CultivationSpecialItems'
 import type { V2Session } from '../OptionsDrawer'
 import { v2Path } from '../navigation'
 import Link from '../../../components/InternalLink'
@@ -87,7 +87,7 @@ function Operator({ row, data, rank }: { row: CultivationCandidate; data: Cultiv
   return <div className="v2-cultivation-operator">
     {rank !== undefined && <span className="v2-cultivation-rank">{String(rank).padStart(2, '0')}</span>}
     <img className="v2-cultivation-portrait" src={`/webp96/${encodeURIComponent(row.operatorId)}.webp`} alt="" width={56} height={56} loading="lazy" />
-    <div><h3>{row.name}</h3><span className="v2-cultivation-skill">{row.skillId && <img src={`/skill-icons/${encodeURIComponent(data.skillIcons?.[row.skillId] ?? row.skillId)}.png`} alt="" width={20} height={20} loading="lazy" />}{text.skillName(row.target.skill)}{row.target.skillLevel > 7 && <strong>{text.masteryName(row.target.skillLevel - 7)}</strong>}</span></div>
+    <div><h3>{row.name}</h3><span className="v2-cultivation-skill">{row.skillId && <img src={`/skill-icons/${encodeURIComponent(data.skillIcons?.[row.skillId] ?? row.skillId)}.png`} alt="" width={20} height={20} loading="lazy" />}{row.target.skill > 0 && row.target.skillLevel <= 7 ? text.skillTarget(row.target.skill, row.target.skillLevel) : text.skillName(row.target.skill)}{row.target.skillLevel > 7 && <strong>{text.masteryName(row.target.skillLevel - 7)}</strong>}</span></div>
   </div>
 }
 
@@ -138,7 +138,7 @@ function SpecialItems({ data, preference }: Parameters<typeof useSpecialItems>[0
           <ol className="v2-special-recommendations">{m.recommendations.slice(0, m.visible).map((row, index) => <li key={row.key}>
             <span className="v2-cultivation-rank">{String(index + 1).padStart(2, '0')}</span>
             {row.operatorId && <img src={`/webp96/${encodeURIComponent(row.operatorId)}.webp`} alt="" width={40} height={40} loading="lazy" />}
-            <div><strong>{row.name}{row.skill && ` · ${text.skillName(row.skill)} ${text.masteryName(3)}`}</strong><small>{text.weightedDemand} {number(row.demand)} · {text.communityRate(row.communityRate)}</small></div>
+            <div><strong>{row.name}{row.skill && ` · ${text.skillName(row.skill)} ${text.masteryName(3)}`}</strong><small>{text.weightedDemand} {number(row.demand)} · <SpecialItemRates row={row} data={data} /></small></div>
             {row.owned !== undefined && <span className="v2-cultivation-status" data-state={row.owned ? 'matched' : 'training'}>{row.owned ? text.ownedOperator : text.newOperator}</span>}
           </li>)}</ol>
           {m.recommendations.length > m.visible && <button type="button" className="v2-text-button" onClick={() => m.setVisible(m.visible + 16)}>{text.showMore}</button>}
