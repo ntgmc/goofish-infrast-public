@@ -101,6 +101,28 @@ it('calculates manual materials even when production fails, then includes crafti
   expect(mocks.api).toHaveBeenCalledTimes(2)
 })
 
+it('shows farming sources for materials and reserves income contributions for money and experience', async () => {
+  const user = userEvent.setup()
+  mocks.api.mockImplementation(async (_url, options) => {
+    const result = data(options.json.projects)
+    for (const candidate of result.candidates) candidate.items.book = 3
+    return { ...result, itemNames: { ...result.itemNames, book: '技巧概要' }, farms: { book: [{ stage: 'CA-5', sanity: 6, quantity: 1, days: [1, 2, 3, 4, 5, 6, 7] }] } }
+  })
+  render(<MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /></MemoryRouter>)
+  await user.click(screen.getByRole('button', { name: text.import }))
+  await user.selectOptions(await screen.findByRole('combobox', { name: text.operator }), 'char_test')
+  await user.click(screen.getByRole('button', { name: text.add }))
+  const section = (await screen.findByRole('heading', { name: text.resources })).parentElement!
+  const material = within(section).getByRole('button', { name: text.viewMaterial('技巧概要') }).closest('li')!
+  expect(within(material).getByText('CA-5')).toBeInTheDocument()
+  expect(within(material).queryByText(text.fromBase)).not.toBeInTheDocument()
+  expect(within(material).queryByText(text.remaining)).not.toBeInTheDocument()
+  expect(within(material).queryByRole('img')).not.toBeInTheDocument()
+  const money = within(section).getByRole('button', { name: text.viewMaterial('龙门币') }).closest('li')!
+  expect(within(money).getByText(text.fromBase)).toBeInTheDocument()
+  expect(within(money).getByRole('img')).toBeInTheDocument()
+})
+
 it('recalculates the latest edited target after an in-flight calculation without reusing old material costs', async () => {
   const user = userEvent.setup()
   render(<MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /></MemoryRouter>)

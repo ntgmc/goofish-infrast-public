@@ -10,7 +10,7 @@ import Link from '../../../components/InternalLink'
 import type { V2Session } from '../OptionsDrawer'
 import { v2Path } from '../navigation'
 import { EmptyState, Facts, Field, Notice, SectionTitle } from '../components/WorkspaceUI'
-import { MaterialNeeds, ResourceArt } from './ProjectMaterials'
+import { MaterialBrowser, MaterialButton, MaterialNeeds } from './ProjectMaterials'
 import './cultivation-projects.css'
 
 const text = copy.cultivationProjects
@@ -178,16 +178,19 @@ function ProjectResults({ route, data, useTemporary }: { route: ProjectRoute; da
       {route.remaining.length > 0 && <Notice>{text.horizon}</Notice>}
     </div>}
     <section className="v2-project-result-section"><h3>{text.resources}</h3><p className="v2-muted">{text.resourceHint}</p>
-    {Object.keys(route.missing).length ? <ul className="v2-project-resource-grid">{Object.entries(route.missing).map(([id, count]) => {
+    {Object.keys(route.missing).length ? <MaterialBrowser data={data}>{(select) => <ul className="v2-project-resource-grid">{Object.entries(route.missing).map(([id, count]) => {
+      const income = id === '4001' || id === 'exp'
       const sources = [[text.fromBase, route.supplied[id] ?? 0, 'base'], [text.fromFarm, route.farmed[id] ?? 0, 'farm'], [text.remaining, route.remaining.filter((row) => row.item === id).reduce((sum, row) => sum + row.remaining, 0), 'remaining']] as const
-      return <li key={id}><header><ResourceArt id={id} data={data} /><div><h4>{material(id)}</h4><span>{text.shortage}</span></div><strong>{number(count)}</strong></header>
-        <div className="v2-project-resource-track" role="img" aria-label={sources.map(([label, amount]) => `${label} ${number(amount)}`).join('，')}>{sources.map(([_label, amount, source]) => <span key={source} data-source={source} style={{ width: `${Math.min(100, amount / count * 100)}%` }} />)}</div>
-        <dl>{sources.map(([label, amount, source]) => <div key={source} data-source={source}><dt>{label}</dt><dd>{number(amount)}</dd></div>)}</dl>
+      const farms = new Map<string, number>()
+      for (const day of route.phases) for (const farm of day.farms) if (farm.item === id) farms.set(farm.stage, (farms.get(farm.stage) ?? 0) + farm.runs)
+      return <li key={id} data-income={income}><MaterialButton id={id} count={count} data={data} onSelect={select} className="v2-project-resource-button">{text.shortage} · {number(count)}</MaterialButton>
+        {income ? <><div className="v2-project-resource-track" role="img" aria-label={sources.map(([label, amount]) => `${label} ${number(amount)}`).join('，')}>{sources.map(([_label, amount, source]) => <span key={source} data-source={source} style={{ width: `${Math.min(100, amount / count * 100)}%` }} />)}</div>
+        <dl>{sources.map(([label, amount, source]) => <div key={source} data-source={source}><dt>{label}</dt><dd>{number(amount)}</dd></div>)}</dl></> : <p className="v2-project-resource-source">{farms.size ? [...farms].map(([stage, runs]) => <span key={stage}>{stage}<b>{text.stageRuns(runs)}</b></span>) : data.farms[id]?.length ? text.noFarmingPlan : text.noFarm}</p>}
       </li>
-    })}</ul> : <p className="v2-muted">{text.noShortage}</p>}</section>
+    })}</ul>}</MaterialBrowser> : <p className="v2-muted">{text.noShortage}</p>}</section>
     {route.phases.length > 0 && <section className="v2-project-result-section"><h3>{text.calendar}</h3><ol className="v2-project-calendar">{route.phases.slice(0, visible).map((day, index) => <li key={day.date}>
       <div className="v2-project-day"><b>{String(index + 1).padStart(2, '0')}</b><div><time dateTime={day.date}>{day.date}</time><small>{text.daySanity(day.spent)}</small>{useTemporary && <small>{day.temporary ? text.temporaryDay : text.normalDay}</small>}</div></div>
-      <div className="v2-project-day-plan"><p className="v2-project-day-income"><DailyOutputIcon size={16} aria-hidden="true" />{text.baseDay(number(day.income['4001']), number(day.income.exp))}</p>{day.farms.length ? <ul>{day.farms.map((farm) => <li key={`${farm.item}:${farm.stage}`}><ResourceArt id={farm.item} data={data} /><div><strong>{farm.stage}</strong><span>{material(farm.item)}</span><small>{text.farmRuns(farm.runs, number(farm.quantity))}</small></div></li>)}</ul> : <p className="v2-muted">{text.noFarms}</p>}</div>
+      <div className="v2-project-day-plan"><p className="v2-project-day-income"><DailyOutputIcon size={16} aria-hidden="true" />{text.baseDay(number(day.income['4001']), number(day.income.exp))}</p>{day.farms.length ? <MaterialBrowser data={data}>{(select) => <ul className="v2-project-day-farms">{day.farms.map((farm) => <li key={`${farm.item}:${farm.stage}`}><MaterialButton id={farm.item} count={farm.quantity} data={data} onSelect={select}><b>{farm.stage}</b><small>{text.farmRuns(farm.runs, number(farm.quantity))}</small></MaterialButton></li>)}</ul>}</MaterialBrowser> : <p className="v2-muted">{text.noFarms}</p>}</div>
     </li>)}</ol>{visible < route.phases.length && <button className="v2-button v2-button-secondary" onClick={() => setVisible((value) => value + 14)}>{text.moreDays}</button>}</section>}
   </section>
 }
