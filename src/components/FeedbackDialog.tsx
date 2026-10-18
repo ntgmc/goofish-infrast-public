@@ -36,6 +36,7 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
   const [feedbackId, setFeedbackId] = useState<string | null>(null)
   const [historyBusy, setHistoryBusy] = useState(false)
   const busy = processing || submitting || historyBusy
+  const attachSchedule = category === 'schedule'
 
   useEffect(() => {
     const button = trigger.current
@@ -77,7 +78,7 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
     setSubmitting(true)
     setError(null)
     try {
-      const context = { ...(attachProfile && profileId ? { profile_id: profileId } : {}), ...(resultId.trim() ? { result_id: resultId.trim() } : {}), ...(jobId.trim() ? { job_id: jobId.trim() } : {}) }
+      const context = { ...(attachProfile && profileId ? { profile_id: profileId } : {}), ...(attachSchedule && resultId.trim() ? { result_id: resultId.trim() } : {}), ...(attachSchedule && jobId.trim() ? { job_id: jobId.trim() } : {}) }
       const created = await apiJson<{ id: string }>('/api/user/feedback', { method: 'POST', json: { category, message: message.trim(), ...(Object.keys(context).length ? { context } : {}), ...(attachment ? { image: attachment.image } : {}) }, fallbackMessage: text.submitFailed })
       setFeedbackId(created.id)
       setSuccess(true)
@@ -96,10 +97,20 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
     </button>
     <Dialog open={open} onOpenChange={(next) => { if (!busy) setOpen(next) }}>
       <DialogContent id={`${id}-dialog`} className="feedback-dialog"
+        onPaste={(event) => {
+          if (view !== 'new' || success) return
+          const file = Array.from(event.clipboardData.items).find((item) => item.kind === 'file' && item.type.startsWith('image/'))?.getAsFile()
+          if (!file) return
+          event.preventDefault()
+          void selectImage(file)
+        }}
         onOpenAutoFocus={(event) => { if (view === 'new') { event.preventDefault(); categoryInput.current?.focus() } }}
         onCloseAutoFocus={(event) => { event.preventDefault(); trigger.current?.focus() }}
         {...(busy ? { showCloseButton: false as const } : { showCloseButton: true as const, closeLabel: text.close })}>
-        <DialogTitle>{text.title}</DialogTitle><DialogDescription>{text.description}</DialogDescription>
+        <div className="feedback-dialog-header">
+          <DialogTitle>{text.title}</DialogTitle>
+          <DialogDescription>{text.description}</DialogDescription>
+        </div>
         <Tabs.Root value={view} onValueChange={(value) => { if (value === 'history') setFeedbackId(null); setView(value as typeof view) }}>
           <Tabs.List className="feedback-tabs" aria-label={text.title}>
             <Tabs.Trigger value="new" className="feedback-tab" disabled={busy}>{text.newFeedback}</Tabs.Trigger>
@@ -117,21 +128,26 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
             <div className="feedback-label"><label htmlFor={`${id}-message`}>{text.message}</label><textarea id={`${id}-message`} className="tool-field feedback-field" rows={5} required maxLength={FEEDBACK_MESSAGE_MAX_LENGTH} value={message} disabled={busy} placeholder={text.placeholder} aria-describedby={`${id}-message-hint`} onChange={(event) => setMessage(event.target.value)} /></div>
             <div className="feedback-message-meta"><p id={`${id}-message-hint`}>{text.messageHint}</p><span className="feedback-count" aria-label={`${text.characterCount} ${message.length}/${FEEDBACK_MESSAGE_MAX_LENGTH}`}>{message.length}/{FEEDBACK_MESSAGE_MAX_LENGTH}</span></div>
           </div>
-          <fieldset className="grid min-w-0 gap-3"><legend className="mb-2 text-sm font-semibold">{text.context}</legend>
-            {profileId && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={attachProfile} disabled={busy} onChange={(event) => setAttachProfile(event.target.checked)} />{text.attachProfile}</label>}
-            <label className="feedback-label"><span>{text.resultId}</span><input className="tool-field feedback-field" maxLength={120} value={resultId} disabled={busy} onChange={(event) => setResultId(event.target.value)} /></label>
-            <label className="feedback-label"><span>{text.jobId}</span><input className="tool-field feedback-field" maxLength={120} value={jobId} disabled={busy} onChange={(event) => setJobId(event.target.value)} /></label>
+          {(profileId || attachSchedule) && <fieldset className="feedback-context"><legend>{text.context}</legend>
+            {profileId && <label className="feedback-profile"><input type="checkbox" checked={attachProfile} disabled={busy} onChange={(event) => setAttachProfile(event.target.checked)} />{text.attachProfile}</label>}
+            {attachSchedule && <div className="feedback-context-fields">
+              <label className="feedback-label"><span>{text.resultId}</span><input className="tool-field feedback-field" maxLength={120} value={resultId} disabled={busy} onChange={(event) => setResultId(event.target.value)} /></label>
+              <label className="feedback-label"><span>{text.jobId}</span><input className="tool-field feedback-field" maxLength={120} value={jobId} disabled={busy} onChange={(event) => setJobId(event.target.value)} /></label>
+            </div>}
             <p className="feedback-hint">{text.contextHint}</p>
-          </fieldset>
+          </fieldset>}
           <div className="feedback-label">
             <span id={`${id}-image-label`}>{text.image}</span>
             <input ref={fileInput} type="file" hidden accept={FEEDBACK_IMAGE_TYPES.join(',')} disabled={busy} aria-label={text.image}
               onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; void selectImage(file) }} />
-            <div className="feedback-image-picker">
-              <button ref={imageButton} type="button" className="feedback-action" disabled={busy} aria-describedby={`${id}-image-hint ${id}-image-name`}
-                onClick={() => fileInput.current?.click()}><ImagePlus size={18} aria-hidden="true" />{attachment ? text.replaceImage : text.chooseImage}</button>
-              <span id={`${id}-image-name`} className="feedback-image-name" title={attachment?.name}>{attachment?.name ?? text.noImage}</span>
-            </div>
+            <button ref={imageButton} type="button" className="feedback-action feedback-image-picker" disabled={busy}
+              aria-label={attachment ? text.replaceImage : text.chooseImage} aria-describedby={`${id}-image-hint ${id}-image-name`}
+              onClick={() => fileInput.current?.click()}>
+              <ImagePlus size={24} aria-hidden="true" />
+              <span className="feedback-image-prompt"><strong>{attachment ? text.replaceImage : text.chooseImage}</strong>
+                <span id={`${id}-image-name`} className="feedback-image-name" title={attachment?.name}>{attachment?.name ?? text.pasteImageHint}</span>
+              </span>
+            </button>
             <p id={`${id}-image-hint`} className="feedback-hint">{text.imageHint}</p>
             {processing && <p role="status" className="feedback-hint">{text.processingImage}</p>}
             {attachment && <div className="feedback-image-preview">
@@ -142,7 +158,7 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
             </div>}
           </div>
           {error && <p ref={errorNotice} tabIndex={-1} role="alert" className="tool-alert tool-alert--error">{error}</p>}
-          <button type="submit" className="feedback-action feedback-action-primary" disabled={busy || !message.trim()}>{submitting ? text.submitting : text.submit}</button>
+          <div className="feedback-form-actions"><button type="submit" className="feedback-action feedback-action-primary" disabled={busy || !message.trim()}>{submitting ? text.submitting : text.submit}</button></div>
         </form>}
           </Tabs.Content>
         </Tabs.Root>
