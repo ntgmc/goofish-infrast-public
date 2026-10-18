@@ -11,8 +11,10 @@ export function cultivationResources(snapshot: PrtsSnapshot, player: ReturnType<
   prices.exp = getExpSanity(1)
   prices['4001'] = getNetLmdSanity(pricing)
   if (prices['4006'] !== undefined) prices['32001'] = prices['4006'] * 90
-  return { inventory: player.inventory, potions: player.potions, prices, recipes: snapshot.recipes, farms: snapshot.farms,
-    itemNames: { ...snapshot.itemNames, exp: '作战经验', '4001': '龙门币' },
+  // AP-5's 20–22 vouchers are absent from the random-drop matrix in older snapshots.
+  const farms = { ...snapshot.farms, '4006': snapshot.farms['4006']?.length ? snapshot.farms['4006'] : [{ stage: 'AP-5', sanity: 30, quantity: 21, days: [1, 4, 6, 7] }] }
+  return { inventory: player.inventory, potions: player.potions, prices, recipes: snapshot.recipes, farms,
+    itemNames: { ...snapshot.itemNames, exp: '作战经验', '4001': '龙门币' }, itemIcons: snapshot.itemIcons,
     updatedAt: snapshot.updatedAt, importedAt: new Date().toISOString(), pricingStatus: pricing.status }
 }
 
@@ -99,8 +101,8 @@ export function buildCultivationData(snapshot: PrtsSnapshot, playerInfo: unknown
     specialItems: specialCatalog ? buildSpecialItemRecommendations(snapshot, player, specialCatalog, community, demands) : [],
     specialItemsUpdatedAt: specialCatalog?.updatedAt || null,
     skillIcons: specialCatalog?.skillIcons,
-    itemIcons: specialCatalog?.itemIcons,
     ...cultivationResources(snapshot, player, pricing),
+    itemIcons: { ...snapshot.itemIcons, ...specialCatalog?.itemIcons },
     groups: [...groups.values()],
     itemNames: { ...snapshot.itemNames, ...specialCatalog?.itemNames, exp: '作战经验', '4001': '龙门币' },
     stats: { homeworks: recommendation.homeworks, owned: player.characters.size, missingOperators: missingOperators.size, incomplete: recommendation.invalid + [...candidates.values()].filter((row) => row.warnings.length).length },

@@ -50,6 +50,63 @@ it('opens website feedback and submits only the context the user chose to attach
   expect(mocks.api).toHaveBeenCalledWith('/api/user/feedback', expect.objectContaining({ json: { category: 'schedule', message: '这个结果存在问题', context: { profile_id: 'profile-42', result_id: 'result-42', job_id: 'job-42' } } }))
 })
 
+it('omits hidden schedule IDs after switching categories while keeping the chosen profile context', async () => {
+  const user = userEvent.setup()
+  mocks.api.mockResolvedValue({ id: 'feedback' })
+  render(<FeedbackButton profileId="profile-42" />)
+  await user.click(screen.getByRole('button', { name: copy.feedback.title }))
+  fireEvent.change(screen.getByLabelText(copy.feedback.resultId), { target: { value: 'result-42' } })
+  fireEvent.change(screen.getByLabelText(copy.feedback.jobId), { target: { value: 'job-42' } })
+  await user.click(screen.getByLabelText(copy.feedback.attachProfile))
+  for (const category of ['account', 'import', 'payment', 'suggestion', 'other']) {
+    await user.selectOptions(screen.getByLabelText(copy.feedback.category), category)
+    expect(screen.queryByLabelText(copy.feedback.resultId)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(copy.feedback.jobId)).not.toBeInTheDocument()
+  }
+  await user.selectOptions(screen.getByLabelText(copy.feedback.category), 'schedule')
+  expect(screen.getByLabelText(copy.feedback.resultId)).toHaveValue('result-42')
+  expect(screen.getByLabelText(copy.feedback.jobId)).toHaveValue('job-42')
+  await user.selectOptions(screen.getByLabelText(copy.feedback.category), 'account')
+  fireEvent.change(screen.getByLabelText(copy.feedback.message), { target: { value: '登录遇到问题' } })
+  await user.click(screen.getByRole('button', { name: copy.feedback.submit }))
+  await screen.findByText(copy.feedback.submitted)
+  expect(mocks.api).toHaveBeenCalledWith('/api/user/feedback', expect.objectContaining({ json: { category: 'account', message: '登录遇到问题', context: { profile_id: 'profile-42' } } }))
+})
+
+it('pastes screenshots through image validation, preserves attachments on failure, and leaves text paste intact', async () => {
+  const user = userEvent.setup()
+  const prepared = { image: { type: 'image/png', base64: 'cG5n' }, bytes: 3, compressed: false }
+  let finish!: (value: typeof prepared) => void
+  mocks.prepareImage.mockReturnValueOnce(new Promise((resolve) => { finish = resolve }))
+    .mockRejectedValueOnce(new Error(copy.feedback.invalidImage))
+  mocks.api.mockResolvedValue({ id: 'feedback' })
+  render(<FeedbackButton />)
+  await user.click(screen.getByRole('button', { name: copy.feedback.title }))
+  const message = screen.getByLabelText(copy.feedback.message)
+  await user.click(message)
+  await user.paste('从剪贴板补充问题')
+  expect(message).toHaveValue('从剪贴板补充问题')
+  expect(mocks.prepareImage).not.toHaveBeenCalled()
+  const image = new File(['png'], '剪贴板截图.png', { type: 'image/png' })
+  const clipboardData = { items: [{ kind: 'string', type: 'text/plain' }, { kind: 'file', type: image.type, getAsFile: () => image }] }
+  expect(fireEvent.paste(message, { clipboardData })).toBe(false)
+  expect(mocks.prepareImage).toHaveBeenCalledExactlyOnceWith(image)
+  expect(screen.getByRole('button', { name: copy.feedback.submit })).toBeDisabled()
+  fireEvent.paste(screen.getByRole('dialog'), { clipboardData })
+  expect(mocks.prepareImage).toHaveBeenCalledTimes(1)
+  await user.keyboard('{Escape}')
+  expect(screen.getByRole('dialog')).toBeVisible()
+  finish(prepared)
+  await waitFor(() => expect(screen.getByRole('button', { name: copy.feedback.replaceImage })).toHaveFocus())
+  fireEvent.paste(screen.getByRole('dialog'), { clipboardData })
+  expect(await screen.findByRole('alert')).toHaveTextContent(copy.feedback.invalidImage)
+  expect(screen.getByText(image.name)).toBeVisible()
+  expect(message).toHaveValue('从剪贴板补充问题')
+  await user.click(screen.getByRole('button', { name: copy.feedback.submit }))
+  await screen.findByText(copy.feedback.submitted)
+  expect(mocks.api).toHaveBeenCalledWith('/api/user/feedback', expect.objectContaining({ json: { category: 'schedule', message: '从剪贴板补充问题', image: prepared.image } }))
+})
+
 it('opens the saved feedback, keeps a failed follow-up draft, and blocks dismissal while sending', async () => {
   const id = '764b3769-09e4-4261-83b8-d23896419a8f'
   const item = { id, category: 'schedule', message: '原始问题', has_image: true, status: 'resolved', result: '已修复，请重试', revision: 2, created_at: '2026-10-13T00:00:00Z', updated_at: '2026-10-13T00:00:00Z' }
@@ -148,5 +205,5 @@ it('returns focus after image selection and removal, and focuses errors without 
   expect(screen.getByText('截图.png')).toBeVisible()
   await user.click(screen.getByRole('button', { name: copy.feedback.removeImage }))
   expect(screen.getByRole('button', { name: copy.feedback.chooseImage })).toHaveFocus()
-  expect(screen.getByText(copy.feedback.noImage)).toBeVisible()
+  expect(screen.getByText(copy.feedback.pasteImageHint)).toBeVisible()
 })

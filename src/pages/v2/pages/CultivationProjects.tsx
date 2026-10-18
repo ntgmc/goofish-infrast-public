@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { NextIcon as ArrowRight, PauseIcon as Pause, ResumeIcon as Play, AddIcon as Plus, RemoveIcon as X, RefreshIcon, SaveIcon } from '../../../components/icons'
+import { NextIcon as ArrowRight, PauseIcon as Pause, ResumeIcon as Play, AddIcon as Plus, RemoveIcon as X, RefreshIcon, SaveIcon, CultivationIcon, ResourceCalendarIcon, ResourceStockIcon, DailyOutputIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { canEditConfig } from '../../../lib/license'
 import { isCultivationProject, prepareProjectProduction, projectDaysEarlier, type CultivationProject, type ProjectOperator, type ProjectRoute } from '../../../lib/cultivation-projects'
@@ -10,6 +10,7 @@ import Link from '../../../components/InternalLink'
 import type { V2Session } from '../OptionsDrawer'
 import { v2Path } from '../navigation'
 import { EmptyState, Facts, Field, Notice, SectionTitle } from '../components/WorkspaceUI'
+import { MaterialBrowser, MaterialButton, MaterialNeeds } from './ProjectMaterials'
 import './cultivation-projects.css'
 
 const text = copy.cultivationProjects
@@ -46,33 +47,46 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
     {(m.data || m.projects.length > 0) && <>
       <div className="v2-project-columns">
         <section className="v2-project-targets"><SectionTitle title={text.targets} description={text.orderHint} />
-          <ol className="v2-project-list">{m.projects.map((project) => {
+          <ol className="v2-project-list">{m.projects.map((project, index) => {
             const operator = m.data?.projectOperators?.find((row) => row.id === project.operatorId)
             const name = operator?.name ?? session.license?.operators?.find((row) => row.id === project.operatorId)?.name ?? project.operatorId
             const row = route?.rows.find((row) => row.project.operatorId === project.operatorId)
+            const materials = m.materials.find((row) => row.project.operatorId === project.operatorId)
             const first = m.projects.find((row) => !row.paused)?.operatorId === project.operatorId
             const deadlineDays = row?.estimatedDate && project.deadline ? projectDaysEarlier(project.deadline, row.estimatedDate) : null
             return <li key={project.operatorId} data-paused={project.paused} data-primary={first && !project.paused}>
-              <img src={`/webp96/${encodeURIComponent(project.operatorId)}.webp`} alt="" width={48} height={48} />
-              <div className="v2-project-target-body"><h3>{name}{(project.paused || first) && <span className="v2-project-status">{project.paused ? text.paused : text.main}</span>}</h3>
-                <p>{text.targetDescription(text.elites[project.elite], project.level, project.skill, text.skillRank(project.skillLevel))}</p>
-                {operator && <small>{text.currentDescription(operator.current.elite, operator.current.level)}</small>}
-                {!project.paused && <div className="v2-project-ready" data-ready={Boolean(row?.estimatedDate) && !m.pendingRefresh}><span>{text.goalReadyDate}</span><strong>{m.pendingRefresh ? text.pendingRefresh : row?.estimatedDate ?? text.pending}</strong></div>}
-                {!project.paused && project.deadline && <small>{project.deadline} · {deadlineDays === null ? text.deadlineUnknown : deadlineDays < 0 ? text.overdue(-deadlineDays) : text.onTime}</small>}
-                {!project.paused && !first && route && <small>{m.plans?.pauseGains[project.operatorId] == null ? text.pauseUnknown : text.pausePreview(m.plans.pauseGains[project.operatorId]!)}</small>}
-                {row?.candidate?.warnings.map((warning) => <Notice key={warning}>{warning}</Notice>)}
+              <div className="v2-project-target-heading">
+                <span className="v2-project-portrait"><img src={`/webp96/${encodeURIComponent(project.operatorId)}.webp`} alt="" width={60} height={60} /><b>{String(index + 1).padStart(2, '0')}</b></span>
+                <div><h3>{name}{(project.paused || first) && <span className="v2-project-status">{project.paused ? text.paused : text.main}</span>}</h3><span className="v2-muted">{operator && '★'.repeat(operator.rarity)}</span></div>
+                <button className="v2-icon-button" aria-label={`${text.remove} ${name}`} onClick={() => { m.setProjects((rows) => rows.filter((row) => row.operatorId !== project.operatorId)); if (editing?.operatorId === project.operatorId) setEditing(null) }}><X size={18} /></button>
+              </div>
+              <div className="v2-project-target-body">
+                <div className="v2-project-training">
+                  {operator && <><div><span>{text.current}</span><strong>{text.elites[operator.current.elite]} <b>Lv.{operator.current.level}</b></strong><small>{operator.current.skillLevel === null ? text.pending : text.skillRank(operator.current.skillLevel)}</small></div><ArrowRight size={18} aria-hidden="true" /></>}
+                  <div data-target="true"><span>{text.target}</span><strong>{text.elites[project.elite]} <b>Lv.{project.level}</b></strong><small>{text.skillName(project.skill)} · {text.skillRank(project.skillLevel)}</small></div>
+                </div>
+                {!project.paused && <>
+                  <div className="v2-project-ready" data-ready={Boolean(row?.estimatedDate)}><ResourceCalendarIcon size={20} aria-hidden="true" /><div><span>{text.goalReadyDate}</span><strong>{!materials?.candidate ? m.busy ? text.calculating : text.pendingRefresh : row?.estimatedDate ?? text.pending}</strong></div></div>
+                  {project.deadline && <small>{project.deadline} · {deadlineDays === null ? text.deadlineUnknown : deadlineDays < 0 ? text.overdue(-deadlineDays) : text.onTime}</small>}
+                  {materials?.candidate && m.data && <details className="v2-project-material-detail" open={first}>
+                    <summary><ResourceStockIcon size={16} aria-hidden="true" />{text.requiredMaterials}<span>{text.materialKinds(Object.keys(materials.candidate.items).length)}</span></summary>
+                    <MaterialNeeds items={materials.candidate.items} data={m.data} />
+                    {materials.allocation && Object.keys(materials.allocation.missing).length > 0 && <MaterialNeeds items={materials.allocation.missing} data={m.data} shortage />}
+                  </details>}
+                  {materials?.candidate?.warnings.map((warning) => <Notice key={warning}>{warning}</Notice>)}
+                  {!first && route && <small>{m.plans?.pauseGains[project.operatorId] == null ? text.pauseUnknown : text.pausePreview(m.plans.pauseGains[project.operatorId]!)}</small>}
+                </>}
                 <div className="v2-actions"><button className="v2-text-button" disabled={m.busy} onClick={() => setEditing(project)}>{text.edit}</button>
                   <button className="v2-text-button" onClick={() => change(project.operatorId, (row) => ({ ...row, paused: !row.paused }))}>{project.paused ? <Play size={14} /> : <Pause size={14} />}{project.paused ? text.resume : text.pause}</button>
                   {!first && !project.paused && <button className="v2-text-button" onClick={() => m.setProjects((rows) => [project, ...rows.filter((row) => row.operatorId !== project.operatorId)])}>{text.makeMain}</button>}
                 </div>
               </div>
-              <button className="v2-icon-button" aria-label={`${text.remove} ${name}`} onClick={() => { m.setProjects((rows) => rows.filter((row) => row.operatorId !== project.operatorId)); if (editing?.operatorId === project.operatorId) setEditing(null) }}><X size={18} /></button>
             </li>
           })}</ol>
-          {!m.projects.length && <p className="v2-muted">{text.emptyHint}</p>}
+          {!m.projects.length && <div className="v2-project-empty"><CultivationIcon size={32} aria-hidden="true" /><h3>{text.empty}</h3><p className="v2-muted">{text.emptyHint}</p></div>}
           {m.data && <GoalForm key={editing ? JSON.stringify(editing) : 'new'} operators={m.data.projectOperators ?? []} projects={m.projects} editing={editing} busy={m.busy} onCancel={() => setEditing(null)} onSave={(goal) => {
             const next = editing ? m.projects.map((row) => row.operatorId === editing.operatorId ? goal : row) : [...m.projects, goal]
-            m.setProjects(next); setEditing(null); void m.load(next, false)
+            m.setProjects(next); setEditing(null)
           }} />}
           <p className="v2-data-date">{text.stored}</p>
         </section>
@@ -101,7 +115,8 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
           </div>
         </aside>
       </div>
-      {m.pendingRefresh && <Notice>{text.pendingRefresh}</Notice>}
+      {m.pendingRefresh && <Notice>{m.busy ? text.calculating : text.pendingRefresh}</Notice>}
+      {m.materials.some((row) => row.candidate) && !m.plans && <Notice>{text.materialPlanPending}</Notice>}
       {m.data && route && route.rows.length > 0 && <ProjectResults key={`${m.normalId}:${m.temporaryId}`} route={route} data={m.data} useTemporary={Boolean(m.plans?.useTemporary)} />}
       {m.data && <p className="v2-data-date">{text.dataTime} {new Date(m.data.importedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</p>}
     </>}
@@ -133,7 +148,7 @@ function GoalForm({ operators, projects, editing, busy, onSave, onCancel }: { op
   }
   const select = (label: string, value: number, onChange: (value: number) => void, children: ReactNode) => <label className="v2-field"><span>{label}</span><select className="v2-input" value={value} onChange={(event) => onChange(Number(event.target.value))}>{children}</select></label>
   return <form className="v2-project-form" onSubmit={submit}>
-    <h3>{editing ? text.edit : text.add}</h3>
+    <h3><CultivationIcon size={20} aria-hidden="true" />{editing ? text.edit : text.add}</h3>
     <div className="v2-project-form-picker">
       {!editing && <Field label={text.search} value={search} onChange={(event) => setSearch(event.target.value)} />}
       <label className="v2-field"><span>{text.operator}</span><select className="v2-input" value={goal.operatorId} disabled={Boolean(editing)} onChange={(event) => choose(event.target.value)}><option value="">{text.choose}</option>{choices.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
@@ -155,14 +170,27 @@ function ProjectResults({ route, data, useTemporary }: { route: ProjectRoute; da
   const [visible, setVisible] = useState(7)
   const material = (id: string) => data.itemNames[id] ?? id
   return <section className="v2-project-results">
-    <header className="v2-project-result-summary" data-ready={Boolean(route.readyDate)}><div><SectionTitle title={text.route} /><p className="v2-muted">{text.dateHint}</p></div><Facts items={[[text.readyDate, route.readyDate ?? text.pending]]} /></header>
+    <header className="v2-project-result-summary" data-ready={Boolean(route.readyDate)}><div><SectionTitle title={text.route} /><p className="v2-muted">{text.dateHint}</p></div><ResourceCalendarIcon size={28} aria-hidden="true" /></header>
+    <Facts items={[[text.readyDate, route.readyDate ?? text.pending], [text.totalSanity, number(route.phases.reduce((sum, day) => sum + day.spent, 0))], [text.farmingDays, String(route.phases.length)]]} />
     {(route.blocked.length > 0 || route.remaining.length > 0 || route.goldLimited) && <div className="v2-project-blockers"><h3>{text.bottlenecks}</h3>
       {route.blocked.length > 0 && <Notice>{text.noSource}{[...new Set(route.blocked.map((row) => material(row.item)))].join('、')}</Notice>}
       {route.goldLimited && <Notice>{text.goldLimited}</Notice>}
       {route.remaining.length > 0 && <Notice>{text.horizon}</Notice>}
     </div>}
-    <section className="v2-project-result-section"><h3>{text.resources}</h3>
-    {Object.keys(route.missing).length ? <div className="v2-project-resource-scroll"><table><thead><tr>{[text.resource, text.shortage, text.fromBase, text.fromFarm, text.remaining].map((title) => <th key={title} scope="col">{title}</th>)}</tr></thead><tbody>{Object.entries(route.missing).map(([id, count]) => <tr key={id}><th scope="row">{material(id)}</th><td>{number(count)}</td><td>{number(route.supplied[id] ?? 0)}</td><td>{number(route.farmed[id] ?? 0)}</td><td>{number(route.remaining.filter((row) => row.item === id).reduce((sum, row) => sum + row.remaining, 0))}</td></tr>)}</tbody></table></div> : <p className="v2-muted">{text.noShortage}</p>}</section>
-    {route.phases.length > 0 && <section className="v2-project-result-section"><h3>{text.calendar}</h3><ol className="v2-project-calendar">{route.phases.slice(0, visible).map((day) => <li key={day.date}><div><time dateTime={day.date}>{day.date}</time><small>{text.daySanity(day.spent)}</small>{useTemporary && <small>{day.temporary ? text.temporaryDay : text.normalDay}</small>}</div><div><p>{text.baseDay(number(day.income['4001']), number(day.income.exp))}</p>{day.farms.length ? day.farms.map((farm) => <p key={`${farm.item}:${farm.stage}`}><strong>{farm.stage}</strong> · {material(farm.item)}<small>{text.farmRuns(farm.runs, number(farm.quantity))}</small></p>) : <p className="v2-muted">{text.noFarms}</p>}</div></li>)}</ol>{visible < route.phases.length && <button className="v2-button v2-button-secondary" onClick={() => setVisible((value) => value + 14)}>{text.moreDays}</button>}</section>}
+    <section className="v2-project-result-section"><h3>{text.resources}</h3><p className="v2-muted">{text.resourceHint}</p>
+    {Object.keys(route.missing).length ? <MaterialBrowser data={data}>{(select) => <ul className="v2-project-resource-grid">{Object.entries(route.missing).map(([id, count]) => {
+      const income = id === '4001' || id === 'exp'
+      const sources = [[text.fromBase, route.supplied[id] ?? 0, 'base'], [text.fromFarm, route.farmed[id] ?? 0, 'farm'], [text.remaining, route.remaining.filter((row) => row.item === id).reduce((sum, row) => sum + row.remaining, 0), 'remaining']] as const
+      const farms = new Map<string, number>()
+      for (const day of route.phases) for (const farm of day.farms) if (farm.item === id) farms.set(farm.stage, (farms.get(farm.stage) ?? 0) + farm.runs)
+      return <li key={id} data-income={income}><MaterialButton id={id} count={count} data={data} onSelect={select} className="v2-project-resource-button">{text.shortage} · {number(count)}</MaterialButton>
+        {income ? <><div className="v2-project-resource-track" role="img" aria-label={sources.map(([label, amount]) => `${label} ${number(amount)}`).join('，')}>{sources.map(([_label, amount, source]) => <span key={source} data-source={source} style={{ width: `${Math.min(100, amount / count * 100)}%` }} />)}</div>
+        <dl>{sources.map(([label, amount, source]) => <div key={source} data-source={source}><dt>{label}</dt><dd>{number(amount)}</dd></div>)}</dl></> : <p className="v2-project-resource-source">{farms.size ? [...farms].map(([stage, runs]) => <span key={stage}>{stage}<b>{text.stageRuns(runs)}</b></span>) : data.farms[id]?.length ? text.noFarmingPlan : text.noFarm}</p>}
+      </li>
+    })}</ul>}</MaterialBrowser> : <p className="v2-muted">{text.noShortage}</p>}</section>
+    {route.phases.length > 0 && <section className="v2-project-result-section"><h3>{text.calendar}</h3><ol className="v2-project-calendar">{route.phases.slice(0, visible).map((day, index) => <li key={day.date}>
+      <div className="v2-project-day"><b>{String(index + 1).padStart(2, '0')}</b><div><time dateTime={day.date}>{day.date}</time><small>{text.daySanity(day.spent)}</small>{useTemporary && <small>{day.temporary ? text.temporaryDay : text.normalDay}</small>}</div></div>
+      <div className="v2-project-day-plan"><p className="v2-project-day-income"><DailyOutputIcon size={16} aria-hidden="true" />{text.baseDay(number(day.income['4001']), number(day.income.exp))}</p>{day.farms.length ? <MaterialBrowser data={data}>{(select) => <ul className="v2-project-day-farms">{day.farms.map((farm) => <li key={`${farm.item}:${farm.stage}`}><MaterialButton id={farm.item} count={farm.quantity} data={data} onSelect={select}><b>{farm.stage}</b><small>{text.farmRuns(farm.runs, number(farm.quantity))}</small></MaterialButton></li>)}</ul>}</MaterialBrowser> : <p className="v2-muted">{text.noFarms}</p>}</div>
+    </li>)}</ol>{visible < route.phases.length && <button className="v2-button v2-button-secondary" onClick={() => setVisible((value) => value + 14)}>{text.moreDays}</button>}</section>}
   </section>
 }

@@ -3,7 +3,7 @@ import { copy } from '../../copy'
 import { apiJson } from '../../lib/api-client'
 import { useSklandSnapshot } from '../../hooks/useSklandSnapshot'
 import type { CultivationData } from '../../lib/cultivation-contract'
-import { buildProjectRoute, projectDaysEarlier, readProjectIncome, validProjectDate, type CultivationProject } from '../../lib/cultivation-projects'
+import { allocateProjectMaterials, buildProjectRoute, projectDaysEarlier, readProjectIncome, validProjectDate, type CultivationProject } from '../../lib/cultivation-projects'
 import { readCultivationProjects, saveCultivationProjects, subscribeCultivationProjects } from '../../lib/cultivation-project-import'
 import type { UserGameAccount, WorkspaceResultHistoryItem } from '../../lib/types'
 import { fetchResultHistoryDetail } from '../tool/optimize/optimization-api'
@@ -87,9 +87,10 @@ export function useCultivationProjects(session: V2Session, profile: UserGameAcco
     // Settings and income objects are small values; use their contents to avoid repeating simulations on unrelated renders.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, projects, validSettings, productionInvalid, dailySanity, startDate, allOpen, production, snapshot.expired])
-  const pendingRefresh = Boolean(plans?.route.rows.some((row) => !row.candidate))
+  const materials = useMemo(() => data && !snapshot.expired ? allocateProjectMaterials(data, projects) : [], [data, projects, snapshot.expired])
+  const pendingRefresh = materials.some((row) => !row.candidate)
 
-  async function load(nextProjects = projects, refresh = true) {
+  async function load(nextProjects = projectRef.current, refresh = true) {
     if (busy) return
     request.current?.abort()
     const controller = new AbortController()
@@ -107,16 +108,16 @@ export function useCultivationProjects(session: V2Session, profile: UserGameAcco
     } finally { if (!controller.signal.aborted) setBusy(false) }
   }
   useEffect(() => {
-    const version = snapshot.data?.version
+    const version = snapshot.data?.version ?? data?.snapshotVersion ?? data?.importedAt
     const matching = projects.every((project) => data?.candidates.some((row) => row.operatorId === project.operatorId
       && row.target.elite === project.elite && row.target.level === project.level && row.target.skill === project.skill && row.target.skillLevel === project.skillLevel))
     const key = `${version}:${JSON.stringify(projects.map(({ operatorId, elite, level, skill, skillLevel }) => ({ operatorId, elite, level, skill, skillLevel })))}`
-    if (!version || busy || data?.snapshotVersion === version && matching || calculatedVersion.current === key) return
+    if (snapshot.available === false || snapshot.expired || !version || busy || matching && (data?.snapshotVersion ?? data?.importedAt) === version || calculatedVersion.current === key) return
     calculatedVersion.current = key
     void load(projectRef.current, false)
-  }, [snapshot.data?.version, busy, projects]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [snapshot.data?.version, snapshot.available, snapshot.expired, busy, projects, data]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return { projects, setProjects, data, busy: busy || snapshot.busy, error: error || snapshot.error || null, load, storageError, dailySanity, setDailySanity, startDate, setStartDate, allOpen, setAllOpen,
     history, normalId, setNormalId, temporaryId, setTemporaryId, production: currentProduction, productionInvalid, normalIncome, temporaryIncome,
-    retryProduction: () => setProductionRetry((value) => value + 1), validSettings, plans, pendingRefresh }
+    retryProduction: () => setProductionRetry((value) => value + 1), validSettings, materials, plans, pendingRefresh }
 }

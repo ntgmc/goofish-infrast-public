@@ -6,7 +6,7 @@ import { copy } from '../copy/index'
 import { apiJson } from '../lib/api-client'
 import { useSklandSnapshot } from '../hooks/useSklandSnapshot'
 import { defaultCultivationQuery, type CultivationData, type CultivationOptions, type CultivationQuery } from '../lib/cultivation-contract'
-import { buildCultivationPlan } from '../lib/cultivation-planner'
+import { recommendCultivationTargets } from '../lib/cultivation-planner'
 import { useToolSession } from './tool/useToolSession'
 import { v2Path } from './v2/navigation'
 import CultivationResults, { number } from './cultivation/CultivationResults'
@@ -14,7 +14,6 @@ import CultivationSpecialItems from './cultivation/CultivationSpecialItems'
 import CultivationFilters from './cultivation/CultivationFilters'
 
 const label = copy.tools.cultivation
-const today = () => new Date(Date.now() + 4 * 3600000).toISOString().slice(0, 10)
 
 type PageProps = { embedded?: boolean; session?: ReturnType<typeof useToolSession> }
 
@@ -41,13 +40,12 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
     const value = searchParams.get(`cultivation_${key}`)
     return [key, value === null ? fallback : typeof fallback === 'boolean' ? value === 'true' : typeof fallback === 'number' ? Number(value) : value]
   })) as CultivationQuery
-  const [options, setOptions] = useState<CultivationOptions>({ recommendation: queryFromUrl(), preference: 'coverage', dailySanity: 240, startDate: today(), days: 30, limit: 5, excluded: [], potions: {}, allOpen: false })
+  const [options, setOptions] = useState<CultivationOptions>({ recommendation: queryFromUrl(), preference: 'coverage', limit: 5, excluded: [] })
   const [appliedOptions, setAppliedOptions] = useState(options)
-  const [numbers, setNumbers] = useState({ dailySanity: '240', days: '30', limit: '5' })
-  const [potionNumbers, setPotionNumbers] = useState<Record<string, string>>({})
+  const [limit, setLimit] = useState('5')
   const request = useRef<AbortController | null>(null)
   const generation = useRef(0)
-  const plan = useMemo(() => data && !snapshot.expired ? buildCultivationPlan(data, appliedOptions) : null, [data, appliedOptions, snapshot.expired])
+  const recommendations = useMemo(() => data && !snapshot.expired ? recommendCultivationTargets(data, appliedOptions) : null, [data, appliedOptions, snapshot.expired])
 
   useEffect(() => {
     generation.current++
@@ -56,9 +54,8 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
     setData(null)
     setError(null)
     setBusy(false)
-    setOptions((value) => ({ ...value, potions: {}, excluded: [] }))
-    setAppliedOptions((value) => ({ ...value, potions: {}, excluded: [] }))
-    setPotionNumbers({})
+    setOptions((value) => ({ ...value, excluded: [] }))
+    setAppliedOptions((value) => ({ ...value, excluded: [] }))
     return () => { generation.current++; request.current?.abort() }
   }, [profileId])
 
@@ -92,10 +89,8 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
       const result = await apiJson<CultivationData>('/api/cultivation-plan', { method: 'POST', json: { profile_id: profileId, recommendation }, signal: controller.signal, timeoutMs: 90000, fallbackMessage: label.failed })
       if (generation.current === run) {
         setData(result)
-        const update = (value: CultivationOptions) => ({ ...value, recommendation, potions: preserveSettings ? Object.fromEntries(result.potions.map((potion) => [potion.key, Math.min(potion.count, value.potions[potion.key] ?? 0)])) : {} })
-        setOptions((value) => ({ ...update(value), recommendation: preserveSettings ? value.recommendation : recommendation }))
-        setAppliedOptions(update)
-        setPotionNumbers((value) => preserveSettings ? Object.fromEntries(result.potions.map((potion) => [potion.key, String(Math.min(potion.count, Number(value[potion.key] ?? 0)))])) : {})
+        setOptions((value) => ({ ...value, recommendation: preserveSettings ? value.recommendation : recommendation }))
+        setAppliedOptions((value) => ({ ...value, recommendation }))
       }
     } catch (caught) {
       if (generation.current === run && !controller.signal.aborted) setError(caught instanceof Error ? caught.message : label.failed)
@@ -115,21 +110,18 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
     setAppliedOptions(update)
   }, [])
 
-  const changed = JSON.stringify(options) !== JSON.stringify(appliedOptions) || Object.entries(numbers).some(([key, value]) => value !== String(appliedOptions[key as keyof typeof numbers])) || Object.entries(potionNumbers).some(([key, value]) => Number(value) !== (appliedOptions.potions[key] ?? 0))
+  const changed = JSON.stringify(options) !== JSON.stringify(appliedOptions) || limit !== String(appliedOptions.limit)
 
   function apply() {
-    const numeric = { dailySanity: Number(numbers.dailySanity), days: Number(numbers.days), limit: Number(numbers.limit) }
-    const bounds = { dailySanity: [0, 2000], days: [1, 180], limit: [1, 30] }
-    if (Object.entries(numeric).some(([key, value]) => !numbers[key as keyof typeof numbers].trim() || !Number.isInteger(value) || value < bounds[key as keyof typeof bounds][0] || value > bounds[key as keyof typeof bounds][1]) || !Number.isFinite(Date.parse(options.startDate + 'T04:00:00+08:00')) || Object.entries(potionNumbers).some(([key, value]) => !Number.isInteger(Number(value)) || Number(value) < 0 || Number(value) > (data?.potions.find((potion) => potion.key === key)?.count ?? 0))) {
+    if (!limit.trim() || !Number.isInteger(Number(limit)) || Number(limit) < 1 || Number(limit) > 30) {
       setError(label.invalidSettings)
       return
     }
-    const next = { ...options, ...numeric, potions: Object.fromEntries((data?.potions ?? []).map((potion) => [potion.key, Math.max(0, Math.min(potion.count, Math.floor(Number(potionNumbers[potion.key] ?? 0) || 0)))])) }
+    const next = { ...options, limit: Number(limit) }
     setError(null)
     setOptions(next)
     setAppliedOptions(next)
-    setNumbers({ dailySanity: String(numeric.dailySanity), days: String(numeric.days), limit: String(numeric.limit) })
-    setPotionNumbers(Object.fromEntries(Object.entries(next.potions).map(([key, value]) => [key, String(value)])))
+    setLimit(String(next.limit))
     const params = new URLSearchParams(searchParams)
     for (const [key, value] of Object.entries(next.recommendation ?? defaultCultivationQuery)) {
       if (value === defaultCultivationQuery[key as keyof CultivationQuery]) params.delete(`cultivation_${key}`)
@@ -140,17 +132,14 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
   }
 
   return { profiles, profileId, setChosenProfile, data, busy: busy || snapshot.busy, error: error || snapshot.error || null, options, setOptions, appliedOptions,
-    numbers, setNumbers, potionNumbers, setPotionNumbers, plan, load, exclude, changed, apply }
+    limit, setLimit, recommendations, load, exclude, changed, apply }
 }
 
 function CultivationContent({ session, embedded = false }: { session: ReturnType<typeof useToolSession>; embedded?: boolean }) {
   const ContentRoot = embedded ? 'div' : 'main'
   const { profiles, profileId, setChosenProfile, data, busy, error, options, setOptions, appliedOptions,
-    numbers, setNumbers, potionNumbers, setPotionNumbers, plan, load, exclude, changed, apply } = useCultivation(session)
+    limit, setLimit, recommendations, load, exclude, changed, apply } = useCultivation(session)
   const appliedQuery = appliedOptions.recommendation ?? defaultCultivationQuery
-  const field = (key: 'dailySanity' | 'days' | 'limit', title: string, min: number, max: number) => <label className="block space-y-2 text-sm">
-    <span>{title}</span><input type="number" min={min} max={max} className="tool-field" value={numbers[key]} onChange={(event) => setNumbers((prior) => ({ ...prior, [key]: event.target.value }))} />
-  </label>
 
   return <div className={embedded ? 'v2-embedded-tool' : 'mx-auto max-w-7xl px-4 py-6 sm:px-6'}>
     {!embedded && <header className="mb-8 flex items-center justify-between gap-3">
@@ -168,23 +157,20 @@ function CultivationContent({ session, embedded = false }: { session: ReturnType
             </div>}
         {error && <p role="alert" className="tool-alert tool-alert--warning p-3 text-sm">{error}</p>}
       </section>
-      {data && plan && <>
+      {data && recommendations && <>
         <dl className="workspace-cultivation-metrics grid grid-cols-2 gap-3 sm:grid-cols-4">{Object.entries({ homeworks: data.stats.homeworks, owned: data.stats.owned, satisfied: data.candidates.filter((row) => row.satisfied).length, incomplete: data.stats.incomplete }).map(([key, value]) => <div key={key} className="tool-inset p-4"><dt className="text-xs text-ink-secondary">{label.stats[key as keyof typeof label.stats]}</dt><dd className="mt-2 text-2xl font-semibold tabular-nums">{number(value)}</dd></div>)}</dl>
         {data.warnings.length > 0 && <ul className="tool-alert tool-alert--warning space-y-1 p-4 text-sm">{data.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
         <details className="workspace-cultivation-options tool-panel px-4 py-2 sm:px-5">
-          <summary className="min-h-11 cursor-pointer content-center text-sm font-semibold">{copy.v2.toolParameters}<small className="ml-3 font-normal text-ink-muted">{appliedQuery.rarity ? label.rarityName(appliedQuery.rarity) : label.rarityGroups[appliedQuery.rarityGroup]} · {label.preferences[appliedOptions.preference]}</small></summary>
+          <summary className="min-h-11 cursor-pointer content-center text-sm font-semibold">{label.parameters}<small className="ml-3 font-normal text-ink-muted">{appliedQuery.rarity ? label.rarityName(appliedQuery.rarity) : label.rarityGroups[appliedQuery.rarityGroup]} · {label.preferences[appliedOptions.preference]}</small></summary>
           <div className="space-y-4 pt-4 pb-2"><CultivationFilters query={options.recommendation ?? defaultCultivationQuery} data={data} onChange={(recommendation) => setOptions((value) => ({ ...value, recommendation }))} />
           <fieldset><legend className="mb-3 text-base font-semibold">{label.preference}</legend><div className="flex flex-wrap gap-2">{Object.entries(label.preferences).map(([key, text]) => <label key={key} className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${options.preference === key ? 'border-brand-500 bg-brand-500/10 text-ink-primary' : 'border-surface-3 text-ink-secondary'}`}><input type="radio" name="preference" value={key} checked={options.preference === key} onChange={() => setOptions((value) => ({ ...value, preference: key as CultivationOptions['preference'] }))} />{text}</label>)}</div><p className="mt-3 text-sm leading-6 text-ink-muted">{label.preferenceHints[options.preference]}</p></fieldset>
           {options.preference === 'community' && data.community?.status !== 'fresh' && <p role="status" className="text-sm text-warning">{data.community?.status === 'stale' ? label.communityStale : label.communityUnavailable}</p>}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{field('dailySanity', label.daily, 0, 2000)}<label className="block space-y-2 text-sm"><span>{label.start}</span><input type="date" className="tool-field" value={options.startDate} onChange={(event) => setOptions((value) => ({ ...value, startDate: event.target.value }))} /></label>{field('days', label.days, 1, 180)}{field('limit', label.limit, 1, 30)}</div>
-          <p className="text-xs leading-5 text-ink-muted">{label.dailyHint}</p>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={options.allOpen} onChange={(event) => setOptions((value) => ({ ...value, allOpen: event.target.checked }))} />{label.allOpen}</label><p className="text-xs leading-5 text-ink-muted">{label.allOpenHint}</p>
-          <details className="tool-inset p-4"><summary className="cursor-pointer text-sm font-medium">{label.potions}</summary><p className="my-3 text-xs leading-5 text-ink-muted">{label.potionHint}</p>{!data.potions.length ? <p className="text-sm text-ink-secondary">{label.noPotions}</p> : <div className="grid gap-4 sm:grid-cols-2">{data.potions.map((potion) => <label key={potion.key} className="space-y-2 text-sm"><span className="block font-medium">{potion.name}</span><span className="block text-xs text-ink-muted">{label.potionAmount(potion.count, potion.sanity)} · {potion.expiresAt ? `${label.expiry} ${new Date(potion.expiresAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}` : label.expiryUnknown}</span><input type="number" min={0} max={potion.count} className="tool-field" disabled={potion.sanity === null || Boolean(potion.expiresAt && Date.parse(potion.expiresAt) <= Date.now())} value={potionNumbers[potion.key] ?? '0'} onChange={(event) => setPotionNumbers((prior) => ({ ...prior, [potion.key]: event.target.value }))} />{potion.sanity === null && <span className="block text-xs text-warning">{label.potionUnknown}</span>}</label>)}</div>}</details>
+          <label className="block space-y-2 text-sm"><span>{label.limit}</span><input type="number" min={1} max={30} className="tool-field" value={limit} onChange={(event) => setLimit(event.target.value)} /></label>
           <div className="flex flex-wrap items-center gap-3"><button type="button" className="tool-primary-action" disabled={busy} onClick={apply}>{label.apply}</button>{changed && <p role="status" className="text-sm text-ink-secondary">{label.settingsChanged}</p>}</div>
           </div>
         </details>
-        <CultivationResults data={data} plan={plan} excluded={appliedOptions.excluded} exclude={exclude} projectScope={session.user ? { userId: session.user.id, profileId } : undefined} />
-        <CultivationSpecialItems key={profileId} data={data} plan={plan} preference={appliedOptions.preference} />
+        <CultivationResults data={data} recommendations={recommendations} excluded={appliedOptions.excluded} exclude={exclude} projectScope={session.user ? { userId: session.user.id, profileId } : undefined} />
+        <CultivationSpecialItems key={profileId} data={data} preference={appliedOptions.preference} />
         <p className="text-xs leading-5 text-ink-muted">{label.dataDate} · {new Date(data.updatedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}<br />{label.importDate} · {new Date(data.importedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</p>
       </>}
     </ContentRoot>

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useSklandSnapshot } from '../hooks/useSklandSnapshot'
-import { analyzeTrainingBalance } from '../lib/training-ratio'
+import { analyzeTrainingBalance, estimateTrainingRecovery, type TrainingResources } from '../lib/training-ratio'
+import { readProjectIncome } from '../lib/cultivation-projects'
+import { fetchResultHistoryDetail } from './tool/optimize/optimization-api'
 import { useSiteFeatures } from '../lib/site-feature-context'
 import type { useToolSession } from './tool/useToolSession'
 
@@ -32,6 +34,23 @@ export function useTrainingRatio(session: ReturnType<typeof useToolSession>) {
   }, [draft, draftKey])
   const [source, setSource] = useState<'manual' | 'imported'>('imported')
   const [manualInventory, setManualInventory] = useState<{ lmd: number; exp: number } | null>(null)
+  const profileId = profile?.id
+  const latest = session.user && profileId && session.workspace?.profile_id === profileId ? session.workspace.latest_result : null
+  const resultId = latest?.source !== 'manual' ? latest?.id : undefined
+  const [production, setProduction] = useState<{ id: string; income: TrainingResources | null; failed: boolean } | null>(null)
+  useEffect(() => {
+    if (!profileId || !resultId) return
+    const controller = new AbortController()
+    void fetchResultHistoryDetail(profileId, resultId, controller.signal).then((item) => {
+      if (!controller.signal.aborted) setProduction({ id: resultId, income: readProjectIncome(item.result.daily_production), failed: false })
+    }).catch(() => {
+      if (!controller.signal.aborted) setProduction({ id: resultId, income: null, failed: true })
+    })
+    return () => controller.abort()
+  }, [profileId, resultId])
+  const currentProduction = production?.id === resultId ? production : null
+  const income = currentProduction?.income ?? null
+  const incomeLoading = Boolean(resultId && !currentProduction)
   const snapshot = useSklandSnapshot(session.user?.id, profile, canImport)
   const stock = snapshot.data?.inventory
   const data = stock?.lmd !== null && stock?.exp !== null && stock?.fetchedAt
@@ -45,5 +64,7 @@ export function useTrainingRatio(session: ReturnType<typeof useToolSession>) {
   }
   const inventory = source === 'imported' ? data?.inventory ?? null : manualInventory
   const balance = inventory ? analyzeTrainingBalance(inventory) : null
-  return { draft, setDraft, draftFailed, source, setSource, data, busy, error, load, manualValid, applyManual, inventory, balance, canImport }
+  const recovery = inventory && !incomeLoading ? estimateTrainingRecovery(inventory, income) : null
+  return { draft, setDraft, draftFailed, source, setSource, data, busy, error, load, manualValid, applyManual, inventory, balance, canImport,
+    recovery, income, incomeLoading, incomeFailed: currentProduction?.failed, incomeName: latest?.name }
 }

@@ -281,7 +281,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
               {label}{view === id && <MotionNavIndicator layoutId="result-tab" variant="underline" />}
             </button>)}
             <span>{sample ? <SampleIcon size={14} aria-hidden="true" /> : <ShieldCheck size={14} aria-hidden="true" />}{sample ? text.sampleSource : text.ownSource}</span>
-            <ResultActions plans={result.plans} shift={shift} onShiftChange={setShift} onExport={() => setExportOpen(true)} busy={busy} loadingResult={loadingResult} />
+            <ResultActions plans={result.plans} shift={shift} showShift={view === 'schedule'} onShiftChange={setShift} onExport={() => setExportOpen(true)} busy={busy} loadingResult={loadingResult} />
           </div>
           <div className="v2-feature-content" hidden={view !== 'manual'}>
             {canManual && manualOpened && session.activeProfile && <Suspense fallback={<p role="status">{text.loading}</p>}><ManualScheduleEditor key={manualKey} source={result} profileId={session.activeProfile.id} operators={operators} simulationBaseline={simulationBaseline} onDirtyChange={setManualDirty} /></Suspense>}
@@ -372,9 +372,10 @@ function OutputRow({ product, value, available = true }: { product: string; valu
     <strong><AnimatedValue value={available ? formatAmount(experience ? value * 1000 : value) : '—'} /><small>{experience ? text.expUnit : text.daily}</small></strong></div>
 }
 
-function ResultActions({ plans, shift, onShiftChange, onExport, busy, loadingResult }: {
+function ResultActions({ plans, shift, showShift, onShiftChange, onExport, busy, loadingResult }: {
   plans: OptimizeResult['plans']
   shift: number
+  showShift: boolean
   onShiftChange: (shift: number) => void
   onExport: () => void
   busy: boolean
@@ -383,12 +384,12 @@ function ResultActions({ plans, shift, onShiftChange, onExport, busy, loadingRes
   const selected = Math.min(shift, Math.max(plans.length - 1, 0))
   return (
     <div className="v2-result-actions" role="group" aria-label={text.result}>
-      <label className="v2-current-shift">
+      {showShift && <label className="v2-current-shift">
         <span>{text.currentShift}</span>
         <select aria-label={text.shiftTabs} value={selected} onChange={(event) => onShiftChange(Number(event.currentTarget.value))}>
           {plans.map((plan, index) => <option key={index} value={index}>{plan.name || text.shift(index + 1)}</option>)}
         </select>
-      </label>
+      </label>}
       <button className="v2-button v2-button-secondary" type="button" disabled={busy || loadingResult} onClick={onExport}><Download size={16} />{text.export}</button>
     </div>
   )

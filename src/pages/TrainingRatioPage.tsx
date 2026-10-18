@@ -83,7 +83,15 @@ function TrainingRatioContent({ session, embedded }: { session: Session; embedde
             <div className="training-ratio-verdict"><span className="training-ratio-verdict-icon" aria-hidden="true">{m.balance.focus === 'lmd' || m.balance.focus === 'exp' ? <ProductIcon product={m.balance.focus === 'lmd' ? 'LMD' : 'Battle Record'} size={44} /> : m.balance.focus === 'balanced' ? <Check size={28} /> : <Scale size={28} />}</span><div><strong>{text.focus[m.balance.focus]}</strong><p>{text.explanation[m.balance.focus]}</p></div></div>
             <ResourceStock inventory={m.inventory} />
             <h3>{text.inventoryRatio}</h3><p className="training-ratio-value">{inventoryRatio}</p>
-            {m.balance.supplement > 0 && <div className="training-ratio-supplement"><h3><ProductIcon product={m.balance.focus === 'lmd' ? 'LMD' : 'Battle Record'} size={28} />{text.supplement}</h3><p>{m.balance.focus === 'lmd' ? text.supplementLmd(number(m.balance.supplement)) : text.supplementExp(number(m.balance.supplement))}</p>{m.balance.focus === 'exp' && <p>{text.bookEquivalent(number(Math.ceil(m.balance.supplement / 2000)))}</p>}<p>{text.supplementHint}</p></div>}
+            {m.balance.supplement > 0 && <div className="training-ratio-supplement">
+              <h3><ProductIcon product={m.balance.focus === 'lmd' ? 'LMD' : 'Battle Record'} size={28} />{text.supplement}</h3>
+              {m.incomeLoading ? <p role="status">{text.recoveryLoading}</p> : m.recovery && <>
+                {m.recovery.days !== null ? <><p className="training-ratio-value">{text.recoveryDays(number(m.recovery.days))}</p><p>{text.recoveryPlan(m.recovery.stage, Boolean(m.income))}</p></> : <p>{text.recoveryBlocked}</p>}
+                {m.income ? <><p>{text.baseIncome(number(m.income.lmd), number(m.income.exp))}</p><p>{text.baseSource(profile?.display_name ?? '', m.incomeName ?? '')}</p></> : <p>{m.incomeFailed ? text.baseIncomeFailed : text.noBaseIncome}</p>}
+                <p>{text.farmingBudget}{m.recovery.stage === 'CE-6' && ` ${text.ceCalendar}`}</p>
+                <p>{text.supplementHint}</p>
+              </>}
+            </div>}
           </> : <p role="status">{m.source === 'manual' ? text.noManualInventory : m.busy ? text.importing : text.noInventory}</p>}
         </section>
       </div>

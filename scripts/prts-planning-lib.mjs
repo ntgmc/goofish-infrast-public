@@ -124,7 +124,8 @@ export async function loadPlanningAssets(gameSha, signal, includeCosts = false) 
     }
   }
   for (const [id, options] of Object.entries(farms)) farms[id] = options.sort((a, b) => a.sanity / a.quantity - b.sanity / b.quantity).slice(0, 12)
-  const assets = { operators, stages: stageCatalog, recipes, farms, itemNames, potionValues }
+  const itemIcons = Object.fromEntries(Object.entries(items.items).filter(([, item]) => typeof item.iconId === 'string' && item.iconId).map(([id, item]) => [id, item.iconId]))
+  const assets = { operators, stages: stageCatalog, recipes, farms, itemNames, itemIcons, potionValues }
   if (!includeCosts) return assets
   const materialCounts = (rows) => Array.isArray(rows) ? Object.fromEntries(rows.map((row) => [row.id, row.count])) : null
   return { ...assets, costs: {

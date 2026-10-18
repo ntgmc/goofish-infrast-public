@@ -2,7 +2,6 @@ import type { CultivationCandidate, CultivationData, CultivationOptions } from '
 import { cultivatedCurrent, cultivationSatisfied } from './cultivation-target'
 
 type Allocation = { missing: Record<string, number>; stock: Record<string, number>; sanity: number | null; knownSanity: number; exchanges: Array<{ item: string; count: number; currency: string; cost: number }> }
-type FarmTask = { item: string; quantity: number; remaining: number; operator: string }
 
 export function allocateCultivationMaterials(items: Record<string, number>, inventory: Record<string, number>, data: Pick<CultivationData, 'recipes' | 'prices'>): Allocation {
   const stock = { ...inventory }
@@ -37,19 +36,10 @@ export function allocateCultivationMaterials(items: Record<string, number>, inve
   return { stock, missing, exchanges, knownSanity, sanity: Object.keys(missing).some((id) => data.prices[id] === undefined) ? null : knownSanity }
 }
 
-export function buildCultivationPlan(data: CultivationData, options: CultivationOptions) {
-  let stock = { ...data.inventory }
+export function recommendCultivationTargets(data: CultivationData, options: CultivationOptions) {
   const excluded = new Set(options.excluded)
   let candidates = data.candidates.filter((row) => !row.satisfied && row.warnings.length === 0 && !excluded.has(row.operatorId) && (options.preference === 'community' ? row.source === 'community' : row.source !== 'community'))
-  const selected: Array<{ candidate: CultivationCandidate; allocation: Allocation; estimatedDate: string | null }> = []
-  const score = (candidate: CultivationCandidate, allocation: Allocation) => {
-    const cost = allocation.sanity ?? Infinity
-    const demand = candidate.weightedFrequency ?? candidate.frequency
-    if (options.preference === 'community') return [-(candidate.communityRate ?? 0), cost]
-    if (options.preference === 'cost') return [cost, -demand]
-    if (options.preference === 'materials') return [Object.keys(allocation.missing).length === 0 ? 0 : 1, cost, -demand]
-    return [-demand, cost]
-  }
+  const selected: CultivationCandidate[] = []
   const fulfilledGroups = new Set<string>()
   const remainingDemand = (candidate: CultivationCandidate) => {
     if (!candidate.demandKeys) return candidate
@@ -57,89 +47,18 @@ export function buildCultivationPlan(data: CultivationData, options: Cultivation
     return { ...candidate, frequency: keys.length, weightedFrequency: keys.reduce((sum, key) => sum + (candidate.demandWeights?.[key] ?? 1), 0) }
   }
   while (candidates.length && selected.length < Math.max(1, Math.min(30, options.limit))) {
-    const ranked = candidates.map(remainingDemand).filter((candidate) => candidate.source === 'community' || candidate.frequency > 0).map((candidate) => ({ candidate, allocation: allocateCultivationMaterials(candidate.items, stock, data) }))
+    const ranked = candidates.map(remainingDemand).filter((candidate) => candidate.source === 'community' || candidate.frequency > 0)
     if (!ranked.length) break
-    const next = ranked.reduce((best, row) => {
-      const left = score(row.candidate, row.allocation), right = score(best.candidate, best.allocation)
-      for (let index = 0; index < left.length; index++) {
-        if (left[index] !== right[index]) return left[index] < right[index] ? row : best
-      }
-      return row.candidate.key.localeCompare(best.candidate.key) < 0 ? row : best
-    })
-    selected.push({ ...next, estimatedDate: null })
-    stock = next.allocation.stock
-    const trained = cultivatedCurrent(next.candidate.current, next.candidate.target, next.candidate.skillId)
+    const next = ranked.sort((a, b) => {
+      const adoption = options.preference === 'community' ? (b.communityRate ?? 0) - (a.communityRate ?? 0) : 0
+      return adoption || (b.weightedFrequency ?? b.frequency) - (a.weightedFrequency ?? a.frequency) || a.key.localeCompare(b.key)
+    })[0]
+    selected.push(next)
+    const trained = cultivatedCurrent(next.current, next.target, next.skillId)
     for (const group of data.groups ?? []) {
-      if (group.options.some((option) => option.operatorId === next.candidate.operatorId && cultivationSatisfied(trained, option.target, option.skillId))) fulfilledGroups.add(group.key)
+      if (group.options.some((option) => option.operatorId === next.operatorId && cultivationSatisfied(trained, option.target, option.skillId))) fulfilledGroups.add(group.key)
     }
-    candidates = candidates.filter((row) => row.operatorId !== next.candidate.operatorId)
+    candidates = candidates.filter((row) => row.operatorId !== next.operatorId)
   }
-  const tasks: FarmTask[] = selected.flatMap(({ candidate, allocation }) => Object.entries(allocation.missing).map(([item, quantity]) => ({ item, quantity, remaining: quantity, operator: candidate.key })))
-  const blocked = tasks.filter((task) => !data.farms[task.item]?.length)
-  const farmItems = [...new Set(tasks.map((task) => task.item))]
-  const farmsByDay = Array.from({ length: 7 }, (_, index) => Object.fromEntries(farmItems.map((item) => [item,
-    (data.farms[item] ?? []).filter((farm) => options.allOpen || farm.days.includes(index + 1)).sort((a, b) => a.sanity / a.quantity - b.sanity / b.quantity)[0],
-  ])))
-  const potionStock = data.potions.map((potion) => ({ ...potion, remaining: Math.max(0, Math.min(potion.count, Math.floor(options.potions[potion.key] ?? 0))) }))
-    .filter((potion) => potion.sanity !== null)
-    .sort((a, b) => (a.expiresAt ?? '9999').localeCompare(b.expiresAt ?? '9999'))
-  const days: Array<{ date: string; budget: number; spent: number; potions: Array<{ name: string; count: number }>; farms: Array<{ item: string; stage: string; runs: number; sanity: number; expectedQuantity: number }> }> = []
-  const totalMaterials: Record<string, number> = {}
-  const missingMaterials: Record<string, number> = {}
-  for (const row of selected) {
-    for (const [id, count] of Object.entries(row.candidate.items)) totalMaterials[id] = (totalMaterials[id] ?? 0) + count
-    for (const [id, count] of Object.entries(row.allocation.missing)) missingMaterials[id] = (missingMaterials[id] ?? 0) + count
-  }
-  const summary = { totalMaterials, missingMaterials, totalTrainingSanity: Object.keys(totalMaterials).some((id) => data.prices[id] === undefined) ? null : Object.entries(totalMaterials).reduce((sum, [id, count]) => sum + data.prices[id] * count, 0) }
-  const start = Date.parse(`${options.startDate}T04:00:00+08:00`)
-  if (!Number.isFinite(start) || !Number.isFinite(options.dailySanity) || options.dailySanity < 0) return { ...summary, selected, days, blocked, remaining: tasks, totalSanity: null }
-  for (let index = 0; index < Math.max(1, Math.min(180, options.days)); index++) {
-    const timestamp = start + index * 86400000
-    const date = new Date(timestamp + 8 * 3600000).toISOString().slice(0, 10)
-    const weekday = new Date(timestamp + 8 * 3600000).getUTCDay() || 7
-    let budget = Math.min(2000, options.dailySanity)
-    let spent = 0
-    const usedPotions: Array<{ name: string; count: number }> = []
-    const farms: (typeof days)[number]['farms'] = []
-    for (const task of tasks) {
-      const farm = farmsByDay[weekday - 1][task.item]
-      if (task.remaining <= 1e-8 || !farm) continue
-      const neededRuns = Math.ceil((task.remaining - 1e-8) / farm.quantity)
-      for (const potion of potionStock) {
-        if (!potion.sanity || !potion.remaining || (potion.expiresAt && Date.parse(potion.expiresAt) <= timestamp)) continue
-        const endOfDay = timestamp + 86400000
-        // Do not assume a timed potion remains usable throughout its expiry day.
-        if (potion.expiresAt && Date.parse(potion.expiresAt) < endOfDay) continue
-        const count = Math.min(potion.remaining, Math.max(0, Math.ceil((neededRuns * farm.sanity - (budget - spent)) / potion.sanity)))
-        if (count > 0) {
-          potion.remaining -= count
-          budget += count * potion.sanity
-          const prior = usedPotions.find((row) => row.name === potion.name)
-          if (prior) prior.count += count
-          else usedPotions.push({ name: potion.name, count })
-        }
-      }
-      const runs = Math.min(neededRuns, Math.floor((budget - spent) / farm.sanity))
-      if (runs > 0) {
-        spent += runs * farm.sanity
-        let produced = runs * farm.quantity
-        for (const demand of tasks) {
-          if (demand.item !== task.item) continue
-          const consumed = Math.min(demand.remaining, produced)
-          demand.remaining -= consumed
-          produced -= consumed
-          if (produced <= 1e-8) break
-        }
-        const prior = farms.find((row) => row.item === task.item && row.stage === farm.stage)
-        if (prior) { prior.runs += runs; prior.sanity += runs * farm.sanity; prior.expectedQuantity += runs * farm.quantity }
-        else farms.push({ item: task.item, stage: farm.stage, runs, sanity: runs * farm.sanity, expectedQuantity: runs * farm.quantity })
-      }
-    }
-    for (const row of selected) {
-      if (!row.estimatedDate && tasks.every((task) => task.operator !== row.candidate.key || task.remaining <= 1e-8)) row.estimatedDate = date
-    }
-    days.push({ date, budget, spent, potions: usedPotions, farms })
-    if (tasks.every((task) => task.remaining <= 1e-8)) break
-  }
-  return { ...summary, selected, days, blocked, remaining: tasks.filter((task) => task.remaining > 1e-8), totalSanity: selected.some((row) => row.allocation.sanity === null) ? null : selected.reduce((sum, row) => sum + (row.allocation.sanity ?? 0), 0) }
+  return selected
 }
