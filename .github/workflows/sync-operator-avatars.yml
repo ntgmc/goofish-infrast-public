@@ -1,4 +1,4 @@
-name: Sync Operator Avatars
+name: Sync Game Icons
 
 on:
   schedule:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       target_branch:
-        description: Branch to update with synced operator avatars
+        description: Branch to update with synced game icons
         required: true
         default: dev
         type: string
@@ -24,7 +24,7 @@ env:
 
 jobs:
   sync:
-    name: Sync operator avatars
+    name: Sync game icons
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -44,25 +44,30 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.OPERATOR_AVATAR_SOURCE_TOKEN || secrets.GITHUB_TOKEN }}
         run: npm run sync:operator-avatars
 
-      - name: Commit synced avatars
+      - name: Sync cultivation icons
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run sync:cultivation-icons
+
+      - name: Commit synced game icons
         shell: bash
         run: |
           set -euo pipefail
 
-          if [[ -z "$(git status --porcelain -- public/webp96)" ]]; then
-            echo "Operator avatars are already up to date."
+          if [[ -z "$(git status --porcelain -- public/webp96 public/item-icons public/skill-icons src/data/cultivation-item-icons.json)" ]]; then
+            echo "Game icons are already up to date."
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A public/webp96
+          git add -A public/webp96 public/item-icons public/skill-icons src/data/cultivation-item-icons.json
 
           if git diff --cached --quiet; then
-            echo "No staged operator avatar changes."
+            echo "No staged game icon changes."
             exit 0
           fi
 
-          git commit -m "ci: 同步干员头像资源"
+          git commit -m "ci: 同步游戏图标资源"
           git pull --rebase origin "$TARGET_BRANCH"
           git push origin "HEAD:$TARGET_BRANCH"

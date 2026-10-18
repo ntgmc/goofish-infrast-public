@@ -16,7 +16,7 @@ function ResourceArt({ id, data }: { id: string; data: CultivationData }) {
   const Icon = id === 'exp' ? ExperienceIcon : id === '4001' ? LmdIcon : MaterialIcon
   return <span className="v2-project-resource-art" data-resource={id === 'exp' || id === '4001' ? id : 'material'} aria-hidden="true">
     <Icon size={22} />
-    {icon && <img src={`https://torappu.prts.wiki/assets/item_icon/${encodeURIComponent(icon)}.png`} alt="" width={40} height={40} loading="lazy" onError={(event) => { event.currentTarget.hidden = true }} />}
+    {icon && <img src={`/item-icons/${encodeURIComponent(icon)}.png`} alt="" width={40} height={40} loading="lazy" onError={(event) => { event.currentTarget.hidden = true }} />}
   </span>
 }
 

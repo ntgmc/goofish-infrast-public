@@ -5,7 +5,7 @@ import type { CultivationData, CultivationOptions } from '../../lib/cultivation-
 import { number } from './CultivationResults'
 
 const label = copy.tools.cultivation
-const itemIcon = (id: string) => `https://torappu.prts.wiki/assets/item_icon/${encodeURIComponent(id)}.png`
+const itemIcon = (id: string) => `/item-icons/${encodeURIComponent(id)}.png`
 
 type Props = { data: CultivationData; preference: CultivationOptions['preference'] }
 

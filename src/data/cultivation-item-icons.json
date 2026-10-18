@@ -32,6 +32,7 @@
   "3303": "MTL_SKILL3",
   "4001": "GOLD",
   "4006": "EXGG_SHD",
+  "5001": "EXP_PLAYER",
   "30011": "MTL_SL_G1",
   "30012": "MTL_SL_G2",
   "30013": "MTL_SL_G3",
@@ -93,7 +94,8 @@
   "31113": "MTL_SL_DJ",
   "31114": "MTL_SL_DJ4",
   "32001": "MTL_ASC_DI",
+  "AP_GAMEPLAY": "AP_GAMEPLAY",
   "mod_unlock_token": "mod_unlock_token",
-  "mod_update_token_2": "mod_update_token_2",
-  "mod_update_token_1": "mod_update_token_1"
+  "mod_update_token_1": "mod_update_token_1",
+  "mod_update_token_2": "mod_update_token_2"
 }

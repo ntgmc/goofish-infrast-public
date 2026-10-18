@@ -39,7 +39,7 @@ function Operator({ row, data }: { row: CultivationCandidate; data: CultivationD
     <img src={`/webp96/${encodeURIComponent(row.operatorId)}.webp`} alt="" width={48} height={48} loading="lazy" className="size-12 rounded-lg bg-surface-2 object-cover" />
     <div className="min-w-0"><h3 className="text-base font-semibold">{row.name}</h3>
       <div className="mt-1 flex items-center gap-2 text-xs text-ink-muted">
-        {row.skillId && <img src={`https://torappu.prts.wiki/assets/skill_icon/skill_icon_${encodeURIComponent(data.skillIcons?.[row.skillId] ?? row.skillId)}.png`} alt="" width={24} height={24} loading="lazy" className="size-6 rounded object-contain" />}
+        {row.skillId && <img src={`/skill-icons/${encodeURIComponent(data.skillIcons?.[row.skillId] ?? row.skillId)}.png`} alt="" width={24} height={24} loading="lazy" className="size-6 rounded object-contain" />}
         <span>{label.skillName(row.target.skill)}</span>{row.target.skillLevel > 7 && <span aria-label={label.masteryName(row.target.skillLevel - 7)} className="rounded bg-brand-500/10 px-2 py-0.5 font-semibold text-brand-500">{'◆'.repeat(row.target.skillLevel - 7)}</span>}
       </div>
     </div>

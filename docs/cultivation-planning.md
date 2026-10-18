@@ -36,7 +36,24 @@ V2 地址为 `/v2?section=cultivation`。所有已绑定森空岛的可用档案
 结果展示作业用途、当前和建议练度、推荐依据及加入养成项目的入口。
 查看作业链接使用 `https://prts.plus/?op=<id>`。
 干员头像复用网站资源，技能图标按游戏技能表的 `iconId` 映射，包含共享技能图标。
+材料、培养券与技能图标使用下文的本站静态资源。
 同一干员同时出现在森空岛基础数据和养成数据时，使用养成接口返回的最新字段。
+
+## 游戏图标同步
+
+材料、培养券与技能图标沿用干员头像的发布方式：提前同步到 `public/`，提交后随前端构建发布。
+页面读取 `/item-icons/<iconId>.png` 和 `/skill-icons/<iconId>.png`，兼容生产环境的同源图片 CSP。
+
+手动更新运行 `npm run sync:cultivation-icons`；使用 `-- --check` 可对比上游与本地文件而不修改文件，
+`node scripts/sync-cultivation-icons.mjs --self-test` 可运行离线检查。
+脚本从 [arkntools/arknights-toolbox-data](https://github.com/arkntools/arknights-toolbox-data) 同步材料和技能图片，
+通过 CDN 读取固定版本的文件，根据游戏物品表映射材料的 `iconId`，培养券图片从 PRTS 同步。
+游戏美术资源归各自权利人所有，arkntools 的 MIT 许可随图标保存在两个目录的 `LICENSE.txt` 中。
+校验 PNG 格式、尺寸及最大 512 KiB 的文件大小后写入；
+全部下载通过后才更新本地资源及 `src/data/cultivation-item-icons.json`，同步失败时保留已有资源。
+
+现有 [Sync Game Icons 工作流](../.github/workflows/sync-operator-avatars.yml) 每天同步头像和养成图标，
+提交到指定分支。访问页面时直接读取已发布图片；材料图片缺失时保留语义图标和名称。
 
 ## 我的养成项目
 
