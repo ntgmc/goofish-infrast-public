@@ -2,7 +2,6 @@ import { memo, useMemo, useState } from 'react'
 import { ExternalLinkIcon as ExternalLink, UndoIcon as RotateCcw, ExcludeIcon as X } from '../../components/icons'
 import { copy } from '../../copy/index'
 import type { CultivationCandidate, CultivationData } from '../../lib/cultivation-contract'
-import type { buildCultivationPlan } from '../../lib/cultivation-planner'
 import { projectFromCultivationCandidate, type CultivationProjectScope } from '../../lib/cultivation-project-import'
 import CultivationProjectImport from '../../components/CultivationProjectImport'
 
@@ -47,11 +46,6 @@ function Operator({ row, data }: { row: CultivationCandidate; data: CultivationD
   </div>
 }
 
-function Materials({ items, data }: { items: Record<string, number>; data: CultivationData }) {
-  return Object.keys(items).length ? <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{Object.entries(items).map(([id, count]) =>
-    <li key={id} className="rounded-lg bg-surface-2 px-3 py-2 text-sm">{data.itemNames[id] ?? id}<strong className="float-right ml-2 tabular-nums">{number(count)}</strong></li>)}</ul> : <p className="text-sm text-ink-secondary">{label.ready}</p>
-}
-
 function Statistics({ row, data }: { row: CultivationCandidate; data: CultivationData }) {
   const statistics = data.community?.operators[row.operatorId]
   if (!statistics) return null
@@ -65,44 +59,29 @@ function Statistics({ row, data }: { row: CultivationCandidate; data: Cultivatio
   </details>
 }
 
-type Props = { data: CultivationData; plan: ReturnType<typeof buildCultivationPlan>; excluded: string[]; exclude: (id: string, excluded: boolean) => void; projectScope?: CultivationProjectScope }
+type Props = { data: CultivationData; recommendations: CultivationCandidate[]; excluded: string[]; exclude: (id: string, excluded: boolean) => void; projectScope?: CultivationProjectScope }
 
-export default memo(function CultivationResults({ data, plan, excluded, exclude, projectScope }: Props) {
+export default memo(function CultivationResults({ data, recommendations, excluded, exclude, projectScope }: Props) {
   const [search, setSearch] = useState('')
   const [visible, setVisible] = useState(50)
   const rows = useMemo(() => data.candidates.filter((row) => row.name.includes(search)).sort((a, b) => (b.weightedFrequency ?? b.frequency) - (a.weightedFrequency ?? a.frequency)), [data, search])
   return <>
     <section className="workspace-cultivation-suggestions tool-panel p-5 sm:p-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-3"><h2 className="text-lg font-semibold">{label.suggestions}</h2><p className="text-sm text-ink-secondary">{label.total} · {plan.totalSanity === null ? label.unpriced : number(plan.totalSanity)}</p></div>
+      <h2 className="text-lg font-semibold">{label.suggestions}</h2>
       <p className="my-3 text-xs leading-5 text-ink-muted">{label.adviceHint}</p>
-      {projectScope && <CultivationProjectImport key={`${projectScope.profileId}:${plan.selected.map(({ candidate }) => candidate.key).join(',')}`} scope={projectScope} projects={plan.selected.flatMap(({ candidate }) => { const project = projectFromCultivationCandidate(candidate); return project ? [project] : [] })} batch partial={plan.selected.some(({ candidate }) => Boolean(candidate.target.moduleId) || candidate.target.potential > candidate.current.potential)} />}
-      {!plan.selected.length ? <p className="py-4 text-sm text-ink-secondary">{label.empty}</p> : <ol className="divide-y divide-surface-3">
-        {plan.selected.map(({ candidate: row, allocation, estimatedDate }, index) => <li key={row.key} className="grid gap-4 py-5 lg:grid-cols-2">
-          <div><div className="flex flex-wrap items-start gap-3"><span className="pt-2 text-lg font-semibold tabular-nums text-brand-500">{index + 1}</span><Operator row={row} data={data} />
+      {projectScope && <CultivationProjectImport key={`${projectScope.profileId}:${recommendations.map((candidate) => candidate.key).join(',')}`} scope={projectScope} projects={recommendations.flatMap((candidate) => { const project = projectFromCultivationCandidate(candidate); return project ? [project] : [] })} batch partial={recommendations.some((candidate) => Boolean(candidate.target.moduleId) || candidate.target.potential > candidate.current.potential)} />}
+      {!recommendations.length ? <p className="py-4 text-sm text-ink-secondary">{label.empty}</p> : <ol className="divide-y divide-surface-3">
+        {recommendations.map((row, index) => <li key={row.key} className="space-y-3 py-5">
+          <div className="flex flex-wrap items-start gap-3"><span className="pt-2 text-lg font-semibold tabular-nums text-brand-500">{index + 1}</span><Operator row={row} data={data} />
             <button type="button" className="tool-secondary-action ml-auto inline-flex shrink-0 items-center gap-1.5 text-xs" onClick={() => exclude(row.operatorId, true)}><X size={14} />{label.exclude}</button>
           </div><CultivationTraining row={row} />
-            {row.source === 'community' && <p className="mt-2 text-xs text-ink-muted">{label.communityRate(row.communityRate ?? null)}</p>}
-            <CultivationEvidence row={row} /><Statistics row={row} data={data} />
-            {projectScope && projectFromCultivationCandidate(row) && <CultivationProjectImport key={row.key} scope={projectScope} projects={[projectFromCultivationCandidate(row)!]} partial={Boolean(row.target.moduleId) || row.target.potential > row.current.potential} />}
-          </div>
-          <div className="space-y-3 text-sm"><p>{label.cost} · <strong className="tabular-nums">{allocation.sanity === null ? label.unpriced : number(allocation.sanity)}</strong></p>
-            <p className="text-xs text-ink-secondary">{label.materialDate} · {estimatedDate ?? label.pending}</p>
-            <p className="text-xs leading-5 text-ink-muted">{Object.keys(allocation.missing).length ? Object.entries(allocation.missing).map(([id, count]) => `${data.itemNames[id] ?? id} × ${number(count)}`).join(' · ') : label.ready}</p>
-            {allocation.exchanges.map((exchange) => <p key={exchange.item} className="tool-inset p-2 text-xs">{label.exchange} · {label.exchangeAmount(exchange.count, exchange.cost)}</p>)}
-            <div className="flex flex-wrap gap-2">{row.examples.map((id) => <a key={id} className="tool-secondary-action inline-flex items-center gap-1.5 text-xs" href={`https://prts.plus/?op=${id}`} target="_blank" rel="noreferrer"><ExternalLink size={14} />{label.example} #{id}</a>)}</div>
-          </div>
+          <p className="text-sm text-ink-secondary">{label.stageCount} {row.stageCount} · {label.weightedDemand} {number(row.weightedFrequency ?? row.frequency)}</p>
+          {row.source === 'community' && <p className="mt-2 text-xs text-ink-muted">{label.communityRate(row.communityRate ?? null)}</p>}
+          <CultivationEvidence row={row} /><Statistics row={row} data={data} />
+          <div className="flex flex-wrap gap-2">{row.examples.map((id) => <a key={id} className="tool-secondary-action inline-flex items-center gap-1.5 text-xs" href={`https://prts.plus/?op=${id}`} target="_blank" rel="noreferrer"><ExternalLink size={14} />{label.example} #{id}</a>)}</div>
+          {projectScope && projectFromCultivationCandidate(row) && <CultivationProjectImport key={row.key} scope={projectScope} projects={[projectFromCultivationCandidate(row)!]} partial={Boolean(row.target.moduleId) || row.target.potential > row.current.potential} />}
         </li>)}
       </ol>}
-    </section>
-    <section className="workspace-cultivation-summary tool-panel space-y-4 p-5 sm:p-6"><h2 className="text-lg font-semibold">{label.summary}</h2>
-      <div className="grid gap-4 sm:grid-cols-2"><div className="tool-inset p-4"><p className="text-sm text-ink-secondary">{label.totalTraining}</p><strong className="mt-2 block text-2xl tabular-nums">{plan.totalTrainingSanity === null ? label.unpriced : number(plan.totalTrainingSanity)}</strong></div><div className="tool-inset p-4"><p className="text-sm text-ink-secondary">{label.total}</p><strong className="mt-2 block text-2xl tabular-nums">{plan.totalSanity === null ? label.unpriced : number(plan.totalSanity)}</strong></div></div>
-      <h3 className="text-sm font-medium">{label.totalMaterials}</h3><Materials items={plan.totalMaterials} data={data} />
-      <h3 className="text-sm font-medium">{label.missingMaterials}</h3><Materials items={plan.missingMaterials} data={data} />
-    </section>
-    {plan.blocked.length > 0 && <section className="tool-alert tool-alert--warning space-y-3 p-5"><h2 className="font-semibold">{label.blocked}</h2><p className="text-xs leading-5">{label.blockedHint}</p><Materials items={Object.fromEntries(plan.blocked.map((task) => [task.item, plan.missingMaterials[task.item]]))} data={data} /></section>}
-    <section className="workspace-cultivation-calendar tool-panel p-5 sm:p-6"><h2 className="text-lg font-semibold">{label.calendar}</h2><p className="my-3 text-xs leading-5 text-ink-muted">{label.calendarHint}</p>
-      <div className="divide-y divide-surface-3">{plan.days.map((day) => <div key={day.date} className="grid gap-2 py-4 sm:grid-cols-[10rem_minmax(0,1fr)]"><div><h3 className="text-sm font-semibold tabular-nums">{day.date}</h3><p className="mt-1 text-xs text-ink-muted">{label.budget(day.spent, day.budget)}</p></div><div className="space-y-2">{!day.farms.length && <p className="text-xs text-ink-muted">{label.noFarms}</p>}{day.farms.map((farm) => <p key={`${farm.item}:${farm.stage}`} className="text-sm">{farm.stage} · {data.itemNames[farm.item] ?? farm.item}<span className="ml-2 text-xs text-ink-secondary">{label.runs(farm.runs, number(farm.expectedQuantity))}</span></p>)}{day.potions.map((potion) => <p key={potion.name} className="text-xs text-ink-secondary">{potion.name} × {potion.count}</p>)}</div></div>)}</div>
-      {plan.remaining.length > 0 && <div className="tool-inset mt-3 p-4"><h3 className="text-sm font-medium">{label.remaining}</h3><p className="mt-2 text-xs leading-5 text-ink-muted">{plan.remaining.map((task) => `${data.itemNames[task.item] ?? task.item} × ${number(task.remaining)}`).join(' · ')}</p></div>}
     </section>
     <details className="tool-panel p-5 sm:p-6"><summary className="cursor-pointer text-base font-semibold">{label.comparison}</summary><p className="my-3 text-xs leading-5 text-ink-muted">{label.comparisonHint}</p>
       <label className="mb-4 block"><span className="sr-only">{label.search}</span><input className="tool-field" placeholder={label.search} value={search} onChange={(event) => { setSearch(event.target.value); setVisible(50) }} /></label>

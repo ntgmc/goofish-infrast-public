@@ -11,7 +11,7 @@ export const cultivationProjectsCopy = {
   importFailed: '目标未能保存，请检查浏览器存储后重试。',
   importLimit: '导入后将超过 30 个目标，请先整理已有项目。',
   importScopeHint: '导入等级和技能目标；模组与潜能需另行准备。',
-  suggestionsEntry: '从养成规划选择目标',
+  suggestionsEntry: '从作业练度推荐选择目标',
   search: '搜索已拥有的干员', operator: '选择干员', choose: '请选择干员', elite: '精英阶段',
   elites: ['未精英', '精英一', '精英二'], level: '目标等级', skill: '技能', skillLevel: '技能目标',
   skillName: (index: number) => `技能 ${index}`, skillRank: (rank: number) => rank <= 7 ? `等级 ${rank}` : `专精 ${rank - 7}`,

@@ -120,15 +120,10 @@ export type CultivationData = {
 }
 
 export type CultivationOptions = {
-  preference: 'coverage' | 'materials' | 'cost' | 'community'
+  preference: 'coverage' | 'community'
   recommendation?: CultivationQuery
-  dailySanity: number
-  startDate: string
-  days: number
   limit: number
   excluded: string[]
-  potions: Record<string, number>
-  allOpen: boolean
 }
 
 export type CultivationStatistics = {
