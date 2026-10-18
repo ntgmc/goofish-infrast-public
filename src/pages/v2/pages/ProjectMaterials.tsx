@@ -1,12 +1,14 @@
 import { ExperienceIcon, LmdIcon, MaterialIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
 import type { CultivationData } from '../../../lib/cultivation-contract'
+import itemIcons from '../../../data/cultivation-item-icons.json'
 
 const text = copy.cultivationProjects
 const number = (amount: number) => amount.toLocaleString('zh-CN', { maximumFractionDigits: 1 })
 
 export function ResourceArt({ id, data }: { id: string; data: CultivationData }) {
-  const icon = data.itemIcons?.[id === 'exp' ? '2004' : id]
+  const itemId = id === 'exp' ? '2004' : id
+  const icon = data.itemIcons?.[itemId] || (itemIcons as Record<string, string>)[itemId]
   const Icon = id === 'exp' ? ExperienceIcon : id === '4001' ? LmdIcon : MaterialIcon
   return <span className="v2-project-resource-art" data-resource={id === 'exp' || id === '4001' ? id : 'material'} aria-hidden="true">
     <Icon size={22} />
