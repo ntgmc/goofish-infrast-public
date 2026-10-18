@@ -56,20 +56,24 @@ export function validProjectDate(date: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(stamp) && new Date(stamp).toISOString().slice(0, 10) === date
 }
 
-export function buildProjectRoute(data: CultivationData, projects: CultivationProject[], settings: ProjectSettings, normal: ProjectIncome | null, temporary: ProjectIncome | null = null) {
-  if (!validProjectDate(settings.startDate) || !Number.isInteger(settings.days) || settings.days < 1 || settings.days > 180
-    || !Number.isInteger(settings.dailySanity) || settings.dailySanity < 0 || settings.dailySanity > 2000) throw new Error('invalid_project_settings')
+export function allocateProjectMaterials(data: CultivationData, projects: CultivationProject[]) {
   const active = projects.filter((project) => !project.paused)
   let stock = { ...data.inventory }
-  const rows = active.map((project) => {
+  return active.map((project) => {
     const candidate = data.candidates.find((row) => row.operatorId === project.operatorId)
     // A changed target must be refreshed before its old costs can produce a date.
     const matches = candidate && candidate.target.elite === project.elite && candidate.target.level === project.level
       && candidate.target.skill === project.skill && candidate.target.skillLevel === project.skillLevel
     const allocation = matches ? allocateCultivationMaterials(candidate.items, stock, data) : null
     if (allocation) stock = allocation.stock
-    return { project, candidate: matches ? candidate : undefined, allocation, estimatedDate: null as string | null }
+    return { project, candidate: matches ? candidate : undefined, allocation }
   })
+}
+
+export function buildProjectRoute(data: CultivationData, projects: CultivationProject[], settings: ProjectSettings, normal: ProjectIncome | null, temporary: ProjectIncome | null = null) {
+  if (!validProjectDate(settings.startDate) || !Number.isInteger(settings.days) || settings.days < 1 || settings.days > 180
+    || !Number.isInteger(settings.dailySanity) || settings.dailySanity < 0 || settings.dailySanity > 2000) throw new Error('invalid_project_settings')
+  const rows = allocateProjectMaterials(data, projects).map((row) => ({ ...row, estimatedDate: null as string | null }))
   const tasks = rows.flatMap((row) => Object.entries(row.allocation?.missing ?? {}).map(([item, quantity]) => ({ operatorId: row.project.operatorId, item, quantity, remaining: quantity })))
   const missing: Record<string, number> = {}
   for (const task of tasks) missing[task.item] = (missing[task.item] ?? 0) + task.quantity

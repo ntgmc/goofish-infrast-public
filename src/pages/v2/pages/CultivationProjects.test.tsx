@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -70,6 +70,65 @@ it('turns a selected goal into an income-linked route and changes configuration 
   expect(await screen.findByRole('heading', { name: text.route })).toBeInTheDocument()
 })
 
+it('calculates manual materials even when production fails, then includes crafting shortages in the route', async () => {
+  const user = userEvent.setup()
+  mocks.result.mockRejectedValue(new Error('production unavailable'))
+  mocks.api.mockImplementation(async (_url, options) => {
+    const result = data(options.json.projects)
+    for (const candidate of result.candidates) candidate.items = { ...candidate.items, high: 2, book: 6 }
+    return { ...result, inventory: { rock: 3 }, itemNames: { ...result.itemNames, high: '提纯源岩', rock: '固源岩', book: '技巧概要' }, recipes: { high: { count: 1, items: { rock: 3, '4001': 100 } } } }
+  })
+  render(<MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /></MemoryRouter>)
+  await user.click(screen.getByRole('button', { name: text.import }))
+  await user.selectOptions(await screen.findByRole('combobox', { name: text.operator }), 'char_test')
+  await user.click(screen.getByRole('button', { name: text.add }))
+  await screen.findByText('提纯源岩')
+  const required = screen.getByRole('heading', { name: text.requiredMaterials }).closest('.v2-project-materials')! as HTMLElement
+  expect(within(required).getByText(text.requiredAmount('2'))).toBeInTheDocument()
+  expect(within(required).getByText('技巧概要')).toBeInTheDocument()
+  const shortage = screen.getByRole('heading', { name: text.materialShortage }).closest('.v2-project-materials')! as HTMLElement
+  expect(within(shortage).getByText('固源岩')).toBeInTheDocument()
+  expect(within(shortage).getByText(text.requiredAmount('3'))).toBeInTheDocument()
+  expect(within(shortage).getByText(text.requiredAmount('1,100'))).toBeInTheDocument()
+  expect(screen.getByText('production unavailable')).toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: text.route })).not.toBeInTheDocument()
+  expect(mocks.api).toHaveBeenCalledTimes(2)
+  expect(mocks.refresh).toHaveBeenCalledTimes(1)
+  await user.selectOptions(screen.getByRole('combobox', { name: text.normal }), '')
+  const resources = await screen.findByRole('heading', { name: text.resources })
+  expect(resources.parentElement).toHaveTextContent('固源岩')
+  expect(resources.parentElement).toHaveTextContent('1,100')
+  expect(mocks.api).toHaveBeenCalledTimes(2)
+})
+
+it('recalculates the latest edited target after an in-flight calculation without reusing old material costs', async () => {
+  const user = userEvent.setup()
+  render(<MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /></MemoryRouter>)
+  await user.click(screen.getByRole('button', { name: text.import }))
+  await user.selectOptions(await screen.findByRole('combobox', { name: text.operator }), 'char_test')
+  await user.click(screen.getByRole('button', { name: text.add }))
+  await screen.findByRole('heading', { name: text.requiredMaterials })
+  await user.click(screen.getByRole('button', { name: text.edit }))
+  const level = screen.getByRole('spinbutton', { name: text.level })
+  await user.clear(level)
+  await user.type(level, '90')
+  let finish!: (result: CultivationData) => void
+  mocks.api.mockImplementationOnce(() => new Promise<CultivationData>((resolve) => { finish = resolve }))
+  await user.click(screen.getByRole('button', { name: text.save }))
+  expect(screen.queryByRole('heading', { name: text.requiredMaterials })).not.toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: text.route })).not.toBeInTheDocument()
+  const latest = { ...JSON.parse(localStorage.getItem('maatool:cultivation-projects:user1:mine')!)[0], level: 80 }
+  await act(async () => {
+    localStorage.setItem('maatool:cultivation-projects:user1:mine', JSON.stringify([latest]))
+    window.dispatchEvent(new StorageEvent('storage', { key: 'maatool:cultivation-projects:user1:mine', newValue: JSON.stringify([latest]), storageArea: localStorage }))
+  })
+  const stale = { ...latest, level: 90 }
+  await act(async () => finish(data([stale])))
+  await waitFor(() => expect(mocks.api).toHaveBeenLastCalledWith('/api/cultivation-plan', expect.objectContaining({ json: { profile_id: 'mine', projects: [latest] } })))
+  await screen.findByRole('heading', { name: text.requiredMaterials })
+  expect(mocks.refresh).toHaveBeenCalledTimes(1)
+})
+
 it('aborts the previous profile import and isolates saved goals when the account changes', async () => {
   let finish!: (result: CultivationData) => void
   let signal: AbortSignal | undefined
@@ -99,11 +158,10 @@ it('imports a bundle from training suggestions into an already mounted project p
   expect(await screen.findByText(text.imported(1, 1))).toBeInTheDocument()
   expect(screen.getByRole('link', { name: text.openProjects })).toHaveAttribute('href', '/v2?section=cultivation-projects&profile_id=mine')
   expect(screen.getByRole('button', { name: `${text.remove} 测试干员` })).toBeInTheDocument()
-  expect(screen.getAllByText(text.pendingRefresh).length).toBeGreaterThan(0)
   const goals = JSON.parse(localStorage.getItem('maatool:cultivation-projects:user1:mine')!)
   expect(goals).toEqual([saved, { operatorId: 'char_test', elite: 2, level: 1, skill: 1, skillLevel: 1, paused: false, deadline: '' }])
-  await user.click(screen.getByRole('button', { name: text.refresh }))
   await waitFor(() => expect(mocks.api).toHaveBeenLastCalledWith('/api/cultivation-plan', expect.objectContaining({ json: { profile_id: 'mine', projects: goals } })))
+  expect(mocks.refresh).toHaveBeenCalledTimes(1)
   await user.click(screen.getByRole('button', { name: text.importSuggestion }))
   expect(await screen.findByText(text.imported(0, 2))).toBeInTheDocument()
   expect(JSON.parse(localStorage.getItem('maatool:cultivation-projects:user1:mine')!)).toEqual(goals)

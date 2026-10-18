@@ -30,6 +30,7 @@ export const prtsSnapshotSchema = z.object({
   recipes: z.record(z.string(), z.object({ count: z.number().positive(), items: z.record(z.string(), z.number().nonnegative()) })),
   farms: z.record(z.string(), z.array(z.object({ stage: z.string(), sanity: z.number().positive(), quantity: z.number().positive(), days: z.array(z.number().int().min(1).max(7)).min(1) }))),
   itemNames: z.record(z.string(), z.string()),
+  itemIcons: z.record(z.string(), z.string()).optional(),
   potionValues: z.record(z.string(), z.number().positive()),
   warnings: z.array(z.string()),
 })
