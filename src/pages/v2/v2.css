@@ -1441,6 +1441,9 @@
 .v2-income-table small { display: block; margin-top: var(--space-3xs); color: var(--v2-muted); font-size: var(--text-xs); }
 .v2-income-table .v2-neutral-tag { display: inline-block; margin-left: var(--space-2xs); }
 .v2-product-amount { display: inline-flex; align-items: center; gap: var(--space-2xs); white-space: nowrap; }
+.v2-detail-data > .v2-room-production { flex-wrap: wrap; gap: var(--space-2xs); }
+.v2-room-production dd { margin-left: auto; }
+.v2-room-production dd > div { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2xs); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .v2-sanity-calculation { display: grid; gap: var(--space-xs); padding-top: var(--space-sm); border-top: 1px solid var(--v2-line); }
 .v2-analysis-details { border-top: 1px solid var(--v2-line); }
 .v2-analysis-details > summary { min-height: 44px; padding-block: var(--space-xs); cursor: pointer; color: var(--v2-secondary); }
