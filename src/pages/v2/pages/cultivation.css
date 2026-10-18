@@ -76,9 +76,11 @@
 .v2-cultivation-community .v2-material-list > div { flex-wrap: wrap; font-size: var(--text-xs); }
 .v2-cultivation-row-actions { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: 0 var(--space-md); min-width: 0; }
 .v2-cultivation-row-actions > .v2-actions { align-items: start; gap: 0 var(--space-sm); margin: 0; min-width: 0; }
-.v2-cultivation-row-actions .cultivation-project-import { max-width: 100%; }
-.v2-cultivation-row-actions .cultivation-project-import > p { max-width: 38ch; }
-.v2-cultivation-exclude { color: var(--v2-muted); }
+.v2-cultivation-row-actions > .v2-actions:has(> .cultivation-project-import) { display: grid; grid-template-columns: max-content minmax(0, 1fr); }
+.v2-cultivation-row-actions .cultivation-project-import { display: contents; }
+.v2-cultivation-row-actions .cultivation-project-import > * { margin: 0; }
+.v2-cultivation-row-actions .cultivation-project-import > p { grid-column: 1 / -1; max-width: 38ch; }
+.v2-cultivation-exclude { grid-column: 2; grid-row: 1; justify-self: start; color: var(--v2-muted); }
 .v2-cultivation-status { flex: none; padding: var(--space-3xs) var(--space-2xs); border-radius: var(--radius-v2-control); background: var(--color-v2-inset); color: var(--v2-secondary); font-size: var(--text-xs); white-space: nowrap; }
 .v2-cultivation-status[data-state="training"] { background: var(--v2-accent-soft); color: var(--v2-accent); }
 .v2-cultivation-status[data-state="check"] { background: var(--color-v2-error-soft); color: var(--color-v2-error); }
