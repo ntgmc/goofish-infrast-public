@@ -31,7 +31,7 @@ export default memo(function CultivationSpecialItems({ data, preference }: Props
     <div><h2 className="text-lg font-semibold">{label.specialItems}</h2><p className="mt-2 text-sm leading-6 text-ink-secondary">{label.specialHint}</p></div>
     {!items.length ? <p className="text-sm text-ink-secondary">{label.noSpecialItems}</p> : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{items.map((item) => <button key={item.id} type="button" aria-pressed={item.id === chosen} className={`tool-secondary-action flex min-w-0 items-center justify-start gap-3 text-left ${item.id === chosen ? 'tool-option-selected' : ''}`} onClick={() => { setChosen(item.id); setVisible(8) }}>
       <img src={itemIcon(item.iconId)} alt="" loading="lazy" width={48} height={48} className="size-12 shrink-0 object-contain" />
-      <span className="min-w-0"><span title={item.name} className="block truncate text-sm font-semibold">{item.name}</span><span className="mt-1 block text-xs text-ink-secondary">{label.itemStock(item.count)}{!item.available && ` · ${label.itemExpired}`}</span></span>
+      <span className="min-w-0"><span title={item.name} className="block truncate text-sm font-semibold">{item.name}</span><span title={item.scope} className="mt-1 line-clamp-2 text-xs text-ink-secondary">{item.count === null ? item.scope : label.itemStock(item.count)}{!item.available && ` · ${label.itemExpired}`}</span></span>
     </button>)}</div>}
     {selected && <div className="tool-inset space-y-4 p-4">
       <div><h3 className="font-semibold">{selected.name}</h3><p className="mt-2 text-sm leading-6 text-ink-secondary">{selected.scope}</p>

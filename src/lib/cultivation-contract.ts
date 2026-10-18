@@ -139,7 +139,7 @@ export type CultivationSpecialItem = {
   name: string
   iconId: string
   kind: 'elite' | 'level' | 'mastery' | 'selector' | 'materials'
-  count: number
+  count: number | null
   scope: string
   sourceUrl: string
   expiresAt: string | null

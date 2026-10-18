@@ -16,10 +16,10 @@ const game = (elite = 1) => ({ data: { chars: [{ charId: 'char_test', evolvePhas
 const pricing = { status: 'fresh' as const, prices: new Map([['rock', 5]]), fetched_at: '', age_ms: 0, snapshot_id: '', valuation_version: '' }
 
 describe('PRTS and Skland cultivation data', () => {
-  it('shares independent demand between material planning and owned special-item recommendations', () => {
+  it('shares independent demand with selector recommendations even without package inventory', () => {
     const input = snapshot()
     input.homeworks.push({ ...input.homeworks[0], id: 21 })
-    const result = buildCultivationData(input, game(0), { items: [{ id: 'selector', count: 1 }] }, pricing, undefined, {
+    const result = buildCultivationData(input, game(0), { items: [] }, pricing, undefined, {
       parserVersion: 4, status: 'fresh', updatedAt: '', itemNames: {}, itemIcons: {}, excludedOperators: [], skillIcons: {},
       items: [{ id: 'selector', name: '调用凭证', iconId: 'selector', kind: 'selector', scope: '', sourceUrl: '', rarity: 4, operators: ['char_test'], options: [] }],
     })

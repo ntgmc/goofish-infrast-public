@@ -22,7 +22,7 @@ const statistic = { charId: 'char_test', own: 200, sampleSize: 1000, elite: { 0:
   skill1: { 0: 100, 1: 20, 2: 30, 3: 50 }, skill2: { 0: 200 }, skill3: { 0: 200 },
   modX: { 0: 150, 1: 10, 2: 15, 3: 25 }, modY: { 0: 200 }, modD: { 0: 200 }, modA: { 0: 200 }, modB: { 0: 200 } }
 
-describe('cultivation references and owned special items', () => {
+describe('cultivation references and special-item recommendations', () => {
   it('uses holder counts for training rates and rejects invalid distributions', () => {
     const rows = parseCultivationStatistics({ success: true, data: [statistic] })
     expect(rows.char_test).toMatchObject({ elite: [0.1, 0.1, 0.8], skills: [[0.5, 0.1, 0.15, 0.25], [1, 0, 0, 0], [1, 0, 0, 0]], modules: { X: [0.75, 0.05, 0.075, 0.125] } })
@@ -47,6 +47,26 @@ describe('cultivation references and owned special items', () => {
     expect(catalog.find((item) => item.id === 'selector')?.operators).toEqual(['char_test'])
     expect(catalog.find((item) => item.id === 'voucher_class_pick1')?.operators).toEqual(['char_other'])
     expect(catalog.find((item) => item.id === 'quoted')?.operators).toEqual(['char_test', 'char_other'])
+  })
+
+  it('lists every selector without inventory and keeps each version’s pool and ownership separate', () => {
+    const input = snapshot()
+    input.operators.char_other = { ...input.operators.char_test, name: '其他干员' }
+    const items = table()
+    const parsed = parseSpecialItemCatalog({ ...items, items: { ...items.items, selector2: training('selector2', 'VOUCHER_PICK', 'selector') } }, {
+      first: '|itemId=selector\n{{干员头像|测试干员}}', second: '|itemId=selector2\n{{干员头像|其他干员}}',
+    }, input.operators)
+    const catalog = { parserVersion: 4 as const, status: 'fresh' as const, updatedAt: '', items: parsed, itemNames: {}, itemIcons: {}, excludedOperators: [], skillIcons: {} }
+    const player = readCultivationPlayer({ chars: [{ charId: 'char_test', evolvePhase: 0, level: 1 }] }, { items: [] }, input)
+    const community = { status: 'fresh' as const, updatedAt: null, operators: parseCultivationStatistics({ success: true, data: [statistic] }) }
+    const demands = new Map([['char_test', { total: 10, elite: 6, skills: {} }]])
+    const result = buildSpecialItemRecommendations(input, player, catalog, community, demands)
+    expect(result.map((item) => item.id)).toEqual(['selector', 'selector2'])
+    expect(result[0]).toMatchObject({ count: null, expiresAt: null, available: true, recommendations: [{ operatorId: 'char_test', owned: true, demand: 10, communityRate: 0.8 }] })
+    expect(result[1].recommendations).toEqual([expect.objectContaining({ operatorId: 'char_other', owned: false, demand: 0, communityRate: null })])
+    player.inventory.selector = 1
+    player.expiries.selector = '2000-01-01T00:00:00Z'
+    expect(buildSpecialItemRecommendations(input, player, catalog, community, demands)[0]).toEqual(result[0])
   })
 
   it('reads owned counts and expiry, enforces voucher prerequisites, and computes remaining training costs', () => {

@@ -82,11 +82,38 @@ describe('homework training recommendations', () => {
     mocks.api.mockResolvedValueOnce(input)
     render(content(v2))
     fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
-    if (v2) fireEvent.click(await screen.findByRole('button', { name: text.specialItems }))
+    if (v2) fireEvent.click(await screen.findByRole('button', { name: text.views.special }))
     fireEvent.click(await screen.findByRole('button', { name: /特训邀请函.*库存 1 份/ }))
     expect(screen.queryByRole('button', { name: /材料自选包/ })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: text.specialRecommendations }).nextElementSibling).toHaveTextContent('银灰')
     expect(screen.queryByText(/等效理智/)).not.toBeInTheDocument()
+  })
+
+  it.each([false, true])('lets users choose selector versions without claiming package stock in V2=%s', async (v2) => {
+    const input = sample()
+    const selector = { id: 'selector', name: '干员调用凭证', iconId: 'selector', count: null, scope: '可选择能天使、推进之王', kind: 'selector' as const, expiresAt: null, available: true, sourceUrl: 'https://prts.wiki/w/test', recommendations: [
+      { key: 'owned', operatorId: 'owned', name: '能天使', owned: true, demand: 100, communityRate: 0.9, items: {}, warnings: [] },
+      { key: 'new', operatorId: 'new', name: '推进之王', owned: false, demand: 1, communityRate: 0.5, items: {}, warnings: [] },
+    ] }
+    input.specialItems = [selector, { ...selector, id: 'selector2', scope: '可选择艾雅法拉', recommendations: [{ ...selector.recommendations[1], key: 'other', name: '艾雅法拉' }] }]
+    mocks.api.mockResolvedValueOnce(input)
+    render(content(v2))
+    fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
+    if (v2) fireEvent.click(await screen.findByRole('button', { name: text.views.special }))
+    const first = await screen.findByRole('button', { name: /干员调用凭证.*可选择能天使、推进之王/ })
+    const second = screen.getByRole('button', { name: /干员调用凭证.*可选择艾雅法拉/ })
+    expect(first).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByRole('heading', { name: text.specialRecommendations })).not.toBeInTheDocument()
+    fireEvent.click(first)
+    expect(first).toHaveAttribute('aria-pressed', 'true')
+    const recommendations = screen.getByRole('heading', { name: text.specialRecommendations }).nextElementSibling!
+    expect(within(recommendations as HTMLElement).getAllByRole('listitem')[0]).toHaveTextContent('推进之王')
+    fireEvent.click(second)
+    expect(first).toHaveAttribute('aria-pressed', 'false')
+    expect(second).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('heading', { name: text.specialRecommendations }).nextElementSibling).toHaveTextContent('艾雅法拉')
+    expect(screen.queryByText(/库存.*份|已过期|有效期至/)).not.toBeInTheDocument()
+    expect(mocks.api).toHaveBeenCalledOnce()
   })
 
   it('restores URL filters, searches the full stage catalog, and applies a query with the current snapshot', async () => {
