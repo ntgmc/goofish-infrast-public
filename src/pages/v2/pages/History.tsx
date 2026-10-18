@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArchiveIcon as Archive, NextIcon as ArrowRight, ResultHistoryIcon as FileClock, SearchIcon as Search } from '../../../components/icons'
 import { copy } from '../../../copy'
+import { matchesSearch } from '../../../lib/search'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import { formatPlanName, formatResultHistorySummary, formatWorkspaceDate } from '../../../lib/workspace-history'
 import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../../lib/workspace-limits'
@@ -22,7 +23,7 @@ export default function History({ workflow: w }: { workflow: V2Workflow }) {
   const historyLimit = w.profileCapacity?.history_slots.limit ?? WORKSPACE_RESULT_HISTORY_LIMIT
   const historyUsed = w.profileCapacity?.history_slots.used ?? w.resultHistory.length
   const archiveLimit = w.profileCapacity?.archive_slots.limit ?? 0
-  const records = (archived ? w.archivedResults : w.resultHistory).filter((item) => item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
+  const records = (archived ? w.archivedResults : w.resultHistory).filter((item) => matchesSearch(item.name, search))
   const selected = records.find((item) => item.id === chosen) ?? records[0]
   const hasMore = archived ? w.archivedResultsHasMore : w.resultHistoryHasMore
   return <div className="v2-history-workspace">

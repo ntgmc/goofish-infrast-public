@@ -1,4 +1,5 @@
 import type { ProductPermissionMode } from '../../src/lib/types'
+import { matchesSearch } from '../../src/lib/search'
 import type { z } from 'zod'
 import { normalizePointsAmount } from '../../src/lib/balance-contracts'
 import { METERED_BILLING_AVAILABLE } from '../../src/lib/site-features'
@@ -797,7 +798,6 @@ function normalizeBinaryFilter(value: string | null, field: string): 'all' | 'ye
 }
 
 function paginateMemoryRecords(records: CdkRecord[], options: AdminCdkPageOptions): AdminCdkPageResult {
-  const term = options.search.toLowerCase()
   const filtered = records.filter((record) => {
     const hasRisk = record.status === 'frozen' || (record.risk_events?.length ?? 0) > 0
     const generated = (record.schedule_generate_count ?? 0) > 0
@@ -807,7 +807,7 @@ function paginateMemoryRecords(records: CdkRecord[], options: AdminCdkPageOption
     if (options.riskOnly && !hasRisk) return false
     if (options.risk !== 'all' && hasRisk !== (options.risk === 'yes')) return false
     if (options.generated !== 'all' && generated !== (options.generated === 'yes')) return false
-    if (term && ![record.code_hash, record.license_order_hash, record.order_note].some((value) => String(value ?? '').toLowerCase().includes(term))) return false
+    if (!matchesSearch([record.code_hash, record.license_order_hash, record.order_note].join(' '), options.search)) return false
     return true
   }).sort((left, right) => right.created_at.localeCompare(left.created_at) || left.code_hash.localeCompare(right.code_hash))
   const totalPages = filtered.length === 0 ? 0 : Math.ceil(filtered.length / options.pageSize)

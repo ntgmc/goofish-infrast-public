@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { matchesSearch } from '../../src/lib/search'
 import { defaultCultivationQuery, matchesCultivationRarity, type CultivationQuery, type CultivationTarget, type CultivationCandidate } from '../../src/lib/cultivation-contract'
 import { asRecord, asRows, type PrtsSnapshot } from './catalog'
 import { readHomeworkRequirements } from './requirements'
@@ -151,7 +152,7 @@ export function calculateCultivationRecommendations(snapshot: PrtsSnapshot, quer
     for (const member of document.members) {
       if (!query.includeAlternatives && member.group !== null) continue
       const operator = member.requirement.operator!
-      if (!matchesCultivationRarity(operator.rarity, query) || query.profession && operator.profession !== query.profession || query.search && !operator.name.toLowerCase().includes(query.search.trim().toLowerCase())) continue
+      if (!matchesCultivationRarity(operator.rarity, query) || query.profession && operator.profession !== query.profession || !matchesSearch(operator.name, query.search)) continue
       const samples = byOperator.get(operator.id) ?? []
       samples.push({ ...member, document, family: family.key, weight: weight * member.share, recent: family.published >= cutoff, quality: lower })
       byOperator.set(operator.id, samples)

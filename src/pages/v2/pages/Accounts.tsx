@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NextIcon as ArrowRight, SelectedIcon as Check, SearchIcon as Search, AccountIcon as UserRound } from '../../../components/icons'
 import { copy } from '../../../copy'
+import { matchesSearch } from '../../../lib/search'
 import type { V2Session } from '../OptionsDrawer'
 import { useProfiles, useProfileDetails } from '../../tool/dashboard/ProfilesSection'
 import { formatDate, formatShanghaiDateTime, getProfileAccessLabel, isFreePreviewProfile } from '../../tool/tool-utils'
@@ -15,7 +16,7 @@ export default function Accounts({ session, onOpen }: { session: V2Session; onOp
   const model = useProfiles({ profiles: session.cdkProfiles, onEdit: session.applyAuthPayload, meteredEnabled: features.metered_billing })
   const [chosen, setChosen] = useState(session.activeProfile?.id ?? '')
   const [search, setSearch] = useState('')
-  const profiles = model.profiles.filter((profile) => `${profile.display_name} ${profile.note ?? ''}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
+  const profiles = model.profiles.filter((profile) => matchesSearch(`${profile.display_name} ${profile.note ?? ''}`, search))
   const selected = profiles.find((profile) => profile.id === chosen) ?? profiles[0]
   return <div className="v2-accounts">
     <Notice error>{model.meteredError}</Notice>

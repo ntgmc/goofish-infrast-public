@@ -100,7 +100,17 @@ describe('homework training recommendations', () => {
     render(content(v2))
     fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
     if (v2) fireEvent.click(await screen.findByRole('button', { name: text.views.special }))
-    const first = await screen.findByRole('button', { name: /干员调用凭证.*可选择能天使、推进之王/ })
+    await screen.findByRole('button', { name: /干员调用凭证.*可选择能天使、推进之王/ })
+    if (v2) {
+      const search = screen.getByRole('searchbox', { name: text.specialSearch })
+      fireEvent.change(search, { target: { value: 'ganyuandiaoyong' } })
+      expect(screen.getAllByRole('button', { name: /干员调用凭证.*可选择/ })).toHaveLength(2)
+      fireEvent.change(search, { target: { value: 'AYFL' } })
+      expect(screen.queryByRole('button', { name: /干员调用凭证.*可选择能天使/ })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /干员调用凭证.*可选择艾雅法拉/ })).toBeInTheDocument()
+      fireEvent.change(search, { target: { value: '' } })
+    }
+    const first = screen.getByRole('button', { name: /干员调用凭证.*可选择能天使、推进之王/ })
     const second = screen.getByRole('button', { name: /干员调用凭证.*可选择艾雅法拉/ })
     expect(first).toHaveAttribute('aria-pressed', 'false')
     expect(screen.queryByRole('heading', { name: text.specialRecommendations })).not.toBeInTheDocument()

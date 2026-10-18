@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg'
+import { matchesSearch } from '../../src/lib/search'
 import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import {
@@ -394,20 +395,21 @@ export function createPostgresCdkRecordStore(): CdkRecordStore {
       if (options.status !== 'all') conditions.push(`status = ${add(options.status)}`)
       if (options.permission !== 'all') conditions.push(`permission = ${add(options.permission)}`)
       if (options.cdkType !== 'all') conditions.push(`cdk_type = ${add(options.cdkType)}`)
-      if (options.search) {
-        const search = add(`%${options.search.toLowerCase()}%`)
-        conditions.push(`(
-          lower(code_hash) like ${search}
-          or lower(coalesce(license_order_hash, '')) like ${search}
-          or lower(coalesce(record_json->>'order_note', '')) like ${search}
-        )`)
-      }
       const riskExpression = `(status = 'frozen' or jsonb_array_length(coalesce(record_json->'risk_events', '[]'::jsonb)) > 0)`
       const generatedExpression = `coalesce(nullif(record_json->>'schedule_generate_count', '')::integer, 0) > 0`
       if (options.riskOnly) conditions.push(riskExpression)
       if (options.risk !== 'all') conditions.push(options.risk === 'yes' ? riskExpression : `not ${riskExpression}`)
       if (options.generated !== 'all') conditions.push(options.generated === 'yes' ? generatedExpression : `not (${generatedExpression})`)
 
+      if (options.search.trim()) {
+        // ponytail: scan searchable fields before pagination; add a stored pinyin index if CDK volume warrants it.
+        const candidates = await query<{ key: string; search_text: string }>(
+          `select key, concat_ws(' ', code_hash, license_order_hash, record_json->>'order_note') as search_text
+           from cdk_records where ${conditions.join(' and ')}`,
+          values,
+        )
+        conditions.push(`key = any(${add(candidates.rows.filter((row) => matchesSearch(row.search_text, options.search)).map((row) => row.key))}::text[])`)
+      }
       const where = conditions.join(' and ')
       const countResult = await query<{ total: string }>(`select count(*)::text as total from cdk_records where ${where}`, values)
       const total = Number(countResult.rows[0]?.total ?? 0)

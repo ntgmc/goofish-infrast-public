@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { matchesSearch } from '../../../lib/search'
 import { RefreshIcon, UndoIcon, ExcludeIcon, NextIcon, ExternalLinkIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { defaultCultivationQuery, type CultivationCandidate, type CultivationData, type CultivationOptions } from '../../../lib/cultivation-contract'
@@ -100,7 +101,7 @@ function Community({ row, data }: { row: CultivationCandidate; data: Cultivation
 function CandidateComparison({ model: m, data }: { model: Model; data: CultivationData }) {
   const [search, setSearch] = useState('')
   const [visible, setVisible] = useState(50)
-  const rows = useMemo(() => data.candidates.filter((row) => row.name.includes(search.trim())).sort((a, b) => (b.weightedFrequency ?? b.frequency) - (a.weightedFrequency ?? a.frequency)), [data, search])
+  const rows = useMemo(() => data.candidates.filter((row) => matchesSearch(row.name, search)).sort((a, b) => (b.weightedFrequency ?? b.frequency) - (a.weightedFrequency ?? a.frequency)), [data, search])
   return <>
     <SectionTitle title={text.comparison} description={text.comparisonHint} />
     <div className="v2-cultivation-search"><Field label={text.search} type="search" value={search} onChange={(event) => { setSearch(event.target.value); setVisible(50) }} /></div>
@@ -120,7 +121,7 @@ function CandidateComparison({ model: m, data }: { model: Model; data: Cultivati
 function SpecialItems({ data, preference }: Parameters<typeof useSpecialItems>[0]) {
   const m = useSpecialItems({ data, preference })
   const [search, setSearch] = useState('')
-  const items = m.items.filter((item) => `${item.name} ${item.scope}`.toLowerCase().includes(search.trim().toLowerCase()))
+  const items = m.items.filter((item) => matchesSearch(`${item.name} ${item.scope}`, search))
   return <>
     <SectionTitle title={text.specialItems} description={text.specialHint} />
     {!m.items.length ? <EmptyState title={text.noSpecialItems} /> : <div className="v2-special-workspace">

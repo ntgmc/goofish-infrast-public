@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { SupportIcon as ArrowUpRight, SearchIcon as Search } from '../../../components/icons'
 import { copy } from '../../../copy'
+import { matchesSearch } from '../../../lib/search'
 import { legalContent, pageMeta, EFFECTIVE_DATE, type PublicInfoPageKind } from '../../PublicInfoPage'
 import { usePublicContent } from '../../../lib/public-content-context'
 import { groupFaqItems } from '../../../lib/faq-groups'
@@ -22,17 +23,17 @@ function Help() {
   const { content } = usePublicContent()
   const [search, setSearch] = useState('')
   const input = useRef<HTMLInputElement>(null)
-  const terms = search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)
-  const items = content.faq.items.filter((item) => terms.every((term) => `${item.question}\n${item.answer}`.toLocaleLowerCase().includes(term)))
+  const searching = Boolean(search.trim())
+  const items = content.faq.items.filter((item) => matchesSearch(`${item.question}\n${item.answer}`, search))
   const groups = groupFaqItems(items)
-  return <div className="v2-help-workspace"><div className="v2-help-search"><p className="v2-lead">{content.faq.intro}</p><label className="v2-field" htmlFor="v2-faq-search"><span>{copy.public.faq_search_label}</span><span className="v2-search"><Search size={18} aria-hidden="true" /><input id="v2-faq-search" ref={input} type="search" value={search} placeholder={copy.public.faq_search_placeholder} aria-describedby="v2-faq-results" onChange={(event) => setSearch(event.target.value)} /></span></label>{search && <button type="button" className="v2-text-button" onClick={() => { setSearch(''); input.current?.focus() }}>{copy.public.faq_search_clear}</button>}<p id="v2-faq-results" role="status" className="v2-muted">{terms.length ? copy.public.faq_search_results(items.length) : copy.public.faq_total(items.length)}</p>
+  return <div className="v2-help-workspace"><div className="v2-help-search"><p className="v2-lead">{content.faq.intro}</p><label className="v2-field" htmlFor="v2-faq-search"><span>{copy.public.faq_search_label}</span><span className="v2-search"><Search size={18} aria-hidden="true" /><input id="v2-faq-search" ref={input} type="search" value={search} placeholder={copy.public.faq_search_placeholder} aria-describedby="v2-faq-results" onChange={(event) => setSearch(event.target.value)} /></span></label>{search && <button type="button" className="v2-text-button" onClick={() => { setSearch(''); input.current?.focus() }}>{copy.public.faq_search_clear}</button>}<p id="v2-faq-results" role="status" className="v2-muted">{searching ? copy.public.faq_search_results(items.length) : copy.public.faq_total(items.length)}</p>
       <nav className="v2-help-groups" aria-label={copy.public.faq_groups_label}>{groups.map((group) => <a key={group.id} href={`#faq-${group.id}`}><span>{group.title}</span><small>{group.items.length}</small></a>)}</nav>
     </div>
     <section className="v2-help-answers" aria-label={copy.public.pages_PublicInfoPage_064}>
       {!items.length && <EmptyState title={copy.public.faq_search_empty}>{copy.public.faq_search_empty_hint}</EmptyState>}
       {groups.map((group) => <section key={group.id} id={`faq-${group.id}`} className="v2-help-group" aria-labelledby={`faq-${group.id}-title`} tabIndex={-1}>
         <h2 id={`faq-${group.id}-title`}>{group.title}</h2>
-        {group.items.map((item, index) => <details key={item.id} open={terms.length > 0 || undefined}><summary><span className="v2-section-number">{String(index + 1).padStart(2, '0')}</span><strong>{item.question}</strong><span aria-hidden="true">+</span></summary><div><p>{item.answer}</p>{item.action === 'qq_group' && <FeedbackLink className="v2-button v2-button-secondary" />}</div></details>)}
+        {group.items.map((item, index) => <details key={item.id} open={searching || undefined}><summary><span className="v2-section-number">{String(index + 1).padStart(2, '0')}</span><strong>{item.question}</strong><span aria-hidden="true">+</span></summary><div><p>{item.answer}</p>{item.action === 'qq_group' && <FeedbackLink className="v2-button v2-button-secondary" />}</div></details>)}
       </section>)}
     </section>
     <aside className="v2-help-contact"><SectionTitle title={content.faq.cta_heading} description={content.faq.cta_body} /><FeedbackLink className="v2-button v2-button-primary" /></aside>

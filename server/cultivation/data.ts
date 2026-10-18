@@ -1,3 +1,4 @@
+import { matchesSearch } from '../../src/lib/search'
 import { defaultCultivationQuery, matchesCultivationRarity, type CultivationCandidate, type CultivationData, type CultivationQuery } from '../../src/lib/cultivation-contract'
 import { getExpSanity, getNetLmdSanity, type PricingState } from '../handlers/material-value'
 import type { PrtsSnapshot } from './catalog'
@@ -73,7 +74,7 @@ export function buildCultivationData(snapshot: PrtsSnapshot, playerInfo: unknown
     const statistics = community?.operators[id]
     const operator = snapshot.operators[id]
     if (!statistics || statistics.owned < 100 || operator.rarity < 4) continue
-    if (!matchesCultivationRarity(operator.rarity, query) || query.profession && operator.profession !== query.profession || query.search && !operator.name.toLowerCase().includes(query.search.trim().toLowerCase())) continue
+    if (!matchesCultivationRarity(operator.rarity, query) || query.profession && operator.profession !== query.profession || !matchesSearch(operator.name, query.search)) continue
     const addCommunity = (target: CultivationCandidate['target'], rate: number) => {
       if (rate <= 0) return
       const skillId = operator.skills[target.skill - 1] ?? ''

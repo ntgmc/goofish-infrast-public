@@ -4,6 +4,7 @@ import PublicFooter, { FeedbackLink } from '../components/PublicFooter'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import { useRef, useState } from 'react'
 import { SearchIcon as Search } from '../components/icons'
+import { matchesSearch } from '../lib/search'
 import { Link } from 'react-router'
 import { copy } from '../copy/index'
 import { productPolicies } from '../lib/product-catalog'
@@ -192,11 +193,8 @@ function FaqContent() {
   const { content } = usePublicContent()
   const [search, setSearch] = useState('')
   const searchInput = useRef<HTMLInputElement>(null)
-  const terms = search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)
-  const items = content.faq.items.filter((item) => {
-    const text = `${item.question}\n${item.answer}`.toLocaleLowerCase()
-    return terms.every((term) => text.includes(term))
-  })
+  const searching = Boolean(search.trim())
+  const items = content.faq.items.filter((item) => matchesSearch(`${item.question}\n${item.answer}`, search))
   const groups = groupFaqItems(items)
   return (
     <section className="document-faq" aria-label={copy.public.pages_PublicInfoPage_064}>
@@ -211,7 +209,7 @@ function FaqContent() {
           {search && <button type="button" className="tool-secondary-action shrink-0" onClick={() => { setSearch(''); searchInput.current?.focus() }}>{copy.public.faq_search_clear}</button>}
         </div>
         <p id="faq-search-results" role="status" className="mt-2 text-sm text-ink-muted">
-          {terms.length > 0 ? copy.public.faq_search_results(items.length) : copy.public.faq_total(items.length)}
+          {searching ? copy.public.faq_search_results(items.length) : copy.public.faq_total(items.length)}
         </p>
       </div>
       {items.length === 0 && <div className="border-y border-surface-3 py-8">
@@ -225,7 +223,7 @@ function FaqContent() {
         {groups.map((group) => <section key={group.id} id={`faq-${group.id}`} aria-labelledby={`faq-${group.id}-title`} tabIndex={-1} className="mb-8 scroll-mt-6">
           <h2 id={`faq-${group.id}-title`} className="mb-2 text-xl font-semibold text-ink-primary">{group.title}</h2>
           {group.items.map((item) => (
-          <details key={item.id} open={terms.length > 0 || undefined} className="group border-b border-surface-3 py-3 transition-colors has-[summary:focus-visible]:border-brand-500/55 has-[summary:focus-visible]:bg-surface-1">
+          <details key={item.id} open={searching || undefined} className="group border-b border-surface-3 py-3 transition-colors has-[summary:focus-visible]:border-brand-500/55 has-[summary:focus-visible]:bg-surface-1">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-5 rounded-lg text-base font-semibold text-ink-primary focus-visible:outline-none">
               {item.question}
               <span className="text-xl leading-none text-brand-300 transition group-open:rotate-45" aria-hidden="true">+</span>

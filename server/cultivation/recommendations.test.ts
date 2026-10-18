@@ -114,6 +114,9 @@ describe('independent cultivation recommendation evidence', () => {
     expect(ids({ ...defaultCultivationQuery, rarityGroup: 'low' })).toEqual(['char_r1', 'char_r2', 'char_r3'])
     expect(ids({ ...defaultCultivationQuery, rarityGroup: 'all' })).toHaveLength(6)
     expect(ids({ ...defaultCultivationQuery, rarity: 3 })).toEqual(['char_r3'])
+    expect(ids({ ...defaultCultivationQuery, search: 'ganyuan4' })).toEqual(['char_r4'])
+    expect(ids({ ...defaultCultivationQuery, search: 'GY5' })).toEqual(['char_r5'])
+    expect(ids({ ...defaultCultivationQuery, search: '干员 6' })).toEqual(['char_r6'])
   })
 
   it('keeps compact strategy identities even when homework actions are large', () => {

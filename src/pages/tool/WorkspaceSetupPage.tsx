@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LayoutGroup } from 'motion/react'
-import PinyinMatch from 'pinyin-match'
+import { matchesSearch } from '../../lib/search'
 import type { Announcement, AuthSuccessResponse, AuthUser, IntermediateProduct, LicenseConfig, LicenseOperator, UserGameAccount, UserWorkspace } from '../../lib/types'
 import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
@@ -114,7 +114,7 @@ export default function WorkspaceSetupPage({
   const filteredOperators = useMemo(() => {
     const keyword = operatorSearch.trim()
     const source = sortOperatorsForPreview((operators ?? []).filter((operator) => operator.own !== false))
-    return keyword ? source.filter((operator) => PinyinMatch.match(operator.name, keyword)) : source
+    return source.filter((operator) => matchesSearch(operator.name, keyword))
   }, [operatorSearch, operators])
   const setupSections: Array<{ id: WorkspaceSetupSection; label: string; ready?: boolean }> = [
     { id: 'operators', label: copy.workspace.pages_tool_WorkspaceSetupPage_001, ready: Boolean(operators) },

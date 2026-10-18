@@ -898,6 +898,14 @@ describe('CDK redemption PostgreSQL concurrency', () => {
       .resolves.toMatchObject({ profiles: [{ id: underscore.profile.id }] })
     await expect(listCommercialProfiles({ userId, state: 'active', query: '\\' }))
       .resolves.toMatchObject({ profiles: [{ display_name: '反\\斜线' }] })
+    const firstPage = await listCommercialProfiles({ userId, state: 'active', query: 'QUDAO', limit: 1 })
+    expect(firstPage.profiles).toHaveLength(1)
+    expect(firstPage.next_cursor).not.toBeNull()
+    const secondPage = await listCommercialProfiles({ userId, state: 'active', query: 'qd', limit: 1, cursor: firstPage.next_cursor })
+    expect(secondPage.profiles).toHaveLength(1)
+    expect(secondPage.profiles[0].id).not.toBe(firstPage.profiles[0].id)
+    await expect(listCommercialProfiles({ userId: await seedUser(), state: 'active', query: 'qd' }))
+      .resolves.toMatchObject({ profiles: [], next_cursor: null })
 
     const operationId = randomUUID()
     await expect(batchArchiveCommercialProfiles({
@@ -926,6 +934,8 @@ describe('CDK redemption PostgreSQL concurrency', () => {
       replayed: false,
     })
     expect(replay).toEqual({ ...archived, replayed: true })
+    const archivedMatches = await listCommercialProfiles({ userId, state: 'archived', query: 'qd' })
+    expect(archivedMatches.profiles.map((profile) => profile.id).sort()).toEqual([percent.profile.id, underscore.profile.id].sort())
   })
 
   it('deletes balance accounts and transactions with the user', async () => {

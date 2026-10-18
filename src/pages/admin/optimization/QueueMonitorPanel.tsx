@@ -1,6 +1,7 @@
 import { ExpandIcon as ChevronDown, CollapsedIcon as ChevronRight, RefreshIcon as RefreshCw, SearchIcon as Search } from '../../../components/icons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { adminApiJson } from '../../../lib/admin-api-client'
+import { matchesSearch } from '../../../lib/search'
 import type {
   AdminOptimizationQueueJob,
   AdminOptimizationQueueSnapshot,
@@ -402,10 +403,7 @@ function matchesFilters(job: AdminOptimizationQueueJob, filters: Filters): boole
   if (filters.status !== 'all' && job.status !== filters.status) return false
   if (filters.source !== 'all' && job.source !== filters.source) return false
   if (filters.priority !== 'all' && job.priority.label !== filters.priority) return false
-  const query = filters.query.trim().toLocaleLowerCase()
-  if (!query) return true
-  return [job.id, job.user?.email, job.user?.id, job.profile?.id, job.profile?.display_name]
-    .some((value) => value?.toLocaleLowerCase().includes(query))
+  return matchesSearch([job.id, job.user?.email, job.user?.id, job.profile?.id, job.profile?.display_name].join(' '), filters.query)
 }
 
 function statusLabel(status: AdminOptimizationQueueStatus): string {

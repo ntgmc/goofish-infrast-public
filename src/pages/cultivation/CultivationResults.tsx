@@ -1,4 +1,5 @@
 import { memo, useMemo, useState } from 'react'
+import { matchesSearch } from '../../lib/search'
 import { ExternalLinkIcon as ExternalLink, UndoIcon as RotateCcw, ExcludeIcon as X } from '../../components/icons'
 import { copy } from '../../copy/index'
 import type { CultivationCandidate, CultivationData } from '../../lib/cultivation-contract'
@@ -64,7 +65,7 @@ type Props = { data: CultivationData; recommendations: CultivationCandidate[]; e
 export default memo(function CultivationResults({ data, recommendations, excluded, exclude, projectScope }: Props) {
   const [search, setSearch] = useState('')
   const [visible, setVisible] = useState(50)
-  const rows = useMemo(() => data.candidates.filter((row) => row.name.includes(search)).sort((a, b) => (b.weightedFrequency ?? b.frequency) - (a.weightedFrequency ?? a.frequency)), [data, search])
+  const rows = useMemo(() => data.candidates.filter((row) => matchesSearch(row.name, search)).sort((a, b) => (b.weightedFrequency ?? b.frequency) - (a.weightedFrequency ?? a.frequency)), [data, search])
   return <>
     <section className="workspace-cultivation-suggestions tool-panel p-5 sm:p-6">
       <h2 className="text-lg font-semibold">{label.suggestions}</h2>

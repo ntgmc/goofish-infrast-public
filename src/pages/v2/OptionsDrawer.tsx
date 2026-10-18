@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import PinyinMatch from 'pinyin-match'
+import { matchesSearch } from '../../lib/search'
 import ConfigCapabilityPreview from '../../components/ConfigCapabilityPreview'
 import type { ConfigDiffItem } from '../../lib/workspace-history'
 import { NextIcon as ArrowRight, SelectedIcon as Check, LogoutIcon as LogOut, RefreshIcon as RefreshCw, SearchIcon as Search, UploadIcon as Upload, AccountIcon as UserRound, SuccessIcon } from '../../components/icons'
@@ -82,7 +82,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
     : shownPanel === 'operators' ? exampleData ? text.sampleOperatorDescription : text.operatorDescription
       : shownPanel === 'account' ? text.accountDescription : text.roomDescription
 
-  const filteredOperators = search.trim() ? operators.filter((operator) => PinyinMatch.match(operator.name, search.trim())) : operators
+  const filteredOperators = operators.filter((operator) => matchesSearch(operator.name, search))
   const canUpload = !session.activeProfile || !isFreePreviewProfile(session.activeProfile)
   async function refreshSkland() {
     if (!session.activeProfile || importBusy || busy) return
