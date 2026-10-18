@@ -70,13 +70,13 @@ describe('cultivation snapshot loading', () => {
     expect(files.stat).toHaveBeenCalledTimes(3)
   })
 
-  it('does not let an invalidated in-flight read overwrite the newer snapshot', async () => {
+  it('does not let a released in-flight read overwrite the newer snapshot', async () => {
     let resolveOld!: (content: string) => void
     files.readFile.mockImplementationOnce(() => new Promise<string>((resolve) => { resolveOld = resolve }))
-    const { invalidatePrtsSnapshot, readPrtsSnapshot } = await import('./catalog')
+    const { releasePrtsSnapshot, readPrtsSnapshot } = await import('./catalog')
     const old = readPrtsSnapshot()
     await vi.waitFor(() => expect(files.readFile).toHaveBeenCalledOnce())
-    invalidatePrtsSnapshot()
+    releasePrtsSnapshot()
     files.stat.mockResolvedValue({ mtimeMs: 2, size: 1100 })
     files.readFile.mockResolvedValue(JSON.stringify({ ...planningFixture(), cursor: 21 }))
     const latest = await readPrtsSnapshot()
@@ -86,10 +86,10 @@ describe('cultivation snapshot loading', () => {
     expect(files.readFile).toHaveBeenCalledTimes(2)
   })
 
-  it('reloads after a successful background sync and never serves another path as fallback', async () => {
-    const { invalidatePrtsSnapshot, readPrtsSnapshot, releasePrtsSnapshot } = await import('./catalog')
+  it('reloads after release and never serves another path as fallback', async () => {
+    const { readPrtsSnapshot, releasePrtsSnapshot } = await import('./catalog')
     await readPrtsSnapshot()
-    invalidatePrtsSnapshot()
+    releasePrtsSnapshot()
     files.stat.mockResolvedValue({ mtimeMs: 2, size: 1100 })
     files.readFile.mockResolvedValue(JSON.stringify({ ...planningFixture(), cursor: 21 }))
     expect((await readPrtsSnapshot()).cursor).toBe(21)

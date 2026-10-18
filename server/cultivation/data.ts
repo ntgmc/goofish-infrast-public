@@ -1,10 +1,10 @@
 import { matchesSearch } from '../../src/lib/search'
-import { defaultCultivationQuery, matchesCultivationRarity, type CultivationCandidate, type CultivationData, type CultivationQuery } from '../../src/lib/cultivation-contract'
+import { matchesCultivationRarity, type CultivationCandidate, type CultivationData, type CultivationQuery } from '../../src/lib/cultivation-contract'
 import { getExpSanity, getNetLmdSanity, type PricingState } from '../handlers/material-value'
 import type { PrtsSnapshot } from './catalog'
 import { cultivationCosts, cultivationSatisfied } from './costs'
 import { readCultivationPlayer } from './player'
-import { getCultivationRecommendations } from './recommendations'
+import type { PublicRecommendations } from './public-evidence'
 import { buildSpecialItemRecommendations, type SpecialItemCatalog } from './special-items'
 
 export function cultivationResources(snapshot: PrtsSnapshot, player: ReturnType<typeof readCultivationPlayer>, pricing: PricingState) {
@@ -19,16 +19,16 @@ export function cultivationResources(snapshot: PrtsSnapshot, player: ReturnType<
     updatedAt: snapshot.updatedAt, importedAt: new Date().toISOString(), pricingStatus: pricing.status }
 }
 
-export function buildCultivationData(snapshot: PrtsSnapshot, playerInfo: unknown, cultivatePlayer: unknown, pricing: PricingState, community?: CultivationData['community'], specialCatalog?: SpecialItemCatalog, query: CultivationQuery = defaultCultivationQuery): CultivationData {
+export function buildCultivationData(snapshot: PrtsSnapshot, playerInfo: unknown, cultivatePlayer: unknown, pricing: PricingState, community: CultivationData['community'] | undefined, specialCatalog: SpecialItemCatalog | undefined, query: CultivationQuery, recommendation: PublicRecommendations): CultivationData {
   const player = readCultivationPlayer(playerInfo, cultivatePlayer, snapshot)
   const candidates = new Map<string, CultivationCandidate & { stages: Set<string> }>()
   const missingOperators = new Set<string>()
-  const recommendation = getCultivationRecommendations(snapshot, query)
   const groups = new Map<string, NonNullable<CultivationData['groups']>[number]>()
   const demands = new Map<string, { total: number; skills: Record<number, number>; elite: number }>()
   const countedDemands = new Set<string>()
   for (const branch of recommendation.recommendations) {
     const operator = snapshot.operators[branch.operatorId]
+    if (!matchesCultivationRarity(operator.rarity, query) || query.profession && operator.profession !== query.profession || !matchesSearch(operator.name, query.search)) continue
     const current = player.characters.get(branch.operatorId)
     const skillId = operator.skills[branch.target.skill - 1] ?? ''
     const key = `${branch.operatorId}:${JSON.stringify(branch.target)}`
@@ -38,34 +38,34 @@ export function buildCultivationData(snapshot: PrtsSnapshot, playerInfo: unknown
       demandKeys: [] as string[], demandWeights: {} as Record<string, number>, frequency: 0, weightedFrequency: 0, fixedFrequency: 0, stageCount: 0, examples: [] as number[],
       ...cost, satisfied: cost.warnings.length === 0 && cultivationSatisfied(current, branch.target, skillId), stages: new Set<string>() } : null
     for (const sample of branch.samples) {
-      const { requirement, document, weight, group, options } = sample
-      const demandKey = `${sample.family}:${group === null ? 'fixed:' + branch.operatorId : 'group:' + group}`
-      if (group !== null) {
-        const valid = options.filter((row) => row.operator && !row.warnings.length)
-        if (valid.some((row) => {
-          const current = player.characters.get(row.operator!.id)
-          return current && cultivationSatisfied(current, row.target, row.operator!.skills[row.target.skill - 1] ?? '')
+      const [family, homeworkId, stage, weight, elite, masterySkill, groupId] = recommendation.samples[sample]
+      const group = groupId < 0 ? null : recommendation.groups[groupId]
+      const demandKey = `${family}:${group ? 'group:' + group.key : 'fixed:' + branch.operatorId}`
+      if (group) {
+        if (group.options.some((row) => {
+          const current = player.characters.get(row.operatorId)
+          return current && cultivationSatisfied(current, row.target, row.skillId)
         })) continue
-        groups.set(demandKey, { key: demandKey, options: valid.map((row) => ({ operatorId: row.operator!.id, target: row.target, skillId: row.operator!.skills[row.target.skill - 1] ?? '' })) })
+        groups.set(demandKey, { ...group, key: demandKey })
       }
-      const demandId = `${branch.operatorId}:${demandKey}:${document.homework.id}`
+      const demandId = `${branch.operatorId}:${demandKey}:${homeworkId}`
       if (!countedDemands.has(demandId)) {
         countedDemands.add(demandId)
         const count = demands.get(branch.operatorId) ?? { total: 0, skills: {}, elite: 0 }
         count.total += weight
-        if (requirement.target.elite === 2) count.elite += weight
-        if (requirement.target.skillLevel > 7) count.skills[requirement.target.skill] = (count.skills[requirement.target.skill] ?? 0) + weight
+        if (elite === 2) count.elite += weight
+        if (masterySkill > 0) count.skills[masterySkill] = (count.skills[masterySkill] ?? 0) + weight
         demands.set(branch.operatorId, count)
       }
       if (!entry) { missingOperators.add(operator.name); continue }
       if (!entry.demandKeys.includes(demandKey)) {
         entry.demandKeys.push(demandKey); entry.frequency++
-        if (group === null) entry.fixedFrequency++
-        if (entry.examples.length < 3) entry.examples.push(document.homework.id)
+        if (!group) entry.fixedFrequency++
+        if (entry.examples.length < 3) entry.examples.push(homeworkId)
       }
       entry.demandWeights[demandKey] = (entry.demandWeights[demandKey] ?? 0) + weight
       entry.weightedFrequency += weight
-      entry.stages.add(document.homework.stageId)
+      entry.stages.add(recommendation.stages[stage].id)
     }
     if (entry?.frequency) candidates.set(key, entry)
   }

@@ -48,7 +48,8 @@ export async function readPrtsSnapshot(): Promise<PrtsSnapshot> {
   const previous = cached?.path === path ? cached : null
   if (previous && now < previous.nextCheck) return previous.data
   if (pending?.path === path) return pending.data
-  const data: Promise<PrtsSnapshot> = (async () => {
+  let data!: Promise<PrtsSnapshot>
+  data = (async () => {
     try {
       const info = await stat(path)
       const snapshot = previous?.modified === info.mtimeMs && previous.size === info.size
@@ -63,11 +64,6 @@ export async function readPrtsSnapshot(): Promise<PrtsSnapshot> {
   })().finally(() => { if (pending?.data === data) pending = null })
   pending = { path, data }
   return data
-}
-
-export function invalidatePrtsSnapshot(): void {
-  if (cached) cached.nextCheck = 0
-  pending = null
 }
 
 export function releasePrtsSnapshot(): void {

@@ -5,7 +5,13 @@ import { cultivationCosts } from './costs'
 import { buildCultivationData as buildData } from './data'
 import { defaultCultivationQuery } from '../../src/lib/cultivation-contract'
 
-const buildCultivationData = (...args: Parameters<typeof buildData>) => buildData(args[0], args[1], args[2], args[3], args[4], args[5], { ...defaultCultivationQuery, stageId: 'main_01' })
+import { calculateCultivationRecommendations } from './recommendations'
+import { compactRecommendations } from './public-evidence'
+const buildCultivationData = (snapshot: Parameters<typeof buildData>[0], game: unknown, inventory: unknown,
+  pricing: Parameters<typeof buildData>[3], community?: Parameters<typeof buildData>[4], catalog?: Parameters<typeof buildData>[5]) => {
+  const query = { ...defaultCultivationQuery, stageId: 'main_01' }
+  return buildData(snapshot, game, inventory, pricing, community, catalog, query, compactRecommendations(calculateCultivationRecommendations(snapshot, query)))
+}
 import { readHomeworkRequirements } from './requirements'
 import type { CultivationCurrent, CultivationTarget } from '../../src/lib/cultivation-contract'
 

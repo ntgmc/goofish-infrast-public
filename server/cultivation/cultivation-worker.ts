@@ -1,8 +1,6 @@
-import { parentPort } from 'node:worker_threads'
-import { syncPrtsPlanning } from '../../scripts/prts-planning-sync.mjs'
 import { getYituliuPricing } from '../handlers/material-value'
-import { invalidatePrtsSnapshot, readPrtsSnapshot, releasePrtsSnapshot } from './catalog'
-import { cultivationDayStart } from './cache-policy'
+import { defaultCultivationQuery } from '../../src/lib/cultivation-contract'
+import { buildPublicEvidence, readStoredRecommendations } from './public-store'
 import { buildCultivationData } from './data'
 import { buildCultivationProjects } from './projects'
 import { readProjectCatalog } from './project-catalog'
@@ -12,23 +10,39 @@ import { CultivationReadError, type CultivationTask, type CultivationWorkerReply
 
 let controller: AbortController | null = null
 
-parentPort!.on('message', (task: CultivationTask | { type: 'cancel' | 'invalidate' }) => {
+function reply(message: CultivationWorkerReply) {
+  if (process.connected) process.send!(message)
+}
+
+process.once('disconnect', () => { controller?.abort() })
+process.on('message', (task: CultivationTask | { type: 'cancel' }) => {
   if (task.type === 'cancel') { controller?.abort(); return }
-  if (task.type === 'invalidate') { invalidatePrtsSnapshot(); return }
   controller = new AbortController()
   const signal = controller.signal
   void execute(task, signal).then(
-    (result) => parentPort!.postMessage({ ok: true, result } satisfies CultivationWorkerReply, result ? [result] : []),
+    (result) => reply({ ok: true, result }),
     (error: unknown) => {
-      const reply: CultivationWorkerReply = error instanceof CultivationReadError
+      const failure: CultivationWorkerReply = error instanceof CultivationReadError
         ? { ok: false, status: error.status, code: error.code, message: error.message }
         : { ok: false, status: 502, code: 'cultivation_failed', message: '读取养成数据失败，请稍后重试。' }
-      parentPort!.postMessage(reply)
+      reply(failure)
     },
   ).finally(() => { controller = null })
 })
 
 async function execute(task: CultivationTask, signal: AbortSignal): Promise<ArrayBuffer | null> {
+  if (task.type === 'prepare' || task.type === 'refresh') {
+    try { await buildPublicEvidence(task.type === 'prepare' ? task.query : defaultCultivationQuery, signal, task.type === 'refresh') }
+    catch (error) {
+      signal.throwIfAborted()
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT')
+        throw new CultivationReadError('作业数据暂不可用，请等待管理员导入后重试。', 503, 'prts_data_unavailable')
+      if (error instanceof Error && /database is locked/.test(error.message))
+        throw new CultivationReadError('养成数据正在更新，请稍后重试。', 503, 'cultivation_busy')
+      throw error
+    }
+    return null
+  }
   if (task.type === 'plan' && task.projects !== undefined) {
     let snapshot
     try { snapshot = await readProjectCatalog(signal) }
@@ -41,22 +55,16 @@ async function execute(task: CultivationTask, signal: AbortSignal): Promise<Arra
     const data = buildCultivationProjects(snapshot, task.game, task.inventory, pricing, task.projects)
     return encodePlan(data, task)
   }
-  let snapshot
-  try { snapshot = await readPrtsSnapshot() }
-  catch { throw new CultivationReadError('作业数据暂不可用，请等待管理员导入后重试。', 503, 'prts_data_unavailable') }
+  let saved: ReturnType<typeof readStoredRecommendations>
+  try { saved = readStoredRecommendations(task.query) }
+  catch { throw new CultivationReadError('作业数据暂不可用，请稍后重试。', 503, 'public_evidence_invalid') }
+  const { snapshot, recommendation } = saved
   signal.throwIfAborted()
-  if (task.type === 'refresh') {
-    if (Date.parse(snapshot.updatedAt) >= cultivationDayStart()) return null
-    snapshot = undefined
-    releasePrtsSnapshot()
-    await syncPrtsPlanning({ signal })
-    return null
-  }
   const [pricing, community, specialCatalog] = await Promise.all([
     getYituliuPricing(), getCultivationStatistics(), getSpecialItemCatalog(snapshot.operators),
   ])
   signal.throwIfAborted()
-  return encodePlan(buildCultivationData(snapshot, task.game, task.inventory, pricing, community, specialCatalog, task.query), task)
+  return encodePlan(buildCultivationData(snapshot, task.game, task.inventory, pricing, community, specialCatalog, task.query, recommendation), task)
 }
 
 function encodePlan(data: import('../../src/lib/cultivation-contract').CultivationData, task: Extract<CultivationTask, { type: 'plan' }>): ArrayBuffer {

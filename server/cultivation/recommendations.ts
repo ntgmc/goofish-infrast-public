@@ -3,12 +3,11 @@ import { matchesSearch } from '../../src/lib/search'
 import { defaultCultivationQuery, matchesCultivationRarity, type CultivationQuery, type CultivationTarget, type CultivationCandidate } from '../../src/lib/cultivation-contract'
 import { asRecord, asRows, type PrtsSnapshot } from './catalog'
 import { readHomeworkRequirements } from './requirements'
-import { cultivationDayStart } from './cache-policy'
 
 type Requirement = ReturnType<typeof readHomeworkRequirements>['fixed'][number]
 type Member = { requirement: Requirement; share: number; group: string | null; options: Requirement[] }
-type Document = { homework: PrtsSnapshot['homeworks'][number]; members: Member[]; skeleton: string; variant: string; published: number }
-type Family = { key: string; documents: Document[]; published: number }
+type Document = { homework: Pick<PrtsSnapshot['homeworks'][number], 'id' | 'stageId' | 'mode' | 'likes' | 'dislikes' | 'views'>; members: Member[]; skeleton: string; variant: string; published: number }
+type Family = { key: string; documents: Document[]; published: number; count: number }
 type Sample = Member & { family: string; document: Document; weight: number; recent: boolean; quality: number }
 
 function canonical(value: unknown): string {
@@ -65,7 +64,8 @@ function parse(snapshot: PrtsSnapshot, homework: PrtsSnapshot['homeworks'][numbe
   const controls = [...asRows(homework.content.opers), ...asRows(homework.content.groups).flatMap((group) => asRows(group.opers))]
     .map((row) => [aliases.get(String(row.name)) ?? row.name, row.skill_usage ?? 0, row.skill_times ?? 1]).sort((a, b) => canonical(a).localeCompare(canonical(b)))
   const variant = fingerprint([[...unique].sort(([a], [b]) => a.localeCompare(b)).map(([id, row]) => [id, row.requirement.target, row.requirement.specified, row.share, row.group]), controls, executable])
-  return { homework, members: [...unique.values()], skeleton, variant, published }
+  const { id, stageId, mode, likes, dislikes, views } = homework
+  return { homework: { id, stageId, mode, likes, dislikes, views }, members: [...unique.values()], skeleton, variant, published }
 }
 
 function stageInfo(snapshot: PrtsSnapshot, id: string) {
@@ -78,7 +78,7 @@ function covers(target: CultivationTarget, other: CultivationTarget) {
     && (target.elite > other.elite || target.elite === other.elite && target.level >= other.level) && target.skillLevel >= other.skillLevel
 }
 
-function prepareRecommendations(snapshot: PrtsSnapshot) {
+export function prepareRecommendations(snapshot: PrtsSnapshot) {
   const documents = snapshot.homeworks.map((row) => parse(snapshot, row)).filter((row): row is Document => row !== null)
   const buckets = new Map<string, Family[]>()
   for (const document of documents.sort((a, b) => a.published - b.published || a.homework.id - b.homework.id)) {
@@ -90,14 +90,29 @@ function prepareRecommendations(snapshot: PrtsSnapshot) {
       return 2 * anchor.filter((id) => identities.has(id)).length / (anchor.length + identities.size) >= 0.85
     })
     if (family) family.documents.push(document)
-    else bucket.push({ key: String(document.homework.id), documents: [document], published: document.published })
+    else bucket.push({ key: String(document.homework.id), documents: [document], published: document.published, count: 0 })
     buckets.set(key, bucket)
   }
-  return { documents, families: [...buckets.values()].flat() }
+  const families = [...buckets.values()].flat()
+  for (const family of families) {
+    family.count = family.documents.length
+    const variants = new Map<string, Document>()
+    for (const document of family.documents) {
+      const previous = variants.get(document.variant)
+      const votes = (row: Document) => (row.homework.likes ?? 0) + (row.homework.dislikes ?? 0)
+      if (!previous || votes(document) > votes(previous) || votes(document) === votes(previous) && document.homework.id < previous.homework.id) variants.set(document.variant, document)
+    }
+    family.documents = [...variants.values()]
+  }
+  return { families,
+    invalid: snapshot.homeworks.length - documents.length + documents.reduce((sum, row) => sum + row.members.filter((member) => member.requirement.moduleUnresolved).length, 0),
+    stages: [...new Set(documents.map((row) => row.homework.stageId))].map((id) => ({ id, ...stageInfo(snapshot, id) })),
+    professions: [...new Set(Object.values(snapshot.operators).flatMap((row) => row.profession ? [row.profession] : []))].sort() }
+
 }
 
 export function calculateCultivationRecommendations(snapshot: PrtsSnapshot, query: CultivationQuery = defaultCultivationQuery, now = Date.now(), prepared = prepareRecommendations(snapshot)) {
-  const { documents, families } = prepared
+  const { families } = prepared
   const cutoff = now - (query.days || 180) * 86400000
   const selected = families.filter((family) => {
     const id = family.documents[0].homework.stageId, stage = stageInfo(snapshot, id)
@@ -108,7 +123,6 @@ export function calculateCultivationRecommendations(snapshot: PrtsSnapshot, quer
   })
   const stageFamilies = new Map<string, number>()
   const categories = new Map<string, Map<string, Set<string>>>()
-  const variants = new Map<Family, Document[]>()
   const exposures = new Map<string, number[]>()
   for (const family of selected) {
     const first = family.documents[0], stage = stageInfo(snapshot, first.homework.stageId), key = stageKey(first)
@@ -119,14 +133,7 @@ export function calculateCultivationRecommendations(snapshot: PrtsSnapshot, quer
     stages.add(key)
     activities.set(stage.activity, stages)
     categories.set(category, activities)
-    const byVariant = new Map<string, Document>()
     for (const document of family.documents) {
-      const previous = byVariant.get(document.variant)
-      const votes = (row: Document) => (row.homework.likes ?? 0) + (row.homework.dislikes ?? 0)
-      if (!previous || votes(document) > votes(previous) || votes(document) === votes(previous) && document.homework.id < previous.homework.id) byVariant.set(document.variant, document)
-    }
-    variants.set(family, [...byVariant.values()])
-    for (const document of byVariant.values()) {
       const key = `${stageKey(document)}:${ageBucket((now - family.published) / 86400000)}`
       const values = exposures.get(key) ?? []
       values.push(Math.log1p(document.homework.views ?? 0))
@@ -138,7 +145,7 @@ export function calculateCultivationRecommendations(snapshot: PrtsSnapshot, quer
   const otherCount = categories.size - permanentCount
   const budget = (permanentCount ? 0.3 : 0) + (otherCount ? 0.7 : 0)
   const byOperator = new Map<string, Sample[]>()
-  for (const family of selected) for (const document of variants.get(family)!) {
+  for (const family of selected) for (const document of family.documents) {
     const homework = document.homework, stage = stageInfo(snapshot, homework.stageId)
     const [lower, upper] = wilson(homework.likes ?? 0, homework.dislikes ?? 0)
     if (upper < 0.6 || !query.includeUncertain && !(homework.likes || homework.dislikes)) continue
@@ -149,7 +156,7 @@ export function calculateCultivationRecommendations(snapshot: PrtsSnapshot, quer
     const balance = (stage.permanent ? 0.3 / permanentCount : 0.7 / otherCount) / budget / activities.size / activities.get(stage.activity)!.size
     const quality = homework.likes || homework.dislikes ? lower : 0.05
     if (quality <= 0) continue
-    const weight = 100 * quality * (0.25 + 0.75 * Math.min(age / 3, 1)) * 2 ** (-age / 180) * exposure * balance / variants.get(family)!.length / stageFamilies.get(stageKey(document))!
+    const weight = 100 * quality * (0.25 + 0.75 * Math.min(age / 3, 1)) * 2 ** (-age / 180) * exposure * balance / family.documents.length / stageFamilies.get(stageKey(document))!
     for (const member of document.members) {
       if (!query.includeAlternatives && member.group !== null) continue
       const operator = member.requirement.operator!
@@ -206,41 +213,8 @@ export function calculateCultivationRecommendations(snapshot: PrtsSnapshot, quer
       }
     }
   }
-  return { recommendations, invalid: snapshot.homeworks.length - documents.length + documents.reduce((sum, row) => sum + row.members.filter((member) => member.requirement.moduleUnresolved).length, 0),
-    homeworks: selected.reduce((sum, family) => sum + family.documents.length, 0),
+  return { recommendations, invalid: prepared.invalid,
+    homeworks: selected.reduce((sum, family) => sum + family.count, 0),
     families: selected.length, withoutActions: selected.filter((family) => family.documents[0].skeleton.startsWith('lineup:')).length,
-    stages: [...new Set(documents.map((row) => row.homework.stageId))].map((id) => ({ id, ...stageInfo(snapshot, id) })),
-    professions: [...new Set(Object.values(snapshot.operators).flatMap((row) => row.profession ? [row.profession] : []))].sort() }
-}
-
-// Cache public evidence only; player training and inventory are always calculated per request.
-type RecommendationResult = ReturnType<typeof calculateCultivationRecommendations>
-const cache = new WeakMap<PrtsSnapshot, { prepared: ReturnType<typeof prepareRecommendations>; day: number;
-  results: Map<string, { result: RecommendationResult; samples: number }>; samples: number }>()
-export function getCultivationRecommendations(snapshot: PrtsSnapshot, query: CultivationQuery) {
-  const day = cultivationDayStart()
-  // These filters only select operators; they do not change independent evidence or its weights.
-  const evidenceQuery: CultivationQuery = { ...query, profession: '', rarity: 0, rarityGroup: 'all', search: '' }
-  const key = canonical(evidenceQuery)
-  let entry = cache.get(snapshot)
-  if (!entry) { entry = { prepared: prepareRecommendations(snapshot), day, results: new Map(), samples: 0 }; cache.set(snapshot, entry) }
-  if (entry.day !== day) { entry.results.clear(); entry.samples = 0; entry.day = day }
-  let value = entry.results.get(key)
-  if (!value) {
-    const result = calculateCultivationRecommendations(snapshot, evidenceQuery, day, entry.prepared)
-    value = { result, samples: result.recommendations.reduce((sum, row) => sum + row.samples.length, 0) }
-    entry.samples += value.samples
-  }
-  entry.results.delete(key)
-  entry.results.set(key, value)
-  // ponytail: bound retained sample graphs as well as query count; use compact aggregates if this working set grows.
-  while (entry.results.size > 1 && (entry.results.size > 64 || entry.samples > 250000)) {
-    const oldest = entry.results.keys().next().value!
-    entry.samples -= entry.results.get(oldest)!.samples
-    entry.results.delete(oldest)
-  }
-  return { ...value.result, recommendations: value.result.recommendations.filter((row) => {
-    const operator = snapshot.operators[row.operatorId]
-    return matchesCultivationRarity(operator.rarity, query) && (!query.profession || operator.profession === query.profession) && matchesSearch(operator.name, query.search)
-  }) }
+    stages: prepared.stages, professions: prepared.professions }
 }
