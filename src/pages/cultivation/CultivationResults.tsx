@@ -1,4 +1,5 @@
 import { memo, useMemo, useState } from 'react'
+import { matchesSearch } from '../../lib/search'
 import { ExternalLinkIcon as ExternalLink, UndoIcon as RotateCcw, ExcludeIcon as X } from '../../components/icons'
 import { copy } from '../../copy/index'
 import type { CultivationCandidate, CultivationData } from '../../lib/cultivation-contract'
@@ -39,7 +40,7 @@ function Operator({ row, data }: { row: CultivationCandidate; data: CultivationD
     <img src={`/webp96/${encodeURIComponent(row.operatorId)}.webp`} alt="" width={48} height={48} loading="lazy" className="size-12 rounded-lg bg-surface-2 object-cover" />
     <div className="min-w-0"><h3 className="text-base font-semibold">{row.name}</h3>
       <div className="mt-1 flex items-center gap-2 text-xs text-ink-muted">
-        {row.skillId && <img src={`https://torappu.prts.wiki/assets/skill_icon/skill_icon_${encodeURIComponent(data.skillIcons?.[row.skillId] ?? row.skillId)}.png`} alt="" width={24} height={24} loading="lazy" className="size-6 rounded object-contain" />}
+        {row.skillId && <img src={`/skill-icons/${encodeURIComponent(data.skillIcons?.[row.skillId] ?? row.skillId)}.png`} alt="" width={24} height={24} loading="lazy" className="size-6 rounded object-contain" />}
         <span>{label.skillName(row.target.skill)}</span>{row.target.skillLevel > 7 && <span aria-label={label.masteryName(row.target.skillLevel - 7)} className="rounded bg-brand-500/10 px-2 py-0.5 font-semibold text-brand-500">{'◆'.repeat(row.target.skillLevel - 7)}</span>}
       </div>
     </div>
@@ -64,7 +65,7 @@ type Props = { data: CultivationData; recommendations: CultivationCandidate[]; e
 export default memo(function CultivationResults({ data, recommendations, excluded, exclude, projectScope }: Props) {
   const [search, setSearch] = useState('')
   const [visible, setVisible] = useState(50)
-  const rows = useMemo(() => data.candidates.filter((row) => row.name.includes(search)).sort((a, b) => (b.weightedFrequency ?? b.frequency) - (a.weightedFrequency ?? a.frequency)), [data, search])
+  const rows = useMemo(() => data.candidates.filter((row) => matchesSearch(row.name, search)).sort((a, b) => (b.weightedFrequency ?? b.frequency) - (a.weightedFrequency ?? a.frequency)), [data, search])
   return <>
     <section className="workspace-cultivation-suggestions tool-panel p-5 sm:p-6">
       <h2 className="text-lg font-semibold">{label.suggestions}</h2>

@@ -1,5 +1,6 @@
 import { useId, useRef, useState } from 'react'
 import { copy } from '../../copy'
+import { matchesSearch } from '../../lib/search'
 import type { CultivationData, CultivationQuery } from '../../lib/cultivation-contract'
 
 const text = copy.tools.cultivation
@@ -11,8 +12,7 @@ function SearchChoice({ label, options, value, onChange, v2 }: { label: string; 
   const [search, setSearch] = useState('')
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
-  const words = search.trim().toLowerCase().split(/\s+/)
-  const matched = options.filter((option) => words.every((word) => `${option.name} ${option.id}`.toLowerCase().includes(word)))
+  const matched = options.filter((option) => matchesSearch(`${option.name} ${option.id}`, search))
   const rows = [...(search.trim() ? [] : [{ id: '', name: text.all }]), ...matched.slice(0, 50)]
   const choose = (next: string) => { onChange(next); setOpen(false); setSearch(''); setActive(0) }
   return <div className={`relative min-w-0 ${v2 ? 'v2-field' : 'space-y-2 text-sm'}`}>

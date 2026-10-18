@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState, type ReactNode, type SyntheticE
 import { useAnimate } from 'motion/react'
 import { useAppReducedMotion } from '../../../lib/motion-preference'
 import { copy } from '../../../copy/index'
+import { matchesSearch } from '../../../lib/search'
 import {
   Dialog,
   DialogClose,
@@ -106,7 +107,7 @@ export function useInventory({ onPayload, onLifetimeProfileCreated }: {
 
   const filtered = useMemo(() => (inventory?.stacks ?? []).filter((stack) => {
     if (category !== 'all' && stack.item.kind !== category) return false
-    return !search.trim() || stack.item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())
+    return matchesSearch(stack.item.name, search)
   }), [category, inventory?.stacks, search])
 
   const runItemAction = async () => {

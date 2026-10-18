@@ -18,6 +18,7 @@
     "backup:manifest": "node scripts/backup-manifest.mjs",
     "postgres:service-file": "node scripts/write-pg-service.mjs",
     "sync:operator-avatars": "node scripts/sync-operator-avatars.mjs",
+    "sync:cultivation-icons": "node scripts/sync-cultivation-icons.mjs",
     "predev": "npm run generate:data && npm run generate:changelog",
     "dev": "vite",
     "pretest": "npm run generate:data && npm run generate:changelog",

@@ -2,7 +2,8 @@ import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { z } from 'zod'
 import { fetchJson, loadPlanningAssets } from '../../scripts/prts-planning-lib.mjs'
-import { prtsSnapshotPath, prtsSnapshotSchema, readPrtsSnapshot, type PrtsSnapshot } from './catalog'
+import { prtsSnapshotPath, prtsSnapshotSchema, type PrtsSnapshot } from './catalog'
+import { readPublicCatalog } from './public-store'
 import { saveCultivationReference } from './references'
 
 const DAY = 86400000
@@ -17,7 +18,8 @@ let cached: { path: string; data: PrtsSnapshot; nextAttempt: number } | null = n
 export async function readProjectCatalog(signal: AbortSignal): Promise<PrtsSnapshot> {
   signal.throwIfAborted()
   // An imported snapshot is reusable, but player-selected goals do not require homework data.
-  try { return await readPrtsSnapshot() } catch { signal.throwIfAborted() }
+  const imported = readPublicCatalog()
+  if (imported) return imported
   const path = join(dirname(prtsSnapshotPath()), 'project-game-data.json')
   if (cached?.path === path && Date.now() < cached.nextAttempt) return cached.data
   if (cached?.path !== path) {

@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { planningFixture } from '../../scripts/prts-planning-fixture.mjs'
 import { defaultCultivationQuery } from '../../src/lib/cultivation-contract'
 import { prtsSnapshotSchema, type PrtsSnapshot } from './catalog'
-import { calculateCultivationRecommendations, getCultivationRecommendations } from './recommendations'
+import { calculateCultivationRecommendations, prepareRecommendations } from './recommendations'
+import { packPreparedEvidence, unpackPreparedEvidence, compactRecommendations } from './public-evidence'
 import { readHomeworkRequirements } from './requirements'
 
 const now = Date.parse('2026-10-08T12:00:00Z')
@@ -114,6 +115,9 @@ describe('independent cultivation recommendation evidence', () => {
     expect(ids({ ...defaultCultivationQuery, rarityGroup: 'low' })).toEqual(['char_r1', 'char_r2', 'char_r3'])
     expect(ids({ ...defaultCultivationQuery, rarityGroup: 'all' })).toHaveLength(6)
     expect(ids({ ...defaultCultivationQuery, rarity: 3 })).toEqual(['char_r3'])
+    expect(ids({ ...defaultCultivationQuery, search: 'ganyuan4' })).toEqual(['char_r4'])
+    expect(ids({ ...defaultCultivationQuery, search: 'GY5' })).toEqual(['char_r5'])
+    expect(ids({ ...defaultCultivationQuery, search: '干员 6' })).toEqual(['char_r6'])
   })
 
   it('keeps compact strategy identities even when homework actions are large', () => {
@@ -142,24 +146,33 @@ describe('independent cultivation recommendation evidence', () => {
     expect(result.recommendations.map((row) => row.target)).toEqual(frontier)
   })
 
-  it('retains only the latest filter result instead of accumulating full sample graphs', () => {
-    vi.spyOn(Date, 'now').mockReturnValue(now)
-    const input = snapshot([job(1), job(2), job(3)])
-    const first = getCultivationRecommendations(input, defaultCultivationQuery)
-    getCultivationRecommendations(input, { ...defaultCultivationQuery, stageId: 'main_1' })
-    expect(getCultivationRecommendations(input, defaultCultivationQuery)).not.toBe(first)
+  it('round-trips compact evidence without retaining homework prose or actions', () => {
+    const rows = [job(1), job(2), job(3)]
+    rows.push({ ...rows[0], id: 201, likes: 100 })
+    const input = snapshot(rows)
+    input.homeworks[0].content.doc = { details: 'large-public-prose' }
+    const packed = JSON.parse(JSON.stringify(packPreparedEvidence(prepareRecommendations(input))))
+    expect(JSON.stringify(packed)).not.toContain('large-public-prose')
+    expect(JSON.stringify(packed)).not.toContain('"actions"')
+    const catalog = { ...input, homeworks: [] }
+    const restored = unpackPreparedEvidence(packed, catalog)
+    for (const scope of ['recent', 'history', 'permanent'] as const) for (const coverage of [0.6, 0.8, 0.9]) {
+      const query = { ...defaultCultivationQuery, scope, coverage }
+      expect(compactRecommendations(calculateCultivationRecommendations(catalog, query, now, restored)))
+        .toEqual(compactRecommendations(calculateCultivationRecommendations(input, query, now)))
+    }
   })
 
-  it('invalidates public recommendations for a replaced snapshot and supports skill-less operators', () => {
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
-    const input = snapshot([job(1)])
-    input.operators.char_test.skills = []
-    const query = { ...defaultCultivationQuery, stageId: 'main_1' }
-    const first = getCultivationRecommendations(input, query)
-    expect(first.recommendations[0].target).toMatchObject({ skill: 0, skillLevel: 1 })
-    expect(getCultivationRecommendations(input, query)).toBe(first)
-    expect(getCultivationRecommendations({ ...input, homeworks: [] }, query).recommendations).toEqual([])
-    clock.mockReturnValue(now + 16 * 60000)
-    expect(getCultivationRecommendations(input, query)).not.toBe(first)
+  it('preserves alternatives, invalid shares, and unresolved modules after compact persistence', () => {
+    const input = snapshot([job(1, { content: { groups: [{ name: 'group', opers: [
+      { name: '测试干员', requirements: { module: 99 } }, { name: '未知干员' },
+    ] }] } })])
+    const query = { ...observing, stageId: 'main_1' }
+    const catalog = { ...input, homeworks: [] }
+    const restored = unpackPreparedEvidence(JSON.parse(JSON.stringify(packPreparedEvidence(prepareRecommendations(input)))), catalog)
+    const actual = compactRecommendations(calculateCultivationRecommendations(catalog, query, now, restored))
+    expect(actual).toEqual(compactRecommendations(calculateCultivationRecommendations(input, query, now)))
+    expect(Object.values(actual.groups)[0].options).toHaveLength(1)
+    expect(actual.invalid).toBeGreaterThan(0)
   })
 })

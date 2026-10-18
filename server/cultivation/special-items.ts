@@ -126,9 +126,9 @@ async function refreshCatalog(operators: PrtsSnapshot['operators']): Promise<Cat
 export type SpecialItemCatalog = Awaited<ReturnType<typeof getSpecialItemCatalog>>
 
 export function buildSpecialItemRecommendations(snapshot: PrtsSnapshot, player: ReturnType<typeof readCultivationPlayer>, catalog: SpecialItemCatalog, community: CultivationData['community'], demands: Map<string, { total: number; skills: Record<number, number>; elite: number }>): CultivationSpecialItem[] {
-  return catalog.items.filter((item) => (player.inventory[item.id] ?? 0) > 0).map((item) => {
+  return catalog.items.filter((item) => item.kind === 'selector' || (player.inventory[item.id] ?? 0) > 0).map((item) => {
     const recommendations: CultivationSpecialItem['recommendations'] = []
-    const expiresAt = player.expiries[item.id] ?? null
+    const expiresAt = item.kind === 'selector' ? null : player.expiries[item.id] ?? null
     const available = !expiresAt || Date.parse(expiresAt) > Date.now()
     const ids = item.kind === 'selector' ? item.operators : [...player.characters.keys()]
     if (item.kind === 'materials') for (const option of item.options) recommendations.push({ ...option, demand: 0, communityRate: null, warnings: [] })
@@ -159,7 +159,7 @@ export function buildSpecialItemRecommendations(snapshot: PrtsSnapshot, player: 
           items: cost.items, warnings: cost.warnings })
       })
     }
-    return { id: item.id, name: item.name, iconId: item.iconId, kind: item.kind, count: player.inventory[item.id], scope: item.scope, sourceUrl: item.sourceUrl, expiresAt, available,
+    return { id: item.id, name: item.name, iconId: item.iconId, kind: item.kind, count: item.kind === 'selector' ? null : player.inventory[item.id], scope: item.scope, sourceUrl: item.sourceUrl, expiresAt, available,
       recommendations }
   })
 }

@@ -1,5 +1,18 @@
 [
   {
+    "date": "2026-10-18",
+    "scope": "v2/cultivation",
+    "macrostructure": "Workbench",
+    "theme": "existing V2 variant",
+    "theme_axes": "light and dark / geometric-sans / warm-copper",
+    "enrichment": "none",
+    "nav": "existing side rail",
+    "footer": "Ft2 inline rule",
+    "variation": "full-width ranked rows, separate operator and training columns, compact overview, expandable conditions above results, searchable selector index with adjacent detail",
+    "brief": "Rebuild homework training recommendations around selecting targets and checking requirements",
+    "design_system": "design.md"
+  },
+  {
     "date": "2026-10-17",
     "scope": "v2/cultivation-projects",
     "macrostructure": "Workbench",

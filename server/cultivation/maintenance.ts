@@ -1,6 +1,7 @@
 import { refreshCultivationSnapshot, shutdownCultivationWorker } from './worker-client'
+import { CULTIVATION_DAY_MS, cultivationDayStart } from './cache-policy'
 
-let timer: ReturnType<typeof setInterval> | null = null
+let timer: ReturnType<typeof setTimeout> | null = null
 let running: Promise<void> | null = null
 let controller: AbortController | null = null
 
@@ -17,14 +18,17 @@ export function initializeCultivationMaintenance() {
   if (timer) return
   controller = new AbortController()
   const signal = controller.signal
-  const tick = () => { running ??= updateIfStale(signal).finally(() => { running = null }) }
+  const tick = () => {
+    if (signal.aborted) return
+    running ??= updateIfStale(signal).finally(() => { running = null })
+    timer = setTimeout(tick, cultivationDayStart() + CULTIVATION_DAY_MS - Date.now())
+    timer.unref()
+  }
   tick()
-  timer = setInterval(tick, 3600000)
-  timer.unref()
 }
 
 export function shutdownCultivationMaintenance() {
-  if (timer) clearInterval(timer)
+  if (timer) clearTimeout(timer)
   timer = null
   controller?.abort()
   controller = null

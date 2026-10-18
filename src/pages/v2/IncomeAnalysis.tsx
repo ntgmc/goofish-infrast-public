@@ -50,8 +50,8 @@ function ProductionAmount({ product, value }: { product: string; value: number }
 export function RoomProduction({ daily, room, shift }: { daily: DailyProduction; room: BoardRoom; shift?: string }) {
   const rows = stationProductionRows(daily).filter((row) => row.roomType === room.roomType && row.roomIndex === room.roomIndex + 1 && row.shift === shift)
   if (!rows.length) return null
-  return <div><dt>{text.estimatedAmount}</dt><dd>{rows.map((row, index) => <div key={index}>
-    <ProductionAmount product={row.product} value={row.amount} />{row.drones && <span className="v2-neutral-tag">{text.drones}</span>}
+  return <div className="v2-room-production"><dt>{text.estimatedAmount}</dt><dd>{rows.map((row, index) => <div key={index}>
+    {row.drones && <span className="v2-neutral-tag">{text.drones}</span>}<ProductionAmount product={row.product} value={row.amount} />
   </div>)}</dd></div>
 }
 

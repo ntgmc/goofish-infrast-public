@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from '../../../components/ui/dialog'
 import { adminApiJson } from '../../../lib/admin-api-client'
+import { matchesSearch } from '../../../lib/search'
 import { itemIconPath } from '../../../lib/inventory-contracts'
 import type {
   AdminInvitationSettingsResponse,
@@ -296,8 +297,7 @@ function ItemPickerDialog({ recipient, catalog, selectedCodes, returnFocusTarget
   onSelect: (item: InvitationRewardCatalogItem) => void
 }) {
   const [search, setSearch] = useState('')
-  const filtered = catalog.filter((item) => !search.trim()
-    || `${item.name} ${item.item_code}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
+  const filtered = catalog.filter((item) => matchesSearch(`${item.name} ${item.item_code}`, search))
   return (
     <Dialog open={recipient !== null} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent

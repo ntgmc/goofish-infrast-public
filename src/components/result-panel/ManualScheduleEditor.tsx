@@ -1,6 +1,6 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { ExportImageIcon as Download, ClearIcon as Eraser, LockedOperatorIcon as LockKeyhole, SearchIcon as Search, UploadIcon as Upload, BackupIcon } from '../icons'
-import PinyinMatch from 'pinyin-match'
+import { matchesSearch } from '../../lib/search'
 import type { LicenseConfig, LicenseOperator, OptimizeResult } from '../../lib/types'
 import { copy } from '../../copy/index'
 import { canonicalJson } from '../../lib/crypto'
@@ -420,7 +420,7 @@ function ManualOperatorPicker({ operators, locked, rooms, roomType, selectedName
     }),
   [operators, locked])
   const matches = useMemo(() => available
-    .filter(({ operator, known, skills }) => (!query || PinyinMatch.match(operator.name, query))
+    .filter(({ operator, known, skills }) => matchesSearch(operator.name, query)
       && (!facility || !known || skills.some((skill) => skill.room === facility))),
   [available, facility, query])
   const resetScroll = () => { setVisibleCount(30); if (grid.current) grid.current.scrollTop = 0 }

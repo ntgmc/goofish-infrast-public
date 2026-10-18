@@ -5,7 +5,13 @@ import { cultivationCosts } from './costs'
 import { buildCultivationData as buildData } from './data'
 import { defaultCultivationQuery } from '../../src/lib/cultivation-contract'
 
-const buildCultivationData = (...args: Parameters<typeof buildData>) => buildData(args[0], args[1], args[2], args[3], args[4], args[5], { ...defaultCultivationQuery, stageId: 'main_01' })
+import { calculateCultivationRecommendations } from './recommendations'
+import { compactRecommendations } from './public-evidence'
+const buildCultivationData = (snapshot: Parameters<typeof buildData>[0], game: unknown, inventory: unknown,
+  pricing: Parameters<typeof buildData>[3], community?: Parameters<typeof buildData>[4], catalog?: Parameters<typeof buildData>[5]) => {
+  const query = { ...defaultCultivationQuery, stageId: 'main_01' }
+  return buildData(snapshot, game, inventory, pricing, community, catalog, query, compactRecommendations(calculateCultivationRecommendations(snapshot, query)))
+}
 import { readHomeworkRequirements } from './requirements'
 import type { CultivationCurrent, CultivationTarget } from '../../src/lib/cultivation-contract'
 
@@ -16,10 +22,10 @@ const game = (elite = 1) => ({ data: { chars: [{ charId: 'char_test', evolvePhas
 const pricing = { status: 'fresh' as const, prices: new Map([['rock', 5]]), fetched_at: '', age_ms: 0, snapshot_id: '', valuation_version: '' }
 
 describe('PRTS and Skland cultivation data', () => {
-  it('shares independent demand between material planning and owned special-item recommendations', () => {
+  it('shares independent demand with selector recommendations even without package inventory', () => {
     const input = snapshot()
     input.homeworks.push({ ...input.homeworks[0], id: 21 })
-    const result = buildCultivationData(input, game(0), { items: [{ id: 'selector', count: 1 }] }, pricing, undefined, {
+    const result = buildCultivationData(input, game(0), { items: [] }, pricing, undefined, {
       parserVersion: 4, status: 'fresh', updatedAt: '', itemNames: {}, itemIcons: {}, excludedOperators: [], skillIcons: {},
       items: [{ id: 'selector', name: '调用凭证', iconId: 'selector', kind: 'selector', scope: '', sourceUrl: '', rarity: 4, operators: ['char_test'], options: [] }],
     })

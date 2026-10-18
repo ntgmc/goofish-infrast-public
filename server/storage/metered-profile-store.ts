@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
+import { matchesSearch } from '../../src/lib/search'
 import { getCommercialTierSummary, getMeteredBillingPolicy, pointsToMinor } from '../../src/lib/metered-billing'
 import type { UserGameAccount } from '../../src/lib/types'
 import { ensureDatabaseSchema } from './schema'
@@ -149,9 +150,20 @@ export async function listCommercialProfiles(input: {
   const limit = input.limit ?? 20
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new MeteredProfileError('invalid_limit', '分页数量必须是 1 到 100 的整数。', 400)
   const cursor = decodeCursor(input.cursor)
-  const search = escapeLikePattern(input.query?.trim().slice(0, 100) ?? '')
+  const search = input.query?.trim().slice(0, 100) ?? ''
   return withTransaction(async (client) => {
-    const values: unknown[] = [input.userId, input.state === 'archived', `%${search}%`, limit + 1]
+    let ids: string[] | null = null
+    if (search) {
+      // ponytail: scan this owner's searchable fields before the cursor; add a stored pinyin index if profile volume warrants it.
+      const candidates = await client.query<{ id: string; search_text: string }>(
+        `select id, concat_ws(' ', display_name, note) as search_text from user_game_accounts
+         where user_id = $1 and kind = 'metered_commercial'
+           and (($2::boolean and archived_at is not null) or (not $2::boolean and archived_at is null))`,
+        [input.userId, input.state === 'archived'],
+      )
+      ids = candidates.rows.filter((row) => matchesSearch(row.search_text, search)).map((row) => row.id)
+    }
+    const values: unknown[] = [input.userId, input.state === 'archived', ids, limit + 1]
     let cursorClause = ''
     if (cursor) {
       values.push(cursor.createdAt, cursor.id)
@@ -161,7 +173,7 @@ export async function listCommercialProfiles(input: {
       `select record_json, created_at, id from user_game_accounts
         where user_id = $1 and kind = 'metered_commercial'
           and (($2::boolean and archived_at is not null) or (not $2::boolean and archived_at is null))
-          and ($3 = '%%' or display_name ilike $3 escape '\\' or note ilike $3 escape '\\')
+          and ($3::text[] is null or id = any($3::text[]))
           ${cursorClause}
         order by created_at desc, id desc limit $4`,
       values,
@@ -540,10 +552,6 @@ function normalizeDisplayName(value: unknown): string {
 
 function normalizeNote(value: unknown): string {
   return typeof value === 'string' ? value.trim().slice(0, 500) : ''
-}
-
-function escapeLikePattern(value: string): string {
-  return value.replace(/[\\%_]/g, (match) => `\\${match}`)
 }
 
 function encodeCursor(row: { created_at: string; id: string }): string {

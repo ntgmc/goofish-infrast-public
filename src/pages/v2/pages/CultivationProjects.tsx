@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { NextIcon as ArrowRight, PauseIcon as Pause, ResumeIcon as Play, AddIcon as Plus, RemoveIcon as X, RefreshIcon, SaveIcon, CultivationIcon, ResourceCalendarIcon, ResourceStockIcon, DailyOutputIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
+import { matchesSearch } from '../../../lib/search'
 import { canEditConfig } from '../../../lib/license'
 import { isCultivationProject, prepareProjectProduction, projectDaysEarlier, type CultivationProject, type ProjectOperator, type ProjectRoute } from '../../../lib/cultivation-projects'
 import type { CultivationData } from '../../../lib/cultivation-contract'
@@ -132,7 +133,7 @@ function GoalForm({ operators, projects, editing, busy, onSave, onCancel }: { op
   const [goal, setGoal] = useState<CultivationProject>(editing ?? { operatorId: '', elite: 2, level: 60, skill: 1, skillLevel: 7, paused: false, deadline: '' })
   const [error, setError] = useState(false)
   const operator = operators.find((row) => row.id === goal.operatorId)
-  const choices = operators.filter((row) => row.name.includes(search.trim()) && (!projects.some((project) => project.operatorId === row.id) || editing?.operatorId === row.id))
+  const choices = operators.filter((row) => matchesSearch(row.name, search) && (!projects.some((project) => project.operatorId === row.id) || editing?.operatorId === row.id))
   function choose(id: string) {
     const row = operators.find((row) => row.id === id)
     if (!row) return

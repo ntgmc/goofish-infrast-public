@@ -21,11 +21,14 @@ beforeAll(async () => {
   await build({ entryPoints: { client: 'server/cultivation/worker-client.ts', 'cultivation-worker': 'server/cultivation/cultivation-worker.ts' },
     outdir: directory, outExtension: { '.js': '.mjs' }, bundle: true, platform: 'node', format: 'esm', logLevel: 'silent',
     plugins: [{ name: 'public-cultivation-fixture', setup(builder) {
-      builder.onResolve({ filter: /handlers\/material-value$|cultivation\/(?:references|special-items|project-catalog)$|\.\/(?:references|special-items|project-catalog)$/ }, (args) => ({ path: args.path.split('/').at(-1)!, namespace: 'fixture' }))
+      builder.onResolve({ filter: /prts-planning-sync\.mjs$|handlers\/material-value$|cultivation\/(?:references|special-items|project-catalog)$|\.\/(?:references|special-items|project-catalog)$/ }, (args) => ({ path: args.path.split('/').at(-1)!, namespace: 'fixture' }))
       builder.onLoad({ filter: /.*/, namespace: 'fixture' }, (args) => ({ contents: {
         'material-value': `export async function getYituliuPricing() {const end = Date.now() + 100; while (Date.now() < end) {}; return {status:'fresh',prices:new Map([['rock',5],['book',2]])}};
           export const getExpSanity = n => n * 0.006; export const getNetLmdSanity = () => 0.0036;
           export const EXP_ITEM_VALUES = {'2001':200,'2002':400,'2003':1000,'2004':2000};`,
+        'prts-planning-sync.mjs': `import { readFile, writeFile } from 'node:fs/promises'; import { setTimeout } from 'node:timers/promises';
+          export async function syncPrtsPlanning({signal}) { await setTimeout(400, undefined, {signal});
+            await writeFile(process.env.MAA_PRTS_PLANNING_PATH, await readFile(new URL('./next-snapshot.json', import.meta.url))) }`,
         references: `export async function getCultivationStatistics() {return {status:'unavailable',updatedAt:null,operators:{}}}`,
         'project-catalog': `import { readFile } from 'node:fs/promises';
           export async function readProjectCatalog() { return JSON.parse(await readFile(new URL('./project-game-data.json', import.meta.url), 'utf8')) }`,
@@ -64,6 +67,33 @@ describe('cultivation worker integration', () => {
 
   it('keeps a fresh snapshot without attempting an incremental crawl', async () => {
     await expect(client.refreshCultivationSnapshot(new AbortController().signal)).resolves.toBeUndefined()
+  })
+
+  it('keeps player inventory and training current while reusing public evidence', async () => {
+    const changed = { ...input, inventory: { items: [{ id: 'rock', count: 99 }] },
+      game: { data: { chars: [{ ...input.game.data.chars[0], evolvePhase: 1, level: 2, mainSkillLvl: 7 }] } } }
+    const data = JSON.parse(new TextDecoder().decode(await client.readCultivationPlan(changed)))
+    expect(data.inventory.rock).toBe(99)
+    expect(data.candidates[0].current).toMatchObject({ elite: 1, level: 2, skillLevel: 7 })
+    expect(data.candidates[0].satisfied).toBe(true)
+    const original = JSON.parse(new TextDecoder().decode(await client.readCultivationPlan(input)))
+    expect(original.inventory.rock).toBe(2)
+    expect(original.candidates[0].satisfied).toBe(false)
+  })
+
+  it('serves the previous snapshot throughout an update and adopts the replacement after publication', async () => {
+    await client.shutdownCultivationWorker()
+    await writeFile(join(directory, 'snapshot.json'), JSON.stringify({ ...planningFixture(), updatedAt: '2020-01-01T00:00:00Z' }))
+    await writeFile(join(directory, 'next-snapshot.json'), JSON.stringify({ ...planningFixture(), updatedAt: new Date().toISOString(), homeworks: [] }))
+    const first = JSON.parse(new TextDecoder().decode(await client.readCultivationPlan(input)))
+    expect(first.candidates).not.toHaveLength(0)
+    const refresh = client.refreshCultivationSnapshot(new AbortController().signal)
+    const during = JSON.parse(new TextDecoder().decode(await client.readCultivationPlan(input)))
+    expect(during.candidates).toEqual(first.candidates)
+    await refresh
+    const after = JSON.parse(new TextDecoder().decode(await client.readCultivationPlan(input)))
+    expect(after.candidates).toEqual([])
+    expect(after.updatedAt).not.toBe(first.updatedAt)
   })
 
   it('reports a missing seed through the reader without crashing the API process', async () => {

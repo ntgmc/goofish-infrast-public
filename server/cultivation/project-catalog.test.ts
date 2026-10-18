@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { planningFixture } from '../../scripts/prts-planning-fixture.mjs'
+import { defaultCultivationQuery } from '../../src/lib/cultivation-contract'
 
 const mocks = vi.hoisted(() => ({ fetch: vi.fn(), assets: vi.fn() }))
 vi.mock('../../scripts/prts-planning-lib.mjs', () => ({ fetchJson: mocks.fetch, loadPlanningAssets: mocks.assets }))
@@ -23,6 +24,8 @@ afterEach(async () => { vi.unstubAllEnvs(); await rm(directory, { recursive: tru
 describe('homework-independent project catalog', () => {
   it('reuses an available imported snapshot without downloading game data', async () => {
     await writeFile(join(directory, 'missing-homeworks.json'), JSON.stringify(planningFixture()))
+    const { buildPublicEvidence } = await import('./public-store')
+    await buildPublicEvidence(defaultCultivationQuery, new AbortController().signal)
     const { readProjectCatalog } = await import('./project-catalog')
     expect((await readProjectCatalog(new AbortController().signal)).operators.char_test.name).toBe('测试干员')
     expect(mocks.fetch).not.toHaveBeenCalled()

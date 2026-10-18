@@ -1,5 +1,6 @@
 import { createHash, createHmac } from 'node:crypto'
 import type { PoolClient } from 'pg'
+import { matchesSearch } from '../../src/lib/search'
 import type { AdminUserFilters } from '../../src/lib/admin-user-filters'
 import type { OperationsDrilldown, OperationsUserProgress } from '../../src/lib/operations-drilldown'
 import { OPERATIONS_COHORT_SQL } from './operations-overview-store'
@@ -1282,20 +1283,6 @@ export async function listAdminUserAccountsPage(options: {
     values.push(value)
     return `$${values.length}`
   }
-  if (options.search) {
-    const search = add(`%${escapeLikePattern(options.search.toLowerCase())}%`)
-    conditions.push(`(lower(user_accounts.email) like ${search} escape '!'
-      or lower(user_accounts.id) like ${search} escape '!'
-      or exists (
-        select 1 from user_game_accounts profile
-        where profile.user_id = user_accounts.id
-          and (
-            lower(profile.display_name) like ${search} escape '!'
-            or lower(profile.id) like ${search} escape '!'
-            or lower(coalesce(profile.cdk_order_hash, '')) like ${search} escape '!'
-          )
-      ))`)
-  }
   const filters = options.filters
   if (filters) {
     if (filters.status !== 'all') conditions.push(`user_accounts.status = ${add(filters.status)}`)
@@ -1324,6 +1311,18 @@ export async function listAdminUserAccountsPage(options: {
             where cdk.key = profile.cdk_key and cdk.status = 'used'
               and (nullif(cdk.record_json->>'profile_expires_at', '') is null or (cdk.record_json->>'profile_expires_at')::timestamptz > now()))))`)
     }
+  }
+  if (options.search.trim()) {
+    // ponytail: scan searchable fields before pagination; add a stored pinyin index if account volume warrants it.
+    const candidates = await query<{ id: string; search_text: string }>(
+      `${prefix} select user_accounts.id,
+        concat_ws(' ', user_accounts.email, user_accounts.id, profile.display_name, profile.id, profile.cdk_order_hash) as search_text
+       from user_accounts left join user_game_accounts profile on profile.user_id = user_accounts.id
+       ${conditions.length ? `where ${conditions.join(' and ')}` : ''}`,
+      values,
+    )
+    const ids = [...new Set(candidates.rows.filter((row) => matchesSearch(row.search_text, options.search)).map((row) => row.id))]
+    conditions.push(`user_accounts.id = any(${add(ids)}::text[])`)
   }
   const where = conditions.length ? `where ${conditions.join(' and ')}` : ''
   const sort = filters?.sort ?? 'registered_desc'
@@ -1360,10 +1359,6 @@ export async function listAdminUserAccountsPage(options: {
     page,
     totalPages,
   }
-}
-
-function escapeLikePattern(value: string): string {
-  return value.replace(/[!%_]/g, (character) => `!${character}`)
 }
 
 export async function updateProfileWorkspaceAtomically(

@@ -111,6 +111,38 @@ describe('atomic password lifecycle', () => {
     expect(page.users.map((item) => item.id)).toEqual([users[0].id])
   })
 
+  it('matches profile names and CDK notes by pinyin before counting and paginating', async () => {
+    const { createPostgresCdkRecordStore } = await import('./cdk-store')
+    const store = createPostgresCdkRecordStore()
+    const users = []
+    for (const [index, name] of ['银灰一号', '银灰二号', '阿米娅'].entries()) {
+      const user = await seedUser(`pinyin-${index}@example.test`, new Date(`2026-10-0${index + 1}T08:00:00Z`))
+      users.push(user)
+      const codeHash = randomUUID().replaceAll('-', '').padEnd(64, 'a')
+      const key = `cdk/${codeHash}.json`
+      await store.create(key, {
+        version: 1, code_hash: codeHash, cdk_type: 'profile', permission: 'advanced', status: 'unused',
+        created_at: user.created_at, used_at: null, order_note: name,
+        license_order_hash: `pinyin-order-${index}`, operator_count: null, config_desc: null,
+      })
+      await saveUserProfile({
+        version: 1, id: randomUUID(), user_id: user.id, kind: 'cdk', cdk_key: null,
+        cdk_code_hash: null, cdk_order_hash: null, permission: 'advanced', status: 'active',
+        display_name: name, note: '', created_at: user.created_at, updated_at: user.updated_at,
+      })
+    }
+    const page = await listAdminUserAccountsPage({ page: 2, pageSize: 1, search: 'YH' })
+    expect(page).toMatchObject({ total: 2, totalPages: 2, page: 2 })
+    expect(page.users.map((user) => user.id)).toEqual([users[0].id])
+    expect((await listAdminUserAccountsPage({ page: 1, pageSize: 25, search: 'yinhuiyihao' })).users.map((user) => user.id)).toEqual([users[0].id])
+    expect((await listAdminUserAccountsPage({ page: 1, pageSize: 25, search: '%' })).total).toBe(0)
+    const cdkOptions = { page: 2, pageSize: 1, search: 'YH', status: 'all', permission: 'all', cdkType: 'all', risk: 'all', generated: 'all' } as const
+    expect(await store.listAdminPage!(cdkOptions)).toMatchObject({ total: 2, totalPages: 2, page: 2, records: [{ order_note: '银灰一号' }] })
+    expect(await store.listAdminPage!({ ...cdkOptions, search: 'yinhuiyihao' })).toMatchObject({ total: 1, records: [{ order_note: '银灰一号' }] })
+    expect(await store.listAdminPage!({ ...cdkOptions, status: 'used' })).toMatchObject({ total: 0, records: [] })
+    expect(await store.listAdminPage!({ ...cdkOptions, search: '_' })).toMatchObject({ total: 0, records: [] })
+  })
+
   it('updates only account status and revokes sessions without overwriting newer credentials', async () => {
     const now = new Date('2026-10-02T08:00:00.000Z')
     const user = await seedUser('status-only@example.test', now)
