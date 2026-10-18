@@ -1,7 +1,8 @@
 import { parentPort } from 'node:worker_threads'
 import { syncPrtsPlanning } from '../../scripts/prts-planning-sync.mjs'
 import { getYituliuPricing } from '../handlers/material-value'
-import { readPrtsSnapshot, releasePrtsSnapshot } from './catalog'
+import { invalidatePrtsSnapshot, readPrtsSnapshot, releasePrtsSnapshot } from './catalog'
+import { cultivationDayStart } from './cache-policy'
 import { buildCultivationData } from './data'
 import { buildCultivationProjects } from './projects'
 import { readProjectCatalog } from './project-catalog'
@@ -11,8 +12,9 @@ import { CultivationReadError, type CultivationTask, type CultivationWorkerReply
 
 let controller: AbortController | null = null
 
-parentPort!.on('message', (task: CultivationTask | { type: 'cancel' }) => {
+parentPort!.on('message', (task: CultivationTask | { type: 'cancel' | 'invalidate' }) => {
   if (task.type === 'cancel') { controller?.abort(); return }
+  if (task.type === 'invalidate') { invalidatePrtsSnapshot(); return }
   controller = new AbortController()
   const signal = controller.signal
   void execute(task, signal).then(
@@ -44,7 +46,7 @@ async function execute(task: CultivationTask, signal: AbortSignal): Promise<Arra
   catch { throw new CultivationReadError('作业数据暂不可用，请等待管理员导入后重试。', 503, 'prts_data_unavailable') }
   signal.throwIfAborted()
   if (task.type === 'refresh') {
-    if (Date.now() - Date.parse(snapshot.updatedAt) < 24 * 3600000) return null
+    if (Date.parse(snapshot.updatedAt) >= cultivationDayStart()) return null
     snapshot = undefined
     releasePrtsSnapshot()
     await syncPrtsPlanning({ signal })

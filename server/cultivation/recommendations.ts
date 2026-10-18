@@ -3,6 +3,7 @@ import { matchesSearch } from '../../src/lib/search'
 import { defaultCultivationQuery, matchesCultivationRarity, type CultivationQuery, type CultivationTarget, type CultivationCandidate } from '../../src/lib/cultivation-contract'
 import { asRecord, asRows, type PrtsSnapshot } from './catalog'
 import { readHomeworkRequirements } from './requirements'
+import { cultivationDayStart } from './cache-policy'
 
 type Requirement = ReturnType<typeof readHomeworkRequirements>['fixed'][number]
 type Member = { requirement: Requirement; share: number; group: string | null; options: Requirement[] }
@@ -213,16 +214,33 @@ export function calculateCultivationRecommendations(snapshot: PrtsSnapshot, quer
 }
 
 // Cache public evidence only; player training and inventory are always calculated per request.
-const cache = new WeakMap<PrtsSnapshot, { prepared: ReturnType<typeof prepareRecommendations>; expires: number; key?: string; result?: ReturnType<typeof calculateCultivationRecommendations> }>()
+type RecommendationResult = ReturnType<typeof calculateCultivationRecommendations>
+const cache = new WeakMap<PrtsSnapshot, { prepared: ReturnType<typeof prepareRecommendations>; day: number;
+  results: Map<string, { result: RecommendationResult; samples: number }>; samples: number }>()
 export function getCultivationRecommendations(snapshot: PrtsSnapshot, query: CultivationQuery) {
-  const now = Date.now(), key = canonical(query)
+  const day = cultivationDayStart()
+  // These filters only select operators; they do not change independent evidence or its weights.
+  const evidenceQuery: CultivationQuery = { ...query, profession: '', rarity: 0, rarityGroup: 'all', search: '' }
+  const key = canonical(evidenceQuery)
   let entry = cache.get(snapshot)
-  if (!entry) { entry = { prepared: prepareRecommendations(snapshot), expires: now + 15 * 60000 }; cache.set(snapshot, entry) }
-  if (entry.expires <= now) { entry.result = undefined; entry.expires = now + 15 * 60000 }
-  if (!entry.result || entry.key !== key) {
-    entry.result = undefined
-    entry.result = calculateCultivationRecommendations(snapshot, query, now, entry.prepared)
-    entry.key = key
+  if (!entry) { entry = { prepared: prepareRecommendations(snapshot), day, results: new Map(), samples: 0 }; cache.set(snapshot, entry) }
+  if (entry.day !== day) { entry.results.clear(); entry.samples = 0; entry.day = day }
+  let value = entry.results.get(key)
+  if (!value) {
+    const result = calculateCultivationRecommendations(snapshot, evidenceQuery, day, entry.prepared)
+    value = { result, samples: result.recommendations.reduce((sum, row) => sum + row.samples.length, 0) }
+    entry.samples += value.samples
   }
-  return entry.result
+  entry.results.delete(key)
+  entry.results.set(key, value)
+  // ponytail: bound retained sample graphs as well as query count; use compact aggregates if this working set grows.
+  while (entry.results.size > 1 && (entry.results.size > 64 || entry.samples > 250000)) {
+    const oldest = entry.results.keys().next().value!
+    entry.samples -= entry.results.get(oldest)!.samples
+    entry.results.delete(oldest)
+  }
+  return { ...value.result, recommendations: value.result.recommendations.filter((row) => {
+    const operator = snapshot.operators[row.operatorId]
+    return matchesCultivationRarity(operator.rarity, query) && (!query.profession || operator.profession === query.profession) && matchesSearch(operator.name, query.search)
+  }) }
 }

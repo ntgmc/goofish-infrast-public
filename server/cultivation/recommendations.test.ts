@@ -145,24 +145,58 @@ describe('independent cultivation recommendation evidence', () => {
     expect(result.recommendations.map((row) => row.target)).toEqual(frontier)
   })
 
-  it('retains only the latest filter result instead of accumulating full sample graphs', () => {
+  it('reuses evidence when switching between queries and across operator filters', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(now)
+    const input = snapshot([job(1), job(2), job(3)])
+    input.operators.char_test.profession = 'WARRIOR'
+    const first = getCultivationRecommendations(input, defaultCultivationQuery)
+    const focused = getCultivationRecommendations(input, { ...defaultCultivationQuery, stageId: 'main_1' })
+    const filtered = getCultivationRecommendations(input, { ...defaultCultivationQuery, profession: 'WARRIOR', rarity: 4, search: 'cs gy' })
+    expect(filtered.recommendations[0]).toBe(first.recommendations[0])
+    expect(getCultivationRecommendations(input, { ...defaultCultivationQuery, search: 'not found' }).recommendations).toEqual([])
+    expect(getCultivationRecommendations(input, defaultCultivationQuery).stages).toBe(first.stages)
+    expect(getCultivationRecommendations(input, { ...defaultCultivationQuery, stageId: 'main_1' }).stages).toBe(focused.stages)
+  })
+
+  it('matches uncached calculations for every rarity group, professions, and searches', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(now)
+    const input = snapshot([job(1), job(2), job(3)])
+    input.operators.char_test.profession = 'WARRIOR'
+    input.operators.char_low = { name: '低星干员', rarity: 2, skills: [], profession: 'SUPPORT' }
+    input.costs.levels.maxLevel[1] = [30]
+    for (const homework of input.homeworks) (homework.content.opers as unknown[]).push({ name: '低星干员', skill: 0 })
+    const day = Date.parse('2026-10-07T16:00:00Z')
+    for (const rarityGroup of ['all', 'low', 'high'] as const) for (const profession of ['', 'WARRIOR', 'SUPPORT']) for (const search of ['', 'CSGY', 'dixing']) {
+      const query = { ...defaultCultivationQuery, rarityGroup, profession, search }
+      expect(getCultivationRecommendations(input, query)).toEqual(calculateCultivationRecommendations(input, query, day))
+    }
+  })
+
+  it('evicts the least recently used query after 64 combinations', () => {
     vi.spyOn(Date, 'now').mockReturnValue(now)
     const input = snapshot([job(1), job(2), job(3)])
     const first = getCultivationRecommendations(input, defaultCultivationQuery)
-    getCultivationRecommendations(input, { ...defaultCultivationQuery, stageId: 'main_1' })
-    expect(getCultivationRecommendations(input, defaultCultivationQuery)).not.toBe(first)
+    const secondQuery = { ...defaultCultivationQuery, stageId: 'main_1' }
+    const second = getCultivationRecommendations(input, secondQuery)
+    for (let index = 0; index < 62; index++) getCultivationRecommendations(input, { ...defaultCultivationQuery, stageId: `other_${index}` })
+    expect(getCultivationRecommendations(input, defaultCultivationQuery).stages).toBe(first.stages)
+    getCultivationRecommendations(input, { ...defaultCultivationQuery, stageId: 'last' })
+    expect(getCultivationRecommendations(input, defaultCultivationQuery).stages).toBe(first.stages)
+    expect(getCultivationRecommendations(input, secondQuery).stages).not.toBe(second.stages)
   })
 
-  it('invalidates public recommendations for a replaced snapshot and supports skill-less operators', () => {
+  it('reuses evidence for the whole Beijing day and rebuilds on midnight or snapshot replacement', () => {
     const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
     const input = snapshot([job(1)])
     input.operators.char_test.skills = []
     const query = { ...defaultCultivationQuery, stageId: 'main_1' }
     const first = getCultivationRecommendations(input, query)
     expect(first.recommendations[0].target).toMatchObject({ skill: 0, skillLevel: 1 })
-    expect(getCultivationRecommendations(input, query)).toBe(first)
+    expect(getCultivationRecommendations(input, query).stages).toBe(first.stages)
     expect(getCultivationRecommendations({ ...input, homeworks: [] }, query).recommendations).toEqual([])
-    clock.mockReturnValue(now + 16 * 60000)
-    expect(getCultivationRecommendations(input, query)).not.toBe(first)
+    clock.mockReturnValue(Date.parse('2026-10-08T15:59:59.999Z'))
+    expect(getCultivationRecommendations(input, query).stages).toBe(first.stages)
+    clock.mockReturnValue(Date.parse('2026-10-08T16:00:00Z'))
+    expect(getCultivationRecommendations(input, query).stages).not.toBe(first.stages)
   })
 })

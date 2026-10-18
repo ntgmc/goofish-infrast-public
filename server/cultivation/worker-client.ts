@@ -10,99 +10,96 @@ export class CultivationReadError extends Error {
   constructor(message: string, readonly status = 503, readonly code = 'cultivation_unavailable') { super(message) }
 }
 
-let worker: Worker | null = null
-let stopping: Promise<unknown> | null = null
-let idleTimer: ReturnType<typeof setTimeout> | null = null
-let active: { task: CultivationTask; promise: Promise<ArrayBuffer | null>; finish: (error: Error | null, result?: ArrayBuffer | null) => void } | null = null
+type WorkerState = { worker: Worker | null; stopping: Promise<unknown> | null;
+  active: { promise: Promise<ArrayBuffer | null>; finish: (error: Error | null, result?: ArrayBuffer | null) => void } | null }
+const reader: WorkerState = { worker: null, stopping: null, active: null }
+const updater: WorkerState = { worker: null, stopping: null, active: null }
 
-function stopWorker() {
-  if (idleTimer) clearTimeout(idleTimer)
-  idleTimer = null
-  const current = worker
-  worker = null
-  if (current) stopping = current.terminate().catch(() => undefined).finally(() => { stopping = null })
-  return stopping ?? Promise.resolve()
+function stopWorker(state: WorkerState) {
+  const current = state.worker
+  state.worker = null
+  if (current) state.stopping = current.terminate().catch(() => undefined).finally(() => { state.stopping = null })
+  return state.stopping ?? Promise.resolve()
 }
 
-function getWorker() {
-  if (worker) return worker
+function getWorker(state: WorkerState) {
+  if (state.worker) return state.worker
   const current = new Worker(new URL('./cultivation-worker.js', import.meta.url), {
     execArgv: [], resourceLimits: { maxOldGenerationSizeMb: 512 },
   })
-  worker = current
+  state.worker = current
   current.on('message', (reply: CultivationWorkerReply) => {
-    if (worker !== current) return
-    if (reply.ok) active?.finish(null, reply.result)
-    else active?.finish(new CultivationReadError(reply.message, reply.status, reply.code))
+    if (state.worker !== current) return
+    if (reply.ok) state.active?.finish(null, reply.result)
+    else state.active?.finish(new CultivationReadError(reply.message, reply.status, reply.code))
   })
   const failed = () => {
-    if (worker !== current) return
-    active?.finish(new CultivationReadError('养成数据读取暂不可用，请稍后重试。'))
-    void stopWorker()
+    if (state.worker !== current) return
+    state.active?.finish(new CultivationReadError('养成数据读取暂不可用，请稍后重试。'))
+    void stopWorker(state)
   }
   current.on('error', failed)
   current.on('exit', failed)
   return current
 }
 
-function execute(task: CultivationTask, signal?: AbortSignal): Promise<ArrayBuffer | null> {
+function execute(state: WorkerState, task: CultivationTask, signal?: AbortSignal): Promise<ArrayBuffer | null> {
   if (signal?.aborted) return Promise.reject(signal.reason)
-  if (active || stopping) return Promise.reject(new CultivationReadError(
-    active?.task.type === 'refresh' ? '养成数据正在更新，请稍后重试。' : '养成数据正在读取，请稍后重试。', 503, 'cultivation_busy',
+  if (state.active || state.stopping) return Promise.reject(new CultivationReadError(
+    task.type === 'refresh' ? '养成数据正在更新，请稍后重试。' : '养成数据正在读取，请稍后重试。', 503, 'cultivation_busy',
   ))
   let current: Worker
-  try { current = getWorker() }
+  try { current = getWorker(state) }
   catch { return Promise.reject(new CultivationReadError('养成数据读取暂不可用，请稍后重试。')) }
   let finish!: (error: Error | null, result?: ArrayBuffer | null) => void
   const promise = new Promise<ArrayBuffer | null>((resolve, reject) => {
-    if (idleTimer) clearTimeout(idleTimer)
-    idleTimer = null
     current.ref()
     const cancel = () => {
       if (task.type === 'refresh') current.postMessage({ type: 'cancel' })
       else {
         finish(new CultivationReadError('养成数据读取已取消。', 499, 'request_aborted'))
-        void stopWorker()
+        void stopWorker(state)
       }
     }
     const timeout = task.type === 'plan' ? setTimeout(() => {
       finish(new CultivationReadError('养成数据读取超时，请稍后重试。', 504, 'cultivation_timeout'))
-      void stopWorker()
+      void stopWorker(state)
     }, 90_000) : null
     finish = (error, result = null) => {
-      if (active?.finish !== finish) return
-      active = null
+      if (state.active?.finish !== finish) return
+      state.active = null
       if (timeout) clearTimeout(timeout)
       signal?.removeEventListener('abort', cancel)
       current.unref()
-      idleTimer = setTimeout(() => { void stopWorker() }, 60_000)
-      idleTimer.unref()
+      if (task.type === 'refresh') void stopWorker(state)
       if (error) reject(error)
       else resolve(result)
     }
     signal?.addEventListener('abort', cancel, { once: true })
   })
-  active = { task, promise, finish }
-  try { worker!.postMessage(task) }
+  state.active = { promise, finish }
+  try { current.postMessage(task) }
   catch {
     finish(new CultivationReadError('养成数据读取暂不可用，请稍后重试。'))
-    void stopWorker()
+    void stopWorker(state)
   }
   return promise
 }
 
 export async function readCultivationPlan(input: Omit<Extract<CultivationTask, { type: 'plan' }>, 'type'>, signal?: AbortSignal): Promise<ArrayBuffer> {
-  return (await execute({ type: 'plan', ...input }, signal))!
+  return (await execute(reader, { type: 'plan', ...input }, signal))!
 }
 
 export async function refreshCultivationSnapshot(signal: AbortSignal): Promise<void> {
-  await execute({ type: 'refresh' }, signal)
+  await execute(updater, { type: 'refresh' }, signal)
+  reader.worker?.postMessage({ type: 'invalidate' })
 }
 
 export async function shutdownCultivationWorker(): Promise<void> {
-  if (active?.task.type === 'refresh') {
-    worker?.postMessage({ type: 'cancel' })
-    await active.promise.catch(() => undefined)
-  } else active?.finish(new CultivationReadError('服务正在重启，请稍后重试。'))
-  await stopWorker()
+  if (updater.active) {
+    updater.worker?.postMessage({ type: 'cancel' })
+    await updater.active.promise.catch(() => undefined)
+  }
+  reader.active?.finish(new CultivationReadError('服务正在重启，请稍后重试。'))
+  await Promise.all([stopWorker(reader), stopWorker(updater)])
 }

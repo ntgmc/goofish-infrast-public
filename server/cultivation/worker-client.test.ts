@@ -17,19 +17,21 @@ beforeEach(() => {
 afterEach(async () => { await shutdownCultivationWorker(); vi.useRealTimers() })
 
 describe('isolated cultivation reader lifecycle', () => {
-  it('bounds concurrency, reuses public caches between reads and releases the idle reader', async () => {
+  it('bounds reads and keeps public caches across idle periods and calendar days', async () => {
     const first = readCultivationPlan(input)
     expect(mocks.create).toHaveBeenCalledWith(expect.any(URL), { execArgv: [], resourceLimits: { maxOldGenerationSizeMb: 512 } })
     await expect(readCultivationPlan(input)).rejects.toMatchObject({ code: 'cultivation_busy', status: 503 })
     worker.emit('message', { ok: true, result: payload })
     await expect(first).resolves.toBe(payload)
+    await vi.advanceTimersByTimeAsync(2 * 86400000)
+    expect(worker.terminate).not.toHaveBeenCalled()
     const second = readCultivationPlan(input)
     worker.emit('message', { ok: true, result: payload })
     await second
     expect(mocks.create).toHaveBeenCalledOnce()
-    await vi.advanceTimersByTimeAsync(60_000)
-    expect(worker.terminate).toHaveBeenCalledOnce()
     expect(vi.getTimerCount()).toBe(0)
+    await shutdownCultivationWorker()
+    expect(worker.terminate).toHaveBeenCalledOnce()
   })
 
   it('terminates a timed-out computation and allows a fresh reader on retry', async () => {
@@ -88,10 +90,45 @@ describe('isolated cultivation reader lifecycle', () => {
     await retry
   })
 
+  it('allows cached reads during a refresh and invalidates the reader only after success', async () => {
+    const updateWorker = Object.assign(new EventEmitter(), { postMessage: vi.fn(), terminate: vi.fn(async () => 0), ref: vi.fn(), unref: vi.fn() })
+    const first = readCultivationPlan(input)
+    worker.emit('message', { ok: true, result: payload })
+    await first
+    mocks.create.mockReturnValueOnce(updateWorker)
+    const refresh = refreshCultivationSnapshot(new AbortController().signal)
+    const read = readCultivationPlan(input)
+    worker.emit('message', { ok: true, result: payload })
+    await expect(read).resolves.toBe(payload)
+    expect(worker.postMessage).not.toHaveBeenCalledWith({ type: 'invalidate' })
+    updateWorker.emit('message', { ok: true, result: null })
+    await refresh
+    expect(worker.postMessage).toHaveBeenCalledWith({ type: 'invalidate' })
+    expect(updateWorker.terminate).toHaveBeenCalledOnce()
+    expect(worker.terminate).not.toHaveBeenCalled()
+  })
+
+  it('preserves the reader and its cache when a background refresh fails', async () => {
+    const updateWorker = Object.assign(new EventEmitter(), { postMessage: vi.fn(), terminate: vi.fn(async () => 0), ref: vi.fn(), unref: vi.fn() })
+    const first = readCultivationPlan(input)
+    worker.emit('message', { ok: true, result: payload })
+    await first
+    mocks.create.mockReturnValueOnce(updateWorker)
+    const refresh = refreshCultivationSnapshot(new AbortController().signal)
+    updateWorker.emit('error', new Error('upstream unavailable'))
+    await expect(refresh).rejects.toBeInstanceOf(CultivationReadError)
+    expect(worker.postMessage).not.toHaveBeenCalledWith({ type: 'invalidate' })
+    expect(worker.terminate).not.toHaveBeenCalled()
+    const retry = readCultivationPlan(input)
+    worker.emit('message', { ok: true, result: payload })
+    await expect(retry).resolves.toBe(payload)
+    expect(mocks.create).toHaveBeenCalledTimes(2)
+  })
+
   it('lets a cancelled refresh finish atomic file cleanup before terminating the thread', async () => {
     const controller = new AbortController()
     const refresh = refreshCultivationSnapshot(controller.signal)
-    await expect(readCultivationPlan(input)).rejects.toMatchObject({ code: 'cultivation_busy' })
+    await expect(refreshCultivationSnapshot(controller.signal)).rejects.toMatchObject({ code: 'cultivation_busy' })
     controller.abort()
     const shutdown = shutdownCultivationWorker()
     expect(worker.postMessage).toHaveBeenCalledWith({ type: 'cancel' })
