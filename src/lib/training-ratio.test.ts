@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyzeTrainingBalance, calculateTrainingCost } from './training-ratio'
+import { analyzeTrainingBalance, calculateTrainingCost, estimateTrainingRecovery } from './training-ratio'
 
 const base = { rarity: 6, currentElite: 0, currentLevel: 1, targetElite: 2, targetLevel: 60 }
 describe('shared game training costs', () => {
@@ -24,6 +24,50 @@ describe('shared game training costs', () => {
       expect(() => calculateTrainingCost(goal)).toThrow('invalid_training_goal')
     }
     expect(() => calculateTrainingCost(base, { maxLevel: [[], [], [], [], [], [50, 80, 90]], characterExpMap: [], characterUpgradeCostMap: [], evolveGoldCost: [] })).toThrow('incomplete_training_levels')
+  })
+})
+
+describe('time to restore inventory balance', () => {
+  const monday = new Date('2026-10-19T04:00:00+08:00')
+  it('counts both base resources while farming EXP instead of dividing the initial shortage by EXP output', () => {
+    const inventory = { lmd: 13000000, exp: 0 }
+    const income = { lmd: 65000, exp: 20000 }
+    const result = estimateTrainingRecovery(inventory, income, monday)!
+    expect(result).toEqual({ stage: 'LS-6', days: 291 })
+    const dailyGain = (income.exp + 240 / 36 * 10000) * 1.3 - income.lmd - 240 / 36 * 432
+    expect((result.days! - 1) * dailyGain).toBeLessThan(inventory.lmd)
+    expect(result.days! * dailyGain).toBeGreaterThanOrEqual(inventory.lmd)
+  })
+  it('counts CE-6 closed days and uses the CN 04:00 reset', () => {
+    const inventory = { lmd: 0, exp: 100000 }
+    expect(estimateTrainingRecovery(inventory, null, monday)).toEqual({ stage: 'CE-6', days: 4 })
+    expect(estimateTrainingRecovery(inventory, null, new Date('2026-10-20T03:59:59+08:00'))?.days).toBe(4)
+    expect(estimateTrainingRecovery(inventory, null, new Date('2026-10-20T04:00:00+08:00'))?.days).toBe(3)
+  })
+  it('finds the earliest day across repeated weeks, including temporary gains with an adverse weekly trend', () => {
+    for (const inventory of [{ lmd: 0, exp: 1000000 }, { lmd: 0, exp: 10000 }, { lmd: 2000000, exp: 0 }]) {
+      for (const income of [{ lmd: 10000, exp: 30000 }, { lmd: 0, exp: 35000 }, { lmd: 100000, exp: 10000 }]) {
+        const result = estimateTrainingRecovery(inventory, income, monday)!
+        let gap = inventory.lmd - inventory.exp * 1.3
+        let days: number | null = null
+        for (let day = 1; day <= 3650; day++) {
+          const open = result.stage === 'LS-6' || [0, 2, 4, 6].includes(day % 7)
+          const farm = open ? 240 / 36 : 0
+          gap += income.lmd + (result.stage === 'CE-6' ? farm * 10000 : farm * 432)
+            - (income.exp + (result.stage === 'LS-6' ? farm * 10000 : 0)) * 1.3
+          if (result.stage === 'CE-6' ? gap >= -1e-6 : gap <= 1e-6) { days = day; break }
+        }
+        expect(result.days).toBe(days)
+      }
+    }
+  })
+  it('handles unavailable production, non-converging income, balanced stock and invalid inputs', () => {
+    expect(estimateTrainingRecovery({ lmd: 13000000, exp: 0 }, null, monday)).toEqual({ stage: 'LS-6', days: 156 })
+    expect(estimateTrainingRecovery({ lmd: 13000000, exp: 0 }, { lmd: 100000, exp: 0 }, monday)?.days).toBeNull()
+    expect(estimateTrainingRecovery({ lmd: 0, exp: 1000000 }, { lmd: 0, exp: 100000 }, monday)?.days).toBeNull()
+    expect(estimateTrainingRecovery({ lmd: 130000, exp: 100000 }, null, monday)).toBeNull()
+    expect(estimateTrainingRecovery({ lmd: 0, exp: 0 }, null, monday)).toBeNull()
+    expect(() => estimateTrainingRecovery({ lmd: 0, exp: 1 }, { lmd: NaN, exp: 0 }, monday)).toThrow('invalid_training_income')
   })
 })
 
