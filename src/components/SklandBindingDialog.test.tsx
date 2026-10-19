@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { copy } from '../copy/index'
 import type { UserGameAccount } from '../lib/types'
 import { ApiError, apiJson, apiVoid } from '../lib/api-client'
 import SklandBindingDialog from './SklandBindingDialog'
@@ -34,7 +35,7 @@ describe('SklandBindingDialog accessibility', () => {
 
     const dialog = screen.getByRole('dialog', { name: '森空岛导入' })
     expect(dialog).toHaveAttribute('aria-modal', 'true')
-    expect(dialog).toHaveAttribute('aria-describedby', 'skland-binding-description')
+    expect(dialog).toHaveAccessibleDescription(copy.workspace.components_SklandBindingDialog_010)
     expect(dialog).toHaveAttribute('data-slot', 'dialog-content')
     expect(dialog).toHaveClass('block', 'max-w-2xl')
     expect(document.querySelector('[data-slot="dialog-overlay"]')).toBeInTheDocument()
