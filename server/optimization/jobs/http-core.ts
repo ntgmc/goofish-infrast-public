@@ -16,7 +16,7 @@ export function sanitizeConfigForPublicOptimize(
 ): LicenseConfig {
   const next = structuredClone(config);
   if (next.intermediate_inventory !== undefined || next.allow_product_rebalance !== undefined || next.auto_balance_source === 'intermediate_inventory' || next.auto_balance_source === 'limited_config') {
-    next.allow_product_rebalance = allowsInventoryProductRebalance(next, hasCapability({ permission }, 'edit_full_config'));
+    next.allow_product_rebalance = allowsInventoryProductRebalance(next, permission !== 'free_preview' && hasCapability({ permission }, 'edit_full_config'));
     // Both sources report depletion; only intermediate_inventory can change product counts.
     next.auto_balance_source = next.allow_product_rebalance ? 'intermediate_inventory' : 'limited_config';
   }

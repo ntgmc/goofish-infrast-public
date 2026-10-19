@@ -10,7 +10,7 @@ export function resolveIncomingClientIp(req: IncomingMessage): string {
 export function resolveClientIp(
   remoteAddress: string | undefined,
   realIpHeader: string | string[] | undefined,
-  environment: Pick<NodeJS.ProcessEnv, 'NODE_ENV' | 'TRUSTED_PROXY_ADDRESSES'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'NODE_ENV' | 'TRUSTED_PROXY_ADDRESSES'>> = process.env,
 ): string {
   const remoteIp = normalizeIp(remoteAddress)
   const forwardedIp = normalizeIp(Array.isArray(realIpHeader) ? realIpHeader[0] : realIpHeader)
@@ -20,7 +20,7 @@ export function resolveClientIp(
 
 export function isTrustedProxyAddress(
   remoteAddress: string | undefined,
-  environment: Pick<NodeJS.ProcessEnv, 'NODE_ENV' | 'TRUSTED_PROXY_ADDRESSES'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'NODE_ENV' | 'TRUSTED_PROXY_ADDRESSES'>> = process.env,
 ): boolean {
   const remoteIp = normalizeIp(remoteAddress)
   if (!remoteIp) return false
@@ -35,7 +35,7 @@ export function isLoopbackIpAddress(value: string | undefined): boolean {
 }
 
 export function resolveTrustedProxyAddresses(
-  environment: Pick<NodeJS.ProcessEnv, 'TRUSTED_PROXY_ADDRESSES'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'TRUSTED_PROXY_ADDRESSES'>> = process.env,
 ): string[] {
   const rawValue = environment.TRUSTED_PROXY_ADDRESSES?.trim()
   if (!rawValue) return []

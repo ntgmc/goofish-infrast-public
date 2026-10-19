@@ -1,4 +1,4 @@
-import type { PoolClient } from 'pg'
+import type { QueryClient } from '../../storage/postgres'
 import { query as postgresQuery } from '../../storage/postgres'
 import type { LicenseOperator, LicenseConfig, OptimizeResult } from "../../../src/lib/types";
 import { canonicalJson, type CdkRecord, incrementCdkScheduleGenerateCount } from "../../handlers/license-utils";
@@ -15,7 +15,7 @@ export function getDownloadableHistoryResult(result: OptimizeResult): OptimizeRe
 
 export async function hasTrainingDiagnosisEntitlement(
   jobId: string,
-  client: Pick<PoolClient, 'query'> = { query: postgresQuery },
+  client: QueryClient = { query: postgresQuery },
 ): Promise<boolean> {
   const result = await client.query<{ entitled: boolean }>(
     `select exists (select 1 from reward_consumptions

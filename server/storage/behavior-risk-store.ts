@@ -1,3 +1,4 @@
+import type { QueryClient } from './postgres'
 import { createHash, randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import {
@@ -116,7 +117,7 @@ export async function insertBehaviorRiskEvent(input: BehaviorRiskEventInput): Pr
 }
 
 export async function insertBehaviorRiskEventInTransaction(
-  client: Pick<PoolClient, 'query'>,
+  client: QueryClient,
   input: BehaviorRiskEventInput,
 ): Promise<boolean> {
   const occurredAt = input.occurredAt ?? new Date()
@@ -426,13 +427,13 @@ async function acknowledgeDirtyUsers(client: PoolClient, claims: DirtyUserClaim[
   )
 }
 
-async function behaviorRiskBacklogCount(client: Pick<PoolClient, 'query'>): Promise<number> {
+async function behaviorRiskBacklogCount(client: QueryClient): Promise<number> {
   const result = await client.query<{ total: string }>('select count(*)::text as total from behavior_risk_dirty_users')
   return safeCount(result.rows[0]?.total)
 }
 
 async function writeBehaviorRiskHealth(
-  client: Pick<PoolClient, 'query'>,
+  client: QueryClient,
   input: {
     evaluationStatus: 'success' | 'lock_busy' | 'failed'
     evaluatedAt: Date

@@ -810,7 +810,7 @@ async function recordSklandOperatorFingerprint(
 
 function assertCurrentConfirmation<T extends { stage?: string; confirmation_id: string; expires_at: string; uid?: string }>(
   pending: T | null | undefined, confirmationId: string,
-): asserts pending is T & { uid: string } {
+): asserts pending is T & { stage?: 'confirmation'; uid: string } {
   if (!pending || (pending.stage && pending.stage !== 'confirmation') || !pending.uid || pending.confirmation_id !== confirmationId
     || !Number.isFinite(Date.parse(pending.expires_at)) || Date.now() > Date.parse(pending.expires_at)) {
     throw new SklandHttpError('skland_pending_expired', '森空岛绑定确认已失效，请重新授权。', 400, 'rebind')

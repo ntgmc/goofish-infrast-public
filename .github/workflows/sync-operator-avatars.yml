@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  NODE_VERSION: "24"
+  NODE_VERSION: "24.22.0"
   TARGET_BRANCH: ${{ github.event.inputs.target_branch || 'dev' }}
 
 jobs:
@@ -34,6 +34,9 @@ jobs:
           ref: ${{ env.TARGET_BRANCH }}
           fetch-depth: 0
 
+      - name: Setup pnpm
+        run: npm install --global pnpm@12.14.0
+
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -42,12 +45,12 @@ jobs:
       - name: Sync operator avatars
         env:
           GITHUB_TOKEN: ${{ secrets.OPERATOR_AVATAR_SOURCE_TOKEN || secrets.GITHUB_TOKEN }}
-        run: npm run sync:operator-avatars
+        run: pnpm run sync:operator-avatars
 
       - name: Sync cultivation icons
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run sync:cultivation-icons
+        run: pnpm run sync:cultivation-icons
 
       - name: Commit synced game icons
         shell: bash

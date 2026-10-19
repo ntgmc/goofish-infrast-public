@@ -7,19 +7,19 @@ const security = normalize(await readFile('.github/workflows/security-analysis.y
 
 test('keeps generation, relevance, release, and migrated-data checks in the quality workflow', () => {
   for (const command of [
-    'npm run test:generate-data',
-    'npm run test:product-catalog',
-    'npm run test:migration-verifier',
-    'npm run test:backup-contracts',
-    'npm run test:build-relevance',
-    'npm run check:build-relevance',
-    'npm run test:release-artifact',
+    'pnpm run test:generate-data',
+    'pnpm run test:product-catalog',
+    'pnpm run test:migration-verifier',
+    'pnpm run test:backup-contracts',
+    'pnpm run test:build-relevance',
+    'pnpm run check:build-relevance',
+    'pnpm run test:release-artifact',
     'node scripts/verify-migrated-data.mjs --require-database',
   ]) {
     assert.match(quality, new RegExp(escapeRegExp(command)))
   }
   assert.match(quality, /GENERATE_CHANGELOG_CANDIDATE: \$\{\{ github\.event_name == 'push'/)
-  assert.match(quality, /npm ci --prefix \.release-smoke\/public --omit=dev/)
+  assert.match(quality, /pnpm --dir \.release-smoke\/public install --frozen-lockfile --prod/)
 })
 
 test('attests the final tarball and runs Semgrep on main pull requests and pushes', () => {

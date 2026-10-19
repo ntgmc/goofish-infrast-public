@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: "24"
+  NODE_VERSION: "24.22.0"
 
 jobs:
   public-validation:
@@ -30,35 +30,41 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup pnpm
+        run: npm install --global pnpm@12.14.0
+
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Validate public source and API boundaries
         run: |
-          npm run check:catalog
-          npm run check:architecture
-          npm run check:dead-code
-          npm run check:api
+          pnpm run generate:data
+          pnpm run generate:changelog
+          pnpm run check:types
+          pnpm run check:catalog
+          pnpm run check:architecture
+          pnpm run check:dead-code
+          pnpm run check:api
 
       - name: Run public tests
         run: |
-          npm run test:workflow-contracts
-          npm run test:generate-data
-          npm run test:product-catalog
-          npm run test:migration-verifier
-          npm run test:backup-contracts
-          npm run test:generate-changelog
-          npm run test:release-artifact
-          npm run test:release-confirmation
-          npm run test:build-relevance
-          npm run check:build-relevance
-          npm test
+          pnpm run test:workflow-contracts
+          pnpm run test:generate-data
+          pnpm run test:product-catalog
+          pnpm run test:migration-verifier
+          pnpm run test:backup-contracts
+          pnpm run test:generate-changelog
+          pnpm run test:release-artifact
+          pnpm run test:release-confirmation
+          pnpm run test:build-relevance
+          pnpm run check:build-relevance
+          pnpm test
 
       - name: Build public application
         env:
@@ -71,9 +77,9 @@ jobs:
           CHANGELOG_BASE_SHA: ${{ github.event.before }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          npm run build
-          npm run generate:release-sbom
-          npm run check:public-export
+          pnpm run build
+          pnpm run generate:release-sbom
+          pnpm run check:public-export
 
       - name: Create and verify public artifact
         if: github.event_name == 'push'
@@ -86,11 +92,11 @@ jobs:
           node scripts/release-artifact.mjs create --kind public --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --run-url "$GITHUB_RUN_URL"
           node scripts/release-artifact.mjs verify --kind public --sha "$GITHUB_SHA"
           mkdir -p .release-packages/public
-          tar -C .release-staging/public -czf .release-packages/public/public.tgz dist server scripts package.json package-lock.json release-sbom.cdx.json build-manifest.json changelog-release.json changelog-release.md
+          tar -C .release-staging/public -czf .release-packages/public/public.tgz dist server scripts package.json pnpm-lock.yaml pnpm-workspace.yaml release-sbom.cdx.json build-manifest.json changelog-release.json changelog-release.md
           (cd .release-packages/public && sha256sum public.tgz > public.tgz.sha256)
           mkdir -p .release-smoke/public
           tar -C .release-smoke/public -xzf .release-packages/public/public.tgz
-          npm ci --prefix .release-smoke/public --omit=dev
+          pnpm --dir .release-smoke/public install --frozen-lockfile --prod
           node .release-smoke/public/scripts/check-release-runtime.mjs .release-smoke/public
 
       - name: Attest public artifact provenance
@@ -132,24 +138,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Setup pnpm
+        run: npm install --global pnpm@12.14.0
+
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run PostgreSQL integration tests
-        run: npm run test:postgres
+        run: pnpm run test:postgres
 
       - name: Verify a migrated PostgreSQL deployment
         env:
           ALLOW_DATABASE_MIGRATION: "true"
           APP_ROLE: api
         run: |
-          npm run build
+          pnpm run build
           node server/dist/migrate.js
           node scripts/check-server-routes.mjs
           node scripts/verify-migrated-data.mjs --require-database

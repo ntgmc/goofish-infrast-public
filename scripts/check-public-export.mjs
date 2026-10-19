@@ -16,7 +16,8 @@ const includedTopLevel = new Set([
   'tools',
   'index.html',
   'package.json',
-  'package-lock.json',
+  'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
   'optimizer-port-contract.json',
   'tsconfig.json',
   'tsconfig.server.json',
@@ -30,7 +31,7 @@ try {
   const nodeModulesTarget = join(root, 'node_modules')
   await symlink(nodeModulesTarget, join(temporaryRoot, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir')
 
-  runNpm(['run', 'build'], temporaryRoot)
+  runPnpm(['run', 'build'], temporaryRoot)
   const assetsRoot = join(temporaryRoot, 'dist/assets')
   for (const file of await readdir(assetsRoot)) {
     if (!file.endsWith('.js')) continue
@@ -46,8 +47,8 @@ try {
       }
     }
   }
-  runNpm(['run', 'check:architecture:public'], temporaryRoot)
-  runNpm(['test'], temporaryRoot)
+  runPnpm(['run', 'check:architecture:public'], temporaryRoot)
+  runPnpm(['test'], temporaryRoot)
 
   const serverOutputs = (await readdir(join(temporaryRoot, 'server/dist'))).sort()
   const expectedOutputs = ['cultivation-worker.js', 'cultivation-worker.js.map', 'import-prts-planning.js', 'import-prts-planning.js.map', 'index.js', 'index.js.map', 'migrate.js', 'migrate.js.map', 'routes.js', 'routes.js.map', 'sync-prts-planning.js', 'sync-prts-planning.js.map']
@@ -99,8 +100,8 @@ async function assertNoEscapingSymlinks(directory, publicRoot) {
   }
 }
 
-function runNpm(argumentsList, cwd) {
-  const command = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+function runPnpm(argumentsList, cwd) {
+  const command = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
   runCommand(command, argumentsList, cwd, process.platform === 'win32')
 }
 

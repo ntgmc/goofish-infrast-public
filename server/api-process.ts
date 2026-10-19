@@ -146,7 +146,7 @@ export function createApiProcess(
 }
 
 export function resolveApiPort(
-  environment: Pick<NodeJS.ProcessEnv, 'PORT'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'PORT'>> = process.env,
 ): number {
   const rawValue = environment.PORT?.trim()
   if (!rawValue) return 3_000

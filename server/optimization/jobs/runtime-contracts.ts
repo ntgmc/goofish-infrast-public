@@ -57,7 +57,16 @@ const optimizeDurationEstimateSchema = z.strictObject({
 
 const scheduleUsageContextSchema = z.strictObject({
   status: z.enum(['success', 'failure']).optional(),
-  reason_code: boundedString(128).optional(),
+  reason_code: z.enum([
+    'ok', 'validation_failed', 'auth_required', 'auth_profile_missing', 'profile_missing',
+    'profile_inactive', 'cdk_missing', 'cdk_used', 'cdk_frozen', 'cdk_revoked', 'cdk_status_invalid',
+    'risk_soft_blocked', 'risk_frozen', 'permission_denied', 'optimizer_runtime_error',
+    'workspace_save_failed', 'insufficient_balance', 'commercial_queue_capacity_exceeded',
+    'commercial_submission_rate_exceeded', 'billing_reconciliation_anomaly', 'registration_failed',
+    'skland_credential_invalid', 'skland_refresh_forbidden', 'skland_not_bound',
+    'skland_refresh_failed', 'skland_import_failed', 'skland_account_mismatch',
+    'skland_pending_expired', 'skland_confirm_invalid', 'announcement_missing', 'unknown_failure',
+  ]).optional(),
   permission: z.string().max(128).optional(),
   profile_id: z.string().max(128).optional(),
   cdk_status: z.string().max(128).optional(),
@@ -182,7 +191,7 @@ export function parseOptimizationJobResult(
 ): OptimizeResult | ScenarioComparisonResult {
   if ('kind' in payload && payload.kind === 'scenario_comparison') return scenarioComparisonResultSchema.parse(value)
   const result = parseOptimizeResult(value)
-  return payload.request.manual_schedule ? { ...result, schedule_source: 'manual' } : result
+  return 'request' in payload && payload.request.manual_schedule ? { ...result, schedule_source: 'manual' } : result
 }
 
 function assertJsonSafe(value: unknown, context: z.RefinementCtx): void {

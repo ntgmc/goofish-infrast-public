@@ -1,3 +1,4 @@
+import type { QueryClient } from './postgres'
 import type { PoolClient } from 'pg'
 import { matchesSearch } from '../../src/lib/search'
 import { query, withTransaction } from './postgres'
@@ -427,7 +428,7 @@ export function createPostgresCdkRecordStore(): CdkRecordStore {
   }
 }
 
-async function insertCdkRecord(client: Pick<PoolClient, 'query'>, key: string, record: CdkRecord): Promise<void> {
+async function insertCdkRecord(client: QueryClient, key: string, record: CdkRecord): Promise<void> {
   const storedRecord = normalizeCdkRecordForPersistence(record)
   const result = await client.query(
     `insert into cdk_records
@@ -452,7 +453,7 @@ async function insertCdkRecord(client: Pick<PoolClient, 'query'>, key: string, r
 }
 
 async function updateStoredCdkRecordInTransaction(
-  client: Pick<PoolClient, 'query'>,
+  client: QueryClient,
   key: string,
   record: CdkRecord,
 ): Promise<void> {

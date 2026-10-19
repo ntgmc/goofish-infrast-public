@@ -1,4 +1,4 @@
-<!-- 此文件由 product/catalog.json 生成，请勿手工编辑。运行 npm run generate:catalog 更新。 -->
+<!-- 此文件由 product/catalog.json 生成，请勿手工编辑。运行 pnpm run generate:catalog 更新。 -->
 # 价格与权益说明
 
 ## 版本

@@ -7,20 +7,20 @@
 | 分类 | 技术 |
 | --- | --- |
 | 前端 | React 19.2、TypeScript 7、Vite 8、React Router 8 |
-| UI | Tailwind CSS 4、shadcn/ui、Radix UI、Motion 13、Lucide |
+| UI | Tailwind CSS 4、shadcn/ui、Radix UI、Motion 14、Lucide |
 | 后端 | Node.js 24、TypeScript、原生 HTTP API |
 | 数据库与任务队列 | PostgreSQL、node-postgres（pg） |
-| 测试 | Vitest 4、Testing Library、Testcontainers |
+| 测试 | Vitest 5、Testing Library、Testcontainers |
 
 ## 本地开发
 
-环境要求：Node.js 24、npm 11。后端开发需准备 PostgreSQL 和项目根目录的 `.env`。
+环境要求：Node.js 24.22.0、pnpm 12.14.0。可通过 `npm install --global pnpm@12.14.0` 安装 pnpm。后端开发需准备 PostgreSQL 和项目根目录的 `.env`。
 
 安装依赖并启动前端：
 
 ```bash
-npm ci
-npm run dev
+pnpm install --frozen-lockfile
+pnpm run dev
 ```
 
 前端默认地址为 `http://localhost:5173`，`/api` 请求代理到 `http://127.0.0.1:3000`。
@@ -28,7 +28,7 @@ npm run dev
 在另一终端启动后端：
 
 ```bash
-npm run start:server
+pnpm run start:server
 ```
 
 排班计算需要接入兼容的 `OptimizerPort` worker；公开范围见 [开源边界](OPEN_SOURCE_BOUNDARY.md)。
@@ -37,12 +37,13 @@ npm run start:server
 
 | 命令 | 用途 |
 | --- | --- |
-| `npm run build` | 构建前端和公共 API 服务端 |
-| `npm run preview` | 预览前端构建产物 |
-| `npm test` | 运行单元测试 |
-| `npm run test:postgres` | 运行 PostgreSQL 集成测试，需要 Docker |
-| `npm run check:architecture` | 检查架构边界 |
-| `npm run check:dead-code` | 检查未使用的代码 |
+| `pnpm run build` | 构建前端和公共 API 服务端 |
+| `pnpm run preview` | 预览前端构建产物 |
+| `pnpm test` | 运行单元测试 |
+| `pnpm run check:types` | 检查前端和后端生产源码类型 |
+| `pnpm run test:postgres` | 运行 PostgreSQL 集成测试，需要 Docker |
+| `pnpm run check:architecture` | 检查架构边界 |
+| `pnpm run check:dead-code` | 检查未使用的代码 |
 
 ## 贡献与许可证
 

@@ -290,7 +290,7 @@ def check_files() -> None:
     ]
     missing = [str(path) for path in required if not path.exists()]
     if missing:
-        raise RuntimeError("缺少运行文件，请先在仓库根目录执行 npm ci：" + ", ".join(missing))
+        raise RuntimeError("缺少运行文件，请先在仓库根目录执行 pnpm install --frozen-lockfile：" + ", ".join(missing))
 
 
 def run_self_test() -> int:

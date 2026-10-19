@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { cp, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -10,6 +11,17 @@ import { ARTIFACT_KINDS } from './release-artifact-config.mjs'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const script = join(root, 'scripts/release-artifact.mjs')
 const sha = '0123456789abcdef0123456789abcdef01234567'
+const fixtureLock = "lockfileVersion: '9.0'\nimporters: {}\npackages: {}\n"
+
+test('rejects an SBOM generated from a different pnpm lockfile', async () => {
+  const fixture = await createFixture('public')
+  try {
+    await writeFile(join(fixture.artifact, 'pnpm-lock.yaml'), fixtureLock + '# changed\n')
+    assert.throws(() => run(fixture, ['create', '--kind', 'public', '--sha', sha]), /SBOM does not match the pnpm lockfile/)
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true })
+  }
+})
 
 for (const kind of Object.keys(ARTIFACT_KINDS)) {
   test(`creates and verifies an immutable ${kind} artifact`, async () => {
@@ -270,22 +282,19 @@ async function writeRequiredFiles(artifact, kind, sourceMode = 'full') {
       await writeFile(target, JSON.stringify({ version: 3, sources: ['../index.ts'], sourcesContent: ['export {}'], mappings: '' }), 'utf8')
     } else if (path === 'package.json') {
       await writeFile(target, `${JSON.stringify({
-        name: 'fixture', version: '2.0.0', type: 'module', engines: { node: '>=24 <25' },
+        name: 'fixture', version: '2.0.0', type: 'module', packageManager: 'pnpm@12.14.0', engines: { node: '>=24 <25' },
         dependencies: { '@aws-sdk/client-sesv2': '1.0.0', '@node-rs/argon2': '1.0.0', pg: '1.0.0', qrcode: '1.0.0' },
       })}\n`, 'utf8')
-    } else if (path === 'package-lock.json') {
-      await writeFile(target, `${JSON.stringify({
-        name: 'fixture', lockfileVersion: 3,
-        packages: {
-          '': { name: 'fixture', version: '2.0.0' },
-          'node_modules/@aws-sdk/client-sesv2': { version: '1.0.0' },
-          'node_modules/@node-rs/argon2': { version: '1.0.0' },
-          'node_modules/pg': { version: '1.0.0' },
-          'node_modules/qrcode': { version: '1.0.0' },
-        },
-      })}\n`, 'utf8')
+    } else if (path === 'pnpm-lock.yaml') {
+      await writeFile(target, fixtureLock, 'utf8')
+    } else if (path === 'pnpm-workspace.yaml') {
+      await writeFile(target, 'nodeLinker: hoisted\n', 'utf8')
     } else if (path === 'release-sbom.cdx.json') {
-      await writeFile(target, `${JSON.stringify({ bomFormat: 'CycloneDX', specVersion: '1.6', components: [{ name: 'pg', version: '1.0.0' }] })}\n`, 'utf8')
+      await writeFile(target, JSON.stringify({
+        bomFormat: 'CycloneDX', specVersion: '1.6',
+        metadata: { properties: [{ name: 'goofish:lockfile:sha256', value: createHash('sha256').update(fixtureLock).digest('hex') }] },
+        components: ['@aws-sdk/client-sesv2', '@node-rs/argon2', 'pg', 'qrcode'].map((name) => ({ name, version: '1.0.0' })),
+      }), 'utf8')
     } else {
       await writeFile(target, path.endsWith('.html') ? '<!doctype html>' : path.endsWith('.js') ? `/*! APP_BUILD_META ${JSON.stringify(buildMeta(sourceMode))} */\nexport {}` : 'export {}', 'utf8')
     }

@@ -13,8 +13,8 @@ test('reports the production dependency audit for every pull request to main', (
 })
 
 test('audits production and development dependencies without lowering the severity threshold', () => {
-  assert.match(workflow, /^        run: npm audit --omit=dev$/m)
-  assert.match(workflow, /^        run: npm audit$/m)
+  assert.match(workflow, /^        run: pnpm audit --prod$/m)
+  assert.match(workflow, /^        run: pnpm audit$/m)
   assert.doesNotMatch(workflow, /--audit-level|continue-on-error/)
 })
 
@@ -22,7 +22,7 @@ test('keeps push audits scoped to dependency and workflow changes', () => {
   const pushTrigger = readTriggerBlock('push')
 
   assert.match(pushTrigger, /^    paths:\n/m)
-  for (const path of ['package.json', 'package-lock.json', '.github/workflows/dependency-audit.yml']) {
+  for (const path of ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.github/workflows/dependency-audit.yml']) {
     assert.match(pushTrigger, new RegExp(`^      - ${escapeRegExp(path)}$`, 'm'))
   }
 })

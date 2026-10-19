@@ -192,7 +192,7 @@ export async function handleUserResultsRequest(
         return false
       })
       const recordExportUsage = () => recordMaaExport({
-        userId: auth.user.id, profileId: profile.id, jobId: historyItem.job_id, idempotencyKey: body.idempotency_key,
+        userId: auth.user.id, profileId: profile.id, jobId: historyItem.job_id ?? null, idempotencyKey: body.idempotency_key,
       })
       if (canExportWithoutCoupon) {
         await recordExportBehavior()

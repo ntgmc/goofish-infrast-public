@@ -261,7 +261,7 @@ async function processInlineQueue(): Promise<void> {
         await store.releaseInterruptedAttempt(job.id, job.attempt_count, processWorkerId, lockToken)
         return
       }
-      const context = executionContext(job, lockToken, (stage) => updateAttemptStage(store, job, lockToken, stage))
+      const context = executionContext(job, lockToken, async (stage) => { await updateAttemptStage(store, job, lockToken, stage) })
       try {
         const result = await runInlineExecutorWithTimeout(job, context)
         const current = await store.getJob(job.id)

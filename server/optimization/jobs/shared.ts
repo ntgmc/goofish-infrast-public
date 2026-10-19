@@ -35,7 +35,7 @@ export type OptimizeDurationEstimate = {
   estimate_sample_count: number;
 };
 
-type OptimizeRuntimeEstimatePhase = "queued" | "running" | "overdue" | "completed" | "failed";
+type OptimizeRuntimeEstimatePhase = "queued" | "running" | "overdue" | "completed" | "failed" | "cancelled";
 
 export type OptimizeRuntimeEstimate = {
   estimated_remaining_ms: number | null;

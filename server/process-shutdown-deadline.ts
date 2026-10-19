@@ -2,7 +2,7 @@ const DEFAULT_PROCESS_SHUTDOWN_DEADLINE_MS = 65_000
 const FORCED_PROCESS_SHUTDOWN_DEADLINE_MS = 1_000
 
 export function resolveProcessShutdownDeadlineMs(
-  environment: Pick<NodeJS.ProcessEnv, 'PROCESS_SHUTDOWN_DEADLINE_MS'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'PROCESS_SHUTDOWN_DEADLINE_MS'>> = process.env,
 ): number {
   const rawValue = environment.PROCESS_SHUTDOWN_DEADLINE_MS?.trim()
   if (!rawValue) return DEFAULT_PROCESS_SHUTDOWN_DEADLINE_MS

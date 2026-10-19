@@ -54,5 +54,5 @@
   同步修改标题、按钮、标签、空状态、说明及相关测试，清理旧表述。
 - 验证每个入口确有目的内容、只读操作不会产生副作用、免费操作仍可用，
   并覆盖服务关闭、体验例外与权益切换。
-- 执行相关组件测试、`npm run check:copy`、`npm run build:web`，
+- 执行相关组件测试、`pnpm run check:copy`、`pnpm run build:web`，
   以及仓库强制架构与 dead-code 检查；最后审阅完整 diff。

@@ -1,3 +1,4 @@
+import type { QueryClient } from './postgres'
 import { createHash, createHmac } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { matchesSearch } from '../../src/lib/search'
@@ -377,7 +378,7 @@ export async function saveUserAccountByAdmin(
 export class AdminUserMutationConflictError extends Error {}
 
 async function saveUserAccountWithClient(
-  client: Pick<PoolClient, 'query'>,
+  client: QueryClient,
   user: UserAccountRecord,
 ): Promise<void> {
   await client.query(
@@ -882,7 +883,7 @@ export async function saveUserProfileByAdmin(
 }
 
 async function saveUserProfileWithClient(
-  client: Pick<PoolClient, 'query'>,
+  client: QueryClient,
   profile: UserGameAccountRecord,
 ): Promise<void> {
   await client.query(
@@ -968,7 +969,7 @@ async function resetLinkedCdkOperatorBaselineInTransaction(
   const currentEvents = Array.isArray(row.record_json.risk_events)
     ? row.record_json.risk_events
     : []
-  const next = {
+  const next: Record<string, unknown> = {
     ...row.record_json,
     risk_events: [...currentEvents, {
       at,
@@ -1530,7 +1531,7 @@ export async function verifyUserEmailWithToken(tokenHash: string, verifiedAt: Da
 
 export async function migrateLegacyUserIfNeeded(user: UserAccountRecord): Promise<UserGameAccountRecord[]> {
   const existingProfiles = await listProfilesForUser(user.id)
-  if (existingProfiles.length > 0 || !user.cdk_key || !user.cdk_code_hash) return existingProfiles
+  if (existingProfiles.length > 0 || user.status === 'pending_deletion' || !user.cdk_key || !user.cdk_code_hash) return existingProfiles
 
   const now = new Date().toISOString()
   const profile: UserGameAccountRecord = {

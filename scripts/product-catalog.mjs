@@ -15,7 +15,7 @@ const generated = renderPrice(catalog)
 if (checkOnly) {
   const current = await readFile(pricePath, 'utf8')
   if (normalize(current) !== normalize(generated)) {
-    throw new Error('PRICE.md 与 product/catalog.json 不一致，请运行 npm run generate:catalog。')
+    throw new Error('PRICE.md 与 product/catalog.json 不一致，请运行 pnpm run generate:catalog。')
   }
   console.log('product catalog checks ok')
 } else {

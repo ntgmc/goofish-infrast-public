@@ -6,7 +6,7 @@ or OptimizerPort contract.
 ## Development
 
 1. Create a focused branch from `main`.
-2. Install dependencies with `npm install`.
+2. Use Node.js 24.22.0 and pnpm 12.14.0, then install dependencies with `pnpm install --frozen-lockfile`.
 3. Add or update tests for behavior changes.
 4. Run the public checks documented in `README.md`.
 5. Submit a pull request with a concise explanation of the behavior and tests.

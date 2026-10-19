@@ -70,7 +70,7 @@ async function applyScheduleCompletionEffect(row: PendingScheduleEffectRow): Pro
   if (!row.profile_id || !row.user_id) throw new Error('Schedule effect is missing its profile owner.')
   const result = parseOptimizationJobResult(payload, row.result_json) as OptimizeResult
   await applyScheduleGenerateEffects(
-    payload.cdkUsageRef,
+    payload.cdkUsageRef ?? null,
     {
       ...payload.scheduleUsageBase,
       profile_id: row.profile_id,
