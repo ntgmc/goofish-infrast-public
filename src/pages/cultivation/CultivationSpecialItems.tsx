@@ -1,7 +1,7 @@
 import { memo, useMemo, useState } from 'react'
 import { ExternalLinkIcon as ExternalLink } from '../../components/icons'
 import { copy } from '../../copy/index'
-import type { CultivationData, CultivationOptions } from '../../lib/cultivation-contract'
+import type { CultivationData, CultivationOptions, CultivationSpecialItem } from '../../lib/cultivation-contract'
 import { number } from './CultivationResults'
 
 const label = copy.tools.cultivation
@@ -25,6 +25,12 @@ export function useSpecialItems({ data, preference }: Props) {
   return { chosen, setChosen, visible, setVisible, items, selected, recommendations }
 }
 
+export function SpecialItemRates({ row, data }: { row: CultivationSpecialItem['recommendations'][number]; data: CultivationData }) {
+  const statistics = row.operatorId ? data.community?.operators[row.operatorId] : undefined
+  const ownership = statistics && statistics.sampleSize > 0 ? statistics.owned / statistics.sampleSize : null
+  return <>{label.specialCommunityRate('ownership', ownership)} · {label.specialCommunityRate(row.skill ? 'mastery' : 'elite', row.communityRate, row.skill)}</>
+}
+
 export default memo(function CultivationSpecialItems({ data, preference }: Props) {
   const { chosen, setChosen, visible, setVisible, items, selected, recommendations } = useSpecialItems({ data, preference })
   return <section className="tool-panel space-y-4 p-5 sm:p-6">
@@ -45,7 +51,7 @@ export default memo(function CultivationSpecialItems({ data, preference }: Props
           <span className="pt-1 tabular-nums text-brand-500">{index + 1}</span>
           {row.operatorId && <img src={`/webp96/${encodeURIComponent(row.operatorId)}.webp`} alt="" loading="lazy" width={40} height={40} className="size-10 shrink-0 rounded object-cover" />}
           <div className="min-w-0 text-sm"><p className="font-medium">{row.name}{row.skill && ` · ${label.skillName(row.skill)} ◆◆◆`}{row.owned !== undefined && <span className="ml-2 text-xs text-ink-muted">{row.owned ? label.ownedOperator : label.newOperator}</span>}</p>
-            <p className="mt-1 text-xs text-ink-secondary">{label.weightedDemand} {number(row.demand)} · {label.communityRate(row.communityRate)}</p>
+            <p className="mt-1 text-xs text-ink-secondary">{label.weightedDemand} {number(row.demand)} · <SpecialItemRates row={row} data={data} /></p>
           </div>
         </li>)}</ol>
         {recommendations.length > visible && <button type="button" className="tool-secondary-action" onClick={() => setVisible((count) => count + 16)}>{label.showMore}</button>}

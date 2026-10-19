@@ -49,8 +49,9 @@ describe('cultivation references and special-item recommendations', () => {
     expect(catalog.find((item) => item.id === 'quoted')?.operators).toEqual(['char_test', 'char_other'])
   })
 
-  it('lists every selector without inventory and keeps each version’s pool and ownership separate', () => {
+  it('lists every training voucher and selector without inventory and keeps selector pools separate', () => {
     const input = snapshot()
+    input.costs.cultivate.test.evolve = [{ rock: 2 }, { rock: 3 }]
     input.operators.char_other = { ...input.operators.char_test, name: '其他干员' }
     const items = table()
     const parsed = parseSpecialItemCatalog({ ...items, items: { ...items.items, selector2: training('selector2', 'VOUCHER_PICK', 'selector') } }, {
@@ -61,12 +62,15 @@ describe('cultivation references and special-item recommendations', () => {
     const community = { status: 'fresh' as const, updatedAt: null, operators: parseCultivationStatistics({ success: true, data: [statistic] }) }
     const demands = new Map([['char_test', { total: 10, elite: 6, skills: {} }]])
     const result = buildSpecialItemRecommendations(input, player, catalog, community, demands)
-    expect(result.map((item) => item.id)).toEqual(['selector', 'selector2'])
-    expect(result[0]).toMatchObject({ count: null, expiresAt: null, available: true, recommendations: [{ operatorId: 'char_test', owned: true, demand: 10, communityRate: 0.8 }] })
-    expect(result[1].recommendations).toEqual([expect.objectContaining({ operatorId: 'char_other', owned: false, demand: 0, communityRate: null })])
+    expect(result.map((item) => item.id)).toEqual(['elite', 'level', 'mastery', 'selector', 'selector2'])
+    expect(result.slice(0, 3).map((item) => item.count)).toEqual([null, null, null])
+    expect(result[0].recommendations).toEqual([expect.objectContaining({ operatorId: 'char_test', demand: 6 })])
+    const selectors = result.filter((item) => item.kind === 'selector')
+    expect(selectors[0]).toMatchObject({ count: null, expiresAt: null, available: true, recommendations: [{ operatorId: 'char_test', owned: true, demand: 10, communityRate: 0.8 }] })
+    expect(selectors[1].recommendations).toEqual([expect.objectContaining({ operatorId: 'char_other', owned: false, demand: 0, communityRate: null })])
     player.inventory.selector = 1
     player.expiries.selector = '2000-01-01T00:00:00Z'
-    expect(buildSpecialItemRecommendations(input, player, catalog, community, demands)[0]).toEqual(result[0])
+    expect(buildSpecialItemRecommendations(input, player, catalog, community, demands).find((item) => item.id === 'selector')).toEqual(selectors[0])
   })
 
   it('reads owned counts and expiry, enforces voucher prerequisites, and computes remaining training costs', () => {

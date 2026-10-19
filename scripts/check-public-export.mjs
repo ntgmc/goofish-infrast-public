@@ -121,6 +121,6 @@ function runCommand(command, argumentsList, cwd, shell) {
     shell,
   })
   if (result.status !== 0) {
-    throw new Error(`${command} ${argumentsList.join(' ')} failed\n${result.error?.message || ''}\n${result.stdout || ''}\n${result.stderr || ''}`)
+    throw new Error(`${command} ${argumentsList.join(' ')} failed\n${result.error?.message || ''}\n${result.stderr || ''}\n${result.stdout || ''}`)
   }
 }

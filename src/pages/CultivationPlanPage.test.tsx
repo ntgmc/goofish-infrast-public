@@ -73,29 +73,40 @@ describe('homework training recommendations', () => {
     expect(mocks.api).toHaveBeenCalledOnce()
   })
 
-  it.each([false, true])('keeps training voucher recommendations while omitting material-package deficit analysis in V2=%s', async (v2) => {
+  it.each([false, true])('shows training vouchers without stock and labels ownership and training rates in V2=%s', async (v2) => {
     const input = sample()
+    input.community = { status: 'fresh', updatedAt: null, operators: { a: { owned: 200, sampleSize: 1000, elite: [0.1, 0.1, 0.8], skills: [], modules: {} } } }
+    const voucher = { id: 'voucher', name: '特训邀请函', iconId: 'voucher', count: null, scope: '提升精英阶段', kind: 'elite' as const, expiresAt: null, available: true, sourceUrl: 'https://prts.wiki/w/test', recommendations: [{ key: 'a', operatorId: 'a', name: '银灰', demand: 10, communityRate: 0.8, items: { rock: 3 }, warnings: [] }] }
     input.specialItems = [
       { id: 'materials', name: '材料自选包', iconId: 'pack', count: 2, scope: '领取材料', kind: 'materials', expiresAt: null, available: true, sourceUrl: 'https://prts.wiki/w/test', recommendations: [] },
-      { id: 'voucher', name: '特训邀请函', iconId: 'voucher', count: 1, scope: '提升精英阶段', kind: 'elite', expiresAt: null, available: true, sourceUrl: 'https://prts.wiki/w/test', recommendations: [{ key: 'a', operatorId: 'a', name: '银灰', demand: 10, communityRate: 0.8, items: { rock: 3 }, warnings: [] }] },
+      voucher,
+      { ...voucher, id: 'level', name: '特训装置', kind: 'level' },
+      { ...voucher, id: 'mastery', name: '技巧集', kind: 'mastery', count: 1, recommendations: [{ ...voucher.recommendations[0], skill: 2, communityRate: 0.3 }] },
     ]
     mocks.api.mockResolvedValueOnce(input)
     render(content(v2))
     fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
     if (v2) fireEvent.click(await screen.findByRole('button', { name: text.views.special }))
-    fireEvent.click(await screen.findByRole('button', { name: /特训邀请函.*库存 1 份/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /特训邀请函.*提升精英阶段/ }))
     expect(screen.queryByRole('button', { name: /材料自选包/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: text.specialRecommendations }).nextElementSibling).toHaveTextContent('银灰')
-    expect(screen.queryByText(/等效理智/)).not.toBeInTheDocument()
+    const recommendations = () => screen.getByRole('heading', { name: text.specialRecommendations }).nextElementSibling!
+    expect(recommendations()).toHaveTextContent('银灰')
+    expect(recommendations()).toHaveTextContent('持有率 20.0% · 精二率（持有人） 80.0%')
+    fireEvent.click(screen.getByRole('button', { name: /特训装置.*提升精英阶段/ }))
+    expect(recommendations()).toHaveTextContent('精二率（持有人） 80.0%')
+    fireEvent.click(screen.getByRole('button', { name: /技巧集.*库存 1 份/ }))
+    expect(recommendations()).toHaveTextContent('持有率 20.0% · 2技能专三率（持有人） 30.0%')
+    expect(screen.queryByText(/等效理智|森空岛不提供自选包库存|达到此目标/)).not.toBeInTheDocument()
   })
 
   it.each([false, true])('lets users choose selector versions without claiming package stock in V2=%s', async (v2) => {
     const input = sample()
+    input.community = { status: 'fresh', updatedAt: null, operators: { owned: { owned: 200, sampleSize: 1000, elite: [0, 0.1, 0.9], skills: [], modules: {} }, new: { owned: 100, sampleSize: 200, elite: [0, 0.5, 0.5], skills: [], modules: {} } } }
     const selector = { id: 'selector', name: '干员调用凭证', iconId: 'selector', count: null, scope: '可选择能天使、推进之王', kind: 'selector' as const, expiresAt: null, available: true, sourceUrl: 'https://prts.wiki/w/test', recommendations: [
       { key: 'owned', operatorId: 'owned', name: '能天使', owned: true, demand: 100, communityRate: 0.9, items: {}, warnings: [] },
       { key: 'new', operatorId: 'new', name: '推进之王', owned: false, demand: 1, communityRate: 0.5, items: {}, warnings: [] },
     ] }
-    input.specialItems = [selector, { ...selector, id: 'selector2', scope: '可选择艾雅法拉', recommendations: [{ ...selector.recommendations[1], key: 'other', name: '艾雅法拉' }] }]
+    input.specialItems = [selector, { ...selector, id: 'selector2', scope: '可选择艾雅法拉', recommendations: [{ ...selector.recommendations[1], key: 'other', operatorId: 'other', name: '艾雅法拉', communityRate: null }] }]
     mocks.api.mockResolvedValueOnce(input)
     render(content(v2))
     fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
@@ -117,11 +128,15 @@ describe('homework training recommendations', () => {
     fireEvent.click(first)
     expect(first).toHaveAttribute('aria-pressed', 'true')
     const recommendations = screen.getByRole('heading', { name: text.specialRecommendations }).nextElementSibling!
-    expect(within(recommendations as HTMLElement).getAllByRole('listitem')[0]).toHaveTextContent('推进之王')
+    const rows = within(recommendations as HTMLElement).getAllByRole('listitem')
+    expect(rows[0]).toHaveTextContent('推进之王')
+    expect(rows[0]).toHaveTextContent('持有率 50.0% · 精二率（持有人） 50.0%')
+    expect(rows[1]).toHaveTextContent('持有率 20.0% · 精二率（持有人） 90.0%')
     fireEvent.click(second)
     expect(first).toHaveAttribute('aria-pressed', 'false')
     expect(second).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('heading', { name: text.specialRecommendations }).nextElementSibling).toHaveTextContent('艾雅法拉')
+    expect(screen.getByRole('heading', { name: text.specialRecommendations }).nextElementSibling).toHaveTextContent('持有率 暂无数据 · 精二率（持有人） 暂无数据')
     expect(screen.queryByText(/库存.*份|已过期|有效期至/)).not.toBeInTheDocument()
     expect(mocks.api).toHaveBeenCalledOnce()
   })
