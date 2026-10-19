@@ -44,6 +44,9 @@ jobs:
 
       - name: Validate public source and API boundaries
         run: |
+          pnpm run generate:data
+          pnpm run generate:changelog
+          pnpm run check:types
           pnpm run check:catalog
           pnpm run check:architecture
           pnpm run check:dead-code
