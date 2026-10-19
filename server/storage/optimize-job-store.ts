@@ -126,7 +126,7 @@ interface OptimizeJobPreemption {
 
 export class OptimizeJobAdmissionError extends Error {
   constructor(
-    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'commercial_queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'commercial_submission_rate_exceeded' | 'priority_coupon_unavailable' | 'item_unavailable' | 'insufficient_balance' | 'pricing_changed' | 'quote_already_used' | 'profile_not_found' | 'not_metered_profile' | 'profile_archived' | 'profile_merged' | 'commercial_not_eligible' | 'commercial_suspended' | 'debt_outstanding' | 'subscription_scenario_quota_exceeded',
+    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'commercial_queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'commercial_submission_rate_exceeded' | 'priority_coupon_unavailable' | 'item_unavailable' | 'insufficient_balance' | 'pricing_changed' | 'quote_already_used' | 'profile_not_found' | 'not_metered_profile' | 'profile_archived' | 'profile_merged' | 'commercial_not_eligible' | 'commercial_suspended' | 'debt_outstanding' | 'subscription_scenario_quota_exceeded' | MeteredBillingQuoteError['code'],
     readonly status: 404 | 409 | 429,
     message: string,
   ) {
@@ -411,7 +411,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
             : '当前账号的优化提交次数已达小时上限。请1小时后再试。'
           throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, message)
         }
-        if (confirmedBillingQuote?.billing_kind === 'metered_commercial') {
+        if (input.billing && confirmedBillingQuote?.billing_kind === 'metered_commercial') {
           const commercialPolicy = getMeteredBillingPolicy().commercial
           const commercial = await client.query<{ running: string; queued: string; submitted: string }>(
             `select

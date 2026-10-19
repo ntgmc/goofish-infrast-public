@@ -238,14 +238,14 @@ export function getCdkBalanceAmount(record: CdkRecord): string | null {
 }
 
 export function getCdkItemCode(record: CdkRecord): ItemCdkCode | null {
-  if (getCdkType(record) !== 'item') return null
+  if (record.cdk_type !== 'item') return null
   return record.item_code === 'lifetime_profile_voucher' || record.item_code === 'limited_profile_voucher'
     ? record.item_code
     : null
 }
 
 export function getCdkItemExpiresAt(record: CdkRecord): string | null {
-  return getCdkType(record) === 'item' && typeof record.item_expires_at === 'string'
+  return record.cdk_type === 'item' && typeof record.item_expires_at === 'string'
     ? record.item_expires_at
     : null
 }

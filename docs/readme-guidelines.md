@@ -49,8 +49,8 @@ read the document for that kind of work; keep detailed rules in the topic file.
   require a README addition. Update its topic document first; edit the README only
   when its permitted content changes.
 - Verify technology versions and runtime requirements against `package.json`
-  and `package-lock.json`; verify commands and local URLs against scripts and
+  and `pnpm-lock.yaml`; verify commands and local URLs against scripts and
   implementation. Document current behavior without proposed or guessed settings.
 - Check links, headings, code fences, and the full diff for duplicated or misplaced
   content. Follow [agent-validation.md](agent-validation.md), including
-  `git diff --check`, `npm run check:architecture`, and `npm run check:dead-code`.
+  `git diff --check`, `pnpm run check:architecture`, and `pnpm run check:dead-code`.

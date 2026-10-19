@@ -89,7 +89,7 @@ The configuration archive is extracted for review only. Do not overwrite
 production configuration automatically. Restore the reviewed EnvironmentFile,
 systemd unit, and Nginx configuration to a fresh host, verify the public
 artifact attestation, deploy the Git commit recorded in the signed manifest,
-then run `npm run check:migration` and verify `/api/health` reports the expected
+then run `pnpm run check:migration` and verify `/api/health` reports the expected
 API build metadata and PostgreSQL schema identity. Record elapsed time and
 require it to stay within the four-hour RTO.
 

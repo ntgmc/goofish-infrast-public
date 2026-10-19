@@ -158,6 +158,7 @@ export interface PublicStatusIncident {
   status: StatusIncidentState
   started_at: string
   resolved_at: string | null
+  created_at?: string
   updated_at: string
   updates: PublicStatusIncidentUpdate[]
 }

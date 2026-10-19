@@ -1,4 +1,4 @@
-import type { PoolClient } from 'pg'
+import type { QueryClient } from './postgres'
 import { randomUUID } from 'node:crypto'
 import {
   CURRENT_PERSONAL_USE_DECLARATION,
@@ -9,7 +9,7 @@ import type { PersonalUseDeclarationUsageAction } from '../../src/lib/personal-u
 import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 
-type DatabaseClient = Pick<PoolClient, 'query'>
+type DatabaseClient = QueryClient
 
 export interface PersonalUseDeclarationAcceptance {
   id: string

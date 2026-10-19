@@ -537,7 +537,7 @@ type RawUpgradeSuggestion = (
     }
   | {
       type: 'bundle';
-      ops: { id?: string; name: string; current: number; target: number }[];
+      ops: { id?: string; name: string; current: number; target: number; current_elite?: number; target_elite?: number }[];
       gain: number;
       rooms?: string;
       specialType?: string;
@@ -1216,6 +1216,8 @@ export interface PersonalDataExportV4 {
   invitation_code: PersonalDataExportRecord | null;
   invitations: PersonalDataExportRecord[];
   qqbot_registration: PersonalDataExportRecord | null;
+  qqbot_binding?: PersonalDataExportRecord | null;
+  qqbot_notifications?: PersonalDataExportRecord[];
   profile_entitlements: PersonalDataExportRecord[];
   entitlement_ledger: PersonalDataExportRecord[];
   metered_personal_claim: PersonalDataExportRecord | null;

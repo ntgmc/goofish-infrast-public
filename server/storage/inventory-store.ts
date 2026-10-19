@@ -1,3 +1,4 @@
+import type { QueryClient } from './postgres'
 import { createHash, randomInt, randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import {
@@ -37,7 +38,7 @@ export async function getProfileCapacityLimits(profileId: string): Promise<{ pla
 }
 
 export async function getProfileCapacityLimitsInTransaction(
-  client: Pick<PoolClient, 'query'>,
+  client: QueryClient,
   profileId: string,
 ): Promise<{ plan: number; history: number; archive: number }> {
   const balances = await client.query<{ entitlement_type: string; units: number }>(
@@ -919,7 +920,7 @@ export async function listOnboardingTasks(userId: string): Promise<OnboardingTas
         [itemCodes],
       )
     : { rows: [] }
-  const definitionByCode = new Map(definitions.rows.map((definition) => [definition.code, definition]))
+  const definitionByCode = new Map<string, { code: string; name: string; icon_key: string }>(definitions.rows.map((definition) => [definition.code, definition] as const))
   return result.rows.map((row) => ({
     code: row.task_code,
     version_id: row.version_id,

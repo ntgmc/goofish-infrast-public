@@ -26,7 +26,7 @@ export async function nodeRequestToWebRequest(req: IncomingMessage, bodyLimitByt
 
     const method = req.method || 'GET'
     const init: RequestInit = { method, headers, signal: abortResources.controller.signal }
-    let bodyBytes: Uint8Array | null = null
+    let bodyBytes: Uint8Array<ArrayBuffer> | null = null
     if (method !== 'GET' && method !== 'HEAD') {
       if (bodyLimitBytes > 0) {
         bodyBytes = new Uint8Array(await readRequestBody(req, bodyLimitBytes))

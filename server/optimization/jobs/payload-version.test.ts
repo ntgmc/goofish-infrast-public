@@ -27,6 +27,14 @@ describe('persisted optimization payload versions', () => {
     expect(normalizePersistedOptimizationJobPayload(extendedPayload)).toEqual(extendedPayload)
   })
 
+  it('validates persisted usage reason codes', () => {
+    const payload = { ...schedulePayload(), scheduleUsageBase: { reason_code: 'ok' } }
+    expect(normalizePersistedOptimizationJobPayload(payload)).toEqual(payload)
+    expect(() => normalizePersistedOptimizationJobPayload({
+      ...payload, scheduleUsageBase: { reason_code: 'invalid-reason' },
+    })).toThrow(UnsupportedOptimizationJobPayloadError)
+  })
+
   it('rejects standalone suggestion payloads', () => {
     expect(() => normalizePersistedOptimizationJobPayload({
       version: 3,

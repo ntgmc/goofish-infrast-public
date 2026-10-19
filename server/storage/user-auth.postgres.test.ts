@@ -28,6 +28,7 @@ import {
   saveUserAccountByAdmin,
   saveUserAccount,
   listAdminUserAccountsPage,
+  migrateLegacyUserIfNeeded,
   touchSession,
   deleteSessionByTokenHash,
   updateUserPasswordAtomically,
@@ -60,6 +61,14 @@ afterAll(async () => {
 })
 
 describe('atomic password lifecycle', () => {
+  it('does not migrate legacy profiles for accounts pending deletion', async () => {
+    const user = await seedUser('legacy-deletion@example.test', new Date('2026-10-19T00:00:00Z'))
+    expect(await migrateLegacyUserIfNeeded({
+      ...user, status: 'pending_deletion', cdk_key: 'legacy-key', cdk_code_hash: 'a'.repeat(64),
+    })).toEqual([])
+    expect(await countRows('user_game_accounts', 'user_id', user.id)).toBe(0)
+  })
+
   it('retains monotonic last seen time after session deletion without changing account revision', async () => {
     const now = new Date('2026-10-02T08:00:00.000Z')
     const user = await seedUser('last-seen@example.test', now)
@@ -734,6 +743,7 @@ async function readTokenUseTimes(ids: string[]): Promise<boolean[]> {
 async function countRows(table: string, column: string, value: string): Promise<number> {
   const allowed = new Set([
     'user_accounts:email',
+    'user_game_accounts:user_id',
     'user_sessions:user_id',
     'password_reset_tokens:token_hash',
     'email_verification_tokens:token_hash',

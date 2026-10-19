@@ -267,7 +267,7 @@ function evaluateGroup(events: IdentifiedEvent[], userIds: string[], now: Date):
   }
   const repeatedMismatchProfile = [...mismatchEventsByProfile.values()].find((profileEvents) => profileEvents.length >= MULTI_IDENTITY_THRESHOLD) ?? null
   const repeatedSklandUidMismatch = Boolean(repeatedMismatchProfile)
-  if (repeatedSklandUidMismatch) {
+  if (repeatedMismatchProfile) {
     rules.push(rule(
       'skland_uid_mismatch_repeated',
       'identity',

@@ -1,3 +1,4 @@
+import type { QueryClient } from './postgres'
 import { randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { query } from './postgres'
@@ -31,7 +32,7 @@ export async function recordAdminOperationAuditInTransaction(
 }
 
 async function insertAdminOperationAudit(
-  client: Pick<PoolClient, 'query'>,
+  client: QueryClient,
   input: AdminOperationAuditInput,
 ): Promise<void> {
   const reason = input.reason.trim()

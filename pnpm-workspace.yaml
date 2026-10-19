@@ -1,0 +1,22 @@
+# Keep release dependencies portable with the existing archive format.
+nodeLinker: hoisted
+engineStrict: true
+
+# Preserve the reviewed npm lock and the selected tooling update during migration.
+minimumReleaseAgeExclude:
+  - framer-motion@14.3.1
+  - motion-dom@14.3.1
+  - motion@14.3.1
+  - openai@7.39.0
+  - knip@6.42.0
+
+overrides:
+  '@babel/plugin-transform-runtime': 7.29.7
+  'testcontainers>archiver': 8.0.0
+
+allowBuilds:
+  cpu-features@0.0.10: true
+  esbuild@0.28.2: true
+  protobufjs@7.6.6: true
+  ssh2@1.17.0: true
+  fsevents: false

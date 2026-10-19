@@ -1,5 +1,6 @@
+import type { QueryClient } from './postgres'
 import { randomUUID } from 'node:crypto'
-import type { PoolClient, QueryResultRow } from 'pg'
+import type { QueryResultRow } from 'pg'
 import {
   SERVICE_STATUS_COMPONENT_IDS,
   SERVICE_STATUS_HISTORY_HOURS,
@@ -33,7 +34,7 @@ export interface CreateServiceStatusIncidentInput {
   status: StatusIncidentState
   body: string
   startedAt: string
-  audit: AdminOperationAuditInput
+  audit: Omit<AdminOperationAuditInput, 'action' | 'targetType' | 'targetId'>
 }
 
 export interface AppendServiceStatusIncidentUpdateInput {
@@ -41,7 +42,7 @@ export interface AppendServiceStatusIncidentUpdateInput {
   status: StatusIncidentState
   body: string
   expectedUpdatedAt: string
-  audit: AdminOperationAuditInput
+  audit: Omit<AdminOperationAuditInput, 'action' | 'targetType' | 'targetId'>
 }
 
 export async function recordServiceStatusSample(sample: ServiceStatusSample): Promise<void> {
@@ -211,7 +212,7 @@ export async function getServiceStatusCostConfig(
 export interface SaveServiceStatusCostConfigInput {
   config: ServiceStatusCostConfig
   expectedUpdatedAt: string | null
-  audit: AdminOperationAuditInput
+  audit: Omit<AdminOperationAuditInput, 'action' | 'targetType' | 'targetId'>
 }
 
 export async function saveServiceStatusCostConfig(
@@ -391,7 +392,7 @@ async function listServiceStatusIncidents(from: string): Promise<PublicStatusInc
 }
 
 async function incidentWithUpdates(
-  client: Pick<PoolClient, 'query'>,
+  client: QueryClient,
   row: ServiceStatusIncidentRow,
 ): Promise<PublicStatusIncident> {
   const updates = await client.query<ServiceStatusIncidentUpdateRow>(
@@ -421,7 +422,7 @@ async function incidentWithUpdates(
 }
 
 async function insertIncidentUpdate(
-  client: Pick<PoolClient, 'query'>,
+  client: QueryClient,
   incidentId: string,
   status: StatusIncidentState,
   body: string,
@@ -463,11 +464,11 @@ interface ServiceStatusHourlyRow extends QueryResultRow {
 
 interface ServiceStatusCostConfigRow extends QueryResultRow {
   component_id: ServiceStatusComponentId
-  billing_model: string
-  currency: string
+  billing_model: ServiceStatusCostConfig['billing_model']
+  currency: ServiceStatusCostConfig['currency']
   resident_hourly_price_cny: string | null
   hourly_price_cny: string | null
-  timezone: string
+  timezone: ServiceStatusCostConfig['timezone']
   schedule_enabled: boolean
   valley_worker_instances: number
   peak_windows_json: unknown

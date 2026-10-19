@@ -7,6 +7,8 @@
     "rootDir": ".",
     "outDir": "server/dist",
     "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
     "declaration": false,
     "sourceMap": true,
     "strict": true,
@@ -24,6 +26,8 @@
   ],
   "exclude": [
     "server/dist",
-    "node_modules"
+    "node_modules",
+    "**/*.test.ts",
+    "**/*.test.tsx"
   ]
 }

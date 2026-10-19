@@ -55,7 +55,7 @@ export function getPool(): Pool {
 }
 
 export function resolvePostgresPoolMax(
-  environment: Pick<NodeJS.ProcessEnv, 'POSTGRES_POOL_MAX'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'POSTGRES_POOL_MAX'>> = process.env,
 ): number {
   return resolveIntegerEnvironmentValue(
     'POSTGRES_POOL_MAX',
@@ -67,7 +67,7 @@ export function resolvePostgresPoolMax(
 }
 
 export function resolvePostgresConnectionTimeoutMs(
-  environment: Pick<NodeJS.ProcessEnv, 'POSTGRES_CONNECTION_TIMEOUT_MS'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'POSTGRES_CONNECTION_TIMEOUT_MS'>> = process.env,
 ): number {
   return resolveIntegerEnvironmentValue(
     'POSTGRES_CONNECTION_TIMEOUT_MS',
@@ -79,7 +79,7 @@ export function resolvePostgresConnectionTimeoutMs(
 }
 
 export function resolvePostgresStatementTimeoutMs(
-  environment: Pick<NodeJS.ProcessEnv, 'POSTGRES_STATEMENT_TIMEOUT_MS'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'POSTGRES_STATEMENT_TIMEOUT_MS'>> = process.env,
 ): number {
   return resolveIntegerEnvironmentValue(
     'POSTGRES_STATEMENT_TIMEOUT_MS',
@@ -91,7 +91,7 @@ export function resolvePostgresStatementTimeoutMs(
 }
 
 export function resolvePostgresQueryTimeoutMs(
-  environment: Pick<NodeJS.ProcessEnv, 'POSTGRES_QUERY_TIMEOUT_MS'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'POSTGRES_QUERY_TIMEOUT_MS'>> = process.env,
 ): number {
   return resolveIntegerEnvironmentValue(
     'POSTGRES_QUERY_TIMEOUT_MS',
@@ -103,7 +103,7 @@ export function resolvePostgresQueryTimeoutMs(
 }
 
 export function resolvePostgresLockTimeoutMs(
-  environment: Pick<NodeJS.ProcessEnv, 'POSTGRES_LOCK_TIMEOUT_MS'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'POSTGRES_LOCK_TIMEOUT_MS'>> = process.env,
 ): number {
   return resolveIntegerEnvironmentValue(
     'POSTGRES_LOCK_TIMEOUT_MS',
@@ -115,7 +115,7 @@ export function resolvePostgresLockTimeoutMs(
 }
 
 export function resolvePostgresIdleTransactionTimeoutMs(
-  environment: Pick<NodeJS.ProcessEnv, 'POSTGRES_IDLE_TRANSACTION_TIMEOUT_MS'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'POSTGRES_IDLE_TRANSACTION_TIMEOUT_MS'>> = process.env,
 ): number {
   return resolveIntegerEnvironmentValue(
     'POSTGRES_IDLE_TRANSACTION_TIMEOUT_MS',
@@ -127,7 +127,7 @@ export function resolvePostgresIdleTransactionTimeoutMs(
 }
 
 export function resolvePostgresHealthQueryTimeoutMs(
-  environment: Pick<NodeJS.ProcessEnv, 'POSTGRES_HEALTH_QUERY_TIMEOUT_MS'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'POSTGRES_HEALTH_QUERY_TIMEOUT_MS'>> = process.env,
 ): number {
   return resolveIntegerEnvironmentValue(
     'POSTGRES_HEALTH_QUERY_TIMEOUT_MS',
@@ -137,6 +137,8 @@ export function resolvePostgresHealthQueryTimeoutMs(
     10_000,
   )
 }
+
+export type QueryClient = { query: typeof query }
 
 export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,

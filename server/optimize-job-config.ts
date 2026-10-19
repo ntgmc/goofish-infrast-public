@@ -27,7 +27,7 @@ export const DEFAULT_OPTIMIZE_WORKER_MAX_OLD_SPACE_MB = 0
 export const MAX_OPTIMIZE_WORKER_MAX_OLD_SPACE_MB = 16_384
 
 export function getOptimizeGlobalWorkerConcurrency(
-  environment: Pick<NodeJS.ProcessEnv, 'OPTIMIZE_GLOBAL_WORKER_CONCURRENCY'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'OPTIMIZE_GLOBAL_WORKER_CONCURRENCY'>> = process.env,
 ): number {
   return resolveInteger(
     'OPTIMIZE_GLOBAL_WORKER_CONCURRENCY',
@@ -39,7 +39,7 @@ export function getOptimizeGlobalWorkerConcurrency(
 }
 
 export function getOptimizeWorkerConcurrency(
-  environment: Pick<NodeJS.ProcessEnv, 'OPTIMIZE_WORKER_CONCURRENCY'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'OPTIMIZE_WORKER_CONCURRENCY'>> = process.env,
 ): number {
   return resolveInteger(
     'OPTIMIZE_WORKER_CONCURRENCY',
@@ -51,7 +51,7 @@ export function getOptimizeWorkerConcurrency(
 }
 
 export function getOptimizeQueuePollMs(
-  environment: Pick<NodeJS.ProcessEnv, 'OPTIMIZE_QUEUE_POLL_MS'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'OPTIMIZE_QUEUE_POLL_MS'>> = process.env,
 ): number {
   const configured = Number(environment.OPTIMIZE_QUEUE_POLL_MS ?? DEFAULT_OPTIMIZE_QUEUE_POLL_MS)
   return Number.isFinite(configured)
@@ -60,7 +60,7 @@ export function getOptimizeQueuePollMs(
 }
 
 export function getOptimizePaidPreemptGraceMs(
-  environment: Pick<NodeJS.ProcessEnv, 'OPTIMIZE_PAID_PREEMPT_GRACE_MS'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'OPTIMIZE_PAID_PREEMPT_GRACE_MS'>> = process.env,
 ): number {
   return resolveInteger(
     'OPTIMIZE_PAID_PREEMPT_GRACE_MS',
@@ -72,13 +72,13 @@ export function getOptimizePaidPreemptGraceMs(
 }
 
 export function getOptimizeStatusQueuePickupGraceMs(
-  environment: Pick<NodeJS.ProcessEnv, 'OPTIMIZE_QUEUE_POLL_MS'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'OPTIMIZE_QUEUE_POLL_MS'>> = process.env,
 ): number {
   return getOptimizeQueuePollMs(environment) * OPTIMIZE_STATUS_QUEUE_PICKUP_GRACE_POLLS
 }
 
 export function getOptimizeWorkerClaimPriority(
-  environment: Pick<NodeJS.ProcessEnv, 'OPTIMIZE_WORKER_CLAIM_PRIORITY'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'OPTIMIZE_WORKER_CLAIM_PRIORITY'>> = process.env,
 ): number {
   return resolveInteger(
     'OPTIMIZE_WORKER_CLAIM_PRIORITY',
@@ -90,7 +90,7 @@ export function getOptimizeWorkerClaimPriority(
 }
 
 export function getOptimizeWorkerMaxOldSpaceMb(
-  environment: Pick<NodeJS.ProcessEnv, 'OPTIMIZE_WORKER_MAX_OLD_SPACE_MB'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'OPTIMIZE_WORKER_MAX_OLD_SPACE_MB'>> = process.env,
 ): number {
   return resolveInteger(
     'OPTIMIZE_WORKER_MAX_OLD_SPACE_MB',
@@ -180,7 +180,7 @@ export function getOptimizeJobHardTimeoutMs(): number {
 }
 
 export function getOptimizeJobMaxAttempts(
-  environment: Pick<NodeJS.ProcessEnv, 'OPTIMIZE_JOB_MAX_ATTEMPTS'> = process.env,
+  environment: Partial<Pick<NodeJS.ProcessEnv, 'OPTIMIZE_JOB_MAX_ATTEMPTS'>> = process.env,
 ): number {
   return resolveInteger(
     'OPTIMIZE_JOB_MAX_ATTEMPTS',

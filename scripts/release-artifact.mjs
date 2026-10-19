@@ -46,7 +46,7 @@ async function createReleaseManifest(kind) {
     github_run_id: argumentsMap['run-id'] || process.env.GITHUB_RUN_ID || 'unknown',
     github_run_url: argumentsMap['run-url'] || process.env.GITHUB_RUN_URL || 'unknown',
     node_version: process.version,
-    npm_version: resolveNpmVersion(),
+    pnpm_version: resolvePnpmVersion(),
     changelog,
     files,
   }
@@ -139,17 +139,23 @@ async function assertPublicArtifactDoesNotLeakPrivateSources(base, files) {
 async function assertPublicRuntimeContract(base) {
   const [packageJson, packageLock, sbom] = await Promise.all([
     readFile(join(base, 'package.json'), 'utf8').then(JSON.parse),
-    readFile(join(base, 'package-lock.json'), 'utf8').then(JSON.parse),
+    readFile(join(base, 'pnpm-lock.yaml')),
     readFile(join(base, 'release-sbom.cdx.json'), 'utf8').then(JSON.parse),
   ])
   if (!String(packageJson.engines?.node ?? '').includes('24')) throw new Error('public artifact must declare the Node 24 runtime')
-  if (packageLock.lockfileVersion < 3 || !packageLock.packages?.['']) throw new Error('public artifact requires an npm lockfileVersion 3 root package')
-  for (const dependency of ['@aws-sdk/client-sesv2', '@node-rs/argon2', 'pg', 'qrcode']) {
-    if (!packageJson.dependencies?.[dependency]) throw new Error(`public runtime dependency is not declared: ${dependency}`)
-    if (!packageLock.packages[`node_modules/${dependency}`]?.version) throw new Error(`public runtime dependency is not locked: ${dependency}`)
-  }
+  if (!/^pnpm@12\./.test(packageJson.packageManager ?? '')) throw new Error('public artifact must pin pnpm 12')
   if (sbom.bomFormat !== 'CycloneDX' || sbom.specVersion !== '1.6' || !Array.isArray(sbom.components) || sbom.components.length === 0) {
     throw new Error('public release SBOM is missing or invalid')
+  }
+  const lockHash = createHash('sha256').update(packageLock).digest('hex')
+  if (!sbom.metadata?.properties?.some((property) => property.name === 'goofish:lockfile:sha256' && property.value === lockHash)) {
+    throw new Error('public release SBOM does not match the pnpm lockfile')
+  }
+  for (const dependency of ['@aws-sdk/client-sesv2', '@node-rs/argon2', 'pg', 'qrcode']) {
+    if (!packageJson.dependencies?.[dependency]) throw new Error(`public runtime dependency is not declared: ${dependency}`)
+    if (!sbom.components.some((component) => (component.group ? `${component.group}/${component.name}` : component.name) === dependency && component.version)) {
+      throw new Error(`public runtime dependency is not locked in the SBOM: ${dependency}`)
+    }
   }
 }
 
@@ -279,10 +285,10 @@ function requireSha(value) {
   return sha
 }
 
-function resolveNpmVersion() {
-  const userAgentVersion = process.env.npm_config_user_agent?.match(/^npm\/([^ ]+)/)?.[1]
+function resolvePnpmVersion() {
+  const userAgentVersion = process.env.npm_config_user_agent?.match(/^pnpm\/([^ ]+)/)?.[1]
   if (userAgentVersion) return userAgentVersion
-  const command = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+  const command = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
   return execFileSync(command, ['--version'], {
     encoding: 'utf8',
     shell: process.platform === 'win32',

@@ -354,7 +354,7 @@ async function verifyAdminUser(username: string | null, password: string): Promi
   if (passwordVerification.needsRehash) {
     try {
       const replacement = await createPasswordHash(password)
-      await store.upgradePasswordHash(username, user.password_hash, replacement)
+      await store.upgradePasswordHash(user.username, user.password_hash, replacement)
     } catch (error) {
       console.warn('admin password hash upgrade skipped:', error instanceof Error ? error.name : 'UnknownError')
     }

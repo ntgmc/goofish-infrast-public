@@ -229,7 +229,7 @@ function resolveItemCdkExpiresAt(input: {
   now: string
 }):
   | { ok: true; expiresAt: string | null }
-  | { ok: false; status: 400; code: string; error: string } {
+  | { ok: false; status: 400 | 409; code: string; error: string } {
   if (input.itemCode === 'lifetime_profile_voucher') {
     if (input.validityMode !== undefined && input.validityMode !== 'never') {
       return { ok: false, status: 400, code: 'cdk_item_validity_mismatch', error: '终身版道具 CDK 不支持限时有效期。' }
@@ -409,7 +409,7 @@ async function handlePatch(req: Request): Promise<Response> {
         return jsonResponse({ error: '批量 CDK 标识必须唯一且格式有效。' }, 400)
       }
       const store = await getCdkRecordStore()
-      const results = []
+      const results: Array<{ code_hash: string; ok: boolean; status: number; error?: string }> = []
       for (const codeHash of code_hashes) {
         try {
           const response = await patchCdkByHash(store, { ...body, code_hash: codeHash })
@@ -601,7 +601,7 @@ async function handleDelete(req: Request): Promise<Response> {
     if (!authentication.ok) return authentication.response
     const store = await getCdkRecordStore()
     if ('code_hashes' in body) {
-      const results = []
+      const results: Array<{ code_hash: string; ok: boolean; status: number; error?: string }> = []
       for (const codeHash of body.code_hashes) {
         try {
           const response = await deleteCdkByHash(store, codeHash)

@@ -111,5 +111,5 @@ tar --extract --file "$workdir/runtime-config.tar" --directory "$RESTORE_CONFIG_
 pg_restore --exit-on-error --single-transaction --no-owner --no-privileges \
   --dbname=service=goofish_restore "$workdir/database.dump"
 
-printf 'Restore completed into an empty target (change %s, source Git SHA %s, schema %s). Validate with npm run check:migration and /api/health before switching traffic.\n' \
+printf 'Restore completed into an empty target (change %s, source Git SHA %s, schema %s). Validate with pnpm run check:migration and /api/health before switching traffic.\n' \
   "$change_id" "$git_sha" "$database_schema_version"

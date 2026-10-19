@@ -44,7 +44,7 @@ V2 地址为 `/v2?section=cultivation`。所有已绑定森空岛的可用档案
 材料、培养券与技能图标沿用干员头像的发布方式：提前同步到 `public/`，提交后随前端构建发布。
 页面读取 `/item-icons/<iconId>.png` 和 `/skill-icons/<iconId>.png`，兼容生产环境的同源图片 CSP。
 
-手动更新运行 `npm run sync:cultivation-icons`；使用 `-- --check` 可对比上游与本地文件而不修改文件，
+手动更新运行 `pnpm run sync:cultivation-icons`；使用 `--check` 可对比上游与本地文件而不修改文件，
 `node scripts/sync-cultivation-icons.mjs --self-test` 可运行离线检查。
 脚本从 [arkntools/arknights-toolbox-data](https://github.com/arkntools/arknights-toolbox-data) 同步材料和技能图片，
 通过 CDN 读取固定版本的文件，根据游戏物品表映射材料的 `iconId`，培养券图片从 PRTS 同步。
@@ -431,5 +431,5 @@ node scripts/sync-prts-planning.mjs \
 
 ```sh
 node --test scripts/prts-planning.test.mjs scripts/fetch-prts-planning.test.mjs
-npm test -- src/lib/cultivation-planner.test.ts server/cultivation server/handlers/cultivation-plan.test.ts server/process-hooks.test.ts src/pages/CultivationPlanPage.test.tsx
+pnpm test src/lib/cultivation-planner.test.ts server/cultivation server/handlers/cultivation-plan.test.ts server/process-hooks.test.ts src/pages/CultivationPlanPage.test.tsx
 ```

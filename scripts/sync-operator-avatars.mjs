@@ -29,7 +29,7 @@ try {
   if (!plan.hasChanges) {
     console.log('Operator avatars are already up to date.')
   } else if (checkOnly) {
-    console.error('Operator avatars are out of sync. Run npm run sync:operator-avatars to update them.')
+    console.error('Operator avatars are out of sync. Run pnpm run sync:operator-avatars to update them.')
     exitCode = 1
   } else {
     await applyPlan(plan, tempDir, targetDir)

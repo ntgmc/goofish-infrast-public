@@ -55,7 +55,7 @@ test('splits oversized commits without dropping file segments and omits lockfile
     subject: 'feat: large change',
     files: [
       { filename: 'src/feature.ts', status: 'modified', additions: 900, deletions: 0, patch: largePatch },
-      { filename: 'package-lock.json', status: 'modified', additions: 1, deletions: 0, patch: lockPatch },
+      { filename: 'pnpm-lock.yaml', status: 'modified', additions: 1, deletions: 0, patch: lockPatch },
     ],
   }], 4000)
 

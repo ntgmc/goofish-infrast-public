@@ -126,7 +126,7 @@ export async function createGiftPackDraft(
   adminUsername: string,
   itemCode: string,
   contentsValue: unknown,
-  idempotencyKey = randomUUID(),
+  idempotencyKey: string = randomUUID(),
   options: { opening_rule?: unknown; publish?: boolean } = {},
 ): Promise<Record<string, unknown>> {
   const contents = normalizeContents(contentsValue)

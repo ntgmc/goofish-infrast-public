@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
-import { hasCapability, type CapabilitySubject } from '../../../src/lib/product-catalog'
+import { hasCapability, resolveRuntimePermission, type CapabilitySubject } from '../../../src/lib/product-catalog'
 import { hasTrainingDiagnosisEntitlement } from './entitlements'
 import type { LicenseConfig, OptimizeEstimateBucket, OptimizeResult } from "../../../src/lib/types";
 import { SCENARIO_VARIABLE_SHIFT_CANDIDATE_LIMIT } from '../../../src/lib/scenario-comparison';
@@ -299,7 +299,7 @@ export async function buildOptimizeJobAccepted(
 function getJobCapabilitySubject(job: OptimizeJobRecord): CapabilitySubject {
   return {
     kind: job.source === 'free_preview' ? 'free_preview' : undefined,
-    permission: job.permission,
+    permission: resolveRuntimePermission(job.permission),
   }
 }
 
@@ -508,7 +508,8 @@ function formatJobPriorityLabel(job: Pick<OptimizeJobRecord, 'priority'>): strin
 function getOptimizeJobEstimate(job: OptimizeJobRecord): OptimizeDurationEstimate {
   const payload = job.payload_json as Partial<OptimizationJobPayload> | null;
   if (isOptimizeDurationEstimate(payload?.estimate)) return payload.estimate;
-  const withSuggestions = payload?.request?.include_upgrade_suggestions === true
+  const withSuggestions = payload != null && 'request' in payload
+    && payload.request?.include_upgrade_suggestions === true
     && payload.request.upgrade_suggestions_allowed === true;
   const bucket = payload?.effectiveConfig
     ? getOptimizeEstimateBucket(payload.effectiveConfig, withSuggestions)
