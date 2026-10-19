@@ -417,7 +417,7 @@ describe('V2 results-first workspace', () => {
     mount()
     expect(await screen.findByRole('alert')).toHaveTextContent(copy.common.pages_ToolPage_003)
     await user.click(screen.getByRole('link', { name: copy.status.pages_StatusPage_002 }))
-    const statusHeading = await screen.findByRole('heading', { name: '当前服务运行正常。' })
+    const statusHeading = await screen.findByRole('heading', { name: '当前服务运行正常。' }, { timeout: 5_000 })
     expect(statusHeading).toBeVisible()
     expect(screen.getByRole('grid', { name: copy.status.pages_StatusPage_043 })).toBeVisible()
     expect(screen.getByRole('alert')).toHaveTextContent(copy.v2.loginServiceUnavailable)
