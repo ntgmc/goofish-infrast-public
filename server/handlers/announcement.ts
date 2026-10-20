@@ -152,6 +152,7 @@ function buildAnnouncementPublicationEvents(
       type: 'announcement.published',
       title: announcement.title,
       summary: normalizeAnnouncementSummary(announcement.body),
+      markdown: announcement.body,
       url: url.toString(),
       published_at: announcement.updated_at,
       version: null,

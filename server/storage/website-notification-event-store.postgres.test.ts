@@ -45,6 +45,23 @@ describe('website notification events in PostgreSQL', () => {
     expect(events.rows[0]?.count).toBe('1')
   })
 
+  it('keeps the full publication Markdown snapshot after the announcement is edited', async () => {
+    const suffix = randomUUID()
+    const store = createPostgresAnnouncementStore(`markdown:${suffix}`)
+    const prefix = '    缩进代码\n\n## 更新\n\n- **重点**\n- [链接](https://example.test/help)\n\n```json\n\t{}\n```\n'
+    const markdown = prefix + '正文'.repeat(Math.floor((5000 - prefix.length) / 2))
+    const cursor = await getLatestWebsiteNotificationCursor()
+    const event = { ...announcementEvent(suffix), markdown, summary: normalizeAnnouncementSummary(markdown) }
+    await store.set({ announcements: [{ id: suffix, body: markdown }] }, 0, [suffix], [event])
+    await store.set({ announcements: [{ id: suffix, body: '已编辑' }] }, 1, [suffix], [])
+
+    const page = await listWebsiteNotificationEvents(cursor, 100)
+    expect(page.events).toEqual([expect.objectContaining({ id: event.id, markdown, summary: event.summary })])
+    await expect(createWebsiteNotificationEvent(event)).resolves.toMatchObject({ created: false })
+    await expect(createWebsiteNotificationEvent({ ...event, markdown: '**已修改**' }))
+      .rejects.toBeInstanceOf(WebsiteNotificationEventConflictError)
+  })
+
   it.each(['😀'.repeat(250), '😀'.repeat(251), 'a' + '😀'.repeat(250)])('publishes a bounded Unicode summary for a valid body', async (body) => {
     const suffix = randomUUID()
     const store = createPostgresAnnouncementStore(`unicode:${suffix}`)
@@ -93,6 +110,22 @@ describe('website notification events in PostgreSQL', () => {
       client.release()
       await later
     }
+  })
+
+  it('orders numeric sequences across digit boundaries without skipping events during pagination', async () => {
+    const cursor = await getLatestWebsiteNotificationCursor()
+    const events = Array.from({ length: 12 }, () => announcementEvent(randomUUID()))
+    for (const event of events) await createWebsiteNotificationEvent(event)
+    const received: string[] = []
+    let nextCursor = cursor
+    let hasMore = true
+    while (hasMore) {
+      const page = await listWebsiteNotificationEvents(nextCursor, 3)
+      received.push(...page.events.map((event) => event.id))
+      nextCursor = page.nextCursor
+      hasMore = page.hasMore
+    }
+    expect(received).toEqual(events.map((event) => event.id))
   })
 
   it('paginates by opaque cursor and rejects conflicting release confirmations', async () => {
