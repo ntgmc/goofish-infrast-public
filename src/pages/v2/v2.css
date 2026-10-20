@@ -1080,6 +1080,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+.v2-room-card:not(.v2-room-trading, .v2-room-manufacture, .v2-room-card-compact) {
+  .v2-room-operators { gap: var(--space-2xs); }
+  .v2-operator { flex: 1 1 36px; min-width: 0; max-width: 64px; }
+  .v2-avatar { width: 36px; height: 36px; border-radius: 50%; }
+}
+
+.v2-room-card:not(.v2-room-card-compact) .v2-room-operators > .v2-muted { flex-basis: 100%; }
+
 .v2-room-card-compact {
   padding: var(--space-xs);
 }
@@ -2006,14 +2014,14 @@
   .v2-room-power .v2-room-icon { background: var(--color-v2-power-soft); }
   .v2-room-title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3xs); }
   .v2-room-title small { margin-left: 0; font-size: var(--text-xs); }
-  .v2-room-operators { display: grid; grid-template-columns: repeat(3, minmax(0, 64px)); gap: var(--space-2xs); margin-block: var(--space-2xs); }
-  .v2-room-card .v2-operator { width: auto; min-width: 0; gap: var(--space-3xs); font-size: var(--text-xs); }
+  .v2-room-operators { gap: var(--space-2xs); margin-block: var(--space-2xs); }
+  .v2-room-card .v2-operator { flex: 0 1 64px; width: auto; min-width: 0; gap: var(--space-3xs); font-size: var(--text-xs); }
+  .v2-room-card .v2-operator > span:last-child { text-wrap: balance; }
   .v2-room-card .v2-avatar { width: 44px; height: 44px; }
-  .v2-room-card:not(.v2-room-trading, .v2-room-manufacture, .v2-room-card-compact) .v2-avatar { width: 36px; height: 36px; border-radius: 50%; }
-  .v2-room-card-compact .v2-room-operators { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .v2-room-card-compact .v2-room-operators { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .v2-room-card-compact .v2-avatar-small { width: 28px; height: 28px; border-radius: 50%; }
-  .v2-room-operators:has(> .v2-operator:only-child) { grid-template-columns: minmax(0, 1fr); }
-  .v2-room-operators:has(> .v2-operator:only-child) .v2-operator { flex-direction: row; text-align: left; gap: var(--space-2xs); }
+  .v2-room-operators:has(> .v2-operator:only-child) { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .v2-room-card .v2-room-operators:has(> .v2-operator:only-child) .v2-operator { max-width: none; flex-direction: row; text-align: left; gap: var(--space-2xs); }
   .v2-room-operators > .v2-muted { grid-column: 1 / -1; font-size: var(--text-xs); }
   .v2-room-bottom { min-height: 32px; font-size: var(--text-xs); }
   .v2-room-bottom strong { font-size: var(--text-sm); }
