@@ -848,6 +848,7 @@ export interface WorkspaceResultHistorySummary {
   operator_count: number;
   source: WorkspaceResultHistorySource;
   archived: boolean;
+  layout?: string | null;
   schedule_mode: string | null;
   maa_exportable: boolean;
   has_config: boolean;

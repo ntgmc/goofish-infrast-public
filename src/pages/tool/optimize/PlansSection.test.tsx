@@ -15,10 +15,12 @@ describe('PlansSection', () => {
   it('labels both active and archived manual history separately from generated schedules', () => {
     renderSection({
       archiveLimit: 1,
-      resultHistory: [{ ...historyItem(1), source: 'manual' }],
-      archivedResults: [{ ...historyItem(2), source: 'manual', archived: true }],
+      resultHistory: [{ ...historyItem(1), source: 'manual', layout: '2-5-2' }],
+      archivedResults: [{ ...historyItem(2), source: 'manual', archived: true, layout: '243' }],
     })
     expect(screen.getAllByText(/手动排班 ·/)).toHaveLength(2)
+    expect(screen.getByText(/252 · 手动排班 · MAA 排班表/)).toBeInTheDocument()
+    expect(screen.getByText(/243 · 手动排班 · MAA 排班表/)).toBeInTheDocument()
   })
 
   it.each([

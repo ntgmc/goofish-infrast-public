@@ -33,6 +33,7 @@ type OptimizationResultRow = {
 
 type OptimizationResultSummaryRow = Omit<OptimizationResultRow, 'config_json' | 'result_json'> & {
   has_config: boolean
+  layout: string | null
   schedule_mode: string | null
 }
 
@@ -93,6 +94,7 @@ async function listProfileOptimizationResultsWithClient(
   const rows = await client.query<OptimizationResultSummaryRow>(
     `select profile_id, id, job_id, name, created_at, operator_count, source, archived_at, position,
             config_json is not null as has_config,
+            coalesce(nullif(config_json->>'layout', ''), nullif(result_json->>'buildingType', '')) as layout,
             nullif(result_json->>'schedule_mode', '') as schedule_mode
        from optimization_result_history
       where profile_id = $1
@@ -159,6 +161,7 @@ export async function getLatestProfileOptimizationResultSummaries(
     `select distinct on (profile_id)
             profile_id, id, job_id, name, created_at, operator_count, source,
             archived_at, position, config_json is not null as has_config,
+            coalesce(nullif(config_json->>'layout', ''), nullif(result_json->>'buildingType', '')) as layout,
             nullif(result_json->>'schedule_mode', '') as schedule_mode
        from optimization_result_history
       where profile_id = any($1::text[]) and archived_at is null
@@ -421,6 +424,7 @@ function toSummary(row: OptimizationResultSummaryRow, scope: ResultScope): Works
     operator_count: Number(row.operator_count),
     source: normalizeSource(row.source),
     archived: scope === 'archived',
+    layout: row.layout,
     schedule_mode: scheduleMode,
     maa_exportable: scheduleMode !== 'rotation',
     has_config: row.has_config,
