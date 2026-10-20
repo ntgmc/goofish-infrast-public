@@ -1689,28 +1689,38 @@
   box-shadow: none;
 }
 
-.v2-import-row {
-  display: grid;
-  gap: var(--space-sm);
-  padding: var(--space-sm);
-  border: 1px solid var(--v2-line);
-  border-radius: 7px;
-  background: var(--v2-bg);
-}
-
-.v2-import-row p {
-  margin-bottom: 12px;
-  color: var(--v2-secondary);
-  font-size: var(--text-sm);
-}
-
-.v2-import-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-xs);
-}
-.v2-import-actions .v2-button { min-width: 0; padding-inline: var(--space-2xs); border-color: var(--v2-line); white-space: normal; }
-.v2-import-profiles { min-height: 44px; justify-content: space-between; padding-top: var(--space-xs); border-top: 1px solid var(--v2-line); }
+.v2-operators-drawer { grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+.v2-operators-drawer .v2-drawer-body { min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
+.v2-operator-management > section { display: grid; min-width: 0; gap: var(--space-xs); }
+.v2-operator-management > section + section { padding-top: var(--space-sm); border-top: 1px solid var(--v2-line); }
+.v2-operator-section-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2xs) var(--space-xs); }
+.v2-operator-management .v2-text-button { min-height: 44px; }
+.v2-operator-management .v2-search { height: 44px; padding-block: 0; }
+.v2-operator-management .v2-search input { height: 100%; padding-block: 0; }
+.v2-operator-profile { display: grid; min-width: 0; gap: var(--space-3xs); }
+.v2-operator-profile > span { color: var(--v2-muted); font-size: var(--text-xs); }
+.v2-operator-profile > strong { overflow-wrap: anywhere; color: var(--v2-secondary); font-size: var(--text-sm); font-weight: 500; }
+.v2-operator-identity { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2xs); }
+.v2-operator-identity h3 { font-size: var(--text-lg); }
+.v2-operator-uid { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3xs) var(--space-xs); color: var(--v2-secondary); }
+.v2-operator-uid > span { min-width: 0; overflow-wrap: anywhere; }
+.v2-operator-uid > span:last-child { flex-basis: 100%; }
+.v2-selectable-uid { user-select: all; font-variant-numeric: tabular-nums; }
+.v2-operator-binding-data { display: grid; gap: var(--space-xs); margin-block: var(--space-2xs); }
+.v2-operator-binding-data > div { display: grid; grid-template-columns: 5em minmax(0, 1fr); gap: var(--space-2xs); align-items: baseline; }
+.v2-operator-binding-data dt { color: var(--v2-muted); }
+.v2-operator-binding-data dd { display: grid; min-width: 0; gap: var(--space-3xs); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.v2-operator-binding-data time { color: var(--v2-secondary); }
+.v2-operator-sync-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
+.v2-operator-unbound h3 { display: flex; align-items: center; gap: var(--space-2xs); }
+.v2-operator-unbound p { margin-top: var(--space-2xs); color: var(--v2-secondary); line-height: 1.7; }
+.v2-operator-notice { display: grid; gap: var(--space-2xs); padding: var(--space-xs); border-left: 2px solid var(--v2-accent); background: var(--color-v2-inset); color: var(--v2-secondary); line-height: 1.7; }
+.v2-operator-notice.v2-error { border-color: var(--color-v2-error); color: var(--color-v2-error); }
+.v2-operator-notice p { overflow-wrap: anywhere; }
+.v2-operator-notice .v2-text-button { justify-self: start; }
+.v2-operator-empty { padding-block: var(--space-xs); }
+.v2-operator-management .v2-operator-entry[data-owned="false"] { color: var(--v2-muted); }
+.v2-operator-management .v2-operator-entry[data-owned="false"] .v2-avatar { filter: grayscale(1); }
 
 .v2-operator-row {
   display: flex;
@@ -2061,7 +2071,7 @@
   .v2-footer nav { flex-wrap: wrap; gap: var(--space-xs) var(--space-sm); }
   .v2-footer a { display: inline-flex; min-height: 44px; align-items: center; }
   .v2-drawer { padding: var(--space-sm) !important; padding-bottom: max(var(--space-sm), env(safe-area-inset-bottom)) !important; border-radius: 0 !important; }
-  .v2-import-actions { grid-template-columns: minmax(0, 1fr); }
+  .v2-operators-drawer { left: 0 !important; width: 100vw !important; }
   .v2-operator-row { flex-wrap: wrap; }
 }
 

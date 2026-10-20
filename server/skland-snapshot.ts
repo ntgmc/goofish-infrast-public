@@ -6,7 +6,10 @@ import { readSklandSnapshot, saveSklandSnapshot, type SklandSnapshotRecord, type
 import { getProfileForUser, type UserGameAccountRecord } from './storage/user-store'
 import { EXP_ITEM_VALUES } from './handlers/material-value'
 
-const pending = new Map<string, Promise<StoredSklandSnapshot>>()
+type RefreshedSklandSnapshot = StoredSklandSnapshot & {
+  credentialVerification?: { profileId: string; verifiedAt: string }
+}
+const pending = new Map<string, Promise<RefreshedSklandSnapshot>>()
 
 export class SklandSnapshotError extends Error {
   constructor(message: string, readonly status = 502, readonly code = 'skland_snapshot_failed') { super(message) }
@@ -56,7 +59,7 @@ function usable(snapshot: StoredSklandSnapshot | null, resources: SklandResource
   return Boolean(snapshot && resources.every((resource) => snapshot[resource] && Date.now() - Date.parse(snapshot[resource]!.fetchedAt) < SKLAND_MAX_AGE_MS))
 }
 
-async function fetchSnapshot(profile: UserGameAccountRecord, previous: StoredSklandSnapshot | null): Promise<StoredSklandSnapshot> {
+async function fetchSnapshot(profile: UserGameAccountRecord, previous: StoredSklandSnapshot | null): Promise<RefreshedSklandSnapshot> {
   const binding = profile.skland_binding!
   const startedAt = new Date().toISOString()
   let results: PromiseSettledResult<unknown>[]
@@ -96,10 +99,10 @@ async function fetchSnapshot(profile: UserGameAccountRecord, previous: StoredSkl
   next.retryAt = new Date(Date.now() + retryAfterMs).toISOString()
   const saved = await withTransaction((client) => saveSklandSnapshot(client, profile, next))
   if (!saved) throw new SklandSnapshotError('森空岛授权已变更，请重新读取当前账号。', 409, 'skland_binding_changed')
-  return saved
+  return { ...saved, ...(!next.errors.game && { credentialVerification: { profileId: profile.id, verifiedAt: next.game!.fetchedAt } }) }
 }
 
-async function refreshSnapshot(profile: UserGameAccountRecord, force: boolean): Promise<StoredSklandSnapshot> {
+async function refreshSnapshot(profile: UserGameAccountRecord, force: boolean): Promise<RefreshedSklandSnapshot> {
   const uid = profile.skland_binding!.uid
   const key = JSON.stringify([profile.user_id, uid])
   const existing = pending.get(key)
@@ -132,7 +135,7 @@ async function refreshSnapshot(profile: UserGameAccountRecord, force: boolean): 
 }
 
 export async function getSklandSnapshot(profile: UserGameAccountRecord, resources: SklandResource[] = ['game', 'inventory'],
-  options: { force?: boolean; wait?: boolean } = {}): Promise<StoredSklandSnapshot> {
+  options: { force?: boolean; wait?: boolean } = {}): Promise<RefreshedSklandSnapshot> {
   profile = await requireSklandProfile(profile.user_id, profile.id)
   const current = await readSklandSnapshot(profile.user_id, profile.skland_binding!.uid)
   if (!options.force && usable(current, resources)) {

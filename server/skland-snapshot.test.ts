@@ -46,8 +46,8 @@ beforeEach(() => {
 describe('shared Skland snapshots', () => {
   it('reuses persisted data across businesses without upstream requests', async () => {
     mocks.rows.set('user:uid', saved())
-    await getSklandSnapshot(profile, ['inventory'])
-    await getSklandSnapshot(profile)
+    expect((await getSklandSnapshot(profile, ['inventory'])).credentialVerification).toBeUndefined()
+    expect((await getSklandSnapshot(profile)).credentialVerification).toBeUndefined()
     expect(mocks.bindings).not.toHaveBeenCalled()
     expect(mocks.game).not.toHaveBeenCalled()
     expect(mocks.inventory).not.toHaveBeenCalled()
@@ -63,6 +63,10 @@ describe('shared Skland snapshots', () => {
     complete(inventory)
     const [a, b] = await Promise.all(reads)
     expect(a.version).toBe(b.version)
+    expect(a.credentialVerification).toEqual({ profileId: profile.id, verifiedAt: a.game!.fetchedAt })
+    expect(b.credentialVerification?.profileId).not.toBe(second.id)
+    expect(mocks.rows.get('user:uid')).not.toHaveProperty('credentialVerification')
+    expect(publicSklandSnapshot('uid', a)).not.toHaveProperty('credentialVerification')
     expect(mocks.game).toHaveBeenCalledTimes(1)
     expect(mocks.save).toHaveBeenCalledTimes(1)
   })
@@ -88,8 +92,9 @@ describe('shared Skland snapshots', () => {
 
   it('forces a fresh read but coalesces repeated clicks during the cooldown', async () => {
     mocks.rows.set('user:uid', saved())
-    await getSklandSnapshot(profile, ['inventory'], { force: true })
-    await getSklandSnapshot(profile, ['inventory'], { force: true })
+    const refreshed = await getSklandSnapshot(profile, ['inventory'], { force: true })
+    expect(refreshed.credentialVerification).toEqual({ profileId: profile.id, verifiedAt: refreshed.game!.fetchedAt })
+    expect((await getSklandSnapshot(profile, ['inventory'], { force: true })).credentialVerification).toBeUndefined()
     expect(mocks.inventory).toHaveBeenCalledTimes(1)
   })
 
@@ -103,6 +108,16 @@ describe('shared Skland snapshots', () => {
     expect(publicSklandSnapshot('uid', result).inventory).toMatchObject({ lmd: 1234, exp: 6000, error: 'inventory unavailable', state: 'stale' })
     await getSklandSnapshot(profile, ['inventory'], { force: true })
     expect(mocks.inventory).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not report credential verification when a failed game refresh retains old operators', async () => {
+    const old = saved(SKLAND_FRESH_MS + 1000)
+    mocks.rows.set('user:uid', old)
+    mocks.game.mockRejectedValue(new Error('game unavailable'))
+    const result = await getSklandSnapshot(profile, ['game'], { force: true })
+    expect(result.game).toEqual(old.game)
+    expect(result.errors.game).toBe('game unavailable')
+    expect(result.credentialVerification).toBeUndefined()
   })
 
   it('rejects failed first imports and expired inventories instead of returning zero', async () => {

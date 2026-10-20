@@ -1,30 +1,25 @@
 import { useRef, useState } from 'react'
-import { matchesSearch } from '../../lib/search'
 import ConfigCapabilityPreview from '../../components/ConfigCapabilityPreview'
 import type { ConfigDiffItem } from '../../lib/workspace-history'
-import { NextIcon as ArrowRight, SelectedIcon as Check, LogoutIcon as LogOut, RefreshIcon as RefreshCw, SearchIcon as Search, UploadIcon as Upload, AccountIcon as UserRound, SuccessIcon } from '../../components/icons'
+import { NextIcon as ArrowRight, SelectedIcon as Check, LogoutIcon as LogOut, AccountIcon as UserRound, SuccessIcon } from '../../components/icons'
 import AuthForm from '../../components/AuthForm'
 import AnimationSettings from '../../components/AnimationSettings'
 import ConfigEditor from '../../components/ConfigEditor'
-import SklandBindingDialog from '../../components/SklandBindingDialog'
-import SklandIcon from '../../components/SklandIcon'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover'
 import { copy } from '../../copy'
 import { validateScheduleConfig } from '../../lib/config'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
-import { extensibleLicenseOperatorsSchema } from '../../lib/workspace-validation'
 import type { DailyProduction, LicenseConfig, LicenseOperator, PermissionMode } from '../../lib/types'
 import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
 import type { useToolSession } from '../tool/useToolSession'
 import { Avatar, roomLevelLabel } from './ScheduleBoard'
-import { getProfileAccessLabel, isFreePreviewProfile, parseOperatorsText } from '../tool/tool-utils'
-import { apiJson, ApiError } from '../../lib/api-client'
-import type { SklandPayload } from '../../components/SklandBindingDialog'
+import { getProfileAccessLabel, isFreePreviewProfile } from '../tool/tool-utils'
 import ConfigSaveStatus from '../tool/workspace/ConfigSaveStatus'
 import V2Transition from './V2Transition'
 import BuildingSkills from './BuildingSkills'
+import OperatorManagementPanel from './OperatorManagementPanel'
 import { RoomProduction } from './IncomeAnalysis'
 import type { V2Section } from './navigation'
 
@@ -64,12 +59,6 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
   onConfirmConfig?: () => Promise<boolean>
   confirmingConfig?: boolean
 }) {
-  const [search, setSearch] = useState('')
-  const [sklandOpen, setSklandOpen] = useState(false)
-  const [importBusy, setImportBusy] = useState(false)
-  const [importError, setImportError] = useState<string | null>(null)
-  const [importDone, setImportDone] = useState(false)
-  const fileInput = useRef<HTMLInputElement>(null)
   const opener = useRef<HTMLElement | null>(null)
   const featureState = useSiteFeatures()
   const [lastPanel, setLastPanel] = useState(panel)
@@ -82,46 +71,9 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
     : shownPanel === 'operators' ? exampleData ? text.sampleOperatorDescription : text.operatorDescription
       : shownPanel === 'account' ? text.accountDescription : text.roomDescription
 
-  const filteredOperators = operators.filter((operator) => matchesSearch(operator.name, search))
-  const canUpload = !session.activeProfile || !isFreePreviewProfile(session.activeProfile)
-  async function refreshSkland() {
-    if (!session.activeProfile || importBusy || busy) return
-    setImportBusy(true)
-    setImportError(null)
-    setImportDone(false)
-    try {
-      if (!await session.flushConfigSave()) throw new Error(text.saveFailed)
-      const payload = await apiJson<SklandPayload>('/api/user/skland/import/refresh', { method: 'POST', json: { profile_id: session.activeProfile.id }, fallbackMessage: copy.workspace.pages_tool_WorkspaceSetupPage_005 })
-      if (!payload.user) throw new Error(copy.workspace.pages_tool_WorkspaceSetupPage_006)
-      session.applyAuthPayload(payload)
-      setImportDone(true)
-    } catch (caught) {
-      if (caught instanceof ApiError && caught.data && typeof caught.data === 'object' && 'user' in caught.data && caught.data.user) session.applyAuthPayload(caught.data as SklandPayload)
-      setImportError(caught instanceof Error ? caught.message : copy.workspace.pages_tool_WorkspaceSetupPage_005)
-    } finally { setImportBusy(false) }
-  }
-
-  async function importFile(file: File) {
-    if (!canUpload || importBusy || busy) return
-    setImportBusy(true)
-    setImportError(null)
-    setImportDone(false)
-    try {
-      const parsed = extensibleLicenseOperatorsSchema.safeParse(parseOperatorsText(await file.text()))
-      if (!parsed.success) throw new Error(text.uploadFailed)
-      await onImportOperators(parsed.data)
-      setImportDone(true)
-    } catch (caught) {
-      setImportError(caught instanceof Error ? caught.message : text.uploadFailed)
-    } finally {
-      setImportBusy(false)
-      if (fileInput.current) fileInput.current.value = ''
-    }
-  }
-
   return (
     <Dialog open={panel !== null} onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent className={`v2-drawer ${isConfig ? 'v2-drawer-wide' : ''}`} showCloseButton closeLabel={text.close}
+      <DialogContent className={`v2-drawer ${isConfig ? 'v2-drawer-wide' : shownPanel === 'operators' ? 'v2-operators-drawer' : ''}`} showCloseButton closeLabel={text.close}
         onOpenAutoFocus={() => { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null }}
         onCloseAutoFocus={(event) => { event.preventDefault(); setLastPanel(null); if (opener.current?.isConnected) opener.current.focus({ preventScroll: true }) }}>
         <div className="v2-drawer-heading">
@@ -151,39 +103,9 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
             </details>}
           </>
         )}
-        {shownPanel === 'operators' && (
-          <div className="v2-options-content">
-            <label className="v2-search-label"><span>{text.searchOperators}</span><span className="v2-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label={text.searchOperators} /></span></label>
-            <div className="v2-import-row">
-              <div className="v2-import-actions">
-                <button type="button" className="v2-button v2-button-secondary" disabled={!canUpload || busy || importBusy}
-                  onClick={() => fileInput.current?.click()}><Upload size={15} />{text.uploadMaa}</button>
-                <button type="button" className="v2-button v2-button-secondary" disabled={busy || importBusy || !featureState.features.skland}
-                  onClick={() => { if (session.user && session.activeProfile) setSklandOpen(true); else onAccount() }}><SklandIcon />{text.bindSkland}</button>
-                {featureState.features.skland && session.activeProfile?.skland_binding && <button type="button" className="v2-button v2-button-secondary" disabled={importBusy || busy} onClick={() => void refreshSkland()}><RefreshCw size={16} />{text.refreshSkland}</button>}
-              </div>
-              {!canUpload && <p className="v2-muted">{copy.workspace.pages_tool_WorkspaceSetupPage_004}</p>}
-              <input className="sr-only" ref={fileInput} type="file" accept=".json,application/json" disabled={!canUpload || importBusy || busy} aria-label={text.uploadMaa}
-                onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file) }} />
-              {importError && <p role="alert" className="v2-error">{importError}</p>}
-              {importDone && <p role="status" className="v2-muted">{session.user ? text.importSuccess : text.sampleImportSuccess}</p>}
-              {session.user && <button type="button" onClick={() => onNavigate('profiles')} className="v2-text-button v2-import-profiles">{text.manageProfiles}<ArrowRight size={14} /></button>}
-            </div>
-            <div className="v2-operator-rows">
-              {filteredOperators.map((operator) => (
-                <div className="v2-operator-entry" key={operator.id}><div className="v2-operator-row">
-                  <Avatar operator={operator} /><strong>{operator.name}</strong>
-                  <span className="v2-operator-status">{operator.own ? text.ownedLabel : text.notOwnedLabel}</span>
-                  <div className="v2-operator-training">
-                    <span className="v2-operator-status">{text.elite(operator.elite)}</span>
-                    <span className="v2-operator-status">{text.operatorLevel(typeof operator.level === 'number' || typeof operator.level === 'string' ? operator.level : undefined)}</span>
-                  </div>
-                </div><BuildingSkills operator={operator} /></div>
-              ))}
-              {filteredOperators.length === 0 && <p className="v2-muted">{text.noOperators}</p>}
-            </div>
-          </div>
-        )}
+        {shownPanel === 'operators' && <OperatorManagementPanel key={session.activeProfile?.id ?? 'guest'}
+          session={session} config={config} operators={operators} busy={busy} onImportOperators={onImportOperators}
+          onAccount={onAccount} onManageProfiles={() => onNavigate('profiles')} />}
         {shownPanel === 'account' && (
           <div className="v2-options-content">
             {session.user ? (
@@ -245,13 +167,6 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
           </PopoverContent>}
         </Popover>}
       </DialogContent>
-      <SklandBindingDialog open={sklandOpen} profile={session.activeProfile} onOpenChange={setSklandOpen}
-        onPayload={(payload) => {
-          if (!payload.user) return
-          session.applyAuthPayload(payload)
-          if (!payload.workspace?.config) session.setConfigOverride(config)
-        }}
-        onCompleted={() => { setSklandOpen(false); setImportDone(true) }} />
     </Dialog>
   )
 }

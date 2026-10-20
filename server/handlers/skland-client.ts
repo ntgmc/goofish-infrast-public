@@ -45,6 +45,8 @@ export interface SklandImportSummary extends SklandBindingSummary {
   inventory_synced: boolean
   config_saved: boolean
   inventory_warning?: string
+  credential_verified_at?: string | null
+  refresh_warning?: string
 }
 
 type IntermediateProduct = 'Originium Shard' | 'Pure Gold' | 'Orirock Cube'
