@@ -268,13 +268,15 @@ it.each(['generation', 'overview'])('shows a failed configuration save beside th
   expect(submissions()[0]![1]!.json).toEqual(expect.objectContaining({ config: patches[0]!.config }))
 }, 15_000)
 
-it.each(['submitted', 'restored'])('automatically displays a %s job result and dismisses completed progress', async (mode) => {
+it.each(['submitted', 'restored'])('automatically displays a %s job result and keeps generation and overview freshness in sync', async (mode) => {
   let completeJob!: (job: OptimizationJobSnapshot) => void
   const completion = new Promise<OptimizationJobSnapshot>((resolve) => { completeJob = resolve })
   let refreshWorkspace!: (payload: AuthSuccessResponse) => void
   const workspaceRefresh = new Promise<AuthSuccessResponse>((resolve) => { refreshWorkspace = resolve })
   vi.mocked(apiJson).mockImplementation(async (url, options) => {
     if (url === '/api/auth/me') return auth
+    if (url === '/api/user/workspace' && options?.method === 'PATCH') return { ...auth, workspace: { ...workspace,
+      config: (options.json as { config: typeof SAMPLE_CONFIG }).config, latest_result: latest, result_history: [latest, previous] } }
     if (url === '/api/optimization/jobs' && options?.method === 'POST') return { job: queued }
     if (url === '/api/optimization/jobs/new-job') return completion
     if (url.startsWith('/api/optimization/jobs?')) return { jobs: [], nextCursor: null }
@@ -313,6 +315,11 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and d
   expect(screen.queryByText(copy.common.components_ScheduleProgress_060)).not.toBeInTheDocument()
   await act(async () => refreshWorkspace({ ...auth, workspace: { ...workspace, latest_result: latest, result_history: [latest, previous] } }))
   await waitFor(() => expect(screen.getByRole('region', { name: copy.v2.lmd })).toHaveTextContent('-41,249.99'))
+  await waitFor(() => expect(screen.queryByText(copy.v2.configChanged)).not.toBeInTheDocument())
+  await userEvent.click(screen.getByRole('button', { name: copy.v2.generation }))
+  expect(await screen.findByRole('button', { name: copy.optimize.pages_tool_optimize_GenerateControlBar_028 })).toBeDisabled()
+  await userEvent.click(screen.getByRole('button', { name: copy.v2.overview }))
+  expect(screen.queryByText(copy.v2.configChanged)).not.toBeInTheDocument()
   expect(screen.queryByRole('region', { name: copy.v2.productionChanges })).not.toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: copy.v2.comparePrevious }))
   const comparison = within(await screen.findByRole('dialog', { name: copy.v2.resultComparison }))
@@ -327,8 +334,15 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and d
   fireEvent.click(screen.getByRole('button', { name: copy.v2.facilities }))
   const unlockedDialog = await screen.findByRole('dialog')
   expect(within(unlockedDialog).getByRole('group', { name: copy.common.components_ConfigEditor_021 })).toBeEnabled()
+  fireEvent.click(within(unlockedDialog).getByRole('button', { name: copy.common.components_ConfigEditor_030 }))
   fireEvent.click(within(unlockedDialog).getByRole('button', { name: copy.v2.done }))
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  await waitFor(() => expect(apiJson).toHaveBeenCalledWith('/api/user/workspace', expect.objectContaining({ method: 'PATCH' })))
+  expect(await screen.findByText(copy.v2.configChanged)).toBeVisible()
+  await userEvent.click(screen.getByRole('button', { name: copy.v2.generation }))
+  expect(await screen.findByRole('button', { name: copy.optimize.pages_tool_optimize_GenerateControlBar_029 })).toBeEnabled()
+  await userEvent.click(screen.getByRole('button', { name: copy.v2.overview }))
+  expect(screen.getByText(copy.v2.configChanged)).toBeVisible()
   expect(vi.mocked(apiJson).mock.calls.filter(([url, options]) => url === '/api/optimization/jobs' && options?.method === 'POST'))
     .toHaveLength(mode === 'submitted' ? 1 : 0)
   expect(vi.mocked(apiJson).mock.calls.filter(([url]) => url.startsWith('/api/user/results/new-result?'))).toHaveLength(1)
