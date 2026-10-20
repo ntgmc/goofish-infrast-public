@@ -74,6 +74,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
   return (
     <Dialog open={panel !== null} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent className={`v2-drawer ${isConfig ? 'v2-drawer-wide' : shownPanel === 'operators' ? 'v2-operators-drawer' : ''}`} showCloseButton closeLabel={text.close}
+        allowOutsideDismiss={isConfig || shownPanel === 'operators'}
         onOpenAutoFocus={() => { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null }}
         onCloseAutoFocus={(event) => { event.preventDefault(); setLastPanel(null); if (opener.current?.isConnected) opener.current.focus({ preventScroll: true }) }}>
         <div className="v2-drawer-heading">

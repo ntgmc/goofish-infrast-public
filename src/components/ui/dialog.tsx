@@ -45,7 +45,9 @@ function DialogOverlay({
   )
 }
 
-type DialogContentProps = React.ComponentProps<typeof DialogPrimitive.Content> &
+type DialogContentProps = React.ComponentProps<typeof DialogPrimitive.Content> & {
+  allowOutsideDismiss?: boolean
+} &
   (
     | { showCloseButton?: false; closeLabel?: never }
     | { showCloseButton: true; closeLabel: string }
@@ -59,6 +61,7 @@ function DialogContent({
   onOpenAutoFocus,
   onCloseAutoFocus,
   onPointerDownOutside,
+  allowOutsideDismiss = false,
   ref,
   ...props
 }: DialogContentProps) {
@@ -79,7 +82,7 @@ function DialogContent({
         ref={setContentRef}
         onPointerDownOutside={(event) => {
           onPointerDownOutside?.(event)
-          if (content.current?.querySelector('input:not([type="hidden"]):not([readonly]), textarea:not([readonly]), select, [contenteditable="true"]')) {
+          if (!allowOutsideDismiss && content.current?.querySelector('input:not([type="hidden"]):not([readonly]), textarea:not([readonly]), select, [contenteditable="true"]')) {
             event.preventDefault()
           }
         }}
