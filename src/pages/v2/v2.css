@@ -1999,6 +1999,7 @@
 }
 
 @media (max-width: 23rem) {
+  .v2-content-tabs { column-gap: var(--space-3xs); }
   .v2-shifts { gap: var(--space-3xs); margin-inline: var(--space-2xs); }
   .v2-shifts > button { padding-inline: var(--space-3xs); }
 }

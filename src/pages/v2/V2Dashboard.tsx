@@ -280,7 +280,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
             {([['schedule', text.scheduleTab], ['analysis', text.analysisTab], ...(showManual ? [['manual', text.manualTab] as const] : []), ...(restrictedPreview || !sample && (workflow?.suggestions?.length || result.upgrade_suggestions_status) ? [['training', text.trainingTab] as const] : [])] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => { setView(id); if (id === 'manual') setManualOpened(true) }}>
               {label}{view === id && <MotionNavIndicator layoutId="result-tab" variant="underline" />}
             </button>)}
-            <span>{sample ? <SampleIcon size={14} aria-hidden="true" /> : <ShieldCheck size={14} aria-hidden="true" />}{sample ? text.sampleSource : text.ownSource}</span>
+            <span title={sample ? text.sampleSource : text.ownSource}>{sample ? <SampleIcon size={14} aria-hidden="true" /> : <ShieldCheck size={14} aria-hidden="true" />}<span className={sample ? undefined : 'max-sm:sr-only'}>{sample ? text.sampleSource : text.ownSource}</span></span>
             <ResultActions plans={result.plans} shift={shift} showShift={view === 'schedule'} onShiftChange={setShift} onExport={() => setExportOpen(true)} busy={busy} loadingResult={loadingResult} />
           </div>
           <div className="v2-feature-content" hidden={view !== 'manual'}>
