@@ -115,6 +115,7 @@ export const domainCopy = {
     failed: "图片导出失败，请重试。",
     title: "排班总览",
     all_shifts: "全部班次",
+    numbered_layout: "生产区按设施编号排列",
     footer: "MaaTool · 基建排班",
   },
   result_board_v2: {

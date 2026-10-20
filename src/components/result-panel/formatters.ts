@@ -28,6 +28,7 @@ export type PreparedIntermediateDepletion = {
 }
 
 export type PreparedResult = {
+  facilityLayout?: string[];
   totalEff: number;
   rawTotalEff: number;
   hasDailyProduction: boolean;
@@ -209,6 +210,7 @@ export function prepareResult(
   }
 
   return {
+    facilityLayout: result.facility_layout,
     totalEff,
     rawTotalEff,
     hasDailyProduction,

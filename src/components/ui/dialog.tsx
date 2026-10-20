@@ -58,16 +58,31 @@ function DialogContent({
   closeLabel,
   onOpenAutoFocus,
   onCloseAutoFocus,
+  onPointerDownOutside,
+  ref,
   ...props
 }: DialogContentProps) {
   const surfaceClassName = React.useContext(DialogSurfaceContext)
   const opener = React.useRef<HTMLElement | null>(null)
+  const content = React.useRef<HTMLDivElement | null>(null)
+  const setContentRef = React.useCallback((node: HTMLDivElement | null) => {
+    content.current = node
+    if (typeof ref === 'function') return ref(node)
+    if (ref) ref.current = node
+  }, [ref])
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         aria-modal="true"
+        ref={setContentRef}
+        onPointerDownOutside={(event) => {
+          onPointerDownOutside?.(event)
+          if (content.current?.querySelector('input:not([type="hidden"]):not([readonly]), textarea:not([readonly]), select, [contenteditable="true"]')) {
+            event.preventDefault()
+          }
+        }}
         onOpenAutoFocus={(event) => {
           opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
           onOpenAutoFocus?.(event)

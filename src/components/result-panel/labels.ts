@@ -8,6 +8,7 @@ export const ROOM_LABELS: Record<string, string> = {
   dormitory: copy.domain.components_result_panel_labels_006,
   processing: copy.domain.components_result_panel_labels_007,
   hire: copy.domain.components_result_panel_labels_008,
+  training: copy.domain.building_skills.training,
 }
 
 export const PRODUCT_LABELS: Record<string, string> = {

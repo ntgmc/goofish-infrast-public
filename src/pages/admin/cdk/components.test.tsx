@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AdminCdkDetail } from '../contracts'
@@ -69,16 +69,19 @@ describe('CdkDetailDialog', () => {
     await waitFor(() => expect(trigger).toHaveFocus())
   })
 
-  it('closes when the backdrop is clicked', async () => {
+  it('preserves the chosen baseline on backdrop clicks and closes with the close button', async () => {
     const user = userEvent.setup()
     render(<DialogHarness />)
     await user.click(screen.getByRole('button', { name: '打开 CDK 详情' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: '新干员基线' }), 'workspace')
 
     const backdrop = document.querySelector<HTMLElement>('[data-slot="dialog-overlay"]')
     if (!backdrop) throw new Error('Expected dialog backdrop.')
-    fireEvent.pointerDown(backdrop)
-    fireEvent.click(backdrop)
+    await user.click(backdrop)
 
+    expect(screen.getByRole('dialog', { name: detail.cdk_id })).toBeVisible()
+    expect(screen.getByRole('combobox', { name: '新干员基线' })).toHaveValue('workspace')
+    await user.click(screen.getByRole('button', { name: '关闭' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
