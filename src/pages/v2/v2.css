@@ -1690,7 +1690,14 @@
 }
 
 .v2-operators-drawer { grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
-.v2-operators-drawer .v2-drawer-body { min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
+.v2-operators-drawer .v2-drawer-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding-inline-end: var(--space-xs);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-v2-control) transparent;
+}
 .v2-operator-management > section { display: grid; min-width: 0; gap: var(--space-xs); }
 .v2-operator-management > section + section { padding-top: var(--space-sm); border-top: 1px solid var(--v2-line); }
 .v2-operator-section-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2xs) var(--space-xs); }
