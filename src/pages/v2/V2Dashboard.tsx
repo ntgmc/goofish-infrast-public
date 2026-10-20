@@ -251,7 +251,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           <InventoryDepletionWarning result={result} className="v2-inventory-warning" action={<button type="button" className="v2-button v2-button-secondary" onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" />{text.configure}</button>} />
           <div className={`v2-ready-banner${sample ? ' v2-example-banner' : ''}`}>
             <div className="v2-ready-status"><span className="v2-ready-icon"><Check size={22} strokeWidth={2} aria-hidden="true" /></span>
-              <h2>{sample ? text.exampleSchedule : text.resultReady}<span className="v2-ready-tag">{sample ? text.sample : SCHEDULE_MODE_LABELS[resultMode]}</span></h2></div>
+              <h2>{sample ? text.exampleSchedule : text.resultReady}<span className="v2-ready-tag">{text.layout} {result.buildingType}</span><span className="v2-ready-tag">{sample ? text.sample : SCHEDULE_MODE_LABELS[resultMode]}</span></h2></div>
             <div className="v2-banner-actions"><button type="button" className="v2-button v2-button-white v2-config-button" aria-label={text.configure} title={text.configure} onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" /><span>{text.configure}</span></button>
               {!sample && <button type="button" className="v2-button v2-button-primary" disabled={busy || loadingResult || Boolean(generationDisabledReason)} title={generationDisabledReason ?? undefined}
                 onClick={() => onGenerate?.()}>{busy ? <LoadingIcon size={16} className="v2-spin" aria-hidden="true" /> : <GenerateIcon size={16} aria-hidden="true" />}{busy ? text.generating : text.regenerate}</button>}

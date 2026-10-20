@@ -68,6 +68,7 @@ export default function ResultPanel({
       ? copy.domain.components_result_panel_ResultPanel_043
       : copy.domain.components_result_panel_ResultPanel_037
   const contextItems = [
+    { label: copy.v2.layout, value: result.buildingType },
     { label: copy.domain.components_result_panel_ResultPanel_001, value: result.schedule_mode_name ?? (isRotationMode ? copy.domain.components_result_panel_ResultPanel_002 : copy.domain.components_result_panel_ResultPanel_003) },
     { label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_004 : copy.domain.components_result_panel_ResultPanel_005, value: isRotationMode ? result.planTimes ?? `${detailStats.planCount}${copy.domain.components_result_panel_ResultPanel_006}` : shiftPattern },
     {
