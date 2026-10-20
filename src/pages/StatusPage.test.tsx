@@ -89,7 +89,7 @@ describe('StatusPage', () => {
     await act(async () => { await Promise.resolve() })
 
     expect(screen.getAllByText('正在增加计算能力').length).toBeGreaterThan(0)
-    expect(screen.getByText('系统正在增加计算能力并处理等待任务，服务仍可正常使用。')).toBeInTheDocument()
+    expect(screen.getByText('正在增加计算能力并处理排队中的任务，服务可正常使用。')).toBeInTheDocument()
   })
 
   it('renders the Skland import status independently from optimization', async () => {

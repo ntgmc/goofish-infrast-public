@@ -145,7 +145,7 @@ describe('App public content routing', () => {
       return original(url)
     })
     render(<MemoryRouter initialEntries={[route]}><App /></MemoryRouter>)
-    expect(await screen.findByRole('alert')).toHaveTextContent('相关功能当前不可用，请稍后重新获取服务状态。')
+    expect(await screen.findByRole('alert')).toHaveTextContent('暂时无法确认服务状态，相关功能当前不可用，请稍后重试。')
     expect(document.querySelector('.v2-loading-screen')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '暂时无法获取服务状态' })).not.toBeInTheDocument()
     await act(async () => screen.getByRole('button', { name: '重新获取' }).click())

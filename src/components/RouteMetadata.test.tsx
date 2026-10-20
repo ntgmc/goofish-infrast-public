@@ -66,7 +66,7 @@ describe('RouteMetadata', () => {
 
     await act(async () => router.navigate('/changelog'))
     expect(document.title).toBe('更新日志 | MaaTool')
-    expect(metaByName('description')).toBe('查看 MaaTool 各版本新增的功能、使用体验调整和问题修复。')
+    expect(metaByName('description')).toBe('查看 MaaTool 各版本的新增功能、体验改进和问题修复。')
     expect(metaByName('robots')).toBe('index, follow')
     expect(metaByProperty('og:url')).toBe(currentUrl('/changelog'))
 

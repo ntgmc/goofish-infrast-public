@@ -10,7 +10,7 @@ export const metadataCopy = {
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_005: "常见问题 | MaaTool",
   // src/components/RouteMetadata.tsx
-  components_RouteMetadata_006: "了解 MaaTool 的账号、CDK、森空岛导入、MAA JSON 和仓库估值使用方式。",
+  components_RouteMetadata_006: "查找 MaaTool 账号、CDK、森空岛导入、MAA JSON 和仓库估值的使用说明。",
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_007: "反馈 | MaaTool",
   // src/components/RouteMetadata.tsx
@@ -42,11 +42,11 @@ export const metadataCopy = {
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_023: "致谢 | MaaTool",
   // src/components/RouteMetadata.tsx
-  components_RouteMetadata_024: "认识 MaaTool 参考的开源项目和社区资料，以及参与开发、测试和反馈的协助者。",
+  components_RouteMetadata_024: "了解 MaaTool 参考的开源项目、社区资料，以及参与开发、测试和反馈的协助者。",
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_025: "更新日志 | MaaTool",
   // src/components/RouteMetadata.tsx
-  components_RouteMetadata_026: "查看 MaaTool 各版本新增的功能、使用体验调整和问题修复。",
+  components_RouteMetadata_026: "查看 MaaTool 各版本的新增功能、体验改进和问题修复。",
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_027: "服务状态 | MaaTool",
   // src/components/RouteMetadata.tsx

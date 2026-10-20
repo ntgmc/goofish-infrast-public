@@ -439,7 +439,7 @@ describe('ResultPanel inventory warnings', () => {
     render(<ResultPanel result={{ ...createResult(), intermediate_depletion: [
       { product: 'Pure Gold', stock: days * 40, net_per_day: -40, days_remaining: days },
     ] }} />)
-    expect(screen.getByRole('alert')).toHaveTextContent(days < 1 ? '赤金库存不足一天用量' : '赤金库存预计约 7 天后耗尽')
+    expect(screen.getByRole('alert')).toHaveTextContent(days < 1 ? '赤金库存不足一天用量' : '赤金库存预计 7 天后耗尽')
   })
 
   it.each([
@@ -514,7 +514,7 @@ describe('ResultPanel tabs', () => {
     )
 
     expect(screen.getByText('已启用但无目标')).toBeInTheDocument()
-    expect(screen.getByText('优化器未找到收益达到阈值的换心情目标')).toBeInTheDocument()
+    expect(screen.getByText('未找到符合收益要求的心情恢复对象')).toBeInTheDocument()
     expect(screen.queryByText('未启用')).not.toBeInTheDocument()
   })
 

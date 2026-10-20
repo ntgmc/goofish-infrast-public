@@ -277,7 +277,7 @@ describe('ConfigEditor inventory and presets', () => {
   it.each([true, false])('preserves an explicit balance choice with canEdit=%s', async (canEdit) => {
     const latest = setup(normalizeConfig({ ...CONFIG_PRESETS['243'], intermediate_inventory: { 'Pure Gold': 50 }, auto_balance_source: 'intermediate_inventory' }), { canEdit, canEditIntermediateInventory: true })
     await openSection(labels.inventory)
-    const balance = screen.getByRole('switch', { name: '允许库存自动平衡调整产物数量' })
+    const balance = screen.getByRole('switch', { name: '按库存自动调整产物数量' })
     expect(balance).toHaveProperty('checked', !canEdit)
     await userEvent.click(balance)
     const stock = screen.getByRole('spinbutton', { name: '赤金' })

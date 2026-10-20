@@ -12,7 +12,7 @@ it('shows benefits by default and offers a working preview for every feature', a
   const onOpen = vi.fn()
   const user = userEvent.setup()
   render(<MemoryRouter><PaidCapabilityPreview onOpen={onOpen} showScenarioLab /></MemoryRouter>)
-  expect(screen.getByText('按需选择自定义配置、收益分析和导出功能').closest('details')).toHaveAttribute('open')
+  expect(screen.getByText('自定义排班、分析收益并导出到 MAA').closest('details')).toHaveAttribute('open')
   expect(screen.getAllByRole('button', { name: /^查看功能：/ })).toHaveLength(6)
   await user.click(screen.getByRole('button', { name: '查看功能：自定义基建与班次' }))
   expect(onOpen).toHaveBeenLastCalledWith('config')

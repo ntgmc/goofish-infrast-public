@@ -17,7 +17,7 @@ export const authCopy = {
   api_too_many_attempts: "操作过于频繁，请稍后再试。",
   api_password_service_busy: "登录注册服务繁忙，请稍后重试。",
   api_verification_email_send_failed: "暂时无法发送验证邮件，请稍后重试。",
-  api_login_required: "请先登录后继续。",
+  api_login_required: "请登录后继续。",
   api_password_reset_requested: "如果该邮箱已注册，我们会发送重置密码邮件，请检查收件箱和垃圾邮件。",
   api_password_reset_invalid: "重置链接无效或已过期，请重新申请重置邮件。",
   api_password_type_invalid: "请输入密码。",
@@ -75,7 +75,7 @@ export const authCopy = {
   // src/components/AuthForm.tsx
   components_AuthForm_013: "CDK（可选）",
   // src/components/AuthForm.tsx
-  components_AuthForm_014: "可注册后在账号页兑换",
+  components_AuthForm_014: "也可在注册后前往账号页兑换",
   // src/components/AuthForm.tsx
   components_AuthForm_015: "邀请码（可选）",
   // src/components/AuthForm.tsx
@@ -149,7 +149,7 @@ export const authCopy = {
   // src/pages/VerifyEmailPage.tsx
   pages_VerifyEmailPage_001: "验证链接无效或已过期，请返回登录页重新发送验证邮件。",
   // src/pages/VerifyEmailPage.tsx
-  pages_VerifyEmailPage_002: "正在验证邮箱，请稍候...",
+  pages_VerifyEmailPage_002: "正在验证邮箱…",
   // src/pages/VerifyEmailPage.tsx
   pages_VerifyEmailPage_003: "邮箱验证成功，正在进入工作台。",
   // src/pages/VerifyEmailPage.tsx
@@ -215,7 +215,7 @@ export const authCopy = {
   // src/pages/tool/AuthPage.tsx
   pages_tool_AuthPage_002: "MAA 基建排班工作台",
   // src/pages/tool/AuthPage.tsx
-  pages_tool_AuthPage_003: "登录后添加账号，准备基建排班。",
+  pages_tool_AuthPage_003: "登录后添加游戏账号，开始基建排班。",
   // src/pages/tool/AuthPage.tsx
   pages_tool_AuthPage_004: "添加游戏账号，导入森空岛或 MAA 干员数据，按实际基建配置生成排班。支持导出的档案可下载 MAA JSON。",
   // src/pages/tool/AuthPage.tsx

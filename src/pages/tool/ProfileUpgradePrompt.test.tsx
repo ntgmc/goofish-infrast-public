@@ -117,7 +117,7 @@ describe('ProfileUpgradePrompt', () => {
     apiJson.mockResolvedValue(inventoryWith('limited_profile_voucher', 'use'))
     const user = userEvent.setup()
     renderPrompt({ userId: 'session-user' })
-    await user.click(await screen.findByRole('button', { name: '本次关闭提示' }))
+    await user.click(await screen.findByRole('button', { name: '暂时关闭' }))
     expect(window.localStorage.getItem(profileUpgradePromptStorageKey('session-user'))).toBeNull()
     cleanup()
 

@@ -47,7 +47,7 @@ describe('PlansSection', () => {
     expect(screen.getByRole('textbox', { name: '方案名称' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '保存当前配置' })).toBeDisabled()
     expect(screen.getByText('已达到保存上限，请先删除不再需要的方案。')).toBeInTheDocument()
-    expect(screen.queryByText('当前方案 vs 上次方案')).not.toBeInTheDocument()
+    expect(screen.queryByText('当前方案与上次方案对比')).not.toBeInTheDocument()
     expect(screen.queryByText('上次结果')).not.toBeInTheDocument()
   })
 

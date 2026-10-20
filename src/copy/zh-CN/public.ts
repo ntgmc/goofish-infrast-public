@@ -56,7 +56,7 @@ export const publicCopy = {
   // src/pages/ChangelogPage.tsx
   pages_ChangelogPage_002: "更新日志",
   // src/pages/ChangelogPage.tsx
-  pages_ChangelogPage_003: "查看各版本新增的功能、使用体验调整和问题修复。",
+  pages_ChangelogPage_003: "查看各版本的新增功能、体验改进和问题修复。",
   // src/pages/ChangelogPage.tsx
   pages_ChangelogPage_004: "前端 v",
   // src/pages/ChangelogPage.tsx
@@ -148,7 +148,7 @@ export const publicCopy = {
   // src/pages/LandingPage.tsx
   pages_LandingPage_016: "337.1 / 日",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_017: "用同一标准比较收益和培养成本",
+  pages_LandingPage_017: "将收益和培养成本换算后比较",
   // src/pages/LandingPage.tsx
   pages_LandingPage_018: "MAA 基建排班优化器",
   // src/pages/LandingPage.tsx
@@ -158,7 +158,7 @@ export const publicCopy = {
   // src/pages/LandingPage.tsx
   pages_LandingPage_021: "进入工作台",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_022: "为使用 MAA 的明日方舟玩家准备",
+  pages_LandingPage_022: "适合使用 MAA 的《明日方舟》玩家",
   // src/pages/LandingPage.tsx
   pages_LandingPage_023: "按你的干员和练度安排基建。",
   // src/pages/LandingPage.tsx
@@ -196,11 +196,11 @@ export const publicCopy = {
   // src/pages/LandingPage.tsx
   pages_LandingPage_038: "排班结果页：下载 JSON，查看等效理智、效率指标和练度成本。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_039: "先查看方案和预计收益，需要了解计算依据或房间安排时再展开明细。",
+  pages_LandingPage_039: "查看方案和预计收益，展开明细了解计算依据与房间安排。",
   // src/pages/LandingPage.tsx
   pages_LandingPage_040: "查看排班收益",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_041: "培养成本和预计收益，一起看。",
+  pages_LandingPage_041: "比较培养成本与预计收益",
   // src/pages/LandingPage.tsx
   pages_LandingPage_042: "结果包含排班 JSON、预计日产出和等效理智。查看练度成本和预计回本时间，再决定是否培养干员。",
   // src/pages/LandingPage.tsx
@@ -328,7 +328,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_044: "使用帮助",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_045: "从注册、导入到排班和导出，遇到问题可以在这里查找处理方法。输入关键词，也能搜索答案中的内容。",
+  pages_PublicInfoPage_045: "查找注册、导入、排班和导出问题的处理方法。搜索会同时匹配问题和答案。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_046: "反馈",
   // src/pages/PublicInfoPage.tsx
@@ -370,11 +370,11 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_065: "还没找到答案？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_066: "通过网站提交问题描述、操作步骤和截图，并在“我的反馈”查看回复和处理进度。",
+  pages_PublicInfoPage_066: "提交问题描述、操作步骤和截图，在“我的反馈”查看回复与处理进度。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_067: "通过网站反馈问题",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_068: "登录后提交反馈，可附带当前档案、结果或任务编号。后续回复和处理进度可在“我的反馈”查看；需要补充信息时，直接在原反馈中回复。",
+  pages_PublicInfoPage_068: "登录后提交反馈，可附带当前档案、结果或任务编号。在“我的反馈”查看回复和处理进度，也可在原反馈中补充信息。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_069: "反馈前请准备",
   // src/pages/PublicInfoPage.tsx
@@ -440,7 +440,7 @@ export const publicCopy = {
     free_action: "免费开始使用",
     free_unavailable: "免费开始暂未开放",
     paid_title: "付费维护",
-    paid_description: "适合经常培养干员、调整基建方案，需要持续导出到 MAA 或自定义配置的玩家。",
+    paid_description: "适合经常培养干员、调整基建，需要持续导出 MAA 文件或自定义排班配置的玩家。",
     paid_action: "选择维护期限",
     highlights_title: "关键差异",
     export_note: "MAA 导出需使用 MAA 排班模式。",
@@ -483,7 +483,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_079: "换设备、误拦截与解冻",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_080: "材料齐全后，我们将在规定工作日内首次响应；核验与解冻完成时间取决于问题复杂度。",
+  pages_PublicInfoPage_080: "材料齐全后，我们会在规定的工作日内首次回复；核验与解冻所需时间取决于问题复杂度。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_081: "MaaTool 账号、游戏账号档案和 CDK 分别是什么？",
   // src/pages/PublicInfoPage.tsx

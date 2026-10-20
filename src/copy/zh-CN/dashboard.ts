@@ -8,7 +8,7 @@ export const dashboardCopy = {
     preferences_help: "调整动画效果和进入工作区的方式。",
     data: "数据与隐私",
     credentials: "森空岛授权",
-    no_credentials: "暂无森空岛绑定账号。导入游戏数据后，可在这里管理授权信息。",
+    no_credentials: "尚未绑定森空岛。导入游戏数据后，可在这里管理授权信息。",
     privacy_details: "个人数据的保存与删除",
     deletion_help: "提交后立即退出登录，7 天内重新登录会自动取消注销。",
   },
@@ -17,7 +17,7 @@ export const dashboardCopy = {
     settings: "界面设置",
     description: "设置保存在当前浏览器，V1 与 V2 同步生效。",
     reduce: "减少动画",
-    help: "开启后，页面和面板立即切换。页面持续卡顿时会自动开启，你也可以手动关闭，当前访问期间将停止自动调整。此设置仅保存在当前浏览器。",
+    help: "开启后，页面和面板会立即切换。持续卡顿时会自动开启；手动关闭后，本次访问期间不再自动调整。设置只保存在当前浏览器。",
     system: "已跟随系统的减少动态效果设置。关闭系统设置后，可在这里调整。",
     storageError: "本次使用已生效，浏览器未能保存此设置。刷新后可能需要重新调整。",
   },
@@ -41,13 +41,13 @@ export const dashboardCopy = {
   },
   workspace_entry: {
     prompt_title: "下次直接进入这个游戏账号？",
-    prompt_body: "你最近多次从账号列表打开同一个游戏账号。启用后，可以省去每次选择账号，直接进入工作区设置；仍可返回账号列表管理账号，也可在账户设置中关闭。",
+    prompt_body: "你最近多次打开同一个游戏账号。启用后，下次会直接进入工作区设置，仍可返回账号列表管理账号，也可在账号设置中关闭。",
     enable: "启用并进入工作区",
     snooze: "7 天内不再提醒",
     never: "不再提示",
     settings_title: "默认进入方式",
     setting_label: "只有一个游戏账号时，直接进入工作区设置",
-    setting_help: "仅在能确定唯一游戏账号时生效，同一 UID 优先使用可用的付费档案。返回账号列表仍可管理账号。此设置仅保存在当前浏览器。",
+    setting_help: "只有一个游戏账号时生效；同一 UID 有多份档案时，优先打开可用的付费档案。仍可返回账号列表管理账号。设置只保存在当前浏览器。",
     unavailable: "有唯一且可用的游戏账号时，可以启用此设置；多个档案需全部绑定同一 UID。",
     storage_error: "无法在当前浏览器保存设置，请允许网站存储后重试。",
   },
@@ -165,7 +165,7 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/ProfilesSection.tsx
   pages_tool_dashboard_ProfilesSection_001: "还没有添加游戏账号",
   // src/pages/tool/dashboard/ProfilesSection.tsx
-  pages_tool_dashboard_ProfilesSection_002: "前往“添加账号”，可以通过森空岛领取免费档案，或使用 CDK 创建正式档案。",
+  pages_tool_dashboard_ProfilesSection_002: "点击“添加账号”，通过森空岛领取免费档案，或使用 CDK 创建正式档案。",
   // src/pages/tool/dashboard/ProfilesSection.tsx
   pages_tool_dashboard_ProfilesSection_003: "账号 ",
   // src/pages/tool/dashboard/ProfilesSection.tsx
@@ -193,7 +193,7 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/ProfilesSection.tsx
   pages_tool_dashboard_ProfilesSection_015: "保存",
   // src/pages/tool/dashboard/ProfilesSection.tsx
-  pages_tool_dashboard_ProfilesSection_016: (endsAt: string) => `高级版功能已临时解锁，有效至 ${endsAt}；到期后恢复免费预览权限。`,
+  pages_tool_dashboard_ProfilesSection_016: (endsAt: string) => `高级版体验已生效，有效至 ${endsAt}；到期后恢复免费预览权限。`,
   // src/pages/tool/dashboard/ProfilesSection.tsx
   pages_tool_dashboard_ProfilesSection_017: (expiresAt: string) => `档案有效期至 ${expiresAt}`,
   // src/pages/tool/dashboard/RedeemSection.tsx
@@ -288,7 +288,7 @@ export const dashboardCopy = {
   pages_tool_AccountDashboard_tour_002: "管理游戏账号",
   pages_tool_AccountDashboard_tour_003: "查看正式档案和免费档案，选择账号后即可准备干员与基建数据。",
   pages_tool_AccountDashboard_tour_004: "使用工具",
-  pages_tool_AccountDashboard_tour_005: "分析仓库价值并下载结果图片。手动排班模拟暂未开放，待功能完善后开放。",
+  pages_tool_AccountDashboard_tour_005: "分析仓库价值并下载结果图片。手动排班模拟将在功能完善后开放。",
   pages_tool_AccountDashboard_tour_006: "添加游戏账号",
   pages_tool_AccountDashboard_tour_007: "使用 CDK 创建正式档案；没有 CDK 时，也可以通过森空岛领取免费个人排班。",
   pages_tool_AccountDashboard_tour_008: "邀请奖励",
@@ -315,7 +315,7 @@ export const dashboardCopy = {
   // src/pages/tool/ProfileUpgradePrompt.tsx
   pages_tool_ProfileUpgradePrompt_006: "不再提示",
   // src/pages/tool/ProfileUpgradePrompt.tsx
-  pages_tool_ProfileUpgradePrompt_007: "本次关闭提示",
+  pages_tool_ProfileUpgradePrompt_007: "暂时关闭",
   // src/pages/tool/ProfileUpgradePrompt.tsx
   pages_tool_ProfileUpgradePrompt_008: "前往背包查看",
 } as const
