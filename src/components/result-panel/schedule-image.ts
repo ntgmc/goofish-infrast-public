@@ -1,6 +1,6 @@
 import { copy } from '../../copy/index'
 import { buildBoardRoomGroups, buildBoardSlots } from './ResultBoard'
-import { buildBoardV2Rooms, PRODUCTION_TYPES } from './ResultBoardV2'
+import { buildBoardV2Rooms } from './ResultBoardV2'
 import { formatCompactNumber, type PreparedResult } from './formatters'
 import { ROOM_LABELS } from './labels'
 import type { PreparedPlan, RoomRow } from './types'
@@ -19,19 +19,40 @@ type ImageOptions = {
   showProfession?: boolean;
 }
 type ImageCard = {
+  key: string;
   title: string;
   product: string;
   products: string[];
   roomType: string;
-  droneLabels: string[];
+  drone: boolean;
   slots: Array<{ label: string; row?: RoomRow }>;
 }
+type Placement = {
+  card: ImageCard;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  headerHeight: number;
+  slotHeights: number[];
+  slotMetaHeights: number[];
+}
 
-const WIDTH = 1200
+const WIDTH = 1760
 const MARGIN = 32
-const GAP = 16
-const CARD_WIDTH = (WIDTH - MARGIN * 2 - GAP) / 2
+const GAP = 12
+const FLOOR_GUTTER = 32
+const SHAFT = 20
+const DORM_WIDTH = 432
+const ROOM_WIDTH = (WIDTH - MARGIN * 2 - FLOOR_GUTTER - DORM_WIDTH - GAP * 4 - SHAFT * 2) / 4
 const FONT_SIZE = 14
+const AVATAR_SIZE = 72
+const TILE_WIDTH = 80
+const BADGE_SIZE = 16
+const HEADER_INSET = 12
+const SLOT_GAP = 12
+const PRODUCTION_TYPES = ['trading', 'manufacture', 'power']
+const SUPPORT_TYPES = ['meeting', 'processing', 'hire', 'training']
 
 export async function downloadScheduleImage(options: ImageOptions): Promise<void> {
   const blob = await renderScheduleImage(options)
@@ -53,20 +74,21 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
   const canvas = document.createElement('canvas')
   const context = canvas.getContext('2d')
   if (!context) throw new Error('Canvas unavailable')
-  const fontFamily = getComputedStyle(document.body).fontFamily || 'sans-serif'
+  const ctx = context
+  const themeRoot = document.querySelector('.v2-app') ?? document.body
+  const fontFamily = getComputedStyle(themeRoot).fontFamily || 'sans-serif'
   const plans = version === 'v2' && planIndex !== undefined ? prepared.plans.slice(planIndex, planIndex + 1) : prepared.plans
   if (plans.length === 0) throw new Error('No schedule to export')
-  const colors = readThemeColors()
-  const avatarSize = version === 'v1' ? 48 : 72
-  const tileWidth = avatarSize + 24
-  const nameGap = version === 'v1' ? 8 : 4
-  const rowGap = version === 'v1' ? 12 : 8
+  const colors = readThemeColors(themeRoot)
   const allText = plans.flatMap((plan) => plan.rows.map((row) => `${row.label} ${row.operatorText}`)).join(' ')
-  if (document.fonts) await document.fonts.load(`500 ${FONT_SIZE}px ${fontFamily}`, `${title} ${allText}`)
+  if (document.fonts) await Promise.all([
+    document.fonts.load(`500 ${FONT_SIZE}px ${fontFamily}`, `${title} ${allText}`),
+    document.fonts.load(`600 16px ${fontFamily}`, allText),
+    document.fonts.load(`700 32px ${fontFamily}`, title),
+  ])
   const images = new Map(await Promise.all([...new Set(plans.flatMap((plan) =>
     plan.rows.flatMap((row) => row.operators.flatMap((operator) => operator.id ? [operator.id] : [])),
   ))].map(async (id) => [id, await loadImage(`/webp96/${encodeURIComponent(id)}.webp`)] as const)))
-
   const recoverySupportIcon = plans.some((plan) => plan.rows.some((row) => row.operators.some((operator) => operator.recoverySupport)))
     ? await loadImage(RECOVERY_SUPPORT_ICON_SRC) : null
   const professions = version === 'v2' && showProfession
@@ -78,11 +100,11 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
     [profession, await loadImage(`/operator-professions/${profession}.png`)] as const)))
 
   function lines(value: string, width: number, size = FONT_SIZE, weight = 500): string[] {
-    context!.font = `${weight} ${size}px ${fontFamily}`
+    ctx.font = `${weight} ${size}px ${fontFamily}`
     const output: string[] = []
     let line = ''
     for (const character of value) {
-      if (character === '\n' || (line && context!.measureText(line + character).width > width)) {
+      if (character === '\n' || (line && ctx.measureText(line + character).width > width)) {
         output.push(line)
         line = character === '\n' ? '' : character
       } else line += character
@@ -91,57 +113,55 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
     return output
   }
 
-  function text(value: string, x: number, y: number, width: number, color: string, size = FONT_SIZE, weight = 500, align: CanvasTextAlign = 'left', centered = false): number {
+  function text(value: string, x: number, y: number, width: number, color: string, size = FONT_SIZE, weight = 500, align: CanvasTextAlign = 'left'): number {
     const wrapped = lines(value, width, size, weight)
-    context!.fillStyle = color
-    context!.textBaseline = centered ? 'alphabetic' : 'top'
-    context!.textAlign = align
-    wrapped.forEach((line, index) => {
-      const metrics = context!.measureText(line)
-      const offset = centered
-        ? (size + 6) / 2 + ((metrics.actualBoundingBoxAscent ?? size * 0.8) - (metrics.actualBoundingBoxDescent ?? size * 0.2)) / 2
-        : 0
-      context!.fillText(line, x, y + offset + index * (size + 6))
-    })
+    ctx.fillStyle = color
+    ctx.textBaseline = 'top'
+    ctx.textAlign = align
+    wrapped.forEach((line, index) => ctx.fillText(line, x, y + index * (size + 6)))
     return wrapped.length * (size + 6)
   }
 
-  function slotMetaHeight(slot: ImageCard['slots'][number]): number {
-    return version === 'v1' ? 28 : slot.label || hasEfficiency(slot.row) ? 24 : 0
+  function rule(x: number, y: number, width: number, color = colors.border) {
+    ctx.fillStyle = color
+    ctx.fillRect(x, y, width, 1)
   }
   function hasEfficiency(row?: RoomRow): boolean {
-    return !manual && Boolean(row && !row.isAutofill && row.efficiency !== '-'
-      && (version === 'v1' || (PRODUCTION_TYPES.includes(row.roomType) && row.roomType !== 'control')))
+    return !manual && Boolean(row && !row.isAutofill && row.efficiency !== '-' && PRODUCTION_TYPES.includes(row.roomType))
+  }
+  function titleWidth(width: number): number {
+    // Keep the same title and portrait alignment whether efficiency is present or absent.
+    return width - 32 - (version === 'v2' ? 88 : 0)
+  }
+  function headerHeight(card: ImageCard, width: number): number {
+    const titleHeight = lines(card.title, titleWidth(width), 16, 600).length * 22
+    const iconWidth = cardProductImages(card).length * 20
+    const productHeight = card.product === '-' ? 20 : lines(card.product, width - 32 - iconWidth - 24, 12).length * 18
+    return HEADER_INSET + titleHeight + 4 + productHeight + HEADER_INSET
   }
   function tilesPerRow(width: number): number {
-    return Math.max(1, Math.floor((width - 32) / tileWidth))
+    return Math.max(1, Math.floor((width - 32) / TILE_WIDTH))
+  }
+  function slotMetaHeight(slot: ImageCard['slots'][number], width: number): number {
+    return version === 'v1' ? Math.max(24, lines(slot.label, width - 32 - 88, 12).length * 18 + 6) : 0
   }
   function slotHeight(slot: ImageCard['slots'][number], width: number): number {
     const row = slot.row
+    const metaHeight = slotMetaHeight(slot, width)
     if (!row || row.isAutofill || row.operators.length === 0) {
-      return slotMetaHeight(slot) + lines(row?.operatorText ?? copy.domain.result_board_v2.empty_room, width - 32).length * 20 + (version === 'v1' ? 0 : rowGap)
+      return metaHeight + Math.max(96, lines(row?.operatorText ?? copy.domain.result_board_v2.empty_room, width - 32).length * 20)
     }
-    let height = slotMetaHeight(slot)
+    if (row.operators.length === 1) {
+      return metaHeight + Math.max(96, lines(row.operators[0].name, width - 32 - AVATAR_SIZE - GAP).length * 20)
+    }
+    let height = metaHeight
     for (let index = 0; index < row.operators.length; index += tilesPerRow(width)) {
-      const nameLines = Math.max(...row.operators.slice(index, index + tilesPerRow(width)).map((operator) => lines(operator.name, tileWidth - 8, 12).length))
-      height += avatarSize + nameGap + nameLines * 18 + rowGap
+      const operators = row.operators.slice(index, index + tilesPerRow(width))
+      const tileWidth = (width - 32) / operators.length
+      const nameLines = Math.max(...operators.map((operator) => lines(operator.name, tileWidth - 4).length))
+      height += AVATAR_SIZE + 4 + nameLines * 20 + 8
     }
     return height
-  }
-
-  function cardHeight(card: ImageCard, width: number): number {
-    return (version === 'v1' ? 40 : 32) + Math.max(lines(card.title, headerTextWidth(card, width), 16, 600).length,
-      card.product === '-' ? 0 : lines(card.product, productTextWidth(card, width), 16, 600).length) * 22
-      + card.slots.reduce((height, slot) => height + slotHeight(slot, width), 0)
-  }
-
-  function headerTextWidth(card: ImageCard, width: number): number {
-    return version === 'v2' && card.product === '-'
-      ? width - 44 - (card.droneLabels.length > 0 ? 40 : 0)
-      : (width - 100) / 2
-  }
-  function productTextWidth(card: ImageCard, width: number): number {
-    return (width - 100) / 2 - cardProductImages(card).length * 24
   }
   function cardProductImages(card: ImageCard): HTMLImageElement[] {
     return card.products.map((product) => productImages.get(product))
@@ -151,7 +171,6 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
     const hours = plan.shift_hours ?? shiftHours?.[index]
     return `${plan.name?.trim() || copy.domain.result_board_v2.shift(index + 1)}${typeof hours === 'number' && hours > 0 ? ` · ${formatCompactNumber(hours)}h` : ''}`
   }
-
   function planNote(plan: PreparedPlan): string {
     const notes: string[] = []
     const target = plan.Fiammetta?.enable ? plan.Fiammetta.target?.trim() : ''
@@ -164,30 +183,26 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
     title: copy.domain.result_image.all_shifts,
     note: plans.map((plan, index) => `${planLabel(plan, index)}${planNote(plan) ? ` · ${planNote(plan)}` : ''}`).join('\n'),
     cards: buildBoardRoomGroups(plans, isRotationMode).map((group): ImageCard => ({
+      key: group.key,
       title: `${group.label}${group.indexLabel ? ` ${group.indexLabel}` : ''}`,
       product: group.product,
       products: Array.from(new Set(group.rows.map((row) => row.product))),
       roomType: group.roomType,
-      droneLabels: plans.flatMap((plan, index) => isDroneTarget(plan.drones, group.roomType, group.rows[0].roomIndex) ? [planLabel(plan, index)] : []),
+      drone: plans.some((plan) => isDroneTarget(plan.drones, group.roomType, group.rows[0].roomIndex)),
       slots: buildBoardSlots(group.rows, prepared.detailStats.planCount, isRotationMode),
     })),
   }] : plans.map((plan, index) => ({
     title: planLabel(plan, planIndex ?? index),
     note: planNote(plan),
-    cards: buildBoardV2Rooms(plan, isRotationMode)
-      .sort((a, b) => {
-        const order = [...PRODUCTION_TYPES, 'meeting', 'hire', 'processing', 'dormitory']
-        const rank = (type: string) => order.includes(type) ? order.indexOf(type) : order.length
-        return rank(a.roomType) - rank(b.roomType)
-      })
-      .map((room): ImageCard => ({
-        title: `${room.label}${room.indexLabel ? ` ${room.indexLabel}` : ''}`,
-        product: room.product,
-        products: [room.product],
-        roomType: room.roomType,
-        droneLabels: isDroneTarget(plan.drones, room.roomType, room.roomIndex) ? [planLabel(plan, planIndex ?? index)] : [],
-        slots: [{ label: '', row: room.row }],
-      })),
+    cards: buildBoardV2Rooms(plan, isRotationMode).map((room): ImageCard => ({
+      key: room.key,
+      title: `${room.label}${room.indexLabel ? ` ${room.indexLabel}` : ''}`,
+      product: room.product,
+      products: [room.product],
+      roomType: room.roomType,
+      drone: isDroneTarget(plan.drones, room.roomType, room.roomIndex),
+      slots: [{ label: '', row: room.row }],
+    })),
   }))
   const productImages = new Map(await Promise.all(
     [...new Set(sections.flatMap((section) => section.cards.flatMap((card) => card.products)))]
@@ -197,163 +212,184 @@ export async function renderScheduleImage({ prepared, isRotationMode, version, t
       })
       .map(async ([product, src]) => [product, await loadImage(src)] as const),
   ))
-  const placements: Array<{ card: ImageCard; x: number; y: number; width: number; height: number }> = []
-  const headings: Array<{ value: string; y: number; note: string }> = []
-  const heading = `${copy.domain.result_image.title} ${version}`
+  const productionKeys = [...new Set(sections.flatMap((section) => section.cards.filter((card) => PRODUCTION_TYPES.includes(card.roomType)).map((card) => card.key)))]
+    .sort((a, b) => PRODUCTION_TYPES.indexOf(a.split('-')[0]) - PRODUCTION_TYPES.indexOf(b.split('-')[0]) || Number(a.split('-')[1]) - Number(b.split('-')[1]))
+  const productionLayout = prepared.facilityLayout?.map((id) => id.replace(/_(\d+)$/, (_, index: string) => `-${Number(index) - 1}`)) ?? productionKeys
+  const columnWidths = [ROOM_WIDTH, ROOM_WIDTH, ROOM_WIDTH, DORM_WIDTH, ROOM_WIDTH]
+  const columnX = columnWidths.map((_, column) => MARGIN + FLOOR_GUTTER
+    + columnWidths.slice(0, column).reduce((sum, width) => sum + width + GAP, 0) + (column >= 3 ? SHAFT : 0) + (column >= 4 ? SHAFT : 0))
+  const placements: Placement[] = []
+  const floorLabels: Array<{ value: string; y: number }> = []
+  const headings: Array<{ value: string; y: number; note: string; width: number }> = []
+  const heading = title.trim() || copy.domain.result_image.title
   const mode = isRotationMode ? copy.domain.components_result_panel_ResultBoard_001 : copy.domain.components_result_panel_ResultBoard_002
-  const subtitle = `${title} · ${manual
+  const subtitle = `${copy.domain.result_image.title} · ${manual
     ? prepared.hasDailyProduction ? copy.domain.manual_schedule.simulation_image : copy.domain.manual_schedule.pending
-    : mode}`
-  let y = 88 + lines(subtitle, WIDTH - MARGIN * 2).length * 20
+    : mode}${!prepared.facilityLayout && productionKeys.length ? ` · ${copy.domain.result_image.numbered_layout}` : ''}`
+  const headingWidth = WIDTH - MARGIN * 2 - 240
+  const subtitleY = MARGIN + lines(heading, headingWidth, 32, 700).length * 38 + 12
+  const headerBottom = subtitleY + lines(subtitle, WIDTH - MARGIN * 2).length * 20 + 24
+  const roomCount = new Set(sections.flatMap((section) => section.cards.map((card) => card.key))).size
+  const operatorCount = new Set(plans.flatMap((plan) => plan.rows.flatMap((row) => row.operators.map((operator) => operator.name)))).size
+  let y = headerBottom + 24
   for (const section of sections) {
-    headings.push({ value: section.title, note: section.note, y })
-    y += lines(section.title, WIDTH - MARGIN * 2, 20, 600).length * 26 + 16
-    if (section.note) y += lines(section.note, WIDTH - MARGIN * 2).length * 20 + 12
-    if (section.cards.length === 0) y += 36
-    if (version === 'v1') {
-      for (let index = 0; index < section.cards.length; index += 2) {
-        const pair = section.cards.slice(index, index + 2)
-        const cardSize = Math.max(...pair.map((card) => cardHeight(card, CARD_WIDTH)))
-        pair.forEach((card, column) => placements.push({ card, x: MARGIN + column * (CARD_WIDTH + GAP), y, width: CARD_WIDTH, height: cardSize }))
-        y += cardSize + GAP
+    const headingWidth = columnX[3] - MARGIN - SHAFT - GAP
+    headings.push({ value: section.title, note: section.note, y, width: headingWidth })
+    const headingHeight = lines(section.title, headingWidth, 20, 600).length * 26 + 12
+      + (section.note ? lines(section.note, headingWidth).length * 20 + 12 : 0)
+    const positioned = section.cards.map((card, index) => {
+      const productionIndex = productionLayout.indexOf(card.key)
+      const roomIndex = Number(card.key.split('-')[1]) || 0
+      if (PRODUCTION_TYPES.includes(card.roomType) && productionIndex >= 0 && productionIndex < 9) {
+        return { card, floor: Math.floor(productionIndex / 3) + 1, column: productionIndex % 3 }
       }
-    } else {
-      const columnWidth = (WIDTH - MARGIN * 2 + GAP) / 6
-      let column = 0
-      let rowHeight = 0
-      for (const card of section.cards) {
-        const count = Math.max(1, ...card.slots.map((slot) => slot.row?.operators.length ?? 0))
-        const span = Math.min(6, Math.max(card.product !== '-' || card.droneLabels.length > 0 ? 2 : 1, Math.ceil((count * tileWidth + 32 + GAP) / columnWidth)))
-        const width = span * columnWidth - GAP
-        const height = cardHeight(card, width)
-        if (column + span > 6) {
-          y += rowHeight + GAP
-          column = 0
-          rowHeight = 0
-        }
-        placements.push({ card, x: MARGIN + column * columnWidth, y, width, height })
-        rowHeight = Math.max(rowHeight, height)
-        column += span
-      }
-      y += rowHeight + GAP
+      if (card.roomType === 'control') return { card, floor: 0, column: 3 }
+      if (card.roomType === 'dormitory' && roomIndex < 4) return { card, floor: roomIndex + 1, column: 3 }
+      const supportIndex = SUPPORT_TYPES.indexOf(card.roomType)
+      if (supportIndex >= 0) return { card, floor: supportIndex + 1, column: 4 }
+      return { card, floor: 5 + Math.floor(index / 5), column: index % 5 }
+    })
+    const floors = [...new Set([0, ...positioned.map((item) => item.floor)])].sort((a, b) => a - b)
+    for (const floor of floors) {
+      const rooms = positioned.filter((item) => item.floor === floor)
+      const floorHeaderHeight = Math.max(72, ...rooms.map(({ card, column }) => headerHeight(card, columnWidths[column])))
+      const slotCount = Math.max(0, ...rooms.map(({ card }) => card.slots.length))
+      const slotMetaHeights = Array.from({ length: slotCount }, (_, index) => Math.max(0,
+        ...rooms.map(({ card, column }) => card.slots[index] ? slotMetaHeight(card.slots[index], columnWidths[column]) : 0)))
+      const slotHeights = slotMetaHeights.map((metaHeight, index) => metaHeight + Math.max(96,
+        ...rooms.map(({ card, column }) => card.slots[index]
+          ? slotHeight(card.slots[index], columnWidths[column]) - slotMetaHeight(card.slots[index], columnWidths[column]) : 0)))
+      const height = floorHeaderHeight + 12 + slotHeights.reduce((sum, size) => sum + size, 0) + Math.max(0, slotCount - 1) * SLOT_GAP + 12
+      if (floor > 0) floorLabels.push({ value: floor < 5 ? `B${floor}` : '', y: y + floorHeaderHeight + 12 })
+      for (const { card, column } of rooms) placements.push({ card, x: columnX[column], y, width: columnWidths[column], height, headerHeight: floorHeaderHeight, slotHeights, slotMetaHeights })
+      y += (floor === 0 ? Math.max(rooms.length ? height : 0, headingHeight) : height) + GAP
     }
     y += 24
   }
-  const height = y + 48
+  const height = y + 40
   // ponytail: cap the PNG at 16 MP; very long schedules trade resolution for a complete image.
   const scale = Math.min(2, 16384 / height, Math.sqrt(16_000_000 / (WIDTH * height)))
   canvas.width = Math.floor(WIDTH * scale)
   canvas.height = Math.floor(height * scale)
-  context.scale(scale, scale)
-  context.fillStyle = colors.background
-  context.fillRect(0, 0, WIDTH, height)
-  text(heading, MARGIN, 28, WIDTH - MARGIN * 2, colors.text, 28, 600)
-  text(subtitle, MARGIN, 70, WIDTH - MARGIN * 2, colors.muted)
+  ctx.scale(scale, scale)
+  ctx.fillStyle = colors.background
+  ctx.fillRect(0, 0, WIDTH, height)
+  text(heading, MARGIN, MARGIN, headingWidth, colors.text, 32, 700)
+  text(subtitle, MARGIN, subtitleY, WIDTH - MARGIN * 2, colors.muted)
+  text(copy.domain.result_board_v2.rooms(roomCount), WIDTH - MARGIN, MARGIN + 4, 216, colors.text, 16, 600, 'right')
+  text(copy.domain.result_board_v2.operators(operatorCount), WIDTH - MARGIN, MARGIN + 32, 216, colors.muted, 14, 500, 'right')
+  rule(MARGIN, headerBottom, WIDTH - MARGIN * 2)
   for (const item of headings) {
-    const titleHeight = text(item.value, MARGIN, item.y, WIDTH - MARGIN * 2, colors.brand, 20, 600)
-    if (item.note) text(item.note, MARGIN, item.y + titleHeight + 16, WIDTH - MARGIN * 2, colors.muted)
+    const titleHeight = text(item.value, MARGIN, item.y + 12, item.width, colors.text, 20, 600)
+    if (item.note) text(item.note, MARGIN, item.y + titleHeight + 24, item.width, colors.muted)
   }
-  for (const { card, x, y: cardY, width, height: cardSize } of placements) {
-    const tone = card.roomType === 'manufacture' ? colors.warning : ['power', 'dormitory'].includes(card.roomType) ? colors.success : colors.brand
-    context.beginPath()
-    context.roundRect(x, cardY, width, cardSize, 12)
-    context.fillStyle = colors.surface
-    context.fill()
-    context.strokeStyle = colors.border
-    context.stroke()
-    context.fillStyle = tone
-    context.fillRect(x + 16, cardY + 16, 3, 20)
-    const titleHeight = text(card.title, x + 28, cardY + 16, headerTextWidth(card, width), colors.text, 16, 600)
-    const productRight = x + width - 16 - (card.droneLabels.length > 0 ? 40 : 0)
+  for (const floor of floorLabels) if (floor.value) text(floor.value, MARGIN, floor.y, FLOOR_GUTTER, colors.muted, 12, 600)
+  for (const { card, x, y: cardY, width, height: cardSize, headerHeight: cardHeaderHeight, slotHeights, slotMetaHeights } of placements) {
+    const tone = card.roomType === 'manufacture' ? colors.warning : ['power', 'dormitory'].includes(card.roomType) ? colors.success
+      : card.roomType === 'trading' ? colors.trading : card.roomType === 'control' ? colors.brand : colors.muted
+    ctx.save()
+    ctx.beginPath()
+    ctx.roundRect(x, cardY, width, cardSize, 8)
+    ctx.clip()
+    ctx.fillStyle = colors.surface
+    ctx.fillRect(x, cardY, width, cardSize)
+    ctx.fillStyle = colors.inset
+    ctx.fillRect(x, cardY, width, cardHeaderHeight)
+    ctx.strokeStyle = colors.border
+    ctx.stroke()
+    const titleHeight = text(card.title, x + 16, cardY + HEADER_INSET, titleWidth(width), colors.text, 16, 600)
+    const metaY = cardY + HEADER_INSET + titleHeight + 4
     const icons = cardProductImages(card)
-    if (icons.length > 0) {
-      const [firstLine] = lines(card.product, productTextWidth(card, width), 16, 600)
-      const iconLeft = productRight - context.measureText(firstLine).width - icons.length * 24
-      icons.forEach((image, index) => context.drawImage(image, iconLeft + index * 24, cardY + 17, 20, 20))
-    }
-    const productHeight = card.product === '-' ? 0
-      : text(card.product, productRight, cardY + 16, productTextWidth(card, width), tone, 16, 600, 'right', true)
-    let rowY = cardY + 16 + Math.max(titleHeight, productHeight) + 8
-    if (card.droneLabels.length > 0) {
-      context.strokeStyle = colors.brand
-      context.lineWidth = 2
-      const centerX = x + width - 28
-      const centerY = cardY + 28
-      for (const [dx, dy] of [[-8, -8], [8, -8], [-8, 8], [8, 8]]) {
-        context.beginPath()
-        context.moveTo(centerX, centerY)
-        context.lineTo(centerX + dx, centerY + dy)
-        context.stroke()
-        context.beginPath()
-        context.arc(centerX + dx, centerY + dy, 5, 0, Math.PI * 2)
-        context.stroke()
-      }
-      context.lineWidth = 1
-    }
-    for (const slot of card.slots) {
+    icons.forEach((image, index) => ctx.drawImage(image, x + 16 + index * 20, metaY, 16, 16))
+    if (card.product !== '-') text(card.product, x + 16 + icons.length * 20, metaY, width - 32 - icons.length * 20 - 24, tone, 12)
+    else text(copy.domain.result_board_v2.operators(Math.max(0, ...card.slots.map((slot) => slot.row?.operators.length ?? 0))), x + 16, metaY, width - 56, colors.muted, 12)
+    if (version === 'v2' && hasEfficiency(card.slots[0]?.row)) text(card.slots[0].row!.efficiency, x + width - 16, cardY + HEADER_INSET, 84, tone, 14, 600, 'right')
+    if (card.drone) drawDrone(x + width - 16 - BADGE_SIZE, metaY, colors.brand)
+    rule(x + 16, cardY + cardHeaderHeight, width - 32)
+    let rowY = cardY + cardHeaderHeight + 12
+    for (const [slotIndex, slot] of card.slots.entries()) {
       const row = slot.row
-      if (slot.label) text(slot.label, x + 16, rowY, width - 140, colors.muted, 12)
-      if (hasEfficiency(row)) text(row!.efficiency, x + width - 16, rowY, 96, tone, 16, 600, 'right')
       const startY = rowY
-      rowY += slotMetaHeight(slot)
+      if (slotIndex > 0) rule(x + 16, rowY - SLOT_GAP / 2, width - 32)
+      if (version === 'v1') {
+        text(slot.label, x + 16, rowY, width - 32 - 88, colors.muted, 12)
+        if (hasEfficiency(row)) text(row!.efficiency, x + width - 16, rowY, 84, tone, 14, 600, 'right')
+        rowY += slotMetaHeights[slotIndex]
+      }
       if (!row || row.isAutofill || row.operators.length === 0) {
-        text(row?.operatorText ?? copy.domain.result_board_v2.empty_room, x + 16, rowY, width - 32, colors.muted)
+        text(row?.operatorText ?? copy.domain.result_board_v2.empty_room, x + 16, rowY + 24, width - 32, colors.muted)
+      } else if (row.operators.length === 1) {
+        const operator = row.operators[0]
+        drawPortrait(operator, x + 16, rowY)
+        const nameWidth = width - 32 - AVATAR_SIZE - GAP
+        const nameHeight = lines(operator.name, nameWidth).length * 20
+        text(operator.name, x + 16 + AVATAR_SIZE + GAP, rowY + Math.max(0, (AVATAR_SIZE - nameHeight) / 2), nameWidth, colors.text)
       } else {
         for (let index = 0; index < row.operators.length; index += tilesPerRow(width)) {
           const operators = row.operators.slice(index, index + tilesPerRow(width))
+          const tileWidth = (width - 32) / operators.length
           let nameHeight = 0
           operators.forEach((operator, column) => {
-            const centerX = version === 'v1'
-              ? x + width / 2 + (column - (operators.length - 1) / 2) * tileWidth
-              : x + 16 + tileWidth / 2 + column * tileWidth
-            const tileX = centerX - avatarSize / 2
-            context.save()
-            context.beginPath()
-            context.roundRect(tileX, rowY, avatarSize, avatarSize, 6)
-            context.clip()
-            const image = operator.id ? images.get(operator.id) : null
-            if (image) context.drawImage(image, tileX, rowY, avatarSize, avatarSize)
-            else {
-              context.fillStyle = colors.background
-              context.fillRect(tileX, rowY, avatarSize, avatarSize)
-              text(operator.name.trim().slice(0, 1) || '?', centerX, rowY + avatarSize / 3, avatarSize, colors.muted, 20, 500, 'center')
-            }
-            context.restore()
-            const profession = operatorProfession(operator)
-            const professionIcon = profession ? professionIcons.get(profession) : null
-            if (professionIcon) {
-              const size = avatarSize / 3
-              context.fillStyle = '#18181b'
-              context.fillRect(tileX + avatarSize - size, rowY, size, size)
-              context.drawImage(professionIcon, tileX + avatarSize - size + 2, rowY + 2, size - 4, size - 4)
-            }
-            if (operator.recoverySupport && recoverySupportIcon) {
-              const size = avatarSize / 3
-              context.drawImage(recoverySupportIcon, tileX + avatarSize - size, rowY + avatarSize - size, size, size)
-            }
-            nameHeight = Math.max(nameHeight, text(
-              operator.name,
-              centerX, rowY + avatarSize + nameGap, tileWidth - 8, colors.text, 12, 500, 'center'))
+            const centerX = x + 16 + (column + 0.5) * tileWidth
+            drawPortrait(operator, centerX - AVATAR_SIZE / 2, rowY)
+            nameHeight = Math.max(nameHeight, text(operator.name, centerX, rowY + AVATAR_SIZE + 4, tileWidth - 4, colors.text, FONT_SIZE, 500, 'center'))
           })
-          rowY += avatarSize + nameGap + nameHeight + rowGap
+          rowY += AVATAR_SIZE + 4 + nameHeight + 8
         }
       }
-      rowY = startY + slotHeight(slot, width)
+      rowY = startY + slotHeights[slotIndex] + SLOT_GAP
     }
+    ctx.restore()
   }
-  text(copy.domain.result_image.footer, MARGIN, height - 36, WIDTH - MARGIN * 2, colors.muted, 12)
+  rule(MARGIN, height - 48, WIDTH - MARGIN * 2)
+  text(copy.domain.result_image.footer, MARGIN, height - 28, WIDTH - MARGIN * 2, colors.muted, 12)
   return new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('PNG encoding failed')), 'image/png'))
+
+  function drawPortrait(operator: RoomRow['operators'][number], x: number, y: number) {
+    ctx.save()
+    ctx.beginPath()
+    ctx.roundRect(x, y, AVATAR_SIZE, AVATAR_SIZE, 6)
+    ctx.clip()
+    ctx.fillStyle = colors.inset
+    ctx.fillRect(x, y, AVATAR_SIZE, AVATAR_SIZE)
+    const image = operator.id ? images.get(operator.id) : null
+    if (image) ctx.drawImage(image, x, y, AVATAR_SIZE, AVATAR_SIZE)
+    else text(operator.name.trim().slice(0, 1) || '?', x + AVATAR_SIZE / 2, y + 24, AVATAR_SIZE, colors.muted, 20, 500, 'center')
+    const profession = operatorProfession(operator)
+    const professionIcon = profession ? professionIcons.get(profession) : null
+    if (professionIcon) {
+      ctx.fillStyle = colors.badge
+      ctx.fillRect(x + AVATAR_SIZE - BADGE_SIZE, y, BADGE_SIZE, BADGE_SIZE)
+      ctx.drawImage(professionIcon, x + AVATAR_SIZE - BADGE_SIZE + 2, y + 2, BADGE_SIZE - 4, BADGE_SIZE - 4)
+    }
+    if (operator.recoverySupport && recoverySupportIcon) ctx.drawImage(recoverySupportIcon, x + AVATAR_SIZE - BADGE_SIZE, y + AVATAR_SIZE - BADGE_SIZE, BADGE_SIZE, BADGE_SIZE)
+    ctx.restore()
+  }
+  function drawDrone(x: number, y: number, color: string) {
+    ctx.strokeStyle = color
+    ctx.lineWidth = 1.5
+    for (const [dx, dy] of [[-4, -4], [4, -4], [-4, 4], [4, 4]]) {
+      ctx.beginPath()
+      ctx.moveTo(x + 8, y + 8)
+      ctx.lineTo(x + 8 + dx, y + 8 + dy)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.arc(x + 8 + dx, y + 8 + dy, 2.25, 0, Math.PI * 2)
+      ctx.stroke()
+    }
+    ctx.lineWidth = 1
+  }
 }
 
-function readThemeColors() {
+function readThemeColors(root: Element) {
   const tokens = {
-    background: '--theme-surface-0', surface: '--theme-surface-1', border: '--theme-surface-3',
+    background: '--theme-surface-0', surface: '--theme-surface-1', inset: '--theme-surface-2', border: '--theme-surface-4',
     text: '--theme-ink-primary', muted: '--theme-ink-secondary', brand: '--theme-brand-400',
-    warning: '--theme-warning', success: '--theme-success',
+    trading: '--station-trading', warning: '--station-manufacturing', success: '--station-power', badge: '--color-v2-rail',
   }
   const probe = document.createElement('span')
   probe.hidden = true
-  document.body.append(probe)
+  root.append(probe)
   try {
     return Object.fromEntries(Object.entries(tokens).map(([key, token]) => {
       probe.style.color = `var(${token})`

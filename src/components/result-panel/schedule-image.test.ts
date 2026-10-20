@@ -8,6 +8,7 @@ const drawnText = vi.fn()
 const drawnTextStyle = vi.fn()
 const drawnImage = vi.fn()
 const drawnRoundRect = vi.fn()
+const drawnArc = vi.fn()
 const encoded = vi.fn()
 let imageRequests: string[] = []
 let failedImages: string[] = []
@@ -25,7 +26,7 @@ beforeEach(() => {
     fillText: drawnText, drawImage: drawnImage,
     scale: vi.fn(), fillRect: vi.fn(), beginPath: vi.fn(), roundRect: drawnRoundRect,
     fill: vi.fn(), stroke: vi.fn(), save: vi.fn(), clip: vi.fn(), restore: vi.fn(),
-    moveTo: vi.fn(), lineTo: vi.fn(), arc: vi.fn(),
+    moveTo: vi.fn(), lineTo: vi.fn(), arc: drawnArc,
   } as unknown as CanvasRenderingContext2D)
   vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (this: HTMLCanvasElement, callback) {
     dimensions = { width: this.width, height: this.height }
@@ -69,10 +70,10 @@ describe('schedule image exports', () => {
     const badges = drawnImage.mock.calls.filter(([image]) => image.source.startsWith('/operator-professions/'))
     expect(badges).toHaveLength(professions.length)
     for (const [, x, y, width, height] of badges) {
-      expect(width).toBe(20)
-      expect(height).toBe(20)
+      expect(width).toBe(12)
+      expect(height).toBe(12)
       expect(drawnRoundRect.mock.calls.some(([avatarX, avatarY, avatarWidth]) =>
-        avatarWidth === 72 && x === avatarX + 50 && y === avatarY + 2)).toBe(true)
+        avatarWidth === 72 && x === avatarX + 58 && y === avatarY + 2)).toBe(true)
     }
   })
 
@@ -96,8 +97,9 @@ describe('schedule image exports', () => {
     await renderScheduleImage({ prepared, version, planIndex: 0, title: result.title, isRotationMode: false })
     expect(drawnText.mock.calls.map(([value]) => value).join('')).not.toContain('恢复支援')
     expect(imageRequests).toContain('/building-skills/bskill_dorm_all&one1.png')
-    const badgeSize = version === 'v1' ? 16 : 24
-    expect(drawnImage.mock.calls.filter(([, , , width, height]) => width === badgeSize && height === badgeSize)).toHaveLength(1)
+    const marks = drawnImage.mock.calls.filter(([image]) => image.source === '/building-skills/bskill_dorm_all&one1.png')
+    expect(marks).toHaveLength(1)
+    expect(marks[0].slice(3)).toEqual([16, 16])
     expect(prepared.plans[0].rows.find((row) => row.roomType === 'dormitory')?.operators[0]).toMatchObject({
       name: '杜林', recoverySupport: true,
     })
@@ -117,6 +119,9 @@ describe('schedule image exports', () => {
       expect(values.includes(name)).toBe(names.some((expected) => expected === name))
     }
     expect(values).toContain('shared')
+    expect(values).toContain(result.title)
+    expect(values).toContain('1 个房间')
+    expect(values).toContain(`${names.length + 1} 位干员`)
     expect(imageRequests.filter((url) => url.includes('avatar')).length).toBe(1)
     expect(imageRequests).toContain('/assets/products/GOLD.png')
     expect(drawnImage).toHaveBeenCalled()
@@ -126,7 +131,7 @@ describe('schedule image exports', () => {
     expect(prepared.plans).toHaveLength(3)
   })
 
-  it.each(['v1', 'v2'] as const)('aligns headers and names with compact portraits in %s', async (version) => {
+  it.each(['v1', 'v2'] as const)('aligns headers and compact portraits in %s', async (version) => {
     const { result, operators } = schedule()
     result.plans = [{
       name: 'day',
@@ -145,11 +150,11 @@ describe('schedule image exports', () => {
     expect(cards[0][3]).toBe(cards[1][3])
     const title = drawnText.mock.calls.find(([value]) => value === manufacture.label)!
     const product = drawnText.mock.calls.find(([value]) => value === manufacture.product)!
-    expect(product[2]).toBe(title[2] + 15)
+    expect(product[2]).toBeGreaterThan(title[2])
     expect(product[1]).toBeGreaterThan(title[1])
     const productStyle = drawnTextStyle.mock.calls.find(([value]) => value === manufacture.product)!
-    expect(productStyle[1]).toContain('16px')
-    expect(productStyle[2]).toBe('right')
+    expect(productStyle[1]).toContain('12px')
+    expect(productStyle[2]).toBe('left')
 
     const efficiency = drawnText.mock.calls.find(([value]) => value === manufacture.efficiency)!
     expect(efficiency[1]).toBe(cards[0][0] + cards[0][2] - 16)
@@ -161,14 +166,10 @@ describe('schedule image exports', () => {
     expect(efficiency[2]).toBeLessThan(portraits[0].y)
     expect(portraits[1].center - portraits[0].center).toBeCloseTo(portraits[2].center - portraits[1].center)
     expect(portraits[1].center - portraits[0].center - avatarDraws[0][3]).toBeLessThanOrEqual(24)
-    if (version === 'v1') {
-      expect(portraits[1].center).toBe(cards[0][0] + cards[0][2] / 2)
-      expect(portraits[3].center).toBe(cards[1][0] + cards[1][2] / 2)
-    } else {
-      expect(cards[0][2]).toBeGreaterThan(cards[1][2])
-      expect(avatarDraws[0][1]).toBe(cards[0][0] + 28)
-      expect(avatarDraws[3][1]).toBe(cards[1][0] + 28)
-    }
+    expect(cards[0][2]).toBe(cards[1][2])
+    expect(portraits[1].center).toBe(cards[0][0] + cards[0][2] / 2)
+    expect(avatarDraws[0][1] - cards[0][0]).toBeLessThan(24)
+    expect(avatarDraws[3][1]).toBe(cards[1][0] + 16)
     for (const [index, name] of ['shared', 'trade1', 'trade2'].entries()) {
       expect(drawnText.mock.calls.find(([value]) => value === name)?.[1]).toBe(portraits[index].center)
       expect(drawnTextStyle.mock.calls.find(([value]) => value === name)?.[2]).toBe('center')
@@ -188,23 +189,20 @@ describe('schedule image exports', () => {
     prepared.plans[0].rows[0].label = '制造站'.repeat(12)
     await renderScheduleImage({ prepared, version, title: result.title, isRotationMode: false })
     const card = drawnRoundRect.mock.calls.find(([, , width]) => width > 100)!
-    const [, iconX, iconY, iconWidth, iconHeight] = drawnImage.mock.calls.find(([, , , width]) => width === 20)!
+    const [, iconX, iconY, iconWidth, iconHeight] = drawnImage.mock.calls.find(([image]) => image.source === '/assets/products/MTL_DIAMOND_SHD.png')!
     const product = drawnText.mock.calls.find(([value]) => value === '源石碎片')!
-    const titleLines = drawnText.mock.calls.filter(([, x]) => x === card[0] + 28)
-    expect(imageRequests).toContain('/assets/products/MTL_DIAMOND_SHD.png')
+    const titleLines = drawnText.mock.calls.filter(([value, x]) => value.includes('制造站') && x === card[0] + 16)
     expect(titleLines.length).toBeGreaterThan(1)
-    expect(product[1]).toBe(card[0] + card[2] - 56)
-    expect(iconX + iconWidth + 4).toBe(product[1] - '源石碎片'.length * 8)
-    expect(iconY + iconHeight / 2).toBe(product[2] - (12 - 4) / 2)
-    expect(drawnTextStyle.mock.calls.find(([value]) => value === '源石碎片')?.[3]).toBe('alphabetic')
-    for (const [value, x] of titleLines) {
-      expect(x + value.length * 8).toBeLessThan(iconX)
-    }
-    const efficiency = drawnText.mock.calls.find(([value]) => value === prepared.plans[0].rows[0].efficiency)!
-    expect(iconY + iconHeight).toBeLessThanOrEqual(efficiency[2])
-    const portraits = drawnImage.mock.calls.filter(([, , , width]) => width > 20)
+    expect(iconX).toBe(card[0] + 16)
+    expect(iconWidth).toBe(16)
+    expect(iconHeight).toBe(16)
+    expect(iconX + iconWidth + 4).toBe(product[1])
+    expect(iconY).toBe(product[2])
+    expect(iconY).toBeGreaterThan(titleLines[titleLines.length - 1][2] + 20)
+    const portraits = drawnImage.mock.calls.filter(([, , , width]) => width === 72)
     expect(portraits).toHaveLength(3)
-    expect(portraits.every(([, , y]) => y > titleLines[titleLines.length - 1][2] + 22)).toBe(true)
+    expect(portraits.every(([, , y]) => y > iconY + iconHeight)).toBe(true)
+    expect(product[1] + '源石碎片'.length * 8).toBeLessThan(card[0] + card[2] - 40)
   })
 
   it('exports the icons for every product in a v1 facility across shifts', async () => {
@@ -222,13 +220,13 @@ describe('schedule image exports', () => {
       '/assets/products/sprite_exp_card_t3.png',
       '/assets/products/MTL_DIAMOND_SHD.png',
     ]))
-    const icons = drawnImage.mock.calls.filter(([, , , width]) => width === 20)
+    const icons = drawnImage.mock.calls.filter(([image]) => image.source.startsWith('/assets/products/'))
     const product = drawnText.mock.calls.find(([value]) => value === '多产物')!
     expect(icons).toHaveLength(3)
-    expect(icons[1][1] - icons[0][1]).toBe(24)
-    expect(icons[2][1] - icons[1][1]).toBe(24)
-    expect(icons[2][1] + 24).toBe(product[1] - '多产物'.length * 8)
-    expect(icons.every(([, , y]) => y + 10 === product[2] - (12 - 4) / 2)).toBe(true)
+    expect(icons[1][1] - icons[0][1]).toBe(20)
+    expect(icons[2][1] - icons[1][1]).toBe(20)
+    expect(icons[2][1] + 20).toBe(product[1])
+    expect(icons.every(([, , y]) => y === product[2])).toBe(true)
   })
 
   it.each(['v1', 'v2'] as const)('exports complete %s product labels and names when a product icon fails to load', async (version) => {
@@ -240,8 +238,73 @@ describe('schedule image exports', () => {
     })
     expect(imageRequests).toContain('/assets/products/GOLD.png')
     expect(drawnText.mock.calls.map(([value]) => value)).toEqual(expect.arrayContaining(['龙门币', 'shared', 'trade1']))
-    expect(drawnImage.mock.calls.filter(([, , , width]) => width === 20)).toHaveLength(0)
+    expect(drawnImage.mock.calls.filter(([image]) => image.source.startsWith('/assets/products/'))).toHaveLength(0)
     expect(encoded).toHaveBeenCalledOnce()
+  })
+
+  it.each(['v1', 'v2'] as const)('preserves recorded base positions, floor alignment and compact markers in %s', async (version) => {
+    const { result, operators } = schedule()
+    result.facility_layout = ['manufacture_3', 'trading_2', 'power_2', 'manufacture_1', 'manufacture_4', 'trading_1', 'power_1', 'manufacture_5', 'manufacture_2']
+    const crew = ['shared', 'trade1', 'trade2']
+    result.plans = [{
+      name: 'day', drones: { enable: true, room: 'trading', index: 2, order: 'pre' },
+      rooms: {
+        trading: Array.from({ length: 2 }, () => ({ operators: crew, product: 'LMD', efficiency: 200 })),
+        manufacture: Array.from({ length: 5 }, () => ({ operators: crew, product: 'Pure Gold', efficiency: 180 })),
+        power: Array.from({ length: 2 }, () => ({ operators: ['shared'], efficiency: 20 })),
+        control: [{ operators: [...crew, 'trade3', 'shared'] }],
+        dormitory: Array.from({ length: 4 }, () => ({ operators: [...crew, 'trade3', 'shared'] })),
+        meeting: [{ operators: crew.slice(0, 2) }], processing: [{ operators: [] }],
+        hire: [{ operators: ['shared'] }], training: [{ operators: ['shared'] }],
+      },
+    }]
+    const prepared = prepareResult(result, false, false, operators)
+    expect(prepared.facilityLayout).toEqual(result.facility_layout)
+    await renderScheduleImage({ prepared, version, title: result.title, isRotationMode: false })
+    const cards = drawnRoundRect.mock.calls.filter(([, , width]) => width > 100)
+    const cardFor = (label: string) => {
+      const [, titleX, titleY] = drawnText.mock.calls.find(([value]) => value === label)!
+      return cards.find(([x, y]) => titleX === x + 16 && titleY === y + 12)!
+    }
+    const labels: Record<string, string> = { manufacture: '制造站', trading: '贸易站', power: '发电站' }
+    const production = result.facility_layout.map((id) => {
+      const [type, index] = id.split('_')
+      return cardFor(`${labels[type]} ${index}`)
+    })
+    for (let floor = 0; floor < 3; floor += 1) {
+      const row = production.slice(floor * 3, floor * 3 + 3)
+      expect(row[0][0]).toBeLessThan(row[1][0])
+      expect(row[1][0]).toBeLessThan(row[2][0])
+      expect(row.every((card) => card[1] === row[0][1] && card[3] === row[0][3])).toBe(true)
+      if (floor) expect(row[0][1]).toBeGreaterThan(production[(floor - 1) * 3][1])
+      expect(cardFor(`宿舍 ${floor + 1}`)[1]).toBe(row[0][1])
+    }
+    const control = cardFor('控制中枢')
+    const dorm = cardFor('宿舍 1')
+    expect(control[0]).toBe(dorm[0])
+    expect(control[1]).toBeLessThan(dorm[1])
+    expect(dorm[0]).toBeGreaterThan(production[2][0])
+    const support = ['会客室', '办公室', '训练室'].map(cardFor)
+    expect(support.every((card) => card[0] > dorm[0] && card[0] === support[0][0])).toBe(true)
+    expect(support[0][1]).toBe(production[0][1])
+    expect(support[1][1]).toBe(production[6][1])
+    expect(support[2][1]).toBe(cardFor('宿舍 4')[1])
+    const portraitsIn = (card: number[]) => drawnImage.mock.calls.filter(([, x, y, width]) => width === 72
+      && x >= card[0] && x < card[0] + card[2] && y >= card[1] && y < card[1] + card[3])
+    expect(portraitsIn(production[0])[0][2]).toBe(portraitsIn(dorm)[0][2])
+    expect(portraitsIn(support[0])[0][2]).toBe(portraitsIn(dorm)[0][2])
+    expect(portraitsIn(production[0])[0][1] - production[0][0]).toBeLessThan(24)
+    expect(drawnText.mock.calls.map(([value]) => value).join(' ')).not.toContain('生产区按设施编号排列')
+    const arcs = drawnArc.mock.calls
+    expect(arcs).toHaveLength(4)
+    const droneRoom = production[1]
+    for (const [x, y, radius] of arcs) {
+      expect(radius).toBeLessThan(3)
+      expect(x - radius).toBeGreaterThan(droneRoom[0] + droneRoom[2] - 40)
+      expect(x + radius).toBeLessThan(droneRoom[0] + droneRoom[2] - 16)
+      expect(y - radius).toBeGreaterThan(droneRoom[1] + 12)
+      expect(y + radius).toBeLessThan(portraitsIn(droneRoom)[0][2])
+    }
   })
 
   it('packs five-, three- and one-operator facilities in order without overlapping cards or clipped names', async () => {
@@ -266,12 +329,12 @@ describe('schedule image exports', () => {
     await renderScheduleImage({ prepared: prepareResult(result, false, false, operators), version: 'v2', title: result.title, isRotationMode: false })
     const cards = drawnRoundRect.mock.calls.filter(([, , width]) => width > 100)
     expect(cards).toHaveLength(6)
-    expect(cards[0][2]).toBe(560)
-    expect(cards[1][2]).toBe(368)
-    expect(cards[3][2]).toBe(176)
-    expect(cards[0][3]).toBeGreaterThan(cards[1][3])
-    expect(cards[0][1]).toBe(cards[1][1])
-    expect(cards[2][1]).toBeGreaterThan(cards[1][1])
+    expect(cards[0][2]).toBe(432)
+    expect(cards[1][2]).toBe(286)
+    expect(cards[3][2]).toBe(286)
+    expect(cards[0][1]).toBeLessThan(cards[1][1])
+    expect(cards[1][3]).toBe(cards[2][3])
+    expect(cards[1][1]).toBe(cards[2][1])
     const facilityNames = ['控制中枢', '制造站 1', '制造站 2', '发电站 1', '发电站 2', '发电站 3']
     const facilityTitles = drawnText.mock.calls.filter(([value]) => facilityNames.includes(value))
     expect(facilityTitles.map(([value]) => value)).toEqual(facilityNames)
@@ -281,23 +344,23 @@ describe('schedule image exports', () => {
       expect(y > previousY || (y === previousY && x > previousX)).toBe(true)
     }
     const controlTitle = drawnText.mock.calls.find(([value]) => value === '控制中枢')!
-    expect(drawnImage.mock.calls.find(([, , , width]) => width === 72)![2] - controlTitle[2]).toBe(30)
+    expect(drawnImage.mock.calls.find(([, , , width]) => width === 72)![2]).toBeGreaterThan(controlTitle[2])
     for (const [index, [x, y, width, height]] of cards.entries()) {
-      expect(x + width).toBeLessThanOrEqual(1168)
+      expect(x + width).toBeLessThanOrEqual(1728)
       for (const [otherX, otherY, otherWidth, otherHeight] of cards.slice(index + 1)) {
-        expect(x + width + 16 <= otherX || otherX + otherWidth + 16 <= x || y + height + 16 <= otherY || otherY + otherHeight + 16 <= y).toBe(true)
+        expect(x + width + 12 <= otherX || otherX + otherWidth + 12 <= x || y + height + 12 <= otherY || otherY + otherHeight + 12 <= y).toBe(true)
       }
     }
     for (const [, x, y, width, height] of drawnImage.mock.calls) {
       expect(cards.some(([cardX, cardY, cardWidth, cardHeight]) => x >= cardX + 16 && y >= cardY + 16 && x + width <= cardX + cardWidth - 16 && y + height <= cardY + cardHeight - 16)).toBe(true)
     }
-    const nameLines = drawnText.mock.calls.filter(([, x, y]) => x === cards[0][0] + 64 && y > cards[0][1] + 72 && y < cards[0][1] + cards[0][3])
+    const nameLines = drawnText.mock.calls.filter(([, x, y]) => x === cards[0][0] + 56 && y > cards[0][1] + 72 && y < cards[0][1] + cards[0][3])
     expect(nameLines.length).toBeGreaterThan(1)
     expect(nameLines.map(([value]) => value).join('')).toBe(longName)
-    expect(nameLines[nameLines.length - 1][2] + 18).toBe(cards[0][1] + cards[0][3] - 16)
+    expect(nameLines[nameLines.length - 1][2] + 20).toBeLessThanOrEqual(cards[0][1] + cards[0][3] - 12)
   })
 
-  it('removes the empty efficiency line from manual v2 cards', async () => {
+  it('exports manual cards without efficiency and places single-operator names beside portraits', async () => {
     const { result, operators } = schedule()
     result.plans = [{ name: 'manual', rooms: { power: [{ operators: ['shared'], efficiency: 20 }] } }]
     await renderScheduleImage({ prepared: prepareResult(result, false, false, operators), version: 'v2', title: result.title, isRotationMode: false, manual: true })
@@ -305,8 +368,9 @@ describe('schedule image exports', () => {
     const portrait = drawnImage.mock.calls.find(([, , , width]) => width === 72)!
     const title = drawnText.mock.calls.find(([value]) => value === '发电站')!
     const name = drawnText.mock.calls.find(([value]) => value === 'shared')!
-    expect(portrait[2] - title[2]).toBe(30)
-    expect(name[2] + 18).toBe(card[1] + card[3] - 16)
+    expect(portrait[2]).toBeGreaterThan(title[2])
+    expect(name[1]).toBeGreaterThan(portrait[1] + portrait[3])
+    expect(name[2] + 20).toBeLessThan(card[1] + card[3] - 12)
     expect(drawnText.mock.calls.map(([value]) => value)).not.toContain('20.0%')
   })
 
