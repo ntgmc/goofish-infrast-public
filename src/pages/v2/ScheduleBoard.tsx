@@ -88,7 +88,7 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
       <div className="v2-panel-heading">
         <div className="v2-heading-inline"><h2>{text.result}</h2><span className="v2-neutral-tag">{text.shifts(result.plans.length)}</span></div>
         <div className="v2-board-controls">
-        <button type="button" className="v2-text-button" aria-pressed={expanded} onClick={() => onExpandedChange(!expanded)}>
+        <button type="button" className="v2-text-button" aria-pressed={expanded} aria-controls={`${id}-panel`} onClick={() => onExpandedChange(!expanded)}>
           {expanded ? text.compactRooms : text.expandRooms}
         </button>
         <div className="v2-view-toggle" role="group" aria-label={text.result}>
@@ -150,7 +150,7 @@ function RoomCard({ room, layoutKey, drone = false, compact = false, autofill = 
       whileHover={reduceMotion ? undefined : { y: -2 }} whileTap={reduceMotion ? undefined : { scale: 0.99 }}>
       <motion.div layout={layout} layoutDependency={layoutKey} transition={motionTokens.spring} className="v2-room-header">
         <span className="v2-room-icon"><Icon size={16} /></span>
-        <span className="v2-room-title">{room.label}<small>{room.indexLabel}</small></span>
+        <span className="v2-room-title"><span>{room.label}</span><small>{room.indexLabel}</small></span>
       </motion.div>
       <span className="v2-room-marker">
         {drone && <span className="v2-drone-tag" title={text.drones}><Drone size={16} /></span>}

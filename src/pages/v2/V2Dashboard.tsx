@@ -1,14 +1,12 @@
 import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
 import { useAppReducedMotion } from '../../lib/motion-preference'
-import { NextIcon as ArrowRight, EditIcon as ArrowUpRight, DailyOutputIcon as CalendarClock, SuccessIcon as Check, ExpandIcon as ChevronDown, BreadcrumbIcon, ExportIcon as Download, ManufactureIcon as Factory, LoginIcon as LogIn, MenuIcon as Menu, GenerateIcon, LoadingIcon, ConfigIcon as Settings2, DataSourceIcon as ShieldCheck, InfoIcon as Sparkles, CloseIcon as X, PowerPlantIcon as Zap, PreviewIcon, SampleIcon } from '../../components/icons'
+import { NextIcon as ArrowRight, SuccessIcon as Check, ExpandIcon as ChevronDown, BreadcrumbIcon, ExportIcon as Download, LoginIcon as LogIn, MenuIcon as Menu, GenerateIcon, LoadingIcon, ConfigIcon as Settings2, DataSourceIcon as ShieldCheck, InfoIcon as Sparkles, CloseIcon as X, PreviewIcon, SampleIcon } from '../../components/icons'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import Link from '../../components/InternalLink'
 import { copy } from '../../copy'
-import ProductIcon from '../../components/ProductIcon'
-import { AnimatedValue, MotionNavIndicator, motionTokens } from '../../components/MotionPrimitives'
-import { formatAmount, prepareResult } from '../../components/result-panel/formatters'
-import { PRODUCT_LABELS } from '../../components/result-panel/labels'
+import { MotionNavIndicator, motionTokens } from '../../components/MotionPrimitives'
+import { prepareResult } from '../../components/result-panel/formatters'
 import InventoryDepletionWarning from '../../components/result-panel/InventoryDepletionWarning'
 import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
 import { getMaaExportNotice } from '../tool/optimize/maa-export-notice'
@@ -23,16 +21,16 @@ import { LockedCapabilityPreview, UpgradeSuggestionStatusNotice } from '../tool/
 import WorkspaceSections, { type V2Workflow } from './WorkspaceSections'
 import { sectionLabels, v2Path, v2Section, v2SectionAvailable, type V2Section } from './navigation'
 import V2Navigation from './V2Navigation'
-import { normalizeScheduleMode, parseShiftHours, SCHEDULE_MODE_LABELS, validateScheduleConfig } from '../../lib/config'
+import { normalizeScheduleMode, SCHEDULE_MODE_LABELS, validateScheduleConfig } from '../../lib/config'
 import type { AuthSuccessResponse, LicenseConfig, LicenseOperator, OptimizeResult, PermissionMode } from '../../lib/types'
-import ScheduleBoard, { Avatar } from './ScheduleBoard'
+import ScheduleBoard from './ScheduleBoard'
+import ScheduleContext from './ScheduleContext'
 import IncomeAnalysis from './IncomeAnalysis'
 import ProductionSummary from './ProductionSummary'
 import ResultExportDrawer from './ResultExportDrawer'
 import OptionsDrawer, { type OptionPanel, type V2Session } from './OptionsDrawer'
 import { isFreePreviewProfile, isFreePreviewTrialActive, sortOperatorsForPreview } from '../tool/tool-utils'
 import V2Transition, { V2PageTransition } from './V2Transition'
-import TradingIcon from './TradingIcon'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import ProfileExpiryPrompt from '../tool/ProfileExpiryPrompt'
@@ -112,9 +110,6 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const sortedOperators = useMemo(() => sortOperatorsForPreview(operators), [operators])
   const owned = useMemo(() => sortedOperators.filter((operator) => operator.own), [sortedOperators])
   const resultMode = normalizeScheduleMode(result.schedule_mode)
-  const configMode = normalizeScheduleMode(config.schedule_mode)
-  const shortTermOrundum = prepared.orundumEconomy?.short_term_orundum ?? prepared.productionStats.orundum
-  const hours = parseShiftHours(config.shift_hours) ?? [8, 8, 8]
   const profileName = session.activeProfile?.display_name
   const signedIn = Boolean(session.user)
   const profileLabel = profileName ?? (signedIn ? text.account : text.login)
@@ -273,22 +268,25 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           </AnimatePresence>
           {generationProgress}
           {children}
-          <ProductionSummary result={result} prepared={prepared} sample={sample} profileId={session.activeProfile?.id} resultId={exportResultId}
+          <div className={`v2-results-grid ${view !== 'schedule' ? 'v2-results-wide' : ''}`}>
+          <div className="v2-overview-metrics"><ProductionSummary result={result} prepared={prepared} sample={sample} profileId={session.activeProfile?.id} resultId={exportResultId}
             resultConfig={workflow?.historyItem?.result === result ? workflow.historyItem.config : undefined}
-            history={[...(workflow?.resultHistory ?? []), ...(workflow?.archivedResults ?? [])]} newResult={Boolean(workflow?.currentResult || workflow?.finalResult)} onConfigure={() => openPanel('config')} />
+            history={[...(workflow?.resultHistory ?? []), ...(workflow?.archivedResults ?? [])]} newResult={Boolean(workflow?.currentResult || workflow?.finalResult)} onConfigure={() => openPanel('config')} /></div>
+          {view === 'schedule' && <ScheduleContext result={result} prepared={prepared} config={config} operators={owned} sampleOperators={sampleOperators}
+            onConfigure={() => openPanel('config')} onOperators={() => openPanel('operators')} />}
           <div className="v2-content-tabs" role="group" aria-label={text.resultTabs}>
             {([['schedule', text.scheduleTab], ['analysis', text.analysisTab], ...(showManual ? [['manual', text.manualTab] as const] : []), ...(restrictedPreview || !sample && (workflow?.suggestions?.length || result.upgrade_suggestions_status) ? [['training', text.trainingTab] as const] : [])] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => { setView(id); if (id === 'manual') setManualOpened(true) }}>
               {label}{view === id && <MotionNavIndicator layoutId="result-tab" variant="underline" />}
             </button>)}
             <span title={sample ? text.sampleSource : text.ownSource}>{sample ? <SampleIcon size={14} aria-hidden="true" /> : <ShieldCheck size={14} aria-hidden="true" />}<span className={sample ? undefined : 'max-sm:sr-only'}>{sample ? text.sampleSource : text.ownSource}</span></span>
-            <ResultActions plans={result.plans} shift={shift} showShift={view === 'schedule'} onShiftChange={setShift} onExport={() => setExportOpen(true)} busy={busy} loadingResult={loadingResult} />
           </div>
-          <div className="v2-feature-content" hidden={view !== 'manual'}>
+          <ResultActions plans={result.plans} shift={shift} showShift={view === 'schedule'} onShiftChange={setShift} onExport={() => setExportOpen(true)} busy={busy} loadingResult={loadingResult} />
+          <div className="v2-feature-content v2-manual-workspace" hidden={view !== 'manual'}>
             {canManual && manualOpened && session.activeProfile && <Suspense fallback={<p role="status">{text.loading}</p>}><ManualScheduleEditor key={manualKey} source={result} profileId={session.activeProfile.id} operators={operators} simulationBaseline={simulationBaseline} onDirtyChange={setManualDirty} /></Suspense>}
             {!canManual && restrictedPreview && view === 'manual' && <LockedCapabilityPreview title={copy.optimize.paid_preview.manual_title} description={copy.optimize.paid_preview.manual_description} />}
           </div>
+          <div className="v2-result-view" hidden={view === 'manual'}>
           <V2Transition motionKey={view}>
-          <div hidden={view === 'manual'} className={`v2-results-grid ${view !== 'schedule' || expanded ? 'v2-results-expanded' : ''}`}>
             {view === 'training' ? <section className="v2-panel v2-feature-content v2-training-workspace v2-section-loading">{canViewTraining
               ? <Suspense fallback={<p role="status">{text.loading}</p>}><UpgradeSuggestionStatusNotice result={result} /><UpgradeSuggestions suggestions={workflow?.suggestions ?? []} embedded projectScope={session.user && session.activeProfile ? { userId: session.user.id, profileId: session.activeProfile.id } : undefined} /></Suspense>
               : <LockedCapabilityPreview title={copy.optimize.pages_tool_optimize_ResultSection_016} description={copy.optimize.pages_tool_optimize_ResultSection_017} />}</section> : view === 'analysis' ? (
@@ -299,31 +297,9 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
               <ScheduleBoard result={result} prepared={prepared} expanded={expanded} onExpandedChange={setExpanded} shift={shift} onShiftChange={setShift}
                 view={boardView} onViewChange={setBoardView} onRoom={openRoom} />
             )}
-            {view === 'schedule' && !expanded && <aside className="v2-result-aside">
-              <section className="v2-panel v2-production-panel">
-                <div className="v2-panel-heading"><h2>{text.dailyOutput}</h2><span className="v2-output-clock"><CalendarClock size={16} /></span></div>
-                <OutputRow product="LMD" value={prepared.productionStats.lmd} available={prepared.hasDailyProduction} />
-                <OutputRow product="Battle Record" value={prepared.productionStats.manufacturing['Battle Record'] ?? 0} available={prepared.hasDailyProduction} />
-                <OutputRow product="Pure Gold" value={prepared.productionStats.manufacturing['Pure Gold'] ?? 0} available={prepared.hasDailyProduction} />
-                {Object.keys(PRODUCT_LABELS).filter((product) => !['LMD', 'Battle Record', 'Pure Gold'].includes(product)).map((product) => {
-                  const value = (prepared.productionStats.manufacturing[product] ?? 0) + (product === 'Orundum' ? shortTermOrundum : result.daily_production?.trading?.[product] ?? 0)
-                  return value !== 0 ? <OutputRow key={product} product={product} value={value} /> : null
-                })}
-              </section>
-              <section className="v2-panel v2-config-panel">
-                <div className="v2-panel-heading"><h2>{text.currentConfig}</h2><button className="v2-text-button" type="button" onClick={() => openPanel('config')}>{text.edit}<ArrowUpRight size={13} /></button></div>
-                <div className="v2-layout-preview">
-                  {Array.from({ length: config.trading_stations_count }, (_, index) => <span className="v2-layout-trading" key={`t${index}`}><TradingIcon size={14} /></span>)}
-                  {Array.from({ length: config.manufacturing_stations_count }, (_, index) => <span className="v2-layout-manufacture" key={`m${index}`}><Factory size={14} /></span>)}
-                  {Array.from({ length: Math.max(0, 9 - config.trading_stations_count - config.manufacturing_stations_count) }, (_, index) => <span className="v2-layout-power" key={`p${index}`}><Zap size={14} /></span>)}
-                </div>
-                <dl className="v2-config-summary"><div><dt>{text.layout}</dt><dd>{config.layout}</dd></div><div><dt>{text.mode}</dt><dd>{SCHEDULE_MODE_LABELS[configMode]}</dd></div>
-                  <div><dt>{text.duration}</dt><dd>{hours.join(' / ')}h</dd></div><div><dt>{text.drones}</dt><dd>{config.drones?.enable ? config.drones.auto ? text.automatic : text.manual : text.disabled}</dd></div></dl>
-                <button className="v2-operator-summary" type="button" onClick={() => openPanel('operators')}><div className="v2-avatar-stack">{owned.slice(0, 4).map((operator) => <Avatar key={operator.id} operator={operator} small />)}</div><span><strong>{text.operatorData}</strong><small>{sampleOperators ? text.guestNavigation.sampleOwned(owned.length) : text.owned(owned.length)}</small></span><ArrowRight size={15} aria-hidden="true" /></button>
-              </section>
-            </aside>}
-          </div>
           </V2Transition>
+          </div>
+          </div>
           <div className="v2-sample-notice"><span className="v2-notice-icon"><Sparkles size={16} /></span><p>{sample && <>{text.sampleHint} </>}{text.estimateNotice}</p>{sample && <button type="button" onClick={() => openPanel('account')}>{session.user ? text.account : text.login}<ArrowRight size={14} /></button>}</div>
           </div>
           </>}</V2PageTransition>
@@ -364,12 +340,6 @@ function FeedbackRegion({ children }: { children: ReactNode }) {
       {children}
     </motion.div>
   )
-}
-
-function OutputRow({ product, value, available = true }: { product: string; value: number; available?: boolean }) {
-  const experience = product === 'Battle Record'
-  return <div className="v2-output-row"><span><ProductIcon product={product} size={29} /><span>{experience ? text.comparison.experience : PRODUCT_LABELS[product] ?? product}</span></span>
-    <strong><AnimatedValue value={available ? formatAmount(experience ? value * 1000 : value) : '—'} /><small>{experience ? text.expUnit : text.daily}</small></strong></div>
 }
 
 function ResultActions({ plans, shift, showShift, onShiftChange, onExport, busy, loadingResult }: {
