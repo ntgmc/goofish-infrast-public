@@ -127,6 +127,8 @@ CREATE TABLE IF NOT EXISTS website_notification_events (
       OR (event_type = 'release.published' AND char_length(btrim(version)) BETWEEN 1 AND 128)
     )
 );
+ALTER TABLE website_notification_events ADD COLUMN IF NOT EXISTS markdown TEXT
+  CHECK (markdown IS NULL OR char_length(markdown) <= 5000);
 
 CREATE TABLE IF NOT EXISTS risk_settings (
   key TEXT PRIMARY KEY,

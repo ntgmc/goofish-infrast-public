@@ -9,12 +9,12 @@ export const toolsCopy = {
     failed: '读取推荐数据失败，请重试。',
     login: '登录后，选择已绑定森空岛的档案，即可对比练度与作业需求。',
     loginAction: '前往登录与档案管理',
-    noProfile: '请先创建档案并绑定森空岛，再读取练度进行对比。',
+    noProfile: '请先创建档案并绑定森空岛，再读取练度对比。',
     profile: '游戏档案', parameters: '推荐条件', unapplied: '待更新',
     views: { priorities: '培养推荐', comparison: '练度对照', special: '培养与自选' },
     preferences: { coverage: '作业需求优先', community: '一图流养成统计' },
     preference: '推荐依据',
-    preferenceHints: { coverage: '优先推荐所选作业中更常用、使用依据更充分的干员与练度目标。', community: '参考一图流持有人养成比例，推荐精二、技能专精与模组目标，也适用于没有作业的玩法。' },
+    preferenceHints: { coverage: '优先推荐在所选作业中更常用、参考依据更充分的干员与练度目标。', community: '参考一图流持有该干员的玩家养成比例，推荐精二、技能专精和模组目标，也适用于没有作业的玩法。' },
     recommendationFilters: '推荐范围', moreFilters: '选择活动、关卡与干员', scope: '推荐用途', scopes: { recent: '近期通用', permanent: '常驻需求', history: '历史参考' },
     timeWindow: '作业时间', allTime: '全部时间', coverage: '养成档位', coverages: { basic: '基础参考 · 60%', practical: '实用推荐 · 80%', high: '高覆盖 · 90%' },
     activity: '活动或章节', stage: '关卡', category: '内容类型', profession: '职业', rarity: '星级', all: '全部',
@@ -23,8 +23,8 @@ export const toolsCopy = {
     recentDays: (days: number) => `近${days}天`, rarityName: (rarity: number) => `${rarity}星`,
     includeClosed: '包含已关闭内容', includeAlternatives: '包含群组备选', includeUncertain: '包含待观察干员',
     clearFilter: (label: string) => `清除${label}`,
-    narrowSearch: '匹配项较多，请继续输入名称、编号或 ID。', noMatches: '没有匹配项，请换一个关键词。',
-    recommendationHint: '默认推荐4–6星中近期有多个关卡使用依据的干员。可切换1–3星、指定关卡、查看历史用途，或纳入反馈较少的干员。',
+    narrowSearch: '匹配结果较多，请补充名称、编号或 ID。', noMatches: '没有匹配项，请换一个关键词。',
+    recommendationHint: '默认推荐近期在多个关卡中有使用依据的 4–6 星干员。可切换到 1–3 星、指定关卡、查看历史用途，或纳入反馈较少的干员。',
     evidenceDetails: '查看推荐依据', upgrades: '需要升级', potentialTarget: (rank: number) => `潜能${rank}`, module: '模组',
     levelTarget: (elite: number, level: number) => `精${elite} Lv.${level}`,
     skillTarget: (skill: number, level: number) => `${skill}技能 · ${level > 7 ? `专精${level - 7}` : `等级${level}`}`,
@@ -62,8 +62,8 @@ export const toolsCopy = {
   manualSchedule: {
     title: "手动排班模拟",
     description: "导入排班 JSON 或从空白方案开始，手动安排干员与无人机，模拟心情变化和生产效率。",
-    access: "账号至少有一个当前可用的高级版权限，即可使用手动排班模拟。",
-    unavailable: "当前账号没有可用的高级版权限。获得可用的高级版权限后，可导入排班或创建空白方案。",
+    access: "账号内至少有一份可用档案具备高级版权限，即可使用手动排班模拟。",
+    unavailable: "当前账号没有可用的高级版权限，开通后可导入排班或创建空白方案。",
     loading: "正在加载手动排班工具",
     profile: "使用档案",
     operatorsRequired: "请先在此档案中导入干员，再开始手动排班。",
@@ -127,7 +127,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_010: "仓库价值分析器",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_011: "上传 MAA 仓库 JSON，用等效理智估算库存价值，再下载结果图分享到贴吧或 QQ 群。",
+  pages_DepotValuePage_011: "上传 MAA 仓库 JSON，估算库存的等效理智价值，并下载结果图分享到贴吧或 QQ 群。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_012: "返回首页",
   // src/pages/DepotValuePage.tsx
@@ -151,7 +151,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_022: "正在估算...",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_023: "分析剪贴板仓库",
+  pages_DepotValuePage_023: "分析已粘贴的仓库数据",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_024: "森空岛快捷导入",
   // src/pages/DepotValuePage.tsx
@@ -175,7 +175,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_034: "绑定森空岛并分析仓库",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_035: "排名样本不包含仓库或干员明细、昵称、完整 UID 和森空岛凭据。样本仍关联本站档案，属于可关联数据，导出个人数据时会包含这些样本，注销账号时会一并删除。",
+  pages_DepotValuePage_035: "排名样本不包含仓库或干员明细、昵称、完整 UID 和森空岛凭据，但仍可通过本站档案关联到你的账号。导出个人数据时会包含这些样本，注销账号时会一并删除。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_036: "估值说明",
   // src/pages/DepotValuePage.tsx
@@ -211,7 +211,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_052: "分析截图",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_053: "\r\n            下载 PNG 后可以直接发给朋友分析。\r\n          ",
+  pages_DepotValuePage_053: "\r\n            下载 PNG 图片，分享给朋友一起分析。\r\n          ",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_054: "下载 PNG",
   // src/pages/DepotValuePage.tsx

@@ -140,7 +140,7 @@ describe('announcement handler', () => {
 
   it.each(['development', 'production'])('conditionally publishes notification events and requests cleanup in %s', async (environment) => {
     vi.stubEnv('NODE_ENV', environment)
-    const next = { ...popup, id: 'popup-2' }
+    const next = { ...popup, id: 'popup-2', body: '## 更新\n\n- **重点**\n- [详情](https://example.test/help)\n\n```json\n  {"enabled": true}\n```\n' }
     mocks.getValidatedJson.mockResolvedValue({ banner: null, announcements: [next], expected_revision: 3 })
     const response = await handler(new Request('http://localhost/api/admin/announcement', { method: 'PUT' }))
     expect(response.status).toBe(200)
@@ -156,7 +156,8 @@ describe('announcement handler', () => {
         id: 'announcement:popup-2',
         type: 'announcement.published',
         title: '公告',
-        summary: '正文',
+        summary: '更新 重点 详情 {"enabled": true}',
+        markdown: next.body,
         url: 'https://example.test/v2?section=announcements#announcement-popup-2',
         published_at: expect.any(String),
         version: null,

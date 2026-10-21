@@ -70,7 +70,7 @@ export function formatPlanName(config: LicenseConfig | null | undefined, fallbac
 }
 
 export function formatResultHistorySummary(summary: WorkspaceResultHistorySummary): string {
-  return summary.source === 'manual' ? `${copy.domain.manual_schedule.tab} · ${formatScheduleMode(summary)}` : formatScheduleMode(summary)
+  return [summary.layout?.replace(/-/g, ''), summary.source === 'manual' ? copy.domain.manual_schedule.tab : null, formatScheduleMode(summary)].filter(Boolean).join(' · ')
 }
 
 export function isMaaJsonDownloadable(result: OptimizeResult): boolean {

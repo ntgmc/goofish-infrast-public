@@ -5,7 +5,7 @@ export const commonCopy = {
   droneAutoInventoryBalance: "库存平衡优先",
   droneAutoEfficiencyHelp: "选择增产收益最高的设施加速。",
   droneAutoInventoryBalanceHelp: "结合赤金、源石碎片和固源岩库存，优先缓解生产与消耗的缺口。",
-  inventoryProductRebalanceLabel: "允许库存自动平衡调整产物数量",
+  inventoryProductRebalanceLabel: "按库存自动调整产物数量",
   inventoryProductRebalanceHelp: "开启后，库存不足时可调整赤金或源石碎片制造站数量。关闭后保持所选数量，结果会提示库存耗尽风险。",
   inventoryProductRebalanceRotation: "游戏内轮换保持固定产物数量，不自动调整。",
   inventoryProductRebalanceEnabled: "允许调整",
@@ -32,7 +32,7 @@ export const commonCopy = {
   facilityLayoutColumns: ["左", "中", "右"],
   facilityLayoutConfirm: "确认布局",
   facilityLayoutConfirmCollapse: "确认并收起",
-  facilityLayoutReviewHelp: "数量与等级检查通过。请再核对设施位置与游戏内一致，点击“确认并收起”完成。",
+  facilityLayoutReviewHelp: "设施数量和等级符合要求。核对位置与游戏内一致后，点击“确认并收起”。",
   facilityLayoutComplete: "布局已确认",
   facilityLayoutCompleteHelp: "可以继续生成排班，无需再次确认。设施有变化时，点击“修改布局”。",
   facilityLayoutEdit: "修改布局",
@@ -90,9 +90,9 @@ export const commonCopy = {
   // src/components/NotFoundPage.tsx
   components_NotFoundPage_001: "404 · 页面未找到",
   // src/components/NotFoundPage.tsx
-  components_NotFoundPage_002: "这个链接暂时没有对应页面",
+  components_NotFoundPage_002: "未找到这个页面",
   // src/components/NotFoundPage.tsx
-  components_NotFoundPage_003: "请核对下方显示的地址，或使用页面导航继续访问。",
+  components_NotFoundPage_003: "请检查下方地址是否正确，也可以通过导航打开其他页面。",
   // src/components/NotFoundPage.tsx
   components_NotFoundPage_004: "页面导航",
   // src/components/NotFoundPage.tsx
@@ -142,7 +142,7 @@ export const commonCopy = {
   // src/components/MobileBrowserPrompt.tsx
   mobileBrowserTitle: "推荐在电脑上打开",
   mobileBrowserDescription: "使用电脑浏览器打开，配置基建和查看排班会更方便。你也可以继续在手机上使用。",
-  mobileBrowserContinue: "仍要进入",
+  mobileBrowserContinue: "继续在手机上使用",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_001: "龙门币",
   // src/components/ConfigEditor.tsx
@@ -208,7 +208,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_033: "按库存微调产物",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_034: "选择预设并填写当前库存，可开启库存自动平衡调整产物数量，或保持预设数量并查看库存耗尽风险。",
+  components_ConfigEditor_034: "选择预设并填写库存后，可按库存自动调整产物数量；也可保持预设数量，查看库存耗尽风险。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_035: "243 均衡",
   // src/components/ConfigEditor.tsx
@@ -286,7 +286,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_069: "游戏内轮换按两班生成，菲亚梅塔不会参与计算。",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_070: (interval: string) => `启用条件：换班间隔须锁定为${interval}（误差需控制在5分钟以内），否则将引发干员“红脸”状态，导致实际效率低于未启用时的水平。`,
+  components_ConfigEditor_070: (interval: string) => `启用后，请固定每${interval}换班，误差控制在 5 分钟以内，否则会导致干员“红脸”，实际效率低于未启用时。`,
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_071: "无人机",
   // src/components/ConfigEditor.tsx
@@ -440,7 +440,7 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_030: "整理对比结果",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_031: "按操作成本整理结果，并筛选更合适的方案组合。",
+  components_ScheduleProgress_031: "按换班次数整理结果，筛选合适的方案组合。",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_032: "优先计算券",
   // src/components/ScheduleProgress.tsx
@@ -454,9 +454,9 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_037: "连接恢复中",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_038: "暂时无法同步最新状态，任务仍在后台执行，连接恢复后会自动继续。",
+  components_ScheduleProgress_038: "暂时无法获取最新进度，任务仍在后台执行。连接恢复后会自动更新进度。",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_039: "正在进行第 ",
+  components_ScheduleProgress_039: "正在尝试第 ",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_040: " 次重连",
   // src/components/ScheduleProgress.tsx
@@ -470,7 +470,7 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_045: "优先计算",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_046: "页面可保持打开，结果完成后会自动展示。",
+  components_ScheduleProgress_046: "可保持页面打开，计算完成后会自动显示结果。",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_047: "排班优化任务",
   // src/components/ScheduleProgress.tsx
@@ -506,7 +506,7 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_063: "任务已开始执行，预计还需 ",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_064: "，会随实际耗时自动校准。",
+  components_ScheduleProgress_064: "，预计时间会随计算进度更新。",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_065: "优先计算",
   // src/components/ScheduleProgress.tsx
@@ -518,7 +518,7 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_069: "，预计还需 ",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_070: "正在检查本次请求，完成后会开始等待计算。",
+  components_ScheduleProgress_070: "正在检查本次请求，通过后将等待计算。",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_071: "任务已开始执行",
   // src/components/ScheduleProgress.tsx
@@ -678,7 +678,7 @@ export const commonCopy = {
   // src/pages/AdminSetupPage.tsx
   pages_AdminSetupPage_009: "管理账号设置",
   // src/pages/AdminSetupPage.tsx
-  pages_AdminSetupPage_010: "首次使用管理后台时，请使用 Root 口令创建第一个管理账号；已有账号时，可继续维护。",
+  pages_AdminSetupPage_010: "使用 Root 口令创建管理账号，也可在这里管理已有账号。",
   // src/pages/AdminSetupPage.tsx
   pages_AdminSetupPage_011: "返回后台",
   // src/pages/AdminSetupPage.tsx
@@ -736,7 +736,7 @@ export const commonCopy = {
   // src/pages/ToolPage.tsx
   pages_ToolPage_003: "暂时无法确认登录状态",
   // src/pages/ToolPage.tsx
-  pages_ToolPage_004: "暂时无法确认登录状态。为保护账号数据，页面不会切换到登录状态，请稍后重试。",
+  pages_ToolPage_004: "暂时无法确认登录状态，工作台尚未打开。请稍后重试。",
   // src/pages/ToolPage.tsx
   pages_ToolPage_005: "重新确认登录状态",
   // src/pages/tool/AccountDashboard.tsx

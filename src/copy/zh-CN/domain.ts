@@ -3,7 +3,7 @@ export const domainCopy = {
     title: "中间产物库存不足",
     depleted: (product: string) => `${product}库存已耗尽，当前产量无法满足消耗。`,
     depletes_today: (product: string) => `${product}库存不足一天用量，按当前排班将很快耗尽。`,
-    depletes_in_days: (product: string, days: string) => `${product}库存预计约 ${days} 天后耗尽。`,
+    depletes_in_days: (product: string, days: string) => `${product}库存预计 ${days} 天后耗尽。`,
     action: "请补充库存或调整生产配置，避免生产中断。",
   },
   building_skills: {
@@ -43,12 +43,12 @@ export const domainCopy = {
     mood_affected: (names: string) => `需要调整的干员：${names}`,
     mood_rotation: "以下按满心情开始每轮工作测算。请按各设施的换班时间安排休息。",
     mood_empty: "本班没有需要测算心情的工作干员。",
-    dormitory_title: "智能宿舍补位",
+    dormitory_title: "补齐宿舍休息安排",
     dormitory_hint: "只为需要恢复心情的干员补入空床位，保留已有人员和位置。",
     dormitory_fill: "补齐宿舍并重新测算",
     dormitory_suggestions: (count: number) => `可补入 ${count} 处休息安排`,
     dormitory_destination: (shift: string, room: number, name: string) => `${shift} · 宿舍 ${room}：${name}`,
-    dormitory_unassigned: "这些干员在以下上班班次仍有心情缺口，请调整此前的宿舍或上班安排：",
+    dormitory_unassigned: "以下干员在对应班次的心情仍不足，请调整此前的休息或上班安排：",
     dormitory_no_need: "当前没有需要补入空床位的干员。",
     dormitory_pending: "先模拟测算，即可查看缺少休息安排的干员并补齐宿舍。",
     tab: "手动排班",
@@ -68,7 +68,7 @@ export const domainCopy = {
     clear: "清空此位置",
     close: "关闭",
     done: "完成",
-    move_hint: "选择已在本班进驻的干员会与当前位置交换；空位会将该干员移到此处。",
+    move_hint: "选择本班已进驻的干员时，两个位置的干员会交换；当前位置为空时，该干员会移到此处。",
     result_scope: "手动调整在本页单独编辑；总览、详情、数据和排班结果页的导出始终对应当前打开的原排班。",
     rules_title: "保存、覆盖与导出规则",
     save_rule: "点击“保存本地草稿”才会保存当前干员和无人机安排。再次保存会覆盖此入口中该档案的上一份草稿，即使上一份草稿来自另一份排班。切换标签页会保留当前修改；刷新或离开页面前，请保存或下载备份。",
@@ -183,7 +183,7 @@ export const domainCopy = {
   // src/components/result-panel/Guides.tsx
   components_result_panel_Guides_016: "自定义",
   // src/components/result-panel/Guides.tsx
-  components_result_panel_Guides_017: "点击选择，选择本站下载的排班 JSON",
+  components_result_panel_Guides_017: "点击“选择”，打开从本站下载的排班 JSON",
   // src/components/result-panel/Guides.tsx
   components_result_panel_Guides_018: "MAA 自定义基建配置中选择排班 JSON 的位置示意图",
   maa_import_screenshot: "查看 MAA 设置截图",
@@ -392,7 +392,7 @@ export const domainCopy = {
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_043: "已启用但无目标",
   // src/components/result-panel/ResultPanel.tsx
-  components_result_panel_ResultPanel_044: "优化器未找到收益达到阈值的换心情目标",
+  components_result_panel_ResultPanel_044: "未找到符合收益要求的心情恢复对象",
   components_result_panel_ResultPanel_045: "已记录搜索状态：",
   components_result_panel_ResultPanel_046: "次",
   // src/components/result-panel/formatters.ts

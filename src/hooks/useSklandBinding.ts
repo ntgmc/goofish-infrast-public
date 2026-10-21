@@ -32,6 +32,8 @@ export type SklandPayload = AuthSuccessResponse & {
     inventory_synced: boolean
     config_saved: boolean
     inventory_warning?: string
+    credential_verified_at?: string | null
+    refresh_warning?: string
   }
   error?: string
   code?:

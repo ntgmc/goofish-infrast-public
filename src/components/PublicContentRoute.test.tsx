@@ -44,10 +44,10 @@ describe('PublicContentRoute', () => {
         </Routes>
       </MemoryRouter>,
     )
-    expect(await screen.findByText(/最新页面内容暂时无法加载/)).toBeInTheDocument()
+    expect(await screen.findByText(/页面内容加载失败/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '重新加载' }))
     expect(await screen.findByText('pricing')).toBeInTheDocument()
-    expect(screen.queryByText(/最新页面内容暂时无法加载/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/页面内容加载失败/)).not.toBeInTheDocument()
   })
 
   it('shows cached-content feedback and retains remote content when refresh fails', async () => {

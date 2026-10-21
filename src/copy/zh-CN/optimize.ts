@@ -1,6 +1,6 @@
 export const optimizeCopy = {
   generation: {
-    save_failed: '配置未保存成功，暂未开始生成。当前输入已保留，请重试保存；保存成功后点击生成。',
+    save_failed: '配置保存失败，排班尚未开始，当前输入已保留。请重试保存，成功后再生成排班。',
     retry_save: '重试保存',
     saving: '正在保存配置…',
   },
@@ -14,7 +14,7 @@ export const optimizeCopy = {
     failed: '暂时无法确认 MAA 导出权益，请刷新背包后重试；生成后可保存排班图片。',
   },
   paid_preview: {
-    title: '按需选择自定义配置、收益分析和导出功能',
+    title: '自定义排班、分析收益并导出到 MAA',
     description: '免费版可生成排班并保存图片，不支持 MAA 导出。需要自定义配置、增量重算、收益分析或 MAA 执行文件时，可查看高级版权益。',
     advanced: '高级版能力',
     conclusion: '需要自定义配置、重新优化或分析收益时，可以比较高级版方案。',
@@ -26,9 +26,9 @@ export const optimizeCopy = {
     current_config: '当前免费配置',
     custom_config: '自定义基建 · 只读预览',
     config_title: '让排班适配你的基建布局',
-    config_description: '高级版可调整房间、产物数量、班次、宿舍和无人机策略。可以先按当前配置查看这些选项，预览会保留已保存的方案。切回免费配置即可继续排班。',
+    config_description: '高级版可调整房间、产物数量、班次、宿舍和无人机策略。先查看当前配置中的这些选项，预览时已保存的方案会保留。切回免费配置后可继续排班。',
     readonly: '高级配置只读预览',
-    manual_title: '解锁手动排班',
+    manual_title: '手动调整干员与无人机安排',
     manual_description: '高级版可调整各班次的进驻干员与无人机加速目标，保存本地草稿、导入导出草稿备份，并导出排班图片。',
     compare: '比较价格与权益',
     config: '自定义基建与班次',
@@ -38,12 +38,12 @@ export const optimizeCopy = {
     exports: 'MAA JSON 与完整计算数据',
     exports_benefit: 'MAA 排班模式可导出执行文件，用于自动化排班；完整计算 JSON 可用于分析、复盘和排障。',
     exports_detail: '高级版可在 MAA 排班模式下导出执行文件，用于自动化排班；也可下载完整计算 JSON，用于分析、复盘和排障。免费版可保存排班图片，不支持这两项文件导出。',
-    analysis: '练度建议与收益回本',
+    analysis: '培养建议与回本分析',
     analysis_detail: '比较培养成本、预计每日收益提升和回本时间，再决定先培养谁。',
     lab: '场景对比实验室',
     lab_detail: '比较当前方案和最多 3 个额外配置的预计收益，选择布局和策略。可用次数随购买方案而定。',
     open: '查看功能',
-    lab_title: '先了解不同配置如何比较',
+    lab_title: '比较不同配置的收益',
     lab_description: '高级版可用同一份干员数据比较多个方案。先查看对比设置，运行后可查看测算收益。',
     baseline: '当前方案',
     alternative: '额外配置',
@@ -73,7 +73,7 @@ export const optimizeCopy = {
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_007: "只看单人提升",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_013: "当前筛选下没有可展示的建议。",
+  components_UpgradeSuggestions_013: "没有符合当前筛选条件的建议。",
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_017: "升级建议",
   // src/components/UpgradeSuggestions.tsx
@@ -136,7 +136,7 @@ export const optimizeCopy = {
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_049: "单人提升不需要拆分模拟。",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_050: "组合拆分模拟未完全完成。",
+  components_UpgradeSuggestions_050: "组合拆分模拟尚未全部完成。",
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_051: "该组合暂无拆分模拟结果。",
   // src/components/UpgradeSuggestions.tsx
@@ -158,7 +158,7 @@ export const optimizeCopy = {
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_060: "影响 ",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_061: "库存不可读",
+  components_UpgradeSuggestions_061: "无法读取库存",
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_062: "材料已够",
   // src/components/UpgradeSuggestions.tsx
@@ -210,7 +210,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_009: "变化记录",
   // src/pages/tool/optimize/ConfigSection.tsx
-  pages_tool_optimize_ConfigSection_010: "当前配置与上次生成",
+  pages_tool_optimize_ConfigSection_010: "当前配置与上次排班对比",
   // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_011: "只有会影响结果的差异才需要重新计算。",
   // src/pages/tool/optimize/ConfigSection.tsx
@@ -376,7 +376,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/PlansSection.tsx
   pages_tool_optimize_PlansSection_002: "保存并复用配置",
   // src/pages/tool/optimize/PlansSection.tsx
-  pages_tool_optimize_PlansSection_003: "保存配置供下次计算使用。开始排班时，需要另行点击生成。",
+  pages_tool_optimize_PlansSection_003: "保存常用配置，下次载入后点击生成即可排班。",
   // src/pages/tool/optimize/PlansSection.tsx
   pages_tool_optimize_PlansSection_004: "方案名称",
   // src/pages/tool/optimize/PlansSection.tsx
@@ -388,7 +388,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/PlansSection.tsx
   pages_tool_optimize_PlansSection_008: "上次结果",
   // src/pages/tool/optimize/PlansSection.tsx
-  pages_tool_optimize_PlansSection_009: "已保存的配置可随时载入到配置编辑器，再按需修改。",
+  pages_tool_optimize_PlansSection_009: "载入已保存的配置后，可在编辑器中继续修改。",
   // src/pages/tool/optimize/PlansSection.tsx
   pages_tool_optimize_PlansSection_010: "已达到保存上限，请先删除不再需要的方案。",
   // src/pages/tool/optimize/PlansSection.tsx
@@ -398,11 +398,11 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/PlansSection.tsx
   pages_tool_optimize_PlansSection_014: "下载 JSON",
   // src/pages/tool/optimize/PlansSection.tsx
-  pages_tool_optimize_PlansSection_015: "继续调配置",
+  pages_tool_optimize_PlansSection_015: "继续调整配置",
   // src/pages/tool/optimize/PlansSection.tsx
   pages_tool_optimize_PlansSection_016: "生成一次排班后，系统会保留上次结果供回看。",
   // src/pages/tool/optimize/PlansSection.tsx
-  pages_tool_optimize_PlansSection_017: "当前方案 vs 上次方案",
+  pages_tool_optimize_PlansSection_017: "当前方案与上次方案对比",
   // src/pages/tool/optimize/PlansSection.tsx
   pages_tool_optimize_PlansSection_018: "上次：",
   // src/pages/tool/optimize/PlansSection.tsx
@@ -494,7 +494,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_009: " 组）",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
-  pages_tool_optimize_ScenarioLabSection_010: "场景比较进行中...",
+  pages_tool_optimize_ScenarioLabSection_010: "正在对比场景…",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_011: "运行 ",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
@@ -566,7 +566,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_045: "预算受限",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
-  pages_tool_optimize_ScenarioLabSection_046: "库存爆发",
+  pages_tool_optimize_ScenarioLabSection_046: "库存支撑的高产出期",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_047: "固源岩",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
@@ -584,7 +584,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/feedback.tsx
   pages_tool_optimize_feedback_001: "正在同步授权状态",
   // src/pages/tool/optimize/feedback.tsx
-  pages_tool_optimize_feedback_002: "请稍候，正在检查 CDK 状态和权限变更，同步完成后即可生成排班。",
+  pages_tool_optimize_feedback_002: "正在检查 CDK 状态与权益变化，同步完成后即可生成排班。",
   // src/pages/tool/optimize/feedback.tsx
   pages_tool_optimize_feedback_003: "通常只需几秒",
   // src/pages/tool/optimize/feedback.tsx
@@ -602,7 +602,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/job-progress.ts
   pages_tool_optimize_job_progress_002: "后台正在确认任务状态，计算仍在继续",
   // src/pages/tool/optimize/job-progress.ts
-  pages_tool_optimize_job_progress_003: "任务已开始，预计用时已重新校准",
+  pages_tool_optimize_job_progress_003: "计算已开始，预计用时已更新",
   // src/pages/tool/optimize/job-progress.ts
   pages_tool_optimize_job_progress_004: "等待任务增加，预计时间已延长",
   // src/pages/tool/optimize/job-progress.ts
@@ -947,7 +947,7 @@ export const optimizeCopy = {
   pages_tool_optimize_tour_008: "查看结果",
   pages_tool_optimize_tour_009: "查看当前或历史排班结果，并在权限允许时下载轻量 MAA JSON 或应用升级建议。",
   pages_tool_optimize_tour_010: "情景实验室",
-  pages_tool_optimize_tour_011: "批量比较多组情景，从图表或表格中选择方案，再把选中配置带回普通优化流程。",
+  pages_tool_optimize_tour_011: "批量比较多组方案，从图表或表格中选好配置，再用于生成排班。",
   pages_tool_optimize_tour_012: "确认输入并编辑配置",
   pages_tool_optimize_tour_013: "总览汇总当前配置、干员数量和结果状态；需要调整参数时可直接进入配置编辑器。",
   pages_tool_optimize_tour_014: "开始排班",
@@ -973,7 +973,7 @@ export const optimizeCopy = {
   pages_tool_optimize_tour_034: "开始情景对比",
   pages_tool_optimize_tour_035: "点击后创建实验任务；进度、失败原因和重试信息会同步显示。",
   pages_tool_optimize_tour_036: "选择并应用方案",
-  pages_tool_optimize_tour_037: "结果生成后可通过帕累托图或表格选择情景，再用“应用此配置”带回普通优化流程。",
+  pages_tool_optimize_tour_037: "通过收益与换班次数图或表格选择方案，再点击“应用此配置”用于生成排班。",
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_071: "数据变化后的快速更新",
   // src/pages/tool/optimize/OverviewSection.tsx
@@ -1017,7 +1017,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
   pages_tool_optimize_scenario_lab_ScenarioResultsTable_052: "理智预算受限",
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
-  pages_tool_optimize_scenario_lab_ScenarioResultsTable_053: "库存爆发期",
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_053: "库存支撑的高产出期",
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
   pages_tool_optimize_scenario_lab_ScenarioResultsTable_054: "库存",
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx

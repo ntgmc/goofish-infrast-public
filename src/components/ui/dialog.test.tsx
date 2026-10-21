@@ -7,10 +7,11 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } fr
 
 afterEach(cleanup)
 
-function Example({ customFocus = false, children, onPointerDownOutside }: {
+function Example({ customFocus = false, children, onPointerDownOutside, allowOutsideDismiss }: {
   customFocus?: boolean
   children?: ReactNode
   onPointerDownOutside?: ComponentProps<typeof DialogContent>['onPointerDownOutside']
+  allowOutsideDismiss?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const alternative = useRef<HTMLButtonElement>(null)
@@ -20,6 +21,7 @@ function Example({ customFocus = false, children, onPointerDownOutside }: {
     <button ref={alternative}>下一步</button>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent
+        allowOutsideDismiss={allowOutsideDismiss}
         onPointerDownOutside={onPointerDownOutside}
         onOpenAutoFocus={customFocus ? (event) => { event.preventDefault(); input.current?.focus() } : undefined}
         onCloseAutoFocus={customFocus ? (event) => { event.preventDefault(); alternative.current?.focus() } : undefined}>
@@ -65,6 +67,38 @@ it.each([
   expect(control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement || control instanceof HTMLSelectElement
     ? control.value : control.textContent).toBe(value)
   await user.click(screen.getByRole('button', { name: '完成' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+})
+
+it.each([false, true])('allows explicit overlay dismissal unless the caller prevents it (%s)', async (prevent) => {
+  const user = userEvent.setup()
+  render(<Example allowOutsideDismiss onPointerDownOutside={prevent ? (event) => event.preventDefault() : undefined} />)
+  await user.click(screen.getByRole('button', { name: '打开弹窗' }))
+  await user.type(screen.getByRole('textbox', { name: '输入' }), '搜索条件')
+  await user.click(document.querySelector('[data-slot="dialog-overlay"]')!)
+  await waitFor(() => expect(Boolean(screen.queryByRole('dialog'))).toBe(prevent))
+})
+
+it('keeps a nested form protected inside a drawer that allows overlay dismissal', async () => {
+  const user = userEvent.setup()
+  render(<Example allowOutsideDismiss>
+    <input aria-label="搜索" />
+    <Dialog defaultOpen>
+      <DialogContent>
+        <DialogTitle>填写反馈</DialogTitle><DialogDescription>提交问题</DialogDescription>
+        <textarea aria-label="反馈内容" />
+        <DialogClose>关闭反馈</DialogClose>
+      </DialogContent>
+    </Dialog>
+  </Example>)
+  await user.click(screen.getByRole('button', { name: '打开弹窗' }))
+  await user.type(screen.getByLabelText('反馈内容'), '未提交的反馈')
+  await user.click(document.querySelectorAll('[data-slot="dialog-overlay"]')[1]!)
+  expect(screen.getByRole('dialog', { name: '填写反馈' })).toBeVisible()
+  expect(screen.getByLabelText('反馈内容')).toHaveValue('未提交的反馈')
+  await user.click(screen.getByRole('button', { name: '关闭反馈' }))
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '填写反馈' })).not.toBeInTheDocument())
+  await user.click(document.querySelector('[data-slot="dialog-overlay"]')!)
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 })
 

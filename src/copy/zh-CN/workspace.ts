@@ -20,7 +20,7 @@ export const workspaceCopy = {
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_010: "先预览游戏昵称和 UID，确认后才会保存绑定并导入干员。",
   components_SklandBindingDialog_lifetime_title: "绑定终身版档案",
-  components_SklandBindingDialog_lifetime_description: "选择森空岛账号并核对信息。数据导入和档案保存成功后，才会消耗终身版兑换 CDK。",
+  components_SklandBindingDialog_lifetime_description: "选择森空岛账号并核对信息，导入数据并保存档案后才会消耗终身版兑换 CDK。",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_011: "关闭森空岛导入",
   // src/components/SklandBindingDialog.tsx
@@ -56,7 +56,7 @@ export const workspaceCopy = {
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_027: "重新生成二维码",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_028: "生成扫码二维码",
+  components_SklandBindingDialog_028: "生成授权二维码",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_029: "森空岛扫码授权二维码",
   // src/components/SklandBindingDialog.tsx
@@ -116,7 +116,7 @@ export const workspaceCopy = {
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_057: "服务器",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_058: "可读取库存角色",
+  components_SklandBindingDialog_058: "可读取库存的角色",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_059: "可读取干员",
   // src/components/SklandBindingDialog.tsx
@@ -178,7 +178,7 @@ export const workspaceCopy = {
   // src/hooks/useSklandBinding.ts
   hooks_useSklandBinding_018: "森空岛凭据读取失败",
   // src/hooks/useSklandBinding.ts
-  hooks_useSklandBinding_019: "已读取森空岛凭据，但没有找到可供确认的账号。",
+  hooks_useSklandBinding_019: "已读取森空岛凭据，但未找到可选择的账号。",
   // src/hooks/useSklandBinding.ts
   hooks_useSklandBinding_020: "请重新获取凭据，或改用扫码授权。",
   // src/hooks/useSklandBinding.ts
@@ -216,7 +216,7 @@ export const workspaceCopy = {
   // src/hooks/useSklandBinding.ts
   hooks_useSklandBinding_037: "请核对森空岛账号信息，确认后将保存绑定并导入干员数据。",
   // src/hooks/useSklandBinding.ts
-  hooks_useSklandBinding_038: "森空岛已保存，正在读取仓库库存。",
+  hooks_useSklandBinding_038: "森空岛绑定已保存，正在读取仓库库存。",
   // src/hooks/useSklandBinding.ts
   hooks_useSklandBinding_039: "森空岛干员数据已导入。",
   // src/hooks/useSklandBinding.ts
@@ -280,7 +280,7 @@ export const workspaceCopy = {
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_024: "干员数据",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_025: "上传 MAA 导出的干员识别文件，或使用森空岛扫码导入后预览干员头像、精英化和等级。",
+  pages_tool_WorkspaceSetupPage_025: "上传 MAA 干员识别文件，或通过森空岛扫码导入，查看干员头像、精英阶段和等级。",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_026: "已就绪",
   // src/pages/tool/WorkspaceSetupPage.tsx
@@ -288,7 +288,7 @@ export const workspaceCopy = {
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_028: "已载入 ",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_029: " 名拥有干员",
+  pages_tool_WorkspaceSetupPage_029: " 名已拥有的干员",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_030: "选择干员识别文件",
   // src/pages/tool/WorkspaceSetupPage.tsx
@@ -348,7 +348,7 @@ export const workspaceCopy = {
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_060: "还没有 CDK",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_061: "通过当前可用的购买渠道获取 CDK，购买后返回此处升级或兑换。",
+  pages_tool_WorkspaceSetupPage_061: "通过下方购买渠道获取 CDK，再返回这里升级或兑换。",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_062: "森空岛导入",
   // src/pages/tool/WorkspaceSetupPage.tsx
@@ -370,7 +370,7 @@ export const workspaceCopy = {
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_071: "可用",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_072: "扫码、粘贴凭据或书签脚本都会先预览昵称和 UID，确认后才保存绑定并导入。",
+  pages_tool_WorkspaceSetupPage_072: "选择扫码、粘贴凭据或书签脚本后，先核对预览中的昵称和 UID，确认后才会保存绑定并导入数据。",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_073: "重新绑定森空岛",
   // src/pages/tool/WorkspaceSetupPage.tsx
@@ -484,7 +484,7 @@ export const workspaceCopy = {
   // src/pages/tool/tool-utils.ts
   pages_tool_tool_utils_018: "密码不能超过 128 位",
   // src/pages/tool/workspace/WorkspaceConfigSection.tsx
-  pages_tool_workspace_WorkspaceConfigSection_001: "配置两页共用，修改自动保存；下次生成时生效，已有结果不变。",
+  pages_tool_workspace_WorkspaceConfigSection_001: "工作区设置与排班页共用配置，修改会自动保存，下次生成时生效，已有结果保持原样。",
   // src/pages/tool/workspace/ConfigSaveStatus.tsx
   config_not_saved: "配置尚未保存",
   config_save_pending: "更改待保存",
@@ -507,5 +507,5 @@ export const workspaceCopy = {
   pages_tool_WorkspaceSetupPage_tour_006: "检查并调整配置",
   pages_tool_WorkspaceSetupPage_tour_007: "按当前档案权益调整房间、产物和库存，修改会自动保存。配置有误时，请先按页面提示修正。",
   pages_tool_WorkspaceSetupPage_tour_008: "进入排班",
-  pages_tool_WorkspaceSetupPage_tour_009: "干员和配置准备好、配置保存成功后，点击「进入排班」前往排班总览，再点击「生成排班」开始计算。",
+  pages_tool_WorkspaceSetupPage_tour_009: "导入干员、确认并保存配置后，点击「进入排班」前往总览，再点击「生成排班」开始计算。",
 } as const

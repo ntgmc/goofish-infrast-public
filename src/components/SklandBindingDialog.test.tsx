@@ -134,7 +134,7 @@ describe('SklandBindingDialog accessibility', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { name: '生成扫码二维码' }))
+    await user.click(screen.getByRole('button', { name: '生成授权二维码' }))
 
     await waitFor(() => expect(mockedApiJson).toHaveBeenCalledWith(
       '/api/user/skland/free-preview/login/start',
@@ -242,7 +242,7 @@ describe('SklandBindingDialog accessibility', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { name: '生成扫码二维码' }))
+    await user.click(screen.getByRole('button', { name: '生成授权二维码' }))
 
     expect(await screen.findByText('森空岛请求过于频繁，请 42 秒后重试。')).toBeInTheDocument()
     expect(screen.queryByText(/二维码生成失败/)).not.toBeInTheDocument()

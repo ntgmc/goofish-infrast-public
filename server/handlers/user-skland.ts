@@ -1683,7 +1683,10 @@ async function saveSklandImport(
     prepared,
   ))
   await runSklandImportPostCommit(userId, profile, prepared)
-  return imported
+  return { ...imported,
+    credential_verified_at: snapshot.credentialVerification?.profileId === profile.id ? snapshot.credentialVerification.verifiedAt : null,
+    ...(snapshot.errors.game && { refresh_warning: snapshot.errors.game }),
+  }
 }
 
 function resolveSklandImportConfig(

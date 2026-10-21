@@ -148,7 +148,7 @@ describe('ResultSection locked capabilities', () => {
     expect(document.querySelector('[data-locked-capability-preview]')).toHaveAttribute('aria-hidden', 'true')
     await user.click(screen.getByRole('tab', { name: '手动排班' }))
     const panel = within(screen.getByRole('tabpanel', { name: '手动排班' }))
-    expect(panel.getByRole('heading', { name: '解锁手动排班' })).toBeInTheDocument()
+    expect(panel.getByRole('heading', { name: '手动调整干员与无人机安排' })).toBeInTheDocument()
     expect(panel.getByText('需要高级版 CDK 权限')).toBeInTheDocument()
     expect(panel.getByRole('link', { name: '购买高级版 CDK' })).toHaveAttribute('href', '/pricing')
     expect(panel.getByRole('link', { name: '兑换 CDK' })).toHaveAttribute('href', '/tool/redeem')

@@ -790,6 +790,24 @@ describe('V2 results-first workspace', () => {
     expect(screen.getByTestId('route-location')).not.toHaveTextContent('panel=')
   })
 
+  it.each(['operators', 'config'] as const)('dismisses the %s drawer through the overlay despite its input controls', async (panel) => {
+    const workflow = connect()
+    const user = userEvent.setup()
+    mount(`/v2?profile_id=profile-1&panel=${panel}`)
+    const dialog = await screen.findByRole('dialog')
+    if (panel === 'operators') await user.type(within(dialog).getByRole('textbox', { name: copy.v2.searchOperators }), '但书')
+    else {
+      await user.click(await within(dialog).findByRole('button', { name: copy.common.components_ConfigEditor_007 }))
+      expect(workflow.updateConfig).toHaveBeenCalledOnce()
+    }
+    expect(dialog.querySelector('input, select, textarea')).not.toBeNull()
+    await user.click(document.querySelector('[data-slot="dialog-overlay"]')!)
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByTestId('route-location')).not.toHaveTextContent('panel=')
+    expect(session.setConfigOverride).not.toHaveBeenCalled()
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+  })
+
   it('refreshes cached teams and expanded skills when saved training and the result change', async () => {
     const workflow = connect()
     const user = userEvent.setup()
@@ -1174,7 +1192,7 @@ describe('V2 results-first workspace', () => {
     expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('combobox')).not.toBeInTheDocument()
     await user.tab()
-    expect(within(dialog).getByRole('button', { name: copy.v2.uploadMaa })).toHaveFocus()
+    expect(within(dialog).getByText(copy.domain.building_skills.title).closest('summary')).toHaveFocus()
     await dismissDrawer(user)
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('53,595')).toBeInTheDocument()
@@ -1642,8 +1660,8 @@ describe('V2 feature continuity', () => {
     expect(workflow.updateConfig).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: copy.v2.operators }))
     const dialog = within(await screen.findByRole('dialog'))
-    expect(dialog.getByRole('button', { name: copy.v2.uploadMaa })).toBeDisabled()
-    expect(dialog.getByText(copy.workspace.pages_tool_WorkspaceSetupPage_004)).toBeInTheDocument()
+    expect(dialog.getByRole('button', { name: copy.v2.operatorManagement.chooseFile })).toBeDisabled()
+    expect(dialog.getByText(copy.v2.operatorManagement.previewImport)).toBeInTheDocument()
     await dismissDrawer(user)
     await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
     const configDialog = within(await screen.findByRole('dialog'))

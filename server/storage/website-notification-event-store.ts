@@ -8,6 +8,7 @@ export interface WebsiteNotificationEventInput {
   type: WebsiteNotificationEventType
   title: string
   summary: string | null
+  markdown?: string | null
   url: string
   published_at: string
   version: string | null
@@ -36,6 +37,7 @@ interface WebsiteNotificationEventRow {
   event_type: WebsiteNotificationEventType
   title: string
   summary: string | null
+  markdown: string | null
   url: string
   version: string | null
   published_at: Date | string
@@ -61,10 +63,10 @@ export async function listWebsiteNotificationEvents(
   }
 
   const result = await query<WebsiteNotificationEventRow>(
-    `select sequence::text, event_id, event_type, title, summary, url, version, published_at
+    `select sequence::text, event_id, event_type, title, summary, markdown, url, version, published_at
        from website_notification_events
       where sequence > $1::bigint
-      order by sequence asc
+      order by website_notification_events.sequence asc
       limit $2`,
     [cursor, limit + 1],
   )
@@ -104,17 +106,17 @@ async function insertWebsiteNotificationEventInTransaction(
   await client.query('select pg_advisory_xact_lock(hashtextextended($1, 0))', ['website-notification-events'])
   const inserted = await client.query<WebsiteNotificationEventRow>(
     `insert into website_notification_events
-       (event_id, event_type, title, summary, url, version, published_at, created_at)
-     values ($1, $2, $3, $4, $5, $6, $7, now())
+       (event_id, event_type, title, summary, markdown, url, version, published_at, created_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, now())
      on conflict (event_id) do nothing
-     returning sequence::text, event_id, event_type, title, summary, url, version, published_at`,
-    [event.id, event.type, event.title, event.summary, event.url, event.version, event.published_at],
+     returning sequence::text, event_id, event_type, title, summary, markdown, url, version, published_at`,
+    [event.id, event.type, event.title, event.summary, event.markdown, event.url, event.version, event.published_at],
   )
   const insertedRow = inserted.rows[0]
   if (insertedRow) return { created: true, event: mapEventRow(insertedRow) }
 
   const existing = await client.query<WebsiteNotificationEventRow>(
-    `select sequence::text, event_id, event_type, title, summary, url, version, published_at
+    `select sequence::text, event_id, event_type, title, summary, markdown, url, version, published_at
        from website_notification_events
       where event_id = $1`,
     [event.id],
@@ -133,6 +135,7 @@ export function normalizeWebsiteNotificationEvent(
   const id = event.id.trim()
   const title = event.title.trim()
   const summary = event.summary === null ? null : event.summary.trim()
+  const markdown = event.markdown ?? null
   const version = event.version === null ? null : event.version.trim()
   if (!EVENT_ID_PATTERN.test(id)) throw new TypeError('Website notification event ID is invalid.')
   if (event.type !== 'announcement.published' && event.type !== 'release.published') {
@@ -143,6 +146,9 @@ export function normalizeWebsiteNotificationEvent(
   }
   if (summary !== null && (summary.length > 500 || containsControlCharacters(summary))) {
     throw new TypeError('Website notification event summary is invalid.')
+  }
+  if (markdown !== null && (markdown.length > 5000 || containsControlCharacters(markdown))) {
+    throw new TypeError('Website notification event Markdown is invalid.')
   }
   let url: URL
   try {
@@ -168,6 +174,7 @@ export function normalizeWebsiteNotificationEvent(
     type: event.type,
     title,
     summary: summary || null,
+    markdown,
     url: url.toString(),
     published_at: publishedAt.toISOString(),
     version,
@@ -190,6 +197,7 @@ function mapEventRow(row: WebsiteNotificationEventRow): WebsiteNotificationEvent
     type: row.event_type,
     title: row.title,
     summary: row.summary,
+    markdown: row.markdown ?? null,
     url: row.url,
     published_at: publishedAt,
     version: row.version,
@@ -204,6 +212,7 @@ function sameEvent(
     && existing.type === incoming.type
     && existing.title === incoming.title
     && existing.summary === incoming.summary
+    && existing.markdown === incoming.markdown
     && existing.url === incoming.url
     && existing.published_at === incoming.published_at
     && existing.version === incoming.version

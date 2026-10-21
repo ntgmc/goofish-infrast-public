@@ -49,7 +49,7 @@ describe('submitWithMeteredBillingQuote', () => {
         { code: 'pricing_changed' },
         '/api/optimization/jobs',
       )),
-    })).rejects.toThrow('报价已从 1250.00 积分更新为 1350.00 积分')
+    })).rejects.toThrow('本次价格已从 1250.00 积分变为 1350.00 积分')
 
     expect(refreshQuote).toHaveBeenCalledTimes(1)
   })

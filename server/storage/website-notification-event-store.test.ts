@@ -56,7 +56,7 @@ describe('website notification event store', () => {
       nextCursor: '842',
       hasMore: true,
     })
-    expect(mocks.query).toHaveBeenCalledWith(expect.stringMatching(/order by sequence asc/), ['840', 3])
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringMatching(/order by website_notification_events\.sequence asc/), ['840', 3])
   })
 
   it('treats an identical release confirmation as an idempotent replay', async () => {
@@ -76,6 +76,24 @@ describe('website notification event store', () => {
 
     await expect(createWebsiteNotificationEvent({ ...releaseEvent, title: '冲突标题' }))
       .rejects.toBeInstanceOf(WebsiteNotificationEventConflictError)
+  })
+
+  it('rejects conflicting Markdown without changing release replay compatibility', async () => {
+    mocks.transactionQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ ...eventRow('842', releaseEvent.id, releaseEvent.type), markdown: '**已发布**' }] })
+
+    await expect(createWebsiteNotificationEvent({ ...releaseEvent, markdown: '**已修改**' }))
+      .rejects.toBeInstanceOf(WebsiteNotificationEventConflictError)
+  })
+
+  it('bounds Markdown without stripping meaningful whitespace or syntax', () => {
+    const markdown = '    缩进代码\n\n## 更新\n\n- **重点**\n\n```json\n\t{}\n```\n'
+    expect(normalizeWebsiteNotificationEvent({ ...releaseEvent, markdown }).markdown).toBe(markdown)
+    expect(normalizeWebsiteNotificationEvent(releaseEvent).markdown).toBeNull()
+    expect(() => normalizeWebsiteNotificationEvent({ ...releaseEvent, markdown: 'a'.repeat(5001) })).toThrow(/Markdown/)
+    expect(() => normalizeWebsiteNotificationEvent({ ...releaseEvent, markdown: 'bad\u0000content' })).toThrow(/Markdown/)
   })
 
   it('validates opaque decimal cursors and HTTPS event URLs', () => {

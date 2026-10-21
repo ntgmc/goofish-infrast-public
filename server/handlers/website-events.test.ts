@@ -83,7 +83,8 @@ describe('website event feed handler', () => {
         id: 'announcement:1',
         type: 'announcement.published',
         title: '公告',
-        summary: null,
+        summary: '更新 重点',
+        markdown: '## 更新\n\n- **重点**\n',
         url: 'https://example.test/#announcement-1',
         published_at: '2026-08-04T08:00:00.000Z',
         version: null,
@@ -97,7 +98,10 @@ describe('website event feed handler', () => {
     expect(mocks.listWebsiteNotificationEvents).toHaveBeenCalledWith('842', 1)
     const body = await response.json()
     expect(body.events[0]).not.toHaveProperty('sequence')
-    expect(body).toMatchObject({ next_cursor: '843', has_more: true })
+    expect(body).toMatchObject({
+      events: [{ summary: '更新 重点', markdown: '## 更新\n\n- **重点**\n' }],
+      next_cursor: '843', has_more: true,
+    })
   })
 
   it('rejects invalid cursors and limits without querying the feed', async () => {
