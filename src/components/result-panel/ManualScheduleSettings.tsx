@@ -13,9 +13,7 @@ export default function ManualScheduleSettings({ result, operators, activePlan, 
   const fiammetta = operators.find((operator) => operator.own && (operator.id === 'char_300_phenxi' || operator.name === label.fiammettaName))
   const canUseFiammetta = Boolean(fiammetta && result.schedule_mode !== 'rotation' &&
     result.schedule_mode !== 'variable' && isFiammettaShiftHoursSupported(result.shift_hours))
-  const targets = Object.entries(plan.rooms).filter(([type]) => type !== 'dormitory' && type !== 'training')
-    .flatMap(([, rooms]) => rooms.flatMap((room) => room.operators ?? []))
-    .filter((name) => name !== fiammetta?.name && operators.some((operator) => operator.own && operator.name === name))
+  const targets = operators.filter((operator) => operator.own && operator.name !== fiammetta?.name).map((operator) => operator.name)
   function changeFacility(type: string, index: number, settings: { level?: number; product?: string }) {
     try { onChange(changeManualFacility(result, type, index, settings)) }
     catch (cause) { onError(cause instanceof Error ? cause.message : label.invalidSettings) }
