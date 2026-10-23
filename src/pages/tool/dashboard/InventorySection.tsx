@@ -332,6 +332,7 @@ export default function InventorySection({ onPayload, onLifetimeProfileCreated, 
 
       <Dialog open={Boolean(selected)} onOpenChange={(open) => { if (!open && !busy) setSelected(null) }}>
         <DialogContent
+          preventOutsideDismiss={busy || Boolean(profileId || selectedRewardCodes.length || lifetimeDisplayName || lifetimeNote || quantity !== 1)}
           className="block sm:max-w-2xl"
           onCloseAutoFocus={(event) => {
             event.preventDefault()

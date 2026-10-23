@@ -46,7 +46,7 @@ function DialogOverlay({
 }
 
 type DialogContentProps = React.ComponentProps<typeof DialogPrimitive.Content> & {
-  allowOutsideDismiss?: boolean
+  preventOutsideDismiss?: boolean
 } &
   (
     | { showCloseButton?: false; closeLabel?: never }
@@ -61,30 +61,20 @@ function DialogContent({
   onOpenAutoFocus,
   onCloseAutoFocus,
   onPointerDownOutside,
-  allowOutsideDismiss = false,
-  ref,
+  preventOutsideDismiss = false,
   ...props
 }: DialogContentProps) {
   const surfaceClassName = React.useContext(DialogSurfaceContext)
   const opener = React.useRef<HTMLElement | null>(null)
-  const content = React.useRef<HTMLDivElement | null>(null)
-  const setContentRef = React.useCallback((node: HTMLDivElement | null) => {
-    content.current = node
-    if (typeof ref === 'function') return ref(node)
-    if (ref) ref.current = node
-  }, [ref])
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         aria-modal="true"
-        ref={setContentRef}
         onPointerDownOutside={(event) => {
           onPointerDownOutside?.(event)
-          if (!allowOutsideDismiss && content.current?.querySelector('input:not([type="hidden"]):not([readonly]), textarea:not([readonly]), select, [contenteditable="true"]')) {
-            event.preventDefault()
-          }
+          if (preventOutsideDismiss) event.preventDefault()
         }}
         onOpenAutoFocus={(event) => {
           opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null

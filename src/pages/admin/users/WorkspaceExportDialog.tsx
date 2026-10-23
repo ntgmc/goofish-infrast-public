@@ -48,7 +48,7 @@ export function WorkspaceExportDialog({
           returnFocusRef.current = null
         }}
         onEscapeKeyDown={(event) => { if (disabled) event.preventDefault() }}
-        onPointerDownOutside={(event) => { if (disabled) event.preventDefault() }}
+        preventOutsideDismiss={disabled || selectedIds.length > 0}
       >
         <DialogTitle>导出工作区</DialogTitle>
         <DialogDescription className="break-words">

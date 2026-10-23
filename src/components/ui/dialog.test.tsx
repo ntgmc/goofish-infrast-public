@@ -7,11 +7,11 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } fr
 
 afterEach(cleanup)
 
-function Example({ customFocus = false, children, onPointerDownOutside, allowOutsideDismiss }: {
+function Example({ customFocus = false, children, onPointerDownOutside, preventOutsideDismiss }: {
   customFocus?: boolean
   children?: ReactNode
   onPointerDownOutside?: ComponentProps<typeof DialogContent>['onPointerDownOutside']
-  allowOutsideDismiss?: boolean
+  preventOutsideDismiss?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const alternative = useRef<HTMLButtonElement>(null)
@@ -21,7 +21,7 @@ function Example({ customFocus = false, children, onPointerDownOutside, allowOut
     <button ref={alternative}>下一步</button>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent
-        allowOutsideDismiss={allowOutsideDismiss}
+        preventOutsideDismiss={preventOutsideDismiss}
         onPointerDownOutside={onPointerDownOutside}
         onOpenAutoFocus={customFocus ? (event) => { event.preventDefault(); input.current?.focus() } : undefined}
         onCloseAutoFocus={customFocus ? (event) => { event.preventDefault(); alternative.current?.focus() } : undefined}>
@@ -51,10 +51,10 @@ it.each([
   ['select', <select aria-label="草稿"><option>初始值</option><option>修改值</option></select>],
   ['disabled field', <fieldset disabled><input aria-label="草稿" defaultValue="正在提交的内容" /></fieldset>],
   ['contenteditable', <div contentEditable suppressContentEditableWarning aria-label="草稿" role="textbox" />],
-])('keeps a dialog with %s open after clicking its overlay', async (_name, field) => {
+])('preserves a protected draft with %s after clicking its overlay', async (_name, field) => {
   const user = userEvent.setup()
   const outside = vi.fn()
-  render(<Example onPointerDownOutside={outside}>{field}</Example>)
+  render(<Example preventOutsideDismiss onPointerDownOutside={outside}>{field}</Example>)
   await user.click(screen.getByRole('button', { name: '打开弹窗' }))
   const control = screen.getByLabelText('草稿')
   if (control instanceof HTMLSelectElement) await user.selectOptions(control, '修改值')
@@ -70,21 +70,34 @@ it.each([
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 })
 
-it.each([false, true])('allows explicit overlay dismissal unless the caller prevents it (%s)', async (prevent) => {
+it.each([
+  ['search', <input type="search" aria-label="搜索" />],
+  ['file picker', <input type="file" aria-label="导入" />],
+  ['toggle', <input type="checkbox" role="switch" aria-label="设置" />],
+  ['select', <select aria-label="筛选"><option>全部</option></select>],
+])('allows overlay dismissal by default with a %s control', async (_name, control) => {
   const user = userEvent.setup()
-  render(<Example allowOutsideDismiss onPointerDownOutside={prevent ? (event) => event.preventDefault() : undefined} />)
+  render(<Example>{control}</Example>)
+  await user.click(screen.getByRole('button', { name: '打开弹窗' }))
+  await user.click(document.querySelector('[data-slot="dialog-overlay"]')!)
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+})
+
+it.each([false, true])('honors the caller outside event handler (%s)', async (prevent) => {
+  const user = userEvent.setup()
+  render(<Example onPointerDownOutside={prevent ? (event) => event.preventDefault() : undefined} />)
   await user.click(screen.getByRole('button', { name: '打开弹窗' }))
   await user.type(screen.getByRole('textbox', { name: '输入' }), '搜索条件')
   await user.click(document.querySelector('[data-slot="dialog-overlay"]')!)
   await waitFor(() => expect(Boolean(screen.queryByRole('dialog'))).toBe(prevent))
 })
 
-it('keeps a nested form protected inside a drawer that allows overlay dismissal', async () => {
+it('keeps a nested form protected inside a dismissible drawer', async () => {
   const user = userEvent.setup()
-  render(<Example allowOutsideDismiss>
+  render(<Example>
     <input aria-label="搜索" />
     <Dialog defaultOpen>
-      <DialogContent>
+      <DialogContent preventOutsideDismiss>
         <DialogTitle>填写反馈</DialogTitle><DialogDescription>提交问题</DialogDescription>
         <textarea aria-label="反馈内容" />
         <DialogClose>关闭反馈</DialogClose>
@@ -102,22 +115,30 @@ it('keeps a nested form protected inside a drawer that allows overlay dismissal'
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 })
 
-it('allows overlay dismissal once dynamic form fields are removed', async () => {
+it('allows overlay dismissal after saving while the editable field remains', async () => {
   const user = userEvent.setup()
-  const view = render(<Example><p>只读详情</p><input type="hidden" value="id" readOnly /><textarea aria-label="复制内容" readOnly value="只读内容" /></Example>)
+  const view = render(<Example preventOutsideDismiss />)
   await user.click(screen.getByRole('button', { name: '打开弹窗' }))
-  view.rerender(<Example><input aria-label="草稿" /></Example>)
-  await user.type(screen.getByLabelText('草稿'), '未提交的内容')
+  await user.type(screen.getByLabelText('输入'), '待保存的内容')
   await user.click(document.querySelector('[data-slot="dialog-overlay"]')!)
   expect(screen.getByRole('dialog')).toBeVisible()
-  view.rerender(<Example><p>只读详情</p><input type="hidden" value="id" readOnly /><textarea aria-label="复制内容" readOnly value="只读内容" /></Example>)
+  view.rerender(<Example preventOutsideDismiss={false} />)
+  expect(screen.getByLabelText('输入')).toHaveValue('待保存的内容')
   await user.click(document.querySelector('[data-slot="dialog-overlay"]')!)
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 })
 
+it('protects pending work even when there are no editable fields', async () => {
+  const user = userEvent.setup()
+  render(<Example preventOutsideDismiss><p>正在处理已选内容</p></Example>)
+  await user.click(screen.getByRole('button', { name: '打开弹窗' }))
+  await user.click(document.querySelector('[data-slot="dialog-overlay"]')!)
+  expect(screen.getByRole('dialog')).toBeVisible()
+})
+
 it('dismisses a nested preview without closing or clearing the parent form', async () => {
   const user = userEvent.setup()
-  render(<Example>
+  render(<Example preventOutsideDismiss>
     <textarea aria-label="草稿" defaultValue="未提交的内容" />
     <Dialog defaultOpen>
       <DialogContent>

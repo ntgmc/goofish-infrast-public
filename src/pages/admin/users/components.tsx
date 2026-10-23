@@ -45,7 +45,7 @@ export interface UserDetailPanelProps {
 export function UserDetailDialog(props: UserDetailPanelProps) {
   if (props.inline) return <UserDetailPanel key={props.detail.user.id} {...props} />
   return (
-    <AdminDetailDialog labelledBy="admin-user-detail-title" onClose={props.onClose}>
+    <AdminDetailDialog labelledBy="admin-user-detail-title" onClose={props.onClose} preventOutsideDismiss={METERED_BILLING_AVAILABLE}>
       <UserDetailPanel {...props} />
     </AdminDetailDialog>
   )

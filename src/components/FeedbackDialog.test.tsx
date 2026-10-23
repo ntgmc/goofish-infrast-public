@@ -142,7 +142,12 @@ it('opens the saved feedback, keeps a failed follow-up draft, and blocks dismiss
   await user.click(screen.getByRole('button', { name: copy.feedback.sendReply }))
   await screen.findByRole('alert')
   expect(screen.getByLabelText(copy.feedback.reply)).toHaveValue('问题仍然存在')
+  await user.click(document.querySelector('[data-slot="dialog-overlay"]')!)
+  expect(screen.getByRole('dialog')).toBeVisible()
+  expect(screen.getByLabelText(copy.feedback.reply)).toHaveValue('问题仍然存在')
   await user.click(screen.getByRole('button', { name: copy.feedback.sendReply }))
+  await user.click(document.querySelector('[data-slot="dialog-overlay"]')!)
+  expect(screen.getByRole('dialog')).toBeVisible()
   await user.keyboard('{Escape}')
   expect(screen.getByRole('dialog')).toBeVisible()
   finish({ id })
@@ -150,6 +155,19 @@ it('opens the saved feedback, keeps a failed follow-up draft, and blocks dismiss
   expect(screen.getByLabelText(copy.feedback.reply)).toHaveValue('')
   const requests = mocks.api.mock.calls.filter((call) => call[1]?.method === 'PATCH')
   expect(requests[0]![1].json.request_key).toBe(requests[1]![1].json.request_key)
+  await user.click(document.querySelector('[data-slot="dialog-overlay"]')!)
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+})
+
+it('allows overlay dismissal while browsing the feedback list', async () => {
+  mocks.api.mockResolvedValue({ items: [], pagination: { page: 1, page_size: 25, total: 0, total_pages: 0 } })
+  const user = userEvent.setup()
+  render(<FeedbackButton />)
+  await user.click(screen.getByRole('button', { name: copy.feedback.title }))
+  await user.click(screen.getByRole('tab', { name: copy.feedback.myFeedback }))
+  await screen.findByText(copy.feedback.myEmpty)
+  await user.click(document.querySelector('[data-slot="dialog-overlay"]')!)
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 })
 
 it('opens the referenced report from a notification even when its sidebar trigger is hidden', async () => {

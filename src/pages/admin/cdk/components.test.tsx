@@ -85,6 +85,15 @@ describe('CdkDetailDialog', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
+  it('allows backdrop dismissal for read-only details without a baseline editor', async () => {
+    const user = userEvent.setup()
+    render(<DialogHarness canManage={false} />)
+    await user.click(screen.getByRole('button', { name: '打开 CDK 详情' }))
+    expect(screen.queryByRole('combobox', { name: '新干员基线' })).not.toBeInTheDocument()
+    await user.click(document.querySelector('[data-slot="dialog-overlay"]')!)
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
   it('selects a trusted baseline source and submits only the source and review reason', async () => {
     const user = userEvent.setup()
     const onPatch = vi.fn(async () => undefined)
@@ -119,7 +128,7 @@ describe('CdkDetailDialog', () => {
   })
 })
 
-function DialogHarness({ onPatch = async () => undefined }: { onPatch?: CdkDetailDialogProps['onPatch'] }) {
+function DialogHarness({ onPatch = async () => undefined, canManage = true }: { onPatch?: CdkDetailDialogProps['onPatch']; canManage?: boolean }) {
   const [open, setOpen] = useState(false)
   const noop = async () => undefined
   return (
@@ -127,6 +136,7 @@ function DialogHarness({ onPatch = async () => undefined }: { onPatch?: CdkDetai
       <button type="button" onClick={() => setOpen(true)}>打开 CDK 详情</button>
       {open && (
         <CdkDetailDialog
+          canManage={canManage}
           detail={detail}
           busyAction={null}
           onClose={() => setOpen(false)}

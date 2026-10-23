@@ -35,6 +35,7 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
   const [view, setView] = useState<'new' | 'history'>('new')
   const [feedbackId, setFeedbackId] = useState<string | null>(null)
   const [historyBusy, setHistoryBusy] = useState(false)
+  const [historyHasDraft, setHistoryHasDraft] = useState(false)
   const busy = processing || submitting || historyBusy
   const attachSchedule = category === 'schedule'
 
@@ -97,6 +98,7 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
     </button>
     <Dialog open={open} onOpenChange={(next) => { if (!busy) setOpen(next) }}>
       <DialogContent id={`${id}-dialog`} className="feedback-dialog"
+        preventOutsideDismiss={busy || view === 'new' && !success || historyHasDraft}
         onPaste={(event) => {
           if (view !== 'new' || success) return
           const file = Array.from(event.clipboardData.items).find((item) => item.kind === 'file' && item.type.startsWith('image/'))?.getAsFile()
@@ -116,7 +118,7 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
             <Tabs.Trigger value="new" className="feedback-tab" disabled={busy}>{text.newFeedback}</Tabs.Trigger>
             <Tabs.Trigger value="history" className="feedback-tab" disabled={busy}>{text.myFeedback}</Tabs.Trigger>
           </Tabs.List>
-          <Tabs.Content value="history" className="feedback-tab-panel"><FeedbackHistory key={feedbackId ?? 'list'} initialId={feedbackId} onBusyChange={setHistoryBusy} /></Tabs.Content>
+          <Tabs.Content value="history" className="feedback-tab-panel"><FeedbackHistory key={feedbackId ?? 'list'} initialId={feedbackId} onBusyChange={setHistoryBusy} onDraftChange={setHistoryHasDraft} /></Tabs.Content>
           <Tabs.Content value="new" className="feedback-tab-panel">
         {success ? <>
           <p role="status" className="feedback-success"><Check size={20} aria-hidden="true" />{text.submitted}</p>

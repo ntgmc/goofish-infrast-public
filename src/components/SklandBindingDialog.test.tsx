@@ -49,6 +49,7 @@ describe('SklandBindingDialog accessibility', () => {
 
   it('requires an explicit account choice and previews the selected uid', async () => {
     const user = userEvent.setup()
+    const onOpenChange = vi.fn()
     const mockedApiJson = vi.mocked(apiJson)
     mockedApiJson
       .mockResolvedValueOnce({
@@ -75,7 +76,7 @@ describe('SklandBindingDialog accessibility', () => {
       <SklandBindingDialog
         open
         profile={createProfile()}
-        onOpenChange={vi.fn()}
+        onOpenChange={onOpenChange}
         onPayload={vi.fn()}
       />,
     )
@@ -87,6 +88,9 @@ describe('SklandBindingDialog accessibility', () => {
     expect(screen.getByText(/右键页面选择“检查”/)).toBeInTheDocument()
     expect(screen.getByText(/allow pasting/)).toBeInTheDocument()
     await user.type(screen.getByPlaceholderText('粘贴森空岛凭据'), 'credential-value')
+    await user.click(document.querySelector('[data-slot="dialog-overlay"]')!)
+    expect(onOpenChange).not.toHaveBeenCalled()
+    expect(screen.getByPlaceholderText('粘贴森空岛凭据')).toHaveValue('credential-value')
     await user.click(screen.getByRole('button', { name: '读取账号预览' }))
 
     const defaultAccount = await screen.findByRole('radio', { name: /默认博士/ })

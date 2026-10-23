@@ -30,6 +30,7 @@ export default function PersonalUseDeclarationDialog({
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen && !submitting) onClose() }}>
       <DialogContent
+        preventOutsideDismiss={confirmed || submitting}
         aria-labelledby="personal-use-declaration-title"
         aria-describedby="personal-use-declaration-description"
         className="block max-h-[calc(100dvh-2rem)] max-w-xl sm:max-h-[calc(100dvh-4rem)]"
@@ -46,9 +47,6 @@ export default function PersonalUseDeclarationDialog({
           returnFocusRef.current = null
         }}
         onEscapeKeyDown={(event) => {
-          if (submitting) event.preventDefault()
-        }}
-        onPointerDownOutside={(event) => {
           if (submitting) event.preventDefault()
         }}
       >

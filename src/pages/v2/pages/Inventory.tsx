@@ -40,7 +40,7 @@ export default function Inventory({ session, onProfiles }: { session: V2Session;
 
 function ItemDetails({ model: m }: { model: InventoryModel }) {
   const item = m.selected
-  return <Dialog open={Boolean(item)} onOpenChange={(open) => { if (!open && !m.busy) m.setSelected(null) }}><DialogContent className="v2-item-dialog" onCloseAutoFocus={(event) => {
+  return <Dialog open={Boolean(item)} onOpenChange={(open) => { if (!open && !m.busy) m.setSelected(null) }}><DialogContent className="v2-item-dialog" preventOutsideDismiss={m.busy || Boolean(m.profileId || m.selectedRewardCodes.length || m.lifetimeDisplayName || m.lifetimeNote || m.quantity !== 1)} onCloseAutoFocus={(event) => {
     event.preventDefault()
     if (!m.lifetimeDialogOpen && !m.rewards?.length) (m.selectedTriggerRef.current?.isConnected ? m.selectedTriggerRef.current : document.getElementById('inventory-search'))?.focus()
   }}>

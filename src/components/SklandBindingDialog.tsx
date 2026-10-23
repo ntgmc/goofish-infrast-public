@@ -86,6 +86,7 @@ export default function SklandBindingDialog({
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) close() }}>
       <DialogContent
+        preventOutsideDismiss={busy || sklandLogin.mode !== 'scan' || sklandLogin.status === 'account_selection_required' || sklandLogin.status === 'confirm_required'}
         aria-labelledby="skland-binding-title"
         aria-describedby="skland-binding-description"
         className="block max-w-2xl"
