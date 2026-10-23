@@ -518,6 +518,7 @@ function cloneConfig(config: LicenseConfig): LicenseConfig {
 
 function resolvePresetMode(config: LicenseConfig, preset: LicenseConfig): LicenseConfig {
   const resolved = cloneConfig(preset)
+  resolved.recycling_station_level = config.recycling_station_level
   resolved.intermediate_inventory = config.intermediate_inventory
   resolved.auto_balance_source = config.auto_balance_source
   resolved.allow_product_rebalance = config.allow_product_rebalance
@@ -538,6 +539,7 @@ function resolvePresetMode(config: LicenseConfig, preset: LicenseConfig): Licens
 
 function resolveFreePreviewPresetMode(config: LicenseConfig, preset: LicenseConfig): LicenseConfig {
   const resolved = cloneConfig(preset)
+  resolved.recycling_station_level = config.recycling_station_level
   resolved.intermediate_inventory = config.intermediate_inventory
   resolved.auto_balance_source = config.auto_balance_source
   resolved.allow_product_rebalance = config.allow_product_rebalance

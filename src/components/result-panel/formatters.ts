@@ -6,7 +6,7 @@ import { copy, CURRENT_LOCALE } from '../../copy/index'
 
 
 const MAX_MOOD_FALLBACK = 24
-const ROOM_DISPLAY_ORDER = ['trading', 'manufacture', 'power', 'control', 'meeting', 'hire', 'dormitory'] as const
+const ROOM_DISPLAY_ORDER = ['trading', 'manufacture', 'power', 'control', 'meeting', 'hire', 'recycling', 'dormitory'] as const
 const UNKNOWN_ROOM_DISPLAY_RANK = ROOM_DISPLAY_ORDER.length
 const ROOM_DISPLAY_RANK: Record<string, number> = ROOM_DISPLAY_ORDER.reduce(
   (rank, roomType, index) => ({ ...rank, [roomType]: index }),
@@ -180,6 +180,7 @@ export function prepareResult(
         const comparison = result.maa_default_comparison
         const deltaDaily: Partial<DailyProduction> = {
           manufacturing: comparison.delta.manufacturing,
+          recycling: comparison.delta.recycling,
           trading: comparison.delta.trading,
           consumption: comparison.delta.consumption,
           net: comparison.delta.net,

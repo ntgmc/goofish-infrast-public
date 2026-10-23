@@ -41,6 +41,18 @@ describe('standalone manual schedules', () => {
     expect(() => createBlankManualSchedule({ ...config, shift_hours: 'invalid' })).toThrow()
   })
 
+  it('round-trips recycling rooms and enforces their capacity and level', () => {
+    const enabled = { ...config, recycling_station_level: 1 }
+    const source = createBlankManualSchedule(enabled)
+    const imported = parseManualScheduleJson(JSON.stringify(source), enabled, operators)
+    expect(resolveManualScheduleConfig(imported, config, operators).recycling_station_level).toBe(1)
+    expect(createManualPlans(imported)[0].rooms.recycling[0]).toHaveLength(1)
+    source.plans[0].rooms.recycling[0].operators = ['芬', '芬']
+    expect(() => parseManualScheduleJson(JSON.stringify(source), enabled, operators)).toThrow()
+    source.plans.forEach((plan) => { plan.rooms.recycling[0] = { level: 4, operators: [] } })
+    expect(() => parseManualScheduleJson(JSON.stringify(source), enabled, operators)).toThrow()
+  })
+
   it('imports MAA and full result JSON while removing stale calculations', () => {
     const source = createBlankManualSchedule(config)
     source.plans[0].rooms.manufacture[0].operators = ['芬']

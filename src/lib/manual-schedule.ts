@@ -32,6 +32,7 @@ function isFixedDormitory(source: OptimizeResult, type: string): boolean {
 export function roomCapacity(type: string, room: ShiftRoom): number {
   if (type === 'trading' || type === 'manufacture') return Math.max(1, Math.min(3, room.level ?? 3))
   if (type === 'control') return Math.max(1, Math.min(5, room.level ?? 5))
+  if (type === 'recycling') return (room.level ?? room.facility_level ?? 3) === 1 ? 1 : 2
   return ({ meeting: 2, hire: 1, power: 1, processing: 1, dormitory: 5 } as Record<string, number>)[type] ?? room.operators?.length ?? 0
 }
 

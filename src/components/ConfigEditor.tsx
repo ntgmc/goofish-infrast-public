@@ -289,6 +289,15 @@ export default function ConfigEditor({
               </div>
             </div>
           </section>}
+          <section className="config-field">
+            <label htmlFor="config-recycling-level" className="config-section-title">{copy.domain.recycling.level}</label>
+            <select id="config-recycling-level" className="tool-field" value={config.recycling_station_level ?? 0} disabled={readOnly}
+              onChange={(event) => { const level = Number(event.currentTarget.value); update((next) => { next.recycling_station_level = level }) }}>
+              <option value={0}>{copy.domain.recycling.disabled}</option>
+              {[1, 2, 3].map((level) => <option key={level} value={level}>Lv.{level}</option>)}
+            </select>
+            <p className="config-help">{copy.domain.recycling.help}</p>
+          </section>
           <section aria-labelledby="config-product-counts-heading">
             <h3 id="config-product-counts-heading" className="config-section-title">{copy.common.components_ConfigEditor_048}</h3>
             <div className="config-product-groups">

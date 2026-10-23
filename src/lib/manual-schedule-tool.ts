@@ -6,7 +6,7 @@ import { hasCapability } from './product-catalog'
 import { copy } from '../copy/index'
 import type { LicenseConfig, LicenseOperator, OptimizeResult, UserGameAccount } from './types'
 
-const roomTypes = z.enum(['trading', 'manufacture', 'power', 'control', 'meeting', 'hire', 'processing', 'training', 'dormitory'])
+const roomTypes = z.enum(['trading', 'manufacture', 'power', 'control', 'meeting', 'hire', 'processing', 'training', 'recycling', 'dormitory'])
 const hours = z.number().finite().positive().max(24)
 
 export const manualScheduleSourceSchema: z.ZodType<OptimizeResult> = z.object({
@@ -84,6 +84,7 @@ export function createBlankManualSchedule(input: LicenseConfig): OptimizeResult 
         power: Array.from({ length: 9 - config.trading_stations_count - config.manufacturing_stations_count }, () => ({ level: 3, operators: [] })),
         control: [{ level: 5, operators: [] }], meeting: [{ level: 3, operators: [] }],
         hire: [{ level: 3, operators: [] }], processing: [{ level: 3, operators: [] }],
+        recycling: config.recycling_station_level ? [{ level: config.recycling_station_level, operators: [] }] : [],
         dormitory: Array.from({ length: 4 }, () => ({ level: 5, operators: [] })),
       },
       drones: { enable: false, room: 'trading', index: 1, order: 'pre' },
@@ -133,7 +134,7 @@ export function parseManualScheduleJson(text: string, config: LicenseConfig, ope
 export function resolveManualScheduleConfig(source: OptimizeResult, input: LicenseConfig, operators: LicenseOperator[]): LicenseConfig {
   const rooms = source.plans[0].rooms
   const owned = new Set(operators.filter((operator) => operator.own).map((operator) => operator.name))
-  const maximumRooms: Record<string, number> = { trading: 5, manufacture: 5, power: 3, dormitory: 4, control: 1, meeting: 1, hire: 1, processing: 1, training: 1 }
+  const maximumRooms: Record<string, number> = { trading: 5, manufacture: 5, power: 3, dormitory: 4, control: 1, meeting: 1, hire: 1, processing: 1, training: 1, recycling: 1 }
   for (const plan of source.plans) {
     if (Object.keys(plan.rooms).length === 0) throw new Error('Empty facilities')
     for (const [type, entries] of Object.entries(plan.rooms)) {
@@ -141,7 +142,7 @@ export function resolveManualScheduleConfig(source: OptimizeResult, input: Licen
       entries.forEach((room, index) => {
         if (maximumRooms[type] === undefined || (room.operators?.length ?? 0) > roomCapacity(type, room) ||
           room.operators?.some((name) => name !== '' && !owned.has(name)) ||
-          ((type === 'trading' || type === 'manufacture' || type === 'power') && (room.level ?? 3) > 3) ||
+          ((type === 'trading' || type === 'manufacture' || type === 'power' || type === 'recycling') && (room.level ?? 3) > 3) ||
           room.product !== rooms[type][index].product || room.level !== rooms[type][index].level) throw new Error('Invalid room')
       })
     }
@@ -185,6 +186,7 @@ export function resolveManualScheduleConfig(source: OptimizeResult, input: Licen
     trading_stations_count: trading, manufacturing_stations_count: manufacture,
     trading_station_levels: rooms.trading.map((room) => room.level ?? 3),
     manufacturing_station_levels: rooms.manufacture.map((room) => room.level ?? 3),
+    recycling_station_level: rooms.recycling?.[0]?.level ?? (rooms.recycling?.length ? 3 : 0),
     product_requirements: { trading_stations: products('trading'), manufacturing_stations: products('manufacture') },
     Fiammetta: { enable: source.plans.some((plan) => plan.Fiammetta?.enable) },
     drones: { enable: source.plans.some((plan) => plan.drones?.enable), auto: false, order: 'pre', targets: [] },
