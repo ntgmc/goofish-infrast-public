@@ -1,11 +1,13 @@
 name: Security Analysis
 
 on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
   workflow_call:
+    inputs:
+      validation_key:
+        description: Validation fingerprint supplied by Quality Checks
+        required: false
+        default: ""
+        type: string
   schedule:
     - cron: "40 1 * * 2"
   workflow_dispatch:
@@ -20,7 +22,7 @@ concurrency:
 jobs:
   semgrep:
     name: Semgrep SAST
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       PIP_DISABLE_PIP_VERSION_CHECK: "1"
@@ -41,3 +43,19 @@ jobs:
 
       - name: Scan repository
         run: semgrep scan --config .semgrep.yml --error --metrics=off .
+
+      - name: Record successful security validation
+        if: inputs.validation_key != ''
+        env:
+          VALIDATION_KEY: ${{ inputs.validation_key }}
+        run: node scripts/ci-validation-reuse.mjs record security "$VALIDATION_KEY"
+
+      - name: Upload security validation record
+        if: inputs.validation_key != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-validation-security-${{ inputs.validation_key }}
+          path: ${{ runner.temp }}/ci-validation/security.json
+          if-no-files-found: error
+          overwrite: true
+          retention-days: ${{ vars.CI_ARTIFACT_RETENTION_DAYS || '3' }}

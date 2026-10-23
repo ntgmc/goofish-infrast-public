@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   id-token: write
   attestations: write
 
@@ -20,9 +21,37 @@ env:
   NODE_VERSION: "24.22.1"
 
 jobs:
+  validation-reuse:
+    name: Resolve Validation Reuse
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      public_key: ${{ steps.reuse.outputs.public_key }}
+      postgres_key: ${{ steps.reuse.outputs.postgres_key }}
+      security_key: ${{ steps.reuse.outputs.security_key }}
+      reuse_public: ${{ steps.reuse.outputs.reuse_public }}
+      reuse_postgres: ${{ steps.reuse.outputs.reuse_postgres }}
+      reuse_security: ${{ steps.reuse.outputs.reuse_security }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Resolve successful validation records
+        id: reuse
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/ci-validation-reuse.mjs resolve
+
   public-validation:
     name: Public Build, Tests, and Boundaries
-    runs-on: ubuntu-latest
+    needs: validation-reuse
+    if: needs.validation-reuse.outputs.reuse_public != 'true'
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Checkout
@@ -52,7 +81,7 @@ jobs:
           pnpm run check:dead-code
           pnpm run check:api
 
-      - name: Run public tests
+      - name: Run workflow and script tests
         run: |
           pnpm run test:workflow-contracts
           pnpm run test:generate-data
@@ -64,7 +93,51 @@ jobs:
           pnpm run test:release-confirmation
           pnpm run test:build-relevance
           pnpm run check:build-relevance
-          pnpm test
+
+      - name: Build and test public export
+        run: pnpm run check:public-export
+
+      - name: Record successful public validation
+        env:
+          VALIDATION_KEY: ${{ needs.validation-reuse.outputs.public_key }}
+        run: node scripts/ci-validation-reuse.mjs record public "$VALIDATION_KEY"
+
+      - name: Upload public validation record
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-validation-public-${{ needs.validation-reuse.outputs.public_key }}
+          path: ${{ runner.temp }}/ci-validation/public.json
+          if-no-files-found: error
+          overwrite: true
+          retention-days: ${{ vars.CI_ARTIFACT_RETENTION_DAYS || '3' }}
+
+  public-release:
+    name: Public Release Artifact
+    needs: [validation-reuse, public-validation]
+    if: >-
+      always() && !cancelled() && github.event_name == 'push' &&
+      needs.validation-reuse.result == 'success' &&
+      (needs.public-validation.result == 'success' ||
+      (needs.public-validation.result == 'skipped' && needs.validation-reuse.outputs.reuse_public == 'true'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        run: npm install --global pnpm@12.14.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Build public application
         env:
@@ -73,16 +146,12 @@ jobs:
           BUILD_NUMBER: ${{ github.run_number }}
           BUILD_CONTEXT: public-quality-checks
           EFFICIENCY_DATA_EXPECTED_MODE: public_fallback
-          GENERATE_CHANGELOG_CANDIDATE: ${{ github.event_name == 'push' && 'true' || 'false' }}
+          GENERATE_CHANGELOG_CANDIDATE: "true"
           CHANGELOG_BASE_SHA: ${{ github.event.before }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          pnpm run build
-          pnpm run generate:release-sbom
-          pnpm run check:public-export
+        run: pnpm run build
 
       - name: Create and verify public artifact
-        if: github.event_name == 'push'
         env:
           RELEASE_ROOT: ${{ github.workspace }}/.release-staging/public
           RELEASE_SOURCE_ROOT: ${{ github.workspace }}
@@ -100,13 +169,11 @@ jobs:
           node .release-smoke/public/scripts/check-release-runtime.mjs .release-smoke/public
 
       - name: Attest public artifact provenance
-        if: github.event_name == 'push'
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: .release-packages/public/public.tgz
 
       - name: Upload public artifact
-        if: github.event_name == 'push'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: goofish-public-${{ github.sha }}
@@ -116,7 +183,9 @@ jobs:
 
   postgres-integration:
     name: PostgreSQL Integration
-    runs-on: ubuntu-latest
+    needs: validation-reuse
+    if: needs.validation-reuse.outputs.reuse_postgres != 'true'
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
       postgres:
@@ -162,3 +231,27 @@ jobs:
           node server/dist/migrate.js
           node scripts/check-server-routes.mjs
           node scripts/verify-migrated-data.mjs --require-database
+
+      - name: Record successful PostgreSQL validation
+        env:
+          VALIDATION_KEY: ${{ needs.validation-reuse.outputs.postgres_key }}
+        run: node scripts/ci-validation-reuse.mjs record postgres "$VALIDATION_KEY"
+
+      - name: Upload PostgreSQL validation record
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-validation-postgres-${{ needs.validation-reuse.outputs.postgres_key }}
+          path: ${{ runner.temp }}/ci-validation/postgres.json
+          if-no-files-found: error
+          overwrite: true
+          retention-days: ${{ vars.CI_ARTIFACT_RETENTION_DAYS || '3' }}
+
+  security:
+    name: Static Security Analysis
+    needs: validation-reuse
+    if: needs.validation-reuse.outputs.reuse_security != 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/security-analysis.yml
+    with:
+      validation_key: ${{ needs.validation-reuse.outputs.security_key }}
