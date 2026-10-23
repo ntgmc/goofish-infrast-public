@@ -83,6 +83,20 @@ V1、V2 排班结果的「培养建议」可逐条加入项目，组合建议一
 仅龙门币与作战经验展示基建和刷取的补充比例及尚未安排的数量。
 每日安排沿时间线展示关卡、次数、预计材料和使用理智。
 
+目标清单上方展开「导出到 MAA」，复制培养计划，再到 MAA「干员培养」点击
+「读取剪贴板」。按当前顺序导出未暂缓的目标；干员资料缺失时先刷新练度与库存。
+复制受浏览器权限限制时，可在文本框中手动复制。导出不依赖材料缺口、生产方案或日期计算。
+MAA 导入会追加到已有培养计划，使用前请检查是否已有相同目标。
+
+格式对照 MAA 仓库的
+[`OperProgressTaskUserControlModel.ParsePlan`](https://github.com/MaaAssistantArknights/MaaAssistantArknights/blob/d9f5be750da3d1e1d6790d85a046672cb7682be1/src/MaaWpfGui/ViewModels/UserControl/TaskQueue/OperProgressTaskUserControlModel.cs)：
+根节点为 JSON 数组，每项使用 `name`、`role`、`elite`、`skill_level`、`skill_mastery`。
+`role` 使用 MAA 职业名（如 `Warrior`），无职业资料时由 MAA 按名字匹配。
+基础技能目标不超过 7；项目技能目标 8–10 分别转为所选技能的专精 1–3，
+其余两个技能的专精为 0。无技能或技能目标为 1 时，`skill_level` 为 0（不设置升级）。
+该导入格式支持精英化、技能升级和专精，没有干员等级字段，目标等级仍需在游戏内完成；
+使用的 MAA 版本须提供「干员培养」入口。
+
 目标清单、资源缺口与每日安排中的材料均可点击，在原位置切换为完整合成路线。
 原料树递归展开至基础资源，数量按所选用量及整批加工计算；芯片助剂展开为采购凭证。
 芯片的双向转换单独标注兑换比例，保留刷取来源，不将循环转换当作必刷原料。

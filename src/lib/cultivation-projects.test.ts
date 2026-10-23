@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { CultivationCandidate, CultivationData } from './cultivation-contract'
 import { CONFIG_PRESETS } from './config'
-import { buildProjectRoute, isCultivationProject, prepareProjectProduction, projectDaysEarlier, readProjectIncome, type CultivationProject } from './cultivation-projects'
+import { buildMaaCultivationPlan, buildProjectRoute, isCultivationProject, prepareProjectProduction, projectDaysEarlier, readProjectIncome, type CultivationProject, type ProjectOperator } from './cultivation-projects'
 
 const project = (operatorId: string): CultivationProject => ({ operatorId, elite: 2, level: 60, skill: 1, skillLevel: 7, paused: false, deadline: '' })
 const candidate = (id: string, items: Record<string, number>): CultivationCandidate => ({
@@ -15,6 +15,39 @@ const data = (candidates: CultivationCandidate[], overrides: Partial<Cultivation
 })
 const settings = { startDate: '2026-10-06', dailySanity: 0, days: 30, allOpen: false }
 const normal = { lmd: 100, exp: 100, goldNet: 0 }
+
+describe('MAA operator development import contract', () => {
+  const operators: ProjectOperator[] = [
+    { id: 'chen', name: '陈', profession: 'WARRIOR', rarity: 6, skills: ['s1', 's2', 's3'], maxLevels: [50, 80, 90], current: candidate('chen', {}).current },
+    { id: 'amiya', name: '阿米娅', profession: 'CASTER', rarity: 5, skills: ['s1', 's2', 's3'], maxLevels: [50, 70, 80], current: candidate('amiya', {}).current },
+    { id: 'amiya_guard', name: '阿米娅', profession: 'WARRIOR', rarity: 5, skills: ['s1', 's2'], maxLevels: [50, 70, 80], current: candidate('amiya', {}).current },
+  ]
+
+  it('matches MAA ParsePlan’s documented Chen example and preserves order while excluding paused goals', () => {
+    const goals = [{ ...project('chen'), skill: 3, skillLevel: 10 }, { ...project('missing'), paused: true }, project('amiya_guard')]
+    const original = structuredClone(goals)
+    const exported = JSON.parse(JSON.stringify(buildMaaCultivationPlan(goals, operators)))
+    // OperProgressTaskUserControlModel.ParsePlan: {"role":"Warrior","name":"陈","elite":2,"skill_level":7,"skill_mastery":[0,0,3]}
+    expect(exported).toEqual([
+      { role: 'Warrior', name: '陈', elite: 2, skill_level: 7, skill_mastery: [0, 0, 3] },
+      { role: 'Warrior', name: '阿米娅', elite: 2, skill_level: 7, skill_mastery: [0, 0, 0] },
+    ])
+    expect(goals).toEqual(original)
+  })
+
+  it.each([[1, 8, [1, 0, 0]], [2, 9, [0, 2, 0]], [3, 10, [0, 0, 3]]] as const)('exports skill %i at rank %i without requesting mastery of other skills', (skill, skillLevel, mastery) => {
+    expect(buildMaaCultivationPlan([{ ...project('chen'), skill, skillLevel }], operators)?.[0]).toMatchObject({ skill_level: 7, skill_mastery: mastery })
+  })
+
+  it('requires all active operators and supports old metadata without a profession or skills', () => {
+    expect(buildMaaCultivationPlan([project('chen'), project('missing')], operators)).toBeNull()
+    expect(buildMaaCultivationPlan([{ ...project('missing'), paused: true }], operators)).toEqual([])
+    const robot = { ...operators[0], id: 'robot', name: 'Lancet-2', profession: undefined, skills: [] }
+    expect(JSON.parse(JSON.stringify(buildMaaCultivationPlan([{ ...project('robot'), elite: 0, skillLevel: 1 }], [robot])))).toEqual([
+      { name: 'Lancet-2', elite: 0, skill_level: 0, skill_mastery: [0, 0, 0] },
+    ])
+  })
+})
 
 describe('goal-driven resource routes', () => {
   it('uses shared inventory, crafting costs and daily income exactly once; pausing reallocates stock', () => {

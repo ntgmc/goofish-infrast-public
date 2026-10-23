@@ -76,6 +76,48 @@ it('turns a selected goal into an income-linked route and changes configuration 
   expect(await screen.findByRole('heading', { name: text.route })).toBeInTheDocument()
 })
 
+it('exports the latest active goals to the MAA clipboard even when production cannot be calculated', async () => {
+  const user = userEvent.setup()
+  const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
+  const goal: CultivationProject = { operatorId: 'char_test', elite: 2, level: 60, skill: 1, skillLevel: 9, paused: false, deadline: '' }
+  localStorage.setItem('maatool:cultivation-projects:user1:mine', JSON.stringify([goal, { ...goal, operatorId: 'paused', paused: true }]))
+  mocks.result.mockRejectedValue(new Error('production unavailable'))
+  render(<MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /></MemoryRouter>)
+  await user.click(screen.getByText(text.maaExport))
+  expect(screen.getByText(text.maaUnavailable)).toBeVisible()
+  expect(screen.queryByRole('button', { name: text.maaCopy })).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: text.import }))
+  const content = await screen.findByRole('textbox', { name: text.maaContent })
+  expect(JSON.parse((content as HTMLTextAreaElement).value)).toEqual([
+    { name: '测试干员', elite: 2, skill_level: 7, skill_mastery: [2, 0, 0] },
+  ])
+  expect(screen.queryByRole('heading', { name: text.route })).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: text.maaCopy }))
+  expect(write).toHaveBeenCalledWith((content as HTMLTextAreaElement).value)
+  expect(await screen.findByText(text.maaCopied)).toBeVisible()
+  expect(JSON.parse(localStorage.getItem('maatool:cultivation-projects:user1:mine')!)[0]).toEqual(goal)
+  await user.click(screen.getByRole('button', { name: text.pause }))
+  expect(screen.getByText(text.maaEmpty)).toBeVisible()
+  expect(screen.queryByText(text.maaCopied)).not.toBeInTheDocument()
+})
+
+it('keeps MAA output available for manual copying when the browser rejects clipboard access', async () => {
+  const user = userEvent.setup()
+  vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(new Error('clipboard denied'))
+  render(<MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /></MemoryRouter>)
+  await user.click(screen.getByRole('button', { name: text.import }))
+  await user.selectOptions(await screen.findByRole('combobox', { name: text.operator }), 'char_test')
+  await user.click(screen.getByRole('button', { name: text.add }))
+  await user.click(screen.getByText(text.maaExport))
+  await user.click(screen.getByRole('button', { name: text.maaCopy }))
+  expect(await screen.findByRole('alert')).toHaveTextContent(text.maaCopyFailed)
+  const content = screen.getByRole('textbox', { name: text.maaContent }) as HTMLTextAreaElement
+  await user.click(content)
+  expect(content.selectionStart).toBe(0)
+  expect(content.selectionEnd).toBe(content.value.length)
+  expect(content).toHaveAttribute('readonly')
+})
+
 it('calculates manual materials even when production fails, then includes crafting shortages in the route', async () => {
   const user = userEvent.setup()
   mocks.result.mockRejectedValue(new Error('production unavailable'))
