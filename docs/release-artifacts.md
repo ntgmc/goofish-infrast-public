@@ -22,7 +22,7 @@ gh attestation verify public.tgz --repo ntgmc/goofish-infrast-public
 sha256sum --check public.tgz.sha256
 ```
 
-After extraction, use Node 24.22.0 and pnpm 12.14.0, install only production
+After extraction, use Node 24.22.1 and pnpm 12.14.0, install only production
 dependencies, and run the packaged smoke check before migration or traffic
 switching:
 
