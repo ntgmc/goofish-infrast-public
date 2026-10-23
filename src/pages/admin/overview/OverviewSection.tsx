@@ -56,7 +56,7 @@ export default function OverviewSection({ model: c, active = true }: Props) {
           detail={current.reuse.eligible ? `${current.reuse.reused} / ${current.reuse.eligible} 人再次使用` : current.reuse.pending ? '等待使用后的 7 天观察期完成' : '暂无可观察的使用用户'}
           href={canViewUsers ? operationsUsersPath(data, 'reuse_missing') : undefined} action="查看未再次排班用户" />
         <BusinessMetric label="MAA 文件获取率" value={percent(current.maa.rate)} previous={previous.maa.rate === null ? null : percent(previous.maa.rate)}
-          detail={!current.maa.complete ? '文件获取记录尚未覆盖完整范围' : current.maa.eligible ? `${current.maa.exported} / ${current.maa.eligible} 份方案已获取` : '暂无可导出为 MAA 的新方案'}
+          detail={current.maa.eligible ? `${current.maa.exported} / ${current.maa.eligible} 份方案已获取${current.maa.complete ? '' : '（自文件获取记录开始）'}` : '暂无可导出为 MAA 的新方案'}
           href={canViewUsers ? operationsUsersPath(data, 'maa_missing') : undefined} action="查看未获取文件用户" />
         <BusinessMetric label="完整等待 P95" value={wait(current.p95_wait_ms)} previous={previous.p95_wait_ms === null ? null : wait(previous.p95_wait_ms)} detail={current.latency_samples ? `从提交到完成，${current.latency_samples} 次成功生成` : '暂无完整等待记录'} />
         <BusinessMetric label="每次成功生成成本" value={money(current.cost.per_success_cny)} previous={previous.cost.per_success_cny === null ? null : money(previous.cost.per_success_cny)}
@@ -83,7 +83,7 @@ export default function OverviewSection({ model: c, active = true }: Props) {
           <div className="ops-result-delivery"><h3>生成之后是否获取了 MAA 文件？</h3><p>已记录获取 {current.maa.exported} 份，可观察方案 {current.maa.eligible} 份。</p>
             {canViewUsers && <Link className="ops-text-link" to={operationsUsersPath(data, 'maa_exported')}>查看已获取文件用户 →</Link>}
             {data.coverage.maa_tracking_started_at && <p className="ops-observation-note">文件获取记录自 {timestamp(data.coverage.maa_tracking_started_at)} 开始。</p>}
-            {!current.maa.complete && <p className="ops-observation-note">选择记录开始后的完整日期范围，可查看获取率。</p>}
+            {!current.maa.complete && <p className="ops-observation-note">获取率按文件获取记录开始后生成的方案计算。</p>}
           </div>
         </section>
       </div>

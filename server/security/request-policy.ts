@@ -744,7 +744,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
     PATCH: json('admin', requestSchemas.adminServiceStatusPatch),
   }, ['view'])],
   ['/api/admin/session', route({ GET: none(), POST: json('auth', requestSchemas.adminSession), DELETE: none() })],
-  ['/api/admin/users', route({ GET: none(), POST: json('admin', requestSchemas.adminUserCreate), PATCH: json('admin', requestSchemas.adminUserPatch), DELETE: json('admin', requestSchemas.adminUserDelete) }, ['user_id', 'profile_id', 'include', 'page', 'page_size', 'profile_page', 'profile_page_size', 'search', 'status', 'permission', 'profile_kind', 'email_verified', 'activity', 'registered_from', 'registered_to', 'last_seen_from', 'last_seen_to', 'sort'])],
+  ['/api/admin/users', route({ GET: none(), POST: json('admin', requestSchemas.adminUserCreate), PATCH: json('admin', requestSchemas.adminUserPatch), DELETE: json('admin', requestSchemas.adminUserDelete) }, ['user_id', 'profile_id', 'include', 'page', 'page_size', 'profile_page', 'profile_page_size', 'search', 'status', 'permission', 'profile_kind', 'email_verified', 'activity', 'registered_from', 'registered_to', 'last_seen_from', 'last_seen_to', 'sort', 'cohort', 'from', 'to', 'observed_at', 'reason'])],
   ['/api/admin/balance', route({ GET: none(), POST: json('admin', requestSchemas.adminBalanceAdjust) }, ['user_id', 'cursor', 'limit'])],
   ['/api/admin/commercial', route({ GET: none(), POST: json('admin', requestSchemas.adminCommercial) }, ['user_id', 'summary'])],
   ['/api/auth/register', route({ POST: json('auth', requestSchemas.authRegister) })],
