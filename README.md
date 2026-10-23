@@ -14,7 +14,7 @@
 
 ## 本地开发
 
-环境要求：Node.js 24.22.0、pnpm 12.14.0。可通过 `npm install --global pnpm@12.14.0` 安装 pnpm。后端开发需准备 PostgreSQL 和项目根目录的 `.env`。
+环境要求：Node.js 24.22.1、pnpm 12.14.0。可通过 `npm install --global pnpm@12.14.0` 安装 pnpm。后端开发需准备 PostgreSQL 和项目根目录的 `.env`。
 
 安装依赖并启动前端：
 
