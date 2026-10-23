@@ -77,6 +77,7 @@ type OptimizeJobPayloadBase = {
     billing_operation?: MeteredBillingOperation;
     baseline_history_id?: string;
     manual_schedule?: import('../../../src/lib/types').OptimizeResult;
+    manual_schedule_purpose?: 'comparison';
   };
 };
 

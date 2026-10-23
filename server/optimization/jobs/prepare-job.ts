@@ -99,7 +99,7 @@ export async function prepareOptimizeJob(
     let isPreviewProfile = false;
     let isPreviewTrial = false;
     let personalUseAudit: PreparedOptimizeJob['personalUseAudit'];
-    let manualSimulation: { source: OptimizeResult; config: LicenseConfig } | null = null;
+    let manualSimulation: { source: OptimizeResult; config: LicenseConfig; purpose?: 'comparison' } | null = null;
     let meteredBilling: PreparedOptimizeJob['billing'] = null;
 
     {
@@ -171,7 +171,10 @@ export async function prepareOptimizeJob(
         } catch {
           return fail({ error: '手动排班无效，请检查干员、设施和无人机安排。', code: 'validation_failed' }, 400);
         }
-        manualSimulation = { source: manualResult(source, body.manualSchedule.plans), config: simulationConfig };
+        manualSimulation = {
+          source: manualResult(source, body.manualSchedule.plans), config: simulationConfig,
+          ...('source' in body.manualSchedule && { purpose: body.manualSchedule.purpose }),
+        };
       }
       if (profileKind === 'free_preview' && isScenarioComparison) {
         scheduleUsage = scheduleFailure('permission_denied', { profile_id: activeProfileId, permission: profile.permission, source: 'account_profile' });
@@ -315,6 +318,7 @@ export async function prepareOptimizeJob(
             request: {
               include_upgrade_suggestions: false, upgrade_suggestions_allowed: false,
               manual_schedule: manualSimulation.source,
+              ...(manualSimulation.purpose && { manual_schedule_purpose: manualSimulation.purpose }),
             },
           }),
         },

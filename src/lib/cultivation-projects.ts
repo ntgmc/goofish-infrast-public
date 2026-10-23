@@ -52,7 +52,7 @@ export function isCultivationProject(value: unknown): value is CultivationProjec
 }
 
 export function buildMaaCultivationPlan(projects: CultivationProject[], operators: ProjectOperator[]) {
-  const plans = []
+  const plans: { name: string; role: string | undefined; elite: number; skill_level: number; skill_mastery: number[] }[] = []
   for (const project of projects.filter((row) => !row.paused)) {
     const operator = operators.find((row) => row.id === project.operatorId)
     if (!operator?.name) return null

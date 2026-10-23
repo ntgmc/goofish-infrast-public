@@ -532,7 +532,7 @@ export const requestSchemas = {
       baseline_history_id: optionalString(128),
       manualSchedule: z.union([
         strict({ baselineHistoryId: shortString(128), plans: manualPlansSchema }),
-        strict({ source: manualScheduleSourceSchema, plans: manualPlansSchema }),
+        strict({ source: manualScheduleSourceSchema, plans: manualPlansSchema, purpose: z.literal('comparison').optional() }),
       ]).optional(),
     }),
     strict({

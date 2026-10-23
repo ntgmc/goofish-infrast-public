@@ -159,6 +159,7 @@ const schedulePayloadSchema: z.ZodType<OptimizeJobPayload> = z.strictObject({
     billing_operation: z.enum(['main_schedule', 'incremental_recompute']).optional(),
     baseline_history_id: boundedString(128).optional(),
     manual_schedule: optimizeResultSchema.optional(),
+    manual_schedule_purpose: z.literal('comparison').optional(),
   }),
   configPermission: z.enum(['recommended', 'growth', 'advanced', 'ultimate', 'metered_advanced', 'admin', 'free_preview']),
   cdkUsageRef: z.strictObject({ code_hash: boundedString(256) }).nullable().optional(),

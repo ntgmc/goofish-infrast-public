@@ -1280,6 +1280,41 @@ describe('PostgreSQL optimization job admission', () => {
     })
   })
 
+  it('keeps comparison results in the job without modifying history, workspace or completion notifications', async () => {
+    const profileId = await seedProfile()
+    await saveWorkspace({ ...emptyWorkspace(profileId), operators: formalOperators(), config: formalConfig() })
+    await withTransaction(async (client) => {
+      for (let index = 0; index < 5; index += 1) {
+        await insertProfileOptimizationResultInTransaction(client, profileId, {
+          id: `comparison-baseline-${index}`, name: `Baseline ${index}`, created_at: new Date().toISOString(),
+          config: formalConfig(), result: formalScheduleResult(`baseline-${index}`), operator_count: 1, source: 'generated',
+        }, 5)
+      }
+    })
+    const beforeHistory = await listProfileOptimizationResults(profileId, 'active')
+    const beforeWorkspace = await getWorkspace(profileId)
+    await query(
+      `insert into qqbot_account_bindings (id, user_id, qq_number, notifications_enabled, created_at)
+       select 'comparison-binding', user_id, '123459998', true, now() from user_game_accounts where id = $1`,
+      [profileId],
+    )
+    const payload = formalSchedulePayload(profileId)
+    const store = createPostgresOptimizeJobStore()
+    const admitted = await store.admitJob(input({
+      priority: 2_100_000_000, owner_key: `profile:${profileId}`, profile_id: profileId, source: 'account_profile',
+      payload_json: { ...payload, request: { ...payload.request, manual_schedule: formalScheduleResult('comparison'), manual_schedule_purpose: 'comparison' } },
+    }))
+    const claimed = await store.claimNextJob('comparison-worker', 'comparison-lock', new Date(Date.now() + 60_000).toISOString(), 2, 100)
+    expect(claimed?.id).toBe(admitted.job.id)
+    await expect(store.completeAttempt(claimed!.id, claimed!.attempt_count, 'comparison-worker', 'comparison-lock', formalScheduleResult('comparison-result'))).resolves.toBe(true)
+    await expect(store.getJob(admitted.job.id)).resolves.toMatchObject({ status: 'succeeded', result_json: { title: 'comparison-result', schedule_source: 'manual' } })
+    await expect(listProfileOptimizationResults(profileId, 'active')).resolves.toEqual(beforeHistory)
+    await expect(getWorkspace(profileId)).resolves.toEqual(beforeWorkspace)
+    expect((await query('select job_id from optimization_job_effects where job_id = $1', [admitted.job.id])).rows).toEqual([])
+    expect((await query('select result_id from qqbot_schedule_notifications where result_id = $1', [admitted.job.id])).rows).toEqual([])
+    expect((await store.listJobsByProfile(profileId))[0].historyResultId).toBeNull()
+  })
+
   it('persists a successful schedule into rolling workspace history and a durable effect outbox', async () => {
     const profileId = await seedProfile()
     await query(
