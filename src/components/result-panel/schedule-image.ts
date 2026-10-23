@@ -52,7 +52,7 @@ const BADGE_SIZE = 16
 const HEADER_INSET = 12
 const SLOT_GAP = 12
 const PRODUCTION_TYPES = ['trading', 'manufacture', 'power']
-const SUPPORT_TYPES = ['meeting', 'processing', 'hire', 'training']
+const SUPPORT_TYPES = ['meeting', 'processing', 'hire', 'training', 'recycling']
 
 export async function downloadScheduleImage(options: ImageOptions): Promise<void> {
   const blob = await renderScheduleImage(options)

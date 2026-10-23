@@ -454,6 +454,7 @@
   align-items: center;
   justify-content: flex-end;
   align-self: stretch;
+  gap: var(--space-md);
   margin-block: 20px 21px;
 }
 
@@ -680,14 +681,15 @@
   background: var(--v2-accent);
 }
 
-.v2-content-tabs > span {
+.v2-result-source {
   display: flex;
+  flex: none;
   align-items: center;
   gap: 6px;
   margin-left: auto;
-  padding-bottom: 6px;
   color: var(--v2-muted);
   font-size: var(--text-sm);
+  white-space: nowrap;
 }
 
 .v2-result-actions > .v2-button {
@@ -2003,8 +2005,8 @@
   .v2-metric-hint { font-size: var(--text-xs); }
   .v2-metric-hint { margin-top: var(--space-2xs); }
   .v2-content-tabs { flex-wrap: wrap; gap: 0 var(--space-xs); margin-block: var(--space-sm); }
-  .v2-content-tabs > span { gap: var(--space-3xs); padding-block: var(--space-xs); font-size: var(--text-xs); }
-  .v2-content-tabs > span > svg { flex: none; }
+  .v2-result-source { gap: var(--space-3xs); font-size: var(--text-xs); }
+  .v2-result-source > svg { flex: none; }
   .v2-content-tabs > button { padding-bottom: var(--space-xs); }
   .v2-panel-heading { align-items: center; padding: var(--space-sm); }
   .v2-heading-inline { flex-wrap: wrap; gap: var(--space-2xs); }

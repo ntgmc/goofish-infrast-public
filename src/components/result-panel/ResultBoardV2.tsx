@@ -20,6 +20,7 @@ const ROOM_STYLES: Record<string, { icon: LucideIcon; tone: string }> = {
   processing: { icon: Wrench, tone: 'text-ink-secondary' },
   hire: { icon: RecruitmentIcon, tone: 'text-ink-secondary' },
   training: { icon: TrainingRoomIcon, tone: 'text-ink-secondary' },
+  recycling: { icon: Wrench, tone: 'text-ink-secondary' },
   dormitory: { icon: BedDouble, tone: 'text-success' },
 }
 

@@ -2645,6 +2645,7 @@ async function persistScheduleCompletionInTransaction(
   result: OptimizeResult,
   nowIso: string,
 ): Promise<OptimizeResult> {
+  if (payload.request.manual_schedule && payload.request.manual_schedule_purpose === 'comparison') return result
   const profileId = job.profile_id!
   const persistedResult = payload.isPreviewProfile && !payload.isPreviewTrial
     ? limitPreviewOptimizeResult(result, await hasTrainingDiagnosisEntitlement(job.id, client))

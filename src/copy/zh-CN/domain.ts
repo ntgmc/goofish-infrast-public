@@ -1,4 +1,11 @@
 export const domainCopy = {
+  recycling: {
+    title: "回收站",
+    level: "回收站等级",
+    disabled: "未建造",
+    help: "自动回收材料；有收益且心情可循环时安排进驻，转化提效关闭。",
+    sanityNote: (value: string) => ` + 回收 ${value}`,
+  },
   inventory_warning: {
     title: "中间产物库存不足",
     depleted: (product: string) => `${product}库存已耗尽，当前产量无法满足消耗。`,

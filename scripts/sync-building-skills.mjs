@@ -6,7 +6,7 @@ import { atomicWriteFile, writeFileIfChanged } from './atomic-write.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const catalogPath = resolve(root, 'src/data/building-skills.json')
-const rooms = { CONTROL: 'control', TRADING: 'trading', MANUFACTURE: 'manufacture', POWER: 'power', DORMITORY: 'dormitory', MEETING: 'meeting', HIRE: 'hire', WORKSHOP: 'processing', TRAINING: 'training' }
+const rooms = { CONTROL: 'control', TRADING: 'trading', MANUFACTURE: 'manufacture', POWER: 'power', DORMITORY: 'dormitory', MEETING: 'meeting', HIRE: 'hire', WORKSHOP: 'processing', TRAINING: 'training', RECYCLE: 'recycling' }
 const gameRepo = 'Kengxxiao/ArknightsGameData'
 const assetRepo = 'arkntools/arknights-toolbox-data'
 const professionRepo = 'ZOOT-Plus/zoot-plus-frontend'
@@ -19,7 +19,9 @@ function compile(building, names, characters, source) {
   for (const [shortId, name] of Object.entries(names)) {
     const id = `char_${shortId}`
     const character = building.chars[id]
-    assert(character && typeof name === 'string', `Missing operator: ${id}`)
+    assert(typeof name === 'string', `Invalid operator name: ${id}`)
+    // Alternate forms without a building record share their original form's skills.
+    if (!character) continue
     const profession = professions[characters[shortId]?.profession]
     assert(profession, `Unknown profession: ${id}`)
     operators[id] = {

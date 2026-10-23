@@ -1586,6 +1586,23 @@ describe('V2 feature continuity', () => {
     expect(session.persistWorkspacePatch).not.toHaveBeenCalled()
   })
 
+  it('opens schedule comparison from the tools directory with the current profile', async () => {
+    connect()
+    session.workspace = { profile_id: 'profile-1', operators: SAMPLE_OPERATORS, config: SAMPLE_CONFIG,
+      elite_overrides: {}, latest_result: summary, result_history: [summary], archived_results: [], saved_configs: [],
+      result_history_next_cursor: null, archived_results_next_cursor: null, free_schedule_entitlement: null, updated_at: null }
+    const user = userEvent.setup()
+    mount('/v2?section=tools&profile_id=profile-1')
+    const link = await screen.findByRole('link', { name: new RegExp(copy.tools.scheduleComparison.title) })
+    expect(link).toHaveAttribute('href', '/v2?section=schedule-comparison&profile_id=profile-1')
+    await user.click(link)
+    expect(await screen.findByRole('heading', { name: copy.tools.scheduleComparison.title })).toBeVisible()
+    expect(await screen.findByLabelText(`${copy.tools.scheduleComparison.before} · ${copy.tools.scheduleComparison.select}`)).toBeVisible()
+    expect(screen.getByRole('button', { name: copy.tools.scheduleComparison.start })).toBeDisabled()
+    await user.click(screen.getByRole('link', { name: copy.v2.backToTools }))
+    expect(await screen.findByRole('link', { name: new RegExp(copy.tools.scheduleComparison.title) })).toBeVisible()
+  })
+
   it('blocks profile switching when configuration cannot be saved', async () => {
     connect()
     const next = { ...session.activeProfile!, id: 'profile-2', display_name: 'Second Doctor' }

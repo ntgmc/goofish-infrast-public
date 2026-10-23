@@ -4,6 +4,7 @@ import { createManualPlans } from '../../../src/lib/manual-schedule'
 import { createBlankManualSchedule } from '../../../src/lib/manual-schedule-tool'
 import type { LicenseOperator, OptimizeResult } from '../../../src/lib/types'
 import { DEFAULT_SITE_FEATURE_SETTINGS } from '../../../src/lib/site-features'
+import { requestSchemas } from '../../security/request-policy'
 
 const mocks = vi.hoisted(() => ({
   profile: vi.fn(), baseline: vi.fn(), session: vi.fn(), authorization: vi.fn(),
@@ -94,6 +95,21 @@ describe('manual schedule admission', () => {
       layout: '3-3-3', shift_hours: [12, 12, 12], trading_stations_count: 3, manufacturing_stations_count: 3,
     })
     expect(result.prepared.payload.request.manual_schedule?.plans).toHaveLength(3)
+  })
+
+  it('preserves comparison purpose through validation without weakening manual simulation authorization', async () => {
+    const standalone = createBlankManualSchedule(normalizeConfig(config))
+    const body = { manualSchedule: { source: standalone, plans: createManualPlans(standalone), purpose: 'comparison' } }
+    const result = await prepareOptimizeJob(request(body))
+    expect(result.ok).toBe(true)
+    if (!result.ok || 'kind' in result.prepared.payload) throw new Error('Expected comparison admission')
+    expect(result.prepared.payload.request).toMatchObject({ manual_schedule_purpose: 'comparison', manual_schedule: { title: standalone.title } })
+    mocks.authorization.mockResolvedValueOnce({ ok: true, permission: 'recommended', cdkRecord: null })
+    const denied = await prepareOptimizeJob(request(body))
+    expect(denied.ok).toBe(false)
+    if (denied.ok) throw new Error('Expected permission rejection')
+    expect(denied.response.status).toBe(403)
+    expect(requestSchemas.optimizationJob.safeParse(await request({ ...body, manualSchedule: { ...body.manualSchedule, purpose: 'save' } }).json()).success).toBe(false)
   })
 
   it('requires current advanced authorization for standalone sources and admits active advanced trials', async () => {

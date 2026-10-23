@@ -6,6 +6,7 @@ import {
   SANITY_PER_PURE_GOLD,
 } from './orundum-economy'
 import type { DailyProduction } from './types'
+import { recyclingSanity } from './recycling'
 import { copy, CURRENT_LOCALE } from '../copy/index'
 
 
@@ -29,11 +30,12 @@ export function calculateProductionSanity(daily: Partial<DailyProduction> | null
   const consumptionSanity =
     getResourceAmount(consumption, 'Pure Gold') * SANITY_PER_PURE_GOLD +
     getResourceAmount(consumption, 'Originium Shard') * SANITY_PER_ORIGINIUM_SHARD
-  const value = manufacturingSanity + tradingSanity - consumptionSanity
+  const recoveredSanity = recyclingSanity(daily?.recycling)
+  const value = manufacturingSanity + tradingSanity + recoveredSanity - consumptionSanity
 
   return {
     value,
-    note: `${copy.domain.lib_production_sanity_001}${formatSanityAmount(manufacturingSanity)}${copy.domain.lib_production_sanity_002}${formatSanityAmount(tradingSanity)}${copy.domain.lib_production_sanity_003}${formatSanityAmount(consumptionSanity)}`,
+    note: `${copy.domain.lib_production_sanity_001}${formatSanityAmount(manufacturingSanity)}${copy.domain.lib_production_sanity_002}${formatSanityAmount(tradingSanity)}${copy.domain.lib_production_sanity_003}${formatSanityAmount(consumptionSanity)}${recoveredSanity > 0 ? copy.domain.recycling.sanityNote(formatSanityAmount(recoveredSanity)) : ''}`,
   }
 }
 

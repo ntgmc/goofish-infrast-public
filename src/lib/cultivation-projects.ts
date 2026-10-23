@@ -12,7 +12,7 @@ export type CultivationProject = {
   paused: boolean
   deadline: string
 }
-export type ProjectOperator = { id: string; name: string; rarity: number; skills: string[]; maxLevels: number[]; current: CultivationCurrent }
+export type ProjectOperator = { id: string; name: string; rarity: number; skills: string[]; profession?: string; maxLevels: number[]; current: CultivationCurrent }
 export type ProjectIncome = { lmd: number; exp: number; goldNet: number | null }
 export type ProjectSettings = { startDate: string; dailySanity: number; days: number; allOpen: boolean }
 const dayMs = 86400000
@@ -49,6 +49,24 @@ export function isCultivationProject(value: unknown): value is CultivationProjec
     && Number.isInteger(row.skillLevel) && row.skillLevel >= 1 && row.skillLevel <= 10
     && typeof row.paused === 'boolean' && typeof row.deadline === 'string'
     && (row.deadline === '' || validProjectDate(row.deadline))
+}
+
+export function buildMaaCultivationPlan(projects: CultivationProject[], operators: ProjectOperator[]) {
+  const plans: { name: string; role: string | undefined; elite: number; skill_level: number; skill_mastery: number[] }[] = []
+  for (const project of projects.filter((row) => !row.paused)) {
+    const operator = operators.find((row) => row.id === project.operatorId)
+    if (!operator?.name) return null
+    const mastery = [0, 0, 0]
+    if (project.skillLevel > 7) mastery[project.skill - 1] = project.skillLevel - 7
+    plans.push({
+      name: operator.name,
+      role: operator.profession ? operator.profession[0].toUpperCase() + operator.profession.slice(1).toLowerCase() : undefined,
+      elite: project.elite,
+      skill_level: operator.skills.length && project.skillLevel > 1 ? Math.min(7, project.skillLevel) : 0,
+      skill_mastery: mastery,
+    })
+  }
+  return plans
 }
 
 export function validProjectDate(date: string): boolean {

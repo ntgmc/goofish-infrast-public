@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { isLoopbackIpAddress, resolveClientIp, resolveTrustedProxyAddresses } from './client-ip'
 import { inspectIncomingRequest } from './http-boundary'
 import { applyHttpSecurityHeaders } from './http-security'
+import { operationsCohortLabels, operationsUsersPath, type OperationsCohort } from '../../src/lib/operations-drilldown'
+import { createOperationsOverview } from '../../src/test/operations-overview-fixture'
 
 const originalNodeEnv = process.env.NODE_ENV
 const originalPublicAppUrl = process.env.PUBLIC_APP_URL
@@ -92,6 +94,18 @@ describe('HTTP security boundary', () => {
       expect(rejected.response.status).toBe(400)
       await expect(rejected.response.json()).resolves.toMatchObject({ code: 'invalid_request' })
     }
+  })
+
+  it.each(Object.keys(operationsCohortLabels) as OperationsCohort[])('allows overview user lists through the HTTP boundary (%s)', (cohort) => {
+    const target = operationsUsersPath(createOperationsOverview(), cohort, cohort === 'failed' ? 'optimizer_runtime_error' : undefined)
+    const url = new URL(`/api${target}`, 'http://localhost:3001')
+    url.searchParams.set('page', '1')
+    url.searchParams.set('page_size', '25')
+    url.searchParams.set('search', '')
+    url.searchParams.set('status', 'all')
+    expect(inspectIncomingRequest(incomingGet(`${url.pathname}${url.search}`, url.host)).allowed).toBe(true)
+    url.searchParams.append('observed_at', new Date().toISOString())
+    expect(inspectIncomingRequest(incomingGet(`${url.pathname}${url.search}`, url.host)).allowed).toBe(false)
   })
 
   it.each([

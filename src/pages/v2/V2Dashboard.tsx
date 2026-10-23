@@ -278,9 +278,8 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
             {([['schedule', text.scheduleTab], ['analysis', text.analysisTab], ...(showManual ? [['manual', text.manualTab] as const] : []), ...(restrictedPreview || !sample && (workflow?.suggestions?.length || result.upgrade_suggestions_status) ? [['training', text.trainingTab] as const] : [])] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => { setView(id); if (id === 'manual') setManualOpened(true) }}>
               {label}{view === id && <MotionNavIndicator layoutId="result-tab" variant="underline" />}
             </button>)}
-            <span title={sample ? text.sampleSource : text.ownSource}>{sample ? <SampleIcon size={14} aria-hidden="true" /> : <ShieldCheck size={14} aria-hidden="true" />}<span className={sample ? undefined : 'max-sm:sr-only'}>{sample ? text.sampleSource : text.ownSource}</span></span>
           </div>
-          <ResultActions plans={result.plans} shift={shift} showShift={view === 'schedule'} onShiftChange={setShift} onExport={() => setExportOpen(true)} busy={busy} loadingResult={loadingResult} />
+          <ResultActions plans={result.plans} shift={shift} showShift={view === 'schedule'} onShiftChange={setShift} onExport={() => setExportOpen(true)} sample={sample} busy={busy} loadingResult={loadingResult} />
           <div className="v2-feature-content v2-manual-workspace" hidden={view !== 'manual'}>
             {canManual && manualOpened && session.activeProfile && <Suspense fallback={<p role="status">{text.loading}</p>}><ManualScheduleEditor key={manualKey} source={result} profileId={session.activeProfile.id} operators={operators} simulationBaseline={simulationBaseline} onDirtyChange={setManualDirty} /></Suspense>}
             {!canManual && restrictedPreview && view === 'manual' && <LockedCapabilityPreview title={copy.optimize.paid_preview.manual_title} description={copy.optimize.paid_preview.manual_description} />}
@@ -342,12 +341,13 @@ function FeedbackRegion({ children }: { children: ReactNode }) {
   )
 }
 
-function ResultActions({ plans, shift, showShift, onShiftChange, onExport, busy, loadingResult }: {
+function ResultActions({ plans, shift, showShift, onShiftChange, onExport, sample, busy, loadingResult }: {
   plans: OptimizeResult['plans']
   shift: number
   showShift: boolean
   onShiftChange: (shift: number) => void
   onExport: () => void
+  sample: boolean
   busy: boolean
   loadingResult: boolean
 }) {
@@ -360,6 +360,7 @@ function ResultActions({ plans, shift, showShift, onShiftChange, onExport, busy,
           {plans.map((plan, index) => <option key={index} value={index}>{plan.name || text.shift(index + 1)}</option>)}
         </select>
       </label>}
+      <span className="v2-result-source" title={sample ? text.sampleSource : text.ownSource}>{sample ? <SampleIcon size={14} aria-hidden="true" /> : <ShieldCheck size={14} aria-hidden="true" />}<span className="max-sm:sr-only">{sample ? text.sampleSource : text.ownSource}</span></span>
       <button className="v2-button v2-button-secondary" type="button" disabled={busy || loadingResult} onClick={onExport}><Download size={16} />{text.export}</button>
     </div>
   )

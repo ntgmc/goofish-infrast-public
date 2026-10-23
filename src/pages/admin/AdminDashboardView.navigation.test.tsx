@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -164,8 +164,13 @@ describe('admin page loading and navigation', () => {
     expect(api.json.mock.calls[0][0]).toBe('/api/admin/users?user_id=user-1&profile_page=1&profile_page_size=100')
   })
 
-  it('opens an exact operational cohort and a feedback todo without a manual search', async () => {
+  it('opens exact operational cohorts with partial coverage and a feedback todo without a manual search', async () => {
     const overview = createOperationsOverview()
+    overview.current.complete = false
+    overview.current.maa.complete = false
+    overview.coverage.complete = false
+    overview.coverage.unknown_outcomes = 1
+    overview.coverage.maa_tracking_started_at = `${overview.current.from}T08:00:00Z`
     const account = { id: 'stopped-user', email: 'stopped@example.test', status: 'active', profile_count: 1, profile_access: [], created_at: overview.current.from,
       operations_progress: { stage: 'no_generation', failure_reason: 'optimizer_runtime_error', failure_at: overview.generated_at } }
     const implementation = api.json.getMockImplementation()!
@@ -178,13 +183,25 @@ describe('admin page loading and navigation', () => {
     })
     const router = mount()
     const user = userEvent.setup()
-    await user.click(await screen.findByRole('link', { name: '查看添加了账号但未完成首次排班的用户 →' }))
+    await screen.findByRole('heading', { name: '有多少人真正用起来了？', level: 2 })
+    for (const [label, rate] of [['新人首次排班率', '60%'], ['7 日再次排班率', '40%'], ['MAA 文件获取率', '80%']]) {
+      expect(within(screen.getByRole('region', { name: label })).getByText(rate)).toBeInTheDocument()
+    }
+    expect(screen.getByText('64 / 80 份方案已获取（自文件获取记录开始）')).toBeInTheDocument()
+    for (const [action, cohort] of [['查看未再次排班用户 →', 'reuse_missing'], ['查看未获取文件用户 →', 'maa_missing']]) {
+      await user.click(screen.getByRole('link', { name: action }))
+      expect(await screen.findByText(account.email)).toBeInTheDocument()
+      expect(new URLSearchParams(router.state.location.search).get('cohort')).toBe(cohort)
+      await user.click(await screen.findByRole('link', { name: '返回运营看板 →' }))
+      await screen.findByRole('heading', { name: '有多少人真正用起来了？', level: 2 })
+    }
+    await user.click(screen.getByRole('link', { name: '查看添加账号后未排班用户 →' }))
     expect(await screen.findByText(account.email)).toBeInTheDocument()
     expect(screen.getByText(/最近失败：排班计算失败/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '详情' })).not.toBeInTheDocument()
     const target = new URLSearchParams(router.state.location.search)
     expect(Object.fromEntries(target)).toMatchObject({ cohort: 'activation_no_generation', from: overview.current.from, to: overview.current.to, observed_at: overview.generated_at })
-    const request = api.json.mock.calls.find(([url]) => url.startsWith('/api/admin/users?'))![0]
+    const request = api.json.mock.calls.find(([url]) => url.startsWith('/api/admin/users?') && url.includes('cohort=activation_no_generation'))![0]
     const sent = new URL(request, 'http://localhost').searchParams
     expect(Object.fromEntries(sent)).toMatchObject({ ...Object.fromEntries(target), search: '', page: '1', status: 'all' })
     await user.click(await screen.findByRole('link', { name: '返回运营看板 →' }))

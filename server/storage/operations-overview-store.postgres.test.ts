@@ -146,10 +146,12 @@ describe('business operations aggregates', () => {
     expect(data.current.activation).toMatchObject({ eligible: 2, activated: 1, with_profile: 2, rate: 50 })
   })
 
-  it('uses null for missing observation periods and partial export coverage, with equal elapsed comparisons', async () => {
+  it('calculates export rates from tracked plans and waits for mature observations, with equal elapsed comparisons', async () => {
     const data = await getOperationsOverview('2030-01-17', '2030-02-01', now)
-    expect(data.current.maa).toMatchObject({ complete: false, rate: null })
+    expect(data.current.maa).toMatchObject({ eligible: 5, exported: 2, complete: false, rate: 40 })
     expect(data.previous.observed_until).toBe('2030-01-16T08:00:00+00:00')
+    const untracked = await getOperationsOverview('2030-01-08', '2030-01-17', now)
+    expect(untracked.current.maa).toMatchObject({ eligible: 0, exported: 0, complete: false, rate: null })
     const recent = await getOperationsOverview('2030-01-29', '2030-01-31', now)
     expect(recent.current.activation).toMatchObject({ eligible: 0, pending: 1, rate: null })
     expect(recent.current.reuse).toMatchObject({ eligible: 0, pending: 2, rate: null })
@@ -165,6 +167,9 @@ describe('business operations aggregates', () => {
     expect(data.current.successful_generations).toBe(7)
     expect(data.current.cost).toMatchObject({ recorded_hours: 287, estimated_cny: null, per_success_cny: null })
     expect(data.coverage).toMatchObject({ complete: false, unattributed_successes: 1, unknown_outcomes: 1 })
+    expect(data.current.activation).toMatchObject({ eligible: 2, activated: 1, rate: 50 })
+    expect(data.current.reuse).toMatchObject({ eligible: 2, reused: 1, rate: 50 })
+    expect(data.current.maa).toMatchObject({ eligible: 6, exported: 2, rate: 33.3 })
     const historical = await getOperationsOverview('2029-01-01', '2029-01-07', now)
     expect(historical.coverage.complete).toBe(false)
     expect(historical.current.activation.rate).toBeNull()

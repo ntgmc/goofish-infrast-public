@@ -100,6 +100,7 @@ const licenseConfigShape = {
   manufacturing_stations_count: z.number().int().min(1).max(5),
   trading_station_levels: z.array(z.number().int().min(1).max(3)).min(1).max(5).optional(),
   manufacturing_station_levels: z.array(z.number().int().min(1).max(3)).min(1).max(5).optional(),
+  recycling_station_level: z.number().int().min(0).max(3).optional(),
   facility_layout: facilityLayoutSchema.optional(),
   product_requirements: z.strictObject({
     trading_stations: boundedCountRecord,

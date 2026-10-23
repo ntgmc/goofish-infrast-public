@@ -12,6 +12,7 @@ import type { V2Session } from '../OptionsDrawer'
 import { v2Path } from '../navigation'
 import { EmptyState, Facts, Field, Notice, SectionTitle } from '../components/WorkspaceUI'
 import { MaterialBrowser, MaterialButton, MaterialNeeds } from './ProjectMaterials'
+import { ProjectMaaExport } from './ProjectMaaExport'
 import './cultivation-projects.css'
 
 const text = copy.cultivationProjects
@@ -48,6 +49,7 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
     {(m.data || m.projects.length > 0) && <>
       <div className="v2-project-columns">
         <section className="v2-project-targets"><SectionTitle title={text.targets} description={text.orderHint} />
+          <ProjectMaaExport projects={m.projects} operators={m.data?.projectOperators ?? []} />
           <ol className="v2-project-list">{m.projects.map((project, index) => {
             const operator = m.data?.projectOperators?.find((row) => row.id === project.operatorId)
             const name = operator?.name ?? session.license?.operators?.find((row) => row.id === project.operatorId)?.name ?? project.operatorId

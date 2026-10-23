@@ -22,6 +22,7 @@ export interface LicenseConfig {
   manufacturing_stations_count: number;
   trading_station_levels?: number[];
   manufacturing_station_levels?: number[];
+  recycling_station_level?: number;
   facility_layout?: string[];
   product_requirements: {
     trading_stations: Record<string, number>;
@@ -619,6 +620,7 @@ export interface DailyProduction {
   normalization_factor?: number;
   shift_hours?: number[];
   manufacturing?: Record<string, number>;
+  recycling?: Record<string, number>;
   trading?: Record<string, number>;
   consumption?: Record<string, number>;
   net?: Record<string, number>;
@@ -632,6 +634,7 @@ interface DailyProductionDelta {
   total_efficiency: number;
   raw_total_efficiency: number;
   manufacturing: Record<string, number>;
+  recycling?: Record<string, number>;
   trading: Record<string, number>;
   consumption: Record<string, number>;
   net: Record<string, number>;
