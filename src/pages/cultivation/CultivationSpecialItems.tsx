@@ -18,8 +18,11 @@ export function useSpecialItems({ data, preference }: Props) {
     if (!selected) return []
     return [...selected.recommendations].sort((a, b) => {
       if (selected.kind === 'selector' && a.owned !== b.owned) return Number(a.owned) - Number(b.owned)
-      if (preference === 'community') return (b.communityRate ?? -1) - (a.communityRate ?? -1) || b.demand - a.demand || a.key.localeCompare(b.key)
-      return b.demand - a.demand || (b.communityRate ?? -1) - (a.communityRate ?? -1) || a.key.localeCompare(b.key)
+      const strength = preference === 'community'
+        ? (b.communityScore ?? 0.5) - (a.communityScore ?? 0.5)
+        : b.demand * (1 + (b.communityScore ?? 0.5)) - a.demand * (1 + (a.communityScore ?? 0.5))
+      if (preference === 'community') return strength || (b.communityRate ?? -1) - (a.communityRate ?? -1) || b.demand - a.demand || a.key.localeCompare(b.key)
+      return strength || (b.communityScore ?? 0.5) - (a.communityScore ?? 0.5) || (b.communityRate ?? -1) - (a.communityRate ?? -1) || a.key.localeCompare(b.key)
     })
   }, [preference, selected])
   return { chosen, setChosen, visible, setVisible, items, selected, recommendations }
@@ -28,7 +31,7 @@ export function useSpecialItems({ data, preference }: Props) {
 export function SpecialItemRates({ row, data }: { row: CultivationSpecialItem['recommendations'][number]; data: CultivationData }) {
   const statistics = row.operatorId ? data.community?.operators[row.operatorId] : undefined
   const ownership = statistics && statistics.sampleSize > 0 ? statistics.owned / statistics.sampleSize : null
-  return <>{label.specialCommunityRate('ownership', ownership)} · {label.specialCommunityRate(row.skill ? 'mastery' : 'elite', row.communityRate, row.skill)}</>
+  return <>{label.specialCommunityRate('ownership', ownership)} · {label.specialCommunityRate(row.skill ? 'mastery' : 'elite', row.communityRate, row.skill)} · {label.communityScore(row.communityScore ?? null)}</>
 }
 
 export default memo(function CultivationSpecialItems({ data, preference }: Props) {

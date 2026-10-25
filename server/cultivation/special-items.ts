@@ -6,6 +6,7 @@ import { asRecord, asRows, prtsSnapshotPath, type PrtsSnapshot } from './catalog
 import { fetchCultivationJson, saveCultivationReference } from './references'
 import { cultivationCosts } from './costs'
 import type { readCultivationPlayer } from './player'
+import { cultivationCommunityScore } from './scoring'
 
 const itemSchema = z.object({ itemId: z.string(), name: z.string(), iconId: z.string().nullable().transform((value) => value ?? ''), itemType: z.string(), rarity: z.string(), usage: z.string().nullable().transform((value) => value ?? ''), description: z.string().nullable().transform((value) => value ?? '') })
 const gameSchema = z.object({ items: z.record(z.string(), itemSchema), itemPackInfos: z.record(z.string(), z.object({ content: z.array(z.object({ id: z.string(), count: z.number().int().positive() })) })) })
@@ -137,9 +138,10 @@ export function buildSpecialItemRecommendations(snapshot: PrtsSnapshot, player: 
       const current = player.characters.get(id)
       if (!operator || (item.rarity && operator.rarity !== item.rarity)) continue
       const statistics = community?.operators[id]
+      const communityScore = cultivationCommunityScore(snapshot, id, statistics)
       const demand = demands.get(id)
       if (item.kind === 'selector') {
-        recommendations.push({ key: id, name: operator.name, operatorId: id, owned: Boolean(current), demand: demand?.total ?? 0, communityRate: statistics?.elite[2] ?? null, items: {}, warnings: [] })
+        recommendations.push({ key: id, name: operator.name, operatorId: id, owned: Boolean(current), demand: demand?.total ?? 0, communityRate: statistics?.elite[2] ?? null, communityScore, items: {}, warnings: [] })
         continue
       }
       if (!current || !available || catalog.excludedOperators.includes(id)) continue
@@ -156,6 +158,7 @@ export function buildSpecialItemRecommendations(snapshot: PrtsSnapshot, player: 
         recommendations.push({ key: `${id}:${index + 1}`, name: operator.name, operatorId: id, skill: item.kind === 'mastery' ? index + 1 : undefined,
           demand: (item.kind === 'mastery' ? demand?.skills[index + 1] : item.kind === 'elite' ? demand?.elite : demand?.total) ?? 0,
           communityRate: item.kind === 'mastery' ? statistics?.skills[index]?.[3] ?? null : statistics?.elite[2] ?? null,
+          communityScore,
           items: cost.items, warnings: cost.warnings })
       })
     }

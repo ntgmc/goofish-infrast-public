@@ -99,6 +99,27 @@ describe('homework training recommendations', () => {
     expect(screen.queryByText(/等效理智|森空岛不提供自选包库存|达到此目标/)).not.toBeInTheDocument()
   })
 
+  it.each([false, true])('uses the shared training strength when switching voucher preference in V2=%s', async (v2) => {
+    const input = sample()
+    input.specialItems = [{ id: 'voucher', name: '特训邀请函', iconId: 'voucher', count: null, scope: '提升精英阶段', kind: 'elite', expiresAt: null, available: true, sourceUrl: '', recommendations: [
+      { key: 'a', operatorId: 'a', name: '银灰', demand: 30, communityRate: 0.95, communityScore: 0.2, items: {}, warnings: [] },
+      { key: 'b', operatorId: 'b', name: '桃金娘', demand: 8, communityRate: 0.7, communityScore: 0.9, items: {}, warnings: [] },
+    ] }]
+    mocks.api.mockResolvedValueOnce(input)
+    render(content(v2))
+    fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
+    if (v2) fireEvent.click(await screen.findByRole('button', { name: text.views.special }))
+    fireEvent.click(await screen.findByRole('button', { name: /特训邀请函.*提升精英阶段/ }))
+    const rows = () => within(screen.getByRole('heading', { name: text.specialRecommendations }).nextElementSibling as HTMLElement).getAllByRole('listitem')
+    expect(rows()[0]).toHaveTextContent('银灰')
+    fireEvent.click(screen.getByText(text.parameters))
+    fireEvent.click(screen.getByRole('radio', { name: text.preferences.community }))
+    fireEvent.click(screen.getByRole('button', { name: text.apply }))
+    expect(rows()[0]).toHaveTextContent('桃金娘')
+    expect(rows()[0]).toHaveTextContent('养成参考分 90.0')
+    expect(mocks.api).toHaveBeenCalledOnce()
+  })
+
   it.each([false, true])('lets users choose selector versions without claiming package stock in V2=%s', async (v2) => {
     const input = sample()
     input.community = { status: 'fresh', updatedAt: null, operators: { owned: { owned: 200, sampleSize: 1000, elite: [0, 0.1, 0.9], skills: [], modules: {} }, new: { owned: 100, sampleSize: 200, elite: [0, 0.5, 0.5], skills: [], modules: {} } } }

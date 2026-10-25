@@ -7,6 +7,7 @@ import { readCultivationPlayer } from './player'
 import type { PublicRecommendations } from './public-evidence'
 import { buildSpecialItemRecommendations, type SpecialItemCatalog } from './special-items'
 import { buildThanksRecruitmentRecommendation } from './thanks-recruitment'
+import { cultivationCommunityScore } from './scoring'
 
 export function cultivationResources(snapshot: PrtsSnapshot, player: ReturnType<typeof readCultivationPlayer>, pricing: PricingState) {
   const prices = Object.fromEntries(pricing.prices)
@@ -35,6 +36,7 @@ export function buildCultivationData(snapshot: PrtsSnapshot, playerInfo: unknown
     const key = `${branch.operatorId}:${JSON.stringify(branch.target)}`
     const cost = current ? cultivationCosts(snapshot, branch.operatorId, current, branch.target, skillId) : null
     const entry = current && cost ? { key, operatorId: branch.operatorId, name: operator.name, current, target: branch.target, skillId,
+      communityScore: cultivationCommunityScore(snapshot, branch.operatorId, community?.operators[branch.operatorId]),
       evidence: branch.evidence, moduleName: branch.target.moduleId ? String(snapshot.costs.modules.equipDict[branch.target.moduleId]?.uniEquipName ?? branch.target.moduleId) : undefined,
       demandKeys: [] as string[], demandWeights: {} as Record<string, number>, frequency: 0, weightedFrequency: 0, fixedFrequency: 0, stageCount: 0, examples: [] as number[],
       ...cost, satisfied: cost.warnings.length === 0 && cultivationSatisfied(current, branch.target, skillId), stages: new Set<string>() } : null
@@ -76,12 +78,13 @@ export function buildCultivationData(snapshot: PrtsSnapshot, playerInfo: unknown
     const operator = snapshot.operators[id]
     if (!statistics || statistics.owned < 100 || operator.rarity < 4) continue
     if (!matchesCultivationRarity(operator.rarity, query) || query.profession && operator.profession !== query.profession || !matchesSearch(operator.name, query.search)) continue
+    const communityScore = cultivationCommunityScore(snapshot, id, statistics)
     const addCommunity = (target: CultivationCandidate['target'], rate: number) => {
       if (rate <= 0) return
       const skillId = operator.skills[target.skill - 1] ?? ''
       const cost = cultivationCosts(snapshot, id, current, target, skillId)
       result.push({ key: `community:${id}:${JSON.stringify(target)}`, operatorId: id, name: operator.name, current, target, skillId,
-        source: 'community', communityRate: rate, frequency: 0, fixedFrequency: 0, stageCount: 0, examples: [], ...cost,
+        source: 'community', communityRate: rate, communityScore, frequency: 0, fixedFrequency: 0, stageCount: 0, examples: [], ...cost,
         moduleName: target.moduleId ? String(snapshot.costs.modules.equipDict[target.moduleId]?.uniEquipName ?? target.moduleId) : undefined,
         satisfied: cost.warnings.length === 0 && cultivationSatisfied(current, target, skillId) })
     }

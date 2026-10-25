@@ -50,8 +50,11 @@ export function recommendCultivationTargets(data: CultivationData, options: Cult
     const ranked = candidates.map(remainingDemand).filter((candidate) => candidate.source === 'community' || candidate.frequency > 0)
     if (!ranked.length) break
     const next = ranked.sort((a, b) => {
+      const strength = options.preference === 'community'
+        ? (b.communityScore ?? 0.5) - (a.communityScore ?? 0.5)
+        : (b.weightedFrequency ?? b.frequency) * (1 + (b.communityScore ?? 0.5)) - (a.weightedFrequency ?? a.frequency) * (1 + (a.communityScore ?? 0.5))
       const adoption = options.preference === 'community' ? (b.communityRate ?? 0) - (a.communityRate ?? 0) : 0
-      return adoption || (b.weightedFrequency ?? b.frequency) - (a.weightedFrequency ?? a.frequency) || a.key.localeCompare(b.key)
+      return strength || adoption || (b.weightedFrequency ?? b.frequency) - (a.weightedFrequency ?? a.frequency) || a.key.localeCompare(b.key)
     })[0]
     selected.push(next)
     const trained = cultivatedCurrent(next.current, next.target, next.skillId)
