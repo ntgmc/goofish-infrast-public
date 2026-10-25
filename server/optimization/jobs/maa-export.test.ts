@@ -41,6 +41,7 @@ describe('buildMaaExportPayload', () => {
           dormitory: [{ operators: [], skip: false, sort: false, autofill: true }],
           processing: [{ operators: ['年'], skip: false, sort: false, autofill: false }],
           training: [{ operators: ['梅尔'], skip: false, sort: false, autofill: false }],
+          recycling: [{ operators: ['旅骨'], skip: false, sort: false, autofill: false }],
         },
       }],
       scheduleType: {
@@ -294,6 +295,7 @@ function richResult(): OptimizeResult {
         dormitory: [{ autofill: true, mood: { 但书: { start: 0, end: 24 } } }],
         processing: [{ operators: ['年'] }],
         training: [{ operators: ['梅尔'] }],
+        recycling: [{ operators: ['旅骨'] }],
         unsupported_internal_room: [{ operators: ['不应导出'] }],
       },
     }],
