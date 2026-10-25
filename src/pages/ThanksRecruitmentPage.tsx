@@ -50,7 +50,7 @@ function QueueCard({ queue }: { queue: NonNullable<NonNullable<ReturnType<typeof
     <header className="flex flex-wrap items-baseline justify-between gap-2 border-b border-surface-3 p-4"><div><h2 className="text-base font-semibold">{queue.name}</h2><p className="mt-1 text-xs text-ink-secondary">{text.queue(queue.key)} · {text.ownership(queue.operators.length - queue.unownedCount, queue.unownedCount, queue.operators.length)}</p></div><strong className="text-brand-600">{text.expectedScore(queue.expectedScore)}</strong></header>
     <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3">{queue.operators.map((operator) => <div key={operator.operatorId} className={`flex min-w-0 items-center gap-2 rounded-md border p-2 ${operator.owned ? 'border-surface-3 bg-surface-1' : 'border-brand-500/30 bg-brand-500/5'}`}>
       <img src={`/webp96/${encodeURIComponent(operator.operatorId)}.webp`} alt={operator.name} loading="lazy" width={40} height={40} className="size-10 shrink-0 rounded object-cover" />
-      <div className="min-w-0"><p className="truncate text-xs font-semibold" title={operator.name}>{operator.name}</p><p className="truncate text-[11px] text-ink-secondary">{operator.owned ? text.owned : text.notOwned} · {text.score(operator.score)}</p></div>
+      <div className="min-w-0"><p className="truncate text-xs font-semibold" title={operator.name}>{operator.name}</p><p className="text-[11px] text-ink-secondary">{operator.owned ? text.owned : text.notOwned} · {text.score(operator.score)}</p></div>
     </div>)}</div>
   </article>
 }

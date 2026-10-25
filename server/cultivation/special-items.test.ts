@@ -24,26 +24,37 @@ const statistic = { charId: 'char_test', own: 200, sampleSize: 1000, elite: { 0:
   modX: { 0: 150, 1: 10, 2: 15, 3: 25 }, modY: { 0: 200 }, modD: { 0: 200 }, modA: { 0: 200 }, modB: { 0: 200 } }
 
 describe('cultivation references and special-item recommendations', () => {
-  it('scores each queue by equal-probability expected value and gives owned operators no value', () => {
+  it('preserves raw operator scores and discounts owned operators only in queue expected values', () => {
     const input = snapshot()
     const names = [...new Set(['能天使', '推进之王', '伊芙利特', '艾雅法拉', '安洁莉娜', '闪灵', '夜莺', '星熊', '塞雷娅', '银灰', '斯卡蒂', '陈', '黑', '赫拉格', '麦哲伦', '莫斯提马', '煌', '阿', '刻俄柏', '风笛', '傀影', '温蒂', '早露', '铃兰', '棘刺', '森蚺', '史尔特尔', '瑕光', '泥岩', '山', '空弦', '嵯峨', '异客', '凯尔希', '卡涅利安', '帕拉斯', '水月', '琴柳', '远牙', '焰尾', '灵知', '老鲤', '澄闪', '菲亚梅塔', '号角', '艾丽妮', '黑键', '多萝西'])]
     const ids = names.map((_name, index) => `char_queue_${index}`)
     input.operators = Object.fromEntries(names.map((name, index) => [ids[index], { ...input.operators.char_test, name }]))
     const player = readCultivationPlayer({ chars: [{ charId: ids[0], evolvePhase: 2, level: 1 }] }, { items: [] }, input)
-    const demands = new Map(ids.slice(1, 12).map((id) => [id, { total: 10, elite: 0, skills: {} }]))
+    const demands = new Map(ids.slice(0, 12).map((id) => [id, { total: 10, elite: 0, skills: {} }]))
     const result = buildThanksRecruitmentRecommendation(input, player, undefined, demands)
     expect(result?.queues).toHaveLength(4)
     expect(result?.queues[0]).toMatchObject({ key: 'I', unownedCount: 11 })
     expect(result?.queues[0].expectedScore).toBeGreaterThan(result?.queues[1].expectedScore ?? 0)
-    expect(result?.queues[0].operators.find((row) => row.operatorId === ids[0])?.score).toBe(0)
+    expect(result?.queues[0].operators[0]).toMatchObject({ owned: true, score: 160 })
+    expect(result?.queues[0].operators[1]).toMatchObject({ owned: false, score: 160 })
+    expect(result?.queues[0].expectedScore).toBeCloseTo((16 + 11 * 160) / 12)
+    expect(result?.queues[1].expectedScore).toBe(140)
 
     const community = { status: 'fresh' as const, updatedAt: null, operators: parseCultivationStatistics({ success: true, data: [
+      { ...statistic, charId: ids[0], elite: { 2: 190 }, skill1: { 0: 200 } },
       { ...statistic, charId: ids[1], elite: { 2: 190 }, skill1: { 0: 200 } },
       { ...statistic, charId: ids[12], elite: { 2: 160 }, skill1: { 3: 160 } },
     ] }) }
     const trained = buildThanksRecruitmentRecommendation(input, player, community, demands)!
     expect(trained.queues[1].operators[0].score).toBeGreaterThan(trained.queues[0].operators[1].score)
-    expect(trained.queues[0].operators[0].score).toBe(0)
+    expect(trained.queues[0].operators[0].score).toBe(trained.queues[0].operators[1].score)
+
+    const owned = player.characters.get(ids[0])!
+    ids.forEach((id) => player.characters.set(id, owned))
+    const allOwned = buildThanksRecruitmentRecommendation(input, player, undefined, demands)!
+    expect(allOwned.queues.map((queue) => queue.unownedCount)).toEqual([0, 0, 0, 0])
+    expect(allOwned.queues.map((queue) => queue.operators.map((operator) => operator.score))).toEqual(result?.queues.map((queue) => queue.operators.map((operator) => operator.score)))
+    expect(allOwned.queues.map((queue) => queue.expectedScore)).toEqual([16, 14, 14, 14])
   })
 
   it('uses holder counts for training rates and rejects invalid distributions', () => {

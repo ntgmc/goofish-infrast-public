@@ -26,10 +26,10 @@ export function buildThanksRecruitmentRecommendation(snapshot: PrtsSnapshot, pla
       const communityRate = community?.operators[operatorId]?.elite[2] ?? null
       const communityScore = cultivationCommunityScore(snapshot, operatorId, community?.operators[operatorId])
       const owned = player.characters.has(operatorId)
-      const score = owned ? 0 : 100 + 80 * (communityScore ?? 0.5) + (maxDemand ? 20 * demand / maxDemand : 0)
+      const score = 100 + 80 * (communityScore ?? 0.5) + (maxDemand ? 20 * demand / maxDemand : 0)
       return { name, operatorId, owned, score, demand, communityRate, communityScore }
     })
-    const expectedScore = operators.reduce((sum, operator) => sum + operator.score, 0) / operators.length
+    const expectedScore = operators.reduce((sum, operator) => sum + operator.score * (operator.owned ? 0.1 : 1), 0) / operators.length
     return { key: queue.key, name: queue.name, expectedScore, unownedCount: operators.filter((operator) => !operator.owned).length, operators }
   })
   return {
