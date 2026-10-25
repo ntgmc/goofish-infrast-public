@@ -1,4 +1,6 @@
 import { defaultCultivationQuery } from '../../src/lib/cultivation-contract'
+import { computeEffectiveSiteFeatures } from '../../src/lib/site-features'
+import { getSiteFeatureSettings } from '../storage/feature-settings-store'
 import { CultivationReadError, readCultivationPlan } from '../cultivation/worker-client'
 import { requireSiteFeatures } from '../feature-gate'
 import { requestSchemas } from '../security/request-policy'
@@ -19,10 +21,12 @@ export default async function cultivationPlanHandler(req: Request): Promise<Resp
     if (profile.status !== 'active' || profile.archived_at) return jsonResponse({ error: '当前档案不可用。' }, 403)
     const binding = profile.skland_binding
     if (!binding?.encrypted_cred) return jsonResponse({ error: '请先在档案中绑定森空岛，再导入练度和材料。' }, 400)
+    const featureSettings = await getSiteFeatureSettings()
+    const effectiveFeatures = computeEffectiveSiteFeatures(featureSettings)
     const snapshot = await getSklandSnapshot(profile)
     const data = await readCultivationPlan({ game: snapshot.game!.data, inventory: snapshot.inventory!.data,
       importedAt: snapshot.inventory!.fetchedAt, snapshotVersion: snapshot.version, warnings: Object.values(snapshot.errors),
-      query: { ...defaultCultivationQuery, ...body.recommendation }, ...(body.projects !== undefined ? { projects: body.projects } : {}) }, req.signal)
+      query: { ...defaultCultivationQuery, ...body.recommendation }, thanksRecruitmentEnabled: effectiveFeatures.thanks_recruitment, ...(body.projects !== undefined ? { projects: body.projects } : {}) }, req.signal)
     return new Response(data, { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
   } catch (error) {
     if (error instanceof RequestInputError) return jsonResponse({ error: error.message, code: error.code }, error.status)

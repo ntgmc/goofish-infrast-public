@@ -59,6 +59,16 @@ export const toolsCopy = {
     progress: (elite: number, level: number, skill: number, skillLevel: number | null, mastery: number | undefined, module: number | undefined) => `精${elite} Lv.${level}${skill ? ` · ${skill}技能${mastery && mastery > 0 ? `专${mastery}` : `等级${skillLevel ?? '?'}`}` : ''}${module === undefined ? '' : ` · 模组${module}级`}`,
     targetProgress: (elite: number, level: number, skill: number, skillLevel: number, module: number | null) => `精${elite} Lv.${level}${skill ? ` · ${skill}技能${skillLevel > 7 ? `专${skillLevel - 7}` : `等级${skillLevel}`}` : ''}${module ? ` · 模组${module}级` : ''}`,
   },
+  thanksRecruitment: {
+    title: '感谢庆典特别招募推荐',
+    description: '按四个特别招募队列查看当前档案的拥有情况与单人评分。每个队列会随机获得一名干员，队列期望分越高，整体越值得选择。',
+    back: '返回工具页', loading: '正在加载特别招募推荐', loadingData: '正在计算队列评分…', failed: '读取特别招募推荐失败，请重试。',
+    login: '登录后，选择已绑定森空岛的档案，即可查看干员拥有情况和队列推荐。', loginAction: '前往登录与档案管理', noProfile: '请先创建档案并绑定森空岛，再查看特别招募推荐。',
+    profile: '游戏档案', refresh: '刷新练度', unavailable: '当前练度数据中没有完整的活动干员名单，请稍后重新导入。',
+    expectedScore: (score: number) => `队列期望分 ${score.toFixed(1)}`, ownership: (owned: number, unowned: number, total: number) => `已拥有 ${owned} · 未拥有 ${unowned}/${total}`,
+    owned: '已拥有', notOwned: '未拥有', score: (score: number) => `评分 ${score.toFixed(1)}`, scoreHint: '每名干员评分综合未拥有状态、作业需求和养成统计；分数越高，随机获得后的预期收益越高。',
+    queue: (key: string) => `队列 ${key}`, activity: '活动说明',
+  },
   scheduleComparison: {
     title: '排班表对比',
     description: '选择两张已有排班表或导入排班 JSON，模拟日产量，查看产出变化和干员安排差异。',

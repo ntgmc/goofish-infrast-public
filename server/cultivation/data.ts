@@ -6,6 +6,7 @@ import { cultivationCosts, cultivationSatisfied } from './costs'
 import { readCultivationPlayer } from './player'
 import type { PublicRecommendations } from './public-evidence'
 import { buildSpecialItemRecommendations, type SpecialItemCatalog } from './special-items'
+import { buildThanksRecruitmentRecommendation } from './thanks-recruitment'
 
 export function cultivationResources(snapshot: PrtsSnapshot, player: ReturnType<typeof readCultivationPlayer>, pricing: PricingState) {
   const prices = Object.fromEntries(pricing.prices)
@@ -19,7 +20,7 @@ export function cultivationResources(snapshot: PrtsSnapshot, player: ReturnType<
     updatedAt: snapshot.updatedAt, importedAt: new Date().toISOString(), pricingStatus: pricing.status }
 }
 
-export function buildCultivationData(snapshot: PrtsSnapshot, playerInfo: unknown, cultivatePlayer: unknown, pricing: PricingState, community: CultivationData['community'] | undefined, specialCatalog: SpecialItemCatalog | undefined, query: CultivationQuery, recommendation: PublicRecommendations): CultivationData {
+export function buildCultivationData(snapshot: PrtsSnapshot, playerInfo: unknown, cultivatePlayer: unknown, pricing: PricingState, community: CultivationData['community'] | undefined, specialCatalog: SpecialItemCatalog | undefined, query: CultivationQuery, recommendation: PublicRecommendations, thanksRecruitmentEnabled = true): CultivationData {
   const player = readCultivationPlayer(playerInfo, cultivatePlayer, snapshot)
   const candidates = new Map<string, CultivationCandidate & { stages: Set<string> }>()
   const missingOperators = new Set<string>()
@@ -96,10 +97,13 @@ export function buildCultivationData(snapshot: PrtsSnapshot, playerInfo: unknown
       for (let rank = 1; rank <= 3; rank++) addCommunity({ ...base, level: Number(equip.unlockLevel), moduleId, moduleLevel: rank }, distribution?.slice(rank).reduce((sum, rate) => sum + rate, 0) ?? 0)
     }
   }
+  const specialItems = specialCatalog ? buildSpecialItemRecommendations(snapshot, player, specialCatalog, community, demands) : []
   return {
     candidates: result, community,
     recommendation: { query, families: recommendation.families, withoutActions: recommendation.withoutActions, stages: recommendation.stages, professions: recommendation.professions },
-    specialItems: specialCatalog ? buildSpecialItemRecommendations(snapshot, player, specialCatalog, community, demands) : [],
+    specialItems,
+    ...(thanksRecruitmentEnabled ? { thanksRecruitment: buildThanksRecruitmentRecommendation(snapshot, player, community, demands) ?? undefined } : {}),
+
     specialItemsUpdatedAt: specialCatalog?.updatedAt || null,
     skillIcons: specialCatalog?.skillIcons,
     ...cultivationResources(snapshot, player, pricing),

@@ -102,6 +102,7 @@ export type CultivationData = {
   }
   community?: { updatedAt: string | null; status: 'fresh' | 'stale' | 'unavailable'; operators: Record<string, CultivationStatistics> }
   specialItems?: CultivationSpecialItem[]
+  thanksRecruitment?: CultivationThanksRecruitment
   specialItemsUpdatedAt?: string | null
   skillIcons?: Record<string, string>
   itemIcons?: Record<string, string>
@@ -132,6 +133,25 @@ export type CultivationStatistics = {
   elite: number[]
   skills: number[][]
   modules: Record<string, number[]>
+}
+
+export type CultivationThanksRecruitment = {
+  name: string
+  scope: string
+  queues: Array<{
+    key: string
+    name: string
+    expectedScore: number
+    unownedCount: number
+    operators: Array<{
+      name: string
+      operatorId: string
+      owned: boolean
+      score: number
+      demand: number
+      communityRate: number | null
+    }>
+  }>
 }
 
 export type CultivationSpecialItem = {

@@ -7,7 +7,7 @@ import type { CultivationProject } from '../../src/lib/cultivation-projects'
 import { hasStoredRecommendation } from './public-store'
 
 export type CultivationTask = { type: 'plan'; game: unknown; inventory: unknown; importedAt: string; snapshotVersion: string;
-  warnings: string[]; query: CultivationQuery; projects?: CultivationProject[] } | { type: 'refresh' } | { type: 'prepare'; query: CultivationQuery }
+  warnings: string[]; query: CultivationQuery; thanksRecruitmentEnabled?: boolean; projects?: CultivationProject[] } | { type: 'refresh' } | { type: 'prepare'; query: CultivationQuery }
 export type CultivationWorkerReply = { ok: true; result: ArrayBuffer | null } | { ok: false; status: number; code: string; message: string }
 
 export class CultivationReadError extends Error {
