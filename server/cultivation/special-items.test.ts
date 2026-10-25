@@ -36,6 +36,14 @@ describe('cultivation references and special-item recommendations', () => {
     expect(result?.queues[0]).toMatchObject({ key: 'I', unownedCount: 11 })
     expect(result?.queues[0].expectedScore).toBeGreaterThan(result?.queues[1].expectedScore ?? 0)
     expect(result?.queues[0].operators.find((row) => row.operatorId === ids[0])?.score).toBe(0)
+
+    const community = { status: 'fresh' as const, updatedAt: null, operators: parseCultivationStatistics({ success: true, data: [
+      { ...statistic, charId: ids[1], elite: { 2: 190 }, skill1: { 0: 200 } },
+      { ...statistic, charId: ids[12], elite: { 2: 160 }, skill1: { 3: 160 } },
+    ] }) }
+    const trained = buildThanksRecruitmentRecommendation(input, player, community, demands)!
+    expect(trained.queues[1].operators[0].score).toBeGreaterThan(trained.queues[0].operators[1].score)
+    expect(trained.queues[0].operators[0].score).toBe(0)
   })
 
   it('uses holder counts for training rates and rejects invalid distributions', () => {

@@ -52,7 +52,7 @@ function Statistics({ row, data }: { row: CultivationCandidate; data: Cultivatio
   if (!statistics) return null
   const percent = (value: number) => `${(value * 100).toFixed(1)}%`
   return <details className="tool-inset mt-3 p-3 text-xs">
-    <summary className="cursor-pointer font-medium">{label.communityTitle} · {label.eliteRate} {percent(statistics.elite[2])}</summary>
+    <summary className="cursor-pointer font-medium">{label.communityTitle} · {label.communityScore(row.communityScore ?? null)} · {label.eliteRate} {percent(statistics.elite[2])}</summary>
     <p className="mt-3 text-ink-secondary">{label.communitySample(statistics.owned)}</p>
     <dl className="mt-3 space-y-2">{statistics.skills.map((skill, index) => <div key={index} className="grid grid-cols-[5rem_minmax(0,1fr)] gap-2"><dt>{label.skillName(index + 1)}</dt><dd>{[1, 2, 3].map((rank) => `${label.masteryName(rank)} ${percent(skill[rank] ?? 0)}`).join(' · ')}</dd></div>)}
       {Object.entries(statistics.modules).filter(([_type, ranks]) => ranks.slice(1).some((value) => value > 0)).map(([type, ranks]) => <div key={type} className="grid grid-cols-[5rem_minmax(0,1fr)] gap-2"><dt>{label.moduleType(type)}</dt><dd>{label.moduleRate} {percent(ranks.slice(1).reduce((sum, value) => sum + value, 0))}<br />{[1, 2, 3].map((rank) => `${label.moduleRank(rank)} ${percent(ranks[rank] ?? 0)}`).join(' · ')}</dd></div>)}

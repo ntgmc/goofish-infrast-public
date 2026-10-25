@@ -56,6 +56,7 @@ export type CultivationCandidate = {
   weightedFrequency?: number
   source?: 'homework' | 'community' | 'project'
   communityRate?: number
+  communityScore?: number | null
   evidence?: {
     status: 'current' | 'limited' | 'historical' | 'insufficient'
     families: number
@@ -150,6 +151,7 @@ export type CultivationThanksRecruitment = {
       score: number
       demand: number
       communityRate: number | null
+      communityScore?: number | null
     }>
   }>
 }
@@ -172,6 +174,7 @@ export type CultivationSpecialItem = {
     owned?: boolean
     demand: number
     communityRate: number | null
+    communityScore?: number | null
     items: Record<string, number>
     warnings: string[]
   }>

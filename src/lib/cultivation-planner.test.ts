@@ -60,12 +60,28 @@ describe('cultivation recommendations and project resource allocation', () => {
     expect(recommendCultivationTargets(input, options())).toHaveLength(2)
   })
 
-  it('keeps community recommendations separate and ranks by adoption without material costs', () => {
+  it('uses training strength to adjust homework priorities and recalculates fulfilled group demand', () => {
+    const popular = { ...candidate('popular', 10, {}), communityScore: 0.1 }
+    const strong = { ...candidate('strong', 8, {}), communityScore: 0.9 }
+    const essential = { ...candidate('essential', 30, {}), communityScore: 0.1 }
+    expect(recommendCultivationTargets(data({ candidates: [popular, strong, essential] }), options()).map((row) => row.key)).toEqual(['essential', 'strong', 'popular'])
+
+    const a = { ...strong, demandKeys: ['group'], demandWeights: { group: 8 } }
+    const b = { ...popular, demandKeys: ['group', 'fixed'], demandWeights: { group: 8, fixed: 0.1 } }
+    const c = { ...candidate('c', 1, {}), communityScore: 0.5 }
+    const input = data({ candidates: [a, b, c], groups: [{ key: 'group', options: [a, b].map((row) => ({ operatorId: row.operatorId, target: row.target, skillId: row.skillId })) }] })
+    expect(recommendCultivationTargets(input, options()).map((row) => row.key)).toEqual(['strong', 'c', 'popular'])
+  })
+
+  it('keeps community recommendations separate and ranks by strength before target adoption', () => {
     const community = { ...candidate('manual', 0, { rock: 2 }), source: 'community' as const, communityRate: 0.8 }
     const higher = { ...candidate('higher', 0, { unknown: 100 }), source: 'community' as const, communityRate: 0.9 }
     const input = data({ candidates: [candidate('homework', 1, { rock: 1 }), community, higher] })
     expect(recommendCultivationTargets(input, options()).map((row) => row.key)).toEqual(['homework'])
     expect(recommendCultivationTargets(input, options({ preference: 'community' })).map((row) => row.key)).toEqual(['higher', 'manual'])
+    community.communityRate = 0.7
+    const scored = data({ candidates: [{ ...community, communityScore: 0.9 }, { ...higher, communityScore: 0.2 }] })
+    expect(recommendCultivationTargets(scored, options({ preference: 'community' })).map((row) => row.key)).toEqual(['manual', 'higher'])
   })
 
   it('excludes incomplete and satisfied targets and selects at most one target per operator', () => {

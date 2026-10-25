@@ -1,6 +1,7 @@
 import type { CultivationData, CultivationThanksRecruitment } from '../../src/lib/cultivation-contract'
 import type { PrtsSnapshot } from './catalog'
 import type { readCultivationPlayer } from './player'
+import { cultivationCommunityScore } from './scoring'
 
 export const THANKS_RECRUITMENT_QUEUES = [
   { key: 'I', name: '特别招募队列·Ⅰ', operators: ['能天使', '推进之王', '伊芙利特', '艾雅法拉', '安洁莉娜', '闪灵', '夜莺', '星熊', '塞雷娅', '银灰', '斯卡蒂', '陈'] },
@@ -23,9 +24,10 @@ export function buildThanksRecruitmentRecommendation(snapshot: PrtsSnapshot, pla
     const operators = queue.pool.map(({ operatorId, name }) => {
       const demand = demands.get(operatorId)?.total ?? 0
       const communityRate = community?.operators[operatorId]?.elite[2] ?? null
+      const communityScore = cultivationCommunityScore(snapshot, operatorId, community?.operators[operatorId])
       const owned = player.characters.has(operatorId)
-      const score = owned ? 0 : 100 + (maxDemand ? 80 * demand / maxDemand : 0) + 20 * (communityRate ?? 0)
-      return { name, operatorId, owned, score, demand, communityRate }
+      const score = owned ? 0 : 100 + 80 * (communityScore ?? 0.5) + (maxDemand ? 20 * demand / maxDemand : 0)
+      return { name, operatorId, owned, score, demand, communityRate, communityScore }
     })
     const expectedScore = operators.reduce((sum, operator) => sum + operator.score, 0) / operators.length
     return { key: queue.key, name: queue.name, expectedScore, unownedCount: operators.filter((operator) => !operator.owned).length, operators }

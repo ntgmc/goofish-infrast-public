@@ -35,6 +35,24 @@ describe('PRTS and Skland cultivation data', () => {
     expect(result.specialItems![0].recommendations[0].demand).toBeCloseTo(row.weightedFrequency!)
   })
 
+  it('shares the same training strength across homework, community targets and selectors', () => {
+    const input = snapshot()
+    input.costs.modules.equipDict.mod_x.typeName2 = 'X'
+    const community = { status: 'fresh' as const, updatedAt: null, operators: { char_test: {
+      owned: 200, sampleSize: 1000, elite: [0.1, 0.1, 0.8], skills: [[0.2, 0, 0, 0.8]], modules: { X: [0.2, 0, 0, 0.8] },
+    } } }
+    const result = buildCultivationData(input, game(0), { items: [] }, pricing, community, {
+      parserVersion: 4, status: 'fresh', updatedAt: '', itemNames: {}, itemIcons: {}, excludedOperators: [], skillIcons: {},
+      items: [{ id: 'selector', name: '调用凭证', iconId: 'selector', kind: 'selector', scope: '', sourceUrl: '', rarity: 4, operators: ['char_test'], options: [] }],
+    })
+    const homework = result.candidates.find((row) => row.source === 'homework')!
+    expect(homework.communityScore).toBeCloseTo(0.8)
+    const targets = result.candidates.filter((row) => row.source === 'community')
+    expect(targets.length).toBeGreaterThan(0)
+    expect(targets.every((row) => row.communityScore === homework.communityScore)).toBe(true)
+    expect(result.specialItems![0].recommendations[0].communityScore).toBe(homework.communityScore)
+  })
+
   it('charges only missing levels, mastery of the selected skill, and ranks of the specified module', () => {
     const cost = cultivationCosts(snapshot(), 'char_test', current, target, 's1')
     expect(cost.warnings).toEqual(['养成材料表缺失'])
