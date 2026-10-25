@@ -6,6 +6,30 @@ starting a clean runtime dependency check from the archive. The archive
 contains `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, and `release-sbom.cdx.json` so a
 rollback uses the same locked production dependency graph as the build.
 
+## Reusing CI validation
+
+Quality Checks reuses successful public build/tests/boundary checks, PostgreSQL
+integration checks, and Semgrep scans when the checked-out Git tree, repository,
+runner platform, and runner image version match. This allows a `main` merge to
+reuse its PR checks even when the commit SHA changes. The public export check
+builds and runs the full application test suite in its independent export;
+the workflow does not run that suite a second time outside the export.
+
+Only unexpired records from the same repository's successful Quality Checks
+runs qualify. The matching job must have completed successfully in the latest
+run attempt, with the record created during that job. Missing records, changed
+inputs, or GitHub API errors run the checks normally. Manual Quality Checks
+runs always perform all checks; scheduled and manual Semgrep scans also run
+in full. Dependency audits continue to check current vulnerability data.
+
+Validation records default to three days of retention, configurable through
+`CI_ARTIFACT_RETENTION_DAYS`. The Actions summary links each reused run. The
+first run executes all checks to create these records. Release archives are
+always rebuilt on `main` pushes with the current SHA and candidate changelog,
+including when public validation is reused.
+
+## Verifying release artifacts
+
 Vite writes build metadata into Web entry chunks, and esbuild writes it into
 each server entry. Manifest creation and verification require those compiled
 values to agree with the target SHA, versions, and candidate changelog. Rebuild

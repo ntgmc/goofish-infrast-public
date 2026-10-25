@@ -30,6 +30,7 @@ export const BUILD_RELEVANT_SCRIPTS = Object.freeze([
   'scripts/build-server.mjs',
   'scripts/changelog-lib.mjs',
   'scripts/changelog-git.mjs',
+  'scripts/ci-validation-reuse.mjs',
   'scripts/check-api-handlers.mjs',
   'scripts/check-architecture.mjs',
   'scripts/check-auth-security.mjs',

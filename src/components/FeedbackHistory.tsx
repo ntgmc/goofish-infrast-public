@@ -6,7 +6,7 @@ import { FEEDBACK_MESSAGE_MAX_LENGTH, type FeedbackPage } from '../lib/feedback-
 import { useFeedbackThread } from '../lib/use-feedback-thread'
 import FeedbackTimeline from './FeedbackTimeline'
 
-export default function FeedbackHistory({ initialId, onBusyChange }: { initialId: string | null; onBusyChange: (busy: boolean) => void }) {
+export default function FeedbackHistory({ initialId, onBusyChange, onDraftChange }: { initialId: string | null; onBusyChange: (busy: boolean) => void; onDraftChange: (hasDraft: boolean) => void }) {
   const text = copy.feedback
   const [page, setPage] = useState(1)
   const [revision, setRevision] = useState(0)
@@ -19,6 +19,7 @@ export default function FeedbackHistory({ initialId, onBusyChange }: { initialId
   const replyForm = useRef<HTMLFormElement>(null)
   const thread = useFeedbackThread('user', selected, true)
   useEffect(() => { onBusyChange(thread.saving); if (thread.saving) replyForm.current?.focus(); return () => onBusyChange(false) }, [onBusyChange, thread.saving])
+  useEffect(() => { onDraftChange(Boolean(reply)); return () => onDraftChange(false) }, [onDraftChange, reply])
   useEffect(() => {
     const controller = new AbortController()
     setListLoading(true)

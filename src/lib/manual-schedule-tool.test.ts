@@ -123,7 +123,7 @@ describe('standalone manual schedules', () => {
     expect(source.plans[0].rooms.manufacture[0].product).toBe('Pure Gold')
   })
 
-  it('validates Fiammetta ownership, active target and compatible shifts', () => {
+  it('allows Fiammetta targets outside the current shift while validating ownership and compatible shifts', () => {
     const source = createBlankManualSchedule(config)
     const withFiammetta = [...operators, { id: 'char_300_phenxi', name: '菲亚梅塔', own: true, elite: 0, level: 1, rarity: 6 }]
     source.plans[0].rooms.manufacture[0].operators = ['芬']
@@ -132,7 +132,9 @@ describe('standalone manual schedules', () => {
     expect(() => resolveManualScheduleConfig(source, config, operators)).toThrow()
     const noWork = structuredClone(source)
     noWork.plans[0].rooms.manufacture[0].operators = []
-    expect(() => resolveManualScheduleConfig(noWork, config, withFiammetta)).toThrow()
+    expect(resolveManualScheduleConfig(noWork, config, withFiammetta).Fiammetta?.enable).toBe(true)
+    expect(parseManualScheduleJson(JSON.stringify(noWork), config, withFiammetta).plans[0].Fiammetta).toEqual(source.plans[0].Fiammetta)
+    expect(() => resolveManualScheduleConfig(noWork, config, withFiammetta.filter((operator) => operator.name !== '芬'))).toThrow()
     const ownTarget = structuredClone(source)
     ownTarget.plans[0].Fiammetta!.target = '菲亚梅塔'
     expect(() => resolveManualScheduleConfig(ownTarget, config, withFiammetta)).toThrow()

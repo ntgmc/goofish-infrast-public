@@ -20,6 +20,7 @@ export default function Tools({ profileId }: { profileId?: string }) {
     { section: 'schedule-comparison' as const, enabled: features.manual_schedule, icon: ComparisonIcon, title: copy.tools.scheduleComparison.title, description: copy.tools.scheduleComparison.description },
     { section: 'cultivation-projects' as const, enabled: features.cultivation_plan, icon: ProjectsIcon, title: copy.cultivationProjects.title, description: copy.cultivationProjects.description },
     { section: 'cultivation' as const, enabled: features.cultivation_plan, icon: CultivationIcon, title: copy.tools.cultivation.title, description: copy.tools.cultivation.description },
+    { section: 'thanks-recruitment' as const, enabled: features.thanks_recruitment, icon: CultivationIcon, title: copy.tools.thanksRecruitment.title, description: copy.tools.thanksRecruitment.description },
     { section: 'depot' as const, enabled: features.depot_value, icon: Gem, title: copy.dashboard.pages_tool_dashboard_ToolsSection_001, description: copy.tools.pages_DepotValuePage_011 },
   ].filter((tool) => tool.enabled)
   return <div className="v2-tools-directory">{tools.map((tool, index) => <Link key={tool.section} to={v2Path(tool.section, profileId)}><span className="v2-tool-number">0{index + 1}</span><tool.icon size={28} aria-hidden="true" /><div><h2>{tool.title}</h2><p>{tool.description}</p></div><span className="v2-tool-enter"><ArrowRight size={22} aria-hidden="true" /></span></Link>)}{!tools.length && <Notice>{copy.v2.featureUnavailable}</Notice>}</div>

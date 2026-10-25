@@ -64,7 +64,7 @@ async function execute(task: CultivationTask, signal: AbortSignal): Promise<Arra
     getYituliuPricing(), getCultivationStatistics(), getSpecialItemCatalog(snapshot.operators),
   ])
   signal.throwIfAborted()
-  return encodePlan(buildCultivationData(snapshot, task.game, task.inventory, pricing, community, specialCatalog, task.query, recommendation), task)
+  return encodePlan(buildCultivationData(snapshot, task.game, task.inventory, pricing, community, specialCatalog, task.query, recommendation, task.thanksRecruitmentEnabled !== false), task)
 }
 
 function encodePlan(data: import('../../src/lib/cultivation-contract').CultivationData, task: Extract<CultivationTask, { type: 'plan' }>): ArrayBuffer {

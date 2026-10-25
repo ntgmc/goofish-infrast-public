@@ -169,7 +169,8 @@ interface CdkDetailPanelProps {
 
 export function CdkDetailDialog(props: CdkDetailPanelProps) {
   return (
-    <AdminDetailDialog labelledBy="admin-cdk-detail-title" onClose={props.onClose}>
+    <AdminDetailDialog labelledBy="admin-cdk-detail-title" onClose={props.onClose}
+      preventOutsideDismiss={props.canManage !== false && (props.detail.status === 'used' || props.detail.status === 'frozen') && Boolean(props.detail.operator_baseline_options?.length)}>
       <CdkDetailPanel {...props} />
     </AdminDetailDialog>
   )

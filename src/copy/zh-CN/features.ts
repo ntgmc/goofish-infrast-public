@@ -58,6 +58,7 @@ export const featuresCopy = {
     qqbot: 'QQ 绑定与通知',
     maa_export: 'MAA 排班导出',
     full_result_export: '完整计算数据导出',
+    thanks_recruitment: '感谢庆典特别招募推荐',
   },
   admin_nav: '功能开关',
   admin_title: '全站功能开关',

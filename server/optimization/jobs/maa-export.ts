@@ -12,6 +12,7 @@ const MAA_EXPORT_ROOM_TYPES = [
   'hire',
   'processing',
   'training',
+  'recycling',
 ] as const;
 
 type MaaExportRoomType = (typeof MAA_EXPORT_ROOM_TYPES)[number];

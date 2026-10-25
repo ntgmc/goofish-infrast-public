@@ -141,7 +141,7 @@ describe('manual schedule admission', () => {
     }))).ok).toBe(false)
   })
 
-  it('validates standalone Fiammetta against the submitted assignments and derives product and level settings', async () => {
+  it('preserves standalone Fiammetta targets outside the current shift and derives product and level settings', async () => {
     const standalone = createBlankManualSchedule(normalizeConfig(config))
     standalone.plans.forEach((plan) => {
       plan.rooms.manufacture[0].level = 2
@@ -159,7 +159,11 @@ describe('manual schedule admission', () => {
     expect(result.prepared.payload.effectiveConfig.product_requirements.manufacturing_stations['Originium Shard']).toBe(1)
     expect(result.prepared.payload.request.manual_schedule?.plans[0].Fiammetta).toMatchObject({ target: '芬', order: 'post' })
     plans[0].rooms.manufacture[0] = ['', '']
-    expect((await prepareOptimizeJob(request(body))).ok).toBe(false)
+    const offShift = await prepareOptimizeJob(request(body))
+    expect(offShift.ok).toBe(true)
+    if (!offShift.ok || 'kind' in offShift.prepared.payload) throw new Error('Expected off-shift target admission')
+    expect(offShift.prepared.payload.request.manual_schedule?.plans[0].Fiammetta).toEqual({ enable: true, target: '芬', order: 'post' })
+    expect(offShift.prepared.payload.request.manual_schedule?.plans[0].rooms.manufacture[0].operators).toEqual([])
     plans[0].rooms.manufacture[0] = ['', '芬']
     expect((await prepareOptimizeJob(request({ ...body, operators }))).ok).toBe(false)
   })

@@ -29,6 +29,7 @@ export const SITE_FEATURE_KEYS = [
   'qqbot',
   'maa_export',
   'full_result_export',
+  'thanks_recruitment',
 ] as const
 
 export type SiteFeatureKey = typeof SITE_FEATURE_KEYS[number]
@@ -78,6 +79,7 @@ export const DEFAULT_SITE_FEATURES: SiteFeatures = Object.freeze({
   qqbot: true,
   maa_export: true,
   full_result_export: true,
+  thanks_recruitment: true,
 })
 
 export const DEFAULT_SITE_FEATURE_SETTINGS: SiteFeatureSettingsV1 = Object.freeze({
@@ -137,6 +139,7 @@ export function computeEffectiveSiteFeatures(settings: SiteFeatureSettingsV1): S
     qqbot: login && raw.qqbot,
     maa_export: profiles && raw.inventory && raw.maa_export,
     full_result_export: profiles && raw.full_result_export,
+    thanks_recruitment: tools && raw.cultivation_plan && raw.thanks_recruitment,
   }
 }
 

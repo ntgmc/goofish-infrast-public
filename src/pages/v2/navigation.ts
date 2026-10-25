@@ -2,7 +2,7 @@ import { copy } from '../../copy'
 import type { SiteFeatures } from '../../lib/site-features'
 import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
 
-const V2_SECTIONS = ['overview', 'generation', 'plans', 'lab', 'tools', 'manual-tool', 'schedule-comparison', 'cultivation', 'cultivation-projects', 'training-ratio', 'depot', 'profiles', 'add-account', 'inventory', 'commercial', 'balance', 'announcements', 'settings', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing'] as const
+const V2_SECTIONS = ['overview', 'generation', 'plans', 'lab', 'tools', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'depot', 'profiles', 'add-account', 'inventory', 'commercial', 'balance', 'announcements', 'settings', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing'] as const
 export type V2Section = typeof V2_SECTIONS[number]
 
 export const V2_PUBLIC_SECTIONS: V2Section[] = ['announcements', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing']
@@ -12,7 +12,7 @@ export const sectionLabels: Record<V2Section, string> = {
   lab: copy.v2.lab, tools: copy.v2.tools, 'manual-tool': copy.tools.manualSchedule.title,
   'schedule-comparison': copy.tools.scheduleComparison.title,
   'training-ratio': copy.trainingRatio.title,
-  cultivation: copy.tools.cultivation.title, 'cultivation-projects': copy.cultivationProjects.title, depot: copy.dashboard.pages_tool_dashboard_ToolsSection_001,
+  cultivation: copy.tools.cultivation.title, 'thanks-recruitment': copy.tools.thanksRecruitment.title, 'cultivation-projects': copy.cultivationProjects.title, depot: copy.dashboard.pages_tool_dashboard_ToolsSection_001,
   profiles: copy.v2.account, 'add-account': copy.v2.addAccount, inventory: copy.inventory.nav,
   commercial: copy.metered.commercial_nav, balance: copy.balance.nav,
   announcements: copy.v2.announcements, settings: copy.v2.settings, help: copy.v2.helpAction, updates: copy.v2.updates,
@@ -43,6 +43,7 @@ export function v2SectionAvailable(section: V2Section, features: SiteFeatures): 
     case 'lab': return features.site && features.profiles && features.scenario_comparison
     case 'manual-tool': case 'schedule-comparison': return features.site && features.manual_schedule
     case 'cultivation': case 'cultivation-projects': return features.site && features.cultivation_plan
+    case 'thanks-recruitment': return features.site && features.thanks_recruitment
     case 'depot': return features.site && features.depot_value
     case 'inventory': return features.site && features.inventory
     case 'commercial': case 'balance': return features.site && METERED_BILLING_AVAILABLE && features.metered_billing
@@ -65,7 +66,7 @@ const legacySections: Record<string, V2Section> = {
   '/tool/optimize/overview': 'generation', '/tool/optimize/plans': 'plans', '/tool/optimize/config': 'overview',
   '/tool/optimize/result': 'overview', '/tool/optimize/lab': 'lab',
   '/tools/training-ratio': 'training-ratio',
-  '/tools/manual-schedule': 'manual-tool', '/tools/cultivation-plan': 'cultivation', '/tools/depot-value': 'depot',
+  '/tools/manual-schedule': 'manual-tool', '/tools/cultivation-plan': 'cultivation', '/tools/thanks-recruitment': 'thanks-recruitment', '/tools/depot-value': 'depot',
   '/announcements': 'announcements', '/faq': 'help', '/changelog': 'updates', '/pricing': 'pricing',
   '/terms': 'terms', '/privacy': 'privacy', '/disclaimer': 'disclaimer', '/support': 'support', '/status': 'status',
 }

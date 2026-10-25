@@ -70,6 +70,7 @@ describe('app route contract', () => {
     expect(isAppRoutePath('/announcements')).toBe(true)
     expect(isAppRoutePath('/tools/depot-value')).toBe(true)
     expect(isAppRoutePath('/tools/manual-schedule')).toBe(true)
+    expect(isAppRoutePath('/tools/thanks-recruitment')).toBe(true)
     expect(isAppRoutePath('/v1')).toBe(true)
     expect(isAppRoutePath('/v1/')).toBe(true)
     expect(isAppRoutePath('/v2')).toBe(true)

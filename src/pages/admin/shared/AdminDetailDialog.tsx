@@ -4,10 +4,12 @@ import { Dialog, DialogContent } from '../../../components/ui/dialog'
 export function AdminDetailDialog({
   labelledBy,
   onClose,
+  preventOutsideDismiss = false,
   children,
 }: {
   labelledBy: string;
   onClose: () => void;
+  preventOutsideDismiss?: boolean;
   children: ReactNode;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -16,6 +18,7 @@ export function AdminDetailDialog({
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent
+        preventOutsideDismiss={preventOutsideDismiss}
         ref={dialogRef}
         aria-labelledby={labelledBy}
         className="block max-h-[calc(100dvh-2rem)] max-w-6xl border-0 bg-transparent p-0 sm:max-h-[calc(100dvh-4rem)]"

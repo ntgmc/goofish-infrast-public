@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { OptimizeResult } from '../../../src/lib/types';
 import { FACILITY_IDS } from '../../../src/lib/facility-layout';
+import { CONFIG_PRESETS, normalizeConfig } from '../../../src/lib/config';
+import { createBlankManualSchedule, parseManualScheduleJson } from '../../../src/lib/manual-schedule-tool';
 import { buildMaaExportPayload, MaaExportValidationError } from './maa-export';
 
 describe('buildMaaExportPayload', () => {
@@ -39,6 +41,7 @@ describe('buildMaaExportPayload', () => {
           dormitory: [{ operators: [], skip: false, sort: false, autofill: true }],
           processing: [{ operators: ['年'], skip: false, sort: false, autofill: false }],
           training: [{ operators: ['梅尔'], skip: false, sort: false, autofill: false }],
+          recycling: [{ operators: ['旅骨'], skip: false, sort: false, autofill: false }],
         },
       }],
       scheduleType: {
@@ -186,6 +189,39 @@ describe('buildMaaExportPayload', () => {
     expect(input).toEqual(original);
   });
 
+  it('round-trips game facility order and drone targets through MAA and full result imports', () => {
+    const config = { ...normalizeConfig(CONFIG_PRESETS['252-1']), facility_layout: [
+      'manufacture_2', 'trading_2', 'manufacture_4', 'manufacture_5', 'power_2',
+      'trading_1', 'manufacture_1', 'power_1', 'manufacture_3',
+    ] };
+    const input = createBlankManualSchedule(config);
+    input.plans.forEach((plan, shift) => {
+      for (const type of ['trading', 'manufacture', 'power']) {
+        plan.rooms[type].forEach((room, index) => {
+          room.operators = Array.from({ length: type === 'power' ? 1 : room.level! }, (_, slot) => `${shift}-${type}-${index}-${slot}`);
+        });
+      }
+      plan.drones = { enable: shift !== 2, room: ['manufacture', 'trading', 'power'][shift], index: 1, order: 'post' };
+    });
+    input.plans[2].Fiammetta = { enable: true, target: input.plans[1].rooms.manufacture[0].operators![0], order: 'pre' };
+    const operators = input.plans.flatMap((plan) => Object.values(plan.rooms).flatMap((rooms) => rooms.flatMap((room) => room.operators ?? [])))
+      .map((name) => ({ id: name, name, own: true, elite: 2, rarity: 6 }));
+    operators.push({ id: 'char_300_phenxi', name: '菲亚梅塔', own: true, elite: 2, rarity: 6 });
+    const exported = buildMaaExportPayload(input);
+    expect(exported.plans[0].rooms.manufacture?.map((room) => room.operators.length)).toEqual([2, 2, 2, 3, 3]);
+    expect(exported.plans.map((plan) => plan.drones?.index)).toEqual([4, 2, 2]);
+    for (const value of [input, exported]) {
+      const imported = parseManualScheduleJson(JSON.stringify(value), config, operators);
+      expect(imported.facility_layout).toEqual(input.facility_layout);
+      for (const type of ['trading', 'manufacture', 'power']) {
+        expect(imported.plans.map((plan) => plan.rooms[type])).toMatchObject(input.plans.map((plan) => plan.rooms[type]));
+      }
+      expect(imported.plans.map((plan) => plan.drones)).toEqual(input.plans.map((plan) => plan.drones));
+      expect(imported.plans[2].Fiammetta).toEqual(input.plans[2].Fiammetta);
+      expect(buildMaaExportPayload(imported)).toEqual({ ...exported, schedule_source: 'manual' });
+    }
+  });
+
   it('preserves original order without saved positions regardless of levels', () => {
     const input = richResult();
     input.plans[0].rooms.manufacture = [
@@ -259,6 +295,7 @@ function richResult(): OptimizeResult {
         dormitory: [{ autofill: true, mood: { 但书: { start: 0, end: 24 } } }],
         processing: [{ operators: ['年'] }],
         training: [{ operators: ['梅尔'] }],
+        recycling: [{ operators: ['旅骨'] }],
         unsupported_internal_room: [{ operators: ['不应导出'] }],
       },
     }],

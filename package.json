@@ -41,7 +41,7 @@
     "test:release-artifact": "node --test scripts/release-artifact.test.mjs scripts/stage-release-artifact.test.mjs",
     "test:release-confirmation": "node --test scripts/confirm-production-release.test.mjs",
     "test:build-relevance": "node --test scripts/build-relevance-lib.test.mjs",
-    "test:workflow-contracts": "node --test scripts/dependency-audit-workflow.test.mjs scripts/quality-workflow.test.mjs",
+    "test:workflow-contracts": "node --test scripts/dependency-audit-workflow.test.mjs scripts/quality-workflow.test.mjs scripts/ci-validation-reuse.test.mjs",
     "test:postgres": "vitest run --config vitest.postgres.config.ts",
     "test:watch": "vitest",
     "check:copy": "node scripts/check-copy-architecture.mjs",
@@ -86,7 +86,7 @@
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.7.0",
     "tw-animate-css": "^1.4.0",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",

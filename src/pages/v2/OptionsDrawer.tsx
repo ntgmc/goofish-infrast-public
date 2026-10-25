@@ -67,6 +67,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
   const isConfig = shownPanel === 'config'
   const validation = validateScheduleConfig(config)
   const exampleData = sample && !session.license
+  const showAuthForm = shownPanel === 'account' && !session.user && featureState.status === 'ready' && featureState.features.site && featureState.features.login
   const description = shownPanel === 'settings' ? copy.dashboard.animation.description : isConfig ? exampleData ? text.demoConfigDescription : text.configDescription
     : shownPanel === 'operators' ? exampleData ? text.sampleOperatorDescription : text.operatorDescription
       : shownPanel === 'account' ? text.accountDescription : text.roomDescription
@@ -74,7 +75,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
   return (
     <Dialog open={panel !== null} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent className={`v2-drawer ${isConfig ? 'v2-drawer-wide' : shownPanel === 'operators' ? 'v2-operators-drawer' : ''}`} showCloseButton closeLabel={text.close}
-        allowOutsideDismiss={isConfig || shownPanel === 'operators'}
+        preventOutsideDismiss={showAuthForm}
         onOpenAutoFocus={() => { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null }}
         onCloseAutoFocus={(event) => { event.preventDefault(); setLastPanel(null); if (opener.current?.isConnected) opener.current.focus({ preventScroll: true }) }}>
         <div className="v2-drawer-heading">
@@ -123,7 +124,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
                 {session.workspaceLoadError && <p role="alert" className="v2-error">{session.workspaceLoadError}</p>}
                 <button type="button" className="v2-button v2-button-secondary" onClick={() => onNavigate('profiles')}>{text.manageProfiles}<ArrowRight size={16} /></button>
               </>
-            ) : featureState.status === 'ready' && featureState.features.site && featureState.features.login ? (
+            ) : showAuthForm ? (
               <AuthForm compact allowCdk={false} onAuthenticated={(payload) => { session.applyAuthPayload(payload); onClose() }} submitClassName="v2-button v2-button-primary w-full" />
             ) : (
               <div className="v2-empty-state"><UserRound size={30} /><p>{text.loginUnavailable}</p>

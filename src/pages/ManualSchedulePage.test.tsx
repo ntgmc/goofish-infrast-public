@@ -121,7 +121,7 @@ describe('manual schedule tool', () => {
     expect(screen.queryByText(copy.domain.manual_schedule.simulated)).not.toBeInTheDocument()
   })
 
-  it('keeps sparse assignments when settings change and prevents lowering capacity or using a removed Fiammetta target', async () => {
+  it('keeps sparse assignments, prevents lowering capacity and preserves Fiammetta targets outside the current shift', async () => {
     const user = userEvent.setup()
     mocks.session.mockReturnValue({ ...session(), workspace: {
       config, operators: [...workspace.operators, { id: 'char_300_phenxi', name: '菲亚梅塔', own: true, elite: 0, level: 1, rarity: 6 }],
@@ -144,15 +144,20 @@ describe('manual schedule tool', () => {
     await user.click(screen.getByRole('button', { name: /编辑 制造站.*芬/ }))
     await user.click(screen.getByRole('button', { name: '清空此位置' }))
     await user.click(screen.getByRole('button', { name: '完成' }))
-    expect(screen.getByText(copy.tools.manualSchedule.fiammettaInvalid)).toBeVisible()
-    expect(screen.getByRole('button', { name: '模拟测算' })).toBeDisabled()
+    expect(screen.queryByText(copy.tools.manualSchedule.fiammettaInvalid)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '模拟测算' })).toBeEnabled()
+    expect(within(screen.getByLabelText('恢复心情对象')).getByRole('option', { name: '芬' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: '模拟测算' }))
+    expect(mocks.submit.mock.calls[1][0].manualSchedule.source.plans[0].Fiammetta).toMatchObject({ enable: true, target: '芬' })
+    expect(mocks.submit.mock.calls[1][0].manualSchedule.plans[0].rooms.manufacture[0]).toEqual(['', '', ''])
+    await screen.findByText(copy.domain.manual_schedule.simulated)
     await user.click(screen.getByRole('button', { name: copy.domain.manual_schedule.save }))
     await user.selectOptions(screen.getByLabelText('恢复心情对象'), '')
     expect(screen.getByRole('button', { name: '模拟测算' })).toBeEnabled()
     await user.click(screen.getByRole('button', { name: copy.domain.manual_schedule.restore }))
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: copy.domain.manual_schedule.done }))
     expect(screen.getByLabelText('恢复心情对象')).toHaveValue('芬')
-    expect(screen.getByRole('button', { name: '模拟测算' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '模拟测算' })).toBeEnabled()
   })
 
   it('discards a simulation when facility settings change during the request', async () => {

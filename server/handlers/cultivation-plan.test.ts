@@ -1,18 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import handler from './cultivation-plan'
 import { CultivationReadError } from '../cultivation/worker-client'
+import { DEFAULT_SITE_FEATURE_SETTINGS } from '../../src/lib/site-features'
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), read: vi.fn(), gate: vi.fn(), snapshot: vi.fn() }))
+const mocks = vi.hoisted(() => ({ session: vi.fn(), read: vi.fn(), gate: vi.fn(), snapshot: vi.fn(), features: vi.fn() }))
 vi.mock('./user-auth', () => ({ requireUserSession: mocks.session, jsonResponse: (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }) }))
 vi.mock('../feature-gate', () => ({ requireSiteFeatures: mocks.gate }))
 vi.mock('../cultivation/worker-client', async (original) => ({ ...await original<typeof import('../cultivation/worker-client')>(), readCultivationPlan: mocks.read }))
 vi.mock('../skland-snapshot', async (original) => ({ ...await original<typeof import('../skland-snapshot')>(), getSklandSnapshot: mocks.snapshot }))
+vi.mock('../storage/feature-settings-store', () => ({ getSiteFeatureSettings: mocks.features }))
 
 const request = (body: unknown = { profile_id: 'mine' }) => new Request('http://local/api/cultivation-plan', { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } })
 
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.gate.mockResolvedValue(null)
+  mocks.features.mockResolvedValue(DEFAULT_SITE_FEATURE_SETTINGS)
   mocks.session.mockResolvedValue({ profiles: [{ id: 'mine', status: 'active', skland_binding: { uid: 'player-uid', encrypted_cred: 'encrypted' } }] })
   mocks.snapshot.mockResolvedValue({ game: { data: { chars: [] }, fetchedAt: '2026-10-17T00:00:00Z' },
     inventory: { data: { items: [] }, fetchedAt: '2026-10-17T00:00:00Z' }, version: '1', errors: {} })
@@ -61,6 +64,13 @@ describe('cultivation planning authorization and data boundary', () => {
     expect(mocks.read).toHaveBeenLastCalledWith(expect.objectContaining({ projects: [] }), expect.any(AbortSignal))
   })
 
+  it('passes the backend-controlled activity switch to the isolated reader', async () => {
+    mocks.features.mockResolvedValue({ ...DEFAULT_SITE_FEATURE_SETTINGS, features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, thanks_recruitment: false } })
+    const response = await handler(request())
+    expect(response.status).toBe(200)
+    expect(mocks.read).toHaveBeenCalledWith(expect.objectContaining({ thanksRecruitmentEnabled: false }), expect.any(AbortSignal))
+  })
+
   it('passes cached source data and request cancellation to the isolated reader without exposing credentials', async () => {
     const req = request({ profile_id: 'mine', recommendation: { stageId: 'main_01', rarityGroup: 'low' } })
     const response = await handler(req)
@@ -68,7 +78,7 @@ describe('cultivation planning authorization and data boundary', () => {
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     expect(mocks.read).toHaveBeenCalledWith({ game: { chars: [] }, inventory: { items: [] },
       importedAt: '2026-10-17T00:00:00Z', snapshotVersion: '1', warnings: [],
-      query: expect.objectContaining({ stageId: 'main_01', rarityGroup: 'low', coverage: 0.8 }),
+      query: expect.objectContaining({ stageId: 'main_01', rarityGroup: 'low', coverage: 0.8 }), thanksRecruitmentEnabled: true,
     }, req.signal)
     const text = await response.text()
     expect(text).not.toContain('private-credential')

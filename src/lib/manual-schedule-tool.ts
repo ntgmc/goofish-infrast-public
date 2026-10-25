@@ -105,6 +105,24 @@ export function parseManualScheduleJson(text: string, config: LicenseConfig, ope
   source.total_schedule_hours = source.shift_hours.reduce((total, hour) => total + hour, 0)
   source.schedule_mode ??= 'maa'
   source.dormitory_rule ??= source.plans.some((plan) => plan.rooms.dormitory?.some((room) => room.autofill)) ? 'maa_pure_autofill' : 'fixed'
+  const layout = !source.facility_layout && config.layout === '2-5-2' &&
+    source.plans[0].rooms.trading?.length === 2 && source.plans[0].rooms.manufacture?.length === 5
+    ? facilityLayoutSchema.safeParse(config.facility_layout) : null
+  if (layout?.success) {
+    // MAA arrays follow game positions; restore facility IDs before applying configured levels.
+    source.facility_layout = layout.data
+    for (const plan of source.plans) {
+      for (const type of ['trading', 'manufacture', 'power']) {
+        const indexes = layout.data.filter((id) => id.startsWith(`${type}_`)).map((id) => Number(id.split('_')[1]) - 1)
+        const rooms = plan.rooms[type]
+        if (!rooms || rooms.length !== indexes.length) throw new Error(copy.tools.manualSchedule.importLayoutMismatch)
+        plan.rooms[type] = rooms.map((_, index) => rooms[indexes.indexOf(index)])
+        if (plan.drones?.room === type && indexes[plan.drones.index - 1] !== undefined) {
+          plan.drones.index = indexes[plan.drones.index - 1] + 1
+        }
+      }
+    }
+  }
   for (const plan of source.plans) {
     for (const [type, rooms] of Object.entries(plan.rooms)) {
       const expectedCount = type === 'trading' ? config.trading_stations_count : config.manufacturing_stations_count
@@ -120,9 +138,6 @@ export function parseManualScheduleJson(text: string, config: LicenseConfig, ope
         } else room.level ??= type === 'control' || type === 'dormitory' ? 5 : 3
       })
     }
-  }
-  if (source.plans[0].rooms.trading?.length === 2 && source.plans[0].rooms.manufacture?.length === 5) {
-    source.facility_layout ??= config.layout === '2-5-2' ? config.facility_layout : undefined
   }
   const resolved = resolveManualScheduleConfig(source, config, operators)
   source.buildingType = Number(resolved.layout.replace(/-/g, ''))
@@ -172,9 +187,7 @@ export function resolveManualScheduleConfig(source: OptimizeResult, input: Licen
     if (!plan.Fiammetta?.enable) continue
     if (!fiammetta || source.schedule_mode === 'rotation' || source.schedule_mode === 'variable' ||
       !isFiammettaShiftHoursSupported(shiftHours) ||
-      !owned.has(plan.Fiammetta.target) || plan.Fiammetta.target === fiammetta.name ||
-      !Object.entries(plan.rooms).some(([type, entries]) => type !== 'dormitory' && type !== 'training' &&
-        entries.some((room) => room.operators?.includes(plan.Fiammetta!.target)))) {
+      !owned.has(plan.Fiammetta.target) || plan.Fiammetta.target === fiammetta.name) {
       throw new Error(copy.tools.manualSchedule.fiammettaInvalid)
     }
   }
