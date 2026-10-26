@@ -7,7 +7,7 @@ import type { OptimizationFailureSnapshot, OptimizationJobListItem, Optimization
 import { getScheduleGenerateDurationStatsByBucket, recordUsageEvent } from "../../handlers/usage-stats";
 import { getProfileForUser, normalizeProfileKind } from "../../storage/user-store";
 import { requireUserSession } from "../../handlers/user-auth";
-import { getOptimizeJobStore, OptimizeJobAdmissionError, type OptimizeJobPriority, type OptimizeJobQueueEstimate, type OptimizeJobRecord, type OptimizeJobStore } from "../../storage/optimize-job-store";
+import { getOptimizeJobStore, OptimizeJobAdmissionError, type OptimizeJobPriority, type OptimizeJobQueueEstimate, type OptimizeJobRecord, type OptimizeJobSummaryRecord, type OptimizeJobStore } from "../../storage/optimize-job-store";
 import { requestOptimizeJobCancellation, requestOptimizeJobProcessing } from "../../optimize-job-signals";
 import { isOptimizeEstimateOverdue } from "../../optimize-estimate";
 import type { OptimizeDurationEstimate, OptimizeRuntimeEstimate, OptimizationJobPayload } from './shared';
@@ -194,7 +194,7 @@ export async function getOptimizationJob(req: Request, rawJobId: string): Promis
   const access = await canReadOptimizeJob(req, job);
   if (!access.ok) return jsonResponse({ error: access.message }, access.status);
 
-  const queueEstimate = await getOptimizeJobQueueEstimate(store, job.id);
+  const queueEstimate = await getOptimizeJobQueueEstimate(store, job);
   return jsonResponse(await projectOptimizeJobSnapshot(
     formatOptimizeJobStatus(job, queueEstimate.queuePosition, queueEstimate.estimatedWaitMs),
     access.subject,
@@ -217,10 +217,13 @@ export async function listOptimizationJobs(req: Request): Promise<Response> {
   const jobs = await store.listJobsByProfile(profileId, limit + 1, before)
   const page = jobs.slice(0, limit)
   const response: OptimizationJobListResponse = {
-    jobs: page.map(({ job, queuePosition, queueWaitMs, historyResultId }) => toOptimizationJobListItem(
-      formatOptimizeJobStatus(job, queuePosition, queueWaitMs),
-      historyResultId,
-    )),
+    jobs: page.map(({ job, queuePosition, queueWaitMs, resultAvailable, historyResultId }) => {
+      const estimate = getOptimizeJobEstimate(job)
+      const runtimeEstimate = getOptimizeRuntimeEstimate(job, queuePosition, estimate, new Date(), queueWaitMs ?? null)
+      return toOptimizationJobListItem(
+        formatOptimizationJobSummary(job, queuePosition, estimate, runtimeEstimate), resultAvailable, historyResultId,
+      )
+    }),
     nextCursor: jobs.length > limit && page.at(-1)
       ? encodeOptimizationJobCursor(page.at(-1)!.job)
       : null,
@@ -228,12 +231,15 @@ export async function listOptimizationJobs(req: Request): Promise<Response> {
   return jsonResponse(response)
 }
 
-function toOptimizationJobListItem(snapshot: OptimizationJobSnapshot, historyResultId?: string | null): OptimizationJobListItem {
+function toOptimizationJobListItem(
+  snapshot: ReturnType<typeof formatOptimizationJobSummary>,
+  resultAvailable: boolean,
+  historyResultId?: string | null,
+): OptimizationJobListItem {
   if (snapshot.status === 'succeeded') {
-    const { result, historyResultId: _historyResultId, ...summary } = snapshot
     return {
-      ...summary,
-      resultAvailable: snapshot.kind === 'schedule' ? Boolean(historyResultId) : result != null,
+      ...snapshot,
+      resultAvailable: snapshot.kind === 'schedule' ? Boolean(historyResultId) : resultAvailable,
       ...(snapshot.kind === 'schedule' && historyResultId && { historyResultId }),
     }
   }
@@ -256,7 +262,7 @@ export async function cancelOptimizationJob(req: Request, rawJobId: string): Pro
   requestOptimizeJobCancellation(jobId)
   return jsonResponse(
     { job: await projectOptimizeJobSnapshot(
-      formatOptimizeJobStatus(cancelled, (await getOptimizeJobQueueEstimate(store, jobId)).queuePosition), access.subject,
+      formatOptimizeJobStatus(cancelled, (await getOptimizeJobQueueEstimate(store, cancelled)).queuePosition), access.subject,
     ) },
     cancelled.status === 'cancelled' ? 200 : 202,
   )
@@ -290,7 +296,7 @@ export async function buildOptimizeJobAccepted(
   job: OptimizeJobRecord,
   subject: CapabilitySubject = getJobCapabilitySubject(job),
 ): Promise<OptimizationJobSnapshot> {
-  const queueEstimate = await getOptimizeJobQueueEstimate(getOptimizeJobStore(), job.id);
+  const queueEstimate = await getOptimizeJobQueueEstimate(getOptimizeJobStore(), job);
   const estimate = getOptimizeJobEstimate(job);
   const runtimeEstimate = getOptimizeRuntimeEstimate(job, queueEstimate.queuePosition, estimate, new Date(), queueEstimate.estimatedWaitMs);
   return projectOptimizeJobSnapshot(
@@ -318,9 +324,10 @@ async function projectOptimizeJobSnapshot(
   }
 }
 
-async function getOptimizeJobQueueEstimate(store: OptimizeJobStore, jobId: string): Promise<OptimizeJobQueueEstimate> {
-  if (typeof store.getQueueEstimate === 'function') return store.getQueueEstimate(jobId)
-  return { queuePosition: await store.getQueuePosition(jobId), estimatedWaitMs: null }
+async function getOptimizeJobQueueEstimate(store: OptimizeJobStore, job: OptimizeJobRecord): Promise<OptimizeJobQueueEstimate> {
+  if (job.status !== 'queued') return { queuePosition: null, estimatedWaitMs: null }
+  if (typeof store.getQueueEstimate === 'function') return store.getQueueEstimate(job.id)
+  return { queuePosition: await store.getQueuePosition(job.id), estimatedWaitMs: null }
 }
 
 function formatOptimizeJobStatus(
@@ -342,11 +349,25 @@ function formatOptimizationJobSnapshot(
   estimate: OptimizeDurationEstimate,
   runtimeEstimate: OptimizeRuntimeEstimate,
 ): OptimizationJobSnapshot {
-  const status = job.status === 'running' ? 'running' : job.status;
+  const summary = formatOptimizationJobSummary(job, queuePosition, estimate, runtimeEstimate)
+  return summary.status === 'succeeded' ? {
+    ...summary,
+    result: job.result_json as OptimizeResult,
+    ...(summary.kind === 'schedule' && { historyResultId: job.id }),
+  } : summary
+}
+
+function formatOptimizationJobSummary(
+  job: OptimizeJobSummaryRecord,
+  queuePosition: number | null,
+  estimate: OptimizeDurationEstimate,
+  runtimeEstimate: OptimizeRuntimeEstimate,
+) {
+  const status = job.status;
   const upgradeSuggestions = getUpgradeSuggestionIntent(job);
   const base = {
     id: job.id,
-    status: job.status === 'running' ? 'running' : 'queued',
+    status: job.status === 'running' ? 'running' as const : 'queued' as const,
     kind: getOptimizeJobKind(job),
     source: job.source,
     priority: { kind: formatJobPriority(job), label: formatJobPriorityLabel(job) },
@@ -381,12 +402,7 @@ function formatOptimizationJobSnapshot(
     billing: job.billing_json,
   };
   if (status === 'succeeded') {
-    return {
-      ...base,
-      status,
-      result: job.result_json as OptimizeResult,
-      ...(getOptimizeJobKind(job) === 'schedule' && { historyResultId: job.id }),
-    };
+    return { ...base, status };
   }
   if (status === 'failed') {
     return {
@@ -407,7 +423,7 @@ function getOptimizePollAfterMs(status: string, queuePosition?: number | null): 
   return Math.min(10_000, 2_000 + position * 250)
 }
 
-function getUpgradeSuggestionIntent(job: OptimizeJobRecord): { requested: boolean; allowed: boolean } {
+function getUpgradeSuggestionIntent(job: OptimizeJobSummaryRecord): { requested: boolean; allowed: boolean } {
   const payload = job.payload_json && typeof job.payload_json === 'object' && !Array.isArray(job.payload_json)
     ? job.payload_json as Record<string, unknown>
     : {}
@@ -420,7 +436,7 @@ function getUpgradeSuggestionIntent(job: OptimizeJobRecord): { requested: boolea
   }
 }
 
-function getOptimizeJobKind(job: OptimizeJobRecord): 'schedule' | 'scenario_comparison' {
+function getOptimizeJobKind(job: OptimizeJobSummaryRecord): 'schedule' | 'scenario_comparison' {
   const payload = job.payload_json && typeof job.payload_json === 'object' ? job.payload_json as Record<string, unknown> : {}
   if (payload.kind === 'scenario_comparison') return 'scenario_comparison'
   return 'schedule'
@@ -432,14 +448,14 @@ function isRemovedOptimizationJob(job: OptimizeJobRecord): boolean {
     && (job.payload_json as Record<string, unknown>).kind === 'reorder_check')
 }
 
-function getOptimizeExecutionPhase(job: OptimizeJobRecord): 'initial_queue' | 'retry_wait' | 'executing' | 'settling' | 'terminal' {
+function getOptimizeExecutionPhase(job: OptimizeJobSummaryRecord): 'initial_queue' | 'retry_wait' | 'executing' | 'settling' | 'terminal' {
   if (job.status === 'running') return job.cancel_requested_at ? 'settling' : 'executing'
   if (job.status === 'queued') return job.attempt_count > 0 || job.failure_count > 0 ? 'retry_wait' : 'initial_queue'
   return 'terminal'
 }
 
 function formatOptimizationFailure(
-  job: OptimizeJobRecord,
+  job: OptimizeJobSummaryRecord,
   status: 'failed' | 'cancelled' | 'dead_lettered',
 ): OptimizationFailureSnapshot {
   const code = job.public_error_code || (status === 'cancelled'
@@ -460,7 +476,7 @@ function formatOptimizationFailure(
   }
 }
 
-function canRetryOptimizeJob(job: OptimizeJobRecord): boolean {
+function canRetryOptimizeJob(job: OptimizeJobSummaryRecord): boolean {
   if (job.status !== 'failed' && job.status !== 'dead_lettered') return false
   return formatOptimizationFailure(job, job.status).retryable
 }
@@ -508,7 +524,7 @@ function formatJobPriorityLabel(job: Pick<OptimizeJobRecord, 'priority'>): strin
   return job.priority >= 20 ? '优先计算券' : job.priority >= 10 ? '付费优先' : job.priority > 0 ? '高级分析' : '免费排队';
 }
 
-function getOptimizeJobEstimate(job: OptimizeJobRecord): OptimizeDurationEstimate {
+function getOptimizeJobEstimate(job: OptimizeJobSummaryRecord): OptimizeDurationEstimate {
   const payload = job.payload_json as Partial<OptimizationJobPayload> | null;
   if (isOptimizeDurationEstimate(payload?.estimate)) return payload.estimate;
   const withSuggestions = payload != null && 'request' in payload
@@ -521,7 +537,7 @@ function getOptimizeJobEstimate(job: OptimizeJobRecord): OptimizeDurationEstimat
 }
 
 function getOptimizeRuntimeEstimate(
-  job: OptimizeJobRecord,
+  job: OptimizeJobSummaryRecord,
   queuePosition: number | null,
   estimate: OptimizeDurationEstimate,
   now = new Date(),

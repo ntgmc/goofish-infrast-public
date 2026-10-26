@@ -86,6 +86,65 @@ afterAll(async () => {
   if (container) await container.stop()
 })
 
+describe('PostgreSQL optimization job read projections', () => {
+  it('returns summaries for large jobs while detail reads retain the full result', async () => {
+    const profileId = await seedProfile()
+    const store = createPostgresOptimizeJobStore()
+    const largeData = 'x'.repeat(200_000)
+    const payload = {
+      ...formalSchedulePayload(profileId),
+      operators: [{ name: largeData }],
+      effectiveConfig: { ...formalConfig(), unrelated: largeData },
+    }
+    const result = { ...formalScheduleResult('large result'), raw_results: [{ data: largeData }] }
+    const job = await store.createJob({ ...input(), profile_id: profileId, payload_json: payload })
+    try {
+      await query("update optimize_jobs set status = 'succeeded', result_json = $2::jsonb, finished_at = now() where id = $1", [job.id, JSON.stringify(result)])
+      const [entry] = await store.listJobsByProfile(profileId)
+      expect(entry).toMatchObject({ resultAvailable: true, queuePosition: null, historyResultId: null })
+      expect(entry.job).not.toHaveProperty('result_json')
+      expect(entry.job.payload_json).toEqual({
+        kind: null,
+        estimate: payload.estimate,
+        request: { include_upgrade_suggestions: false, upgrade_suggestions_allowed: false },
+        effectiveConfig: { schedule_mode: 'maa', Fiammetta: { enable: null } },
+      })
+      const fullJob = await store.getJob(job.id)
+      expect(fullJob?.result_json).toEqual(result)
+      expect(fullJob?.payload_json).toEqual(payload)
+      expect(JSON.stringify(entry).length).toBeLessThan(JSON.stringify(fullJob).length / 100)
+      for (const emptyResult of [null, 'null']) {
+        await query('update optimize_jobs set result_json = $2::jsonb where id = $1', [job.id, emptyResult])
+        expect((await store.listJobsByProfile(profileId))[0].resultAvailable).toBe(false)
+      }
+    } finally {
+      await query('delete from optimize_jobs where id = $1', [job.id])
+    }
+  })
+
+  it('uses fresh queue data for admission even while display estimates are cached', async () => {
+    const now = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+    vi.stubEnv('OPTIMIZE_QUEUE_MAX_AGE_MS', '3600000')
+    vi.stubEnv('OPTIMIZE_GLOBAL_WORKER_CONCURRENCY', '1')
+    const store = createPostgresOptimizeJobStore()
+    const first = input({ payload_json: { estimate: { estimated_duration_ms: 5_000 } } })
+    const blocker = input({ payload_json: { estimate: { estimated_duration_ms: 7_200_000 } } })
+    try {
+      await store.admitJob(first)
+      await store.getQueueEstimate!(first.id)
+      await store.createJob(blocker)
+      // The display snapshot predates the blocker, but admission must still see it.
+      await expect(store.getQueueEstimate!(blocker.id)).resolves.toEqual({ queuePosition: null, estimatedWaitMs: null })
+      await expect(store.admitJob(input())).rejects.toMatchObject({ code: 'queue_wait_capacity_exceeded' })
+    } finally {
+      clock.mockRestore()
+      vi.unstubAllEnvs()
+      await query('delete from optimize_jobs where id = any($1::text[])', [[first.id, blocker.id]])
+    }
+  })
+})
+
 describe('PostgreSQL optimization job admission', () => {
   it('upgrades queued jobs created before retry and expiry columns were added', async () => {
     const columns = await query<{ column_name: string }>(

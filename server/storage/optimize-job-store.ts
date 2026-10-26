@@ -44,7 +44,8 @@ interface OptimizeJobCursor {
 }
 
 interface OptimizeJobListRecord {
-  job: OptimizeJobRecord
+  job: OptimizeJobSummaryRecord
+  resultAvailable: boolean
   queuePosition: number | null
   queueWaitMs?: number | null
   historyResultId?: string | null
@@ -86,6 +87,12 @@ export interface OptimizeJobRecord<TPayload = unknown, TResult = unknown> {
   finished_at: string | null
   updated_at: string
 }
+
+export type OptimizeJobSummaryRecord = Pick<OptimizeJobRecord,
+  'id' | 'status' | 'priority' | 'source' | 'payload_json' | 'billing_json'
+  | 'error_message' | 'failure_kind' | 'public_error_code' | 'attempt_count' | 'failure_count'
+  | 'next_attempt_at' | 'cancel_requested_at' | 'execution_stage' | 'stage_updated_at'
+  | 'created_at' | 'started_at' | 'finished_at'>
 
 interface CreateOptimizeJobInput<TPayload = unknown> {
   id: string
@@ -264,6 +271,30 @@ declare global {
 }
 
 let schemaReady: Promise<void> | null = null
+let queueEstimateCache: { estimates: Map<string, OptimizeJobQueueEstimate>; expiresAt: number } | null = null
+let queueEstimateInFlight: Promise<Map<string, OptimizeJobQueueEstimate>> | null = null
+
+const OPTIMIZE_QUEUE_CAPACITY_SELECT = `select id, status, priority, owner_key,
+  payload_json #> '{estimate,estimated_duration_ms}' as estimated_duration_ms, created_at, started_at
+  from optimize_jobs where status in ('queued', 'running')`
+
+async function getPostgresQueueEstimates(): Promise<Map<string, OptimizeJobQueueEstimate>> {
+  if (queueEstimateInFlight) return queueEstimateInFlight
+  if (queueEstimateCache && Date.now() < queueEstimateCache.expiresAt) return queueEstimateCache.estimates
+  queueEstimateInFlight = (async () => {
+    await ensureSchema()
+    const result = await query<OptimizeQueueCapacityRow>(OPTIMIZE_QUEUE_CAPACITY_SELECT)
+    const estimates = buildOptimizeQueueEstimates(result.rows.map(fromQueueCapacityRow), Date.now())
+    // shortcut: display estimates may lag by one second; revisit shared caching if multiple API instances make this a hotspot.
+    queueEstimateCache = { estimates, expiresAt: Date.now() + 1_000 }
+    return estimates
+  })()
+  try {
+    return await queueEstimateInFlight
+  } finally {
+    queueEstimateInFlight = null
+  }
+}
 
 export function getOptimizeJobStore(): OptimizeJobStore {
   return globalThis.__maaOptimizeJobStoreForTesting ?? createPostgresOptimizeJobStore()
@@ -390,8 +421,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           }
         }
         const activeQueue = await client.query<OptimizeQueueCapacityRow>(
-          `select id, status, priority, owner_key, payload_json, created_at, started_at
-           from optimize_jobs where status in ('queued', 'running')`,
+          OPTIMIZE_QUEUE_CAPACITY_SELECT,
         )
         assertOptimizeQueueWaitCapacity(activeQueue.rows.map(fromQueueCapacityRow), input.owner_key, now)
         if (input.source === 'free_preview' && running + queued > 0) {
@@ -530,16 +560,24 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
     },
     listJobsByProfile: async (profileId, limit = 50, before = null) => {
       await ensureSchema()
-      const result = await query<OptimizeJobRow & { queue_position: string | null; history_result_id: string | null }>(
-        `with queued_rank as (
-           select id, row_number() over (
-             order by (priority <= 0) asc, priority desc, created_at asc, id asc
-           ) as queue_position
-           from optimize_jobs where status = 'queued'
-         )
-         select job.*, queued_rank.queue_position::text, history.id as history_result_id
+      const result = await query<OptimizeJobSummaryRow & { result_available: boolean; history_result_id: string | null }>(
+        `select job.id, job.status, job.priority, job.source, job.billing_json,
+           job.error_message, job.failure_kind, job.public_error_code, job.attempt_count, job.failure_count,
+           job.next_attempt_at, job.cancel_requested_at, job.execution_stage, job.stage_updated_at,
+           job.created_at, job.started_at, job.finished_at,
+           jsonb_build_object(
+             'kind', job.payload_json->'kind',
+             'estimate', job.payload_json->'estimate',
+             'request', jsonb_build_object(
+               'include_upgrade_suggestions', job.payload_json #> '{request,include_upgrade_suggestions}',
+               'upgrade_suggestions_allowed', job.payload_json #> '{request,upgrade_suggestions_allowed}'),
+             'effectiveConfig', jsonb_build_object(
+               'schedule_mode', job.payload_json #> '{effectiveConfig,schedule_mode}',
+               'Fiammetta', jsonb_build_object('enable', job.payload_json #> '{effectiveConfig,Fiammetta,enable}'))
+           ) as payload_json,
+           (job.result_json is not null and job.result_json <> 'null'::jsonb) as result_available,
+           history.id as history_result_id
          from optimize_jobs job
-         left join queued_rank on queued_rank.id = job.id
          left join optimization_result_history history on history.profile_id = job.profile_id and history.id = job.id
          where job.profile_id = $1
            and job.source <> 'reorder_check'
@@ -552,15 +590,14 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           new Date(Date.now() - OPTIMIZE_JOB_HISTORY_RETENTION_MS).toISOString(),
         ],
       )
-      const activeQueue = await query<OptimizeQueueCapacityRow>(
-        `select id, status, priority, owner_key, payload_json, created_at, started_at
-           from optimize_jobs where status in ('queued', 'running')`,
-      )
-      const queueEstimates = buildOptimizeQueueEstimates(activeQueue.rows.map(fromQueueCapacityRow), Date.now())
+      const queueEstimates = result.rows.some((row) => row.status === 'queued')
+        ? await getPostgresQueueEstimates()
+        : new Map<string, OptimizeJobQueueEstimate>()
       return result.rows.map((row) => ({
-        job: fromRow(row),
-        queuePosition: row.queue_position === null ? null : Number(row.queue_position),
-        queueWaitMs: queueEstimates.get(row.id)?.estimatedWaitMs ?? null,
+        job: fromSummaryRow(row),
+        resultAvailable: row.result_available,
+        queuePosition: row.status === 'queued' ? queueEstimates.get(row.id)?.queuePosition ?? null : null,
+        queueWaitMs: row.status === 'queued' ? queueEstimates.get(row.id)?.estimatedWaitMs ?? null : null,
         historyResultId: row.history_result_id,
       }))
     },
@@ -588,15 +625,8 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       ].join(' '), [row.priority, row.created_at, 'queued', row.id, row.priority <= 0])
       return Number(result.rows[0]?.position ?? 1)
     },
-    getQueueEstimate: async (id) => {
-      await ensureSchema()
-      const result = await query<OptimizeQueueCapacityRow>(
-        `select id, status, priority, owner_key, payload_json, created_at, started_at
-           from optimize_jobs where status in ('queued', 'running')`,
-      )
-      return buildOptimizeQueueEstimates(result.rows.map(fromQueueCapacityRow), Date.now()).get(id)
-        ?? { queuePosition: null, estimatedWaitMs: null }
-    },
+    getQueueEstimate: async (id) => (await getPostgresQueueEstimates()).get(id)
+      ?? { queuePosition: null, estimatedWaitMs: null },
     claimNextJob: async (workerId, lockToken, lockExpiresAt, maxFailures, maxGlobalRunning = Number.MAX_SAFE_INTEGER, claimPriority = 0) => {
       await ensureSchema()
       const now = new Date().toISOString()
@@ -1379,7 +1409,7 @@ export function createMemoryOptimizeJobStore(
         throw new OptimizeJobAdmissionError('global_queue_capacity_exceeded', 429, '优化服务全局队列已满，请稍后重试。')
       }
       assertOptimizeQueueWaitCapacity(
-        [...records.values()].filter((job) => activeStatuses.has(job.status)),
+        [...records.values()].filter((job) => activeStatuses.has(job.status)).map(toQueueCapacityJob),
         input.owner_key,
         input.created_at ?? new Date().toISOString(),
       )
@@ -1452,7 +1482,7 @@ export function createMemoryOptimizeJobStore(
     getJob: async (id) => records.has(id) ? clone(records.get(id)!) : null,
     listJobsByProfile: async (profileId, limit = 50, before = null) => {
       const queueEstimates = buildOptimizeQueueEstimates(
-        [...records.values()].filter((job) => activeStatuses.has(job.status)),
+        [...records.values()].filter((job) => activeStatuses.has(job.status)).map(toQueueCapacityJob),
         Date.now(),
       )
       return [...records.values()]
@@ -1464,7 +1494,8 @@ export function createMemoryOptimizeJobStore(
         .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id.localeCompare(a.id))
         .slice(0, Math.max(1, Math.min(101, Math.floor(limit))))
         .map((job) => ({
-          job: clone(job),
+          job: clone(toJobSummary(job)),
+          resultAvailable: job.result_json != null,
           queuePosition: memoryQueuePosition(records, job),
           queueWaitMs: queueEstimates.get(job.id)?.estimatedWaitMs ?? null,
         }))
@@ -1477,7 +1508,7 @@ export function createMemoryOptimizeJobStore(
       return job ? memoryQueuePosition(records, job) : null
     },
     getQueueEstimate: async (id) => buildOptimizeQueueEstimates(
-      [...records.values()].filter((job) => activeStatuses.has(job.status)),
+      [...records.values()].filter((job) => activeStatuses.has(job.status)).map(toQueueCapacityJob),
       Date.now(),
     ).get(id) ?? { queuePosition: null, estimatedWaitMs: null },
     claimNextJob: async (workerId, lockToken, lockExpiresAt, maxFailures, maxGlobalRunning = Number.MAX_SAFE_INTEGER, claimPriority = 0) => {
@@ -1905,7 +1936,9 @@ async function upsertBillingReconciliationCase(
 }
 
 type OptimizeQueueCapacityJob = Pick<OptimizeJobRecord,
-  'id' | 'status' | 'priority' | 'owner_key' | 'payload_json' | 'created_at' | 'started_at'>
+  'id' | 'status' | 'priority' | 'owner_key' | 'created_at' | 'started_at'> & {
+  estimated_duration_ms: unknown
+}
 
 type OptimizeQueueCapacityRow = Omit<OptimizeQueueCapacityJob, 'priority' | 'created_at' | 'started_at'> & {
   priority: number | string
@@ -1926,21 +1959,53 @@ type OptimizeJobRow = Omit<OptimizeJobRecord, 'heartbeat_at' | 'lock_expires_at'
   updated_at: string | Date
 }
 
-function fromRow(row: OptimizeJobRow): OptimizeJobRecord {
+type OptimizeJobSummaryRow = Pick<OptimizeJobRow, keyof OptimizeJobSummaryRecord>
+
+function fromSummaryRow(row: OptimizeJobSummaryRow): OptimizeJobSummaryRecord {
   return {
     ...row,
     priority: Number(row.priority),
     attempt_count: Number(row.attempt_count),
     failure_count: Number(row.failure_count),
-    heartbeat_at: normalizeTimestamp(row.heartbeat_at),
-    lock_expires_at: normalizeTimestamp(row.lock_expires_at),
     next_attempt_at: normalizeTimestamp(row.next_attempt_at),
-    expires_at: normalizeTimestamp(row.expires_at),
     cancel_requested_at: normalizeTimestamp(row.cancel_requested_at),
     stage_updated_at: normalizeTimestamp(row.stage_updated_at),
     created_at: normalizeTimestamp(row.created_at) ?? new Date().toISOString(),
     started_at: normalizeTimestamp(row.started_at),
     finished_at: normalizeTimestamp(row.finished_at),
+  }
+}
+
+function toJobSummary(job: OptimizeJobRecord): OptimizeJobSummaryRecord {
+  const payload = job.payload_json as Partial<OptimizationJobPayload> | null
+  return {
+    id: job.id, status: job.status, priority: job.priority, source: job.source, billing_json: job.billing_json,
+    error_message: job.error_message, failure_kind: job.failure_kind, public_error_code: job.public_error_code,
+    attempt_count: job.attempt_count, failure_count: job.failure_count, next_attempt_at: job.next_attempt_at,
+    cancel_requested_at: job.cancel_requested_at, execution_stage: job.execution_stage, stage_updated_at: job.stage_updated_at,
+    created_at: job.created_at, started_at: job.started_at, finished_at: job.finished_at,
+    payload_json: {
+      kind: payload && 'kind' in payload ? payload.kind : undefined,
+      estimate: payload?.estimate,
+      request: payload && 'request' in payload ? {
+        include_upgrade_suggestions: payload.request?.include_upgrade_suggestions,
+        upgrade_suggestions_allowed: payload.request?.upgrade_suggestions_allowed,
+      } : undefined,
+      effectiveConfig: payload && 'effectiveConfig' in payload ? {
+        schedule_mode: payload.effectiveConfig?.schedule_mode,
+        Fiammetta: { enable: payload.effectiveConfig?.Fiammetta?.enable },
+      } : undefined,
+    },
+  }
+}
+
+function fromRow(row: OptimizeJobRow): OptimizeJobRecord {
+  return {
+    ...row,
+    ...fromSummaryRow(row),
+    heartbeat_at: normalizeTimestamp(row.heartbeat_at),
+    lock_expires_at: normalizeTimestamp(row.lock_expires_at),
+    expires_at: normalizeTimestamp(row.expires_at),
     updated_at: normalizeTimestamp(row.updated_at) ?? new Date().toISOString(),
   }
 }
@@ -1948,6 +2013,15 @@ function fromRow(row: OptimizeJobRow): OptimizeJobRecord {
 function normalizeTimestamp(value: string | Date | null): string | null {
   if (!value) return null
   return value instanceof Date ? value.toISOString() : value
+}
+
+function toQueueCapacityJob(job: OptimizeJobRecord): OptimizeQueueCapacityJob {
+  const payload = job.payload_json as { estimate?: { estimated_duration_ms?: unknown } } | null
+  return {
+    id: job.id, status: job.status, priority: job.priority, owner_key: job.owner_key,
+    created_at: job.created_at, started_at: job.started_at,
+    estimated_duration_ms: payload?.estimate?.estimated_duration_ms,
+  }
 }
 
 function fromQueueCapacityRow(row: OptimizeQueueCapacityRow): OptimizeQueueCapacityJob {
@@ -1984,7 +2058,7 @@ function estimateOptimizeQueueWaitMs(
 ): number {
   const schedule = createOptimizeQueueSchedule(activeJobs, nowMs)
   for (const job of schedule.queuedJobs) {
-    scheduleQueueWork(schedule.workerAvailableAt, schedule.ownerAvailableAt, job.owner_key, getQueueJobDurationMs(job.payload_json))
+    scheduleQueueWork(schedule.workerAvailableAt, schedule.ownerAvailableAt, job.owner_key, getQueueJobDurationMs(job.estimated_duration_ms))
   }
   return getEarliestQueueStart(schedule.workerAvailableAt, schedule.ownerAvailableAt.get(ownerKey) ?? 0)
 }
@@ -2000,7 +2074,7 @@ function buildOptimizeQueueEstimates(
       schedule.workerAvailableAt,
       schedule.ownerAvailableAt,
       job.owner_key,
-      getQueueJobDurationMs(job.payload_json),
+      getQueueJobDurationMs(job.estimated_duration_ms),
     )
     estimates.set(job.id, {
       queuePosition: index + 1,
@@ -2029,7 +2103,7 @@ function createOptimizeQueueSchedule(
 
   for (const job of runningJobs) {
     const elapsedMs = Math.max(0, nowMs - parseQueueTimestamp(job.started_at, nowMs))
-    const estimatedDurationMs = getQueueJobDurationMs(job.payload_json)
+    const estimatedDurationMs = getQueueJobDurationMs(job.estimated_duration_ms)
     const remainingMs = elapsedMs >= estimatedDurationMs
       ? Math.max(1_000, getOptimizeJobHardTimeoutMs() - elapsedMs)
       : Math.max(1_000, estimatedDurationMs - elapsedMs)
@@ -2067,12 +2141,8 @@ function getEarliestQueueStart(workerAvailableAt: number[], ownerReadyAt: number
   )
 }
 
-function getQueueJobDurationMs(payload: unknown): number {
-  const rawEstimate = payload && typeof payload === 'object'
-    && (payload as { estimate?: unknown }).estimate
-    && typeof (payload as { estimate: unknown }).estimate === 'object'
-    ? Number(((payload as { estimate: { estimated_duration_ms?: unknown } }).estimate).estimated_duration_ms)
-    : Number.NaN
+function getQueueJobDurationMs(value: unknown): number {
+  const rawEstimate = Number(value)
   return Number.isFinite(rawEstimate) && rawEstimate > 0
     ? Math.max(1_000, Math.round(rawEstimate))
     : 60_000
