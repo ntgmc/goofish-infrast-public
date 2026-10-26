@@ -1,4 +1,5 @@
 import type { Server } from 'node:http'
+import { startPerformanceObservation } from './performance-observation'
 import {
   initializeOptimizeJobProcessing,
   shutdownOptimizeJobProcessing,
@@ -8,7 +9,7 @@ import {
   type OptimizerPort,
 } from './optimization/jobs/optimizer-port'
 import { canRunOptimizeWorker, resolveAppRole } from './process-role'
-import { closePool } from './storage/postgres'
+import { closePool, getPostgresPoolSnapshot } from './storage/postgres'
 import { describeServerError } from './security/error-reporting'
 import { ensureDatabaseSchema } from './storage/schema'
 import {
@@ -63,6 +64,7 @@ export function runOptimizeWorkerProcess(optimizerPort: OptimizerPort): void {
     throw error
   }
 
+  const stopObservation = startPerformanceObservation(getPostgresPoolSnapshot)
   let lifecycleState: WorkerLifecycleState = 'starting'
   const healthServer = createOptimizeWorkerHealthServer(() => lifecycleState)
   let shutdownPromise: Promise<void> | null = null
@@ -85,6 +87,7 @@ export function runOptimizeWorkerProcess(optimizerPort: OptimizerPort): void {
       await closeServer(healthServer).catch(() => undefined)
       await closePool().catch(() => undefined)
     } finally {
+      stopObservation()
       releaseOptimizerPort()
       lifecycleState = 'stopped'
       process.exitCode = 1
@@ -146,6 +149,7 @@ export function runOptimizeWorkerProcess(optimizerPort: OptimizerPort): void {
         await closeServer(healthServer)
         await closePool()
       } finally {
+        stopObservation()
         releaseOptimizerPort()
         lifecycleState = 'stopped'
       }

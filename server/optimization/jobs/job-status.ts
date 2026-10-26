@@ -26,6 +26,7 @@ import {
 } from '../../storage/personal-use-declaration-store';
 import { resolveProfileAuthorization } from '../../handlers/profile-authorization'
 import { projectOptimizeResultForCapabilities } from '../../../src/lib/optimize-result-projection'
+import { logPerformanceEvent } from '../../performance-observation'
 
 export async function submitOptimizationJob(req: Request): Promise<Response> {
   const lifecycleState = getServiceLifecycleState();
@@ -159,8 +160,10 @@ async function acceptedOptimizationJobResponse(req: Request, job: OptimizeJobRec
     if (!access.ok) return jsonResponse({ error: access.message }, access.status)
     subject = access.subject
   }
+  const accepted = await buildOptimizeJobAccepted(job, subject)
+  logPerformanceEvent('optimization.accepted', { job_id: job.id, status: job.status })
   return jsonResponse({
-    job: await buildOptimizeJobAccepted(job, subject),
+    job: accepted,
     ...(!job.owner_key.startsWith('profile:') && { pollToken: createOptimizeJobPollToken(job) }),
   }, 202)
 }

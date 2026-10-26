@@ -1,5 +1,6 @@
 import { Client, Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg'
 import { describeServerError } from '../security/error-reporting'
+import { observePostgresPool } from './postgres-observation'
 
 let pool: Pool | null = null
 let poolClosing: Promise<void> | null = null
@@ -43,6 +44,7 @@ export function getPool(): Pool {
       idle_in_transaction_session_timeout: resolvePostgresIdleTransactionTimeoutMs(),
       application_name: 'goofish-infrast-v1',
     })
+    observePostgresPool(nextPool)
     nextPool.on('error', (error) => {
       if (pool === nextPool) {
         console.error('[postgres] unexpected error on idle client', describeServerError(error))
@@ -52,6 +54,10 @@ export function getPool(): Pool {
   }
 
   return pool
+}
+
+export function getPostgresPoolSnapshot(): { total: number; idle: number; waiting: number } | null {
+  return pool ? { total: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount } : null
 }
 
 export function resolvePostgresPoolMax(

@@ -16,6 +16,7 @@ import {
   type OptimizerPort,
 } from './optimization/jobs/optimizer-port'
 import { createMemoryOptimizeJobStore } from './storage/optimize-job-store'
+import { getPerformanceContext } from './performance-observation'
 
 let executeSchedule: (context: OptimizeExecutionContext) => Promise<unknown> = async (context) => scheduleResult(context.jobId)
 let unregisterOptimizerPort: (() => void) | null = null
@@ -211,6 +212,17 @@ describe('optimization dispatcher startup recovery', () => {
     process.env.OPTIMIZE_FORCE_WORKER_THREADS_FOR_TESTING = '1'
     process.env.OPTIMIZE_WORKER_ENTRY_FOR_TESTING = resolve('server/test-fixtures/optimize-progress-worker.mjs')
     const job = await store.createJob(input())
+    const observedContexts: Array<ReturnType<typeof getPerformanceContext>> = []
+    const updateStage = store.updateAttemptStage
+    const complete = store.completeAttempt
+    store.updateAttemptStage = (...args) => {
+      observedContexts.push(getPerformanceContext())
+      return updateStage(...args)
+    }
+    store.completeAttempt = (...args) => {
+      observedContexts.push(getPerformanceContext())
+      return complete(...args)
+    }
 
     requestOptimizeJobProcessing()
     await waitFor(async () => (await store.getJob(job.id))?.execution_stage === 'simulating_upgrades')
@@ -221,6 +233,8 @@ describe('optimization dispatcher startup recovery', () => {
       execution_stage: 'completed',
       result_json: { title: 'result' },
     })
+    expect(observedContexts.length).toBeGreaterThanOrEqual(2)
+    expect(observedContexts.every((context) => context.job_id === job.id && context.attempt_no === 1)).toBe(true)
 
     delete process.env.OPTIMIZE_FORCE_WORKER_THREADS_FOR_TESTING
     delete process.env.OPTIMIZE_WORKER_ENTRY_FOR_TESTING

@@ -8,9 +8,10 @@ import {
 } from './optimization/jobs/optimizer-port'
 import type { OptimizerFailure } from './optimization/jobs/optimizer-port'
 import { executeOptimizationJobWithPort } from './optimization/jobs/optimizer-dispatcher'
-import { closePool } from './storage/postgres'
+import { closePool, getPostgresPoolSnapshot } from './storage/postgres'
 import type { OptimizeJobRecord } from './storage/optimize-job-store'
 import { describeServerError } from './security/error-reporting'
+import { startPerformanceObservation } from './performance-observation'
 
 export type OptimizeWorkerData = {
   job: OptimizeJobRecord
@@ -39,6 +40,7 @@ export async function runOptimizeWorkerThread(options: OptimizeWorkerRuntimeOpti
     reportStage: (stage) => messagePort?.postMessage({ type: 'progress', stage }),
   }
 
+  const stopObservation = startPerformanceObservation(getPostgresPoolSnapshot)
   let message: Exclude<OptimizeWorkerResultMessage, { type: 'progress' }>
   try {
     const result = await executeOptimizationJobWithPort(data.job, context, options.optimizerPort)
@@ -55,5 +57,6 @@ export async function runOptimizeWorkerThread(options: OptimizeWorkerRuntimeOpti
   } catch (error) {
     console.warn('optimize worker pool close skipped:', describeServerError(error))
   }
+  stopObservation()
   messagePort?.postMessage(message)
 }

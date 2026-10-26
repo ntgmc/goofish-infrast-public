@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { performance } from 'node:perf_hooks'
 import { hostname } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -41,6 +42,8 @@ import {
 } from './storage/optimize-job-store'
 import { processPendingOptimizationJobEffects } from './optimization/jobs/job-effects'
 import { describeServerError } from './security/error-reporting'
+import { logPerformanceEvent, recordPerformanceDuration, withPerformanceContext } from './performance-observation'
+import { observeOptimizationClaim } from './optimization/jobs/execution-observation'
 
 const DEFAULT_LOCK_TTL_MS = 60_000
 const DEFAULT_HEARTBEAT_MS = 15_000
@@ -63,6 +66,7 @@ type ActiveAttempt = {
   leaseRenewalEnabled: boolean
   settling: boolean
   progressUpdates: Promise<void>
+  observedStartedMs: number
 }
 
 class OptimizeJobTimeoutError extends Error {
@@ -226,7 +230,7 @@ async function preemptLocalFreeAttemptForPaid(store: OptimizeJobStore): Promise<
     victim.settling = true
     stopAttemptLeaseRenewal(victim)
     await victim.worker.terminate().catch(() => undefined)
-    finishAttempt(victim)
+    finishAttempt(victim, 'preempted')
   }
   if (!accepting) {
     await store.releaseInterruptedAttempt(preemption.job.id, preemption.job.attempt_count, processWorkerId, lockToken)
@@ -261,6 +265,7 @@ async function processInlineQueue(): Promise<void> {
         await store.releaseInterruptedAttempt(job.id, job.attempt_count, processWorkerId, lockToken)
         return
       }
+      observeOptimizationClaim(job)
       const context = executionContext(job, lockToken, async (stage) => { await updateAttemptStage(store, job, lockToken, stage) })
       try {
         const result = await runInlineExecutorWithTimeout(job, context)
@@ -298,6 +303,17 @@ async function runInlineExecutorWithTimeout(
 }
 
 function spawnClaimedWorker(job: OptimizeJobRecord, lockToken: string): void {
+  withPerformanceContext({ job_id: job.id, attempt_no: job.attempt_count, worker_id: processWorkerId }, () => {
+    spawnObservedWorker(job, lockToken)
+  })
+}
+
+function spawnObservedWorker(job: OptimizeJobRecord, lockToken: string): void {
+  observeOptimizationClaim(job)
+  logPerformanceEvent('optimization.attempt_started', {
+    job_id: job.id, attempt_no: job.attempt_count, worker_id: processWorkerId,
+  }, {})
+  const observedStartedMs = performance.now()
   const context = executionContext(job, lockToken)
   const maxOldGenerationSizeMb = getOptimizeWorkerMaxOldSpaceMb()
   const worker = new Worker(workerEntryUrl(), {
@@ -317,6 +333,7 @@ function spawnClaimedWorker(job: OptimizeJobRecord, lockToken: string): void {
     leaseRenewalEnabled: true,
     settling: false,
     progressUpdates: Promise.resolve(),
+    observedStartedMs,
   }
 
   attempt.heartbeatTimer = setInterval(() => void heartbeat(attempt), heartbeatMs())
@@ -388,6 +405,7 @@ async function settleWorkerMessage(
   if (attempt.settling || activeAttempts.get(attempt.job.id) !== attempt) return
   attempt.settling = true
   clearTimeout(attempt.hardTimeout)
+  let reason = 'settlement_error'
   try {
     const progressFlushed = await waitUntil(
       attempt.progressUpdates,
@@ -398,6 +416,7 @@ async function settleWorkerMessage(
     }
     const current = await getOptimizeJobStore().getJob(attempt.job.id)
     if (current?.cancel_requested_at) {
+      reason = 'cancelled'
       await attempt.worker.terminate()
       await getOptimizeJobStore().cancelAttempt(
         attempt.job.id,
@@ -408,16 +427,18 @@ async function settleWorkerMessage(
       return
     }
     if (message?.type === 'succeeded') {
-      await completeAttempt(getOptimizeJobStore(), attempt.job, attempt.lockToken, message.result)
+      reason = await completeAttempt(getOptimizeJobStore(), attempt.job, attempt.lockToken, message.result)
+        ? 'succeeded' : 'lease_lost'
     } else {
       const failure = message?.type === 'failed'
         ? message.failure
         : toOptimizerFailure(new Error('优化 worker 返回了无效结果。'))
       await settleOptimizerFailure(getOptimizeJobStore(), attempt.job, attempt.lockToken, failure)
+      reason = 'failed'
     }
   } finally {
     stopAttemptLeaseRenewal(attempt)
-    finishAttempt(attempt)
+    finishAttempt(attempt, reason)
   }
 }
 
@@ -436,7 +457,7 @@ async function stopAndCancel(attempt: ActiveAttempt): Promise<void> {
   } catch (error) {
     console.error('optimize worker cancellation settlement failed:', describeServerError(error))
   } finally {
-    finishAttempt(attempt)
+    finishAttempt(attempt, 'cancelled')
   }
 }
 
@@ -472,7 +493,7 @@ async function stopAndRetry(
   } catch (error) {
     console.error('optimize worker retry settlement failed:', describeServerError(error))
   } finally {
-    finishAttempt(attempt)
+    finishAttempt(attempt, failureKind)
   }
 }
 
@@ -496,12 +517,19 @@ async function interruptForShutdown(attempt: ActiveAttempt): Promise<void> {
   } catch (error) {
     console.error('optimize worker shutdown release failed:', describeServerError(error))
   } finally {
-    finishAttempt(attempt)
+    finishAttempt(attempt, 'shutdown')
   }
 }
 
-function finishAttempt(attempt: ActiveAttempt): void {
-  if (activeAttempts.get(attempt.job.id) === attempt) activeAttempts.delete(attempt.job.id)
+function finishAttempt(attempt: ActiveAttempt, reason: string): void {
+  if (activeAttempts.get(attempt.job.id) !== attempt) return
+  const durationMs = performance.now() - attempt.observedStartedMs
+  recordPerformanceDuration('optimization.attempt', durationMs, { reason })
+  logPerformanceEvent('optimization.attempt', {
+    job_id: attempt.job.id, attempt_no: attempt.job.attempt_count, worker_id: processWorkerId,
+    reason, duration_ms: durationMs,
+  }, {})
+  activeAttempts.delete(attempt.job.id)
   if (activeAttempts.size === 0) {
     for (const resolveIdle of idleWaiters) resolveIdle()
     idleWaiters.clear()

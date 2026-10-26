@@ -1,11 +1,14 @@
 import { once } from 'node:events'
-import { createConnection, type AddressInfo } from 'node:net'
+import { createConnection, Socket, type AddressInfo } from 'node:net'
+import { IncomingMessage, ServerResponse } from 'node:http'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 vi.mock('./routes', () => ({ routeRequest: vi.fn(async () => new Response('ok')) }))
 
 import { createApiServer } from './http-server'
 import { routeRequest } from './routes'
+import { getPerformanceContext } from './performance-observation'
+import { observeHttpRequest } from './http-observation'
 
 const server = createApiServer()
 let port: number
@@ -17,6 +20,7 @@ beforeAll(async () => {
 afterEach(() => {
   vi.unstubAllEnvs()
   vi.clearAllMocks()
+  vi.restoreAllMocks()
 })
 afterAll(async () => {
   server.closeAllConnections()
@@ -51,6 +55,47 @@ describe('API HTTP request lifecycle', () => {
     expect(response.headers.get('X-Request-ID')).toBeTruthy()
     await expect(response.text()).resolves.toBe('ok')
     expect(routeRequest).toHaveBeenCalledOnce()
+  })
+
+  it('correlates concurrent requests and logs route templates without query values or result IDs', async () => {
+    const events: Array<Record<string, unknown>> = []
+    vi.spyOn(console, 'info').mockImplementation((line: string) => { events.push(JSON.parse(line)) })
+    const observed: string[] = []
+    const handler = async () => {
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      observed.push(getPerformanceContext().request_id!)
+      return new Response('ok')
+    }
+    vi.mocked(routeRequest).mockImplementationOnce(handler).mockImplementationOnce(handler)
+    const responses = await Promise.all([
+      fetch(`http://127.0.0.1:${port}/api/health/live`),
+      fetch(`http://127.0.0.1:${port}/api/user/results/private-result?profile_id=secret-marker`),
+    ])
+    await Promise.all(responses.map((response) => response.text()))
+    const ids = responses.map((response) => response.headers.get('X-Request-ID')).sort()
+    expect(observed.sort()).toEqual(ids)
+    expect(events.map((event) => event.request_id).sort()).toEqual(ids)
+    expect(events).toContainEqual(expect.objectContaining({ route: '/api/user/results/:resultId', outcome: 'completed', status: 200 }))
+    expect(JSON.stringify(events)).not.toMatch(/private-result|secret-marker/)
+  })
+
+  it('counts an aborted response once even when multiple lifecycle events arrive', () => {
+    const events: Array<Record<string, unknown>> = []
+    vi.spyOn(console, 'info').mockImplementation((line: string) => { events.push(JSON.parse(line)) })
+    const request = new IncomingMessage(new Socket())
+    request.method = 'GET'
+    request.url = '/unknown-private-path?token=secret-marker'
+    const response = new ServerResponse(request)
+    observeHttpRequest(request, response, 'aborted-request')
+    response.emit('close')
+    response.emit('finish')
+    response.emit('close')
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({ request_id: 'aborted-request', route: 'unmatched', status: null, outcome: 'aborted' })
+    expect(JSON.stringify(events)).not.toMatch(/unknown-private-path|secret-marker/)
+    expect(response.listenerCount('finish')).toBe(0)
+    expect(response.listenerCount('close')).toBe(0)
+    request.destroy()
   })
 })
 

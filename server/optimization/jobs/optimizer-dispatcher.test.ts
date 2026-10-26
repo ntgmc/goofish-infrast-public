@@ -81,7 +81,7 @@ describe('optimization job dispatcher', () => {
     expect(port.executeSchedule).not.toHaveBeenCalled()
     const result = await executeOptimizationJobWithPort(job(payload), context, { ...port, supportsManualScheduleSimulation: true })
     expect(result).toMatchObject({ schedule_source: 'manual' })
-    expect(port.executeSchedule).toHaveBeenCalledWith(payload, context)
+    expect(port.executeSchedule).toHaveBeenCalledWith(payload, { ...context, reportStage: expect.any(Function) })
   })
   it.each(['252', '252-1'])('includes %s room levels in schedule result data', async (preset) => {
     const payload = schedulePayload()
@@ -137,7 +137,7 @@ describe('optimization job dispatcher', () => {
 
     await executeOptimizationJobWithPort(job(payload), context, port)
 
-    expect(port.executeSchedule).toHaveBeenCalledWith(payload, context)
+    expect(port.executeSchedule).toHaveBeenCalledWith(payload, { ...context, reportStage: expect.any(Function) })
     expect(port.executeScenarioComparison).not.toHaveBeenCalled()
   })
 
@@ -147,7 +147,7 @@ describe('optimization job dispatcher', () => {
 
     await executeOptimizationJobWithPort(job(payload), context, port)
 
-    expect(port.executeScenarioComparison).toHaveBeenCalledWith(payload, context)
+    expect(port.executeScenarioComparison).toHaveBeenCalledWith(payload, { ...context, reportStage: expect.any(Function) })
     expect(port.executeSchedule).not.toHaveBeenCalled()
   })
 

@@ -7,6 +7,8 @@ import { applyHttpSecurityHeaders, isSecureIncomingRequest } from './security/ht
 import { inspectIncomingRequest } from './security/http-boundary'
 import { describeServerError } from './security/error-reporting'
 import { RequestInputError, validateAndStoreJsonBody } from './security/request-validation'
+import { observeHttpRequest } from './http-observation'
+import { withPerformanceContext } from './performance-observation'
 
 export function createApiServer(): Server {
   const server = createServer({
@@ -14,8 +16,12 @@ export function createApiServer(): Server {
     requireHostHeader: true,
     rejectNonStandardBodyWrites: true,
   })
-  const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
+  const handleRequest = (req: IncomingMessage, res: ServerResponse) => {
     const requestId = randomUUID()
+    observeHttpRequest(req, res, requestId)
+    return withPerformanceContext({ request_id: requestId }, () => handleObservedRequest(req, res, requestId))
+  }
+  const handleObservedRequest = async (req: IncomingMessage, res: ServerResponse, requestId: string) => {
     let request: Request | null = null
     try {
       const boundary = inspectIncomingRequest(req)
