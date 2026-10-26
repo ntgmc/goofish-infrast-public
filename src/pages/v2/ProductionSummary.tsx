@@ -55,6 +55,12 @@ export default function ProductionSummary({ result, prepared, sample, profileId,
   const orundum = economy?.short_term_orundum ?? prepared.productionStats.orundum
   const isOrundum = Boolean(economy) || orundum > 0
   const showOrundum = isOrundum && experience === 0
+  const priorProducts = baseline?.item?.config?.product_requirements
+  const previousIsOrundum = Boolean(baseline?.item?.result.orundum_economy)
+    || (priorDaily?.trading?.Orundum ?? 0) > 0
+    || (priorDaily?.manufacturing?.['Originium Shard'] ?? 0) > 0
+    || (priorProducts?.trading_stations?.Orundum ?? 0) > 0
+    || (priorProducts?.manufacturing_stations?.['Originium Shard'] ?? 0) > 0
   const goldNet = daily?.net?.['Pure Gold']
   const hasGoldNet = typeof goldNet === 'number' && Number.isFinite(goldNet)
   const goldDays = result.inventory_warnings?.find((item) => item.product === 'Pure Gold')?.days_remaining
@@ -81,7 +87,7 @@ export default function ProductionSummary({ result, prepared, sample, profileId,
         : priorDaily ? (priorDaily.manufacturing?.['Battle Record'] ?? 0) * 1000 : undefined,
       unit: showOrundum ? text.orundumUnit : text.expUnit },
     { label: text.goldNetChange, value: goldNet, before: priorDaily?.net?.['Pure Gold'], unit: text.goldUnit },
-    ...(!isOrundum ? [{ label: text.sanity, value: prepared.productionSanity.value, before: priorDaily ? calculateProductionSanity(priorDaily).value : undefined, unit: text.sanityUnit }] : []),
+    ...(!isOrundum && !previousIsOrundum ? [{ label: text.sanity, value: prepared.productionSanity.value, before: priorDaily ? calculateProductionSanity(priorDaily).value : undefined, unit: text.sanityUnit }] : []),
   ].map(({ label, value, before, unit }) => ({ label, value: change(value, before, unit), compact: change(value, before) }))
   const configChanges = baseline?.config && baseline.item?.config ? describeConfigDiff(baseline.config, baseline.item.config) : null
   const showChanges = Boolean(daily && priorDaily)
