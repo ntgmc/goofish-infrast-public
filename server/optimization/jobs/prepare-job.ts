@@ -10,8 +10,7 @@ import type { ScheduleUsageContext, OptimizeJobSource, PreparedOptimizeJob, Opti
 import { createPersistedOptimizeJobPayload } from './shared';
 import { sanitizeConfigForPublicOptimize, jsonResponse } from './http-core';
 import { recordScheduleGenerate, scheduleFailure } from './entitlements';
-import { getOptimizeEstimateBucket, getEstimateScheduleMode, isEstimateFiammettaEnabled, resolveOptimizeDurationEstimate } from './job-status';
-import { buildScenarioComparisonEstimate } from './job-status';
+import { getOptimizeEstimateBucket, getEstimateScheduleMode, isEstimateFiammettaEnabled, resolveOptimizeDurationEstimate, buildScenarioComparisonEstimate } from './job-estimates';
 import { expandScenarioComparison } from '../../../src/lib/scenario-comparison';
 import { isFreePreviewTrialActive } from '../../free-preview-trial';
 import { hasCapability } from '../../../src/lib/product-catalog';

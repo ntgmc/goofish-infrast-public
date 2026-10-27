@@ -1,13 +1,12 @@
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import {
   buildOptimizeJobAccepted,
-  buildScenarioComparisonEstimate,
   createOptimizeJobPollToken,
   decodeOptimizationJobCursor,
   encodeOptimizationJobCursor,
-  getOptimizeEstimateBucket,
   verifyOptimizeJobPollToken,
 } from './job-status'
+import { buildScenarioComparisonEstimate, getOptimizeEstimateBucket } from './job-estimates'
 import { createPersistedOptimizeJobPayload } from './shared'
 import { DEFAULT_OPTIMIZE_JOB_HARD_TIMEOUT_MS, formatOptimizeJobHardTimeout, getOptimizeJobHardTimeoutMs } from '../../optimize-job-config'
 import { createMemoryOptimizeJobStore } from '../../storage/optimize-job-store'
