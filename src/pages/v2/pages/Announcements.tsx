@@ -1,4 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate } from 'react-router'
 import { NextIcon as ArrowRight } from '../../../components/icons'
 import { copy } from '../../../copy'
@@ -6,6 +7,7 @@ import AnnouncementMarkdown from '../../../components/AnnouncementMarkdown'
 import { apiJson, getApiErrorMessage } from '../../../lib/api-client'
 import { getAnnouncementReminderState } from '../../../lib/announcement-reminders'
 import type { AnnouncementPageResponse } from '../../../lib/types'
+import { updateUserAnnouncementQueries, useAnnouncementPageQuery } from '../../../lib/announcement-query'
 import { formatShanghaiDateTime } from '../../tool/tool-utils'
 import type { V2Session } from '../OptionsDrawer'
 import { EmptyState, Loading, Notice } from '../components/WorkspaceUI'
@@ -27,50 +29,30 @@ function AnnouncementFeed({ session }: { session: V2Session }) {
   const unreadOnly = signedIn && search.get('unread_only') === '1'
   let announcementId = location.hash.startsWith('#announcement-') ? location.hash.slice(14) : ''
   try { announcementId = decodeURIComponent(announcementId) } catch { /* Keep malformed anchors visible as missing announcements. */ }
-  const endpoint = signedIn ? '/api/user/announcements' : '/api/announcement'
-  const [data, setData] = useState<AnnouncementPageResponse | null>(null)
-  const cachedPage = useRef<{ data: AnnouncementPageResponse; unreadOnly: boolean } | null>(null)
-  const requestVersion = useRef(0)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [retry, setRetry] = useState(0)
+  const client = useQueryClient()
+  const query = useAnnouncementPageQuery(signedIn ? session.user!.id : null, page, unreadOnly, announcementId)
+  const { data, apiUrl } = query
+  const loading = query.isFetching
+  const [writeError, setWriteError] = useState<string | null>(null)
+  const error = writeError ?? (query.error ? getApiErrorMessage(query.error, copy.public.pages_AnnouncementsPage_001) : null)
   const [marking, setMarking] = useState<string | null>(null)
-  const params = new URLSearchParams({ page: String(page) })
-  if (unreadOnly) params.set('unread_only', '1')
-  if (announcementId) params.set('announcement_id', announcementId)
-  const apiUrl = `${endpoint}?${params}`
+  const writeAbort = useRef<AbortController | null>(null)
+  useEffect(() => {
+    setWriteError(null)
+    setMarking(null)
+    return () => writeAbort.current?.abort()
+  }, [apiUrl])
 
   useEffect(() => {
-    requestVersion.current += 1
-    const cached = cachedPage.current
-    if (cached?.unreadOnly === unreadOnly && cached.data.page === page
-      && (!announcementId || cached.data.announcements.some((item) => item.announcement.id === announcementId))) {
-      setLoading(false)
-      setError(null)
-      return () => { requestVersion.current += 1 }
+    if (!data) return
+    if (typeof data.unread_count === 'number') session.setAnnouncementUnreadCount(data.unread_count)
+    if (data.page !== page) {
+      const normalized = new URLSearchParams(location.search)
+      normalized.set('section', 'announcements')
+      normalized.set('page', String(data.page))
+      navigate({ search: `?${normalized}`, hash: location.hash }, { replace: true })
     }
-    const controller = new AbortController()
-    setLoading(true)
-    setError(null)
-    void apiJson<AnnouncementPageResponse>(apiUrl, { signal: controller.signal }).then((result) => {
-      if (controller.signal.aborted) return
-      cachedPage.current = { data: result, unreadOnly }
-      setData(result)
-      setLoading(false)
-      if (typeof result.unread_count === 'number') session.setAnnouncementUnreadCount(result.unread_count)
-      if (result.page !== page) {
-        const normalized = new URLSearchParams(location.search)
-        normalized.set('section', 'announcements')
-        normalized.set('page', String(result.page))
-        navigate({ search: `?${normalized}`, hash: location.hash }, { replace: true })
-      }
-    }).catch((cause: unknown) => {
-      if (controller.signal.aborted) return
-      setError(getApiErrorMessage(cause, copy.public.pages_AnnouncementsPage_001))
-      setLoading(false)
-    })
-    return () => { controller.abort(); requestVersion.current += 1 }
-  }, [apiUrl, page, announcementId, unreadOnly, retry, location.search, location.hash, navigate, session.setAnnouncementUnreadCount])
+  }, [data, page, location.search, location.hash, navigate, session.setAnnouncementUnreadCount])
 
   function openPage(nextPage: number, id = '', unread = unreadOnly) {
     const next = new URLSearchParams(location.search)
@@ -82,23 +64,25 @@ function AnnouncementFeed({ session }: { session: V2Session }) {
   }
 
   async function markRead(id?: string) {
-    const version = requestVersion.current
+    if (!signedIn || marking) return
+    const controller = new AbortController()
+    writeAbort.current = controller
     setMarking(id ?? 'all')
-    setError(null)
+    setWriteError(null)
     try {
       const result = await apiJson<AnnouncementPageResponse>(apiUrl, {
-        method: 'PATCH', json: id ? { announcement_id: id, updated_at: data?.announcements.find((item) => item.announcement.id === id)?.announcement.updated_at } : { all: true },
+        method: 'PATCH', signal: controller.signal, json: id ? { announcement_id: id, updated_at: data?.announcements.find((item) => item.announcement.id === id)?.announcement.updated_at } : { all: true },
         fallbackMessage: text.pages_tool_dashboard_AnnouncementsSection_002,
       })
-      if (version !== requestVersion.current) return
-      cachedPage.current = { data: result, unreadOnly }
-      setData(result)
+      if (controller.signal.aborted) return
+      await updateUserAnnouncementQueries(client, session.user!.id, result, query.queryKey)
+      if (controller.signal.aborted) return
       if (typeof result.unread_count === 'number') session.setAnnouncementUnreadCount(result.unread_count)
       if (unreadOnly || result.page !== page) openPage(result.page, unreadOnly ? '' : announcementId)
     } catch (cause: unknown) {
-      if (version === requestVersion.current) setError(getApiErrorMessage(cause, text.pages_tool_dashboard_AnnouncementsSection_002))
+      if (!controller.signal.aborted) setWriteError(getApiErrorMessage(cause, text.pages_tool_dashboard_AnnouncementsSection_002))
     } finally {
-      setMarking(null)
+      if (!controller.signal.aborted) setMarking(null)
     }
   }
 
@@ -109,7 +93,7 @@ function AnnouncementFeed({ session }: { session: V2Session }) {
   const busy = loading || marking !== null
   return <div className="v2-announcement-inbox">
     {!signedIn && <p className="v2-lead">{copy.public.pages_AnnouncementsPage_004}</p>}
-    {error && <Notice error>{error}<button className="v2-text-button" onClick={() => { cachedPage.current = null; setRetry((value) => value + 1) }}>{copy.v2.retry}</button></Notice>}
+    {error && <Notice error>{error}<button className="v2-text-button" onClick={() => { setWriteError(null); void query.refetch({ cancelRefetch: false }) }}>{copy.v2.retry}</button></Notice>}
     {signedIn && <div className="v2-inbox-toolbar">
       <div className="v2-filter-group"><button disabled={busy} aria-pressed={!unreadOnly} onClick={() => openPage(1, '', false)}>{copy.v2.readAll}</button><button disabled={busy} aria-pressed={unreadOnly} onClick={() => openPage(1, '', true)}>{copy.v2.readUnread} {unreadCount}</button></div>
       <button className="v2-text-button" disabled={busy || unreadCount === 0} onClick={() => void markRead()}>{marking === 'all' ? text.pages_tool_dashboard_AnnouncementsSection_004 : text.pages_tool_dashboard_AnnouncementsSection_005}</button>

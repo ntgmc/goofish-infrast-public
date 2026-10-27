@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { UserQueryScope, usePrivateQueryScope } from '../lib/private-query-scope'
 import { NotificationSettingsIcon as Bell } from './icons'
 import { apiJson } from '../lib/api-client'
+import type { AuthMeResponse } from '../lib/types'
 import { copy } from '../copy/index'
 import { useSiteFeatures } from '../lib/site-feature-context'
 
@@ -13,21 +16,30 @@ const ENDPOINT = '/api/user/qqbot'
 
 export default function QqBotSettingsPanel() {
   const { features } = useSiteFeatures()
-  return features.qqbot ? <QqBotSettingsContent /> : null
+  const owner = usePrivateQueryScope('user')
+  const session = useQuery({ queryKey: ['user', null, null, 'qqbot-session'], enabled: features.qqbot && !owner.identity, staleTime: 0, gcTime: 0,
+    queryFn: ({ signal }) => apiJson<AuthMeResponse>('/api/auth/me', { signal }) })
+  const identity = owner.identity ?? session.data?.user?.id ?? null
+  if (!features.qqbot) return null
+  if (session.error && !identity) return <p className="tool-alert tool-alert--error" role="alert">{session.error.message}<button type="button" className="tool-secondary-action" onClick={() => void session.refetch({ cancelRefetch: false })}>{copy.notifications.qqbot.refresh}</button></p>
+  return <UserQueryScope.Provider value={identity}><QqBotSettingsContent key={identity} /></UserQueryScope.Provider>
 }
 
 function QqBotSettingsContent() {
-  const [settings, setSettings] = useState<Settings | null>(null)
+  const owner = usePrivateQueryScope('user')
+  const client = useQueryClient()
+  const key = [...owner.key, 'qqbot']
+  const query = useQuery({ queryKey: key, enabled: owner.enabled, queryFn: ({ signal }) => apiJson<Settings>(ENDPOINT, { signal }) })
+  const settings = query.data
   const [code, setCode] = useState<BindingCode | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [saving, setBusy] = useState(false)
+  const [writeError, setError] = useState<string | null>(null)
+  const busy = saving || query.isFetching
+  const error = writeError ?? query.error?.message
   const text = copy.notifications.qqbot
 
-  const refresh = useCallback(async () => {
-    const next = await apiJson<Settings>(ENDPOINT)
-    setSettings(next)
-    if (next.binding) setCode(null)
-  }, [])
+  const refresh = async () => { if (owner.enabled) await client.invalidateQueries({ queryKey: key, exact: true }) }
+  useEffect(() => { if (settings?.binding) setCode(null) }, [settings])
 
   const run = useCallback(async (action: () => Promise<void>) => {
     setBusy(true)
@@ -36,8 +48,6 @@ function QqBotSettingsContent() {
       setError(caught instanceof Error ? caught.message : copy.notifications.qqbot.failed)
     } finally { setBusy(false) }
   }, [])
-
-  useEffect(() => { void run(refresh) }, [refresh, run])
 
   return (
     <section className="tool-panel p-5 sm:p-6">

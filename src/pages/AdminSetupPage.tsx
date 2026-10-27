@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import type { AdminSessionUser } from './admin/contracts'
 import { Link } from 'react-router'
 import { getApiErrorMessage } from '../lib/api-client'
 import { adminApiJson, adminApiVoid } from '../lib/admin-api-client'
@@ -6,6 +8,7 @@ import { copy } from '../copy/index'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import { SectionLoader } from '../components/SessionLoader'
 import { DialogSurfaceProvider } from '../components/ui/dialog'
+import './admin/admin.css'
 
 
 interface AdminUserSummary {
@@ -21,25 +24,36 @@ export default function AdminSetupPage() {
   const [password, setPassword] = useState('')
   const [operationReason, setOperationReason] = useState('')
   const [role, setRole] = useState<AdminUserSummary['role']>('risk_viewer')
-  const [users, setUsers] = useState<AdminUserSummary[]>([])
+  const client = useQueryClient()
+  const [sessionExpired, setSessionExpired] = useState(false)
+  const session = useQuery({ queryKey: ['admin', null, 'setup-session'], enabled: !sessionExpired, staleTime: 0, gcTime: 0,
+    queryFn: ({ signal }) => adminApiJson<{ user?: AdminSessionUser }>('/api/admin/session', { signal }) })
+  const identity = sessionExpired ? null : session.data?.user
+  const usersKey = ['admin', identity?.username ?? null, 'setup-users', identity?.capabilities ?? []]
+  const usersQuery = useQuery({ queryKey: usersKey, enabled: Boolean(identity?.username), gcTime: 0,
+    queryFn: ({ signal }) => adminApiJson<{ users?: AdminUserSummary[] }>('/api/admin/users', { signal }) })
+  const users = identity ? usersQuery.data?.users ?? [] : []
+  const setUsers = async (update: (items: AdminUserSummary[]) => AdminUserSummary[]) => {
+    await client.cancelQueries({ queryKey: usersKey, exact: true })
+    client.setQueriesData<{ users?: AdminUserSummary[] }>({ queryKey: usersKey, exact: true }, (data) => data && ({ ...data, users: update(data.users ?? []) }))
+  }
   const [loading, setLoading] = useState(false)
-  const [usersLoading, setUsersLoading] = useState(true)
-  const [usersError, setUsersError] = useState<string | null>(null)
+  const usersLoading = session.isFetching || usersQuery.isFetching
+  const usersError = session.error || usersQuery.error ? getApiErrorMessage(session.error ?? usersQuery.error, copy.common.pages_AdminSetupPage_025)
+    : !usersLoading && !identity ? copy.common.pages_AdminSetupPage_025 : null
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
-  const loadUsers = useCallback(() => {
-    setUsersLoading(true)
-    setUsersError(null)
-    return adminApiJson<{ users?: AdminUserSummary[] }>('/api/admin/users')
-      .then((data) => {
-        setUsers(data.users ?? [])
-      })
-      .catch((caught) => setUsersError(getApiErrorMessage(caught, copy.common.pages_AdminSetupPage_025)))
-      .finally(() => setUsersLoading(false))
-  }, [])
-
-  useEffect(() => { void loadUsers() }, [loadUsers])
+  const loadUsers = () => {
+    if (identity) return usersQuery.refetch({ cancelRefetch: false })
+    setSessionExpired(false)
+    return session.refetch({ cancelRefetch: false })
+  }
+  useEffect(() => {
+    const expired = () => { setSessionExpired(true); client.removeQueries({ queryKey: ['admin'] }) }
+    window.addEventListener('goofish:admin-session-expired', expired)
+    return () => window.removeEventListener('goofish:admin-session-expired', expired)
+  }, [client])
 
   const handleCreate = async (event: FormEvent) => {
     event.preventDefault()
@@ -62,7 +76,7 @@ export default function AdminSetupPage() {
         fallbackMessage: copy.common.pages_AdminSetupPage_001,
       })
       if (!data.user) throw new Error(copy.common.pages_AdminSetupPage_002)
-      setUsers((current) => [data.user!, ...current.filter((item) => item.username !== data.user!.username)])
+      await setUsers((current) => [data.user!, ...current.filter((item) => item.username !== data.user!.username)])
       setUsername('')
       setPassword('')
       setOperationReason('')
@@ -86,7 +100,7 @@ export default function AdminSetupPage() {
         json: { root_password: rootPassword, username: target, reason: operationReason.trim() },
         fallbackMessage: copy.common.pages_AdminSetupPage_005,
       })
-      setUsers((current) => current.filter((item) => item.username !== target))
+      await setUsers((current) => current.filter((item) => item.username !== target))
       setOperationReason('')
       setNotice(`${copy.common.pages_AdminSetupPage_006}${target}`)
     } catch (caught) {

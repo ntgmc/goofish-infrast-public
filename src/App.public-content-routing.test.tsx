@@ -96,7 +96,7 @@ describe('App public content routing', () => {
     const router = createMemoryRouter([{ path: '*', element: <App /> }], { initialEntries: ['/v1'] })
     render(<RouterProvider router={router} />)
     expect(await screen.findByRole('heading', { name: copy.public.pages_LandingPage_023 })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: copy.v2.testEntry })).toHaveAttribute('href', '/v2')
+    expect(await screen.findByRole('link', { name: copy.v2.testEntry })).toHaveAttribute('href', '/v2')
     await act(async () => screen.getByRole('button', { name: copy.public.pages_LandingPage_026 }).click())
     expect(await screen.findByText('Tool workspace')).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/tool/profiles')

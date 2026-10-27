@@ -269,7 +269,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           {generationProgress}
           {children}
           <div className={`v2-results-grid ${view !== 'schedule' ? 'v2-results-wide' : ''}`}>
-          <div className="v2-overview-metrics"><ProductionSummary result={result} prepared={prepared} sample={sample} profileId={session.activeProfile?.id} resultId={exportResultId}
+          <div className="v2-overview-metrics"><ProductionSummary result={result} prepared={prepared} sample={sample} userId={session.user?.id} profileId={session.activeProfile?.id} resultId={exportResultId}
             resultConfig={workflow?.historyItem?.result === result ? workflow.historyItem.config : undefined}
             history={[...(workflow?.resultHistory ?? []), ...(workflow?.archivedResults ?? [])]} newResult={Boolean(workflow?.currentResult || workflow?.finalResult)} onConfigure={() => openPanel('config')} /></div>
           {view === 'schedule' && <ScheduleContext result={result} prepared={prepared} config={config} operators={owned} sampleOperators={sampleOperators}

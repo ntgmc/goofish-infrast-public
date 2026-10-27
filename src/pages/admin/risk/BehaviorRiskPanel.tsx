@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { SectionLoader } from '../../../components/SessionLoader'
 import {
   behaviorRiskCasePageSchema,
@@ -6,7 +6,9 @@ import {
   type BehaviorRiskCasePageDto,
   type BehaviorRiskHealthDto,
 } from '../../../lib/behavior-risk-contracts'
-import { ApiError, apiJson } from '../../../lib/api-client'
+import { ApiError } from '../../../lib/api-client'
+import { adminApiJson as apiJson } from '../../../lib/admin-api-client'
+import { useAdminPanelQuery } from '../../../lib/admin-panel-query'
 import { AdminToast } from '../shared/AdminToast'
 
 type RiskStatus = BehaviorRiskCaseDto['status'] | 'all'
@@ -40,54 +42,26 @@ export default function BehaviorRiskPanel({ active = true, search = '' }: { acti
   const [selectedCaseId, setSelectedCaseId] = useState('')
   const [status, setStatus] = useState<RiskStatus>('pending')
   const [page, setPage] = useState(1)
-  const [data, setData] = useState<BehaviorRiskCasePageDto>(emptyPage)
-  const [loading, setLoading] = useState(true)
   const [busyCase, setBusyCase] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [writeError, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [rootPasswords, setRootPasswords] = useState<Record<string, string>>({})
   const [selections, setSelections] = useState<Record<string, ActionSelection>>({})
-  const requestId = useRef(0)
-  const abortController = useRef<AbortController | null>(null)
+  const query = useAdminPanelQuery<BehaviorRiskCasePageDto>('behavior-risk', `/api/admin/behavior-risk?status=${status}&page=${page}&page_size=25`, active, { parse: behaviorRiskCasePageSchema.parse })
+  const data = query.error ? emptyPage() : query.data ?? emptyPage()
+  const loading = query.isFetching
+  const error = writeError ?? query.error?.message
   useEffect(() => {
     if (new URLSearchParams(search).get('status') === 'pending') { setStatus('pending'); setPage(1); setSelectedCaseId('') }
   }, [search])
 
-  const load = useCallback(async () => {
-    const currentRequestId = ++requestId.current
-    abortController.current?.abort()
-    const controller = new AbortController()
-    abortController.current = controller
-    setLoading(true)
-    setError(null)
-    setData(emptyPage())
-    try {
-      const raw = await apiJson<unknown>(`/api/admin/behavior-risk?status=${status}&page=${page}&page_size=25`, {
-        signal: controller.signal,
-        fallbackMessage: '加载行为风控复核单失败。',
-      })
-      const result = behaviorRiskCasePageSchema.parse(raw)
-      if (currentRequestId !== requestId.current) return
-      setData(result)
-      cleanupCaseFormState(result.cases.map((riskCase) => riskCase.id), setNotes, setRootPasswords, setSelections)
-      if (result.pagination.page !== page) setPage(result.pagination.page)
-    } catch (caught) {
-      if (currentRequestId !== requestId.current || isAbortError(caught)) return
-      setError((caught as Error).message)
-    } finally {
-      if (currentRequestId === requestId.current) setLoading(false)
-    }
-  }, [page, status])
-
+  const load = async () => { setError(null); await query.refetch({ cancelRefetch: false }) }
   useEffect(() => {
-    if (!active) return
-    void load()
-    return () => {
-      requestId.current += 1
-      abortController.current?.abort()
-    }
-  }, [active, load])
+    if (!query.data || query.error) return
+    cleanupCaseFormState(query.data.cases.map((riskCase) => riskCase.id), setNotes, setRootPasswords, setSelections)
+    if (query.data.pagination.page !== page) setPage(query.data.pagination.page)
+  }, [query.data, query.error, page])
 
   const review = async (riskCase: BehaviorRiskCaseDto, outcome: 'dismiss' | 'restrict') => {
     const note = notes[riskCase.id]?.trim() ?? ''
@@ -365,10 +339,6 @@ function cleanupCaseFormState(
   setNotes((current) => Object.fromEntries(Object.entries(current).filter(([caseId]) => allowed.has(caseId))))
   setRootPasswords((current) => Object.fromEntries(Object.entries(current).filter(([caseId]) => allowed.has(caseId))))
   setSelections((current) => Object.fromEntries(Object.entries(current).filter(([key]) => allowed.has(key.split(':', 1)[0]!))))
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === 'AbortError'
 }
 
 function selectionKey(caseId: string, userId: string): string {

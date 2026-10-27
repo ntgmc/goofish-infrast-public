@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useAdminDraftQuery } from '../../../lib/admin-draft-query'
 import {
   Dialog,
   DialogClose,
@@ -46,31 +47,20 @@ export default function InvitationSettingsSection({ active = true }: { active?: 
   const [configuredGiftPackVersions, setConfiguredGiftPackVersions] = useState<InvitationGiftPackSummary[]>([])
   const [stats, setStats] = useState<AdminInvitationStats | null>(null)
   const [addingFor, setAddingFor] = useState<InvitationRewardRecipient | null>(null)
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [writeError, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const itemPickerTriggerRef = useRef<HTMLButtonElement | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await adminApiJson<AdminInvitationSettingsResponse>('/api/admin/invitation-settings')
-      const next = data.settings ?? DEFAULT_SETTINGS
-      setSettings(next)
-      setSavedSettings(next)
-      setCatalog(data.catalog ?? [])
-      setConfiguredGiftPackVersions(data.configured_gift_pack_versions ?? [])
-      setStats(data.stats)
-    } catch (caught) {
-      setError((caught as Error).message)
-    } finally {
-      setLoading(false)
-    }
+  const apply = useCallback((data: AdminInvitationSettingsResponse) => {
+    const next = data.settings ?? DEFAULT_SETTINGS
+    setSettings(next); setSavedSettings(next); setCatalog(data.catalog ?? [])
+    setConfiguredGiftPackVersions(data.configured_gift_pack_versions ?? []); setStats(data.stats)
   }, [])
-
-  useEffect(() => { void load() }, [load])
+  const query = useAdminDraftQuery('invitation-settings', '/api/admin/invitation-settings', apply)
+  const loading = query.isFetching
+  const error = writeError ?? query.error?.message
+  const load = () => { setError(null); return query.load() }
   useEffect(() => { if (!active) setAddingFor(null) }, [active])
 
   const dirty = useMemo(() => JSON.stringify(settings) !== JSON.stringify(savedSettings), [savedSettings, settings])
@@ -126,6 +116,7 @@ export default function InvitationSettingsSection({ active = true }: { active?: 
       const next = data.settings ?? settings
       setSettings(next)
       setSavedSettings(next)
+      await query.write({ ...query.data!, settings: next })
       setNotice('邀请设置已保存；新配置将用于之后完成激活的邀请。')
     } catch (caught) {
       setError((caught as Error).message)

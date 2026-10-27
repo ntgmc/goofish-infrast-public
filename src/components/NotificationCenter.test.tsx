@@ -1,16 +1,17 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, renderHook, screen, waitFor } from '../test/query-render'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { NotificationBell, NotificationCenterProvider } from './NotificationCenter'
 import type { UserNotificationPage } from '../lib/types'
+import { useNotificationQuery } from '../lib/notification-query'
 import { markInventoryStale } from '../lib/inventory-refresh'
 
 const featureSwitches = vi.hoisted(() => ({ notifications: true }))
 vi.mock('../lib/site-feature-context', () => ({ useSiteFeatures: () => ({ features: featureSwitches }) }))
 
-vi.mock('../lib/inventory-refresh', () => ({ markInventoryStale: vi.fn() }))
+vi.mock('../lib/inventory-refresh', () => ({ markInventoryStale: vi.fn(), useInventoryRefresh: vi.fn() }))
 
 afterEach(() => {
   cleanup()
@@ -167,6 +168,24 @@ describe('NotificationCenter', () => {
     staleRefresh.resolve(jsonResponse(page(1)))
 
     await waitFor(() => expect(screen.getByRole('button', { name: '通知，无未读消息' })).toBeInTheDocument())
+  })
+
+  it('marks only the displayed versions when a read-all response arrives after a newer refresh', async () => {
+    const mutation = deferred<Response>()
+    const newer = page(2)
+    newer.notifications.push({ ...newer.notifications[0], id: 'notification-2' })
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(page(1))).mockReturnValueOnce(mutation.promise).mockResolvedValueOnce(jsonResponse(newer))
+    vi.stubGlobal('fetch', fetchMock)
+    const hook = renderHook(() => useNotificationQuery('user-1'))
+    await waitFor(() => expect(hook.result.current.notifications).toHaveLength(1))
+    let write!: Promise<void>
+    act(() => { write = hook.result.current.markAllRead() })
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    await act(async () => hook.result.current.refresh())
+    await waitFor(() => expect(hook.result.current.notifications).toHaveLength(2))
+    await act(async () => { mutation.resolve(jsonResponse({ unread_count: 1 })); await write })
+    await waitFor(() => expect(hook.result.current.notifications.find((item) => item.id === 'notification-1')?.read_at).not.toBeNull())
+    expect(hook.result.current.notifications.find((item) => item.id === 'notification-2')?.read_at).toBeNull()
   })
 
   it('does not let an old user read mutation overwrite the next user', async () => {

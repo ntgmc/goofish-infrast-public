@@ -5,7 +5,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '../../components/ui/dialog'
-import { apiJson } from '../../lib/api-client'
+import { useInventoryQuery } from '../../lib/inventory-query'
 import type { InventoryResponse } from '../../lib/inventory-contracts'
 import type { UserGameAccount } from '../../lib/types'
 import { copy } from '../../copy/index'
@@ -36,7 +36,6 @@ export default function ProfileUpgradePrompt({
   onOpenInventory,
 }: ProfileUpgradePromptProps) {
   const [open, setOpen] = useState(false)
-  const [availableKinds, setAvailableKinds] = useState<UpgradeVoucherKind[]>([])
   const [sessionSuppressed, setSessionSuppressed] = useState(false)
   const eligible = Boolean(
     inventoryEnabled
@@ -50,35 +49,19 @@ export default function ProfileUpgradePrompt({
   const currentProfileUid = profile?.skland_binding?.uid ?? null
   const trialActive = profile ? isFreePreviewTrialActive(profile) : false
   const shouldCheckInventory = eligible && currentPath !== '/tool/inventory' && !isPromptSuppressed(userId)
+  const inventory = useInventoryQuery(shouldCheckInventory ? userId! : '', currentProfileId)
+  const availableKinds = useMemo(() => shouldCheckInventory && inventory.data && !inventory.error && profile
+    ? getAvailableVoucherKinds(inventory.data, profile) : [], [shouldCheckInventory, inventory.data, inventory.error, profile])
 
   useEffect(() => {
     setOpen(false)
-    setAvailableKinds([])
     setSessionSuppressed(Boolean(userId && isPromptSuppressed(userId)))
-
-    if (!shouldCheckInventory || !userId || !profile) return
-
-    const controller = new AbortController()
-    let cancelled = false
-    void apiJson<InventoryResponse>('/api/user/inventory', { signal: controller.signal })
-      .then((inventory) => {
-        if (cancelled) return
-        setAvailableKinds(getAvailableVoucherKinds(inventory, profile))
-      })
-      .catch(() => {
-        // The prompt is optional; inventory failures must not block the workbench.
-      })
-
-    return () => {
-      cancelled = true
-      controller.abort()
-    }
-  }, [currentPath, currentProfileId, currentProfileUid, eligible, profile, shouldCheckInventory, trialActive, userId])
+  }, [currentPath, currentProfileId, currentProfileUid, eligible, shouldCheckInventory, trialActive, userId])
 
   useEffect(() => {
     if (!shouldCheckInventory || availableKinds.length === 0 || sessionSuppressed) return
     return waitForModalAvailability(() => setOpen(true))
-  }, [availableKinds.length, sessionSuppressed, shouldCheckInventory])
+  }, [availableKinds.length, sessionSuppressed, shouldCheckInventory, currentPath, currentProfileId, currentProfileUid, trialActive, userId])
 
   const description = useMemo(() => {
     if (availableKinds.length === 2) return copy.dashboard.pages_tool_ProfileUpgradePrompt_003

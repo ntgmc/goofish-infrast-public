@@ -1,22 +1,23 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { ComparePreviousIcon as ArrowRightLeft, ConfigIcon as Settings2 } from '../../components/icons'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/dialog'
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
 import { AnimatedValue, RevealItem, StaggeredReveal } from '../../components/MotionPrimitives'
 import { formatAmount, formatIntermediateDepletionSummary, type PreparedResult } from '../../components/result-panel/formatters'
-import { fetchResultHistoryDetail } from '../tool/optimize/optimization-api'
+import { useResultHistoryDetailQuery } from '../tool/optimize/result-history-query'
 import { calculateProductionSanity } from '../../lib/production-sanity'
 import { describeConfigDiff } from '../../lib/workspace-history'
-import type { LicenseConfig, OptimizeResult, WorkspaceResultHistoryItem, WorkspaceResultHistorySummary } from '../../lib/types'
+import type { LicenseConfig, OptimizeResult, WorkspaceResultHistorySummary } from '../../lib/types'
 
 const text = copy.v2
 const signedAmount = (value: number) => value.toLocaleString('zh-CN', { maximumFractionDigits: 2, signDisplay: 'exceptZero' })
 
-export default function ProductionSummary({ result, prepared, sample, profileId, resultId, resultConfig, history, newResult, onConfigure }: {
+export default function ProductionSummary({ result, prepared, sample, userId, profileId, resultId, resultConfig, history, newResult, onConfigure }: {
   result: OptimizeResult
   prepared: PreparedResult
   sample: boolean
+  userId?: string
   profileId?: string
   resultId?: string
   resultConfig?: LicenseConfig | null
@@ -28,26 +29,12 @@ export default function ProductionSummary({ result, prepared, sample, profileId,
   const index = resultId ? ordered.findIndex((item) => item.id === resultId || item.job_id === resultId) : -1
   const previous = !sample ? ordered[index >= 0 ? index + 1 : newResult ? 0 : ordered.length] : undefined
   const previousId = previous?.id
-  const requestKey = profileId && previousId ? `${profileId}:${resultId ?? 'new'}:${previousId}` : null
-  const [comparison, setComparison] = useState<{ key: string; item?: WorkspaceResultHistoryItem; config?: LicenseConfig | null; failed?: boolean } | null>(null)
-  const [retry, setRetry] = useState(0)
+  const previousQuery = useResultHistoryDetailQuery(userId, profileId, previousId)
+  const currentQuery = useResultHistoryDetailQuery(userId, profileId, resultConfig === undefined && previousId ? resultId : undefined)
   const [comparisonOpen, setComparisonOpen] = useState(false)
-  useEffect(() => {
-    if (!profileId || !previousId || !requestKey) return
-    const controller = new AbortController()
-    setComparison(null)
-    const currentConfig = resultConfig !== undefined ? Promise.resolve(resultConfig)
-      : resultId ? fetchResultHistoryDetail(profileId, resultId, controller.signal).then((item) => item.config).catch(() => undefined)
-        : Promise.resolve(null)
-    void Promise.all([fetchResultHistoryDetail(profileId, previousId, controller.signal), currentConfig]).then(([item, config]) => {
-      if (!controller.signal.aborted) setComparison({ key: requestKey, item, config })
-    }).catch(() => {
-      if (!controller.signal.aborted) setComparison({ key: requestKey, failed: true })
-    })
-    return () => controller.abort()
-  }, [profileId, resultId, resultConfig, previousId, requestKey, retry])
-
-  const baseline = comparison?.key === requestKey ? comparison : null
+  const baseline = previousQuery.data || previousQuery.error ? { item: previousQuery.data, failed: previousQuery.isError,
+    config: resultConfig !== undefined ? resultConfig : currentQuery.data?.config } : null
+  const retry = () => { void previousQuery.refetch({ cancelRefetch: false }); if (resultConfig === undefined && resultId) void currentQuery.refetch({ cancelRefetch: false }) }
   const daily = result.daily_production
   const priorDaily = baseline?.item?.result.daily_production
   const experience = (prepared.productionStats.manufacturing['Battle Record'] ?? 0) * 1000
@@ -55,6 +42,12 @@ export default function ProductionSummary({ result, prepared, sample, profileId,
   const orundum = economy?.short_term_orundum ?? prepared.productionStats.orundum
   const isOrundum = Boolean(economy) || orundum > 0
   const showOrundum = isOrundum && experience === 0
+  const priorProducts = baseline?.item?.config?.product_requirements
+  const previousIsOrundum = Boolean(baseline?.item?.result.orundum_economy)
+    || (priorDaily?.trading?.Orundum ?? 0) > 0
+    || (priorDaily?.manufacturing?.['Originium Shard'] ?? 0) > 0
+    || (priorProducts?.trading_stations?.Orundum ?? 0) > 0
+    || (priorProducts?.manufacturing_stations?.['Originium Shard'] ?? 0) > 0
   const goldNet = daily?.net?.['Pure Gold']
   const hasGoldNet = typeof goldNet === 'number' && Number.isFinite(goldNet)
   const goldDays = result.inventory_warnings?.find((item) => item.product === 'Pure Gold')?.days_remaining
@@ -81,7 +74,7 @@ export default function ProductionSummary({ result, prepared, sample, profileId,
         : priorDaily ? (priorDaily.manufacturing?.['Battle Record'] ?? 0) * 1000 : undefined,
       unit: showOrundum ? text.orundumUnit : text.expUnit },
     { label: text.goldNetChange, value: goldNet, before: priorDaily?.net?.['Pure Gold'], unit: text.goldUnit },
-    ...(!isOrundum ? [{ label: text.sanity, value: prepared.productionSanity.value, before: priorDaily ? calculateProductionSanity(priorDaily).value : undefined, unit: text.sanityUnit }] : []),
+    ...(!isOrundum && !previousIsOrundum ? [{ label: text.sanity, value: prepared.productionSanity.value, before: priorDaily ? calculateProductionSanity(priorDaily).value : undefined, unit: text.sanityUnit }] : []),
   ].map(({ label, value, before, unit }) => ({ label, value: change(value, before, unit), compact: change(value, before) }))
   const configChanges = baseline?.config && baseline.item?.config ? describeConfigDiff(baseline.config, baseline.item.config) : null
   const showChanges = Boolean(daily && priorDaily)
@@ -120,7 +113,7 @@ export default function ProductionSummary({ result, prepared, sample, profileId,
       <DialogTitle>{text.resultComparison}</DialogTitle>
       <DialogDescription aria-live="polite">
         {!previous ? text.noPreviousProduction : !baseline ? text.loadingPreviousProduction : baseline.failed
-          ? <>{text.previousProductionFailed} <button type="button" className="v2-text-button" onClick={() => setRetry((value) => value + 1)}>{text.retry}</button></>
+          ? <>{text.previousProductionFailed} <button type="button" className="v2-text-button" onClick={retry}>{text.retry}</button></>
           : text.previousProductionBaseline(previous.name, new Date(previous.created_at).toLocaleString('zh-CN'))}
       </DialogDescription>
       </div>
@@ -132,7 +125,7 @@ export default function ProductionSummary({ result, prepared, sample, profileId,
         </section>
         <section aria-label={text.resultConfigChanges}>
           <h3>{text.resultConfigChanges}</h3>
-          {baseline.config === undefined ? <p className="v2-metrics-note">{text.resultConfigReadFailed} <button type="button" className="v2-text-button" onClick={() => setRetry((value) => value + 1)}>{text.retry}</button></p>
+          {baseline.config === undefined ? <p className="v2-metrics-note">{text.resultConfigReadFailed} <button type="button" className="v2-text-button" onClick={retry}>{text.retry}</button></p>
             : configChanges ? configChanges.length ? <dl className="v2-result-config-changes">{configChanges.map((row) => <div key={row.label}>
               <dt>{row.label}</dt><dd><span className="sr-only">{copy.optimize.pages_tool_optimize_ConfigSection_012}</span><span>{row.before}</span><span aria-hidden="true"> → </span><span className="sr-only">{copy.optimize.pages_tool_optimize_ConfigSection_013}</span><strong>{row.after}</strong></dd>
             </div>)}</dl>

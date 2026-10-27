@@ -247,13 +247,13 @@ export default function AccountDashboard({
           <PageTransition motionKey={section} className="tool-page-transition">{(displayedSection) => <div key={displayedSection} className="tool-section-content">
             <Suspense fallback={<SectionLoader label={copy.common.pages_tool_AccountDashboard_015} />}>
               {displayedSection === 'profiles' && <ProfilesSection profiles={profiles} openingProfileId={openingProfileId} onOpen={onOpenProfile} onEdit={onPayload} meteredEnabled={features.metered_billing} />}
-              {displayedSection === 'commercial' && METERED_BILLING_AVAILABLE && features.metered_billing && <CommercialProfilesSection onOpen={onOpenProfile} />}
+              {displayedSection === 'commercial' && METERED_BILLING_AVAILABLE && features.metered_billing && <CommercialProfilesSection userId={user.id} activeProfileId={activeProfile?.id ?? null} onOpen={onOpenProfile} />}
               {displayedSection === 'tools' && <ToolsSection />}
               {displayedSection === 'redeem' && <RedeemSection autoStartTour={!suppressInitialRedeemTour} tourReplayToken={redeemTourReplayToken} onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} onInventoryRedeemed={() => onSectionChange('inventory', { replace: true })} />}
-              {displayedSection === 'invitations' && <InvitationsSection loadingFallback={<SectionLoader label={copy.dashboard.pages_tool_dashboard_InvitationsSection_005} />} />}
-              {displayedSection === 'inventory' && <InventorySection loadingFallback={<SectionLoader label={copy.inventory.loading} />} onPayload={onPayload} onLifetimeProfileCreated={() => onSectionChange('profiles', { replace: true })} onViewProfiles={() => onSectionChange('profiles')} />}
-              {displayedSection === 'balance' && METERED_BILLING_AVAILABLE && features.metered_billing && <BalanceSection redemptionEnabled={features.cdk_redemption} />}
-              {displayedSection === 'announcements' && <AnnouncementsSection loadingFallback={<SectionLoader label={copy.dashboard.pages_tool_dashboard_AnnouncementsSection_006} />} onUnreadCountChange={onAnnouncementUnreadCountChange} />}
+              {displayedSection === 'invitations' && <InvitationsSection userId={user.id} activeProfileId={activeProfile?.id ?? null} loadingFallback={<SectionLoader label={copy.dashboard.pages_tool_dashboard_InvitationsSection_005} />} />}
+              {displayedSection === 'inventory' && <InventorySection userId={user.id} activeProfileId={activeProfile?.id ?? null} loadingFallback={<SectionLoader label={copy.inventory.loading} />} onPayload={onPayload} onLifetimeProfileCreated={() => onSectionChange('profiles', { replace: true })} onViewProfiles={() => onSectionChange('profiles')} />}
+              {displayedSection === 'balance' && METERED_BILLING_AVAILABLE && features.metered_billing && <BalanceSection userId={user.id} activeProfileId={activeProfile?.id ?? null} redemptionEnabled={features.cdk_redemption} />}
+              {displayedSection === 'announcements' && <AnnouncementsSection userId={user.id} loadingFallback={<SectionLoader label={copy.dashboard.pages_tool_dashboard_AnnouncementsSection_006} />} onUnreadCountChange={onAnnouncementUnreadCountChange} />}
               {displayedSection === 'settings' && <SettingsSection profiles={profiles} activeProfileId={activeProfile?.id} onPayload={onPayload} workspaceEntry={workspaceEntry} />}
             </Suspense>
           </div>}</PageTransition>

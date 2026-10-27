@@ -21,7 +21,7 @@ export default function OverviewSection({ model: c, active = true }: Props) {
   const canViewUsers = c.adminCapabilities.includes('user_view')
   const canViewService = c.adminCapabilities.includes('optimization_view')
   return <section className="ops-overview" aria-label="运营看板" aria-busy={c.loading}>
-    <OperationsTodosPanel active={active} capabilities={c.adminCapabilities} refreshKey={data?.generated_at ?? ''} />
+    <OperationsTodosPanel adminUsername={c.adminUsername} active={active} capabilities={c.adminCapabilities} refreshKey={data?.generated_at ?? ''} />
     <div className="ops-controls"><div role="group" aria-label="统计范围" className="ops-range-options">
       {(['7d', '14d', '30d', 'custom'] as const).map((range) => <button key={range} type="button" onClick={() => c.setUsageRange(range)}
         aria-pressed={c.usageRange === range} className={`tool-secondary-action ${c.usageRange === range ? 'tool-option-selected' : ''}`}>

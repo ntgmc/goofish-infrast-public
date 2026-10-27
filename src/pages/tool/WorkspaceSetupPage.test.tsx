@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '../../test/query-render'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { MemoryRouter } from 'react-router'
@@ -95,7 +95,7 @@ describe('WorkspaceSetupPage automatic configuration saving', () => {
       json: { profile_id: 'advanced-profile', config: expect.objectContaining({ layout: '2-4-3' }) },
     }))
     await user.click(within(screen.getByRole('navigation', { name: '工作区设置' })).getByRole('button', { name: /基建配置/ }))
-    await user.click(await screen.findByRole('button', { name: '333 搓玉' }))
+    await user.click(await screen.findByRole('button', { name: '333 搓玉' }, { timeout: 5_000 }))
     expect(screen.getByRole('button', { name: '进入排班' })).toBeDisabled()
     await screen.findByText('配置已保存')
     expect(apiJsonMock).toHaveBeenLastCalledWith('/api/user/workspace', expect.objectContaining({

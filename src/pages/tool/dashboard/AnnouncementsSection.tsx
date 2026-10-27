@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import type { UserAnnouncementRead } from '../../../lib/types'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { updateUserAnnouncementQueries, useUserAnnouncementsQuery, type UserAnnouncementsResponse } from '../../../lib/announcement-query'
 import { apiJson } from '../../../lib/api-client'
 import { getAnnouncementReminderState } from '../../../lib/announcement-reminders'
 import { formatDate } from '../tool-utils'
@@ -8,58 +9,58 @@ import { copy } from '../../../copy/index'
 
 
 
-function useUserAnnouncements(onUnreadCountChange: (count: number) => void) {
-  const [items, setItems] = useState<UserAnnouncementRead[]>([])
-  const [loading, setLoading] = useState(true)
+function useUserAnnouncements(userId: string, onUnreadCountChange: (count: number) => void) {
+  const client = useQueryClient()
+  const query = useUserAnnouncementsQuery(userId || null)
+  const items = query.data?.announcements ?? []
+  const loading = query.isFetching
   const [error, setError] = useState<string | null>(null)
   const [markingId, setMarkingId] = useState<string | null>(null)
   const [markingAll, setMarkingAll] = useState(false)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await apiJson<{ announcements?: UserAnnouncementRead[]; unread_count?: number }>('/api/user/announcements', { fallbackMessage: copy.dashboard.pages_tool_dashboard_AnnouncementsSection_001 })
-      setItems(data.announcements ?? [])
-      onUnreadCountChange(data.unread_count ?? 0)
-      setError(null)
-    } catch (caught) {
-      setError((caught as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }, [onUnreadCountChange])
-
-  useEffect(() => { void load() }, [load])
+  const writeAbort = useRef<AbortController | null>(null)
+  useEffect(() => {
+    if (query.data) onUnreadCountChange(query.data.unread_count ?? 0)
+  }, [query.data, onUnreadCountChange])
+  useEffect(() => () => writeAbort.current?.abort(), [userId])
 
   const markRead = async (announcementId?: string) => {
+    if (!userId || markingId || markingAll) return
+    const controller = new AbortController()
+    writeAbort.current = controller
     const isMarkingAll = !announcementId
     setError(null)
     if (isMarkingAll) setMarkingAll(true)
     else setMarkingId(announcementId)
 
     try {
-      const data = await apiJson<{ announcements?: UserAnnouncementRead[]; unread_count?: number }>('/api/user/announcements', {
-        method: 'PATCH',
+      const data = await apiJson<UserAnnouncementsResponse>('/api/user/announcements', {
+        method: 'PATCH', signal: controller.signal,
         json: announcementId ? { announcement_id: announcementId, updated_at: items.find((item) => item.announcement.id === announcementId)?.announcement.updated_at } : { all: true },
         fallbackMessage: copy.dashboard.pages_tool_dashboard_AnnouncementsSection_002,
       })
-      if (Array.isArray(data.announcements)) setItems(data.announcements)
-      else await load()
-      if (typeof data.unread_count === 'number') onUnreadCountChange(data.unread_count)
+      if (controller.signal.aborted) return
+      await updateUserAnnouncementQueries(client, userId, data)
+      if (!controller.signal.aborted && typeof data.unread_count === 'number') onUnreadCountChange(data.unread_count)
     } catch (caught) {
-      setError((caught as Error).message)
+      if (!controller.signal.aborted) setError((caught as Error).message)
     } finally {
-      if (isMarkingAll) setMarkingAll(false)
-      else setMarkingId(null)
+      if (!controller.signal.aborted) {
+        if (isMarkingAll) setMarkingAll(false)
+        else setMarkingId(null)
+      }
     }
   }
 
   const unreadCount = items.filter((item) => !item.read_at).length
-  return { items, loading, error, markingId, markingAll, load, markRead, unreadCount }
+  return { items, loading, error: error ?? query.error?.message, markingId, markingAll, markRead, unreadCount }
 }
 
-export default function AnnouncementsSection({ onUnreadCountChange, loadingFallback }: { onUnreadCountChange: (count: number) => void; loadingFallback?: ReactNode }) {
-  const { items, loading, error, markingId, markingAll, markRead, unreadCount } = useUserAnnouncements(onUnreadCountChange)
+export default function AnnouncementsSection(props: { userId: string; onUnreadCountChange: (count: number) => void; loadingFallback?: ReactNode }) {
+  return <UserAnnouncements key={props.userId} {...props} />
+}
+
+function UserAnnouncements({ userId, onUnreadCountChange, loadingFallback }: { userId: string; onUnreadCountChange: (count: number) => void; loadingFallback?: ReactNode }) {
+  const { items, loading, error, markingId, markingAll, markRead, unreadCount } = useUserAnnouncements(userId, onUnreadCountChange)
   if (loading && !items.length && loadingFallback) return loadingFallback
 
   return (

@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { useAnimate } from 'motion/react'
+import { useQuery } from '@tanstack/react-query'
+import { useInventoryQuery } from '../../../lib/inventory-query'
 import { useAppReducedMotion } from '../../../lib/motion-preference'
 import { copy } from '../../../copy/index'
 import { matchesSearch } from '../../../lib/search'
@@ -25,7 +27,7 @@ import {
   type OnboardingTaskView,
   type ProfileCapacitySummary,
 } from '../../../lib/inventory-contracts'
-import { markInventoryStale, useInventoryRefresh } from '../../../lib/inventory-refresh'
+import { markInventoryStale } from '../../../lib/inventory-refresh'
 
 type Category = 'all' | 'consumable' | 'capacity_upgrade' | 'gift_pack' | 'license_voucher'
 type UseResponse = {
@@ -52,12 +54,12 @@ type LimitedProfileUseResponse = UseResponse & {
 }
 type InventoryNotice = { message: string; action?: 'profiles' }
 
-export function useInventory({ onPayload, onLifetimeProfileCreated }: {
+export function useInventory({ userId, activeProfileId, onPayload, onLifetimeProfileCreated }: {
+  userId: string
+  activeProfileId: string | null
   onPayload: (payload: AuthSuccessResponse) => void
   onLifetimeProfileCreated?: () => void
 }) {
-  const [inventory, setInventory] = useState<InventoryResponse | null>(null)
-  const [tasks, setTasks] = useState<OnboardingTaskView[]>([])
   const [selected, setSelected] = useState<InventoryStack | null>(null)
   const [category, setCategory] = useState<Category>('all')
   const [search, setSearch] = useState('')
@@ -67,7 +69,6 @@ export function useInventory({ onPayload, onLifetimeProfileCreated }: {
   const [highlightedReward, setHighlightedReward] = useState<number | null>(null)
   const [lifetimeDisplayName, setLifetimeDisplayName] = useState('')
   const [lifetimeNote, setLifetimeNote] = useState('')
-  const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<InventoryNotice | null>(null)
@@ -76,34 +77,26 @@ export function useInventory({ onPayload, onLifetimeProfileCreated }: {
   const selectedTriggerRef = useRef<HTMLButtonElement | null>(null)
   const itemIdempotencyKeyRef = useRef(crypto.randomUUID())
   const pendingItemKeysRef = useRef(new Map<string, string>())
-  const loadVersionRef = useRef(0)
   const [chestScope, animate] = useAnimate<HTMLFieldSetElement>()
   const reduceMotion = useAppReducedMotion()
   const { features } = useSiteFeatures()
 
+  const inventoryQuery = useInventoryQuery(userId, activeProfileId)
+  const tasksQuery = useQuery({
+    queryKey: ['user', userId, activeProfileId, 'onboarding-tasks'],
+    queryFn: ({ signal }) => apiJson<{ tasks: OnboardingTaskView[] }>('/api/user/onboarding-tasks', { signal }),
+    enabled: Boolean(userId) && features.onboarding_tasks,
+  })
+  const inventory = inventoryQuery.data ?? null
+  const tasks = features.onboarding_tasks ? tasksQuery.data?.tasks ?? [] : []
+  const loading = inventoryQuery.isFetching
   const load = useCallback(async () => {
-    const version = ++loadVersionRef.current
-    setLoading(true)
     setError(null)
-    try {
-      const onboardingTasks = features.onboarding_tasks
-        ? apiJson<{ tasks: OnboardingTaskView[] }>('/api/user/onboarding-tasks').catch(() => ({ tasks: [] }))
-        : Promise.resolve({ tasks: [] })
-      const [nextInventory, nextTasks] = await Promise.all([
-        apiJson<InventoryResponse>('/api/user/inventory', { cache: 'no-store' }),
-        onboardingTasks,
-      ])
-      if (version !== loadVersionRef.current) return
-      setInventory(nextInventory)
-      setTasks(nextTasks.tasks ?? [])
-    } catch (caught) {
-      if (version === loadVersionRef.current) setError(getApiErrorMessage(caught, copy.inventory.load_failed))
-    } finally {
-      if (version === loadVersionRef.current) setLoading(false)
-    }
-  }, [features.onboarding_tasks])
-
-  useInventoryRefresh(load)
+    await Promise.all([
+      inventoryQuery.refetch({ cancelRefetch: false }),
+      ...(features.onboarding_tasks ? [tasksQuery.refetch({ cancelRefetch: false })] : []),
+    ])
+  }, [inventoryQuery.refetch, tasksQuery.refetch, features.onboarding_tasks])
 
   const filtered = useMemo(() => (inventory?.stacks ?? []).filter((stack) => {
     if (category !== 'all' && stack.item.kind !== category) return false
@@ -209,6 +202,7 @@ export function useInventory({ onPayload, onLifetimeProfileCreated }: {
       setLifetimeDisplayName('')
       setLifetimeNote('')
       setNotice({ message: copy.inventory.lifetime_json_created })
+      markInventoryStale()
       onPayload(response)
       if (onLifetimeProfileCreated) onLifetimeProfileCreated()
       else await load()
@@ -232,6 +226,7 @@ export function useInventory({ onPayload, onLifetimeProfileCreated }: {
     if (!payload.user) return
     setLifetimeDialogOpen(false)
     setNotice({ message: copy.inventory.lifetime_bound })
+    markInventoryStale()
     onPayload(payload)
     if (onLifetimeProfileCreated) onLifetimeProfileCreated()
     else void load()
@@ -239,12 +234,14 @@ export function useInventory({ onPayload, onLifetimeProfileCreated }: {
 
   return { inventory, tasks, selected, setSelected, category, setCategory, search, setSearch, profileId, setProfileId,
     quantity, setQuantity, selectedRewardCodes, setSelectedRewardCodes, highlightedReward, lifetimeDisplayName, setLifetimeDisplayName,
-    lifetimeNote, setLifetimeNote, loading, busy, error, notice, rewards, setRewards, lifetimeDialogOpen, setLifetimeDialogOpen,
+    lifetimeNote, setLifetimeNote, loading, busy, error: error ?? (inventoryQuery.error ? getApiErrorMessage(inventoryQuery.error, copy.inventory.load_failed) : null), notice, rewards, setRewards, lifetimeDialogOpen, setLifetimeDialogOpen,
     selectedTriggerRef, chestScope, filtered, runItemAction, claimTask, createLifetimeProfileWithJson, selectedCapacity,
     maximumQuantity, canUseSelected, handleLifetimePayload, load }
 }
 
-export default function InventorySection({ onPayload, onLifetimeProfileCreated, onViewProfiles, loadingFallback }: {
+export default function InventorySection({ userId, activeProfileId, onPayload, onLifetimeProfileCreated, onViewProfiles, loadingFallback }: {
+  userId: string
+  activeProfileId: string | null
   onPayload: (payload: AuthSuccessResponse) => void
   onLifetimeProfileCreated?: () => void
   onViewProfiles?: () => void
@@ -254,7 +251,7 @@ export default function InventorySection({ onPayload, onLifetimeProfileCreated, 
     quantity, setQuantity, selectedRewardCodes, setSelectedRewardCodes, highlightedReward, lifetimeDisplayName, setLifetimeDisplayName,
     lifetimeNote, setLifetimeNote, loading, busy, error, notice, rewards, setRewards, lifetimeDialogOpen, setLifetimeDialogOpen,
     selectedTriggerRef, chestScope, filtered, runItemAction, claimTask, createLifetimeProfileWithJson, selectedCapacity,
-    maximumQuantity, canUseSelected, handleLifetimePayload } = useInventory({ onPayload, onLifetimeProfileCreated })
+    maximumQuantity, canUseSelected, handleLifetimePayload } = useInventory({ userId, activeProfileId, onPayload, onLifetimeProfileCreated })
   if (loading && !inventory) return loadingFallback ?? <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.inventory.loading}</div>
   return (
     <div className="workspace-inventory space-y-5">

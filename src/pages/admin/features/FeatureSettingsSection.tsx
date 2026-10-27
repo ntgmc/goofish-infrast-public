@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useAdminDraftQuery } from '../../../lib/admin-draft-query'
 import { ApiError } from '../../../lib/api-client'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import type { AdminSiteFeatureSettingsV1, SiteFeatureKey, SiteFeatures } from '../../../lib/site-features'
@@ -28,11 +29,10 @@ export default function FeatureSettingsSection() {
   const [groupId, setGroupId] = useState('registration')
   const [settings, setSettings] = useState<AdminSiteFeatureSettingsV1 | null>(null)
   const [effective, setEffective] = useState<SiteFeatures | null>(null)
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [conflict, setConflict] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [writeError, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
   const applyResponse = useCallback((data: FeatureSettingsResponse) => {
@@ -44,21 +44,10 @@ export default function FeatureSettingsSection() {
     setConflict(false)
   }, [])
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      applyResponse(await adminApiJson<FeatureSettingsResponse>('/api/admin/feature-settings', {
-        fallbackMessage: copy.features.admin_load_failed,
-      }))
-    } catch (caught) {
-      setError((caught as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }, [applyResponse])
-
-  useEffect(() => { void load() }, [load])
+  const query = useAdminDraftQuery('features', '/api/admin/feature-settings', applyResponse)
+  const loading = query.isFetching
+  const error = writeError ?? query.error?.message
+  const load = () => { setError(null); return query.load() }
 
   const toggle = (feature: SiteFeatureKey, checked: boolean) => {
     setSettings((current) => {
@@ -78,11 +67,13 @@ export default function FeatureSettingsSection() {
     setError(null)
     setNotice(null)
     try {
-      applyResponse(await adminApiJson<FeatureSettingsResponse>('/api/admin/feature-settings', {
+      const data = await adminApiJson<FeatureSettingsResponse>('/api/admin/feature-settings', {
         method: 'PUT',
         json: { features: settings.features, expected_revision: settings.revision },
         fallbackMessage: copy.features.admin_save_failed,
-      }))
+      })
+      await query.write(data)
+      applyResponse(data)
       setNotice(copy.features.admin_saved)
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409) {

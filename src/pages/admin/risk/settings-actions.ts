@@ -9,7 +9,7 @@ export async function saveRiskControlSettings(options: {
   reason: string
   rootPassword: string
   currentRevision: number
-  setSettings: Dispatch<SetStateAction<RiskControlSettings>>
+  setSettings: (settings: RiskControlSettings) => void | Promise<void>
   setBusyAction: Dispatch<SetStateAction<string | null>>
   setError: Dispatch<SetStateAction<string | null>>
   setNotice: Dispatch<SetStateAction<string | null>>
@@ -28,13 +28,13 @@ export async function saveRiskControlSettings(options: {
       },
       fallbackMessage: '保存风控设置失败',
     })
-    options.setSettings(normalizeRiskSettings(data.settings))
+    await options.setSettings(normalizeRiskSettings(data.settings))
     options.setNotice('风控设置已保存')
     return true
   } catch (caught) {
     if (caught instanceof ApiError && caught.status === 409 && caught.data && typeof caught.data === 'object') {
       const latest = (caught.data as { settings?: Partial<RiskControlSettings> }).settings
-      if (latest) options.setSettings(normalizeRiskSettings(latest))
+      if (latest) await options.setSettings(normalizeRiskSettings(latest))
     }
     options.setError((caught as Error).message)
     return false

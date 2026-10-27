@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '../../test/query-render'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuthSuccessResponse, LicenseConfig } from '../../lib/types'
 import { CONFIG_PRESETS, normalizeConfig } from '../../lib/config'

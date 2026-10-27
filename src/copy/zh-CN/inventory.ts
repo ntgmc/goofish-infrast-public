@@ -78,7 +78,6 @@ export const inventoryCopy = {
   scenario_coupon_required: '当前档案需要使用一张情景推演券才能运行。',
   inventory_refresh_failed: '暂时无法读取背包，道具选项当前不可用。',
   balances_load_failed: '暂时无法加载道具数量，请稍后重试。',
-  priority_coupon_balance_load_failed: '暂时无法读取优先计算券数量，请稍后重试。',
   capacity_expansion_done: (previous: number, next: number, maximum: number) => `扩容已生效：${previous} → ${next}（上限 ${maximum}）。`,
   task_rewards_label: (title: string) => `${title}奖励`,
   expires_after_days: (days: number) => `领取后 ${days} 天内有效`,

@@ -6,7 +6,6 @@ import { installStaleChunkReloadHandler } from './lib/chunk-reload'
 import { clearLocalViteDevCaches } from './lib/local-dev-cache'
 import { installDebugDiagnostics } from './lib/debug-diagnostics'
 import './index.css'
-import './pages/admin/admin.css'
 
 clearLocalViteDevCaches()
 installDebugDiagnostics()

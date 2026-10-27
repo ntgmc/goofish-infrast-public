@@ -17,10 +17,19 @@ import {
   type OptimizationJobPayload,
 } from './shared'
 import { parseOptimizationJobResult } from './runtime-contracts'
+import { observeOptimizationExecution } from './execution-observation'
 
 export type OptimizationJobExecutionResult = OptimizeResult | ScenarioComparisonResult
 
 export async function executeOptimizationJobWithPort(
+  job: OptimizeJobRecord,
+  context: OptimizeExecutionContext,
+  port: OptimizerPort,
+): Promise<OptimizationJobExecutionResult> {
+  return observeOptimizationExecution(job, context, (observedContext) => executeJob(job, observedContext, port))
+}
+
+async function executeJob(
   job: OptimizeJobRecord,
   context: OptimizeExecutionContext,
   port: OptimizerPort,

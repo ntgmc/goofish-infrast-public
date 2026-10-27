@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '../../../test/private-query-render'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { adminApiJson } = vi.hoisted(() => ({ adminApiJson: vi.fn() }))

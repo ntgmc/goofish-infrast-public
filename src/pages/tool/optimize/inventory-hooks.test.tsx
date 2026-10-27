@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
-import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
+import { act, cleanup, renderHook, waitFor } from '../../../test/query-render'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { InventoryResponse } from '../../../lib/inventory-contracts'
 import { useInventoryBalances } from './useInventoryBalances'
-import { usePriorityCoupon } from './usePriorityCoupon'
 import { markInventoryStale } from '../../../lib/inventory-refresh'
 
 const apiJson = vi.fn()
@@ -23,7 +22,7 @@ describe('inventory optimization hooks', () => {
     apiJson.mockResolvedValueOnce(inventorySnapshot())
       .mockImplementationOnce(() => new Promise<InventoryResponse>((resolve) => { complete = resolve }))
       .mockResolvedValueOnce({ ...inventorySnapshot(), stacks: [] })
-    const { result } = renderHook(() => useInventoryBalances('profile-1'))
+    const { result } = renderHook(() => useInventoryBalances('user', 'profile-1'))
     await waitFor(() => expect(result.current.loaded).toBe(true))
     act(() => markInventoryStale())
     await waitFor(() => expect(apiJson).toHaveBeenCalledTimes(2))
@@ -34,10 +33,27 @@ describe('inventory optimization hooks', () => {
     await waitFor(() => expect(result.current.balances).toEqual({}))
   })
 
+  it('invalidates another profile cache when a shared inventory balance changes', async () => {
+    apiJson.mockResolvedValue(inventorySnapshot())
+    const { result, rerender } = renderHook(({ profileId }) => useInventoryBalances('user', profileId), {
+      initialProps: { profileId: 'profile-1' },
+    })
+    await waitFor(() => expect(result.current.balances.training_diagnosis_coupon).toBe(2))
+    rerender({ profileId: 'profile-2' })
+    await waitFor(() => expect(result.current.balances.training_diagnosis_coupon).toBe(2))
+    expect(apiJson).toHaveBeenCalledTimes(2)
+    apiJson.mockResolvedValue({ ...inventorySnapshot(), stacks: [] })
+    await act(async () => { await result.current.refresh() })
+    await waitFor(() => expect(result.current.balances).toEqual({}))
+    rerender({ profileId: 'profile-1' })
+    await waitFor(() => expect(result.current.balances).toEqual({}))
+    expect(apiJson).toHaveBeenCalledTimes(4)
+  })
+
   it('keeps inventory unresolved and exposes the first load failure', async () => {
     apiJson.mockRejectedValue(new Error('inventory unavailable'))
 
-    const { result } = renderHook(() => useInventoryBalances('profile-1'))
+    const { result } = renderHook(() => useInventoryBalances('user', 'profile-1'))
 
     await waitFor(() => expect(result.current.error).toBe('inventory unavailable'))
     expect(result.current.loaded).toBe(false)
@@ -46,32 +62,39 @@ describe('inventory optimization hooks', () => {
 
   it('preserves the last successful inventory snapshot when refresh fails', async () => {
     apiJson.mockResolvedValueOnce(inventorySnapshot())
-    const { result } = renderHook(() => useInventoryBalances('profile-1'))
+    const { result } = renderHook(() => useInventoryBalances('user', 'profile-1'))
     await waitFor(() => expect(result.current.loaded).toBe(true))
     expect(result.current.balances.training_diagnosis_coupon).toBe(2)
 
     apiJson.mockRejectedValueOnce(new Error('refresh failed'))
     await act(async () => { await result.current.refresh() })
 
-    expect(result.current.error).toBe('refresh failed')
+    await waitFor(() => expect(result.current.error).toBe('refresh failed'))
     expect(result.current.loaded).toBe(true)
     expect(result.current.balances.training_diagnosis_coupon).toBe(2)
   })
 
-  it('preserves the last priority balance while exposing refresh failure', async () => {
-    apiJson.mockResolvedValueOnce({
-      balances: [{ type: 'priority_compute_coupon', available: 1, permanent: 1, next_expiry_at: null }],
-    })
-    const { result } = renderHook(() => usePriorityCoupon('profile-1'))
-    await waitFor(() => expect(result.current.balance?.available).toBe(1))
-    act(() => result.current.setSelected(true))
-
+  it('shares priority coupon data between consumers and keeps its last snapshot on refresh failure', async () => {
+    const inventory = inventorySnapshot()
+    const stack = { ...inventory.stacks[0], item: { ...inventory.stacks[0].item, code: 'priority_compute_coupon' } }
+    apiJson.mockResolvedValueOnce({ ...inventory, stacks: [
+      { ...stack, quantity: 2, permanent: 1, next_expiry_at: '2026-11-01T00:00:00Z' },
+      { ...stack, stack_id: 'another-priority-stack', quantity: 3, permanent: 0, next_expiry_at: '2026-10-30T00:00:00Z' },
+    ] })
+    const { result } = renderHook(() => ({
+      first: useInventoryBalances('user', 'profile-1'), second: useInventoryBalances('user', 'profile-1'),
+    }))
+    await waitFor(() => expect(result.current.first.priorityCouponBalance).toEqual({
+      type: 'priority_compute_coupon', available: 5, permanent: 1, next_expiry_at: '2026-10-30T00:00:00Z',
+    }))
+    expect(result.current.second.priorityCouponBalance).toEqual(result.current.first.priorityCouponBalance)
+    expect(apiJson).toHaveBeenCalledTimes(1)
+    expect(apiJson).toHaveBeenCalledWith('/api/user/inventory', expect.objectContaining({ signal: expect.any(AbortSignal) }))
     apiJson.mockRejectedValueOnce(new Error('coupon refresh failed'))
-    await act(async () => { await result.current.refresh() })
-
-    expect(result.current.error).toBe('coupon refresh failed')
-    expect(result.current.balance?.available).toBe(1)
-    expect(result.current.selected).toBe(false)
+    await act(async () => { await result.current.first.refresh() })
+    await waitFor(() => expect(result.current.first.error).toBe('coupon refresh failed'))
+    expect(result.current.first.priorityCouponBalance?.available).toBe(5)
+    expect(result.current.second.error).toBe('coupon refresh failed')
   })
 })
 

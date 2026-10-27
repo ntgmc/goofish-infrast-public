@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '../../test/query-render'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -645,7 +645,7 @@ describe('V2 results-first workspace', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/user/results/older?profile_id=profile-1', expect.anything()))
     expect(screen.getByText(copy.v2.loadingPreviousProduction)).toBeInTheDocument()
     await act(async () => finish(Response.json({ item: { ...older, config: priorConfig, result: priorResult } })))
-    const changes = screen.getByRole('region', { name: copy.v2.productionChanges })
+    const changes = await screen.findByRole('region', { name: copy.v2.productionChanges })
     expect(changes).toHaveTextContent('龙门币+2,594.99 龙门币 / 天')
     expect(changes).toHaveTextContent('经验+12,426.6 经验 / 天')
     expect(changes).toHaveTextContent('赤金净变化-4.98 个 / 天')

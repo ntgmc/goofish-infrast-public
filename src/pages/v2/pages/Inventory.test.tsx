@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '../../../test/query-render'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
 import { copy } from '../../../copy'
@@ -25,7 +25,7 @@ it('keeps a failed item use open and reuses its idempotency key when retried fro
     return { stacks: [stack], capacities: [], recent_events: [] }
   })
   const user = userEvent.setup()
-  render(<Inventory session={{ applyAuthPayload: vi.fn() } as unknown as V2Session} onProfiles={vi.fn()} />)
+  render(<Inventory session={{ user: { id: 'user' }, activeProfile: { id: 'profile-1' }, applyAuthPayload: vi.fn() } as unknown as V2Session} onProfiles={vi.fn()} />)
   await user.click(await screen.findByRole('button', { name: /测试礼包/ }))
   const dialog = within(screen.getByRole('dialog'))
   const quantity = dialog.getByRole('spinbutton', { name: copy.inventory.use_quantity })

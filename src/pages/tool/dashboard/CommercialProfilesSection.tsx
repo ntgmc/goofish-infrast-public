@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import type { UserGameAccount } from '../../../lib/types'
 import { apiJson, getApiErrorMessage } from '../../../lib/api-client'
 import { copy } from '../../../copy/index'
@@ -18,59 +19,73 @@ type Limits = {
 type Page = { profiles: UserGameAccount[]; next_cursor: string | null; limits: Limits }
 type EditDraft = { profileId: string; displayName: string; note: string }
 
-export function useCommercialProfiles() {
-  const [page, setPage] = useState<Page | null>(null)
+export function useCommercialProfiles(userId: string, profileId: string | null) {
+  const queryClient = useQueryClient()
   const [state, setState] = useState<'active' | 'archived'>('active')
   const [draftQuery, setDraftQuery] = useState('')
   const [appliedQuery, setAppliedQuery] = useState('')
-  const [loading, setLoading] = useState(true)
+  const query = useInfiniteQuery({
+    queryKey: ['user', userId, profileId, 'commercial-profiles', state, appliedQuery],
+    enabled: Boolean(userId),
+    queryFn: ({ pageParam, signal }) => {
+      const params = new URLSearchParams({ state, limit: '20' })
+      if (appliedQuery) params.set('q', appliedQuery)
+      if (pageParam) params.set('cursor', pageParam)
+      return apiJson<Page>(`/api/user/commercial/profiles?${params}`, { signal, fallbackMessage: copy.metered.commercial_profiles.load_failed })
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) => page.next_cursor ?? undefined,
+  })
+  const page = useMemo(() => {
+    if (!query.data) return null
+    const seen = new Set<string>()
+    return {
+      ...query.data.pages[query.data.pages.length - 1]!,
+      profiles: query.data.pages.flatMap((page) => page.profiles).filter((profile) => {
+        if (seen.has(profile.id)) return false
+        seen.add(profile.id)
+        return true
+      }),
+    }
+  }, [query.data])
+  const loading = query.isFetching
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [editDraft, setEditDraft] = useState<EditDraft | null>(null)
-  const requestSequence = useRef(0)
-  const requestController = useRef<AbortController | null>(null)
   const batchRequest = useRef<{ signature: string; operationId: string } | null>(null)
-
-  const load = useCallback(async (cursor?: string | null) => {
-    const sequence = ++requestSequence.current
-    requestController.current?.abort()
-    const controller = new AbortController()
-    requestController.current = controller
-    setLoading(true)
+  const { refetch, fetchNextPage, hasNextPage } = query
+  const load = useCallback(async () => {
+    if (!userId) return
     setError(null)
-    try {
-      const params = new URLSearchParams({ state, limit: '20' })
-      if (appliedQuery) params.set('q', appliedQuery)
-      if (cursor) params.set('cursor', cursor)
-      const next = await apiJson<Page>(`/api/user/commercial/profiles?${params}`, { signal: controller.signal })
-      if (sequence !== requestSequence.current) return
-      setPage((current) => cursor && current ? {
-        ...next,
-        profiles: [...current.profiles, ...next.profiles.filter((profile) => !current.profiles.some((existing) => existing.id === profile.id))],
-      } : next)
-      if (!cursor) setSelectedIds(new Set())
-    } catch (caught) {
-      if (sequence === requestSequence.current && !isAbortError(caught)) {
-        setError(getApiErrorMessage(caught, copy.metered.commercial_profiles.load_failed))
-      }
-    } finally {
-      if (sequence === requestSequence.current) setLoading(false)
-    }
-  }, [appliedQuery, state])
-
+    const result = await refetch({ cancelRefetch: false })
+    if (result.isSuccess) setSelectedIds(new Set())
+  }, [refetch, userId])
+  const loadMore = async () => {
+    if (!hasNextPage || loading) return
+    setError(null)
+    await fetchNextPage({ cancelRefetch: false })
+  }
+  const refreshProfiles = async () => {
+    await queryClient.invalidateQueries({
+      predicate: ({ queryKey }) => queryKey[0] === 'user' && queryKey[1] === userId && queryKey[3] === 'commercial-profiles',
+    })
+    setSelectedIds(new Set())
+  }
   useEffect(() => {
-    void load()
-    return () => requestController.current?.abort()
-  }, [load])
+    setSelectedIds(new Set())
+    setEditDraft(null)
+    setError(null)
+  }, [userId, profileId, state, appliedQuery])
+  useEffect(() => { batchRequest.current = null; setNotice(null) }, [userId, profileId])
 
   const create = async () => {
     if (!page) return
     setBusy('create'); setError(null); setNotice(null)
     try {
       await apiJson('/api/user/commercial/profiles', { method: 'POST', json: {}, fallbackMessage: copy.metered.commercial_profiles.create_failed })
-      await load()
+      await refreshProfiles()
     } catch (caught) { setError(getApiErrorMessage(caught, copy.metered.commercial_profiles.create_failed)) }
     finally { setBusy(null) }
   }
@@ -82,7 +97,7 @@ export function useCommercialProfiles() {
       await apiJson('/api/user/commercial/profiles', action === 'delete' ? {
         method: 'DELETE', json: { profile_id: profile.id, confirm_permanent_delete: true },
       } : { method: 'PATCH', json: { profile_id: profile.id, action } })
-      await load()
+      await refreshProfiles()
     } catch (caught) { setError(getApiErrorMessage(caught, copy.metered.commercial_profiles.update_failed)) }
     finally { setBusy(null) }
   }
@@ -103,7 +118,7 @@ export function useCommercialProfiles() {
       })
       setEditDraft(null)
       setNotice(copy.metered.commercial_profiles.edit_success)
-      await load()
+      await refreshProfiles()
     } catch (caught) { setError(getApiErrorMessage(caught, copy.metered.commercial_profiles.update_failed)) }
     finally { setBusy(null) }
   }
@@ -111,7 +126,6 @@ export function useCommercialProfiles() {
   const search = (event: FormEvent) => {
     event.preventDefault()
     const next = draftQuery.trim()
-    setPage(null)
     if (next === appliedQuery) void load()
     else setAppliedQuery(next)
   }
@@ -133,20 +147,23 @@ export function useCommercialProfiles() {
       })
       batchRequest.current = null
       setNotice(copy.metered.commercial_profiles.batch_success(result.results.length))
-      await load()
+      await refreshProfiles()
     } catch (caught) { setError(getApiErrorMessage(caught, copy.metered.commercial_profiles.batch_partial)) }
     finally { setBusy(null) }
   }
 
   const activeProfiles = state === 'active' ? page?.profiles ?? [] : []
   const allVisibleSelected = activeProfiles.length > 0 && activeProfiles.every((profile) => selectedIds.has(profile.id))
-  return { page, state, setState, draftQuery, setDraftQuery, loading, busy, error, notice, selectedIds, setSelectedIds,
-    editDraft, setEditDraft, setPage, load, create, mutate, saveEdit, search, batchArchive, activeProfiles, allVisibleSelected }
+  return { page, state, setState, draftQuery, setDraftQuery, loading, busy,
+    error: error ?? (query.error ? getApiErrorMessage(query.error, copy.metered.commercial_profiles.load_failed) : null), notice, selectedIds, setSelectedIds,
+    editDraft, setEditDraft, load, loadMore, create, mutate, saveEdit, search, batchArchive, activeProfiles, allVisibleSelected }
 }
 
-export default function CommercialProfilesSection({ onOpen }: { onOpen: (profile: UserGameAccount) => void }) {
+export default function CommercialProfilesSection({ userId, activeProfileId, onOpen }: {
+  userId: string; activeProfileId: string | null; onOpen: (profile: UserGameAccount) => void
+}) {
   const { page, state, setState, draftQuery, setDraftQuery, loading, busy, error, notice, selectedIds, setSelectedIds,
-    editDraft, setEditDraft, setPage, load, create, mutate, saveEdit, search, batchArchive, activeProfiles, allVisibleSelected } = useCommercialProfiles()
+    editDraft, setEditDraft, load, loadMore, create, mutate, saveEdit, search, batchArchive, activeProfiles, allVisibleSelected } = useCommercialProfiles(userId, activeProfileId)
   return <div className="space-y-4">
     <section className="tool-panel p-5 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -157,7 +174,7 @@ export default function CommercialProfilesSection({ onOpen }: { onOpen: (profile
       {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error}{!page && <button type="button" className="ml-2 underline" onClick={() => void load()}>{copy.metered.commercial_profiles.retry}</button>}</div>}
       {notice && <div className="tool-alert tool-alert--success mt-4" role="status">{notice}</div>}
       <form onSubmit={search} className="mt-4 flex flex-col gap-2 sm:flex-row">
-        <select value={state} onChange={(event) => { setPage(null); setState(event.currentTarget.value as 'active' | 'archived') }} className="tool-field sm:w-36"><option value="active">{copy.metered.commercial_profiles.active_filter}</option><option value="archived">{copy.metered.commercial_profiles.archived_filter}</option></select>
+        <select value={state} onChange={(event) => setState(event.currentTarget.value as 'active' | 'archived')} className="tool-field sm:w-36"><option value="active">{copy.metered.commercial_profiles.active_filter}</option><option value="archived">{copy.metered.commercial_profiles.archived_filter}</option></select>
         <input value={draftQuery} onChange={(event) => setDraftQuery(event.currentTarget.value)} className="tool-field flex-1" placeholder={copy.metered.commercial_profiles.search_placeholder} />
         <button className="tool-secondary-action" type="submit">{copy.metered.commercial_profiles.search}</button>
       </form>
@@ -198,10 +215,6 @@ export default function CommercialProfilesSection({ onOpen }: { onOpen: (profile
       </article>)}
       {!loading && !(page?.profiles.length) && <div className="tool-panel p-6 text-sm text-ink-secondary">{copy.metered.commercial_profiles.empty}</div>}
     </section>}
-    {page?.next_cursor && <button type="button" disabled={loading} onClick={() => void load(page.next_cursor)} className="tool-secondary-action w-full">{copy.metered.commercial_profiles.load_more}</button>}
+    {page?.next_cursor && <button type="button" disabled={loading} onClick={() => void loadMore()} className="tool-secondary-action w-full">{copy.metered.commercial_profiles.load_more}</button>}
   </div>
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === 'AbortError'
 }

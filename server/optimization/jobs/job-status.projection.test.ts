@@ -48,7 +48,7 @@ describe('optimization job result projection', () => {
       ok: true, permission: profile.permission, cdkRecord: null,
     }))
     mocks.getQueuePosition.mockResolvedValue(null)
-    mocks.listJobsByProfile.mockResolvedValue([{ job: jobRecord(), queuePosition: null }])
+    mocks.listJobsByProfile.mockResolvedValue([{ job: jobSummary(), resultAvailable: true, queuePosition: null }])
     mocks.requireUserSession.mockResolvedValue({ user: { id: 'user-1' } })
     mocks.getProfileForUser.mockResolvedValue({
       id: 'profile-1',
@@ -58,13 +58,39 @@ describe('optimization job result projection', () => {
   })
 
   it.each([null, 'job-1'])('reports schedule result availability from persisted history (%s)', async (historyResultId) => {
-    mocks.listJobsByProfile.mockResolvedValue([{ job: jobRecord(), queuePosition: null, historyResultId }])
+    mocks.listJobsByProfile.mockResolvedValue([{ job: jobSummary(), resultAvailable: true, queuePosition: null, historyResultId }])
     const response = await listOptimizationJobs(new Request('http://localhost/api/optimization/jobs?profile_id=profile-1'))
     expect(response.status).toBe(200)
     const { jobs } = await response.json()
     expect(jobs[0]).toMatchObject({ status: 'succeeded', resultAvailable: Boolean(historyResultId) })
     expect(jobs[0].historyResultId).toBe(historyResultId ?? undefined)
     expect(jobs[0]).not.toHaveProperty('result')
+  })
+
+  it.each([false, true])('reports scenario result availability without loading its result (%s)', async (resultAvailable) => {
+    const job = { ...jobSummary(), source: 'scenario_comparison', payload_json: { kind: 'scenario_comparison' } }
+    mocks.listJobsByProfile.mockResolvedValue([{ job, resultAvailable, queuePosition: null }])
+    const response = await listOptimizationJobs(new Request('http://localhost/api/optimization/jobs?profile_id=profile-1'))
+    const { jobs } = await response.json()
+    expect(jobs[0]).toMatchObject({ kind: 'scenario_comparison', status: 'succeeded', resultAvailable })
+    expect(jobs[0]).not.toHaveProperty('result')
+    expect(jobs[0]).not.toHaveProperty('historyResultId')
+  })
+
+  it.each(['running', 'succeeded', 'failed', 'cancelled', 'dead_lettered'])('skips queue estimates for %s status', async (status) => {
+    mocks.getJob.mockResolvedValue({ ...jobRecord(), status })
+    const response = await getOptimizationJob(request(), 'job-1')
+    expect(response.status).toBe(200)
+    expect((await response.json()).queuePosition).toBeNull()
+    expect(mocks.getQueuePosition).not.toHaveBeenCalled()
+  })
+
+  it('still estimates a queued job', async () => {
+    mocks.getJob.mockResolvedValue({ ...jobRecord(), status: 'queued' })
+    mocks.getQueuePosition.mockResolvedValue(2)
+    const response = await getOptimizationJob(request(), 'job-1')
+    expect((await response.json()).queuePosition).toBe(2)
+    expect(mocks.getQueuePosition).toHaveBeenCalledWith('job-1')
   })
 
   it('does not expose full or raw result data to a recommended profile owner', async () => {
@@ -145,6 +171,11 @@ describe('optimization job result projection', () => {
     expect(snapshot.result.raw_results).toEqual([])
   })
 })
+
+function jobSummary() {
+  const { result_json: _result, ...summary } = jobRecord()
+  return summary
+}
 
 function replayRequest(): Request {
   return new Request('http://localhost/api/optimization/jobs', {

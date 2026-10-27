@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { SuccessIcon as Check, AddImageIcon as ImagePlus, FeedbackIcon as MessageSquare, RemoveIcon as X } from './icons'
+import { useQueryClient } from '@tanstack/react-query'
+import { usePrivateQueryScope } from '../lib/private-query-scope'
 import { copy } from '../copy'
 import { apiJson, getApiErrorMessage } from '../lib/api-client'
 import { FEEDBACK_CATEGORIES, FEEDBACK_IMAGE_TYPES, FEEDBACK_MESSAGE_MAX_LENGTH, type FeedbackCategory } from '../lib/feedback-contracts'
@@ -12,6 +14,8 @@ import './FeedbackDialog.css'
 
 export default function FeedbackButton({ iconOnly = false, className = 'tool-secondary-action', profileId }: { iconOnly?: boolean; className?: string; profileId?: string }) {
   const text = copy.feedback
+  const client = useQueryClient()
+  const owner = usePrivateQueryScope('user')
   const id = useId()
   const trigger = useRef<HTMLButtonElement>(null)
   const categoryInput = useRef<HTMLSelectElement>(null)
@@ -81,6 +85,7 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
     try {
       const context = { ...(attachProfile && profileId ? { profile_id: profileId } : {}), ...(attachSchedule && resultId.trim() ? { result_id: resultId.trim() } : {}), ...(attachSchedule && jobId.trim() ? { job_id: jobId.trim() } : {}) }
       const created = await apiJson<{ id: string }>('/api/user/feedback', { method: 'POST', json: { category, message: message.trim(), ...(Object.keys(context).length ? { context } : {}), ...(attachment ? { image: attachment.image } : {}) }, fallbackMessage: text.submitFailed })
+      void client.invalidateQueries({ queryKey: [...owner.key, 'feedback'] })
       setFeedbackId(created.id)
       setSuccess(true)
       setMessage('')

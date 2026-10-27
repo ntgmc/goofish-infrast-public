@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type SyntheticEvent } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { serviceBuildQueryOptions } from '../lib/service-build-query'
 import { RefreshIcon as RefreshCw } from './icons'
 import { APP_BUILD_META } from '../lib/build-meta'
 import type { AppBuildMeta } from '../lib/types'
@@ -18,63 +20,26 @@ interface Props {
 export default function DeploymentUpdatePrompt({
   meta = APP_BUILD_META,
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
-  fetchHealth = requestServiceBuildMeta,
+  fetchHealth,
   reloadPage = reloadCurrentPage,
 }: Props) {
   const [availableMeta, setAvailableMeta] = useState<AppBuildMeta | null>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const refreshButtonRef = useRef<HTMLButtonElement>(null)
 
+  const query = useQuery({ ...serviceBuildQueryOptions,
+    queryKey: fetchHealth ? ['public', 'service-build', 'custom'] : serviceBuildQueryOptions.queryKey,
+    queryFn: fetchHealth ? async ({ signal }) => ({ meta: await fetchHealth(signal), ok: true }) : serviceBuildQueryOptions.queryFn,
+    enabled: !availableMeta, staleTime: 0, refetchOnMount: 'always', refetchOnWindowFocus: 'always', refetchInterval: pollIntervalMs,
+  })
   useEffect(() => {
-    let active = true
-    let checking = false
-    let updateDetected = false
-    let timer: number | null = null
-    let controller: AbortController | null = null
-
-    const scheduleNextCheck = () => {
-      if (!active || updateDetected) return
-      if (timer !== null) window.clearTimeout(timer)
-      timer = window.setTimeout(checkForUpdate, pollIntervalMs)
-    }
-
-    const checkForUpdate = () => {
-      if (!active || checking || updateDetected) return
-      checking = true
-      controller = new AbortController()
-      void fetchHealth(controller.signal)
-        .then((candidate) => {
-          if (!active || !isServiceDeploymentNewer(meta, candidate)) return
-          updateDetected = true
-          if (timer !== null) window.clearTimeout(timer)
-          setAvailableMeta(candidate)
-        })
-        .catch(() => {
-          // A transient health failure must not interrupt the current page.
-        })
-        .finally(() => {
-          checking = false
-          controller = null
-          scheduleNextCheck()
-        })
-    }
-
-    const handleFocus = () => checkForUpdate()
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') checkForUpdate()
-    }
-
-    checkForUpdate()
-    window.addEventListener('focus', handleFocus)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => {
-      active = false
-      if (timer !== null) window.clearTimeout(timer)
-      controller?.abort()
-      window.removeEventListener('focus', handleFocus)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [fetchHealth, meta, pollIntervalMs])
+    if (!availableMeta && !query.isFetching && query.data?.ok && isServiceDeploymentNewer(meta, query.data.meta)) setAvailableMeta(query.data.meta)
+  }, [availableMeta, query.isFetching, query.data, meta])
+  useEffect(() => {
+    const onFocus = () => { if (!availableMeta && document.visibilityState === 'visible') void query.refetch({ cancelRefetch: false }) }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [availableMeta, query.refetch])
 
   useEffect(() => {
     if (!availableMeta) return
@@ -140,18 +105,6 @@ export default function DeploymentUpdatePrompt({
       </AnimatedPresenceRegion>
     </dialog>
   )
-}
-
-async function requestServiceBuildMeta(signal: AbortSignal): Promise<AppBuildMeta> {
-  const response = await fetch('/api/health', {
-    signal,
-    cache: 'no-store',
-    headers: { Accept: 'application/json' },
-  })
-  if (!response.ok) throw new Error(`Service health check failed with ${response.status}.`)
-  const payload = await response.json() as { build_meta?: AppBuildMeta }
-  if (!payload.build_meta) throw new Error('Service health response is missing build metadata.')
-  return payload.build_meta
 }
 
 function isServiceDeploymentNewer(current: AppBuildMeta, candidate: AppBuildMeta): boolean {

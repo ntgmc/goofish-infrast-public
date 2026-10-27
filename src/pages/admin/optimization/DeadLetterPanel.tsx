@@ -1,96 +1,44 @@
 import { ExpandIcon as ChevronDown, CollapsedIcon as ChevronRight, RefreshIcon as RefreshCw } from '../../../components/icons'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useQueries } from '@tanstack/react-query'
+import { useAdminPanelQuery } from '../../../lib/admin-panel-query'
+import { usePrivateQueryScope } from '../../../lib/private-query-scope'
 import { adminApiBlob as apiBlob, adminApiJson as apiJson } from '../../../lib/admin-api-client'
 import type { AdminOptimizationDeadLetter, AdminOptimizationDeadLetterDetail } from '../contracts'
 import { requestAdminOperationReason } from '../../../lib/admin-operation-reason'
 import { SectionLoader } from '../../../components/SessionLoader'
 
 export default function DeadLetterPanel({ active = true, pendingOnly = false }: { active?: boolean; pendingOnly?: boolean }) {
-  const [records, setRecords] = useState<AdminOptimizationDeadLetter[]>([])
-  const [details, setDetails] = useState<Record<string, AdminOptimizationDeadLetterDetail>>({})
-  const recordIdsRef = useRef(new Set<string>())
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null)
-  const [loadingDetailIds, setLoadingDetailIds] = useState<Set<string>>(() => new Set())
-  const [detailErrors, setDetailErrors] = useState<Record<string, string>>({})
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [loaded, setLoaded] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const requestRef = useRef<AbortController | null>(null)
-  useEffect(() => { setRecords([]); setLoaded(false); recordIdsRef.current = new Set() }, [pendingOnly])
-  const load = useCallback(async () => {
-    requestRef.current?.abort()
-    const controller = new AbortController()
-    requestRef.current = controller
-    setLoading(true)
-    try {
-      const response = await apiJson<{ dead_letters?: AdminOptimizationDeadLetter[] }>(`/api/admin/optimization?limit=50${pendingOnly ? '&status=pending_review' : ''}`, { signal: controller.signal, fallbackMessage: '加载优化死信失败' })
-      if (controller.signal.aborted) return
-      const nextRecords = response.dead_letters ?? []
-      const ids = new Set(nextRecords.map((record) => record.id))
-      recordIdsRef.current = ids
-      setRecords(nextRecords)
-      setDetails((current) => Object.fromEntries(Object.entries(current).filter(([id]) => ids.has(id))))
-      setDetailErrors((current) => Object.fromEntries(Object.entries(current).filter(([id]) => ids.has(id))))
-      setExpandedRecordId((current) => current && ids.has(current) ? current : null)
-      setError(null)
-    } catch (caught) {
-      if (!controller.signal.aborted) setError((caught as Error).message)
-    } finally {
-      if (!controller.signal.aborted) { setLoading(false); setLoaded(true) }
-    }
-  }, [pendingOnly])
+  const [writeError, setError] = useState<string | null>(null)
+  const owner = usePrivateQueryScope('admin', active)
+  const query = useAdminPanelQuery<{ dead_letters?: AdminOptimizationDeadLetter[] }>('dead-letters', `/api/admin/optimization?limit=50${pendingOnly ? '&status=pending_review' : ''}`, active, { refetchInterval: 15_000, staleTime: 0, refetchOnWindowFocus: 'always' })
+  const records = query.data?.dead_letters ?? []
   useEffect(() => {
-    if (!active) return
-    void load()
-    const poll = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void load()
-    }, 15_000)
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') void load()
-    }
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => {
-      window.clearInterval(poll)
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-      requestRef.current?.abort()
-    }
-  }, [active, load])
-  const loadDetail = async (id: string) => {
-    if (loadingDetailIds.has(id)) return
-    setLoadingDetailIds((current) => new Set(current).add(id))
-    setDetailErrors((current) => {
-      const next = { ...current }
-      delete next[id]
-      return next
-    })
-    try {
-      const response = await apiJson<{ dead_letter?: AdminOptimizationDeadLetterDetail }>(
-        `/api/admin/optimization?view=dead_letter&id=${encodeURIComponent(id)}`,
-        { fallbackMessage: '加载死信完整数据失败' },
-      )
-      if (!recordIdsRef.current.has(id)) return
+    if (query.data && expandedRecordId && !query.data.dead_letters?.some((record) => record.id === expandedRecordId)) setExpandedRecordId(null)
+  }, [query.data, expandedRecordId])
+  const loading = query.isFetching
+  const loaded = Boolean(query.data || query.error) || !owner.enabled
+  const error = writeError ?? query.error?.message
+  const load = async () => { setError(null); await query.refetch({ cancelRefetch: false }) }
+  const detailQueries = useQueries({ queries: records.map((record) => ({
+    queryKey: [...owner.key, 'dead-letter-detail', record.id], enabled: owner.enabled && expandedRecordId === record.id, gcTime: 0,
+    queryFn: async ({ signal }: { signal: AbortSignal }) => {
+      const response = await apiJson<{ dead_letter?: AdminOptimizationDeadLetterDetail }>(`/api/admin/optimization?view=dead_letter&id=${encodeURIComponent(record.id)}`, { signal, fallbackMessage: '加载死信完整数据失败' })
       if (!response.dead_letter) throw new Error('接口未返回死信完整数据。')
-      setDetails((current) => ({ ...current, [id]: response.dead_letter! }))
-    } catch (caught) {
-      if (recordIdsRef.current.has(id)) setDetailErrors((current) => ({ ...current, [id]: (caught as Error).message }))
-    } finally {
-      setLoadingDetailIds((current) => {
-        const next = new Set(current)
-        next.delete(id)
-        return next
-      })
-    }
-  }
+      return response.dead_letter
+    },
+  })) })
+  const loadDetail = (id: string) => owner.enabled ? detailQueries[records.findIndex((record) => record.id === id)]?.refetch({ cancelRefetch: false }) : undefined
   const toggleDetail = (id: string) => {
     if (expandedRecordId === id) {
       setExpandedRecordId(null)
       return
     }
     setExpandedRecordId(id)
-    if (!details[id]) void loadDetail(id)
   }
   const onAction = async (id: string, action: 'replay' | 'discard') => {
     const reason = await requestAdminOperationReason({
@@ -177,12 +125,12 @@ export default function DeadLetterPanel({ active = true, pendingOnly = false }: 
       {notice && <div className="tool-alert tool-alert--success mt-4" role="status">{notice}</div>}
       {records.length === 0 ? <p className="mt-4 text-sm text-ink-muted">暂无死信任务。</p> : (
         <div className="mt-4 space-y-3">
-          {records.map((record) => {
+          {records.map((record, index) => {
             const busy = busyAction === `dead-letter:${record.id}`
             const expanded = expandedRecordId === record.id
-            const loadingDetail = loadingDetailIds.has(record.id)
-            const detail = details[record.id]
-            const detailError = detailErrors[record.id]
+            const loadingDetail = detailQueries[index].isFetching
+            const detail = detailQueries[index].data
+            const detailError = detailQueries[index].error?.message
             const detailPanelId = `dead-letter-detail-${record.id}`
             const isReadOnlyLegacySuggestion = record.source === 'optimize_suggestions'
             return (

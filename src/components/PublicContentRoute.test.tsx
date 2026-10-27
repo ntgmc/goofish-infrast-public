@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '../test/query-render'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router'
@@ -29,7 +29,7 @@ describe('PublicContentRoute', () => {
     )
     expect(screen.getByText('最新页面内容正在加载，部分信息可能稍后更新。')).toBeInTheDocument()
     await act(async () => resolveRequest(cloneDefaultPublicContentSettings()))
-    expect(screen.queryByText('最新页面内容正在加载，部分信息可能稍后更新。')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('最新页面内容正在加载，部分信息可能稍后更新。')).not.toBeInTheDocument())
   })
 
   it('shows bundled-content fallback feedback and retries', async () => {

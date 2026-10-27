@@ -5,8 +5,8 @@ import { useSklandSnapshot } from '../../hooks/useSklandSnapshot'
 import type { CultivationData } from '../../lib/cultivation-contract'
 import { allocateProjectMaterials, buildProjectRoute, projectDaysEarlier, readProjectIncome, validProjectDate, type CultivationProject } from '../../lib/cultivation-projects'
 import { readCultivationProjects, saveCultivationProjects, subscribeCultivationProjects } from '../../lib/cultivation-project-import'
-import type { UserGameAccount, WorkspaceResultHistoryItem } from '../../lib/types'
-import { fetchResultHistoryDetail } from '../tool/optimize/optimization-api'
+import type { UserGameAccount } from '../../lib/types'
+import { useResultHistoryDetailQuery } from '../tool/optimize/result-history-query'
 import type { V2Session } from '../v2/OptionsDrawer'
 
 const text = copy.cultivationProjects
@@ -50,20 +50,11 @@ export function useCultivationProjects(session: V2Session, profile: UserGameAcco
   const history = session.workspace?.profile_id === profile.id ? session.workspace.result_history.filter((row) => row.source !== 'manual') : []
   const [normalId, setNormalId] = useState(history[0]?.id ?? '')
   const [temporaryId, setTemporaryId] = useState('')
-  const [production, setProduction] = useState<{ key: string; normal: WorkspaceResultHistoryItem | null; temporary: WorkspaceResultHistoryItem | null; error?: string } | null>(null)
-  const [productionRetry, setProductionRetry] = useState(0)
-  const productionKey = `${normalId}:${temporaryId}:${productionRetry}`
-  useEffect(() => {
-    const controller = new AbortController()
-    const detail = (id: string) => id ? fetchResultHistoryDetail(profile.id, id, controller.signal) : Promise.resolve(null)
-    void Promise.all([detail(normalId), detail(temporaryId)]).then(([normal, temporary]) => {
-      if (!controller.signal.aborted) setProduction({ key: productionKey, normal, temporary })
-    }).catch((caught) => {
-      if (!controller.signal.aborted) setProduction({ key: productionKey, normal: null, temporary: null, error: caught instanceof Error ? caught.message : text.incomeFailed })
-    })
-    return () => controller.abort()
-  }, [profile.id, normalId, temporaryId, productionKey])
-  const currentProduction = production?.key === productionKey ? production : null
+  const normalQuery = useResultHistoryDetailQuery(userId, profile.id, normalId || undefined)
+  const temporaryQuery = useResultHistoryDetailQuery(userId, profile.id, temporaryId || undefined)
+  const production = useMemo(() => normalQuery.isLoading || temporaryQuery.isLoading ? null : ({ normal: normalQuery.data ?? null, temporary: temporaryQuery.data ?? null,
+    error: (normalQuery.error ?? temporaryQuery.error)?.message }), [normalQuery.data, temporaryQuery.data, normalQuery.error, temporaryQuery.error, normalQuery.isLoading, temporaryQuery.isLoading])
+  const currentProduction = production
   const normalIncome = readProjectIncome(currentProduction?.normal?.result.daily_production)
   const temporaryIncome = readProjectIncome(currentProduction?.temporary?.result.daily_production)
   const productionInvalid = !currentProduction || Boolean(currentProduction.error) || Boolean(normalId && !normalIncome || temporaryId && !temporaryIncome)
@@ -119,5 +110,5 @@ export function useCultivationProjects(session: V2Session, profile: UserGameAcco
 
   return { projects, setProjects, data, busy: busy || snapshot.busy, error: error || snapshot.error || null, load, storageError, dailySanity, setDailySanity, startDate, setStartDate, allOpen, setAllOpen,
     history, normalId, setNormalId, temporaryId, setTemporaryId, production: currentProduction, productionInvalid, normalIncome, temporaryIncome,
-    retryProduction: () => setProductionRetry((value) => value + 1), validSettings, materials, plans, pendingRefresh }
+    retryProduction: () => { if (normalId) void normalQuery.refetch({ cancelRefetch: false }); if (temporaryId) void temporaryQuery.refetch({ cancelRefetch: false }) }, validSettings, materials, plans, pendingRefresh }
 }

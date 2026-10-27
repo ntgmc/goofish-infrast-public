@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { StrictMode } from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '../../test/query-render'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -102,7 +102,6 @@ it('continues from login and Skland import through saved configuration to the fi
     if (url === '/api/optimization/jobs' && options?.method === 'POST') return { job: queued }
     if (url === '/api/optimization/jobs/new-job') return new Promise(() => {})
     if (url === '/api/user/inventory') return { stacks: [], capacities: [], recent_events: [] }
-    if (url === '/api/user/priority-coupon-balance') return { balances: [] }
     throw new Error(`Unexpected API request: ${url}`)
   })
   render(<MemoryRouter initialEntries={['/']}><MotionPreferenceProvider><V2Page /></MotionPreferenceProvider></MemoryRouter>)
@@ -141,7 +140,6 @@ it.each([false, true])('loads the saved schedule on entry without a retry (Stric
     if (url.startsWith('/api/optimization/jobs?')) return { jobs: [], nextCursor: null }
     if (url.startsWith('/api/user/status?')) return {}
     if (url === '/api/user/inventory') return { stacks: [], capacities: [], recent_events: [] }
-    if (url === '/api/user/priority-coupon-balance') return { balances: [] }
     throw new Error(`Unexpected API request: ${url}`)
   })
   const page = <MemoryRouter initialEntries={['/']}><MotionPreferenceProvider><V2Page /></MotionPreferenceProvider></MemoryRouter>
@@ -175,7 +173,6 @@ it('waits for login and saved-result detail, then retries a failed read without 
     if (url.startsWith('/api/optimization/jobs?')) return { jobs: [], nextCursor: null }
     if (url.startsWith('/api/user/status?')) return {}
     if (url === '/api/user/inventory') return { stacks: [], capacities: [], recent_events: [] }
-    if (url === '/api/user/priority-coupon-balance') return { balances: [] }
     throw new Error(`Unexpected API request: ${url}`)
   })
   render(<MemoryRouter initialEntries={['/v2']}><MotionPreferenceProvider><V2Page /></MotionPreferenceProvider></MemoryRouter>)
@@ -225,7 +222,6 @@ it.each(['generation', 'overview'])('shows a failed configuration save beside th
     if (url === '/api/optimization/jobs/new-job') return new Promise(() => {})
     if (url.startsWith('/api/user/status?')) return {}
     if (url === '/api/user/inventory') return { stacks: [], capacities: [], recent_events: [] }
-    if (url === '/api/user/priority-coupon-balance') return { balances: [] }
     throw new Error(`Unexpected API request: ${url}`)
   })
   const submissions = () => vi.mocked(apiJson).mock.calls.filter(([url, options]) => url === '/api/optimization/jobs' && options?.method === 'POST')
@@ -285,7 +281,6 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and k
     if (url.startsWith('/api/user/results/new-result?')) return { item: { ...latest, config: SAMPLE_CONFIG, result: newResult } }
     if (url.startsWith('/api/user/status?')) return {}
     if (url === '/api/user/inventory') return { stacks: [], capacities: [], recent_events: [] }
-    if (url === '/api/user/priority-coupon-balance') return { balances: [] }
     throw new Error(`Unexpected API request: ${url}`)
   })
   if (mode === 'restored') {
@@ -346,9 +341,10 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and k
   expect(vi.mocked(apiJson).mock.calls.filter(([url, options]) => url === '/api/optimization/jobs' && options?.method === 'POST'))
     .toHaveLength(mode === 'submitted' ? 1 : 0)
   expect(vi.mocked(apiJson).mock.calls.filter(([url]) => url.startsWith('/api/user/results/new-result?'))).toHaveLength(1)
-  fireEvent.click(screen.getByRole('button', { name: copy.v2.history }))
-  const previousCard = (await screen.findByText('Previous schedule')).closest('.v2-record')!
-  fireEvent.click(within(previousCard as HTMLElement).getByRole('button', { name: copy.optimize.pages_tool_optimize_PlansSection_030 }))
+  await userEvent.click(screen.getByRole('button', { name: copy.v2.history }))
+  // History is loaded lazily on its first navigation.
+  const previousCard = await screen.findByRole('article', { name: 'Previous schedule' }, { timeout: 5_000 })
+  fireEvent.click(within(previousCard).getByRole('button', { name: copy.optimize.pages_tool_optimize_PlansSection_030 }))
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   await waitFor(() => expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('53,595')).toBeInTheDocument())
   expect(vi.mocked(apiJson).mock.calls.filter(([url]) => url.startsWith('/api/user/results/new-result?'))).toHaveLength(1)

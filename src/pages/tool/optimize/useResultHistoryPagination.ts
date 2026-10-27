@@ -1,85 +1,41 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { UserWorkspace, WorkspaceResultHistorySummary } from '../../../lib/types'
+import { useMemo } from 'react'
+import { useInfiniteQuery } from '@tanstack/react-query'
+import type { UserWorkspace, WorkspaceResultHistoryPage, WorkspaceResultHistorySummary } from '../../../lib/types'
 import { fetchResultHistoryPage } from './optimization-api'
+import { resultHistoryKey } from './result-history-query'
 import { copy } from '../../../copy/index'
 
 type ResultScope = 'active' | 'archived'
 
-export function useResultHistoryPagination(
-  profileId: string,
-  workspace: UserWorkspace | null,
-) {
-  const [resultHistory, setResultHistory] = useState<WorkspaceResultHistorySummary[]>(
-    workspace?.result_history ?? [],
-  )
-  const [archivedResults, setArchivedResults] = useState<WorkspaceResultHistorySummary[]>(
-    workspace?.archived_results ?? [],
-  )
-  const [resultHistoryCursor, setResultHistoryCursor] = useState<string | null>(
-    workspace?.result_history_next_cursor ?? null,
-  )
-  const [archivedResultsCursor, setArchivedResultsCursor] = useState<string | null>(
-    workspace?.archived_results_next_cursor ?? null,
-  )
-  const [loadingScope, setLoadingScope] = useState<ResultScope | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  const request = useRef<AbortController | null>(null)
-  useEffect(() => {
-    setResultHistory(workspace?.result_history ?? [])
-    setArchivedResults(workspace?.archived_results ?? [])
-    setResultHistoryCursor(workspace?.result_history_next_cursor ?? null)
-    setArchivedResultsCursor(workspace?.archived_results_next_cursor ?? null)
-    setLoadingScope(null)
-    setError(null)
-    return () => {
-      request.current?.abort()
-      request.current = null
-    }
-  }, [profileId, workspace])
-
-  const loadMore = useCallback(async (scope: ResultScope) => {
-    const cursor = scope === 'active' ? resultHistoryCursor : archivedResultsCursor
-    if (!cursor || request.current) return
-    const controller = new AbortController()
-    request.current = controller
-    const current = () => request.current === controller && !controller.signal.aborted
-    setLoadingScope(scope)
-    setError(null)
-    try {
-      const page = await fetchResultHistoryPage(profileId, scope, cursor, controller.signal)
-      if (!current()) return
-      const appendUnique = (
-        current: WorkspaceResultHistorySummary[],
-      ): WorkspaceResultHistorySummary[] => {
-        const known = new Set(current.map((item) => item.id))
-        return [...current, ...page.items.filter((item) => !known.has(item.id))]
-      }
-      if (scope === 'active') {
-        setResultHistory(appendUnique)
-        setResultHistoryCursor(page.next_cursor)
-      } else {
-        setArchivedResults(appendUnique)
-        setArchivedResultsCursor(page.next_cursor)
-      }
-    } catch (loadError) {
-      if (current()) setError(loadError instanceof Error ? loadError.message : copy.optimize.pages_tool_optimize_result_history_load_failed)
-    } finally {
-      if (current()) {
-        request.current = null
-        setLoadingScope(null)
-      }
-    }
-  }, [archivedResultsCursor, profileId, resultHistoryCursor])
-
-  return {
-    resultHistory,
-    archivedResults,
-    resultHistoryHasMore: Boolean(resultHistoryCursor),
-    archivedResultsHasMore: Boolean(archivedResultsCursor),
-    loadingScope,
-    error,
-    loadMoreResultHistory: () => loadMore('active'),
-    loadMoreArchivedResults: () => loadMore('archived'),
+export function useResultHistoryPagination(profileId: string, workspace: UserWorkspace | null, userId: string | null) {
+  const snapshot = workspace?.profile_id === profileId ? workspace : null
+  const revision = [snapshot?.updated_at, snapshot?.result_history, snapshot?.archived_results, snapshot?.result_history_next_cursor, snapshot?.archived_results_next_cursor]
+  const options = (scope: ResultScope) => ({
+    queryKey: [...resultHistoryKey(userId, profileId), 'pages', scope, revision],
+    enabled: Boolean(userId && profileId && snapshot), staleTime: Infinity,
+    initialPageParam: null as string | null,
+    initialData: { pages: [{ items: scope === 'active' ? snapshot?.result_history ?? [] : snapshot?.archived_results ?? [],
+      next_cursor: scope === 'active' ? snapshot?.result_history_next_cursor ?? null : snapshot?.archived_results_next_cursor ?? null }], pageParams: [null] },
+    queryFn: ({ signal, pageParam }: { signal: AbortSignal; pageParam: string | null }) => fetchResultHistoryPage(profileId, scope, pageParam, signal),
+    getNextPageParam: (page: WorkspaceResultHistoryPage) => page.next_cursor ?? undefined,
+  })
+  const active = useInfiniteQuery(options('active'))
+  const archived = useInfiniteQuery(options('archived'))
+  const resultHistory = useMemo(() => merge(active.data.pages), [active.data])
+  const archivedResults = useMemo(() => merge(archived.data.pages), [archived.data])
+  const error = active.error ?? archived.error
+  const load = async (scope: ResultScope) => {
+    const query = scope === 'active' ? active : archived
+    if (userId && snapshot && query.hasNextPage && !active.isFetching && !archived.isFetching) await query.fetchNextPage({ cancelRefetch: false })
   }
+  return { resultHistory, archivedResults, resultHistoryHasMore: active.hasNextPage, archivedResultsHasMore: archived.hasNextPage,
+    loadingScope: active.isFetching ? 'active' as const : archived.isFetching ? 'archived' as const : null,
+    error: error ? error instanceof Error ? error.message : copy.optimize.pages_tool_optimize_result_history_load_failed : null,
+    loadMoreResultHistory: () => load('active'), loadMoreArchivedResults: () => load('archived') }
+}
+
+function merge(pages: WorkspaceResultHistoryPage[]): WorkspaceResultHistorySummary[] {
+  const items = new Map<string, WorkspaceResultHistorySummary>()
+  for (const page of pages) for (const item of page.items) if (!items.has(item.id)) items.set(item.id, item)
+  return [...items.values()]
 }

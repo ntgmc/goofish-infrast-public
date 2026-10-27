@@ -5,13 +5,15 @@ import type { WorkspacePatch } from '../useToolSession'
 import type { OptimizePhase, OptimizeSection } from './types'
 import { copy } from '../../../copy/index'
 import { apiJson } from '../../../lib/api-client'
-import { fetchResultHistoryDetail } from './optimization-api'
+import { useQueryClient } from '@tanstack/react-query'
+import { fetchCachedResultHistoryDetail, resultHistoryKey } from './result-history-query'
 import { recordToolBehavior } from '../../../lib/tool-behavior-observation'
 
 
 type Setter<T> = Dispatch<SetStateAction<T>>
 
 type UseOptimizeWorkspaceOptions = {
+  userId: string
   profileId: string
   activeConfig: LicenseConfig
   isConfigReadOnly?: () => boolean
@@ -35,6 +37,7 @@ type UseOptimizeWorkspaceOptions = {
 }
 
 export function useOptimizeWorkspace({
+  userId,
   profileId,
   activeConfig,
   isConfigReadOnly,
@@ -56,6 +59,7 @@ export function useOptimizeWorkspace({
   setSection,
   onDownloadMaaResult,
 }: UseOptimizeWorkspaceOptions) {
+  const client = useQueryClient()
   const historyRequest = useRef<AbortController | null>(null)
   const invalidateHistoryRequest = useCallback(() => {
     historyRequest.current?.abort()
@@ -143,7 +147,7 @@ export function useOptimizeWorkspace({
     setWorkspaceBusyAction(`detail:${item.id}`)
     setWorkspaceError(null)
     try {
-      const detail = await fetchResultHistoryDetail(profileId, item.id, controller.signal)
+      const detail = await fetchCachedResultHistoryDetail(client, userId, profileId, item.id)
       return current() ? { item: detail, current } : null
     } catch (error) {
       if (current()) setWorkspaceError((error as Error).message)
@@ -151,7 +155,7 @@ export function useOptimizeWorkspace({
     } finally {
       if (current()) setWorkspaceBusyAction(null)
     }
-  }, [invalidateHistoryRequest, profileId, setWorkspaceBusyAction, setWorkspaceError])
+  }, [client, userId, invalidateHistoryRequest, profileId, setWorkspaceBusyAction, setWorkspaceError])
 
   const handleViewHistory = useCallback(async (summary: WorkspaceResultHistorySummary) => {
     recordToolBehavior({ name: 'result_select', profile: profileId, subject: summary.id })
@@ -213,6 +217,11 @@ export function useOptimizeWorkspace({
         json: { profile_id: profileId, result_id: item.id, action, ...(action === 'rename' ? { name } : {}), idempotency_key: crypto.randomUUID() },
         fallbackMessage: action === 'rename' ? copy.inventory.archive_rename_failed : action === 'archive' ? copy.inventory.archive_full : action === 'unarchive' ? copy.inventory.history_full_for_unarchive : copy.inventory.delete_result,
       })
+      invalidateHistoryRequest()
+      const detailKey = [...resultHistoryKey(userId, profileId), 'detail', item.id]
+      await client.cancelQueries({ queryKey: detailKey, exact: true })
+      if (action === 'delete') client.removeQueries({ queryKey: detailKey, exact: true })
+      else if (action === 'rename') client.setQueriesData<WorkspaceResultHistoryItem>({ queryKey: detailKey, exact: true }, (detail) => detail && ({ ...detail, name: name! }))
       onWorkspaceUpdated(profileId, data.workspace)
       if (action !== 'rename') await refreshInventory()
       if (action === 'rename') {
@@ -224,7 +233,7 @@ export function useOptimizeWorkspace({
     } finally {
       setWorkspaceBusyAction(null)
     }
-  }, [onWorkspaceUpdated, profileId, refreshInventory, setHistoryItem, setWorkspaceBusyAction, setWorkspaceError, setWorkspaceNotice])
+  }, [client, userId, invalidateHistoryRequest, onWorkspaceUpdated, profileId, refreshInventory, setHistoryItem, setWorkspaceBusyAction, setWorkspaceError, setWorkspaceNotice])
 
   const handleRenameArchivedHistory = useCallback(async (item: WorkspaceResultHistorySummary) => {
     const nextName = window.prompt(copy.inventory.archive_rename_prompt, item.name)

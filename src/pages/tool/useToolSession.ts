@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type {
   Announcement,
-  AnnouncementPublicResponse,
   AuthSuccessResponse,
   AuthUser,
   LicenseConfig,
@@ -11,9 +11,10 @@ import type {
   UserWorkspace,
   WorkspaceSavedConfigAction,
 } from '../../lib/types'
-import { apiJson, apiJsonOrNull, apiVoid } from '../../lib/api-client'
+import { apiJson, apiVoid } from '../../lib/api-client'
 import { normalizeConfig, validateScheduleConfig } from '../../lib/config'
 import { createAccountLicense, isSchedulableProfile } from './tool-utils'
+import { usePublicAnnouncementsQuery } from '../../lib/announcement-query'
 import { copy } from '../../copy/index'
 import { syncSklandSnapshotSession } from '../../lib/skland-snapshot-client'
 
@@ -30,6 +31,7 @@ export type AuthStatus = 'loading' | 'authenticated' | 'anonymous' | 'error'
 const CONFIG_SAVE_DEBOUNCE_MS = 600
 
 export function useToolSession(requestedProfileId?: string | null, rememberLastProfile = false, loadAnnouncementPopups = true) {
+  const queryClient = useQueryClient()
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading')
   const [authError, setAuthError] = useState<Error | null>(null)
   const [authRequestVersion, setAuthRequestVersion] = useState(0)
@@ -40,8 +42,9 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
   const [license, setLicense] = useState<LicenseFile | null>(null)
   const [eliteOverrides, setEliteOverridesState] = useState<Record<string, number>>({})
   const [configOverride, setConfigOverrideState] = useState<LicenseConfig | null>(null)
-  const [banner, setBanner] = useState<Announcement | null>(null)
-  const [popups, setPopups] = useState<Announcement[]>([])
+  const announcements = usePublicAnnouncementsQuery(loadAnnouncementPopups)
+  const banner: Announcement | null = loadAnnouncementPopups ? announcements.data?.banner ?? null : null
+  const popups: Announcement[] = loadAnnouncementPopups ? announcements.data?.popups ?? [] : []
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0)
   const [openingProfileId, setOpeningProfileId] = useState<string | null>(null)
   const [workspaceLoadError, setWorkspaceLoadError] = useState<string | null>(null)
@@ -82,6 +85,7 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
   ) => {
     syncSklandSnapshotSession(payload)
     const nextUser = payload?.user ?? null
+    queryClient.removeQueries({ predicate: ({ queryKey }) => queryKey[0] === 'user' && queryKey[1] !== nextUser?.id })
     const nextProfiles = payload?.profiles ?? []
     const nextProfile = payload?.active_profile ?? null
     const nextWorkspace = payload?.workspace ?? null
@@ -102,7 +106,7 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
     setLicense(nextProfile && nextWorkspace?.operators && nextWorkspace.config
       ? createAccountLicense(nextProfile, nextWorkspace.operators, nextWorkspace.config)
       : null)
-  }, [cancelPendingConfigSave, rememberLastProfile])
+  }, [cancelPendingConfigSave, queryClient, rememberLastProfile])
 
   const applyAuthPayload = useCallback((payload: AuthSuccessResponse | null) => {
     invalidateWorkspaceRequest()
@@ -168,19 +172,6 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
       cancelled = true
     }
   }, [applyAuthPayload, authRequestVersion, invalidateWorkspaceRequest, requestedProfileId, rememberLastProfile])
-
-  useEffect(() => {
-    if (!loadAnnouncementPopups) return
-    let cancelled = false
-    void apiJsonOrNull<AnnouncementPublicResponse>('/api/announcement')
-      .then((data) => {
-        if (cancelled) return
-        setBanner(data?.banner ?? null)
-        setPopups(Array.isArray(data?.popups) ? data.popups : [])
-      })
-      .catch(console.error)
-    return () => { cancelled = true }
-  }, [loadAnnouncementPopups, authRequestVersion, requestedProfileId])
 
   useEffect(() => () => {
     pendingConfigRef.current = null

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '../../test/query-render'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -220,6 +220,35 @@ describe('admin page loading and navigation', () => {
     expect(screen.queryByRole('link', { name: /查看.*用户/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /待回复反馈|待认领反馈|异常任务/ })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: /待复核风险/ })).toHaveAttribute('href', '/admin/risk?status=pending')
+  })
+
+  it('passes the confirmed administrator to queue reads and cancels them when navigation leaves the monitor', async () => {
+    const pending = deferred<unknown>()
+    let signal: AbortSignal | undefined
+    let queueReads = 0
+    const queue = { snapshot_at: '2026-10-01T00:00:00Z',
+      capacity: { queue_limit: 200, worker_concurrency: 3, worker_instances: 1, source: 'runtime_registry', heartbeat_interval_ms: 10_000, stale_after_ms: 30_000 },
+      counts: { queued: 17, ready_queued: 0, oldest_ready_wait_ms: 0, running: 0, retry_waiting: 0, recent_failed: 0 }, queued_jobs: [], running_jobs: [], recent_jobs: [] }
+    const implementation = api.json.getMockImplementation()!
+    api.json.mockImplementation(async (url: string, options?: { signal?: AbortSignal }) => {
+      if (url === '/api/admin/session') return { user: { username: 'operator', capabilities: ['usage_view', 'optimization_view'] } }
+      if (url === '/api/admin/optimization?view=queue') {
+        signal = options?.signal
+        return ++queueReads === 1 ? pending.promise : queue
+      }
+      return implementation(url)
+    })
+    const router = mount('/admin/queue')
+    await waitFor(() => expect(signal).toBeDefined())
+    const firstSignal = signal
+    await act(async () => { await router.navigate('/admin/overview') })
+    await screen.findByRole('heading', { name: '有多少人真正用起来了？', level: 2 })
+    expect(firstSignal?.aborted).toBe(true)
+    await act(async () => pending.resolve(queue))
+    expect(screen.queryByText('17 / 200')).not.toBeInTheDocument()
+    await act(async () => { await router.navigate('/admin/queue') })
+    await screen.findByText('17 / 200')
+    expect(queueReads).toBe(2)
   })
 
   it('aborts a user request when leaving the page and ignores its late result', async () => {

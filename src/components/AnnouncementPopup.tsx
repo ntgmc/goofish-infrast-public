@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState, type SyntheticEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
 import { Link } from 'react-router'
-import type { Announcement, UserAnnouncementRead } from '../lib/types'
+import { useQueryClient } from '@tanstack/react-query'
+import { updateUserAnnouncementQueries, useUserAnnouncementsQuery, type UserAnnouncementsResponse } from '../lib/announcement-query'
+import type { Announcement } from '../lib/types'
 import { apiJson, apiVoid, getApiErrorMessage } from '../lib/api-client'
 import { getAnnouncementReminderState } from '../lib/announcement-reminders'
 import AnnouncementMarkdown from './AnnouncementMarkdown'
@@ -28,7 +30,6 @@ interface Props {
 
 export default function AnnouncementPopup({ announcements, userId, onUnreadCountChange, announcementsPath = '/announcements' }: Props) {
   const [current, setCurrent] = useState<Announcement | null>(null)
-  const [serverReads, setServerReads] = useState<{ userId: string; versions: Set<string> } | null>(null)
   const [marking, setMarking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -37,6 +38,14 @@ export default function AnnouncementPopup({ announcements, userId, onUnreadCount
   const currentUserRef = useRef(userId)
   currentUserRef.current = userId
   const candidate = announcements.find((item) => getAnnouncementReminderState(item) === 'active')
+  const client = useQueryClient()
+  const query = useUserAnnouncementsQuery(userId && candidate && !hasShownThisVisit() ? userId : null)
+  const serverReads = useMemo(() => query.data && !query.error && !query.isFetching ? new Set((query.data.announcements ?? [])
+    .filter((item) => Boolean(item.read_at)).map((item) => announcementVersionKey(item.announcement))) : null, [query.data, query.error, query.isFetching])
+
+  useEffect(() => {
+    if (typeof query.data?.unread_count === 'number') onUnreadCountChange?.(query.data.unread_count)
+  }, [query.data, onUnreadCountChange])
 
   useEffect(() => {
     setCurrent(null)
@@ -45,31 +54,13 @@ export default function AnnouncementPopup({ announcements, userId, onUnreadCount
   }, [userId])
 
   useEffect(() => {
-    setServerReads(null)
-    if (!userId || !candidate || hasShownThisVisit()) return
-    const controller = new AbortController()
-    void apiJson<{ announcements?: UserAnnouncementRead[]; unread_count?: number }>('/api/user/announcements', { signal: controller.signal })
-      .then((payload) => {
-        if (controller.signal.aborted) return
-        setServerReads({ userId, versions: new Set((payload.announcements ?? [])
-          .filter((item) => Boolean(item.read_at))
-          .map((item) => announcementVersionKey(item.announcement))) })
-        if (typeof payload.unread_count === 'number') onUnreadCountChange?.(payload.unread_count)
-      })
-      .catch(() => {
-        // An unavailable read state must not turn old announcements into reminders.
-      })
-    return () => controller.abort()
-  }, [onUnreadCountChange, userId, candidate?.id, candidate?.updated_at])
-
-  useEffect(() => {
     if (current) {
       if (!announcements.some((item) => announcementVersionKey(item) === announcementVersionKey(current)
         && getAnnouncementReminderState(item) === 'active')) setCurrent(null)
       return
     }
-    if (hasShownThisVisit() || (userId && serverReads?.userId !== userId)) return
-    if (!candidate || (userId ? serverReads?.versions.has(announcementVersionKey(candidate)) : isAnnouncementRead(candidate))) return
+    if (hasShownThisVisit() || (userId && !serverReads)) return
+    if (!candidate || (userId ? serverReads?.has(announcementVersionKey(candidate)) : isAnnouncementRead(candidate))) return
     setCurrent(candidate)
   }, [announcements, candidate, current, serverReads, userId])
 
@@ -117,9 +108,11 @@ export default function AnnouncementPopup({ announcements, userId, onUnreadCount
     setError(null)
     try {
       if (userId) {
-        const payload = await apiJson<{ unread_count?: number }>('/api/user/announcements', {
+        const payload = await apiJson<UserAnnouncementsResponse>('/api/user/announcements', {
           method: 'PATCH', json: { announcement_id: current.id, updated_at: current.updated_at },
         })
+        if (currentUserRef.current !== userId) return
+        await updateUserAnnouncementQueries(client, userId, payload)
         if (currentUserRef.current !== userId) return
         if (typeof payload.unread_count === 'number') onUnreadCountChange?.(payload.unread_count)
       } else markAnnouncementRead(current)

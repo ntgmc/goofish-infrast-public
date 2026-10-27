@@ -1,4 +1,5 @@
 import type { Server } from 'node:http'
+import { startPerformanceObservation } from './performance-observation'
 import {
   type AccountDeletionWorkerController,
   getAccountDeletionConfigurationHealth,
@@ -13,7 +14,7 @@ import {
 } from './lifecycle'
 import { describeServerError } from './security/error-reporting'
 import { resolveTrustedProxyAddresses } from './security/client-ip'
-import { closePool } from './storage/postgres'
+import { closePool, getPostgresPoolSnapshot } from './storage/postgres'
 import { ensureDatabaseSchema } from './storage/schema'
 import { ensureSklandServiceConfiguration } from './skland-config'
 import {
@@ -66,8 +67,10 @@ export function createApiProcess(
   let accountDeletionWorker: AccountDeletionWorkerController | null = null
   let shutdownPromise: Promise<void> | null = null
   let cancelHardExit: (() => void) | null = null
+  let stopObservation: (() => void) | null = null
 
   async function start(): Promise<void> {
+    stopObservation = startPerformanceObservation(getPostgresPoolSnapshot)
     await ensureDatabase()
     await hooks.initialize()
     if (getServiceLifecycleState() !== 'starting') return
@@ -94,6 +97,7 @@ export function createApiProcess(
     await closeServer(server).catch(() => undefined)
     await accountDeletionWorker?.waitForIdle().catch(() => undefined)
     await closeDatabase().catch(() => undefined)
+    stopObservation?.()
     markServiceStopped()
     process.exitCode = 1
     cancelHardExit()
@@ -138,6 +142,7 @@ export function createApiProcess(
     await httpClosed
     await accountDeletionWorker?.waitForIdle()
     await closeDatabase()
+    stopObservation?.()
     markServiceStopped()
     console.log('server shutdown complete')
   }

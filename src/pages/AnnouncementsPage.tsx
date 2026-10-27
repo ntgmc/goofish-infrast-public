@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react'
+import { usePublicAnnouncementsQuery } from '../lib/announcement-query'
 import { Link } from 'react-router'
-import type { Announcement, AnnouncementPublicResponse } from '../lib/types'
-import { apiJson } from '../lib/api-client'
 import { getAnnouncementReminderState } from '../lib/announcement-reminders'
 import AnnouncementMarkdown from '../components/AnnouncementMarkdown'
 import ThemeSwitcher from '../components/ThemeSwitcher'
@@ -9,32 +7,8 @@ import { copy, CURRENT_LOCALE } from '../copy/index'
 
 
 function usePublicAnnouncements() {
-  const [announcements, setAnnouncements] = useState<Announcement[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-
-    apiJson<AnnouncementPublicResponse>('/api/announcement', { fallbackMessage: copy.public.pages_AnnouncementsPage_001 })
-      .then((data) => {
-        if (cancelled) return
-        setAnnouncements(Array.isArray(data.announcements) ? data.announcements : [])
-        setError(null)
-      })
-      .catch((caught) => {
-        if (!cancelled) setError((caught as Error).message)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  return { announcements, loading, error }
+  const query = usePublicAnnouncementsQuery()
+  return { announcements: query.data?.announcements ?? [], loading: query.isFetching, error: query.error?.message }
 }
 
 export default function AnnouncementsPage({ embedded = false }: { embedded?: boolean } = {}) {

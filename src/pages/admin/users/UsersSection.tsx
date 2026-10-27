@@ -50,7 +50,7 @@ export default function UsersSection({ model: c, active, search = '' }: { model:
       </form>}
       <UserDetailDialog inline active={active} initialProfileId={requestedProfile ?? undefined} capabilities={c.adminCapabilities} detail={c.selectedUserDetail} balance={c.selectedUserBalance} balanceLoading={c.userBalanceLoading}
         busyAction={c.busyAction} operatorDataByProfileId={c.operatorDataByProfileId} expandedOperatorProfileId={c.expandedOperatorProfileId}
-        onClose={() => { c.setSelectedUserDetail(null); c.setSelectedUserBalance(null); c.setOperatorDataByProfileId({}); c.setExpandedOperatorProfileId(null); setResetOpen(false) }}
+        onClose={() => { c.setSelectedUserDetail(null); c.setOperatorDataByProfileId({}); c.setExpandedOperatorProfileId(null); setResetOpen(false) }}
         onUpdateProfile={c.handleUpdateProfile} onSetProfileStatus={c.handleSetProfileStatus} onSetProfilePermission={c.handleSetProfilePermission} onUpgradePreviewProfile={c.handleUpgradePreviewProfile}
         onClearSklandBinding={c.handleClearProfileSklandBinding} onClearWorkspace={c.handleClearProfileWorkspace} onViewOperators={c.handleViewProfileOperators} onDownloadOperators={c.handleDownloadProfileOperators}
         onDownloadWorkspaces={c.handleDownloadUserWorkspaces} onLoadProfilePage={async (page) => { await c.loadUserDetail(c.selectedUserDetail!.user, page) }}

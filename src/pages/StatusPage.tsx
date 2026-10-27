@@ -1,5 +1,6 @@
 import { RefreshIcon as RefreshCw } from '../components/icons'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import BrandLogo from '../components/BrandLogo'
 import PublicFooter from '../components/PublicFooter'
@@ -40,54 +41,18 @@ const UNAVAILABLE_STATUS: ServiceStatusResponse = {
 }
 
 export function useServiceStatus() {
-  const [status, setStatus] = useState<ServiceStatusResponse | null>(null)
-  const [error, setError] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
-  const requestRef = useRef<AbortController | null>(null)
-
-  const loadStatus = useCallback(async () => {
-    requestRef.current?.abort()
-    const controller = new AbortController()
-    requestRef.current = controller
-    setRefreshing(true)
-    try {
-      const response = await fetch('/api/status', {
-        method: 'GET',
-        cache: 'no-store',
-        signal: controller.signal,
-        headers: { Accept: 'application/json' },
-      })
-      const payload = await response.json() as unknown
-      if (controller.signal.aborted) return
+  const query = useQuery({ queryKey: ['public', 'service-status'], staleTime: 0, refetchOnMount: 'always', refetchOnWindowFocus: 'always', refetchInterval: POLL_INTERVAL_MS,
+    queryFn: async ({ signal }) => {
+      const response = await fetch('/api/status', { method: 'GET', cache: 'no-store', signal, headers: { Accept: 'application/json' } })
+      const payload: unknown = await response.json()
       if (!isServiceStatusResponse(payload)) throw new Error('invalid_status_response')
-      setStatus(normalizeStatusResponse(payload))
-      setError(false)
-    } catch {
-      if (controller.signal.aborted) return
-      setError(true)
-    } finally {
-      if (requestRef.current === controller) {
-        requestRef.current = null
-        setRefreshing(false)
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    void loadStatus()
-    const poll = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void loadStatus()
-    }, POLL_INTERVAL_MS)
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') void loadStatus()
-    }
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => {
-      window.clearInterval(poll)
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-      requestRef.current?.abort()
-    }
-  }, [loadStatus])
+      return normalizeStatusResponse(payload)
+    },
+  })
+  const status = query.data ?? null
+  const error = Boolean(query.error)
+  const refreshing = query.isFetching
+  const loadStatus = useCallback(async () => { await query.refetch({ cancelRefetch: false }) }, [query.refetch])
 
   const currentStatus = status ?? UNAVAILABLE_STATUS
   const optimizationStatus = status?.components.find((component) => component.id === 'optimization')?.status ?? status?.status
