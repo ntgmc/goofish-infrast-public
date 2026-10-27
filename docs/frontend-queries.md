@@ -1,6 +1,6 @@
 # 前端查询缓存
 
-TanStack Query v5 当前管理库存、库存余额提示、新手任务、优化任务列表、积分余额明细和好友邀请记录，以及后台用户、CDK 和风险记录分页列表。`App` 的 `QueryProvider` 为各路由共享一个内存中的 `QueryClient`，不持久化缓存。请求继续使用 `apiJson`、`adminApiJson` 和现有优化 API 函数，沿用超时、错误消息、诊断及管理员会话过期处理。
+TanStack Query v5 当前管理库存、库存余额提示、新手任务、优化任务列表、积分余额明细和好友邀请记录，以及后台用户、CDK、风险记录分页列表和概览读取（运营报表、CDK 汇总、公告线上快照、风控设置）。`App` 的 `QueryProvider` 为各路由共享一个内存中的 `QueryClient`，不持久化缓存。请求继续使用 `apiJson`、`adminApiJson` 和现有优化 API 函数，沿用超时、错误消息、诊断及管理员会话过期处理。
 
 ## 状态归属
 
@@ -20,8 +20,12 @@ TanStack Query v5 当前管理库存、库存余额提示、新手任务、优�
 | 后台用户分页 | `['admin', adminUsername, 'users', capabilities, operationsSearch, page, pageSize, search, filters]` |
 | 后台 CDK 分页 | `['admin', adminUsername, 'cdks', capabilities, 'list', page, pageSize, search, filters]` |
 | 后台风险记录分页 | `['admin', adminUsername, 'cdks', capabilities, 'risk', page, pageSize]` |
+| 后台运营报表 | `['admin', adminUsername, 'overview', capabilities, rangeQuery]` |
+| 后台 CDK 汇总 | `['admin', adminUsername, 'cdks', capabilities, 'summary']` |
+| 后台公告线上快照 | `['admin', adminUsername, 'announcement', capabilities]` |
+| 后台风控设置 | `['admin', adminUsername, 'risk-settings', capabilities]` |
 
-没有活动档案时使用 `null`；没有已确认的用户身份时禁用用户查询。后台列表按管理员会话、权限和完整筛选条件隔离，不属于某个游戏档案；无访问权限或离开对应页面时使用禁用查询并脱离原查询，取消无人订阅的请求。
+没有活动档案时使用 `null`；没有已确认的用户身份时禁用用户查询。后台查询按管理员会话、权限和完整筛选条件隔离，不属于某个游戏档案；无访问权限或离开对应页面时使用禁用查询并脱离原查询，取消无人订阅的请求。
 
 `useToolSession` 应用会话响应时删除其他用户的查询；退出账号删除全部用户查询并取消在途请求。账号安全页的退出和注销申请成功后同样清理。后台退出或会话失效由 `resetAdminState` 删除后台查询。用户会话与管理员会话分别清理。
 
@@ -32,10 +36,20 @@ TanStack Query v5 当前管理库存、库存余额提示、新手任务、优�
 - 优化任务使用 `useInfiniteQuery`，打开任务中心或有进行中任务时每 10 秒刷新，否则每 30 秒刷新。页面隐藏时暂停轮询，回到前台时刷新。现有跨标签页任务通知仍合并为延迟 250 毫秒的刷新；慢请求不会被定时查询反复取消。刷新已加载的多页时依次读取新的游标，合并结果时按任务 ID 去重。
 - 取消任务仍执行原有确认与提交，成功后使对应用户、档案的任务列表失效。
 - 积分余额与明细使用 `useInfiniteQuery`，沿用服务端游标，逐页刷新并按流水 ID 去重。界面从最后一次成功读取的分页响应中获取余额和 `as_of`。兑换仍使用原提交与幂等键；成功后使该用户各档案的余额查询失效。兑换成功提示和账单刷新错误分别展示，查询失败不会触发兑换重试。查询中的余额不替代计费报价或服务端结算。
-- 后台用户修改成功后调用 `loadUsersPage`，使当前管理员的所有用户列表查询失效：当前页刷新，其他缓存页再次打开时读取新数据。CDK 修改后的 `loadCdkPage`、`loadRiskPage` 共用 `cdks` 前缀，使普通列表和风险列表的所有缓存页同时失效。保留操作原因、乐观并发检查，以及“操作成功但刷新失败”的错误处理。
+- 后台用户修改成功后调用 `loadUsersPage`，使当前管理员的所有用户列表查询失效：当前页刷新，其他缓存页再次打开时读取新数据。CDK 修改后的 `loadCdkPage`、`loadRiskPage` 共用 `cdks` 前缀，使普通列表、风险列表的所有缓存页与汇总同时失效。保留操作原因、乐观并发检查，以及“操作成功但刷新失败”的错误处理。
+
+## 后台概览与配置快照
+
+`useAdminOverview` 只在对应栏目和权限下订阅查询：运营报表需要 `usage_view`，公告需要 `admin_manage`，风控设置需要 `risk_view`，CDK 汇总需要 `admin_manage` 并供 CDK、风控两页共享。各读取独立保存结果；其中一项失败时保留其他成功结果和最近成功同步时间，继续显示部分失败提示。请求取消、迟到响应隔离和加载状态由查询负责。
+
+运营报表的固定范围和已应用的自定义日期进入查询键，输入日期草稿不发请求；保留日期及响应版本校验。更换范围不显示上一范围的数据。导出使用当前范围成功读取的快照，刷新中暂停导出。
+
+公告线上快照与本机编辑草稿分开管理，查询结果继续经过现有草稿协调逻辑，保留自动保存、恢复、版本冲突和明确丢弃操作。公告发布、丢弃草稿后的读取和 409 冲突响应会更新当前管理员、权限下已有的快照；风控保存及冲突响应同样更新设置缓存。写回前取消旧读取，退出后已删除的缓存不会被写回操作重新创建。修改仍由原操作函数提交，不自动重试。
+
+手动刷新和修改后的刷新使当前栏目对应的查询前缀失效；CDK 汇总与列表只失效一次。当前栏目读取新数据，其他已缓存范围或页面下次使用时重读；修改成功与后续读取失败分别提示。
 
 ## 本阶段保留的流程
 
-会话与工作区读取、排班历史分页、自动保存、计费报价与提交、任务提交、后台概览与 CDK 汇总、森空岛快照客户端仍使用原有流程。排班历史首屏由工作区快照提供，后续迁移需一起处理快照替换和历史修改后的失效。自动保存的串行队列与草稿恢复、提交的幂等键，以及森空岛的请求合并、版本失效和跨标签页通知不由查询缓存替代。后续迁移应逐个明确数据身份和失效来源，保留这些流程已有的边界语义。
+会话与工作区读取、排班历史分页、自动保存、计费报价与提交、任务提交、后台详情读取及其他独立面板、森空岛快照客户端仍使用原有流程。排班历史首屏由工作区快照提供，后续迁移需一起处理快照替换和历史修改后的失效。自动保存的串行队列与草稿恢复、提交的幂等键，以及森空岛的请求合并、版本失效和跨标签页通知不由查询缓存替代。后续迁移应逐个明确数据身份和失效来源，保留这些流程已有的边界语义。
 
-涉及缓存共享、身份切换、迟到响应、退出清理或修改后的失效时，运行 `inventory-query.test.tsx`、`inventory-hooks.test.tsx`、`useOptimizationTaskCenter.test.tsx`、`useOptimizeWorkflow.races.test.tsx`、`BalanceSection.test.tsx`、`InvitationsSection.test.tsx`、`useAdminUserList.test.tsx`、`useAdminCdkData.test.tsx` 及相关页面集成测试，再按 [验证规则](agent-validation.md) 运行仓库检查。
+涉及缓存共享、身份切换、迟到响应、退出清理或修改后的失效时，运行 `inventory-query.test.tsx`、`inventory-hooks.test.tsx`、`useOptimizationTaskCenter.test.tsx`、`useOptimizeWorkflow.races.test.tsx`、`BalanceSection.test.tsx`、`InvitationsSection.test.tsx`、`useAdminUserList.test.tsx`、`useAdminCdkData.test.tsx`、`useAdminOverview.test.ts`、`useAdminController.test.tsx` 及相关页面集成测试，再按 [验证规则](agent-validation.md) 运行仓库检查。

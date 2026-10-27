@@ -4,7 +4,7 @@ import type { AnnouncementAdminResponse } from '../../lib/types'
 import type { AdminBalanceTransaction, BalancePage } from '../../lib/balance-contracts'
 import { ADMIN_SESSION_EXPIRED_EVENT, adminApiJson as apiJson, adminApiVoid as apiVoid } from '../../lib/admin-api-client'
 import { ApiError } from '../../lib/api-client'
-import { GeneratedPermission, CdkType, FieldErrors, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, AdminCdkDetail, RiskControlSettings, RiskControlSettingsPatch, AdminSessionUser, AdminCapability, AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, DEFAULT_RISK_SETTINGS, cdkProductPermissions, MAX_CDK_BATCH_COUNT, normalizeRiskSettings, validateEmailInput, validatePasswordInput, normalizeGeneratedCdks, normalizeProductPermission, buildGeneratedCdkCsv, downloadBlob, downloadOperatorsJson, formatDownloadTimestamp } from './modules'
+import { GeneratedPermission, CdkType, FieldErrors, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, AdminCdkDetail, RiskControlSettingsPatch, AdminSessionUser, AdminCapability, AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, cdkProductPermissions, MAX_CDK_BATCH_COUNT, buildCdkOpsSummary, validateEmailInput, validatePasswordInput, normalizeGeneratedCdks, normalizeProductPermission, buildGeneratedCdkCsv, downloadBlob, downloadOperatorsJson, formatDownloadTimestamp } from './modules'
 import type { AdminSection } from './contracts'
 import { useAdminCdkData } from './cdk/useAdminCdkData'
 import { useAdminOverview } from './overview/useAdminOverview'
@@ -30,8 +30,6 @@ export function useAdminController(section: AdminSection = 'overview', search = 
   const [adminUsername, setAdminUsername] = useState<string | null>(null)
   const [adminCapabilities, setAdminCapabilities] = useState<AdminCapability[]>([])
   const [lastSuccessfulSyncAt, setLastSuccessfulSyncAt] = useState<string | null>(null)
-  const [overviewPartialFailure, setOverviewPartialFailure] = useState(false)
-  const overviewRequestRef = useRef<{ sequence: number; controller: AbortController | null }>({ sequence: 0, controller: null })
 
   const detailRequest = useRef<AbortController | null>(null)
   const beginDetailRequest = () => {
@@ -71,8 +69,6 @@ export function useAdminController(section: AdminSection = 'overview', search = 
     reorderAnnouncements,
   } = useAnnouncementDraft()
 
-  const [riskSettings, setRiskSettings] = useState<RiskControlSettings>(DEFAULT_RISK_SETTINGS)
-
   const [permission, setPermission] = useState<GeneratedPermission>('advanced')
   const [cdkType, setCdkType] = useState<CdkType>('profile')
   const [balanceAmount, setBalanceAmount] = useState('100.00')
@@ -103,7 +99,7 @@ export function useAdminController(section: AdminSection = 'overview', search = 
 
   const [resetFieldErrors, setResetFieldErrors] = useState<FieldErrors>({})
 
-  const [loading, setLoading] = useState(false)
+  const [loginLoading, setLoginLoading] = useState(false)
 
   const [busyAction, setBusyAction] = useState<string | null>(null)
 
@@ -122,9 +118,12 @@ export function useAdminController(section: AdminSection = 'overview', search = 
 
   const cdkData = useAdminCdkData({ adminUsername, authenticated, capabilities: adminCapabilities, section, setError })
   const { records, cdkSearchInput, cdkPage, cdkPageSize, cdkSearch, statusFilter, permissionFilter, riskFilter, generatedFilter,
-    cdkTypeFilter, cdkFilters, loadCdkPage, loadRiskPage, loadCdkSummary, resetCdkSummary } = cdkData
-  const overview = useAdminOverview()
-  const { businessOverview, setBusinessOverview, loadUsageStats } = overview
+    cdkTypeFilter, cdkFilters } = cdkData
+  const overview = useAdminOverview({ adminUsername, authenticated, capabilities: adminCapabilities, section })
+  const { businessOverview, announcementData, announcementUpdatedAt, updateAnnouncementSnapshot, riskSettings, setRiskSettings,
+    cdkSummary, overviewLoading, overviewError, overviewUpdatedAt, overviewPartialFailure } = overview
+  const loading = loginLoading || overviewLoading
+  const cdkOpsSummary = useMemo(() => cdkSummary ?? buildCdkOpsSummary(records), [cdkSummary, records])
   const visibleRecords = records
 
   const selectedRecords = useMemo(() => {
@@ -137,17 +136,12 @@ export function useAdminController(section: AdminSection = 'overview', search = 
       setAdminUsername(null)
       setAdminCapabilities([])
       setLastSuccessfulSyncAt(null)
-      setOverviewPartialFailure(false)
-      overviewRequestRef.current.controller?.abort()
       detailRequest.current?.abort()
       detailRequest.current = null
       setBusyAction(null)
       cancelAdminOperation()
       setAuthenticated(false)
-      resetCdkSummary()
       setSelectedUserIds([])
-      setBusinessOverview(null)
-      setRiskSettings(DEFAULT_RISK_SETTINGS)
       setSelectedCdkHashes([])
       setSelectedCdkDetail(null)
       setSelectedUserDetail(null)
@@ -168,71 +162,21 @@ export function useAdminController(section: AdminSection = 'overview', search = 
     refreshUsers: () => loadUsersPage(),
   })
 
-  const loadOverviewData = useCallback(async () => {
-      setLoading(true)
-      setError(null)
-      overviewRequestRef.current.controller?.abort()
-      const controller = new AbortController()
-      const sequence = overviewRequestRef.current.sequence + 1
-      overviewRequestRef.current = { sequence, controller }
-      try {
-        const canManageAdminData = adminCapabilities.includes('admin_manage') && section === 'announcement'
-        const canViewRisk = adminCapabilities.includes('risk_view') && section === 'risk'
-        const canViewUsage = adminCapabilities.includes('usage_view') && section === 'overview'
-        const canViewCdkSummary = adminCapabilities.includes('admin_manage') && ['cdk', 'risk'].includes(section)
-        const [usageResult, announcementResult, riskSettingsResult, cdkSummaryResult] = await Promise.allSettled([
-          canViewUsage
-            ? loadUsageStats(controller.signal)
-            : Promise.resolve(null),
-          canManageAdminData
-            ? apiJson<Partial<AnnouncementAdminResponse>>('/api/admin/announcement', { signal: controller.signal, fallbackMessage: '加载公告失败' })
-            : Promise.resolve(null),
-          canViewRisk
-            ? apiJson<{ settings?: Partial<RiskControlSettings> }>('/api/admin/risk-settings', { signal: controller.signal, fallbackMessage: '加载风控设置失败' })
-            : Promise.resolve(null),
-          canViewCdkSummary
-            ? loadCdkSummary(controller.signal)
-            : Promise.resolve(null),
-        ])
-        if (controller.signal.aborted || overviewRequestRef.current.sequence !== sequence) return
-        if (announcementResult.status === 'fulfilled' && announcementResult.value && adminUsername) {
-          reconcileLoadedAnnouncementData(adminUsername, announcementResult.value)
-        }
-        if (riskSettingsResult.status === 'fulfilled' && riskSettingsResult.value) {
-          setRiskSettings(normalizeRiskSettings(riskSettingsResult.value.settings))
-        }
-        const results = [
-          ...(canViewUsage ? [usageResult] : []),
-          ...(canManageAdminData ? [announcementResult] : []),
-          ...(canViewCdkSummary ? [cdkSummaryResult] : []),
-          ...(canViewRisk ? [riskSettingsResult] : []),
-        ]
-        const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
-        const successCount = results.length - failures.length
-        if (successCount > 0) setLastSuccessfulSyncAt(new Date().toISOString())
-        setOverviewPartialFailure(failures.length > 0)
-        if (failures.length > 0) {
-          setError(`部分概览数据刷新失败：${failures.map((result) => errorMessage(result.reason)).join('；')}`)
-        }
-      } finally {
-        if (overviewRequestRef.current.sequence === sequence) setLoading(false)
-      }
-    }, [adminCapabilities, adminUsername, reconcileLoadedAnnouncementData, loadUsageStats, loadCdkSummary, section])
-
   const refreshAdminData = useCallback(async () => {
-    const requests: Promise<void>[] = []
-    if (['overview', 'announcement', 'cdk', 'risk'].includes(section)) requests.push(loadOverviewData())
-    if (section === 'cdk' && adminCapabilities.includes('admin_manage')) requests.push(loadCdkPage())
-    if (section === 'risk' && adminCapabilities.includes('risk_view')) requests.push(loadRiskPage())
-    if (section === 'users' && adminCapabilities.includes('user_view')) requests.push(loadUsersPage())
-    const results = await Promise.allSettled(requests)
+    if (!authenticated || !adminUsername) return
+    setError(null)
+    const families = section === 'overview' ? ['overview'] : section === 'announcement' ? ['announcement']
+      : section === 'cdk' ? ['cdks'] : section === 'risk' ? ['cdks', 'risk-settings'] : section === 'users' ? ['users'] : []
+    const results = await Promise.allSettled(families.map((family) => queryClient.invalidateQueries({
+      queryKey: ['admin', adminUsername, family],
+    }, { throwOnError: true })))
     const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
     if (failures.length > 0) {
       setError(`部分数据刷新失败：${failures.map((result) => errorMessage(result.reason)).join('；')}`)
       setNotice((current) => current ? `${current}；操作已成功，但部分数据刷新失败，请手动重试。` : current)
     }
-    if (!failures.length && requests.length) setLastSuccessfulSyncAt(new Date().toISOString())
-  }, [adminCapabilities, loadOverviewData, loadCdkPage, loadUsersPage, loadRiskPage, section])
+    if (!failures.length && families.length) setLastSuccessfulSyncAt(new Date().toISOString())
+  }, [authenticated, adminUsername, queryClient, section])
 
   const loadDashboard = refreshAdminData
 
@@ -260,14 +204,18 @@ export function useAdminController(section: AdminSection = 'overview', search = 
     setError(null)
     setNotice(null)
     setLastSuccessfulSyncAt(null)
-    setOverviewPartialFailure(false)
     return cancelAdminOperation
   }, [section])
 
   useEffect(() => {
-    if (authenticated && adminUsername && ['overview', 'announcement', 'cdk', 'risk'].includes(section)) void loadOverviewData()
-    return () => overviewRequestRef.current.controller?.abort()
-  }, [adminUsername, authenticated, loadOverviewData, section])
+    if (adminUsername && announcementData) reconcileLoadedAnnouncementData(adminUsername, announcementData)
+  }, [adminUsername, announcementData, announcementUpdatedAt, reconcileLoadedAnnouncementData])
+
+  useEffect(() => {
+    if (['overview', 'announcement', 'cdk', 'risk'].includes(section)) {
+      setLastSuccessfulSyncAt(overviewUpdatedAt ? new Date(overviewUpdatedAt).toISOString() : null)
+    }
+  }, [overviewUpdatedAt, section])
 
   useEffect(() => { setSelectedCdkHashes([]) }, [cdkPage, cdkPageSize, cdkSearchInput, statusFilter, cdkTypeFilter, permissionFilter, riskFilter, generatedFilter])
 
@@ -300,7 +248,7 @@ export function useAdminController(section: AdminSection = 'overview', search = 
       if (!loginPassword) nextErrors.loginPassword = '请输入密码'
       setLoginFieldErrors(nextErrors)
       if (Object.keys(nextErrors).length > 0) return
-      setLoading(true)
+      setLoginLoading(true)
       setError(null)
       try {
         const data = await apiJson<{ user?: AdminSessionUser }>('/api/admin/session', {
@@ -317,7 +265,7 @@ export function useAdminController(section: AdminSection = 'overview', search = 
       } catch (caught) {
         setError((caught as Error).message)
       } finally {
-        setLoading(false)
+        setLoginLoading(false)
       }
     }
 
@@ -438,10 +386,15 @@ export function useAdminController(section: AdminSection = 'overview', search = 
           json: currentAnnouncementSnapshot(),
           fallbackMessage: '保存公告失败',
         })
+        await updateAnnouncementSnapshot(data)
         if (adminUsername) acceptServerAnnouncementData(adminUsername, data, true)
         setNotice('横幅和公告已发布')
       } catch (caught) {
-        if (caught instanceof ApiError && caught.status === 409 && adminUsername && caught.data && typeof caught.data === 'object') reconcileLoadedAnnouncementData(adminUsername, caught.data as Partial<AnnouncementAdminResponse>)
+        if (caught instanceof ApiError && caught.status === 409 && adminUsername && caught.data && typeof caught.data === 'object') {
+          const data = caught.data as Partial<AnnouncementAdminResponse>
+          await updateAnnouncementSnapshot(data)
+          reconcileLoadedAnnouncementData(adminUsername, data)
+        }
         setError((caught as Error).message)
       } finally {
         setBusyAction(null)
@@ -458,6 +411,7 @@ export function useAdminController(section: AdminSection = 'overview', search = 
           fallbackMessage: '重新加载线上公告失败',
         })
         if (!adminUsername) throw new Error('无法确认当前管理员身份')
+        await updateAnnouncementSnapshot(data)
         const discardError = discardAndAcceptServerData(adminUsername, data)
         if (discardError) throw new Error(discardError)
         setNotice('本机草稿已丢弃，已重新载入线上公告')
@@ -785,7 +739,7 @@ export function useAdminController(section: AdminSection = 'overview', search = 
     }
 
   return {
-    ...userList, ...cdkData, ...overview, adminCapabilities, lastSuccessfulSyncAt, overviewPartialFailure,
+    ...userList, ...cdkData, ...overview, cdkOpsSummary, adminCapabilities, lastSuccessfulSyncAt, overviewPartialFailure,
     permission, cdkType, setCdkType, balanceAmount, setBalanceAmount,
     adminUsername, loginUser, setLoginUser, loginPassword, setLoginPassword, authenticated, sessionChecking,
     setPermission,
@@ -795,7 +749,7 @@ export function useAdminController(section: AdminSection = 'overview', search = 
     selectedCdkHashes, setSelectedCdkHashes, selectedCdkDetail, setSelectedCdkDetail, selectedUserDetail, setSelectedUserDetail,
     selectedUserBalance, setSelectedUserBalance, userBalanceLoading, operatorDataByProfileId, setOperatorDataByProfileId,
     expandedOperatorProfileId, setExpandedOperatorProfileId, resetUserEmail, setResetUserEmail, resetPassword, setResetPassword,
-    loginFieldErrors, setLoginFieldErrors, resetFieldErrors, setResetFieldErrors, loading, busyAction, error, notice, clearNotice,
+    loginFieldErrors, setLoginFieldErrors, resetFieldErrors, setResetFieldErrors, loading, busyAction, error: error ?? overviewError, notice, clearNotice,
     visibleRecords, loadDashboard, handleLogin, handleLogout,
     handleExportUsageReport, handleGenerateCdk, handleCopyGeneratedCdks, handleDownloadGeneratedCdks,
     handleSaveAnnouncement, handleDiscardAnnouncementDraft, handleSaveRiskSettings,

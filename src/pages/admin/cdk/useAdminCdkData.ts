@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminApiJson } from '../../../lib/admin-api-client'
-import { EMPTY_PAGINATION, type AdminCapability, type AdminCdkRecord, type AdminSection, type BinaryFilter, type CdkOpsSummary,
+import { EMPTY_PAGINATION, type AdminCapability, type AdminCdkRecord, type AdminSection, type BinaryFilter,
   type CdkTableFilters, type CdkTypeFilter, type PaginationMeta, type PermissionFilter, type StatusFilter } from '../contracts'
-import { buildCdkOpsSummary } from '../shared/helpers'
 
 const EMPTY_CDK_RECORDS: AdminCdkRecord[] = []
 
@@ -22,7 +21,6 @@ export function useAdminCdkData({ adminUsername, authenticated, capabilities, se
   const [cdkPageSize, setCdkPageSize] = useState(25)
   const [riskPage, setRiskPage] = useState(1)
   const [riskPageSize, setRiskPageSize] = useState(25)
-  const [summary, setSummary] = useState<CdkOpsSummary | null>(null)
   const cdkFilters = useMemo<CdkTableFilters>(() => ({ status: statusFilter, cdk_type: cdkTypeFilter, permission: permissionFilter, risk: riskFilter, generated: generatedFilter }),
     [statusFilter, cdkTypeFilter, permissionFilter, riskFilter, generatedFilter])
   const cdkEnabled = authenticated && Boolean(adminUsername) && section === 'cdk' && capabilities.includes('admin_manage')
@@ -47,15 +45,9 @@ export function useAdminCdkData({ adminUsername, authenticated, capabilities, se
   const riskRecords = riskEnabled ? riskQuery.data?.cdks ?? EMPTY_CDK_RECORDS : EMPTY_CDK_RECORDS
   const cdkPagination = cdkQuery.data?.pagination ?? { ...EMPTY_PAGINATION, page_size: cdkPageSize }
   const riskPagination = riskQuery.data?.pagination ?? { ...EMPTY_PAGINATION, page_size: riskPageSize }
-  const cdkOpsSummary = useMemo(() => summary ?? buildCdkOpsSummary(records), [summary, records])
   const refreshCdkLists = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ['admin', adminUsername, 'cdks'] }, { throwOnError: true })
   }, [adminUsername, queryClient])
-  const loadCdkSummary = useCallback(async (signal?: AbortSignal) => {
-    const data = await adminApiJson<{ summary?: CdkOpsSummary }>('/api/admin/cdk?view=summary', { signal, fallbackMessage: '加载 CDK 汇总失败' })
-    if (!signal?.aborted) setSummary(data.summary ?? null)
-  }, [])
-  const resetCdkSummary = useCallback(() => setSummary(null), [])
 
   useEffect(() => {
     const timeout = window.setTimeout(() => { setCdkSearch(cdkSearchInput.trim()); setCdkPage(1) }, 300)
@@ -74,7 +66,7 @@ export function useAdminCdkData({ adminUsername, authenticated, capabilities, se
 
   return { records, cdkSearchInput, setCdkSearchInput, cdkPage, setCdkPage, cdkPageSize, setCdkPageSize, cdkPagination,
     cdkLoading: cdkEnabled && cdkQuery.isFetching, cdkLoaded: cdkEnabled && cdkQuery.isFetched,
-    riskRecords, riskPage, setRiskPage, riskPageSize, setRiskPageSize, riskPagination, riskLoading: riskEnabled && riskQuery.isFetching, cdkOpsSummary,
+    riskRecords, riskPage, setRiskPage, riskPageSize, setRiskPageSize, riskPagination, riskLoading: riskEnabled && riskQuery.isFetching,
     cdkFilters, cdkSearch, cdkTypeFilter, setCdkTypeFilter, statusFilter, setStatusFilter, permissionFilter, setPermissionFilter,
-    riskFilter, setRiskFilter, generatedFilter, setGeneratedFilter, loadCdkPage: refreshCdkLists, loadRiskPage: refreshCdkLists, loadCdkSummary, resetCdkSummary }
+    riskFilter, setRiskFilter, generatedFilter, setGeneratedFilter, loadCdkPage: refreshCdkLists, loadRiskPage: refreshCdkLists }
 }

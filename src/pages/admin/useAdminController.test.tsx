@@ -5,7 +5,7 @@ import { ApiError } from '../../lib/api-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FormEvent } from 'react'
 import type { Announcement, AnnouncementAdminResponse } from '../../lib/types'
-import type { AdminProfileSummary, AdminUserDetail } from './contracts'
+import type { AdminProfileSummary, AdminSection, AdminUserDetail } from './contracts'
 import {
   announcementDraftStorageKey,
   readAnnouncementDraft,
@@ -217,8 +217,8 @@ describe('useAdminController announcement drafts', () => {
     expect(result.current.announcementDraftDirty).toBe(true)
   })
 
-  it('autosaves after the debounce and clears the draft after publishing', async () => {
-    const { result } = renderHook(() => useAdminController('announcement'))
+  it('autosaves after the debounce and preserves the published snapshot when revisiting its cached page', async () => {
+    const { result, rerender } = renderHook(({ section }) => useAdminController(section), { initialProps: { section: 'announcement' as AdminSection } })
     await waitForHydration(result)
 
     const popupUntil = '2026-10-20T18:00:00.000Z'
@@ -232,6 +232,13 @@ describe('useAdminController announcement drafts', () => {
     expect(result.current.announcementDraftDirty).toBe(false)
     expect(window.localStorage.getItem(announcementDraftStorageKey('alice'))).toBeNull()
     expect(adminApi.json).toHaveBeenCalledWith('/api/admin/announcement', expect.objectContaining({ method: 'PUT', json: expect.objectContaining({ announcements: expect.arrayContaining([expect.objectContaining({ popup_until: popupUntil })]) }) }))
+    rerender({ section: 'overview' })
+    await waitForHydration(result)
+    rerender({ section: 'announcement' })
+    await waitForHydration(result)
+    expect(result.current.announcements[0]).toMatchObject({ body: '自动保存后的正文', popup_until: popupUntil })
+    expect(result.current.announcementDraftDirty).toBe(false)
+    expect(adminApi.json.mock.calls.filter(([url, init]) => url === '/api/admin/announcement' && !init?.method)).toHaveLength(1)
   })
 
   it('keeps drafts isolated when another administrator logs in', async () => {
@@ -298,6 +305,108 @@ describe('useAdminController announcement drafts', () => {
     expect(result.current.announcementDraftDirty).toBe(false)
     expect(result.current.notice).toContain('已重新载入线上公告')
     expect(window.localStorage.getItem(announcementDraftStorageKey('alice'))).toBeNull()
+  })
+
+  it('keeps announcement edits after a revision conflict and retries explicitly with the new revision', async () => {
+    const implementation = adminApi.json.getMockImplementation()!
+    let conflict = true
+    adminApi.json.mockImplementation(async (url, init) => {
+      if (url === '/api/admin/announcement' && init?.method === 'PUT' && conflict) {
+        conflict = false
+        serverAnnouncements = { ...serverAnnouncements, revision: 2,
+          banner: { ...serverAnnouncements.banner!, title: '另一个管理员的更新', updated_at: '2026-10-27T00:00:00Z' } }
+        throw new ApiError('公告版本冲突', 409, serverAnnouncements, url)
+      }
+      return implementation(url, init)
+    })
+    const { result } = renderHook(() => useAdminController('announcement'))
+    await waitForHydration(result)
+    act(() => result.current.updateBanner({ title: '本机待发布标题' }))
+    await act(async () => result.current.handleSaveAnnouncement(formEvent()))
+    expect(result.current.error).toBe('公告版本冲突')
+    expect(result.current.banner.title).toBe('本机待发布标题')
+    expect(result.current.announcementDraftConflict).toBe(true)
+    await act(async () => result.current.handleSaveAnnouncement(formEvent()))
+    expect(result.current.announcementDraftDirty).toBe(false)
+    expect(result.current.notice).toBe('横幅和公告已发布')
+    const writes = adminApi.json.mock.calls.filter(([url, init]) => url === '/api/admin/announcement' && init?.method === 'PUT')
+    expect(writes.map(([, init]) => init.json.expected_revision)).toEqual([1, 2])
+  })
+
+  it('uses the latest risk revision after a conflict and retains the saved settings when revisiting', async () => {
+    const implementation = adminApi.json.getMockImplementation()!
+    let settings = { operator_data_risk_enabled: true, revision: 4, can_configure: true, updated_at: null }
+    let conflict = true
+    adminApi.json.mockImplementation(async (url, init) => {
+      if (url !== '/api/admin/risk-settings') return implementation(url, init)
+      if (init?.method === 'PUT') {
+        if (conflict) {
+          conflict = false
+          settings = { ...settings, revision: 5 }
+          throw new ApiError('风控设置版本冲突', 409, { settings }, url)
+        }
+        settings = { ...settings, revision: 6, operator_data_risk_enabled: false }
+      }
+      return { settings }
+    })
+    const { result, rerender } = renderHook(({ section }) => useAdminController(section), { initialProps: { section: 'risk' as AdminSection } })
+    await waitForHydration(result)
+    await act(async () => { expect(await result.current.handleSaveRiskSettings({ operator_data_risk_enabled: false }, '工单 OPS-104', 'password')).toBe(false) })
+    expect(result.current.riskSettings.revision).toBe(5)
+    await act(async () => { expect(await result.current.handleSaveRiskSettings({ operator_data_risk_enabled: false }, '工单 OPS-104', 'password')).toBe(true) })
+    expect(result.current.riskSettings).toMatchObject({ revision: 6, operator_data_risk_enabled: false })
+    rerender({ section: 'overview' })
+    await waitForHydration(result)
+    rerender({ section: 'risk' })
+    await waitForHydration(result)
+    expect(result.current.riskSettings).toMatchObject({ revision: 6, operator_data_risk_enabled: false })
+    const writes = adminApi.json.mock.calls.filter(([url, init]) => url === '/api/admin/risk-settings' && init?.method === 'PUT')
+    expect(writes.map(([, init]) => init.json.expected_revision)).toEqual([4, 5])
+  })
+
+  it('cancels an expired administrator overview read and ignores its late response after another login', async () => {
+    const implementation = adminApi.json.getMockImplementation()!
+    const pending = deferred<unknown>()
+    let oldSignal!: AbortSignal
+    adminApi.json.mockImplementation((url, init) => {
+      if (url.startsWith('/api/admin/usage-stats') && sessionUsername === 'alice') {
+        oldSignal = init.signal
+        return pending.promise
+      }
+      return implementation(url, init)
+    })
+    const { result } = renderHook(() => useAdminController())
+    await waitFor(() => expect(result.current.loading).toBe(true))
+    act(() => window.dispatchEvent(new Event('goofish:admin-session-expired')))
+    expect(oldSignal.aborted).toBe(true)
+    sessionUsername = 'bob'
+    usageVisits = 22
+    act(() => { result.current.setLoginUser('bob'); result.current.setLoginPassword('password') })
+    await act(async () => result.current.handleLogin(formEvent()))
+    await waitForHydration(result)
+    await act(async () => pending.resolve(createOperationsOverview(11)))
+    expect(result.current.businessOverview?.current.successful_users).toBe(22)
+    expect(result.current.adminUsername).toBe('bob')
+    expect(result.current.error).toBeNull()
+  })
+
+  it('reports a CDK mutation success separately from a failed summary refresh', async () => {
+    const implementation = adminApi.json.getMockImplementation()!
+    let failSummary = false
+    adminApi.json.mockImplementation((url, init) => {
+      if (failSummary && url === '/api/admin/cdk?view=summary') throw new Error('CDK summary unavailable')
+      return implementation(url, init)
+    })
+    const { result } = renderHook(() => useAdminController('risk'))
+    await waitForHydration(result)
+    failSummary = true
+    await act(async () => result.current.patchCdk(adminCdkRecord('a'.repeat(64)), 'unfreeze'))
+    expect(result.current.notice).toContain('CDK 已更新')
+    expect(result.current.notice).toContain('操作已成功，但部分数据刷新失败')
+    expect(result.current.error).toContain('CDK summary unavailable')
+    expect(result.current.overviewPartialFailure).toBe(true)
+    expect(result.current.lastSuccessfulSyncAt).not.toBeNull()
+    expect(adminApi.json.mock.calls.filter(([url, init]) => url === '/api/admin/cdk' && init?.method === 'PATCH')).toHaveLength(1)
   })
 
   it('warns that clearing a Skland binding also resets the operator baseline', async () => {
