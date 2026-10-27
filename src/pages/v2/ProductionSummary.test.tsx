@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '../../test/query-render'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
 import { apiJson } from '../../lib/api-client'
@@ -43,7 +43,7 @@ it.each([
   vi.mocked(apiJson).mockResolvedValue({ item: { ...previous, config, result } })
   const user = userEvent.setup()
   const prepared = prepareResult(SAMPLE_RESULT, false, false, SAMPLE_OPERATORS)
-  render(<ProductionSummary result={SAMPLE_RESULT} prepared={prepared}
+  render(<ProductionSummary userId="user-1" result={SAMPLE_RESULT} prepared={prepared}
     sample={false} profileId="profile-1" resultId={current.id} resultConfig={SAMPLE_CONFIG}
     history={[current, previous]} newResult={false} onConfigure={vi.fn()} />)
 

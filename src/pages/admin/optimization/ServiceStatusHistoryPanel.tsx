@@ -1,6 +1,7 @@
 import { RefreshIcon as RefreshCw } from '../../../components/icons'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
+import { useAdminDraftQuery } from '../../../lib/admin-draft-query'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import ServiceStatusBadge from '../../../components/ServiceStatusBadge'
 import { SectionLoader } from '../../../components/SessionLoader'
@@ -16,10 +17,8 @@ const EMPTY: AdminServiceStatusResponse = {
   cost: { config: createDefaultServiceStatusCostConfig(), estimate: calculateServiceStatusCostEstimate(createDefaultServiceStatusCostConfig(), [], new Date(0).toISOString()), recommendation: { generated_at: new Date(0).toISOString(), source_sample_count: 0, confidence: 'none', valley_worker_instances: 0, peak_windows: [], hourly_worker_instances: Array.from({ length: 24 }, () => 0), rationale: [] } },
 }
 
-export default function ServiceStatusHistoryPanel() {
-  const [data, setData] = useState<AdminServiceStatusResponse>(EMPTY)
-  const [error, setError] = useState<string | null>(null)
-  const [refreshing, setRefreshing] = useState(true)
+export default function ServiceStatusHistoryPanel({ active = true }: { active?: boolean }) {
+  const [writeError, setError] = useState<string | null>(null)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [impact, setImpact] = useState<StatusIncidentImpact>('minor')
@@ -30,17 +29,12 @@ export default function ServiceStatusHistoryPanel() {
   const [costDraft, setCostDraft] = useState<ServiceStatusCostConfig>(EMPTY.cost.config)
   const [costSaving, setCostSaving] = useState(false)
 
-  const load = useCallback(async () => {
-    setRefreshing(true)
-    try {
-      const value = await adminApiJson<AdminServiceStatusResponse>('/api/admin/service-status?view=history', { fallbackMessage: '加载状态历史失败' })
-      const next = value?.history ? normalizeAdminStatusResponse(value) : EMPTY
-      setData(next); setCostDraft(next.cost.config); setError(null)
-    } catch (caught) { setError(caught instanceof Error ? caught.message : '加载状态历史失败') }
-    finally { setRefreshing(false) }
-  }, [])
-
-  useEffect(() => { void load() }, [load])
+  const apply = useCallback((value: AdminServiceStatusResponse) => { setCostDraft(value?.history ? normalizeAdminStatusResponse(value).cost.config : EMPTY.cost.config) }, [])
+  const query = useAdminDraftQuery('service-history', '/api/admin/service-status?view=history', apply, active)
+  const data = useMemo(() => query.data?.history ? normalizeAdminStatusResponse(query.data) : EMPTY, [query.data])
+  const error = writeError ?? query.error?.message
+  const refreshing = query.isFetching
+  const load = () => { setError(null); return query.load() }
 
   const saveCost = async () => {
     setCostSaving(true)

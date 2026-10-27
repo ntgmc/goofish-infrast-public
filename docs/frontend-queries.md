@@ -1,6 +1,6 @@
 # 前端查询缓存
 
-TanStack Query v5 当前管理库存、库存余额提示、新手任务、优化任务列表、积分余额明细、好友邀请记录、商用档案分页和用户公告（含 V2 公开分页），以及后台用户、CDK、风险记录分页列表、概览读取（运营报表、今日待办、CDK 汇总、公告线上快照、风控设置）和任务监控队列快照。`App` 的 `QueryProvider` 为各路由共享一个内存中的 `QueryClient`，不持久化缓存。请求继续使用 `apiJson`、`adminApiJson` 和现有优化 API 函数，沿用超时、错误消息、诊断及管理员会话过期处理。
+TanStack Query v5 管理普通页面读取：库存、新手任务、优化任务、积分流水、邀请与商用档案、公告、反馈与通知、QQ Bot 设置、排班历史分页和详情、公共内容与站点开关、注册配置、服务状态、版本信息，以及后台列表、详情、设置和监控快照。`App` 的 `QueryProvider` 为各路由共享一个内存中的 `QueryClient`，不持久化缓存。请求继续使用 `apiJson`、`adminApiJson` 和现有优化 API 函数，沿用超时、错误消息、诊断及管理员会话过期处理。
 
 ## 状态归属
 
@@ -21,6 +21,18 @@ TanStack Query v5 当前管理库存、库存余额提示、新手任务、优�
 | 用户公告全量列表（V1 列表与弹窗共用） | `['user', userId, null, 'announcements', 'all']` |
 | V2 用户公告分页 | `['user', userId, null, 'announcements', 'page', page, unreadOnly]` |
 | V2 公开公告分页 | `['public', 'announcements', 'page', page, false]` |
+| 用户反馈列表与时间线 | `['user', userId, null, 'feedback', 'list'或'thread', ...分页或反馈ID]` |
+| 用户通知分页 | `['user', userId, null, 'notifications']` |
+| QQ Bot 设置 | `['user', userId, null, 'qqbot']` |
+| 排班历史详情 | `['user', userId, profileId, 'result-history', 'detail', resultId]` |
+| 排班历史分页 | `['user', userId, profileId, 'result-history', 'pages', scope, 首屏快照]` |
+| 公共内容、站点开关、注册配置、服务状态和构建版本 | `['public', 'content'或'features'或'registration-settings'或'service-status'或'service-build', ...条件]` |
+| 公开公告全量列表（横幅、提醒来源与原公开页共用） | `['public', 'announcements', 'all']` |
+| 更新记录分页与定位 | `['public', 'changelog', page, ...未缓存的版本ID]` |
+| 后台栏目读取（反馈、设置、道具、行为风控、服务历史、死信） | `['admin', adminUsername, 'panels', capabilities, name, ...条件]` |
+| 后台用户、CDK、干员和积分详情 | `['admin', adminUsername, 'details', capabilities, name, ...目标与分页]` |
+| 后台死信载荷详情 | `['admin', adminUsername, 'panels', capabilities, 'dead-letter-detail', id]` |
+| 管理账号列表 | `['admin', adminUsername, 'setup-users', capabilities]` |
 | 后台用户分页 | `['admin', adminUsername, 'users', capabilities, operationsSearch, page, pageSize, search, filters]` |
 | 后台 CDK 分页 | `['admin', adminUsername, 'cdks', capabilities, 'list', page, pageSize, search, filters]` |
 | 后台风险记录分页 | `['admin', adminUsername, 'cdks', capabilities, 'risk', page, pageSize]` |
@@ -69,10 +81,30 @@ V2 分页按用户或公开身份、页码与未读筛选隔离。直达尚未�
 
 队列快照只在任务监控栏目和任务视图活跃、管理员具有 `optimization_view` 时订阅。关联账号、档案或任务的 `relatedQuery` 进入查询键；面板内搜索、状态、来源和优先级筛选继续在本地执行，不额外请求。队列新鲜期为 0，进入视图和回到前台时刷新；每 5 秒查询，网页隐藏时暂停轮询。多个消费者、轮询和前台恢复共用尚未完成的读取，不反复取消慢请求。刷新失败保留同一查询的最后成功快照，允许手动重读。
 
-离开栏目或队列任务视图时脱离原查询，取消无人订阅的读取；切换管理员、权限或关联查询时不显示旧查询的数据。没有身份或所需权限时，自动读取和手动刷新均禁用。查询数据脱离时保留队列筛选、展开状态及已访问的服务历史、死信子面板，避免卸载清空本地编辑；管理员变化时重新挂载监控面板。服务历史与死信处理仍使用原有读取和提交逻辑。
+离开栏目或队列任务视图时脱离原查询，取消无人订阅的读取；切换管理员、权限或关联查询时不显示旧查询的数据。没有身份或所需权限时，自动读取和手动刷新均禁用。查询数据脱离时保留队列筛选、展开状态及已访问的服务历史、死信子面板，避免卸载清空本地编辑；管理员变化时重新挂载监控面板。服务历史与死信读取也由 Query 管理，提交仍沿用原有流程。
 
-## 本阶段保留的流程
+## 反馈、通知与设置草稿
 
-会话与工作区读取、原公开公告页及会话附带的横幅/提醒来源、排班历史分页、自动保存、计费报价与提交、任务提交、后台详情读取与反馈、服务历史、死信等独立面板、森空岛快照客户端仍使用原有流程。排班历史首屏由工作区快照提供，后续迁移需一起处理快照替换和历史修改后的失效。自动保存的串行队列与草稿恢复、提交的幂等键，以及森空岛的请求合并、版本失效和跨标签页通知不由查询缓存替代。后续迁移应逐个明确数据身份和失效来源，保留这些流程已有的边界语义。
+用户身份由 `UserQueryScope` 提供；后台保留已访问栏目，通过 `AdminQueryScope` 提供管理员、权限和活跃状态。后台只有当前有权限的栏目订阅读取，切换管理员会重新挂载栏目；用户反馈和 QQ Bot 表单也按用户重新挂载。
 
-涉及缓存共享、身份切换、迟到响应、退出清理或修改后的失效时，运行 `inventory-query.test.tsx`、`inventory-hooks.test.tsx`、`useOptimizationTaskCenter.test.tsx`、`useOptimizeWorkflow.races.test.tsx`、`BalanceSection.test.tsx`、`InvitationsSection.test.tsx`、`CommercialProfilesSection.test.tsx`、`ProfileUpgradePrompt.test.tsx`、`announcement-query.test.tsx`、`AnnouncementsSection.test.tsx`、V2 `Announcements.test.tsx`、`Accessibility.test.tsx`、`useAdminUserList.test.tsx`、`useAdminCdkData.test.tsx`、`useAdminOverview.test.ts`、`useAdminController.test.tsx`、`OperationsTodosPanel.test.tsx`、`QueueMonitorPanel.test.tsx`、`AdminDashboardView.navigation.test.tsx` 及相关页面集成测试，再按 [验证规则](agent-validation.md) 运行仓库检查。
+反馈列表按筛选和页码查询，时间线使用 `before_revision` 分页，合并时按 revision 去重。回复保留 `expected_revision`、内容签名对应的请求幂等键、冲突提示和明确重试。成功后使同一身份下的反馈列表与时间线失效；后续读取失败不会重发回复。身份、权限或目标变化会取消未完成回复，输入保留到原有明确清除操作。
+
+通知每 60 秒查询，隐藏时暂停，回到前台或窗口重新聚焦时刷新。分页刷新跟随新的服务端游标并按 ID 去重；通知中的库存变化仍调用 `markInventoryStale()`。标记已读前后取消旧读取，单条标记只修改匹配 `updated_at` 的通知；迟到结果不会重建退出时删除的缓存。账号安全入口没有工作台身份时，QQ Bot 面板先确认会话再读取设置，避免在服务暂停时丢失解绑入口。QQ Bot 的绑定码生成、更换、解绑和通知开关仍手动提交，读取重试不重复提交。
+
+后台设置通过 `useAdminPanelQuery` 保存线上快照；需要编辑的页面通过 `useAdminDraftQuery` 初始化草稿。同一管理员、权限和目标下，自动读取只初始化一次，保留输入；明确重载才重新应用快照，原有丢弃确认继续生效。保存后先取消旧 GET，再写入已有缓存，保留原 revision、操作原因和 Root 二次认证。服务历史的事件正文与成本配置同样保留独立草稿。
+
+行为风控保留分页修正、证据校验和复核状态；死信每 15 秒查询，离开时暂停，载荷按需读取并在记录移除后释放。后台详情用查询键隔离目标和权限，干员数据仍按需展开或下载。后台积分流水在计费功能可用时才读取，沿用游标并按交易 ID 去重；调整成功与刷新失败分别处理，不因读取失败再次调整积分。
+
+## 工作区与历史的衔接
+
+工作区快照仍提供历史首屏。活动与归档历史分别使用 `useInfiniteQuery`，工作区版本、首屏内容和游标进入查询键；首屏替换后脱离旧分页，取消无人订阅的读取，避免旧页回填。首屏不额外重读，后续分页按 ID 去重。相同工作区版本与首屏可复用已加载页面；历史详情按用户、档案和结果 ID 共用缓存，供生成、对比、养成和收益摘要使用。
+
+历史重命名更新已有详情缓存，删除时取消并移除详情；成功返回的工作区快照更新分页来源。选择历史结果、导入配置或文件仍保留本地操作的取消标记，防止迟到的读取覆盖较新的编辑选择。这些标记不保存另一份分页数据。
+
+## 保留的专用流程
+
+会话检查、登录退出和工作区读取与应用仍由会话流程协调：它们还负责身份清理、档案切换、森空岛会话同步和编辑草稿。工作区修改与自动保存保留串行队列、草稿恢复和版本检查。计费报价、声明确认、计费提交、任务提交和执行进度保留各自的实时校验、幂等与恢复机制。森空岛快照客户端继续负责请求合并、版本失效、过期与跨标签页通知；设施导入和其他计算请求仍由原操作发起。这些流程不使用普通页面缓存替代校验或提交。
+
+公共内容校验失败时保留最后成功的内容；站点开关失败时关闭功能。服务状态每 30 秒刷新，保留对 HTTP 503 有效状态正文的解析。页面构建信息与更新提示共用健康读取，更新提示只接受成功健康响应并在发现新版本后停止轮询。更新记录保留翻页失败时继续显示上一次成功正文的行为，通过缓存中的页码读取正文，不另存一份响应；重试仍请求当前页。注册设置只在注册表单打开时读取。管理账号设置页先确认管理员会话，再按身份读取账号列表；列表重试与 Root 授权的创建、替换、删除分开处理。
+
+涉及缓存共享、身份切换、迟到响应、退出清理或修改后的失效时，运行 `admin-panel-query.test.tsx`、`useAdminDetailQuery.test.tsx`、`use-feedback-thread.test.ts`、`NotificationCenter.test.tsx`、`balance-actions.test.tsx`、`useResultHistoryPagination.test.tsx`、`inventory-query.test.tsx`、`inventory-hooks.test.tsx`、`useOptimizationTaskCenter.test.tsx`、`useOptimizeWorkflow.races.test.tsx`、`BalanceSection.test.tsx`、`InvitationsSection.test.tsx`、`CommercialProfilesSection.test.tsx`、`ProfileUpgradePrompt.test.tsx`、`announcement-query.test.tsx`、`AnnouncementsSection.test.tsx`、V2 `Announcements.test.tsx`、`Accessibility.test.tsx`、`useAdminUserList.test.tsx`、`useAdminCdkData.test.tsx`、`useAdminOverview.test.ts`、`useAdminController.test.tsx`、`OperationsTodosPanel.test.tsx`、`QueueMonitorPanel.test.tsx`、`AdminDashboardView.navigation.test.tsx` 及相关页面集成测试，再按 [验证规则](agent-validation.md) 运行仓库检查。

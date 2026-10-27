@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { AdminQueryScope } from '../../lib/private-query-scope'
 import { Navigate, useLocation } from 'react-router'
 import { adminPath, fallbackAdminPath, resolveAdminSection } from '../../lib/app-routes'
 import { PageTransition } from '../../components/MotionPrimitives'
@@ -65,7 +66,7 @@ export default function AdminDashboardView() {
     {c.error && <div className="tool-alert tool-alert--error mb-5" role="alert">{c.error}</div>}
     {c.notice && <AdminToast message={c.notice} onDismiss={c.clearNotice} />}
     <PageTransition motionKey={activeSection} className="tool-page-transition">{(displayedSection) => <>
-      {visibleSections.filter((section) => section === displayedSection || visitedSections.includes(section)).map((section) => <div key={section}
+      {visibleSections.filter((section) => section === displayedSection || visitedSections.includes(section)).map((section) => <AdminQueryScope.Provider key={`${c.adminUsername}:${section}`} value={{ username: c.adminUsername, capabilities: c.adminCapabilities, active: section === displayedSection }}><div
         hidden={section !== displayedSection} className="admin-section tool-section-content" data-loading={sectionLoading(section) || undefined}>
         <SectionLoader label={`正在加载${sectionLabels[section]}…`} /><div className="admin-section-body tool-page-content">
           {section === 'overview' && <OverviewSection model={c} active={displayedSection === 'overview'} />}
@@ -85,7 +86,7 @@ export default function AdminDashboardView() {
             draftError={c.announcementDraftError} draftDirty={c.announcementDraftDirty} onSubmit={c.handleSaveAnnouncement} onDiscardDraft={c.handleDiscardAnnouncementDraft}
             onUpdateBanner={c.updateBanner} onAdd={c.addAnnouncement} onUpdate={c.updateAnnouncement} onDelete={c.deleteAnnouncement} onReorder={c.reorderAnnouncements} />}
         </div>
-      </div>)}
+      </div></AdminQueryScope.Provider>)}
     </>}</PageTransition>
   </AdminShell>
 }

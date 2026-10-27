@@ -54,6 +54,7 @@ beforeEach(() => {
   window.localStorage.setItem(tourStorageKey('workspace-setup', 1), 'done')
   apiJson.mockReset().mockImplementation(async (url: string) => {
     if (url === '/api/site/public-content') return cloneDefaultPublicContentSettings()
+    if (url === '/api/auth/me') return { user: sessionState.current?.user, profiles: sessionState.current?.profiles }
     if (url === '/api/user/qqbot') return { available: false, binding: null }
     throw new Error(`Unexpected request: ${url}`)
   })

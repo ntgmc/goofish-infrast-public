@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type FormEvent } from 'react'
+import { useAdminDraftQuery } from '../../../lib/admin-draft-query'
 import { copy } from '../../../copy/index'
 import { SectionLoader } from '../../../components/SessionLoader'
 import { ApiError } from '../../../lib/api-client'
@@ -37,38 +38,22 @@ const TABS: Array<{ id: TabId; label: string }> = [
 export default function PublicContentSettingsSection() {
   const [settings, setSettings] = useState<AdminPublicContentSettingsV1 | null>(null)
   const [activeTab, setActiveTab] = useState<TabId>('qq')
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [conflict, setConflict] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [focusPath, setFocusPath] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [writeError, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    setNotice(null)
-    try {
-      const data = await adminApiJson<{ settings?: AdminPublicContentSettingsV1 }>('/api/admin/public-content', {
-        fallbackMessage: copy.publicContent.admin_load_failed,
-      })
-      if (!data.settings) throw new Error(copy.publicContent.admin_load_failed)
-      setSettings(data.settings)
-      setDirty(false)
-      setConflict(false)
-      setFieldErrors({})
-      setFocusPath(null)
-    } catch (caught) {
-      setSettings(null)
-      setError((caught as Error).message)
-    } finally {
-      setLoading(false)
-    }
+  const apply = useCallback((data: { settings?: AdminPublicContentSettingsV1 }) => {
+    if (!data.settings) throw new Error(copy.publicContent.admin_load_failed)
+    setSettings(data.settings); setDirty(false); setConflict(false); setFieldErrors({}); setFocusPath(null)
   }, [])
-
-  useEffect(() => { void load() }, [load])
+  const query = useAdminDraftQuery('public-content', '/api/admin/public-content', apply)
+  const loading = query.isFetching
+  const error = writeError ?? query.error?.message
+  const load = () => { setError(null); setNotice(null); return query.load() }
 
   const edit: EditSettings = (updater) => {
     setSettings((current) => {
@@ -109,6 +94,7 @@ export default function PublicContentSettingsSection() {
         fallbackMessage: copy.publicContent.admin_save_failed,
       })
       if (!data.settings) throw new Error(copy.publicContent.admin_save_failed)
+      await query.write(data)
       setSettings(data.settings)
       setDirty(false)
       setConflict(false)

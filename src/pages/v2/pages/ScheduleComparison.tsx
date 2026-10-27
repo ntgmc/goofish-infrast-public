@@ -13,7 +13,9 @@ import { compareScheduleOperators, scheduleProductionMetrics, type ScheduleAssig
 import { getOptimizePollRetryDelayMs } from '../../../lib/optimize-poll'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import type { LicenseConfig, LicenseOperator, OptimizeResult, UserWorkspace } from '../../../lib/types'
-import { fetchResultHistoryDetail, submitOptimizationJob } from '../../tool/optimize/optimization-api'
+import { useQueryClient } from '@tanstack/react-query'
+import { fetchCachedResultHistoryDetail } from '../../tool/optimize/result-history-query'
+import { submitOptimizationJob } from '../../tool/optimize/optimization-api'
 import { fetchOptimizeJobSnapshotStatus, isOptimizeJobPollCancelled, isRetryableOptimizePollError, waitForOptimizePoll } from '../../tool/optimize/job-progress'
 import { useResultHistoryPagination } from '../../tool/optimize/useResultHistoryPagination'
 import type { V2Session } from '../OptionsDrawer'
@@ -51,15 +53,16 @@ export default function ScheduleComparison({ session, onOpenProfile }: {
         </label>
         <Notice error>{session.workspaceLoadError}{session.workspaceLoadError && <button className="v2-text-button" disabled={Boolean(session.openingProfileId)} onClick={() => void session.refreshProfileWorkspace(profile).catch(() => undefined)}>{manual.retryWorkspace}</button>}</Notice>
         {ready && !operators.some((operator) => operator.own) ? <Notice>{text.operatorsRequired} <Link className="v2-text-button" to={`${v2Path('overview', profile.id)}&panel=operators`}>{manual.setup}</Link></Notice>
-          : ready && <ComparisonWorkspace key={profile.id} profileId={profile.id} operators={operators} config={config} workspace={session.workspace} />}
+          : ready && <ComparisonWorkspace key={profile.id} userId={profile.user_id} profileId={profile.id} operators={operators} config={config} workspace={session.workspace} />}
       </>}
   </div>
 }
 
-function ComparisonWorkspace({ profileId, operators, config, workspace }: {
-  profileId: string; operators: LicenseOperator[]; config: LicenseConfig; workspace: UserWorkspace | null
+function ComparisonWorkspace({ userId, profileId, operators, config, workspace }: {
+  userId: string; profileId: string; operators: LicenseOperator[]; config: LicenseConfig; workspace: UserWorkspace | null
 }) {
-  const history = useResultHistoryPagination(profileId, workspace)
+  const client = useQueryClient()
+  const history = useResultHistoryPagination(profileId, workspace, userId)
   const [slots, setSlots] = useState<Slot[]>([{ selection: '' }, { selection: '' }])
   const [outputs, setOutputs] = useState<(OptimizeResult | null)[]>([null, null])
   const [busy, setBusy] = useState(false)
@@ -112,7 +115,7 @@ function ComparisonWorkspace({ profileId, operators, config, workspace }: {
         if (!current()) return
         source = parseManualScheduleJson(content, fallback, operators)
       } else {
-        const item = await fetchResultHistoryDetail(profileId, selection, controller.signal)
+        const item = await fetchCachedResultHistoryDetail(client, userId, profileId, selection)
         if (!current()) return
         fallback = normalizeConfig(item.config ?? importConfig)
         source = parseManualScheduleJson(JSON.stringify(item.result), fallback, operators)

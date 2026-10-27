@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { act, cleanup, renderHook, waitFor } from '../test/query-render'
 import { afterEach, expect, it, vi } from 'vitest'
 import { apiJson } from './api-client'
-import { updateUserAnnouncementQueries, useAnnouncementPageQuery, useUserAnnouncementsQuery, userAnnouncementsKey } from './announcement-query'
+import { updateUserAnnouncementQueries, useAnnouncementPageQuery, usePublicAnnouncementsQuery, useUserAnnouncementsQuery, userAnnouncementsKey } from './announcement-query'
 import type { AnnouncementPageResponse, UserAnnouncementRead } from './types'
 
 vi.mock('./api-client', () => ({ apiJson: vi.fn() }))
@@ -14,6 +14,15 @@ const item: UserAnnouncementRead = { announcement: {
 const unread = { announcements: [item], unread_count: 1 }
 const read = { announcements: [{ ...item, read_at: item.announcement.updated_at }], unread_count: 0 }
 const page: AnnouncementPageResponse = { ...unread, page: 1, pageSize: 10, total: 1 }
+
+it('shares the public list and reminder source while retaining empty-list fallbacks for invalid arrays', async () => {
+  vi.mocked(apiJson).mockResolvedValue({ announcements: {}, popups: null })
+  const hook = renderHook(() => ({ list: usePublicAnnouncementsQuery(), reminders: usePublicAnnouncementsQuery() }))
+  await waitFor(() => expect(hook.result.current.list.isSuccess).toBe(true))
+  expect(hook.result.current.list.data?.announcements).toEqual([])
+  expect(hook.result.current.reminders.data?.popups).toEqual([])
+  expect(apiJson).toHaveBeenCalledTimes(1)
+})
 
 it('isolates accounts, cancels old reads and never exposes private data through the public feed', async () => {
   const requests: Array<{ signal?: AbortSignal | null; finish: (data: unknown) => void }> = []

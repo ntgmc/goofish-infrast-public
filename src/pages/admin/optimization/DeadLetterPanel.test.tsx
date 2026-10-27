@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '../../../test/private-query-render'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AdminOptimizationDeadLetter, AdminOptimizationDeadLetterDetail } from '../contracts'
 
@@ -54,7 +54,7 @@ describe('DeadLetterPanel', () => {
     expect(within(operatorSummary.closest('details')!).getByText(/"name": "能天使"/)).toBeInTheDocument()
     expect(adminApiJson).toHaveBeenCalledWith(
       '/api/admin/optimization?view=dead_letter&id=letter-1',
-      { fallbackMessage: '加载死信完整数据失败' },
+      { fallbackMessage: '加载死信完整数据失败', signal: expect.any(AbortSignal) },
     )
   })
 
@@ -105,10 +105,10 @@ describe('DeadLetterPanel', () => {
       .mockResolvedValue({ dead_letters: [record()] })
 
     render(<DeadLetterPanel />)
-    await act(async () => { await Promise.resolve() })
+    await act(async () => { await vi.advanceTimersByTimeAsync(1) })
     expect(screen.getByRole('alert')).toHaveTextContent('加载优化死信失败')
 
-    await act(async () => { vi.advanceTimersByTime(15_000); await Promise.resolve() })
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_001) })
     expect(screen.getByText(/任务 job-1/)).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })

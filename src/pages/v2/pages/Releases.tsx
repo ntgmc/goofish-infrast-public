@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate } from 'react-router'
 import { copy } from '../../../copy'
 import { apiJson, getApiErrorMessage } from '../../../lib/api-client'
@@ -13,42 +14,33 @@ export default function Releases() {
   const rawPage = Number(new URLSearchParams(location.search).get('page') ?? 1)
   const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1
   const releaseId = location.hash.startsWith('#release-') ? location.hash.slice(9) : ''
-  const [data, setData] = useState<ChangelogPageData | null>(null)
-  const cachedPage = useRef<ChangelogPageData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [retry, setRetry] = useState(0)
+  const client = useQueryClient()
+  const key = ['public', 'changelog', page]
+  const cached = client.getQueryData<ChangelogPageData>(key)
+  const locate = releaseId && !cached?.releases.some((release) => release.id === releaseId) ? releaseId : ''
+  const query = useQuery({ queryKey: locate ? [...key, locate] : key,
+    queryFn: ({ signal }) => {
+      const params = new URLSearchParams({ page: String(page) })
+      if (locate) params.set('release', locate)
+      return apiJson<ChangelogPageData>(`/api/changelog?${params}`, { signal })
+    },
+  })
+  const lastPage = useRef<number | null>(null)
+  const data = query.data ?? (lastPage.current ? client.getQueryData<ChangelogPageData>(['public', 'changelog', lastPage.current]) : undefined)
+  const loading = query.isFetching
+  const error = query.error ? getApiErrorMessage(query.error, copy.v2.updatesLoadFailed) : null
 
   useEffect(() => {
-    const cached = cachedPage.current
-    if (cached?.page === page && (!releaseId || cached.releases.some((release) => release.id === releaseId))) {
-      setLoading(false)
-      setError(null)
-      return
+    if (!query.data || query.isFetching) return
+    const data = query.data
+    lastPage.current = data.page
+    if (locate || data.page !== page) client.setQueryData(['public', 'changelog', data.page], data, { updatedAt: query.dataUpdatedAt })
+    if (data.page !== page) {
+      const search = new URLSearchParams(location.search)
+      search.set('section', 'updates'); search.set('page', String(data.page))
+      navigate({ search: `?${search}`, hash: location.hash }, { replace: true })
     }
-    const controller = new AbortController()
-    const params = new URLSearchParams({ page: String(page) })
-    if (releaseId) params.set('release', releaseId)
-    setLoading(true)
-    setError(null)
-    void apiJson<ChangelogPageData>(`/api/changelog?${params}`, { signal: controller.signal }).then((result) => {
-      if (controller.signal.aborted) return
-      cachedPage.current = result
-      setData(result)
-      setLoading(false)
-      if (result.page !== page) {
-        const search = new URLSearchParams(location.search)
-        search.set('section', 'updates')
-        search.set('page', String(result.page))
-        navigate({ search: `?${search}`, hash: location.hash }, { replace: true })
-      }
-    }).catch((cause: unknown) => {
-      if (controller.signal.aborted) return
-      setError(getApiErrorMessage(cause, copy.v2.updatesLoadFailed))
-      setLoading(false)
-    })
-    return () => controller.abort()
-  }, [page, releaseId, retry, location.search, location.hash, navigate])
+  }, [query.data, query.dataUpdatedAt, query.isFetching, locate, page, location.search, location.hash, navigate, client])
 
   function openPage(nextPage: number, id = '') {
     const params = new URLSearchParams(location.search)
@@ -61,7 +53,7 @@ export default function Releases() {
   const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1
   return <div className="v2-releases">
     <p className="v2-lead">{copy.public.pages_ChangelogPage_003}</p>
-    {error && <Notice error>{error}<button className="v2-text-button" onClick={() => setRetry((value) => value + 1)}>{copy.v2.retry}</button></Notice>}
+    {error && <Notice error>{error}<button className="v2-text-button" onClick={() => void query.refetch({ cancelRefetch: false })}>{copy.v2.retry}</button></Notice>}
     {loading && <Loading label={copy.v2.updatesLoading} />}
     {data && <>
       <div className="v2-selection-workspace" aria-busy={loading}>

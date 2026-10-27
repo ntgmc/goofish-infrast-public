@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { serviceBuildQueryOptions } from '../lib/service-build-query'
 import { APP_BUILD_META } from '../lib/build-meta'
 import type { AppBuildMeta } from '../lib/types'
 import { copy } from '../copy/index'
@@ -11,8 +13,9 @@ interface Props {
 }
 
 export default function BuildMetaStrip({ meta = APP_BUILD_META, className = '', placement = 'inline' }: Props) {
-  const [serviceMeta, setServiceMeta] = useState<AppBuildMeta | null>(null)
-  const [serviceReachable, setServiceReachable] = useState<boolean | null>(null)
+  const query = useQuery(serviceBuildQueryOptions)
+  const serviceMeta = query.data?.meta
+  const serviceReachable = query.isLoading ? null : !query.error
   const expectedBackendVersion = meta.expected_backend_version ?? meta.backend_version
   const serviceAlignment = useMemo(() => {
     if (serviceReachable === null) return 'checking'
@@ -20,22 +23,6 @@ export default function BuildMetaStrip({ meta = APP_BUILD_META, className = '', 
     if (meta.git_sha && serviceMeta.git_sha) return meta.git_sha === serviceMeta.git_sha ? 'aligned' : 'drifted'
     return expectedBackendVersion === serviceMeta.backend_version ? 'aligned' : 'drifted'
   }, [expectedBackendVersion, meta.git_sha, serviceMeta, serviceReachable])
-
-  useEffect(() => {
-    const controller = new AbortController()
-    void fetch('/api/health', { signal: controller.signal, headers: { Accept: 'application/json' } })
-      .then(async (response) => response.json() as Promise<{ build_meta?: AppBuildMeta }>)
-      .then((payload) => {
-        if (!payload.build_meta) throw new Error('health response is missing build metadata')
-        setServiceMeta(payload.build_meta)
-        setServiceReachable(true)
-      })
-      .catch((error) => {
-        if (error instanceof DOMException && error.name === 'AbortError') return
-        setServiceReachable(false)
-      })
-    return () => controller.abort()
-  }, [])
 
   const rootClassName = placement === 'corner'
     ? `relative z-40 mt-3 flex w-full max-w-full flex-wrap items-end justify-end gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-xs text-ink-muted sm:fixed sm:bottom-3 sm:right-3 sm:mt-0 sm:w-auto sm:max-w-[calc(100vw-1.5rem)] sm:px-0 sm:pb-0 ${className}`

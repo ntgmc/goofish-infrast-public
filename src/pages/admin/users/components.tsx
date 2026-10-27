@@ -9,6 +9,7 @@ import { AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOpera
 import { AdminTabs } from '../shared/AdminTabs'
 import { AdminDetailDialog } from '../shared/AdminDetailDialog'
 import { DetailItem, StatusPill, UserStatusPill, SmallButton, formatDate, getAdminProfileAccessLabel, formatAdminProfileAccess, formatOperatorValue, getAppUserStatusLabel } from '../shared/helpers'
+import { useAdminDraftQuery } from '../../../lib/admin-draft-query'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import { WorkspaceExportDialog } from './WorkspaceExportDialog'
 import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
@@ -353,7 +354,7 @@ function UserBalanceCard({
 
 export function CommercialAdminControls({ userId, eligible }: { userId: string; eligible: boolean }) {
   if (!eligible) return null
-  return <EffectiveCommercialAdminControls userId={userId} />
+  return <EffectiveCommercialAdminControls key={userId} userId={userId} />
 }
 
 function EffectiveCommercialAdminControls({ userId }: { userId: string }) {
@@ -369,37 +370,23 @@ function EffectiveCommercialAdminControls({ userId }: { userId: string }) {
     inflight_jobs: number
     inflight_reserved: string
   }
-  const [limits, setLimits] = useState<Limits | null>(null)
   const [activeLimit, setActiveLimit] = useState('')
   const [totalLimit, setTotalLimit] = useState('')
   const [reason, setReason] = useState('')
   const [rootPassword, setRootPassword] = useState('')
-  const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [writeError, setError] = useState<string | null>(null)
   const requestIdentity = useRef<{ signature: string; key: string } | null>(null)
   const resetRequestIdentity = () => { requestIdentity.current = null }
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await adminApiJson<{ limits: Limits }>(`/api/admin/commercial?user_id=${encodeURIComponent(userId)}`)
-      setLimits(data.limits)
-      setActiveLimit(String(data.limits.active_limit))
-      setTotalLimit(String(data.limits.total_limit))
-      setReason('')
-      setRootPassword('')
-      resetRequestIdentity()
-    } catch (caught) {
-      setLimits(null)
-      setActiveLimit('')
-      setTotalLimit('')
-      setError((caught as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }, [userId])
-  useEffect(() => { void load() }, [load])
+  const apply = useCallback((data: { limits: Limits }) => {
+    setActiveLimit(String(data.limits.active_limit)); setTotalLimit(String(data.limits.total_limit))
+    setReason(''); setRootPassword(''); requestIdentity.current = null
+  }, [])
+  const query = useAdminDraftQuery('commercial', `/api/admin/commercial?user_id=${encodeURIComponent(userId)}`, apply)
+  const limits = query.data?.limits
+  const loading = query.isFetching
+  const error = writeError ?? query.error?.message
+  const load = () => { setError(null); return query.load() }
   const save = async (suspended = limits?.suspended ?? false) => {
     if (!limits) return
     const active = Number(activeLimit)
@@ -438,7 +425,7 @@ function EffectiveCommercialAdminControls({ userId }: { userId: string }) {
           root_password: rootPassword,
         },
       })
-      setLimits(data.limits)
+      await query.write(data)
       setActiveLimit(String(data.limits.active_limit))
       setTotalLimit(String(data.limits.total_limit))
       setReason('')

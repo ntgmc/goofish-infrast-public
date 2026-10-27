@@ -2,7 +2,15 @@ import { useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query'
 import { copy } from '../copy'
 import { apiJson } from './api-client'
-import type { AnnouncementPageResponse, UserAnnouncementRead } from './types'
+import type { AnnouncementPageResponse, AnnouncementPublicResponse, UserAnnouncementRead } from './types'
+
+export function usePublicAnnouncementsQuery(enabled = true) {
+  return useQuery({ queryKey: ['public', 'announcements', 'all'], enabled,
+    queryFn: async ({ signal }) => {
+      const data = await apiJson<AnnouncementPublicResponse>('/api/announcement', { signal, fallbackMessage: copy.public.pages_AnnouncementsPage_001 })
+      return { ...data, announcements: Array.isArray(data?.announcements) ? data.announcements : [], popups: Array.isArray(data?.popups) ? data.popups : [] }
+    } })
+}
 
 export type UserAnnouncementsResponse = { announcements?: UserAnnouncementRead[]; unread_count?: number }
 

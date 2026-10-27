@@ -6,6 +6,7 @@ import {
   AUTH_PASSWORD_MIN_LENGTH,
   AUTH_RESEND_COOLDOWN_SECONDS,
 } from '../lib/auth-constraints'
+import { useQuery } from '@tanstack/react-query'
 import { ApiError, apiJson } from '../lib/api-client'
 import {
   validateRegistrationEmail,
@@ -46,10 +47,11 @@ export default function AuthForm({
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [cdk, setCdk] = useState('')
   const [inviteCode, setInviteCode] = useState(initialInviteCode)
-  const [inviteCodeRequired, setInviteCodeRequired] = useState<boolean | null>(null)
-  const [registrationSettingsLoading, setRegistrationSettingsLoading] = useState(false)
-  const [registrationSettingsError, setRegistrationSettingsError] = useState<string | null>(null)
-  const [registrationSettingsAttempt, setRegistrationSettingsAttempt] = useState(0)
+  const registrationQuery = useQuery({ queryKey: ['public', 'registration-settings', mode === 'register'], enabled: mode === 'register',
+    queryFn: ({ signal }) => apiJson<{ invite_code_required?: boolean }>('/api/auth/registration-settings', { signal, fallbackMessage: copy.auth.components_AuthForm_004 }) })
+  const inviteCodeRequired = registrationQuery.data ? registrationQuery.data.invite_code_required === true : null
+  const registrationSettingsLoading = registrationQuery.isFetching
+  const registrationSettingsError = registrationQuery.error ? registrationQuery.error.message || copy.auth.components_AuthForm_045 : null
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -59,25 +61,6 @@ export default function AuthForm({
   const [resendCooldownSeconds, setResendCooldownSeconds] = useState(0)
 
   useEffect(clearInviteFragment, [])
-
-  useEffect(() => {
-    if (mode !== 'register' || inviteCodeRequired !== null) return
-    const controller = new AbortController()
-    setRegistrationSettingsLoading(true)
-    setRegistrationSettingsError(null)
-    void apiJson<{ invite_code_required?: boolean }>('/api/auth/registration-settings', {
-      signal: controller.signal,
-      fallbackMessage: copy.auth.components_AuthForm_004,
-    })
-      .then((data) => setInviteCodeRequired(data.invite_code_required === true))
-      .catch((caught) => {
-        if ((caught as Error).name !== 'AbortError') {
-          setRegistrationSettingsError((caught as Error).message || copy.auth.components_AuthForm_045)
-        }
-      })
-      .finally(() => setRegistrationSettingsLoading(false))
-    return () => controller.abort()
-  }, [inviteCodeRequired, mode, registrationSettingsAttempt])
 
   useEffect(() => {
     if (mode === 'login' && !features.login) setMode(features.registration ? 'register' : 'forgot')
@@ -357,8 +340,7 @@ export default function AuthForm({
               type="button"
               className="tool-secondary-action min-h-9 px-3 text-sm"
               onClick={() => {
-                setRegistrationSettingsError(null)
-                setRegistrationSettingsAttempt((current) => current + 1)
+                void registrationQuery.refetch({ cancelRefetch: false })
               }}
             >{copy.auth.components_AuthForm_048}</button>
           </div>

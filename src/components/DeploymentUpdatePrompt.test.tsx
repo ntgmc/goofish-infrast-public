@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '../test/query-render'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppBuildMeta } from '../lib/types'
@@ -91,7 +91,7 @@ describe('DeploymentUpdatePrompt', () => {
     expect(fetchHealth).toHaveBeenCalledOnce()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
-    await act(async () => { await vi.advanceTimersByTimeAsync(1_000) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_001) })
     expect(fetchHealth).toHaveBeenCalledTimes(2)
     expect(screen.getByRole('dialog', { name: '新版本已发布' })).toBeInTheDocument()
   })

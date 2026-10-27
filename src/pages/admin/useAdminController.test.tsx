@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, renderHook, screen, waitFor } from '../../test/query-render'
+import { useQueryClient } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import { ApiError } from '../../lib/api-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -150,6 +151,27 @@ describe('useAdminController announcement drafts', () => {
     expect(result.current.permission).toBe('advanced')
   })
 
+  it('clears a detail read error when an automatic refresh recovers', async () => {
+    const implementation = adminApi.json.getMockImplementation()!
+    const detail = { user: { id: 'user-1' }, profiles: [] } as unknown as AdminUserDetail
+    let failed = true
+    adminApi.json.mockImplementation(async (url, init) => {
+      if (url.startsWith('/api/admin/users?user_id=')) {
+        if (failed) throw new Error('详情暂时不可用')
+        return { detail }
+      }
+      return implementation(url, init)
+    })
+    const { result } = renderHook(() => ({ ...useAdminController('users'), client: useQueryClient() }))
+    await waitForHydration(result)
+    await act(async () => { await result.current.loadUserDetail(detail.user) })
+    await waitFor(() => expect(result.current.error).toBe('详情暂时不可用'))
+    failed = false
+    await act(async () => { await result.current.client.invalidateQueries({ queryKey: ['admin'], predicate: (query) => query.queryKey[2] === 'details' }) })
+    await waitFor(() => expect(result.current.selectedUserDetail).toEqual(detail))
+    expect(result.current.error).toBeNull()
+  })
+
   it('opens user details without requesting the retired balance endpoint', async () => {
     const originalImplementation = adminApi.json.getMockImplementation()!
     const detail = { user: { id: 'user-1' }, profiles: [] } as unknown as AdminUserDetail
@@ -157,9 +179,10 @@ describe('useAdminController announcement drafts', () => {
       if (url.startsWith('/api/admin/users?user_id=')) return { detail }
       return originalImplementation(url, init)
     })
-    const { result } = renderHook(() => useAdminController())
+    const { result } = renderHook(() => useAdminController('users'))
     await waitForHydration(result)
     await act(async () => result.current.loadUserDetail(detail.user))
+    await waitFor(() => expect(result.current.selectedUserDetail).toEqual(detail))
     expect(result.current.selectedUserDetail).toEqual(detail)
     expect(result.current.selectedUserBalance).toBeNull()
     expect(result.current.error).toBeNull()
@@ -410,7 +433,7 @@ describe('useAdminController announcement drafts', () => {
   })
 
   it('warns that clearing a Skland binding also resets the operator baseline', async () => {
-    const { result } = renderHook(() => useAdminController())
+    const { result } = renderHook(() => useAdminController('users'))
     await waitForHydration(result)
     const profile = { id: 'profile-1', display_name: 'B 账号' } as AdminProfileSummary
     act(() => result.current.setSelectedUserDetail({ user: { id: 'user-1' } } as AdminUserDetail))
@@ -445,7 +468,7 @@ describe('useAdminController announcement drafts', () => {
     adminApi.blob.mockReturnValueOnce(new Promise<Blob>((resolve) => {
       resolveBlob = resolve
     }))
-    const { result } = renderHook(() => useAdminController())
+    const { result } = renderHook(() => useAdminController('users'))
     await waitForHydration(result)
     act(() => result.current.setSelectedUserDetail({ user: { id: 'user-123456789' } } as AdminUserDetail))
 
@@ -475,7 +498,7 @@ describe('useAdminController announcement drafts', () => {
   it('shows an export error without generating a download', async () => {
     adminApi.blob.mockRejectedValueOnce(new Error('导出服务不可用'))
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
-    const { result } = renderHook(() => useAdminController())
+    const { result } = renderHook(() => useAdminController('users'))
     await waitForHydration(result)
     act(() => result.current.setSelectedUserDetail({ user: { id: 'user-1' } } as AdminUserDetail))
 
@@ -488,7 +511,7 @@ describe('useAdminController announcement drafts', () => {
   })
 
   it('rejects an empty workspace selection instead of exporting every account', async () => {
-    const { result } = renderHook(() => useAdminController())
+    const { result } = renderHook(() => useAdminController('users'))
     await waitForHydration(result)
     act(() => result.current.setSelectedUserDetail({ user: { id: 'user-1' } } as AdminUserDetail))
 

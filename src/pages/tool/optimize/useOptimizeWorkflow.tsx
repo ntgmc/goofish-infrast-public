@@ -186,7 +186,7 @@ export function useOptimizeWorkflow(props: Props) {
     error: resultHistoryError,
     loadMoreResultHistory,
     loadMoreArchivedResults,
-  } = useResultHistoryPagination(profileId, workspace)
+  } = useResultHistoryPagination(profileId, workspace, profile.user_id)
 
   const latestWorkspaceResult = workspace?.latest_result ?? resultHistory[0] ?? null
 
@@ -343,6 +343,7 @@ export function useOptimizeWorkflow(props: Props) {
     handleUnarchiveHistory,
     handleDeleteHistory,
   } = useOptimizeWorkspace({
+    userId: profile.user_id,
     profileId,
     activeConfig,
     isConfigReadOnly,

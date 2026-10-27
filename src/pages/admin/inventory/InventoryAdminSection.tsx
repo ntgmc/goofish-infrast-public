@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
+import { useAdminPanelQuery } from '../../../lib/admin-panel-query'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import { adminInventoryOverviewSchema, type AdminInventoryOverview as Overview } from '../../../lib/admin-inventory-contracts'
 import { itemIconPath, type ItemDefinition } from '../../../lib/inventory-contracts'
@@ -20,29 +21,17 @@ const ADMIN_TABS = [
 type AdminTab = typeof ADMIN_TABS[number]['id']
 
 export default function InventoryAdminSection() {
-  const [data, setData] = useState<Overview | null>(null)
+  const query = useAdminPanelQuery<Overview>('items', '/api/admin/items', true, { parse: adminInventoryOverviewSchema.parse })
+  const data = query.data
   const [activeTab, setActiveTab] = useState<AdminTab>('catalog')
   const [visited, setVisited] = useState<AdminTab[]>(['catalog'])
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [writeError, setError] = useState<string | null>(null)
+  const error = writeError ?? query.error?.message
   const [notice, setNotice] = useState<string | null>(null)
   const pending = useRef(new Map<string, { requestJson: string; key: string }>())
   const inFlight = useRef(false)
-  const load = useCallback(async (signal?: AbortSignal) => {
-    setError(null)
-    try {
-      const overview = adminInventoryOverviewSchema.parse(await adminApiJson<unknown>('/api/admin/items', { signal }))
-      if (!signal?.aborted) setData(overview)
-    } catch (caught) {
-      if (!signal?.aborted) setError((caught as Error).message)
-    }
-  }, [])
-
-  useEffect(() => {
-    const controller = new AbortController()
-    void load(controller.signal)
-    return () => controller.abort()
-  }, [load])
+  const load = async () => { setError(null); await query.refetch({ cancelRefetch: false }) }
 
   const run: InventoryPanelProps['run'] = async <T,>(url: string, json: Record<string, unknown>, success: string,
     options: { idempotencyScope?: string; confirmation?: string } = {}) => {

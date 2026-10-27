@@ -1,23 +1,18 @@
 import {
   createContext,
-  useCallback,
   useContext,
-  useEffect,
-  useRef,
   useState,
   type ReactNode,
 } from 'react'
 import { NotificationIcon as Bell } from './icons'
 import { useNavigate } from 'react-router'
 import { copy, CURRENT_LOCALE } from '../copy'
-import { apiJson, getApiErrorMessage } from '../lib/api-client'
+import { useNotificationQuery } from '../lib/notification-query'
 import { itemIconPath } from '../lib/inventory-contracts'
-import { markInventoryStale } from '../lib/inventory-refresh'
-import type { UserNotification, UserNotificationPage } from '../lib/types'
+import type { UserNotification } from '../lib/types'
+import { UserQueryScope } from '../lib/private-query-scope'
 import { useSiteFeatures } from '../lib/site-feature-context'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
-
-const POLL_INTERVAL_MS = 60_000
 
 type NotificationCenterValue = {
   notifications: UserNotification[]
@@ -38,221 +33,13 @@ const NotificationCenterContext = createContext<NotificationCenterValue | null>(
 
 export function NotificationCenterProvider({ userId, children }: { userId: string; children: ReactNode }) {
   const { features } = useSiteFeatures()
-  if (!features.notifications) return children
-  return <EnabledNotificationCenterProvider userId={userId}>{children}</EnabledNotificationCenterProvider>
+  return <UserQueryScope.Provider value={userId}>{features.notifications
+    ? <EnabledNotificationCenterProvider key={userId} userId={userId}>{children}</EnabledNotificationCenterProvider>
+    : children}</UserQueryScope.Provider>
 }
 
 function EnabledNotificationCenterProvider({ userId, children }: { userId: string; children: ReactNode }) {
-  const [notifications, setNotifications] = useState<UserNotification[]>([])
-  const [unreadCount, setUnreadCount] = useState(0)
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [markingAll, setMarkingAll] = useState(false)
-  const [markingId, setMarkingId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const refreshInFlight = useRef<Promise<void> | null>(null)
-  const refreshAbort = useRef<AbortController | null>(null)
-  const loadMoreAbort = useRef<AbortController | null>(null)
-  const mutationAbort = useRef<AbortController | null>(null)
-  const mutationVersion = useRef(0)
-  const currentUserId = useRef(userId)
-  const hasLoaded = useRef(false)
-  const inventoryRevision = useRef<string | null>(null)
-  currentUserId.current = userId
-
-  const refresh = useCallback((): Promise<void> => {
-    if (refreshInFlight.current) return refreshInFlight.current
-    loadMoreAbort.current?.abort()
-    loadMoreAbort.current = null
-    setLoadingMore(false)
-    const requestedUserId = userId
-    const requestedMutationVersion = mutationVersion.current
-    const controller = new AbortController()
-    refreshAbort.current = controller
-    if (!hasLoaded.current) setLoading(true)
-    const request = apiJson<UserNotificationPage>('/api/user/notifications?limit=20', {
-      fallbackMessage: copy.notifications.loadError,
-      signal: controller.signal,
-    }).then((page) => {
-      if (currentUserId.current !== requestedUserId || mutationVersion.current !== requestedMutationVersion) return
-      setNotifications(page.notifications)
-      setUnreadCount(page.unread_count)
-      setNextCursor(page.next_cursor)
-      setError(null)
-      hasLoaded.current = true
-      const nextInventoryRevision = page.notifications
-        .filter((notification) => notification.action?.kind === 'inventory')
-        .map((notification) => `${notification.id}:${notification.updated_at}`)
-        .sort()
-        .join('|')
-      if (inventoryRevision.current !== null && inventoryRevision.current !== nextInventoryRevision) {
-        markInventoryStale()
-      }
-      inventoryRevision.current = nextInventoryRevision
-    }).catch((caught) => {
-      if (currentUserId.current === requestedUserId && mutationVersion.current === requestedMutationVersion
-        && !isAbortError(caught)) {
-        setError(getApiErrorMessage(caught, copy.notifications.loadError))
-      }
-    }).finally(() => {
-      if (currentUserId.current === requestedUserId && mutationVersion.current === requestedMutationVersion) {
-        setLoading(false)
-      }
-      if (refreshInFlight.current === request) refreshInFlight.current = null
-      if (refreshAbort.current === controller) refreshAbort.current = null
-    })
-    refreshInFlight.current = request
-    return request
-  }, [userId])
-
-  useEffect(() => {
-    mutationVersion.current += 1
-    refreshAbort.current?.abort()
-    loadMoreAbort.current?.abort()
-    mutationAbort.current?.abort()
-    hasLoaded.current = false
-    inventoryRevision.current = null
-    refreshInFlight.current = null
-    setNotifications([])
-    setUnreadCount(0)
-    setNextCursor(null)
-    setError(null)
-    setLoading(true)
-    setLoadingMore(false)
-    setMarkingAll(false)
-    setMarkingId(null)
-    void refresh()
-
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') void refresh()
-    }
-    const interval = window.setInterval(refreshWhenVisible, POLL_INTERVAL_MS)
-    document.addEventListener('visibilitychange', refreshWhenVisible)
-    window.addEventListener('focus', refreshWhenVisible)
-    return () => {
-      refreshAbort.current?.abort()
-      loadMoreAbort.current?.abort()
-      mutationAbort.current?.abort()
-      window.clearInterval(interval)
-      document.removeEventListener('visibilitychange', refreshWhenVisible)
-      window.removeEventListener('focus', refreshWhenVisible)
-    }
-  }, [refresh, userId])
-
-  const loadMore = useCallback(async () => {
-    if (!nextCursor || loadingMore || refreshInFlight.current) return
-    setLoadingMore(true)
-    const requestedUserId = userId
-    const requestedMutationVersion = mutationVersion.current
-    loadMoreAbort.current?.abort()
-    const controller = new AbortController()
-    loadMoreAbort.current = controller
-    try {
-      const page = await apiJson<UserNotificationPage>(
-        `/api/user/notifications?limit=20&cursor=${encodeURIComponent(nextCursor)}`,
-        { fallbackMessage: copy.notifications.loadError, signal: controller.signal },
-      )
-      if (controller.signal.aborted || loadMoreAbort.current !== controller
-        || currentUserId.current !== requestedUserId || mutationVersion.current !== requestedMutationVersion) return
-      setNotifications((current) => mergeNotifications(current, page.notifications))
-      setUnreadCount(page.unread_count)
-      setNextCursor(page.next_cursor)
-      setError(null)
-    } catch (caught) {
-      if (currentUserId.current === requestedUserId && mutationVersion.current === requestedMutationVersion
-        && loadMoreAbort.current === controller && !controller.signal.aborted && !isAbortError(caught)) {
-        setError(getApiErrorMessage(caught, copy.notifications.loadError))
-      }
-    } finally {
-      if (loadMoreAbort.current === controller) {
-        setLoadingMore(false)
-        loadMoreAbort.current = null
-      }
-    }
-  }, [loadingMore, nextCursor, userId])
-
-  const markRead = useCallback(async (displayed: UserNotification) => {
-    const notificationId = displayed.id
-    const requestedUserId = userId
-    mutationVersion.current += 1
-    const requestedMutationVersion = mutationVersion.current
-    loadMoreAbort.current?.abort()
-    loadMoreAbort.current = null
-    setLoadingMore(false)
-    mutationAbort.current?.abort()
-    const controller = new AbortController()
-    mutationAbort.current = controller
-    setMarkingId(notificationId)
-    try {
-      const result = await apiJson<{ unread_count: number }>('/api/user/notifications', {
-        method: 'PATCH',
-        json: { notification_id: notificationId, updated_at: displayed.updated_at },
-        fallbackMessage: copy.notifications.updateError,
-        signal: controller.signal,
-      })
-      if (currentUserId.current !== requestedUserId || mutationVersion.current !== requestedMutationVersion) {
-        throw new Error('Notification mutation superseded by a user change.')
-      }
-      const readAt = new Date().toISOString()
-      setNotifications((current) => current.map((notification) => (
-        notification.id === notificationId && notification.updated_at === displayed.updated_at && !notification.read_at
-          ? { ...notification, read_at: readAt }
-          : notification
-      )))
-      setUnreadCount(result.unread_count)
-      setError(null)
-    } catch (caught) {
-      if (currentUserId.current === requestedUserId && mutationVersion.current === requestedMutationVersion
-        && !isAbortError(caught)) {
-        setError(getApiErrorMessage(caught, copy.notifications.updateError))
-      }
-      throw caught
-    } finally {
-      if (currentUserId.current === requestedUserId && mutationVersion.current === requestedMutationVersion) {
-        setMarkingId(null)
-      }
-      if (mutationAbort.current === controller) mutationAbort.current = null
-    }
-  }, [userId])
-
-  const markAllRead = useCallback(async () => {
-    const requestedUserId = userId
-    mutationVersion.current += 1
-    const requestedMutationVersion = mutationVersion.current
-    loadMoreAbort.current?.abort()
-    loadMoreAbort.current = null
-    setLoadingMore(false)
-    mutationAbort.current?.abort()
-    const controller = new AbortController()
-    mutationAbort.current = controller
-    setMarkingAll(true)
-    try {
-      const result = await apiJson<{ unread_count: number }>('/api/user/notifications', {
-        method: 'PATCH',
-        json: { all: true },
-        fallbackMessage: copy.notifications.updateError,
-        signal: controller.signal,
-      })
-      if (currentUserId.current !== requestedUserId || mutationVersion.current !== requestedMutationVersion) return
-      const readAt = new Date().toISOString()
-      setNotifications((current) => current.map((notification) => (
-        notification.read_at ? notification : { ...notification, read_at: readAt }
-      )))
-      setUnreadCount(result.unread_count)
-      setError(null)
-    } catch (caught) {
-      if (currentUserId.current === requestedUserId && mutationVersion.current === requestedMutationVersion
-        && !isAbortError(caught)) {
-        setError(getApiErrorMessage(caught, copy.notifications.updateError))
-      }
-    } finally {
-      if (currentUserId.current === requestedUserId && mutationVersion.current === requestedMutationVersion) {
-        setMarkingAll(false)
-      }
-      if (mutationAbort.current === controller) mutationAbort.current = null
-    }
-  }, [userId])
+  const { notifications, unreadCount, nextCursor, loading, loadingMore, markingAll, markingId, error, refresh, loadMore, markRead, markAllRead } = useNotificationQuery(userId)
 
   return (
     <NotificationCenterContext.Provider value={{
@@ -416,20 +203,6 @@ function NotificationBellContent({ center, iconOnly, onInventory }: { center: No
       </PopoverContent>
     </Popover>
   )
-}
-
-function mergeNotifications(primary: UserNotification[], secondary: UserNotification[]): UserNotification[] {
-  const byId = new Map<string, UserNotification>()
-  for (const notification of [...primary, ...secondary]) {
-    if (!byId.has(notification.id)) byId.set(notification.id, notification)
-  }
-  return [...byId.values()].sort((left, right) => (
-    right.updated_at.localeCompare(left.updated_at) || right.id.localeCompare(left.id)
-  ))
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === 'AbortError'
 }
 
 function formatNotificationTime(value: string): string {

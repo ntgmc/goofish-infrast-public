@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen } from '../../../test/query-render'
+import { act, cleanup, fireEvent, render, screen } from '../../../test/private-query-render'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AdminCapability, AdminOptimizationQueueSnapshot } from '../contracts'
 

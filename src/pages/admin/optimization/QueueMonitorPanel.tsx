@@ -177,7 +177,7 @@ function QueueMonitor({ adminUsername, capabilities, active = true, search = '' 
       )}
 
       </div>
-      <div hidden={view !== 'history'} role="tabpanel" aria-label="服务历史与事件">{visited.includes('history') && <ServiceStatusHistoryPanel />}</div>
+      <div hidden={view !== 'history'} role="tabpanel" aria-label="服务历史与事件">{visited.includes('history') && <ServiceStatusHistoryPanel active={active && view === 'history'} />}</div>
       <div hidden={view !== 'dead'} role="tabpanel" aria-label="死信处理">{visited.includes('dead') && <DeadLetterPanel active={active && view === 'dead'} pendingOnly={new URLSearchParams(search).get('status') === 'pending_review'} />}</div>
     </section>
   )

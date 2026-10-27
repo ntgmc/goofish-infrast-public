@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { useAdminPanelQuery } from '../../../lib/admin-panel-query'
 import { SectionLoader } from '../../../components/SessionLoader'
 import type { AdminRegistrationInvitation, AdminRegistrationInvitationStatus } from '../../../lib/types'
 import { adminApiJson } from '../../../lib/admin-api-client'
@@ -27,38 +28,23 @@ interface InvitationCreateResponse {
 
 const EMPTY_PAGINATION: PaginationMeta = { page: 1, page_size: 20, total: 0, total_pages: 0 }
 
-export default function AdminRegistrationInvitationsPanel() {
-  const [invitations, setInvitations] = useState<AdminRegistrationInvitation[]>([])
-  const [pagination, setPagination] = useState(EMPTY_PAGINATION)
+export default function AdminRegistrationInvitationsPanel({ active = true }: { active?: boolean }) {
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState<StatusFilter>('all')
-  const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [generated, setGenerated] = useState<InvitationCreateResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [writeError, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [reason, setReason] = useState('')
   const [rootPassword, setRootPassword] = useState('')
   const idempotencyKeyRef = useRef(crypto.randomUUID())
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const query = new URLSearchParams({ page: String(page), page_size: '20', status })
-      const data = await adminApiJson<InvitationListResponse>(`/api/admin/registration-invitations?${query}`, {
-        fallbackMessage: copy.admin.registration_admin_invites_load_failed,
-      })
-      setInvitations(data.invitations ?? [])
-      setPagination(data.pagination ?? EMPTY_PAGINATION)
-    } catch (caught) {
-      setError((caught as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }, [page, status])
-
-  useEffect(() => { void load() }, [load])
+  const query = useAdminPanelQuery<InvitationListResponse>('registration-invitations', `/api/admin/registration-invitations?${new URLSearchParams({ page: String(page), page_size: '20', status })}`, active)
+  const invitations = query.data?.invitations ?? []
+  const pagination = query.data?.pagination ?? EMPTY_PAGINATION
+  const loading = query.isFetching
+  const error = writeError ?? query.error?.message
+  const load = async () => { setError(null); await query.refetch({ cancelRefetch: false }) }
 
   const absoluteShareUrl = useMemo(() => generated
     ? new URL(generated.share_url, window.location.origin).toString()

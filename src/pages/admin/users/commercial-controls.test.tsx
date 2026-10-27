@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '../../../test/private-query-render'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CommercialAdminControls } from './components'
 
@@ -38,9 +38,9 @@ describe('commercial admin controls', () => {
 
     render(<CommercialAdminControls userId="user-2" eligible />)
 
-    await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/commercial?user_id=user-2'))
+    await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/commercial?user_id=user-2', { signal: expect.any(AbortSignal) }))
     expect(screen.getByText('商用账户控制')).toBeInTheDocument()
-    expect(screen.getByText(/档案用量：活跃 2 \/ 100，总量 4 \/ 1000；状态：已暂停/)).toBeInTheDocument()
+    expect(await screen.findByText(/档案用量：活跃 2 \/ 100，总量 4 \/ 1000；状态：已暂停/)).toBeInTheDocument()
     expect(screen.getByText(/计算中任务 2 个 · 暂扣 1200.00 积分/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '恢复商用' })).toBeInTheDocument()
   })

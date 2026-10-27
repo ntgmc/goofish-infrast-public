@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, renderHook } from '@testing-library/react'
+import { act, cleanup, renderHook } from '../../../test/query-render'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LicenseConfig, UserWorkspace, WorkspaceResultHistorySummary } from '../../../lib/types'
 import { useOptimizeWorkspace } from './useOptimizeWorkspace'
@@ -40,7 +40,7 @@ describe('useOptimizeWorkspace history mutations', () => {
     const refreshInventory = vi.fn().mockResolvedValue(undefined)
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     const { result } = renderHook(() => useOptimizeWorkspace({
-      profileId: 'profile-1',
+      userId: 'user-1', profileId: 'profile-1',
       activeConfig: {} as LicenseConfig,
       normalizeAllowedConfigOverride: (config) => config,
       onWorkspacePatch,
@@ -82,7 +82,7 @@ describe('useOptimizeWorkspace history mutations', () => {
     const setCurrentResult = vi.fn()
     const onWorkspacePatch = vi.fn()
     const { result } = renderHook(() => useOptimizeWorkspace({
-      profileId: 'profile-1', activeConfig: CONFIG_PRESETS['243'],
+      userId: 'user-1', profileId: 'profile-1', activeConfig: CONFIG_PRESETS['243'],
       isConfigReadOnly: () => readOnly, normalizeAllowedConfigOverride: (config) => config,
       onWorkspacePatch, onWorkspaceUpdated: vi.fn(), refreshInventory: vi.fn(),
       setConfigOverride, setCurrentResult, setFinalResult: vi.fn(), setHistoryItem: vi.fn(),
@@ -125,7 +125,7 @@ describe('useOptimizeWorkspace history mutations', () => {
     const workspace = { archived_results: [{ ...historyItem(), name: '我的封存' }] }
     mocks.apiJson.mockResolvedValue({ workspace })
     const { result } = renderHook(() => useOptimizeWorkspace({
-      profileId: 'profile-1',
+      userId: 'user-1', profileId: 'profile-1',
       activeConfig: {} as LicenseConfig,
       normalizeAllowedConfigOverride: (config) => config,
       onWorkspacePatch: vi.fn(),

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '../../../test/private-query-render'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import BehaviorRiskPanel from './BehaviorRiskPanel'
@@ -125,7 +125,8 @@ describe('BehaviorRiskPanel review form', () => {
     await waitFor(() => expect(apiJsonMock.mock.calls[apiJsonMock.mock.calls.length - 1]?.[0]).toContain('status=actioned'))
     view.rerender(<BehaviorRiskPanel search="?status=pending" />)
     await waitFor(() => expect(status).toHaveValue('pending'))
-    await waitFor(() => expect(apiJsonMock.mock.calls[apiJsonMock.mock.calls.length - 1]?.[0]).toContain('status=pending&page=1'))
+    expect(screen.getByText('采集与评估健康：正常')).toBeInTheDocument()
+    expect(apiJsonMock).toHaveBeenCalledTimes(2)
   })
 
   it('labels repeated Skland UID mismatches in the member evidence', async () => {

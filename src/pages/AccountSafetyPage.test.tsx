@@ -74,9 +74,9 @@ describe('AccountSafetyPage lifecycle controls', () => {
       features: { ...DEFAULT_SITE_FEATURES, ...(unavailable === 'error' ? {} : { [unavailable]: false }) },
       updatedAt: null, retry: vi.fn(),
     })
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ available: false, binding: null }), {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url) => Promise.resolve(new Response(JSON.stringify(url === '/api/auth/me' ? { user: { id: 'user-1' }, profiles: [] } : { available: false, binding: null }), {
       status: 200, headers: { 'Content-Type': 'application/json' },
-    })))
+    }))))
     const router = renderPage()
     expect(screen.getByRole('button', { name: '安全退出' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '修改密码' })).not.toBeInTheDocument()

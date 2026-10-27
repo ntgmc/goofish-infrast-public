@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '../test/query-render'
+import { render as renderUi } from '@testing-library/react'
+import QueryProvider from './query-provider'
 import { StrictMode } from 'react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -28,9 +30,9 @@ describe('SiteFeatureProvider', () => {
     let resolveCurrent!: (settings: typeof DEFAULT_SITE_FEATURE_SETTINGS) => void
     const current = new Promise((resolve) => { resolveCurrent = resolve })
     apiJson.mockReturnValueOnce(cancelled).mockReturnValueOnce(current)
-    render(<StrictMode><MemoryRouter><SiteFeatureProvider>
+    renderUi(<StrictMode><QueryProvider><MemoryRouter><SiteFeatureProvider>
       <FeatureRoute feature="v2"><p>V2 available</p></FeatureRoute>
-    </SiteFeatureProvider></MemoryRouter></StrictMode>)
+    </SiteFeatureProvider></MemoryRouter></QueryProvider></StrictMode>)
     await waitFor(() => expect(apiJson).toHaveBeenCalledTimes(2))
     expect(apiJson.mock.calls[0][1].signal.aborted).toBe(true)
     await act(async () => {

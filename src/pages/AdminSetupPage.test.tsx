@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '../test/query-render'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -23,7 +23,7 @@ const existingAdmin = {
 } as const
 
 beforeEach(() => {
-  adminApi.json.mockReset().mockResolvedValue({ users: [existingAdmin] })
+  adminApi.json.mockReset().mockResolvedValue({ user: { ...existingAdmin, capabilities: ['admin_manage'] }, users: [existingAdmin] })
   adminApi.void.mockReset().mockResolvedValue(undefined)
   vi.stubGlobal('confirm', vi.fn(() => true))
 })
@@ -36,6 +36,7 @@ afterEach(() => {
 describe('AdminSetupPage', () => {
   it('distinguishes a loading failure from an empty list and retries explicitly', async () => {
     adminApi.json
+      .mockResolvedValueOnce({ user: { ...existingAdmin, capabilities: ['admin_manage'] } })
       .mockRejectedValueOnce(new Error('管理员列表网络失败'))
       .mockResolvedValueOnce({ users: [existingAdmin] })
     renderPage()
@@ -45,11 +46,12 @@ describe('AdminSetupPage', () => {
     await userEvent.click(screen.getByRole('button', { name: '重试' }))
 
     expect(await screen.findByText(existingAdmin.username)).toBeInTheDocument()
-    expect(adminApi.json).toHaveBeenCalledTimes(2)
+    expect(adminApi.json).toHaveBeenCalledTimes(3)
   })
 
   it('requires confirmation and sends an explicit audited replacement request for a duplicate username', async () => {
     adminApi.json
+      .mockResolvedValueOnce({ user: { ...existingAdmin, capabilities: ['admin_manage'] } })
       .mockResolvedValueOnce({ users: [existingAdmin] })
       .mockResolvedValueOnce({ user: { ...existingAdmin, role: 'security_admin' }, replaced: true })
     renderPage()

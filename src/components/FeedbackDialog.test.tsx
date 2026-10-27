@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '../test/private-query-render'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import FeedbackButton from './FeedbackDialog'
@@ -35,6 +37,26 @@ it('preserves the draft after failure, submits the chosen category, and clears i
   await waitFor(() => expect(screen.getByRole('button', { name: copy.feedback.title })).toHaveFocus())
   await user.click(screen.getByRole('button', { name: copy.feedback.title }))
   expect(screen.getByLabelText(copy.feedback.message)).toHaveValue('')
+})
+
+it('invalidates the current user feedback pages after creation while preserving other users', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000 } } })
+  const key = ['user', 'test-user', null, 'feedback', 'list', 1]
+  const other = ['user', 'other-user', null, 'feedback', 'list', 1]
+  client.setQueryData(key, { items: [] })
+  client.setQueryData(other, { items: [] })
+  mocks.api.mockResolvedValue({ id: 'new-feedback' })
+  const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  render(<FeedbackButton />, { wrapper })
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('button', { name: copy.feedback.title }))
+  fireEvent.change(screen.getByLabelText(copy.feedback.message), { target: { value: '新反馈' } })
+  await user.click(screen.getByRole('button', { name: copy.feedback.submit }))
+  await screen.findByText(copy.feedback.submitted)
+  expect(client.getQueryState(key)?.isInvalidated).toBe(true)
+  expect(client.getQueryState(other)?.isInvalidated).toBe(false)
+  expect(mocks.api).toHaveBeenCalledTimes(1)
+  cleanup(); client.clear()
 })
 
 it('opens website feedback and submits only the context the user chose to attach', async () => {

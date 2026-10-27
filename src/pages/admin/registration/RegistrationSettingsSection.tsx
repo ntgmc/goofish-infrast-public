@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
+import { useAdminDraftQuery } from '../../../lib/admin-draft-query'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import type { BrevoEmailStats, RegistrationSettings } from '../../../lib/types'
 import { copy } from '../../../copy/index'
@@ -17,29 +18,18 @@ export default function RegistrationSettingsSection() {
   const [invitesVisited, setInvitesVisited] = useState(false)
   const [settings, setSettings] = useState<RegistrationSettings | null>(null)
   const [emailStats, setEmailStats] = useState<BrevoEmailStats | null>(null)
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [writeError, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await adminApiJson<RegistrationSettingsResponse>('/api/admin/registration-settings', {
-        fallbackMessage: copy.admin.registration_load_failed,
-      })
-      if (!data.settings || !data.email_stats) throw new Error(copy.admin.registration_load_failed)
-      setSettings(data.settings)
-      setEmailStats(data.email_stats)
-    } catch (caught) {
-      setError((caught as Error).message)
-    } finally {
-      setLoading(false)
-    }
+  const apply = useCallback((data: RegistrationSettingsResponse) => {
+    if (!data.settings || !data.email_stats) throw new Error(copy.admin.registration_load_failed)
+    setSettings(data.settings); setEmailStats(data.email_stats)
   }, [])
-
-  useEffect(() => { void load() }, [load])
+  const query = useAdminDraftQuery('registration', '/api/admin/registration-settings', apply)
+  const loading = query.isFetching
+  const error = writeError ?? query.error?.message
+  const load = () => { setError(null); return query.load() }
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -71,6 +61,7 @@ export default function RegistrationSettingsSection() {
         fallbackMessage: copy.admin.registration_save_failed,
       })
       if (!data.settings || !data.email_stats) throw new Error(copy.admin.registration_save_failed)
+      await query.write(data)
       setSettings(data.settings)
       setEmailStats(data.email_stats)
       setNotice(copy.admin.registration_saved)
@@ -360,7 +351,7 @@ export default function RegistrationSettingsSection() {
         </div>
       </section>
     </form>
-    <div hidden={view !== 'invites'} role="tabpanel" aria-label="注册邀请">{invitesVisited && <AdminRegistrationInvitationsPanel />}</div>
+    <div hidden={view !== 'invites'} role="tabpanel" aria-label="注册邀请">{invitesVisited && <AdminRegistrationInvitationsPanel active={view === 'invites'} />}</div>
     </div>
   )
 }
