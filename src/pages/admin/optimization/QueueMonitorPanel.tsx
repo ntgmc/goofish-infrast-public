@@ -1,8 +1,10 @@
 import { ExpandIcon as ChevronDown, CollapsedIcon as ChevronRight, RefreshIcon as RefreshCw, SearchIcon as Search } from '../../../components/icons'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import { matchesSearch } from '../../../lib/search'
 import type {
+  AdminCapability,
   AdminOptimizationQueueJob,
   AdminOptimizationQueueSnapshot,
   AdminOptimizationQueueStatus,
@@ -23,19 +25,21 @@ type Filters = {
 
 const DEFAULT_FILTERS: Filters = { query: '', status: 'all', source: 'all', priority: 'all' }
 
-export default function QueueMonitorPanel({ active = true, search = '' }: { active?: boolean; search?: string }) {
+type Props = { adminUsername: string | null; capabilities: AdminCapability[]; active?: boolean; search?: string }
+
+export default function QueueMonitorPanel(props: Props) {
+  return <QueueMonitor key={props.adminUsername} {...props} />
+}
+
+function QueueMonitor({ adminUsername, capabilities, active = true, search = '' }: Props) {
   const requestedView = new URLSearchParams(search).get('view')
   const [view, setView] = useState<'tasks' | 'history' | 'dead'>(requestedView === 'dead' || requestedView === 'history' ? requestedView : 'tasks')
   const requestedJob = new URLSearchParams(search).get('job_id')
   const relatedQuery = new URLSearchParams(search).get('query') ?? ''
   const [jobView, setJobView] = useState<'queued' | 'running' | 'recent'>(relatedQuery ? 'recent' : 'queued')
   const [visited, setVisited] = useState<string[]>([view])
-  const [snapshot, setSnapshot] = useState<AdminOptimizationQueueSnapshot | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [refreshing, setRefreshing] = useState(false)
   const [filters, setFilters] = useState<Filters>({ ...DEFAULT_FILTERS, query: new URLSearchParams(search).get('query') ?? '' })
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(() => new Set())
-  const requestRef = useRef<AbortController | null>(null)
   useEffect(() => {
     const next = new URLSearchParams(search).get('view')
     if (next === 'dead' || next === 'history') {
@@ -49,46 +53,21 @@ export default function QueueMonitorPanel({ active = true, search = '' }: { acti
     }
   }, [search, requestedJob, relatedQuery])
 
-  const loadSnapshot = useCallback(async () => {
-    requestRef.current?.abort()
-    const controller = new AbortController()
-    requestRef.current = controller
-    setRefreshing(true)
-    try {
-      const data = await adminApiJson<AdminOptimizationQueueSnapshot>(`/api/admin/optimization?view=queue${relatedQuery ? `&related=${encodeURIComponent(relatedQuery)}` : ''}`, {
-        signal: controller.signal,
-        fallbackMessage: '加载异步队列失败',
-      })
-      if (controller.signal.aborted) return
-      setSnapshot(data)
-      setError(null)
-    } catch (caught) {
-      if (controller.signal.aborted) return
-      setError(caught instanceof Error ? caught.message : '加载异步队列失败')
-    } finally {
-      if (requestRef.current === controller) {
-        requestRef.current = null
-        setRefreshing(false)
-      }
-    }
-  }, [relatedQuery])
-
-  useEffect(() => {
-    if (!active || view !== 'tasks') return
-    void loadSnapshot()
-    const poll = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void loadSnapshot()
-    }, POLL_INTERVAL_MS)
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') void loadSnapshot()
-    }
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => {
-      window.clearInterval(poll)
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-      requestRef.current?.abort()
-    }
-  }, [active, loadSnapshot, view])
+  const enabled = active && view === 'tasks' && Boolean(adminUsername) && capabilities.includes('optimization_view')
+  const query = useQuery({
+    queryKey: ['admin', enabled ? adminUsername : null, 'optimization-queue', capabilities, relatedQuery],
+    enabled,
+    queryFn: ({ signal }) => adminApiJson<AdminOptimizationQueueSnapshot>(`/api/admin/optimization?view=queue${relatedQuery ? `&related=${encodeURIComponent(relatedQuery)}` : ''}`, {
+      signal, fallbackMessage: '加载异步队列失败',
+    }),
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: 'always',
+    refetchInterval: POLL_INTERVAL_MS,
+  })
+  const snapshot = query.data
+  const error = query.error?.message
+  const refreshing = query.isFetching
 
   const allJobs = useMemo(() => snapshot
     ? [...snapshot.queued_jobs, ...snapshot.running_jobs, ...snapshot.recent_jobs]
@@ -108,13 +87,12 @@ export default function QueueMonitorPanel({ active = true, search = '' }: { acti
     setExpandedJobs((current) => current.has(id) ? new Set() : new Set([id]))
   }
 
-  if (view === 'tasks' && !snapshot && !error) return <SectionLoader label="正在加载异步队列…" />
-
   return (
     <section className="space-y-5" aria-label="服务与任务监控">
       <AdminTabs label="服务监控任务" items={[{ id: 'tasks', label: '任务监控' }, { id: 'history', label: '服务历史与事件' }, { id: 'dead', label: '死信处理' }]} value={view}
         onChange={(next) => { setView(next); setVisited((current) => current.includes(next) ? current : [...current, next]) }} />
       <div hidden={view !== 'tasks'} role="tabpanel" aria-label="任务监控" className="space-y-5">
+      {!snapshot && !error && <SectionLoader label="正在加载异步队列…" />}
       <section className="tool-panel p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -128,7 +106,7 @@ export default function QueueMonitorPanel({ active = true, search = '' }: { acti
             <span className="text-xs text-ink-muted" aria-live="polite">
               {snapshot ? `数据时间 ${formatDateTime(snapshot.snapshot_at)}` : '等待首次同步'}
             </span>
-            <button type="button" onClick={() => void loadSnapshot()} disabled={refreshing} className="tool-secondary-action gap-2">
+            <button type="button" onClick={() => void query.refetch({ cancelRefetch: false })} disabled={refreshing || !enabled} className="tool-secondary-action gap-2">
               <RefreshCw aria-hidden="true" className={`h-4 w-4 ${refreshing ? 'animate-spin motion-reduce:animate-none' : ''}`} />
               {refreshing ? '刷新中' : '立即刷新'}
             </button>

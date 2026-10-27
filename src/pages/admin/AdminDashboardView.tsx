@@ -73,7 +73,7 @@ export default function AdminDashboardView() {
           {section === 'feedback' && <FeedbackSection search={activeSection === 'feedback' ? location.search : ''} active={displayedSection === 'feedback'} canManage={c.adminCapabilities.includes('user_manage')} canViewUser={c.adminCapabilities.includes('sensitive_data_view')} canViewTasks={c.adminCapabilities.includes('optimization_view')} />}
           {section === 'cdk' && <CdkSection model={c} active={displayedSection === 'cdk'} />}
           {section === 'risk' && <RiskSection model={c} search={activeSection === 'risk' ? location.search : ''} active={displayedSection === 'risk'} />}
-          {section === 'queue' && <QueueMonitorPanel search={activeSection === 'queue' ? location.search : ''} active={displayedSection === 'queue'} />}
+          {section === 'queue' && <QueueMonitorPanel adminUsername={c.adminUsername} capabilities={c.adminCapabilities} search={activeSection === 'queue' ? location.search : ''} active={displayedSection === 'queue'} />}
           {section === 'features' && <FeatureSettingsSection />}
           {section === 'content' && <PublicContentSettingsSection />}
           {section === 'items' && <InventoryAdminSection />}

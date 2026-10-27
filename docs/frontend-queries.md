@@ -1,12 +1,12 @@
 # 前端查询缓存
 
-TanStack Query v5 当前管理库存、库存余额提示、新手任务、优化任务列表、积分余额明细、好友邀请记录、商用档案分页和用户公告（含 V2 公开分页），以及后台用户、CDK、风险记录分页列表和概览读取（运营报表、CDK 汇总、公告线上快照、风控设置）。`App` 的 `QueryProvider` 为各路由共享一个内存中的 `QueryClient`，不持久化缓存。请求继续使用 `apiJson`、`adminApiJson` 和现有优化 API 函数，沿用超时、错误消息、诊断及管理员会话过期处理。
+TanStack Query v5 当前管理库存、库存余额提示、新手任务、优化任务列表、积分余额明细、好友邀请记录、商用档案分页和用户公告（含 V2 公开分页），以及后台用户、CDK、风险记录分页列表、概览读取（运营报表、今日待办、CDK 汇总、公告线上快照、风控设置）和任务监控队列快照。`App` 的 `QueryProvider` 为各路由共享一个内存中的 `QueryClient`，不持久化缓存。请求继续使用 `apiJson`、`adminApiJson` 和现有优化 API 函数，沿用超时、错误消息、诊断及管理员会话过期处理。
 
 ## 状态归属
 
 查询保存服务端数据、加载状态、错误和分页游标。组件保留筛选输入、选择、弹窗、通知和提交状态。不要把查询返回的数据再复制到 `useState`，也不要为同一个查询另设请求序号或取消控制器；查询函数应把 TanStack Query 提供的 `signal` 传给请求函数。
 
-默认新鲜期为 30 秒，关闭自动重试和窗口聚焦刷新。库存通过下述失效桥接刷新；任务中心单独启用回到前台时刷新和定时查询。积分余额的新鲜期为 0，进入页面和回到前台时都重新读取，避免直接沿用短期缓存中的余额。失败后保留同一身份下最后成功的数据，并显示错误。切换身份或分页时不使用上一查询的数据作为占位。
+默认新鲜期为 30 秒，关闭自动重试和窗口聚焦刷新。库存通过下述失效桥接刷新；任务中心与后台队列快照分别启用回到前台时刷新和定时查询。积分余额的新鲜期为 0，进入页面和回到前台时都重新读取，避免直接沿用短期缓存中的余额。失败后保留同一身份下最后成功的数据，并显示错误。切换身份或分页时不使用上一查询的数据作为占位。
 
 ## 查询键与清理
 
@@ -25,6 +25,8 @@ TanStack Query v5 当前管理库存、库存余额提示、新手任务、优�
 | 后台 CDK 分页 | `['admin', adminUsername, 'cdks', capabilities, 'list', page, pageSize, search, filters]` |
 | 后台风险记录分页 | `['admin', adminUsername, 'cdks', capabilities, 'risk', page, pageSize]` |
 | 后台运营报表 | `['admin', adminUsername, 'overview', capabilities, rangeQuery]` |
+| 后台今日待办 | `['admin', adminUsername, 'operations-todos', capabilities, refreshKey]` |
+| 后台任务监控队列快照 | `['admin', adminUsername, 'optimization-queue', capabilities, relatedQuery]` |
 | 后台 CDK 汇总 | `['admin', adminUsername, 'cdks', capabilities, 'summary']` |
 | 后台公告线上快照 | `['admin', adminUsername, 'announcement', capabilities]` |
 | 后台风控设置 | `['admin', adminUsername, 'risk-settings', capabilities]` |
@@ -61,8 +63,16 @@ V2 分页按用户或公开身份、页码与未读筛选隔离。直达尚未�
 
 手动刷新和修改后的刷新使当前栏目对应的查询前缀失效；CDK 汇总与列表只失效一次。当前栏目读取新数据，其他已缓存范围或页面下次使用时重读；修改成功与后续读取失败分别提示。
 
+## 后台待办与队列快照
+
+今日待办只在总览栏目活跃、管理员身份已确认且具有 `usage_view` 时订阅。运营报表的 `generated_at` 作为 `refreshKey` 进入查询键，报表更新后读取对应的待办快照；手动刷新只重读当前待办。同一管理员、权限和刷新标识下共享在途请求与 30 秒内的新鲜结果，保留按权限显示待办入口和读取失败时隐藏数字的行为。
+
+队列快照只在任务监控栏目和任务视图活跃、管理员具有 `optimization_view` 时订阅。关联账号、档案或任务的 `relatedQuery` 进入查询键；面板内搜索、状态、来源和优先级筛选继续在本地执行，不额外请求。队列新鲜期为 0，进入视图和回到前台时刷新；每 5 秒查询，网页隐藏时暂停轮询。多个消费者、轮询和前台恢复共用尚未完成的读取，不反复取消慢请求。刷新失败保留同一查询的最后成功快照，允许手动重读。
+
+离开栏目或队列任务视图时脱离原查询，取消无人订阅的读取；切换管理员、权限或关联查询时不显示旧查询的数据。没有身份或所需权限时，自动读取和手动刷新均禁用。查询数据脱离时保留队列筛选、展开状态及已访问的服务历史、死信子面板，避免卸载清空本地编辑；管理员变化时重新挂载监控面板。服务历史与死信处理仍使用原有读取和提交逻辑。
+
 ## 本阶段保留的流程
 
-会话与工作区读取、原公开公告页及会话附带的横幅/提醒来源、排班历史分页、自动保存、计费报价与提交、任务提交、后台详情读取及其他独立面板、森空岛快照客户端仍使用原有流程。排班历史首屏由工作区快照提供，后续迁移需一起处理快照替换和历史修改后的失效。自动保存的串行队列与草稿恢复、提交的幂等键，以及森空岛的请求合并、版本失效和跨标签页通知不由查询缓存替代。后续迁移应逐个明确数据身份和失效来源，保留这些流程已有的边界语义。
+会话与工作区读取、原公开公告页及会话附带的横幅/提醒来源、排班历史分页、自动保存、计费报价与提交、任务提交、后台详情读取与反馈、服务历史、死信等独立面板、森空岛快照客户端仍使用原有流程。排班历史首屏由工作区快照提供，后续迁移需一起处理快照替换和历史修改后的失效。自动保存的串行队列与草稿恢复、提交的幂等键，以及森空岛的请求合并、版本失效和跨标签页通知不由查询缓存替代。后续迁移应逐个明确数据身份和失效来源，保留这些流程已有的边界语义。
 
-涉及缓存共享、身份切换、迟到响应、退出清理或修改后的失效时，运行 `inventory-query.test.tsx`、`inventory-hooks.test.tsx`、`useOptimizationTaskCenter.test.tsx`、`useOptimizeWorkflow.races.test.tsx`、`BalanceSection.test.tsx`、`InvitationsSection.test.tsx`、`CommercialProfilesSection.test.tsx`、`ProfileUpgradePrompt.test.tsx`、`announcement-query.test.tsx`、`AnnouncementsSection.test.tsx`、V2 `Announcements.test.tsx`、`Accessibility.test.tsx`、`useAdminUserList.test.tsx`、`useAdminCdkData.test.tsx`、`useAdminOverview.test.ts`、`useAdminController.test.tsx` 及相关页面集成测试，再按 [验证规则](agent-validation.md) 运行仓库检查。
+涉及缓存共享、身份切换、迟到响应、退出清理或修改后的失效时，运行 `inventory-query.test.tsx`、`inventory-hooks.test.tsx`、`useOptimizationTaskCenter.test.tsx`、`useOptimizeWorkflow.races.test.tsx`、`BalanceSection.test.tsx`、`InvitationsSection.test.tsx`、`CommercialProfilesSection.test.tsx`、`ProfileUpgradePrompt.test.tsx`、`announcement-query.test.tsx`、`AnnouncementsSection.test.tsx`、V2 `Announcements.test.tsx`、`Accessibility.test.tsx`、`useAdminUserList.test.tsx`、`useAdminCdkData.test.tsx`、`useAdminOverview.test.ts`、`useAdminController.test.tsx`、`OperationsTodosPanel.test.tsx`、`QueueMonitorPanel.test.tsx`、`AdminDashboardView.navigation.test.tsx` 及相关页面集成测试，再按 [验证规则](agent-validation.md) 运行仓库检查。
