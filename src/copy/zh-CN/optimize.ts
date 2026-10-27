@@ -302,13 +302,9 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/OptimizeWorkflowPage.tsx
   pages_tool_optimize_OptimizeWorkflowPage_003: "库存数据：",
   // src/pages/tool/optimize/OptimizeWorkflowPage.tsx
-  pages_tool_optimize_OptimizeWorkflowPage_004: "优先计算券：",
-  // src/pages/tool/optimize/OptimizeWorkflowPage.tsx
   pages_tool_optimize_OptimizeWorkflowPage_005: "正在重试…",
   // src/pages/tool/optimize/OptimizeWorkflowPage.tsx
   pages_tool_optimize_OptimizeWorkflowPage_006: "重试库存",
-  // src/pages/tool/optimize/OptimizeWorkflowPage.tsx
-  pages_tool_optimize_OptimizeWorkflowPage_007: "重试优先券",
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_001: "方案与历史",
   // src/pages/tool/optimize/OverviewSection.tsx

@@ -1,6 +1,6 @@
 # 前端查询缓存
 
-TanStack Query v5 当前管理库存、库存余额提示、新手任务、优化任务列表和积分余额明细，以及后台用户、CDK 和风险记录分页列表。`App` 的 `QueryProvider` 为各路由共享一个内存中的 `QueryClient`，不持久化缓存。请求继续使用 `apiJson`、`adminApiJson` 和现有优化 API 函数，沿用超时、错误消息、诊断及管理员会话过期处理。
+TanStack Query v5 当前管理库存、库存余额提示、新手任务、优化任务列表、积分余额明细和好友邀请记录，以及后台用户、CDK 和风险记录分页列表。`App` 的 `QueryProvider` 为各路由共享一个内存中的 `QueryClient`，不持久化缓存。请求继续使用 `apiJson`、`adminApiJson` 和现有优化 API 函数，沿用超时、错误消息、诊断及管理员会话过期处理。
 
 ## 状态归属
 
@@ -16,6 +16,7 @@ TanStack Query v5 当前管理库存、库存余额提示、新手任务、优�
 | 新手任务 | `['user', userId, profileId, 'onboarding-tasks']` |
 | 优化任务分页 | `['user', userId, profileId, 'optimization-jobs']` |
 | 积分余额与明细分页 | `['user', userId, profileId, 'balance']` |
+| 好友邀请概况与记录分页 | `['user', userId, profileId, 'invitations']` |
 | 后台用户分页 | `['admin', adminUsername, 'users', capabilities, operationsSearch, page, pageSize, search, filters]` |
 | 后台 CDK 分页 | `['admin', adminUsername, 'cdks', capabilities, 'list', page, pageSize, search, filters]` |
 | 后台风险记录分页 | `['admin', adminUsername, 'cdks', capabilities, 'risk', page, pageSize]` |
@@ -26,7 +27,8 @@ TanStack Query v5 当前管理库存、库存余额提示、新手任务、优�
 
 ## 刷新与修改
 
-- `markInventoryStale()` 仍是道具使用、领取和其他库存变化的通知入口。`QueryProvider` 通过现有 `useInventoryRefresh` 将通知转换为库存和新手任务查询失效，回到前台时也刷新。请求中收到的失效通知在请求结束后补刷，多个消费者共享同一请求。
+- `markInventoryStale()` 仍是道具使用、领取和其他库存变化的通知入口。`QueryProvider` 通过现有 `useInventoryRefresh` 将通知转换为库存和新手任务查询失效，回到前台时也刷新。请求中收到的失效通知在请求结束后补刷，多个消费者共享同一请求。优先计算券的数量、永久数量和最近到期日从同一份库存派生，生成页面共用库存错误与重试；请求失败保留上次成功数量，同时取消优先券选择。切换档案或券数归零也取消选择。任务结束后只刷新一次库存。
+- 好友邀请使用 `useInfiniteQuery`，沿用服务端游标，刷新已加载页面时使用新游标并按记录 ID 去重。有待结算记录时每 15 秒查询，页面隐藏时暂停轮询，回到前台时刷新；慢请求不会被轮询中断。读取或观察到已发奖邀请数量变化时，通过库存通知刷新道具余额。邀请码生成、更换、暂停和恢复保留原提交与更换确认；操作成功后使该用户各档案的邀请查询失效，读取失败不重提修改。
 - 优化任务使用 `useInfiniteQuery`，打开任务中心或有进行中任务时每 10 秒刷新，否则每 30 秒刷新。页面隐藏时暂停轮询，回到前台时刷新。现有跨标签页任务通知仍合并为延迟 250 毫秒的刷新；慢请求不会被定时查询反复取消。刷新已加载的多页时依次读取新的游标，合并结果时按任务 ID 去重。
 - 取消任务仍执行原有确认与提交，成功后使对应用户、档案的任务列表失效。
 - 积分余额与明细使用 `useInfiniteQuery`，沿用服务端游标，逐页刷新并按流水 ID 去重。界面从最后一次成功读取的分页响应中获取余额和 `as_of`。兑换仍使用原提交与幂等键；成功后使该用户各档案的余额查询失效。兑换成功提示和账单刷新错误分别展示，查询失败不会触发兑换重试。查询中的余额不替代计费报价或服务端结算。
@@ -34,6 +36,6 @@ TanStack Query v5 当前管理库存、库存余额提示、新手任务、优�
 
 ## 本阶段保留的流程
 
-会话与工作区读取、自动保存、计费报价与提交、任务提交、优先计算券的独立读取、后台概览与 CDK 汇总、森空岛快照客户端仍使用原有流程。自动保存的串行队列与草稿恢复、提交的幂等键，以及森空岛的请求合并、版本失效和跨标签页通知不由查询缓存替代。后续迁移应逐个明确数据身份和失效来源，保留这些流程已有的边界语义。
+会话与工作区读取、排班历史分页、自动保存、计费报价与提交、任务提交、后台概览与 CDK 汇总、森空岛快照客户端仍使用原有流程。排班历史首屏由工作区快照提供，后续迁移需一起处理快照替换和历史修改后的失效。自动保存的串行队列与草稿恢复、提交的幂等键，以及森空岛的请求合并、版本失效和跨标签页通知不由查询缓存替代。后续迁移应逐个明确数据身份和失效来源，保留这些流程已有的边界语义。
 
-涉及缓存共享、身份切换、迟到响应、退出清理或修改后的失效时，运行 `inventory-query.test.tsx`、`inventory-hooks.test.tsx`、`useOptimizationTaskCenter.test.tsx`、`BalanceSection.test.tsx`、`useAdminUserList.test.tsx`、`useAdminCdkData.test.tsx` 及相关页面集成测试，再按 [验证规则](agent-validation.md) 运行仓库检查。
+涉及缓存共享、身份切换、迟到响应、退出清理或修改后的失效时，运行 `inventory-query.test.tsx`、`inventory-hooks.test.tsx`、`useOptimizationTaskCenter.test.tsx`、`useOptimizeWorkflow.races.test.tsx`、`BalanceSection.test.tsx`、`InvitationsSection.test.tsx`、`useAdminUserList.test.tsx`、`useAdminCdkData.test.tsx` 及相关页面集成测试，再按 [验证规则](agent-validation.md) 运行仓库检查。

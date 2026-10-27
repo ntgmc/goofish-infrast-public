@@ -115,6 +115,37 @@ it.each(['V1', 'V2'])('requires explicit coupon selection in %s and preserves in
   }
 })
 
+it('shares priority inventory reads, clears unsafe selections, and refreshes once after a failed submission', async () => {
+  const inventory = { stacks: [{ item: { code: 'priority_compute_coupon' }, quantity: 1, permanent: 1, next_expiry_at: null }], capacities: [], recent_events: [] }
+  let inventoryAvailable = true
+  const submit = vi.fn(async (input, init) => {
+    if (String(input) === '/api/user/inventory') return inventoryAvailable ? json(inventory) : json({ error: { message: 'Inventory unavailable' } }, 503)
+    if (String(input) === '/api/optimization/jobs' && init?.method === 'POST') return json({ error: { message: 'Submission unavailable' } }, 503)
+    return json({})
+  })
+  vi.stubGlobal('fetch', submit)
+  const hook = renderHook((props) => useOptimizeWorkflow(props), { initialProps: propsFor() })
+  await waitFor(() => expect(hook.result.current.priorityCouponBalance?.available).toBe(1))
+  act(() => hook.result.current.setUsePriorityCoupon(true))
+  inventoryAvailable = false
+  await act(async () => { await hook.result.current.refreshInventory() })
+  await waitFor(() => expect(hook.result.current.usePriorityCoupon).toBe(false))
+  expect(hook.result.current.inventoryError).toBe('Inventory unavailable')
+  expect(hook.result.current.priorityCouponBalance?.available).toBe(1)
+  inventoryAvailable = true
+  await act(async () => { await hook.result.current.refreshInventory() })
+  act(() => hook.result.current.setUsePriorityCoupon(true))
+  await act(async () => { await hook.result.current.handleGenerate() })
+  const submissions = submit.mock.calls.filter(([url, init]) => url === '/api/optimization/jobs' && init?.method === 'POST')
+  expect(submissions).toHaveLength(1)
+  expect(JSON.parse(String(submissions[0][1]?.body)).use_items).toEqual(['priority_compute_coupon'])
+  expect(submit.mock.calls.filter(([url]) => url === '/api/user/inventory')).toHaveLength(4)
+  expect(submit.mock.calls.some(([url]) => String(url).includes('priority-coupon-balance'))).toBe(false)
+  act(() => hook.result.current.setUsePriorityCoupon(true))
+  hook.rerender(propsFor({ ...profile, id: 'another-profile' }))
+  expect(hook.result.current.usePriorityCoupon).toBe(false)
+})
+
 const accepted: OptimizeJobAccepted = { job_id: 'race-job', status: 'queued', priority: 'paid', priority_label: 'paid', queue_position: 1,
   submitted_at: '2026-10-01T00:00:00Z', poll_after_ms: 500, estimated_duration_ms: 1000, estimate_bucket: 'maa_plain', estimate_source: 'fallback_p95',
   estimate_sample_count: 0, estimated_remaining_ms: 1000, estimated_total_ms: 1000, estimate_phase: 'queued', estimate_updated_at: '2026-10-01T00:00:00Z',

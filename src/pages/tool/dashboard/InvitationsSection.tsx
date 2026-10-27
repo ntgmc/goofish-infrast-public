@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { copy, CURRENT_LOCALE } from '../../../copy/index'
-import { apiJson } from '../../../lib/api-client'
+import { apiJson, getApiErrorMessage } from '../../../lib/api-client'
+import { markInventoryStale } from '../../../lib/inventory-refresh'
 import { itemIconPath } from '../../../lib/inventory-contracts'
 import type {
   InvitationRecordSummary,
@@ -9,39 +11,53 @@ import type {
   InviterRewardStatus,
 } from '../../../lib/types'
 
-export default function InvitationsSection({ loadingFallback }: { loadingFallback?: ReactNode }) {
-  const [summary, setSummary] = useState<InvitationSummary | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
+export default function InvitationsSection({ userId, activeProfileId, loadingFallback }: {
+  userId: string; activeProfileId: string | null; loadingFallback?: ReactNode
+}) {
+  const queryClient = useQueryClient()
+  const query = useInfiniteQuery({
+    queryKey: ['user', userId, activeProfileId, 'invitations'],
+    queryFn: ({ pageParam, signal }) => apiJson<InvitationSummary>(`/api/user/invitations${pageParam ? `?cursor=${encodeURIComponent(pageParam)}` : ''}`, { signal }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) => page.next_cursor ?? undefined,
+    enabled: Boolean(userId),
+    refetchInterval: (query) => query.state.data?.pages.some((page) => page.records.some((record) => (
+      record.status === 'activated' || record.status === 'processing' || record.status === 'failed'
+    ))) ? 15_000 : false,
+    refetchOnWindowFocus: 'always',
+  })
+  const summary = useMemo(() => {
+    if (!query.data) return null
+    const seen = new Set<string>()
+    return {
+      ...query.data.pages[query.data.pages.length - 1]!,
+      records: query.data.pages.flatMap((page) => page.records).filter((record) => {
+        if (seen.has(record.id)) return false
+        seen.add(record.id)
+        return true
+      }),
+    }
+  }, [query.data])
+  const loading = query.isFetching && !query.isFetchingNextPage
+  const loadingMore = query.isFetchingNextPage
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-
-  const load = useCallback(async (silent = false) => {
-    if (!silent) {
-      setLoading(true)
-      setError(null)
-    }
-    try {
-      setSummary(await apiJson<InvitationSummary>('/api/user/invitations'))
-    } catch (caught) {
-      if (!silent) setError((caught as Error).message)
-    } finally {
-      if (!silent) setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { void load() }, [load])
-
-  const hasPendingSettlement = summary?.records.some((record) => (
-    record.status === 'activated' || record.status === 'processing' || record.status === 'failed'
-  )) === true
-
+  const loadError = query.error ? getApiErrorMessage(query.error, copy.dashboard.pages_tool_dashboard_InvitationsSection_074) : null
+  const { refetch } = query
+  const load = useCallback(async () => {
+    setError(null)
+    await refetch({ cancelRefetch: false })
+  }, [refetch])
+  const refreshInvitations = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      predicate: ({ queryKey }) => queryKey[0] === 'user' && queryKey[1] === userId && queryKey[3] === 'invitations',
+    })
+  }, [queryClient, userId])
+  const rewardedInvitations = summary?.stats.rewarded_invitations
   useEffect(() => {
-    if (!hasPendingSettlement) return
-    const timer = window.setInterval(() => void load(true), 15_000)
-    return () => window.clearInterval(timer)
-  }, [hasPendingSettlement, load])
+    if (rewardedInvitations) markInventoryStale()
+  }, [rewardedInvitations, userId])
 
   const absoluteShareUrl = useMemo(() => {
     if (!summary?.share_url) return null
@@ -58,7 +74,7 @@ export default function InvitationsSection({ loadingFallback }: { loadingFallbac
         json: { action: 'ensure' },
         fallbackMessage: copy.dashboard.pages_tool_dashboard_InvitationsSection_001,
       })
-      await load()
+      await refreshInvitations()
       setNotice(copy.dashboard.pages_tool_dashboard_InvitationsSection_002)
     } catch (caught) {
       setError((caught as Error).message)
@@ -78,7 +94,7 @@ export default function InvitationsSection({ loadingFallback }: { loadingFallbac
         json: { action },
         fallbackMessage: copy.dashboard.pages_tool_dashboard_InvitationsSection_079,
       })
-      await load()
+      await refreshInvitations()
       setNotice(action === 'pause'
         ? copy.dashboard.pages_tool_dashboard_InvitationsSection_080
         : action === 'resume'
@@ -92,20 +108,9 @@ export default function InvitationsSection({ loadingFallback }: { loadingFallbac
   }
 
   const loadMore = async () => {
-    if (!summary?.next_cursor || loadingMore) return
-    setLoadingMore(true)
+    if (!query.hasNextPage || query.isFetching) return
     setError(null)
-    try {
-      const page = await apiJson<InvitationSummary>(`/api/user/invitations?cursor=${encodeURIComponent(summary.next_cursor)}`)
-      setSummary((current) => current ? {
-        ...page,
-        records: [...current.records, ...page.records.filter((record) => !current.records.some((existing) => existing.id === record.id))],
-      } : page)
-    } catch (caught) {
-      setError((caught as Error).message || copy.dashboard.pages_tool_dashboard_InvitationsSection_074)
-    } finally {
-      setLoadingMore(false)
-    }
+    await query.fetchNextPage({ cancelRefetch: false })
   }
 
   const copyToClipboard = async (value: string, label: string) => {
@@ -122,7 +127,7 @@ export default function InvitationsSection({ loadingFallback }: { loadingFallbac
 
   return (
     <div className="space-y-5">
-      {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
+      {(error || loadError) && <div className="tool-alert tool-alert--error" role="alert">{error ?? loadError}</div>}
       {notice && <div className="tool-alert tool-alert--success" role="status" aria-live="polite">{notice}</div>}
 
       <section className="tool-panel overflow-hidden p-5 sm:p-6" aria-labelledby="invitation-title">
