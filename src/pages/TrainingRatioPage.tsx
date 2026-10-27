@@ -1,11 +1,10 @@
 import { Link, useNavigate } from 'react-router'
-import { NextIcon as ArrowRight, BalancedResourcesIcon as Check, HelpHintIcon as CircleHelp, RefreshIcon as RefreshCw, ResourceRatioIcon as Scale, ResourceStockIcon as Wallet } from '../components/icons'
+import { NextIcon as ArrowRight, BalancedResourcesIcon as Check, RefreshIcon as RefreshCw, ResourceRatioIcon as Scale, ResourceStockIcon as Wallet } from '../components/icons'
 import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import ProductIcon from '../components/ProductIcon'
 import { Tabs } from '../components/ui/tabs'
 import { copy } from '../copy'
-import { calculateTrainingCost } from '../lib/training-ratio'
 import { useSiteFeatures } from '../lib/site-feature-context'
 import { profileScopedPath } from '../lib/app-routes'
 import { useToolSession } from './tool/useToolSession'
@@ -13,11 +12,11 @@ import { trainingAmount, useTrainingRatio } from './useTrainingRatio'
 import { v2Path } from './v2/navigation'
 import TrainingRatioGoals from './TrainingRatioGoals'
 import TrainingRatioAccount from './TrainingRatioAccount'
+import TrainingRatioEvidence from './TrainingRatioEvidence'
 import './training-ratio.css'
 
 const text = copy.trainingRatio
 const number = (value: number) => value.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
-const examples = [{ rarity: 4, targetLevel: 40 }, { rarity: 5, targetLevel: 50 }, { rarity: 6, targetLevel: 1 }, { rarity: 6, targetLevel: 60 }, { rarity: 6, targetLevel: 90 }]
 type Session = ReturnType<typeof useToolSession>
 
 function ResourceStock({ inventory }: { inventory: { lmd: number; exp: number } }) {
@@ -104,7 +103,7 @@ function TrainingRatioContent({ session, embedded }: { session: Session; embedde
           </> : <p role="status">{m.source === 'manual' ? text.noManualInventory : m.busy ? text.importing : text.noInventory}</p>}
         </section>
       </div>
-      <details className="training-ratio-evidence tool-panel"><summary><span><CircleHelp size={18} aria-hidden="true" />{text.evidence}</span></summary><p>{accountMode ? text.accountEvidence : text.reason}</p><p>{text.evidenceHint}</p><div className="training-ratio-table"><table><thead><tr>{[text.target, text.lmd, text.exp, text.costRatio].map((label) => <th key={label} scope="col">{label}</th>)}</tr></thead><tbody>{examples.map((example, index) => { const cost = calculateTrainingCost({ ...example, currentElite: 0, currentLevel: 1, targetElite: 2 }); return <tr key={index}><th scope="row">{text.evidenceRows[index]}</th><td>{number(cost.lmd)}</td><td>{number(cost.exp)}</td><td>{number(cost.lmd / cost.exp)}∶1</td></tr> })}</tbody></table></div><p>{text.habits}</p><p>{text.scope}</p>{features.cultivation_plan && <Link className="training-ratio-link" to={v2Path('cultivation-projects', profile?.id)}>{text.projectEntry}<ArrowRight size={14} /></Link>}</details>
+      <TrainingRatioEvidence accountMode={accountMode} projectHref={features.cultivation_plan ? v2Path('cultivation-projects', profile?.id) : undefined} />
     </Root>
   </div>
 }

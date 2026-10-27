@@ -81,7 +81,7 @@
 .training-ratio-coverage { height: 5px; margin: 16px 0 8px; border-radius: 3px; background: color-mix(in srgb, currentColor 15%, transparent); overflow: hidden; }
 .training-ratio-coverage span { display: block; height: 100%; border-radius: inherit; background: currentColor; }
 .training-ratio-demand small { color: var(--color-ink-2); font-size: 12px; }
-.training-ratio .training-ratio-module-total { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin: 16px 0; padding: 10px 0; border-bottom: 1px solid var(--color-rule); }
+.training-ratio .training-ratio-module-total { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin: 16px 0; padding: 10px 0; }
 .training-ratio-module-total strong { color: var(--training-lmd); font-variant-numeric: tabular-nums; }
 .training-ratio-module-list, .training-ratio-issues { margin-top: 20px; border-top: 1px solid var(--color-rule); }
 .training-ratio-module-list summary, .training-ratio-issues summary { min-height: 44px; padding: 12px 0; cursor: pointer; font-size: 13px; }
@@ -93,8 +93,24 @@
 @media (prefers-reduced-motion: reduce) { .training-ratio-options span { transition: none; } }
 .training-ratio-supplement { margin-top: 16px; padding-top: 4px; border-top: 1px solid var(--color-rule); }
 .training-ratio-evidence { margin-top: 24px; padding: 12px 24px; }
-.training-ratio-evidence summary { min-height: 44px; align-content: center; cursor: pointer; font-size: 14px; font-weight: 600; }
-.training-ratio-evidence summary > span { display: inline-flex; align-items: center; gap: 8px; vertical-align: middle; }
+.training-ratio-evidence > summary { min-height: 44px; align-content: center; cursor: pointer; font-size: 14px; font-weight: 600; }
+.training-ratio-evidence > summary > span { display: inline-flex; align-items: center; gap: 8px; vertical-align: middle; }
+.training-ratio-evidence-tabs { margin-top: 20px; }
+.training-ratio-example-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-block: 20px; }
+.training-ratio-example-card { min-width: 0; padding: 16px; border: 1px solid var(--color-rule); border-radius: var(--radius-input); background: var(--color-paper); }
+.training-ratio-example-card header { margin-bottom: 16px; }
+.training-ratio-example-card h3 { margin: 0; font-size: 15px; }
+.training-ratio-example-card header p { margin: 6px 0 0; font-variant-numeric: tabular-nums; }
+.training-ratio-example-card table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.training-ratio-example-card th, .training-ratio-example-card td { padding: 12px 0 12px 8px; text-align: right; white-space: nowrap; }
+.training-ratio-example-card th:first-child { padding-left: 0; text-align: left; }
+.training-ratio-example-card thead { color: var(--color-ink-2); }
+.training-ratio-example-card thead th { font-weight: 500; }
+.training-ratio-example-card tbody tr { border-top: 1px solid var(--color-rule); }
+.training-ratio-example-card tbody th { font-weight: 500; }
+.training-ratio-example-card small { display: block; margin-top: 4px; color: var(--color-ink-2); font-size: 12px; }
+.training-ratio-example-ratio { color: var(--color-brand-primary); font-weight: 650; }
+.training-ratio-evidence-footer { margin-top: 20px; padding-top: 4px; border-top: 1px solid var(--color-rule); }
 .training-ratio-table { overflow-x: auto; margin-block: 16px; }
 .training-ratio-table table { width: 100%; min-width: 540px; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
 .training-ratio-table th, .training-ratio-table td { padding: 12px; border-bottom: 1px solid var(--color-rule); text-align: right; white-space: nowrap; }
@@ -102,6 +118,9 @@
 .training-ratio :is(button, a, input, select, summary):focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
 @media (max-width: 60rem) {
   .training-ratio-columns { grid-template-columns: minmax(0, 1fr); }
+  .training-ratio-example-grid { grid-template-columns: minmax(0, 1fr); }
+  .training-ratio-example-card { padding: 16px; }
+  .training-ratio-example-card table { font-size: 13px; }
 }
 @media (max-width: 40rem) {
   .training-ratio-inputs, .training-ratio-results { padding: 16px; }
