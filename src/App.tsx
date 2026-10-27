@@ -21,6 +21,7 @@ import { apiVoid } from './lib/api-client'
 import { categorizeBehaviorRiskPath } from './lib/behavior-risk-client'
 import NotFoundPage from './components/NotFoundPage'
 import { recordDebugNavigation } from './lib/debug-diagnostics'
+import QueryProvider from './lib/query-provider'
 
 
 const LandingPage = lazy(() => import('./pages/LandingPage'))
@@ -46,13 +47,13 @@ const V2Page = lazy(() => import('./pages/v2/V2Page'))
 
 export default function App() {
   return (
-    <ThemeProvider>
+    <QueryProvider><ThemeProvider>
       <MotionPreferenceProvider>
         <SiteFeatureProvider>
           <AnimatedApp />
         </SiteFeatureProvider>
       </MotionPreferenceProvider>
-    </ThemeProvider>
+    </ThemeProvider></QueryProvider>
   )
 }
 

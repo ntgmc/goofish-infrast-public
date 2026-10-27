@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type {
   Announcement,
   AnnouncementPublicResponse,
@@ -30,6 +31,7 @@ export type AuthStatus = 'loading' | 'authenticated' | 'anonymous' | 'error'
 const CONFIG_SAVE_DEBOUNCE_MS = 600
 
 export function useToolSession(requestedProfileId?: string | null, rememberLastProfile = false, loadAnnouncementPopups = true) {
+  const queryClient = useQueryClient()
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading')
   const [authError, setAuthError] = useState<Error | null>(null)
   const [authRequestVersion, setAuthRequestVersion] = useState(0)
@@ -82,6 +84,7 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
   ) => {
     syncSklandSnapshotSession(payload)
     const nextUser = payload?.user ?? null
+    queryClient.removeQueries({ predicate: ({ queryKey }) => queryKey[0] === 'user' && queryKey[1] !== nextUser?.id })
     const nextProfiles = payload?.profiles ?? []
     const nextProfile = payload?.active_profile ?? null
     const nextWorkspace = payload?.workspace ?? null
@@ -102,7 +105,7 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
     setLicense(nextProfile && nextWorkspace?.operators && nextWorkspace.config
       ? createAccountLicense(nextProfile, nextWorkspace.operators, nextWorkspace.config)
       : null)
-  }, [cancelPendingConfigSave, rememberLastProfile])
+  }, [cancelPendingConfigSave, queryClient, rememberLastProfile])
 
   const applyAuthPayload = useCallback((payload: AuthSuccessResponse | null) => {
     invalidateWorkspaceRequest()

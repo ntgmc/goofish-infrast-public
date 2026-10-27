@@ -6,7 +6,7 @@
 
 | 分类 | 技术 |
 | --- | --- |
-| 前端 | React 19.2、TypeScript 7、Vite 8、React Router 8 |
+| 前端 | React 19.2、TypeScript 7、Vite 8、React Router 8、TanStack Query 5 |
 | UI | Tailwind CSS 4、shadcn/ui、Radix UI、Motion 14、Lucide |
 | 后端 | Node.js 24、TypeScript、原生 HTTP API |
 | 数据库与任务队列 | PostgreSQL、node-postgres（pg） |

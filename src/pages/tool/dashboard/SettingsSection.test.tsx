@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render as renderUi, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render as renderUi, screen, waitFor } from '../../../test/query-render'
 import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router'
 import type { ReactNode } from 'react'
 import AccountSafetyPage from '../../AccountSafetyPage'

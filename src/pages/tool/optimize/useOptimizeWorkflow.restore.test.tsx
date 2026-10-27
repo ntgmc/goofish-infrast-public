@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { createElement, StrictMode, type PropsWithChildren } from 'react'
-import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
+import { act, cleanup, renderHook, waitFor } from '../../../test/query-render'
 import { afterEach, expect, it, vi } from 'vitest'
 import { apiJson } from '../../../lib/api-client'
 import { CONFIG_PRESETS, normalizeConfig } from '../../../lib/config'

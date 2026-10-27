@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
-import { act, cleanup, renderHook } from '@testing-library/react'
+import { act, cleanup, renderHook } from '../../../test/query-render'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OptimizationJobBroadcast } from './optimization-job-events'
-import { listOptimizationJobs } from './optimization-api'
-import { useOptimizationTaskCenter } from './useOptimizationTaskCenter'
+import { cancelOptimizationJob, listOptimizationJobs } from './optimization-api'
+import type { OptimizationJobListItem } from '../../../lib/optimization-contracts'
+import { useOptimizationTaskCenter as useUserTaskCenter } from './useOptimizationTaskCenter'
+
+const useOptimizationTaskCenter = (profileId: string, open: boolean) => useUserTaskCenter('user', profileId, open)
 
 let broadcastListener: ((event: OptimizationJobBroadcast) => void) | null = null
 const setOptimizationAppBadge = vi.fn()
@@ -100,7 +103,7 @@ describe('useOptimizationTaskCenter', () => {
     expect(listOptimizationJobs).toHaveBeenCalledTimes(1)
 
     visibility.mockReturnValue('visible')
-    act(() => document.dispatchEvent(new Event('visibilitychange')))
+    act(() => document.dispatchEvent(new Event('visibilitychange', { bubbles: true })))
     await act(async () => { await vi.advanceTimersByTimeAsync(250) })
     expect(listOptimizationJobs).toHaveBeenCalledTimes(2)
   })
@@ -116,6 +119,41 @@ describe('useOptimizationTaskCenter', () => {
     await act(async () => { finish({ jobs: [], nextCursor: null }) })
     await act(async () => { await vi.advanceTimersByTimeAsync(10_000) })
     expect(listOptimizationJobs).toHaveBeenCalledTimes(2)
+  })
+
+  it('deduplicates pages and refreshes them in order using the latest cursors', async () => {
+    const first = { id: 'first', status: 'queued' } as OptimizationJobListItem
+    const second = { id: 'second', status: 'succeeded' } as OptimizationJobListItem
+    vi.mocked(listOptimizationJobs)
+      .mockResolvedValueOnce({ jobs: [first], nextCursor: 'old-cursor' })
+      .mockResolvedValueOnce({ jobs: [first, second], nextCursor: null })
+      .mockResolvedValueOnce({ jobs: [{ ...first, status: 'cancelled' } as OptimizationJobListItem], nextCursor: 'new-cursor' })
+      .mockResolvedValueOnce({ jobs: [second], nextCursor: null })
+    const { result } = renderHook(() => useOptimizationTaskCenter('profile-1', false))
+    await flushPromises()
+    await act(async () => { await result.current.loadMore() })
+    await flushPromises()
+    expect(result.current.jobs.map((job) => job.id)).toEqual(['first', 'second'])
+    expect(result.current.hasMore).toBe(false)
+    await act(async () => { await result.current.refresh() })
+    await flushPromises()
+    expect(result.current.jobs[0].status).toBe('cancelled')
+    expect(vi.mocked(listOptimizationJobs).mock.calls.map(([, cursor]) => cursor)).toEqual([undefined, 'old-cursor', undefined, 'new-cursor'])
+  })
+
+  it('submits cancellation once and refreshes the cached list after success', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const job = { id: 'first', status: 'queued' } as OptimizationJobListItem
+    vi.mocked(listOptimizationJobs)
+      .mockResolvedValueOnce({ jobs: [job], nextCursor: null })
+      .mockResolvedValueOnce({ jobs: [{ ...job, status: 'cancelled' } as OptimizationJobListItem], nextCursor: null })
+    vi.mocked(cancelOptimizationJob).mockResolvedValue({} as never)
+    const { result } = renderHook(() => useOptimizationTaskCenter('profile-1', false))
+    await flushPromises()
+    await act(async () => { await result.current.cancel(job) })
+    await flushPromises()
+    expect(cancelOptimizationJob).toHaveBeenCalledExactlyOnceWith('first')
+    expect(result.current.jobs[0].status).toBe('cancelled')
   })
 
   it('summarizes active and attention states and updates the app badge', async () => {
@@ -140,7 +178,6 @@ describe('useOptimizationTaskCenter', () => {
 
 async function flushPromises(): Promise<void> {
   await act(async () => {
-    await Promise.resolve()
-    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(0)
   })
 }

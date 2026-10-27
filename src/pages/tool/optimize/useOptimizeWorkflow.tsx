@@ -108,7 +108,7 @@ export function useOptimizeWorkflow(props: Props) {
   }, [])
 
   const { balance: priorityCouponBalance, selected: usePriorityCoupon, setSelected: setUsePriorityCoupon, loading: priorityCouponLoading, error: priorityCouponError, refresh: refreshRewardBalance } = usePriorityCouponState(profileId)
-  const { balances: itemBalances, capacity: profileCapacity, loaded: inventoryLoaded, loading: inventoryLoading, error: inventoryError, refresh: refreshInventory } = useInventoryBalances(profileId)
+  const { balances: itemBalances, capacity: profileCapacity, loaded: inventoryLoaded, loading: inventoryLoading, error: inventoryError, refresh: refreshInventory } = useInventoryBalances(profile.user_id, profileId)
   const [useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon] = useState(false)
 
   const [lastGeneratedSignature, setLastGeneratedSignature] = useState<string | null>(null)

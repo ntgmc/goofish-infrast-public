@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
+import { act, cleanup, renderHook, waitFor } from '../../../test/query-render'
 import { afterEach, expect, it, vi } from 'vitest'
 import { CONFIG_PRESETS, normalizeConfig } from '../../../lib/config'
 import type { UserGameAccount } from '../../../lib/types'

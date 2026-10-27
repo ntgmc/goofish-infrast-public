@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate, useSearchParams } from 'react-router'
 import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
@@ -11,6 +12,7 @@ import { useSiteFeatures } from '../lib/site-feature-context'
 import { copy } from '../copy/index'
 
 export default function AccountSafetyPage() {
+  const queryClient = useQueryClient()
   const [params] = useSearchParams()
   const scheduledFor = params.get('scheduled_for')
   const featureState = useSiteFeatures()
@@ -24,6 +26,7 @@ export default function AccountSafetyPage() {
     setError(null)
     try {
       await apiVoid('/api/auth/logout', { method: 'POST' })
+      queryClient.removeQueries({ queryKey: ['user'] })
       setNotice(copy.features.logout_done)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : copy.features.logout)

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import type { OptimizationJobListItem } from '../../../lib/optimization-contracts'
 import { copy } from '../../../copy/index'
 import { cancelOptimizationJob, listOptimizationJobs } from './optimization-api'
@@ -29,23 +30,28 @@ export interface OptimizationTaskCenterController {
 }
 
 export function useOptimizationTaskCenter(
+  userId: string,
   profileId: string,
   dialogOpen: boolean,
 ): OptimizationTaskCenterController {
-  const [jobs, setJobs] = useState<OptimizationJobListItem[]>([])
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [loadingMore, setLoadingMore] = useState(false)
+  const queryClient = useQueryClient()
   const [error, setError] = useState<string | null>(null)
   const [busyJobId, setBusyJobId] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [notificationsEnabled, setNotificationsEnabledState] = useState(optimizationNotificationsEnabled)
-  const requestSequenceRef = useRef(0)
-  const requestControllerRef = useRef<AbortController | null>(null)
   const refreshTimerRef = useRef<number | null>(null)
-  const hasLoadedRef = useRef(false)
-
+  const query = useInfiniteQuery({
+    queryKey: ['user', userId, profileId, 'optimization-jobs'],
+    queryFn: ({ pageParam, signal }) => listOptimizationJobs(profileId, pageParam, signal),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    enabled: Boolean(userId && profileId),
+    refetchOnWindowFocus: 'always',
+    refetchInterval: (current) => dialogOpen || current.state.data?.pages.some((page) =>
+      page.jobs.some((job) => job.status === 'queued' || job.status === 'running')) ? 10_000 : 30_000,
+  })
+  const { refetch, fetchNextPage, hasNextPage, isFetching } = query
+  const jobs = useMemo(() => dedupeJobs(query.data?.pages.flatMap((page) => page.jobs) ?? []), [query.data])
   const activeCount = useMemo(
     () => jobs.filter((job) => job.status === 'queued' || job.status === 'running').length,
     [jobs],
@@ -54,95 +60,31 @@ export function useOptimizationTaskCenter(
     () => jobs.filter((job) => job.status === 'failed' || job.status === 'dead_lettered').length,
     [jobs],
   )
-
-  const load = useCallback(async (cursor: string | null = null, append = false) => {
-    const requestSequence = ++requestSequenceRef.current
-    requestControllerRef.current?.abort()
-    const controller = new AbortController()
-    requestControllerRef.current = controller
-    if (append) {
-      setRefreshing(false)
-      setLoadingMore(true)
-    } else {
-      setLoadingMore(false)
-      if (hasLoadedRef.current) setRefreshing(true)
-      else setLoading(true)
-    }
-    try {
-      const response = await listOptimizationJobs(profileId, cursor ?? undefined, controller.signal)
-      if (requestSequence !== requestSequenceRef.current) return
-      setJobs((current) => append ? dedupeJobs([...current, ...response.jobs]) : response.jobs)
-      setNextCursor(response.nextCursor)
-      setError(null)
-      hasLoadedRef.current = true
-    } catch (caught) {
-      if (requestSequence !== requestSequenceRef.current) return
-      if (caught instanceof DOMException && caught.name === 'AbortError') return
-      setError(caught instanceof Error ? caught.message : copy.optimize.pages_tool_optimize_OptimizationTaskCenter_028)
-    } finally {
-      if (requestSequence === requestSequenceRef.current) {
-        requestControllerRef.current = null
-        if (append) setLoadingMore(false)
-        else {
-          setLoading(false)
-          setRefreshing(false)
-        }
-      }
-    }
-  }, [profileId])
-
-  const queueRefresh = useCallback(() => {
-    if (document.visibilityState === 'hidden' || refreshTimerRef.current !== null) return
-    refreshTimerRef.current = window.setTimeout(() => {
-      refreshTimerRef.current = null
-      if (document.visibilityState !== 'hidden') void load()
-    }, 250)
-  }, [load])
-
-  const refresh = useCallback(async () => load(), [load])
+  const refresh = useCallback(async () => {
+    setError(null)
+    await refetch({ cancelRefetch: false })
+  }, [refetch])
   const loadMore = useCallback(async () => {
-    if (nextCursor) await load(nextCursor, true)
-  }, [load, nextCursor])
+    if (hasNextPage && !isFetching) await fetchNextPage({ cancelRefetch: false })
+  }, [fetchNextPage, hasNextPage, isFetching])
 
   useEffect(() => {
-    requestControllerRef.current?.abort()
-    if (refreshTimerRef.current !== null) {
-      window.clearTimeout(refreshTimerRef.current)
-      refreshTimerRef.current = null
-    }
-    requestSequenceRef.current += 1
-    hasLoadedRef.current = false
-    setJobs([])
-    setNextCursor(null)
     setNotice(null)
-    setRefreshing(false)
-    setLoadingMore(false)
-    void load()
-  }, [load, profileId])
-
-  useEffect(() => subscribeOptimizationJobUpdates((event) => {
-    if (event.profileId === profileId) queueRefresh()
-  }), [profileId, queueRefresh])
-
-  useEffect(() => {
-    const intervalMs = dialogOpen || activeCount > 0 ? 10_000 : 30_000
-    const refreshWhenVisible = () => {
-      if (!requestControllerRef.current) queueRefresh()
-    }
-    const timer = window.setInterval(refreshWhenVisible, intervalMs)
-    document.addEventListener('visibilitychange', refreshWhenVisible)
-    return () => {
-      window.clearInterval(timer)
-      document.removeEventListener('visibilitychange', refreshWhenVisible)
-    }
-  }, [activeCount, dialogOpen, queueRefresh])
+    setError(null)
+    setBusyJobId(null)
+    return subscribeOptimizationJobUpdates((event) => {
+      if (event.profileId !== profileId || document.visibilityState === 'hidden' || refreshTimerRef.current !== null) return
+      refreshTimerRef.current = window.setTimeout(() => {
+        refreshTimerRef.current = null
+        if (document.visibilityState !== 'hidden') void refresh()
+      }, 250)
+    })
+  }, [profileId, refresh, userId])
 
   useEffect(() => () => {
-    requestSequenceRef.current += 1
-    requestControllerRef.current?.abort()
     if (refreshTimerRef.current !== null) window.clearTimeout(refreshTimerRef.current)
     refreshTimerRef.current = null
-  }, [])
+  }, [profileId, userId])
 
   useEffect(() => {
     setOptimizationAppBadge(activeCount)
@@ -157,13 +99,13 @@ export function useOptimizationTaskCenter(
       const snapshot = await cancelOptimizationJob(job.id)
       publishOptimizationJobUpdate(profileId, snapshot)
       setNotice(copy.optimize.pages_tool_optimize_OptimizationTaskCenter_021)
-      await load()
+      await queryClient.invalidateQueries({ queryKey: ['user', userId, profileId, 'optimization-jobs'] })
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : copy.optimize.pages_tool_optimize_OptimizationTaskCenter_029)
     } finally {
       setBusyJobId(null)
     }
-  }, [load, profileId])
+  }, [profileId, queryClient, userId])
 
   const toggleNotifications = useCallback(async () => {
     const enabled = await setOptimizationNotificationsEnabled(!notificationsEnabled)
@@ -175,14 +117,14 @@ export function useOptimizationTaskCenter(
     jobs,
     activeCount,
     attentionCount,
-    loading,
-    refreshing,
-    loadingMore,
-    error,
+    loading: query.isLoading,
+    refreshing: query.isRefetching && !query.isFetchingNextPage,
+    loadingMore: query.isFetchingNextPage,
+    error: error ?? (query.error ? query.error instanceof Error ? query.error.message : copy.optimize.pages_tool_optimize_OptimizationTaskCenter_028 : null),
     notice,
     busyJobId,
     notificationsEnabled,
-    hasMore: Boolean(nextCursor),
+    hasMore: hasNextPage,
     refresh,
     loadMore,
     cancel,
@@ -192,11 +134,9 @@ export function useOptimizationTaskCenter(
 
 function dedupeJobs(jobs: OptimizationJobListItem[]): OptimizationJobListItem[] {
   const seen = new Set<string>()
-  const unique: OptimizationJobListItem[] = []
-  for (const job of jobs) {
-    if (seen.has(job.id)) continue
+  return jobs.filter((job) => {
+    if (seen.has(job.id)) return false
     seen.add(job.id)
-    unique.push(job)
-  }
-  return unique
+    return true
+  })
 }

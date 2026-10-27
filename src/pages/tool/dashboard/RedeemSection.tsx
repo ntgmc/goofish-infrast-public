@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import type { AuthSuccessResponse } from '../../../lib/types'
 import { apiJson } from '../../../lib/api-client'
+import { markInventoryStale } from '../../../lib/inventory-refresh'
 import GuidedTour, { useFirstRunTour, type TourDefinition } from '../../../components/GuidedTour'
 import SklandBindingDialog, { type SklandPayload } from '../../../components/SklandBindingDialog'
 import SklandIcon from '../../../components/SklandIcon'
@@ -73,6 +74,7 @@ export function useAccountRedemption({ onRedeemed, onInventoryRedeemed, tourRepl
       setDisplayName('')
       setNote('')
       idempotencyKeyRef.current = crypto.randomUUID()
+      markInventoryStale()
       if (data.redemption_type === 'profile') onRedeemed(data.auth)
       else onInventoryRedeemed?.(data.item.name)
     } catch (caught) {

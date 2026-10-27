@@ -15,7 +15,7 @@ const text = copy.inventory
 type InventoryModel = ReturnType<typeof useInventory>
 
 export default function Inventory({ session, onProfiles }: { session: V2Session; onProfiles: () => void }) {
-  const model = useInventory({ onPayload: session.applyAuthPayload, onLifetimeProfileCreated: onProfiles })
+  const model = useInventory({ userId: session.user?.id ?? '', activeProfileId: session.activeProfile?.id ?? null, onPayload: session.applyAuthPayload, onLifetimeProfileCreated: onProfiles })
   const [view, setView] = useState('items')
   const tasks = model.tasks.filter((task) => task.enabled)
   if (model.loading && !model.inventory) return <V2SectionLoading label={text.loading} />

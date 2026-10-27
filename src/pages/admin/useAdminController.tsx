@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { AnnouncementAdminResponse } from '../../lib/types'
 import type { AdminBalanceTransaction, BalancePage } from '../../lib/balance-contracts'
 import { ADMIN_SESSION_EXPIRED_EVENT, adminApiJson as apiJson, adminApiVoid as apiVoid } from '../../lib/admin-api-client'
@@ -25,6 +26,7 @@ function errorMessage(value: unknown): string {
 export type AdminController = ReturnType<typeof useAdminController>
 
 export function useAdminController(section: AdminSection = 'overview', search = '') {
+  const queryClient = useQueryClient()
   const [adminUsername, setAdminUsername] = useState<string | null>(null)
   const [adminCapabilities, setAdminCapabilities] = useState<AdminCapability[]>([])
   const [lastSuccessfulSyncAt, setLastSuccessfulSyncAt] = useState<string | null>(null)
@@ -111,10 +113,12 @@ export function useAdminController(section: AdminSection = 'overview', search = 
   const clearNotice = useCallback(() => setNotice(null), [])
 
   const userList = useAdminUserList({
+    adminUsername, capabilities: adminCapabilities,
+    enabled: authenticated && section === 'users' && adminCapabilities.includes('user_view'),
     setBusyAction, setError, setNotice,
     closeDetail: () => { detailRequest.current?.abort(); setSelectedUserDetail(null) },
   }, section === 'users' ? search : '')
-  const { setAppUsers, loadUsersPage, setSelectedUserIds, setUsersLoaded } = userList
+  const { loadUsersPage, setSelectedUserIds, usersUpdatedAt } = userList
 
   const cdkData = useAdminCdkData({ authenticated, capabilities: adminCapabilities, section, setError })
   const { records, cdkSearchInput, cdkPage, cdkPageSize, cdkSearch, statusFilter, permissionFilter, riskFilter, generatedFilter,
@@ -129,6 +133,7 @@ export function useAdminController(section: AdminSection = 'overview', search = 
     }, [records, selectedCdkHashes])
 
   const resetAdminState = useCallback(() => {
+      queryClient.removeQueries({ queryKey: ['admin'] })
       setAdminUsername(null)
       setAdminCapabilities([])
       setLastSuccessfulSyncAt(null)
@@ -140,8 +145,6 @@ export function useAdminController(section: AdminSection = 'overview', search = 
       cancelAdminOperation()
       setAuthenticated(false)
       resetCdkData()
-      setAppUsers([])
-      setUsersLoaded(false)
       setSelectedUserIds([])
       setBusinessOverview(null)
       setRiskSettings(DEFAULT_RISK_SETTINGS)
@@ -269,13 +272,8 @@ export function useAdminController(section: AdminSection = 'overview', search = 
   useEffect(() => { setSelectedCdkHashes([]) }, [cdkPage, cdkPageSize, cdkSearchInput, statusFilter, cdkTypeFilter, permissionFilter, riskFilter, generatedFilter])
 
   useEffect(() => {
-    if (!authenticated || section !== 'users' || !adminCapabilities.includes('user_view')) return
-    const controller = new AbortController()
-    void loadUsersPage(controller.signal).then(() => { if (!controller.signal.aborted) setLastSuccessfulSyncAt(new Date().toISOString()) }).catch((caught) => {
-      if (!controller.signal.aborted) setError((caught as Error).message)
-    })
-    return () => controller.abort()
-  }, [adminCapabilities, authenticated, loadUsersPage, section])
+    if (authenticated && section === 'users' && usersUpdatedAt) setLastSuccessfulSyncAt(new Date(usersUpdatedAt).toISOString())
+  }, [authenticated, section, usersUpdatedAt])
 
   useEffect(() => {
       const handleSessionExpired = () => {

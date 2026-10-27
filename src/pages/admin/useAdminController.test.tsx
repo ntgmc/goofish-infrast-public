@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, renderHook, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, renderHook, screen, waitFor } from '../../test/query-render'
 import userEvent from '@testing-library/user-event'
 import { ApiError } from '../../lib/api-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

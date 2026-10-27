@@ -127,7 +127,7 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
     redeemedNotice: null,
     onProfileUpgraded: session.applyAuthPayload,
   })
-  const tasks = useOptimizationTaskCenter(profile.id, taskCenterOpen || workflow.loading)
+  const tasks = useOptimizationTaskCenter(session.user!.id, profile.id, taskCenterOpen || workflow.loading)
   const activeJob = tasks.jobs.find((job) => job.id === workflow.progress?.jobId && job.canCancel)
   const latest = workflow.latestWorkspaceResult
   const current = workflow.finalResult ?? workflow.currentResult ?? workflow.historyItem?.result ?? null

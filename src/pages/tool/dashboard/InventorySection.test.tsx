@@ -1,9 +1,13 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '../../../test/query-render'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { InventoryResponse, ItemUseRequest } from '../../../lib/inventory-contracts'
-import InventorySection from './InventorySection'
+import InventorySectionView from './InventorySection'
+
+function InventorySection(props: Omit<Parameters<typeof InventorySectionView>[0], 'userId' | 'activeProfileId'>) {
+  return <InventorySectionView userId="user" activeProfileId="profile-1" {...props} />
+}
 
 const mocks = vi.hoisted(() => ({
   apiJson: vi.fn(),

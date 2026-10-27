@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { NotificationSettingsIcon as Bell, ExpandIcon as ChevronDown, SecurityIcon as LockKeyhole, PersonalDataIcon as ShieldCheck, PreferencesIcon as SlidersHorizontal } from '../../../components/icons'
 import { apiJson, apiVoid } from '../../../lib/api-client'
@@ -25,6 +26,7 @@ export function useAccountSettings({ profiles, activeProfileId, onPayload, onDel
   onPayload: (payload: AuthSuccessResponse) => void
   onDeletionStateChange?: (state: 'idle' | 'submitting' | 'accepted') => void
 }) {
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -124,6 +126,7 @@ export function useAccountSettings({ profiles, activeProfileId, onPayload, onDel
         json: { email: deleteEmail, password: deletePassword },
         fallbackMessage: copy.dashboard.pages_tool_dashboard_SettingsSection_015,
       })
+      queryClient.removeQueries({ queryKey: ['user'] })
       setDeletePassword('')
       onDeletionStateChange?.('accepted')
       void navigate(`/account-safety?scheduled_for=${encodeURIComponent(accepted.scheduled_for)}`, { replace: true })
