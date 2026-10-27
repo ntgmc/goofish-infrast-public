@@ -22,7 +22,7 @@ vi.mock('../../feature-gate', async (original) => ({
   ...await original<typeof import('../../feature-gate')>(), requireMeteredBillingFeature: vi.fn(async () => null),
 }))
 vi.mock('../../storage/feature-settings-store', () => ({ getSiteFeatureSettings: mocks.features }))
-vi.mock('./job-status', () => ({
+vi.mock('./job-estimates', () => ({
   resolveOptimizeDurationEstimate: vi.fn(async (bucket) => ({
     estimated_duration_ms: 1000, estimate_bucket: bucket, estimate_source: 'fallback_p95', estimate_sample_count: 0,
   })),
