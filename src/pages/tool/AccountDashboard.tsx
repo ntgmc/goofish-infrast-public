@@ -247,7 +247,7 @@ export default function AccountDashboard({
           <PageTransition motionKey={section} className="tool-page-transition">{(displayedSection) => <div key={displayedSection} className="tool-section-content">
             <Suspense fallback={<SectionLoader label={copy.common.pages_tool_AccountDashboard_015} />}>
               {displayedSection === 'profiles' && <ProfilesSection profiles={profiles} openingProfileId={openingProfileId} onOpen={onOpenProfile} onEdit={onPayload} meteredEnabled={features.metered_billing} />}
-              {displayedSection === 'commercial' && METERED_BILLING_AVAILABLE && features.metered_billing && <CommercialProfilesSection onOpen={onOpenProfile} />}
+              {displayedSection === 'commercial' && METERED_BILLING_AVAILABLE && features.metered_billing && <CommercialProfilesSection userId={user.id} activeProfileId={activeProfile?.id ?? null} onOpen={onOpenProfile} />}
               {displayedSection === 'tools' && <ToolsSection />}
               {displayedSection === 'redeem' && <RedeemSection autoStartTour={!suppressInitialRedeemTour} tourReplayToken={redeemTourReplayToken} onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} onInventoryRedeemed={() => onSectionChange('inventory', { replace: true })} />}
               {displayedSection === 'invitations' && <InvitationsSection userId={user.id} activeProfileId={activeProfile?.id ?? null} loadingFallback={<SectionLoader label={copy.dashboard.pages_tool_dashboard_InvitationsSection_005} />} />}

@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { useQueryClient } from '@tanstack/react-query'
+import { act, cleanup, render, screen, waitFor, within } from '../../test/query-render'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as React from 'react'
 import type { InventoryResponse, InventoryStack } from '../../lib/inventory-contracts'
 import type { UserGameAccount } from '../../lib/types'
+import { useInventoryQuery } from '../../lib/inventory-query'
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog'
 import ProfileUpgradePrompt, { profileUpgradePromptStorageKey, type ProfileUpgradePromptProps } from './ProfileUpgradePrompt'
 
@@ -179,6 +181,43 @@ describe('ProfileUpgradePrompt', () => {
     await waitFor(() => expect(apiJson).toHaveBeenCalledTimes(2))
     expect(await screen.findByRole('dialog')).toHaveTextContent('终身版兑换 CDK')
     expect(screen.queryByText('限时 CDK，立即开启')).not.toBeInTheDocument()
+  })
+
+  it('shares pending and fresh inventory with other consumers and follows inventory invalidation', async () => {
+    let finish!: (value: InventoryResponse) => void
+    apiJson.mockReturnValueOnce(new Promise<InventoryResponse>((resolve) => { finish = resolve }))
+    const profile = createProfile()
+    let client!: ReturnType<typeof useQueryClient>
+    function Harness({ showPrompt }: { showPrompt: boolean }) {
+      useInventoryQuery('shared-prompt-user', profile.id)
+      client = useQueryClient()
+      return showPrompt ? <ProfileUpgradePrompt {...promptProps({ userId: 'shared-prompt-user', profile })} /> : null
+    }
+    const view = render(<Harness showPrompt />)
+    expect(apiJson).toHaveBeenCalledOnce()
+    await act(async () => finish(inventoryWith('lifetime_profile_voucher', 'bind')))
+    expect(await screen.findByRole('dialog')).toHaveTextContent('终身版兑换 CDK')
+    view.rerender(<Harness showPrompt={false} />)
+    view.rerender(<Harness showPrompt />)
+    expect(await screen.findByRole('dialog')).toHaveTextContent('终身版兑换 CDK')
+    expect(apiJson).toHaveBeenCalledOnce()
+    apiJson.mockResolvedValueOnce(emptyInventory())
+    await act(async () => { await client.invalidateQueries({ queryKey: ['user', 'shared-prompt-user', profile.id, 'inventory'] }) })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(apiJson).toHaveBeenCalledTimes(2)
+  })
+
+  it('cancels its optional read when inventory is disabled and ignores the late result', async () => {
+    let finish!: (value: InventoryResponse) => void
+    apiJson.mockReturnValueOnce(new Promise<InventoryResponse>((resolve) => { finish = resolve }))
+    const props = promptProps({ userId: 'disabled-during-read' })
+    const view = render(<ProfileUpgradePrompt {...props} />)
+    const signal = apiJson.mock.calls[0][1].signal as AbortSignal
+    view.rerender(<ProfileUpgradePrompt {...props} inventoryEnabled={false} />)
+    expect(signal.aborted).toBe(true)
+    await act(async () => finish(inventoryWith('limited_profile_voucher', 'use')))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(apiJson).toHaveBeenCalledOnce()
   })
 
   it('silently ignores inventory failures', async () => {

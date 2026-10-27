@@ -212,8 +212,8 @@ describe('useAdminController announcement drafts', () => {
     act(() => result.current.setLoginPassword('password'))
     await act(async () => result.current.handleLogin(formEvent()))
     await waitFor(() => expect(result.current.authenticated).toBe(true))
-    await waitFor(() => expect(result.current.banner.title).toBe('会话过期前的草稿'))
-    expect(result.current.announcementDraftRestored).toBe(true)
+    await waitFor(() => expect(result.current.announcementDraftRestored).toBe(true))
+    expect(result.current.banner.title).toBe('会话过期前的草稿')
     expect(result.current.announcementDraftDirty).toBe(true)
   })
 

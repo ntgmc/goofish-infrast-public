@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { useQueryClient } from '@tanstack/react-query'
+import { act, cleanup, render, renderHook, screen, waitFor } from '../../../test/query-render'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UserGameAccount } from '../../../lib/types'
@@ -11,7 +12,8 @@ vi.mock('../../../lib/api-client', () => ({
   getApiErrorMessage: (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback,
 }))
 
-import CommercialProfilesSection from './CommercialProfilesSection'
+import CommercialProfilesSection, { useCommercialProfiles } from './CommercialProfilesSection'
+import { Commercial } from '../../v2/pages/Billing'
 
 const limits = {
   active: 2,
@@ -41,13 +43,15 @@ afterEach(() => {
 })
 
 describe('CommercialProfilesSection request boundaries', () => {
-  it('does not search while typing and requests only after form submission', async () => {
+  it.each(['v1', 'v2'])('does not search while typing and requests only after form submission in %s', async (version) => {
     mocks.apiJson.mockResolvedValue(page(profiles))
     const user = userEvent.setup()
-    render(<CommercialProfilesSection onOpen={vi.fn()} />)
+    render(version === 'v1'
+      ? <CommercialProfilesSection userId="user-1" activeProfileId="profile-1" onOpen={vi.fn()} />
+      : <Commercial userId="user-1" activeProfileId="profile-1" onOpen={vi.fn()} />)
 
     await screen.findByText('甲账号')
-    await user.type(screen.getByPlaceholderText('搜索名称或备注'), '  乙账号  ')
+    await user.type(screen.getByRole('textbox'), '  乙账号  ')
     expect(mocks.apiJson).toHaveBeenCalledTimes(1)
 
     await user.click(screen.getByRole('button', { name: '搜索' }))
@@ -64,7 +68,7 @@ describe('CommercialProfilesSection request boundaries', () => {
       return Promise.resolve(page(profiles))
     })
     const user = userEvent.setup()
-    render(<CommercialProfilesSection onOpen={vi.fn()} />)
+    render(<CommercialProfilesSection userId="user-1" activeProfileId="profile-1" onOpen={vi.fn()} />)
     await screen.findByText('甲账号')
 
     const search = screen.getByPlaceholderText('搜索名称或备注')
@@ -93,7 +97,7 @@ describe('CommercialProfilesSection request boundaries', () => {
       })
       .mockResolvedValueOnce(page([]))
     const user = userEvent.setup()
-    render(<CommercialProfilesSection onOpen={vi.fn()} />)
+    render(<CommercialProfilesSection userId="user-1" activeProfileId="profile-1" onOpen={vi.fn()} />)
     await screen.findByText('甲账号')
 
     await user.click(screen.getByText('全选当前已加载档案'))
@@ -113,13 +117,137 @@ describe('CommercialProfilesSection request boundaries', () => {
     expect(patchCalls[1]?.[1]?.json).toEqual(patchCalls[0]?.[1]?.json)
   })
 
+  it('refreshes loaded pages using new cursors, deduplicates profiles and retains the last successful limits on failure', async () => {
+    let refreshed = false
+    mocks.apiJson.mockImplementation(async (url: string) => {
+      if (url.includes('cursor=old')) return page([profiles[0]!, profiles[1]!])
+      if (url.includes('cursor=new')) return { ...page([profile('third', '第三个账号', '')]), limits: { ...limits, revision: 2 } }
+      return { ...page([refreshed ? profiles[1]! : profiles[0]!]), next_cursor: refreshed ? 'new' : 'old' }
+    })
+    const { result } = renderHook(() => useCommercialProfiles('user-1', 'profile-1'))
+    await waitFor(() => expect(result.current.page?.next_cursor).toBe('old'))
+    await act(async () => result.current.loadMore())
+    expect(result.current.page?.profiles.map((item) => item.id)).toEqual(['commercial-1', 'commercial-2'])
+    refreshed = true
+    await act(async () => result.current.load())
+    expect(result.current.page?.profiles.map((item) => item.id)).toEqual(['commercial-2', 'third'])
+    expect(result.current.page?.limits.revision).toBe(2)
+    expect(mocks.apiJson.mock.calls.map(([url]) => url)).toEqual([
+      '/api/user/commercial/profiles?state=active&limit=20',
+      '/api/user/commercial/profiles?state=active&limit=20&cursor=old',
+      '/api/user/commercial/profiles?state=active&limit=20',
+      '/api/user/commercial/profiles?state=active&limit=20&cursor=new',
+    ])
+    mocks.apiJson.mockRejectedValue(new Error('列表刷新失败'))
+    await act(async () => result.current.load())
+    await waitFor(() => expect(result.current.error).toBe('列表刷新失败'))
+    expect(result.current.page?.profiles.map((item) => item.id)).toEqual(['commercial-2', 'third'])
+    expect(result.current.page?.limits.revision).toBe(2)
+    expect(mocks.apiJson).toHaveBeenCalledTimes(5)
+  })
+
+  it('cancels old identities, discards late responses and disables reads without a confirmed user', async () => {
+    const requests: Array<{ signal: AbortSignal; finish: (value: ReturnType<typeof page>) => void }> = []
+    mocks.apiJson.mockImplementation((_url, init) => new Promise((finish) => requests.push({ signal: init.signal, finish })))
+    const { result, rerender, unmount } = renderHook(({ userId, profileId }) => useCommercialProfiles(userId, profileId), {
+      initialProps: { userId: 'user-1', profileId: 'profile-1' },
+    })
+    rerender({ userId: 'user-1', profileId: 'profile-2' })
+    expect(requests[0].signal.aborted).toBe(true)
+    expect(result.current.page).toBeNull()
+    rerender({ userId: 'user-2', profileId: 'profile-2' })
+    expect(requests[1].signal.aborted).toBe(true)
+    await act(async () => {
+      requests[0].finish(page([profiles[0]!]))
+      requests[1].finish(page([profiles[1]!]))
+      requests[2].finish(page([profile('current', '当前账号', '')]))
+    })
+    await waitFor(() => expect(result.current.page?.profiles[0]?.id).toBe('current'))
+    act(() => {
+      result.current.setSelectedIds(new Set(['current']))
+      result.current.setEditDraft({ profileId: 'current', displayName: '草稿', note: '' })
+    })
+    rerender({ userId: '', profileId: 'profile-2' })
+    expect(result.current.page).toBeNull()
+    expect(result.current.selectedIds.size).toBe(0)
+    expect(result.current.editDraft).toBeNull()
+    await act(async () => { await result.current.load(); await result.current.loadMore() })
+    expect(mocks.apiJson).toHaveBeenCalledTimes(3)
+    rerender({ userId: 'user-3', profileId: 'profile-3' })
+    unmount()
+    expect(requests[3].signal.aborted).toBe(true)
+  })
+
+  it('keeps active and archived caches separate, reuses fresh results and clears hidden selections', async () => {
+    const pending = deferred<ReturnType<typeof page>>()
+    mocks.apiJson.mockResolvedValueOnce(page(profiles)).mockReturnValueOnce(pending.promise)
+    const { result } = renderHook(() => useCommercialProfiles('user-1', null))
+    await waitFor(() => expect(result.current.page?.profiles).toHaveLength(2))
+    act(() => result.current.setSelectedIds(new Set(['commercial-1'])))
+    act(() => result.current.setState('archived'))
+    expect(result.current.page).toBeNull()
+    expect(result.current.selectedIds.size).toBe(0)
+    await act(async () => pending.resolve(page([profile('archived', '已归档账号', '')])))
+    await waitFor(() => expect(result.current.page?.profiles[0]?.id).toBe('archived'))
+    act(() => result.current.setState('active'))
+    expect(result.current.page?.profiles).toEqual(profiles)
+    expect(mocks.apiJson).toHaveBeenCalledTimes(2)
+  })
+
+  it('invalidates other profile and search caches after editing while keeping other accounts isolated', async () => {
+    const old = page(profiles)
+    const updated = page([profile('commercial-1', '新名称', '新备注')])
+    mocks.apiJson.mockResolvedValueOnce(old).mockResolvedValue(updated)
+    const { result, rerender } = renderHook(({ profileId }) => ({
+      model: useCommercialProfiles('user-1', profileId), client: useQueryClient(),
+    }), { initialProps: { profileId: 'profile-1' } })
+    await waitFor(() => expect(result.current.model.page?.profiles).toHaveLength(2))
+    const otherProfile = ['user', 'user-1', 'profile-2', 'commercial-profiles', 'active', '']
+    const archivedSearch = ['user', 'user-1', 'profile-1', 'commercial-profiles', 'archived', 'name']
+    const otherUser = ['user', 'user-2', 'profile-1', 'commercial-profiles', 'active', '']
+    for (const key of [otherProfile, archivedSearch, otherUser]) {
+      result.current.client.setQueryData(key, { pages: [old], pageParams: [undefined] })
+    }
+    act(() => result.current.model.setEditDraft({ profileId: 'commercial-1', displayName: '新名称', note: '新备注' }))
+    await act(async () => result.current.model.saveEdit())
+    expect(result.current.client.getQueryState(otherProfile)?.isInvalidated).toBe(true)
+    expect(result.current.client.getQueryState(archivedSearch)?.isInvalidated).toBe(true)
+    expect(result.current.client.getQueryState(otherUser)?.isInvalidated).toBe(false)
+    rerender({ profileId: 'profile-2' })
+    await waitFor(() => expect(result.current.model.page?.profiles[0]?.display_name).toBe('新名称'))
+  })
+
+  it('keeps a successful batch notice after a failed read and retries only the list', async () => {
+    let failReads = false
+    mocks.apiJson.mockImplementation(async (_url, init) => {
+      if (init?.method === 'PATCH') return { results: [{ profile_id: 'commercial-1', status: 'archived' }], replayed: false }
+      if (failReads) throw new Error('读取暂时失败')
+      return page(profiles)
+    })
+    const { result } = renderHook(() => useCommercialProfiles('user-1', 'profile-1'))
+    await waitFor(() => expect(result.current.page?.profiles).toHaveLength(2))
+    act(() => result.current.setSelectedIds(new Set(['commercial-1'])))
+    failReads = true
+    await act(async () => result.current.batchArchive())
+    await waitFor(() => expect(result.current.error).toBe('读取暂时失败'))
+    expect(result.current.notice).toBe('已归档 1 个商用档案。')
+    expect(result.current.page?.profiles).toHaveLength(2)
+    expect(result.current.selectedIds.size).toBe(0)
+    failReads = false
+    await act(async () => result.current.load())
+    await waitFor(() => expect(result.current.error).toBeNull())
+    expect(result.current.notice).toBe('已归档 1 个商用档案。')
+    expect(mocks.apiJson.mock.calls.filter(([, init]) => init?.method === 'PATCH')).toHaveLength(1)
+    expect(window.confirm).toHaveBeenCalledOnce()
+  })
+
   it('saves inline name and note edits through action=update', async () => {
     mocks.apiJson
       .mockResolvedValueOnce(page([profiles[0]!]))
       .mockResolvedValueOnce({})
       .mockResolvedValueOnce(page([profile('commercial-1', '新名称', '新备注')]))
     const user = userEvent.setup()
-    render(<CommercialProfilesSection onOpen={vi.fn()} />)
+    render(<CommercialProfilesSection userId="user-1" activeProfileId="profile-1" onOpen={vi.fn()} />)
     await screen.findByText('甲账号')
 
     await user.click(screen.getByRole('button', { name: '编辑' }))

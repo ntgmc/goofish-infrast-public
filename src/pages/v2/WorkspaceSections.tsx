@@ -105,7 +105,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
                 {section === 'announcements' && <Announcements session={session} />}
                 {section === 'inventory' && <Inventory session={session} onProfiles={() => onNavigate('profiles')} />}
                 {section === 'balance' && <Balance userId={session.user!.id} activeProfileId={session.activeProfile?.id ?? null} redemptionEnabled={features.cdk_redemption} />}
-                {section === 'commercial' && <Commercial onOpen={onOpenProfile} />}
+                {section === 'commercial' && <Commercial userId={session.user!.id} activeProfileId={session.activeProfile?.id ?? null} onOpen={onOpenProfile} />}
                 {section === 'tools' && <Tools profileId={session.activeProfile?.id} />}
                 {(['help', 'terms', 'privacy', 'disclaimer', 'support'] as V2Section[]).includes(section) && <PublicInfo page={section === 'help' ? 'faq' : section as 'terms' | 'privacy' | 'disclaimer' | 'support'} />}
                 {section === 'pricing' && <Pricing />}
