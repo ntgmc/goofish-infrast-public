@@ -1745,6 +1745,13 @@
   content-visibility: auto;
   contain-intrinsic-size: auto 140px;
 }
+.v2-operator-virtual-list { position: relative; overflow-anchor: none; }
+.v2-operator-virtual-row {
+  position: absolute;
+  inset: 0 0 auto;
+  content-visibility: visible;
+  contain-intrinsic-size: none;
+}
 .v2-operator-entry .v2-operator-row, .v2-room-operator .v2-operator-row { border: 0; }
 .v2-building-skills summary { display: flex; min-height: 44px; align-items: center; gap: var(--space-xs); cursor: pointer; color: var(--v2-secondary); }
 .v2-building-skills summary::after { content: '+'; margin-left: auto; font-size: var(--text-md); }

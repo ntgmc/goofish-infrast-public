@@ -1,4 +1,4 @@
-import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { NextIcon as ArrowRight, RefreshIcon, SearchIcon, UploadIcon } from '../../components/icons'
 import SklandBindingDialog, { type SklandPayload } from '../../components/SklandBindingDialog'
 import SklandIcon from '../../components/SklandIcon'
@@ -9,9 +9,8 @@ import { useSiteFeatures } from '../../lib/site-feature-context'
 import type { LicenseConfig, LicenseOperator } from '../../lib/types'
 import { extensibleLicenseOperatorsSchema } from '../../lib/workspace-validation'
 import { countOwnedOperators, isFreePreviewProfile, parseOperatorsText, sortOperatorsForPreview } from '../tool/tool-utils'
-import BuildingSkills from './BuildingSkills'
+import OperatorRows from './OperatorRows'
 import type { V2Session } from './OptionsDrawer'
-import { Avatar } from './ScheduleBoard'
 
 const text = copy.v2.operatorManagement
 
@@ -181,16 +180,6 @@ export default function OperatorManagementPanel({ session, config, operators, bu
       }} />
   </>
 }
-
-const OperatorRows = memo(function OperatorRows({ operators }: { operators: LicenseOperator[] }) {
-  return operators.map((operator) => <div className="v2-operator-entry" key={operator.id} data-owned={operator.own !== false}>
-    <div className="v2-operator-row"><Avatar operator={operator} /><strong>{operator.name}</strong>
-      <span className="v2-operator-status">{operator.own !== false ? copy.v2.ownedLabel : copy.v2.notOwnedLabel}</span>
-      <div className="v2-operator-training"><span className="v2-operator-status">{copy.v2.elite(operator.elite)}</span>
-        <span className="v2-operator-status">{copy.v2.operatorLevel(typeof operator.level === 'number' || typeof operator.level === 'string' ? operator.level : undefined)}</span></div>
-    </div><BuildingSkills operator={operator} />
-  </div>)
-})
 
 function bindingTime(value: string | null, empty: string) {
   if (!value || Number.isNaN(Date.parse(value))) return empty
