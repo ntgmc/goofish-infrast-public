@@ -9,16 +9,12 @@ import RouteLifecycle from './components/RouteLifecycle'
 import RouteMetadata from './components/RouteMetadata'
 import SessionLoader from './components/SessionLoader'
 import V2LoadingScreen from './pages/v2/V2LoadingScreen'
-import LandingPage from './pages/LandingPage'
-import ResetPasswordPage from './pages/ResetPasswordPage'
-import VerifyEmailPage from './pages/VerifyEmailPage'
-import CancelAccountDeletionPage from './pages/CancelAccountDeletionPage'
 import { copy } from './copy/index'
+import { routesCopy } from './copy/zh-CN/routes'
 import { ThemeProvider } from './lib/theme'
 import { MotionPreferenceProvider, useAppReducedMotion } from './lib/motion-preference'
 import { SiteFeatureProvider } from './lib/site-feature-context'
 import { FeatureRoute } from './components/FeatureUnavailablePage'
-import AccountSafetyPage from './pages/AccountSafetyPage'
 import PublicContentRoute from './components/PublicContentRoute'
 import { PublicContentProvider } from './lib/public-content-context'
 import { apiVoid } from './lib/api-client'
@@ -27,6 +23,11 @@ import NotFoundPage from './components/NotFoundPage'
 import { recordDebugNavigation } from './lib/debug-diagnostics'
 
 
+const LandingPage = lazy(() => import('./pages/LandingPage'))
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
+const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'))
+const CancelAccountDeletionPage = lazy(() => import('./pages/CancelAccountDeletionPage'))
+const AccountSafetyPage = lazy(() => import('./pages/AccountSafetyPage'))
 const ToolPage = lazy(() => import('./pages/ToolPage'))
 const CultivationPlanPage = lazy(() => import('./pages/CultivationPlanPage'))
 const ThanksRecruitmentPage = lazy(() => import('./pages/ThanksRecruitmentPage'))
@@ -88,13 +89,13 @@ function AppContent() {
       <RouteLifecycle />
       <Routes>
         <Route element={<PublicContentRoute />}>
-          <Route path="/v1" element={<LandingPage onStart={() => navigate('/tool/profiles')} />} />
+          <Route path="/v1" element={<LazyPage fallback={copy.features.loading}><LandingPage onStart={() => navigate('/tool/profiles')} /></LazyPage>} />
           <Route path="/changelog" element={<FeatureRoute feature="changelog"><LazyPage fallback={copy.common.App_014}><ChangelogPage /></LazyPage></FeatureRoute>} />
           <Route path="/faq" element={<FeatureRoute feature="faq"><LazyPage fallback={copy.common.App_003}><PublicInfoPage page="faq" /></LazyPage></FeatureRoute>} />
           <Route path="/support" element={<FeatureRoute feature="support"><LazyPage fallback={copy.common.App_004}><PublicInfoPage page="support" /></LazyPage></FeatureRoute>} />
           <Route path="/pricing" element={<FeatureRoute feature="pricing"><LazyPage fallback={copy.common.App_012}><PricingPage /></LazyPage></FeatureRoute>} />
           <Route path="/thanks" element={<FeatureRoute feature="thanks"><LazyPage fallback={copy.common.App_013}><ThanksPage /></LazyPage></FeatureRoute>} />
-          <Route path="/status" element={<FeatureRoute feature="service_status"><LazyPage fallback={copy.status.pages_StatusPage_024}><StatusPage /></LazyPage></FeatureRoute>} />
+          <Route path="/status" element={<FeatureRoute feature="service_status"><LazyPage fallback={routesCopy.loading.status}><StatusPage /></LazyPage></FeatureRoute>} />
           <Route path="/privacy" element={<LazyPage fallback={copy.common.App_005}><PublicInfoPage page="privacy" /></LazyPage>} />
           <Route path="/terms" element={<LazyPage fallback={copy.common.App_006}><PublicInfoPage page="terms" /></LazyPage>} />
           <Route path="/disclaimer" element={<LazyPage fallback={copy.common.App_007}><PublicInfoPage page="disclaimer" /></LazyPage>} />
@@ -102,16 +103,16 @@ function AppContent() {
         <Route path="/" element={v2Page} />
         <Route path="/v2" element={v2Page} />
         <Route path="/tool/*" element={<LazyPage fallback={copy.common.App_001}><ToolPage /></LazyPage>} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/verify-email" element={<VerifyEmailPage />} />
-        <Route path="/cancel-account-deletion" element={<CancelAccountDeletionPage />} />
-        <Route path="/account-safety" element={<AccountSafetyPage />} />
+        <Route path="/reset-password" element={<LazyPage fallback={copy.features.loading}><ResetPasswordPage /></LazyPage>} />
+        <Route path="/verify-email" element={<LazyPage fallback={copy.features.loading}><VerifyEmailPage /></LazyPage>} />
+        <Route path="/cancel-account-deletion" element={<LazyPage fallback={copy.features.loading}><CancelAccountDeletionPage /></LazyPage>} />
+        <Route path="/account-safety" element={<LazyPage fallback={copy.features.loading}><AccountSafetyPage /></LazyPage>} />
         <Route path="/announcements" element={<FeatureRoute feature="announcements"><LazyPage fallback={copy.common.App_002}><AnnouncementsPage /></LazyPage></FeatureRoute>} />
         <Route path="/tools/depot-value" element={<FeatureRoute feature="depot_value"><LazyPage fallback={copy.common.App_009}><DepotValuePage /></LazyPage></FeatureRoute>} />
-        <Route path="/tools/manual-schedule" element={<FeatureRoute feature="manual_schedule"><LazyPage fallback={copy.tools.manualSchedule.loading}><ManualSchedulePage /></LazyPage></FeatureRoute>} />
-        <Route path="/tools/training-ratio" element={<FeatureRoute feature="tools"><LazyPage fallback={copy.trainingRatio.loading}><TrainingRatioPage /></LazyPage></FeatureRoute>} />
-        <Route path="/tools/cultivation-plan" element={<FeatureRoute feature="cultivation_plan"><LazyPage fallback={copy.tools.cultivation.loading}><CultivationPlanPage /></LazyPage></FeatureRoute>} />
-        <Route path="/tools/thanks-recruitment" element={<FeatureRoute feature="thanks_recruitment"><LazyPage fallback={copy.tools.thanksRecruitment.loading}><ThanksRecruitmentPage /></LazyPage></FeatureRoute>} />
+        <Route path="/tools/manual-schedule" element={<FeatureRoute feature="manual_schedule"><LazyPage fallback={routesCopy.loading['manual-tool']}><ManualSchedulePage /></LazyPage></FeatureRoute>} />
+        <Route path="/tools/training-ratio" element={<FeatureRoute feature="tools"><LazyPage fallback={routesCopy.loading['training-ratio']}><TrainingRatioPage /></LazyPage></FeatureRoute>} />
+        <Route path="/tools/cultivation-plan" element={<FeatureRoute feature="cultivation_plan"><LazyPage fallback={routesCopy.loading.cultivation}><CultivationPlanPage /></LazyPage></FeatureRoute>} />
+        <Route path="/tools/thanks-recruitment" element={<FeatureRoute feature="thanks_recruitment"><LazyPage fallback={routesCopy.loading['thanks-recruitment']}><ThanksRecruitmentPage /></LazyPage></FeatureRoute>} />
         <Route path="/admin/setup" element={<LazyPage fallback={copy.common.App_010}><AdminSetupPage /></LazyPage>} />
         <Route path="/admin/*" element={<LazyPage fallback={copy.common.App_011}><AdminPage /></LazyPage>} />
         <Route path="*" element={<NotFoundPage />} />

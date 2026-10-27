@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router'
 import { copy } from '../copy/index'
+import { routesCopy } from '../copy/zh-CN/routes'
 import { sectionLabels, v2Section } from '../pages/v2/navigation'
 
 
@@ -15,13 +16,13 @@ type Metadata = {
 
 const PUBLIC_METADATA: Record<string, Metadata> = {
   '/tools/training-ratio': {
-    title: copy.trainingRatio.title,
-    description: copy.trainingRatio.description,
+    title: routesCopy.labels['training-ratio'],
+    description: routesCopy.descriptions['training-ratio'],
     indexable: false,
   },
   '/tools/cultivation-plan': {
-    title: copy.tools.cultivation.title,
-    description: copy.tools.cultivation.description,
+    title: routesCopy.labels.cultivation,
+    description: routesCopy.descriptions.cultivation,
     indexable: false,
   },
   '/': {
@@ -35,8 +36,8 @@ const PUBLIC_METADATA: Record<string, Metadata> = {
     indexable: false,
   },
   '/v2': {
-    title: `${copy.v2.brandDescription} | ${copy.v2.brand} · ${copy.v2.testVersion}`,
-    description: copy.v2.resultDescription,
+    title: `${routesCopy.v2.brandDescription} | ${routesCopy.v2.brand} · ${routesCopy.v2.testVersion}`,
+    description: routesCopy.v2.resultDescription,
     indexable: false,
   },
   '/announcements': {
@@ -137,7 +138,7 @@ function resolveMetadata(pathname: string, search: string, hash: string): Metada
   const metadata = PUBLIC_METADATA[pathname] ?? PRIVATE_METADATA
   if (pathname === '/' || pathname === '/v2') {
     const section = v2Section(new URLSearchParams(search), hash)
-    if (section !== 'overview') return { ...metadata, title: `${sectionLabels[section]} | ${copy.v2.brand}`, indexable: false }
+    if (section !== 'overview') return { ...metadata, title: `${sectionLabels[section]} | ${routesCopy.v2.brand}`, indexable: false }
   }
   return metadata
 }
