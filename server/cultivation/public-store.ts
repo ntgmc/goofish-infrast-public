@@ -39,15 +39,6 @@ export function hasStoredRecommendation(query: CultivationQuery, allowStale = fa
   finally { database?.close() }
 }
 
-export function readPublicCatalog(): PrtsSnapshot | null {
-  let database: DatabaseSync | undefined
-  try {
-    database = openRead()
-    return readCatalog(database).data
-  } catch { return null }
-  finally { database?.close() }
-}
-
 function readCatalog(database: DatabaseSync) {
   const info = database.prepare('SELECT revision FROM snapshot WHERE id = 1').get() as { revision: string } | undefined
   if (!info) throw new Error('Public evidence is not prepared')

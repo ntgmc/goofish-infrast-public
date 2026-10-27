@@ -1,8 +1,11 @@
 import { getYituliuPricing } from '../handlers/material-value'
+import { describeServerError } from '../security/error-reporting'
 import { defaultCultivationQuery } from '../../src/lib/cultivation-contract'
 import { buildPublicEvidence, readStoredRecommendations } from './public-store'
+import { asRecord, asRows } from './catalog'
 import { buildCultivationData } from './data'
 import { buildCultivationProjects } from './projects'
+import { buildTrainingAccountData } from './training-ratio'
 import { readProjectCatalog } from './project-catalog'
 import { getCultivationStatistics } from './references'
 import { getSpecialItemCatalog } from './special-items'
@@ -15,6 +18,13 @@ function reply(message: CultivationWorkerReply) {
 }
 
 process.once('disconnect', () => { controller?.abort() })
+// Let an interrupted incremental update release its snapshot lock before exiting.
+const stop = () => {
+  controller?.abort()
+  if (process.connected) process.disconnect()
+}
+process.once('SIGINT', stop)
+process.once('SIGTERM', stop)
 process.on('message', (task: CultivationTask | { type: 'cancel' }) => {
   if (task.type === 'cancel') { controller?.abort(); return }
   controller = new AbortController()
@@ -22,6 +32,9 @@ process.on('message', (task: CultivationTask | { type: 'cancel' }) => {
   void execute(task, signal).then(
     (result) => reply({ ok: true, result }),
     (error: unknown) => {
+      if (!signal.aborted && !(error instanceof CultivationReadError)) {
+        console.error('cultivation task failed:', { task: task.type, ...describeServerError(error) })
+      }
       const failure: CultivationWorkerReply = error instanceof CultivationReadError
         ? { ok: false, status: error.status, code: error.code, message: error.message }
         : { ok: false, status: 502, code: 'cultivation_failed', message: '读取养成数据失败，请稍后重试。' }
@@ -43,16 +56,24 @@ async function execute(task: CultivationTask, signal: AbortSignal): Promise<Arra
     }
     return null
   }
-  if (task.type === 'plan' && task.projects !== undefined) {
+  if (task.type === 'plan' && (task.projects !== undefined || task.training)) {
     let snapshot
-    try { snapshot = await readProjectCatalog(signal) }
+    try {
+      const ownedIds = asRows(asRecord(asRecord(task.game).data ?? task.game).chars).map((row) => String(row.charId ?? row.id ?? ''))
+      snapshot = await readProjectCatalog(signal, ownedIds)
+    }
     catch {
       signal.throwIfAborted()
       throw new CultivationReadError('养成资料暂不可用，请稍后重试。', 503, 'cultivation_data_unavailable')
     }
+    if (task.training) {
+      const community = await getCultivationStatistics()
+      signal.throwIfAborted()
+      return encodePlan(buildTrainingAccountData(snapshot, task.game, task.inventory, community), task)
+    }
     const pricing = await getYituliuPricing()
     signal.throwIfAborted()
-    const data = buildCultivationProjects(snapshot, task.game, task.inventory, pricing, task.projects)
+    const data = buildCultivationProjects(snapshot, task.game, task.inventory, pricing, task.projects!)
     return encodePlan(data, task)
   }
   let saved: ReturnType<typeof readStoredRecommendations>
@@ -67,7 +88,7 @@ async function execute(task: CultivationTask, signal: AbortSignal): Promise<Arra
   return encodePlan(buildCultivationData(snapshot, task.game, task.inventory, pricing, community, specialCatalog, task.query, recommendation, task.thanksRecruitmentEnabled !== false), task)
 }
 
-function encodePlan(data: import('../../src/lib/cultivation-contract').CultivationData, task: Extract<CultivationTask, { type: 'plan' }>): ArrayBuffer {
+function encodePlan(data: { warnings: string[] }, task: Extract<CultivationTask, { type: 'plan' }>): ArrayBuffer {
   return new TextEncoder().encode(JSON.stringify({ ...data, importedAt: task.importedAt, snapshotVersion: task.snapshotVersion,
     warnings: [...data.warnings, ...task.warnings] })).buffer
 }

@@ -1,4 +1,6 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { fork } from 'node:child_process'
+import { once } from 'node:events'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -26,9 +28,17 @@ beforeAll(async () => {
         'material-value': `export async function getYituliuPricing() {const end = Date.now() + 100; while (Date.now() < end) {}; return {status:'fresh',prices:new Map([['rock',5],['book',2]])}};
           export const getExpSanity = n => n * 0.006; export const getNetLmdSanity = () => 0.0036;
           export const EXP_ITEM_VALUES = {'2001':200,'2002':400,'2003':1000,'2004':2000};`,
-        'prts-planning-sync.mjs': `import { readFile, writeFile } from 'node:fs/promises'; import { setTimeout } from 'node:timers/promises';
-          export async function syncPrtsPlanning({signal}) { await setTimeout(400, undefined, {signal});
-            await writeFile(process.env.MAA_PRTS_PLANNING_PATH, await readFile(new URL('./next-snapshot.json', import.meta.url))) }`,
+        'prts-planning-sync.mjs': `import { readFile, writeFile, unlink } from 'node:fs/promises'; import { setTimeout } from 'node:timers/promises';
+          export async function syncPrtsPlanning({signal}) {
+            if (process.env.CULTIVATION_TEST_FAILURE) throw new Error('sync source failed password=test-private-token');
+            const lock = process.env.MAA_PRTS_PLANNING_PATH + '.lock';
+            await writeFile(lock, String(process.pid), {flag:'wx'});
+            try {
+              if (process.env.CULTIVATION_TEST_SIGNAL) process.send({sync_started:true});
+              await setTimeout(process.env.CULTIVATION_TEST_SIGNAL ? 30000 : 400, undefined, {signal});
+              await writeFile(process.env.MAA_PRTS_PLANNING_PATH, await readFile(new URL('./next-snapshot.json', import.meta.url)))
+            } finally { await unlink(lock) }
+          }`,
         references: `export async function getCultivationStatistics() {return {status:'unavailable',updatedAt:null,operators:{}}}`,
         'project-catalog': `import { readFile } from 'node:fs/promises';
           export async function readProjectCatalog() { return JSON.parse(await readFile(new URL('./project-game-data.json', import.meta.url), 'utf8')) }`,
@@ -96,6 +106,49 @@ describe('cultivation worker integration', () => {
     expect(after.updatedAt).not.toBe(first.updatedAt)
   })
 
+  it.each(['SIGINT', 'SIGTERM'] as const)('releases the snapshot lock when an update receives %s', async (signal) => {
+    const path = join(directory, `${signal}.json`)
+    const original = JSON.stringify({ ...planningFixture(), updatedAt: '2020-01-01T00:00:00Z' })
+    await writeFile(path, original)
+    const worker = fork(join(directory, 'cultivation-worker.js'), [], { execArgv: [], stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
+      env: { ...process.env, MAA_PRTS_PLANNING_PATH: path, CULTIVATION_TEST_SIGNAL: '1' } })
+    const exited = once(worker, 'exit')
+    try {
+      const started = once(worker, 'message')
+      worker.send({ type: 'refresh' })
+      expect((await started)[0]).toEqual({ sync_started: true })
+      expect(await readFile(`${path}.lock`, 'utf8')).toBe(String(worker.pid))
+      worker.kill(signal)
+      expect(await exited).toEqual([0, null])
+      await expect(readFile(`${path}.lock`)).rejects.toMatchObject({ code: 'ENOENT' })
+      expect(await readFile(path, 'utf8')).toBe(original)
+    } finally {
+      if (worker.exitCode === null && worker.signalCode === null) { worker.kill('SIGKILL'); await exited }
+    }
+  })
+
+  it('logs sanitized update failures while keeping internal details out of replies', async () => {
+    const path = join(directory, 'failed-update.json')
+    await writeFile(path, JSON.stringify({ ...planningFixture(), updatedAt: '2020-01-01T00:00:00Z' }))
+    const worker = fork(join(directory, 'cultivation-worker.js'), [], { execArgv: [], stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
+      env: { ...process.env, MAA_PRTS_PLANNING_PATH: path, CULTIVATION_TEST_FAILURE: '1' } })
+    const exited = once(worker, 'exit')
+    let log = ''
+    worker.stderr!.setEncoding('utf8').on('data', (chunk) => { log += chunk })
+    try {
+      const reply = once(worker, 'message')
+      worker.send({ type: 'refresh' })
+      expect((await reply)[0]).toMatchObject({ ok: false, code: 'cultivation_failed', message: '读取养成数据失败，请稍后重试。' })
+      worker.disconnect()
+      await exited
+      expect(log).toContain('sync source failed')
+      expect(log).toContain('<redacted>')
+      expect(log).not.toContain('test-private-token')
+    } finally {
+      if (worker.exitCode === null && worker.signalCode === null) { worker.kill('SIGKILL'); await exited }
+    }
+  })
+
   it('reports a missing seed through the reader without crashing the API process', async () => {
     await client.shutdownCultivationWorker()
     vi.stubEnv('MAA_PRTS_PLANNING_PATH', join(directory, 'missing.json'))
@@ -104,6 +157,7 @@ describe('cultivation worker integration', () => {
 
   it('imports owned operators and selected goals without a homework snapshot', async () => {
     const snapshot = { ...planningFixture(), homeworks: [] }
+    snapshot.costs.modules.charEquip.char_test = ['mod_x']
     await writeFile(join(directory, 'project-game-data.json'), JSON.stringify(snapshot))
     const first = JSON.parse(new TextDecoder().decode(await client.readCultivationPlan({ ...input, projects: [] })))
     expect(first.projectOperators).toMatchObject([{ id: 'char_test', current: { elite: 0, level: 1 } }])
@@ -114,6 +168,9 @@ describe('cultivation worker integration', () => {
     expect(JSON.parse(text).candidates).toMatchObject([{ operatorId: 'char_test', items: { rock: 2, exp: 100, '4001': 110 }, warnings: [] }])
     expect(text).not.toContain('private-credential')
     expect(text).not.toContain('player-uid')
+    const training = JSON.parse(new TextDecoder().decode(await client.readCultivationPlan({ ...input, training: true })))
+    expect(training).toMatchObject({ snapshotVersion: '1', inventory: { lmd: 0, exp: 0 }, operators: [{ id: 'char_test', elite: 0, level: 1 }] })
+    expect(training.candidates).toBeUndefined()
     await expect(client.readCultivationPlan(input)).rejects.toMatchObject({ code: 'prts_data_unavailable' })
   })
 

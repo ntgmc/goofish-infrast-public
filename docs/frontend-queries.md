@@ -24,6 +24,7 @@ TanStack Query v5 管理普通页面读取：库存、新手任务、优化任�
 | 用户反馈列表与时间线 | `['user', userId, null, 'feedback', 'list'或'thread', ...分页或反馈ID]` |
 | 用户通知分页 | `['user', userId, null, 'notifications']` |
 | QQ Bot 设置 | `['user', userId, null, 'qqbot']` |
+| 钱书平衡的账号培养资料 | `['user', userId, profileId, 'training-ratio', 森空岛快照版本]` |
 | 排班历史详情 | `['user', userId, profileId, 'result-history', 'detail', resultId]` |
 | 排班历史分页 | `['user', userId, profileId, 'result-history', 'pages', scope, 首屏快照]` |
 | 公共内容、站点开关、注册配置、服务状态和构建版本 | `['public', 'content'或'features'或'registration-settings'或'service-status'或'service-build', ...条件]` |

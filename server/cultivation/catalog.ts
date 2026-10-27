@@ -21,7 +21,7 @@ export const prtsSnapshotSchema = z.object({
     views: z.number().int().nonnegative().optional(),
     hotScore: z.number().nonnegative().optional(),
   })),
-  operators: z.record(z.string(), z.object({ name: z.string(), rarity: z.number().int().min(1).max(6), skills: z.array(z.string()), profession: z.string().optional() })),
+  operators: z.record(z.string(), z.object({ name: z.string(), rarity: z.number().int().min(1).max(6), skills: z.array(z.string()), profession: z.string().optional(), baseId: z.string().min(1).optional() })),
   stages: z.record(z.string(), z.object({ name: z.string(), activity: z.string(), category: z.string(), permanent: z.boolean(), open: z.boolean().nullable().optional() })).optional(),
   costs: z.object({
     cultivate: z.record(z.string(), record),

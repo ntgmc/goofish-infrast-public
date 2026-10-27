@@ -135,6 +135,10 @@ test('builds project promotion and mastery costs from the same pinned game table
     ], allSkillLvlup: [{ lvlUpCost: [{ id: 'book', count: 5 }] }], skills: [
       { skillId: 's1', levelUpCostCond: [{ levelUpCost: [{ id: 'book3', count: 6 }, { id: 'rock', count: 3 }] }] },
     ] } },
+    char_patch_table: { infos: { char_test: { tmplIds: ['char_test', 'char_test_form'] } }, patchChars: {
+      char_test_form: { name: '测试转职', rarity: 'TIER_6', profession: 'MEDIC', skills: [{ skillId: 'form_s1' }], phases: [{ evolveCost: null }, { evolveCost: [{ id: 'chip', count: 5 }] }] },
+    } },
+    uniequip_table: { equipDict: { form_mod: { charId: 'char_test_form', itemCost: { '1': [{ id: '4001', count: 80000 }] } } }, charEquip: { char_test_form: ['form_mod'] } },
     building_data: { workshopFormulas: { high: { formulaType: 'F_EVOLVE', itemId: 'high', count: 1, goldCost: 300, costs: [{ id: 'rock', count: 3 }] } }, manufactFormulas: {} },
     item_table: { items: { rock: { name: '源岩', iconId: 'MTL_ROCK' }, ap_supply_lt_60: { name: '理智药', itemType: 'AP_SUPPLY' } } },
     zone_table: { zones: { daily: { zoneNameFirst: '资源收集' } }, weeklyAdditionInfo: { daily: { daysOfWeek: [2, 4, 6, 7] } } },
@@ -150,6 +154,10 @@ test('builds project promotion and mastery costs from the same pinned game table
   assert.deepEqual(assets.costs.cultivate.test, {
     evolve: [{ chip: 5 }, { chip2: 4 }], skills: { normal: [{ book: 5 }], elite: [{ cost: [{ book3: 6, rock: 3 }] }] },
   })
+  assert.deepEqual(assets.operators.char_test_form, { name: '测试转职', rarity: 6, profession: 'MEDIC', skills: ['form_s1'], baseId: 'char_test' })
+  assert.equal(assets.operators.char_test.baseId, 'char_test')
+  assert.deepEqual(assets.costs.cultivate.test_form.evolve, [{ chip: 5 }])
+  assert.deepEqual(assets.costs.modules, tables.uniequip_table)
   assert.deepEqual(assets.costs.levels.maxLevel[5], [50, 80, 90])
   assert.equal(assets.costs.levels.eliteCost[5][1], 180000)
   assert.deepEqual(assets.recipes.high, { count: 1, items: { rock: 3, '4001': 300 } })
@@ -157,6 +165,7 @@ test('builds project promotion and mastery costs from the same pinned game table
   assert.equal(assets.potionValues.ap_supply_lt_60, 60)
   const serialized = prtsSnapshotSchema.parse({ ...planningFixture(), ...assets })
   assert.deepEqual(serialized.itemIcons, { rock: 'MTL_ROCK' })
+  assert.equal(serialized.operators.char_test_form.baseId, 'char_test')
   assert.ok(urls.filter((url) => !url.includes('penguin-stats')).every((url) => url.startsWith(`https://cdn.jsdelivr.net/gh/Kengxxiao/ArknightsGameData@${sha}/`)))
   assert.equal((await loadPlanningAssets(sha)).costs, undefined)
   await assert.rejects(loadPlanningAssets('master', undefined, true), /pinned game_sha/)

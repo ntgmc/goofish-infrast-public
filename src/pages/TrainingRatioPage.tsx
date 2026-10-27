@@ -11,6 +11,8 @@ import { profileScopedPath } from '../lib/app-routes'
 import { useToolSession } from './tool/useToolSession'
 import { trainingAmount, useTrainingRatio } from './useTrainingRatio'
 import { v2Path } from './v2/navigation'
+import TrainingRatioGoals from './TrainingRatioGoals'
+import TrainingRatioAccount from './TrainingRatioAccount'
 import './training-ratio.css'
 
 const text = copy.trainingRatio
@@ -42,13 +44,19 @@ function TrainingRatioContent({ session, embedded }: { session: Session; embedde
   const inventoryRatio = m.balance?.ratio === null ? m.inventory && m.inventory.lmd > 0 ? text.noExp : text.noResources
     : m.balance ? m.balance.focus === 'lmd' && number(m.balance.ratio) === '1.2' ? text.belowRange
       : m.balance.focus === 'exp' && number(m.balance.ratio) === '1.4' ? text.aboveRange : `${number(m.balance.ratio)}∶1` : ''
+  const accountMode = m.source === 'imported'
+  const required = m.requirements
+  const reference = m.account.isError || required?.issues.length ? '—'
+    : !m.accountBalance || !required ? m.data ? text.targetsLoading : text.noDemand
+      : !required.exp ? required.lmd ? text.onlyLmd : text.noDemand
+        : required.lmd ? `${number(required.lmd / required.exp)}∶1` : text.onlyExp
   const Root = embedded ? 'div' : 'main'
   return <div className={`training-ratio${embedded ? ' training-ratio--embedded' : ' training-ratio--standalone'}`}>
     {!embedded && <header className="training-ratio-header"><Link to="/tool/tools" aria-label={text.back}><BrandLogo /></Link><div><Link to="/tool/tools">{text.back}</Link><ThemeSwitcher /></div></header>}
     <Root>
       {!embedded && <h1>{text.title}</h1>}
       <p className="training-ratio-lead">{text.description}</p>
-      <section className="training-ratio-reference" aria-label={text.reference}><div><span>{text.reference}</span><strong><ProductIcon product="LMD" size={40} />{text.referenceValue}<ProductIcon product="Battle Record" size={40} /></strong><span className="training-ratio-range"><Scale size={16} aria-hidden="true" />{text.referenceRange}</span></div><p>{text.referenceHint}</p></section>
+      <section className="training-ratio-reference" aria-label={accountMode ? text.accountReference : text.reference}><div><span>{accountMode ? text.accountReference : text.reference}</span><strong><ProductIcon product="LMD" size={40} />{accountMode ? reference : text.referenceValue}<ProductIcon product="Battle Record" size={40} /></strong><span className="training-ratio-range"><Scale size={16} aria-hidden="true" />{accountMode ? text.accountRange : text.referenceRange}</span></div><p>{accountMode ? text.accountReferenceHint : text.referenceHint}</p></section>
       <div className="training-ratio-columns">
         <section className="training-ratio-inputs tool-panel" aria-label={text.inventory}>
           <h2><Wallet size={20} aria-hidden="true" />{text.inventory}</h2>
@@ -62,6 +70,7 @@ function TrainingRatioContent({ session, embedded }: { session: Session; embedde
           {m.canImport ? <div className="training-ratio-actions"><button type="button" className="tool-secondary-action training-ratio-import" disabled={m.busy} onClick={() => void m.load()}><RefreshCw size={16} aria-hidden="true" />{m.busy ? copy.skland.refreshing : copy.skland.refresh}</button></div> : session.authLoading ? <p role="status">{text.accountLoading}</p> : <p>{text.loginHint} <Link className="training-ratio-link" to={embedded ? v2Path('profiles', profile?.id) : '/tool/profiles'}>{text.accountEntry}<ArrowRight size={14} /></Link></p>}
           {m.data && <><ResourceStock inventory={m.data.inventory} /><p>{text.importedAt} {new Date(m.data.importedAt).toLocaleString('zh-CN')}</p></>}
           {m.error && <p role="alert" className="training-ratio-error">{m.error}</p>}
+          <TrainingRatioGoals model={m} />
           </Tabs.Content>
           <Tabs.Content value="manual" forceMount hidden={m.source !== 'manual'}>
             <form onSubmit={(event) => { event.preventDefault(); m.applyManual() }}>
@@ -72,14 +81,14 @@ function TrainingRatioContent({ session, embedded }: { session: Session; embedde
             {!m.manualValid && <p role="alert" className="training-ratio-error">{text.invalidAmount}</p>}
             <button type="submit" className="tool-primary-action" disabled={!m.manualValid}>{text.applyManual}</button>
             </form>
-          {m.draftFailed && <p role="status">{text.draftFailed}</p>}
           </Tabs.Content>
           </Tabs.Root>
+          {m.draftFailed && <p role="status">{text.draftFailed}</p>}
         </section>
-        <section className="training-ratio-results tool-panel" data-focus={m.balance?.focus ?? 'empty'} aria-label={text.result} aria-live="polite">
+        <section className="training-ratio-results tool-panel" data-focus={accountMode ? m.accountBalance?.focus === 'ready' ? 'balanced' : m.accountBalance?.focus ?? 'empty' : m.balance?.focus ?? 'empty'} aria-label={text.result} aria-live="polite">
           <h2><Scale size={20} aria-hidden="true" />{text.result}</h2>
           {m.balance && <p className="training-ratio-source">{m.source === 'manual' ? text.manualSource : text.importedSource}</p>}
-          {m.balance && m.inventory ? <>
+          {accountMode ? <TrainingRatioAccount model={m} accountName={profile?.display_name ?? ''} /> : m.balance && m.inventory ? <>
             <div className="training-ratio-verdict"><span className="training-ratio-verdict-icon" aria-hidden="true">{m.balance.focus === 'lmd' || m.balance.focus === 'exp' ? <ProductIcon product={m.balance.focus === 'lmd' ? 'LMD' : 'Battle Record'} size={44} /> : m.balance.focus === 'balanced' ? <Check size={28} /> : <Scale size={28} />}</span><div><strong>{text.focus[m.balance.focus]}</strong><p>{text.explanation[m.balance.focus]}</p></div></div>
             <ResourceStock inventory={m.inventory} />
             <h3>{text.inventoryRatio}</h3><p className="training-ratio-value">{inventoryRatio}</p>
@@ -95,7 +104,7 @@ function TrainingRatioContent({ session, embedded }: { session: Session; embedde
           </> : <p role="status">{m.source === 'manual' ? text.noManualInventory : m.busy ? text.importing : text.noInventory}</p>}
         </section>
       </div>
-      <details className="training-ratio-evidence tool-panel"><summary><span><CircleHelp size={18} aria-hidden="true" />{text.evidence}</span></summary><p>{text.reason}</p><p>{text.evidenceHint}</p><div className="training-ratio-table"><table><thead><tr>{[text.target, text.lmd, text.exp, text.costRatio].map((label) => <th key={label} scope="col">{label}</th>)}</tr></thead><tbody>{examples.map((example, index) => { const cost = calculateTrainingCost({ ...example, currentElite: 0, currentLevel: 1, targetElite: 2 }); return <tr key={index}><th scope="row">{text.evidenceRows[index]}</th><td>{number(cost.lmd)}</td><td>{number(cost.exp)}</td><td>{number(cost.lmd / cost.exp)}∶1</td></tr> })}</tbody></table></div><p>{text.habits}</p><p>{text.scope}</p>{features.cultivation_plan && <Link className="training-ratio-link" to={v2Path('cultivation-projects', profile?.id)}>{text.projectEntry}<ArrowRight size={14} /></Link>}</details>
+      <details className="training-ratio-evidence tool-panel"><summary><span><CircleHelp size={18} aria-hidden="true" />{text.evidence}</span></summary><p>{accountMode ? text.accountEvidence : text.reason}</p><p>{text.evidenceHint}</p><div className="training-ratio-table"><table><thead><tr>{[text.target, text.lmd, text.exp, text.costRatio].map((label) => <th key={label} scope="col">{label}</th>)}</tr></thead><tbody>{examples.map((example, index) => { const cost = calculateTrainingCost({ ...example, currentElite: 0, currentLevel: 1, targetElite: 2 }); return <tr key={index}><th scope="row">{text.evidenceRows[index]}</th><td>{number(cost.lmd)}</td><td>{number(cost.exp)}</td><td>{number(cost.lmd / cost.exp)}∶1</td></tr> })}</tbody></table></div><p>{text.habits}</p><p>{text.scope}</p>{features.cultivation_plan && <Link className="training-ratio-link" to={v2Path('cultivation-projects', profile?.id)}>{text.projectEntry}<ArrowRight size={14} /></Link>}</details>
     </Root>
   </div>
 }

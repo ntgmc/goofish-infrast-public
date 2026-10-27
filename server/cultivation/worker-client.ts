@@ -1,13 +1,10 @@
 import { fork, type ChildProcess } from 'node:child_process'
-import { stat } from 'node:fs/promises'
-import { defaultCultivationQuery } from '../../src/lib/cultivation-contract'
-import { prtsSnapshotPath } from './catalog'
 import type { CultivationQuery } from '../../src/lib/cultivation-contract'
 import type { CultivationProject } from '../../src/lib/cultivation-projects'
 import { hasStoredRecommendation } from './public-store'
 
 export type CultivationTask = { type: 'plan'; game: unknown; inventory: unknown; importedAt: string; snapshotVersion: string;
-  warnings: string[]; query: CultivationQuery; thanksRecruitmentEnabled?: boolean; projects?: CultivationProject[] } | { type: 'refresh' } | { type: 'prepare'; query: CultivationQuery }
+  warnings: string[]; query: CultivationQuery; thanksRecruitmentEnabled?: boolean; projects?: CultivationProject[]; training?: true } | { type: 'refresh' } | { type: 'prepare'; query: CultivationQuery }
 export type CultivationWorkerReply = { ok: true; result: ArrayBuffer | null } | { ok: false; status: number; code: string; message: string }
 
 export class CultivationReadError extends Error {
@@ -127,14 +124,7 @@ export async function readCultivationPlan(input: Omit<Extract<CultivationTask, {
   reading = true
   const started = generation
   try {
-    if (input.projects !== undefined && !hasStoredRecommendation(defaultCultivationQuery, true)) {
-      const sourceExists = await stat(prtsSnapshotPath()).then(() => true, () => false)
-      if (sourceExists) {
-        try { await executeBuild({ type: 'prepare', query: defaultCultivationQuery }, signal) }
-        catch (error) { if (signal?.aborted) throw error }
-      }
-    }
-    if (input.projects === undefined && !hasStoredRecommendation(input.query)) {
+    if (input.projects === undefined && !input.training && !hasStoredRecommendation(input.query)) {
       try { await executeBuild({ type: 'prepare', query: input.query }, signal) }
       catch (error) {
         if (signal?.aborted || !hasStoredRecommendation(input.query, true)) throw error

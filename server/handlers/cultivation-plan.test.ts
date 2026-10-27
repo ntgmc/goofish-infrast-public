@@ -64,6 +64,18 @@ describe('cultivation planning authorization and data boundary', () => {
     expect(mocks.read).toHaveBeenLastCalledWith(expect.objectContaining({ projects: [] }), expect.any(AbortSignal))
   })
 
+  it('authorizes the account training catalog and rejects mixed calculation modes', async () => {
+    for (const body of [{ profile_id: 'mine', training: false }, { profile_id: 'mine', training: true, projects: [] }, { profile_id: 'mine', training: true, recommendation: {} }]) {
+      expect((await handler(request(body))).status).toBe(400)
+    }
+    expect((await handler(request({ profile_id: 'foreign', training: true }))).status).toBe(404)
+    expect(mocks.read).not.toHaveBeenCalled()
+    const response = await handler(request({ profile_id: 'mine', training: true }))
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    expect(mocks.read).toHaveBeenCalledWith(expect.objectContaining({ training: true, snapshotVersion: '1' }), expect.any(AbortSignal))
+  })
+
   it('passes the backend-controlled activity switch to the isolated reader', async () => {
     mocks.features.mockResolvedValue({ ...DEFAULT_SITE_FEATURE_SETTINGS, features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, thanks_recruitment: false } })
     const response = await handler(request())

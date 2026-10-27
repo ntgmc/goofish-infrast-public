@@ -75,12 +75,16 @@ export async function loadPlanningAssets(gameSha, signal, includeCosts = false) 
   const base = includeCosts
     ? `https://cdn.jsdelivr.net/gh/Kengxxiao/ArknightsGameData@${gameSha}/zh_CN/gamedata/excel`
     : `https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/${gameSha}/zh_CN/gamedata/excel`
-  const [characters, building, items, zones, stages, drops] = await Promise.all([
+  const [characters, building, items, zones, stages, drops, patches, modules] = await Promise.all([
     ...['character_table', 'building_data', 'item_table', 'zone_table', 'stage_table'].map((file) => fetchJson(`${base}/${file}.json`, { signal })),
     fetchJson('https://penguin-stats.io/PenguinStats/api/v2/result/matrix?server=CN', { signal }),
+    ...(includeCosts ? ['char_patch_table', 'uniequip_table'].map((file) => fetchJson(`${base}/${file}.json`, { signal })) : []),
   ])
-  const operators = Object.fromEntries(Object.entries(characters).filter(([id]) => id.startsWith('char_')).map(([id, row]) => [id, {
+  const playable = { ...characters, ...patches?.patchChars }
+  const baseIds = new Map(Object.entries(patches?.infos ?? {}).flatMap(([baseId, info]) => info.tmplIds.map((id) => [id, baseId])))
+  const operators = Object.fromEntries(Object.entries(playable).filter(([id]) => id.startsWith('char_')).map(([id, row]) => [id, {
     name: row.name, profession: row.profession, rarity: typeof row.rarity === 'number' ? row.rarity + 1 : Number(String(row.rarity).replace('TIER_', '')), skills: (row.skills ?? []).map((skill) => skill.skillId),
+    ...(baseIds.has(id) ? { baseId: baseIds.get(id) } : {}),
   }]))
   const stageCatalog = Object.fromEntries(Object.entries(stages.stages).map(([id, stage]) => [id, {
     name: `${stage.code ?? id} ${stage.name ?? ''}`.trim(),
@@ -129,7 +133,7 @@ export async function loadPlanningAssets(gameSha, signal, includeCosts = false) 
   if (!includeCosts) return assets
   const materialCounts = (rows) => Array.isArray(rows) ? Object.fromEntries(rows.map((row) => [row.id, row.count])) : null
   return { ...assets, costs: {
-    cultivate: Object.fromEntries(Object.entries(characters).filter(([id]) => id.startsWith('char_')).map(([id, row]) => [id.replace(/^char_/, ''), {
+    cultivate: Object.fromEntries(Object.entries(playable).filter(([id]) => id.startsWith('char_')).map(([id, row]) => [id.replace(/^char_/, ''), {
       evolve: (row.phases ?? []).slice(1).map((phase) => materialCounts(phase.evolveCost)),
       skills: {
         normal: (row.allSkillLvlup ?? []).map((rank) => materialCounts(rank.lvlUpCost)),
@@ -137,7 +141,7 @@ export async function loadPlanningAssets(gameSha, signal, includeCosts = false) 
       },
     }])),
     levels: { maxLevel: levelData.maxLevel, characterExp: levelData.characterExpMap, characterUpgradeCost: levelData.characterUpgradeCostMap, eliteCost: levelData.evolveGoldCost },
-    modules: { equipDict: {}, charEquip: {} },
+    modules: { equipDict: modules.equipDict, charEquip: modules.charEquip },
   } }
 }
 
