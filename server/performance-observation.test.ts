@@ -50,6 +50,24 @@ describe('performance observations', () => {
     expect(JSON.stringify(events)).not.toContain('private-id')
   })
 
+  it('keeps short and long samples when histogram capacity grows and starts a fresh window', () => {
+    const events = captureEvents()
+    const durations = [0, 0.77, 0.77, 2_000, 1_800_000, 7 * 24 * 60 * 60_000]
+    for (const duration of durations) recordPerformanceDuration('postgres.query', duration)
+    flushPerformanceDurations()
+    expect(events[0]).toMatchObject({ count: durations.length })
+    expect(Number(events[0].p50_ms)).toBeCloseTo(0.77, 2)
+    const expectedMean = durations.reduce((sum, duration) => sum + duration, 0) / durations.length
+    expect(Math.abs(Number(events[0].mean_ms) - expectedMean) / expectedMean).toBeLessThan(0.01)
+    expect(Number(events[0].max_ms)).toBeGreaterThanOrEqual(durations.at(-1)!)
+    expect(Number(events[0].max_ms)).toBeLessThan(durations.at(-1)! * 1.01)
+    recordPerformanceDuration('postgres.query', 0.77)
+    flushPerformanceDurations()
+    expect(events).toHaveLength(2)
+    expect(events[1]).toMatchObject({ count: 1 })
+    expect(Number(events[1].max_ms)).toBeCloseTo(0.77, 2)
+  })
+
   it('bounds metric cardinality and keeps overflow samples', () => {
     const events = captureEvents()
     for (let index = 0; index < 520; index += 1) recordPerformanceDuration('http.request', 1, { route: String(index) })
@@ -59,18 +77,23 @@ describe('performance observations', () => {
     expect(events.at(-1)).toMatchObject({ labels: { overflow: 'true' }, count: 8 })
   })
 
-  it('samples idle processes and flushes exactly once at shutdown', () => {
+  it('samples every five minutes even when idle and flushes exactly once at shutdown', () => {
     const events = captureEvents()
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
     const stop = startPerformanceObservation(() => ({ total: 2, idle: 1, waiting: 3 }))
     vi.advanceTimersByTime(60_000)
+    expect(events).toHaveLength(0)
+    recordPerformanceDuration('postgres.query', 10)
+    vi.advanceTimersByTime(240_000)
+    expect(events.filter((event) => event.event === 'performance.runtime')).toHaveLength(1)
+    expect(events.filter((event) => event.event === 'performance.duration')).toHaveLength(1)
     recordPerformanceDuration('postgres.query', 20)
     stop()
     stop()
-    vi.advanceTimersByTime(60_000)
+    vi.advanceTimersByTime(300_000)
     expect(events.filter((event) => event.event === 'performance.runtime')).toHaveLength(2)
     expect(events[0]).toMatchObject({ postgres_pool: { total: 2, idle: 1, waiting: 3 }, event_loop_samples: 0, event_loop_p95_ms: null })
-    expect(events.filter((event) => event.event === 'performance.duration')).toHaveLength(1)
+    expect(events.filter((event) => event.event === 'performance.duration')).toHaveLength(2)
     expect(vi.getTimerCount()).toBe(0)
   })
 

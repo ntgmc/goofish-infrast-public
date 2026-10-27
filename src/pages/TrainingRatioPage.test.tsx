@@ -4,13 +4,15 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { copy } from '../copy'
+import levels from '../data/training-level-data.json'
 import type { SklandSnapshot } from '../lib/skland-snapshot'
+import type { TrainingAccountData } from '../lib/training-ratio-account'
 import type { WorkspaceResultHistoryItem } from '../lib/types'
 import { syncSklandSnapshotSession } from '../lib/skland-snapshot-client'
 import type { useToolSession } from './tool/useToolSession'
 import TrainingRatioPage from './TrainingRatioPage'
 
-const mocks = vi.hoisted(() => ({ api: vi.fn(), result: vi.fn() }))
+const mocks = vi.hoisted(() => ({ api: vi.fn(), result: vi.fn(), stock: vi.fn(), catalog: vi.fn() }))
 vi.mock('./tool/optimize/optimization-api', () => ({ fetchResultHistoryDetail: mocks.result }))
 vi.mock('../lib/api-client', async (original) => ({ ...await original<typeof import('../lib/api-client')>(), apiJson: mocks.api }))
 const text = copy.trainingRatio
@@ -24,47 +26,59 @@ const production = (lmd: number, exp: number) => ({ result: { daily_production: 
 const view = (current = session()) => <MemoryRouter><TrainingRatioPage session={current} embedded /></MemoryRouter>
 const data = { uid: 'first', version: '1', game: { state: 'fresh', fetchedAt: new Date().toISOString(), error: null },
   inventory: { state: 'fresh', fetchedAt: new Date().toISOString(), error: null, items: { '4001': 200000, '2004': 50 }, lmd: 200000, exp: 100000 }, retryAt: null } as SklandSnapshot
+const account: TrainingAccountData = { snapshotVersion: '1', importedAt: '', inventory: { lmd: 200000, exp: 100000 }, levels, warnings: [], operators: [{
+  id: 'a', name: '测试干员', rarity: 6, elite: 0, level: 1, modules: [{ id: 'x', name: '测试模组', elite: 2, level: 60, current: 0, costs: [80000, 100000, 120000], common: true }],
+}] }
 beforeEach(() => {
   syncSklandSnapshotSession({ user: { id: 'reset' }, profiles: [] } as never); syncSklandSnapshotSession(null)
-  localStorage.clear(); sessionStorage.clear(); mocks.api.mockResolvedValue(data)
+  localStorage.clear(); sessionStorage.clear()
+  mocks.stock.mockResolvedValue(data); mocks.catalog.mockResolvedValue(account)
+  mocks.api.mockImplementation((path, options) => path === '/api/cultivation-plan' ? mocks.catalog(options) : mocks.stock(path, options))
   mocks.result.mockResolvedValue({ result: {} })
 })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
-it('imports stock by default without targets and keeps imported data out of the manual draft', async () => {
-  const user = userEvent.setup()
+it('calculates a dynamic account ratio without reading saved projects or persisting personal data', async () => {
   localStorage.setItem('maatool:cultivation-projects:user1:first', '[broken')
   render(view())
-  expect(await screen.findByText(text.recoveryDays('1'))).toBeInTheDocument()
-  expect(screen.getByText(text.recoveryPlan('LS-6', false))).toBeInTheDocument()
+  expect(await screen.findByText(text.accountFocus.exp)).toBeInTheDocument()
+  expect(screen.getByLabelText(text.accountReference)).toHaveTextContent('1.29∶1')
   expect(screen.getByText(text.noBaseIncome)).toBeInTheDocument()
-  expect(mocks.api).toHaveBeenCalledTimes(1)
-  expect(mocks.api).toHaveBeenCalledWith('/api/user/skland/snapshot?profile_id=first', expect.any(Object))
-  expect(screen.getByText(text.importedSource)).toBeInTheDocument()
+  expect(mocks.catalog).toHaveBeenCalledWith(expect.objectContaining({ json: { profile_id: 'first', training: true }, signal: expect.any(AbortSignal) }))
   expect(screen.getByRole('spinbutton', { name: text.lmd, hidden: true })).not.toBeVisible()
   expect(localStorage.getItem('maatool:cultivation-projects:user1:first')).toBe('[broken')
+  expect(sessionStorage.getItem('maatool:training-ratio:user1:first:goals')).not.toContain('测试干员')
   expect(sessionStorage.getItem('maatool:training-ratio:user1:first')).not.toContain('200000')
-  await user.click(screen.getByRole('button', { name: copy.skland.refresh }))
-  expect(mocks.api).toHaveBeenCalledTimes(2)
 })
 
-it('switches input and results together through source tabs while preserving each calculation', async () => {
+it('updates all costs locally when rarity and module goals change, including modules already partly upgraded', async () => {
+  const user = userEvent.setup()
+  render(view())
+  await screen.findByText(text.accountFocus.exp)
+  await user.click(within(screen.getByRole('group', { name: text.modules })).getByLabelText(text.moduleChoices.common))
+  await user.click(screen.getByLabelText(text.moduleLevels[2]))
+  expect(screen.getByLabelText(text.accountReference)).toHaveTextContent('1.8∶1')
+  expect(screen.getByText(text.moduleCost).parentElement).toHaveTextContent('300,000')
+  await user.click(screen.getByText(text.selectedModules(1)))
+  expect(screen.getByText('测试干员 · 测试模组')).toBeVisible()
+  await user.click(within(screen.getByRole('group', { name: /六星/ })).getByLabelText(text.goalChoices.none))
+  expect(screen.getByText(text.accountFocus.ready)).toBeInTheDocument()
+  expect(screen.getByLabelText(text.accountReference)).toHaveTextContent(text.noDemand)
+  expect(mocks.catalog).toHaveBeenCalledTimes(1)
+})
+
+it('keeps manual calculations and account goals separate when switching tabs', async () => {
   const user = userEvent.setup()
   render(view())
   await screen.findByText(text.importedSource)
-  expect(screen.getByRole('tab', { name: text.accountInventory })).toHaveAttribute('aria-selected', 'true')
   await user.click(screen.getByRole('tab', { name: text.manual }))
-  expect(screen.getByRole('tab', { name: text.manual })).toHaveAttribute('aria-selected', 'true')
-  expect(screen.queryByRole('combobox', { name: text.account })).not.toBeInTheDocument()
-  expect(screen.queryByText(text.importedSource)).not.toBeInTheDocument()
+  expect(screen.getByLabelText(text.reference)).toHaveTextContent(text.referenceValue)
   expect(screen.getByText(text.noManualInventory)).toBeInTheDocument()
   await user.clear(screen.getByRole('spinbutton', { name: text.lmd }))
   await user.type(screen.getByRole('spinbutton', { name: text.lmd }), '100000')
   await user.clear(screen.getByRole('spinbutton', { name: text.exp }))
   await user.type(screen.getByRole('spinbutton', { name: text.exp }), '100000')
-  expect(screen.getByText(text.noManualInventory)).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: text.applyManual }))
-  expect(screen.getByText(text.manualSource)).toBeInTheDocument()
   expect(screen.getByText(text.recoveryPlan('CE-6', false))).toBeInTheDocument()
   await user.click(screen.getByRole('checkbox', { name: text.books }))
   await user.clear(screen.getByRole('spinbutton', { name: text.bookNames[3] }))
@@ -74,93 +88,84 @@ it('switches input and results together through source tabs while preserving eac
   expect(within(screen.getByLabelText(text.result)).getByText('40,000')).toBeInTheDocument()
   await user.clear(screen.getByRole('spinbutton', { name: text.lmd }))
   expect(screen.getByRole('button', { name: text.applyManual })).toBeDisabled()
-  expect(within(screen.getByLabelText(text.result)).getByText('40,000')).toBeInTheDocument()
   await user.click(screen.getByRole('tab', { name: text.accountInventory }))
-  expect(screen.getByText(text.importedSource)).toBeInTheDocument()
-  expect(within(screen.getByLabelText(text.result)).getByText('200,000')).toBeInTheDocument()
+  expect(await screen.findByText(text.importedSource)).toBeInTheDocument()
   await user.click(screen.getByRole('tab', { name: text.manual }))
-  expect(screen.getByText(text.manualSource)).toBeInTheDocument()
   expect(within(screen.getByLabelText(text.result)).getByText('40,000')).toBeInTheDocument()
   expect(screen.getByRole('spinbutton', { name: text.lmd })).toHaveValue(null)
-  expect(mocks.api).toHaveBeenCalledTimes(1)
 })
 
-it('allows explicit manual advice without binding and after an automatic import fails', async () => {
+it('allows manual advice without a binding and when the stock import fails', async () => {
   const user = userEvent.setup()
   const rendered = render(view(session('first', false)))
   expect(mocks.api).not.toHaveBeenCalled()
-  await user.click(screen.getByText(text.manual, { exact: true }))
-  expect(screen.queryByText(text.manualSource)).not.toBeInTheDocument()
+  await user.click(screen.getByRole('tab', { name: text.manual }))
   await user.click(screen.getByRole('button', { name: text.applyManual }))
   expect(screen.getByText(text.focus.empty)).toBeInTheDocument()
-  expect(screen.getByText(text.manualSource)).toBeInTheDocument()
-  mocks.api.mockRejectedValueOnce(new Error(text.importFailed))
+  mocks.stock.mockRejectedValueOnce(new Error(text.importFailed))
   rendered.rerender(view(session('second')))
   expect(await screen.findByRole('alert')).toHaveTextContent(text.importFailed)
-  await user.click(screen.getByText(text.manual, { exact: true }))
+  await user.click(screen.getByRole('tab', { name: text.manual }))
   await user.click(screen.getByRole('button', { name: text.applyManual }))
   expect(screen.getByText(text.focus.empty)).toBeInTheDocument()
 })
 
-it('preserves the manual tab and its result when a pending import or a later refresh returns', async () => {
+it('does not show fixed-ratio advice when training data fails or module information is incomplete', async () => {
+  const user = userEvent.setup()
+  mocks.catalog.mockRejectedValueOnce(new Error(text.targetsFailed))
+  render(view())
+  expect(await screen.findByRole('alert')).toHaveTextContent(text.targetsFailed)
+  expect(screen.getByLabelText(text.accountReference)).not.toHaveTextContent(text.referenceValue)
+  mocks.catalog.mockResolvedValueOnce({ ...account, operators: [{ ...account.operators[0], modules: [{ ...account.operators[0].modules[0], current: null }] }] })
+  await user.click(screen.getByRole('button', { name: text.retryTargets }))
+  await screen.findByText(text.accountFocus.exp)
+  await user.click(within(screen.getByRole('group', { name: text.modules })).getByLabelText(text.moduleChoices.all))
+  expect(screen.getByText(text.incomplete)).toBeInTheDocument()
+  expect(screen.getByText(text.issueReasons.modules)).toBeInTheDocument()
+  expect(screen.queryByText(text.accountFocus.exp)).not.toBeInTheDocument()
+})
+
+it('ignores late training responses after an account change and isolates saved goals', async () => {
+  let finish!: (value: TrainingAccountData) => void
+  mocks.catalog.mockImplementationOnce(() => new Promise<TrainingAccountData>((resolve) => { finish = resolve }))
+  sessionStorage.setItem('maatool:training-ratio:user1:second:goals', JSON.stringify({ low: 'none', four: 'none', five: 'none', six: 'none', modules: 'none', moduleLevel: 1 }))
+  const rendered = render(view())
+  await screen.findAllByText(text.targetsLoading)
+  rendered.rerender(view(session('second')))
+  expect(await screen.findByText(text.accountFocus.ready)).toBeInTheDocument()
+  await act(async () => finish(account))
+  expect(screen.getByText(text.accountFocus.ready)).toBeInTheDocument()
+  expect(screen.queryByText(text.accountFocus.exp)).not.toBeInTheDocument()
+})
+
+it('preserves manual output when a pending stock import finishes and refreshes account requirements with a new snapshot', async () => {
   const user = userEvent.setup()
   let finish!: (value: SklandSnapshot) => void
-  mocks.api.mockImplementationOnce(() => new Promise<SklandSnapshot>((resolve) => { finish = resolve }))
+  mocks.stock.mockImplementationOnce(() => new Promise<SklandSnapshot>((resolve) => { finish = resolve }))
   render(view())
   await user.click(screen.getByRole('tab', { name: text.manual }))
   await user.click(screen.getByRole('button', { name: text.applyManual }))
   await act(async () => finish(data))
   expect(screen.getByText(text.manualSource)).toBeInTheDocument()
-  expect(screen.getByText(text.focus.empty)).toBeInTheDocument()
   await user.click(screen.getByRole('tab', { name: text.accountInventory }))
-  mocks.api.mockImplementationOnce(() => new Promise<SklandSnapshot>((resolve) => { finish = resolve }))
+  await screen.findByText(text.accountFocus.exp)
+  mocks.stock.mockResolvedValueOnce({ ...data, version: '2' })
+  mocks.catalog.mockResolvedValueOnce({ ...account, snapshotVersion: '2', inventory: { lmd: 9999999, exp: 9999999 } })
   await user.click(screen.getByRole('button', { name: copy.skland.refresh }))
-  await user.click(screen.getByRole('tab', { name: text.manual }))
-  await act(async () => finish(data))
-  expect(mocks.api).toHaveBeenCalledTimes(2)
-  expect(screen.getByRole('tab', { name: text.manual })).toHaveAttribute('aria-selected', 'true')
-  expect(screen.getByText(text.manualSource)).toBeInTheDocument()
-  await user.click(screen.getByRole('tab', { name: text.accountInventory }))
-  expect(screen.getByText(text.importedSource)).toBeInTheDocument()
-  expect(screen.getByText(text.recoveryDays('1'))).toBeInTheDocument()
+  expect(await screen.findByText(text.accountFocus.ready)).toBeInTheDocument()
+  expect(mocks.catalog).toHaveBeenCalledTimes(2)
 })
 
-it('uses the current account schedule income and ignores a previous account response', async () => {
+it('uses the current schedule income and ignores the previous account income response', async () => {
   let finish!: (value: WorkspaceResultHistoryItem) => void
   mocks.result.mockImplementationOnce(() => new Promise<WorkspaceResultHistoryItem>((resolve) => { finish = resolve }))
   mocks.result.mockResolvedValueOnce(production(65000, 20000))
-  mocks.api.mockResolvedValue({ ...data, inventory: { ...data.inventory, lmd: 13000000, exp: 0 } })
   const rendered = render(view(withProduction()))
   expect(await screen.findByText(text.recoveryLoading)).toBeInTheDocument()
   rendered.rerender(view(withProduction('second', 'plan2')))
-  expect(await screen.findByText(text.recoveryDays('291'))).toBeInTheDocument()
+  expect(await screen.findByText(text.baseIncome('65,000', '20,000'))).toBeInTheDocument()
   expect(mocks.result).toHaveBeenLastCalledWith('second', 'plan2', expect.any(AbortSignal))
-  expect(screen.getByText(text.baseIncome('65,000', '20,000'))).toBeInTheDocument()
   expect(screen.getByText(text.baseSource('second', 'plan2'))).toBeInTheDocument()
-  expect(screen.getByText(text.recoveryPlan('LS-6', true))).toBeInTheDocument()
   await act(async () => finish(production(100000, 0)))
-  expect(screen.getByText(text.recoveryDays('291'))).toBeInTheDocument()
-  expect(screen.queryByText(text.recoveryBlocked)).not.toBeInTheDocument()
-})
-
-it('falls back to farming only when income fails and reports a non-converging base forecast', async () => {
-  mocks.result.mockRejectedValueOnce(new Error('unavailable'))
-  const rendered = render(view(withProduction()))
-  expect(await screen.findByText(text.baseIncomeFailed)).toBeInTheDocument()
-  expect(screen.getByText(text.recoveryDays('1'))).toBeInTheDocument()
-  mocks.result.mockResolvedValueOnce(production(100000, 0))
-  rendered.rerender(view(withProduction('first', 'plan2')))
-  expect(await screen.findByText(text.recoveryBlocked)).toBeInTheDocument()
-  expect(screen.queryByText(text.recoveryDays('1'))).not.toBeInTheDocument()
-})
-
-it('isolates account changes while allowing the shared request to finish for its original account', async () => {
-  let finish!: (value: SklandSnapshot) => void
-  mocks.api.mockImplementationOnce(() => new Promise<SklandSnapshot>((resolve) => { finish = resolve }))
-  const rendered = render(view())
-  rendered.rerender(view(session('second')))
-  await screen.findByText(text.recoveryDays('1'))
-  await act(async () => finish({ ...data, inventory: { ...data.inventory, lmd: 0, exp: 100000 } }))
-  expect(screen.getByLabelText(text.result)).toHaveTextContent(text.focus.exp)
-  expect(screen.getByLabelText(text.result)).not.toHaveTextContent(text.focus.lmd)
+  expect(screen.getByText(text.baseIncome('65,000', '20,000'))).toBeInTheDocument()
 })

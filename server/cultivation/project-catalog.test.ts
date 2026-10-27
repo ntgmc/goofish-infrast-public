@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({ fetch: vi.fn(), assets: vi.fn() }))
 vi.mock('../../scripts/prts-planning-lib.mjs', () => ({ fetchJson: mocks.fetch, loadPlanningAssets: mocks.assets }))
 let directory: string
 const sha = 'a'.repeat(40)
-const saved = () => ({ ...planningFixture(), gameSha: sha, homeworks: [], updatedAt: new Date().toISOString() })
+const saved = () => ({ ...planningFixture(), gameSha: sha, catalogVersion: 2, homeworks: [], updatedAt: new Date().toISOString() })
 
 beforeEach(async () => {
   vi.resetModules()
@@ -22,14 +22,17 @@ beforeEach(async () => {
 afterEach(async () => { vi.unstubAllEnvs(); await rm(directory, { recursive: true, force: true }) })
 
 describe('homework-independent project catalog', () => {
-  it('reuses an available imported snapshot without downloading game data', async () => {
-    await writeFile(join(directory, 'missing-homeworks.json'), JSON.stringify(planningFixture()))
+  it('refreshes game data independently of a recently updated homework snapshot', async () => {
+    const imported = planningFixture()
+    imported.updatedAt = new Date().toISOString()
+    imported.operators.char_test.name = '旧的游戏资料'
+    await writeFile(join(directory, 'missing-homeworks.json'), JSON.stringify(imported))
     const { buildPublicEvidence } = await import('./public-store')
     await buildPublicEvidence(defaultCultivationQuery, new AbortController().signal)
     const { readProjectCatalog } = await import('./project-catalog')
     expect((await readProjectCatalog(new AbortController().signal)).operators.char_test.name).toBe('测试干员')
-    expect(mocks.fetch).not.toHaveBeenCalled()
-    expect(mocks.assets).not.toHaveBeenCalled()
+    expect(mocks.fetch).toHaveBeenCalledOnce()
+    expect(mocks.assets).toHaveBeenCalledOnce()
   })
 
   it('initializes a pinned public catalog with no homework seed and reuses it after a worker restart', async () => {
@@ -75,6 +78,41 @@ describe('homework-independent project catalog', () => {
     expect(await readFile(path, 'utf8')).toBe('{broken')
     expect((await readProjectCatalog(new AbortController().signal)).operators.char_test.name).toBe('测试干员')
     expect(mocks.assets).toHaveBeenCalledTimes(2)
+  })
+
+  it('rebuilds legacy catalogs that did not include alternate forms or module costs', async () => {
+    const legacy = { ...saved(), catalogVersion: undefined, costs: { ...planningFixture().costs, modules: { equipDict: {}, charEquip: {} } } }
+    await writeFile(join(directory, 'project-game-data.json'), JSON.stringify(legacy))
+    const { readProjectCatalog } = await import('./project-catalog')
+    const data = await readProjectCatalog(new AbortController().signal)
+    expect(data.costs.modules.equipDict.mod_x).toBeDefined()
+    expect(mocks.assets).toHaveBeenCalledOnce()
+    expect(JSON.parse(await readFile(join(directory, 'project-game-data.json'), 'utf8')).catalogVersion).toBe(2)
+  })
+
+  it('refreshes a current catalog when an owned operator was released after it was cached', async () => {
+    const path = join(directory, 'project-game-data.json')
+    await writeFile(path, JSON.stringify(saved()))
+    const { readProjectCatalog } = await import('./project-catalog')
+    const signal = new AbortController().signal
+    await readProjectCatalog(signal)
+    expect(mocks.fetch).not.toHaveBeenCalled()
+    const updated = planningFixture()
+    updated.operators.char_new = { ...updated.operators.char_test, name: '新干员' }
+    updated.costs.cultivate.new = updated.costs.cultivate.test
+    mocks.assets.mockResolvedValueOnce(updated)
+    expect((await readProjectCatalog(signal, ['char_test', 'char_new'])).operators.char_new.name).toBe('新干员')
+    expect(mocks.fetch).toHaveBeenCalledOnce()
+    expect(JSON.parse(await readFile(path, 'utf8')).operators.char_new.name).toBe('新干员')
+  })
+
+  it('does not substitute an incomplete cache when owned operators are missing upstream', async () => {
+    const path = join(directory, 'project-game-data.json')
+    const original = JSON.stringify(saved())
+    await writeFile(path, original)
+    const { readProjectCatalog } = await import('./project-catalog')
+    await expect(readProjectCatalog(new AbortController().signal, ['char_missing'])).rejects.toThrow('养成资料缺少已持有干员')
+    expect(await readFile(path, 'utf8')).toBe(original)
   })
 
   it('does not fall back to stale data when the request is cancelled', async () => {

@@ -26,7 +26,7 @@ export default async function cultivationPlanHandler(req: Request): Promise<Resp
     const snapshot = await getSklandSnapshot(profile)
     const data = await readCultivationPlan({ game: snapshot.game!.data, inventory: snapshot.inventory!.data,
       importedAt: snapshot.inventory!.fetchedAt, snapshotVersion: snapshot.version, warnings: Object.values(snapshot.errors),
-      query: { ...defaultCultivationQuery, ...body.recommendation }, thanksRecruitmentEnabled: effectiveFeatures.thanks_recruitment, ...(body.projects !== undefined ? { projects: body.projects } : {}) }, req.signal)
+      query: { ...defaultCultivationQuery, ...body.recommendation }, thanksRecruitmentEnabled: effectiveFeatures.thanks_recruitment, ...(body.training ? { training: true } : {}), ...(body.projects !== undefined ? { projects: body.projects } : {}) }, req.signal)
     return new Response(data, { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
   } catch (error) {
     if (error instanceof RequestInputError) return jsonResponse({ error: error.message, code: error.code }, error.status)

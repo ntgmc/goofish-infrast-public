@@ -53,10 +53,64 @@
 .training-ratio-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 12px; border-bottom: 2px solid transparent; color: var(--color-ink-2); font-size: 13px; font-weight: 600; }
 .training-ratio-tabs [data-state="active"] { color: var(--color-brand-primary); border-bottom-color: var(--color-brand-primary); }
 .training-ratio-source { margin-top: -8px; }
+.training-ratio-goals { margin-top: 24px; padding-top: 4px; border-top: 1px solid var(--color-rule); }
+.training-ratio-goals > h3 { margin-bottom: 4px; }
+.training-ratio-goals > p { margin-top: 4px; }
+.training-ratio-goal-row { min-width: 0; margin: 18px 0 0; padding: 0; border: 0; }
+.training-ratio-goal-row legend { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; width: 100%; margin-bottom: 8px; font-size: 13px; }
+.training-ratio-goal-row legend span { color: var(--color-ink-3); font-size: 12px; }
+.training-ratio-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.training-ratio-options label { position: relative; display: flex; min-width: 0; cursor: pointer; }
+.training-ratio-options input { position: absolute; width: 1px; height: 1px; min-height: 0; opacity: 0; }
+.training-ratio-options span { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 46px; padding: 8px 6px; border: 1px solid var(--color-rule); border-radius: var(--radius-input); color: var(--color-ink-2); background: var(--color-paper); font-size: 12px; line-height: 1.5; text-align: center; transition: background-color 150ms, border-color 150ms, color 150ms; }
+.training-ratio-options label:hover span { border-color: var(--color-brand-primary); }
+.training-ratio-options input:checked + span { border-color: var(--color-brand-primary); color: var(--color-brand-primary); background: var(--color-selected-bg); box-shadow: inset 0 0 0 1px var(--color-brand-primary); font-weight: 650; }
+.training-ratio-options input:focus-visible { outline: none; }
+.training-ratio-options input:focus-visible + span { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+.training-ratio-module-options { padding-top: 18px; border-top: 1px solid var(--color-rule); }
+.training-ratio-module-options p { margin-bottom: 0; font-size: 12px; }
+.training-ratio-target-count { font-variant-numeric: tabular-nums; }
+.training-ratio-demand { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.training-ratio-demand-card { min-width: 0; padding: 16px; border-radius: var(--radius-input); }
+.training-ratio-demand-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; font-size: 14px; }
+.training-ratio-demand dl > div { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; margin-top: 10px; }
+.training-ratio-demand dt { color: var(--color-ink-2); font-size: 12px; }
+.training-ratio-demand dd { margin: 0; color: var(--color-ink); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.training-ratio-demand .training-ratio-missing { display: block; margin-top: 16px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent); }
+.training-ratio-demand .training-ratio-missing dd { margin-top: 4px; font-size: clamp(20px, 2vw, 26px); line-height: 1.4; }
+.training-ratio-coverage { height: 5px; margin: 16px 0 8px; border-radius: 3px; background: color-mix(in srgb, currentColor 15%, transparent); overflow: hidden; }
+.training-ratio-coverage span { display: block; height: 100%; border-radius: inherit; background: currentColor; }
+.training-ratio-demand small { color: var(--color-ink-2); font-size: 12px; }
+.training-ratio .training-ratio-module-total { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin: 16px 0; padding: 10px 0; }
+.training-ratio-module-total strong { color: var(--training-lmd); font-variant-numeric: tabular-nums; }
+.training-ratio-module-list, .training-ratio-issues { margin-top: 20px; border-top: 1px solid var(--color-rule); }
+.training-ratio-module-list summary, .training-ratio-issues summary { min-height: 44px; padding: 12px 0; cursor: pointer; font-size: 13px; }
+.training-ratio-module-list ul { padding: 0; list-style: none; }
+.training-ratio-module-list li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--color-rule); font-size: 12px; font-variant-numeric: tabular-nums; }
+.training-ratio-module-list li div { display: grid; gap: 4px; }
+.training-ratio-module-list li span { color: var(--color-ink-2); }
+.training-ratio-issues { color: var(--color-caution); }
+@media (prefers-reduced-motion: reduce) { .training-ratio-options span { transition: none; } }
 .training-ratio-supplement { margin-top: 16px; padding-top: 4px; border-top: 1px solid var(--color-rule); }
 .training-ratio-evidence { margin-top: 24px; padding: 12px 24px; }
-.training-ratio-evidence summary { min-height: 44px; align-content: center; cursor: pointer; font-size: 14px; font-weight: 600; }
-.training-ratio-evidence summary > span { display: inline-flex; align-items: center; gap: 8px; vertical-align: middle; }
+.training-ratio-evidence > summary { min-height: 44px; align-content: center; cursor: pointer; font-size: 14px; font-weight: 600; }
+.training-ratio-evidence > summary > span { display: inline-flex; align-items: center; gap: 8px; vertical-align: middle; }
+.training-ratio-evidence-tabs { margin-top: 20px; }
+.training-ratio-example-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-block: 20px; }
+.training-ratio-example-card { min-width: 0; padding: 16px; border: 1px solid var(--color-rule); border-radius: var(--radius-input); background: var(--color-paper); }
+.training-ratio-example-card header { margin-bottom: 16px; }
+.training-ratio-example-card h3 { margin: 0; font-size: 15px; }
+.training-ratio-example-card header p { margin: 6px 0 0; font-variant-numeric: tabular-nums; }
+.training-ratio-example-card table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.training-ratio-example-card th, .training-ratio-example-card td { padding: 12px 0 12px 8px; text-align: right; white-space: nowrap; }
+.training-ratio-example-card th:first-child { padding-left: 0; text-align: left; }
+.training-ratio-example-card thead { color: var(--color-ink-2); }
+.training-ratio-example-card thead th { font-weight: 500; }
+.training-ratio-example-card tbody tr { border-top: 1px solid var(--color-rule); }
+.training-ratio-example-card tbody th { font-weight: 500; }
+.training-ratio-example-card small { display: block; margin-top: 4px; color: var(--color-ink-2); font-size: 12px; }
+.training-ratio-example-ratio { color: var(--color-brand-primary); font-weight: 650; }
+.training-ratio-evidence-footer { margin-top: 20px; padding-top: 4px; border-top: 1px solid var(--color-rule); }
 .training-ratio-table { overflow-x: auto; margin-block: 16px; }
 .training-ratio-table table { width: 100%; min-width: 540px; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
 .training-ratio-table th, .training-ratio-table td { padding: 12px; border-bottom: 1px solid var(--color-rule); text-align: right; white-space: nowrap; }
@@ -64,9 +118,16 @@
 .training-ratio :is(button, a, input, select, summary):focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
 @media (max-width: 60rem) {
   .training-ratio-columns { grid-template-columns: minmax(0, 1fr); }
+  .training-ratio-example-grid { grid-template-columns: minmax(0, 1fr); }
+  .training-ratio-example-card { padding: 16px; }
+  .training-ratio-example-card table { font-size: 13px; }
 }
 @media (max-width: 40rem) {
   .training-ratio-inputs, .training-ratio-results { padding: 16px; }
+  .training-ratio-demand { gap: 8px; }
+  .training-ratio-demand-card { padding: 12px; }
+  .training-ratio-options { gap: 6px; }
+  .training-ratio-reference strong { font-size: 24px; }
   .training-ratio-evidence { padding-inline: 16px; }
   .training-ratio-stock { gap: 8px; }
   .training-ratio-stock > div { grid-template-columns: 32px minmax(0, 1fr); gap: 6px; padding: 10px; }

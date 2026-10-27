@@ -1,4 +1,8 @@
 import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { apiJson } from '../lib/api-client'
+import { accountTrainingRequirements, analyzeAccountTraining, defaultTrainingSettings, estimateAccountTrainingDays, type TrainingAccountData, type TrainingSettings } from '../lib/training-ratio-account'
+import { copy } from '../copy'
 import { useSklandSnapshot } from '../hooks/useSklandSnapshot'
 import { analyzeTrainingBalance, estimateTrainingRecovery } from '../lib/training-ratio'
 import { readProjectIncome } from '../lib/cultivation-projects'
@@ -21,17 +25,30 @@ function readDraft(key: string): Draft {
   return initialDraft
 }
 
+function readSettings(key: string): TrainingSettings {
+  try {
+    const value = JSON.parse(sessionStorage.getItem(key) ?? 'null') as TrainingSettings | null
+    if (value && ['none', 'max'].includes(value.low) && [value.four, value.five, value.six].every((goal) => ['none', 'practical', 'max'].includes(goal))
+      && ['none', 'common', 'all'].includes(value.modules) && [1, 2, 3].includes(value.moduleLevel)) return value
+  } catch { /* Invalid preferences use the default goals. */ }
+  return defaultTrainingSettings
+}
+
 export function useTrainingRatio(session: ReturnType<typeof useToolSession>) {
   const profile = session.activeProfile
   const { features } = useSiteFeatures()
-  const canImport = Boolean(features.skland && session.user && profile?.skland_binding && profile.status === 'active' && !profile.archived_at)
+  const canImport = Boolean(features.skland && session.user && profile?.skland_binding && profile.status === 'active' && !profile.archived_at && profile.skland_binding.credential_status !== 'invalid')
   const draftKey = `maatool:training-ratio:${session.user?.id ?? 'guest'}:${profile?.id ?? 'none'}`
   const [draft, setDraft] = useState(() => readDraft(draftKey))
   const [draftFailed, setDraftFailed] = useState(false)
+  const [settings, setSettings] = useState(() => readSettings(`${draftKey}:goals`))
   useEffect(() => {
-    try { sessionStorage.setItem(draftKey, JSON.stringify(draft)); setDraftFailed(false) }
-    catch { setDraftFailed(true) }
-  }, [draft, draftKey])
+    try {
+      sessionStorage.setItem(draftKey, JSON.stringify(draft))
+      sessionStorage.setItem(`${draftKey}:goals`, JSON.stringify(settings))
+      setDraftFailed(false)
+    } catch { setDraftFailed(true) }
+  }, [draft, settings, draftKey])
   const [source, setSource] = useState<'manual' | 'imported'>('imported')
   const [manualInventory, setManualInventory] = useState<{ lmd: number; exp: number } | null>(null)
   const profileId = profile?.id
@@ -51,9 +68,19 @@ export function useTrainingRatio(session: ReturnType<typeof useToolSession>) {
     setManualInventory({ lmd: Number(draft.lmd), exp: draft.useBooks
       ? draft.books.reduce((sum, value, index) => sum + Number(value) * [200, 400, 1000, 2000][index], 0) : Number(draft.exp) })
   }
-  const inventory = source === 'imported' ? data?.inventory ?? null : manualInventory
-  const balance = inventory ? analyzeTrainingBalance(inventory) : null
-  const recovery = inventory && !incomeLoading ? estimateTrainingRecovery(inventory, income) : null
+  const account = useQuery({
+    queryKey: ['user', session.user?.id, profileId, 'training-ratio', snapshot.data?.version],
+    enabled: snapshot.available && source === 'imported' && Boolean(data),
+    queryFn: ({ signal }) => apiJson<TrainingAccountData>('/api/cultivation-plan', { method: 'POST', json: { profile_id: profileId, training: true }, signal, timeoutMs: 90000, fallbackMessage: copy.trainingRatio.targetsFailed }),
+  })
+  const accountData = snapshot.available && data ? account.data : undefined
+  const requirements = accountData ? accountTrainingRequirements(accountData, settings) : null
+  const accountBalance = accountData && requirements && !requirements.issues.length ? analyzeAccountTraining(accountData.inventory, requirements) : null
+  const accountDays = accountData && requirements && accountBalance && !incomeLoading ? estimateAccountTrainingDays(accountData.inventory, requirements, income) : null
+  const inventory = source === 'imported' ? accountData?.inventory ?? data?.inventory ?? null : manualInventory
+  const balance = source === 'manual' && inventory ? analyzeTrainingBalance(inventory) : null
+  const recovery = source === 'manual' && inventory && !incomeLoading ? estimateTrainingRecovery(inventory, income) : null
   return { draft, setDraft, draftFailed, source, setSource, data, busy, error, load, manualValid, applyManual, inventory, balance, canImport,
-    recovery, income, incomeLoading, incomeFailed: production.isError, incomeName: latest?.name }
+    recovery, income, incomeLoading, incomeFailed: production.isError, incomeName: latest?.name,
+    settings, setSettings, account, accountData, requirements, accountBalance, accountDays }
 }

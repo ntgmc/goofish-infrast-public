@@ -126,7 +126,7 @@ const adminTargetProfileShape = {
 }
 
 export const requestSchemas = {
-  cultivationPlan: strict({ profile_id: shortString(128), projects: z.array(strict({
+  cultivationPlan: strict({ profile_id: shortString(128), training: z.literal(true).optional(), projects: z.array(strict({
     operatorId: shortString(128), elite: z.number().int().min(0).max(2), level: z.number().int().min(1).max(90),
     skill: z.number().int().min(1).max(3), skillLevel: z.number().int().min(1).max(10), paused: z.boolean(),
     deadline: z.union([z.literal(''), z.iso.date()]),
@@ -137,7 +137,7 @@ export const requestSchemas = {
     stageId: z.string().trim().max(256).optional(), activity: z.string().trim().max(256).optional(), category: z.string().trim().max(128).optional(),
     profession: z.string().trim().max(64).optional(), rarity: z.number().int().min(0).max(6).optional(), rarityGroup: z.enum(['high', 'low', 'all']).optional(), search: z.string().trim().max(128).optional(),
     includeClosed: z.boolean().optional(), includeAlternatives: z.boolean().optional(), includeUncertain: z.boolean().optional(),
-  }).optional() }),
+  }).optional() }).refine((body) => !body.training || body.projects === undefined && body.recommendation === undefined, '培养目标读取不能同时指定养成项目或推荐条件。'),
   depotValue: depotValueRequestSchema,
   userFeedback: feedbackRequestSchema,
   userFeedbackReply: feedbackReplySchema,

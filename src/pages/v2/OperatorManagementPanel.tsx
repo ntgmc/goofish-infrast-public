@@ -1,17 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { NextIcon as ArrowRight, RefreshIcon, SearchIcon, UploadIcon } from '../../components/icons'
 import SklandBindingDialog, { type SklandPayload } from '../../components/SklandBindingDialog'
 import SklandIcon from '../../components/SklandIcon'
 import { copy, CURRENT_LOCALE } from '../../copy'
 import { ApiError, apiJson } from '../../lib/api-client'
-import { matchesSearch } from '../../lib/search'
+import { filterSearch } from '../../lib/search'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import type { LicenseConfig, LicenseOperator } from '../../lib/types'
 import { extensibleLicenseOperatorsSchema } from '../../lib/workspace-validation'
 import { countOwnedOperators, isFreePreviewProfile, parseOperatorsText, sortOperatorsForPreview } from '../tool/tool-utils'
-import BuildingSkills from './BuildingSkills'
+import OperatorRows from './OperatorRows'
 import type { V2Session } from './OptionsDrawer'
-import { Avatar } from './ScheduleBoard'
 
 const text = copy.v2.operatorManagement
 
@@ -42,9 +41,11 @@ export default function OperatorManagementPanel({ session, config, operators, bu
   const invalid = binding?.credential_status === 'invalid' || credentialInvalid
   const canUpload = !profile || !isFreePreviewProfile(profile)
   const disabled = busy || action !== null || sklandOpen
-  const filtered = sortOperatorsForPreview(operators)
-    .sort((left, right) => Number(right.own !== false) - Number(left.own !== false))
-    .filter((operator) => matchesSearch(operator.name, search))
+  const sortedOperators = useMemo(() => sortOperatorsForPreview(operators)
+    .sort((left, right) => Number(right.own !== false) - Number(left.own !== false)), [operators])
+  const ownedCount = useMemo(() => countOwnedOperators(operators), [operators])
+  const deferredSearch = useDeferredValue(search)
+  const filtered = useMemo(() => filterSearch(sortedOperators, deferredSearch, (operator) => operator.name), [sortedOperators, deferredSearch])
 
   function openBinding() {
     setNotice(null)
@@ -154,18 +155,12 @@ export default function OperatorManagementPanel({ session, config, operators, bu
           onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file) }} />
       </section>
       <section aria-label={text.list}>
-        <div className="v2-operator-section-heading"><h3>{text.list}</h3><span className="v2-muted">{search.trim() ? text.matchingCount(filtered.length) : text.ownedCount(countOwnedOperators(operators))}</span></div>
+        <div className="v2-operator-section-heading"><h3>{text.list}</h3><span className="v2-muted">{deferredSearch.trim() ? text.matchingCount(filtered.length) : text.ownedCount(ownedCount)}</span></div>
         <label className="v2-search-label"><span>{copy.v2.searchOperators}</span><span className="v2-search"><SearchIcon size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label={copy.v2.searchOperators} /></span></label>
-        <div className="v2-operator-rows">
-          {filtered.map((operator) => <div className="v2-operator-entry" key={operator.id} data-owned={operator.own !== false}>
-            <div className="v2-operator-row"><Avatar operator={operator} /><strong>{operator.name}</strong>
-              <span className="v2-operator-status">{operator.own !== false ? copy.v2.ownedLabel : copy.v2.notOwnedLabel}</span>
-              <div className="v2-operator-training"><span className="v2-operator-status">{copy.v2.elite(operator.elite)}</span>
-                <span className="v2-operator-status">{copy.v2.operatorLevel(typeof operator.level === 'number' || typeof operator.level === 'string' ? operator.level : undefined)}</span></div>
-            </div><BuildingSkills operator={operator} />
-          </div>)}
+        <div className="v2-operator-rows" aria-busy={search !== deferredSearch}>
+          <OperatorRows operators={filtered} />
           {filtered.length === 0 && <div className="v2-operator-empty"><p className="v2-muted">{operators.length ? copy.v2.noOperators : text.empty}</p>
-            {search && <button type="button" className="v2-text-button" onClick={() => setSearch('')}>{text.clearSearch}</button>}
+            {deferredSearch && <button type="button" className="v2-text-button" onClick={() => setSearch('')}>{text.clearSearch}</button>}
           </div>}
         </div>
       </section>

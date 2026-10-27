@@ -4,12 +4,19 @@ import { operatorBuildingSkills } from '../../components/result-panel/building-s
 import { ROOM_LABELS } from '../../components/result-panel/labels'
 import type { RoomOperator } from '../../components/result-panel/types'
 
-export default memo(function BuildingSkills({ operator }: { operator: RoomOperator }) {
-  const [open, setOpen] = useState(false)
+export default memo(function BuildingSkills({ operator, defaultOpen = false, onOpenChange }: {
+  operator: RoomOperator
+  defaultOpen?: boolean
+  onOpenChange?: (open: boolean) => void
+}) {
+  const [open, setOpen] = useState(defaultOpen)
   const skills = operatorBuildingSkills(operator)
   const label = copy.domain.building_skills
   if (!skills.length) return <p className="v2-muted">{copy.v2.skillsUnavailable}</p>
-  return <details className="v2-building-skills" onToggle={(event) => setOpen(event.currentTarget.open)}>
+  return <details className="v2-building-skills" open={open} onToggle={(event) => {
+    setOpen(event.currentTarget.open)
+    onOpenChange?.(event.currentTarget.open)
+  }}>
     <summary><span>{label.title}</span><span className="v2-skill-icons">
       {skills.filter((skill) => skill.state === 'active' || skill.state === 'unknown').map((skill) =>
         <img key={skill.id} src={`/building-skills/${skill.icon}.png`} alt={skill.name} width={28} height={28} loading="lazy" decoding="async" />)}

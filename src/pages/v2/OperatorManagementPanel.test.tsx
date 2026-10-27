@@ -32,9 +32,9 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
-function panel() {
+function panel(operators = SAMPLE_OPERATORS) {
   return <MotionPreferenceProvider><OperatorManagementPanel key={session.activeProfile!.id} session={session}
-    config={SAMPLE_CONFIG} operators={SAMPLE_OPERATORS} busy={false} onImportOperators={vi.fn()}
+    config={SAMPLE_CONFIG} operators={operators} busy={false} onImportOperators={vi.fn()}
     onAccount={vi.fn()} onManageProfiles={vi.fn()} /></MotionPreferenceProvider>
 }
 function payload(overrides: Partial<NonNullable<SklandPayload['skland_import']>> = {}): SklandPayload {
@@ -95,6 +95,45 @@ it('reports retained operators and partial inventory failures without claiming a
   await user.click(screen.getByRole('button', { name: text.retry }))
   expect(await screen.findByText(text.credentialVerified)).toBeInTheDocument()
   expect(screen.getByRole('status')).toHaveTextContent(text.inventoryWarning)
+})
+
+it('keeps search results and counts in sync with imported operators and restores owned-first order when cleared', async () => {
+  const user = userEvent.setup()
+  const operators = [
+    { ...SAMPLE_OPERATORS[0], own: true, elite: 0, level: 1 },
+    { ...SAMPLE_OPERATORS[1], own: false, elite: 2, level: 90 },
+    { ...SAMPLE_OPERATORS[2], own: true, elite: 2, level: 80 },
+  ]
+  const page = render(panel(operators))
+  const list = screen.getByRole('region', { name: text.list })
+  const names = () => Array.from(list.querySelectorAll('.v2-operator-row > strong'), (node) => node.textContent)
+  expect(names()).toEqual([operators[2].name, operators[0].name, operators[1].name])
+  expect(within(list).getByText(text.ownedCount(2))).toBeInTheDocument()
+
+  const search = screen.getByRole('textbox', { name: copy.v2.searchOperators })
+  await user.type(search, operators[0].name)
+  await waitFor(() => expect(names()).toEqual([operators[0].name]))
+  expect(within(list).getByText(text.matchingCount(1))).toBeInTheDocument()
+
+  const imported = [
+    { ...operators[0], own: false, elite: 2, level: 90 },
+    { ...SAMPLE_OPERATORS[3], own: true, elite: 1, level: 30 },
+  ]
+  page.rerender(panel(imported))
+  await waitFor(() => expect(names()).toEqual([imported[0].name]))
+  expect(within(list).getByText(copy.v2.notOwnedLabel)).toBeInTheDocument()
+  expect(within(list).getByText(copy.v2.operatorLevel(90))).toBeInTheDocument()
+
+  await user.clear(search)
+  await user.type(search, 'no-matching-operator')
+  expect(await within(list).findByText(copy.v2.noOperators)).toBeInTheDocument()
+  expect(within(list).getByText(text.matchingCount(0))).toBeInTheDocument()
+  await user.click(within(list).getByRole('button', { name: text.clearSearch }))
+  expect(search).toHaveValue('')
+  await waitFor(() => expect(names()).toEqual([imported[1].name, imported[0].name]))
+  expect(within(list).getByText(text.ownedCount(1))).toBeInTheDocument()
+  expect(operators.map((operator) => operator.id)).toEqual(SAMPLE_OPERATORS.slice(0, 3).map((operator) => operator.id))
+  expect(imported.map((operator) => operator.id)).toEqual([SAMPLE_OPERATORS[0].id, SAMPLE_OPERATORS[3].id])
 })
 
 it('clears account-specific state and ignores a late refresh response after switching profiles', async () => {
