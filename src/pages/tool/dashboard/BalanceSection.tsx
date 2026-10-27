@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useMemo, useState, type FormEvent } from 'react'
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { useInternalHref } from '../../../components/InternalLink'
 import { copy } from '../../../copy/index'
 import { ApiError, apiJson, getApiErrorMessage } from '../../../lib/api-client'
@@ -14,38 +15,46 @@ type RedeemResponse = {
   replayed: boolean
 }
 
-export function useBalance() {
-  const [page, setPage] = useState<BalancePage | null>(null)
+export function useBalance(userId: string, profileId: string | null) {
+  const queryClient = useQueryClient()
+  const query = useInfiniteQuery({
+    queryKey: ['user', userId, profileId, 'balance'],
+    queryFn: ({ pageParam, signal }) => apiJson<BalancePage>(`/api/user/balance${pageParam ? `?cursor=${encodeURIComponent(pageParam)}` : ''}`, { signal }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) => page.next_cursor ?? undefined,
+    enabled: Boolean(userId),
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: 'always',
+  })
+  const page = useMemo(() => {
+    if (!query.data) return null
+    const seen = new Set<string>()
+    return {
+      ...query.data.pages[query.data.pages.length - 1]!,
+      transactions: query.data.pages.flatMap((entry) => entry.transactions).filter((transaction) => {
+        if (seen.has(transaction.id)) return false
+        seen.add(transaction.id)
+        return true
+      }),
+    }
+  }, [query.data])
   const [cdk, setCdk] = useState('')
   const [pending, setPending] = useState<{ cdk: string; key: string } | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
   const [redeeming, setRedeeming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [errorTarget, setErrorTarget] = useState<string | null>(null)
 
-  const load = useCallback(async (cursor?: string | null) => {
-    cursor ? setLoadingMore(true) : setLoading(true)
+  const { refetch, fetchNextPage, hasNextPage, isFetching } = query
+  const load = useCallback(async () => {
     setError(null)
     setErrorTarget(null)
-    try {
-      const next = await apiJson<BalancePage>(`/api/user/balance${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`)
-      setPage((current) => cursor && current ? {
-        balance: next.balance,
-        transactions: [...current.transactions, ...next.transactions],
-        next_cursor: next.next_cursor,
-        as_of: next.as_of,
-      } : next)
-    } catch (caught) {
-      setError(getApiErrorMessage(caught, copy.balance.load_failed))
-    } finally {
-      setLoading(false)
-      setLoadingMore(false)
-    }
-  }, [])
-
-  useEffect(() => { void load() }, [load])
+    await refetch({ cancelRefetch: false })
+  }, [refetch])
+  const loadMore = useCallback(async () => {
+    if (hasNextPage && !isFetching) await fetchNextPage({ cancelRefetch: false })
+  }, [fetchNextPage, hasNextPage, isFetching])
 
   const redeem = async (event: FormEvent) => {
     event.preventDefault()
@@ -66,7 +75,9 @@ export function useBalance() {
       setCdk('')
       setPending(null)
       setNotice(`${copy.balance.redeem_success}：+${formatPoints(response.cdk.amount)} ${copy.balance.unit}`)
-      await load()
+      await queryClient.invalidateQueries({
+        predicate: ({ queryKey }) => queryKey[0] === 'user' && queryKey[1] === userId && queryKey[3] === 'balance',
+      })
     } catch (caught) {
       setError(getApiErrorMessage(caught, copy.metered.balance.redeem_retry))
       setErrorTarget(getSafeErrorTarget(caught))
@@ -75,12 +86,16 @@ export function useBalance() {
     }
   }
 
-  return { page, cdk, setCdk, setPending, loading, loadingMore, redeeming, error, notice, errorTarget, load, redeem }
+  return { page, cdk, setCdk, setPending, loading: query.isLoading, loadingMore: query.isFetchingNextPage,
+    redeeming, error: error ?? (query.error ? getApiErrorMessage(query.error, copy.balance.load_failed) : null),
+    notice, errorTarget, load, loadMore, redeem }
 }
 
-export default function BalanceSection({ redemptionEnabled }: { redemptionEnabled: boolean }) {
+export default function BalanceSection({ userId, activeProfileId, redemptionEnabled }: {
+  userId: string; activeProfileId: string | null; redemptionEnabled: boolean
+}) {
   const resolveHref = useInternalHref()
-  const { page, cdk, setCdk, setPending, loading, loadingMore, redeeming, error, notice, errorTarget, load, redeem } = useBalance()
+  const { page, cdk, setCdk, setPending, loading, loadingMore, redeeming, error, notice, errorTarget, load, loadMore, redeem } = useBalance(userId, activeProfileId)
   if (!page) {
     if (loading) return <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.balance.loading}</div>
     return <div className="tool-panel p-6" role="alert">
@@ -155,7 +170,7 @@ export default function BalanceSection({ redemptionEnabled }: { redemptionEnable
             ))}
           </ul>
         )}
-        {page?.next_cursor && <button type="button" disabled={loadingMore} onClick={() => void load(page.next_cursor)} className="tool-secondary-action mt-4 w-full">{loadingMore ? copy.balance.loading : copy.balance.load_more}</button>}
+        {page?.next_cursor && <button type="button" disabled={loadingMore} onClick={() => void loadMore()} className="tool-secondary-action mt-4 w-full">{loadingMore ? copy.balance.loading : copy.balance.load_more}</button>}
       </details>
     </div>
   )

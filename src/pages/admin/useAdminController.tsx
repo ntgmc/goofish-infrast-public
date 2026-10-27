@@ -120,9 +120,9 @@ export function useAdminController(section: AdminSection = 'overview', search = 
   }, section === 'users' ? search : '')
   const { loadUsersPage, setSelectedUserIds, usersUpdatedAt } = userList
 
-  const cdkData = useAdminCdkData({ authenticated, capabilities: adminCapabilities, section, setError })
+  const cdkData = useAdminCdkData({ adminUsername, authenticated, capabilities: adminCapabilities, section, setError })
   const { records, cdkSearchInput, cdkPage, cdkPageSize, cdkSearch, statusFilter, permissionFilter, riskFilter, generatedFilter,
-    cdkTypeFilter, cdkFilters, loadCdkPage, loadRiskPage, loadCdkSummary, resetCdkData } = cdkData
+    cdkTypeFilter, cdkFilters, loadCdkPage, loadRiskPage, loadCdkSummary, resetCdkSummary } = cdkData
   const overview = useAdminOverview()
   const { businessOverview, setBusinessOverview, loadUsageStats } = overview
   const visibleRecords = records
@@ -144,7 +144,7 @@ export function useAdminController(section: AdminSection = 'overview', search = 
       setBusyAction(null)
       cancelAdminOperation()
       setAuthenticated(false)
-      resetCdkData()
+      resetCdkSummary()
       setSelectedUserIds([])
       setBusinessOverview(null)
       setRiskSettings(DEFAULT_RISK_SETTINGS)

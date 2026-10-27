@@ -252,7 +252,7 @@ export default function AccountDashboard({
               {displayedSection === 'redeem' && <RedeemSection autoStartTour={!suppressInitialRedeemTour} tourReplayToken={redeemTourReplayToken} onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} onInventoryRedeemed={() => onSectionChange('inventory', { replace: true })} />}
               {displayedSection === 'invitations' && <InvitationsSection loadingFallback={<SectionLoader label={copy.dashboard.pages_tool_dashboard_InvitationsSection_005} />} />}
               {displayedSection === 'inventory' && <InventorySection userId={user.id} activeProfileId={activeProfile?.id ?? null} loadingFallback={<SectionLoader label={copy.inventory.loading} />} onPayload={onPayload} onLifetimeProfileCreated={() => onSectionChange('profiles', { replace: true })} onViewProfiles={() => onSectionChange('profiles')} />}
-              {displayedSection === 'balance' && METERED_BILLING_AVAILABLE && features.metered_billing && <BalanceSection redemptionEnabled={features.cdk_redemption} />}
+              {displayedSection === 'balance' && METERED_BILLING_AVAILABLE && features.metered_billing && <BalanceSection userId={user.id} activeProfileId={activeProfile?.id ?? null} redemptionEnabled={features.cdk_redemption} />}
               {displayedSection === 'announcements' && <AnnouncementsSection loadingFallback={<SectionLoader label={copy.dashboard.pages_tool_dashboard_AnnouncementsSection_006} />} onUnreadCountChange={onAnnouncementUnreadCountChange} />}
               {displayedSection === 'settings' && <SettingsSection profiles={profiles} activeProfileId={activeProfile?.id} onPayload={onPayload} workspaceEntry={workspaceEntry} />}
             </Suspense>

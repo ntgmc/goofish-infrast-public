@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import type { FormEvent } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { act, cleanup, render, renderHook, screen, waitFor } from '../../../test/query-render'
+import type { BalancePage } from '../../../lib/balance-contracts'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -15,7 +18,11 @@ vi.mock('../../../lib/api-client', () => ({
   getApiErrorMessage: (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback,
 }))
 
-import BalanceSection from './BalanceSection'
+import BalanceSectionView, { useBalance } from './BalanceSection'
+
+function BalanceSection({ redemptionEnabled }: { redemptionEnabled: boolean }) {
+  return <BalanceSectionView userId="user" activeProfileId="profile-1" redemptionEnabled={redemptionEnabled} />
+}
 import { ApiError } from '../../../lib/api-client'
 
 const firstPage = {
@@ -44,6 +51,7 @@ const firstPage = {
     created_at: '2026-07-29T01:00:00.000Z',
   }],
   next_cursor: 'next page',
+  as_of: '2026-07-29T01:00:00.000Z',
 }
 
 beforeEach(() => {
@@ -58,7 +66,7 @@ afterEach(() => {
 
 describe('BalanceSection', () => {
   it('shows a dedicated retry state instead of zero assets when the initial load fails', async () => {
-    mocks.apiJson.mockRejectedValueOnce(new Error('积分服务不可用'))
+    mocks.apiJson.mockRejectedValueOnce(new Error('积分服务不可用')).mockResolvedValueOnce({ ...firstPage, next_cursor: null })
 
     const user = userEvent.setup()
     render(<BalanceSection redemptionEnabled />)
@@ -68,6 +76,7 @@ describe('BalanceSection', () => {
     expect(screen.queryByText('暂无积分变动记录。')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '重试' }))
     expect(mocks.apiJson).toHaveBeenCalledTimes(2)
+    expect(await screen.findByText('12.30')).toBeInTheDocument()
   })
 
   it('loads the balance and appends cursor-paginated transactions', async () => {
@@ -102,7 +111,7 @@ describe('BalanceSection', () => {
     expect(screen.queryByText(/\.00/)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '查看更多记录' }))
 
-    await waitFor(() => expect(mocks.apiJson).toHaveBeenNthCalledWith(2, '/api/user/balance?cursor=next%20page'))
+    await waitFor(() => expect(mocks.apiJson).toHaveBeenNthCalledWith(2, '/api/user/balance?cursor=next%20page', expect.objectContaining({ signal: expect.any(AbortSignal) })))
     expect(await screen.findByText('-2')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '查看更多记录' })).not.toBeInTheDocument()
     expect(history).toHaveAttribute('open')
@@ -169,6 +178,22 @@ describe('BalanceSection', () => {
     expect(redeemCalls[1]?.[1]?.json).toEqual(redeemCalls[0]?.[1]?.json)
   })
 
+  it('keeps the successful redemption notice when the following balance refresh fails', async () => {
+    mocks.apiJson
+      .mockResolvedValueOnce({ ...firstPage, next_cursor: null })
+      .mockResolvedValueOnce({ cdk: { amount: '10.00' } })
+      .mockRejectedValueOnce(new Error('账单刷新失败'))
+    const user = userEvent.setup()
+    render(<BalanceSection redemptionEnabled />)
+    await screen.findByText('+12.30')
+    await user.type(screen.getByPlaceholderText('输入积分 CDK'), 'balance-code')
+    await user.click(screen.getByRole('button', { name: '确认兑换' }))
+    expect(await screen.findByText(/兑换成功：\+10 积分/)).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('账单刷新失败')
+    expect(mocks.apiJson.mock.calls.filter(([url]) => url === '/api/user/balance/redeem')).toHaveLength(1)
+    expect(screen.getByPlaceholderText('输入积分 CDK')).toHaveValue('')
+  })
+
   it('shows only the allowlisted account redemption target for a mismatched CDK', async () => {
     mocks.apiJson
       .mockResolvedValueOnce({ ...firstPage, next_cursor: null })
@@ -187,5 +212,67 @@ describe('BalanceSection', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('该 CDK 应在账号兑换页使用')
     expect(screen.getByRole('link', { name: '前往账号兑换页' })).toHaveAttribute('href', '/tool/redeem')
+  })
+})
+
+describe('balance query lifecycle', () => {
+  it('deduplicates ledger pages and refreshes them using the latest cursors', async () => {
+    const older = { ...firstPage.transactions[0], id: 'tx-older' }
+    mocks.apiJson
+      .mockResolvedValueOnce(firstPage)
+      .mockResolvedValueOnce({ ...firstPage, transactions: [firstPage.transactions[0], older], next_cursor: null })
+      .mockResolvedValueOnce({ ...firstPage, next_cursor: 'new cursor' })
+      .mockResolvedValueOnce({ ...firstPage, balance: { ...firstPage.balance, available: '22.30' }, transactions: [older], next_cursor: null })
+    const { result } = renderHook(() => useBalance('user', 'profile-1'))
+    await waitFor(() => expect(result.current.page).not.toBeNull())
+    await act(async () => { await result.current.loadMore() })
+    await waitFor(() => expect(result.current.page?.transactions).toHaveLength(2))
+    await act(async () => { await result.current.load() })
+    await waitFor(() => expect(result.current.page?.balance.available).toBe('22.30'))
+    expect(mocks.apiJson.mock.calls.map(([url]) => url)).toEqual([
+      '/api/user/balance', '/api/user/balance?cursor=next%20page', '/api/user/balance', '/api/user/balance?cursor=new%20cursor',
+    ])
+  })
+
+  it('cancels obsolete user and profile reads and discards their late responses', async () => {
+    const requests: Array<{ signal: AbortSignal; finish: (value: BalancePage) => void }> = []
+    mocks.apiJson.mockImplementation((_url: string, init: { signal: AbortSignal }) => new Promise((resolve) => {
+      requests.push({ signal: init.signal, finish: resolve })
+    }))
+    const { result, rerender } = renderHook(({ userId, profileId }) => useBalance(userId, profileId), {
+      initialProps: { userId: 'user-a', profileId: 'profile-1' },
+    })
+    rerender({ userId: 'user-a', profileId: 'profile-2' })
+    expect(requests[0].signal.aborted).toBe(true)
+    expect(result.current.page).toBeNull()
+    rerender({ userId: 'user-b', profileId: 'profile-2' })
+    expect(requests[1].signal.aborted).toBe(true)
+    await act(async () => {
+      requests[0].finish(firstPage)
+      requests[1].finish(firstPage)
+      requests[2].finish({ ...firstPage, balance: { ...firstPage.balance, available: '99.00' } })
+    })
+    await waitFor(() => expect(result.current.page?.balance.available).toBe('99.00'))
+  })
+
+  it('reads a fresh balance when revisiting a cached profile and invalidates all profile balances after redemption', async () => {
+    mocks.apiJson.mockResolvedValue({ ...firstPage, next_cursor: null })
+    const { result, rerender } = renderHook(({ profileId }) => ({
+      balance: useBalance('user', profileId), client: useQueryClient(),
+    }), { initialProps: { profileId: 'profile-1' } })
+    await waitFor(() => expect(result.current.balance.page).not.toBeNull())
+    rerender({ profileId: 'profile-2' })
+    await waitFor(() => expect(result.current.balance.page).not.toBeNull())
+    rerender({ profileId: 'profile-1' })
+    await waitFor(() => expect(mocks.apiJson).toHaveBeenCalledTimes(3))
+    act(() => document.dispatchEvent(new Event('visibilitychange', { bubbles: true })))
+    await waitFor(() => expect(mocks.apiJson).toHaveBeenCalledTimes(4))
+    mocks.apiJson.mockImplementation(async (_url: string, init?: { method?: string }) => init?.method === 'POST'
+      ? { cdk: { amount: '10.00' } }
+      : { ...firstPage, balance: { ...firstPage.balance, available: '22.30' }, next_cursor: null })
+    act(() => result.current.balance.setCdk('balance-code'))
+    await act(async () => { await result.current.balance.redeem({ preventDefault: vi.fn() } as unknown as FormEvent) })
+    await waitFor(() => expect(result.current.balance.page?.balance.available).toBe('22.30'))
+    expect(result.current.client.getQueryState(['user', 'user', 'profile-2', 'balance'])?.isInvalidated).toBe(true)
   })
 })

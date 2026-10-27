@@ -6,8 +6,10 @@ import { useInternalHref } from '../../../components/InternalLink'
 import type { V2Session } from '../OptionsDrawer'
 import { EmptyState, Facts, Field, Loading, Notice, SectionTitle } from '../components/WorkspaceUI'
 
-export function Balance({ redemptionEnabled }: { redemptionEnabled: boolean }) {
-  const m = useBalance()
+export function Balance({ userId, activeProfileId, redemptionEnabled }: {
+  userId: string; activeProfileId: string | null; redemptionEnabled: boolean
+}) {
+  const m = useBalance(userId, activeProfileId)
   const resolve = useInternalHref()
   const policy = getMeteredBillingPolicy()
   const text = copy.balance
@@ -17,7 +19,7 @@ export function Balance({ redemptionEnabled }: { redemptionEnabled: boolean }) {
   return <div className="v2-balance-workspace"><section className="v2-balance-summary"><div><span className="v2-label">{text.available}</span><strong>{formatPoints(m.page.balance.available ?? '0.00')}</strong><small>{text.unit}</small></div><Facts items={[[text.reserved, formatPoints(m.page.balance.reserved ?? '0.00')], [text.lifetime_credited, formatPoints(m.page.balance.lifetime_credited ?? '0.00')], ...(debt !== '0.00' ? [[text.debt, formatPoints(debt)] as [string, string]] : [])]} /></section><p className="v2-lead">{text.description}</p><Notice error>{m.error}{m.errorTarget && <a href={resolve(m.errorTarget)}>{text.go_to_redeem}</a>}</Notice><Notice>{m.notice}</Notice>
     <div className="v2-balance-controls"><section><SectionTitle title={copy.metered.balance.personal_price_label} /><p>{copy.metered.balance.personal_price_value(formatPoints(policy.personal.main_schedule_points))}</p>{commercial && <p>{debt !== '0.00' ? copy.metered.balance.commercial_debt(commercial.level, formatPoints(debt)) : commercial.eligible ? copy.metered.balance.commercial_eligible(commercial.level, formatPoints(commercial.charge_points)) : copy.metered.balance.commercial_locked(formatPoints(commercial.points_to_next_level ?? commercial.threshold_points ?? '10000.00'))}</p>}{commercial?.eligible && commercial.next_threshold_points && <p>{copy.metered.balance.next_level(formatPoints(commercial.points_to_next_level ?? '0.00'), formatPoints(commercial.next_threshold_points))}</p>}</section>
     {redemptionEnabled && <form onSubmit={m.redeem}><SectionTitle title={text.redeem_title} description={text.redeem_description} /><Field label={text.redeem_placeholder} value={m.cdk} required onChange={(event) => { m.setCdk(event.target.value); m.setPending(null) }} /><button type="submit" className="v2-button v2-button-primary" disabled={m.redeeming}>{m.redeeming ? text.redeeming : text.redeem}</button></form>}</div>
-    <section><SectionTitle title={text.history} />{!m.page.transactions.length ? <EmptyState title={text.empty} /> : <ol className="v2-balance-ledger">{m.page.transactions.map((transaction) => <li key={transaction.id}><time>{new Date(transaction.created_at).toLocaleString('zh-CN')}</time><strong>{text[transaction.kind]}</strong><b data-debit={transaction.amount.startsWith('-')}>{transaction.amount.startsWith('-') ? formatPoints(transaction.amount) : `+${formatPoints(transaction.amount)}`}</b><small>{copy.metered.balance.transaction_balance(formatPoints(transaction.balance_after))}</small></li>)}</ol>}{m.page.next_cursor && <button className="v2-button v2-button-secondary" disabled={m.loadingMore} onClick={() => void m.load(m.page!.next_cursor)}>{m.loadingMore ? text.loading : text.load_more}</button>}</section>
+    <section><SectionTitle title={text.history} />{!m.page.transactions.length ? <EmptyState title={text.empty} /> : <ol className="v2-balance-ledger">{m.page.transactions.map((transaction) => <li key={transaction.id}><time>{new Date(transaction.created_at).toLocaleString('zh-CN')}</time><strong>{text[transaction.kind]}</strong><b data-debit={transaction.amount.startsWith('-')}>{transaction.amount.startsWith('-') ? formatPoints(transaction.amount) : `+${formatPoints(transaction.amount)}`}</b><small>{copy.metered.balance.transaction_balance(formatPoints(transaction.balance_after))}</small></li>)}</ol>}{m.page.next_cursor && <button className="v2-button v2-button-secondary" disabled={m.loadingMore} onClick={() => void m.loadMore()}>{m.loadingMore ? text.loading : text.load_more}</button>}</section>
   </div>
 }
 
