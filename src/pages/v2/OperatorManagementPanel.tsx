@@ -4,7 +4,7 @@ import SklandBindingDialog, { type SklandPayload } from '../../components/Skland
 import SklandIcon from '../../components/SklandIcon'
 import { copy, CURRENT_LOCALE } from '../../copy'
 import { ApiError, apiJson } from '../../lib/api-client'
-import { matchesSearch } from '../../lib/search'
+import { filterSearch } from '../../lib/search'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import type { LicenseConfig, LicenseOperator } from '../../lib/types'
 import { extensibleLicenseOperatorsSchema } from '../../lib/workspace-validation'
@@ -45,7 +45,7 @@ export default function OperatorManagementPanel({ session, config, operators, bu
     .sort((left, right) => Number(right.own !== false) - Number(left.own !== false)), [operators])
   const ownedCount = useMemo(() => countOwnedOperators(operators), [operators])
   const deferredSearch = useDeferredValue(search)
-  const filtered = useMemo(() => sortedOperators.filter((operator) => matchesSearch(operator.name, deferredSearch)), [sortedOperators, deferredSearch])
+  const filtered = useMemo(() => filterSearch(sortedOperators, deferredSearch, (operator) => operator.name), [sortedOperators, deferredSearch])
 
   function openBinding() {
     setNotice(null)

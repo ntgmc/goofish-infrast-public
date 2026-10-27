@@ -73,6 +73,7 @@ export default memo(function OperatorRows({ operators }: { operators: LicenseOpe
 })
 
 const OperatorRow = memo(function OperatorRow({ operator, expanded }: { operator: LicenseOperator; expanded: Set<string> }) {
+  'use memo'
   return <>
     <div className="v2-operator-row"><Avatar operator={operator} /><strong>{operator.name}</strong>
       <span className="v2-operator-status">{operator.own !== false ? copy.v2.ownedLabel : copy.v2.notOwnedLabel}</span>

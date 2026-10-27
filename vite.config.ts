@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { APP_BUILD_META } from "./src/lib/.generated/build-meta.ts";
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), localDevCacheResetPlugin()],
+  plugins: [react({ compiler: process.env.REACT_COMPILER === "1" ? { compilationMode: "annotation", logDiagnostics: true } : false }), tailwindcss(), localDevCacheResetPlugin()],
   build: {
     rolldownOptions: {
       output: {
