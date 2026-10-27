@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { useQueryClient } from '@tanstack/react-query'
+import { act, cleanup, render, screen, waitFor, within } from '../../../test/query-render'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -43,7 +44,8 @@ afterEach(() => { cleanup(); vi.resetAllMocks() })
 function RouteControls() {
   const location = useLocation()
   const navigate = useNavigate()
-  return <><output data-testid="location">{location.pathname}{location.search}{location.hash}</output><button onClick={() => navigate(-1)}>Back</button><button onClick={() => navigate(1)}>Forward</button><button onClick={() => navigate('/v2?section=announcements&page=2')}>Jump</button></>
+  const client = useQueryClient()
+  return <><button onClick={() => void client.invalidateQueries({ queryKey: ['public', 'announcements'] })}>Refresh</button><output data-testid="location">{location.pathname}{location.search}{location.hash}</output><button onClick={() => navigate(-1)}>Back</button><button onClick={() => navigate(1)}>Forward</button><button onClick={() => navigate('/v2?section=announcements&page=2')}>Jump</button></>
 }
 
 function mount(path = '/v2?section=announcements&profile_id=doctor', signedIn = false) {
@@ -71,6 +73,7 @@ it('loads one page, renders only the selected body, and restores page and select
   await screen.findByRole('heading', { name: 'Announcement 3' })
   await user.click(screen.getByRole('button', { name: 'Forward' }))
   await screen.findByRole('heading', { name: 'Announcement 10' })
+  expect(mocks.api).toHaveBeenCalledTimes(2)
 })
 
 it('opens an encoded old announcement directly and normalizes its page without another request', async () => {
@@ -95,16 +98,61 @@ it('ignores a response for a page left while it was loading', async () => {
   expect(screen.getByRole('heading', { name: 'Announcement 10' })).toBeInTheDocument()
 })
 
-it('keeps the current page after a failed load and retries the requested page', async () => {
+it('does not display a different page after a failed load and retries the requested page', async () => {
   const user = userEvent.setup()
   mount()
   await screen.findByRole('heading', { name: 'Announcement 0' })
   mocks.api.mockRejectedValueOnce(new Error('Network request failed'))
   await user.click(screen.getByRole('button', { name: copy.v2.nextPage }))
   expect(await screen.findByRole('alert')).toHaveTextContent(copy.public.pages_AnnouncementsPage_001)
-  expect(screen.getByText('Body 0')).toBeInTheDocument()
+  expect(screen.queryByText('Body 0')).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: copy.v2.retry }))
   await screen.findByRole('heading', { name: 'Announcement 10' })
+})
+
+it('retains the same page snapshot on refresh failure and replaces it after a successful retry', async () => {
+  const user = userEvent.setup()
+  mount()
+  await screen.findByRole('heading', { name: 'Announcement 0' })
+  mocks.api.mockRejectedValueOnce(new Error('Read unavailable'))
+  await user.click(screen.getByRole('button', { name: 'Refresh' }))
+  await screen.findByRole('alert')
+  expect(screen.getByText('Body 0')).toBeInTheDocument()
+  items[0].announcement = { ...items[0].announcement, body: 'Updated body' }
+  await user.click(screen.getByRole('button', { name: copy.v2.retry }))
+  await screen.findByText('Updated body')
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  expect(mocks.api).toHaveBeenCalledTimes(3)
+})
+
+it('cancels a pending acknowledgement on navigation and ignores its late snapshot', async () => {
+  const user = userEvent.setup()
+  mount('/v2?section=announcements', true)
+  await screen.findByRole('heading', { name: 'Announcement 0' })
+  let finish!: (value: AnnouncementPageResponse) => void
+  mocks.api.mockImplementationOnce(() => new Promise<AnnouncementPageResponse>((resolve) => { finish = resolve }))
+  await user.click(screen.getByRole('button', { name: copy.dashboard.pages_tool_dashboard_AnnouncementsSection_011 }))
+  const signal = mocks.api.mock.calls[1][1].signal as AbortSignal
+  await user.click(screen.getByRole('button', { name: 'Jump' }))
+  expect(signal.aborted).toBe(true)
+  await screen.findByRole('heading', { name: 'Announcement 10' })
+  await act(async () => finish({ ...pageData(1), unread_count: 0 }))
+  expect(screen.getByRole('heading', { name: 'Announcement 10' })).toBeInTheDocument()
+  expect(mocks.unread).toHaveBeenLastCalledWith(23)
+})
+
+it('retries reading after an acknowledgement error without submitting it again', async () => {
+  const user = userEvent.setup()
+  mount('/v2?section=announcements', true)
+  await screen.findByRole('heading', { name: 'Announcement 0' })
+  mocks.api.mockRejectedValueOnce(new Error('Write failed'))
+  await user.click(screen.getByRole('button', { name: copy.dashboard.pages_tool_dashboard_AnnouncementsSection_011 }))
+  await screen.findByRole('alert')
+  await user.click(screen.getByRole('button', { name: copy.v2.retry }))
+  await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+  expect(screen.getByRole('heading', { name: 'Announcement 0' })).toBeInTheDocument()
+  expect(mocks.api.mock.calls.filter(([, init]) => init.method === 'PATCH')).toHaveLength(1)
+  expect(mocks.unread).toHaveBeenLastCalledWith(23)
 })
 
 it.each(['missing', '%E0%A4%A'])('shows an unavailable or malformed announcement explicitly (%s)', async (id) => {
