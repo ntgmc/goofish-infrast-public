@@ -15,12 +15,12 @@ export function validationKeys(root = '.', env = process.env) {
   if (tree.status !== 0) throw new Error('Cannot resolve the checked-out validation tree')
   return Object.fromEntries(Object.keys(VALIDATION_JOBS).map((kind) => [kind,
     createHash('sha256').update(JSON.stringify({
-      schema: 1,
+      schema: 2,
       repository: env.GITHUB_REPOSITORY || '',
       runner_os: env.RUNNER_OS || '',
       runner_arch: env.RUNNER_ARCH || '',
+      // Hosted jobs can receive different image revisions during a rollout.
       image_os: env.ImageOS || '',
-      image_version: env.ImageVersion || '',
       kind,
       tree: tree.stdout.trim(),
     })).digest('hex'),

@@ -82,7 +82,7 @@ test('any committed input change invalidates every validation kind', async (t) =
   for (const kind of Object.keys(before)) assert.notEqual(after[kind], before[kind])
 })
 
-for (const input of ['GITHUB_REPOSITORY', 'RUNNER_OS', 'RUNNER_ARCH', 'ImageOS', 'ImageVersion']) {
+for (const input of ['GITHUB_REPOSITORY', 'RUNNER_OS', 'RUNNER_ARCH', 'ImageOS']) {
   test(`${input} changes invalidate every validation key`, async (t) => {
     const root = await fixture(t)
     const before = validationKeys(root, env)
@@ -208,6 +208,22 @@ test('manual runs always validate without an API lookup', async (t) => {
     api: async () => assert.fail('Unexpected API lookup'),
   })
   assert.ok(Object.values(result.sources).every((source) => source === null))
+})
+
+test('records validation across hosted runner image revisions', async (t) => {
+  const root = await fixture(t)
+  const decisionEnv = { ...env, RUNNER_ARCH: 'X64', ImageOS: 'ubuntu24', ImageVersion: '20261025.353.1' }
+  const { keys } = await resolveValidationReuse({
+    root, env: decisionEnv, api: async () => ({ artifacts: [] }),
+  })
+  const recordEnv = { ...decisionEnv, ImageVersion: '20261012.334.1', RUNNER_TEMP: root }
+  assert.deepEqual(validationKeys(root, recordEnv), keys)
+  for (const kind of Object.keys(VALIDATION_JOBS)) {
+    await recordValidation(kind, keys[kind], { root, env: recordEnv })
+    const record = JSON.parse(await readFile(join(root, `ci-validation/${kind}.json`), 'utf8'))
+    assert.equal(record.kind, kind)
+    assert.equal(record.key, keys[kind])
+  }
 })
 
 test('records only matching validation inputs', async (t) => {
