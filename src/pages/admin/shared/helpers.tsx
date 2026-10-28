@@ -368,7 +368,8 @@ export function downloadBlob(blob: Blob, filename: string): void {
 }
 
 export function downloadOperatorsJson(data: AdminProfileOperatorData): void {
-  const blob = new Blob([JSON.stringify(data.operators, null, 2)], { type: 'application/json' })
+  const operators = data.operators.map((operator) => ({ ...operator, rarity: operator.rarity + 1 }))
+  const blob = new Blob([JSON.stringify(operators, null, 2)], { type: 'application/json' })
   downloadBlob(blob, `skland-operators-${formatFileSegment(data.profile.id)}-${formatDownloadTimestamp()}.json`)
 }
 
