@@ -44,14 +44,10 @@ const MANUAL_CHANGELOG_RELEASES = [
   },
 ] as const satisfies readonly ChangelogRelease[]
 
-export const CHANGELOG_RELEASES = selectPublicChangelogReleases([
+export const CHANGELOG_RELEASES = sortChangelogReleases([
   ...GENERATED_CHANGELOG_RELEASES,
   ...MANUAL_CHANGELOG_RELEASES,
 ])
-
-export function selectPublicChangelogReleases(releases: readonly ChangelogRelease[]): readonly ChangelogRelease[] {
-  return sortChangelogReleases(releases)
-}
 
 export function sortChangelogReleases(releases: readonly ChangelogRelease[]): readonly ChangelogRelease[] {
   const byId = new Map<string, ChangelogRelease>()

@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomBytes } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { canonicalJson } from '../../src/lib/crypto'
 import type {
   LicenseConfig,
   LicenseFile,
@@ -26,6 +27,8 @@ import {
   type RiskControlSettingsPatch,
   type RiskControlSettingsStore,
 } from '../storage/risk-settings-store'
+
+export { canonicalJson }
 
 export const CDK_PRODUCT_PERMISSIONS: ProductPermissionMode[] = listAdminIssuablePermissions()
 export type CdkStatus = 'unused' | 'claiming' | 'used' | 'frozen' | 'revoked'
@@ -423,19 +426,6 @@ function readLocalEnv(name: string): string | undefined {
     return match[2].replace(/^["']|["']$/g, '')
   }
   return undefined
-}
-
-export function canonicalJson(obj: unknown): string {
-  if (obj === null || typeof obj !== 'object') {
-    return JSON.stringify(obj)
-  }
-  if (Array.isArray(obj)) {
-    return '[' + obj.map(canonicalJson).join(',') + ']'
-  }
-  const sortedKeys = Object.keys(obj as Record<string, unknown>).sort()
-  return '{' + sortedKeys
-    .map((key) => JSON.stringify(key) + ':' + canonicalJson((obj as Record<string, unknown>)[key]))
-    .join(',') + '}'
 }
 
 export function generateCdk(): string {

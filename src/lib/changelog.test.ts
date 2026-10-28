@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHANGELOG_RELEASES, selectPublicChangelogReleases, sortChangelogReleases } from './changelog'
+import { CHANGELOG_RELEASES, sortChangelogReleases } from './changelog'
 
 describe('changelog releases', () => {
   it('keeps release identities unique and ordered from newest to oldest', () => {
@@ -34,7 +34,7 @@ describe('changelog releases', () => {
   })
 
   it('keeps baseline and no-public-change releases so their empty states remain reachable', () => {
-    const releases = selectPublicChangelogReleases([
+    const releases = sortChangelogReleases([
       {
         id: 'v2.0.101',
         version: '2.0.101',
