@@ -15,8 +15,11 @@ import {
   normalizeScheduleMode,
   parseShiftHours,
   resolveConfigLayout,
+  validateConfig,
 } from '../lib/config'
-import { facilityLayoutSchema } from '../lib/facility-layout'
+import { facilityLayoutSchema, sklandFacilityConfigSchema } from '../lib/facility-layout'
+import { apiJson } from '../lib/api-client'
+import SklandIcon from './SklandIcon'
 import { BASE_DAILY_SANITY_BUDGET, MONTHLY_CARD_DAILY_SANITY_BONUS, normalizeOrundumPlanning } from '../lib/orundum-economy'
 import type { IntermediateProduct, LicenseConfig, PermissionMode } from '../lib/types'
 import { useSiteFeatures } from '../lib/site-feature-context'
@@ -134,6 +137,14 @@ export default function ConfigEditor({
   hidePresetActions = false, hideValidation = false,
 }: ConfigEditorProps) {
   const [section, setSection] = useState('common')
+  const [importing, setImporting] = useState(false)
+  const [importNotice, setImportNotice] = useState('')
+  const importRequest = useRef<AbortController | null>(null)
+  useEffect(() => {
+    setImporting(false)
+    setImportNotice('')
+    return () => importRequest.current?.abort()
+  }, [profileId, readOnly])
   const roomsTabRef = useRef<HTMLButtonElement>(null)
   const canUseIntermediateInventory = canEdit || Boolean(canEditIntermediateInventory)
   const supported252 = getRightFull252Variant(config) !== null || isFullBlood252Config(config)
@@ -162,6 +173,40 @@ export default function ConfigEditor({
       const tab = roomsTabRef.current
       if (tab?.getAttribute('aria-selected') === 'true') tab.focus({ preventScroll: true })
     })
+  }
+  const importSklandConfig = async () => {
+    if (!profileId || (!canEdit && !supported252) || readOnly || importRequest.current) return
+    const controller = new AbortController()
+    importRequest.current = controller
+    setImporting(true)
+    setImportNotice('')
+    try {
+      const response = await apiJson<{ configuration: unknown; configuration_error?: string; fetched_at: string; refresh_warning?: string }>('/api/user/skland/facilities', {
+        method: 'POST', json: { profile_id: profileId }, signal: controller.signal, timeoutMs: 90_000, fallbackMessage: copy.common.facilityLayoutReadFailed,
+      })
+      if (controller.signal.aborted) return
+      if (!response.configuration) throw new Error(response.configuration_error || copy.common.facilityLayoutReadFailed)
+      const parsed = sklandFacilityConfigSchema.safeParse(response.configuration)
+      if (!parsed.success) throw new Error(copy.common.facilityLayoutReadFailed)
+      const imported = parsed.data
+      if (!canEdit && !presetMatches(config, imported)) throw new Error(copy.skland.configPresetRequired)
+      const validation = validateConfig({ ...config, ...imported, trading_station_levels: imported.trading_station_levels,
+        manufacturing_station_levels: imported.manufacturing_station_levels, facility_layout: imported.facility_layout })
+      if (!validation.ok) throw new Error(validation.message)
+      update((next) => {
+        delete next.trading_station_levels
+        delete next.manufacturing_station_levels
+        delete next.facility_layout
+        Object.assign(next, imported)
+      })
+      setImportNotice(response.refresh_warning ? copy.skland.configWarning(new Date(response.fetched_at).toLocaleString('zh-CN')) : copy.skland.importConfigSuccess)
+      showRooms()
+    } catch (error) {
+      if (!controller.signal.aborted) setImportNotice(error instanceof Error ? error.message : copy.common.facilityLayoutReadFailed)
+    } finally {
+      if (importRequest.current === controller) importRequest.current = null
+      if (!controller.signal.aborted) setImporting(false)
+    }
   }
   const applyPreset = (id: string) => {
     const preset = CONFIG_PRESETS[id]
@@ -224,7 +269,12 @@ export default function ConfigEditor({
         <Tabs.Trigger value="inventory">{text.inventory}</Tabs.Trigger>
         <Tabs.Trigger value="strategy">{text.strategy}</Tabs.Trigger>
       </Tabs.List>
-      <fieldset disabled={readOnly} className="config-editor-fields" aria-label={copy.common.components_ConfigEditor_021}>
+      {profileId && (canEdit || supported252) && <div className="config-field mt-4">
+        <button type="button" className="tool-secondary-action min-h-11 px-4" disabled={readOnly || importing} onClick={() => void importSklandConfig()}><SklandIcon />{importing ? copy.skland.importingConfig : copy.skland.importConfig}</button>
+        <p className="config-help">{copy.skland.importConfigHelp}</p>
+      </div>}
+      {importNotice && <p role="status" className="tool-alert mt-3">{importNotice}</p>}
+      <fieldset disabled={readOnly || importing} aria-busy={importing} className="config-editor-fields" aria-label={copy.common.components_ConfigEditor_021}>
         <Tabs.Content value="common" forceMount hidden={section !== 'common'} className="config-task-panel config-task-panel--common">
           <h3 className="sr-only">{text.commonTitle}</h3>
           {!hidePresetActions && <section className="config-field config-preset-section" data-tour-target="config-preset-actions" aria-label={copy.v2.configPreset}>
@@ -274,7 +324,7 @@ export default function ConfigEditor({
         <Tabs.Content value="rooms" forceMount hidden={section !== 'rooms'} className="config-task-panel">
           {supported252 ? <>
             <FacilityLayoutEditor key={JSON.stringify([profileId, config.trading_station_levels, config.manufacturing_station_levels])}
-              profileId={profileId} config={config} readOnly={readOnly} onUpdate={update} />
+              config={config} readOnly={readOnly} onUpdate={update} />
             <p className="tool-alert tool-alert--warning text-xs leading-5" role="note">{copy.common.components_ConfigEditor_109}</p>
           </> : <section aria-labelledby="config-room-layout-heading">
             <h3 id="config-room-layout-heading" className="config-section-title">{copy.common.components_ConfigEditor_042}</h3>

@@ -911,6 +911,7 @@ function memoryStorePlugin() {
       build.onLoad({ filter: /.*/, namespace: 'workspace-history-smoke' }, (args) => ({
         contents: memoryModule(args.path),
         loader: 'js',
+        resolveDir: resolve('.'),
       }))
     },
   }
@@ -1278,11 +1279,7 @@ function memoryLicenseUtilsModule() {
   return `
     const store = globalThis.__workspaceHistorySmokeStore
     export function canUseUpgradeFeatures() { return true }
-    export function canonicalJson(obj) {
-      if (obj === null || typeof obj !== 'object') return JSON.stringify(obj)
-      if (Array.isArray(obj)) return '[' + obj.map(canonicalJson).join(',') + ']'
-      return '{' + Object.keys(obj).sort().map((key) => JSON.stringify(key) + ':' + canonicalJson(obj[key])).join(',') + '}'
-    }
+    export { canonicalJson } from './src/lib/crypto'
     export function buildOperatorFingerprint(operators) {
       const snapshot = Object.fromEntries(operators.map((operator) => [String(operator.id || operator.name), {
         name: operator.name,

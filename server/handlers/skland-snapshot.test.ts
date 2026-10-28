@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), profile: vi.fn(), snapshot: vi.fn(), gate: vi.fn() }))
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), profile: vi.fn(), snapshot: vi.fn(), gate: vi.fn(), info: vi.fn() }))
 vi.mock('./user-auth', () => ({ requireUserSession: mocks.auth,
   jsonResponse: (body: unknown, status = 200, headers = {}) => Response.json(body, { status, headers }) }))
 vi.mock('../feature-gate', () => ({ requireSiteFeatures: mocks.gate }))
 vi.mock('../skland-snapshot', async (original) => ({ ...await original<typeof import('../skland-snapshot')>(),
   requireSklandProfile: mocks.profile, getSklandSnapshot: mocks.snapshot }))
+vi.mock('./skland-client', async (original) => ({ ...await original<typeof import('./skland-client')>(),
+  decryptSklandCredential: () => 'private-credential', SklandClient: class { getCultivateInfo = mocks.info } }))
 import handler from './skland-snapshot'
 import { SklandSnapshotError } from '../skland-snapshot'
 const request = (method = 'GET', body: unknown = { profile_id: 'mine' }) => new Request(
@@ -19,6 +21,7 @@ beforeEach(() => {
   mocks.snapshot.mockResolvedValue({ version: '1', game: { data: { secretField: 'server-only' }, fetchedAt },
     inventory: { data: { items: [{ id: '4001', count: 500 }, { id: '2004', count: 5 }] }, fetchedAt }, errors: {}, retryAt: null })
   mocks.gate.mockResolvedValue(null)
+  mocks.info.mockResolvedValue({ items: { '4001': { name: '龙门币' } } })
 })
 
 describe('Skland snapshot HTTP boundary', () => {
@@ -34,18 +37,37 @@ describe('Skland snapshot HTTP boundary', () => {
     const response = await handler(request())
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     const body = await response.text()
-    expect(JSON.parse(body)).toMatchObject({ uid: 'uid', version: '1', inventory: { lmd: 500, exp: 10000, state: 'fresh' } })
+    expect(JSON.parse(body)).toMatchObject({ uid: 'uid', version: '1', inventory: { lmd: 500, exp: 10000, state: 'fresh', itemNames: { '4001': '龙门币' } } })
     expect(body).not.toContain('server-only')
     expect(body).not.toContain('private-credential')
     expect(mocks.profile).toHaveBeenCalledWith('user', 'mine')
   })
 
+  it('returns game data even when inventory is unavailable', async () => {
+    mocks.snapshot.mockResolvedValueOnce({ version: '2', game: { data: { data: { status: { name: '博士' } } }, fetchedAt: new Date().toISOString() },
+      errors: { inventory: 'inventory unavailable' }, retryAt: null })
+    const response = await handler(request())
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ game: { data: { player: { name: '博士' } } }, inventory: { state: 'unavailable', items: null } })
+    expect(mocks.info).not.toHaveBeenCalled()
+  })
+
+  it('rechecks authorization after waiting for public item definitions', async () => {
+    mocks.info.mockImplementationOnce(async () => {
+      mocks.profile.mockResolvedValue({ id: 'mine', skland_binding: { uid: 'other', encrypted_cred: 'changed' } })
+      return { items: {} }
+    })
+    const response = await handler(request())
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ code: 'skland_binding_changed' })
+  })
+
   it('validates explicit refreshes and supports automatic revalidation without bypassing freshness', async () => {
     expect((await handler(request('POST', { profile_id: 'mine', arbitrary: true }))).status).toBe(400)
     expect((await handler(request('POST'))).status).toBe(200)
-    expect(mocks.snapshot).toHaveBeenLastCalledWith(expect.any(Object), ['inventory'], { force: true, wait: true })
+    expect(mocks.snapshot).toHaveBeenLastCalledWith(expect.any(Object), [], { force: true, wait: true })
     await handler(request('POST', { profile_id: 'mine', force: false }))
-    expect(mocks.snapshot).toHaveBeenLastCalledWith(expect.any(Object), ['inventory'], { force: false, wait: true })
+    expect(mocks.snapshot).toHaveBeenLastCalledWith(expect.any(Object), [], { force: false, wait: true })
     expect((await handler(new Request('http://local/api/user/skland/snapshot/refresh'))).status).toBe(405)
   })
 })

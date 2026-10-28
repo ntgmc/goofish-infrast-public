@@ -1,14 +1,23 @@
 import { useEffect, useRef, useState, type SyntheticEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { serviceBuildQueryOptions } from '../lib/service-build-query'
+import { apiJson } from '../lib/api-client'
+import type { ChangelogPageData } from '../lib/changelog-contract'
 import { RefreshIcon as RefreshCw } from './icons'
 import { APP_BUILD_META } from '../lib/build-meta'
 import type { AppBuildMeta } from '../lib/types'
 import { copy } from '../copy/index'
 import { AnimatedPresenceRegion } from './MotionPrimitives'
+import AnnouncementMarkdown from './AnnouncementMarkdown'
 import './DeploymentUpdatePrompt.css'
 
 const DEFAULT_POLL_INTERVAL_MS = 60_000
+const SECTION_TITLES = {
+  feature: copy.public.pages_ChangelogPage_021,
+  fix: copy.public.pages_ChangelogPage_022,
+  performance: copy.public.pages_ChangelogPage_023,
+  security: copy.public.pages_ChangelogPage_024,
+}
 
 interface Props {
   meta?: AppBuildMeta
@@ -32,6 +41,16 @@ export default function DeploymentUpdatePrompt({
     queryFn: fetchHealth ? async ({ signal }) => ({ meta: await fetchHealth(signal), ok: true }) : serviceBuildQueryOptions.queryFn,
     enabled: !availableMeta, staleTime: 0, refetchOnMount: 'always', refetchOnWindowFocus: 'always', refetchInterval: pollIntervalMs,
   })
+  const changelog = useQuery({
+    queryKey: ['public', 'changelog', 1, 'deployment', availableMeta && deploymentIdentity(availableMeta)],
+    queryFn: ({ signal }) => apiJson<ChangelogPageData>(
+      `/api/changelog?page=1&release=${encodeURIComponent(`v${availableMeta!.frontend_version}`)}`,
+      { signal },
+    ),
+    enabled: !!availableMeta,
+  })
+  const release = changelog.data?.releases.find((item) => item.version === availableMeta?.frontend_version)
+
   useEffect(() => {
     if (!availableMeta && !query.isFetching && query.data?.ok && isServiceDeploymentNewer(meta, query.data.meta)) setAvailableMeta(query.data.meta)
   }, [availableMeta, query.isFetching, query.data, meta])
@@ -91,6 +110,30 @@ export default function DeploymentUpdatePrompt({
             <dd className="deployment-update-latest">{availableMeta.frontend_version}</dd>
           </div>
         </dl>
+        <section className="deployment-update-notes" aria-labelledby="deployment-update-notes-title" aria-busy={changelog.isFetching} tabIndex={0}>
+          <h3 id="deployment-update-notes-title">{copy.common.deploymentUpdateNotes}</h3>
+          {changelog.isPending ? (
+            <p role="status">{copy.v2.updatesLoading}</p>
+          ) : changelog.isError ? (
+            <p role="alert">
+              {copy.v2.updatesLoadFailed}{' '}
+              <button type="button" className="deployment-update-retry" onClick={() => void changelog.refetch({ cancelRefetch: false })}>
+                {copy.v2.retry}
+              </button>
+            </p>
+          ) : release?.sections.length ? (
+            release.sections.map((section) => (
+              <section key={section.id} className="deployment-update-section">
+                <h4>{section.title || (section.kind === 'custom' ? section.id : SECTION_TITLES[section.kind])}</h4>
+                <ul>
+                  {section.items.map((item, index) => <li key={index}><AnnouncementMarkdown>{item}</AnnouncementMarkdown></li>)}
+                </ul>
+              </section>
+            ))
+          ) : (
+            <p>{copy.public.pages_ChangelogPage_020}</p>
+          )}
+        </section>
         <div className="deployment-update-actions">
           <button
             ref={refreshButtonRef}

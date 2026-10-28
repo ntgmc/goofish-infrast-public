@@ -150,6 +150,7 @@ function memoryStorePlugin() {
                 ? 'export async function getSiteFeatureSettings() { return { version: 1, features: {}, updated_at: null } }'
             : memoryUserAuthModule(),
         loader: 'js',
+        resolveDir: resolve('.'),
       }))
     },
   }
@@ -305,11 +306,7 @@ function memoryLicenseUtilsModule() {
   return `
     export function canUseUpgradeFeatures() { return true }
     export function getSecretKeyring() { return ['depot-profile-test-secret'] }
-    export function canonicalJson(obj) {
-      if (obj === null || typeof obj !== 'object') return JSON.stringify(obj)
-      if (Array.isArray(obj)) return '[' + obj.map(canonicalJson).join(',') + ']'
-      return '{' + Object.keys(obj).sort().map((key) => JSON.stringify(key) + ':' + canonicalJson(obj[key])).join(',') + '}'
-    }
+    export { canonicalJson } from './src/lib/crypto'
     export function evaluateOperatorRisk() { return { ok: true } }
     export function formatOperatorRiskBlockMessage() { return 'blocked' }
     export function formatRiskFreezeMessage(message) { return message }

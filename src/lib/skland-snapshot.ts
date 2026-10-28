@@ -1,3 +1,5 @@
+import type { SklandGame } from './skland-game'
+
 export const SKLAND_FRESH_MS = 15 * 60_000
 export const SKLAND_MAX_AGE_MS = 24 * 60 * 60_000
 
@@ -7,8 +9,8 @@ type SklandResourceStatus = { fetchedAt: string | null; state: SklandResourceSta
 export type SklandSnapshot = {
   uid: string
   version: string
-  game: SklandResourceStatus
-  inventory: SklandResourceStatus & { items: Record<string, number> | null; lmd: number | null; exp: number | null }
+  game: SklandResourceStatus & { data?: SklandGame | null }
+  inventory: SklandResourceStatus & { items: Record<string, number> | null; lmd: number | null; exp: number | null; itemNames?: Record<string, string> }
   retryAt: string | null
 }
 

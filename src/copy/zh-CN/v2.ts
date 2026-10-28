@@ -451,8 +451,6 @@ export const v2Copy = {
   selectedPlan: '已选方案',
   serviceHistory: '过去 7 天',
   setupAccount: '选择游戏账号',
-  setupLayout: '设置基建与班次',
-  setupSchedule: '生成排班',
   logout: '退出登录',
   noProfiles: '还没有游戏账号档案，点击「添加账号」开始。',
   sampleHistory: '示例方案',

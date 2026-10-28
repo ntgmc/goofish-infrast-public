@@ -5,6 +5,7 @@ import { query, withPostgresAdvisoryLock, withTransaction } from './storage/post
 import { readSklandSnapshot, saveSklandSnapshot, type SklandSnapshotRecord, type StoredSklandSnapshot } from './storage/skland-snapshot-store'
 import { getProfileForUser, type UserGameAccountRecord } from './storage/user-store'
 import { EXP_ITEM_VALUES } from './handlers/material-value'
+import { readSklandGame } from './handlers/skland-game'
 
 type RefreshedSklandSnapshot = StoredSklandSnapshot & {
   credentialVerification?: { profileId: string; verifiedAt: string }
@@ -51,7 +52,9 @@ export function publicSklandSnapshot(uid: string, snapshot: StoredSklandSnapshot
   const items = inventoryStatus.state === 'fresh' || inventoryStatus.state === 'stale' ? readSnapshotItems(snapshot.inventory!.data) : null
   const exp = items ? Object.entries(EXP_ITEM_VALUES).reduce((sum, [id, value]) => sum + (items[id] ?? 0) * value, 0) : null
   if (exp !== null && (!Number.isSafeInteger(exp) || exp > 1e12)) throw new SklandSnapshotError('森空岛作战经验数量无效。')
-  return { uid, version: snapshot.version, game: status('game'), inventory: { ...inventoryStatus, items,
+  const gameStatus = status('game')
+  const game = gameStatus.state === 'fresh' || gameStatus.state === 'stale' ? readSklandGame(snapshot.game?.data) : null
+  return { uid, version: snapshot.version, game: { ...gameStatus, data: game }, inventory: { ...inventoryStatus, items,
     lmd: items ? items['4001'] ?? 0 : null, exp }, retryAt: snapshot.retryAt }
 }
 
@@ -138,8 +141,9 @@ export async function getSklandSnapshot(profile: UserGameAccountRecord, resource
   options: { force?: boolean; wait?: boolean } = {}): Promise<RefreshedSklandSnapshot> {
   profile = await requireSklandProfile(profile.user_id, profile.id)
   const current = await readSklandSnapshot(profile.user_id, profile.skland_binding!.uid)
-  if (!options.force && usable(current, resources)) {
-    if (resources.every((resource) => sklandResourceState(current![resource]!.fetchedAt) === 'fresh')) return current!
+  const freshnessResources: SklandResource[] = resources.length ? resources : ['game', 'inventory']
+  if (!options.force && usable(current, freshnessResources)) {
+    if (freshnessResources.every((resource) => sklandResourceState(current![resource]!.fetchedAt) === 'fresh')) return current!
     if (!options.wait) {
       void refreshSnapshot(profile, false).catch(() => undefined)
       return current!

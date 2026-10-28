@@ -11,6 +11,54 @@ import {
 } from './public-content'
 
 describe('public content settings', () => {
+  it('updates saved default account binding copy without changing prices, links, or the stored input', () => {
+    const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 13, updated_at: '2026-10-28T00:00:00.000Z' }
+    for (const planId of PUBLIC_PRICING_PLAN_IDS) {
+      stored.pricing.plans[planId].account_scope = copy.publicContent.legacy_account_binding.scopes[planId]
+      stored.pricing.plans[planId].purchase_url = `https://example.com/${planId}`
+    }
+    const comparison = stored.pricing.comparison_rows.find((row) => row.feature === '更换游戏账号')!
+    for (const planId of PUBLIC_PRICING_PLAN_IDS) {
+      comparison[planId] = planId === 'free_preview' ? '不支持' : '不支持自行更换；需人工核验'
+    }
+    stored.faq.items.find((item) => item.id === 'change-bound-account')!.answer = copy.publicContent.legacy_account_binding.faq_answer
+    const original = structuredClone(stored)
+
+    const migrated = normalizePublicContentSettings(stored)
+    for (const planId of PUBLIC_PRICING_PLAN_IDS) {
+      expect(migrated.pricing.plans[planId]).toEqual({
+        ...original.pricing.plans[planId],
+        account_scope: DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.plans[planId].account_scope,
+      })
+      expect(migrated.pricing.comparison_rows.find((row) => row.id === comparison.id)?.[planId]).toBe('绑定森空岛 UID 后不支持自行更换')
+    }
+    expect(migrated.faq).toEqual(DEFAULT_PUBLIC_CONTENT_DRAFT.faq)
+    expect(migrated.updated_at).toBe(original.updated_at)
+    expect(normalizePublicContentSettings(migrated)).toEqual(migrated)
+    expect(stored).toEqual(original)
+  })
+
+  it('preserves custom account binding copy and only applies the default update to older revisions', () => {
+    const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 13 }
+    stored.pricing.plans.single_account_monthly.account_scope = '管理员自定义账号范围'
+    const comparison = stored.pricing.comparison_rows.find((row) => row.feature === '更换游戏账号')!
+    comparison.single_account_monthly = '不支持自行更换；需人工核验'
+    comparison.single_account_annual = '管理员自定义换绑说明'
+    stored.faq.items.find((item) => item.id === 'change-bound-account')!.answer = '管理员自定义常见问题'
+
+    const migrated = normalizePublicContentSettings(stored)
+    expect(migrated.pricing.plans.single_account_monthly.account_scope).toBe('管理员自定义账号范围')
+    expect(migrated.pricing.comparison_rows.find((row) => row.id === comparison.id)).toMatchObject({
+      single_account_monthly: '绑定森空岛 UID 后不支持自行更换',
+      single_account_annual: '管理员自定义换绑说明',
+    })
+    expect(migrated.faq).toEqual(stored.faq)
+    expect(migrated.defaults_revision).toBe(PUBLIC_CONTENT_DEFAULTS_REVISION)
+
+    migrated.pricing.comparison_rows.find((row) => row.id === comparison.id)!.single_account_monthly = '不支持自行更换；需人工核验'
+    expect(normalizePublicContentSettings(migrated)).toEqual(migrated)
+  })
+
   it('adds manual lifetime upgrade defaults to existing settings without replacing custom content', () => {
     const legacy = cloneDefaultPublicContentSettings()
     delete (legacy.pricing as Partial<typeof legacy.pricing>).lifetime_upgrade

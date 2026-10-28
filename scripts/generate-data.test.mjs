@@ -1,19 +1,37 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
-import { readFile } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import test from 'node:test'
+import test, { afterEach, beforeEach } from 'node:test'
 import {
   PUBLIC_EFFICIENCY_DATA_FALLBACK,
   readEfficiencyDataSource,
 } from './efficiency-data-source.mjs'
 
-const root = resolve(import.meta.dirname, '..')
-const dataOutput = resolve(root, 'server/handlers/.generated/data.ts')
-const metaOutput = resolve(root, 'src/lib/.generated/build-meta.ts')
-const sourcePath = resolve(root, 'server/handlers/efficiency-data.json')
+const repositoryRoot = resolve(import.meta.dirname, '..')
 const sha = '0123456789abcdef0123456789abcdef01234567'
+let root
+let dataOutput
+let metaOutput
+let sourcePath
+
+beforeEach(async () => {
+  root = await mkdtemp(resolve(tmpdir(), 'goofish-generate-data-'))
+  dataOutput = resolve(root, 'server/handlers/.generated/data.ts')
+  metaOutput = resolve(root, 'src/lib/.generated/build-meta.ts')
+  sourcePath = resolve(root, 'server/handlers/efficiency-data.json')
+  await mkdir(resolve(root, 'scripts'))
+  await copyFile(resolve(repositoryRoot, 'package.json'), resolve(root, 'package.json'))
+  for (const filename of ['generate-data.mjs', 'atomic-write.mjs', 'efficiency-data-source.mjs', 'validate-efficiency-skill-refs.mjs']) {
+    await copyFile(resolve(repositoryRoot, 'scripts', filename), resolve(root, 'scripts', filename))
+  }
+})
+
+afterEach(async () => {
+  await rm(root, { recursive: true, force: true })
+})
 
 test('generates deterministic ignored modules and content-addressed data versions', async () => {
   const generatedAt = '2026-07-18T00:00:00.000Z'

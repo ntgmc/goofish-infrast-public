@@ -1,6 +1,19 @@
 export const publicContentCopy = {
   pricing_comparison_presets: '基建预设',
   pricing_comparison_manual: '手动排班',
+  pricing_comparison_bound_account: '更换游戏账号',
+  legacy_account_binding: {
+    scopes: {
+      free_preview: '绑定森空岛 UID，一个游戏 UID 全站只能领取一次',
+      single_account_monthly: '仅限一个游戏 UID，兑换后连续 30 天有效，不支持自行更换游戏账号',
+      single_account_half_year: '仅限一个游戏 UID，兑换后连续 90 天有效，不支持自行更换游戏账号',
+      single_account_annual: '仅限一个游戏 UID，兑换后连续 365 天有效，不支持自行更换游戏账号',
+      single_account_lifetime: '仅限长期维护同一个游戏 UID，不支持自行更换游戏账号',
+    },
+    comparison_free: '不支持',
+    comparison_paid: '不支持自行更换；需人工核验',
+    faq_answer: '绑定后不能自行更换 UID。免费档案和各类付费维护卡都用于同一个游戏账号，通过森空岛或 JSON 初始化均适用。预览时发现角色选错，可以返回重新选择；已经确认绑定或遇到异常拦截时，请通过网站反馈申请人工核验，不要反复导入其他账号。',
+  },
   legacy_pricing_preset_supported: '支持右满252',
   legacy_pricing_eyebrow: '公开 SKU',
   legacy_pricing_intro: '先了解完整权益与限制，再选择适合自己的版本。现在提供月卡、半年卡、年卡、终身卡，以及个人和商用积分单次排班。',

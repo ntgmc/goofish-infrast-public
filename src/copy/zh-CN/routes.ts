@@ -4,7 +4,7 @@ export const routesCopy = {
     overview: '排班总览', generation: '生成与计算', plans: '历史方案', lab: '方案对比', tools: '实用工具',
     'manual-tool': '手动排班模拟', 'schedule-comparison': '排班表对比', 'training-ratio': '钱书平衡建议',
     cultivation: '作业练度推荐', 'thanks-recruitment': '感谢庆典特别招募推荐', 'cultivation-projects': '我的养成项目',
-    depot: '仓库价值分析', profiles: '账号与档案', 'add-account': '添加账号', inventory: '背包',
+    depot: '仓库价值分析', skland: '森空岛数据', profiles: '账号与档案', 'add-account': '添加账号', inventory: '背包',
     commercial: '商用账户', balance: '积分', announcements: '查看公告', settings: '账号设置',
     help: '使用指南', updates: '更新日志', terms: '服务条款', privacy: '隐私政策',
     disclaimer: '免责声明', support: '反馈', status: '服务状态', pricing: '比较价格与权益',

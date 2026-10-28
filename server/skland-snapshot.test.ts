@@ -128,6 +128,16 @@ describe('shared Skland snapshots', () => {
     expect(mocks.rows.get('user:uid')?.inventory).toBeUndefined()
   })
 
+  it('allows partial display snapshots without weakening inventory requirements for calculations', async () => {
+    mocks.inventory.mockRejectedValue(new Error('inventory unavailable'))
+    const partial = await getSklandSnapshot(profile, [])
+    expect(partial.game).toBeDefined()
+    expect(partial.inventory).toBeUndefined()
+    expect(publicSklandSnapshot('uid', partial).inventory.items).toBeNull()
+    await expect(getSklandSnapshot(profile, ['inventory'])).rejects.toThrow('inventory unavailable')
+    expect(mocks.inventory).toHaveBeenCalledTimes(1)
+  })
+
   it('respects upstream retry intervals across businesses', async () => {
     mocks.inventory.mockRejectedValue(new SklandClientError('request_failed', 'rate limited', 429, undefined, 120_000))
     const started = Date.now()

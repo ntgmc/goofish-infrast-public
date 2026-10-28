@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { copy } from '../../../copy'
 import { CONFIG_PRESETS, normalizeConfig } from '../../../lib/config'
+import { FACILITY_IDS } from '../../../lib/facility-layout'
 import { createBlankManualSchedule } from '../../../lib/manual-schedule-tool'
 import type { LicenseOperator, UserGameAccount, UserWorkspace, WorkspaceResultHistoryItem } from '../../../lib/types'
 import type { V2Session } from '../OptionsDrawer'
@@ -113,6 +114,28 @@ it('keeps per-file errors local and clears prior results after replacing an inpu
   expect(screen.getByRole('button', { name: text.start })).toBeDisabled()
 })
 
+it('identifies missing owned operators and accepts the same file after the profile roster is updated', async () => {
+  const user = userEvent.setup()
+  const value = session()
+  const { rerender } = render(view(value))
+  const source = record('B').result
+  source.plans[0].rooms.manufacture[0].operators = ['旅骨']
+  const content = JSON.stringify(source)
+  await upload(user, 'before', 'A')
+  await upload(user, 'after', 'B', content)
+  expect(await screen.findByText(copy.tools.manualSchedule.unownedOperators(['旅骨']))).toBeVisible()
+  expect(screen.getByText('A.json', { selector: 'strong' })).toBeVisible()
+  expect(screen.getByRole('button', { name: text.start })).toBeDisabled()
+  const updated = { ...value, workspace: { ...value.workspace!, operators: [
+    ...value.workspace!.operators!, { id: 'recycler', name: '旅骨', own: true, elite: 2, rarity: 6 },
+  ] } }
+  rerender(view(updated))
+  await upload(user, 'before', 'A')
+  await upload(user, 'after', 'B', content)
+  await waitFor(() => expect(screen.getByRole('button', { name: text.start })).toBeEnabled())
+  expect(screen.queryByText(copy.tools.manualSchedule.unownedOperators(['旅骨']))).not.toBeInTheDocument()
+})
+
 it('uses configurable fallback hours for MAA JSON and preserves each table’s own configuration', async () => {
   const user = userEvent.setup()
   render(view())
@@ -128,6 +151,33 @@ it('uses configurable fallback hours for MAA JSON and preserves each table’s o
   await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(2))
   expect(mocks.submit.mock.calls[0][0].manualSchedule.source.shift_hours).toEqual([12, 6, 6])
   expect(mocks.submit.mock.calls[1][0].manualSchedule.source.shift_hours).toEqual([8, 8, 8])
+})
+
+it.each(['243', '252'])('imports a %s MAA table without configuring positions and submits its own facilities', async (preset) => {
+  const user = userEvent.setup()
+  const value = session()
+  value.workspace!.config = normalizeConfig(CONFIG_PRESETS['252'])
+  const source = preset === '243' ? record('A').result
+    : createBlankManualSchedule({ ...normalizeConfig(CONFIG_PRESETS[preset]), facility_layout: [...FACILITY_IDS] })
+  source.plans[0].rooms.trading[1].operators = ['芬', '香草', '克洛丝']
+  source.plans[0].rooms.manufacture[0].operators = []
+  const maa = { title: source.title, plans: source.plans.map(({ rooms, ...plan }) => ({
+    ...plan, rooms: Object.fromEntries(Object.entries(rooms).map(([type, entries]) => [
+      type, entries.map(({ level: _level, ...room }) => room),
+    ])),
+  })) }
+  render(view(value))
+  await upload(user, 'before', 'MAA', JSON.stringify(maa))
+  await upload(user, 'after', 'B')
+  const start = screen.getByRole('button', { name: text.start })
+  await waitFor(() => expect(start).toBeEnabled())
+  await user.click(start)
+  await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(2))
+  const request = mocks.submit.mock.calls[0][0]
+  expect(request.manualSchedule.source.buildingType).toBe(Number(preset))
+  expect(request.manualSchedule.source.plans[0].rooms.trading[1]).toEqual({
+    level: 3, product: 'LMD', operators: ['芬', '香草', '克洛丝'],
+  })
 })
 
 it('can select archived and paginated schedules', async () => {

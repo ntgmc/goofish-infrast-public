@@ -698,6 +698,14 @@ async function assertFacilityRead() {
     || result.body.rooms[8].type !== 'power') {
     throw new Error(`facility read: invalid response ${result.status}`)
   }
+  const config = result.body.configuration
+  if (config?.layout !== '2-5-2' || config.facility_layout?.length !== 9
+    || config.trading_station_levels?.join() !== '3,1' || config.manufacturing_station_levels?.join() !== '2,2,3,3,2'
+    || config.product_requirements?.trading_stations.LMD !== 2 || config.product_requirements?.manufacturing_stations['Pure Gold'] !== 5
+    || result.body.configuration_error !== null || !result.body.fetched_at
+    || !store.fetchCalls.some((url) => url.includes('/api/v1/game/player/info'))) {
+    throw new Error('facility read must return the current complete configuration')
+  }
   if (JSON.stringify(store.workspaces.get('profile-1')) !== before) {
     throw new Error('facility read must not mutate the workspace')
   }
@@ -1335,8 +1343,8 @@ function setFetchMode(mode) {
         message: 'OK',
       data: {
         building: {
-          tradings: [{ slotId: 'slot_25', level: 1 }, { slotId: 'slot_24', level: 3 }],
-          manufactures: ['slot_5', 'slot_14', 'slot_15', 'slot_16', 'slot_26'].map((slotId) => ({ slotId, level: 2 })),
+          tradings: [{ slotId: 'slot_25', level: 1, strategy: 'O_GOLD' }, { slotId: 'slot_24', level: 3, strategy: 'O_GOLD' }],
+          manufactures: ['slot_5', 'slot_14', 'slot_15', 'slot_16', 'slot_26'].map((slotId, index) => ({ slotId, level: [2, 2, 3, 3, 2][index], formulaId: '4' })),
           powers: [{ slotId: 'slot_7', level: 3 }, { slotId: 'slot_6', level: 3 }],
         },
         chars: mode === 'refresh'

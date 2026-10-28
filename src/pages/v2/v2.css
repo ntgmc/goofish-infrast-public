@@ -1669,7 +1669,8 @@
   gap: var(--space-2xs);
   color: var(--v2-secondary);
 }
-.v2-search:focus-within {
+.v2-search:focus-within,
+:is(.v2-app, .v2-drawer, .v2-dialog) .operator-picker-search:focus-within {
   border-color: var(--color-v2-focus);
   outline: 2px solid var(--color-v2-focus);
   outline-offset: 2px;
@@ -1686,7 +1687,7 @@
   color: var(--v2-ink);
 }
 
-:is(.v2-app, .v2-drawer, .v2-dialog) .v2-search input:focus-visible {
+:is(.v2-app, .v2-drawer, .v2-dialog) :is(.v2-search, .operator-picker-search) input:focus-visible {
   outline: none;
   box-shadow: none;
 }

@@ -1311,8 +1311,13 @@ describe('PostgreSQL optimization job admission', () => {
     await expect(getWorkspace(profileId)).resolves.toMatchObject({ elite_overrides: { alpha: 1, beta: 2 } })
   })
 
-  it('persists a manual simulation with provenance in both the job snapshot and history', async () => {
+  it('persists a manual simulation with provenance without sending a QQ notification', async () => {
     const profileId = await seedProfile()
+    await query(
+      `insert into qqbot_account_bindings (id, user_id, qq_number, notifications_enabled, created_at)
+       select 'manual-binding', user_id, '123459997', true, now() from user_game_accounts where id = $1`,
+      [profileId],
+    )
     const payload = formalSchedulePayload(profileId)
     const store = createPostgresOptimizeJobStore()
     const admitted = await store.admitJob(input({
@@ -1337,6 +1342,7 @@ describe('PostgreSQL optimization job admission', () => {
     await expect(store.getJob(admitted.job.id)).resolves.toMatchObject({
       result_json: { schedule_source: 'manual' },
     })
+    expect((await query('select result_id from qqbot_schedule_notifications where result_id = $1', [admitted.job.id])).rows).toEqual([])
   })
 
   it('keeps comparison results in the job without modifying history, workspace or completion notifications', async () => {

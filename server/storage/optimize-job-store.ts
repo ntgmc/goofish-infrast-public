@@ -2761,9 +2761,11 @@ async function persistScheduleCompletionInTransaction(
      on conflict (job_id, effect_type) do nothing`,
     [job.id, JSON.stringify({ status: 'pending', attempts: 0 }), nowIso],
   )
-  await enqueueQqBotScheduleNotificationInTransaction(client, {
-    profileId, resultId: job.id, title: persistedResult.title, now: nowIso,
-  })
+  if (!payload.request.manual_schedule) {
+    await enqueueQqBotScheduleNotificationInTransaction(client, {
+      profileId, resultId: job.id, title: persistedResult.title, now: nowIso,
+    })
+  }
   return persistedResult
 }
 

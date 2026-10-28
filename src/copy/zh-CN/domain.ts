@@ -106,13 +106,16 @@ export const domainCopy = {
     no_drone: "取消本班无人机加速",
   },
   game_queue: {
-    maa_hint: "照着选用的排班设置游戏内预设队列，可快速切换到相同的干员组合。换班时间、宿舍休息、无人机和菲亚梅塔操作需要手动安排。",
-    open_overview: "打开游戏内“基建 → 进驻总览 → 工作区”，找到每个贸易站、制造站和发电站的“预设队列”。",
-    set_queues: "对照本站“总览图 v2”或“详情”，按同一设施的班次顺序填写干员，并核对制造站产物。班次数超过游戏可保存的队列数时，可合并相同组合，不够的位置需在换班时重新设置。",
-    switch_maa: "首次使用时，逐个设施点击目标队列的切换按钮，进驻第一班。之后按排班的班次时长，在换班时间逐个切换到下一班；“队列轮换”只处理符合游戏条件的设施，固定时间换班请逐个核对并切换。",
-    switch_rotation: "首次使用时，逐个设施切换到队列 1；之后在游戏提示可轮换时使用“队列轮换”，并检查各设施实际进驻的队列。需要提前换班时，可逐个设施点击目标队列的切换按钮。",
-    support: "工作区之外的控制中枢、会客室和办公室按对应班次手动更换；下班干员按宿舍安排休息，使用“干员休整”后检查床位和恢复支援干员。无人机按各班目标及换班前后的使用顺序手动处理；启用菲亚梅塔时，按排班安排手动恢复目标干员心情。",
-    autofill: "采用 MAA 自动填满宿舍的方案时，在游戏内为下班干员安排休息，并保留排班中的宿舍技能干员；纯自动填满方案也需自行安排宿舍。",
+    maa_hint: "按排班设置好游戏内预设队列，就能快速切换干员组合。换班时间、宿舍休息、无人机和菲亚梅塔仍需手动安排。",
+    open_overview: "在游戏内打开“基建 → 进驻总览 → 工作区”，找到各个贸易站、制造站和发电站的“预设队列”。",
+    set_queues: "对照本站“总览图 v2”或“详情”，为每个设施按班次顺序设置干员，并核对制造站产物。班次数多于可保存的队列数时，可合并相同的干员组合；仍放不下的班次，在换班时重新设置。",
+    switch_maa: "首次使用时，逐个设施点击目标队列的切换按钮，进驻第一班。之后按班次时长，逐个设施切换到下一班。“队列轮换”只会切换符合游戏条件的设施；按固定时间换班时，请逐个核对并切换。",
+    switch_rotation: "首次使用时，将每个设施切换到队列 1。游戏提示可轮换后，使用“队列轮换”，再检查各设施的实际进驻队列。需要提前换班时，可逐个设施点击目标队列的切换按钮。",
+    support: "控制中枢、会客室和办公室不在工作区内，需要按对应班次手动换人。",
+    dormitory: "让下班干员按宿舍安排休息。使用“干员休整”后，检查床位和恢复支援干员。",
+    drones: "按各班的无人机目标，以及换班前后的使用顺序，手动使用无人机。",
+    fiammetta: "启用菲亚梅塔时，按排班要求手动为目标干员恢复心情。",
+    autofill: "排班采用 MAA 自动填满宿舍时，需要自行安排下班干员休息，并保留排班中的宿舍技能干员。纯自动填满方案也需自行安排宿舍。",
   },
   result_image: {
     long: "导出总览长图",
@@ -160,7 +163,7 @@ export const domainCopy = {
   // src/components/result-panel/Guides.tsx
   components_result_panel_Guides_001: "不用 MAA？在游戏内设置预设队列",
   // src/components/result-panel/Guides.tsx
-  components_result_panel_Guides_002: "游戏内轮换不生成排班 JSON。按下方预设队列逐个设施设置队列 1 / 队列 2，平时使用游戏内“队列轮换/快速切换”；同一设施由心情消耗最快的干员触发切换，触发时会切换该设施内所有干员。",
+  components_result_panel_Guides_002: "按下方预设队列，为每个设施设置队列 1 和队列 2，之后用游戏内的“队列轮换”或“快速切换”换班。同一设施中心情消耗最快的干员会触发切换，届时该设施内的所有干员会一起换班。游戏内轮换模式不生成排班 JSON。",
   // src/components/result-panel/Guides.tsx
   components_result_panel_Guides_003: "如何在 MAA 中使用排班 JSON",
   // src/components/result-panel/Guides.tsx
@@ -193,7 +196,8 @@ export const domainCopy = {
   components_result_panel_Guides_017: "点击“选择”，打开从本站下载的排班 JSON",
   // src/components/result-panel/Guides.tsx
   components_result_panel_Guides_018: "MAA 自定义基建配置中选择排班 JSON 的位置示意图",
-  maa_import_screenshot: "查看 MAA 设置截图",
+  maa_import_enlarge: "点击放大截图",
+  maa_import_close: "关闭截图",
   // src/components/result-panel/ResultBoard.tsx
   components_result_panel_ResultBoard_001: "游戏内轮换参考图",
   // src/components/result-panel/ResultBoard.tsx

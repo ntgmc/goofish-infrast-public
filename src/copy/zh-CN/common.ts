@@ -11,10 +11,7 @@ export const commonCopy = {
   inventoryProductRebalanceEnabled: "允许调整",
   inventoryProductRebalanceDisabled: "保持所选数量",
   facilityLayoutTitle: "设施位置与等级",
-  facilityLayoutRead: "从森空岛读取设施",
-  facilityLayoutReading: "正在读取设施…",
   facilityLayoutReadFailed: "读取设施失败，请稍后重试。",
-  facilityLayoutReadSuccess: "已读取设施位置与等级。请核对游戏内布局，完成确认后再生成排班。",
   facilityLayoutHelp: "按游戏内位置摆放设施，点击卡片更换类型，在下方选择等级。调整完毕后确认布局，即可生成排班。",
   facilityLayoutSaved: "已确认",
   facilityLayoutDraft: "待确认",
@@ -139,6 +136,8 @@ export const commonCopy = {
   components_DeploymentUpdatePrompt_005: "最新版本",
   // src/components/DeploymentUpdatePrompt.tsx
   components_DeploymentUpdatePrompt_006: "立即刷新",
+  // src/components/DeploymentUpdatePrompt.tsx
+  deploymentUpdateNotes: "更新内容",
   // src/components/MobileBrowserPrompt.tsx
   mobileBrowserTitle: "推荐在电脑上打开",
   mobileBrowserDescription: "使用电脑浏览器打开，配置基建和查看排班会更方便。你也可以继续在手机上使用。",

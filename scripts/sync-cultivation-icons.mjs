@@ -6,6 +6,8 @@ import { atomicWriteFile, writeFileIfChanged } from './atomic-write.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const catalogPath = resolve(root, 'src/data/cultivation-item-icons.json')
+const sklandCatalogPath = resolve(root, 'src/data/skland-items.json')
+const resourceIds = ['3003', '3141', '4002', '4003', '4004', '4005', '4006', '4007', '4008', '4009', '4010', '5001', '6001', '7001', '7002', '7003', '7004', '7006', '3401', '3131', '3132', '3133', '3112', '3113', '3114', 'classic_normal_ticket', 'classic_gacha']
 const assetRepo = 'arkntools/arknights-toolbox-data'
 const pngSignature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
 const safeName = /^[A-Za-z0-9_-]{1,128}$/
@@ -27,12 +29,24 @@ function planIcons(tree, items) {
     if (kind === 'item') itemIcons[id] = name
     add(kind, name, `https://cdn.jsdelivr.net/gh/${assetRepo}@${tree.sha}/${entry.path}`)
   }
+  for (const id of resourceIds) {
+    const item = items[id]
+    if (!item?.iconId || itemIcons[id]) continue
+    itemIcons[id] = item.iconId
+    add('item', item.iconId, `https://torappu.prts.wiki/assets/item_icon/${item.iconId}.png`)
+  }
   for (const item of Object.values(items)) {
     if (specialType.test(item.itemType) && item.iconId) {
       add('item', item.iconId, `https://torappu.prts.wiki/assets/item_icon/${item.iconId}.png`)
     }
   }
-  return { icons, itemIcons }
+  const sklandItems = Object.fromEntries(Object.entries(items).map(([id, item]) => {
+    const group = resourceIds.includes(id) || ['GOLD', 'CARD_EXP'].includes(item.itemType) ? 'resources'
+      : /^(?:MTL_ASC|MTL_SKILL)/.test(item.iconId) || id.startsWith('mod_') ? 'upgrades'
+        : item.classifyType === 'MATERIAL' && item.sortId < 200000 ? 'materials' : 'other'
+    return [id, { name: item.name, ...(icons.has(`public/item-icons/${item.iconId}.png`) && { icon: item.iconId }), group, sort: item.sortId }]
+  }))
+  return { icons, itemIcons, sklandItems }
 }
 
 async function fetchBytes(url, maximumBytes = 5_000_000) {
@@ -71,7 +85,7 @@ async function sync() {
     fetchBytes(`https://api.github.com/repos/${assetRepo}/git/trees/main?recursive=1`).then((bytes) => JSON.parse(bytes)),
     fetchBytes('https://cdn.jsdelivr.net/gh/Kengxxiao/ArknightsGameData@master/zh_CN/gamedata/excel/item_table.json').then((bytes) => JSON.parse(bytes)),
   ])
-  const { icons, itemIcons } = planIcons(tree, table.items)
+  const { icons, itemIcons, sklandItems } = planIcons(tree, table.items)
   assert(Object.keys(itemIcons).length >= 97 && icons.size > 900, 'Incomplete upstream icon catalog')
   const previous = JSON.parse(await readFile(catalogPath, 'utf8'))
   for (const id of Object.keys(previous)) assert(itemIcons[id], `Missing material icon: ${id}`)
@@ -101,9 +115,11 @@ async function sync() {
       changed++
     }
   }
-  const catalog = `${JSON.stringify(itemIcons, null, 2)}\n`
-  if (check) assert.equal(await readFile(catalogPath, 'utf8'), catalog, 'Material icon mapping is out of sync')
-  else await writeFileIfChanged(catalogPath, catalog, { mode: 0o644 })
+  for (const [path, data] of [[catalogPath, itemIcons], [sklandCatalogPath, sklandItems]]) {
+    const catalog = `${JSON.stringify(data, null, 2)}\n`
+    if (check) assert.equal(await readFile(path, 'utf8'), catalog, `Item catalog is out of sync: ${path}`)
+    else await writeFileIfChanged(path, catalog, { mode: 0o644 })
+  }
   console.log(`Cultivation icons ${check ? 'verified' : 'synced'}: ${Object.keys(itemIcons).length} materials, ${icons.size} PNGs, ${changed} changed (${assetRepo}@${tree.sha}).`)
 }
 
@@ -113,9 +129,10 @@ if (process.argv.includes('--self-test')) {
     { type: 'blob', path: 'assets/img/skill/shared.png' },
     { type: 'blob', path: 'assets/img/avatar/unused.png' },
   ] }
-  const items = { '4001': { iconId: 'GOLD', itemType: 'GOLD' }, voucher: { iconId: 'voucher', itemType: 'VOUCHER_ELITE_II_6' }, duplicate: { iconId: 'voucher', itemType: 'VOUCHER_PICK' } }
+  const items = { '4001': { name: '龙门币', iconId: 'GOLD', itemType: 'GOLD', sortId: 10400 }, voucher: { iconId: 'voucher', itemType: 'VOUCHER_ELITE_II_6' }, duplicate: { iconId: 'voucher', itemType: 'VOUCHER_PICK' } }
   const plan = planIcons(tree, items)
   assert.deepEqual(plan.itemIcons, { '4001': 'GOLD' })
+  assert.deepEqual(plan.sklandItems['4001'], { name: '龙门币', icon: 'GOLD', group: 'resources', sort: 10400 })
   assert.equal(plan.icons.size, 3)
   assert(plan.icons.get('public/skill-icons/shared.png').includes(`@${tree.sha}/`))
   assert.equal(plan.icons.get('public/item-icons/voucher.png'), 'https://torappu.prts.wiki/assets/item_icon/voucher.png')
