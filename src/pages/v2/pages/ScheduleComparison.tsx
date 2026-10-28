@@ -7,7 +7,7 @@ import { copy, CURRENT_LOCALE } from '../../../copy'
 import { canonicalJson } from '../../../lib/crypto'
 import { CONFIG_PRESETS, normalizeConfig } from '../../../lib/config'
 import { mergeOperators } from '../../../lib/license'
-import { isManualScheduleProfileAvailable, parseManualScheduleJson } from '../../../lib/manual-schedule-tool'
+import { isManualScheduleProfileAvailable, parseManualScheduleJson, UnownedScheduleOperatorsError } from '../../../lib/manual-schedule-tool'
 import { createManualPlans } from '../../../lib/manual-schedule'
 import { compareScheduleOperators, scheduleProductionMetrics, type ScheduleAssignment } from '../../../lib/schedule-comparison'
 import { getOptimizePollRetryDelayMs } from '../../../lib/optimize-poll'
@@ -124,8 +124,9 @@ function ComparisonWorkspace({ userId, profileId, operators, config, workspace }
       if (current()) setSlots((current) => current.map((slot, side) => side === index ? { selection, choice: { name, source, config: fallback } } : slot))
     } catch (cause) {
       if (!current()) return
-      const message = cause instanceof Error && [manual.tooLarge, manual.importLayoutMismatch, manual.fiammettaInvalid,
-        copy.common.facilityLayoutRequired, copy.domain.lib_config_035].some((message) => message === cause.message) ? cause.message : manual.importFailed
+      const message = cause instanceof Error && (cause instanceof UnownedScheduleOperatorsError ||
+        [manual.tooLarge, manual.importLayoutMismatch, manual.fiammettaInvalid,
+          copy.common.facilityLayoutRequired, copy.domain.lib_config_035].some((message) => message === cause.message)) ? cause.message : manual.importFailed
       setSlots((current) => current.map((slot, side) => side === index ? { selection, error: message } : slot))
     }
   }

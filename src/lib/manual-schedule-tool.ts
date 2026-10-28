@@ -9,6 +9,12 @@ import type { LicenseConfig, LicenseOperator, OptimizeResult, UserGameAccount } 
 const roomTypes = z.enum(['trading', 'manufacture', 'power', 'control', 'meeting', 'hire', 'processing', 'training', 'recycling', 'dormitory'])
 const hours = z.number().finite().positive().max(24)
 
+export class UnownedScheduleOperatorsError extends Error {
+  constructor(names: string[]) {
+    super(copy.tools.manualSchedule.unownedOperators(names))
+  }
+}
+
 export const manualScheduleSourceSchema: z.ZodType<OptimizeResult> = z.object({
   author: z.string().max(1_000).default(''),
   title: z.string().max(1_000),
@@ -142,6 +148,9 @@ export function parseManualScheduleJson(text: string, config: LicenseConfig, ope
 export function resolveManualScheduleConfig(source: OptimizeResult, input: LicenseConfig, operators: LicenseOperator[]): LicenseConfig {
   const rooms = source.plans[0].rooms
   const owned = new Set(operators.filter((operator) => operator.own).map((operator) => operator.name))
+  const unowned = [...new Set(source.plans.flatMap((plan) => Object.values(plan.rooms)
+    .flatMap((rooms) => rooms.flatMap((room) => room.operators ?? []))))].filter((name) => name !== '' && !owned.has(name))
+  if (unowned.length) throw new UnownedScheduleOperatorsError(unowned)
   const maximumRooms: Record<string, number> = { trading: 5, manufacture: 5, power: 3, dormitory: 4, control: 1, meeting: 1, hire: 1, processing: 1, training: 1, recycling: 1 }
   for (const plan of source.plans) {
     if (Object.keys(plan.rooms).length === 0) throw new Error('Empty facilities')
@@ -149,7 +158,6 @@ export function resolveManualScheduleConfig(source: OptimizeResult, input: Licen
       if (entries.length > maximumRooms[type] || entries.length !== (rooms[type]?.length ?? 0)) throw new Error('Invalid facilities')
       entries.forEach((room, index) => {
         if (maximumRooms[type] === undefined || (room.operators?.length ?? 0) > roomCapacity(type, room) ||
-          room.operators?.some((name) => name !== '' && !owned.has(name)) ||
           ((type === 'trading' || type === 'manufacture' || type === 'power' || type === 'recycling') && (room.level ?? 3) > 3) ||
           room.product !== rooms[type][index].product || room.level !== rooms[type][index].level) throw new Error('Invalid room')
       })

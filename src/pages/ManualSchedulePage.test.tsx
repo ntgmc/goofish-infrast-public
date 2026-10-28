@@ -78,6 +78,12 @@ describe('manual schedule tool', () => {
     await user.upload(screen.getByLabelText('导入排班 JSON', { selector: 'input' }), file)
     await user.click(await screen.findByRole('button', { name: '模拟测算' }))
     expect(mocks.submit.mock.calls[0][0].manualSchedule.plans[0].rooms.manufacture[0]).toEqual(['芬', '', ''])
+    source.plans[0].rooms.manufacture[0].operators = ['旅骨']
+    const missing = new File([JSON.stringify(source)], 'missing.json', { type: 'application/json' })
+    Object.defineProperty(missing, 'text', { value: async () => JSON.stringify(source) })
+    await user.upload(screen.getByLabelText('导入排班 JSON', { selector: 'input' }), missing)
+    expect(await screen.findByText(copy.tools.manualSchedule.unownedOperators(['旅骨']))).toBeVisible()
+    expect(screen.getByRole('button', { name: '模拟测算' })).toBeEnabled()
     const invalid = new File(['{}'], 'invalid.json', { type: 'application/json' })
     Object.defineProperty(invalid, 'text', { value: async () => '{}' })
     await user.upload(screen.getByLabelText('导入排班 JSON', { selector: 'input' }), invalid)

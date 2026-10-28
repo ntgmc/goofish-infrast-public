@@ -114,6 +114,28 @@ it('keeps per-file errors local and clears prior results after replacing an inpu
   expect(screen.getByRole('button', { name: text.start })).toBeDisabled()
 })
 
+it('identifies missing owned operators and accepts the same file after the profile roster is updated', async () => {
+  const user = userEvent.setup()
+  const value = session()
+  const { rerender } = render(view(value))
+  const source = record('B').result
+  source.plans[0].rooms.manufacture[0].operators = ['旅骨']
+  const content = JSON.stringify(source)
+  await upload(user, 'before', 'A')
+  await upload(user, 'after', 'B', content)
+  expect(await screen.findByText(copy.tools.manualSchedule.unownedOperators(['旅骨']))).toBeVisible()
+  expect(screen.getByText('A.json', { selector: 'strong' })).toBeVisible()
+  expect(screen.getByRole('button', { name: text.start })).toBeDisabled()
+  const updated = { ...value, workspace: { ...value.workspace!, operators: [
+    ...value.workspace!.operators!, { id: 'recycler', name: '旅骨', own: true, elite: 2, rarity: 6 },
+  ] } }
+  rerender(view(updated))
+  await upload(user, 'before', 'A')
+  await upload(user, 'after', 'B', content)
+  await waitFor(() => expect(screen.getByRole('button', { name: text.start })).toBeEnabled())
+  expect(screen.queryByText(copy.tools.manualSchedule.unownedOperators(['旅骨']))).not.toBeInTheDocument()
+})
+
 it('uses configurable fallback hours for MAA JSON and preserves each table’s own configuration', async () => {
   const user = userEvent.setup()
   render(view())

@@ -112,6 +112,7 @@ export const toolsCopy = {
     import: "导入排班 JSON",
     importHint: "支持完整计算结果 JSON 和 MAA 排班 JSON，最大 5 MB。MAA 文件缺少换班时长时，使用上方设置。",
     importFailed: "排班 JSON 无效，请检查文件结构、干员归属和设施安排。",
+    unownedOperators: (names: string[]) => `当前档案的已拥有干员中缺少：${names.join('、')}。请更新此档案的干员数据，或切换匹配的档案后重新导入。`,
     tooLarge: "排班 JSON 最大为 5 MB，请缩小文件后重试。",
     back: "返回工具页",
     layout: "设施配置",

@@ -8,7 +8,7 @@ import { OperatorAvatarTile } from '../components/result-panel/OperatorAvatarStr
 import ManualScheduleEditor from '../components/result-panel/ManualScheduleEditor'
 import { copy } from '../copy/index'
 import { CONFIG_PRESETS, normalizeConfig } from '../lib/config'
-import { createBlankManualSchedule, isManualScheduleProfileAvailable, parseManualScheduleJson } from '../lib/manual-schedule-tool'
+import { createBlankManualSchedule, isManualScheduleProfileAvailable, parseManualScheduleJson, UnownedScheduleOperatorsError } from '../lib/manual-schedule-tool'
 import { profileScopedPath, workspaceSetupPath } from '../lib/app-routes'
 import { v2Path } from './v2/navigation'
 import { useSiteFeatures } from '../lib/site-feature-context'
@@ -104,7 +104,8 @@ export function useManualTool({ session, embedded = false, onDirtyChange }: Page
       }
     } catch (caught) {
       if (revision.current === run) setError(caught instanceof Error &&
-        [label.tooLarge, label.importLayoutMismatch, label.fiammettaInvalid, copy.common.facilityLayoutRequired].some((message) => message === caught.message)
+        (caught instanceof UnownedScheduleOperatorsError ||
+          [label.tooLarge, label.importLayoutMismatch, label.fiammettaInvalid, copy.common.facilityLayoutRequired].some((message) => message === caught.message))
         ? caught.message : label.importFailed)
     } finally {
       setImporting(false)

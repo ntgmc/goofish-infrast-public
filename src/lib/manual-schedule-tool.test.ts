@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { CONFIG_PRESETS, normalizeConfig } from './config'
 import { copy } from '../copy'
 import { createManualPlans, manualResult, manualSourceKey, parseManualDraft } from './manual-schedule'
-import { changeManualFacility, createBlankManualSchedule, isManualScheduleProfileAvailable, parseManualScheduleJson, resolveManualScheduleConfig } from './manual-schedule-tool'
+import { changeManualFacility, createBlankManualSchedule, isManualScheduleProfileAvailable, parseManualScheduleJson, resolveManualScheduleConfig, UnownedScheduleOperatorsError } from './manual-schedule-tool'
 import { FACILITY_IDS } from './facility-layout'
 import type { LicenseOperator, UserGameAccount } from './types'
 
@@ -87,6 +87,18 @@ describe('standalone manual schedules', () => {
     expect(imported.plans[0].rooms.trading[1].operators).toEqual(['芬'])
     delete maa.plans[0].rooms.manufacture[0].product
     expect(() => parseManualScheduleJson(JSON.stringify(maa), current, operators)).toThrow(copy.tools.manualSchedule.importLayoutMismatch)
+  })
+
+  it('names missing operators once and admits the same schedule after the roster is updated', () => {
+    const source = createBlankManualSchedule({ ...config, recycling_station_level: 1 })
+    source.plans.forEach((plan) => { plan.rooms.recycling[0].operators = ['旅骨'] })
+    const content = JSON.stringify(source)
+    const missing = { id: 'recycler', name: '旅骨', own: false, elite: 2, rarity: 6 }
+    expect(() => parseManualScheduleJson(content, config, [...operators, missing])).toThrow(UnownedScheduleOperatorsError)
+    expect(() => parseManualScheduleJson(content, config, operators)).toThrow(copy.tools.manualSchedule.unownedOperators(['旅骨']))
+    const updated = [...operators, { ...missing, own: true }]
+    expect(parseManualScheduleJson(content, config, updated).plans[0].rooms.recycling[0].operators).toEqual(['旅骨'])
+    expect(() => resolveManualScheduleConfig(source, config, operators)).toThrow(UnownedScheduleOperatorsError)
   })
 
   it('rejects unowned operators, excessive capacities, inconsistent facilities and invalid products', () => {
