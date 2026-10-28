@@ -243,7 +243,7 @@ describe('admin page loading and navigation', () => {
     const firstSignal = signal
     await act(async () => { await router.navigate('/admin/overview') })
     await screen.findByRole('heading', { name: '有多少人真正用起来了？', level: 2 })
-    expect(firstSignal?.aborted).toBe(true)
+    await waitFor(() => expect(firstSignal?.aborted).toBe(true))
     await act(async () => pending.resolve(queue))
     expect(screen.queryByText('17 / 200')).not.toBeInTheDocument()
     await act(async () => { await router.navigate('/admin/queue') })
