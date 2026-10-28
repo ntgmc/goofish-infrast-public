@@ -1,7 +1,9 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { NextIcon as ArrowRight, PauseIcon as Pause, ResumeIcon as Play, AddIcon as Plus, RemoveIcon as X, RefreshIcon, SaveIcon, CultivationIcon, ResourceCalendarIcon, ResourceStockIcon, DailyOutputIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
-import { matchesSearch } from '../../../lib/search'
+import OperatorPicker from '../../../components/OperatorPicker'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../../components/ui/dialog'
+import { Avatar } from '../ScheduleBoard'
 import { canEditConfig } from '../../../lib/license'
 import { isCultivationProject, prepareProjectProduction, projectDaysEarlier, type CultivationProject, type ProjectOperator, type ProjectRoute } from '../../../lib/cultivation-projects'
 import type { CultivationData } from '../../../lib/cultivation-contract'
@@ -17,6 +19,7 @@ import './cultivation-projects.css'
 
 const text = copy.cultivationProjects
 const number = (amount: number) => amount.toLocaleString('zh-CN', { maximumFractionDigits: 1 })
+const profession = (operator: ProjectOperator) => copy.tools.cultivation.professions[operator.profession as keyof typeof copy.tools.cultivation.professions] ?? ''
 
 export default function CultivationProjects({ session, onConfig }: { session: V2Session; onConfig: () => void }) {
   const profile = session.activeProfile
@@ -59,20 +62,20 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
             const deadlineDays = row?.estimatedDate && project.deadline ? projectDaysEarlier(project.deadline, row.estimatedDate) : null
             return <li key={project.operatorId} data-paused={project.paused} data-primary={first && !project.paused}>
               <div className="v2-project-target-heading">
-                <span className="v2-project-portrait"><img src={`/webp96/${encodeURIComponent(project.operatorId)}.webp`} alt="" width={60} height={60} /><b>{String(index + 1).padStart(2, '0')}</b></span>
-                <div><h3>{name}{(project.paused || first) && <span className="v2-project-status">{project.paused ? text.paused : text.main}</span>}</h3><span className="v2-muted">{operator && '★'.repeat(operator.rarity)}</span></div>
+                <span className="v2-project-portrait"><Avatar key={operator?.baseId ?? project.operatorId} operator={{ id: operator?.baseId ?? project.operatorId, name }} /><b>{String(index + 1).padStart(2, '0')}</b></span>
+                <div><h3>{name}{(project.paused || first) && <span className="v2-project-status">{project.paused ? text.paused : text.main}</span>}</h3>{operator && <span className="v2-muted">★{operator.rarity} · {profession(operator)}</span>}</div>
                 <button className="v2-icon-button" aria-label={`${text.remove} ${name}`} onClick={() => { m.setProjects((rows) => rows.filter((row) => row.operatorId !== project.operatorId)); if (editing?.operatorId === project.operatorId) setEditing(null) }}><X size={18} /></button>
               </div>
               <div className="v2-project-target-body">
-                <div className="v2-project-training">
+                <div className="v2-project-target-summary"><div className="v2-project-training">
                   {operator && <><div><span>{text.current}</span><strong>{text.elites[operator.current.elite]} <b>Lv.{operator.current.level}</b></strong><small>{operator.current.skillLevel === null ? text.pending : text.skillRank(operator.current.skillLevel)}</small></div><ArrowRight size={18} aria-hidden="true" /></>}
-                  <div data-target="true"><span>{text.target}</span><strong>{text.elites[project.elite]} <b>Lv.{project.level}</b></strong><small>{text.skillName(project.skill)} · {text.skillRank(project.skillLevel)}</small></div>
+                  <div data-target="true"><span>{text.target}</span><strong>{text.elites[project.elite]} <b>Lv.{project.level}</b></strong><small className="v2-project-skill"><span>{text.skillName(project.skill)}</span><span>{text.skillRank(project.skillLevel)}</span></small></div>
+                </div>
+                {!project.paused && <div className="v2-project-ready" data-ready={Boolean(row?.estimatedDate)}><ResourceCalendarIcon size={20} aria-hidden="true" /><div><span>{text.goalReadyDate}</span><strong>{!materials?.candidate ? m.busy ? text.calculating : text.pendingRefresh : row?.estimatedDate ?? text.pending}</strong>{project.deadline && <small>{project.deadline} · {deadlineDays === null ? text.deadlineUnknown : deadlineDays < 0 ? text.overdue(-deadlineDays) : text.onTime}</small>}</div></div>}
                 </div>
                 {!project.paused && <>
-                  <div className="v2-project-ready" data-ready={Boolean(row?.estimatedDate)}><ResourceCalendarIcon size={20} aria-hidden="true" /><div><span>{text.goalReadyDate}</span><strong>{!materials?.candidate ? m.busy ? text.calculating : text.pendingRefresh : row?.estimatedDate ?? text.pending}</strong></div></div>
-                  {project.deadline && <small>{project.deadline} · {deadlineDays === null ? text.deadlineUnknown : deadlineDays < 0 ? text.overdue(-deadlineDays) : text.onTime}</small>}
-                  {materials?.candidate && m.data && <details className="v2-project-material-detail" open={first}>
-                    <summary><ResourceStockIcon size={16} aria-hidden="true" />{text.requiredMaterials}<span>{text.materialKinds(Object.keys(materials.candidate.items).length)}</span></summary>
+                  {materials?.candidate && m.data && <details className="v2-project-material-detail">
+                    <summary><ResourceStockIcon size={16} aria-hidden="true" />{text.requiredMaterials}<span>{materials.allocation ? text.shortageKinds(Object.keys(materials.allocation.missing).length) : text.materialKinds(Object.keys(materials.candidate.items).length)}</span></summary>
                     <MaterialNeeds items={materials.candidate.items} data={m.data} />
                     {materials.allocation && Object.keys(materials.allocation.missing).length > 0 && <MaterialNeeds items={materials.allocation.missing} data={m.data} shortage />}
                   </details>}
@@ -131,11 +134,23 @@ function HistoryOption({ item }: { item: WorkspaceResultHistorySummary }) {
 }
 
 function GoalForm({ operators, projects, editing, busy, onSave, onCancel }: { operators: ProjectOperator[]; projects: CultivationProject[]; editing: CultivationProject | null; busy: boolean; onSave: (goal: CultivationProject) => void; onCancel: () => void }) {
-  const [search, setSearch] = useState('')
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [goal, setGoal] = useState<CultivationProject>(editing ?? { operatorId: '', elite: 2, level: 60, skill: 1, skillLevel: 7, paused: false, deadline: '' })
   const [error, setError] = useState(false)
   const operator = operators.find((row) => row.id === goal.operatorId)
-  const choices = operators.filter((row) => matchesSearch(row.name, search) && (!projects.some((project) => project.operatorId === row.id) || editing?.operatorId === row.id))
+  const choices = useMemo(() => {
+    const used = new Set(projects.map((project) => {
+      const row = operators.find((operator) => operator.id === project.operatorId)
+      return row?.baseId ?? project.operatorId
+    }))
+    const groups = new Map<string, ProjectOperator>()
+    for (const row of operators) {
+      const id = row.baseId ?? row.id
+      if (!used.has(id) && (!groups.has(id) || row.id === id)) groups.set(id, row)
+    }
+    return [...groups.values()]
+  }, [operators, projects])
+  const forms = operator ? operators.filter((row) => (row.baseId ?? row.id) === (operator.baseId ?? operator.id)) : []
   function choose(id: string) {
     const row = operators.find((row) => row.id === id)
     if (!row) return
@@ -144,7 +159,7 @@ function GoalForm({ operators, projects, editing, busy, onSave, onCancel }: { op
   }
   function submit(event: FormEvent) {
     event.preventDefault()
-    if (!operator || !isCultivationProject(goal) || goal.level > (operator.maxLevels[goal.elite] ?? 0) || !editing && (projects.length >= 30 || projects.some((row) => row.operatorId === goal.operatorId))) { setError(true); return }
+    if (!operator || !isCultivationProject(goal) || goal.level > (operator.maxLevels[goal.elite] ?? 0) || !editing && (projects.length >= 30 || projects.some((row) => forms.some((form) => form.id === row.operatorId)))) { setError(true); return }
     setError(false)
     onSave(goal)
     if (!editing) setGoal({ ...goal, operatorId: '' })
@@ -152,17 +167,25 @@ function GoalForm({ operators, projects, editing, busy, onSave, onCancel }: { op
   const select = (label: string, value: number, onChange: (value: number) => void, children: ReactNode) => <label className="v2-field"><span>{label}</span><select className="v2-input" value={value} onChange={(event) => onChange(Number(event.target.value))}>{children}</select></label>
   return <form className="v2-project-form" onSubmit={submit}>
     <h3><CultivationIcon size={20} aria-hidden="true" />{editing ? text.edit : text.add}</h3>
-    <div className="v2-project-form-picker">
-      {!editing && <Field label={text.search} value={search} onChange={(event) => setSearch(event.target.value)} />}
-      <label className="v2-field"><span>{text.operator}</span><select className="v2-input" value={goal.operatorId} disabled={Boolean(editing)} onChange={(event) => choose(event.target.value)}><option value="">{text.choose}</option>{choices.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
-    </div>
+    <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+      <button type="button" className="v2-project-choose" aria-label={text.operator} onClick={() => setPickerOpen(true)} disabled={Boolean(editing) || busy || projects.length >= 30}>
+        {operator ? <><Avatar key={operator.baseId ?? operator.id} operator={{ id: operator.baseId ?? operator.id, name: operator.name }} /><span><strong>{operator.name}</strong><small>★{operator.rarity} · {profession(operator)}</small></span>{!editing && <span className="v2-project-choose-action">{text.changeOperator}</span>}</> : <><Plus size={24} aria-hidden="true" /><span><strong>{text.operator}</strong><small>{text.pickerHint}</small></span><ArrowRight size={18} aria-hidden="true" /></>}
+      </button>
+      <DialogContent className="v2-dialog v2-project-picker" showCloseButton closeLabel={copy.v2.close}>
+        <div><DialogTitle>{text.operator}</DialogTitle><DialogDescription>{text.pickerHint}</DialogDescription></div>
+        <OperatorPicker operators={choices} selectedId={operator?.baseId ?? operator?.id} searchLabel={text.search}
+          onChoose={(row) => { choose(row.id); setPickerOpen(false) }}
+          details={(row) => <><strong>★{row.rarity} · {profession(row)}</strong><p>{text.elites[row.current.elite]} · Lv.{row.current.level}</p></>} />
+      </DialogContent>
+    </Dialog>
+    {operator && forms.length > 1 && <fieldset className="v2-project-forms"><legend>{text.form}</legend>{forms.map((row) => <label key={row.id}><input type="radio" name="operator-form" value={row.id} checked={goal.operatorId === row.id} disabled={Boolean(editing)} onChange={() => choose(row.id)} /><span>{profession(row)}</span></label>)}</fieldset>}
     {operator && <div className="v2-project-form-fields">
       {select(text.elite, goal.elite, (elite) => setGoal({ ...goal, elite, level: Math.min(goal.level, operator.maxLevels[elite]), skill: Math.min(goal.skill, elite + 1), skillLevel: Math.min(goal.skillLevel, elite === 2 ? 10 : elite === 1 ? 7 : 4) }), operator.maxLevels.map((_max, index) => <option key={index} value={index}>{text.elites[index]}</option>))}
       <Field label={text.level} type="number" min={1} max={operator.maxLevels[goal.elite]} value={goal.level} onChange={(event) => setGoal({ ...goal, level: Number(event.target.value) })} />
       {operator.skills.length > 0 && <>{select(text.skill, goal.skill, (skill) => setGoal({ ...goal, skill, elite: Math.max(goal.elite, skill - 1) }), operator.skills.map((_skill, index) => <option key={index} value={index + 1}>{text.skillName(index + 1)}</option>))}
       {select(text.skillLevel, goal.skillLevel, (skillLevel) => setGoal({ ...goal, skillLevel, elite: Math.max(goal.elite, skillLevel > 7 ? 2 : skillLevel > 4 ? 1 : 0) }), Array.from({ length: operator.maxLevels.length > 2 ? 10 : operator.maxLevels.length > 1 ? 7 : 4 }, (_, index) => <option key={index} value={index + 1}>{text.skillRank(index + 1)}</option>))}</>}
     </div>}
-    <Field label={text.deadline} type="date" value={goal.deadline} onChange={(event) => setGoal({ ...goal, deadline: event.target.value })} />
+    {operator && <Field label={text.deadline} type="date" value={goal.deadline} onChange={(event) => setGoal({ ...goal, deadline: event.target.value })} />}
     <Notice error>{error ? text.invalidTarget : null}</Notice>
     <div className="v2-actions"><button type="submit" className="v2-button v2-button-primary" disabled={busy || !operator || !editing && projects.length >= 30}>{editing ? <SaveIcon size={16} aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}{editing ? text.save : text.add}</button>{editing && <button type="button" className="v2-text-button" onClick={onCancel}>{text.cancel}</button>}</div>
     {projects.length >= 30 && !editing && <p className="v2-muted">{text.targetLimit}</p>}

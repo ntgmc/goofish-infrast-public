@@ -12,7 +12,7 @@ export type CultivationProject = {
   paused: boolean
   deadline: string
 }
-export type ProjectOperator = { id: string; name: string; rarity: number; skills: string[]; profession?: string; maxLevels: number[]; current: CultivationCurrent }
+export type ProjectOperator = { id: string; baseId?: string; name: string; rarity: number; skills: string[]; profession?: string; maxLevels: number[]; current: CultivationCurrent }
 export type ProjectIncome = { lmd: number; exp: number; goldNet: number | null }
 export type ProjectSettings = { startDate: string; dailySanity: number; days: number; allOpen: boolean }
 const dayMs = 86400000

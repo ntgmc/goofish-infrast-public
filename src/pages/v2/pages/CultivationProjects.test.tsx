@@ -27,6 +27,13 @@ const data = (projects: CultivationProject[] = []): CultivationData => ({
   inventory: {}, itemNames: { exp: '作战经验', '4001': '龙门币' }, prices: {}, recipes: {}, farms: {}, potions: [],
   stats: { homeworks: 0, owned: 1, missingOperators: 0, incomplete: 0 }, updatedAt: '2026-10-06T00:00:00Z', importedAt: '2026-10-06T00:00:00Z', pricingStatus: 'fresh', warnings: [],
 })
+async function chooseOperator(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: text.operator }))
+  await user.click(await within(screen.getByRole('dialog')).findByRole('button', { name: '测试干员' }))
+}
+async function openMaterials(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByText(text.requiredMaterials, { selector: 'summary' }))
+}
 function session(id = 'mine'): V2Session {
   return { user: { id: 'user1' }, authStatus: 'authenticated', authLoading: false, activeProfile: { id, display_name: id, status: 'active', skland_binding: {} },
     workspace: { profile_id: id, result_history: ['normal', 'temporary'].map((id) => ({ id, name: id, created_at: '2026-10-06T00:00:00Z', source: 'generated' })) },
@@ -47,17 +54,18 @@ it('turns a selected goal into an income-linked route and changes configuration 
   const current = session()
   render(<MemoryRouter><CultivationProjects session={current} onConfig={vi.fn()} /></MemoryRouter>)
   await user.click(screen.getByRole('button', { name: text.import }))
-  const picker = await screen.findByRole('combobox', { name: text.operator })
-  const search = screen.getByRole('textbox', { name: text.search })
+  await user.click(await screen.findByRole('button', { name: text.operator }))
+  const picker = within(screen.getByRole('dialog'))
+  const search = picker.getByRole('searchbox', { name: text.search })
   await user.type(search, 'CSGY')
-  expect(within(picker).getByRole('option', { name: '测试干员' })).toBeInTheDocument()
+  expect(await picker.findByRole('button', { name: '测试干员' })).toBeInTheDocument()
   await user.clear(search)
   await user.type(search, 'ceshi')
-  await user.selectOptions(picker, 'char_test')
+  await user.click(await picker.findByRole('button', { name: '测试干员' }))
   await user.click(screen.getByRole('button', { name: text.add }))
   await waitFor(() => expect(mocks.api).toHaveBeenCalledTimes(2))
   expect(mocks.refresh).toHaveBeenCalledTimes(1)
-  expect(screen.getByRole('combobox', { name: text.operator })).toHaveValue('')
+  expect(screen.getByRole('button', { name: text.operator })).toHaveTextContent(text.operator)
   expect(screen.getByRole('button', { name: text.add })).toBeDisabled()
   const budget = screen.getByRole('spinbutton', { name: text.dailySanity })
   await user.clear(budget)
@@ -74,6 +82,42 @@ it('turns a selected goal into an income-linked route and changes configuration 
   expect(screen.queryByRole('heading', { name: text.route })).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: text.resume }))
   expect(await screen.findByRole('heading', { name: text.route })).toBeInTheDocument()
+})
+
+it('groups Amiya forms into one choice and saves the selected profession without offering the same operator twice', async () => {
+  const user = userEvent.setup()
+  mocks.api.mockImplementation(async (_url, options) => {
+    const result = data(options.json.projects)
+    const base = { ...result.projectOperators![0], name: '阿米娅', rarity: 5, baseId: 'char_002_amiya' }
+    result.projectOperators = [
+      { ...base, id: 'char_1001_amiya2', profession: 'WARRIOR', skills: ['guard1', 'guard2'] },
+      { ...base, id: 'char_002_amiya', profession: 'CASTER', skills: ['caster1', 'caster2', 'caster3'] },
+      { ...base, id: 'char_1037_amiya3', profession: 'MEDIC', skills: ['medic1', 'medic2'] },
+      ...result.projectOperators!,
+    ]
+    return result
+  })
+  render(<MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /></MemoryRouter>)
+  await user.click(screen.getByRole('button', { name: text.import }))
+  await user.click(await screen.findByRole('button', { name: text.operator }))
+  const dialog = within(screen.getByRole('dialog'))
+  expect(await dialog.findAllByRole('button', { name: '阿米娅' })).toHaveLength(1)
+  await user.click(dialog.getByRole('button', { name: '阿米娅' }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(screen.getByRole('radio', { name: '术师' })).toBeChecked()
+  await user.click(screen.getByRole('radio', { name: '医疗' }))
+  await user.selectOptions(screen.getByRole('combobox', { name: text.skill }), '2')
+  await user.selectOptions(screen.getByRole('combobox', { name: text.skillLevel }), '10')
+  await user.click(screen.getByRole('button', { name: text.add }))
+  const goals = JSON.parse(localStorage.getItem('maatool:cultivation-projects:user1:mine')!)
+  expect(goals).toMatchObject([{ operatorId: 'char_1037_amiya3', skill: 2, skillLevel: 10 }])
+  await waitFor(() => expect(mocks.api).toHaveBeenLastCalledWith('/api/cultivation-plan', expect.objectContaining({ json: { profile_id: 'mine', projects: goals } })))
+  await user.click(screen.getByRole('button', { name: text.operator }))
+  const next = within(screen.getByRole('dialog'))
+  expect(await next.findByRole('button', { name: '测试干员' })).toBeVisible()
+  expect(next.queryByRole('button', { name: '阿米娅' })).not.toBeInTheDocument()
+  await user.keyboard('{Escape}')
+  expect(screen.getByRole('button', { name: text.operator })).toHaveFocus()
 })
 
 it('exports the latest active goals to the MAA clipboard even when production cannot be calculated', async () => {
@@ -106,7 +150,7 @@ it('keeps MAA output available for manual copying when the browser rejects clipb
   vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(new Error('clipboard denied'))
   render(<MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /></MemoryRouter>)
   await user.click(screen.getByRole('button', { name: text.import }))
-  await user.selectOptions(await screen.findByRole('combobox', { name: text.operator }), 'char_test')
+  await chooseOperator(user)
   await user.click(screen.getByRole('button', { name: text.add }))
   await user.click(screen.getByText(text.maaExport))
   await user.click(screen.getByRole('button', { name: text.maaCopy }))
@@ -128,8 +172,9 @@ it('calculates manual materials even when production fails, then includes crafti
   })
   render(<MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /></MemoryRouter>)
   await user.click(screen.getByRole('button', { name: text.import }))
-  await user.selectOptions(await screen.findByRole('combobox', { name: text.operator }), 'char_test')
+  await chooseOperator(user)
   await user.click(screen.getByRole('button', { name: text.add }))
+  await openMaterials(user)
   await screen.findByText('提纯源岩')
   const required = screen.getByRole('heading', { name: text.requiredMaterials }).closest('.v2-project-materials')! as HTMLElement
   expect(within(required).getByText(text.requiredAmount('2'))).toBeInTheDocument()
@@ -158,7 +203,7 @@ it('shows farming sources for materials and reserves income contributions for mo
   })
   render(<MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /></MemoryRouter>)
   await user.click(screen.getByRole('button', { name: text.import }))
-  await user.selectOptions(await screen.findByRole('combobox', { name: text.operator }), 'char_test')
+  await chooseOperator(user)
   await user.click(screen.getByRole('button', { name: text.add }))
   const section = (await screen.findByRole('heading', { name: text.resources })).parentElement!
   const material = within(section).getByRole('button', { name: text.viewMaterial('技巧概要') }).closest('li')!
@@ -175,8 +220,9 @@ it('recalculates the latest edited target after an in-flight calculation without
   const user = userEvent.setup()
   render(<MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /></MemoryRouter>)
   await user.click(screen.getByRole('button', { name: text.import }))
-  await user.selectOptions(await screen.findByRole('combobox', { name: text.operator }), 'char_test')
+  await chooseOperator(user)
   await user.click(screen.getByRole('button', { name: text.add }))
+  await openMaterials(user)
   await screen.findByRole('heading', { name: text.requiredMaterials })
   await user.click(screen.getByRole('button', { name: text.edit }))
   const level = screen.getByRole('spinbutton', { name: text.level })
@@ -195,6 +241,7 @@ it('recalculates the latest edited target after an in-flight calculation without
   const stale = { ...latest, level: 90 }
   await act(async () => finish(data([stale])))
   await waitFor(() => expect(mocks.api).toHaveBeenLastCalledWith('/api/cultivation-plan', expect.objectContaining({ json: { profile_id: 'mine', projects: [latest] } })))
+  await openMaterials(user)
   await screen.findByRole('heading', { name: text.requiredMaterials })
   expect(mocks.refresh).toHaveBeenCalledTimes(1)
 })
@@ -209,7 +256,7 @@ it('aborts the previous profile import and isolates saved goals when the account
   view.rerender(<MemoryRouter><CultivationProjects session={session('second')} onConfig={vi.fn()} /></MemoryRouter>)
   expect(signal?.aborted).toBe(true)
   await act(async () => finish(data()))
-  expect(screen.queryByRole('combobox', { name: text.operator })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: text.operator })).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: text.import })).toBeEnabled()
   expect(localStorage.getItem('maatool:cultivation-projects:user1:second')).toBeNull()
 })
@@ -223,7 +270,7 @@ it('imports a bundle from training suggestions into an already mounted project p
   ] }
   render(<MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /><UpgradeSuggestions suggestions={[suggestion]} projectScope={{ userId: 'user1', profileId: 'mine' }} /></MemoryRouter>)
   await user.click(screen.getByRole('button', { name: text.import }))
-  await screen.findByRole('combobox', { name: text.operator })
+  await screen.findByRole('button', { name: text.operator })
   await user.click(screen.getByRole('button', { name: text.importSuggestion }))
   expect(await screen.findByText(text.imported(1, 1))).toBeInTheDocument()
   expect(screen.getByRole('link', { name: text.openProjects })).toHaveAttribute('href', '/v2?section=cultivation-projects&profile_id=mine')
