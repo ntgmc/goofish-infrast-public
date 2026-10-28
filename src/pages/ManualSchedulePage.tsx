@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
-import FacilityLayoutEditor from '../components/FacilityLayoutEditor'
+import ManualBlankScheduleSetup from '../components/ManualBlankScheduleSetup'
 import OperatorSkillPreview from '../components/result-panel/OperatorSkillPreview'
 import { OperatorAvatarTile } from '../components/result-panel/OperatorAvatarStrip'
 import ManualScheduleEditor from '../components/result-panel/ManualScheduleEditor'
@@ -182,26 +182,6 @@ function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpe
                 <button type="button" className="tool-primary-action" disabled={!enabled} onClick={() => upload.current?.click()}>{label.import}</button>
                 <p className="text-xs leading-5 text-ink-muted">{label.importHint}</p>
               </div>
-              <details className="tool-inset p-4">
-                <summary className="cursor-pointer text-sm font-medium">{label.blankSettings}</summary>
-                <p className="my-3 text-xs leading-5 text-ink-muted">{label.configHint}</p>
-                <div className="space-y-4">
-                  <label className="block space-y-2 text-sm">
-                    <span>{label.layout}</span>
-                    <select className="tool-field" value={preset} disabled={!enabled} onChange={(event) => { setPreset(event.target.value); setConfigDraft(null) }}>
-                      <option value="">{label.currentLayout}</option>
-                      {Object.entries(CONFIG_PRESETS).map(([key, config]) => <option key={key} value={key}>{config.desc}</option>)}
-                    </select>
-                  </label>
-                  {ready && baseConfig.layout === '2-5-2' && <FacilityLayoutEditor
-                    key={`${profile.id}:${preset}`} config={baseConfig} onUpdate={(mutate) => {
-                      const next = structuredClone(baseConfig)
-                      mutate(next)
-                      setConfigDraft(next)
-                    }} />}
-                  <button type="button" className="tool-secondary-action" disabled={!enabled} onClick={start}>{label.start}</button>
-                </div>
-              </details>
               <label className="block space-y-2 text-sm">
                 <span>{label.shiftHours}</span>
                 <input className="tool-field sm:max-w-64" value={configuredHours} disabled={!enabled} onChange={(event) => setShiftHours(event.target.value)} />
@@ -224,6 +204,9 @@ function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpe
           {draft && <p className="text-sm text-warning">{label.replace}</p>}
           </div>
         </section>
+        {profile && <ManualBlankScheduleSetup key={profile.id} config={baseConfig} preset={preset} enabled={enabled}
+          onPresetChange={(preset) => { setPreset(preset); setConfigDraft(null) }}
+          onUpdate={(mutate) => { const next = structuredClone(baseConfig); mutate(next); setConfigDraft(next) }} onStart={start} />}
         {canUse && draft?.profileId === profile?.id && draft && (
           <ManualScheduleEditor key={`${draft.profileId}:${draft.revision}`} source={draft.source}
             profileId={draft.profileId} draftStorageKey={`tool:${draft.profileId}`}

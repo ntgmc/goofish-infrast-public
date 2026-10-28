@@ -1,12 +1,11 @@
 import { ComparisonIcon, NextIcon as ArrowRight, TrainingRatioIcon as Calculator, ProjectsIcon, CultivationIcon, ManualScheduleIcon as CalendarClock, DepotValueIcon as Gem } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
-import { CONFIG_PRESETS } from '../../../lib/config'
 import type { V2Session } from '../OptionsDrawer'
 import { v2Path } from '../navigation'
 import Link from '../../../components/InternalLink'
 import ManualScheduleEditor from '../../../components/result-panel/ManualScheduleEditor'
-import FacilityLayoutEditor from '../../../components/FacilityLayoutEditor'
+import ManualBlankScheduleSetup from '../../../components/ManualBlankScheduleSetup'
 import OperatorSkillPreview from '../../../components/result-panel/OperatorSkillPreview'
 import { OperatorAvatarTile } from '../../../components/result-panel/OperatorAvatarStrip'
 import { useManualTool } from '../../ManualSchedulePage'
@@ -42,16 +41,13 @@ export function ManualTool({ session, onDirtyChange, onOpenProfile }: { session:
       <section><span className="v2-step-number">02</span><SectionTitle title={text.prepareSchedule} description={text.importHint} />
         <div className="v2-actions"><button className="v2-button v2-button-primary" disabled={!m.enabled} onClick={() => m.upload.current?.click()}>{text.import}<ArrowRight size={16} /></button></div>
         <input ref={m.upload} type="file" accept=".json,application/json" hidden aria-label={text.import} disabled={!m.enabled} onChange={(event) => void m.importSchedule(event.target.files?.[0])} />
-        <details className="v2-disclosure">
-          <summary>{text.blankSettings}</summary><p>{text.configHint}</p>
-          <label className="v2-field"><span>{text.layout}</span><select className="v2-input" value={m.preset} disabled={!m.enabled} onChange={(event) => { m.setPreset(event.target.value); m.setConfigDraft(null) }}><option value="">{text.currentLayout}</option>{Object.entries(CONFIG_PRESETS).map(([key, config]) => <option key={key} value={key}>{config.desc}</option>)}</select></label>
-          {m.ready && m.profile && m.baseConfig.layout === '2-5-2' && <FacilityLayoutEditor key={`${m.profile.id}:${m.preset}`} config={m.baseConfig} onUpdate={(mutate) => { const next = structuredClone(m.baseConfig); mutate(next); m.setConfigDraft(next) }} />}
-          <button className="v2-button v2-button-secondary" disabled={!m.enabled} onClick={m.start}>{text.start}<ArrowRight size={16} /></button>
-        </details>
         <Field label={text.shiftHours} help={text.shiftHint} value={m.configuredHours} disabled={!m.enabled} onChange={(event) => m.setShiftHours(event.target.value)} />
         {m.draft && <Notice>{text.replace}</Notice>}
       </section>
     </div>
+    <ManualBlankScheduleSetup key={m.profile?.id} config={m.baseConfig} preset={m.preset} enabled={m.enabled}
+      onPresetChange={(preset) => { m.setPreset(preset); m.setConfigDraft(null) }}
+      onUpdate={(mutate) => { const next = structuredClone(m.baseConfig); mutate(next); m.setConfigDraft(next) }} onStart={m.start} />
     <Notice error>{m.error ?? session.workspaceLoadError}{session.workspaceLoadError && m.profile && <button className="v2-text-button" disabled={Boolean(session.openingProfileId)} onClick={() => void session.refreshProfileWorkspace(m.profile!).catch(() => undefined)}>{text.retryWorkspace}</button>}</Notice>
     {m.canUse && m.draft && m.draft.profileId === m.profile?.id && <div className="v2-manual-editor"><ManualScheduleEditor key={`${m.draft.profileId}:${m.draft.revision}`} source={m.draft.source} profileId={m.draft.profileId} draftStorageKey={`tool:${m.draft.profileId}`} operators={m.operators} simulationBaseline={{ config: m.draft.config }} onDirtyChange={onDirtyChange} /></div>}
   </div>
