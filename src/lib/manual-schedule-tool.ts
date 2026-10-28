@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { isFiammettaShiftHoursSupported, isValidShiftHours, normalizeConfig, validateScheduleConfig } from './config'
-import { facilityLayoutSchema } from './facility-layout'
+import { FACILITY_IDS, facilityLayoutSchema } from './facility-layout'
 import { createManualPlans, roomCapacity, validateManualPlans } from './manual-schedule'
 import { hasCapability } from './product-catalog'
 import { copy } from '../copy/index'
@@ -105,24 +105,9 @@ export function parseManualScheduleJson(text: string, config: LicenseConfig, ope
   source.total_schedule_hours = source.shift_hours.reduce((total, hour) => total + hour, 0)
   source.schedule_mode ??= 'maa'
   source.dormitory_rule ??= source.plans.some((plan) => plan.rooms.dormitory?.some((room) => room.autofill)) ? 'maa_pure_autofill' : 'fixed'
-  const requiresFacilityLayout = source.plans[0].rooms.trading?.length === 2 && source.plans[0].rooms.manufacture?.length === 5
-  const layout = !source.facility_layout && config.layout === '2-5-2' && requiresFacilityLayout
-    ? facilityLayoutSchema.safeParse(config.facility_layout) : null
-  if (layout?.success) {
-    // MAA arrays follow game positions; restore facility IDs before applying configured levels.
-    source.facility_layout = layout.data
-    for (const plan of source.plans) {
-      for (const type of ['trading', 'manufacture', 'power']) {
-        const indexes = layout.data.filter((id) => id.startsWith(`${type}_`)).map((id) => Number(id.split('_')[1]) - 1)
-        const rooms = plan.rooms[type]
-        if (!rooms || rooms.length !== indexes.length) throw new Error(copy.tools.manualSchedule.importLayoutMismatch)
-        plan.rooms[type] = rooms.map((_, index) => rooms[indexes.indexOf(index)])
-        if (plan.drones?.room === type && indexes[plan.drones.index - 1] !== undefined) {
-          plan.drones.index = indexes[plan.drones.index - 1] + 1
-        }
-      }
-    }
-  }
+  const is252 = source.plans[0].rooms.trading?.length === 2 && source.plans[0].rooms.manufacture?.length === 5
+  // MAA room arrays and drone indexes already follow the same order within each facility type.
+  if (is252) source.facility_layout ??= [...FACILITY_IDS]
   const matchingLayout = source.plans[0].rooms.trading?.length === config.trading_stations_count &&
     source.plans[0].rooms.manufacture?.length === config.manufacturing_stations_count
   for (const plan of source.plans) {
@@ -134,7 +119,13 @@ export function parseManualScheduleJson(text: string, config: LicenseConfig, ope
         .flatMap(([product, count]) => Array<string>(count).fill(product))
       rooms.forEach((room, index) => {
         if (type === 'trading' || type === 'manufacture') {
-          if ((room.product === undefined || (requiresFacilityLayout && room.level === undefined)) && rooms.length !== expectedCount) throw new Error(copy.tools.manualSchedule.importLayoutMismatch)
+          if (room.product === undefined && rooms.length !== expectedCount) throw new Error(copy.tools.manualSchedule.importLayoutMismatch)
+          if (is252 && room.level === undefined) {
+            const entries = source.plans.map((plan) => plan.rooms[type]?.[index])
+            room.level = entries.find((entry) => entry?.level !== undefined)?.level ??
+              Math.max(1, ...entries.map((entry) => entry?.operators?.filter(Boolean).length ?? 0))
+            room.operators = room.operators?.filter(Boolean)
+          }
           room.level ??= (matchingLayout ? levels?.[index] : undefined) ?? 3
           room.product ??= products[index]
         } else room.level ??= type === 'control' || type === 'dormitory' ? 5 : 3

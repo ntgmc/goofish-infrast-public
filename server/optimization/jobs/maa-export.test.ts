@@ -189,7 +189,7 @@ describe('buildMaaExportPayload', () => {
     expect(input).toEqual(original);
   });
 
-  it('round-trips game facility order and drone targets through MAA and full result imports', () => {
+  it('round-trips facility order, inferred levels and drone targets without borrowing the current layout', () => {
     const config = { ...normalizeConfig(CONFIG_PRESETS['252-1']), facility_layout: [
       'manufacture_2', 'trading_2', 'manufacture_4', 'manufacture_5', 'power_2',
       'trading_1', 'manufacture_1', 'power_1', 'manufacture_3',
@@ -210,13 +210,24 @@ describe('buildMaaExportPayload', () => {
     const exported = buildMaaExportPayload(input);
     expect(exported.plans[0].rooms.manufacture?.map((room) => room.operators.length)).toEqual([2, 2, 2, 3, 3]);
     expect(exported.plans.map((plan) => plan.drones?.index)).toEqual([4, 2, 2]);
-    for (const value of [input, exported]) {
-      const imported = parseManualScheduleJson(JSON.stringify(value), config, operators);
-      expect(imported.facility_layout).toEqual(input.facility_layout);
+    const complete = parseManualScheduleJson(JSON.stringify(input), config, operators);
+    expect(complete.facility_layout).toEqual(input.facility_layout);
+    for (const type of ['trading', 'manufacture', 'power']) {
+      expect(complete.plans.map((plan) => plan.rooms[type])).toMatchObject(input.plans.map((plan) => plan.rooms[type]));
+    }
+    expect(complete.plans.map((plan) => plan.drones)).toEqual(input.plans.map((plan) => plan.drones));
+    expect(buildMaaExportPayload(complete)).toEqual({ ...exported, schedule_source: 'manual' });
+    for (const preset of [config, normalizeConfig(CONFIG_PRESETS['243'])]) {
+      const imported = parseManualScheduleJson(JSON.stringify(exported), preset, operators);
+      expect(imported.facility_layout).toEqual(FACILITY_IDS);
+      expect(imported.plans[0].rooms.trading.map((room) => room.level)).toEqual([2, 3]);
+      expect(imported.plans[0].rooms.manufacture.map((room) => room.level)).toEqual([2, 2, 2, 3, 3]);
       for (const type of ['trading', 'manufacture', 'power']) {
-        expect(imported.plans.map((plan) => plan.rooms[type])).toMatchObject(input.plans.map((plan) => plan.rooms[type]));
+        expect(imported.plans.map((plan) => plan.rooms[type].map((room) => room.operators))).toEqual(
+          exported.plans.map((plan) => plan.rooms[type]?.map((room) => room.operators)),
+        );
       }
-      expect(imported.plans.map((plan) => plan.drones)).toEqual(input.plans.map((plan) => plan.drones));
+      expect(imported.plans.map((plan) => plan.drones)).toEqual(exported.plans.map((plan) => plan.drones));
       expect(imported.plans[2].Fiammetta).toEqual(input.plans[2].Fiammetta);
       expect(buildMaaExportPayload(imported)).toEqual({ ...exported, schedule_source: 'manual' });
     }

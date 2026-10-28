@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { copy } from '../../../copy'
 import { CONFIG_PRESETS, normalizeConfig } from '../../../lib/config'
+import { FACILITY_IDS } from '../../../lib/facility-layout'
 import { createBlankManualSchedule } from '../../../lib/manual-schedule-tool'
 import type { LicenseOperator, UserGameAccount, UserWorkspace, WorkspaceResultHistoryItem } from '../../../lib/types'
 import type { V2Session } from '../OptionsDrawer'
@@ -130,11 +131,12 @@ it('uses configurable fallback hours for MAA JSON and preserves each table’s o
   expect(mocks.submit.mock.calls[1][0].manualSchedule.source.shift_hours).toEqual([8, 8, 8])
 })
 
-it('imports a 243 MAA table under a 252 profile and submits its own facility configuration', async () => {
+it.each(['243', '252'])('imports a %s MAA table without configuring positions and submits its own facilities', async (preset) => {
   const user = userEvent.setup()
   const value = session()
   value.workspace!.config = normalizeConfig(CONFIG_PRESETS['252'])
-  const source = record('A').result
+  const source = preset === '243' ? record('A').result
+    : createBlankManualSchedule({ ...normalizeConfig(CONFIG_PRESETS[preset]), facility_layout: [...FACILITY_IDS] })
   source.plans[0].rooms.trading[1].operators = ['芬', '香草', '克洛丝']
   source.plans[0].rooms.manufacture[0].operators = []
   const maa = { title: source.title, plans: source.plans.map(({ rooms, ...plan }) => ({
@@ -150,7 +152,7 @@ it('imports a 243 MAA table under a 252 profile and submits its own facility con
   await user.click(start)
   await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(2))
   const request = mocks.submit.mock.calls[0][0]
-  expect(request.manualSchedule.source.buildingType).toBe(243)
+  expect(request.manualSchedule.source.buildingType).toBe(Number(preset))
   expect(request.manualSchedule.source.plans[0].rooms.trading[1]).toEqual({
     level: 3, product: 'LMD', operators: ['芬', '香草', '克洛丝'],
   })
