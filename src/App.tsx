@@ -118,7 +118,7 @@ function AppContent() {
         <Route path="/admin/*" element={<LazyPage fallback={copy.common.App_011}><AdminPage /></LazyPage>} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
-      <DeploymentUpdatePrompt />
+      {import.meta.env.PROD && <DeploymentUpdatePrompt />}
       <MobileBrowserPrompt />
       {location.pathname !== '/' && location.pathname !== '/v2' && <BuildMetaStrip placement="corner" />}
     </div>
