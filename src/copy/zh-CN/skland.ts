@@ -34,7 +34,7 @@ export const sklandCopy = {
   lmd: '龙门币', exp: '作战经验', search: '搜索道具名称', noItems: '没有匹配的物品。',
   itemCount: (count: number) => `${count} 种物品`,
   roomTypes: { control: '控制中枢', trading: '贸易站', manufacture: '制造站', power: '发电站', dormitory: '宿舍', meeting: '会客室', hire: '人力办公室', training: '训练室' },
-  stock: '待收取', capacity: '容量', completion: '预计完成', morale: '心情', noResidents: '当前无人进驻',
+  stock: '待收取', capacity: '容量', completion: '预计完成', morale: '心情', moraleUnavailable: '暂无数据', noResidents: '当前无人进驻',
   comfort: '氛围', clues: '线索收集', clueBoard: '已放置线索', clueOwned: '自有线索', clueReceived: '收到线索',
   sharing: '线索交流中', notSharing: '未开启交流', training: '技能训练', trainee: '受训干员', trainer: '协助干员',
   remaining: '预计剩余', minutes: (minutes: number) => `${minutes} 分钟`,
@@ -47,4 +47,6 @@ export const sklandCopy = {
   configUnknownProduct: '部分房间的生产类型暂不支持或尚未设置，请在游戏内调整后重试，或手动配置。',
   configWarning: (time: string) => `本次未获取到新数据，已使用 ${time} 的基建配置。`,
   configure: '修改基建配置', productionRooms: '生产设施地图',
+  doctorProfile: '博士档案', progress: '任务与行动进度', recovery: '预计回满',
+  supportRooms: '辅助设施', residents: '进驻干员',
 } as const

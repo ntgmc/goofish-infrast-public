@@ -7,15 +7,11 @@ import { Tabs } from '../../../components/ui/tabs'
 import { useSklandSnapshot } from '../../../hooks/useSklandSnapshot'
 import { sklandResourceState } from '../../../lib/skland-snapshot'
 import SklandBackpack from './SklandBackpack'
-import { SKLAND_PRODUCTION_SLOTS } from '../../../lib/facility-layout'
-import type { SklandGame, SklandRoom } from '../../../lib/skland-game'
+import { SklandOverview, SklandInfrastructure } from './SklandGamePanels'
 import type { V2Session } from '../OptionsDrawer'
-import { Facts, Notice } from '../components/WorkspaceUI'
+import { Notice } from '../components/WorkspaceUI'
 
 const text = copy.skland
-const number = (value: number | null | undefined) => value == null ? text.unavailable : value.toLocaleString('zh-CN')
-const date = (value: number | null | undefined) => value ? new Date(value * 1000).toLocaleString('zh-CN') : text.unavailable
-const ratio = (value: { current: number; max?: number; total?: number } | null | undefined) => value ? `${number(value.current)} / ${number(value.max ?? value.total)}` : text.unavailable
 
 export default function Skland({ session, onOpenProfile, onProfiles, onConfig }: {
   session: V2Session
@@ -41,7 +37,7 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
   const rebind = !profile?.skland_binding || profile.skland_binding.credential_status === 'invalid'
   return <div className="space-y-5">
     <section className="v2-panel p-5 sm:p-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="skland-account-controls flex flex-wrap items-end justify-between gap-4">
         {profiles.length > 0 ? <label className="v2-field min-w-0 w-full sm:w-auto sm:flex-1 sm:max-w-sm"><span>{text.profile}</span>
           <select className="v2-input" value={profile?.id ?? ''} disabled={Boolean(session.openingProfileId)} onChange={(event) => {
             const next = profiles.find((entry) => entry.id === event.currentTarget.value)
@@ -67,14 +63,14 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
           className="min-h-11 flex-1 border-b-2 border-transparent px-3 py-3 text-sm font-medium text-ink-secondary data-[state=active]:border-brand-500 data-[state=active]:text-ink-primary focus-visible:outline-2 focus-visible:outline-brand-500 sm:flex-none sm:px-6">{text[entry]}</Tabs.Trigger>)}
       </Tabs.List>
       <Tabs.Content value="overview" className="space-y-5">
-        {game ? <Overview game={game} lmd={data.inventory.lmd} exp={data.inventory.exp} /> : <Notice>{text.noGame}</Notice>}
+        {game ? <SklandOverview game={game} lmd={data.inventory.lmd} exp={data.inventory.exp} /> : <Notice>{text.noGame}</Notice>}
         <DataTime value={data.game.fetchedAt} />
       </Tabs.Content>
       <Tabs.Content value="backpack" className="space-y-5"><SklandBackpack items={['fresh', 'stale'].includes(sklandResourceState(data.inventory.fetchedAt)) ? data.inventory.items : null} names={data.inventory.itemNames ?? {}} userId={session.user!.id} uid={data.uid} />
         <DataTime value={data.inventory.fetchedAt} />
       </Tabs.Content>
       <Tabs.Content value="infrastructure" className="space-y-5">
-        {game?.building ? <Infrastructure building={game.building} /> : <Notice>{text.noBuilding}</Notice>}
+        {game?.building ? <SklandInfrastructure building={game.building} /> : <Notice>{text.noBuilding}</Notice>}
         <DataTime value={data.game.fetchedAt} />
       </Tabs.Content>
     </Tabs.Root>}
@@ -85,52 +81,4 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
 
 function DataTime({ value }: { value: string | null }) {
   return value ? <p className="text-sm text-ink-muted">{text.updated(new Date(value).toLocaleString('zh-CN'))}</p> : null
-}
-
-function Overview({ game, lmd, exp }: { game: SklandGame; lmd: number | null; exp: number | null }) {
-  const player = game.player
-  return <>
-    <section className="v2-panel p-5 sm:p-6">
-      <h2 className="mb-4 text-lg font-semibold">{player.name ?? text.name}{player.level != null && <span className="ml-3 text-sm font-normal text-ink-secondary">Lv.{player.level}</span>}</h2>
-      <Facts items={[[text.sanity, ratio(player.sanity)], [text.drones, ratio(game.building?.drones)], [text.lmd, number(lmd)], [text.exp, number(exp)],
-        [text.tired, number(game.building?.tired)], [text.operators, number(player.operators)], [text.skins, number(player.skins)], [text.furniture, number(player.furniture)],
-        [text.mainStage, player.mainStage ?? text.unavailable], [text.lastOnline, date(player.lastOnline)],
-        [text.daily, ratio(game.routine.daily)], [text.weekly, ratio(game.routine.weekly)], [text.campaign, ratio(game.campaign)],
-        [text.towerHigher, ratio(game.tower?.higher)], [text.towerLower, ratio(game.tower?.lower)]]} />
-      {player.dataAt && <p className="mt-4 text-sm text-ink-muted">{text.sourceTime(date(player.dataAt))}</p>}
-    </section>
-    <section className="v2-panel p-5 sm:p-6"><h2 className="mb-4 text-base font-semibold">{text.recruitment}</h2>
-      {game.recruit ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{game.recruit.map((slot, index) => <div key={index} className="tool-inset p-4">
-        <h3 className="text-sm text-ink-secondary">{text.recruitSlot(index)}</h3><p className="mt-2 font-semibold">{text.recruitStates[slot.state === 2 && slot.finishAt && game.currentTs && slot.finishAt <= game.currentTs ? 3 : slot.state] ?? text.unavailable}</p>
-        {slot.finishAt != null && slot.finishAt > 0 && <p className="mt-2 text-sm text-ink-secondary">{text.completion} {date(slot.finishAt)}</p>}
-      </div>)}</div> : <p className="text-sm text-ink-secondary">{text.unavailable}</p>}
-    </section>
-  </>
-}
-
-function Infrastructure({ building }: { building: NonNullable<SklandGame['building']> }) {
-  return <>
-    <section className="v2-panel p-5 sm:p-6"><Facts items={[[text.drones, ratio(building.drones)], [text.tired, number(building.tired)]]} /></section>
-    <section aria-label={text.productionRooms} className="grid gap-4 xl:grid-cols-3">{building.rooms.filter((room) => ['trading', 'manufacture', 'power'].includes(room.type))
-      .sort((left, right) => SKLAND_PRODUCTION_SLOTS.indexOf(left.id) - SKLAND_PRODUCTION_SLOTS.indexOf(right.id)).map((room) => <Room key={room.id} room={room} />)}</section>
-    <div className="grid gap-4 lg:grid-cols-2">{building.rooms.filter((room) => !['trading', 'manufacture', 'power'].includes(room.type)).map((room) => <Room key={room.id} room={room} />)}</div>
-    <div className="grid gap-4 lg:grid-cols-2">
-      {building.clues && <section className="v2-panel p-5 sm:p-6"><h2 className="mb-4 font-semibold">{text.clues}</h2><Facts items={[[text.clueBoard, building.clues.board == null ? text.unavailable : `${number(building.clues.board)} / 7`], [text.clueOwned, number(building.clues.owned)], [text.clueReceived, number(building.clues.received)]]} />
-        <p className="mt-4 text-sm text-ink-secondary">{building.clues.sharing == null ? text.unavailable : building.clues.sharing ? `${text.sharing} · ${date(building.clues.shareCompleteAt)}` : text.notSharing}</p>
-      </section>}
-      {building.training && <section className="v2-panel p-5 sm:p-6"><h2 className="mb-4 font-semibold">{text.training}</h2><Facts items={[[text.trainee, building.training.trainee ?? text.noResidents], [text.trainer, building.training.trainer ?? text.noResidents],
-        [text.remaining, building.training.remaining == null ? text.unavailable : text.minutes(Math.ceil(building.training.remaining / 60))]]} /></section>}
-    </div>
-  </>
-}
-
-function Room({ room }: { room: SklandRoom }) {
-  const position = SKLAND_PRODUCTION_SLOTS.indexOf(room.id)
-  return <section className="v2-panel min-w-0 p-5 sm:p-6">
-    <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">{text.roomTypes[room.type]} <span className="ml-1 text-sm font-normal text-ink-secondary">Lv.{room.level}</span></h2>{position >= 0 && <span className="text-xs text-ink-muted">B{Math.floor(position / 3) + 1} · {copy.common.facilityLayoutColumns[position % 3]}</span>}</div>
-    {(room.type === 'manufacture' || room.type === 'trading') && <div className="mt-4"><Facts items={[[room.product ?? text.unavailable, `${text.stock} ${number(room.stock)} / ${number(room.capacity)}`], [text.completion, date(room.completeAt)]]} /></div>}
-    {room.comfort != null && <p className="mt-3 text-sm text-ink-secondary">{text.comfort} {number(room.comfort)}</p>}
-    {room.operators.length ? <ul className="mt-4 flex flex-wrap gap-2">{room.operators.map((operator) => <li key={operator.id} className="tool-inset px-3 py-2 text-sm"><span className="font-medium">{operator.name}</span><span className="ml-2 text-ink-secondary">{text.morale} {operator.morale == null ? text.unavailable : `${Math.round(operator.morale * 10) / 10} / 24`}</span></li>)}</ul>
-      : <p className="mt-4 text-sm text-ink-secondary">{text.noResidents}</p>}
-  </section>
 }
