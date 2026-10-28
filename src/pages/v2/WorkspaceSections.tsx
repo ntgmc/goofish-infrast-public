@@ -29,6 +29,7 @@ const ThanksRecruitment = lazy(() => import('../ThanksRecruitmentPage'))
 const CultivationProjects = lazy(() => import('./pages/CultivationProjects'))
 const TrainingRatio = lazy(() => import('../TrainingRatioPage'))
 const Depot = lazy(() => import('./pages/Depot'))
+const Skland = lazy(() => import('./pages/Skland'))
 const Plans = lazy(() => import('./pages/History'))
 const Generation = lazy(() => import('./pages/Generation'))
 const Lab = lazy(() => import('./pages/Comparison'))
@@ -46,7 +47,7 @@ const descriptions: Partial<Record<V2Section, string>> = {
   generation: copy.v2.generationDescription, plans: copy.v2.plansDescription,
   tools: copy.v2.toolsDescription, profiles: copy.v2.profilesDescription,
   'add-account': copy.v2.addAccountDescription, settings: copy.v2.settingsDescription,
-  inventory: copy.v2.inventoryDescription,
+  inventory: copy.v2.inventoryDescription, skland: copy.skland.description,
 }
 const publicSections: V2Section[] = ['tools', 'depot', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'settings', ...V2_PUBLIC_SECTIONS]
 const workflowSections: V2Section[] = ['generation', 'plans', 'lab']
@@ -103,6 +104,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
                 </>}
                 {section === 'settings' && (signedIn ? <Settings session={session} /> : <AnimationSettings className="v2-guest-settings" />)}
                 {section === 'announcements' && <Announcements session={session} />}
+                {section === 'skland' && <Skland key={session.activeProfile?.id} session={session} onOpenProfile={onOpenProfile} onProfiles={() => onNavigate('profiles')} onConfig={onConfig} />}
                 {section === 'inventory' && <Inventory session={session} onProfiles={() => onNavigate('profiles')} />}
                 {section === 'balance' && <Balance userId={session.user!.id} activeProfileId={session.activeProfile?.id ?? null} redemptionEnabled={features.cdk_redemption} />}
                 {section === 'commercial' && <Commercial userId={session.user!.id} activeProfileId={session.activeProfile?.id ?? null} onOpen={onOpenProfile} />}

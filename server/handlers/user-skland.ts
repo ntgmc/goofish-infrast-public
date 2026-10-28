@@ -68,7 +68,7 @@ import {
 } from './skland-client'
 import { buildAuthPayload, jsonResponse, requireUserSession, scheduleInvitationSettlement } from './user-auth'
 import { getSklandSnapshot, seedSklandSnapshot, SklandSnapshotError } from '../skland-snapshot'
-import { readSklandFacilityRooms } from './skland-facilities'
+import { readSklandFacilityConfig, readSklandFacilityRooms } from './skland-facilities'
 import { sklandResourceState } from '../../src/lib/skland-snapshot'
 import { recordUsageEvent } from './usage-stats'
 import type { UsageReasonCode } from '../storage/usage-store'
@@ -426,9 +426,14 @@ export default async (req: Request): Promise<Response> => {
       if (!binding?.encrypted_cred || !binding.uid) {
         return jsonResponse({ error: '请先为当前档案绑定森空岛账号。', code: 'skland_not_bound' }, 400)
       }
-      const snapshot = await getSklandSnapshot(profile, ['game'])
+      const snapshot = await getSklandSnapshot(profile, ['game'], { force: true, wait: true })
       const rooms = readSklandFacilityRooms(snapshot.game!.data)
-      return jsonResponse({ rooms }, 200, { 'Cache-Control': 'no-store' })
+      let configuration: ReturnType<typeof readSklandFacilityConfig> | null = null
+      let configuration_error: string | null = null
+      try { configuration = readSklandFacilityConfig(snapshot.game!.data) }
+      catch (error) { configuration_error = error instanceof Error ? error.message : '无法读取基建配置。' }
+      return jsonResponse({ rooms, configuration, configuration_error, fetched_at: snapshot.game!.fetchedAt,
+        refresh_warning: snapshot.errors.game ?? null }, 200, { 'Cache-Control': 'no-store' })
     }
 
     if (pathname.endsWith('/import/refresh')) {

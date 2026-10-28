@@ -9,11 +9,11 @@ import { sectionLabels, v2Path, v2SectionAvailable, type V2Section } from './nav
 
 const text = copy.v2
 const workspaceEntries = ['overview', 'generation', 'plans', 'lab', 'cultivation-projects', 'tools'] as const
-const personalEntries = ['profiles', 'inventory', 'commercial', 'balance', 'announcements', 'settings'] as const
+const personalEntries = ['profiles', 'skland', 'inventory', 'commercial', 'balance', 'announcements', 'settings'] as const
 const guestPersonalEntries = ['plans', 'lab', 'profiles', 'inventory', 'commercial', 'balance'] as const
 const icons = {
   overview: OverviewIcon, generation: GenerateIcon, plans: ResultHistoryIcon, lab: ComparisonIcon, 'cultivation-projects': ProjectsIcon, tools: ToolsIcon,
-  profiles: AccountsIcon, inventory: InventoryIcon, commercial: BillingIcon, balance: BalanceIcon, announcements: AnnouncementIcon, settings: SettingsIcon,
+  skland: OverviewIcon, profiles: AccountsIcon, inventory: InventoryIcon, commercial: BillingIcon, balance: BalanceIcon, announcements: AnnouncementIcon, settings: SettingsIcon,
   pricing: PricingIcon, help: HelpIcon, support: SupportIcon, status: ServiceStatusIcon, updates: ReleasesIcon,
 }
 

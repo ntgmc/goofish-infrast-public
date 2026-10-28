@@ -144,6 +144,29 @@ function connect() {
   return workflow
 }
 
+it('opens the Skland data page with partial game data and keeps unsupported resources unavailable', async () => {
+  connect()
+  session.activeProfile!.skland_binding = { uid: 'skland-uid', credential_status: 'available' } as NonNullable<UserGameAccount['skland_binding']>
+  const fetchedAt = new Date().toISOString()
+  const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => Response.json(String(url).includes('/skland/snapshot') ? {
+    uid: 'skland-uid', version: 'skland-page-test', retryAt: null,
+    game: { fetchedAt, state: 'fresh', error: null, data: { currentTs: 0,
+      player: { name: '测试博士', level: 120, mainStage: null, dataAt: null, lastOnline: null, operators: 200, skins: 0, furniture: null, sanity: { current: 0, max: 135 } },
+      routine: { daily: null, weekly: null }, recruit: null, building: null } },
+    inventory: { fetchedAt: null, state: 'unavailable', items: null, lmd: null, exp: null, error: '背包读取失败' },
+  } : { notifications: [], unread_count: 0, next_cursor: null }))
+  const user = userEvent.setup()
+  mount('/v2?section=skland&profile_id=profile-1')
+  await screen.findByRole('heading', { name: /测试博士/ })
+  expect(screen.getByRole('tab', { name: copy.skland.overview })).toHaveAttribute('aria-selected', 'true')
+  expect(screen.getByText('0 / 135')).toBeInTheDocument()
+  expect(fetch.mock.calls.some(([url, init]) => url === '/api/user/skland/snapshot/refresh' && init?.method === 'POST')).toBe(true)
+  await user.click(screen.getByRole('tab', { name: copy.skland.backpack }))
+  expect(await screen.findByText(copy.skland.noInventory)).toBeVisible()
+  await user.click(screen.getByRole('tab', { name: copy.skland.infrastructure }))
+  expect(await screen.findByText(copy.skland.noBuilding)).toBeVisible()
+})
+
 describe('V2 results-first workspace', () => {
   it('continues from the homepage through login and account setup to generation without submitting early', async () => {
     const guest = session

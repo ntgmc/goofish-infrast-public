@@ -2,7 +2,7 @@ import { routesCopy } from '../../copy/zh-CN/routes'
 import type { SiteFeatures } from '../../lib/site-features'
 import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
 
-const V2_SECTIONS = ['overview', 'generation', 'plans', 'lab', 'tools', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'depot', 'profiles', 'add-account', 'inventory', 'commercial', 'balance', 'announcements', 'settings', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing'] as const
+const V2_SECTIONS = ['overview', 'generation', 'plans', 'lab', 'tools', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'depot', 'skland', 'profiles', 'add-account', 'inventory', 'commercial', 'balance', 'announcements', 'settings', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing'] as const
 export type V2Section = typeof V2_SECTIONS[number]
 
 export const V2_PUBLIC_SECTIONS: V2Section[] = ['announcements', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing']
@@ -34,6 +34,7 @@ export function v2SectionAvailable(section: V2Section, features: SiteFeatures): 
     case 'cultivation': case 'cultivation-projects': return features.site && features.cultivation_plan
     case 'thanks-recruitment': return features.site && features.thanks_recruitment
     case 'depot': return features.site && features.depot_value
+    case 'skland': return features.site && features.profiles && features.skland
     case 'inventory': return features.site && features.inventory
     case 'commercial': case 'balance': return features.site && METERED_BILLING_AVAILABLE && features.metered_billing
     case 'announcements': return features.announcements

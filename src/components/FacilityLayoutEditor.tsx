@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { SelectedIcon as Check, ExpandIcon as ChevronDown, ManufactureIcon as Factory, TradingStationIcon as Store, PowerPlantIcon as Zap, SuccessIcon } from './icons'
 import { copy } from '../copy'
-import { FACILITY_IDS, facilityLayoutSchema, facilityRoomsSchema } from '../lib/facility-layout'
-import { apiJson } from '../lib/api-client'
+import { FACILITY_IDS, facilityLayoutSchema } from '../lib/facility-layout'
 import type { LicenseConfig } from '../lib/types'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
-import SklandIcon from './SklandIcon'
 import './FacilityLayoutEditor.css'
 
 const FACILITIES = {
@@ -18,8 +16,7 @@ type Room = { type: FacilityType; level: number }
 const TYPES = Object.keys(FACILITIES) as FacilityType[]
 const positionLabel = (position: number) => `B${Math.floor(position / 3) + 1} · ${copy.common.facilityLayoutColumns[position % 3]}`
 
-export default function FacilityLayoutEditor({ config, onUpdate, profileId, readOnly = false }: {
-  profileId?: string
+export default function FacilityLayoutEditor({ config, onUpdate, readOnly = false }: {
   readOnly?: boolean
   config: LicenseConfig
   onUpdate: (mutate: (config: LicenseConfig) => void) => void
@@ -38,49 +35,11 @@ export default function FacilityLayoutEditor({ config, onUpdate, profileId, read
   const [rooms, setRooms] = useState(() => (parsed.success ? parsed.data : FACILITY_IDS).map(roomFor))
   const [selectedPosition, setSelectedPosition] = useState<number | null>(null)
   const [errors, setErrors] = useState<string[]>([])
-  const [reading, setReading] = useState(false)
-  const [readNotice, setReadNotice] = useState('')
-  const requestRef = useRef<AbortController | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const statusRef = useRef<HTMLDivElement | null>(null)
   const expected = FACILITY_IDS.map(roomFor)
   const expectedSignature = JSON.stringify(expected)
-  useEffect(() => () => requestRef.current?.abort(), [])
-  useEffect(() => {
-    if (!readOnly) return
-    requestRef.current?.abort()
-    setReading(false)
-    setSelectedPosition(null)
-  }, [readOnly])
-
-  const readFacilities = async () => {
-    if (!profileId || reading || readOnly) return
-    const controller = new AbortController()
-    requestRef.current = controller
-    setReading(true)
-    setReadNotice('')
-    try {
-      const response = await apiJson<{ rooms: unknown }>('/api/user/skland/facilities', {
-        method: 'POST',
-        json: { profile_id: profileId },
-        signal: controller.signal,
-        fallbackMessage: copy.common.facilityLayoutReadFailed,
-      })
-      const imported = facilityRoomsSchema.safeParse(response.rooms)
-      if (!imported.success) throw new Error(copy.common.facilityLayoutReadFailed)
-      if (controller.signal.aborted) return
-      setRooms(imported.data)
-      setEditing(true)
-      setReviewed(false)
-      setErrors([])
-      onUpdate((next) => { delete next.facility_layout })
-      setReadNotice(copy.common.facilityLayoutReadSuccess)
-    } catch (error) {
-      if (!controller.signal.aborted) setReadNotice(error instanceof Error ? error.message : copy.common.facilityLayoutReadFailed)
-    } finally {
-      if (!controller.signal.aborted) setReading(false)
-    }
-  }
+  useEffect(() => { if (readOnly) setSelectedPosition(null) }, [readOnly])
 
   useEffect(() => {
     if (savedLayout) {
@@ -137,15 +96,8 @@ export default function FacilityLayoutEditor({ config, onUpdate, profileId, read
             {savedLayout ? copy.common.facilityLayoutSaved : copy.common.facilityLayoutDraft}
           </span>
         </div>
-        {profileId && (
-          <button type="button" disabled={reading || readOnly} onClick={() => { void readFacilities() }} className="tool-secondary-action min-h-11 px-3">
-            <SklandIcon />
-            {reading ? copy.common.facilityLayoutReading : copy.common.facilityLayoutRead}
-          </button>
-        )}
       </div>
-      {readNotice && <p role="status" className="tool-alert mt-3">{readNotice}</p>}
-      <fieldset disabled={reading || readOnly} className="min-w-0 border-0 p-0" aria-busy={reading}>
+      <fieldset disabled={readOnly} className="min-w-0 border-0 p-0">
       {collapsed ? (
         <div className="tool-inset mt-3 flex flex-wrap items-center justify-between gap-3 p-4">
           <div role="status">
