@@ -106,7 +106,7 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
       const nextPlans = createManualPlans(checked)
       nextPlans.forEach((plan, planIndex) => {
         for (const [type, rooms] of Object.entries(plan.rooms)) rooms.forEach((room, roomIndex) => {
-          const previous = plans[planIndex].rooms[type][roomIndex]
+          const previous = plans[planIndex].rooms[type]?.[roomIndex] ?? []
           if (previous.slice(room.length).some(Boolean)) throw new Error(copy.tools.manualSchedule.occupiedSlots)
           plan.rooms[type][roomIndex] = Array.from({ length: room.length }, (_, index) => previous[index] ?? '')
         })

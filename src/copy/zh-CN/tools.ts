@@ -131,6 +131,8 @@ export const toolsCopy = {
     settings: "手动排班设置",
     facilities: "设施等级与产物",
     facilitiesHint: "等级和产物同步到所有班次。降低等级前，请先移出超出容量的干员。宿舍保留 JSON 中的进驻安排；没有进驻安排的自动宿舍由 MAA 填满。",
+    facilityGroups: { production: "生产设施", support: "辅助设施", dormitory: "宿舍" },
+    recyclingOccupied: "回收站仍有已安排的干员，请先清空所有班次的回收站后再设为未建造。",
     level: "设施等级",
     product: "产物",
     fiammettaName: "菲亚梅塔",

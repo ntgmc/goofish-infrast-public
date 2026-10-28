@@ -63,6 +63,15 @@ export default function ManualBlankScheduleSetup({ config, preset, enabled, onPr
             </div>
           ))}
         </dl>
+        <div className="manual-blank-recycling">
+          <label htmlFor={`${group}-recycling`}>{copy.domain.recycling.level}</label>
+          <select id={`${group}-recycling`} className="tool-field" value={config.recycling_station_level ?? 0} disabled={!enabled}
+            onChange={(event) => { const level = Number(event.target.value); onUpdate((next) => { next.recycling_station_level = level }) }}>
+            <option value={0}>{copy.domain.recycling.disabled}</option>
+            {[1, 2, 3].map((level) => <option key={level} value={level}>Lv.{level}</option>)}
+          </select>
+          <p>{copy.domain.recycling.help}</p>
+        </div>
         {config.layout === '2-5-2' && <FacilityLayoutEditor key={preset} config={config} onUpdate={onUpdate} readOnly={!enabled} />}
         <div className="manual-blank-footer">
           <p>{label.configHint}</p>

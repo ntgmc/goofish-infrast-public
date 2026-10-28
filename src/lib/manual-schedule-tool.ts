@@ -214,7 +214,18 @@ function manualShiftHours(value: LicenseConfig['shift_hours']): number[] | null 
 export function changeManualFacility(source: OptimizeResult, type: string, index: number, settings: { level?: number; product?: string }): OptimizeResult {
   const next = structuredClone(source)
   for (const plan of next.plans) {
-    const room = plan.rooms[type]?.[index]
+    let room = plan.rooms[type]?.[index]
+    if (type === 'recycling' && index === 0 && settings.level !== undefined) {
+      if (settings.level === 0) {
+        if (room?.operators?.some(Boolean)) throw new Error(copy.tools.manualSchedule.recyclingOccupied)
+        plan.rooms.recycling = []
+        continue
+      }
+      if (!room) {
+        room = { operators: [] }
+        plan.rooms.recycling = [room]
+      }
+    }
     if (!room) throw new Error(copy.tools.manualSchedule.invalidSettings)
     Object.assign(room, settings)
     const capacity = roomCapacity(type, room)

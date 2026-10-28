@@ -3,7 +3,7 @@ import { copy } from '../../copy/index'
 import { isFiammettaShiftHoursSupported } from '../../lib/config'
 import { changeManualFacility } from '../../lib/manual-schedule-tool'
 import type { LicenseOperator, OptimizeResult } from '../../lib/types'
-import { PRODUCT_LABELS, ROOM_LABELS } from './labels'
+import ManualFacilitySettings from './ManualFacilitySettings'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '../ui/dialog'
 import { OperatorAvatarTile } from './OperatorAvatarStrip'
 import ManualOperatorPicker from './ManualOperatorPicker'
@@ -33,36 +33,7 @@ export default function ManualScheduleSettings({ result, operators, activePlan, 
   return (
     <section className="tool-panel space-y-4 p-4" aria-label={label.settings}>
       <h3 className="font-semibold">{label.settings}</h3>
-      <details open>
-        <summary className="cursor-pointer text-sm font-medium">{label.facilities}</summary>
-        <p className="my-3 text-xs leading-5 text-ink-muted">{label.facilitiesHint}</p>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {Object.entries(plan.rooms).flatMap(([type, rooms]) => rooms.map((room, index) => {
-            const name = `${ROOM_LABELS[type] ?? copy.domain.building_skills.training} ${index + 1}`
-            const products = type === 'trading' ? ['LMD', 'Orundum'] : type === 'manufacture' ? ['Pure Gold', 'Battle Record', 'Originium Shard'] : []
-            return (
-              <div key={`${type}:${index}`} className="tool-inset space-y-2 p-3">
-                <p className="text-sm font-medium">{name}</p>
-                <label className="flex items-center justify-between gap-3 text-xs">
-                  <span>{label.level}</span>
-                  <select aria-label={`${name} · ${label.level}`} className="tool-field w-20" value={room.level ?? (type === 'control' || type === 'dormitory' ? 5 : 3)}
-                    onChange={(event) => changeFacility(type, index, { level: Number(event.target.value) })}>
-                    {Array.from({ length: type === 'control' || type === 'dormitory' ? 5 : 3 }, (_, level) =>
-                      <option key={level} value={level + 1}>{level + 1}</option>)}
-                  </select>
-                </label>
-                {products.length > 0 && <label className="block space-y-1 text-xs">
-                  <span>{label.product}</span>
-                  <select aria-label={`${name} · ${label.product}`} className="tool-field" value={room.product ?? (type === 'trading' ? 'LMD' : 'Battle Record')}
-                    onChange={(event) => changeFacility(type, index, { product: event.target.value })}>
-                    {products.map((product) => <option key={product} value={product}>{PRODUCT_LABELS[product]}</option>)}
-                  </select>
-                </label>}
-              </div>
-            )
-          }))}
-        </div>
-      </details>
+      <ManualFacilitySettings rooms={plan.rooms} onChange={changeFacility} />
       <div className="space-y-3 border-t border-surface-3 pt-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-semibold">{label.fiammetta}</p>

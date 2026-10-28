@@ -54,6 +54,24 @@ describe('standalone manual schedules', () => {
     expect(() => parseManualScheduleJson(JSON.stringify(source), enabled, operators)).toThrow()
   })
 
+  it('adds and removes recycling in every shift and rejects changes that would discard assignments', () => {
+    const source = createBlankManualSchedule(config)
+    source.plans.forEach((plan) => { delete plan.rooms.recycling })
+    const added = changeManualFacility(source, 'recycling', 0, { level: 2 })
+    expect(added.plans.every((plan) => plan.rooms.recycling[0].level === 2)).toBe(true)
+    expect(createManualPlans(added).every((plan) => plan.rooms.recycling[0].length === 2)).toBe(true)
+    added.plans[1].rooms.recycling[0].operators = ['', '芬']
+    expect(() => changeManualFacility(added, 'recycling', 0, { level: 0 })).toThrow(copy.tools.manualSchedule.recyclingOccupied)
+    expect(() => changeManualFacility(added, 'recycling', 0, { level: 1 })).toThrow(copy.tools.manualSchedule.occupiedSlots)
+    expect(added.plans[1].rooms.recycling[0]).toMatchObject({ level: 2, operators: ['', '芬'] })
+    added.plans[1].rooms.recycling[0].operators = []
+    const removed = changeManualFacility(added, 'recycling', 0, { level: 0 })
+    expect(removed.plans.every((plan) => plan.rooms.recycling.length === 0)).toBe(true)
+    expect(resolveManualScheduleConfig(removed, config, operators).recycling_station_level).toBe(0)
+    expect(parseManualScheduleJson(JSON.stringify(removed), config, operators).plans[0].rooms.recycling).toEqual([])
+    expect(source.plans[0].rooms.recycling).toBeUndefined()
+  })
+
   it('imports MAA and full result JSON while removing stale calculations', () => {
     const source = createBlankManualSchedule(config)
     source.plans[0].rooms.manufacture[0].operators = ['芬']
