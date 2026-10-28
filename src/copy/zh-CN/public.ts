@@ -477,7 +477,7 @@ export const publicCopy = {
   pricing_upgrade_purchase: "前往闲鱼补差价",
   pricing_upgrade_unavailable: "升级商品待上架",
   // src/pages/PricingPage.tsx
-  pages_PricingPage_016: "仅限一个游戏 UID；按所选期限有效，不支持自行更换游戏账号。",
+  pages_PricingPage_016: "仅限一个游戏 UID，按所选期限有效；绑定森空岛 UID 后不支持自行更换。",
   // src/pages/PricingPage.tsx
   pages_PricingPage_017: (originalPrice: string, discountFold: number) => `原价 ${originalPrice} · ${discountFold} 折`,
   // src/pages/PublicInfoPage.tsx
@@ -515,7 +515,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_095: "绑定后可以自行更换游戏 UID 吗？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_096: "绑定后不能自行更换 UID。免费档案和各类付费维护卡都用于同一个游戏账号，通过森空岛或 JSON 初始化均适用。预览时发现角色选错，可以返回重新选择；已经确认绑定或遇到异常拦截时，请通过网站反馈申请人工核验，不要反复导入其他账号。",
+  pages_PublicInfoPage_096: "绑定森空岛 UID 后不支持自行更换。免费档案和各类付费维护卡都用于同一个游戏账号，通过森空岛或 JSON 初始化均适用。预览时发现角色选错，可以返回重新选择；遇到绑定异常或数据误拦截时，请通过网站反馈申请人工核验，不要反复导入其他账号。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_097: "MaaTool 如何保护账号和授权数据？",
   // src/pages/PublicInfoPage.tsx

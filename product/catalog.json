@@ -83,7 +83,7 @@
       "default_discount_fold": 10,
       "display_price": "12.9 元 / 30 天",
       "duration_days": 30,
-      "account_scope": "仅限一个游戏 UID，兑换后连续 30 天有效，不支持自行更换游戏账号",
+      "account_scope": "仅限一个游戏 UID，兑换后连续 30 天有效；绑定森空岛 UID 后不支持自行更换",
       "runtime_permission": "advanced",
       "summary": "30 天内不限次数生成排班和增量重算，任务优先处理。支持 MAA JSON 导出、完整计算数据下载和高级分析。",
       "audience": "近期会培养干员，或想先试用高级功能的玩家"
@@ -96,7 +96,7 @@
       "default_discount_fold": 10,
       "display_price": "24.9 元 / 90 天",
       "duration_days": 90,
-      "account_scope": "仅限一个游戏 UID，兑换后连续 90 天有效，不支持自行更换游戏账号",
+      "account_scope": "仅限一个游戏 UID，兑换后连续 90 天有效；绑定森空岛 UID 后不支持自行更换",
       "runtime_permission": "advanced",
       "summary": "90 天内不限次数生成排班和增量重算，任务优先处理。支持 MAA JSON 导出、完整计算数据下载和高级分析。",
       "audience": "一个版本周期内会持续培养干员、调整排班的玩家"
@@ -109,7 +109,7 @@
       "default_discount_fold": 10,
       "display_price": "44.9 元 / 365 天",
       "duration_days": 365,
-      "account_scope": "仅限一个游戏 UID，兑换后连续 365 天有效，不支持自行更换游戏账号",
+      "account_scope": "仅限一个游戏 UID，兑换后连续 365 天有效；绑定森空岛 UID 后不支持自行更换",
       "runtime_permission": "advanced",
       "summary": "365 天内不限次数生成排班和增量重算，任务优先处理。支持 MAA JSON 导出、完整计算数据下载和高级分析。",
       "audience": "全年持续培养干员，希望降低排班维护成本的玩家"
@@ -122,7 +122,7 @@
       "default_discount_fold": 10,
       "display_price": "59 元 / 长期",
       "duration_days": null,
-      "account_scope": "仅限长期维护同一个游戏 UID，不支持自行更换游戏账号",
+      "account_scope": "仅限长期维护同一个游戏 UID；绑定森空岛 UID 后不支持自行更换",
       "runtime_permission": "advanced",
       "summary": "长期不限次数生成排班和增量重算，任务优先处理。支持配置切换、MAA JSON 导出、完整计算数据下载、高级分析、练度建议和自定义配置。",
       "audience": "长期维护同一游戏账号、经常调整基建方案的玩家"
@@ -214,7 +214,7 @@
       { "feature": "自定义配置", "free_preview": "不支持", "single_account_monthly": "支持", "single_account_half_year": "支持", "single_account_annual": "支持", "single_account_lifetime": "支持" },
       { "feature": "场景对比实验室 / Pareto 高级分析", "free_preview": "不支持", "single_account_monthly": "含 1 次，单次最多 3 个额外配置", "single_account_half_year": "含 3 次，单次最多 3 个额外配置", "single_account_annual": "含 8 次，单次最多 3 个额外配置", "single_account_lifetime": "无限次，单次最多 3 个额外配置" },
       { "feature": "批量报告导出 / 商用授权", "free_preview": "不支持", "single_account_monthly": "不支持", "single_account_half_year": "不支持", "single_account_annual": "不支持", "single_account_lifetime": "不支持" },
-      { "feature": "更换游戏账号", "free_preview": "不支持", "single_account_monthly": "不支持自行更换；需人工核验", "single_account_half_year": "不支持自行更换；需人工核验", "single_account_annual": "不支持自行更换；需人工核验", "single_account_lifetime": "不支持自行更换；需人工核验" },
+      { "feature": "更换游戏账号", "free_preview": "绑定森空岛 UID 后不支持自行更换", "single_account_monthly": "绑定森空岛 UID 后不支持自行更换", "single_account_half_year": "绑定森空岛 UID 后不支持自行更换", "single_account_annual": "绑定森空岛 UID 后不支持自行更换", "single_account_lifetime": "绑定森空岛 UID 后不支持自行更换" },
       { "feature": "手动排班", "free_preview": "高级版限定", "single_account_monthly": "支持调整干员与无人机目标、保存草稿与导出图片", "single_account_half_year": "支持调整干员与无人机目标、保存草稿与导出图片", "single_account_annual": "支持调整干员与无人机目标、保存草稿与导出图片", "single_account_lifetime": "支持调整干员与无人机目标、保存草稿与导出图片" }
     ]
   }

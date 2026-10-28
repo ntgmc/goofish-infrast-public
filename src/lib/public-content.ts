@@ -3,7 +3,7 @@ import { copy } from '../copy/index'
 import { getSku, productPolicies } from './product-catalog'
 
 export const PUBLIC_CONTENT_VERSION = 1 as const
-export const PUBLIC_CONTENT_DEFAULTS_REVISION = 13 as const
+export const PUBLIC_CONTENT_DEFAULTS_REVISION = 14 as const
 export const PUBLIC_PRICING_PLAN_IDS = [
   'free_preview',
   'single_account_monthly',
@@ -379,6 +379,24 @@ export function resolvePublicContentSettings(value: unknown): { content: PublicC
     migratedDraft.faq.items = migratedDraft.faq.items.map((item) => item.id === previousContact.id && item.question === previousContact.question
       && (item.answer === previousContact.answer || item.answer === copy.publicContent.legacy_feedback_join_answer)
       ? { ...item, question: copy.publicContent.faq_join_question, answer: copy.publicContent.faq_join_answer } : item)
+  }
+  if (storedDefaultsRevision < 14) {
+    const previous = copy.publicContent.legacy_account_binding
+    for (const planId of PUBLIC_PRICING_PLAN_IDS) {
+      const plan = migratedDraft.pricing.plans[planId]
+      if (plan.account_scope === previous.scopes[planId]) plan.account_scope = defaultPricingPlans[planId].account_scope
+    }
+    const comparison = productPolicies.public_feature_comparison.find((row) => row.feature === copy.publicContent.pricing_comparison_bound_account)!
+    for (const row of migratedDraft.pricing.comparison_rows) {
+      if (row.feature !== comparison.feature) continue
+      for (const planId of PUBLIC_PRICING_PLAN_IDS) {
+        const oldValue = planId === 'free_preview' ? previous.comparison_free : previous.comparison_paid
+        if (row[planId] === oldValue) row[planId] = comparison[planId]
+      }
+    }
+    migratedDraft.faq.items = migratedDraft.faq.items.map((item) => item.id === 'change-bound-account'
+      && item.question === copy.public.pages_PublicInfoPage_095 && item.answer === previous.faq_answer
+      ? { ...item, answer: copy.public.pages_PublicInfoPage_096 } : item)
   }
   return {
     content: {
