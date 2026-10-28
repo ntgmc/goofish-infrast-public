@@ -8,7 +8,7 @@ import { OperatorAvatarTile } from '../components/result-panel/OperatorAvatarStr
 import ManualScheduleEditor from '../components/result-panel/ManualScheduleEditor'
 import { copy } from '../copy/index'
 import { CONFIG_PRESETS, normalizeConfig } from '../lib/config'
-import { createBlankManualSchedule, isManualScheduleProfileAvailable, parseManualScheduleJson, UnownedScheduleOperatorsError } from '../lib/manual-schedule-tool'
+import { createBlankManualSchedule, isManualScheduleProfileAvailable, parseManualScheduleJson, resolveManualScheduleConfig, UnownedScheduleOperatorsError } from '../lib/manual-schedule-tool'
 import { profileScopedPath, workspaceSetupPath } from '../lib/app-routes'
 import { v2Path } from './v2/navigation'
 import { useSiteFeatures } from '../lib/site-feature-context'
@@ -100,12 +100,12 @@ export function useManualTool({ session, embedded = false, onDirtyChange }: Page
       const source = parseManualScheduleJson(await file.text(), config, operators)
       if (revision.current === run && profileId.current === selectedProfileId) {
         if (draft && !window.confirm(label.replace)) return
-        setDraft({ source, config, profileId: selectedProfileId, revision: run })
+        setDraft({ source, config: resolveManualScheduleConfig(source, config, operators), profileId: selectedProfileId, revision: run })
       }
     } catch (caught) {
       if (revision.current === run) setError(caught instanceof Error &&
         (caught instanceof UnownedScheduleOperatorsError ||
-          [label.tooLarge, label.importLayoutMismatch, label.fiammettaInvalid, copy.common.facilityLayoutRequired].some((message) => message === caught.message))
+          [label.tooLarge, label.importMissingProduct, label.fiammettaInvalid, copy.common.facilityLayoutRequired].some((message) => message === caught.message))
         ? caught.message : label.importFailed)
     } finally {
       setImporting(false)
@@ -178,27 +178,35 @@ function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpe
                 </OperatorSkillPreview>
                 <Link className="mt-3 inline-block text-sm text-brand-500 underline" to={operatorsPath(profile.id)}>{label.editOperators}</Link>
               </details>}
-              <p className="text-xs leading-5 text-ink-muted">{label.configHint}</p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block space-y-2 text-sm">
-                  <span>{label.layout}</span>
-                  <select className="tool-field" value={preset} disabled={!enabled} onChange={(event) => { setPreset(event.target.value); setConfigDraft(null) }}>
-                    <option value="">{label.currentLayout}</option>
-                    {Object.entries(CONFIG_PRESETS).map(([key, config]) => <option key={key} value={key}>{config.desc}</option>)}
-                  </select>
-                </label>
-                <label className="block space-y-2 text-sm">
-                  <span>{label.shiftHours}</span>
-                  <input className="tool-field" value={configuredHours} disabled={!enabled} onChange={(event) => setShiftHours(event.target.value)} />
-                  <span className="block text-xs text-ink-muted">{label.shiftHint}</span>
-                </label>
+              <div className="space-y-2">
+                <button type="button" className="tool-primary-action" disabled={!enabled} onClick={() => upload.current?.click()}>{label.import}</button>
+                <p className="text-xs leading-5 text-ink-muted">{label.importHint}</p>
               </div>
-              {ready && baseConfig.layout === '2-5-2' && <FacilityLayoutEditor
-                key={`${profile.id}:${preset}`} config={baseConfig} onUpdate={(mutate) => {
-                  const next = structuredClone(baseConfig)
-                  mutate(next)
-                  setConfigDraft(next)
-                }} />}
+              <details className="tool-inset p-4">
+                <summary className="cursor-pointer text-sm font-medium">{label.blankSettings}</summary>
+                <p className="my-3 text-xs leading-5 text-ink-muted">{label.configHint}</p>
+                <div className="space-y-4">
+                  <label className="block space-y-2 text-sm">
+                    <span>{label.layout}</span>
+                    <select className="tool-field" value={preset} disabled={!enabled} onChange={(event) => { setPreset(event.target.value); setConfigDraft(null) }}>
+                      <option value="">{label.currentLayout}</option>
+                      {Object.entries(CONFIG_PRESETS).map(([key, config]) => <option key={key} value={key}>{config.desc}</option>)}
+                    </select>
+                  </label>
+                  {ready && baseConfig.layout === '2-5-2' && <FacilityLayoutEditor
+                    key={`${profile.id}:${preset}`} config={baseConfig} onUpdate={(mutate) => {
+                      const next = structuredClone(baseConfig)
+                      mutate(next)
+                      setConfigDraft(next)
+                    }} />}
+                  <button type="button" className="tool-secondary-action" disabled={!enabled} onClick={start}>{label.start}</button>
+                </div>
+              </details>
+              <label className="block space-y-2 text-sm">
+                <span>{label.shiftHours}</span>
+                <input className="tool-field sm:max-w-64" value={configuredHours} disabled={!enabled} onChange={(event) => setShiftHours(event.target.value)} />
+                <span className="block text-xs text-ink-muted">{label.shiftHint}</span>
+              </label>
             </>
           )}
           {session.workspaceLoadError && <div role="alert" className="text-sm text-warning">
@@ -207,13 +215,12 @@ function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpe
               onClick={() => void session.refreshProfileWorkspace(profile).catch(() => undefined)}>{label.retryWorkspace}</button>}
           </div>}
           {error && <p role="alert" className="text-sm text-warning">{error}</p>}
-          <div className="flex flex-wrap gap-3">
-            <button type="button" className="tool-primary-action" disabled={!enabled} onClick={start}>{label.start}</button>
-            <button type="button" className="tool-secondary-action" disabled={!enabled} onClick={() => upload.current?.click()}>{label.import}</button>
-            <input ref={upload} type="file" accept=".json,application/json" className="hidden" aria-label={label.import}
-              disabled={!enabled} onChange={(event) => void importSchedule(event.target.files?.[0])} />
-          </div>
-          {profile && <p className="text-xs leading-5 text-ink-muted">{label.importHint}</p>}
+          {!profile && <div className="flex flex-wrap gap-3">
+            <button type="button" className="tool-primary-action" disabled>{label.import}</button>
+            <button type="button" className="tool-secondary-action" disabled>{label.start}</button>
+          </div>}
+          <input ref={upload} type="file" accept=".json,application/json" className="hidden" aria-label={label.import}
+            disabled={!enabled} onChange={(event) => void importSchedule(event.target.files?.[0])} />
           {draft && <p className="text-sm text-warning">{label.replace}</p>}
           </div>
         </section>

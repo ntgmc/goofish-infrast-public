@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { CONFIG_PRESETS, normalizeConfig } from './config'
 import { copy } from '../copy'
-import { createManualPlans, manualResult, manualSourceKey, parseManualDraft } from './manual-schedule'
+import { createManualPlans, manualResult, manualSourceKey, parseManualDraft, validateManualPlans } from './manual-schedule'
 import { changeManualFacility, createBlankManualSchedule, isManualScheduleProfileAvailable, parseManualScheduleJson, resolveManualScheduleConfig, UnownedScheduleOperatorsError } from './manual-schedule-tool'
 import { FACILITY_IDS } from './facility-layout'
 import type { LicenseOperator, UserGameAccount } from './types'
@@ -85,8 +85,38 @@ describe('standalone manual schedules', () => {
     expect(resolved.manufacturing_station_levels).toEqual([3, 3, 3, 3])
     expect(resolved.product_requirements).toEqual(config.product_requirements)
     expect(imported.plans[0].rooms.trading[1].operators).toEqual(['芬'])
-    delete maa.plans[0].rooms.manufacture[0].product
-    expect(() => parseManualScheduleJson(JSON.stringify(maa), current, operators)).toThrow(copy.tools.manualSchedule.importLayoutMismatch)
+    maa.plans.forEach((plan) => { delete plan.rooms.manufacture[0].product })
+    expect(() => parseManualScheduleJson(JSON.stringify(maa), current, operators)).toThrow(copy.tools.manualSchedule.importMissingProduct)
+  })
+
+  it.each([undefined, 'maa_pure_autofill'] as const)('preserves stationed dormitory operators with autofill and rule %s', (dormitory_rule) => {
+    const source = createBlankManualSchedule(config)
+    source.dormitory_rule = dormitory_rule
+    source.plans.forEach((plan) => {
+      plan.rooms.dormitory[0] = { level: 5, operators: ['芬'], autofill: true }
+      plan.rooms.dormitory[1].autofill = true
+    })
+    const imported = parseManualScheduleJson(JSON.stringify(source), config, operators)
+    expect(imported.dormitory_rule).toBe('fixed')
+    expect(imported.plans[0].rooms.dormitory[0]).toMatchObject({ operators: ['芬'], autofill: false })
+    expect(imported.plans.every((plan) => plan.rooms.dormitory.every((room) => room.autofill === false))).toBe(true)
+    const plans = createManualPlans(imported)
+    plans[0].rooms.dormitory[0][0] = ''
+    expect(() => validateManualPlans(imported, plans, operators)).not.toThrow()
+    source.plans.forEach((plan) => { plan.rooms.dormitory[0].operators = [] })
+    expect(parseManualScheduleJson(JSON.stringify(source), config, operators).dormitory_rule).toBe('maa_pure_autofill')
+  })
+
+  it('uses JSON facilities independently of page presets, including fields supplied by another shift', () => {
+    const source = createBlankManualSchedule(config)
+    source.plans.forEach((plan) => { plan.rooms.manufacture[0].level = 2 })
+    delete source.plans[0].rooms.manufacture[0].level
+    delete source.plans[0].rooms.manufacture[0].product
+    const text = JSON.stringify(source)
+    const alternate = { ...config, manufacturing_station_levels: [1, 1, 1, 1],
+      product_requirements: { trading_stations: { Orundum: 2 }, manufacturing_stations: { 'Originium Shard': 4 } } }
+    expect(parseManualScheduleJson(text, alternate, operators)).toEqual(parseManualScheduleJson(text, config, operators))
+    expect(parseManualScheduleJson(text, alternate, operators).plans[0].rooms.manufacture[0]).toMatchObject({ level: 2, product: 'Pure Gold' })
   })
 
   it('names missing operators once and admits the same schedule after the roster is updated', () => {
@@ -129,7 +159,7 @@ describe('standalone manual schedules', () => {
     expect(resolved.product_requirements).toEqual(importedConfig.product_requirements)
   })
 
-  it('preserves shift order, infers empty 252 facilities and fills missing products from a matching configuration', () => {
+  it('preserves shift order, infers empty 252 facilities and requires products from the JSON', () => {
     const selected = { ...normalizeConfig(CONFIG_PRESETS['252']), facility_layout: [...FACILITY_IDS], shift_hours: [6, 12, 6] }
     const source = createBlankManualSchedule(selected)
     expect(source.shift_hours).toEqual([6, 12, 6])
@@ -138,12 +168,19 @@ describe('standalone manual schedules', () => {
         type, rooms.map(({ operators }) => ({ operators })),
       ])),
     })) }
+    expect(() => parseManualScheduleJson(JSON.stringify(maa), selected, operators)).toThrow(copy.tools.manualSchedule.importMissingProduct)
+    maa.plans.forEach((plan, shift) => {
+      for (const type of ['trading', 'manufacture']) {
+        plan.rooms[type].forEach((room, index) => Object.assign(room, { product: source.plans[shift].rooms[type][index].product }))
+      }
+    })
     const imported = parseManualScheduleJson(JSON.stringify(maa), selected, operators)
     expect(imported.shift_hours).toEqual([6, 12, 6])
     expect(imported.plans[0].rooms.trading.map((room) => room.level)).toEqual([1, 1])
     expect(imported.plans[0].rooms.manufacture.map((room) => room.product)).toEqual(['Pure Gold', 'Pure Gold', 'Battle Record', 'Battle Record', 'Battle Record'])
     expect(imported.facility_layout).toEqual(FACILITY_IDS)
-    expect(() => parseManualScheduleJson(JSON.stringify(maa), config, operators)).toThrow()
+    expect(parseManualScheduleJson(JSON.stringify(maa), config, operators).plans.map((plan) => plan.rooms))
+      .toEqual(imported.plans.map((plan) => plan.rooms))
     const withProducts = structuredClone(source)
     withProducts.plans.forEach((plan) => Object.values(plan.rooms).flat().forEach((room) => { delete room.level }))
     expect(parseManualScheduleJson(JSON.stringify(withProducts), config, operators).plans[0].rooms.manufacture.map((room) => room.level)).toEqual([1, 1, 1, 1, 1])

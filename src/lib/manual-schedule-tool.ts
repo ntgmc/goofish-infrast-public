@@ -103,38 +103,36 @@ export function parseManualScheduleJson(text: string, config: LicenseConfig, ope
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid schedule')
   const data = value as Record<string, unknown>
   const source = manualScheduleSourceSchema.parse({ ...data, raw_results: [] })
-  const shiftHours = source.shift_hours ?? manualShiftHours(config.shift_hours)
+  const shiftHours = source.shift_hours ?? (source.plans.every((plan) => plan.shift_hours !== undefined)
+    ? source.plans.map((plan) => plan.shift_hours!) : manualShiftHours(config.shift_hours))
   if (!shiftHours) throw new Error('Invalid shifts')
   source.plans.forEach((plan, index) => { plan.shift_hours ??= shiftHours[index % shiftHours.length] })
   source.shift_hours = source.plans.map((plan) => plan.shift_hours!)
   source.planTimes = source.shift_hours.map((hour) => `${hour}h`).join('-')
   source.total_schedule_hours = source.shift_hours.reduce((total, hour) => total + hour, 0)
   source.schedule_mode ??= 'maa'
+  const hasDormitoryOperators = source.plans.some((plan) => plan.rooms.dormitory?.some((room) => room.operators?.some(Boolean)))
+  if (hasDormitoryOperators && source.schedule_mode !== 'rotation') source.dormitory_rule = 'fixed'
   source.dormitory_rule ??= source.plans.some((plan) => plan.rooms.dormitory?.some((room) => room.autofill)) ? 'maa_pure_autofill' : 'fixed'
   const is252 = source.plans[0].rooms.trading?.length === 2 && source.plans[0].rooms.manufacture?.length === 5
   // MAA room arrays and drone indexes already follow the same order within each facility type.
   if (is252) source.facility_layout ??= [...FACILITY_IDS]
-  const matchingLayout = source.plans[0].rooms.trading?.length === config.trading_stations_count &&
-    source.plans[0].rooms.manufacture?.length === config.manufacturing_stations_count
   for (const plan of source.plans) {
     for (const [type, rooms] of Object.entries(plan.rooms)) {
-      const expectedCount = type === 'trading' ? config.trading_stations_count : config.manufacturing_stations_count
-      const levels = type === 'trading' ? config.trading_station_levels : config.manufacturing_station_levels
-      const products = Object.entries(type === 'trading'
-        ? config.product_requirements.trading_stations : config.product_requirements.manufacturing_stations)
-        .flatMap(([product, count]) => Array<string>(count).fill(product))
       rooms.forEach((room, index) => {
+        const entries = source.plans.map((plan) => plan.rooms[type]?.[index])
         if (type === 'trading' || type === 'manufacture') {
-          if (room.product === undefined && rooms.length !== expectedCount) throw new Error(copy.tools.manualSchedule.importLayoutMismatch)
-          if (is252 && room.level === undefined) {
-            const entries = source.plans.map((plan) => plan.rooms[type]?.[index])
-            room.level = entries.find((entry) => entry?.level !== undefined)?.level ??
-              Math.max(1, ...entries.map((entry) => entry?.operators?.filter(Boolean).length ?? 0))
-            room.operators = room.operators?.filter(Boolean)
+          room.product ??= entries.find((entry) => entry?.product !== undefined)?.product
+          if (room.product === undefined) throw new Error(copy.tools.manualSchedule.importMissingProduct)
+          if (room.level === undefined) {
+            room.level = entries.find((entry) => entry?.level !== undefined)?.level ?? (is252
+              ? Math.max(1, ...entries.map((entry) => entry?.operators?.filter(Boolean).length ?? 0)) : 3)
+            if (is252) room.operators = room.operators?.filter(Boolean)
           }
-          room.level ??= (matchingLayout ? levels?.[index] : undefined) ?? 3
-          room.product ??= products[index]
-        } else room.level ??= type === 'control' || type === 'dormitory' ? 5 : 3
+        } else {
+          room.level ??= entries.find((entry) => entry?.level !== undefined)?.level ?? (type === 'control' || type === 'dormitory' ? 5 : 3)
+          if (type === 'dormitory' && source.dormitory_rule === 'fixed' && hasDormitoryOperators) room.autofill = false
+        }
       })
     }
   }

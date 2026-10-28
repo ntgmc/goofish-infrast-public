@@ -125,7 +125,7 @@ function ComparisonWorkspace({ userId, profileId, operators, config, workspace }
     } catch (cause) {
       if (!current()) return
       const message = cause instanceof Error && (cause instanceof UnownedScheduleOperatorsError ||
-        [manual.tooLarge, manual.importLayoutMismatch, manual.fiammettaInvalid,
+        [manual.tooLarge, manual.importMissingProduct, manual.fiammettaInvalid,
           copy.common.facilityLayoutRequired, copy.domain.lib_config_035].some((message) => message === cause.message)) ? cause.message : manual.importFailed
       setSlots((current) => current.map((slot, side) => side === index ? { selection, error: message } : slot))
     }

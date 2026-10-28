@@ -37,7 +37,26 @@ describe('public Skland game projection', () => {
     expect(readSklandGame({ data: {} })).toBeNull()
     expect(readSklandGame({ data: { building: { meeting: { slotId: 'meeting', level: 3, clue: {} } } } })?.building?.clues)
       .toMatchObject({ owned: null, received: null, board: null, sharing: null })
-    expect(readSklandGame({ data: { building: { labor: { value: -1, maxValue: 200 } } } })).toBeNull()
+    expect(readSklandGame({ data: { building: { labor: { value: -1, maxValue: 200 } } } })?.building?.drones).toBeNull()
+  })
+  it('keeps overview and valid rooms when idle timestamps, missing sections or individual rooms differ', () => {
+    const value = game()
+    const result = readSklandGame({ data: { ...value.data,
+      campaign: null, tower: null, recruit: null, charInfoMap: { broken: null, ...value.data.charInfoMap },
+      building: { ...value.data.building, tiredCharsCount: undefined, tiredChars: ['char_test'],
+        control: { slotId: 'control', level: 5, chars: null },
+        training: { slotId: 'training', level: 3, trainee: null, trainer: null, remainSecs: -1 },
+        manufactures: [{ ...value.data.building.manufactures[0], completeWorkTime: -1 }, { slotId: 'unbuilt', level: null }],
+      } } })!
+    expect(result.player.name).toBe('博士')
+    expect(result.building?.rooms).toHaveLength(4)
+    expect(result.building?.rooms.find((room) => room.id === 'slot_25')).toMatchObject({ stock: 5, completeAt: null })
+    expect(result.building?.training).toMatchObject({ trainee: null, trainer: null, remaining: null })
+    expect(result.building?.tired).toBe(1)
+    expect(result.campaign).toBeNull()
+    expect(result.recruit).toBeNull()
+    expect(readSklandGame({ data: { ...value.data, building: null } })?.player.name).toBe('博士')
+    expect(readSklandGame({ data: { ...value.data, status: null } })?.building?.rooms).toHaveLength(2)
   })
   it('reads public item definitions from keyed or array catalogs', () => {
     expect(readSklandItemNames({ items: { '4001': { name: '龙门币', credentials: 'ignored' }, bad: null } })).toEqual({ '4001': '龙门币' })

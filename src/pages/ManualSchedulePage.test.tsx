@@ -39,6 +39,13 @@ beforeEach(() => {
 afterEach(cleanup)
 const page = () => render(<MemoryRouter><ManualSchedulePage /></MemoryRouter>)
 
+async function chooseFiammetta(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(screen.getByRole('button', { name: '恢复心情对象' }))
+  const dialog = within(screen.getByRole('dialog', { name: '恢复心情对象' }))
+  expect(dialog.queryByRole('button', { name: '菲亚梅塔' })).not.toBeInTheDocument()
+  await user.click(await dialog.findByRole('button', { name: name || '不使用菲亚梅塔' }))
+}
+
 describe('manual schedule tool', () => {
   it('shows an explanation with disabled actions when no current advanced permission exists', () => {
     mocks.session.mockReturnValue({ ...session(), profiles: [
@@ -55,6 +62,7 @@ describe('manual schedule tool', () => {
   it('starts a blank schedule and submits simulation with the actual profile identity', async () => {
     const user = userEvent.setup()
     page()
+    await user.click(screen.getByText(copy.tools.manualSchedule.blankSettings))
     await user.click(screen.getByRole('button', { name: '从零开始排班' }))
     await user.click(screen.getByRole('button', { name: '模拟测算' }))
     expect(mocks.submit).toHaveBeenCalledWith(expect.objectContaining({
@@ -67,17 +75,22 @@ describe('manual schedule tool', () => {
     expect(await screen.findByText(copy.domain.manual_schedule.simulated)).toBeVisible()
   })
 
-  it('imports MAA JSON and preserves the current editor after invalid imports', async () => {
+  it('imports JSON facilities and shifts independently of page settings and preserves the editor after invalid imports', async () => {
     const user = userEvent.setup()
     page()
-    const source = createBlankManualSchedule(config)
+    await user.clear(screen.getByRole('textbox', { name: /每班时长/ }))
+    await user.type(screen.getByRole('textbox'), 'invalid')
+    const source = createBlankManualSchedule(normalizeConfig(CONFIG_PRESETS['333']))
     source.plans[0].rooms.manufacture[0].operators = ['芬']
+    mocks.snapshot.mockResolvedValue({ status: 'succeeded', result: { ...source, total_efficiency: 175 } })
     const maa = { title: '导入方案', description: '', plans: source.plans }
     const file = new File([JSON.stringify(maa)], 'schedule.json', { type: 'application/json' })
     Object.defineProperty(file, 'text', { value: async () => JSON.stringify(maa) })
     await user.upload(screen.getByLabelText('导入排班 JSON', { selector: 'input' }), file)
     await user.click(await screen.findByRole('button', { name: '模拟测算' }))
     expect(mocks.submit.mock.calls[0][0].manualSchedule.plans[0].rooms.manufacture[0]).toEqual(['芬', '', ''])
+    expect(mocks.submit.mock.calls[0][0].config).toMatchObject({ layout: '3-3-3', shift_hours: [8, 8, 8],
+      product_requirements: normalizeConfig(CONFIG_PRESETS['333']).product_requirements })
     source.plans[0].rooms.manufacture[0].operators = ['旅骨']
     const missing = new File([JSON.stringify(source)], 'missing.json', { type: 'application/json' })
     Object.defineProperty(missing, 'text', { value: async () => JSON.stringify(source) })
@@ -99,18 +112,22 @@ describe('manual schedule tool', () => {
     page()
     const source = createBlankManualSchedule(config)
     source.plans[0].rooms.manufacture[0].operators = ['芬']
+    source.plans[0].drones = { enable: true, room: 'manufacture', index: 1, order: 'pre' }
     const text = JSON.stringify(source)
     const file = new File([text], 'schedule.json', { type: 'application/json' })
     Object.defineProperty(file, 'text', { value: async () => text })
     await user.upload(screen.getByLabelText('导入排班 JSON', { selector: 'input' }), file)
     await user.selectOptions(await screen.findByLabelText('制造站 1 · 产物'), 'Originium Shard')
     await user.selectOptions(screen.getByLabelText('制造站 1 · 设施等级'), '2')
-    await user.selectOptions(screen.getByLabelText('恢复心情对象'), '芬')
-    await user.selectOptions(screen.getByLabelText('使用时机'), 'post')
+    await chooseFiammetta(user, '芬')
+    await user.click(screen.getByText(copy.tools.manualSchedule.timingSettings))
+    await user.click(within(screen.getByRole('group', { name: copy.tools.manualSchedule.fiammettaOrder })).getByRole('radio', { name: '换班后' }))
+    await user.click(within(screen.getByRole('group', { name: copy.tools.manualSchedule.droneOrder })).getByRole('radio', { name: '换班后' }))
     await user.click(screen.getByRole('button', { name: copy.domain.manual_schedule.save }))
     const saved = JSON.parse(localStorage.getItem('manual-schedule:tool:manual-profile')!)
     expect(saved.schedule.plans[0].rooms.manufacture[0]).toMatchObject({ level: 2, product: 'Originium Shard' })
     expect(saved.schedule.plans[0].Fiammetta).toMatchObject({ enable: true, target: '芬', order: 'post' })
+    expect(saved.schedule.plans[0].drones).toMatchObject({ enable: true, room: 'manufacture', index: 1, order: 'post' })
     expect(saved.schedule.plans[1].Fiammetta).toBeUndefined()
     await user.selectOptions(screen.getByLabelText('制造站 1 · 产物'), 'Battle Record')
     await user.click(screen.getByRole('button', { name: '恢复已保存草稿' }))
@@ -122,6 +139,7 @@ describe('manual schedule tool', () => {
     expect(submitted.manualSchedule.source.plans.every((plan: typeof source.plans[number]) =>
       plan.rooms.manufacture[0].product === 'Originium Shard' && plan.rooms.manufacture[0].level === 2)).toBe(true)
     expect(submitted.manualSchedule.source.plans[0].Fiammetta).toMatchObject({ target: '芬', order: 'post' })
+    expect(submitted.manualSchedule.source.plans[0].drones).toMatchObject({ enable: true, room: 'manufacture', index: 1, order: 'post' })
     expect(await screen.findByText(copy.domain.manual_schedule.simulated)).toBeVisible()
     await user.selectOptions(screen.getByLabelText('制造站 1 · 产物'), 'Battle Record')
     expect(screen.queryByText(copy.domain.manual_schedule.simulated)).not.toBeInTheDocument()
@@ -143,7 +161,7 @@ describe('manual schedule tool', () => {
     await user.selectOptions(screen.getByLabelText('制造站 1 · 设施等级'), '2')
     expect(await screen.findByText(copy.tools.manualSchedule.occupiedSlots)).toBeVisible()
     expect(screen.getByLabelText('制造站 1 · 设施等级')).toHaveValue('3')
-    await user.selectOptions(screen.getByLabelText('恢复心情对象'), '芬')
+    await chooseFiammetta(user, '芬')
     await user.click(screen.getByRole('button', { name: '模拟测算' }))
     expect(mocks.submit.mock.calls[0][0].manualSchedule.plans[0].rooms.manufacture[0]).toEqual(['', '', '芬'])
     await screen.findByText(copy.domain.manual_schedule.simulated)
@@ -152,17 +170,17 @@ describe('manual schedule tool', () => {
     await user.click(screen.getByRole('button', { name: '完成' }))
     expect(screen.queryByText(copy.tools.manualSchedule.fiammettaInvalid)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '模拟测算' })).toBeEnabled()
-    expect(within(screen.getByLabelText('恢复心情对象')).getByRole('option', { name: '芬' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '恢复心情对象' })).toHaveTextContent('芬')
     await user.click(screen.getByRole('button', { name: '模拟测算' }))
     expect(mocks.submit.mock.calls[1][0].manualSchedule.source.plans[0].Fiammetta).toMatchObject({ enable: true, target: '芬' })
     expect(mocks.submit.mock.calls[1][0].manualSchedule.plans[0].rooms.manufacture[0]).toEqual(['', '', ''])
     await screen.findByText(copy.domain.manual_schedule.simulated)
     await user.click(screen.getByRole('button', { name: copy.domain.manual_schedule.save }))
-    await user.selectOptions(screen.getByLabelText('恢复心情对象'), '')
+    await chooseFiammetta(user, '')
     expect(screen.getByRole('button', { name: '模拟测算' })).toBeEnabled()
     await user.click(screen.getByRole('button', { name: copy.domain.manual_schedule.restore }))
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: copy.domain.manual_schedule.done }))
-    expect(screen.getByLabelText('恢复心情对象')).toHaveValue('芬')
+    expect(screen.getByRole('button', { name: '恢复心情对象' })).toHaveTextContent('芬')
     expect(screen.getByRole('button', { name: '模拟测算' })).toBeEnabled()
   })
 
@@ -171,6 +189,7 @@ describe('manual schedule tool', () => {
     mocks.snapshot.mockImplementation(() => new Promise((resolve) => { finish = resolve }))
     const user = userEvent.setup()
     page()
+    await user.click(screen.getByText(copy.tools.manualSchedule.blankSettings))
     await user.click(screen.getByRole('button', { name: copy.tools.manualSchedule.start }))
     await user.click(screen.getByRole('button', { name: copy.domain.manual_schedule.simulate }))
     await user.selectOptions(screen.getByLabelText('制造站 1 · 产物'), 'Originium Shard')
@@ -178,10 +197,11 @@ describe('manual schedule tool', () => {
     expect(screen.queryByText(copy.domain.manual_schedule.simulated)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: copy.domain.manual_schedule.simulate })).toBeEnabled()
   })
-  it('prevents starting before the selected profile has owned operators', () => {
+  it('prevents starting before the selected profile has owned operators', async () => {
     mocks.session.mockReturnValue({ ...session(), workspace: { config, operators: [] } })
     page()
     expect(screen.getByText(/请先在此档案中导入干员/)).toBeVisible()
+    await userEvent.setup().click(screen.getByText(copy.tools.manualSchedule.blankSettings))
     expect(screen.getByRole('button', { name: '从零开始排班' })).toBeDisabled()
     expect(within(screen.getByRole('main')).getByRole('link', { name: '前往导入干员' }))
       .toHaveAttribute('href', '/tool/setup/operators?profile_id=manual-profile')

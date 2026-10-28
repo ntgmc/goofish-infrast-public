@@ -6,7 +6,7 @@ import SklandBindingDialog from '../../../components/SklandBindingDialog'
 import { Tabs } from '../../../components/ui/tabs'
 import { useSklandSnapshot } from '../../../hooks/useSklandSnapshot'
 import { sklandResourceState } from '../../../lib/skland-snapshot'
-import { matchesSearch } from '../../../lib/search'
+import SklandBackpack from './SklandBackpack'
 import { SKLAND_PRODUCTION_SLOTS } from '../../../lib/facility-layout'
 import type { SklandGame, SklandRoom } from '../../../lib/skland-game'
 import type { V2Session } from '../OptionsDrawer'
@@ -70,7 +70,7 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
         {game ? <Overview game={game} lmd={data.inventory.lmd} exp={data.inventory.exp} /> : <Notice>{text.noGame}</Notice>}
         <DataTime value={data.game.fetchedAt} />
       </Tabs.Content>
-      <Tabs.Content value="backpack" className="space-y-5"><Backpack items={['fresh', 'stale'].includes(sklandResourceState(data.inventory.fetchedAt)) ? data.inventory.items : null} names={data.inventory.itemNames ?? {}} />
+      <Tabs.Content value="backpack" className="space-y-5"><SklandBackpack items={['fresh', 'stale'].includes(sklandResourceState(data.inventory.fetchedAt)) ? data.inventory.items : null} names={data.inventory.itemNames ?? {}} userId={session.user!.id} uid={data.uid} />
         <DataTime value={data.inventory.fetchedAt} />
       </Tabs.Content>
       <Tabs.Content value="infrastructure" className="space-y-5">
@@ -104,24 +104,6 @@ function Overview({ game, lmd, exp }: { game: SklandGame; lmd: number | null; ex
         <h3 className="text-sm text-ink-secondary">{text.recruitSlot(index)}</h3><p className="mt-2 font-semibold">{text.recruitStates[slot.state === 2 && slot.finishAt && game.currentTs && slot.finishAt <= game.currentTs ? 3 : slot.state] ?? text.unavailable}</p>
         {slot.finishAt != null && slot.finishAt > 0 && <p className="mt-2 text-sm text-ink-secondary">{text.completion} {date(slot.finishAt)}</p>}
       </div>)}</div> : <p className="text-sm text-ink-secondary">{text.unavailable}</p>}
-    </section>
-  </>
-}
-
-function Backpack({ items, names }: { items: Record<string, number> | null; names: Record<string, string> }) {
-  const [search, setSearch] = useState('')
-  if (!items) return <Notice>{text.noInventory}</Notice>
-  const visible = Object.entries(items).filter(([id]) => matchesSearch(`${names[id] ?? ''} ${id}`, search)).sort(([left], [right]) => (names[left] ?? left).localeCompare(names[right] ?? right, 'zh-CN', { numeric: true }))
-  return <>
-    <section className="v2-panel p-5 sm:p-6"><p className="text-sm leading-6 text-ink-secondary">{text.inventoryHelp}</p>
-      <div className="mt-4"><Facts items={text.resources.map((name) => [name, text.unavailable])} /></div>
-    </section>
-    <section className="v2-panel p-5 sm:p-6">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><label className="v2-field min-w-0 flex-1 sm:max-w-sm"><span>{text.search}</span><input type="search" className="v2-input" value={search} onChange={(event) => setSearch(event.target.value)} /></label><span className="text-sm text-ink-secondary">{text.itemCount(visible.length)}</span></div>
-      <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{visible.map(([id, count]) => <div key={id} className="tool-inset flex min-w-0 items-center justify-between gap-4 p-4">
-        <dt className="min-w-0 break-words text-sm">{names[id] ?? id}<span className="mt-1 block text-xs text-ink-muted">{id}</span></dt><dd className="shrink-0 font-semibold tabular-nums">{number(count)}</dd>
-      </div>)}</dl>
-      {!visible.length && <p className="py-6 text-sm text-ink-secondary">{text.noItems}</p>}
     </section>
   </>
 }

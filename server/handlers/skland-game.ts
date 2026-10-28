@@ -2,32 +2,36 @@ import { z } from 'zod'
 import type { SklandGame, SklandRoom } from '../../src/lib/skland-game'
 
 const count = z.number().finite().nonnegative()
-const optionalCount = count.nullish()
+const optionalCount = count.nullish().catch(null)
 const text = z.string().max(256)
+const optionalText = text.nullish().catch(null)
 const resident = z.object({ charId: text, ap: optionalCount })
-const room = z.object({ slotId: text, level: count, chars: z.array(resident).optional(),
-  formulaId: z.union([text, z.number()]).nullish(), strategy: text.nullish(),
-  complete: optionalCount, capacity: optionalCount, stock: z.array(z.unknown()).optional(), stockLimit: optionalCount,
+const residents = z.array(resident.nullable().catch(null)).nullish().catch(null).transform((rows) => rows?.filter((row) => row !== null) ?? [])
+const room = z.object({ slotId: text, level: count, chars: residents,
+  formulaId: z.union([text, z.number()]).nullish().catch(null), strategy: optionalText,
+  complete: optionalCount, capacity: optionalCount, stock: z.array(z.unknown()).nullish().catch(null), stockLimit: optionalCount,
   completeWorkTime: optionalCount, comfort: optionalCount })
+const rooms = z.array(room.nullable().catch(null)).nullish().catch(null).transform((rows) => rows?.filter((row) => row !== null) ?? [])
+const progress = z.object({ current: count, total: count }).nullish().catch(null)
 const schema = z.object({ data: z.object({
   currentTs: optionalCount,
-  status: z.object({ name: text.nullish(), level: optionalCount, mainStageProgress: text.nullish(), lastOnlineTs: optionalCount,
+  status: z.object({ name: optionalText, level: optionalCount, mainStageProgress: optionalText, lastOnlineTs: optionalCount,
     storeTs: optionalCount, charCnt: optionalCount, skinCnt: optionalCount, furnitureCnt: optionalCount,
-    ap: z.object({ current: count, max: count, completeRecoveryTime: optionalCount }).nullish(),
-  }).optional(),
-  charInfoMap: z.record(z.string(), z.object({ name: text.optional() })).optional(),
-  campaign: z.object({ reward: z.object({ current: count, total: count }).optional() }).optional(),
-  tower: z.object({ reward: z.object({ higherItem: z.object({ current: count, total: count }).optional(), lowerItem: z.object({ current: count, total: count }).optional() }).optional() }).optional(),
-  recruit: z.array(z.object({ state: count, finishTs: optionalCount })).optional(),
-  routine: z.object({ daily: z.object({ current: count, total: count }).optional(), weekly: z.object({ current: count, total: count }).optional() }).optional(),
+    ap: z.object({ current: count, max: count, completeRecoveryTime: optionalCount }).nullish().catch(null),
+  }).nullish().catch(null),
+  charInfoMap: z.record(z.string(), z.object({ name: optionalText }).catch({ name: null })).nullish().catch(null),
+  campaign: z.object({ reward: progress }).nullish().catch(null),
+  tower: z.object({ reward: z.object({ higherItem: progress, lowerItem: progress }).nullish().catch(null) }).nullish().catch(null),
+  recruit: z.array(z.object({ state: count, finishTs: optionalCount })).nullish().catch(null),
+  routine: z.object({ daily: progress, weekly: progress }).nullish().catch(null),
   building: z.object({
-    control: room.nullish(), tradings: z.array(room).optional(), manufactures: z.array(room).optional(), powers: z.array(room).optional(),
-    dormitories: z.array(room).optional(), hire: room.nullish(),
-    meeting: room.extend({ clue: z.object({ own: optionalCount, received: optionalCount, board: z.array(text).optional(),
-      sharing: z.boolean().optional(), shareCompleteTime: optionalCount }).optional() }).nullish(),
-    training: room.extend({ trainee: resident.nullish(), trainer: resident.nullish(), remainSecs: optionalCount }).nullish(),
-    labor: z.object({ value: count, maxValue: count }).nullish(), tiredChars: z.array(resident).optional(), tiredCharsCount: optionalCount,
-  }).optional(),
+    control: room.nullish().catch(null), tradings: rooms, manufactures: rooms, powers: rooms,
+    dormitories: rooms, hire: room.nullish().catch(null),
+    meeting: room.extend({ clue: z.object({ own: optionalCount, received: optionalCount, board: z.array(text).nullish().catch(null),
+      sharing: z.boolean().nullish().catch(null), shareCompleteTime: optionalCount }).nullish().catch(null) }).nullish().catch(null),
+    training: room.extend({ trainee: resident.nullish().catch(null), trainer: resident.nullish().catch(null), remainSecs: optionalCount }).nullish().catch(null),
+    labor: z.object({ value: count, maxValue: count }).nullish().catch(null), tiredChars: z.array(z.unknown()).nullish().catch(null), tiredCharsCount: optionalCount,
+  }).nullish().catch(null),
 }) })
 
 // Formula IDs and storage weights are defined by the game's manufacturing recipes.
