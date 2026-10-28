@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CONFIG_PRESETS, normalizeConfig } from './config'
+import { copy } from '../copy'
 import { createManualPlans, manualResult, manualSourceKey, parseManualDraft } from './manual-schedule'
 import { changeManualFacility, createBlankManualSchedule, isManualScheduleProfileAvailable, parseManualScheduleJson, resolveManualScheduleConfig } from './manual-schedule-tool'
 import { FACILITY_IDS } from './facility-layout'
@@ -68,6 +69,26 @@ describe('standalone manual schedules', () => {
     expect(parseManualScheduleJson(JSON.stringify(maa), config, operators).shift_hours).toEqual([8, 8, 8])
   })
 
+  it.each(['252', '333'])('imports MAA products with full-level facilities when the current layout is %s', (preset) => {
+    const source = createBlankManualSchedule(config)
+    source.plans[0].rooms.trading[1].operators = ['芬']
+    const maa = { title: source.title, plans: source.plans.map(({ rooms, ...plan }) => ({
+      ...plan, rooms: Object.fromEntries(Object.entries(rooms).map(([type, entries]) => [
+        type, entries.map(({ level: _level, ...room }) => room),
+      ])),
+    })) }
+    const current = normalizeConfig(CONFIG_PRESETS[preset])
+    const imported = parseManualScheduleJson(JSON.stringify(maa), current, operators)
+    const resolved = resolveManualScheduleConfig(imported, current, operators)
+    expect(resolved.layout).toBe('2-4-3')
+    expect(resolved.trading_station_levels).toEqual([3, 3])
+    expect(resolved.manufacturing_station_levels).toEqual([3, 3, 3, 3])
+    expect(resolved.product_requirements).toEqual(config.product_requirements)
+    expect(imported.plans[0].rooms.trading[1].operators).toEqual(['芬'])
+    delete maa.plans[0].rooms.manufacture[0].product
+    expect(() => parseManualScheduleJson(JSON.stringify(maa), current, operators)).toThrow(copy.tools.manualSchedule.importLayoutMismatch)
+  })
+
   it('rejects unowned operators, excessive capacities, inconsistent facilities and invalid products', () => {
     const source = createBlankManualSchedule(config)
     for (const mutate of [
@@ -111,6 +132,9 @@ describe('standalone manual schedules', () => {
     expect(imported.plans[0].rooms.manufacture.map((room) => room.product)).toEqual(['Pure Gold', 'Pure Gold', 'Battle Record', 'Battle Record', 'Battle Record'])
     expect(imported.facility_layout).toEqual(FACILITY_IDS)
     expect(() => parseManualScheduleJson(JSON.stringify(maa), config, operators)).toThrow()
+    const withProducts = structuredClone(source)
+    withProducts.plans.forEach((plan) => Object.values(plan.rooms).flat().forEach((room) => { delete room.level }))
+    expect(() => parseManualScheduleJson(JSON.stringify(withProducts), config, operators)).toThrow(copy.tools.manualSchedule.importLayoutMismatch)
     expect(() => createBlankManualSchedule({ ...selected, facility_layout: undefined })).toThrow()
   })
 

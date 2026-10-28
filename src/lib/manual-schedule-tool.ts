@@ -105,8 +105,8 @@ export function parseManualScheduleJson(text: string, config: LicenseConfig, ope
   source.total_schedule_hours = source.shift_hours.reduce((total, hour) => total + hour, 0)
   source.schedule_mode ??= 'maa'
   source.dormitory_rule ??= source.plans.some((plan) => plan.rooms.dormitory?.some((room) => room.autofill)) ? 'maa_pure_autofill' : 'fixed'
-  const layout = !source.facility_layout && config.layout === '2-5-2' &&
-    source.plans[0].rooms.trading?.length === 2 && source.plans[0].rooms.manufacture?.length === 5
+  const requiresFacilityLayout = source.plans[0].rooms.trading?.length === 2 && source.plans[0].rooms.manufacture?.length === 5
+  const layout = !source.facility_layout && config.layout === '2-5-2' && requiresFacilityLayout
     ? facilityLayoutSchema.safeParse(config.facility_layout) : null
   if (layout?.success) {
     // MAA arrays follow game positions; restore facility IDs before applying configured levels.
@@ -123,6 +123,8 @@ export function parseManualScheduleJson(text: string, config: LicenseConfig, ope
       }
     }
   }
+  const matchingLayout = source.plans[0].rooms.trading?.length === config.trading_stations_count &&
+    source.plans[0].rooms.manufacture?.length === config.manufacturing_stations_count
   for (const plan of source.plans) {
     for (const [type, rooms] of Object.entries(plan.rooms)) {
       const expectedCount = type === 'trading' ? config.trading_stations_count : config.manufacturing_stations_count
@@ -132,8 +134,8 @@ export function parseManualScheduleJson(text: string, config: LicenseConfig, ope
         .flatMap(([product, count]) => Array<string>(count).fill(product))
       rooms.forEach((room, index) => {
         if (type === 'trading' || type === 'manufacture') {
-          if ((room.level === undefined || room.product === undefined) && rooms.length !== expectedCount) throw new Error(copy.tools.manualSchedule.importLayoutMismatch)
-          room.level ??= levels?.[index] ?? 3
+          if ((room.product === undefined || (requiresFacilityLayout && room.level === undefined)) && rooms.length !== expectedCount) throw new Error(copy.tools.manualSchedule.importLayoutMismatch)
+          room.level ??= (matchingLayout ? levels?.[index] : undefined) ?? 3
           room.product ??= products[index]
         } else room.level ??= type === 'control' || type === 'dormitory' ? 5 : 3
       })
