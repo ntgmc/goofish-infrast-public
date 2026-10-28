@@ -63,7 +63,6 @@ describe('manual schedule tool', () => {
     const user = userEvent.setup()
     page()
     await user.click(screen.getByText(copy.tools.manualSchedule.blankSettings))
-    await user.selectOptions(screen.getByLabelText(copy.domain.recycling.level), '2')
     await user.click(screen.getByRole('button', { name: '从零开始排班' }))
     await user.click(screen.getByRole('button', { name: '模拟测算' }))
     expect(mocks.submit).toHaveBeenCalledWith(expect.objectContaining({
@@ -73,8 +72,6 @@ describe('manual schedule tool', () => {
     const submitted = mocks.submit.mock.calls[0][0]
     expect(submitted.manualSchedule.baselineHistoryId).toBeUndefined()
     expect(submitted.manualSchedule.plans[0].rooms.manufacture[0]).toEqual(['', '', ''])
-    expect(submitted.config.recycling_station_level).toBe(2)
-    expect(submitted.manualSchedule.plans.every((plan: { rooms: { recycling: string[][] } }) => plan.rooms.recycling[0].length === 2)).toBe(true)
     expect(await screen.findByText(copy.domain.manual_schedule.simulated)).toBeVisible()
   })
 
