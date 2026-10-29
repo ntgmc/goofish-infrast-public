@@ -82,7 +82,7 @@ export async function writeWebResponse(res: ServerResponse, response: Response):
   res.statusCode = response.status
   res.statusMessage = response.statusText
   response.headers.forEach((value, key) => {
-    res.setHeader(key, value)
+    res.setHeader(key, key === 'set-cookie' ? response.headers.getSetCookie() : value)
   })
 
   if (!response.body) {

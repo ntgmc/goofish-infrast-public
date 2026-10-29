@@ -20,6 +20,7 @@ export type AdminCapability =
   | 'user_delete'
   | 'optimization_view'
   | 'optimization_manage'
+  | 'optimization_rate_limit_bypass'
   | 'admin_manage'
 
 export interface AdminSessionUser {

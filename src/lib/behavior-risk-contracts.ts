@@ -13,6 +13,7 @@ const adminCapabilitySchema = z.enum([
   'user_delete',
   'optimization_view',
   'optimization_manage',
+  'optimization_rate_limit_bypass',
   'admin_manage',
 ])
 

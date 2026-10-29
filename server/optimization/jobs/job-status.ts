@@ -6,6 +6,7 @@ import type { OptimizationFailureSnapshot, OptimizationJobListItem, Optimization
 import { recordUsageEvent } from "../../handlers/usage-stats";
 import { getProfileForUser, normalizeProfileKind } from "../../storage/user-store";
 import { requireUserSession } from "../../handlers/user-auth";
+import { authenticateAdminRequest } from '../../handlers/admin-auth';
 import { getOptimizeJobStore, OptimizeJobAdmissionError, type OptimizeJobPriority, type OptimizeJobQueueEstimate, type OptimizeJobRecord, type OptimizeJobSummaryRecord, type OptimizeJobStore } from "../../storage/optimize-job-store";
 import { requestOptimizeJobCancellation, requestOptimizeJobProcessing } from "../../optimize-job-signals";
 import type { OptimizeDurationEstimate, OptimizeRuntimeEstimate } from './shared';
@@ -62,6 +63,7 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
         clientIp: getRequestClientIp(req),
       });
     }
+    const admin = await authenticateAdminRequest(req, 'optimization_rate_limit_bypass');
     const admissionInput = {
       id: randomUUID(),
       priority: prepared.priorityValue,
@@ -77,6 +79,7 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
       use_priority_coupon: prepared.usePriorityCoupon === true,
       reward_item_codes: prepared.rewardItemCodes ?? [],
       billing: prepared.billing ?? null,
+      bypass_submission_rate_limit: admin.ok,
     };
     // Third-party test stores predating atomic admission remain read-only test
     // doubles; production and the built-in memory store always implement admitJob.

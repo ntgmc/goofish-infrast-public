@@ -7,6 +7,10 @@ changelog-release.json
 changelog-release.md
 release-sbom.cdx.json
 .cache/
+# Keep the schedule benchmark and its operator inputs local.
+/tools/schedule-benchmark/
+/tools/operators/
+/docs/schedule-benchmark.md
 .idea/
 *.pyc
 __pycache__/

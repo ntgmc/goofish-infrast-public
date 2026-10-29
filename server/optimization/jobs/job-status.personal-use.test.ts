@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   requestOptimizeJobProcessing: vi.fn(),
   requireUserSession: vi.fn(),
   getProfileForUser: vi.fn(),
+  authenticateAdminRequest: vi.fn(),
 }))
 
 vi.mock('./prepare-job', () => ({ prepareOptimizeJob: mocks.prepareOptimizeJob }))
@@ -23,6 +24,7 @@ vi.mock('../../storage/optimize-job-store', () => ({
   }),
 }))
 vi.mock('../../handlers/user-auth', () => ({ requireUserSession: mocks.requireUserSession }))
+vi.mock('../../handlers/admin-auth', () => ({ authenticateAdminRequest: mocks.authenticateAdminRequest }))
 vi.mock('../../storage/user-store', () => ({
   getProfileForUser: mocks.getProfileForUser,
   normalizeProfileKind: (profile: { kind: string }) => profile.kind,
@@ -72,6 +74,7 @@ describe('personal-use optimization admission', () => {
     mocks.requireUserSession.mockResolvedValue({ user: { id: 'user-1' } })
     mocks.getProfileForUser.mockResolvedValue({ id: 'profile-1', kind: 'cdk', permission: 'advanced' })
     mocks.recordRequestBehaviorEvent.mockResolvedValue(true)
+    mocks.authenticateAdminRequest.mockResolvedValue({ ok: false, response: new Response(null, { status: 401 }) })
   })
 
   it('returns 428 before admission when the current declaration is not accepted', async () => {
@@ -94,6 +97,19 @@ describe('personal-use optimization admission', () => {
 
     await expect(submitOptimizationJob(request())).rejects.toThrow('database unavailable')
     expect(mocks.admitJob).not.toHaveBeenCalled()
+  })
+
+  it.each([true, false])('derives the rate-limit exemption from administrator authentication: %s', async (allowed) => {
+    mocks.authenticateAdminRequest.mockResolvedValueOnce(allowed
+      ? { ok: true, username: 'administrator', capabilities: ['optimization_rate_limit_bypass'] }
+      : { ok: false, response: new Response(null, { status: 401 }) })
+    mocks.admitJob.mockResolvedValueOnce({ job: jobRecord(), replayed: false })
+
+    const response = await submitOptimizationJob(requestWithBody('{"bypass_submission_rate_limit":true}'))
+
+    expect(response.status).toBe(202)
+    expect(mocks.authenticateAdminRequest).toHaveBeenCalledWith(expect.any(Request), 'optimization_rate_limit_bypass')
+    expect(mocks.admitJob).toHaveBeenCalledWith(expect.objectContaining({ bypass_submission_rate_limit: allowed }))
   })
 
   it('returns an accepted replay before mutable preparation and hashes equivalent JSON canonically', async () => {
