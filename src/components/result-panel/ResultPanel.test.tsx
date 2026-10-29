@@ -351,6 +351,22 @@ describe('ResultPanel overview v2', () => {
     },
   )
 
+  it('preserves manual history dormitory assignments despite a pure-autofill rule', async () => {
+    const user = userEvent.setup()
+    const result = createPreviewOrderResult()
+    result.schedule_source = 'manual'
+    result.dormitory_rule = 'maa_pure_autofill'
+    result.plans[0].rooms.dormitory.push({ operators: ['宿舍干员2'] })
+    render(<ResultPanel result={result} />)
+    for (const tab of ['总览图', '总览图 v2', '详情']) {
+      await user.click(screen.getByRole('tab', { name: tab }))
+      const panel = within(screen.getByRole('tabpanel', { name: tab }))
+      expect(panel.getByText('宿舍干员')).toBeInTheDocument()
+      expect(panel.getByText('宿舍干员2')).toBeInTheDocument()
+      expect(panel.queryByText('宿舍由 MAA 自动填满')).not.toBeInTheDocument()
+    }
+  })
+
   it.each(['maa_autofill', 'maa_pure_autofill'] as const)('marks explicitly placed dormitory recovery support in %s', async (mode) => {
     const user = userEvent.setup()
     const result = createPreviewOrderResult()

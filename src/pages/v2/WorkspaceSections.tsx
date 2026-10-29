@@ -122,7 +122,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
     </div>
     {openedTools.map((tool) => <div key={tool} className="v2-section-body" hidden={section !== tool} inert={section !== tool}>
       <Suspense fallback={<V2SectionLoading />}>
-        {tool === 'manual-tool' && v2SectionAvailable(tool, features) && <ManualTool session={session} onDirtyChange={onToolDirtyChange} onOpenProfile={onOpenProfile} />}
+        {tool === 'manual-tool' && v2SectionAvailable(tool, features) && <ManualTool session={session} workflow={workflow} onDirtyChange={onToolDirtyChange} onOpenProfile={onOpenProfile} onNavigate={onNavigate} />}
         {tool === 'schedule-comparison' && v2SectionAvailable(tool, features) && <ScheduleComparison session={session} onOpenProfile={onOpenProfile} />}
         {tool === 'cultivation' && v2SectionAvailable(tool, features) && <Cultivation session={session} />}
         {tool === 'thanks-recruitment' && v2SectionAvailable(tool, features) && <ThanksRecruitment session={session} embedded />}

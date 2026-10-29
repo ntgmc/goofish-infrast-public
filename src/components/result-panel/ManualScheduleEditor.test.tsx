@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CONFIG_PRESETS } from '../../lib/config'
 import type { OptimizeResult } from '../../lib/types'
+import type { OptimizationJobSnapshot } from '../../lib/optimization-contracts'
 import ResultPanel from './ResultPanel'
 import ManualScheduleEditor from './ManualScheduleEditor'
 import { createManualPlans, saveManualDraft } from '../../lib/manual-schedule'
@@ -41,6 +42,25 @@ async function editor(result = source) {
   return { user, scope: within(await screen.findByRole('region', { name: '手动调整排班' })) }
 }
 describe('manual simulation lifecycle', () => {
+  it.each(['manual-history', undefined])('exports the completed simulation using history ID %s and clears it on edit', async (historyResultId) => {
+    mocks.snapshot.mockResolvedValue({
+      status: 'succeeded', result: simulated, historyResultId,
+    } satisfies Pick<Extract<OptimizationJobSnapshot, { status: 'succeeded' }>, 'status' | 'result' | 'historyResultId'>)
+    const renderExport = vi.fn(({ resultId }: { resultId: string }) => <button>Export {resultId}</button>)
+    const user = userEvent.setup()
+    render(<ManualScheduleEditor source={source} profileId="manual" operators={[]}
+      simulationBaseline={{ id: 'history-1', config: CONFIG_PRESETS['243'] }} renderExport={renderExport} />)
+    expect(renderExport).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: '模拟测算' }))
+    const resultId = historyResultId ?? 'manual-job'
+    expect(await screen.findByRole('button', { name: `Export ${resultId}` })).toBeVisible()
+    expect(renderExport).toHaveBeenLastCalledWith(expect.objectContaining({ result: simulated, resultId, shift: 0 }))
+    await user.click(screen.getByRole('button', { name: /编辑 制造站.*芬/ }))
+    await user.click(screen.getByRole('button', { name: '清空此位置' }))
+    await user.click(screen.getByRole('button', { name: '完成' }))
+    expect(screen.queryByRole('button', { name: `Export ${resultId}` })).not.toBeInTheDocument()
+  })
+
   it.each(['manual', 'tool:manual'])('clears only the draft at %s when resetting a reopened schedule', async (draftStorageKey) => {
     const user = userEvent.setup()
     const operators = ['芬', '克洛丝'].map((name) => ({ id: name, name, own: true, elite: 1, rarity: 3 }))

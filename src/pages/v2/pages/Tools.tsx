@@ -10,6 +10,9 @@ import OperatorSkillPreview from '../../../components/result-panel/OperatorSkill
 import { OperatorAvatarTile } from '../../../components/result-panel/OperatorAvatarStrip'
 import { useManualTool } from '../../ManualSchedulePage'
 import { Field, Notice, SectionTitle } from '../components/WorkspaceUI'
+import ManualResultExport from '../ManualResultExport'
+import type { V2Workflow } from '../WorkspaceSections'
+import type { V2Section } from '../navigation'
 
 export default function Tools({ profileId }: { profileId?: string }) {
   const { features } = useSiteFeatures()
@@ -25,7 +28,7 @@ export default function Tools({ profileId }: { profileId?: string }) {
   return <div className="v2-tools-directory">{tools.map((tool, index) => <Link key={tool.section} to={v2Path(tool.section, profileId)}><span className="v2-tool-number">0{index + 1}</span><tool.icon size={28} aria-hidden="true" /><div><h2>{tool.title}</h2><p>{tool.description}</p></div><span className="v2-tool-enter"><ArrowRight size={22} aria-hidden="true" /></span></Link>)}{!tools.length && <Notice>{copy.v2.featureUnavailable}</Notice>}</div>
 }
 
-export function ManualTool({ session, onDirtyChange, onOpenProfile }: { session: V2Session; onDirtyChange: (dirty: boolean) => void; onOpenProfile: (profile: V2Session['profiles'][number]) => Promise<void> }) {
+export function ManualTool({ session, workflow, onDirtyChange, onOpenProfile, onNavigate }: { session: V2Session; workflow?: V2Workflow; onDirtyChange: (dirty: boolean) => void; onOpenProfile: (profile: V2Session['profiles'][number]) => Promise<void>; onNavigate: (section: V2Section) => void }) {
   const m = useManualTool({ session, embedded: true, onDirtyChange })
   const text = copy.tools.manualSchedule
   const operatorsPath = (profileId: string) => `${v2Path('overview', profileId)}&panel=operators`
@@ -49,6 +52,7 @@ export function ManualTool({ session, onDirtyChange, onOpenProfile }: { session:
       onPresetChange={(preset) => { m.setPreset(preset); m.setConfigDraft(null) }}
       onUpdate={(mutate) => { const next = structuredClone(m.baseConfig); mutate(next); m.setConfigDraft(next) }} onStart={m.start} />
     <Notice error>{m.error ?? session.workspaceLoadError}{session.workspaceLoadError && m.profile && <button className="v2-text-button" disabled={Boolean(session.openingProfileId)} onClick={() => void session.refreshProfileWorkspace(m.profile!).catch(() => undefined)}>{text.retryWorkspace}</button>}</Notice>
-    {m.canUse && m.draft && m.draft.profileId === m.profile?.id && <div className="v2-manual-editor"><ManualScheduleEditor key={`${m.draft.profileId}:${m.draft.revision}`} source={m.draft.source} profileId={m.draft.profileId} draftStorageKey={`tool:${m.draft.profileId}`} operators={m.operators} simulationBaseline={{ config: m.draft.config }} onDirtyChange={onDirtyChange} /></div>}
+    {m.canUse && m.draft && m.draft.profileId === m.profile?.id && <div className="v2-manual-editor"><ManualScheduleEditor key={`${m.draft.profileId}:${m.draft.revision}`} source={m.draft.source} profileId={m.draft.profileId} draftStorageKey={`tool:${m.draft.profileId}`} operators={m.operators} simulationBaseline={{ config: m.draft.config }} onDirtyChange={onDirtyChange} renderExport={(props) => workflow && <ManualResultExport key={props.resultId} {...props} workflow={workflow}
+      onRecover={(action) => { onNavigate(action === 'login' ? 'generation' : action); if (action === 'login') session.retryAuth() }} />} /></div>}
   </div>
 }

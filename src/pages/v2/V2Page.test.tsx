@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { useState } from 'react'
+import { useState, type ComponentProps } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '../../test/query-render'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
@@ -17,6 +17,8 @@ import { SANITY_PER_LMD, SANITY_PER_PURE_GOLD } from '../../lib/orundum-economy'
 import { ApiError } from '../../lib/api-client'
 import { FIRST_SCHEDULE_INTENT_KEY } from '../../lib/first-schedule'
 import type { ResultExportFailure } from '../tool/optimize/useResultDownloads'
+import type ManualScheduleEditor from '../../components/result-panel/ManualScheduleEditor'
+import { prepareResult } from '../../components/result-panel/formatters'
 
 const mocks = vi.hoisted(() => ({
   session: vi.fn(),
@@ -130,6 +132,7 @@ function connect() {
     currentResult: null as OptimizeResult | null, finalResult: null, historyItem: { result: SAMPLE_RESULT },
     activeConfig: SAMPLE_CONFIG, mergedOperators: SAMPLE_OPERATORS, configDiffRows: [],
     updateConfig: vi.fn(), handleGenerate: vi.fn(async () => undefined), handleDownloadMAA: vi.fn(),
+    downloadMaaResult: vi.fn(), downloadFullResult: vi.fn(),
     permission: 'ultimate', userCanEditConfig: true, userCanUseIntermediateAutoConfig: true, userCanUseUpgradeFeatures: true,
     userCanUseScenarioLab: true, refreshInventory: vi.fn(async () => undefined),
     userCanViewFullData: true, userCanDownloadFullResult: true, handleDownloadFullResult: vi.fn(),
@@ -1587,6 +1590,51 @@ describe('V2 feature continuity', () => {
     await act(async () => { finishInventory(new Response(JSON.stringify({ stacks: [], capacities: [], recent_events: [] }), { status: 200 })) })
     expect(await screen.findByRole('heading', { name: copy.inventory.title, level: 2 })).toBeInTheDocument()
     expect(screen.queryByRole('status', { name: copy.inventory.loading })).not.toBeInTheDocument()
+  })
+
+  it.each(['overview', 'manual-tool'])('exports the manual simulation instead of the original result from %s', async (section) => {
+    const workflow = connect()
+    session.workspace = { operators: SAMPLE_OPERATORS, config: SAMPLE_CONFIG } as V2Session['workspace']
+    const result: OptimizeResult = { ...structuredClone(SAMPLE_RESULT), schedule_source: 'manual', title: 'Manual simulation' }
+    result.dormitory_rule = 'maa_pure_autofill'
+    result.plans[0].rooms.dormitory = [{ operators: ['杜林'], autofill: false }, { operators: ['安赛尔'], autofill: false }]
+    mocks.manual.mockImplementation(({ renderExport }: ComponentProps<typeof ManualScheduleEditor>) => renderExport?.({
+      result, resultId: 'manual-simulation', prepared: prepareResult(result, false, true, SAMPLE_OPERATORS), shift: 0,
+    }))
+    const user = userEvent.setup()
+    mount(`/v2?section=${section}&profile_id=profile-1`)
+    if (section === 'overview') await user.click(screen.getByRole('button', { name: copy.v2.manualTab }))
+    else {
+      await user.click(await screen.findByText(copy.tools.manualSchedule.blankSettings))
+      await user.click(screen.getByRole('button', { name: copy.tools.manualSchedule.start }))
+    }
+    await user.click(await screen.findByRole('button', { name: copy.v2.export }))
+    const dialog = within(await screen.findByRole('dialog', { name: copy.v2.exportTitle }))
+    await user.click(dialog.getByRole('button', { name: copy.v2.exportMaa }))
+    expect(workflow.downloadMaaResult).toHaveBeenCalledWith('manual-simulation')
+    expect(workflow.handleDownloadMAA).not.toHaveBeenCalled()
+    await user.click(dialog.getByRole('button', { name: copy.domain.components_result_panel_ResultPanel_039 }))
+    expect(workflow.downloadFullResult).toHaveBeenCalledWith('manual-simulation')
+    expect(workflow.handleDownloadFullResult).not.toHaveBeenCalled()
+    await user.click(dialog.getByRole('button', { name: copy.domain.result_image.current }))
+    await waitFor(() => expect(mocks.image).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Manual simulation', manual: true, planIndex: 0,
+    })))
+    const prepared = mocks.image.mock.calls[0][0].prepared
+    expect(prepared.plans[0].rows.filter((row: { roomType: string }) => row.roomType === 'dormitory').map((row: { operatorText: string }) => row.operatorText)).toEqual(['杜林', '安赛尔'])
+  })
+
+  it('shows stationed dormitory operators when opening a manual history result', () => {
+    const workflow = connect()
+    const result: OptimizeResult = { ...structuredClone(SAMPLE_RESULT), schedule_source: 'manual', dormitory_rule: 'maa_pure_autofill' }
+    result.plans[0].rooms.dormitory = [{ operators: ['杜林'], autofill: false }, { operators: ['安赛尔'], autofill: false }]
+    workflow.historyItem = { result }
+    mount()
+    const dormitories = document.querySelectorAll('.v2-room-dormitory')
+    expect(dormitories).toHaveLength(2)
+    expect(dormitories[0]).toHaveTextContent('杜林')
+    expect(dormitories[1]).toHaveTextContent('安赛尔')
+    expect(screen.queryByText(copy.domain.components_result_panel_formatters_005)).not.toBeInTheDocument()
   })
 
   it('retains manual changes across tabs and pages and uses the selected history baseline', async () => {
