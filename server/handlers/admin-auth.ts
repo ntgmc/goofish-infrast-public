@@ -37,6 +37,7 @@ export type AdminCapability =
   | 'user_delete'
   | 'optimization_view'
   | 'optimization_manage'
+  | 'optimization_rate_limit_bypass'
   | 'admin_manage'
 
 export interface AdminAuthenticationRequirement {
@@ -342,8 +343,8 @@ function adminUserAuditSnapshot(user: AdminUserRecord) {
   }
 }
 
-function clearAdminSessionCookie(): string {
-  return `${ADMIN_SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=0${secureCookieSuffix()}`
+export function clearAdminSessionCookie(path: '/api' | '/api/admin' = '/api'): string {
+  return `${ADMIN_SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path=${path}; Max-Age=0${secureCookieSuffix()}`
 }
 
 async function verifyAdminUser(username: string | null, password: string): Promise<AdminUserRecord | null> {
@@ -389,7 +390,7 @@ function createAdminSessionRecord(username: string, now: Date): { token: string;
 }
 
 function adminSessionCookie(token: string): string {
-  return `${ADMIN_SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/api/admin${secureCookieSuffix()}`
+  return `${ADMIN_SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/api${secureCookieSuffix()}`
 }
 
 function getAdminSessionToken(req: Request): { present: boolean; token: string | null } {
@@ -446,6 +447,7 @@ function capabilitiesForRole(role: AdminRole): AdminCapability[] {
       'user_delete',
       'optimization_view',
       'optimization_manage',
+      'optimization_rate_limit_bypass',
       'admin_manage',
     ]
   }

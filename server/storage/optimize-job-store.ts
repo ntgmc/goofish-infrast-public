@@ -111,6 +111,7 @@ interface AdmitOptimizeJobInput<TPayload = unknown> extends CreateOptimizeJobInp
   legacy_request_hash?: string
   reward_user_id?: string | null
   use_priority_coupon?: boolean
+  bypass_submission_rate_limit?: boolean
   reward_item_codes?: string[]
   billing?: { userId: string; operation: MeteredBillingOperation; billingKind: MeteredBillingKind; confirmation: MeteredQuoteConfirmation } | null
 }
@@ -435,7 +436,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
            where owner_key = $1 and created_at >= now() - make_interval(hours => $2::int)`,
           [input.owner_key, limits.submissionWindowHours],
         )
-        if (Number(submitted.rows[0]?.count ?? 0) >= limits.submissions) {
+        if (!input.bypass_submission_rate_limit && Number(submitted.rows[0]?.count ?? 0) >= limits.submissions) {
           const message = input.source === 'free_preview'
             ? `免费预览每 ${limits.submissionWindowHours} 小时最多提交 ${limits.submissions} 次排班，请稍后再试。`
             : '当前账号的优化提交次数已达小时上限。请1小时后再试。'
@@ -456,7 +457,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
             || Number(usage?.queued ?? 0) >= commercialPolicy.max_queued_jobs) {
             throw new OptimizeJobAdmissionError('commercial_queue_capacity_exceeded', 429, '商用账户的优化队列已满，请稍后重试。')
           }
-          if (Number(usage?.submitted ?? 0) >= commercialPolicy.max_submissions_per_hour) {
+          if (!input.bypass_submission_rate_limit && Number(usage?.submitted ?? 0) >= commercialPolicy.max_submissions_per_hour) {
             throw new OptimizeJobAdmissionError('commercial_submission_rate_exceeded', 429, '商用账户每小时最多接纳 30 个新任务。')
           }
         }
@@ -1427,13 +1428,13 @@ export function createMemoryOptimizeJobStore(
           || accountJobs.filter((job) => job.status === 'queued').length >= 8) {
           throw new OptimizeJobAdmissionError('commercial_queue_capacity_exceeded', 429, '商用账户的优化队列已满，请稍后重试。')
         }
-        if (accountRecent.length >= 30) throw new OptimizeJobAdmissionError('commercial_submission_rate_exceeded', 429, '商用账户每小时最多接纳 30 个新任务。')
+        if (!input.bypass_submission_rate_limit && accountRecent.length >= 30) throw new OptimizeJobAdmissionError('commercial_submission_rate_exceeded', 429, '商用账户每小时最多接纳 30 个新任务。')
         commercialSubmission = { key: accountKey, recent: accountRecent }
       }
       const submissionWindowHours = free ? productPolicies.free_preview.submission_window_hours : 1
       const submissionLimit = free ? productPolicies.free_preview.max_submissions_per_window : 12
       const recent = (submissions.get(input.owner_key) ?? []).filter((time) => time >= now - submissionWindowHours * 60 * 60_000)
-      if (recent.length >= submissionLimit) {
+      if (!input.bypass_submission_rate_limit && recent.length >= submissionLimit) {
         const message = free
           ? `免费预览每 ${submissionWindowHours} 小时最多提交 ${submissionLimit} 次排班，请稍后再试。`
           : '当前账号的优化提交次数已达小时上限。请1小时后再试。'

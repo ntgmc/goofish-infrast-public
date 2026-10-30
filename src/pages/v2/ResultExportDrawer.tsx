@@ -41,7 +41,7 @@ export default function ResultExportDrawer({ open, onOpenChange, result, prepare
     try {
       const { downloadScheduleImage } = await import('../../components/result-panel/schedule-image')
       await downloadScheduleImage({ prepared, isRotationMode, version: 'v2', title: result.title,
-        shiftHours: result.shift_hours, planIndex: allPlans ? undefined : selected })
+        shiftHours: result.shift_hours, planIndex: allPlans ? undefined : selected, manual: result.schedule_source === 'manual' })
     } catch (error) {
       const reasons: Record<string, string> = { 'Canvas unavailable': text.exportImageCanvasFailed, 'PNG encoding failed': text.exportImageEncodingFailed, 'No schedule to export': text.exportImageEmpty }
       const reason = error instanceof Error ? reasons[error.message] : undefined

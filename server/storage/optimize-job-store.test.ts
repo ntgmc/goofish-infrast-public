@@ -347,6 +347,39 @@ describe('optimization job submission admission', () => {
     )
   })
 
+  it.each([['account_profile', 12], ['free_preview', 2]] as const)('exempts a trusted administrator from the %s time-window limit while counting submissions', async (source, limit) => {
+    const store = createMemoryOptimizeJobStore()
+    const owner = `profile:${randomUUID()}`
+    for (let index = 0; index < limit; index += 1) {
+      const accepted = await store.admitJob(admissionInput(owner, source))
+      store.records.get(accepted.job.id)!.status = 'succeeded'
+    }
+    await expect(store.admitJob(admissionInput(owner, source))).rejects.toMatchObject({ code: 'submission_rate_exceeded' })
+    const privileged = await store.admitJob({ ...admissionInput(owner, source), bypass_submission_rate_limit: true })
+    store.records.get(privileged.job.id)!.status = 'succeeded'
+    await expect(store.admitJob(admissionInput(owner, source))).rejects.toMatchObject({ code: 'submission_rate_exceeded' })
+    expect(store.records.size).toBe(limit + 1)
+  })
+
+  it('exempts the commercial hourly limit while preserving billing and queue capacity', async () => {
+    const store = createMemoryOptimizeJobStore()
+    const billing = { userId: 'commercial-owner', billingKind: 'metered_commercial' as const,
+      operation: 'main_schedule' as const, confirmation: { quoteId: 'quote', pricingVersion: 'test', acceptedMaxPoints: '1.00' } }
+    for (let index = 0; index < 30; index += 1) {
+      const accepted = await store.admitJob({ ...admissionInput(`profile:${randomUUID()}`, 'account_profile'), billing })
+      store.records.get(accepted.job.id)!.status = 'succeeded'
+    }
+    await expect(store.admitJob({ ...admissionInput('profile:blocked', 'account_profile'), billing }))
+      .rejects.toMatchObject({ code: 'commercial_submission_rate_exceeded' })
+    const owner = `profile:${randomUUID()}`
+    const privileged = await store.admitJob({ ...admissionInput(owner, 'account_profile'), billing, bypass_submission_rate_limit: true })
+    expect(privileged.job.billing_json).toMatchObject({ status: 'reserved', charge: '1.00' })
+    await store.admitJob({ ...admissionInput(owner, 'account_profile'), billing, bypass_submission_rate_limit: true })
+    await store.admitJob({ ...admissionInput(owner, 'account_profile'), billing, bypass_submission_rate_limit: true })
+    await expect(store.admitJob({ ...admissionInput(owner, 'account_profile'), billing, bypass_submission_rate_limit: true }))
+      .rejects.toMatchObject({ code: 'queue_capacity_exceeded' })
+  })
+
   it('limits free previews to two submissions in a rolling six-hour window', async () => {
     vi.useFakeTimers()
     const startedAt = new Date('2026-08-29T00:00:00.000Z')

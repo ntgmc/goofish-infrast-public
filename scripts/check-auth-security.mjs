@@ -1212,7 +1212,7 @@ async function assertAdminAuthenticationRateLimits() {
   assert.match(login.cookie, /^maa_admin_session=[A-Za-z0-9_-]{43};/)
   assert.match(login.cookie, /; HttpOnly/)
   assert.match(login.cookie, /; SameSite=Strict/)
-  assert.match(login.cookie, /; Path=\/api\/admin/)
+  assert.match(login.cookie, /; Path=\/api(?:;|$)/)
   assert.doesNotMatch(login.cookie, /Max-Age|Expires=/i, 'admin session cookie should close with the browser')
   assert.doesNotMatch(login.cookie, /; Secure/, 'development admin cookie should work over HTTP')
   const sessionToken = adminCookieToken(login.cookie)
@@ -1243,6 +1243,7 @@ async function assertAdminAuthenticationRateLimits() {
         'user_delete',
         'optimization_view',
         'optimization_manage',
+        'optimization_rate_limit_bypass',
         'admin_manage',
       ])
   )))
@@ -1502,13 +1503,18 @@ async function assertAdminAuthenticationRateLimits() {
   }))
   assert.equal(handlerLoginResponse.status, 200)
   assert.equal(handlerLoginResponse.headers.get('Cache-Control'), 'no-store')
-  const handlerCookie = handlerLoginResponse.headers.get('Set-Cookie')
+  const loginCookies = handlerLoginResponse.headers.getSetCookie()
+  const handlerCookie = loginCookies[0]
   assert(handlerCookie)
+  assert.match(handlerCookie, /; Path=\/api(?:;|$)/)
+  assert.match(loginCookies[1], /Path=\/api\/admin; Max-Age=0/)
   const handlerSessionResponse = await adminSessionHandler.default(adminSessionRequest(handlerCookie))
   assert.equal(handlerSessionResponse.status, 200)
   const handlerLogoutResponse = await adminSessionHandler.default(adminSessionRequest(handlerCookie, { method: 'DELETE' }))
   assert.equal(handlerLogoutResponse.status, 200)
-  assert.match(handlerLogoutResponse.headers.get('Set-Cookie') ?? '', /Max-Age=0/)
+  const logoutCookies = handlerLogoutResponse.headers.getSetCookie()
+  assert.match(logoutCookies[0], /Path=\/api; Max-Age=0/)
+  assert.match(logoutCookies[1], /Path=\/api\/admin; Max-Age=0/)
   const handlerMethodResponse = await adminSessionHandler.default(adminSessionRequest('', { method: 'PUT' }))
   assert.equal(handlerMethodResponse.status, 405)
   const idempotentLogout = await adminSessionHandler.default(adminSessionRequest('', { method: 'DELETE' }))

@@ -32,6 +32,21 @@ describe('Node HTTP adapter', () => {
     expect(arrayBufferSpy).not.toHaveBeenCalled()
   })
 
+  it('preserves separate session and legacy-cookie deletion headers over HTTP', async () => {
+    const cookies = ['maa_admin_session=current; HttpOnly; SameSite=Strict; Path=/api',
+      'maa_admin_session=; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=0']
+    const server = createServer(async (_request, response) => {
+      const headers = new Headers()
+      for (const cookie of cookies) headers.append('Set-Cookie', cookie)
+      await writeWebResponse(response, new Response(null, { headers }))
+    })
+    servers.push(server)
+    const port = await listen(server)
+    const response = await fetch(`http://127.0.0.1:${port}/api/admin/session`)
+    expect(response.headers.getSetCookie()).toEqual(cookies)
+    await response.text()
+  })
+
   it('cancels a late response after the client has already disconnected', async () => {
     let resolveClosed!: () => void
     const closed = new Promise<void>((resolve) => { resolveClosed = resolve })

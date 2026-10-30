@@ -117,7 +117,7 @@ function memoryStorePlugin() {
         path: 'memory-user-store',
         namespace: 'depot-profile-smoke',
       }))
-      build.onResolve({ filter: /(^|[\\/])user-auth(\.ts)?$/ }, () => ({
+      build.onResolve({ filter: /(^|[\\/])(?:user-auth|admin-auth)(\.ts)?$/ }, () => ({
         path: 'memory-user-auth',
         namespace: 'depot-profile-smoke',
       }))
@@ -377,6 +377,7 @@ function memoryOptimizeJobStoreModule() {
 function memoryUserAuthModule() {
   return `
     const store = globalThis.__depotProfileSmokeStore
+    export async function authenticateAdminRequest() { return { ok: false } }
     export function jsonResponse(body, status = 200, headers = {}) {
       return new Response(status === 204 ? null : JSON.stringify(body), {
         status,

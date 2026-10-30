@@ -97,7 +97,8 @@ export function prepareResult(
       if (isRotationMode && roomType === 'dormitory') return []
       return rooms.flatMap((room, index) => {
         const queueLabel = isRotationMode ? plan.name || `${copy.domain.components_result_panel_formatters_003}${planIndex + 1}` : plan.name || `${copy.domain.components_result_panel_formatters_004}${planIndex + 1}`
-        if (roomType === 'dormitory' && isPureMaaDormitoryAutofill && !rooms.some((entry) => entry.recovery_support_operators?.length)) {
+        if (roomType === 'dormitory' && isPureMaaDormitoryAutofill && result.schedule_source !== 'manual'
+          && !rooms.some((entry) => entry.recovery_support_operators?.length)) {
           if (index > 0) return []
           return [{
             key: `${planIndex}-${roomType}-maa-autofill`,

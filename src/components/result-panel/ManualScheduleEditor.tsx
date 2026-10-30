@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ExportImageIcon as Download, ClearIcon as Eraser, LockedOperatorIcon as LockKeyhole, UploadIcon as Upload, BackupIcon } from '../icons'
 import type { LicenseConfig, LicenseOperator, OptimizeResult } from '../../lib/types'
 import { copy } from '../../copy/index'
@@ -6,7 +6,7 @@ import { canonicalJson } from '../../lib/crypto'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '../ui/dialog'
 import ResultBoardV2, { type BoardRoom } from './ResultBoardV2'
 import { OperatorAvatarTile } from './OperatorAvatarStrip'
-import { prepareResult } from './formatters'
+import { prepareResult, type PreparedResult } from './formatters'
 import ManualOperatorPicker from './ManualOperatorPicker'
 import ResultMetrics from './ResultMetrics'
 import ResultDetail from './ResultDetail'
@@ -21,13 +21,14 @@ import {
   manualSourceKey, parseManualDraft, readManualDraft, saveManualDraft, type ManualDraft, type ManualPlan,
 } from '../../lib/manual-schedule'
 
-export default function ManualScheduleEditor({ source: initialSource, profileId, operators, simulationBaseline, draftStorageKey = profileId, onDirtyChange }: {
+export default function ManualScheduleEditor({ source: initialSource, profileId, operators, simulationBaseline, draftStorageKey = profileId, onDirtyChange, renderExport }: {
   source: OptimizeResult;
   profileId: string;
   operators: LicenseOperator[];
   simulationBaseline?: { id?: string; config: LicenseConfig };
   draftStorageKey?: string;
   onDirtyChange?: (dirty: boolean) => void;
+  renderExport?: (props: { result: OptimizeResult; resultId: string; prepared: PreparedResult; shift: number }) => ReactNode;
 }) {
   const label = copy.domain.manual_schedule
   const standalone = Boolean(simulationBaseline && !simulationBaseline.id)
@@ -45,7 +46,8 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [simulation, setSimulation] = useState<OptimizeResult | null>(null)
+  const [completed, setCompleted] = useState<{ result: OptimizeResult; resultId: string } | null>(null)
+  const simulation = completed?.result ?? null
   const [simulating, setSimulating] = useState(false)
   const simulationRun = useRef(0)
   const simulationLock = useRef(false)
@@ -72,7 +74,7 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
     }
   }, [standalone, source, plans, simulationBaseline, operators])
   useEffect(() => () => { simulationRun.current += 1 }, [])
-  useEffect(() => { setSimulation(null) }, [operatorsKey])
+  useEffect(() => { setCompleted(null) }, [operatorsKey])
 
   useEffect(() => {
     try {
@@ -95,7 +97,7 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
   const update = useCallback((next: ManualPlan[]) => {
     currentInputKey.current = canonicalJson({ source, plans: next, operators })
     setPlans(next)
-    setSimulation(null)
+    setCompleted(null)
     setError(null)
     setNotice(null)
   }, [source, operators])
@@ -114,7 +116,7 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
       setSource(checked)
       currentInputKey.current = canonicalJson({ source: checked, plans: nextPlans, operators })
       setPlans(nextPlans)
-      setSimulation(null)
+      setCompleted(null)
       setError(null)
       setNotice(null)
     } catch (cause) { setError(cause instanceof Error && cause.message === copy.tools.manualSchedule.occupiedSlots
@@ -129,7 +131,7 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
     const isCancelled = () => simulationRun.current !== run
     setSimulating(true)
     setError(null)
-    setSimulation(null)
+    setCompleted(null)
     try {
       const accepted = await submitOptimizationJob({
         kind: 'schedule', identity: { type: 'profile', profileId },
@@ -145,7 +147,7 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
           if (isCancelled()) return
           failures = 0
           if (job.status === 'succeeded') {
-            if (currentInputKey.current === submittedKey) setSimulation(job.result)
+            if (currentInputKey.current === submittedKey) setCompleted({ result: job.result, resultId: job.historyResultId ?? accepted.job_id })
             return
           }
           if (job.status !== 'queued' && job.status !== 'running') throw new Error(job.error.message)
@@ -286,6 +288,7 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
         {draftStorageKey === profileId && <p className="text-sm leading-6 text-ink-secondary">{label.result_scope}</p>}
         <div className="flex flex-wrap gap-2">
           <button type="button" className="tool-primary-action" disabled={!simulationBaseline || simulating || Boolean(settingsError)} aria-busy={simulating} onClick={() => void simulate()}>{label.simulate}</button>
+          {completed && renderExport?.({ ...completed, prepared, shift: activePlan })}
           <button type="button" className="tool-primary-action" disabled={!changed || busy} onClick={save}>{label.save}</button>
           <button type="button" className="tool-secondary-action" disabled={!stored || busy}
             onClick={() => dirty ? setConfirmation('restore') : stored && restore(stored)}>{label.restore}</button>

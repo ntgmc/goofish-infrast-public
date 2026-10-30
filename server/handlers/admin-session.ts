@@ -1,5 +1,6 @@
 import {
   authenticateAdminRequest,
+  clearAdminSessionCookie,
   loginAdminRequest,
   logoutAdminRequest,
 } from './admin-auth'
@@ -14,7 +15,7 @@ export default async (req: Request): Promise<Response> => {
       const body = await getValidatedJson(req, requestSchemas.adminSession)
       const login = await loginAdminRequest(req, body.username, body.password)
       if (!login.ok) return login.response
-      return jsonResponse(
+      const response = jsonResponse(
         {
           user: {
             username: login.username,
@@ -29,6 +30,8 @@ export default async (req: Request): Promise<Response> => {
           'Cache-Control': 'no-store',
         },
       )
+      response.headers.append('Set-Cookie', clearAdminSessionCookie('/api/admin'))
+      return response
     }
 
     if (req.method === 'GET') {
@@ -51,7 +54,7 @@ export default async (req: Request): Promise<Response> => {
     if (req.method === 'DELETE') {
       const logout = await logoutAdminRequest(req)
       if (!logout.ok) return logout.response
-      return jsonResponse(
+      const response = jsonResponse(
         { ok: true },
         200,
         {
@@ -59,6 +62,8 @@ export default async (req: Request): Promise<Response> => {
           'Cache-Control': 'no-store',
         },
       )
+      response.headers.append('Set-Cookie', clearAdminSessionCookie('/api/admin'))
+      return response
     }
 
     return jsonResponse({ error: 'Method not allowed' }, 405, { 'Cache-Control': 'no-store' })

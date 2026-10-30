@@ -94,9 +94,19 @@ describe('admin risk capabilities', () => {
         'user_delete',
         'optimization_view',
         'optimization_manage',
+        'optimization_rate_limit_bypass',
         'admin_manage',
       ],
     })
+  })
+
+  it.each(['risk_viewer', 'risk_reviewer', 'security_admin'] as const)('grants submission-rate exemption only to security administrators: %s', async (role) => {
+    mocks.getAdminUser.mockResolvedValue(adminUser(2, role))
+    const result = await authenticateAdminRequest(adminRequest(), 'optimization_rate_limit_bypass')
+    expect(result.ok).toBe(role === 'security_admin')
+    expect(mocks.recordAdminOperationAudit).toHaveBeenCalledWith(expect.objectContaining({
+      targetId: 'optimization_rate_limit_bypass', action: role === 'security_admin' ? 'authorization.allow' : 'authorization.deny',
+    }))
   })
 
   it('allows a viewer to read usage while denying user data access', async () => {

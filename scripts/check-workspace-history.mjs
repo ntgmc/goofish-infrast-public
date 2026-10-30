@@ -872,7 +872,7 @@ function memoryStorePlugin() {
         path: 'memory-user-store',
         namespace: 'workspace-history-smoke',
       }))
-      build.onResolve({ filter: /(^|[\\/])user-auth(\.ts)?$/ }, () => ({
+      build.onResolve({ filter: /(^|[\\/])(?:user-auth|admin-auth)(\.ts)?$/ }, () => ({
         path: 'memory-user-auth',
         namespace: 'workspace-history-smoke',
       }))
@@ -1167,6 +1167,7 @@ function memoryOptimizationResultStoreModule() {
 function memoryUserAuthModule() {
   return `
     const store = globalThis.__workspaceHistorySmokeStore
+    export async function authenticateAdminRequest() { return { ok: false } }
     export function jsonResponse(body, status = 200, headers = {}) {
       return new Response(status === 204 ? null : JSON.stringify(body), { status, headers: { ...(status === 204 ? {} : { 'Content-Type': 'application/json' }), ...headers } })
     }

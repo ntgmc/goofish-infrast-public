@@ -413,6 +413,20 @@ describe('PostgreSQL optimization job admission', () => {
     })
   })
 
+  it.each([['account_profile', 12], ['free_preview', 2]] as const)('honors a trusted administrator rate-limit exemption for %s and still records submissions', async (source, limit) => {
+    const store = createPostgresOptimizeJobStore()
+    const owner = `profile:${randomUUID()}`
+    for (let index = 0; index < limit; index += 1) {
+      const accepted = await store.admitJob(input({ owner_key: owner, source }))
+      await query("update optimize_jobs set status = 'succeeded' where id = $1", [accepted.job.id])
+    }
+    await expect(store.admitJob(input({ owner_key: owner, source }))).rejects.toMatchObject({ code: 'submission_rate_exceeded' })
+    const accepted = await store.admitJob(input({ owner_key: owner, source, bypass_submission_rate_limit: true }))
+    await query("update optimize_jobs set status = 'succeeded' where id = $1", [accepted.job.id])
+    expect((await query<{ count: string }>('select count(*)::text as count from optimization_submissions where owner_key = $1', [owner])).rows[0]?.count).toBe(String(limit + 1))
+    await expect(store.admitJob(input({ owner_key: owner, source }))).rejects.toMatchObject({ code: 'submission_rate_exceeded' })
+  })
+
   it('limits free previews to two submissions in a rolling six-hour window', async () => {
     const store = createPostgresOptimizeJobStore()
     const owner = `license:${randomUUID()}`

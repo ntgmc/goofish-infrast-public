@@ -28,6 +28,7 @@ import ScheduleContext from './ScheduleContext'
 import IncomeAnalysis from './IncomeAnalysis'
 import ProductionSummary from './ProductionSummary'
 import ResultExportDrawer from './ResultExportDrawer'
+import ManualResultExport from './ManualResultExport'
 import OptionsDrawer, { type OptionPanel, type V2Session } from './OptionsDrawer'
 import { isFreePreviewProfile, isFreePreviewTrialActive, sortOperatorsForPreview } from '../tool/tool-utils'
 import V2Transition, { V2PageTransition } from './V2Transition'
@@ -279,9 +280,10 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
               {label}{view === id && <MotionNavIndicator layoutId="result-tab" variant="underline" />}
             </button>)}
           </div>
-          <ResultActions plans={result.plans} shift={shift} showShift={view === 'schedule'} onShiftChange={setShift} onExport={() => setExportOpen(true)} sample={sample} busy={busy} loadingResult={loadingResult} />
+          {view !== 'manual' && <ResultActions plans={result.plans} shift={shift} showShift={view === 'schedule'} onShiftChange={setShift} onExport={() => setExportOpen(true)} sample={sample} busy={busy} loadingResult={loadingResult} />}
           <div className="v2-feature-content v2-manual-workspace" hidden={view !== 'manual'}>
-            {canManual && manualOpened && session.activeProfile && <Suspense fallback={<p role="status">{text.loading}</p>}><ManualScheduleEditor key={manualKey} source={result} profileId={session.activeProfile.id} operators={operators} simulationBaseline={simulationBaseline} onDirtyChange={setManualDirty} /></Suspense>}
+            {canManual && manualOpened && session.activeProfile && <Suspense fallback={<p role="status">{text.loading}</p>}><ManualScheduleEditor key={manualKey} source={result} profileId={session.activeProfile.id} operators={operators} simulationBaseline={simulationBaseline} onDirtyChange={setManualDirty} renderExport={(props) => workflow && <ManualResultExport key={props.resultId} {...props} workflow={workflow}
+              onRecover={(action) => { navigateSection(action === 'login' ? 'generation' : action); if (action === 'login') session.retryAuth() }} />} /></Suspense>}
             {!canManual && restrictedPreview && view === 'manual' && <LockedCapabilityPreview title={copy.optimize.paid_preview.manual_title} description={copy.optimize.paid_preview.manual_description} />}
           </div>
           <div className="v2-result-view" hidden={view === 'manual'}>
