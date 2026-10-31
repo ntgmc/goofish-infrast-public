@@ -1,5 +1,17 @@
 [
   {
+    "date": "2026-10-31",
+    "scope": "v2/benchmarks",
+    "macrostructure": "Stat-Led",
+    "theme": "existing V2 variant",
+    "enrichment": "none",
+    "nav": "existing side rail",
+    "footer": "Ft2 inline rule",
+    "variation": "paired execution and yield headline metrics, 90-mark pass/fail matrix, three paired gains, 30 rows of side-by-side scores with struck failures and expandable evidence",
+    "brief": "Make the current three-site comparison immediately readable; remove obsolete version comparison and collapse technical methods",
+    "design_system": "design.md"
+  },
+  {
     "date": "2026-10-18",
     "scope": "v2/cultivation",
     "macrostructure": "Workbench",

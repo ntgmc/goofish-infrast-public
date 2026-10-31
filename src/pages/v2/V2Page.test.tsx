@@ -85,7 +85,7 @@ it('allows a guest to open the benchmark from navigation and return to the works
   const user = userEvent.setup()
   mount('/v2')
   await user.click(screen.getByRole('link', { name: copy.siteBenchmark.title }))
-  await screen.findByRole('heading', { name: copy.siteBenchmark.headline('MaaTool', 30) }, { timeout: 3000 })
+  await screen.findByRole('heading', { name: copy.siteBenchmark.headline('MaaTool', 30).join('') }, { timeout: 3000 })
   expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2/benchmarks')
   expect(screen.queryByText(copy.v2.signInRequired)).not.toBeInTheDocument()
   await user.click(screen.getByRole('link', { name: copy.v2.guestNavigation.example }))

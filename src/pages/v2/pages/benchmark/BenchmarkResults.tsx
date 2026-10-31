@@ -19,11 +19,11 @@ function Results({ params }: { params: URLSearchParams }) {
   const selectedId = data.cases.find((item) => item.sample === params.get('sample') && item.layout === params.get('layout') && item.site === params.get('site'))?.id
   useEffect(() => {
     if (!selectedId) return
-    const frame = requestAnimationFrame(() => document.getElementById('benchmark-data')?.scrollIntoView?.({ block: 'start' }))
+    const frame = requestAnimationFrame(() => document.querySelector(`[data-case-id="${selectedId}"]`)?.scrollIntoView?.({ block: 'start' }))
     return () => cancelAnimationFrame(frame)
   }, [selectedId])
   const shown = data.cases.filter((item) => (!sample || sample === item.sample) && (!layout || layout === item.layout) && (!site || site === item.site) && (!status || item.passed === (status === 'passed')))
-  const groups = data.samples.flatMap((sample) => data.layouts.map((layout) => ({ sample, layout, cases: shown.filter((item) => item.sample === sample.alias && item.layout === layout.id) }))).filter((group) => group.cases.length)
+  const groups = data.layouts.map((layout) => ({ layout, samples: data.samples.map((sample) => ({ sample, cases: shown.filter((item) => item.sample === sample.alias && item.layout === layout.id) })).filter((group) => group.cases.length) })).filter((group) => group.samples.length)
   const filters = new URLSearchParams(Object.entries({ sample, layout, site, status }).filter(([, value]) => value))
   function reset() { setSample(''); setLayout(''); setSite(''); setStatus('') }
   return <section className="benchmark-section benchmark-data" id="benchmark-data">
@@ -36,21 +36,47 @@ function Results({ params }: { params: URLSearchParams }) {
       <button className="v2-button v2-button-secondary" type="button" onClick={reset}>{text.reset}</button>
     </div>
     <div className="benchmark-filter-summary"><p className="benchmark-muted" role="status" aria-live="polite">{text.shown(shown.length, data.cases.length)}</p>{filters.size > 0 && <Link className="benchmark-link" to={`/v2/benchmarks?${filters}#benchmark-data`}>{text.filterLink}</Link>}</div>
-    {groups.length ? groups.map((group) => <section className="benchmark-result-group" key={`${group.sample.alias}-${group.layout.id}`}>
-      <header><h3>{group.sample.alias} · {group.layout.label}</h3><p className="benchmark-muted">{text.inputSummary(group.sample.owned, group.sample.elite2)}</p></header>
-      {group.cases.map((item) => <CaseResult key={item.id} item={item} initiallyOpen={item.id === selectedId} />)}
+    <p className="benchmark-legend"><span className="benchmark-valid">✓ {text.passLabel}</span><span className="benchmark-invalid">× <s>{text.failedReading}</s></span></p>
+    {groups.length ? groups.map(({ layout, samples }) => <section className="benchmark-layout-board" key={layout.id}>
+      <header><h3>{layout.label}</h3><p>{layout.id === 'S3' ? text.costDirection : text.yieldDirection}</p></header>
+      {samples.map((group) => <ResultGroup key={group.sample.alias} sample={group.sample.alias} cases={group.cases} selectedId={selectedId} />)}
     </section>) : <p className="benchmark-empty">{text.empty}</p>}
   </section>
 }
 
-function CaseResult({ item, initiallyOpen }: { item: BenchmarkCase; initiallyOpen: boolean }) {
-  const [expanded, setExpanded] = useState(initiallyOpen)
+function ResultGroup({ sample, cases, selectedId }: { sample: string; cases: BenchmarkCase[]; selectedId?: string }) {
+  const [expandedId, setExpandedId] = useState(cases.find((item) => item.id === selectedId)?.id)
+  const selected = cases.find((item) => item.id === expandedId)
+  const value = (item: BenchmarkCase) => item.opportunityCost?.perOrundum ?? item.resources.sanity
+  const maximum = Math.max(...cases.map(value))
+  return <div className="benchmark-result-group" role="group" aria-label={`${sample} · ${data.layouts.find((layout) => layout.id === cases[0].layout)!.label}`}>
+    <h4>{sample}</h4>
+    <div className="benchmark-match">
+      {data.sites.map((site) => {
+        const item = cases.find((item) => item.site === site.id)
+        if (!item) return <div key={site.id} className="benchmark-score-empty" />
+        return <button key={item.id} type="button" className={`benchmark-score ${item.passed ? 'benchmark-score-pass' : 'benchmark-score-fail'} ${site.id === 'maatool' ? 'benchmark-score-own' : ''}`} aria-expanded={expandedId === item.id} aria-controls={`${sample}-${item.layout}-evidence`} onClick={() => setExpandedId(expandedId === item.id ? undefined : item.id)} data-score-id={item.id}>
+          <span className="benchmark-score-site">{text.siteShort[site.id as keyof typeof text.siteShort]}</span>
+          <span className="benchmark-score-value">{item.passed ? number(value(item), item.opportunityCost ? 4 : 2) : <s>{number(value(item), item.opportunityCost ? 4 : 2)}</s>}</span>
+          <span className="benchmark-score-bar" aria-hidden="true"><span style={{ transform: `scaleX(${value(item) / maximum})` }} /></span>
+          <span className="benchmark-score-status"><span aria-hidden="true">{item.passed ? '✓' : '×'}</span> {item.passed ? text.scorePass : text.scoreFail}</span>
+          {item.opportunityCost && <small>{number(item.resources.orundum, 1)} {text.unitOrundum}</small>}
+        </button>
+      })}
+    </div>
+    <div id={`${sample}-${cases[0].layout}-evidence`}>{selected && <CaseResult key={selected.id} item={selected} onClose={() => {
+      document.querySelector<HTMLButtonElement>(`[data-score-id="${selected.id}"]`)?.focus()
+      setExpandedId(undefined)
+    }} />}</div>
+  </div>
+}
+
+function CaseResult({ item, onClose }: { item: BenchmarkCase; onClose: () => void }) {
   const opportunity = item.opportunityCost
   const baseline = opportunity ? data.cases.find((candidate) => candidate.sample === item.sample && candidate.site === item.site && candidate.layout === opportunity.baselineScenario)! : null
   const site = data.sites.find((site) => site.id === item.site)!
-  return <details className="benchmark-case" open={expanded} onToggle={(event) => setExpanded(event.currentTarget.open)} data-case-id={item.id}>
-    <summary><strong>{site.label}</strong><span className={`benchmark-status ${item.passed ? 'benchmark-valid' : 'benchmark-invalid'}`}>{item.passed ? text.passLabel : text.failureLabel}</span><span className="benchmark-case-value">{number(opportunity ? opportunity.perOrundum : item.resources.sanity, opportunity ? 4 : 2)}<small>{opportunity ? text.unitCost : text.unitSanity}</small></span><span className="benchmark-case-arrow" aria-hidden="true">＋</span></summary>
-    {expanded && <div className="benchmark-case-body">
+  return <div className="benchmark-case-body" data-case-id={item.id}>
+      <div className="benchmark-case-heading"><h4>{site.label} · {item.sample} · {data.layouts.find((layout) => layout.id === item.layout)!.label}</h4><button type="button" className="benchmark-link" onClick={onClose}>{text.closeEvidence}</button></div>
       <p className="benchmark-loop">{item.stable ? text.stable : text.unstable} · {text.iterations(item.iterations)} · {text.moodErrors(item.moodErrors)}</p>
       <h4>{text.resourcesTitle}</h4><dl className="benchmark-resources">{(Object.keys(text.resources) as (keyof typeof text.resources)[]).map((key) => <div key={key}><dt>{text.resources[key]}</dt><dd>{number(item.resources[key])}</dd></div>)}</dl>
       {opportunity && <><h4>{text.costTitle}</h4><dl className="benchmark-resources">
@@ -58,6 +84,5 @@ function CaseResult({ item, initiallyOpen }: { item: BenchmarkCase; initiallyOpe
         {[[text.foregone, opportunity.foregoneProduction], [text.materials, opportunity.materialCost], [text.dailyCost, opportunity.dailyCost], [text.unitCost, opportunity.perOrundum]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{number(value as number, label === text.unitCost ? 4 : 2)}</dd></div>)}</dl></>}
       <div className="benchmark-actions"><Link className="benchmark-link" to={benchmarkCasePath(item)}>{text.caseLink}</Link><a className="benchmark-link" href={`${BENCHMARK_ASSETS}/cases/${item.id}.json`} download>{text.caseDownload}</a></div>
       <BenchmarkEvidence item={item} />
-    </div>}
-  </details>
+  </div>
 }

@@ -28,6 +28,10 @@ describe('frozen public benchmark evidence', () => {
     expect(groups[1].median).toBeCloseTo(7.26, 2)
     expect(groups[2].median).toBeCloseTo(0.32, 2)
     expect(groups[3].median).toBeNull()
+    const pairs = groups.flatMap((group) => group.pairs)
+    expect(pairs).toHaveLength(10)
+    expect(pairs.every((pair) => pair.deltaPercent > 0)).toBe(true)
+    expect(pairs.filter((pair) => pair.deltaPercent > 1)).toHaveLength(7)
   })
 
   it('retains opportunity-cost components, deficits and unavailable historical readings', () => {
