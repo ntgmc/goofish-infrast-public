@@ -13,6 +13,7 @@ minimumReleaseAgeExclude:
 overrides:
   '@babel/plugin-transform-runtime': 7.29.7
   'testcontainers>archiver': 8.0.0
+  'minimatch@<11.0.1': 11.0.1
 
 allowBuilds:
   cpu-features@0.0.10: true
