@@ -27,7 +27,7 @@ function Results({ params }: { params: URLSearchParams }) {
   const filters = new URLSearchParams(Object.entries({ sample, layout, site, status }).filter(([, value]) => value))
   function reset() { setSample(''); setLayout(''); setSite(''); setStatus('') }
   return <section className="benchmark-section benchmark-data" id="benchmark-data">
-    <h2>{text.dataTitle}</h2><p>{text.dataBody}</p>
+    <h2>{text.dataTitle}</h2><p>{text.dataBody}</p><p className="benchmark-muted">{text.scoreScale}</p>
     <div className="benchmark-filters">
       <label>{text.sample}<select value={sample} onChange={(event) => setSample(event.target.value)}><option value="">{text.allSamples}</option>{data.samples.map((item) => <option value={item.alias} key={item.alias}>{item.alias}</option>)}</select></label>
       <label>{text.layout}<select value={layout} onChange={(event) => setLayout(event.target.value)}><option value="">{text.allLayouts}</option>{data.layouts.map((item) => <option value={item.id} key={item.id}>{item.label}</option>)}</select></label>
@@ -48,17 +48,21 @@ function ResultGroup({ sample, cases, selectedId }: { sample: string; cases: Ben
   const [expandedId, setExpandedId] = useState(cases.find((item) => item.id === selectedId)?.id)
   const selected = cases.find((item) => item.id === expandedId)
   const value = (item: BenchmarkCase) => item.opportunityCost?.perOrundum ?? item.resources.sanity
-  const maximum = Math.max(...cases.map(value))
+  const values = data.cases.filter((item) => item.sample === sample && item.layout === cases[0].layout).map(value)
+  const minimum = Math.min(...values)
+  const maximum = Math.max(...values)
+  const range = maximum - minimum
   return <div className="benchmark-result-group" role="group" aria-label={`${sample} · ${data.layouts.find((layout) => layout.id === cases[0].layout)!.label}`}>
     <h4>{sample}</h4>
     <div className="benchmark-match">
       {data.sites.map((site) => {
         const item = cases.find((item) => item.site === site.id)
         if (!item) return <div key={site.id} className="benchmark-score-empty" />
+        const improvement = item.opportunityCost ? maximum - value(item) : value(item) - minimum
         return <button key={item.id} type="button" className={`benchmark-score ${item.passed ? 'benchmark-score-pass' : 'benchmark-score-fail'} ${site.id === 'maatool' ? 'benchmark-score-own' : ''}`} aria-expanded={expandedId === item.id} aria-controls={`${sample}-${item.layout}-evidence`} onClick={() => setExpandedId(expandedId === item.id ? undefined : item.id)} data-score-id={item.id}>
           <span className="benchmark-score-site">{text.siteShort[site.id as keyof typeof text.siteShort]}</span>
           <span className="benchmark-score-value">{item.passed ? number(value(item), item.opportunityCost ? 4 : 2) : <s>{number(value(item), item.opportunityCost ? 4 : 2)}</s>}</span>
-          <span className="benchmark-score-bar" aria-hidden="true"><span style={{ transform: `scaleX(${value(item) / maximum})` }} /></span>
+          <span className="benchmark-score-bar" aria-hidden="true"><span style={{ transform: `scaleX(${range === 0 ? 1 : 0.2 + 0.8 * improvement / range})` }} /></span>
           <span className="benchmark-score-status"><span aria-hidden="true">{item.passed ? '✓' : '×'}</span> {item.passed ? text.scorePass : text.scoreFail}</span>
           {item.opportunityCost && <small>{number(item.resources.orundum, 1)} {text.unitOrundum}</small>}
         </button>

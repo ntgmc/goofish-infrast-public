@@ -43,6 +43,7 @@ export const siteBenchmarkCopy = {
   orundumNote: '负净变化需要外部供料。MaaTool的搓玉量较高，碎片消耗也更大。',
   dataTitle: '30组输入，90份排班直接对照',
   dataBody: '每行是同一批干员、同一种布局。绿勾可执行，红叉与删除线标出失败读数；点击数值查看排班证据。',
+  scoreScale: '横条放大每组三站的差距，越长越好；实际差距请看数值。',
   failedReading: '执行失败的原始读数', scorePass: '通过', scoreFail: '执行失败', closeEvidence: '收起证据',
   sample: '样本', site: '站点', state: '执行状态', allSamples: '全部样本', allLayouts: '全部布局', allSites: '全部站点', allStates: '全部状态', failuresOnly: '只看执行失败', passedOnly: '只看通过', reset: '清除筛选',
   shown: (shown: number, total: number) => `当前显示 ${shown}／${total}项`, filterLink: '当前筛选直达链接',
