@@ -65,6 +65,7 @@ describe('App public content routing', () => {
   it.each([
     '/',
     '/v2',
+    '/v2/benchmarks',
     '/v1',
     '/changelog',
     '/faq',
@@ -137,6 +138,13 @@ describe('App public content routing', () => {
     await waitFor(() => expect(document.head.querySelector('meta[name="robots"]')).toHaveAttribute('content', 'noindex, nofollow'))
   })
 
+  it('opens the public benchmark in the V2 shell with indexable metadata', async () => {
+    render(<MemoryRouter initialEntries={['/v2/benchmarks?sample=A01&layout=S2&site=yituliu']}><App /></MemoryRouter>)
+    expect(await screen.findByText('V2 test workspace')).toBeInTheDocument()
+    expect(document.title).toBe(copy.siteBenchmark.metadataTitle)
+    expect(document.head.querySelector('meta[name="robots"]')).toHaveAttribute('content', 'index, follow')
+  })
+
   it.each(['/', '/v2'])('keeps V2 service-state failures and retries in the V2 loading screen at %s', async (route) => {
     let requests = 0
     const original = apiJson.getMockImplementation()!
@@ -153,7 +161,7 @@ describe('App public content routing', () => {
   })
 
   it.each([
-    ['/', 'v2'], ['/v2', 'v2'], ['/tools/manual-schedule', 'manual_schedule'], ['/tools/cultivation-plan', 'cultivation_plan'],
+    ['/', 'v2'], ['/v2', 'v2'], ['/v2/benchmarks', 'v2'], ['/tools/manual-schedule', 'manual_schedule'], ['/tools/cultivation-plan', 'cultivation_plan'],
     ['/faq', 'faq'], ['/support', 'support'], ['/pricing', 'pricing'], ['/changelog', 'changelog'],
     ['/thanks', 'thanks'], ['/status', 'service_status'],
   ] satisfies Array<[string, SiteFeatureKey]>)('blocks direct visits to the disabled page %s', async (route, feature) => {

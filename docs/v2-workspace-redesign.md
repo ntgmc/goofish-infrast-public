@@ -41,7 +41,7 @@
 | `disclaimer` | 正文与目录；保持阅读宽度和段落层级 | `pages/Documents.tsx` |
 | `support` | 联系入口、反馈准备步骤和服务申请信息 | `pages/Documents.tsx` |
 | `status` | 服务摘要、组件状态、小时历史与事件时间线；请求失败支持重试 | `pages/ServiceStatus.tsx` |
-| `pricing` | 先选择免费开始或付费维护，查看导入、生成、MAA 导出与自定义配置差异；再选期限购买，完整权益按需展开 | `pages/Pricing.tsx` |
+| `pricing` | 四张维护卡并排展示价格、适用人群、勾选权益与购买入口；保留免费开始，实测证明压缩为横条，方案说明、完整权益和购买规则按需展开 | `pages/Pricing.tsx` |
 
 ## 业务保护与回归
 

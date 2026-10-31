@@ -94,10 +94,11 @@ it deliberately when changing the shared design.
   conditions from priority, material, calendar and inventory results. Manual
   scheduling makes account, layout and starting schedule explicit steps.
 - Settings use task navigation and a single visible content region. Pricing
-  leads with free start and paid maintenance, then compares import, generation,
-  MAA export and configuration before term selection and purchase. The full
-  entitlement comparison expands on demand. All pages use bounded content
-  widths and the existing V2 tokens.
+  leads with four maintenance cards showing price, audience, checked benefits
+  and a direct purchase action. Keep free start visible above the cards, shared
+  activation terms beside redemption, and a compact benchmark proof strip below.
+  Plan descriptions, the full entitlement comparison, purchase rules and upgrade
+  details expand on demand. All pages use bounded content widths and V2 tokens.
 - The workspace shell owns page headings. Legal documents place their index
   to the right of a reading area of up to 65ch. FAQ pairs search with expandable
   answers; support pairs a contact region with preparation steps. Releases and
@@ -106,6 +107,13 @@ it deliberately when changing the shared design.
   `.v2-page-section`. Collapse secondary columns below 80rem, selection and
   document columns below 60rem, and dense controls below 40rem. Retain padded
   surfaces, keyboard focus, 44px controls, and shared reduced-motion support.
+- The public site comparison at `/v2/benchmarks` uses Stat-Led composition inside
+  the same V2 rail: paired execution and yield headline metrics, a 90-mark
+  pass/fail matrix, prominent paired gains, and 30 rows of three-site scores.
+  Use green checks and red crosses with struck failed readings; expand evidence
+  below the selected row and collapse methods by default. Retain the V2
+  palette, fonts, responsive controls and reduced-motion behavior. Frozen data,
+  publication fields and verification: [site comparison](docs/site-benchmark.md).
 - Page coverage and verification: [V2 workspace redesign](docs/v2-workspace-redesign.md).
 
 ### Management console (`/admin`)

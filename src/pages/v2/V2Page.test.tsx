@@ -81,6 +81,17 @@ function mount(path = '/v2') {
   return render(<MemoryRouter initialEntries={[path]}><V2Page /><RouteLocation /></MemoryRouter>, { wrapper: MotionPreferenceProvider })
 }
 
+it('allows a guest to open the benchmark from navigation and return to the workspace', async () => {
+  const user = userEvent.setup()
+  mount('/v2')
+  await user.click(screen.getByRole('link', { name: copy.siteBenchmark.title }))
+  await screen.findByRole('heading', { name: copy.siteBenchmark.headline('MaaTool', 30).join('') }, { timeout: 3000 })
+  expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2/benchmarks')
+  expect(screen.queryByText(copy.v2.signInRequired)).not.toBeInTheDocument()
+  await user.click(screen.getByRole('link', { name: copy.v2.guestNavigation.example }))
+  expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2')
+})
+
 it.each(['/#release-v2.0.1016', '/v2#release-v2.0.1016'])('opens the changelog from a version anchor at %s', async (path) => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
     releases: [{ id: 'v2.0.1016', version: '2.0.1016', displayVersion: 'v2.0.1016', releasedAt: '2026-10-11', kind: 'release', sections: [] }],
@@ -1790,22 +1801,31 @@ describe('V2 feature continuity', () => {
     expect(screen.queryByRole('link', { name: copy.public.pricing_choice.free_action })).not.toBeInTheDocument()
   })
 
-  it('uses configured purchase links after public content loads in the V2 pricing workspace', async () => {
+  it('shows all maintenance cards with their configured purchase destinations and keeps an unlisted plan unavailable', async () => {
     const content = cloneDefaultPublicContentSettings()
     content.pricing.plans.single_account_monthly.purchase_url = 'https://example.com/monthly'
+    content.pricing.plans.single_account_annual.purchase_url = 'https://example.com/annual'
     content.pricing.plans.single_account_lifetime.purchase_url = 'https://example.com/lifetime'
+    content.pricing.plans.single_account_half_year.purchase_url = ''
     content.pricing.lifetime_upgrade.purchase_url = 'https://example.com/upgrade'
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(content), { headers: { 'Content-Type': 'application/json' } }))
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/v2?section=pricing']}><PublicContentProvider><V2Page /></PublicContentProvider></MemoryRouter>, { wrapper: MotionPreferenceProvider })
-    const monthly = await screen.findByRole('link', { name: copy.public.pricing_purchase_labels.single_account_monthly })
-    expect(monthly).toHaveAttribute('href', 'https://example.com/monthly')
-    expect(monthly).toHaveAttribute('target', '_blank')
-    expect(monthly).toHaveAttribute('rel', 'noopener noreferrer')
+    await screen.findByRole('link', { name: copy.public.pricing_purchase_labels.single_account_monthly })
+    const cards = within(screen.getByRole('region', { name: copy.v2.planChoice }))
+    expect(cards.getAllByRole('article')).toHaveLength(4)
+    for (const id of ['single_account_monthly', 'single_account_annual', 'single_account_lifetime'] as const) {
+      const purchase = cards.getByRole('link', { name: copy.public.pricing_purchase_labels[id] })
+      expect(purchase).toHaveAttribute('href', content.pricing.plans[id].purchase_url)
+      expect(purchase).toHaveAttribute('target', '_blank')
+      expect(purchase).toHaveAttribute('rel', 'noopener noreferrer')
+      expect(purchase).toHaveAccessibleDescription(expect.stringContaining(content.pricing.plans[id].account_scope))
+      expect(purchase).toHaveAccessibleDescription(expect.stringContaining(copy.public.pricing_redemption.activation))
+    }
+    expect(cards.getByRole('button', { name: copy.public.pricing_purchase_unavailable })).toBeDisabled()
+    expect(cards.queryByRole('link', { name: copy.public.pricing_purchase_labels.single_account_half_year })).not.toBeInTheDocument()
+    await user.click(screen.getByText(copy.public.pricing_cards.rules))
     expect(screen.getByRole('link', { name: copy.public.pricing_upgrade_purchase })).toHaveAttribute('href', 'https://example.com/upgrade')
-    await user.click(within(screen.getByRole('group', { name: copy.v2.planChoice })).getByRole('button', { name: /终身/ }))
-    expect(screen.getByRole('link', { name: copy.public.pricing_purchase_labels.single_account_lifetime })).toHaveAttribute('href', 'https://example.com/lifetime')
-    expect(screen.queryByRole('button', { name: copy.public.pricing_purchase_unavailable })).not.toBeInTheDocument()
   })
 
   it.each([true, false])('opens CDK redemption from pricing and retains the destination through login: signed in %s', async (signedIn) => {

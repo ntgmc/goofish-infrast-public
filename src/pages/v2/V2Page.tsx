@@ -29,8 +29,8 @@ import './workspace-pages.css'
 
 export default function V2Page() {
   const [params] = useSearchParams()
-  const { hash } = useLocation()
-  const section = v2Section(params, hash)
+  const { hash, pathname } = useLocation()
+  const section = v2Section(params, hash, pathname)
   const publicPage = V2_PUBLIC_SECTIONS.includes(section)
   const session = useToolSession(params.get('profile_id'), true, section !== 'announcements')
   const features = useSiteFeatures()
@@ -95,8 +95,8 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
   const confirmResultChange = () => !manualDirty.current || window.confirm(copy.v2.discardManual)
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const { hash } = useLocation()
-  const section = v2Section(params, hash)
+  const { hash, pathname } = useLocation()
+  const section = v2Section(params, hash, pathname)
   const onSectionChange = useCallback((section: 'overview' | 'plans' | 'config' | 'result' | 'lab') => {
     if (section === 'result') {
       if (!readingLatest.current) void navigate(v2Path('overview', profile.id))

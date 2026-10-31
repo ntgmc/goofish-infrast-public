@@ -75,6 +75,8 @@ describe('app route contract', () => {
     expect(isAppRoutePath('/v1/')).toBe(true)
     expect(isAppRoutePath('/v2')).toBe(true)
     expect(isAppRoutePath('/v2/')).toBe(true)
+    expect(isAppRoutePath('/v2/benchmarks')).toBe(true)
+    expect(isAppRoutePath('/v2/benchmarks/')).toBe(true)
     expect(isAppRoutePath('/tool/inventory/export')).toBe(false)
     expect(isAppRoutePath('/api/user/inventory')).toBe(false)
     expect(isAppRoutePath('/v1/not-a-page')).toBe(false)

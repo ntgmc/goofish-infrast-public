@@ -7,7 +7,7 @@ export const routesCopy = {
     depot: '仓库价值分析', skland: '森空岛数据', profiles: '账号与档案', 'add-account': '添加账号', inventory: '背包',
     commercial: '商用账户', balance: '积分', announcements: '查看公告', settings: '账号设置',
     help: '使用指南', updates: '更新日志', terms: '服务条款', privacy: '隐私政策',
-    disclaimer: '免责声明', support: '反馈', status: '服务状态', pricing: '比较价格与权益',
+    disclaimer: '免责声明', support: '反馈', status: '服务状态', pricing: '比较价格与权益', benchmarks: '站点对比',
   },
   descriptions: {
     'training-ratio': '根据当前龙门币和经验库存，判断接下来优先补哪一项。',

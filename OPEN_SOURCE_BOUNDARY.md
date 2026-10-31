@@ -10,6 +10,9 @@
   messaging, combined hooks, and health-state primitives.
 - OptimizerPort v1, payload validation, and exhaustive job dispatch.
 - Schedule and scenario-comparison public request/result types.
+- Sanitized, frozen site-comparison results and selected schedule evidence under
+  `public/benchmarks/`; publication fields and validation are described in
+  [the site benchmark guide](docs/site-benchmark.md).
 
 ## Not included
 

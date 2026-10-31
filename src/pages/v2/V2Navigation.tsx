@@ -14,7 +14,7 @@ const guestPersonalEntries = ['plans', 'lab', 'profiles', 'inventory', 'commerci
 const icons = {
   overview: OverviewIcon, generation: GenerateIcon, plans: ResultHistoryIcon, lab: ComparisonIcon, 'cultivation-projects': ProjectsIcon, tools: ToolsIcon,
   skland: OverviewIcon, profiles: AccountsIcon, inventory: InventoryIcon, commercial: BillingIcon, balance: BalanceIcon, announcements: AnnouncementIcon, settings: SettingsIcon,
-  pricing: PricingIcon, help: HelpIcon, support: SupportIcon, status: ServiceStatusIcon, updates: ReleasesIcon,
+  pricing: PricingIcon, help: HelpIcon, support: SupportIcon, status: ServiceStatusIcon, updates: ReleasesIcon, benchmarks: ComparisonIcon,
 }
 
 export default function V2Navigation({ section, session, operatorCount, sampleOperators, onNavigate, onPanel, onClose, onLegacy }: {
@@ -39,7 +39,7 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
       {section === entry && <span className="v2-nav-dot" />}
     </button>
   }
-  function publicItem(entry: 'overview' | 'generation' | 'pricing' | 'help' | 'support' | 'status' | 'updates', label = sectionLabels[entry]) {
+  function publicItem(entry: 'overview' | 'generation' | 'pricing' | 'help' | 'support' | 'status' | 'updates' | 'benchmarks', label = sectionLabels[entry]) {
     if (!v2SectionAvailable(entry, features)) return null
     const Icon = icons[entry]
     return <Link key={entry} className={`v2-nav-item ${section === entry ? 'v2-nav-active' : ''}`} to={v2Path(entry, session.activeProfile?.id)} aria-current={section === entry ? 'page' : undefined} onClick={onClose}>
@@ -69,6 +69,7 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
       </>}
       <div className="v2-sidebar-menu-links">
         {signedIn && publicItem('pricing', text.guestNavigation.pricing)}
+        {publicItem('benchmarks')}
         {publicItem('support')}
         {publicItem('status')}
       </div>

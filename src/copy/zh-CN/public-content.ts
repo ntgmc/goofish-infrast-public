@@ -178,7 +178,7 @@ export const publicContentCopy = {
   admin_answer: '答案',
   admin_show_qq_action: '附加提交反馈按钮',
   admin_pricing_plans: '价格方案与有效期',
-  admin_pricing_plans_description: '价格页将四种个人维护方案放在同一张卡片中。分别设置 30 天、90 天、365 天和终身方案的价格与说明。',
+  admin_pricing_plans_description: '价格页并排展示四种个人维护方案。分别设置 30 天、90 天、365 天和终身方案的价格与说明。',
   admin_plan_label: '方案名称',
   admin_plan_badge: '方案徽标',
   admin_plan_original_price: '原价（含单位和有效期）',

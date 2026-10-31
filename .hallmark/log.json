@@ -1,5 +1,29 @@
 [
   {
+    "date": "2026-11-01",
+    "scope": "v2/pricing",
+    "macrostructure": "Workbench",
+    "theme": "existing V2 variant",
+    "enrichment": "none",
+    "nav": "existing side rail",
+    "footer": "Ft2 inline rule",
+    "variation": "four visible term cards with direct purchase actions, checked benefits and a lifetime accent; compact benchmark proof strip and collapsed descriptions, entitlements and purchase rules",
+    "brief": "Make pricing and paid benefits immediately comparable, following the V1 card presentation while retaining V2 styling",
+    "design_system": "design.md"
+  },
+  {
+    "date": "2026-10-31",
+    "scope": "v2/benchmarks",
+    "macrostructure": "Stat-Led",
+    "theme": "existing V2 variant",
+    "enrichment": "none",
+    "nav": "existing side rail",
+    "footer": "Ft2 inline rule",
+    "variation": "paired execution and yield headline metrics, 90-mark pass/fail matrix, three paired gains, 30 rows of side-by-side scores with struck failures and expandable evidence",
+    "brief": "Make the current three-site comparison immediately readable; remove obsolete version comparison and collapse technical methods",
+    "design_system": "design.md"
+  },
+  {
     "date": "2026-10-18",
     "scope": "v2/cultivation",
     "macrostructure": "Workbench",

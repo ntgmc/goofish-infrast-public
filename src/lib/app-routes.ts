@@ -82,6 +82,7 @@ const standaloneAppPaths = new Set([
   '/verify-email',
   '/v1',
   '/v2',
+  '/v2/benchmarks',
 ])
 
 export function dashboardPath(section: DashboardSection): string {

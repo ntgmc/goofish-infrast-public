@@ -1,1 +1,4 @@
 *.sh text eol=lf
+
+# Preserve exact bytes for frozen downloads and their checksums.
+/public/benchmarks/** -text whitespace=trailing-space,space-before-tab,cr-at-eol

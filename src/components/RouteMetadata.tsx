@@ -40,6 +40,11 @@ const PUBLIC_METADATA: Record<string, Metadata> = {
     description: routesCopy.v2.resultDescription,
     indexable: false,
   },
+  '/v2/benchmarks': {
+    title: copy.siteBenchmark.metadataTitle,
+    description: copy.siteBenchmark.metadataDescription,
+    indexable: true,
+  },
   '/announcements': {
     title: copy.metadata.components_RouteMetadata_003,
     description: copy.metadata.components_RouteMetadata_004,
@@ -112,8 +117,9 @@ export default function RouteMetadata() {
     const socialImageUrl = new URL(SOCIAL_IMAGE_PATH, canonicalUrl).href
     const icon = document.head.querySelector<HTMLLinkElement>('link[rel="icon"]') ?? document.createElement('link')
     icon.rel = 'icon'
-    icon.type = location.pathname === '/v2' ? 'image/svg+xml' : 'image/png'
-    icon.href = location.pathname === '/v2' ? '/assets/maatool-v2-icon.svg' : '/favicon-32.png'
+    const v2Icon = location.pathname === '/v2' || location.pathname === '/v2/benchmarks'
+    icon.type = v2Icon ? 'image/svg+xml' : 'image/png'
+    icon.href = v2Icon ? '/assets/maatool-v2-icon.svg' : '/favicon-32.png'
     if (!icon.parentElement) document.head.append(icon)
 
     document.title = metadata.title

@@ -103,6 +103,7 @@ function AppContent() {
         </Route>
         <Route path="/" element={v2Page} />
         <Route path="/v2" element={v2Page} />
+        <Route path="/v2/benchmarks" element={v2Page} />
         <Route path="/tool/*" element={<LazyPage fallback={copy.common.App_001}><ToolPage /></LazyPage>} />
         <Route path="/reset-password" element={<LazyPage fallback={copy.features.loading}><ResetPasswordPage /></LazyPage>} />
         <Route path="/verify-email" element={<LazyPage fallback={copy.features.loading}><VerifyEmailPage /></LazyPage>} />
@@ -120,7 +121,7 @@ function AppContent() {
       </Routes>
       {import.meta.env.PROD && <DeploymentUpdatePrompt />}
       <MobileBrowserPrompt />
-      {location.pathname !== '/' && location.pathname !== '/v2' && <BuildMetaStrip placement="corner" />}
+      {location.pathname !== '/' && location.pathname !== '/v2' && location.pathname !== '/v2/benchmarks' && <BuildMetaStrip placement="corner" />}
     </div>
   )
 }

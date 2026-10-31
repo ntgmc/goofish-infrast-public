@@ -75,6 +75,12 @@ describe('RouteMetadata', () => {
     expect(metaByName('description')).toBe('查看 MaaTool 网站和排班计算服务是否可用、当前是否繁忙，以及历史服务状态。')
     expect(metaByName('robots')).toBe('index, follow')
 
+    await act(async () => router.navigate('/v2/benchmarks?sample=A01&layout=S2&site=yituliu#benchmark-data'))
+    expect(document.title).toBe('三站基建排班实测：90份排班的执行与收益 | MaaTool')
+    expect(metaByName('robots')).toBe('index, follow')
+    expect(metaByProperty('og:url')).toBe(currentUrl('/v2/benchmarks'))
+    expect(document.head.querySelector<HTMLLinkElement>('link[rel="icon"]')).toHaveAttribute('href', '/assets/maatool-v2-icon.svg')
+
     await act(async () => router.navigate('/v1'))
     expect(document.title).toBe('MAA 基建排班优化器 | MaaTool · V1')
     expect(metaByName('robots')).toBe('noindex, nofollow')
