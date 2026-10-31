@@ -73,9 +73,9 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
 }) {
   const { features } = useSiteFeatures()
   const [params, setParams] = useSearchParams()
-  const { hash } = useLocation()
+  const { hash, pathname } = useLocation()
   const navigate = useNavigate()
-  const section = v2Section(params, hash)
+  const section = v2Section(params, hash, pathname)
   const startDisabledReason = generationDisabledReason ?? (!features.profiles || !features.schedule_generation ? copy.features.schedule_read_only : null)
   const [navigationError, setNavigationError] = useState<string | null>(null)
   const [manualOpened, setManualOpened] = useState(false)

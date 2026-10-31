@@ -106,6 +106,11 @@ it deliberately when changing the shared design.
   `.v2-page-section`. Collapse secondary columns below 80rem, selection and
   document columns below 60rem, and dense controls below 40rem. Retain padded
   surfaces, keyboard focus, 44px controls, and shared reduced-motion support.
+- The public site comparison at `/v2/benchmarks` uses Stat-Led composition inside
+  the same V2 rail: a dominant execution count, same-scale comparison bars,
+  open result tables, native disclosures and shift timelines. Retain the V2
+  palette, fonts, responsive controls and reduced-motion behavior. Frozen data,
+  publication fields and verification: [site comparison](docs/site-benchmark.md).
 - Page coverage and verification: [V2 workspace redesign](docs/v2-workspace-redesign.md).
 
 ### Management console (`/admin`)

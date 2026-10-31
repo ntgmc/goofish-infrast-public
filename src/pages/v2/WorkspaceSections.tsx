@@ -38,13 +38,14 @@ const PublicInfo = lazy(() => import('./pages/Documents'))
 const Updates = lazy(() => import('./pages/Releases'))
 const Pricing = lazy(() => import('./pages/Pricing'))
 const Status = lazy(() => import('./pages/ServiceStatus'))
+const SiteBenchmark = lazy(() => import('./pages/SiteBenchmark'))
 const AnimationSettings = lazy(() => import('../../components/AnimationSettings'))
 
 export type V2Workflow = ReturnType<typeof useOptimizeWorkflow> & {
   optimizationTasks?: OptimizationTaskCenterController
 }
 const descriptions: Partial<Record<V2Section, string>> = {
-  generation: copy.v2.generationDescription, plans: copy.v2.plansDescription,
+  generation: copy.v2.generationDescription, plans: copy.v2.plansDescription, benchmarks: copy.siteBenchmark.introduction,
   tools: copy.v2.toolsDescription, profiles: copy.v2.profilesDescription,
   'add-account': copy.v2.addAccountDescription, settings: copy.v2.settingsDescription,
   inventory: copy.v2.inventoryDescription, skland: copy.skland.description,
@@ -112,6 +113,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
                 {(['help', 'terms', 'privacy', 'disclaimer', 'support'] as V2Section[]).includes(section) && <PublicInfo page={section === 'help' ? 'faq' : section as 'terms' | 'privacy' | 'disclaimer' | 'support'} />}
                 {section === 'pricing' && <Pricing />}
                 {section === 'status' && <Status />}
+                {section === 'benchmarks' && <SiteBenchmark />}
                 {section === 'updates' && <Updates />}
                 {section === 'plans' && workflow && <Plans workflow={workflow} />}
                 {section === 'generation' && workflow && <Generation workflow={workflow} progress={generationProgress} disabledReason={generationDisabledReason}

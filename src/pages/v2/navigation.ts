@@ -2,14 +2,15 @@ import { routesCopy } from '../../copy/zh-CN/routes'
 import type { SiteFeatures } from '../../lib/site-features'
 import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
 
-const V2_SECTIONS = ['overview', 'generation', 'plans', 'lab', 'tools', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'depot', 'skland', 'profiles', 'add-account', 'inventory', 'commercial', 'balance', 'announcements', 'settings', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing'] as const
+const V2_SECTIONS = ['overview', 'generation', 'plans', 'lab', 'tools', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'depot', 'skland', 'profiles', 'add-account', 'inventory', 'commercial', 'balance', 'announcements', 'settings', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing', 'benchmarks'] as const
 export type V2Section = typeof V2_SECTIONS[number]
 
-export const V2_PUBLIC_SECTIONS: V2Section[] = ['announcements', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing']
+export const V2_PUBLIC_SECTIONS: V2Section[] = ['announcements', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing', 'benchmarks']
 
 export const sectionLabels: Record<V2Section, string> = routesCopy.labels
 
-export function v2Section(params: URLSearchParams, hash = ''): V2Section {
+export function v2Section(params: URLSearchParams, hash = '', pathname = ''): V2Section {
+  if (pathname.replace(/\/+$/, '') === '/v2/benchmarks') return 'benchmarks'
   const section = params.get('section')
   if (!section && hash.startsWith('#release-')) return 'updates'
   if (!section && hash.startsWith('#announcement-')) return 'announcements'
@@ -17,6 +18,7 @@ export function v2Section(params: URLSearchParams, hash = ''): V2Section {
 }
 
 export function v2Path(section: V2Section, profileId?: string | null): string {
+  if (section === 'benchmarks') return '/v2/benchmarks'
   const params = new URLSearchParams()
   if (section !== 'overview') params.set('section', section)
   if (profileId) params.set('profile_id', profileId)

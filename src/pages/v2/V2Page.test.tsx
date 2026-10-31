@@ -81,6 +81,17 @@ function mount(path = '/v2') {
   return render(<MemoryRouter initialEntries={[path]}><V2Page /><RouteLocation /></MemoryRouter>, { wrapper: MotionPreferenceProvider })
 }
 
+it('allows a guest to open the benchmark from navigation and return to the workspace', async () => {
+  const user = userEvent.setup()
+  mount('/v2')
+  await user.click(screen.getByRole('link', { name: copy.siteBenchmark.title }))
+  await screen.findByRole('heading', { name: copy.siteBenchmark.headline('MaaTool', 30) }, { timeout: 3000 })
+  expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2/benchmarks')
+  expect(screen.queryByText(copy.v2.signInRequired)).not.toBeInTheDocument()
+  await user.click(screen.getByRole('link', { name: copy.v2.guestNavigation.example }))
+  expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2')
+})
+
 it.each(['/#release-v2.0.1016', '/v2#release-v2.0.1016'])('opens the changelog from a version anchor at %s', async (path) => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
     releases: [{ id: 'v2.0.1016', version: '2.0.1016', displayVersion: 'v2.0.1016', releasedAt: '2026-10-11', kind: 'release', sections: [] }],
