@@ -94,10 +94,11 @@ it deliberately when changing the shared design.
   conditions from priority, material, calendar and inventory results. Manual
   scheduling makes account, layout and starting schedule explicit steps.
 - Settings use task navigation and a single visible content region. Pricing
-  leads with free start and paid maintenance, then compares import, generation,
-  MAA export and configuration before term selection and purchase. The full
-  entitlement comparison expands on demand. All pages use bounded content
-  widths and the existing V2 tokens.
+  leads with four maintenance cards showing price, audience, checked benefits
+  and a direct purchase action. Keep free start visible above the cards, shared
+  activation terms beside redemption, and a compact benchmark proof strip below.
+  Plan descriptions, the full entitlement comparison, purchase rules and upgrade
+  details expand on demand. All pages use bounded content widths and V2 tokens.
 - The workspace shell owns page headings. Legal documents place their index
   to the right of a reading area of up to 65ch. FAQ pairs search with expandable
   answers; support pairs a contact region with preparation steps. Releases and

@@ -62,7 +62,6 @@ textarea.v2-input { resize: vertical; }
   .v2-record-details,
   .v2-announcement-reading,
   .v2-release-detail,
-  .v2-pricing-selected,
   .v2-comparison-selected,
   .v2-special-detail,
   .v2-item-shelf
@@ -75,12 +74,12 @@ textarea.v2-input { resize: vertical; }
 }
 
 @media (hover: hover) {
-  :is(.v2-view-switch, .v2-filter-group, .v2-account-methods, .v2-settings-index, .v2-special-items, .v2-inbox-index, .v2-release-index, .v2-term-choices) > button:hover:not(:disabled),
+  :is(.v2-view-switch, .v2-filter-group, .v2-account-methods, .v2-settings-index, .v2-special-items, .v2-inbox-index, .v2-release-index) > button:hover:not(:disabled),
   :is(.v2-account-choice, .v2-record-select):hover:not(:disabled) {
     background: var(--color-v2-hover);
   }
 }
-:is(.v2-view-switch, .v2-filter-group, .v2-account-methods, .v2-settings-index, .v2-special-items, .v2-inbox-index, .v2-release-index, .v2-term-choices) > button:active:not(:disabled),
+:is(.v2-view-switch, .v2-filter-group, .v2-account-methods, .v2-settings-index, .v2-special-items, .v2-inbox-index, .v2-release-index) > button:active:not(:disabled),
 :is(.v2-account-choice, .v2-record-select):active:not(:disabled) {
   background: var(--v2-accent-soft);
 }
@@ -267,21 +266,26 @@ textarea.v2-input { resize: vertical; }
 .v2-release-detail { min-width: 0; > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-sm); padding-bottom: var(--space-lg); border-bottom: 1px solid var(--v2-line); } time, code { color: var(--v2-muted); font-size: var(--text-xs); } > section { padding-block: var(--space-lg); border-bottom: 1px solid var(--v2-line); } ul { list-style: disc; padding-left: var(--space-md); margin-top: var(--space-sm); } li { font-size: var(--text-sm); line-height: 1.9; margin-bottom: var(--space-xs); color: var(--v2-secondary); } }
 
 /* Hallmark · modern-minimal · Workbench · design-system: design.md
- * Choose free or maintained use, compare key differences, then choose a term.
- * Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V4 */
-.v2-pricing-paths { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-lg); margin-block: var(--space-lg); > article { display: flex; flex-direction: column; align-items: start; gap: var(--space-sm); padding: var(--space-md); background: var(--v2-paper); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-panel); } p { font-size: var(--text-sm); } .v2-button { margin-top: auto; } }
-.v2-pricing-path-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-sm); strong { color: var(--v2-accent); font-variant-numeric: tabular-nums; } }
-.v2-pricing-highlights > p { margin-top: var(--space-sm); }
+ * Four term cards lead with price, benefits and purchase; evidence and rules follow.
+ * Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V4 */
+.v2-pricing-intro { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-sm); margin-bottom: var(--space-md); }
+.v2-pricing-plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-sm); }
+.v2-pricing-plan { display: flex; min-width: 0; flex-direction: column; padding: var(--space-sm); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-panel); background: var(--v2-paper); h2 { margin-block: var(--space-xs); font-size: var(--text-base); } > header > small { display: block; margin-top: var(--space-2xs); } .v2-button { width: 100%; white-space: nowrap; } }
+.v2-pricing-plan-featured { border-color: var(--v2-accent); background: var(--v2-accent-soft); }
+.v2-pricing-badge { color: var(--v2-accent); font-size: var(--text-xs); font-weight: 600; }
+.v2-pricing-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-3xs); strong { font-size: var(--text-v2-metric); line-height: 1.2; color: var(--v2-ink); white-space: nowrap; } > span { font-size: var(--text-xs); color: var(--v2-muted); white-space: nowrap; } }
+.v2-pricing-plan .v2-pricing-audience { min-height: 3.5em; font-size: var(--text-xs); margin-top: var(--space-xs); }
+.v2-pricing-benefits { display: grid; gap: var(--space-xs); margin-block: var(--space-md); li { display: flex; align-items: start; gap: var(--space-2xs); font-size: var(--text-sm); line-height: 1.7; color: var(--v2-secondary); } svg { flex: none; margin-top: var(--space-3xs); color: var(--color-v2-power); } }
+.v2-pricing-plan-footer { margin-top: auto; }
+.v2-pricing-plan-details { border-top: 1px solid var(--v2-line); margin-bottom: var(--space-xs); summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-xs); min-height: 44px; cursor: pointer; list-style: none; color: var(--v2-secondary); font-size: var(--text-xs); } summary::-webkit-details-marker { display: none; } summary:hover, summary:active { color: var(--v2-accent); } p { font-size: var(--text-xs); margin-bottom: var(--space-xs); white-space: pre-line; } }
+.v2-pricing-checkout { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-sm) var(--space-lg); margin-block: var(--space-md) var(--space-lg); > div { flex: 1 1 26rem; } p { font-size: var(--text-xs); color: var(--v2-muted); } p + p { margin-top: var(--space-2xs); } }
+.v2-pricing-evidence { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: center; gap: var(--space-lg); h2 { font-size: var(--text-base); } p { max-width: 65ch; margin-top: var(--space-2xs); color: var(--v2-muted); } .v2-button { margin-top: var(--space-sm); } .v2-facts { flex-wrap: nowrap; gap: var(--space-md); border: 0; margin: 0; padding: 0; } dd { font-size: var(--text-xl); color: var(--v2-accent); } }
+.v2-pricing-free-start { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-lg); h2 { font-size: var(--text-base); } p { margin-top: var(--space-2xs); } }
 .v2-pricing-comparison { width: 100%; table-layout: fixed; text-align: left; font-size: var(--text-sm); line-height: 1.75; th, td { padding: var(--space-sm); border-bottom: 1px solid var(--v2-line); vertical-align: top; overflow-wrap: anywhere; white-space: pre-line; } thead th { color: var(--v2-muted); font-weight: 500; } th:first-child { width: 24%; } tbody th { font-weight: 600; } }
-.v2-pricing-selector { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: var(--space-lg); margin-block: var(--space-lg); scroll-margin-top: var(--space-lg); }
-.v2-term-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-xs); button { display: flex; min-height: 72px; align-items: center; gap: var(--space-xs); text-align: left; padding: var(--space-xs) var(--space-sm); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-control); } button > span { flex: 1; min-width: 0; } strong, small { display: block; white-space: nowrap; } svg { flex: none; } button[aria-pressed="true"] { border-color: var(--v2-accent); background: var(--v2-paper); color: var(--v2-accent); } }
-.v2-pricing-selected { padding: var(--space-lg); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-panel); background: var(--v2-paper); p { white-space: pre-line; font-size: var(--text-sm); margin-top: var(--space-sm); } }
-.v2-pricing-purchase { margin-top: var(--space-md); padding-top: var(--space-xs); border-top: 1px solid var(--v2-line); }
-.v2-plan-price { display: block; font-size: var(--text-v2-metric); color: var(--v2-accent); margin-block: var(--space-sm); }
-.v2-pricing-details { border-top: 1px solid var(--v2-line); summary { display: flex; min-height: 64px; align-items: center; justify-content: space-between; gap: var(--space-sm); padding-block: var(--space-sm); cursor: pointer; list-style: none; } summary::-webkit-details-marker { display: none; } summary h2 { font-size: var(--text-base); } summary svg { flex: none; color: var(--v2-accent); } &[open] summary svg { transform: rotate(180deg); } }
+.v2-pricing-details { border-top: 1px solid var(--v2-line); > summary { display: flex; min-height: 64px; align-items: center; justify-content: space-between; gap: var(--space-sm); padding-block: var(--space-sm); cursor: pointer; list-style: none; } > summary::-webkit-details-marker { display: none; } > summary h2 { font-size: var(--text-base); } > summary svg { flex: none; color: var(--v2-accent); } &[open] > summary svg { transform: rotate(180deg); } > p { margin-block: var(--space-sm); } }
 .v2-pricing-free { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.5fr); gap: var(--space-xl); padding-block: var(--space-lg); margin-top: var(--space-lg); border-top: 1px solid var(--v2-line); strong { display: block; font-size: var(--text-xl); color: var(--v2-accent); margin-top: var(--space-sm); } p { font-size: var(--text-sm); white-space: pre-line; margin-bottom: var(--space-sm); } span { display: block; font-size: var(--text-xs); color: var(--v2-muted); } }
-.v2-pricing-upgrade, .v2-pricing-policy, .v2-pricing-support, .v2-metered-pricing { padding-block: var(--space-lg); border-top: 1px solid var(--v2-line); p { font-size: var(--text-sm); } }
-.v2-pricing-policy ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-md) var(--space-xl); li { font-size: var(--text-sm); line-height: 1.8; padding-left: var(--space-sm); border-left: 2px solid var(--v2-line); white-space: pre-line; } }
+.v2-pricing-evidence, .v2-pricing-free-start, .v2-pricing-upgrade, .v2-pricing-policy, .v2-pricing-support, .v2-metered-pricing { padding-block: var(--space-lg); border-top: 1px solid var(--v2-line); p { font-size: var(--text-sm); } }
+.v2-pricing-policy ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-md) var(--space-xl); li { font-size: var(--text-sm); line-height: 1.8; white-space: pre-line; } }
 .v2-tier-list article { padding-block: var(--space-sm); border-bottom: 1px solid var(--v2-line); dl { display: flex; flex-wrap: wrap; gap: var(--space-md); margin-top: var(--space-xs); font-size: var(--text-sm); } dt { color: var(--v2-muted); font-size: var(--text-xs); } }
 
 /* Service availability, components and observed history. */
@@ -304,6 +308,9 @@ textarea.v2-input { resize: vertical; }
 .v2-commercial-name { display: flex; gap: var(--space-sm); align-items: start; input { margin-top: var(--space-xs); } p { font-size: var(--text-sm); margin-top: var(--space-xs); } }
 .v2-training-workspace { padding: var(--space-md); }
 
+@media (width < 80rem) {
+  .v2-pricing-plans { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 80rem) {
   .v2-choice-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-sm); }
 }
@@ -323,8 +330,9 @@ textarea.v2-input { resize: vertical; }
 @media (max-width: 40rem) {
   .v2-page-section .v2-section-heading { flex-direction: column; gap: var(--space-sm); }
   .v2-page-section .v2-section-heading h1 { font-size: var(--text-xl); }
+  .v2-pricing-plan .v2-pricing-audience { min-height: 0; }
   .v2-block-title { flex-direction: column; gap: var(--space-xs); }
-  .v2-generation-flow > section, .v2-account-detail, .v2-settings-content, .v2-account-registration, .v2-experiment-builder, .v2-depot-source, .v2-announcement-reading, .v2-pricing-selected { padding: var(--space-sm); }
+  .v2-generation-flow > section, .v2-account-detail, .v2-settings-content, .v2-account-registration, .v2-experiment-builder, .v2-depot-source, .v2-announcement-reading { padding: var(--space-sm); }
   .v2-inventory-overview > strong { display: none; }
   .v2-item-shelf { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-xs); }
   .v2-item-tile { padding: var(--space-xs); }
@@ -346,7 +354,7 @@ textarea.v2-input { resize: vertical; }
   .v2-comparison-outcome > .v2-comparison-table th:first-child { min-width: 9rem; width: 9rem; }
   .v2-comparison-selected .v2-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-sm); }
   .v2-comparison-selected .v2-comparison-table :is(th, td) { padding-inline: var(--space-xs); font-size: var(--text-xs); }
-  .v2-choice-list, .v2-manual-preparation, .v2-material-list, .v2-pricing-paths, .v2-pricing-selector, .v2-pricing-free, .v2-pricing-policy ul, .v2-service-components, .v2-support-information, .v2-balance-summary, .v2-balance-controls { grid-template-columns: minmax(0, 1fr); }
+  .v2-choice-list, .v2-manual-preparation, .v2-material-list, .v2-pricing-plans, .v2-pricing-evidence, .v2-pricing-free-start, .v2-pricing-free, .v2-pricing-policy ul, .v2-service-components, .v2-support-information, .v2-balance-summary, .v2-balance-controls { grid-template-columns: minmax(0, 1fr); }
   .v2-service-incidents li { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
   .v2-pricing-comparison { display: block; thead { display: none; } tbody { display: block; } tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-xs) var(--space-sm); padding-block: var(--space-sm); border-bottom: 1px solid var(--v2-line); } th, td { padding: 0; border: 0; } th:first-child { grid-column: 1 / -1; width: auto; } td::before { content: attr(data-label); display: block; font-size: var(--text-xs); color: var(--v2-muted); margin-bottom: var(--space-3xs); } }
   .v2-service-summary { padding: var(--space-sm); gap: var(--space-sm); > div { flex-basis: calc(100% - 2rem); } }
