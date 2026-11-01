@@ -72,7 +72,7 @@ export default function IncomeAnalysis({ result, prepared }: { result: OptimizeR
           <td>{row.sanity === null ? '—' : amount(row.sanity)}</td>
         </tr>)}</tbody></table>
     </div> : <p className="v2-analysis-note">{text.noStationOutput}</p>}
-    {result.orundum_economy && <OrundumProductionAnalysis economy={result.orundum_economy} />}
+    {prepared.orundumEconomy && <OrundumProductionAnalysis economy={prepared.orundumEconomy} daily={daily} />}
     <section className="v2-sanity-calculation" aria-label={text.sanityCalculation}>
       <h3>{text.sanityCalculation} · {sanity.value.toFixed(2)} {text.daily}</h3>
       <p>{text.sanityFormula}</p><p className="v2-muted">{sanity.note}</p>
@@ -100,21 +100,28 @@ export default function IncomeAnalysis({ result, prepared }: { result: OptimizeR
   </div>
 }
 
-function OrundumProductionAnalysis({ economy }: { economy: OrundumEconomy }) {
-  const shards = economy.sustainable_orundum / 10
+function OrundumProductionAnalysis({ economy, daily }: { economy: OrundumEconomy; daily?: DailyProduction }) {
+  const shards = daily?.manufacturing?.['Originium Shard'] ?? 0
   const capacityRows = [
     [text.dailySanityBudget, economy.daily_sanity_budget, text.sanityUnit],
     [text.monthlyCardSanity, economy.total_daily_sanity_budget - economy.daily_sanity_budget, text.sanityUnit],
     [text.totalSanityBudget, economy.total_daily_sanity_budget, text.sanityUnit],
     [text.dailyOrirockSupply, economy.daily_orirock_supply, text.orirockUnit],
     [text.rockLimitedOrundum, economy.rock_limited_orundum, text.orundumUnit],
+    ...(economy.lmd_limited_orundum !== undefined ? [[text.lmdLimitedOrundum, economy.lmd_limited_orundum, text.orundumUnit] as const] : []),
     [text.factoryOrundumCapacity, economy.factory_orundum_capacity, text.orundumUnit],
     [text.tradeOrundumCapacity, economy.trade_orundum_capacity, text.orundumUnit],
     [text.sustainableOrundum, economy.sustainable_orundum, text.orundumUnit],
     [text.shortTermOrundum, economy.short_term_orundum, text.orundumUnit],
-    [text.dailyShardConsumption, shards, `${PRODUCT_LABELS['Originium Shard']} ${text.daily}`],
-    [text.orirockCost, shards * 2, text.orirockUnit],
+    [text.dailyShardProduction, shards, `${PRODUCT_LABELS['Originium Shard']} ${text.daily}`],
+    [text.dailyShardConsumption, daily?.consumption?.['Originium Shard'] ?? 0, `${PRODUCT_LABELS['Originium Shard']} ${text.daily}`],
+    ...(economy.daily_orirock_cost !== undefined ? [[text.orirockCost, economy.daily_orirock_cost, text.orirockUnit] as const] : []),
+    ...(economy.daily_lmd_income !== undefined ? [[text.dailyLmdIncome, economy.daily_lmd_income, `${PRODUCT_LABELS.LMD} ${text.daily}`] as const] : []),
     [text.shardLmdCost, economy.hard_lmd_cost, `${PRODUCT_LABELS.LMD} ${text.daily}`],
+    ...(economy.daily_lmd_net !== undefined ? [[text.lmdNetChange, economy.daily_lmd_net, `${PRODUCT_LABELS.LMD} ${text.daily}`] as const] : []),
+    ...(economy.shard_inventory_depletion_days !== null ? [[text.shardInventoryDepletion, economy.shard_inventory_depletion_days, text.daysUnit] as const] : []),
+    ...(economy.orirock_inventory_depletion_days !== null ? [[text.orirockInventoryDepletion, economy.orirock_inventory_depletion_days, text.daysUnit] as const] : []),
+    ...(economy.lmd_inventory_depletion_days != null ? [[text.lmdInventoryDepletion, economy.lmd_inventory_depletion_days, text.daysUnit] as const] : []),
     ...(economy.inventory_depletion_days !== null ? [[text.inventoryDepletion, economy.inventory_depletion_days, text.daysUnit] as const] : []),
   ] as const
 
@@ -127,6 +134,6 @@ function OrundumProductionAnalysis({ economy }: { economy: OrundumEconomy }) {
         </tr>)}</tbody></table>
     </div>
     <p>{amount(economy.total_daily_sanity_budget)} ÷ 4.8 ≈ {amount(economy.daily_orirock_supply)} {text.orirockUnit}</p>
-    <p>{text.sustainableOrundum} = min({amount(economy.rock_limited_orundum)}, {amount(economy.factory_orundum_capacity)}, {amount(economy.trade_orundum_capacity)}) ≈ {amount(economy.sustainable_orundum)} {text.orundumUnit}</p>
+    <p>{text.sustainableOrundum} = min({amount(economy.rock_limited_orundum)}, {economy.lmd_limited_orundum !== undefined && `${amount(economy.lmd_limited_orundum)}, `}{amount(economy.factory_orundum_capacity)}, {amount(economy.trade_orundum_capacity)}) ≈ {amount(economy.sustainable_orundum)} {text.orundumUnit}</p>
   </section>
 }

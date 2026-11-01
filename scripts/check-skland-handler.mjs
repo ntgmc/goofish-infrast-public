@@ -471,6 +471,7 @@ async function assertConfirmImport() {
     workspace.config?.intermediate_inventory?.['Pure Gold'] !== 123 ||
     workspace.config?.intermediate_inventory?.['Originium Shard'] !== 45 ||
     workspace.config?.intermediate_inventory?.['Orirock Cube'] !== 7658 ||
+    workspace.config?.intermediate_inventory?.LMD !== 240000 ||
     workspace.config?.auto_balance_source !== 'intermediate_inventory' ||
     workspace.config?.drones?.auto_strategy !== 'inventory_balance'
   ) {
@@ -481,7 +482,8 @@ async function assertConfirmImport() {
     result.body.skland_import?.config_saved !== true ||
     result.body.skland_import?.intermediate_inventory?.['Pure Gold'] !== 123 ||
     result.body.skland_import?.intermediate_inventory?.['Originium Shard'] !== 45 ||
-    result.body.skland_import?.intermediate_inventory?.['Orirock Cube'] !== 7658
+    result.body.skland_import?.intermediate_inventory?.['Orirock Cube'] !== 7658 ||
+    result.body.skland_import?.intermediate_inventory?.LMD !== 240000
   ) {
     throw new Error(`confirm import: import summary missing inventory sync ${JSON.stringify(result.body.skland_import)}`)
   }
@@ -746,6 +748,7 @@ async function assertRefreshImport() {
     workspace?.config?.intermediate_inventory?.['Pure Gold'] !== 9 ||
     workspace?.config?.intermediate_inventory?.['Originium Shard'] !== 8 ||
     workspace?.config?.intermediate_inventory?.['Orirock Cube'] !== 76 ||
+    workspace?.config?.intermediate_inventory?.LMD !== 120000 ||
     workspace?.config?.allow_product_rebalance !== false
   ) {
     throw new Error(`refresh import: intermediate inventory was not refreshed ${JSON.stringify(workspace?.config?.intermediate_inventory)}`)
@@ -1370,6 +1373,7 @@ function setFetchMode(mode) {
         message: 'OK',
         data: {
           items: {
+            4001: { name: '龙门币' },
             3003: { name: '赤金' },
             30012: { name: '固源岩' },
             shard_item: { id: 'shard_item', name: '源石碎片' },
@@ -1386,6 +1390,7 @@ function setFetchMode(mode) {
         message: 'OK',
         data: {
           items: [
+            { id: '4001', count: mode === 'refresh' ? 120000 : 240000 },
             { id: '3003', count: mode === 'refresh' ? 9 : 123 },
             { id: '30012', count: mode === 'refresh' ? 76 : 7658 },
             { id: 'shard_item', count: mode === 'refresh' ? 8 : 45 },

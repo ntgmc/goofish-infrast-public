@@ -5,10 +5,11 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { apiJson } from '../../lib/api-client'
 import { copy } from '../../copy'
 import { prepareResult } from '../../components/result-panel/formatters'
-import type { WorkspaceResultHistorySummary } from '../../lib/types'
+import type { OrundumEconomy, WorkspaceResultHistorySummary } from '../../lib/types'
 import { CONFIG_PRESETS } from '../../lib/config'
 import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './sample-result'
 import ProductionSummary from './ProductionSummary'
+import IncomeAnalysis from './IncomeAnalysis'
 
 vi.mock('../../lib/api-client', async (original) => ({
   ...await original<typeof import('../../lib/api-client')>(),
@@ -29,6 +30,52 @@ const previous: WorkspaceResultHistorySummary = {
 afterEach(() => {
   cleanup()
   vi.resetAllMocks()
+})
+
+it('uses optimizer cash flow and depletion instead of recalculating the production summary', async () => {
+  const daily = { manufacturing: { 'Originium Shard': 90 }, trading: { LMD: 41000, Orundum: 1000 }, consumption: { 'Originium Shard': 100 } }
+  const economy: OrundumEconomy = {
+    daily_sanity_budget: 240, monthly_card: false, total_daily_sanity_budget: 240,
+    daily_orirock_supply: 50, rock_limited_orundum: 250, factory_orundum_capacity: 1000,
+    trade_orundum_capacity: 1000, sustainable_orundum: 250, short_term_orundum: 1000,
+    case: 'inventory_burst', bottleneck: 'inventory', hard_lmd_cost: 160000,
+    daily_lmd_income: 40000, daily_lmd_net: -120000, daily_orirock_cost: 200,
+    lmd_limited_orundum: 250, inventory_depletion_days: 2, shard_inventory_depletion_days: null,
+    orirock_inventory_depletion_days: 10, lmd_inventory_depletion_days: 2,
+    opportunity_cost_sanity: 0, opportunity_lmd_equivalent: 0,
+  }
+  const result = { ...SAMPLE_RESULT, daily_production: daily, orundum_economy: economy }
+  const prepared = prepareResult(result, false, false)
+  vi.mocked(apiJson).mockResolvedValue({ item: { ...previous, config: SAMPLE_CONFIG, result: {
+    ...SAMPLE_RESULT, daily_production: { trading: { LMD: 50000, Orundum: 500 }, manufacturing: { 'Originium Shard': 50 } },
+    orundum_economy: { ...economy, daily_lmd_net: -30000 },
+  } } })
+  render(<>
+    <ProductionSummary userId="user-1" result={result} prepared={prepared} sample={false}
+      profileId="profile-1" resultId={current.id} resultConfig={SAMPLE_CONFIG}
+      history={[current, previous]} newResult={false} onConfigure={vi.fn()} />
+    <IncomeAnalysis result={result} prepared={prepared} />
+  </>)
+
+  const cash = screen.getByRole('region', { name: copy.v2.lmdNetChange })
+  expect(cash).toHaveTextContent('-120,000')
+  expect(cash).toHaveTextContent('每日产出 40,000 · 制造碎片消耗 160,000')
+  expect(screen.getByRole('region', { name: copy.v2.shortTermPulls })).toHaveTextContent('预计可持续 2 天')
+  const inputs = within(screen.getByRole('region', { name: copy.v2.orundumInputs }))
+  expect(inputs.getByRole('rowheader', { name: copy.v2.shardLmdCost }).closest('tr')).toHaveTextContent('160,000')
+  expect(inputs.getByRole('rowheader', { name: copy.v2.lmdInventoryDepletion }).closest('tr')).toHaveTextContent('2 天')
+  expect(inputs.getByRole('rowheader', { name: copy.v2.orirockInventoryDepletion }).closest('tr')).toHaveTextContent('10 天')
+  await userEvent.click(screen.getByRole('button', { name: copy.v2.comparePrevious }))
+  const changes = within(await screen.findByRole('region', { name: copy.v2.productionChanges }))
+  expect(changes.getByText(copy.v2.lmdNetChange).closest('div')).toHaveTextContent('-90,000')
+})
+
+it('keeps legacy income as gross income when the optimizer has not returned cash flow', () => {
+  const result = { ...SAMPLE_RESULT, daily_production: { manufacturing: { 'Originium Shard': 10 }, trading: { LMD: 10000 } } }
+  render(<ProductionSummary result={result} prepared={prepareResult(result, false, false)} sample
+    history={[]} newResult={false} onConfigure={vi.fn()} />)
+  expect(screen.getByRole('region', { name: copy.v2.lmd })).toHaveTextContent('10,000')
+  expect(screen.queryByRole('region', { name: copy.v2.lmdNetChange })).not.toBeInTheDocument()
 })
 
 it.each([

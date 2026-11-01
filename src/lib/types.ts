@@ -8,7 +8,7 @@ export interface LicenseOperator {
 }
 
 export type IntermediateProduct = 'Originium Shard' | 'Pure Gold' | 'Orirock Cube';
-type IntermediateInventory = Partial<Record<IntermediateProduct, number>>;
+type IntermediateInventory = Partial<Record<IntermediateProduct | 'LMD', number>>;
 export type DormitoryRule = 'fixed' | 'maa_autofill' | 'maa_pure_autofill';
 
 export interface LicenseConfig {
@@ -86,8 +86,13 @@ export interface OrundumEconomy {
   sustainable_orundum: number;
   short_term_orundum: number;
   case: 'capacity_limited' | 'budget_limited' | 'inventory_burst';
-  bottleneck: 'orirock_budget' | 'manufacture' | 'trading' | 'inventory';
+  bottleneck: 'orirock_budget' | 'lmd_budget' | 'manufacture' | 'trading' | 'inventory';
   hard_lmd_cost: number;
+  daily_lmd_income?: number;
+  daily_lmd_net?: number;
+  daily_orirock_cost?: number;
+  lmd_limited_orundum?: number;
+  lmd_inventory_depletion_days?: number | null;
   inventory_depletion_days: number | null;
   shard_inventory_depletion_days: number | null;
   orirock_inventory_depletion_days: number | null;

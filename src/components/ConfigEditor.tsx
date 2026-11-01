@@ -89,9 +89,12 @@ function applyCounts(config: LicenseConfig): void {
       : `${config.layout}${copy.common.components_ConfigEditor_019}`
 }
 
-function normalizeIntermediateInventory(value: LicenseConfig['intermediate_inventory']): Record<IntermediateProduct, number> {
-  const next: Record<IntermediateProduct, number> = { 'Originium Shard': 0, 'Pure Gold': 0, 'Orirock Cube': 0 }
-  for (const product of Object.keys(next) as IntermediateProduct[]) {
+function normalizeIntermediateInventory(value: LicenseConfig['intermediate_inventory']): Record<IntermediateProduct, number> & { LMD?: number } {
+  const next: Record<IntermediateProduct, number> & { LMD?: number } = {
+    'Originium Shard': 0, 'Pure Gold': 0, 'Orirock Cube': 0,
+    ...(value?.LMD !== undefined ? { LMD: 0 } : {}),
+  }
+  for (const product of Object.keys(next) as Array<IntermediateProduct | 'LMD'>) {
     const count = Number(value?.[product])
     next[product] = Number.isFinite(count) ? Math.max(0, Math.round(count * 100) / 100) : 0
   }
@@ -364,9 +367,9 @@ export default function ConfigEditor({
           <section aria-labelledby="config-inventory-heading">
             <h3 id="config-inventory-heading" className="config-section-title">{copy.common.components_ConfigEditor_077}</h3>
             <div className="config-inventory-grid">
-              {(['Originium Shard', 'Pure Gold', ...(showOrundum ? ['Orirock Cube'] as const : [])] as const).map((product) => <IntermediateInventoryField
+              {(['Originium Shard', 'Pure Gold', ...(showOrundum ? ['Orirock Cube', 'LMD'] as const : [])] as const).map((product) => <IntermediateInventoryField
                 key={product} product={product} label={product === 'Orirock Cube' ? copy.common.components_ConfigEditor_080 : PRODUCT_LABELS[product]}
-                value={inventory[product]} canEdit={canUseIntermediateInventory}
+                value={inventory[product] ?? 0} canEdit={canUseIntermediateInventory}
                 onChange={(product, value) => update((next) => {
                   next.intermediate_inventory = { ...normalizeIntermediateInventory(next.intermediate_inventory), [product]: Number.isFinite(value) ? Math.max(0, value) : 0 }
                   next.allow_product_rebalance = allowsInventoryProductRebalance(next, canEdit)
@@ -529,8 +532,8 @@ function fitProductCounts(current: Record<string, number>, products: string[], t
 }
 
 function IntermediateInventoryField({ label, product, value, canEdit, onChange }: {
-  label: string; product: IntermediateProduct; value: number; canEdit: boolean
-  onChange: (product: IntermediateProduct, value: number) => void
+  label: string; product: IntermediateProduct | 'LMD'; value: number; canEdit: boolean
+  onChange: (product: IntermediateProduct | 'LMD', value: number) => void
 }) {
   const [draftValue, setDraftValue] = useState(String(value))
   useEffect(() => { setDraftValue(String(value)) }, [value])
