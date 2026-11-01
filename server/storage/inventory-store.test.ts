@@ -19,6 +19,7 @@ import { listInventory, useInventoryItem } from './inventory-store'
 import { withTransaction } from './postgres'
 import type { PoolClient } from 'pg'
 import type { GiftPackOpeningRule } from '../../src/lib/inventory-contracts'
+import type { CdkRecord } from '../handlers/license-utils'
 
 vi.mock('./notification-store', () => ({
   upsertItemGrantNotificationInTransaction: vi.fn(),
@@ -148,15 +149,19 @@ describe('chest opening', () => {
 })
 
 describe('inventory listing', () => {
+  const cdkRecords = new Map<string, CdkRecord>()
+
   beforeEach(() => {
     vi.clearAllMocks()
+    cdkRecords.clear()
     ensureDatabaseSchema.mockResolvedValue(undefined)
     listProfilesForUser.mockResolvedValue([
       { id: 'schedule-profile', user_id: 'user-1', kind: 'cdk', status: 'active', display_name: '排班档案' },
       { id: 'depot-profile', user_id: 'user-1', kind: 'depot_value', status: 'active', display_name: '仓库档案' },
     ])
     getProfileWorkspace.mockResolvedValue(null)
-    query.mockImplementation(async (statement: string) => {
+    query.mockImplementation(async (statement: string, values: unknown[] = []) => {
+      if (statement.includes('from cdk_records')) return { rows: (values[0] as string[]).flatMap((key) => cdkRecords.has(key) ? [{ key, record_json: cdkRecords.get(key) }] : []) }
       if (statement.includes('from reward_grants grants')) return { rows: [] }
       if (statement.includes('from inventory_ledger')) return { rows: [] }
       if (statement.includes('from profile_entitlement_balances balances')) return { rows: [] }
@@ -177,5 +182,31 @@ describe('inventory listing', () => {
       archive_slots: expect.objectContaining({ used: 0 }),
     })])
     expect(getProfileWorkspace).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['month', 0, 0, 1],
+    ['half_year', 1, 1, 1],
+    ['year', 2, 1, 5],
+    ['month', 1, 0, 0],
+    ['month', 1, 1, 0],
+    ['lifetime', 99, 99, null],
+    [undefined, 99, 99, null],
+  ] as const)('returns remaining %s comparisons after %s completions and %s reservations', async (duration, completed, reserved, remaining) => {
+    const key = 'cdk/profile-code.json'
+    listProfilesForUser.mockResolvedValue([
+      { id: 'schedule-profile', user_id: 'user-1', kind: 'cdk', status: 'active', display_name: '排班档案', cdk_key: key },
+    ])
+    cdkRecords.set(key, {
+      version: 2, cdk_type: 'profile', code_hash: 'profile-code', status: 'used', permission: 'advanced', balance_amount: null,
+      profile_duration: duration, scenario_comparison_count: completed, scenario_comparison_reserved_count: reserved,
+      created_at: '2026-11-01T00:00:00.000Z', used_at: '2026-11-01T00:00:00.000Z',
+      order_note: null, license_order_hash: 'profile-order', operator_count: null, config_desc: null,
+    })
+
+    const inventory = await listInventory('user-1')
+
+    expect(inventory.capacities[0].scenario_comparison_remaining).toBe(remaining)
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('from cdk_records'), [[key]])
   })
 })

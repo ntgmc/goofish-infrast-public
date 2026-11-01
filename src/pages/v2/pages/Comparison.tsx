@@ -27,6 +27,7 @@ function ComparisonWorkspace({ workflow: w, onConfig }: { workflow: V2Workflow; 
   const expansion = useMemo(() => { try { return { value: expandScenarioComparison(w.activeConfig, model.factors), error: null } } catch (caught) { return { value: null, error: caught instanceof Error ? caught.message : String(caught) } } }, [w.activeConfig, model.factors])
   const [useCoupon, setUseCoupon] = useState(false)
   const couponBalance = w.itemBalances.scenario_simulation_coupon ?? 0
+  const remaining = w.scenarioCouponRequired ? couponBalance : w.profile.kind === 'cdk' ? w.profileCapacity?.scenario_comparison_remaining : null
   useEffect(() => {
     if (!w.scenarioCouponRequired || couponBalance < 1) setUseCoupon(false)
   }, [couponBalance, w.scenarioCouponRequired])
@@ -41,7 +42,9 @@ function ComparisonWorkspace({ workflow: w, onConfig }: { workflow: V2Workflow; 
     </label>}
     {w.scenarioCouponRequired && !useCoupon && <Notice>{copy.inventory.scenario_coupon_required}</Notice>}
     <div className="v2-experiment-run">
-      <div aria-live="polite">{expansion.value ? <strong>{ui.scenarioCount(expansion.value.scenarios.length)}</strong> : <Notice error>{expansion.error}</Notice>}</div>
+      <div aria-live="polite" aria-atomic="true">{expansion.value ? <strong>{ui.scenarioCount(expansion.value.scenarios.length)}</strong> : <Notice error>{expansion.error}</Notice>}
+        {!w.scenarioQuoteRequired && <p className="v2-muted">{ui.remainingRuns}：{!w.inventoryLoaded || w.inventoryError || remaining === undefined ? '—' : remaining === null ? <span aria-label={ui.unlimitedRuns}>∞</span> : remaining}</p>}
+      </div>
       <button type="button" className="v2-button v2-button-primary" disabled={model.loading || !expansion.value || (w.scenarioCouponRequired && (!useCoupon || couponBalance < 1)) || quoteUnavailable} onClick={() => void model.run(w.scenarioCouponRequired && useCoupon, w.scenarioBillingQuote)}>{model.loading ? ui.running : ui.run}</button>
     </div>
     {skippedCount > 0 && <details className="v2-comparison-skips"><summary>{ui.skippedCount(skippedCount)}</summary><ul>{expansion.value?.skipped.map((item) => <li key={`${item.code}:${item.droneStrategy}`}>{ui.skippedItem(item.message, item.count)}</li>)}</ul></details>}

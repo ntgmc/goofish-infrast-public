@@ -67,6 +67,8 @@ export interface ProfileCapacitySummary {
   plan_slots: { used: number; limit: number; maximum: number }
   history_slots: { used: number; limit: number; maximum: number }
   archive_slots: { used: number; limit: number; maximum: number }
+  /** null means unlimited comparisons. */
+  scenario_comparison_remaining?: number | null
 }
 
 export interface InventoryResponse {

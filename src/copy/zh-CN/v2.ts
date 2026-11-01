@@ -51,6 +51,8 @@ export const v2Copy = {
     drones: '无人机用途',
     dronesInactive: '选择 MAA 换班方式后，可比较无人机用途。',
     run: '开始对比',
+    remainingRuns: '剩余次数',
+    unlimitedRuns: '不限次数',
     scenarioCount: (count: number) => `将对比 ${count} 个方案`,
     skippedCount: (count: number) => `${count} 个组合无需比较`,
     skippedItem: (message: string, count: number) => `${message}（${count} 个组合）`,
