@@ -60,6 +60,8 @@ import {
   importSklandOperatorsByCred,
   isSklandCredentialCurrent,
   listSklandArknightsBindingsByCred,
+  readSklandIntermediateInventory,
+  SklandClient,
   SklandClientError,
   type IntermediateInventory,
   type SklandAccountOption,
@@ -426,14 +428,18 @@ export default async (req: Request): Promise<Response> => {
       if (!binding?.encrypted_cred || !binding.uid) {
         return jsonResponse({ error: '请先为当前档案绑定森空岛账号。', code: 'skland_not_bound' }, 400)
       }
-      const snapshot = await getSklandSnapshot(profile, ['game'], { force: true, wait: true })
+      const snapshot = await getSklandSnapshot(profile, ['game', 'inventory'], { force: true, wait: true })
       const rooms = readSklandFacilityRooms(snapshot.game!.data)
       let configuration: ReturnType<typeof readSklandFacilityConfig> | null = null
       let configuration_error: string | null = null
-      try { configuration = readSklandFacilityConfig(snapshot.game!.data) }
-      catch (error) { configuration_error = error instanceof Error ? error.message : '无法读取基建配置。' }
-      return jsonResponse({ rooms, configuration, configuration_error, fetched_at: snapshot.game!.fetchedAt,
-        refresh_warning: snapshot.errors.game ?? null }, 200, { 'Cache-Control': 'no-store' })
+      try {
+        const facilities = readSklandFacilityConfig(snapshot.game!.data)
+        const metadata = await new SklandClient(decryptSklandCredential(binding.encrypted_cred)).getCultivateInfo()
+        configuration = { ...facilities, intermediate_inventory: readSklandIntermediateInventory(metadata, snapshot.inventory!.data) }
+      } catch (error) { configuration_error = error instanceof Error ? error.message : '无法读取基建配置。' }
+      return jsonResponse({ rooms, configuration, configuration_error,
+        fetched_at: [snapshot.game!.fetchedAt, snapshot.inventory!.fetchedAt].sort()[0],
+        refresh_warning: snapshot.errors.game ?? snapshot.errors.inventory ?? null }, 200, { 'Cache-Control': 'no-store' })
     }
 
     if (pathname.endsWith('/import/refresh')) {

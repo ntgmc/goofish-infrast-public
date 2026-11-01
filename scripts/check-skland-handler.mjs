@@ -704,12 +704,33 @@ async function assertFacilityRead() {
   if (config?.layout !== '2-5-2' || config.facility_layout?.length !== 9
     || config.trading_station_levels?.join() !== '3,1' || config.manufacturing_station_levels?.join() !== '2,2,3,3,2'
     || config.product_requirements?.trading_stations.LMD !== 2 || config.product_requirements?.manufacturing_stations['Pure Gold'] !== 5
+    || config.intermediate_inventory?.['Pure Gold'] !== 9 || config.intermediate_inventory?.['Originium Shard'] !== 8
+    || config.intermediate_inventory?.['Orirock Cube'] !== 76 || config.intermediate_inventory?.LMD !== 120000
     || result.body.configuration_error !== null || !result.body.fetched_at
     || !store.fetchCalls.some((url) => url.includes('/api/v1/game/player/info'))) {
     throw new Error('facility read must return the current complete configuration')
   }
   if (JSON.stringify(store.workspaces.get('profile-1')) !== before) {
     throw new Error('facility read must not mutate the workspace')
+  }
+  const profile = store.profiles.get('profile-1')
+  const snapshotKey = profile.user_id + ':' + profile.skland_binding.uid
+  const previous = structuredClone(store.snapshots.get(snapshotKey))
+  setFetchMode('inventory-fail')
+  const failed = await callSkland('/api/user/skland/facilities', { profile_id: 'profile-1' })
+  if (failed.status !== 502 || failed.body.configuration || JSON.stringify(store.workspaces.get('profile-1')) !== before) {
+    throw new Error('facility read must preserve the configuration when no usable inventory is available')
+  }
+  setFetchMode('inventory-fail')
+  const oldInventoryTime = new Date(Date.now() - 60 * 60_000).toISOString()
+  previous.inventory.fetchedAt = oldInventoryTime
+  previous.retryAt = null
+  store.snapshots.set(snapshotKey, previous)
+  const fallback = await callSkland('/api/user/skland/facilities', { profile_id: 'profile-1' })
+  if (fallback.status !== 200 || !fallback.body.refresh_warning || fallback.body.fetched_at !== oldInventoryTime
+    || JSON.stringify(fallback.body.configuration?.intermediate_inventory) !== JSON.stringify(config.intermediate_inventory)
+    || JSON.stringify(store.workspaces.get('profile-1')) !== before) {
+    throw new Error('facility read must retain usable old inventory and report its original time when refreshing fails')
   }
   seedProfile({ id: 'facility-unbound', status: 'active' })
   const unbound = await callSkland('/api/user/skland/facilities', { profile_id: 'facility-unbound' })

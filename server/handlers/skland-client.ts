@@ -188,12 +188,12 @@ async function readIntermediateInventoryForImport(
   }
 }
 
-function readSklandIntermediateInventory(calInfo: unknown, calPlayer: unknown): IntermediateInventory {
+export function readSklandIntermediateInventory(calInfo: unknown, calPlayer: unknown): Required<IntermediateInventory> {
   const itemMeta = createItemMeta(unwrapDataRecord(calInfo).items)
   const playerItems = unwrapDataRecord(calPlayer).items
   if (!Array.isArray(playerItems)) throw new SklandClientError('request_failed', '森空岛养成库存为空或格式异常。')
 
-  const inventory: IntermediateInventory = {
+  const inventory: Required<IntermediateInventory> = {
     'Originium Shard': 0,
     'Pure Gold': 0,
     'Orirock Cube': 0,

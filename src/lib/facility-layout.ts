@@ -27,6 +27,10 @@ export const sklandFacilityConfigSchema = z.object({
   trading_station_levels: z.array(z.number().int().min(1).max(3)).optional(),
   manufacturing_station_levels: z.array(z.number().int().min(1).max(3)).optional(),
   facility_layout: facilityLayoutSchema.optional(),
+  intermediate_inventory: z.object({
+    'Originium Shard': z.number().int().min(0).max(1e12), 'Pure Gold': z.number().int().min(0).max(1e12),
+    'Orirock Cube': z.number().int().min(0).max(1e12), LMD: z.number().int().min(0).max(1e12),
+  }).optional(),
   product_requirements: z.object({ trading_stations: z.record(z.string(), z.number().int().nonnegative()),
     manufacturing_stations: z.record(z.string(), z.number().int().nonnegative()) }),
 })
