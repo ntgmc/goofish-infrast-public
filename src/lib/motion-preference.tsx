@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react'
 import { useReducedMotion } from 'motion/react'
+import { copy } from '../copy/index'
 
 const STORAGE_KEY = 'maatool-reduce-motion'
 const SYSTEM_QUERY = '(prefers-reduced-motion: reduce)'
@@ -22,7 +23,14 @@ export function MotionPreferenceProvider({ children }: { children: ReactNode }) 
   const [systemReducedMotion, setSystemReducedMotion] = useState(() => typeof window !== 'undefined' && Boolean(window.matchMedia?.(SYSTEM_QUERY).matches))
   const [storageError, setStorageError] = useState(false)
   const [autoDetect, setAutoDetect] = useState(true)
+  const [showAutoReducedToast, setShowAutoReducedToast] = useState(false)
   const reducedMotion = reduceAnimations || systemReducedMotion
+
+  useEffect(() => {
+    if (!showAutoReducedToast) return
+    const timeout = window.setTimeout(() => setShowAutoReducedToast(false), 5000)
+    return () => window.clearTimeout(timeout)
+  }, [showAutoReducedToast])
 
   useEffect(() => {
     const query = window.matchMedia?.(SYSTEM_QUERY)
@@ -71,6 +79,7 @@ export function MotionPreferenceProvider({ children }: { children: ReactNode }) 
       }
       if (slowFrames >= 3 && slowTime >= 300) {
         setPreference(true)
+        setShowAutoReducedToast(true)
         return
       }
       if (time - startedAt < 1000) frame = window.requestAnimationFrame(sample)
@@ -97,7 +106,18 @@ export function MotionPreferenceProvider({ children }: { children: ReactNode }) 
       setPreference(enabled)
     },
   }), [reducedMotion, systemReducedMotion, storageError, setPreference])
-  return <MotionPreferenceContext.Provider value={value}>{children}</MotionPreferenceContext.Provider>
+  return <MotionPreferenceContext.Provider value={value}>
+    {children}
+    {showAutoReducedToast && <div className="pointer-events-none fixed inset-x-4 top-4 z-[70] flex justify-center sm:inset-x-auto sm:right-6 sm:top-6" role="status" aria-live="polite" aria-atomic="true">
+      <div className="tool-alert tool-alert--info pointer-events-auto flex w-full max-w-md items-center gap-3 bg-surface-1 shadow-lg">
+        <p className="min-w-0 flex-1 text-sm font-medium leading-6">{copy.common.animationAutoReduced}</p>
+        <button type="button" className="-my-2 -mr-2 flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-lg text-ink-muted hover:bg-surface-2 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+          onClick={() => setShowAutoReducedToast(false)} aria-label={copy.common.animationDismissToast}>
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+    </div>}
+  </MotionPreferenceContext.Provider>
 }
 
 export function useMotionPreference() {

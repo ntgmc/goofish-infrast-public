@@ -25,6 +25,8 @@ import { emptyWorkspace, isDepotValueProfile, listProfilesForUser, updateProfile
 import { FREE_PREVIEW_LIMITED_CDK_ACTIVITY, isFreePreviewLimitedCdkActivityActive } from '../free-preview-trial'
 import { upsertItemGrantNotificationGroupInTransaction, upsertItemGrantNotificationInTransaction } from './notification-store'
 import { createLifetimeVoucherProfileAuthorizationInTransaction } from './cdk-redemption'
+import { listCdkRecordsByKeys } from './cdk-store'
+import { getCdkScenarioQuotaLimit } from '../handlers/license-utils'
 
 const PROFILE_CAPACITY_LIMITS = Object.freeze({
   plan: { base: WORKSPACE_SAVED_CONFIG_LIMIT, maximum: 20, entitlement: 'plan_slots' },
@@ -1067,7 +1069,7 @@ async function getProfileCapacities(userId: string): Promise<ProfileCapacitySumm
   const profiles = (await listProfilesForUser(userId)).filter(
     (profile) => profile.status === 'active' && !isDepotValueProfile(profile),
   )
-  const [balances, usageRows] = await Promise.all([
+  const [balances, usageRows, cdkRecords] = await Promise.all([
     query<{ profile_id: string; entitlement_type: string; units: number }>(
       `select balances.profile_id, balances.entitlement_type, balances.units
          from profile_entitlement_balances balances
@@ -1092,6 +1094,7 @@ async function getProfileCapacities(userId: string): Promise<ProfileCapacitySumm
         group by workspace.profile_id, workspace.record_json`,
       [profiles.map((profile) => profile.id)],
     ),
+    listCdkRecordsByKeys(profiles.flatMap((profile) => profile.cdk_key ? [profile.cdk_key] : [])),
   ])
   const byProfile = new Map<string, Map<string, number>>()
   for (const row of balances.rows) {
@@ -1103,12 +1106,21 @@ async function getProfileCapacities(userId: string): Promise<ProfileCapacitySumm
   return profiles.map((profile) => {
     const usage = usageByProfile.get(profile.id)
     const units = byProfile.get(profile.id) ?? new Map<string, number>()
+    const cdk = profile.cdk_key ? cdkRecords.get(profile.cdk_key) : undefined
+    const scenarioLimit = cdk ? getCdkScenarioQuotaLimit(cdk) : null
     return {
       profile_id: profile.id,
       display_name: profile.display_name,
       plan_slots: capacity(Number(usage?.plan_used ?? 0), PROFILE_CAPACITY_LIMITS.plan, units),
       history_slots: capacity(Number(usage?.history_used ?? 0), PROFILE_CAPACITY_LIMITS.history, units),
       archive_slots: capacity(Number(usage?.archive_used ?? 0), PROFILE_CAPACITY_LIMITS.archive, units),
+      ...(cdk && {
+        scenario_comparison_remaining: scenarioLimit === null ? null : Math.max(0,
+          scenarioLimit
+            - Math.max(0, Math.floor(cdk.scenario_comparison_count ?? 0))
+            - Math.max(0, Math.floor(cdk.scenario_comparison_reserved_count ?? 0)),
+        ),
+      }),
     }
   })
 }

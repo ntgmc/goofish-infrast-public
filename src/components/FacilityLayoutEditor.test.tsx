@@ -19,17 +19,21 @@ function setup() {
   return { config, update, props }
 }
 
-it('imports the full configuration in one update and removes obsolete 252 levels without changing scheduling choices or stock', async () => {
+it.each([
+  { 'Pure Gold': 9, 'Originium Shard': 8, 'Orirock Cube': 76, LMD: 120000 },
+  { 'Pure Gold': 0, 'Originium Shard': 0, 'Orirock Cube': 0, LMD: 0 },
+])('imports the full configuration and inventory %j in one update without changing scheduling choices', async (intermediate_inventory) => {
   const { config, update, props } = setup()
+  config.allow_product_rebalance = false
   const { layout, desc, trading_stations_count, manufacturing_stations_count, product_requirements } = CONFIG_PRESETS['333']
-  const fetch = vi.fn().mockResolvedValue(Response.json({ configuration: { layout, desc, trading_stations_count, manufacturing_stations_count, product_requirements }, fetched_at: new Date().toISOString() }))
+  const fetch = vi.fn().mockResolvedValue(Response.json({ configuration: { layout, desc, trading_stations_count, manufacturing_stations_count, product_requirements, intermediate_inventory }, fetched_at: new Date().toISOString() }))
   vi.stubGlobal('fetch', fetch)
   render(<ConfigEditor {...props} />)
   await userEvent.click(screen.getByRole('button', { name: copy.skland.importConfig }))
   await screen.findByText(copy.skland.importConfigSuccess)
   expect(update).toHaveBeenCalledTimes(1)
   expect(config).toMatchObject({ layout: '3-3-3', trading_stations_count: 3, manufacturing_stations_count: 3,
-    product_requirements, shift_hours: [12, 12, 12], intermediate_inventory: { 'Pure Gold': 123 } })
+    product_requirements, shift_hours: [12, 12, 12], intermediate_inventory, allow_product_rebalance: false })
   expect(config.trading_station_levels).toBeUndefined()
   expect(config.manufacturing_station_levels).toBeUndefined()
   expect(config.facility_layout).toBeUndefined()
@@ -47,15 +51,34 @@ it('leaves the existing configuration intact when the layout or product is unsup
   expect(config).toEqual(before)
 })
 
-it('preserves preset permissions while allowing a matching 252 map to be imported', async () => {
+it('rejects unavailable or invalid inventory without replacing the existing configuration', async () => {
+  const { config, update, props } = setup()
+  const before = cloneConfig(config)
+  const fetch = vi.fn().mockResolvedValueOnce(Response.json({ error: '库存读取失败，请稍后重试。' }, { status: 502 }))
+    .mockResolvedValueOnce(Response.json({ configuration: { ...CONFIG_PRESETS['333'], intermediate_inventory: { 'Pure Gold': -1 } } }))
+  vi.stubGlobal('fetch', fetch)
+  render(<ConfigEditor {...props} />)
+  await userEvent.click(screen.getByRole('button', { name: copy.skland.importConfig }))
+  await screen.findByText('库存读取失败，请稍后重试。')
+  expect(update).not.toHaveBeenCalled()
+  expect(config).toEqual(before)
+  await userEvent.click(screen.getByRole('button', { name: copy.skland.importConfig }))
+  await screen.findByText(copy.common.facilityLayoutReadFailed)
+  expect(update).not.toHaveBeenCalled()
+  expect(config).toEqual(before)
+})
+
+it('preserves preset permissions while allowing a matching 252 map and inventory to be imported', async () => {
   const { config, props, update } = setup()
-  const configuration = { ...CONFIG_PRESETS['252'], facility_layout: [...config.facility_layout!].reverse() }
+  const intermediate_inventory = { 'Pure Gold': 9, 'Originium Shard': 8, 'Orirock Cube': 76, LMD: 120000 }
+  const configuration = { ...CONFIG_PRESETS['252'], facility_layout: [...config.facility_layout!].reverse(), intermediate_inventory }
   vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => Response.json({ configuration, fetched_at: new Date().toISOString() })))
   render(<ConfigEditor {...props} canEdit={false} />)
   await userEvent.click(screen.getByRole('button', { name: copy.skland.importConfig }))
   await screen.findByText(copy.skland.importConfigSuccess)
   expect(update).toHaveBeenCalledTimes(1)
   expect(config.facility_layout).toEqual(configuration.facility_layout)
+  expect(config.intermediate_inventory).toEqual(intermediate_inventory)
   configuration.trading_stations_count = 3
   await userEvent.click(screen.getByRole('button', { name: copy.skland.importConfig }))
   await screen.findByText(copy.skland.configPresetRequired)

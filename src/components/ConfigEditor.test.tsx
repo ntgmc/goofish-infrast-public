@@ -274,6 +274,20 @@ describe('ConfigEditor inventory and presets', () => {
     expect(latest().drones?.auto_target_product).toBeUndefined()
   })
 
+  it('keeps LMD stock through other inventory edits and preset changes', async () => {
+    const latest = setup(normalizeConfig(CONFIG_PRESETS['333']), { canEdit: false, canEditIntermediateInventory: true })
+    await openSection(labels.inventory)
+    const lmd = screen.getByRole('spinbutton', { name: '龙门币' })
+    await userEvent.clear(lmd)
+    await userEvent.type(lmd, '240000')
+    const rock = screen.getByRole('spinbutton', { name: '固源岩' })
+    await userEvent.clear(rock)
+    await userEvent.type(rock, '1500')
+    await selectPreset('243')
+    await selectPreset('333')
+    expect(normalizeConfig(latest()).intermediate_inventory).toMatchObject({ LMD: 240000, 'Orirock Cube': 1500 })
+  })
+
   it.each([true, false])('preserves an explicit balance choice with canEdit=%s', async (canEdit) => {
     const latest = setup(normalizeConfig({ ...CONFIG_PRESETS['243'], intermediate_inventory: { 'Pure Gold': 50 }, auto_balance_source: 'intermediate_inventory' }), { canEdit, canEditIntermediateInventory: true })
     await openSection(labels.inventory)

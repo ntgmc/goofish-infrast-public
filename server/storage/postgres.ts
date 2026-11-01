@@ -205,6 +205,8 @@ export async function withPostgresAdvisoryLock<T>(
     application_name: 'goofish-infrast-v1-maintenance-leader',
   })
   let acquired = false
+  let connectionError: Error | undefined
+  client.on('error', (error: Error) => { connectionError ??= error })
   try {
     await client.connect()
     acquired = Boolean((await client.query<{ acquired: boolean }>(
@@ -212,9 +214,11 @@ export async function withPostgresAdvisoryLock<T>(
       [lockName],
     )).rows[0]?.acquired)
     if (!acquired) return { acquired: false }
-    return { acquired: true, value: await work() }
+    const value = await work()
+    if (connectionError) throw connectionError
+    return { acquired: true, value }
   } finally {
-    if (acquired) {
+    if (acquired && !connectionError) {
       await client.query('select pg_advisory_unlock(hashtextextended($1, 0))', [lockName])
         .catch((error) => console.warn('[postgres] advisory unlock failed', describeServerError(error)))
     }

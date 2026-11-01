@@ -50,7 +50,7 @@ export interface SklandImportSummary extends SklandBindingSummary {
 }
 
 type IntermediateProduct = 'Originium Shard' | 'Pure Gold' | 'Orirock Cube'
-export type IntermediateInventory = Record<IntermediateProduct, number>
+export type IntermediateInventory = Record<IntermediateProduct, number> & { LMD?: number }
 
 type SklandImportOptions = {
   uid: string
@@ -188,15 +188,16 @@ async function readIntermediateInventoryForImport(
   }
 }
 
-function readSklandIntermediateInventory(calInfo: unknown, calPlayer: unknown): IntermediateInventory {
+export function readSklandIntermediateInventory(calInfo: unknown, calPlayer: unknown): Required<IntermediateInventory> {
   const itemMeta = createItemMeta(unwrapDataRecord(calInfo).items)
   const playerItems = unwrapDataRecord(calPlayer).items
   if (!Array.isArray(playerItems)) throw new SklandClientError('request_failed', '森空岛养成库存为空或格式异常。')
 
-  const inventory: IntermediateInventory = {
+  const inventory: Required<IntermediateInventory> = {
     'Originium Shard': 0,
     'Pure Gold': 0,
     'Orirock Cube': 0,
+    LMD: 0,
   }
   for (const raw of playerItems) {
     if (!isRecord(raw)) continue
@@ -206,12 +207,13 @@ function readSklandIntermediateInventory(calInfo: unknown, calPlayer: unknown): 
     const meta = isRecord(itemMeta[id]) ? itemMeta[id] : {}
     const product = identifyIntermediateProduct(id, stringValue(meta.name ?? meta.itemName ?? raw.name ?? raw.itemName))
     if (!product) continue
-    inventory[product] = roundInventoryCount(inventory[product] + count)
+    inventory[product] = roundInventoryCount((inventory[product] ?? 0) + count)
   }
   return inventory
 }
 
-function identifyIntermediateProduct(id: string, name: string): IntermediateProduct | null {
+function identifyIntermediateProduct(id: string, name: string): IntermediateProduct | 'LMD' | null {
+  if (id === '4001') return 'LMD'
   if (id === '3003') return 'Pure Gold'
   if (id === '30012') return 'Orirock Cube'
   const normalized = name.replace(/\s+/g, '').toLowerCase()
@@ -219,6 +221,7 @@ function identifyIntermediateProduct(id: string, name: string): IntermediateProd
   if (normalized.includes('赤金') || normalized.includes('puregold')) return 'Pure Gold'
   if (normalized.includes('源石碎片') || normalized.includes('originiumshard')) return 'Originium Shard'
   if (normalized === '固源岩' || normalized === 'orirockcube') return 'Orirock Cube'
+  if (normalized === '龙门币' || normalized === 'lmd') return 'LMD'
   return null
 }
 

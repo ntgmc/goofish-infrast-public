@@ -83,7 +83,7 @@ const scenarioOrundumMetricsSchema = z.strictObject({
   hardLmdCostPerDay: finiteNumber,
   opportunityCostSanityPerDay: finiteNumber,
   inventoryDepletionDays: finiteNumber.nullable(),
-  bottleneck: z.enum(['orirock_budget', 'manufacture', 'trading', 'inventory']),
+  bottleneck: z.enum(['orirock_budget', 'lmd_budget', 'manufacture', 'trading', 'inventory']),
   case: z.enum(['capacity_limited', 'budget_limited', 'inventory_burst']),
   dailySanityBudget: finiteNumber,
   monthlyCard: z.boolean(),

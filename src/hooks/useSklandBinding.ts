@@ -28,7 +28,7 @@ export type SklandPayload = AuthSuccessResponse & {
     channel_name: string
     operator_count: number
     imported_at: string
-    intermediate_inventory?: Record<IntermediateProduct, number>
+    intermediate_inventory?: Record<IntermediateProduct, number> & { LMD?: number }
     inventory_synced: boolean
     config_saved: boolean
     inventory_warning?: string
@@ -611,14 +611,14 @@ function formatImportedMessage(data: SklandPayload, isDepot: boolean): string {
 
 function formatSklandInventoryMessage(imported: NonNullable<SklandPayload['skland_import']>): string {
   if (imported.inventory_synced && imported.intermediate_inventory) {
-    return `${copy.workspace.hooks_useSklandBinding_042}${formatInventoryAmount('Pure Gold', imported.intermediate_inventory['Pure Gold'])}、${formatInventoryAmount('Originium Shard', imported.intermediate_inventory['Originium Shard'])}、${formatInventoryAmount('Orirock Cube', imported.intermediate_inventory['Orirock Cube'])}${copy.workspace.hooks_useSklandBinding_043}`
+    return `${copy.workspace.hooks_useSklandBinding_042}${formatInventoryAmount('Pure Gold', imported.intermediate_inventory['Pure Gold'])}、${formatInventoryAmount('Originium Shard', imported.intermediate_inventory['Originium Shard'])}、${formatInventoryAmount('Orirock Cube', imported.intermediate_inventory['Orirock Cube'])}${imported.intermediate_inventory.LMD !== undefined ? `、${formatInventoryAmount('LMD', imported.intermediate_inventory.LMD)}` : ''}${copy.workspace.hooks_useSklandBinding_043}`
   }
   if (imported.inventory_warning) return copy.workspace.hooks_useSklandBinding_044
   return ''
 }
 
-function formatInventoryAmount(product: IntermediateProduct, value: number | undefined): string {
-  const label = product === 'Pure Gold'
+function formatInventoryAmount(product: IntermediateProduct | 'LMD', value: number | undefined): string {
+  const label = product === 'LMD' ? copy.common.components_ConfigEditor_001 : product === 'Pure Gold'
     ? copy.workspace.hooks_useSklandBinding_045
     : product === 'Originium Shard'
       ? copy.workspace.hooks_useSklandBinding_046

@@ -14,6 +14,7 @@ afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+  vi.useRealTimers()
   window.localStorage.removeItem(key)
 })
 
@@ -59,6 +60,7 @@ it('shares and persists the account setting across mounted settings controls and
   expect(screen.getByLabelText('motion mode')).toHaveTextContent('reduced')
   expect(document.documentElement).toHaveAttribute('data-reduced-motion')
   expect(window.localStorage.getItem(key)).toBe('true')
+  expect(screen.queryByText('检测到持续卡顿，已自动开启减少动画。')).not.toBeInTheDocument()
   first.unmount()
 
   render(<MotionPreferenceProvider><AnimationSettings /><Probe /></MotionPreferenceProvider>)
@@ -70,7 +72,8 @@ it('shares and persists the account setting across mounted settings controls and
   expect(window.localStorage.getItem(key)).toBe('false')
 })
 
-it('automatically shares and persists reduced motion after sustained stuttering and stops monitoring', () => {
+it('automatically shares and persists reduced motion after sustained stuttering and briefly notifies once', () => {
+  vi.useFakeTimers()
   const frames = mockFrames()
   const page = mountSettings()
   expect(frames.callbacks.size).toBe(0)
@@ -78,16 +81,25 @@ it('automatically shares and persists reduced motion after sustained stuttering 
   frames.advance(100)
   frames.advance(100)
   expect(screen.getByLabelText('motion mode')).toHaveTextContent('full')
+  expect(screen.queryByText('检测到持续卡顿，已自动开启减少动画。')).not.toBeInTheDocument()
   frames.advance(100)
   expect(screen.getByRole('switch', { name: '减少动画' })).toBeChecked()
   expect(screen.getByLabelText('motion mode')).toHaveTextContent('reduced')
   expect(document.documentElement).toHaveAttribute('data-reduced-motion')
   expect(window.localStorage.getItem(key)).toBe('true')
+  const toast = screen.getByText('检测到持续卡顿，已自动开启减少动画。').closest('[role="status"]')
+  expect(toast).toHaveAttribute('aria-live', 'polite')
   fireEvent.scroll(document)
   expect(frames.callbacks.size).toBe(0)
+  act(() => vi.advanceTimersByTime(4999))
+  expect(toast).toBeInTheDocument()
+  act(() => vi.advanceTimersByTime(1))
+  expect(toast).not.toBeInTheDocument()
+  expect(screen.getByLabelText('motion mode')).toHaveTextContent('reduced')
   page.unmount()
   mountSettings()
   expect(screen.getByLabelText('motion mode')).toHaveTextContent('reduced')
+  expect(screen.queryByText('检测到持续卡顿，已自动开启减少动画。')).not.toBeInTheDocument()
 })
 
 it('keeps smooth animations and isolated loading pauses, and bounds monitoring to interaction windows', () => {
@@ -140,6 +152,9 @@ it('respects manually disabling automatic reduction for the rest of the visit', 
   mountSettings()
   fireEvent.click(document.body)
   for (let index = 0; index < 3; index += 1) frames.advance(100)
+  fireEvent.click(screen.getByRole('button', { name: '关闭提示' }))
+  expect(screen.queryByText('检测到持续卡顿，已自动开启减少动画。')).not.toBeInTheDocument()
+  expect(screen.getByLabelText('motion mode')).toHaveTextContent('reduced')
   fireEvent.click(screen.getByRole('switch', { name: '减少动画' }))
   fireEvent.scroll(document)
   for (let index = 0; index < 3; index += 1) frames.advance(100)
@@ -176,6 +191,7 @@ it('reacts to system motion changes without replacing the saved browser preferen
   expect(toggle).toBeChecked()
   expect(toggle).toBeDisabled()
   expect(screen.getByLabelText('motion mode')).toHaveTextContent('reduced')
+  expect(screen.queryByText('检测到持续卡顿，已自动开启减少动画。')).not.toBeInTheDocument()
   expect(window.localStorage.getItem(key)).toBeNull()
   act(() => {
     query.matches = false

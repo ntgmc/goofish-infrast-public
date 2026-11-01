@@ -238,7 +238,7 @@ async function assertOrirockInventoryPersistence() {
   store.workspaces.set('profile-1', emptyWorkspace('profile-1'))
   const config = {
     ...sampleConfig,
-    intermediate_inventory: { 'Pure Gold': 123, 'Originium Shard': 45, 'Orirock Cube': 7658 },
+    intermediate_inventory: { 'Pure Gold': 123, 'Originium Shard': 45, 'Orirock Cube': 7658, LMD: 240000 },
     auto_balance_source: 'intermediate_inventory',
     drones: { ...sampleConfig.drones, auto_strategy: 'inventory_balance' },
   }
@@ -248,7 +248,8 @@ async function assertOrirockInventoryPersistence() {
   }, { method: 'PATCH' })
   if (
     savedWorkspace.status !== 200 ||
-    savedWorkspace.body.workspace.config?.intermediate_inventory?.['Orirock Cube'] !== 7658
+    savedWorkspace.body.workspace.config?.intermediate_inventory?.['Orirock Cube'] !== 7658 ||
+    savedWorkspace.body.workspace.config?.intermediate_inventory?.LMD !== 240000
   ) {
     throw new Error(`orirock workspace persistence failed: ${JSON.stringify(savedWorkspace.body)}`)
   }
@@ -259,7 +260,8 @@ async function assertOrirockInventoryPersistence() {
   }, { method: 'PATCH' })
   if (
     savedConfig.status !== 200 ||
-    savedConfig.body.workspace.saved_configs[0]?.config?.intermediate_inventory?.['Orirock Cube'] !== 7658
+    savedConfig.body.workspace.saved_configs[0]?.config?.intermediate_inventory?.['Orirock Cube'] !== 7658 ||
+    savedConfig.body.workspace.saved_configs[0]?.config?.intermediate_inventory?.LMD !== 240000
   ) {
     throw new Error(`orirock saved config persistence failed: ${JSON.stringify(savedConfig.body)}`)
   }

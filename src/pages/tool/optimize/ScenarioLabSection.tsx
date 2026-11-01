@@ -223,5 +223,5 @@ function economyCaseLabel(value: NonNullable<NonNullable<ScenarioComparisonPoint
 }
 
 function bottleneckLabel(value: NonNullable<NonNullable<ScenarioComparisonPoint['screening']>['orundumEconomy']>['bottleneck']): string {
-  return ({ orirock_budget: copy.optimize.pages_tool_optimize_ScenarioLabSection_047, manufacture: copy.optimize.pages_tool_optimize_ScenarioLabSection_048, trading: copy.optimize.pages_tool_optimize_ScenarioLabSection_049, inventory: copy.optimize.pages_tool_optimize_ScenarioLabSection_050 })[value]
+  return ({ orirock_budget: copy.optimize.pages_tool_optimize_ScenarioLabSection_047, lmd_budget: copy.common.components_ConfigEditor_001, manufacture: copy.optimize.pages_tool_optimize_ScenarioLabSection_048, trading: copy.optimize.pages_tool_optimize_ScenarioLabSection_049, inventory: copy.optimize.pages_tool_optimize_ScenarioLabSection_050 })[value]
 }

@@ -471,6 +471,7 @@ async function assertConfirmImport() {
     workspace.config?.intermediate_inventory?.['Pure Gold'] !== 123 ||
     workspace.config?.intermediate_inventory?.['Originium Shard'] !== 45 ||
     workspace.config?.intermediate_inventory?.['Orirock Cube'] !== 7658 ||
+    workspace.config?.intermediate_inventory?.LMD !== 240000 ||
     workspace.config?.auto_balance_source !== 'intermediate_inventory' ||
     workspace.config?.drones?.auto_strategy !== 'inventory_balance'
   ) {
@@ -481,7 +482,8 @@ async function assertConfirmImport() {
     result.body.skland_import?.config_saved !== true ||
     result.body.skland_import?.intermediate_inventory?.['Pure Gold'] !== 123 ||
     result.body.skland_import?.intermediate_inventory?.['Originium Shard'] !== 45 ||
-    result.body.skland_import?.intermediate_inventory?.['Orirock Cube'] !== 7658
+    result.body.skland_import?.intermediate_inventory?.['Orirock Cube'] !== 7658 ||
+    result.body.skland_import?.intermediate_inventory?.LMD !== 240000
   ) {
     throw new Error(`confirm import: import summary missing inventory sync ${JSON.stringify(result.body.skland_import)}`)
   }
@@ -702,12 +704,33 @@ async function assertFacilityRead() {
   if (config?.layout !== '2-5-2' || config.facility_layout?.length !== 9
     || config.trading_station_levels?.join() !== '3,1' || config.manufacturing_station_levels?.join() !== '2,2,3,3,2'
     || config.product_requirements?.trading_stations.LMD !== 2 || config.product_requirements?.manufacturing_stations['Pure Gold'] !== 5
+    || config.intermediate_inventory?.['Pure Gold'] !== 9 || config.intermediate_inventory?.['Originium Shard'] !== 8
+    || config.intermediate_inventory?.['Orirock Cube'] !== 76 || config.intermediate_inventory?.LMD !== 120000
     || result.body.configuration_error !== null || !result.body.fetched_at
     || !store.fetchCalls.some((url) => url.includes('/api/v1/game/player/info'))) {
     throw new Error('facility read must return the current complete configuration')
   }
   if (JSON.stringify(store.workspaces.get('profile-1')) !== before) {
     throw new Error('facility read must not mutate the workspace')
+  }
+  const profile = store.profiles.get('profile-1')
+  const snapshotKey = profile.user_id + ':' + profile.skland_binding.uid
+  const previous = structuredClone(store.snapshots.get(snapshotKey))
+  setFetchMode('inventory-fail')
+  const failed = await callSkland('/api/user/skland/facilities', { profile_id: 'profile-1' })
+  if (failed.status !== 502 || failed.body.configuration || JSON.stringify(store.workspaces.get('profile-1')) !== before) {
+    throw new Error('facility read must preserve the configuration when no usable inventory is available')
+  }
+  setFetchMode('inventory-fail')
+  const oldInventoryTime = new Date(Date.now() - 60 * 60_000).toISOString()
+  previous.inventory.fetchedAt = oldInventoryTime
+  previous.retryAt = null
+  store.snapshots.set(snapshotKey, previous)
+  const fallback = await callSkland('/api/user/skland/facilities', { profile_id: 'profile-1' })
+  if (fallback.status !== 200 || !fallback.body.refresh_warning || fallback.body.fetched_at !== oldInventoryTime
+    || JSON.stringify(fallback.body.configuration?.intermediate_inventory) !== JSON.stringify(config.intermediate_inventory)
+    || JSON.stringify(store.workspaces.get('profile-1')) !== before) {
+    throw new Error('facility read must retain usable old inventory and report its original time when refreshing fails')
   }
   seedProfile({ id: 'facility-unbound', status: 'active' })
   const unbound = await callSkland('/api/user/skland/facilities', { profile_id: 'facility-unbound' })
@@ -746,6 +769,7 @@ async function assertRefreshImport() {
     workspace?.config?.intermediate_inventory?.['Pure Gold'] !== 9 ||
     workspace?.config?.intermediate_inventory?.['Originium Shard'] !== 8 ||
     workspace?.config?.intermediate_inventory?.['Orirock Cube'] !== 76 ||
+    workspace?.config?.intermediate_inventory?.LMD !== 120000 ||
     workspace?.config?.allow_product_rebalance !== false
   ) {
     throw new Error(`refresh import: intermediate inventory was not refreshed ${JSON.stringify(workspace?.config?.intermediate_inventory)}`)
@@ -1370,6 +1394,7 @@ function setFetchMode(mode) {
         message: 'OK',
         data: {
           items: {
+            4001: { name: '龙门币' },
             3003: { name: '赤金' },
             30012: { name: '固源岩' },
             shard_item: { id: 'shard_item', name: '源石碎片' },
@@ -1386,6 +1411,7 @@ function setFetchMode(mode) {
         message: 'OK',
         data: {
           items: [
+            { id: '4001', count: mode === 'refresh' ? 120000 : 240000 },
             { id: '3003', count: mode === 'refresh' ? 9 : 123 },
             { id: '30012', count: mode === 'refresh' ? 76 : 7658 },
             { id: 'shard_item', count: mode === 'refresh' ? 8 : 45 },

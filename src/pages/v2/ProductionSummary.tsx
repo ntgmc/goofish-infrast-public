@@ -41,6 +41,10 @@ export default function ProductionSummary({ result, prepared, sample, userId, pr
   const economy = prepared.orundumEconomy
   const orundum = economy?.short_term_orundum ?? prepared.productionStats.orundum
   const isOrundum = Boolean(economy) || orundum > 0
+  const hasLmdCashFlow = economy?.daily_lmd_net !== undefined
+  const netLmd = economy?.daily_lmd_net ?? prepared.productionStats.lmd
+  const priorNetLmd = hasLmdCashFlow ? baseline?.item?.result.orundum_economy?.daily_lmd_net
+    : priorDaily?.trading?.LMD ?? (priorDaily ? 0 : undefined)
   const showOrundum = isOrundum && experience === 0
   const priorProducts = baseline?.item?.config?.product_requirements
   const previousIsOrundum = Boolean(baseline?.item?.result.orundum_economy)
@@ -68,7 +72,7 @@ export default function ProductionSummary({ result, prepared, sample, userId, pr
     return Math.abs(difference) < 0.005 ? text.sameAsPrevious : `${signedAmount(difference)} ${unit}`.trim()
   }
   const changes = [
-    { label: text.lmd, value: prepared.productionStats.lmd, before: priorDaily?.trading?.LMD ?? (priorDaily ? 0 : undefined), unit: `${text.comparison.lmd} ${text.daily}` },
+    { label: hasLmdCashFlow ? text.lmdNetChange : text.lmd, value: netLmd, before: priorNetLmd, unit: `${text.comparison.lmd} ${text.daily}` },
     { label: showOrundum ? text.orundum : text.exp, value: showOrundum ? orundum : experience,
       before: showOrundum ? baseline?.item?.result.orundum_economy?.short_term_orundum ?? priorDaily?.trading?.Orundum ?? (priorDaily ? 0 : undefined)
         : priorDaily ? (priorDaily.manufacturing?.['Battle Record'] ?? 0) * 1000 : undefined,
@@ -82,7 +86,8 @@ export default function ProductionSummary({ result, prepared, sample, userId, pr
 
   return <>
     <StaggeredReveal className="v2-metrics">
-      <Metric label={text.lmd} value={daily ? formatAmount(prepared.productionStats.lmd) : '—'} unit={text.daily} product="LMD"
+      <Metric label={hasLmdCashFlow ? text.lmdNetChange : text.lmd} value={daily ? formatAmount(netLmd) : '—'} unit={text.daily} product="LMD"
+        hint={hasLmdCashFlow && economy ? text.lmdCashFlowHint(formatAmount(economy.daily_lmd_income ?? prepared.productionStats.lmd), formatAmount(economy.hard_lmd_cost)) : undefined}
         change={showChanges ? changes[0].compact : undefined} />
       <Metric label={showOrundum ? text.orundum : text.exp} value={daily ? formatAmount(showOrundum ? orundum : experience) : '—'}
         unit={showOrundum ? text.daily : text.expUnit} product={showOrundum ? 'Orundum' : 'Battle Record'}

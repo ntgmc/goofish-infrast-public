@@ -27,6 +27,7 @@ function ComparisonWorkspace({ workflow: w, onConfig }: { workflow: V2Workflow; 
   const expansion = useMemo(() => { try { return { value: expandScenarioComparison(w.activeConfig, model.factors), error: null } } catch (caught) { return { value: null, error: caught instanceof Error ? caught.message : String(caught) } } }, [w.activeConfig, model.factors])
   const [useCoupon, setUseCoupon] = useState(false)
   const couponBalance = w.itemBalances.scenario_simulation_coupon ?? 0
+  const remaining = w.scenarioCouponRequired ? couponBalance : w.profile.kind === 'cdk' ? w.profileCapacity?.scenario_comparison_remaining : null
   useEffect(() => {
     if (!w.scenarioCouponRequired || couponBalance < 1) setUseCoupon(false)
   }, [couponBalance, w.scenarioCouponRequired])
@@ -41,7 +42,9 @@ function ComparisonWorkspace({ workflow: w, onConfig }: { workflow: V2Workflow; 
     </label>}
     {w.scenarioCouponRequired && !useCoupon && <Notice>{copy.inventory.scenario_coupon_required}</Notice>}
     <div className="v2-experiment-run">
-      <div aria-live="polite">{expansion.value ? <strong>{ui.scenarioCount(expansion.value.scenarios.length)}</strong> : <Notice error>{expansion.error}</Notice>}</div>
+      <div aria-live="polite" aria-atomic="true">{expansion.value ? <strong>{ui.scenarioCount(expansion.value.scenarios.length)}</strong> : <Notice error>{expansion.error}</Notice>}
+        {!w.scenarioQuoteRequired && <p className="v2-muted">{ui.remainingRuns}：{!w.inventoryLoaded || w.inventoryError || remaining === undefined ? '—' : remaining === null ? <span aria-label={ui.unlimitedRuns}>∞</span> : remaining}</p>}
+      </div>
       <button type="button" className="v2-button v2-button-primary" disabled={model.loading || !expansion.value || (w.scenarioCouponRequired && (!useCoupon || couponBalance < 1)) || quoteUnavailable} onClick={() => void model.run(w.scenarioCouponRequired && useCoupon, w.scenarioBillingQuote)}>{model.loading ? ui.running : ui.run}</button>
     </div>
     {skippedCount > 0 && <details className="v2-comparison-skips"><summary>{ui.skippedCount(skippedCount)}</summary><ul>{expansion.value?.skipped.map((item) => <li key={`${item.code}:${item.droneStrategy}`}>{ui.skippedItem(item.message, item.count)}</li>)}</ul></details>}
@@ -81,13 +84,17 @@ function Factors({ factors, disabled, onChange }: { factors: ScenarioComparisonF
   return <fieldset className="v2-experiment-factors" disabled={disabled}>
     <legend className="sr-only">{ui.builderTitle}</legend>
     <section className="v2-production-builder">
-      <h3>{ui.productionPlans}</h3>
-      <div className="v2-production-editor">
+      <div className="v2-comparison-section-heading"><h3>{ui.productionPlans}</h3><p>{ui.productionHelp}</p></div>
+      <div className="v2-production-workspace">
+      <div className="v2-production-draft">
+        <div className="v2-production-draft-heading"><h4>{ui.draftPlan}</h4>
         <label className="v2-field"><span>{ui.layout}</span>
           <select className="v2-input" aria-label={ui.layout} value={layoutId} onChange={(event) => setLayoutId(event.target.value as ScenarioLayout)}>
             {LAYOUTS.map((item) => <option key={item.id} value={item.id}>{SCENARIO_LAYOUT_LABELS[item.id]}</option>)}
           </select>
         </label>
+        </div>
+        <div className="v2-production-editor">
         <fieldset className="v2-production-allocation" disabled={Boolean(fixedPlan)}><legend>{ui.tradingStations}<small>{ui.stationCount(layout.trading)}</small></legend>
           <div>
             <ProductCount product="Orundum" value={draft.trading.orundum} max={layout.trading} onChange={setOrundum} />
@@ -109,16 +116,21 @@ function Factors({ factors, disabled, onChange }: { factors: ScenarioComparisonF
           onChange({ ...factors, layouts: layouts.sort((a, b) => a.layout.localeCompare(b.layout)) })
         }}><Plus size={16} aria-hidden="true" />{duplicate ? ui.duplicatePlan : count >= SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS ? ui.planLimit : ui.addPlan}</button>
       </div>
-      <div className="v2-production-selected">
-        <h4>{ui.selectedPlans(count, SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS)}</h4>
+      </div>
+      <section className="v2-production-selected" aria-label={ui.selectedPlansTitle}>
+        <div className="v2-production-selected-heading"><h4>{ui.selectedPlansTitle}</h4><span>{ui.selectedPlans(count, SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS)}</span></div>
         {count === 0 ? <p className="v2-muted">{ui.noPlans}</p> : <ul className="v2-production-plans">
           {factors.layouts.flatMap((entry) => entry.plans.map((plan) => <li key={`${entry.layout}:${planKey(plan)}`}>
-            <b>{SCENARIO_LAYOUT_LABELS[entry.layout]}</b><ProductionSummary plan={plan} />
-            <button type="button" className="v2-icon-button" aria-label={`${text.pages_tool_optimize_scenario_lab_ScenarioFactors_026}${SCENARIO_LAYOUT_LABELS[entry.layout]} ${planLabel(plan)}`} onClick={() => onChange({ ...factors, layouts: factors.layouts.map((row) => row.layout === entry.layout ? { ...row, plans: row.plans.filter((item) => planKey(item) !== planKey(plan)) } : row).filter((row) => row.plans.length > 0) })}><X size={16} aria-hidden="true" /></button>
+            <div className="v2-production-plan-heading"><b>{SCENARIO_LAYOUT_LABELS[entry.layout]}</b>
+            <button type="button" className="v2-icon-button" aria-label={`${text.pages_tool_optimize_scenario_lab_ScenarioFactors_026}${SCENARIO_LAYOUT_LABELS[entry.layout]} ${planLabel(plan)}`} onClick={() => onChange({ ...factors, layouts: factors.layouts.map((row) => row.layout === entry.layout ? { ...row, plans: row.plans.filter((item) => planKey(item) !== planKey(plan)) } : row).filter((row) => row.plans.length > 0) })}><X size={16} aria-hidden="true" /></button></div>
+            <ProductionSummary plan={plan} />
           </li>))}
         </ul>}
+      </section>
       </div>
     </section>
+    <section className="v2-experiment-strategies">
+    <div className="v2-comparison-section-heading"><h3>{ui.strategiesTitle}</h3><p>{ui.strategiesHelp}</p></div>
     <div className="v2-experiment-options">
       <fieldset><legend>{ui.schedules}<small>{ui.multipleChoice}</small></legend>
         <div className="v2-schedule-choices">
@@ -139,24 +151,25 @@ function Factors({ factors, disabled, onChange }: { factors: ScenarioComparisonF
         <p className="v2-muted">{hasMaa ? ui.dronesHelp : ui.dronesInactive}</p>
       </fieldset>
     </div>
+    </section>
   </fieldset>
 }
 
 function ProductCount({ product, value, max = 0, onChange }: { product: string; value: number; max?: number; onChange?: (value: number) => void }) {
   const label = ui.productCount(PRODUCT_LABELS[product])
-  return <div className="v2-product-count">
+  return <label className="v2-product-count">
     <span><ProductIcon product={product} size={24} />{PRODUCT_LABELS[product]}</span>
     {onChange ? <select className="v2-input" aria-label={label} value={value} onChange={(event) => onChange(Number(event.target.value))}>
       {Array.from({ length: max + 1 }, (_, i) => <option key={i} value={i}>{ui.stationCount(i)}</option>)}
     </select> : <output aria-label={label}><strong>{ui.stationCount(value)}</strong><small>{ui.automatic}</small></output>}
-  </div>
+  </label>
 }
 
 function ProductionSummary({ plan }: { plan: ScenarioProductionPlan }) {
-  return <div className="v2-production-summary">{([
-    ['LMD', plan.trading.lmd], ['Orundum', plan.trading.orundum],
-    ['Pure Gold', plan.manufacturing.pureGold], ['Battle Record', plan.manufacturing.battleRecord], ['Originium Shard', plan.manufacturing.originiumShard],
-  ] as const).filter(([, count]) => count > 0).map(([product, count]) => <span key={product}><ProductIcon product={product} size={20} />{PRODUCT_LABELS[product]}<b>×{count}</b></span>)}</div>
+  return <dl className="v2-production-summary">{([
+    [ui.tradingStations, [['LMD', plan.trading.lmd], ['Orundum', plan.trading.orundum]]],
+    [ui.manufacturingStations, [['Pure Gold', plan.manufacturing.pureGold], ['Battle Record', plan.manufacturing.battleRecord], ['Originium Shard', plan.manufacturing.originiumShard]]],
+  ] as const).map(([station, products]) => <div key={station}><dt>{station}</dt><dd>{products.filter(([, count]) => count > 0).map(([product, count]) => <span key={product}><ProductIcon product={product} size={20} />{PRODUCT_LABELS[product]}<b>×{count}</b></span>)}</dd></div>)}</dl>
 }
 
 function ComparisonPreview({ baseline }: { baseline: string }) {

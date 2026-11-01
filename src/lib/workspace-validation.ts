@@ -81,6 +81,7 @@ const variableShiftScheduleSchema = z.strictObject({
 })
 
 const intermediateInventorySchema = z.strictObject({
+  LMD: finiteNumber.min(0).max(1_000_000_000_000).optional(),
   'Originium Shard': finiteNumber.min(0).max(1_000_000_000_000).optional(),
   'Pure Gold': finiteNumber.min(0).max(1_000_000_000_000).optional(),
   'Orirock Cube': finiteNumber.min(0).max(1_000_000_000_000).optional(),

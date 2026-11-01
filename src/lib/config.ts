@@ -312,14 +312,15 @@ export function validateConfig(config: LicenseConfig): { ok: true } | { ok: fals
   return { ok: true }
 }
 
-function normalizeIntermediateInventory(value: unknown): Record<IntermediateProduct, number> {
+function normalizeIntermediateInventory(value: unknown): Record<IntermediateProduct, number> & { LMD?: number } {
   const source = value && typeof value === 'object' ? value as Record<string, unknown> : {}
-  const next: Record<IntermediateProduct, number> = {
+  const next: Record<IntermediateProduct, number> & { LMD?: number } = {
     'Originium Shard': 0,
     'Pure Gold': 0,
     'Orirock Cube': 0,
+    ...(source.LMD !== undefined ? { LMD: 0 } : {}),
   }
-  for (const product of Object.keys(next) as IntermediateProduct[]) {
+  for (const product of Object.keys(next) as Array<IntermediateProduct | 'LMD'>) {
     const count = Number(source[product])
     next[product] = Number.isFinite(count) ? Math.max(0, Math.round(count * 100) / 100) : 0
   }

@@ -24,9 +24,11 @@ export function observeHttpRequest(req: IncomingMessage, res: ServerResponse, re
     const durationMs = performance.now() - started
     const outcome = res.writableFinished ? 'completed' : 'aborted'
     recordPerformanceDuration('http.request', durationMs, { method, route, status: res.headersSent ? res.statusCode : 0, outcome })
-    logPerformanceEvent('http.request', {
-      method, route, status: res.headersSent ? res.statusCode : null, outcome, duration_ms: durationMs,
-    }, { request_id: requestId })
+    if (outcome === 'aborted' || res.statusCode >= 400 || durationMs >= 1_000) {
+      logPerformanceEvent('http.request', {
+        method, route, status: res.headersSent ? res.statusCode : null, outcome, duration_ms: durationMs,
+      }, { request_id: requestId })
+    }
   }
   res.once('finish', finish)
   res.once('close', finish)
