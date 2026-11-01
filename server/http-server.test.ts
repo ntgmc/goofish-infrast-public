@@ -1,13 +1,14 @@
 import { once } from 'node:events'
 import { createConnection, Socket, type AddressInfo } from 'node:net'
 import { IncomingMessage, ServerResponse } from 'node:http'
+import { performance } from 'node:perf_hooks'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 vi.mock('./routes', () => ({ routeRequest: vi.fn(async () => new Response('ok')) }))
 
 import { createApiServer } from './http-server'
 import { routeRequest } from './routes'
-import { getPerformanceContext } from './performance-observation'
+import { flushPerformanceDurations, getPerformanceContext } from './performance-observation'
 import { observeHttpRequest } from './http-observation'
 
 const server = createApiServer()
@@ -49,22 +50,55 @@ describe('API HTTP request lifecycle', () => {
     expect(routeRequest).not.toHaveBeenCalled()
   })
 
-  it('routes ordinary requests through the same response path', async () => {
+  it('aggregates ordinary requests without logging each request', async () => {
+    const events: Array<Record<string, unknown>> = []
+    vi.spyOn(console, 'info').mockImplementation((line: string) => { events.push(JSON.parse(line)) })
+    flushPerformanceDurations()
+    events.length = 0
     const response = await fetch(`http://127.0.0.1:${port}/api/health/live`)
     expect(response.status).toBe(200)
     expect(response.headers.get('X-Request-ID')).toBeTruthy()
     await expect(response.text()).resolves.toBe('ok')
     expect(routeRequest).toHaveBeenCalledOnce()
+    expect(events).toHaveLength(0)
+    flushPerformanceDurations()
+    expect(events).toEqual([expect.objectContaining({
+      event: 'performance.duration', metric: 'http.request', count: 1,
+      labels: { method: 'GET', route: '/api/health/live', status: 200, outcome: 'completed' },
+    })])
   })
 
-  it('correlates concurrent requests and logs route templates without query values or result IDs', async () => {
+  it.each([
+    { status: 200, durationMs: 999, logged: false },
+    { status: 200, durationMs: 1_000, logged: true },
+    { status: 400, durationMs: 0, logged: true },
+    { status: 500, durationMs: 0, logged: true },
+  ])('logs status $status at $durationMs ms: $logged', async ({ status, durationMs, logged }) => {
+    const events: Array<Record<string, unknown>> = []
+    vi.spyOn(console, 'info').mockImplementation((line: string) => { events.push(JSON.parse(line)) })
+    let now = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
+    vi.mocked(routeRequest).mockImplementationOnce(async () => {
+      now = durationMs
+      return new Response('ok', { status })
+    })
+    const response = await fetch(`http://127.0.0.1:${port}/api/health/live`)
+    await response.text()
+    expect(events).toHaveLength(logged ? 1 : 0)
+    if (logged) expect(events[0]).toMatchObject({
+      event: 'http.request', status, duration_ms: durationMs, outcome: 'completed',
+      request_id: response.headers.get('X-Request-ID'),
+    })
+  })
+
+  it('correlates concurrent failed requests and logs route templates without query values or result IDs', async () => {
     const events: Array<Record<string, unknown>> = []
     vi.spyOn(console, 'info').mockImplementation((line: string) => { events.push(JSON.parse(line)) })
     const observed: string[] = []
     const handler = async () => {
       await new Promise<void>((resolve) => setImmediate(resolve))
       observed.push(getPerformanceContext().request_id!)
-      return new Response('ok')
+      return new Response('unavailable', { status: 503 })
     }
     vi.mocked(routeRequest).mockImplementationOnce(handler).mockImplementationOnce(handler)
     const responses = await Promise.all([
@@ -75,7 +109,7 @@ describe('API HTTP request lifecycle', () => {
     const ids = responses.map((response) => response.headers.get('X-Request-ID')).sort()
     expect(observed.sort()).toEqual(ids)
     expect(events.map((event) => event.request_id).sort()).toEqual(ids)
-    expect(events).toContainEqual(expect.objectContaining({ route: '/api/user/results/:resultId', outcome: 'completed', status: 200 }))
+    expect(events).toContainEqual(expect.objectContaining({ route: '/api/user/results/:resultId', outcome: 'completed', status: 503 }))
     expect(JSON.stringify(events)).not.toMatch(/private-result|secret-marker/)
   })
 

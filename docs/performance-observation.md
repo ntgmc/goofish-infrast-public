@@ -8,7 +8,7 @@ API、任务进程和计算线程启动后自动输出 JSON 观测日志，每 5
 
 | 日志事件 | 计时边界和用途 |
 | --- | --- |
-| `http.request` | 从 Node 收到请求到响应完成，包含读请求体、校验、业务处理及写响应；`aborted` 表示响应未完成。代理排队和浏览器网络时间应结合已有浏览器记录排查。 |
+| `http.request` | 从 Node 收到请求到响应完成，包含读请求体、校验、业务处理及写响应；达到 1 秒、HTTP 状态码 ≥ 400 或响应中断时单独记录，`aborted` 表示响应未完成。代理排队和浏览器网络时间应结合已有浏览器记录排查。 |
 | `postgres.acquire` | 借连接调用到获得连接或失败，包含新连接建立；达到 100 ms 或失败时单独记录，同时附带池中的连接数和等待数。它与 SQL 执行分开统计。 |
 | `postgres.query` | 连接上发起 SQL 到返回或失败，包含数据库执行、锁等待、网络和结果解码，不包含借连接。达到 250 ms 或失败时单独记录。覆盖共享查询、池查询和直接借连接的事务查询。 |
 | `optimization.accepted` | 提交请求已获得可读取的任务，包含 `request_id` 与 `job_id`，也会记录幂等重放。 |
@@ -29,7 +29,7 @@ API、任务进程和计算线程启动后自动输出 JSON 观测日志，每 5
 
 ## 采集口径与开销
 
-HTTP 每次请求记录一条事件，包括校验失败与响应断连。SQL 正常调用只更新内存分布，慢调用和失败调用另写事件；不记录 SQL 文本、参数、请求体、查询字符串、Cookie、令牌或用户身份。SQL 的 `query_fingerprint` 是原始语句模板的 SHA-256，可在源码排查时比较相同模板的指纹；它与 PostgreSQL 的 `queryid` 使用不同算法，不能直接连接。
+HTTP 每次请求都更新内存耗时分布；只有达到 1 秒、HTTP 状态码 ≥ 400 或响应中断时才单独记录 `http.request`，正常快速请求随每 5 分钟的 `performance.duration` 汇总输出。SQL 正常调用只更新内存分布，慢调用和失败调用另写事件；不记录 SQL 文本、参数、请求体、查询字符串、Cookie、令牌或用户身份。SQL 的 `query_fingerprint` 是原始语句模板的 SHA-256，可在源码排查时比较相同模板的指纹；它与 PostgreSQL 的 `queryid` 使用不同算法，不能直接连接。
 
 指标标签使用声明的路由模板、有限的方法和阶段等字段。动态任务和结果编号只进入关联日志，未知路由统一记为 `unmatched`；未发送响应头的断连，其聚合状态为 `0`。单窗口保留最多 512 个常规标签组合，多余样本按指标归入 `overflow`。耗时直方图按微秒记录，最小值为 1 微秒，使用两位有效数字；初始容量至少覆盖 1 秒，遇到更长耗时再扩容并保留已有样本，避免为每个组合预分配极大范围。汇总耗时仍以毫秒输出，最多保留三位小数。事件循环每 20 ms 采样，无样本时延迟值为 `null`。
 
@@ -49,7 +49,7 @@ CPU 运行状态是整个进程的 CPU 增量，包含其计算线程，不能�
 
 | 边界 | 需要保留的证据 | 报告内容 |
 | --- | --- | --- |
-| 提交 | 浏览器请求时序、响应 `X-Request-ID`、`http.request` 与 `optimization.accepted` | 提交耗时及任务关联号 |
+| 提交 | 浏览器请求时序、响应 `X-Request-ID` 与 `optimization.accepted`；慢请求或失败请求另有 `http.request` | 提交耗时及任务关联号 |
 | 排队 | 首次 `optimization.claimed`，或首次 attempt 的持久化时间 | 首次等待、未领取任务数及当前等待年龄 |
 | 执行 | 同一 `job_id`／`attempt_no` 的 attempt、execution、各阶段、CPU Profile 与线程 CPU | 阶段墙钟、CPU、父进程收尾及失败／超时／取消数量 |
 | 数据库 | 同期借连接与查询窗口、慢调用、完整的 `pg_stat_statements` 前后快照 | 连接等待、客户端 SQL 耗时、服务器区间调用与执行时间、锁等待 |
@@ -108,7 +108,7 @@ psql 'service=goofish' -X -v ON_ERROR_STOP=1 -f deploy/postgres/performance.sql
 
 ## 部署后的验证顺序
 
-1. 请求一个 API，确认响应的 `X-Request-ID` 能找到对应的 `http.request`；提交一个任务，确认可通过 `optimization.accepted` 串到计算日志。
+1. 请求一个正常 API，确认响应带有 `X-Request-ID` 且低于 1 秒时不输出逐请求日志；对慢请求、HTTP 错误或响应中断，确认 `http.request` 带有对应关联号。提交一个任务，确认可通过 `optimization.accepted` 串到计算日志。
 2. 经过一个采样窗口后检查 API 和任务进程的 `performance.runtime`、`performance.duration`，确认日志采集保留完整 JSON。
 3. 对一次慢任务分别检查首次排队、各计算阶段、线程 CPU 时间和父进程收尾，再检查同一任务下的数据库慢调用。
 4. 运行 PostgreSQL 只读诊断，对照客户端 SQL 耗时和数据库内部统计，确定优化层。
