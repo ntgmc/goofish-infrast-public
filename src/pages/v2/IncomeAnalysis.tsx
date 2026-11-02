@@ -85,6 +85,15 @@ export default function IncomeAnalysis({ result, prepared }: { result: OptimizeR
   const maxContribution = Math.max(1, ...contributions.map(({ value }) => Math.abs(value)))
 
   return <div className="v2-income-content">
+    {daily?.orundum_optimization && <div className="v2-income-inventory">
+      <dl>
+        <div><dt>{text.orundumPreference}</dt><dd>{text.orundumPreferences[daily.orundum_optimization.preference]}</dd></div>
+        {daily.orundum_optimization.opportunity_cost_per_orundum != null && <div>
+          <dt>{text.orundumUnitCost}</dt><dd>{daily.orundum_optimization.opportunity_cost_per_orundum.toLocaleString('zh-CN', { maximumFractionDigits: 3 })} {text.orundumUnitCostUnit}</dd>
+        </div>}
+      </dl>
+      {daily.orundum_optimization.opportunity_cost_per_orundum != null && <p className="v2-income-caption">{text.orundumUnitCostHelp}</p>}
+    </div>}
     {prepared.orundumEconomy && <OrundumProductionAnalysis economy={prepared.orundumEconomy} daily={daily} />}
     <section className="v2-income-section" aria-label={text.stationOutput}>
       <header className="v2-income-heading"><h3>{text.stationOutput}</h3><p>{text.stationOutputNote}</p></header>

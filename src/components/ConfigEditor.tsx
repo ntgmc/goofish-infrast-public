@@ -122,6 +122,7 @@ interface ConfigEditorProps {
   canEditIntermediateInventory?: boolean
   canSelectPreset?: boolean
   canEditFixedShiftHours?: boolean
+  showOrundumPreference?: boolean
   changed?: boolean
   permission?: PermissionMode
   validation: { ok: true } | { ok: false; message: string }
@@ -135,7 +136,7 @@ interface ConfigEditorProps {
 
 export default function ConfigEditor({
   profileId, config, canEdit, readOnly = false, readOnlyMessage = copy.common.configGenerationReadOnly, canEditIntermediateInventory,
-  canSelectPreset = false, canEditFixedShiftHours = false, changed = false, permission,
+  canSelectPreset = false, canEditFixedShiftHours = false, showOrundumPreference = false, changed = false, permission,
   validation, onUpdate, note, embedded = false, hideHeader = false,
   hidePresetActions = false, hideValidation = false,
 }: ConfigEditorProps) {
@@ -307,6 +308,17 @@ export default function ConfigEditor({
             </div>
             <p className="config-help">{rotationMode ? copy.common.components_ConfigEditor_062 : text.maaHelp}</p>
           </section>
+          {(config.product_requirements.trading_stations.Orundum ?? 0) > 0 && showOrundumPreference && <fieldset className="config-orundum-preference" disabled={!canUseIntermediateInventory}>
+            <legend className="config-section-title">{copy.v2.orundumPreference}</legend>
+            {(['production', 'economy'] as const).map((preference) => <label key={preference} className="config-preference-option">
+              <input type="radio" name="orundum-preference" value={preference}
+                checked={(config.orundum_planning?.preference ?? 'production') === preference}
+                onChange={() => update((next) => {
+                  next.orundum_planning = { ...next.orundum_planning, preference }
+                })} />
+              <span><strong>{copy.v2.orundumPreferences[preference]}</strong><span className="config-help">{copy.v2.orundumPreferenceHelp[preference]}</span></span>
+            </label>)}
+          </fieldset>}
           {!rotationMode && <ShiftHoursEditor value={config.shift_hours} variableMode={variableShiftMode} canEdit={canEdit}
             canEditFixedShiftHours={canEditFixedShiftHours} onChange={changeHours}
             onSelectVariable={() => update((next) => {

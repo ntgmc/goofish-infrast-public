@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CONFIG_PRESETS, cloneConfig, normalizeConfig } from '../lib/config'
 import { copy } from '../copy'
 import ConfigEditor from './ConfigEditor'
+import { licenseConfigSchema } from '../lib/workspace-validation'
 
 const { featureSwitches } = vi.hoisted(() => ({ featureSwitches: { one_shift_per_day: false } }))
 vi.mock('../lib/site-feature-context', () => ({ useSiteFeatures: () => ({ features: featureSwitches }) }))
@@ -21,6 +22,20 @@ const selectShift = (id: string) => userEvent.selectOptions(screen.getByRole('co
 afterEach(() => { cleanup(); featureSwitches.one_shift_per_day = false })
 
 describe('ConfigEditor facility configuration', () => {
+  it('persists the V2 Orundum preference through configuration validation with production as the legacy default', async () => {
+    const config = normalizeConfig(CONFIG_PRESETS['333'])
+    const update = vi.fn((mutate: (next: typeof config) => void) => mutate(config))
+    const view = render(<ConfigEditor showOrundumPreference config={config} canEdit={false} canEditIntermediateInventory validation={{ ok: true }} onUpdate={update} />)
+    const production = screen.getByRole('radio', { name: /尽量多产玉/ })
+    expect(production).toBeChecked()
+    await userEvent.click(screen.getByRole('radio', { name: /更省资源/ }))
+    expect(licenseConfigSchema.parse(config).orundum_planning?.preference).toBe('economy')
+    view.rerender(<ConfigEditor showOrundumPreference config={config} canEdit={false} canEditIntermediateInventory readOnly validation={{ ok: true }} onUpdate={update} />)
+    expect(screen.getByRole('radio', { name: /更省资源/ })).toBeChecked()
+    expect(screen.getByRole('radio', { name: /更省资源/ })).toBeDisabled()
+    expect(licenseConfigSchema.safeParse({ ...config, orundum_planning: { preference: 'unknown' } }).success).toBe(false)
+  })
+
   it('loads confirmed layouts collapsed and requires review again after editing', async () => {
     const config = normalizeConfig(CONFIG_PRESETS['252'])
     config.facility_layout = ['trading_1', 'trading_2', 'manufacture_1', 'manufacture_2', 'manufacture_3', 'manufacture_4', 'manufacture_5', 'power_1', 'power_2']

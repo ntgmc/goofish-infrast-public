@@ -33,7 +33,8 @@ afterEach(() => {
 })
 
 it('uses optimizer cash flow and depletion instead of recalculating the production summary', async () => {
-  const daily = { manufacturing: { 'Originium Shard': 90 }, trading: { LMD: 41000, Orundum: 1000 }, consumption: { 'Originium Shard': 100, LMD: 160000 },
+  const daily = { orundum_optimization: { preference: 'economy' as const, production_capacity: 900, baseline_sanity: 350, opportunity_cost_per_orundum: 1.8123 },
+    manufacturing: { 'Originium Shard': 90 }, trading: { LMD: 41000, Orundum: 1000 }, consumption: { 'Originium Shard': 100, LMD: 160000 },
     details: [{ room_type: 'manufacture', room_index: 1, shift: '早班', product: 'Originium Shard', amount: 90, consume: { LMD: 160000 } }] }
   const economy: OrundumEconomy = {
     daily_sanity_budget: 240, monthly_card: false, total_daily_sanity_budget: 240,
@@ -58,6 +59,8 @@ it('uses optimizer cash flow and depletion instead of recalculating the producti
     <IncomeAnalysis result={result} prepared={prepared} />
   </>)
 
+  expect(screen.getByText(copy.v2.orundumPreferences.economy)).toBeInTheDocument()
+  expect(screen.getByText(copy.v2.orundumUnitCost).closest('div')).toHaveTextContent('1.81')
   const cash = screen.getByRole('region', { name: copy.v2.lmdNetChange })
   expect(cash).toHaveTextContent('-120,000')
   expect(cash).toHaveTextContent('每日产出 40,000 · 制造碎片消耗 160,000')

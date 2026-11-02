@@ -47,6 +47,7 @@ export function describeConfigDiff(current: LicenseConfig, previous: LicenseConf
   pushDiff(rows, copy.common.lib_workspace_history_018, formatProductCounts(previous.product_requirements?.manufacturing_stations), formatProductCounts(current.product_requirements?.manufacturing_stations))
   pushDiff(rows, copy.common.lib_workspace_history_019, previous.Fiammetta?.enable ? copy.common.lib_workspace_history_020 : copy.common.lib_workspace_history_021, current.Fiammetta?.enable ? copy.common.lib_workspace_history_022 : copy.common.lib_workspace_history_023)
   pushDiff(rows, copy.common.lib_workspace_history_024, formatDrones(previous), formatDrones(current))
+  pushDiff(rows, copy.v2.orundumPreference, copy.v2.orundumPreferences[previous.orundum_planning?.preference ?? 'production'], copy.v2.orundumPreferences[current.orundum_planning?.preference ?? 'production'])
   pushDiff(rows, copy.common.lib_workspace_history_025, formatIntermediateInventory(previous), formatIntermediateInventory(current))
   pushDiff(rows, copy.common.inventoryProductRebalanceLabel, formatProductRebalance(previous), formatProductRebalance(current))
   return rows

@@ -508,6 +508,9 @@ function cloneConfig(config: LicenseConfig): LicenseConfig {
 
 function resolvePresetMode(config: LicenseConfig, preset: LicenseConfig): LicenseConfig {
   const resolved = cloneConfig(preset)
+  if (config.orundum_planning?.preference) resolved.orundum_planning = {
+    ...resolved.orundum_planning, preference: config.orundum_planning.preference,
+  }
   resolved.recycling_station_level = config.recycling_station_level
   resolved.intermediate_inventory = config.intermediate_inventory
   resolved.auto_balance_source = config.auto_balance_source
@@ -529,6 +532,9 @@ function resolvePresetMode(config: LicenseConfig, preset: LicenseConfig): Licens
 
 function resolveFreePreviewPresetMode(config: LicenseConfig, preset: LicenseConfig): LicenseConfig {
   const resolved = cloneConfig(preset)
+  if (config.orundum_planning?.preference) resolved.orundum_planning = {
+    ...resolved.orundum_planning, preference: config.orundum_planning.preference,
+  }
   resolved.recycling_station_level = config.recycling_station_level
   resolved.intermediate_inventory = config.intermediate_inventory
   resolved.auto_balance_source = config.auto_balance_source

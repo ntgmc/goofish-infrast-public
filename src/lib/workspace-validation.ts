@@ -122,6 +122,7 @@ const licenseConfigShape = {
     targets: z.array(boundedString(64)).max(20).optional().default([]),
   }).optional(),
   orundum_planning: z.strictObject({
+    preference: z.enum(['production', 'economy']).optional(),
     daily_sanity_budget: finiteNumber.min(0).max(100_000).optional(),
     monthly_card: z.boolean().optional(),
   }).optional(),
