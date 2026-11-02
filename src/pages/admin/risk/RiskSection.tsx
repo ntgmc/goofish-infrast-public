@@ -18,7 +18,7 @@ export default function RiskSection({ model: c, active, search = '' }: { model: 
         onPageChange={c.setRiskPage} onPageSizeChange={(size) => { c.setRiskPageSize(size); c.setRiskPage(1) }} onPatch={c.patchCdk} onOpenDetail={c.loadCdkDetail} />
       <div className="grid gap-5 xl:grid-cols-2"><RiskTrendPanel days={c.cdkOpsSummary.risk_trend} /><RiskReasonPanel reasons={c.cdkOpsSummary.risk_reasons} onOpenDetail={c.loadCdkDetail} /></div>
     </div>
-    <div hidden={view !== 'rules'} role="tabpanel" aria-label="规则设置">{visited.includes('rules') && <RiskSettingsPanel settings={c.riskSettings} saving={c.busyAction === 'risk-settings'} onChange={c.handleSaveRiskSettings} />}</div>
+    <div hidden={view !== 'rules'} role="tabpanel" aria-label="规则设置" className="admin-settings">{visited.includes('rules') && <RiskSettingsPanel settings={c.riskSettings} saving={c.busyAction === 'risk-settings'} onChange={c.handleSaveRiskSettings} />}</div>
     {c.selectedCdkDetail && active && view === 'cdk' && <CdkDetailDialog canManage={c.adminCapabilities.includes('admin_manage')} detail={c.selectedCdkDetail} busyAction={c.busyAction} onClose={() => c.setSelectedCdkDetail(null)} onPatch={c.patchCdk} onUpdateNote={c.handleUpdateCdkNote} onSetPermission={c.handleSetCdkPermission} />}
   </section>
 }

@@ -396,6 +396,8 @@ export const v2Copy = {
     maaHelp: '由 MAA 按计划换班，也可手动设置队列执行。',
     oneShiftDisabled: '一天1换（已停用）',
     rooms: '房间',
+    roomSettings: '房间数量与产物',
+    roomSummary: (trading: number, manufacturing: number, power: string) => `${trading} 贸易 · ${manufacturing} 制造 · ${power} 发电`,
     inventory: '库存',
     orundum: '搓玉',
     orundumInventory: '搓玉库存',

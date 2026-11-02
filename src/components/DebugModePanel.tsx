@@ -76,7 +76,7 @@ export default function DebugModePanel() {
       <p className="mt-2 text-xs leading-5 text-ink-muted">{copy.debug.privacy}</p>
       {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error}</div>}
       {notice && <div className="tool-alert tool-alert--success mt-4" role="status" aria-live="polite">{notice}</div>}
-      <div className="tool-inset mt-5 p-4">
+      <div className="mt-4">
         <p className="text-sm font-medium text-ink-primary">
           {snapshot.enabled ? copy.debug.enabled_status : copy.debug.disabled_status}
         </p>
@@ -89,7 +89,6 @@ export default function DebugModePanel() {
               <button type="button" className="tool-primary-action" onClick={() => void exportData()} disabled={busy}>
                 {busy ? copy.debug.exporting : copy.debug.export}
               </button>
-              <button type="button" className="tool-secondary-action" onClick={clear} disabled={busy}>{copy.debug.clear}</button>
               <button type="button" className="tool-secondary-action" aria-pressed="true" onClick={disable} disabled={busy}>{copy.debug.disable}</button>
             </>
           ) : (
@@ -99,6 +98,9 @@ export default function DebugModePanel() {
           )}
         </div>
       </div>
+      {snapshot.enabled && <div className="settings-danger-actions">
+        <button type="button" className="tool-secondary-action" onClick={clear} disabled={busy}>{copy.debug.clear}</button>
+      </div>}
     </details>
   )
 }

@@ -104,8 +104,8 @@ export default function FeatureSettingsSection() {
   }
 
   return (
-    <div className="space-y-5">
-      <section className="tool-panel p-5 sm:p-6">
+    <div className="admin-settings space-y-5">
+      <section className="admin-settings-heading">
         <p className="tool-eyebrow">{copy.features.admin_nav}</p>
         <h2 className="mt-2 text-lg font-semibold text-ink-primary">{copy.features.admin_title}</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">{copy.features.admin_description}</p>
@@ -117,12 +117,12 @@ export default function FeatureSettingsSection() {
       {GROUPS.map((group) => (
         <section key={group.label} hidden={group.features[0] !== groupId} role="tabpanel" className="tool-panel p-5 sm:p-6" aria-labelledby={`feature-group-${group.features[0]}`}>
           <h3 id={`feature-group-${group.features[0]}`} className="text-base font-semibold text-ink-primary">{group.label}</h3>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="admin-settings-fields mt-4">
             {group.features.filter((feature) => feature !== 'metered_billing' || METERED_BILLING_AVAILABLE).map((feature) => {
               const rawEnabled = settings.features[feature]
               const effectiveEnabled = effective[feature]
               return (
-                <label key={feature} className="tool-inset flex cursor-pointer items-start gap-3 p-4">
+                <label key={feature} className="admin-feature-option">
                   <input
                     type="checkbox"
                     name={feature}

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { DormitoryIcon as BedDouble, ManufactureIcon as Factory, FiammettaIcon as Flame, TradingStationIcon as Store, PowerPlantIcon as Zap, DroneIcon, SelectedIcon as Check, ConfigIcon, NextIcon as ArrowRight } from './icons'
+import { DormitoryIcon as BedDouble, ManufactureIcon as Factory, FiammettaIcon as Flame, TradingStationIcon as Store, PowerPlantIcon as Zap, DroneIcon, SelectedIcon as Check, ConfigIcon, NextIcon as ArrowRight, ExpandIcon as ChevronDown } from './icons'
 import { Tabs } from './ui/tabs'
 import {
   CONFIG_PRESETS,
@@ -325,31 +325,33 @@ export default function ConfigEditor({
             </div>
             <p className="config-help" role="status">{text.currentPreset(presetId ? CONFIG_PRESETS[presetId].desc : copy.v2.configCustomPreset)}</p>
           </section>}
-          <section aria-labelledby="config-schedule-heading" className="config-field config-execution-field">
-            <h4 id="config-schedule-heading">{copy.v2.configExecution}</h4>
-            <div className="config-execution-options" role="group" aria-label={copy.common.components_ConfigEditor_061}>
-              {(['maa', 'rotation'] as const).map((mode) => <button key={mode} type="button"
-                aria-pressed={mode === 'rotation' ? rotationMode : !rotationMode}
-                className={`tool-secondary-action ${rotationMode === (mode === 'rotation') ? 'tool-option-selected' : ''}`}
-                onClick={() => update((next) => { next.schedule_mode = mode; applyCounts(next) })}>
-                {SCHEDULE_MODE_LABELS[mode]}
-              </button>)}
-            </div>
-            <p className="config-help">{rotationMode ? copy.common.components_ConfigEditor_062 : text.maaHelp}</p>
-          </section>
-          {!rotationMode && <ShiftHoursEditor value={config.shift_hours} variableMode={variableShiftMode} canEdit={canEdit}
-            canEditFixedShiftHours={canEditFixedShiftHours} onChange={changeHours}
-            onSelectVariable={() => update((next) => {
-              next.schedule_mode = 'variable'
-              next.shift_hours = [8, 8, 8]
-              next.Fiammetta = { ...next.Fiammetta, enable: false }
-              next.variable_shift_schedule = {
-                ...next.variable_shift_schedule, enable: true, enabled: true, max_shifts: 4,
-                shift_step_minutes: 60, min_low_hours: 3, beam_width: 4,
-                trace_variable_shifts: false, trace_mood_cycle: false,
-              }
-              applyCounts(next)
-            })} />}
+          <div className="config-execution-settings">
+            <section aria-labelledby="config-schedule-heading" className="config-field">
+              <h4 id="config-schedule-heading">{copy.v2.configExecution}</h4>
+              <div className="config-execution-options" role="group" aria-label={copy.common.components_ConfigEditor_061}>
+                {(['maa', 'rotation'] as const).map((mode) => <button key={mode} type="button"
+                  aria-pressed={mode === 'rotation' ? rotationMode : !rotationMode}
+                  className={`tool-secondary-action ${rotationMode === (mode === 'rotation') ? 'tool-option-selected' : ''}`}
+                  onClick={() => update((next) => { next.schedule_mode = mode; applyCounts(next) })}>
+                  {SCHEDULE_MODE_LABELS[mode]}
+                </button>)}
+              </div>
+              <p className="config-help">{rotationMode ? copy.common.components_ConfigEditor_062 : text.maaHelp}</p>
+            </section>
+            {!rotationMode && <ShiftHoursEditor value={config.shift_hours} variableMode={variableShiftMode} canEdit={canEdit}
+              canEditFixedShiftHours={canEditFixedShiftHours} onChange={changeHours}
+              onSelectVariable={() => update((next) => {
+                next.schedule_mode = 'variable'
+                next.shift_hours = [8, 8, 8]
+                next.Fiammetta = { ...next.Fiammetta, enable: false }
+                next.variable_shift_schedule = {
+                  ...next.variable_shift_schedule, enable: true, enabled: true, max_shifts: 4,
+                  shift_step_minutes: 60, min_low_hours: 3, beam_width: 4,
+                  trace_variable_shifts: false, trace_mood_cycle: false,
+                }
+                applyCounts(next)
+              })} />}
+          </div>
           {needsLayout && <button key={presetId || 'custom'} type="button" className="tool-secondary-action config-layout-notice" onClick={showRooms}>
             <span>{text.confirmLayout}</span>
             <span className="config-layout-arrows" aria-hidden="true">{[0, 1, 2].map((index) => <ArrowRight key={index} size={16} />)}</span>
@@ -358,21 +360,37 @@ export default function ConfigEditor({
         <Tabs.Content value="rooms" forceMount hidden={activeSection !== 'rooms'} className="config-task-panel">
           <FacilityLayoutEditor key={JSON.stringify([profileId, config.trading_stations_count, config.manufacturing_stations_count, config.trading_station_levels, config.manufacturing_station_levels])}
             config={config} readOnly={readOnly} onUpdate={update} />
-          {supported252 && <p className="tool-alert tool-alert--warning text-xs leading-5" role="note">{copy.common.components_ConfigEditor_109}</p>}
-          {!supported252 && <section aria-labelledby="config-room-layout-heading">
-            <h3 id="config-room-layout-heading" className="config-section-title">{copy.common.components_ConfigEditor_042}</h3>
-            <div className="config-room-counts">
-              <CounterField station="trading" id="trading-stations-count" label={copy.common.components_ConfigEditor_044} value={config.trading_stations_count}
-                canEdit={canEdit} onChange={(value) => setStationCounts(value, 6 - value)} />
-              <CounterField station="manufacturing" id="manufacturing-stations-count" label={copy.common.components_ConfigEditor_045} value={config.manufacturing_stations_count}
-                canEdit={canEdit} onChange={(value) => setStationCounts(6 - value, value)} />
-              <div className="config-field config-station config-station--power">
-                <span className="config-station-heading"><Zap aria-hidden="true" />{copy.common.components_ConfigEditor_094}</span>
-                <strong className="config-station-count">{config.layout.split('-')[2]}</strong>
-              </div>
+          <details className="config-room-settings">
+            <summary><span><strong>{text.roomSettings}</strong><small>{text.roomSummary(config.trading_stations_count, config.manufacturing_stations_count, config.layout.split('-')[2])}</small></span><ChevronDown size={18} aria-hidden="true" /></summary>
+            <div className="config-room-settings-body">
+              {supported252 && <p className="tool-alert tool-alert--warning text-xs leading-5" role="note">{copy.common.components_ConfigEditor_109}</p>}
+              {!supported252 && <section aria-labelledby="config-room-layout-heading">
+                <h3 id="config-room-layout-heading" className="config-section-title">{copy.common.components_ConfigEditor_042}</h3>
+                <div className="config-room-counts">
+                  <CounterField station="trading" id="trading-stations-count" label={copy.common.components_ConfigEditor_044} value={config.trading_stations_count}
+                    canEdit={canEdit} onChange={(value) => setStationCounts(value, 6 - value)} />
+                  <CounterField station="manufacturing" id="manufacturing-stations-count" label={copy.common.components_ConfigEditor_045} value={config.manufacturing_stations_count}
+                    canEdit={canEdit} onChange={(value) => setStationCounts(6 - value, value)} />
+                  <div className="config-field config-station config-station--power">
+                    <span className="config-station-heading"><Zap aria-hidden="true" />{copy.common.components_ConfigEditor_094}</span>
+                    <strong className="config-station-count">{config.layout.split('-')[2]}</strong>
+                  </div>
+                </div>
+              </section>}
+              <section aria-labelledby="config-product-counts-heading">
+                <h3 id="config-product-counts-heading" className="config-section-title">{copy.common.components_ConfigEditor_048}</h3>
+                <div className="config-product-groups">
+                  <ProductGroupEditor station="trading" label={copy.common.components_ConfigEditor_049} products={tradingProducts}
+                    counts={config.product_requirements.trading_stations} canEdit={canEdit && !supported252}
+                    onChange={(product, value) => update((next) => { next.product_requirements.trading_stations[product] = value; applyCounts(next) })} />
+                  <ProductGroupEditor station="manufacturing" label={copy.common.components_ConfigEditor_050} products={manufacturingProducts}
+                    counts={config.product_requirements.manufacturing_stations} canEdit={canEdit && !supported252}
+                    onChange={(product, value) => update((next) => { next.product_requirements.manufacturing_stations[product] = value; applyCounts(next) })} />
+                </div>
+              </section>
             </div>
-          </section>}
-          <section className="config-field">
+          </details>
+          <section className="config-field config-field--inline">
             <label htmlFor="config-recycling-level" className="config-section-title">{copy.domain.recycling.level}</label>
             <select id="config-recycling-level" className="tool-field" value={config.recycling_station_level ?? 0} disabled={readOnly}
               onChange={(event) => { const level = Number(event.currentTarget.value); update((next) => { next.recycling_station_level = level }) }}>
@@ -380,17 +398,6 @@ export default function ConfigEditor({
               {[1, 2, 3].map((level) => <option key={level} value={level}>Lv.{level}</option>)}
             </select>
             <p className="config-help">{copy.domain.recycling.help}</p>
-          </section>
-          <section aria-labelledby="config-product-counts-heading">
-            <h3 id="config-product-counts-heading" className="config-section-title">{copy.common.components_ConfigEditor_048}</h3>
-            <div className="config-product-groups">
-              <ProductGroupEditor station="trading" label={copy.common.components_ConfigEditor_049} products={tradingProducts}
-                counts={config.product_requirements.trading_stations} canEdit={canEdit && !supported252}
-                onChange={(product, value) => update((next) => { next.product_requirements.trading_stations[product] = value; applyCounts(next) })} />
-              <ProductGroupEditor station="manufacturing" label={copy.common.components_ConfigEditor_050} products={manufacturingProducts}
-                counts={config.product_requirements.manufacturing_stations} canEdit={canEdit && !supported252}
-                onChange={(product, value) => update((next) => { next.product_requirements.manufacturing_stations[product] = value; applyCounts(next) })} />
-            </div>
           </section>
         </Tabs.Content>
         <Tabs.Content value="inventory" forceMount hidden={activeSection !== 'inventory'} className="config-task-panel">
@@ -626,7 +633,7 @@ function ShiftHoursEditor({ value, variableMode, canEdit, canEditFixedShiftHours
     setDraftValue(parsed.join('-'))
     if (variableMode || parsed.length !== normalized.length || parsed.some((hours, index) => Math.abs(hours - normalized[index]!) > 0.0001)) onChange(parsed)
   }
-  return <div className="config-field config-shift-field">
+  return <div className="config-field">
     <label htmlFor={id}>{copy.v2.configShiftFrequency}</label>
     <select id={id} className="tool-field" value={selected} disabled={!canEdit && !canEditFixedShiftHours} onChange={(event) => {
       const choice = SHIFT_SCHEDULE_OPTIONS.find((choice) => choice.id === event.currentTarget.value)

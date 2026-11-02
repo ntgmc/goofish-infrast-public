@@ -61,7 +61,8 @@ function QqBotSettingsContent() {
       {settings?.binding ? (
         <div className="mt-4 space-y-4">
           <p className="text-sm text-ink-secondary">{text.bound(settings.binding.qq_number)}</p>
-          <label className="flex min-h-11 items-center gap-3 text-sm text-ink-primary">
+          <label className="flex min-h-11 items-center justify-between gap-3 text-sm text-ink-primary">
+            <span>{text.receive}</span>
             <input type="checkbox" checked={settings.binding.notifications_enabled}
               className="size-4 shrink-0 accent-brand-500"
               disabled={busy || (!settings.available && !settings.binding.notifications_enabled)}
@@ -72,16 +73,17 @@ function QqBotSettingsContent() {
                   await refresh()
                 })
               }} />
-            {text.receive}
           </label>
-          <button type="button" className="tool-secondary-action" disabled={busy} onClick={() => {
-            if (!window.confirm(text.unbindConfirm)) return
-            void run(async () => {
-              await apiJson(ENDPOINT, { method: 'DELETE' })
-              setCode(null)
-              await refresh()
-            })
-          }}>{text.unbind}</button>
+          <div className="settings-danger-actions">
+            <button type="button" className="tool-secondary-action" disabled={busy} onClick={() => {
+              if (!window.confirm(text.unbindConfirm)) return
+              void run(async () => {
+                await apiJson(ENDPOINT, { method: 'DELETE' })
+                setCode(null)
+                await refresh()
+              })
+            }}>{text.unbind}</button>
+          </div>
         </div>
       ) : (
         <div className="mt-4 space-y-4">

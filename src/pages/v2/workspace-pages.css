@@ -134,10 +134,15 @@ textarea.v2-input { resize: vertical; }
 /* Settings expose one task at a time and retain its form state. */
 .v2-settings-workspace { display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: var(--space-xl); }
 .v2-settings-index { display: flex; flex-direction: column; gap: var(--space-2xs); button { display: flex; align-items: start; gap: var(--space-sm); padding: var(--space-sm); min-height: 64px; text-align: left; border-radius: var(--radius-v2-control); } svg { flex: none; margin-top: var(--space-3xs); } strong, small { display: block; } small { margin-top: var(--space-3xs); } button[aria-pressed="true"] { color: var(--v2-accent); background: var(--v2-paper); box-shadow: inset 3px 0 var(--v2-accent); } }
-.v2-settings-content { min-width: 0; padding: var(--space-lg); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-panel); background: var(--v2-paper); > section { min-width: 0; } }
-.v2-settings-form { max-width: 32rem; > button { margin-top: var(--space-md); } }
-.v2-preference-control { padding-block: var(--space-md); }
+.v2-settings-content { min-width: 0; padding: clamp(var(--space-sm), 3vw, var(--space-lg)); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-panel); background: var(--v2-paper); > section { min-width: 0; } }
+.v2-settings-content .tool-panel { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.v2-settings-content .v2-field { margin-block: var(--space-sm); }
+.v2-settings-form { max-width: 32rem; > button { display: flex; margin-top: var(--space-md); margin-left: auto; } }
+.v2-preference-control { padding-block: 0; margin-bottom: var(--space-xl); }
+.v2-settings-content .settings-danger-actions { margin-top: var(--space-xl); padding-top: var(--space-md); border-top: 1px solid var(--v2-line); }
+.v2-settings-content .settings-danger-actions > button { color: var(--color-v2-error); }
 .v2-credential-list article { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: var(--space-sm); padding-block: var(--space-md); border-bottom: 1px solid var(--v2-line); p { font-size: var(--text-sm); max-width: 45ch; margin-top: var(--space-xs); } }
+.v2-danger-zone { margin-top: var(--space-xl); padding-top: var(--space-md); }
 .v2-danger-zone > summary { color: var(--color-v2-error); }
 
 /* Items are objects with an inspect-and-use flow, not a table of actions. */
@@ -349,7 +354,7 @@ textarea.v2-input { resize: vertical; }
   .v2-page-section .v2-section-heading h1 { font-size: var(--text-xl); }
   .v2-pricing-plan .v2-pricing-audience { min-height: 0; }
   .v2-block-title { flex-direction: column; gap: var(--space-xs); }
-  .v2-generation-flow > section, .v2-account-detail, .v2-settings-content, .v2-account-registration, .v2-experiment-builder, .v2-depot-source, .v2-announcement-reading { padding: var(--space-sm); }
+  .v2-generation-flow > section, .v2-account-detail, .v2-account-registration, .v2-experiment-builder, .v2-depot-source, .v2-announcement-reading { padding: var(--space-sm); }
   .v2-inventory-overview > strong { display: none; }
   .v2-item-shelf { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-xs); }
   .v2-item-tile { padding: var(--space-xs); }
