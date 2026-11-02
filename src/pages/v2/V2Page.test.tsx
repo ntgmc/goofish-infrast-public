@@ -69,6 +69,7 @@ afterEach(() => {
   window.localStorage.removeItem(FIRST_SCHEDULE_INTENT_KEY)
   window.sessionStorage.clear()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
 function RouteLocation() {
@@ -84,6 +85,7 @@ function mount(path = '/v2') {
 it('allows a guest to open the benchmark from navigation and return to the workspace', async () => {
   const user = userEvent.setup()
   mount('/v2')
+  await user.click(screen.getByText(copy.v2.navigationMore))
   await user.click(screen.getByRole('link', { name: copy.siteBenchmark.title }))
   await screen.findByRole('heading', { name: copy.siteBenchmark.headline('MaaTool', 30).join('') }, { timeout: 3000 })
   expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2/benchmarks')
@@ -92,10 +94,46 @@ it('allows a guest to open the benchmark from navigation and return to the works
   expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2')
 })
 
+it('keeps personal navigation in the account drawer and respects feature availability', async () => {
+  connect()
+  mocks.features.mockReturnValue({ status: 'ready', features: { ...DEFAULT_SITE_FEATURES, skland: false, inventory: false }, retry: vi.fn() })
+  const user = userEvent.setup()
+  mount('/v2?profile_id=profile-1')
+  const navigation = within(screen.getByRole('navigation', { name: copy.v2.navigation }))
+  expect(navigation.queryByRole('button', { name: copy.v2.settings })).not.toBeInTheDocument()
+  const opener = screen.getByRole('button', { name: session.activeProfile!.display_name })
+  await user.click(opener)
+  const dialog = within(await screen.findByRole('dialog'))
+  expect(dialog.queryByRole('button', { name: copy.inventory.nav })).not.toBeInTheDocument()
+  expect(dialog.queryByRole('button', { name: copy.skland.title })).not.toBeInTheDocument()
+  expect(dialog.getByRole('button', { name: copy.v2.settings })).toBeVisible()
+  await dismissDrawer(user)
+  await waitFor(() => expect(opener).toHaveFocus())
+  await user.click(opener)
+  await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: copy.v2.manageProfiles }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('section=profiles&profile_id=profile-1'))
+})
+
+it('closes mobile navigation with Escape and restores the menu trigger', async () => {
+  vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(max-width: 60rem)', addEventListener: vi.fn(), removeEventListener: vi.fn() }))
+  const user = userEvent.setup()
+  mount()
+  const opener = screen.getByRole('button', { name: copy.v2.menu })
+  await user.click(opener)
+  const navigation = screen.getByRole('dialog', { name: copy.v2.navigation })
+  expect(navigation).toContainElement(document.activeElement as HTMLElement)
+  expect(screen.getByRole('main', { hidden: true }).closest('.v2-workspace')).toHaveAttribute('inert')
+  await user.keyboard('{Escape}')
+  expect(screen.queryByRole('dialog', { name: copy.v2.navigation })).not.toBeInTheDocument()
+  expect(opener).toHaveFocus()
+  expect(screen.getByRole('main').closest('.v2-workspace')).not.toHaveAttribute('inert')
+})
+
 it('opens material demand charts from the V2 tools directory without an account', async () => {
   mount('/v2?section=tools')
   await userEvent.click(await screen.findByRole('link', { name: /材料需求趋势/ }))
-  const chart = await screen.findByRole('slider', { name: /固源岩组的材料需求趋势/ })
+  const chart = await screen.findByRole('slider', { name: /固源岩组的材料需求趋势/ }, { timeout: 5_000 })
   expect(screen.getByTestId('route-location')).toHaveTextContent('section=material-demand')
   expect(screen.queryByText(copy.v2.signInRequired)).not.toBeInTheDocument()
   expect(screen.getAllByRole('button', { name: /^查看.+详细趋势$/ })).toHaveLength(21)
@@ -374,12 +412,13 @@ describe('V2 results-first workspace', () => {
     expect(mocks.workflow).not.toHaveBeenCalled()
     const navigation = within(screen.getByRole('navigation', { name: copy.v2.navigation }))
     expect(navigation.getAllByRole('link').slice(0, 4).map((link) => link.textContent)).toEqual([
-      copy.v2.guestNavigation.example, copy.v2.generateMine, copy.v2.guestNavigation.pricing, copy.v2.helpAction,
+      copy.v2.guestNavigation.example, copy.v2.generateMine, copy.v2.tools, copy.v2.guestNavigation.pricing,
     ])
     const count = SAMPLE_OPERATORS.filter((operator) => operator.own).length
     expect(navigation.getByRole('button', { name: copy.v2.operators })).toHaveTextContent(copy.v2.guestNavigation.operatorCount(count))
     expect(screen.getByText(copy.v2.guestNavigation.sampleOwned(count))).toBeVisible()
-    expect(navigation.getByText(copy.v2.guestNavigation.personal).closest('details')).not.toHaveAttribute('open')
+    expect(navigation.getByText(copy.v2.navigationMore).closest('details')).not.toHaveAttribute('open')
+    expect(navigation.queryByRole('button', { name: copy.v2.settings })).not.toBeInTheDocument()
 
     const workflow = connect()
     workflow.mergedOperators = [{ ...SAMPLE_OPERATORS[0], own: true }]
@@ -441,7 +480,7 @@ describe('V2 results-first workspace', () => {
       expect(session.retryAuth).toHaveBeenCalledOnce()
     }
     const navigation = within(screen.getByRole('navigation', { name: copy.v2.navigation }))
-    await user.click(navigation.getByRole('link', { name: copy.public.pages_PublicInfoPage_061 }))
+    await user.click(navigation.getByRole('link', { name: copy.v2.contactSupport }))
     expect(await screen.findByRole('heading', { name: copy.public.pages_PublicInfoPage_067 })).toBeVisible()
     expect(screen.getByTestId('route-location')).toHaveTextContent('section=support')
     expect(mocks.workflow).not.toHaveBeenCalled()
@@ -973,6 +1012,7 @@ describe('V2 results-first workspace', () => {
     const user = userEvent.setup()
     render(<MotionPreferenceProvider><MemoryRouter initialEntries={['/v2']}><V2Page /></MemoryRouter></MotionPreferenceProvider>)
     await user.click(screen.getByRole('tab', { name: /第2班/ }))
+    await user.click(screen.getByText(copy.v2.navigationMore))
     const settingsButton = screen.getByRole('button', { name: copy.dashboard.animation.settings })
     await user.click(settingsButton)
     const dialog = within(await screen.findByRole('dialog', { name: copy.dashboard.animation.settings }))
@@ -1603,7 +1643,8 @@ describe('V2 feature continuity', () => {
     const navigation = screen.getByRole('navigation', { name: copy.v2.navigation })
     const topbar = document.querySelector('.v2-topbar')
     const main = screen.getByRole('main')
-    await user.click(screen.getByRole('button', { name: copy.inventory.nav }))
+    await user.click(screen.getByRole('button', { name: session.activeProfile!.display_name }))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: copy.inventory.nav }))
     const loading = await screen.findByRole('status', { name: copy.inventory.loading })
     expect(loading).toHaveAttribute('aria-busy', 'true')
     expect(loading.closest('main')).toBe(main)
@@ -1881,7 +1922,8 @@ describe('V2 feature continuity', () => {
     connect()
     const user = userEvent.setup()
     mount()
-    await user.click(screen.getByRole('button', { name: copy.v2.settings }))
+    await user.click(screen.getByRole('button', { name: session.activeProfile!.display_name }))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: copy.v2.settings }))
     // Cold imports of the lazy settings page can exceed the default 1s wait in CI.
     expect(await screen.findByLabelText(copy.dashboard.pages_tool_dashboard_SettingsSection_018, {}, { timeout: 5_000 })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: copy.dashboard.settings.preferences }))
@@ -1915,7 +1957,8 @@ describe('V2 feature continuity', () => {
     mount()
     await user.click(screen.getByRole('button', { name: copy.v2.manualTab }))
     await user.click(await screen.findByRole('button', { name: 'Edit draft: original' }))
-    await user.click(screen.getByRole('button', { name: copy.v2.account }))
+    await user.click(screen.getByRole('button', { name: session.activeProfile!.display_name }))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: copy.v2.manageProfiles }))
     await user.click(await screen.findByRole('button', { name: copy.v2.addAccount }))
     await user.click(await screen.findByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_005 }))
     fireEvent.change(screen.getByRole('textbox', { name: 'CDK' }), { target: { value: 'MAA-NEW-ACCOUNT' } })

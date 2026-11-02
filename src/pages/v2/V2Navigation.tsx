@@ -1,4 +1,4 @@
-import { AccountsIcon, AccountIcon, AnimationIcon, AnnouncementIcon, BalanceIcon, BillingIcon, CollapsedIcon, ComparisonIcon, FacilitiesIcon, GenerateIcon, HelpIcon, InventoryIcon, NextIcon, OperatorsIcon, OverviewIcon, PricingIcon, ProjectsIcon, ReleasesIcon, ResultHistoryIcon, ServiceStatusIcon, SettingsIcon, SupportIcon, ToolsIcon } from '../../components/icons'
+import { AnimationIcon, AnnouncementIcon, CollapsedIcon, ComparisonIcon, FacilitiesIcon, GenerateIcon, HelpIcon, OperatorsIcon, OverviewIcon, PricingIcon, ProjectsIcon, ReleasesIcon, ResultHistoryIcon, ServiceStatusIcon, SupportIcon, ToolsIcon } from '../../components/icons'
 import Link from '../../components/InternalLink'
 import FeedbackButton from '../../components/FeedbackDialog'
 import { copy } from '../../copy'
@@ -8,12 +8,11 @@ import { sectionLabels, v2Path, v2SectionAvailable, type V2Section } from './nav
 
 const text = copy.v2
 const workspaceEntries = ['overview', 'generation', 'plans', 'lab', 'cultivation-projects', 'tools'] as const
-const personalEntries = ['profiles', 'skland', 'inventory', 'commercial', 'balance', 'announcements', 'settings'] as const
-const guestPersonalEntries = ['plans', 'lab', 'profiles', 'inventory', 'commercial', 'balance'] as const
+const moreEntries = ['help', 'announcements', 'updates', 'benchmarks', 'pricing', 'support', 'status'] as const
+const toolSections: V2Section[] = ['tools', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'training-ratio', 'material-demand', 'depot']
 const icons = {
   overview: OverviewIcon, generation: GenerateIcon, plans: ResultHistoryIcon, lab: ComparisonIcon, 'cultivation-projects': ProjectsIcon, tools: ToolsIcon,
-  skland: OverviewIcon, profiles: AccountsIcon, inventory: InventoryIcon, commercial: BillingIcon, balance: BalanceIcon, announcements: AnnouncementIcon, settings: SettingsIcon,
-  pricing: PricingIcon, help: HelpIcon, support: SupportIcon, status: ServiceStatusIcon, updates: ReleasesIcon, benchmarks: ComparisonIcon,
+  announcements: AnnouncementIcon, pricing: PricingIcon, help: HelpIcon, support: SupportIcon, status: ServiceStatusIcon, updates: ReleasesIcon, benchmarks: ComparisonIcon,
 }
 
 export default function V2Navigation({ section, session, operatorCount, sampleOperators, onNavigate, onPanel, onClose }: {
@@ -27,65 +26,49 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
 }) {
   const { features } = useSiteFeatures()
   const signedIn = session.authStatus === 'authenticated' && Boolean(session.user)
-  const personalCurrent = guestPersonalEntries.some((entry) => entry === section)
-  function workspaceItem(entry: typeof workspaceEntries[number] | typeof personalEntries[number]) {
+  const moreCurrent = moreEntries.some((entry) => entry === section)
+  function item(entry: typeof workspaceEntries[number] | typeof moreEntries[number], label = sectionLabels[entry]) {
     if (!v2SectionAvailable(entry, features)) return null
     const Icon = icons[entry]
-    return <button type="button" key={entry} className={`v2-nav-item ${section === entry ? 'v2-nav-active' : ''}`} aria-current={section === entry ? 'page' : undefined} onClick={() => onNavigate(entry)}>
-      <Icon size={19} aria-hidden="true" /><span>{sectionLabels[entry]}</span>
+    const current = section === entry
+    const active = current || entry === 'tools' && (toolSections.includes(section) || !signedIn && section === 'cultivation-projects')
+    const contents = <><Icon size={19} aria-hidden="true" /><span>{label}</span>
       {entry === 'announcements' && session.announcementUnreadCount > 0 && <small>{session.announcementUnreadCount}</small>}
-      {section === entry && <span className="v2-nav-dot" />}
-    </button>
+      {active && <span className="v2-nav-dot" />}</>
+    const className = `v2-nav-item ${active ? 'v2-nav-active' : ''}`
+    return signedIn && workspaceEntries.some((workspace) => workspace === entry)
+      ? <button type="button" key={entry} className={className} aria-current={current ? 'page' : undefined} onClick={() => onNavigate(entry)}>{contents}</button>
+      : <Link key={entry} className={className} to={v2Path(entry, session.activeProfile?.id)} aria-current={current ? 'page' : undefined} onClick={onClose}>{contents}</Link>
   }
-  function publicItem(entry: 'overview' | 'generation' | 'pricing' | 'help' | 'support' | 'status' | 'updates' | 'benchmarks', label = sectionLabels[entry]) {
-    if (!v2SectionAvailable(entry, features)) return null
-    const Icon = icons[entry]
-    return <Link key={entry} className={`v2-nav-item ${section === entry ? 'v2-nav-active' : ''}`} to={v2Path(entry, session.activeProfile?.id)} aria-current={section === entry ? 'page' : undefined} onClick={onClose}>
-      <Icon size={19} aria-hidden="true" /><span>{label}</span>{section === entry && <span className="v2-nav-dot" />}
-    </Link>
-  }
-  const configuration = <>
-    <p className="v2-nav-label">{signedIn ? text.configuration : text.guestNavigation.configuration}</p>
-    <button type="button" className="v2-nav-item" aria-label={text.operators} aria-describedby="v2-nav-operator-count" onClick={() => onPanel('operators')}><OperatorsIcon size={19} aria-hidden="true" /><span>{text.operators}</span><small id="v2-nav-operator-count">{sampleOperators ? text.guestNavigation.operatorCount(operatorCount) : operatorCount}</small></button>
-    <button type="button" className="v2-nav-item" onClick={() => onPanel('config')}><FacilitiesIcon size={19} aria-hidden="true" /><span>{text.facilities}</span></button>
-  </>
-  const animationSettings = <button type="button" className="v2-nav-item" onClick={() => onPanel('settings')}><AnimationIcon size={19} aria-hidden="true" /><span>{copy.dashboard.animation.settings}</span></button>
-  return <>
-    <nav aria-label={text.navigation}>
+  return <nav aria-label={text.navigation}>
       <p className="v2-nav-label">{signedIn ? text.workspace : text.guestNavigation.title}</p>
-      {signedIn ? <>
-        {workspaceEntries.map(workspaceItem)}
-        {configuration}
-        <p className="v2-nav-label">{text.personal}</p>
-        {animationSettings}
-        {personalEntries.map(workspaceItem)}
-      </> : <>
-        {publicItem('overview', text.guestNavigation.example)}
-        {publicItem('generation', text.generateMine)}
-        {publicItem('pricing', text.guestNavigation.pricing)}
-        {publicItem('help')}
+      {signedIn ? workspaceEntries.map((entry) => item(entry)) : <>
+        {item('overview', text.guestNavigation.example)}
+        {item('generation', text.generateMine)}
+        {item('tools')}
+        {item('pricing', text.guestNavigation.pricing)}
       </>}
-      <div className="v2-sidebar-menu-links">
-        {signedIn && publicItem('pricing', text.guestNavigation.pricing)}
-        {publicItem('benchmarks')}
-        {publicItem('support')}
-        {publicItem('status')}
+      <p className="v2-nav-label">{signedIn ? text.configuration : text.guestNavigation.configuration}</p>
+      <div className="v2-config-shortcuts">
+        <button type="button" className="v2-config-shortcut" aria-label={text.operators} aria-describedby="v2-nav-operator-count" onClick={() => onPanel('operators')}>
+          <OperatorsIcon size={20} aria-hidden="true" /><span>{text.operators}</span><small id="v2-nav-operator-count">{sampleOperators ? text.guestNavigation.operatorCount(operatorCount) : operatorCount}</small>
+        </button>
+        <button type="button" className="v2-config-shortcut" onClick={() => onPanel('config')}><FacilitiesIcon size={20} aria-hidden="true" /><span>{text.facilities}</span></button>
       </div>
-      {!signedIn && <>
-        {configuration}
-        <details className="v2-nav-disclosure" open={personalCurrent}>
-          <summary className="v2-nav-item"><AccountIcon size={19} aria-hidden="true" /><span>{text.guestNavigation.personal}</span><small>{text.guestNavigation.signIn}</small><CollapsedIcon className="v2-nav-chevron" size={16} aria-hidden="true" /></summary>
-          {guestPersonalEntries.map(workspaceItem)}
-        </details>
-      </>}
-      <div className="v2-sidebar-menu-links">
-        {!signedIn && <>{workspaceItem('tools')}{workspaceItem('announcements')}{animationSettings}</>}
-        {publicItem('updates')}
-      </div>
-    </nav>
-    {signedIn && <div className="v2-sidebar-bottom">
-      <FeedbackButton className="v2-help-link" profileId={session.activeProfile?.id} />
-      {features.faq && <Link className="v2-help-link" to={v2Path('help', session.activeProfile?.id)} onClick={onClose}><HelpIcon size={19} aria-hidden="true" /><span>{text.helpAction}</span><NextIcon size={14} aria-hidden="true" /></Link>}
-    </div>}
-  </>
+    <div className="v2-sidebar-bottom">
+      <details className="v2-nav-disclosure" open={moreCurrent}>
+        <summary className={`v2-nav-item ${moreCurrent ? 'v2-nav-active' : ''}`}><HelpIcon size={19} aria-hidden="true" /><span>{text.navigationMore}</span>
+          {features.announcements && session.announcementUnreadCount > 0 && <small aria-label={text.unreadAnnouncements(session.announcementUnreadCount)}>{session.announcementUnreadCount}</small>}
+          <CollapsedIcon className="v2-nav-chevron" size={16} aria-hidden="true" />
+        </summary>
+        <div className="v2-nav-extra">
+          {moreEntries.filter((entry) => signedIn || entry !== 'pricing').map((entry) => item(entry, entry === 'pricing' ? text.guestNavigation.pricing : entry === 'support' ? text.contactSupport : sectionLabels[entry]))}
+          <div className="v2-sidebar-menu-links">
+            <button type="button" className="v2-nav-item" onClick={() => onPanel('settings')}><AnimationIcon size={19} aria-hidden="true" /><span>{copy.dashboard.animation.settings}</span></button>
+            {signedIn && <FeedbackButton className="v2-nav-item" profileId={session.activeProfile?.id} />}
+          </div>
+        </div>
+      </details>
+    </div>
+  </nav>
 }

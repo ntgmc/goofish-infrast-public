@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
 import { useAppReducedMotion } from '../../lib/motion-preference'
 import { NextIcon as ArrowRight, SuccessIcon as Check, ExpandIcon as ChevronDown, BreadcrumbIcon, ExportIcon as Download, LoginIcon as LogIn, MenuIcon as Menu, GenerateIcon, LoadingIcon, ConfigIcon as Settings2, DataSourceIcon as ShieldCheck, InfoIcon as Sparkles, CloseIcon as X, PreviewIcon, SampleIcon } from '../../components/icons'
@@ -104,6 +104,16 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const [shift, setShift] = useState(0)
   const [boardView, setBoardView] = useState<'grid' | 'list'>('grid')
   const [mobileNavigation, setMobileNavigation] = useState(false)
+  const menuButton = useRef<HTMLButtonElement>(null)
+  const navigationClose = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!mobileNavigation) return
+    navigationClose.current?.focus()
+    const mobileViewport = window.matchMedia('(max-width: 60rem)')
+    const closeOnDesktop = () => { if (!mobileViewport.matches) setMobileNavigation(false) }
+    mobileViewport.addEventListener('change', closeOnDesktop)
+    return () => { mobileViewport.removeEventListener('change', closeOnDesktop); menuButton.current?.focus() }
+  }, [mobileNavigation])
   const [downloadNotice, setDownloadNotice] = useState(false)
   const reduceMotion = useAppReducedMotion()
   const motionId = useId()
@@ -208,16 +218,26 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
         {mobileNavigation && <motion.button key="navigation-scrim" className="v2-nav-scrim" type="button" onClick={() => setMobileNavigation(false)} aria-label={text.close}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduceMotion ? 0 : motionTokens.duration.exit }} />}
       </AnimatePresence>
-      <aside id="v2-navigation" className={`v2-sidebar ${mobileNavigation ? 'v2-sidebar-open' : ''}`}>
-        <Link to={v2Path('overview', session.activeProfile?.id)} className="v2-brand"><img className="v2-brand-mark" src="/assets/maatool-v2-icon.svg" width="44" height="44" alt="" />
+      <aside id="v2-navigation" className={`v2-sidebar ${mobileNavigation ? 'v2-sidebar-open' : ''}`} role={mobileNavigation ? 'dialog' : undefined} aria-modal={mobileNavigation || undefined} aria-label={text.navigation}
+        onKeyDown={(event) => {
+          if (!mobileNavigation) return
+          if (event.key === 'Escape') { event.preventDefault(); setMobileNavigation(false) }
+          if (event.key !== 'Tab') return
+          const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('a[href], button:not(:disabled), summary'))
+            .filter((node) => node.getClientRects().length > 0 && (node.tagName === 'SUMMARY' || !node.closest('details:not([open])')))
+          const first = controls[0], last = controls[controls.length - 1]
+          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+        }}>
+        <Link to={v2Path('overview', session.activeProfile?.id)} className="v2-brand" onClick={() => setMobileNavigation(false)}><img className="v2-brand-mark" src="/assets/maatool-v2-icon.svg" width="44" height="44" alt="" />
           <span><strong>{text.brand}</strong><small>{text.brandDescription}</small></span></Link>
-        <button className="v2-mobile-close v2-icon-button" type="button" onClick={() => setMobileNavigation(false)} aria-label={text.close}><X size={20} /></button>
+        <button ref={navigationClose} className="v2-mobile-close v2-icon-button" type="button" onClick={() => setMobileNavigation(false)} aria-label={text.close}><X size={20} /></button>
         <V2Navigation section={section} session={session} operatorCount={owned.length} sampleOperators={sampleOperators}
           onNavigate={navigateSection} onPanel={openPanel} onClose={() => setMobileNavigation(false)} />
       </aside>
-      <div className="v2-workspace">
+      <div className="v2-workspace" inert={mobileNavigation || undefined}>
         <header className="v2-topbar">
-          <div className="v2-breadcrumb"><button className="v2-menu-button v2-icon-button" type="button" onClick={() => setMobileNavigation(true)} aria-label={text.menu} aria-expanded={mobileNavigation} aria-controls="v2-navigation"><Menu size={21} /></button>
+          <div className="v2-breadcrumb"><button ref={menuButton} className="v2-menu-button v2-icon-button" type="button" onClick={() => setMobileNavigation(true)} aria-label={text.menu} aria-expanded={mobileNavigation} aria-controls="v2-navigation"><Menu size={21} /></button>
             <span>{text.workspace}</span><BreadcrumbIcon size={14} aria-hidden="true" /><strong>{sectionLabels[section]}</strong></div>
           <div className="v2-topbar-actions"><div className="v2-feature-content">{taskCenterAction}</div>
             <div className="v2-feature-content"><ThemeSwitcher iconOnly /></div>

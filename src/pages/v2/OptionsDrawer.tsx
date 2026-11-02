@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import ConfigCapabilityPreview from '../../components/ConfigCapabilityPreview'
 import type { ConfigDiffItem } from '../../lib/workspace-history'
-import { NextIcon as ArrowRight, SelectedIcon as Check, LogoutIcon as LogOut, AccountIcon as UserRound, SuccessIcon } from '../../components/icons'
+import { AccountsIcon, BalanceIcon, BillingIcon, InventoryIcon, NextIcon as ArrowRight, OverviewIcon, SelectedIcon as Check, SettingsIcon, LogoutIcon as LogOut, AccountIcon as UserRound, SuccessIcon } from '../../components/icons'
 import AuthForm from '../../components/AuthForm'
 import AnimationSettings from '../../components/AnimationSettings'
 import ConfigEditor from '../../components/ConfigEditor'
@@ -21,11 +21,17 @@ import V2Transition from './V2Transition'
 import BuildingSkills from './BuildingSkills'
 import OperatorManagementPanel from './OperatorManagementPanel'
 import { RoomProduction } from './IncomeAnalysis'
-import type { V2Section } from './navigation'
+import { sectionLabels, v2SectionAvailable, type V2Section } from './navigation'
 
 const text = copy.v2
 export type OptionPanel = 'operators' | 'config' | 'account' | 'room' | 'settings'
 export type V2Session = ReturnType<typeof useToolSession>
+
+const accountEntries = [
+  { section: 'profiles', icon: AccountsIcon }, { section: 'skland', icon: OverviewIcon },
+  { section: 'inventory', icon: InventoryIcon }, { section: 'settings', icon: SettingsIcon },
+  { section: 'commercial', icon: BillingIcon }, { section: 'balance', icon: BalanceIcon },
+] as const
 
 const titles: Record<OptionPanel, string> = {
   operators: text.operators, config: text.facilities, settings: copy.dashboard.animation.settings,
@@ -70,7 +76,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
   const showAuthForm = shownPanel === 'account' && !session.user && featureState.status === 'ready' && featureState.features.site && featureState.features.login
   const description = shownPanel === 'settings' ? copy.dashboard.animation.description : isConfig ? exampleData ? text.demoConfigDescription : text.configDescription
     : shownPanel === 'operators' ? exampleData ? text.sampleOperatorDescription : text.operatorDescription
-      : shownPanel === 'account' ? text.accountDescription : text.roomDescription
+      : shownPanel === 'account' ? session.user ? text.accountManagementDescription : text.accountDescription : text.roomDescription
 
   return (
     <Dialog open={panel !== null} onOpenChange={(open) => { if (!open) onClose() }}>
@@ -114,6 +120,9 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
               <>
                 <div className="v2-account-card"><UserRound size={23} /><strong>{session.user.email}</strong>
                   <button type="button" className="v2-icon-button" title={text.logout} aria-label={text.logout} disabled={busy} onClick={() => void session.handleLogout()}><LogOut size={18} /></button></div>
+                <nav className="v2-account-links" aria-label={text.personal}>{accountEntries.filter((entry) => v2SectionAvailable(entry.section, featureState.features)).map(({ section, icon: Icon }) =>
+                  <button type="button" key={section} onClick={() => onNavigate(section)}><Icon size={20} aria-hidden="true" /><span>{section === 'profiles' ? text.manageProfiles : sectionLabels[section]}</span><ArrowRight size={15} aria-hidden="true" /></button>
+                )}</nav>
                 <h3>{text.profiles}</h3>
                 {session.cdkProfiles.filter((profile) => (METERED_BILLING_AVAILABLE && featureState.features.metered_billing) || !profile.kind.startsWith('metered_')).map((profile) => <button type="button" className="v2-profile-option" key={profile.id}
                   disabled={busy || session.openingProfileId !== null} onClick={() => void onOpenProfile(profile)}>
@@ -122,7 +131,6 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
                 </button>)}
                 {!session.cdkProfiles.some((profile) => (METERED_BILLING_AVAILABLE && featureState.features.metered_billing) || !profile.kind.startsWith('metered_')) && <p className="v2-muted">{text.noProfiles}</p>}
                 {session.workspaceLoadError && <p role="alert" className="v2-error">{session.workspaceLoadError}</p>}
-                <button type="button" className="v2-button v2-button-secondary" onClick={() => onNavigate('profiles')}>{text.manageProfiles}<ArrowRight size={16} /></button>
               </>
             ) : showAuthForm ? (
               <AuthForm compact allowCdk={false} onAuthenticated={(payload) => { session.applyAuthPayload(payload); onClose() }} submitClassName="v2-button v2-button-primary w-full" />
