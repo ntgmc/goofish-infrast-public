@@ -8,7 +8,7 @@ import { planningFixture } from '../../scripts/prts-planning-fixture.mjs'
 import { defaultCultivationQuery } from '../../src/lib/cultivation-contract'
 import { prtsSnapshotSchema } from './catalog'
 import { calculateCultivationRecommendations, prepareRecommendations } from './recommendations'
-import { compactRecommendations, packPreparedEvidence } from './public-evidence'
+import { compactRecommendations, serializePreparedEvidence } from './public-evidence'
 
 let directory: string, store: typeof import('./public-store')
 const signal = () => new AbortController().signal
@@ -60,7 +60,7 @@ describe('persistent public recommendation evidence', () => {
     await store.buildPublicEvidence(query, signal())
     sql((database) => {
       const row = database.prepare('SELECT prepared FROM snapshot').get() as { prepared: Uint8Array }
-      expect(JSON.parse(gunzipSync(row.prepared).toString('utf8'))).toEqual(packPreparedEvidence(prepareRecommendations(original)))
+      expect(JSON.parse(gunzipSync(row.prepared).toString('utf8'))).toEqual(JSON.parse([...serializePreparedEvidence(prepareRecommendations(original))].join('')))
     })
     const first = store.readStoredRecommendations(query)
     expect(first.recommendation).toEqual(compactRecommendations(calculateCultivationRecommendations(original, { ...query, rarityGroup: 'all' }, day)))

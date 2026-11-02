@@ -1,7 +1,6 @@
-import { readFile, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { z } from 'zod'
-import { CULTIVATION_DAY_MS, cultivationDayStart } from './cache-policy.ts'
+import { readSnapshotEntries } from './snapshot-reader.ts'
 
 const record = z.record(z.string(), z.unknown())
 export const prtsSnapshotSchema = z.object({
@@ -41,34 +40,14 @@ export function prtsSnapshotPath() {
   return resolve(process.env.MAA_PRTS_PLANNING_PATH?.trim() || '.cache/cultivation/prts-planning.json')
 }
 
-let cached: { path: string; modified: number; size: number; data: PrtsSnapshot; nextCheck: number } | null = null
-let pending: { path: string; data: Promise<PrtsSnapshot> } | null = null
-export async function readPrtsSnapshot(): Promise<PrtsSnapshot> {
-  const path = prtsSnapshotPath(), now = Date.now()
-  const previous = cached?.path === path ? cached : null
-  if (previous && now < previous.nextCheck) return previous.data
-  if (pending?.path === path) return pending.data
-  let data!: Promise<PrtsSnapshot>
-  data = (async () => {
-    try {
-      const info = await stat(path)
-      const snapshot = previous?.modified === info.mtimeMs && previous.size === info.size
-        ? previous.data : prtsSnapshotSchema.parse(JSON.parse(await readFile(path, 'utf8')))
-      if (pending?.data === data) cached = { path, modified: info.mtimeMs, size: info.size, data: snapshot, nextCheck: cultivationDayStart() + CULTIVATION_DAY_MS }
-      return snapshot
-    } catch (error) {
-      if (!previous) throw error
-      if (pending?.data === data) cached = { ...previous, nextCheck: Date.now() + 300000 }
-      return previous.data
-    }
-  })().finally(() => { if (pending?.data === data) pending = null })
-  pending = { path, data }
-  return data
+export function readPrtsCatalog(path = prtsSnapshotPath()): PrtsSnapshot {
+  return prtsSnapshotSchema.parse(Object.fromEntries(readSnapshotEntries(path, false)))
 }
 
-export function releasePrtsSnapshot(): void {
-  cached = null
-  pending = null
+export function* readPrtsHomeworks(path = prtsSnapshotPath()): Generator<PrtsSnapshot['homeworks'][number]> {
+  for (const [key, value] of readSnapshotEntries(path, true)) {
+    if (key === 'homeworks') yield* prtsSnapshotSchema.shape.homeworks.parse(value)
+  }
 }
 
 export function asRecord(value: unknown): Record<string, unknown> {

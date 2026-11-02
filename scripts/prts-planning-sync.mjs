@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 import { setTimeout } from 'node:timers/promises'
-import { prtsSnapshotPath, prtsSnapshotSchema } from '../server/cultivation/catalog.ts'
+import { prtsSnapshotPath, readPrtsCatalog, readPrtsHomeworks } from '../server/cultivation/catalog.ts'
 import { fetchJson, hashContent, homeworkRow, loadPlanningAssets, readJson, withSnapshotLock, writeSnapshot } from './prts-planning-lib.mjs'
 
 const API = 'https://prts.maa.plus'
@@ -14,8 +14,10 @@ export async function syncPrtsPlanning(options = {}, request = (url) => fetchJso
   const reconcile = Number(options.reconcile ?? 200)
   if (!Number.isInteger(reconcile) || reconcile < 0 || reconcile > 2000) throw new Error('--reconcile must be 0..2000')
   return withSnapshotLock(output, async () => {
-    const snapshot = prtsSnapshotSchema.parse(await readJson(output))
-    const byId = new Map(snapshot.homeworks.map((row) => [row.id, row]))
+    const snapshot = readPrtsCatalog(output)
+    const byId = new Map(), old = []
+    for (const row of readPrtsHomeworks(output)) { byId.set(row.id, row); old.push(row.id) }
+    old.sort((a, b) => a - b)
     let cursor = snapshot.cursor
     let changed = 0
     let previousPageLastId = Infinity
@@ -44,7 +46,6 @@ export async function syncPrtsPlanning(options = {}, request = (url) => fetchJso
       await pause()
     }
     // Revisit a bounded slice of old details to pick up edits and removed/private jobs without a full crawl.
-    const old = snapshot.homeworks.map((row) => row.id).sort((a, b) => a - b)
     const offset = Math.min(snapshot.reconcilePage - 1, Math.max(0, old.length - 1))
     const ids = old.slice(offset, offset + reconcile)
     for (const id of ids) {

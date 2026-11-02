@@ -7,8 +7,8 @@ import { createGzip, gzipSync, gunzipSync } from 'node:zlib'
 import { defaultCultivationQuery, type CultivationQuery } from '../../src/lib/cultivation-contract'
 import { syncPrtsPlanning } from '../../scripts/prts-planning-sync.mjs'
 import { cultivationDayStart } from './cache-policy'
-import { prtsSnapshotPath, prtsSnapshotSchema, readPrtsSnapshot, releasePrtsSnapshot, type PrtsSnapshot } from './catalog'
-import { compactRecommendations, packPreparedEvidence, unpackPreparedEvidence, type PublicRecommendations } from './public-evidence'
+import { prtsSnapshotPath, prtsSnapshotSchema, readPrtsCatalog, readPrtsHomeworks, type PrtsSnapshot } from './catalog'
+import { compactRecommendations, serializePreparedEvidence, unpackPreparedEvidence, type PublicRecommendations } from './public-evidence'
 import { calculateCultivationRecommendations, prepareRecommendations } from './recommendations'
 
 type SnapshotRow = { revision: string; source_path: string; updated_at: string; catalog: Uint8Array; prepared: Uint8Array }
@@ -31,27 +31,25 @@ function decode<T>(value: Uint8Array): T { return JSON.parse(gunzipSync(value, {
 function openRead(): DatabaseSync { return new DatabaseSync(publicEvidencePath(), { readOnly: true }) }
 
 async function encodePrepared(prepared: ReturnType<typeof prepareRecommendations>) {
-  const { families, ...metadata } = packPreparedEvidence(prepared)
-  function* chunks() {
-    yield `${JSON.stringify(metadata).slice(0, -1)},"families":[`
-    for (const [index, family] of families.entries()) yield `${index ? ',' : ''}${JSON.stringify(family)}`
-    yield ']}'
-  }
   const compressed: Buffer[] = []
-  for await (const chunk of Readable.from(chunks()).compose(createGzip())) compressed.push(chunk)
+  for await (const chunk of Readable.from(serializePreparedEvidence(prepared), { objectMode: false }).compose(createGzip())) compressed.push(chunk)
   return Buffer.concat(compressed)
 }
 
 async function prepareSource(info: { mtimeMs: number; size: number }) {
-  try {
-    const original = await readPrtsSnapshot()
-    const prepared = prepareRecommendations(original)
-    const catalog = { ...original, homeworks: [], warnings: [...original.warnings,
-      ...(original.homeworks.some((row) => !row.uploadedAt) ? ['部分作业缺少发布时间，暂不参与推荐；请重新导入作业数据或等待同步补齐。'] : [])] }
-    const after = await stat(prtsSnapshotPath())
-    if (after.mtimeMs !== info.mtimeMs || after.size !== info.size) throw new Error('Public snapshot changed while building evidence')
-    return { catalog, prepared }
-  } finally { releasePrtsSnapshot() }
+  const catalog = readPrtsCatalog()
+  let missingDates = false
+  function* homeworks() {
+    for (const row of readPrtsHomeworks()) {
+      if (!row.uploadedAt) missingDates = true
+      yield row
+    }
+  }
+  const prepared = prepareRecommendations(catalog, homeworks())
+  if (missingDates) catalog.warnings.push('部分作业缺少发布时间，暂不参与推荐；请重新导入作业数据或等待同步补齐。')
+  const after = await stat(prtsSnapshotPath())
+  if (after.mtimeMs !== info.mtimeMs || after.size !== info.size) throw new Error('Public snapshot changed while building evidence')
+  return { catalog, prepared }
 }
 
 export function hasStoredRecommendation(query: CultivationQuery, allowStale = false): boolean {
@@ -126,8 +124,7 @@ export async function buildPublicEvidence(query: CultivationQuery, signal: Abort
     let info = saved && !refresh ? null : await stat(sourcePath)
     let revision = info ? identify(info) : saved!.revision
     if (refresh) {
-      const updatedAt = saved?.revision === revision ? saved.updated_at : (await readPrtsSnapshot()).updatedAt
-      releasePrtsSnapshot()
+      const updatedAt = saved?.revision === revision ? saved.updated_at : readPrtsCatalog().updatedAt
       if (Date.parse(updatedAt) < cultivationDayStart()) {
         await syncPrtsPlanning({ signal })
         info = await stat(sourcePath)
@@ -171,5 +168,5 @@ export async function buildPublicEvidence(query: CultivationQuery, signal: Abort
         sum(length(result)) OVER (ORDER BY touched DESC, rowid DESC) AS total FROM queries)
       WHERE position > 64 OR (position > 1 AND total > 67108864))`)
     database.exec('COMMIT')
-  } finally { database.close(); releasePrtsSnapshot() }
+  } finally { database.close() }
 }

@@ -85,9 +85,14 @@ function covers(target: CultivationTarget, other: CultivationTarget) {
     && (target.elite > other.elite || target.elite === other.elite && target.level >= other.level) && target.skillLevel >= other.skillLevel
 }
 
-export function prepareRecommendations(snapshot: PrtsSnapshot) {
-  const requirements = new Map<string, Requirement>()
-  const documents = snapshot.homeworks.map((row) => parse(snapshot, row, requirements)).filter((row): row is Document => row !== null)
+export function prepareRecommendations(snapshot: PrtsSnapshot, homeworks: Iterable<PrtsSnapshot['homeworks'][number]> = snapshot.homeworks) {
+  const requirements = new Map<string, Requirement>(), documents: Document[] = []
+  let count = 0
+  for (const row of homeworks) {
+    count++
+    const document = parse(snapshot, row, requirements)
+    if (document) documents.push(document)
+  }
   const buckets = new Map<string, Family[]>()
   for (const document of documents.sort((a, b) => a.published - b.published || a.homework.id - b.homework.id)) {
     const key = `${stageKey(document)}:${document.skeleton}`
@@ -113,7 +118,7 @@ export function prepareRecommendations(snapshot: PrtsSnapshot) {
     family.documents = [...variants.values()]
   }
   return { families,
-    invalid: snapshot.homeworks.length - documents.length + documents.reduce((sum, row) => sum + row.members.filter((member) => member.requirement.moduleUnresolved).length, 0),
+    invalid: count - documents.length + documents.reduce((sum, row) => sum + row.members.filter((member) => member.requirement.moduleUnresolved).length, 0),
     stages: [...new Set(documents.map((row) => row.homework.stageId))].map((id) => ({ id, ...stageInfo(snapshot, id) })),
     professions: [...new Set(Object.values(snapshot.operators).flatMap((row) => row.profession ? [row.profession] : []))].sort() }
 
@@ -195,10 +200,9 @@ export function calculateCultivationRecommendations(snapshot: PrtsSnapshot, quer
     }
     const total = samples.reduce((sum, row) => sum + row.weight, 0)
     for (const group of branches.values()) {
-      const targets = [...new Map(group.map((row) => [canonical(row.requirement.target), row.requirement.target])).values()]
       const branchWeight = group.reduce((sum, row) => sum + row.weight, 0)
-      const base = targets[0], operator = snapshot.operators[operatorId]
-      const values = (field: 'elite' | 'level' | 'skillLevel' | 'potential') => [...new Set(targets.map((row) => row[field]))].sort((a, b) => a - b)
+      const base = group[0].requirement.target, operator = snapshot.operators[operatorId]
+      const values = (field: 'elite' | 'level' | 'skillLevel' | 'potential') => [...new Set(group.map((row) => row.requirement.target[field]))].sort((a, b) => a - b)
       const elites = values('elite'), levels = values('level'), skills = values('skillLevel'), potentials = values('potential')
       const maxima = snapshot.costs.levels.maxLevel[operator.rarity - 1]
       const module = base.moduleId ? snapshot.costs.modules.equipDict[base.moduleId] : null

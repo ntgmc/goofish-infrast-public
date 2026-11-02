@@ -27,16 +27,20 @@ export function homeworkRow(id, content, hash = hashContent(content), metadata =
 export async function readJson(path) { return JSON.parse(await readFile(path, 'utf8')) }
 
 export async function writeSnapshot(path, snapshot) {
-  const data = prtsSnapshotSchema.parse(snapshot)
+  const data = prtsSnapshotSchema.parse({ ...snapshot, homeworks: [] })
+  if (!Array.isArray(snapshot.homeworks)) throw new Error('Invalid PRTS homework collection')
   await mkdir(dirname(path), { recursive: true })
   const temporary = `${path}.${randomUUID()}.tmp`
   try {
     const file = await open(temporary, 'wx', 0o600)
     function* chunks() {
       const { homeworks, ...catalog } = data
-      yield `${JSON.stringify(catalog).slice(0, -1)},"homeworks":[`
-      for (const [index, homework] of homeworks.entries()) yield `${index ? ',' : ''}${JSON.stringify(homework)}`
-      yield ']}'
+      let chunk = `${JSON.stringify(catalog).slice(0, -1)},"homeworks":[`
+      for (const [index, homework] of snapshot.homeworks.entries()) {
+        chunk += `${index ? ',' : ''}${JSON.stringify(prtsSnapshotSchema.shape.homeworks.element.parse(homework))}`
+        if (chunk.length >= 64 * 1024) { yield chunk; chunk = '' }
+      }
+      yield `${chunk}]}`
     }
     try {
       await file.writeFile(chunks())

@@ -53,6 +53,7 @@ test('writes chunked snapshots with exact Unicode and delimiters, including an e
 test('preserves the old snapshot and removes the temporary file when serialization fails after writing starts', async () => sandbox(async (directory) => {
   const output = join(directory, 'snapshot.json')
   const fixture = planningFixture()
+  fixture.homeworks[0].content.doc = { details: '中文'.repeat(40000) }
   await writeSnapshot(output, fixture)
   const before = await readFile(output, 'utf8')
   fixture.homeworks.push({ ...fixture.homeworks[0], id: 21, content: { unsupported: 1n } })
@@ -140,6 +141,19 @@ test('failed sync preserves the entire old snapshot and releases the lock for re
   await assert.rejects(syncPrtsPlanning({ output }, request, async () => {}), /network failed/)
   assert.equal(await readFile(output, 'utf8'), original)
   await assert.rejects(syncPrtsPlanning({ output }, request, async () => {}), /network failed/)
+}))
+
+test('rejects a late invalid source row before requesting upstream data and releases its lock', async () => sandbox(async (directory) => {
+  const output = join(directory, 'snapshot.json'), fixture = planningFixture()
+  fixture.homeworks.push({ ...fixture.homeworks[0], id: -1 })
+  const original = JSON.stringify(fixture)
+  await writeFile(output, original)
+  let requested = false
+  const request = async () => { requested = true; throw new Error('unexpected request') }
+  await assert.rejects(syncPrtsPlanning({ output }, request), { name: 'ZodError' })
+  assert.equal(requested, false)
+  assert.equal(await readFile(output, 'utf8'), original)
+  assert.deepEqual(await readdir(directory), ['snapshot.json'])
 }))
 
 test('a duplicate writer cannot replace a snapshot while import/sync holds its lock', async () => sandbox(async (directory) => {

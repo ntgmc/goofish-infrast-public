@@ -3,7 +3,7 @@ import { planningFixture } from '../../scripts/prts-planning-fixture.mjs'
 import { defaultCultivationQuery } from '../../src/lib/cultivation-contract'
 import { prtsSnapshotSchema, type PrtsSnapshot } from './catalog'
 import { calculateCultivationRecommendations, prepareRecommendations } from './recommendations'
-import { packPreparedEvidence, unpackPreparedEvidence, compactRecommendations } from './public-evidence'
+import { serializePreparedEvidence, unpackPreparedEvidence, compactRecommendations } from './public-evidence'
 import { readHomeworkRequirements } from './requirements'
 
 const now = Date.parse('2026-10-08T12:00:00Z')
@@ -162,12 +162,28 @@ describe('independent cultivation recommendation evidence', () => {
     expect(input).toEqual(before)
   })
 
+  it('consumes homework once and preserves global families, earliest dates, and all query results', () => {
+    const first = job(1, { uploadedAt: ago(700) })
+    const input = snapshot([{ ...first, id: 10, uploadedAt: ago(1) }, job(2), first, job(3, { uploadedAt: undefined })])
+    let count = 0
+    function* rows() { for (const row of input.homeworks) { count++; yield row } }
+    const catalog = { ...input, homeworks: [] }
+    const prepared = prepareRecommendations(catalog, rows())
+    expect(count).toBe(input.homeworks.length)
+    expect(prepared).toEqual(prepareRecommendations(input))
+    for (const scope of ['recent', 'history', 'permanent'] as const) for (const coverage of [0.6, 0.8, 0.9]) {
+      const query = { ...observing, scope, coverage, days: 0 }
+      expect(compactRecommendations(calculateCultivationRecommendations(catalog, query, now, prepared)))
+        .toEqual(compactRecommendations(calculateCultivationRecommendations(input, query, now)))
+    }
+  })
+
   it('round-trips compact evidence without retaining homework prose or actions', () => {
     const rows = [job(1), job(2), job(3)]
     rows.push({ ...rows[0], id: 201, likes: 100 })
     const input = snapshot(rows)
     input.homeworks[0].content.doc = { details: 'large-public-prose' }
-    const packed = JSON.parse(JSON.stringify(packPreparedEvidence(prepareRecommendations(input))))
+    const packed = JSON.parse([...serializePreparedEvidence(prepareRecommendations(input))].join(''))
     expect(JSON.stringify(packed)).not.toContain('large-public-prose')
     expect(JSON.stringify(packed)).not.toContain('"actions"')
     const catalog = { ...input, homeworks: [] }
@@ -185,7 +201,7 @@ describe('independent cultivation recommendation evidence', () => {
     ] }] } })])
     const query = { ...observing, stageId: 'main_1' }
     const catalog = { ...input, homeworks: [] }
-    const restored = unpackPreparedEvidence(JSON.parse(JSON.stringify(packPreparedEvidence(prepareRecommendations(input)))), catalog)
+    const restored = unpackPreparedEvidence(JSON.parse([...serializePreparedEvidence(prepareRecommendations(input))].join('')), catalog)
     const actual = compactRecommendations(calculateCultivationRecommendations(catalog, query, now, restored))
     expect(actual).toEqual(compactRecommendations(calculateCultivationRecommendations(input, query, now)))
     expect(Object.values(actual.groups)[0].options).toHaveLength(1)

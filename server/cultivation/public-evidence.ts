@@ -12,7 +12,7 @@ type PackedPrepared = Omit<Prepared, 'families'> & { requirements: PackedRequire
   documents: Array<Omit<Prepared['families'][number]['documents'][number], 'members'> & { members: PackedMember[] }>
 }> }
 
-export function packPreparedEvidence(prepared: Prepared): PackedPrepared {
+export function* serializePreparedEvidence(prepared: Prepared): Generator<string> {
   const requirements: PackedRequirement[] = [], ids = new Map<string, number>()
   const index = (row: Requirement) => {
     const value: PackedRequirement = [row.operator!.id, row.target,
@@ -22,12 +22,17 @@ export function packPreparedEvidence(prepared: Prepared): PackedPrepared {
     if (id === undefined) { id = requirements.length; requirements.push(value); ids.set(key, id) }
     return id
   }
-  return { ...prepared, requirements, families: prepared.families.map((family) => ({ ...family,
-    documents: family.documents.map((document) => ({ ...document, members: document.members.map((member) => [
-      index(member.requirement), member.share, member.group,
-      member.options.filter((row) => row.operator && !row.warnings.length).map(index),
-    ]) })),
-  })) }
+  let chunk = '{"families":['
+  for (const [position, family] of prepared.families.entries()) {
+    const packed = { ...family, documents: family.documents.map((document) => ({ ...document,
+      members: document.members.map((member): PackedMember => [index(member.requirement), member.share, member.group,
+        member.options.filter((row) => row.operator && !row.warnings.length).map(index)]),
+    })) }
+    chunk += `${position ? ',' : ''}${JSON.stringify(packed)}`
+    if (chunk.length >= 64 * 1024) { yield chunk; chunk = '' }
+  }
+  const { invalid, stages, professions } = prepared
+  yield `${chunk}],${JSON.stringify({ invalid, stages, professions, requirements }).slice(1)}`
 }
 
 export function unpackPreparedEvidence(packed: PackedPrepared, snapshot: PrtsSnapshot): Prepared {
