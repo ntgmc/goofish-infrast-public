@@ -52,19 +52,27 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm run sync:cultivation-icons
 
+      - name: Sync material demand history
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pnpm install --frozen-lockfile
+          node --test scripts/material-demand-lib.test.mjs
+          node scripts/sync-material-demand.mjs
+
       - name: Commit synced game icons
         shell: bash
         run: |
           set -euo pipefail
 
-          if [[ -z "$(git status --porcelain -- public/webp96 public/item-icons public/skill-icons src/data/cultivation-item-icons.json)" ]]; then
+          if [[ -z "$(git status --porcelain -- public/webp96 public/item-icons public/skill-icons src/data/cultivation-item-icons.json src/data/material-demand.json)" ]]; then
             echo "Game icons are already up to date."
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A public/webp96 public/item-icons public/skill-icons src/data/cultivation-item-icons.json
+          git add -A public/webp96 public/item-icons public/skill-icons src/data/cultivation-item-icons.json src/data/material-demand.json
 
           if git diff --cached --quiet; then
             echo "No staged game icon changes."

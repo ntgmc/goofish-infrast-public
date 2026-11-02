@@ -92,6 +92,19 @@ it('allows a guest to open the benchmark from navigation and return to the works
   expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2')
 })
 
+it('opens material demand charts from the V2 tools directory without an account', async () => {
+  mount('/v2?section=tools')
+  await userEvent.click(await screen.findByRole('link', { name: /材料需求趋势/ }))
+  const chart = await screen.findByRole('slider', { name: /固源岩组的材料需求趋势/ })
+  expect(screen.getByTestId('route-location')).toHaveTextContent('section=material-demand')
+  expect(screen.queryByText(copy.v2.signInRequired)).not.toBeInTheDocument()
+  expect(screen.getAllByRole('button', { name: /^查看.+详细趋势$/ })).toHaveLength(21)
+  const before = chart.getAttribute('aria-valuenow')
+  fireEvent.keyDown(chart, { key: 'ArrowLeft' })
+  expect(Number(chart.getAttribute('aria-valuenow'))).toBe(Number(before) - 1)
+  expect(screen.getByRole('button', { name: '下载全部材料月度 CSV', hidden: true })).not.toBeVisible()
+})
+
 it.each(['/#release-v2.0.1016', '/v2#release-v2.0.1016'])('opens the changelog from a version anchor at %s', async (path) => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
     releases: [{ id: 'v2.0.1016', version: '2.0.1016', displayVersion: 'v2.0.1016', releasedAt: '2026-10-11', kind: 'release', sections: [] }],
