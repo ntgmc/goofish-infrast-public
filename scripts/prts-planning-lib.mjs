@@ -32,7 +32,16 @@ export async function writeSnapshot(path, snapshot) {
   const temporary = `${path}.${randomUUID()}.tmp`
   try {
     const file = await open(temporary, 'wx', 0o600)
-    try { await file.writeFile(JSON.stringify(data)); await file.sync() } finally { await file.close() }
+    function* chunks() {
+      const { homeworks, ...catalog } = data
+      yield `${JSON.stringify(catalog).slice(0, -1)},"homeworks":[`
+      for (const [index, homework] of homeworks.entries()) yield `${index ? ',' : ''}${JSON.stringify(homework)}`
+      yield ']}'
+    }
+    try {
+      await file.writeFile(chunks())
+      await file.sync()
+    } finally { await file.close() }
     await rename(temporary, path)
   } finally { await unlink(temporary).catch(() => undefined) }
 }

@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto'
 import { mkdir, stat } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { gzipSync, gunzipSync } from 'node:zlib'
+import { Readable } from 'node:stream'
+import { createGzip, gzipSync, gunzipSync } from 'node:zlib'
 import { defaultCultivationQuery, type CultivationQuery } from '../../src/lib/cultivation-contract'
 import { syncPrtsPlanning } from '../../scripts/prts-planning-sync.mjs'
 import { cultivationDayStart } from './cache-policy'
@@ -28,6 +29,30 @@ function queryKey(query: CultivationQuery) { return JSON.stringify(evidenceQuery
 function encode(value: unknown) { return gzipSync(JSON.stringify(value)) }
 function decode<T>(value: Uint8Array): T { return JSON.parse(gunzipSync(value, { maxOutputLength: 128 * 1024 * 1024 }).toString('utf8')) as T }
 function openRead(): DatabaseSync { return new DatabaseSync(publicEvidencePath(), { readOnly: true }) }
+
+async function encodePrepared(prepared: ReturnType<typeof prepareRecommendations>) {
+  const { families, ...metadata } = packPreparedEvidence(prepared)
+  function* chunks() {
+    yield `${JSON.stringify(metadata).slice(0, -1)},"families":[`
+    for (const [index, family] of families.entries()) yield `${index ? ',' : ''}${JSON.stringify(family)}`
+    yield ']}'
+  }
+  const compressed: Buffer[] = []
+  for await (const chunk of Readable.from(chunks()).compose(createGzip())) compressed.push(chunk)
+  return Buffer.concat(compressed)
+}
+
+async function prepareSource(info: { mtimeMs: number; size: number }) {
+  try {
+    const original = await readPrtsSnapshot()
+    const prepared = prepareRecommendations(original)
+    const catalog = { ...original, homeworks: [], warnings: [...original.warnings,
+      ...(original.homeworks.some((row) => !row.uploadedAt) ? ['部分作业缺少发布时间，暂不参与推荐；请重新导入作业数据或等待同步补齐。'] : [])] }
+    const after = await stat(prtsSnapshotPath())
+    if (after.mtimeMs !== info.mtimeMs || after.size !== info.size) throw new Error('Public snapshot changed while building evidence')
+    return { catalog, prepared }
+  } finally { releasePrtsSnapshot() }
+}
 
 export function hasStoredRecommendation(query: CultivationQuery, allowStale = false): boolean {
   let database: DatabaseSync | undefined
@@ -124,19 +149,16 @@ export async function buildPublicEvidence(query: CultivationQuery, signal: Abort
     }
     if (saved?.revision !== revision) {
       if (!info) { info = await stat(sourcePath); revision = identify(info) }
-      const original = await readPrtsSnapshot()
-      prepared = prepareRecommendations(original)
-      catalog = { ...original, homeworks: [], warnings: [...original.warnings,
-        ...(original.homeworks.some((row) => !row.uploadedAt) ? ['部分作业缺少发布时间，暂不参与推荐；请重新导入作业数据或等待同步补齐。'] : [])] }
-      const after = await stat(sourcePath)
-      if (!info || after.mtimeMs !== info.mtimeMs || after.size !== info.size) throw new Error('Public snapshot changed while building evidence')
+      const source = await prepareSource(info!)
+      catalog = source.catalog
+      prepared = source.prepared
+      const encoded = await encodePrepared(prepared)
       signal.throwIfAborted()
       database.prepare(`INSERT INTO snapshot VALUES (1, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET revision=excluded.revision, source_path=excluded.source_path,
           updated_at=excluded.updated_at, catalog=excluded.catalog, prepared=excluded.prepared`)
-        .run(revision, sourcePath, catalog.updatedAt, encode(catalog), encode(packPreparedEvidence(prepared)))
+        .run(revision, sourcePath, catalog.updatedAt, encode(catalog), encoded)
       database.exec('DELETE FROM queries')
-      releasePrtsSnapshot()
     }
     const result = encode(compactRecommendations(calculateCultivationRecommendations(catalog, evidenceQuery(query), day, prepared)))
     signal.throwIfAborted()

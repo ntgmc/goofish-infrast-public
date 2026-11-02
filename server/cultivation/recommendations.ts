@@ -30,10 +30,17 @@ function wilson(likes: number, dislikes: number) {
 
 const actionAliases: Record<string, string> = { 部署: 'Deploy', 技能: 'Skill', 撤退: 'Retreat', 二倍速: 'SpeedUp', 子弹时间: 'BulletTime', 技能用法: 'SkillUsage', 打印: 'Output', 摆完挂机: 'SkillDaemon', 移动相机: 'MoveCamera', 点击: 'Click', 滑动: 'Swipe', 设置单位坐标: 'SetUnitLocation' }
 const directions: Record<string, string> = { 左: 'Left', 右: 'Right', 上: 'Up', 下: 'Down', 无: 'None' }
-function parse(snapshot: PrtsSnapshot, homework: PrtsSnapshot['homeworks'][number]): Document | null {
+function parse(snapshot: PrtsSnapshot, homework: PrtsSnapshot['homeworks'][number], requirements: Map<string, Requirement>): Document | null {
   const published = Date.parse(homework.uploadedAt ?? '')
   if (!Number.isFinite(published) || homework.content.type === 'SSS' || !homework.stageId) return null
   const parsed = readHomeworkRequirements(homework.content, snapshot)
+  for (const rows of [parsed.fixed, ...parsed.groups]) for (const [index, row] of rows.entries()) {
+    if (!row.operator || row.warnings.length) continue
+    const key = JSON.stringify([row.operator.id, row.target, row.specified, row.moduleUnresolved])
+    const shared = requirements.get(key)
+    if (shared) rows[index] = shared
+    else requirements.set(key, row)
+  }
   const members: Member[] = parsed.fixed.map((requirement) => ({ requirement, share: 1, group: null, options: [] }))
   const aliases = new Map(parsed.fixed.map((row) => [row.name, row.operator?.id ?? row.name]))
   for (const [index, rows] of parsed.groups.entries()) {
@@ -79,7 +86,8 @@ function covers(target: CultivationTarget, other: CultivationTarget) {
 }
 
 export function prepareRecommendations(snapshot: PrtsSnapshot) {
-  const documents = snapshot.homeworks.map((row) => parse(snapshot, row)).filter((row): row is Document => row !== null)
+  const requirements = new Map<string, Requirement>()
+  const documents = snapshot.homeworks.map((row) => parse(snapshot, row, requirements)).filter((row): row is Document => row !== null)
   const buckets = new Map<string, Family[]>()
   for (const document of documents.sort((a, b) => a.published - b.published || a.homework.id - b.homework.id)) {
     const key = `${stageKey(document)}:${document.skeleton}`

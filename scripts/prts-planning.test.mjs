@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -36,6 +36,29 @@ test('imports a completed qqbot snapshot read-only and rejects incomplete import
   await assert.rejects(importPrtsPlanning({ database: databasePath, costs, assets, output }), /missing or outdated/)
   assert.equal(await readFile(output, 'utf8'), original)
   database.close()
+}))
+
+test('writes chunked snapshots with exact Unicode and delimiters, including an empty collection', async () => sandbox(async (directory) => {
+  const output = join(directory, 'snapshot.json')
+  const fixture = planningFixture()
+  fixture.homeworks = Array.from({ length: 300 }, (_, index) => ({ ...fixture.homeworks[0], id: index + 1,
+    content: { ...fixture.homeworks[0].content, doc: { details: '中文😀\\"\n'.repeat(100) } } }))
+  for (const homeworks of [fixture.homeworks, []]) {
+    const value = { ...fixture, homeworks }
+    await writeSnapshot(output, value)
+    assert.deepEqual(JSON.parse(await readFile(output, 'utf8')), prtsSnapshotSchema.parse(value))
+  }
+}))
+
+test('preserves the old snapshot and removes the temporary file when serialization fails after writing starts', async () => sandbox(async (directory) => {
+  const output = join(directory, 'snapshot.json')
+  const fixture = planningFixture()
+  await writeSnapshot(output, fixture)
+  const before = await readFile(output, 'utf8')
+  fixture.homeworks.push({ ...fixture.homeworks[0], id: 21, content: { unsupported: 1n } })
+  await assert.rejects(writeSnapshot(output, fixture), /BigInt/)
+  assert.equal(await readFile(output, 'utf8'), before)
+  assert.deepEqual(await readdir(directory), ['snapshot.json'])
 }))
 
 test('continues from the imported cursor and reconciles edited and private jobs without a full crawl', async () => sandbox(async (directory) => {

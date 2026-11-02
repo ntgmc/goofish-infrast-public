@@ -146,6 +146,22 @@ describe('independent cultivation recommendation evidence', () => {
     expect(result.recommendations.map((row) => row.target)).toEqual(frontier)
   })
 
+  it('shares identical requirements across strategies without merging different targets or completeness', () => {
+    const rows = [job(1), job(2), job(3), job(4)]
+    rows[2].content.opers = [{ name: '测试干员', skill: 1, requirements: { elite: 1, level: 1, skill_level: 7, module: 0 } }]
+    rows[3].content.opers = [{ name: '测试干员', skill: 1, requirements: { elite: 1, level: 2, skill_level: 7 } }]
+    const input = snapshot(rows)
+    const before = structuredClone(input)
+    const prepared = prepareRecommendations(input)
+    const requirements = new Map(prepared.families.flatMap((family) => family.documents.map((document) => [document.homework.id, document.members[0].requirement] as const)))
+    expect(requirements.get(1)).toBe(requirements.get(2))
+    expect(requirements.get(3)).not.toBe(requirements.get(1))
+    expect(requirements.get(4)?.target).toEqual(requirements.get(1)?.target)
+    expect(requirements.get(4)?.specified.module).toBe(false)
+    expect(requirements.get(4)).not.toBe(requirements.get(1))
+    expect(input).toEqual(before)
+  })
+
   it('round-trips compact evidence without retaining homework prose or actions', () => {
     const rows = [job(1), job(2), job(3)]
     rows.push({ ...rows[0], id: 201, likes: 100 })
