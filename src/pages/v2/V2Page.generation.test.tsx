@@ -63,6 +63,12 @@ const queued: OptimizationJobSnapshot = {
 }
 const newResult = { ...SAMPLE_RESULT, daily_production: { trading: { LMD: 12345 } } }
 
+async function confirmLayout() {
+  await userEvent.click(screen.getByRole('button', { name: copy.v2.configEditor.confirmLayout }))
+  await userEvent.click(screen.getByRole('button', { name: copy.common.facilityLayoutConfirm }))
+  await userEvent.click(screen.getByRole('button', { name: copy.common.facilityLayoutConfirmCollapse }))
+}
+
 beforeEach(() => {
   window.localStorage.setItem('maatool-reduce-motion', 'true')
   vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
@@ -118,6 +124,7 @@ it('continues from login and Skland import through saved configuration to the fi
   await user.click(await screen.findByRole('button', { name: copy.v2.firstSchedule.configAction }, { timeout: 5_000 }))
   const dialog = within(await screen.findByRole('dialog'))
   await user.click(dialog.getByRole('button', { name: copy.common.components_ConfigEditor_035 }))
+  await confirmLayout()
   await user.click(dialog.getByRole('button', { name: copy.v2.firstSchedule.confirmConfig }))
   expect(screen.getByRole('button', { name: copy.v2.firstSchedule.confirming })).toBeDisabled()
   expect(vi.mocked(apiJson).mock.calls.some(([url, options]) => url === '/api/optimization/jobs' && options?.method === 'POST')).toBe(false)
@@ -229,6 +236,7 @@ it.each(['generation', 'overview'])('shows a failed configuration save beside th
   await screen.findByText(copy.v2.ownSource)
   await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
   await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: copy.common.components_ConfigEditor_030 }))
+  await confirmLayout()
   await user.click(screen.getByRole('button', { name: copy.v2.done }))
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   await waitFor(() => expect(patches).toHaveLength(1))
@@ -330,6 +338,7 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and k
   const unlockedDialog = await screen.findByRole('dialog')
   expect(within(unlockedDialog).getByRole('group', { name: copy.common.components_ConfigEditor_021 })).toBeEnabled()
   fireEvent.click(within(unlockedDialog).getByRole('button', { name: copy.common.components_ConfigEditor_030 }))
+  await confirmLayout()
   fireEvent.click(within(unlockedDialog).getByRole('button', { name: copy.v2.done }))
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   await waitFor(() => expect(apiJson).toHaveBeenCalledWith('/api/user/workspace', expect.objectContaining({ method: 'PATCH' })))

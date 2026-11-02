@@ -36,6 +36,9 @@ globalThis.Date = class SmokeDate extends NativeDate {
   }
 }
 
+const layout243 = ['trading_1', 'trading_2', 'manufacture_1', 'manufacture_2', 'manufacture_3', 'manufacture_4', 'power_1', 'power_2', 'power_3']
+const layout333 = ['trading_1', 'trading_2', 'trading_3', 'manufacture_1', 'manufacture_2', 'manufacture_3', 'power_1', 'power_2', 'power_3']
+
 const sampleConfig = {
   layout: '3-3-3',
   desc: '333 orundum',
@@ -43,6 +46,7 @@ const sampleConfig = {
   dormitory_rule: 'fixed',
   trading_stations_count: 3,
   manufacturing_stations_count: 3,
+  facility_layout: [...layout333],
   product_requirements: {
     trading_stations: { LMD: 2, Orundum: 1 },
     manufacturing_stations: { 'Pure Gold': 2, 'Originium Shard': 1 },
@@ -58,6 +62,7 @@ const free333OrundumConfig = {
   dormitory_rule: 'fixed',
   trading_stations_count: 3,
   manufacturing_stations_count: 3,
+  facility_layout: [...layout333],
   product_requirements: {
     trading_stations: { LMD: 2, Orundum: 1 },
     manufacturing_stations: { 'Pure Gold': 2, 'Originium Shard': 1 },
@@ -77,6 +82,7 @@ const free243BalancedConfig = {
   dormitory_rule: 'fixed',
   trading_stations_count: 2,
   manufacturing_stations_count: 4,
+  facility_layout: [...layout243],
   product_requirements: {
     trading_stations: { LMD: 2 },
     manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 2 },
@@ -91,6 +97,7 @@ const free243OrundumInventoryConfig = {
   dormitory_rule: 'maa_autofill',
   trading_stations_count: 2,
   manufacturing_stations_count: 4,
+  facility_layout: [...layout243],
   product_requirements: {
     trading_stations: { LMD: 2 },
     manufacturing_stations: { 'Pure Gold': 2, 'Originium Shard': 2 },
@@ -313,6 +320,14 @@ async function assertOptimizeHistory() {
       last_used_at: null,
     }],
   })
+
+  const unconfirmed = await call(optimizeHandler, '/api/optimize', {
+    profile_id: 'profile-1', license: null, operators: sampleOperators,
+    config: { ...sampleConfig, facility_layout: undefined },
+  })
+  if (unconfirmed.status !== 400 || !unconfirmed.body.error?.includes('确认设施位置')) {
+    throw new Error(`unconfirmed layout: expected actionable 400, got ${unconfirmed.status}`)
+  }
 
   const generated = await call(optimizeHandler, '/api/optimize', {
     profile_id: 'profile-1',

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { SelectedIcon as Check, ExpandIcon as ChevronDown, ManufactureIcon as Factory, TradingStationIcon as Store, PowerPlantIcon as Zap, SuccessIcon } from './icons'
 import { copy } from '../copy'
-import { FACILITY_IDS, facilityLayoutSchema } from '../lib/facility-layout'
+import { getFacilityIds, hasConfirmedFacilityLayout } from '../lib/facility-layout'
 import type { LicenseConfig } from '../lib/types'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
 import './FacilityLayoutEditor.css'
@@ -26,28 +26,29 @@ export default function FacilityLayoutEditor({ config, onUpdate, readOnly = fals
     const levels = type === 'trading' ? config.trading_station_levels : config.manufacturing_station_levels
     return { type, level: type === 'power' ? 3 : levels?.[Number(id.split('_')[1]) - 1] ?? 3 }
   }
-  const parsed = facilityLayoutSchema.safeParse(config.facility_layout)
-  const savedLayout = parsed.success ? parsed.data.join(',') : ''
+  const facilityIds = getFacilityIds(config)
+  const savedLayout = hasConfirmedFacilityLayout(config) ? config.facility_layout!.join(',') : ''
   const [editing, setEditing] = useState(false)
   const [reviewed, setReviewed] = useState(false)
   const collapsed = Boolean(savedLayout) && !editing
   const editButtonRef = useRef<HTMLButtonElement | null>(null)
-  const [rooms, setRooms] = useState(() => (parsed.success ? parsed.data : FACILITY_IDS).map(roomFor))
+  const [rooms, setRooms] = useState(() => (savedLayout ? config.facility_layout! : facilityIds).map(roomFor))
   const [selectedPosition, setSelectedPosition] = useState<number | null>(null)
   const [errors, setErrors] = useState<string[]>([])
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const statusRef = useRef<HTMLDivElement | null>(null)
-  const expected = FACILITY_IDS.map(roomFor)
+  const expected = facilityIds.map(roomFor)
   const expectedSignature = JSON.stringify(expected)
+  const idsSignature = facilityIds.join(',')
   useEffect(() => { if (readOnly) setSelectedPosition(null) }, [readOnly])
 
   useEffect(() => {
     if (savedLayout) {
       const requirements = JSON.parse(expectedSignature) as Room[]
-      setRooms(savedLayout.split(',').map((id) => requirements[FACILITY_IDS.indexOf(id as typeof FACILITY_IDS[number])]))
+      setRooms(savedLayout.split(',').map((id) => requirements[idsSignature.split(',').indexOf(id)]))
       setErrors([])
     }
-  }, [savedLayout, expectedSignature])
+  }, [savedLayout, expectedSignature, idsSignature])
 
   const updateRoom = (position: number, change: Partial<Room>) => {
     setReviewed(false)
@@ -74,7 +75,7 @@ export default function FacilityLayoutEditor({ config, onUpdate, readOnly = fals
       setReviewed(true)
       return
     }
-    const available = [...FACILITY_IDS]
+    const available = [...facilityIds]
     const layout = rooms.map((room) => {
       const index = available.findIndex((id) => {
         const candidate = roomFor(id)

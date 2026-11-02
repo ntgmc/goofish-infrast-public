@@ -1,6 +1,6 @@
 import type { DormitoryRule, IntermediateProduct, LicenseConfig } from './types'
 import { copy } from '../copy/index'
-import { facilityLayoutSchema } from './facility-layout'
+import { hasConfirmedFacilityLayout } from './facility-layout'
 
 export const SCHEDULE_MODE_LABELS: Record<string, string> = {
   maa: copy.domain.lib_config_006,
@@ -240,7 +240,6 @@ export function normalizeDroneAutoStrategy(strategy: string | undefined): 'effic
 
 export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   const next = cloneConfig(config)
-  if (next.layout !== '2-5-2') delete next.facility_layout
   delete next.optimization_mode
   delete next.optimizer_search
   if (next.Fiammetta) delete next.Fiammetta.candidate_mode
@@ -277,13 +276,14 @@ export function normalizeConfig(config: LicenseConfig): LicenseConfig {
 }
 
 export function validateScheduleConfig(config: LicenseConfig): { ok: true } | { ok: false; message: string } {
-  if (resolveConfigLayout(config) === '2-5-2' && !facilityLayoutSchema.safeParse(config.facility_layout).success) {
+  if (!hasConfirmedFacilityLayout(config)) {
     return { ok: false, message: copy.common.facilityLayoutRequired }
   }
   return validateConfig(config)
 }
 
 export function validateConfig(config: LicenseConfig): { ok: true } | { ok: false; message: string } {
+  if (config.facility_layout && !hasConfirmedFacilityLayout(config)) return { ok: false, message: copy.common.facilityLayoutRequired }
   const rotationMode = normalizeScheduleMode(config.schedule_mode) === 'rotation'
   const tradingCount = config.trading_stations_count
   const manufacturingCount = config.manufacturing_stations_count

@@ -3,6 +3,7 @@
 import { act, cleanup, renderHook, waitFor } from '../../../test/query-render'
 import { afterEach, expect, it, vi } from 'vitest'
 import { CONFIG_PRESETS, normalizeConfig } from '../../../lib/config'
+import { getFacilityIds } from '../../../lib/facility-layout'
 import type { UserGameAccount } from '../../../lib/types'
 import { createAccountLicense } from '../tool-utils'
 import { useOptimizeWorkflow, type Props } from './useOptimizeWorkflow'
@@ -45,7 +46,7 @@ it.each(['cdk', 'free_preview'] as const)('retains explicit inventory balance se
   }
 })
 
-it.each(['252', '252-1', '252-full'])('retains the %s preset selected by a free preview profile', async (preset) => {
+it.each(['243', '333', '252', '252-1', '252-full'])('retains the %s preset and map selected by a free preview profile', async (preset) => {
   const profile: UserGameAccount = {
     id: 'free-config', user_id: 'user', kind: 'free_preview', permission: 'growth',
     status: 'active', cdk_order_hash: null, display_name: '免费预览', note: '',
@@ -63,11 +64,13 @@ it.each(['252', '252-1', '252-full'])('retains the %s preset selected by a free 
   }
   const { result } = renderHook(() => useOptimizeWorkflow(props))
   await waitFor(() => expect(result.current.licenseSyncing).toBe(false))
-  act(() => result.current.updateConfig((draft) => Object.assign(draft, CONFIG_PRESETS[preset])))
+  const facility_layout = getFacilityIds(CONFIG_PRESETS[preset]).reverse()
+  act(() => result.current.updateConfig((draft) => Object.assign(draft, CONFIG_PRESETS[preset], { facility_layout })))
   expect(setConfigOverride).toHaveBeenLastCalledWith(expect.objectContaining({
-    layout: '2-5-2',
+    layout: CONFIG_PRESETS[preset].layout,
+    facility_layout,
     desc: CONFIG_PRESETS[preset].desc,
-    trading_station_levels: CONFIG_PRESETS[preset].trading_station_levels,
-    manufacturing_station_levels: CONFIG_PRESETS[preset].manufacturing_station_levels,
+    ...(CONFIG_PRESETS[preset].trading_station_levels && { trading_station_levels: CONFIG_PRESETS[preset].trading_station_levels }),
+    ...(CONFIG_PRESETS[preset].manufacturing_station_levels && { manufacturing_station_levels: CONFIG_PRESETS[preset].manufacturing_station_levels }),
   }))
 })

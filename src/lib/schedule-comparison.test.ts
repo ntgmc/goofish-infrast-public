@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { createBlankManualSchedule } from './manual-schedule-tool'
 import { CONFIG_PRESETS, normalizeConfig } from './config'
+import { getFacilityIds } from './facility-layout'
 import { compareScheduleOperators, scheduleProductionMetrics } from './schedule-comparison'
 
-const schedule = () => createBlankManualSchedule(normalizeConfig(CONFIG_PRESETS['243']))
+const schedule = () => createBlankManualSchedule(normalizeConfig({ ...CONFIG_PRESETS['243'], facility_layout: getFacilityIds(CONFIG_PRESETS['243']) }))
 
 describe('schedule operator comparison', () => {
   it('distinguishes added, removed and moved operators without treating room slot order or names as changes', () => {

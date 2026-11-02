@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CONFIG_PRESETS } from '../../src/lib/config'
+import { getFacilityIds } from '../../src/lib/facility-layout'
 import {
   getCdkScenarioQuotaLimit,
   resolveConfigForPermission,
@@ -43,10 +44,10 @@ describe('restricted profile presets', () => {
     }
   })
 
-  it('preserves facility positions for restricted profiles and free preview', () => {
+  it.each(['243', '333', '252-full'])('preserves %s facility positions for restricted profiles and free preview', (preset) => {
     const config = {
-      ...CONFIG_PRESETS['252-full'],
-      facility_layout: ['manufacture_3', 'trading_2', 'power_2', 'manufacture_1', 'manufacture_4', 'trading_1', 'power_1', 'manufacture_5', 'manufacture_2'],
+      ...CONFIG_PRESETS[preset],
+      facility_layout: getFacilityIds(CONFIG_PRESETS[preset]).reverse(),
     }
     for (const result of [validateConfig(config), resolveConfigForPermission('recommended', config), resolveFreePreviewConfig(config)]) {
       expect(result).toMatchObject({ ok: true, config: { facility_layout: config.facility_layout } })

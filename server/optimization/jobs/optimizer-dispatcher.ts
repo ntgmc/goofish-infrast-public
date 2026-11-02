@@ -148,7 +148,7 @@ async function dispatchOptimizationJobPayload(
     const inventoryWarnings = inventoryDepletionWarnings(result.intermediate_depletion)
     if (inventoryWarnings.length > 0) result.inventory_warnings = inventoryWarnings
     else delete result.inventory_warnings
-    if (payload.effectiveConfig.layout === '2-5-2' && payload.effectiveConfig.facility_layout) {
+    if (payload.effectiveConfig.facility_layout) {
       result.facility_layout = [...payload.effectiveConfig.facility_layout]
     } else {
       delete result.facility_layout

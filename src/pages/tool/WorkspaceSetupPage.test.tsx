@@ -8,6 +8,8 @@ import type { Announcement, AuthSuccessResponse, AuthUser, LicenseConfig, UserGa
 import AccountDashboard from './AccountDashboard'
 import WorkspaceSetupPage from './WorkspaceSetupPage'
 import { CONFIG_PRESETS } from '../../lib/config'
+import { getFacilityIds } from '../../lib/facility-layout'
+import { copy } from '../../copy'
 import { tourStorageKey } from '../../components/GuidedTour'
 import { cloneDefaultPublicContentSettings } from '../../lib/public-content'
 import * as publicContentContext from '../../lib/public-content-context'
@@ -89,14 +91,21 @@ describe('WorkspaceSetupPage automatic configuration saving', () => {
 
     expect(await screen.findByText('更改待保存')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '进入排班' })).toBeDisabled()
+    await user.click(within(screen.getByRole('navigation', { name: '工作区设置' })).getByRole('button', { name: /基建配置/ }))
+    await user.click(await screen.findByRole('button', { name: copy.v2.configEditor.confirmLayout }))
+    await user.click(screen.getByRole('button', { name: '确认布局' }))
+    await user.click(screen.getByRole('button', { name: '确认并收起' }))
     await screen.findByText('配置已保存')
     expect(apiJsonMock).toHaveBeenCalledWith('/api/user/workspace', expect.objectContaining({
       method: 'PATCH',
       json: { profile_id: 'advanced-profile', config: expect.objectContaining({ layout: '2-4-3' }) },
     }))
-    await user.click(within(screen.getByRole('navigation', { name: '工作区设置' })).getByRole('button', { name: /基建配置/ }))
+    await user.click(screen.getByRole('tab', { name: copy.v2.configEditor.common }))
     await user.click(await screen.findByRole('button', { name: '333 搓玉' }, { timeout: 5_000 }))
     expect(screen.getByRole('button', { name: '进入排班' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: copy.v2.configEditor.confirmLayout }))
+    await user.click(screen.getByRole('button', { name: '确认布局' }))
+    await user.click(screen.getByRole('button', { name: '确认并收起' }))
     await screen.findByText('配置已保存')
     expect(apiJsonMock).toHaveBeenLastCalledWith('/api/user/workspace', expect.objectContaining({
       json: { profile_id: 'advanced-profile', config: expect.objectContaining({ layout: '3-3-3' }) },
@@ -116,7 +125,7 @@ describe('WorkspaceSetupPage automatic configuration saving', () => {
       ...createPayload(),
       active_profile: createAdvancedProfile(),
       profiles: [createAdvancedProfile()],
-      workspace: { ...createAdvancedWorkspace(), config: structuredClone(CONFIG_PRESETS['243']) },
+      workspace: { ...createAdvancedWorkspace(), config: { ...structuredClone(CONFIG_PRESETS['243']), facility_layout: getFacilityIds(CONFIG_PRESETS['243']) } },
     }
     let saveAttempts = 0
     apiJsonMock.mockImplementation(async (url: string, options?: { json?: { config: LicenseConfig } }) => {
@@ -134,6 +143,9 @@ describe('WorkspaceSetupPage automatic configuration saving', () => {
     await screen.findByText('配置已保存')
     await user.click(within(screen.getByRole('navigation', { name: '工作区设置' })).getByRole('button', { name: /基建配置/ }))
     await user.click(await screen.findByRole('button', { name: '333 搓玉' }))
+    await user.click(screen.getByRole('button', { name: copy.v2.configEditor.confirmLayout }))
+    await user.click(screen.getByRole('button', { name: '确认布局' }))
+    await user.click(screen.getByRole('button', { name: '确认并收起' }))
     const retry = await screen.findByRole('button', { name: '配置保存失败，点击重试' })
     expect(screen.getByRole('button', { name: '进入排班' })).toBeDisabled()
     expect(apiJsonMock).toHaveBeenLastCalledWith('/api/user/workspace', expect.objectContaining({
@@ -148,7 +160,7 @@ describe('WorkspaceSetupPage automatic configuration saving', () => {
 })
 
 describe('WorkspaceSetupPage CDK paths', () => {
-  it.each(['252', '252-1', '252-full'])('blocks scheduling until %s facility confirmation is complete', async (preset) => {
+  it.each(['243', '333', '252', '252-1', '252-full'])('blocks scheduling until %s facility confirmation is complete', async (preset) => {
     const user = userEvent.setup()
     renderWorkspace({
       profile: createAdvancedProfile(),

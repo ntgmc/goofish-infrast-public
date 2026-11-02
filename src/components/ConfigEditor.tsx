@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { DormitoryIcon as BedDouble, ManufactureIcon as Factory, FiammettaIcon as Flame, TradingStationIcon as Store, PowerPlantIcon as Zap, DroneIcon } from './icons'
+import { DormitoryIcon as BedDouble, ManufactureIcon as Factory, FiammettaIcon as Flame, TradingStationIcon as Store, PowerPlantIcon as Zap, DroneIcon, SelectedIcon as Check, ConfigIcon, NextIcon as ArrowRight } from './icons'
 import { Tabs } from './ui/tabs'
 import {
   CONFIG_PRESETS,
@@ -17,7 +17,7 @@ import {
   resolveConfigLayout,
   validateConfig,
 } from '../lib/config'
-import { facilityLayoutSchema, sklandFacilityConfigSchema } from '../lib/facility-layout'
+import { hasConfirmedFacilityLayout, sklandFacilityConfigSchema } from '../lib/facility-layout'
 import { apiJson } from '../lib/api-client'
 import SklandIcon from './SklandIcon'
 import { BASE_DAILY_SANITY_BUDGET, MONTHLY_CARD_DAILY_SANITY_BONUS, normalizeOrundumPlanning } from '../lib/orundum-economy'
@@ -68,8 +68,10 @@ const PERMISSION_LABELS: Record<PermissionMode, string> = {
 const PRESET_GROUPS = [
   { label: copy.common.components_ConfigEditor_110, presets: [
     ['243', copy.common.components_ConfigEditor_030, 'balanced', ['Pure Gold', 'Battle Record']],
-    ['243-1', copy.common.components_ConfigEditor_031, 'orundum', ['Orundum']],
     ['333-lmd', copy.common.components_ConfigEditor_107, 'gold', ['LMD']],
+  ] },
+  { label: text.orundum, presets: [
+    ['243-1', copy.common.components_ConfigEditor_031, 'orundum', ['Orundum']],
     ['333', copy.common.components_ConfigEditor_032, 'orundum', ['Orundum']],
   ] },
   { label: copy.common.components_ConfigEditor_111, presets: [
@@ -82,6 +84,7 @@ const PRESET_GROUPS = [
 function applyCounts(config: LicenseConfig): void {
   const variant = getRightFull252Variant(config)
   config.layout = resolveConfigLayout(config)
+  if (config.desc === copy.v2.configCustomPreset) return
   config.desc = isFullBlood252Config(config)
     ? copy.common.components_ConfigEditor_108
     : variant
@@ -141,6 +144,7 @@ export default function ConfigEditor({
   hidePresetActions = false, hideValidation = false,
 }: ConfigEditorProps) {
   const [section, setSection] = useState('common')
+  const [reviewedOrundumKey, setReviewedOrundumKey] = useState('')
   const [importing, setImporting] = useState(false)
   const [importNotice, setImportNotice] = useState('')
   const importRequest = useRef<AbortController | null>(null)
@@ -152,7 +156,7 @@ export default function ConfigEditor({
   const roomsTabRef = useRef<HTMLButtonElement>(null)
   const canUseIntermediateInventory = canEdit || Boolean(canEditIntermediateInventory)
   const supported252 = getRightFull252Variant(config) !== null || isFullBlood252Config(config)
-  const needsLayout = supported252 && !facilityLayoutSchema.safeParse(config.facility_layout).success
+  const needsLayout = !hasConfirmedFacilityLayout(config)
   const tradingProducts = [...new Set([...TRADING_PRODUCTS, ...Object.keys(config.product_requirements.trading_stations)])]
   const manufacturingProducts = [...new Set([...MANUFACTURING_PRODUCTS, ...Object.keys(config.product_requirements.manufacturing_stations)])]
   const rotationMode = normalizeScheduleMode(config.schedule_mode) === 'rotation'
@@ -166,7 +170,9 @@ export default function ConfigEditor({
   const orundumPlanning = normalizeOrundumPlanning(config)
   const showOrundum = (config.product_requirements.trading_stations.Orundum ?? 0) > 0
     || (config.product_requirements.manufacturing_stations['Originium Shard'] ?? 0) > 0
-  const presetId = Object.keys(CONFIG_PRESETS).find((id) => presetMatches(config, CONFIG_PRESETS[id])) ?? ''
+  const presetId = config.desc === copy.v2.configCustomPreset ? '' : Object.keys(CONFIG_PRESETS).find((id) => presetMatches(config, CONFIG_PRESETS[id])) ?? ''
+  const activeSection = section === 'orundum' && !showOrundum ? 'common' : section
+  const orundumKey = JSON.stringify([profileId, config.product_requirements])
 
   const update = (mutate: (next: LicenseConfig) => void) => {
     if (!readOnly) onUpdate(mutate)
@@ -179,7 +185,7 @@ export default function ConfigEditor({
     })
   }
   const importSklandConfig = async () => {
-    if (!profileId || (!canEdit && !supported252) || readOnly || importRequest.current) return
+    if (!profileId || readOnly || importRequest.current) return
     const controller = new AbortController()
     importRequest.current = controller
     setImporting(true)
@@ -215,6 +221,7 @@ export default function ConfigEditor({
   const applyPreset = (id: string) => {
     const preset = CONFIG_PRESETS[id]
     if (!preset) return
+    setReviewedOrundumKey('')
     update((next) => {
       const stock = normalizeIntermediateInventory(next.intermediate_inventory)
       const autoBalanceEnabled = next.allow_product_rebalance !== undefined
@@ -234,15 +241,22 @@ export default function ConfigEditor({
         bindAutoDrones(next)
       }
     })
-    if (preset.layout === '2-5-2') showRooms()
   }
   const setStationCounts = (trading: number, manufacturing: number) => update((next) => {
     next.trading_stations_count = trading
     next.manufacturing_stations_count = manufacturing
     delete next.trading_station_levels
     delete next.manufacturing_station_levels
+    delete next.facility_layout
     next.product_requirements.trading_stations = fitProductCounts(next.product_requirements.trading_stations, tradingProducts, trading, 'LMD')
     next.product_requirements.manufacturing_stations = fitProductCounts(next.product_requirements.manufacturing_stations, manufacturingProducts, manufacturing, 'Pure Gold')
+    applyCounts(next)
+  })
+  const updateInventory = (product: IntermediateProduct | 'LMD', value: number) => update((next) => {
+    next.intermediate_inventory = { ...normalizeIntermediateInventory(next.intermediate_inventory), [product]: Number.isFinite(value) ? Math.max(0, value) : 0 }
+    next.allow_product_rebalance = allowsInventoryProductRebalance(next, canEdit)
+    next.auto_balance_source = 'intermediate_inventory'
+    bindAutoDrones(next)
     applyCounts(next)
   })
   const changeHours = (hours: number[]) => update((next) => {
@@ -254,7 +268,10 @@ export default function ConfigEditor({
   })
 
   return (
-    <Tabs.Root value={section} onValueChange={setSection} className={`config-editor min-w-0 ${embedded ? '' : 'tool-panel p-5 sm:p-6'}`}>
+    <Tabs.Root value={activeSection} onValueChange={(value) => {
+      setSection(value)
+      if (value === 'orundum') setReviewedOrundumKey(orundumKey)
+    }} className={`config-editor min-w-0 ${embedded ? '' : 'tool-panel p-5 sm:p-6'}`}>
       {!hideHeader && <header className="config-editor-header">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-lg font-semibold text-ink-primary">{copy.common.components_ConfigEditor_021}</h2>
@@ -271,15 +288,16 @@ export default function ConfigEditor({
         <Tabs.Trigger value="common">{text.common}</Tabs.Trigger>
         <Tabs.Trigger ref={roomsTabRef} value="rooms">{text.rooms}{needsLayout && <span className="config-task-pending" aria-label={text.needsLayout} />}</Tabs.Trigger>
         <Tabs.Trigger value="inventory">{text.inventory}</Tabs.Trigger>
+        {showOrundum && <Tabs.Trigger value="orundum">{text.orundum}{reviewedOrundumKey !== orundumKey && <span className="config-task-pending config-task-pending--orundum" aria-label={text.needsOrundumReview} />}</Tabs.Trigger>}
         <Tabs.Trigger value="strategy">{text.strategy}</Tabs.Trigger>
       </Tabs.List>
-      {profileId && (canEdit || supported252) && <div className="config-field mt-4">
+      {profileId && <div className="config-field mt-4">
         <button type="button" className="tool-secondary-action min-h-11 px-4" disabled={readOnly || importing} onClick={() => void importSklandConfig()}><SklandIcon />{importing ? copy.skland.importingConfig : copy.skland.importConfig}</button>
         <p className="config-help">{copy.skland.importConfigHelp}</p>
       </div>}
       {importNotice && <p role="status" className="tool-alert mt-3">{importNotice}</p>}
       <fieldset disabled={readOnly || importing} aria-busy={importing} className="config-editor-fields" aria-label={copy.common.components_ConfigEditor_021}>
-        <Tabs.Content value="common" forceMount hidden={section !== 'common'} className="config-task-panel config-task-panel--common">
+        <Tabs.Content value="common" forceMount hidden={activeSection !== 'common'} className="config-task-panel config-task-panel--common">
           <h3 className="sr-only">{text.commonTitle}</h3>
           {!hidePresetActions && <section className="config-field config-preset-section" data-tour-target="config-preset-actions" aria-label={copy.v2.configPreset}>
             <h4>{copy.v2.configPreset}</h4>
@@ -291,10 +309,21 @@ export default function ConfigEditor({
                   disabled={!canEdit && !canSelectPreset} onClick={() => applyPreset(id)}>
                   <span className="config-preset-icons">{products.map((product) => <ProductIcon key={product} product={product} size={20} />)}</span>
                   {label}
+                  {presetId === id && <Check size={16} aria-hidden="true" />}
                 </button>)}</div>
               </div>)}
+              {canEdit && <div className="config-preset-group" role="group" aria-label={text.customGroup}>
+                <span>{text.customGroup}</span>
+                <div><button type="button" className="tool-secondary-action config-preset config-preset--balanced"
+                  aria-pressed={!presetId} onClick={() => {
+                    update((next) => { next.desc = copy.v2.configCustomPreset })
+                  }}>
+                  <ConfigIcon size={20} aria-hidden="true" />{copy.v2.configCustomPreset}
+                  {!presetId && <Check size={16} aria-hidden="true" />}
+                </button></div>
+              </div>}
             </div>
-            {!presetId && <p className="config-help">{copy.v2.configCustomPreset}</p>}
+            <p className="config-help" role="status">{text.currentPreset(presetId ? CONFIG_PRESETS[presetId].desc : copy.v2.configCustomPreset)}</p>
           </section>}
           <section aria-labelledby="config-schedule-heading" className="config-field config-execution-field">
             <h4 id="config-schedule-heading">{copy.v2.configExecution}</h4>
@@ -308,17 +337,6 @@ export default function ConfigEditor({
             </div>
             <p className="config-help">{rotationMode ? copy.common.components_ConfigEditor_062 : text.maaHelp}</p>
           </section>
-          {(config.product_requirements.trading_stations.Orundum ?? 0) > 0 && showOrundumPreference && <fieldset className="config-orundum-preference" disabled={!canUseIntermediateInventory}>
-            <legend className="config-section-title">{copy.v2.orundumPreference}</legend>
-            {(['production', 'economy'] as const).map((preference) => <label key={preference} className="config-preference-option">
-              <input type="radio" name="orundum-preference" value={preference}
-                checked={(config.orundum_planning?.preference ?? 'production') === preference}
-                onChange={() => update((next) => {
-                  next.orundum_planning = { ...next.orundum_planning, preference }
-                })} />
-              <span><strong>{copy.v2.orundumPreferences[preference]}</strong><span className="config-help">{copy.v2.orundumPreferenceHelp[preference]}</span></span>
-            </label>)}
-          </fieldset>}
           {!rotationMode && <ShiftHoursEditor value={config.shift_hours} variableMode={variableShiftMode} canEdit={canEdit}
             canEditFixedShiftHours={canEditFixedShiftHours} onChange={changeHours}
             onSelectVariable={() => update((next) => {
@@ -332,16 +350,16 @@ export default function ConfigEditor({
               }
               applyCounts(next)
             })} />}
-          {needsLayout && <button type="button" className="tool-secondary-action config-layout-notice" onClick={showRooms}>
-            {text.confirmLayout}
+          {needsLayout && <button key={presetId || 'custom'} type="button" className="tool-secondary-action config-layout-notice" onClick={showRooms}>
+            <span>{text.confirmLayout}</span>
+            <span className="config-layout-arrows" aria-hidden="true">{[0, 1, 2].map((index) => <ArrowRight key={index} size={16} />)}</span>
           </button>}
         </Tabs.Content>
-        <Tabs.Content value="rooms" forceMount hidden={section !== 'rooms'} className="config-task-panel">
-          {supported252 ? <>
-            <FacilityLayoutEditor key={JSON.stringify([profileId, config.trading_station_levels, config.manufacturing_station_levels])}
-              config={config} readOnly={readOnly} onUpdate={update} />
-            <p className="tool-alert tool-alert--warning text-xs leading-5" role="note">{copy.common.components_ConfigEditor_109}</p>
-          </> : <section aria-labelledby="config-room-layout-heading">
+        <Tabs.Content value="rooms" forceMount hidden={activeSection !== 'rooms'} className="config-task-panel">
+          <FacilityLayoutEditor key={JSON.stringify([profileId, config.trading_stations_count, config.manufacturing_stations_count, config.trading_station_levels, config.manufacturing_station_levels])}
+            config={config} readOnly={readOnly} onUpdate={update} />
+          {supported252 && <p className="tool-alert tool-alert--warning text-xs leading-5" role="note">{copy.common.components_ConfigEditor_109}</p>}
+          {!supported252 && <section aria-labelledby="config-room-layout-heading">
             <h3 id="config-room-layout-heading" className="config-section-title">{copy.common.components_ConfigEditor_042}</h3>
             <div className="config-room-counts">
               <CounterField station="trading" id="trading-stations-count" label={copy.common.components_ConfigEditor_044} value={config.trading_stations_count}
@@ -375,20 +393,12 @@ export default function ConfigEditor({
             </div>
           </section>
         </Tabs.Content>
-        <Tabs.Content value="inventory" forceMount hidden={section !== 'inventory'} className="config-task-panel">
+        <Tabs.Content value="inventory" forceMount hidden={activeSection !== 'inventory'} className="config-task-panel">
           <section aria-labelledby="config-inventory-heading">
             <h3 id="config-inventory-heading" className="config-section-title">{copy.common.components_ConfigEditor_077}</h3>
             <div className="config-inventory-grid">
-              {(['Originium Shard', 'Pure Gold', ...(showOrundum ? ['Orirock Cube', 'LMD'] as const : [])] as const).map((product) => <IntermediateInventoryField
-                key={product} product={product} label={product === 'Orirock Cube' ? copy.common.components_ConfigEditor_080 : PRODUCT_LABELS[product]}
-                value={inventory[product] ?? 0} canEdit={canUseIntermediateInventory}
-                onChange={(product, value) => update((next) => {
-                  next.intermediate_inventory = { ...normalizeIntermediateInventory(next.intermediate_inventory), [product]: Number.isFinite(value) ? Math.max(0, value) : 0 }
-                  next.allow_product_rebalance = allowsInventoryProductRebalance(next, canEdit)
-                  next.auto_balance_source = 'intermediate_inventory'
-                  bindAutoDrones(next)
-                  applyCounts(next)
-                })} />)}
+              <IntermediateInventoryField product="Pure Gold" label={PRODUCT_LABELS['Pure Gold']}
+                value={inventory['Pure Gold']} canEdit={canUseIntermediateInventory} onChange={updateInventory} />
             </div>
             <label className="config-switch-row">
               <span>{copy.common.inventoryProductRebalanceLabel}</span>
@@ -405,7 +415,28 @@ export default function ConfigEditor({
             </label>
             <p className="config-help">{rotationMode ? copy.common.inventoryProductRebalanceRotation : copy.common.inventoryProductRebalanceHelp}</p>
           </section>
-          {showOrundum && <section aria-labelledby="config-orundum-heading" className="config-section-divider">
+        </Tabs.Content>
+        {showOrundum && <Tabs.Content value="orundum" forceMount hidden={activeSection !== 'orundum'} className="config-task-panel">
+          {showOrundumPreference && (config.product_requirements.trading_stations.Orundum ?? 0) > 0 && <fieldset className="config-orundum-preference" disabled={!canUseIntermediateInventory}>
+            <legend className="config-section-title">{copy.v2.orundumPreference}</legend>
+            {(['production', 'economy'] as const).map((preference) => <label key={preference} className="config-preference-option">
+              <input type="radio" name="orundum-preference" value={preference}
+                checked={(config.orundum_planning?.preference ?? 'production') === preference}
+                onChange={() => update((next) => {
+                  next.orundum_planning = { ...next.orundum_planning, preference }
+                })} />
+              <span><strong>{copy.v2.orundumPreferences[preference]}</strong><span className="config-help">{copy.v2.orundumPreferenceHelp[preference]}</span></span>
+            </label>)}
+          </fieldset>}
+          <section aria-labelledby="config-orundum-stock-heading">
+            <h3 id="config-orundum-stock-heading" className="config-section-title">{text.orundumInventory}</h3>
+            <div className="config-inventory-grid">
+              {(['Originium Shard', 'Orirock Cube', 'LMD'] as const).map((product) => <IntermediateInventoryField
+                key={product} product={product} label={product === 'Orirock Cube' ? copy.common.components_ConfigEditor_080 : PRODUCT_LABELS[product]}
+                value={inventory[product] ?? 0} canEdit={canUseIntermediateInventory} onChange={updateInventory} />)}
+            </div>
+          </section>
+          <section aria-labelledby="config-orundum-heading" className="config-section-divider">
             <h3 id="config-orundum-heading" className="config-section-title">{copy.common.components_ConfigEditor_052}</h3>
             <label className="config-switch-row"><span>{copy.common.components_ConfigEditor_056}</span>
               <Switch checked={orundumPlanning.monthly_card} disabled={!canEdit} onChange={(event) => {
@@ -430,9 +461,9 @@ export default function ConfigEditor({
               <p>{copy.common.components_ConfigEditor_053}{BASE_DAILY_SANITY_BUDGET}{copy.common.components_ConfigEditor_054}{MONTHLY_CARD_DAILY_SANITY_BONUS}{copy.common.components_ConfigEditor_055}</p>
               <p>{copy.common.components_ConfigEditor_058}{orundumPlanning.total_daily_sanity_budget}{copy.common.components_ConfigEditor_059}</p>
             </details>
-          </section>}
-        </Tabs.Content>
-        <Tabs.Content value="strategy" forceMount hidden={section !== 'strategy'} className="config-task-panel config-strategy-panel">
+          </section>
+        </Tabs.Content>}
+        <Tabs.Content value="strategy" forceMount hidden={activeSection !== 'strategy'} className="config-task-panel config-strategy-panel">
           <section aria-labelledby="config-dormitory-heading" className="config-field config-strategy-section config-strategy-section--dormitory">
             <h3 id="config-dormitory-heading" className="config-strategy-heading"><BedDouble aria-hidden="true" />{copy.common.components_ConfigEditor_063}</h3>
             <select className="tool-field" aria-label={copy.common.components_ConfigEditor_063} value={dormitoryRule}

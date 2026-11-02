@@ -7,6 +7,7 @@ import { CONFIG_PRESETS, cloneConfig, normalizeConfig } from '../lib/config'
 import { copy } from '../copy'
 import ConfigEditor from './ConfigEditor'
 import { licenseConfigSchema } from '../lib/workspace-validation'
+import { getFacilityIds } from '../lib/facility-layout'
 
 const { featureSwitches } = vi.hoisted(() => ({ featureSwitches: { one_shift_per_day: false } }))
 vi.mock('../lib/site-feature-context', () => ({ useSiteFeatures: () => ({ features: featureSwitches }) }))
@@ -26,6 +27,7 @@ describe('ConfigEditor facility configuration', () => {
     const config = normalizeConfig(CONFIG_PRESETS['333'])
     const update = vi.fn((mutate: (next: typeof config) => void) => mutate(config))
     const view = render(<ConfigEditor showOrundumPreference config={config} canEdit={false} canEditIntermediateInventory validation={{ ok: true }} onUpdate={update} />)
+    await openSection(labels.orundum)
     const production = screen.getByRole('radio', { name: /尽量多产玉/ })
     expect(production).toBeChecked()
     await userEvent.click(screen.getByRole('radio', { name: /更省资源/ }))
@@ -291,7 +293,7 @@ describe('ConfigEditor inventory and presets', () => {
 
   it('keeps LMD stock through other inventory edits and preset changes', async () => {
     const latest = setup(normalizeConfig(CONFIG_PRESETS['333']), { canEdit: false, canEditIntermediateInventory: true })
-    await openSection(labels.inventory)
+    await openSection(labels.orundum)
     const lmd = screen.getByRole('spinbutton', { name: '龙门币' })
     await userEvent.clear(lmd)
     await userEvent.type(lmd, '240000')
@@ -327,10 +329,62 @@ describe('ConfigEditor inventory and presets', () => {
     expect(screen.getByRole('button', { name: '减少合成玉' })).toBeDisabled()
   })
 
-  it.each(['252', '252-1', '252-full'])('applies %s, opens required layout review and clears levels when returning to 243', async (id) => {
+  it.each(['243', '333-lmd', '333'])('confirms and restores the %s map through normalization', async (id) => {
+    const latest = setup()
+    await selectPreset(id)
+    expect(screen.getByRole('tab', { name: labels.common })).toHaveAttribute('aria-selected', 'true')
+    await userEvent.click(screen.getByRole('button', { name: labels.confirmLayout }))
+    await userEvent.click(screen.getByRole('button', { name: '确认布局' }))
+    await userEvent.click(screen.getByRole('button', { name: '确认并收起' }))
+    const saved = licenseConfigSchema.parse(normalizeConfig(latest()))
+    expect(saved.facility_layout).toEqual(getFacilityIds(CONFIG_PRESETS[id]))
+    cleanup()
+    setup(saved)
+    await openSection(labels.rooms)
+    expect(screen.getByText('布局已确认', { exact: true })).toBeInTheDocument()
+  })
+
+  it('restores preset and explicit custom states on reopen without clearing existing settings', async () => {
+    const latest = setup()
+    expect(screen.getByRole('button', { name: '243 均衡' })).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(screen.getByRole('button', { name: copy.v2.configCustomPreset }))
+    expect(latest().product_requirements).toEqual(CONFIG_PRESETS['243'].product_requirements)
+    await openSection(labels.common)
+    expect(screen.getByRole('button', { name: copy.v2.configCustomPreset })).toHaveAttribute('aria-pressed', 'true')
+    await selectShift('12x3')
+    const saved = licenseConfigSchema.parse(normalizeConfig(latest()))
+    cleanup()
+    setup(saved)
+    expect(screen.getByRole('button', { name: copy.v2.configCustomPreset })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: '243 均衡' })).toHaveAttribute('aria-pressed', 'false')
+    await selectPreset('243')
+    await openSection(labels.common)
+    expect(screen.getByRole('button', { name: '243 均衡' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: copy.v2.configCustomPreset })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('groups Orundum settings together and removes the tab after switching back to regular production', async () => {
+    setup(undefined, { canEdit: false, canEditIntermediateInventory: true, showOrundumPreference: true })
+    expect(screen.queryByRole('tab', { name: labels.orundum })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: copy.v2.configCustomPreset })).not.toBeInTheDocument()
+    await selectPreset('333')
+    expect(screen.getByLabelText(labels.needsOrundumReview)).toBeInTheDocument()
+    await openSection(labels.orundum)
+    expect(screen.queryByLabelText(labels.needsOrundumReview)).not.toBeInTheDocument()
+    expect(screen.getByRole('spinbutton', { name: '龙门币' })).toBeEnabled()
+    expect(screen.getByRole('spinbutton', { name: '固源岩' })).toBeEnabled()
+    expect(screen.getByRole('radio', { name: /尽量多产玉/ })).toBeChecked()
+    expect(screen.getByRole('spinbutton', { name: copy.common.components_ConfigEditor_057 })).toBeDisabled()
+    await selectPreset('243')
+    expect(screen.queryByRole('tab', { name: labels.orundum })).not.toBeInTheDocument()
+  })
+
+  it.each(['252', '252-1', '252-full'])('applies %s without leaving common settings and clears levels when returning to 243', async (id) => {
     const latest = setup(normalizeConfig({ ...CONFIG_PRESETS['243'], optimization_mode: 'fast', optimizer_search: { optimization_mode: 'fast', beam: true } }))
     await selectPreset(id)
-    expect(screen.getByRole('tab', { name: /房间/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: labels.common })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('combobox', { name: copy.v2.configShiftFrequency })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: labels.confirmLayout }))
     expect(screen.getByRole('button', { name: '确认布局' })).toBeInTheDocument()
     expect(latest().trading_station_levels).toEqual(CONFIG_PRESETS[id].trading_station_levels)
     expect(latest().manufacturing_station_levels).toEqual(CONFIG_PRESETS[id].manufacturing_station_levels)
@@ -347,12 +401,14 @@ describe('ConfigEditor inventory and presets', () => {
     expect(latest().layout).toBe('2-4-3')
   })
 
-  it('does not return to rooms when delayed preset focus runs after switching tasks', async () => {
+  it('does not return to rooms when delayed layout-link focus runs after switching tasks', async () => {
     setup()
     const callbacks: FrameRequestCallback[] = []
     const frame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => callbacks.push(callback))
     try {
       await selectPreset('252')
+      expect(callbacks).toHaveLength(0)
+      await userEvent.click(screen.getByRole('button', { name: labels.confirmLayout }))
       expect(callbacks).toHaveLength(1)
       await openSection(labels.strategy)
       act(() => callbacks.forEach((callback) => callback(performance.now())))

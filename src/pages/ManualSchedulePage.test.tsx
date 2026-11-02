@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CONFIG_PRESETS, normalizeConfig } from '../lib/config'
 import { createBlankManualSchedule } from '../lib/manual-schedule-tool'
+import { getFacilityIds } from '../lib/facility-layout'
 import type { UserGameAccount } from '../lib/types'
 import ManualSchedulePage from './ManualSchedulePage'
 import { copy } from '../copy/index'
@@ -22,7 +23,7 @@ const profile: UserGameAccount = {
   id: 'manual-profile', user_id: 'user', kind: 'cdk', permission: 'advanced', status: 'active',
   display_name: '我的档案', cdk_order_hash: null, note: '', operator_count: 1, updated_at: null, created_at: '2026-01-01',
 }
-const config = normalizeConfig(CONFIG_PRESETS['243'])
+const config = normalizeConfig({ ...CONFIG_PRESETS['243'], facility_layout: getFacilityIds(CONFIG_PRESETS['243']) })
 const workspace = { config, operators: [{ id: 'f', name: '芬', own: true, elite: 1, rarity: 3 }] }
 const session = () => ({
   authStatus: 'authenticated', authLoading: false, profiles: [profile], activeProfile: profile, workspace,
@@ -80,7 +81,7 @@ describe('manual schedule tool', () => {
     page()
     await user.clear(screen.getByRole('textbox', { name: /每班时长/ }))
     await user.type(screen.getByRole('textbox'), 'invalid')
-    const source = createBlankManualSchedule(normalizeConfig(CONFIG_PRESETS['333']))
+    const source = createBlankManualSchedule(normalizeConfig({ ...CONFIG_PRESETS['333'], facility_layout: getFacilityIds(CONFIG_PRESETS['333']) }))
     source.plans[0].rooms.manufacture[0].operators = ['芬']
     mocks.snapshot.mockResolvedValue({ status: 'succeeded', result: { ...source, total_efficiency: 175 } })
     const maa = { title: '导入方案', description: '', plans: source.plans }

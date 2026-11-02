@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { FACILITY_IDS, SKLAND_PRODUCTION_SLOTS as PRODUCTION_SLOTS, facilityRoomsSchema, sklandFacilityConfigSchema } from '../../src/lib/facility-layout'
+import { getFacilityIds, SKLAND_PRODUCTION_SLOTS as PRODUCTION_SLOTS, facilityRoomsSchema, sklandFacilityConfigSchema } from '../../src/lib/facility-layout'
 import { CONFIG_PRESETS, normalizeConfig, validateConfig } from '../../src/lib/config'
 import { copy } from '../../src/copy'
 
@@ -50,29 +50,26 @@ export function readSklandFacilityConfig(value: unknown) {
     if (!product) throw new Error(copy.skland.configUnknownProduct)
     products.manufacturing_stations[product] = (products.manufacturing_stations[product] ?? 0) + 1
   }
-  let layout: string[] | undefined
-  if (preset.layout === '2-5-2') {
-    const available = [...FACILITY_IDS]
-    const entries = [
-      ...building.tradings.map((room) => ({ ...room, type: 'trading' })),
-      ...building.manufactures.map((room) => ({ ...room, type: 'manufacture' })),
-      ...building.powers.map((room) => ({ ...room, type: 'power' })),
-    ]
-    layout = PRODUCTION_SLOTS.map((slot) => {
-      const room = entries.find((entry) => entry.slotId === slot)!
-      const index = available.findIndex((id) => {
-        const [type, number] = id.split('_')
-        const levels = type === 'trading' ? preset.trading_station_levels : preset.manufacturing_station_levels
-        return type === room.type && (type === 'power' ? 3 : levels![Number(number) - 1]) === room.level
-      })
-      return available.splice(index, 1)[0]
+  const available = getFacilityIds(preset)
+  const entries = [
+    ...building.tradings.map((room) => ({ ...room, type: 'trading' })),
+    ...building.manufactures.map((room) => ({ ...room, type: 'manufacture' })),
+    ...building.powers.map((room) => ({ ...room, type: 'power' })),
+  ]
+  const layout = PRODUCTION_SLOTS.map((slot) => {
+    const room = entries.find((entry) => entry.slotId === slot)!
+    const index = available.findIndex((id) => {
+      const [type, number] = id.split('_')
+      const levels = type === 'trading' ? preset.trading_station_levels : preset.manufacturing_station_levels
+      return type === room.type && (type === 'power' ? 3 : levels?.[Number(number) - 1] ?? 3) === room.level
     })
-  }
+    return available.splice(index, 1)[0]
+  })
   const config = sklandFacilityConfigSchema.parse({ layout: preset.layout, desc: copy.skland.importedConfig,
     trading_stations_count: preset.trading_stations_count, manufacturing_stations_count: preset.manufacturing_stations_count,
     ...(preset.trading_station_levels && { trading_station_levels: [...preset.trading_station_levels] }),
     ...(preset.manufacturing_station_levels && { manufacturing_station_levels: [...preset.manufacturing_station_levels] }),
-    ...(layout && { facility_layout: layout }), product_requirements: products })
+    facility_layout: layout, product_requirements: products })
   const validation = validateConfig(normalizeConfig(config))
   if (!validation.ok) throw new Error(validation.message)
   return config

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { CultivationCandidate, CultivationData } from './cultivation-contract'
 import { CONFIG_PRESETS } from './config'
+import { getFacilityIds } from './facility-layout'
 import { buildMaaCultivationPlan, buildProjectRoute, isCultivationProject, prepareProjectProduction, projectDaysEarlier, readProjectIncome, type CultivationProject, type ProjectOperator } from './cultivation-projects'
 
 const project = (operatorId: string): CultivationProject => ({ operatorId, elite: 2, level: 60, skill: 1, skillLevel: 7, paused: false, deadline: '' })
@@ -126,13 +127,13 @@ describe('goal-driven resource routes', () => {
   })
 
   it('prepares a focused production config without changing factory count or the original config', () => {
-    const original = structuredClone(CONFIG_PRESETS['243'])
+    const original = { ...structuredClone(CONFIG_PRESETS['243']), facility_layout: getFacilityIds(CONFIG_PRESETS['243']) }
     const focused = prepareProjectProduction(original, 'exp')!
     expect(focused.product_requirements.manufacturing_stations).toEqual({ 'Pure Gold': 1, 'Battle Record': 3 })
     expect(focused.manufacturing_stations_count).toBe(4)
     expect(focused.allow_product_rebalance).toBe(false)
     expect(prepareProjectProduction(focused, '4001')!.product_requirements).toEqual(original.product_requirements)
-    expect(original).toEqual(CONFIG_PRESETS['243'])
+    expect(original).toEqual({ ...CONFIG_PRESETS['243'], facility_layout: getFacilityIds(CONFIG_PRESETS['243']) })
     expect(prepareProjectProduction(CONFIG_PRESETS['333-lmd'], '4001')).toBeNull()
   })
 

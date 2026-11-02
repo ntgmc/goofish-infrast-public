@@ -3,10 +3,10 @@ import { CONFIG_PRESETS, normalizeConfig } from './config'
 import { copy } from '../copy'
 import { createManualPlans, manualResult, manualSourceKey, parseManualDraft, validateManualPlans } from './manual-schedule'
 import { changeManualFacility, createBlankManualSchedule, isManualScheduleProfileAvailable, parseManualScheduleJson, resolveManualScheduleConfig, UnownedScheduleOperatorsError } from './manual-schedule-tool'
-import { FACILITY_IDS } from './facility-layout'
+import { FACILITY_IDS, getFacilityIds } from './facility-layout'
 import type { LicenseOperator, UserGameAccount } from './types'
 
-const config = normalizeConfig(CONFIG_PRESETS['243'])
+const config = normalizeConfig({ ...CONFIG_PRESETS['243'], facility_layout: getFacilityIds(CONFIG_PRESETS['243']) })
 const operators: LicenseOperator[] = [{ id: 'f', name: '芬', own: true, elite: 1, rarity: 3 }]
 const profile: UserGameAccount = {
   id: 'p', user_id: 'u', kind: 'cdk', permission: 'advanced', status: 'active',
@@ -166,15 +166,19 @@ describe('standalone manual schedules', () => {
     expect(() => parseManualScheduleJson(JSON.stringify(invalid), config, operators)).toThrow()
   })
 
-  it('derives the simulation configuration from imported facilities and shifts', () => {
-    const importedConfig = normalizeConfig(CONFIG_PRESETS['333'])
+  it.each(['243', '333'])('derives the %s simulation configuration from imported facilities, map and shifts', (preset) => {
+    const importedConfig = normalizeConfig({ ...CONFIG_PRESETS[preset], facility_layout: getFacilityIds(CONFIG_PRESETS[preset]).reverse() })
     const source = createBlankManualSchedule({ ...importedConfig, shift_hours: [12, 12, 12] })
-    const resolved = resolveManualScheduleConfig(source, config, operators)
-    expect(resolved.layout).toBe('3-3-3')
-    expect(resolved.trading_stations_count).toBe(3)
-    expect(resolved.manufacturing_stations_count).toBe(3)
+    const imported = parseManualScheduleJson(JSON.stringify(source), config, operators)
+    const resolved = resolveManualScheduleConfig(imported, config, operators)
+    expect(resolved.layout).toBe(importedConfig.layout)
+    expect(resolved.trading_stations_count).toBe(importedConfig.trading_stations_count)
+    expect(resolved.manufacturing_stations_count).toBe(importedConfig.manufacturing_stations_count)
     expect(resolved.shift_hours).toEqual([12, 12, 12])
     expect(resolved.product_requirements).toEqual(importedConfig.product_requirements)
+    expect(resolved.facility_layout).toEqual(importedConfig.facility_layout)
+    source.facility_layout = [...FACILITY_IDS]
+    expect(() => parseManualScheduleJson(JSON.stringify(source), config, operators)).toThrow(copy.common.facilityLayoutRequired)
   })
 
   it('preserves shift order, infers empty 252 facilities and requires products from the JSON', () => {

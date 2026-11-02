@@ -204,7 +204,7 @@ export function useOptimizeWorkflow(props: Props) {
   
       const limited = normalizeConfig(baseConfig)
       limited.allow_product_rebalance = next.allow_product_rebalance
-    if (limited.layout === '2-5-2') limited.facility_layout = next.facility_layout?.slice()
+      limited.facility_layout = next.facility_layout?.slice()
       limited.schedule_mode = normalizeScheduleMode(next.schedule_mode)
       limited.dormitory_rule = normalizeDormitoryRule(next.dormitory_rule)
       if (limited.schedule_mode !== 'rotation' && userCanUseIntermediateAutoConfig && (next.allow_product_rebalance !== undefined || next.auto_balance_source === 'intermediate_inventory' || next.auto_balance_source === 'limited_config')) {

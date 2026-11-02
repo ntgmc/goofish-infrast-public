@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readSklandFacilityConfig, readSklandFacilityRooms } from './skland-facilities'
 import { normalizeConfig, validateScheduleConfig } from '../../src/lib/config'
+import { hasConfirmedFacilityLayout } from '../../src/lib/facility-layout'
 
 function playerInfo() {
   return { data: { building: {
@@ -28,6 +29,19 @@ describe('Skland facility positions', () => {
       product_requirements: { trading_stations: { LMD: 1, Orundum: 1 }, manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 1, 'Originium Shard': 2 } } })
     expect(config.facility_layout).toEqual(['trading_1', 'trading_2', 'manufacture_1', 'manufacture_2', 'manufacture_3', 'manufacture_4', 'manufacture_5', 'power_1', 'power_2'])
     expect(validateScheduleConfig(normalizeConfig(config))).toEqual({ ok: true })
+  })
+  it('imports and preserves a three-power map in game order', () => {
+    const info = playerInfo()
+    const building = info.data.building
+    building.tradings.forEach((room) => { room.level = 3 })
+    const removed = building.manufactures.shift()!
+    building.manufactures.forEach((room) => { room.level = 3 })
+    building.powers.push({ slotId: removed.slotId, level: 3 })
+    const config = normalizeConfig(readSklandFacilityConfig(info))
+    expect(config.layout).toBe('2-4-3')
+    expect(config.facility_layout).toEqual(['trading_1', 'trading_2', 'manufacture_1', 'manufacture_2', 'manufacture_3', 'manufacture_4', 'power_1', 'power_2', 'power_3'])
+    expect(hasConfirmedFacilityLayout(config)).toBe(true)
+    expect(validateScheduleConfig(config)).toEqual({ ok: true })
   })
   it('rejects unsupported layouts and products instead of guessing a usable configuration', () => {
     const unsupported = playerInfo()
