@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { AnimationIcon, AnnouncementIcon, CollapsedIcon, ComparisonIcon, FacilitiesIcon, GenerateIcon, HelpIcon, OperatorsIcon, OverviewIcon, PricingIcon, ProjectsIcon, ReleasesIcon, ResultHistoryIcon, ServiceStatusIcon, SupportIcon, ToolsIcon } from '../../components/icons'
 import Link from '../../components/InternalLink'
 import FeedbackButton from '../../components/FeedbackDialog'
@@ -25,6 +26,20 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
   onClose: () => void
 }) {
   const { features } = useSiteFeatures()
+  const more = useRef<HTMLDetailsElement>(null)
+  useEffect(() => {
+    function closeOutside(event: PointerEvent) {
+      // Keep the opener visible when a nested dialog restores focus.
+      if (document.querySelector('[data-slot="dialog-content"]')) return
+      if (more.current && event.target instanceof Node && !more.current.contains(event.target)) more.current.open = false
+    }
+    document.addEventListener('pointerdown', closeOutside, true)
+    return () => document.removeEventListener('pointerdown', closeOutside, true)
+  }, [])
+  function closeNavigation() {
+    if (more.current) more.current.open = false
+    onClose()
+  }
   const signedIn = session.authStatus === 'authenticated' && Boolean(session.user)
   const moreCurrent = moreEntries.some((entry) => entry === section)
   function item(entry: typeof workspaceEntries[number] | typeof moreEntries[number], label = sectionLabels[entry]) {
@@ -38,7 +53,7 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
     const className = `v2-nav-item ${active ? 'v2-nav-active' : ''}`
     return signedIn && workspaceEntries.some((workspace) => workspace === entry)
       ? <button type="button" key={entry} className={className} aria-current={current ? 'page' : undefined} onClick={() => onNavigate(entry)}>{contents}</button>
-      : <Link key={entry} className={className} to={v2Path(entry, session.activeProfile?.id)} aria-current={current ? 'page' : undefined} onClick={onClose}>{contents}</Link>
+      : <Link key={entry} className={className} to={v2Path(entry, session.activeProfile?.id)} aria-current={current ? 'page' : undefined} onClick={closeNavigation}>{contents}</Link>
   }
   return <nav aria-label={text.navigation}>
       <p className="v2-nav-label">{signedIn ? text.workspace : text.guestNavigation.title}</p>
@@ -56,7 +71,13 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
         <button type="button" className="v2-config-shortcut" onClick={() => onPanel('config')}><FacilitiesIcon size={20} aria-hidden="true" /><span>{text.facilities}</span></button>
       </div>
     <div className="v2-sidebar-bottom">
-      <details className="v2-nav-disclosure" open={moreCurrent}>
+      <details ref={more} className="v2-nav-disclosure" onKeyDown={(event) => {
+        if (event.key !== 'Escape' || !event.currentTarget.open) return
+        event.preventDefault()
+        event.stopPropagation()
+        event.currentTarget.open = false
+        event.currentTarget.querySelector('summary')?.focus()
+      }}>
         <summary className={`v2-nav-item ${moreCurrent ? 'v2-nav-active' : ''}`}><HelpIcon size={19} aria-hidden="true" /><span>{text.navigationMore}</span>
           {features.announcements && session.announcementUnreadCount > 0 && <small aria-label={text.unreadAnnouncements(session.announcementUnreadCount)}>{session.announcementUnreadCount}</small>}
           <CollapsedIcon className="v2-nav-chevron" size={16} aria-hidden="true" />

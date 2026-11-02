@@ -85,7 +85,12 @@ function mount(path = '/v2') {
 it('allows a guest to open the benchmark from navigation and return to the workspace', async () => {
   const user = userEvent.setup()
   mount('/v2')
-  await user.click(screen.getByText(copy.v2.navigationMore))
+  const more = screen.getByText(copy.v2.navigationMore)
+  await user.click(more)
+  await user.keyboard('{Escape}')
+  expect(more.closest('details')).not.toHaveAttribute('open')
+  expect(more.closest('summary')).toHaveFocus()
+  await user.click(more)
   await user.click(screen.getByRole('link', { name: copy.siteBenchmark.title }))
   await screen.findByRole('heading', { name: copy.siteBenchmark.headline('MaaTool', 30).join('') }, { timeout: 3000 })
   expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2/benchmarks')
@@ -480,6 +485,7 @@ describe('V2 results-first workspace', () => {
       expect(session.retryAuth).toHaveBeenCalledOnce()
     }
     const navigation = within(screen.getByRole('navigation', { name: copy.v2.navigation }))
+    await user.click(navigation.getByText(copy.v2.navigationMore))
     await user.click(navigation.getByRole('link', { name: copy.v2.contactSupport }))
     expect(await screen.findByRole('heading', { name: copy.public.pages_PublicInfoPage_067 })).toBeVisible()
     expect(screen.getByTestId('route-location')).toHaveTextContent('section=support')

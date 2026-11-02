@@ -74,7 +74,9 @@ it deliberately when changing the shared design.
   configuration in paired shortcuts. The top-right account drawer owns profile
   management, Skland data, inventory, account settings and available billing
   pages. Group guides, announcements, releases and site links under the rail's
-  expandable “帮助与更多”; retain the unread announcement count while collapsed.
+  “帮助与更多” menu, which opens above its bottom trigger without moving the
+  trigger or resizing the rail. Keep scrolling inside the menu when needed and
+  retain the unread announcement count while collapsed.
   Tool detail pages keep the tools entry highlighted. Preserve the Ft2 footer.
 - Use one production summary strip and one schedule panel with open room regions. Operator portraits
   and efficiency carry the visual weight.
