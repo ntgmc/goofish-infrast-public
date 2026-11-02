@@ -392,12 +392,12 @@ export default function ConfigEditor({
           </details>
           <section className="config-field config-field--inline">
             <label htmlFor="config-recycling-level" className="config-section-title">{copy.domain.recycling.level}</label>
-            <select id="config-recycling-level" className="tool-field" value={config.recycling_station_level ?? 0} disabled={readOnly}
+            <select id="config-recycling-level" aria-describedby="config-recycling-help" className="tool-field" value={config.recycling_station_level ?? 0} disabled={readOnly}
               onChange={(event) => { const level = Number(event.currentTarget.value); update((next) => { next.recycling_station_level = level }) }}>
               <option value={0}>{copy.domain.recycling.disabled}</option>
               {[1, 2, 3].map((level) => <option key={level} value={level}>Lv.{level}</option>)}
             </select>
-            <p className="config-help">{copy.domain.recycling.help}</p>
+            <p id="config-recycling-help" className="config-help">{copy.domain.recycling.help}{profileId && copy.skland.configRecyclingManual}</p>
           </section>
         </Tabs.Content>
         <Tabs.Content value="inventory" forceMount hidden={activeSection !== 'inventory'} className="config-task-panel">
