@@ -33,7 +33,8 @@ afterEach(() => {
 })
 
 it('uses optimizer cash flow and depletion instead of recalculating the production summary', async () => {
-  const daily = { manufacturing: { 'Originium Shard': 90 }, trading: { LMD: 41000, Orundum: 1000 }, consumption: { 'Originium Shard': 100 } }
+  const daily = { manufacturing: { 'Originium Shard': 90 }, trading: { LMD: 41000, Orundum: 1000 }, consumption: { 'Originium Shard': 100, LMD: 160000 },
+    details: [{ room_type: 'manufacture', room_index: 1, shift: '早班', product: 'Originium Shard', amount: 90, consume: { LMD: 160000 } }] }
   const economy: OrundumEconomy = {
     daily_sanity_budget: 240, monthly_card: false, total_daily_sanity_budget: 240,
     daily_orirock_supply: 50, rock_limited_orundum: 250, factory_orundum_capacity: 1000,
@@ -61,10 +62,18 @@ it('uses optimizer cash flow and depletion instead of recalculating the producti
   expect(cash).toHaveTextContent('-120,000')
   expect(cash).toHaveTextContent('每日产出 40,000 · 制造碎片消耗 160,000')
   expect(screen.getByRole('region', { name: copy.v2.shortTermPulls })).toHaveTextContent('预计可持续 2 天')
-  const inputs = within(screen.getByRole('region', { name: copy.v2.orundumInputs }))
-  expect(inputs.getByRole('rowheader', { name: copy.v2.shardLmdCost }).closest('tr')).toHaveTextContent('160,000')
-  expect(inputs.getByRole('rowheader', { name: copy.v2.lmdInventoryDepletion }).closest('tr')).toHaveTextContent('2 天')
-  expect(inputs.getByRole('rowheader', { name: copy.v2.orirockInventoryDepletion }).closest('tr')).toHaveTextContent('10 天')
+  const inputsRegion = screen.getByRole('region', { name: copy.v2.orundumInputs })
+  const inputs = within(inputsRegion)
+  expect(inputs.getByText(copy.v2.shardLmdCost).closest('div')).toHaveTextContent('160,000')
+  expect(inputs.getByText(copy.v2.lmdInventoryDepletion).closest('div')).toHaveTextContent('2 天')
+  expect(inputs.getByText(copy.v2.orirockInventoryDepletion).closest('div')).toHaveTextContent('10 天')
+  expect(inputsRegion.compareDocumentPosition(screen.getByRole('region', { name: copy.v2.stationOutput })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  const calculation = within(screen.getByRole('region', { name: copy.v2.sanityCalculation }))
+  expect(calculation.getByText('314.00')).toBeInTheDocument()
+  expect(calculation.getByText('-428.4')).toBeInTheDocument()
+  const station = within(screen.getByRole('region', { name: copy.v2.stationOutput }))
+  await userEvent.click(station.getByText(copy.v2.stationShiftDetails))
+  expect(station.getByText('-507.62')).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: copy.v2.comparePrevious }))
   const changes = within(await screen.findByRole('region', { name: copy.v2.productionChanges }))
   expect(changes.getByText(copy.v2.lmdNetChange).closest('div')).toHaveTextContent('-90,000')

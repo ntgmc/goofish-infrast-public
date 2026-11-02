@@ -1,7 +1,7 @@
 import {
   SANITY_PER_BATTLE_RECORD,
   SANITY_PER_LMD,
-  SANITY_PER_ORIGINIUM_SHARD,
+  SANITY_PER_ORIGINIUM_SHARD_OPPORTUNITY,
   SANITY_PER_ORUNDUM,
   SANITY_PER_PURE_GOLD,
 } from './orundum-economy'
@@ -23,13 +23,14 @@ export function calculateProductionSanity(daily: Partial<DailyProduction> | null
   const manufacturingSanity =
     getResourceAmount(manufacturing, 'Pure Gold') * SANITY_PER_PURE_GOLD +
     getResourceAmount(manufacturing, 'Battle Record') * SANITY_PER_BATTLE_RECORD +
-    getResourceAmount(manufacturing, 'Originium Shard') * SANITY_PER_ORIGINIUM_SHARD
+    getResourceAmount(manufacturing, 'Originium Shard') * SANITY_PER_ORIGINIUM_SHARD_OPPORTUNITY
   const tradingSanity =
     getResourceAmount(trading, 'LMD') * SANITY_PER_LMD +
     getResourceAmount(trading, 'Orundum') * SANITY_PER_ORUNDUM
   const consumptionSanity =
     getResourceAmount(consumption, 'Pure Gold') * SANITY_PER_PURE_GOLD +
-    getResourceAmount(consumption, 'Originium Shard') * SANITY_PER_ORIGINIUM_SHARD
+    getResourceAmount(consumption, 'Originium Shard') * SANITY_PER_ORIGINIUM_SHARD_OPPORTUNITY +
+    getResourceAmount(consumption, 'LMD') * SANITY_PER_LMD
   const recoveredSanity = recyclingSanity(daily?.recycling)
   const value = manufacturingSanity + tradingSanity + recoveredSanity - consumptionSanity
 
