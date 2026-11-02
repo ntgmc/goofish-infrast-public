@@ -1,0 +1,13 @@
+.v1-migration-notice {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  border-bottom: 1px solid var(--color-selected-border);
+  background: var(--color-selected-bg);
+  color: var(--color-selected-ink);
+}
+
+.v1-layout .tool-sidebar,
+.v1-layout .tool-header {
+  top: var(--v1-notice-height, 0px);
+}

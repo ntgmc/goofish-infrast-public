@@ -22,6 +22,7 @@ import { categorizeBehaviorRiskPath } from './lib/behavior-risk-client'
 import NotFoundPage from './components/NotFoundPage'
 import { recordDebugNavigation } from './lib/debug-diagnostics'
 import QueryProvider from './lib/query-provider'
+import V1Route from './components/V1Route'
 
 
 const LandingPage = lazy(() => import('./pages/LandingPage'))
@@ -89,8 +90,13 @@ function AppContent() {
       <RouteMetadata />
       <RouteLifecycle />
       <Routes>
+        <Route element={<V1Route />}>
+          <Route element={<PublicContentRoute />}>
+            <Route path="/v1" element={<LazyPage fallback={copy.features.loading}><LandingPage onStart={() => navigate('/tool/profiles')} /></LazyPage>} />
+          </Route>
+          <Route path="/tool/*" element={<LazyPage fallback={copy.common.App_001}><ToolPage /></LazyPage>} />
+        </Route>
         <Route element={<PublicContentRoute />}>
-          <Route path="/v1" element={<LazyPage fallback={copy.features.loading}><LandingPage onStart={() => navigate('/tool/profiles')} /></LazyPage>} />
           <Route path="/changelog" element={<FeatureRoute feature="changelog"><LazyPage fallback={copy.common.App_014}><ChangelogPage /></LazyPage></FeatureRoute>} />
           <Route path="/faq" element={<FeatureRoute feature="faq"><LazyPage fallback={copy.common.App_003}><PublicInfoPage page="faq" /></LazyPage></FeatureRoute>} />
           <Route path="/support" element={<FeatureRoute feature="support"><LazyPage fallback={copy.common.App_004}><PublicInfoPage page="support" /></LazyPage></FeatureRoute>} />
@@ -104,7 +110,6 @@ function AppContent() {
         <Route path="/" element={v2Page} />
         <Route path="/v2" element={v2Page} />
         <Route path="/v2/benchmarks" element={v2Page} />
-        <Route path="/tool/*" element={<LazyPage fallback={copy.common.App_001}><ToolPage /></LazyPage>} />
         <Route path="/reset-password" element={<LazyPage fallback={copy.features.loading}><ResetPasswordPage /></LazyPage>} />
         <Route path="/verify-email" element={<LazyPage fallback={copy.features.loading}><VerifyEmailPage /></LazyPage>} />
         <Route path="/cancel-account-deletion" element={<LazyPage fallback={copy.features.loading}><CancelAccountDeletionPage /></LazyPage>} />

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
 import { useAppReducedMotion } from '../../lib/motion-preference'
 import { NextIcon as ArrowRight, SuccessIcon as Check, ExpandIcon as ChevronDown, BreadcrumbIcon, ExportIcon as Download, LoginIcon as LogIn, MenuIcon as Menu, GenerateIcon, LoadingIcon, ConfigIcon as Settings2, DataSourceIcon as ShieldCheck, InfoIcon as Sparkles, CloseIcon as X, PreviewIcon, SampleIcon } from '../../components/icons'
@@ -167,14 +167,6 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
     if (!await session.flushConfigSave()) { setNavigationError(text.saveFailed); return }
     await session.handleLogout()
   }
-  async function openLegacy(event: MouseEvent<HTMLAnchorElement>) {
-    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
-    event.preventDefault()
-    setMobileNavigation(false)
-    if ((manualDirty || toolDirty) && !window.confirm(text.discardManual)) return
-    if (!await session.flushConfigSave()) { setNavigationError(text.saveFailed); return }
-    void navigate('/v1')
-  }
   const guardedSession = { ...session, handleLogout: logout }
   function closePanel() {
     setPanel(null)
@@ -221,7 +213,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           <span><strong>{text.brand}</strong><small>{text.brandDescription}</small></span></Link>
         <button className="v2-mobile-close v2-icon-button" type="button" onClick={() => setMobileNavigation(false)} aria-label={text.close}><X size={20} /></button>
         <V2Navigation section={section} session={session} operatorCount={owned.length} sampleOperators={sampleOperators}
-          onNavigate={navigateSection} onPanel={openPanel} onClose={() => setMobileNavigation(false)} onLegacy={openLegacy} />
+          onNavigate={navigateSection} onPanel={openPanel} onClose={() => setMobileNavigation(false)} />
       </aside>
       <div className="v2-workspace">
         <header className="v2-topbar">

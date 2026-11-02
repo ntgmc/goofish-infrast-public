@@ -1,5 +1,4 @@
-import type { MouseEventHandler } from 'react'
-import { AccountsIcon, AccountIcon, AnimationIcon, AnnouncementIcon, BalanceIcon, BillingIcon, CollapsedIcon, ComparisonIcon, FacilitiesIcon, GenerateIcon, HelpIcon, InventoryIcon, LegacyWorkspaceIcon, NextIcon, OperatorsIcon, OverviewIcon, PricingIcon, ProjectsIcon, ReleasesIcon, ResultHistoryIcon, ServiceStatusIcon, SettingsIcon, SupportIcon, ToolsIcon } from '../../components/icons'
+import { AccountsIcon, AccountIcon, AnimationIcon, AnnouncementIcon, BalanceIcon, BillingIcon, CollapsedIcon, ComparisonIcon, FacilitiesIcon, GenerateIcon, HelpIcon, InventoryIcon, NextIcon, OperatorsIcon, OverviewIcon, PricingIcon, ProjectsIcon, ReleasesIcon, ResultHistoryIcon, ServiceStatusIcon, SettingsIcon, SupportIcon, ToolsIcon } from '../../components/icons'
 import Link from '../../components/InternalLink'
 import FeedbackButton from '../../components/FeedbackDialog'
 import { copy } from '../../copy'
@@ -17,7 +16,7 @@ const icons = {
   pricing: PricingIcon, help: HelpIcon, support: SupportIcon, status: ServiceStatusIcon, updates: ReleasesIcon, benchmarks: ComparisonIcon,
 }
 
-export default function V2Navigation({ section, session, operatorCount, sampleOperators, onNavigate, onPanel, onClose, onLegacy }: {
+export default function V2Navigation({ section, session, operatorCount, sampleOperators, onNavigate, onPanel, onClose }: {
   section: V2Section
   session: V2Session
   operatorCount: number
@@ -25,7 +24,6 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
   onNavigate: (section: V2Section) => void
   onPanel: (panel: OptionPanel) => void
   onClose: () => void
-  onLegacy: MouseEventHandler<HTMLAnchorElement>
 }) {
   const { features } = useSiteFeatures()
   const signedIn = session.authStatus === 'authenticated' && Boolean(session.user)
@@ -83,7 +81,6 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
       <div className="v2-sidebar-menu-links">
         {!signedIn && <>{workspaceItem('tools')}{workspaceItem('announcements')}{animationSettings}</>}
         {publicItem('updates')}
-        <Link className="v2-nav-item" to="/v1" onClick={onLegacy}><LegacyWorkspaceIcon size={19} aria-hidden="true" /><span>{text.legacyEntry}</span></Link>
       </div>
     </nav>
     {signedIn && <div className="v2-sidebar-bottom">

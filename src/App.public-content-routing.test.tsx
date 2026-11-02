@@ -39,6 +39,7 @@ describe('App public content routing', () => {
     apiVoid.mockReset().mockResolvedValue(undefined)
     toolMount.mockReset()
     toolUnmount.mockReset()
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
     vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
     apiJson.mockReset().mockImplementation(async (url: string) => {
       if (url === '/api/site/features') return DEFAULT_SITE_FEATURE_SETTINGS
@@ -47,7 +48,7 @@ describe('App public content routing', () => {
     })
   })
 
-  afterEach(() => cleanup())
+  afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
   it.each([
     '/reset-password',
@@ -97,10 +98,29 @@ describe('App public content routing', () => {
     const router = createMemoryRouter([{ path: '*', element: <App /> }], { initialEntries: ['/v1'] })
     render(<RouterProvider router={router} />)
     expect(await screen.findByRole('heading', { name: copy.public.pages_LandingPage_023 })).toBeInTheDocument()
+    expect(screen.getByRole('complementary', { name: copy.features.v1_migration.label })).toBeInTheDocument()
     expect(await screen.findByRole('link', { name: copy.v2.testEntry })).toHaveAttribute('href', '/v2')
     await act(async () => screen.getByRole('button', { name: copy.public.pages_LandingPage_026 }).click())
     expect(await screen.findByText('Tool workspace')).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/tool/profiles')
+  })
+
+  it.each(['/v1', '/tool/profiles', '/tool/setup/config?profile_id=profile-1', '/tool/optimize/plans?profile_id=profile-1'])('keeps disabled V1 visits at %s until the user chooses V2', async (route) => {
+    const original = apiJson.getMockImplementation()!
+    apiJson.mockImplementation((url: string) => url === '/api/site/features'
+      ? Promise.resolve({ ...DEFAULT_SITE_FEATURE_SETTINGS, features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, v1: false } })
+      : original(url))
+    const router = createMemoryRouter([{ path: '*', element: <App /> }], { initialEntries: [route] })
+    render(<RouterProvider router={router} />)
+    expect(await screen.findByRole('heading', { name: copy.features.v1_migration.closed_title })).toBeInTheDocument()
+    expect(router.state.location.pathname + router.state.location.search).toBe(route)
+    expect(toolMount).not.toHaveBeenCalled()
+    expect(screen.queryByRole('complementary', { name: copy.features.v1_migration.label })).not.toBeInTheDocument()
+    const link = screen.getByRole('link', { name: copy.v2.testEntry })
+    expect(link).toHaveAttribute('href', route.includes('profile_id') ? '/v2?profile_id=profile-1' : '/v2')
+    await act(async () => link.click())
+    expect(await screen.findByText('V2 test workspace')).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/v2')
   })
 
   it('reuses loaded public content across public navigation and history', async () => {

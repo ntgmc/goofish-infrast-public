@@ -18,7 +18,7 @@ type FeatureSettingsResponse = {
 const GROUPS: Array<{ label: string; features: SiteFeatureKey[] }> = [
   { label: copy.features.admin_groups.site, features: ['site'] },
   { label: copy.features.admin_groups.account, features: ['registration', 'login', 'profiles', 'cdk_redemption', 'free_preview', 'skland'] },
-  { label: copy.features.admin_groups.pages, features: ['v2', 'faq', 'support', 'pricing', 'changelog', 'thanks', 'service_status'] },
+  { label: copy.features.admin_groups.pages, features: ['v2', 'v1', 'faq', 'support', 'pricing', 'changelog', 'thanks', 'service_status'] },
   { label: copy.features.admin_groups.scheduling, features: ['schedule_generation', 'one_shift_per_day', 'scenario_comparison', 'metered_billing'] },
   { label: copy.features.admin_groups.tools, features: ['tools', 'depot_value', 'cultivation_plan', 'thanks_recruitment', 'manual_schedule'] },
   { label: copy.features.admin_groups.exports, features: ['maa_export', 'full_result_export'] },
@@ -133,6 +133,7 @@ export default function FeatureSettingsSection() {
                   />
                   <span className="min-w-0">
                     <strong className="flex items-center gap-2 text-sm text-ink-primary">{feature === 'skland' && <SklandIcon />}{copy.features.feature_labels[feature]}</strong>
+                    {feature === 'v1' && <span className="mt-1 block text-xs leading-5 text-ink-secondary">{copy.features.v1_migration.admin_help}</span>}
                     <span className={`mt-1 block text-xs ${effectiveEnabled ? 'text-success' : 'text-ink-muted'}`}>
                       {effectiveEnabled ? copy.features.admin_effective_on : rawEnabled ? copy.features.admin_raw_on_effective_off : copy.features.admin_effective_off}
                     </span>

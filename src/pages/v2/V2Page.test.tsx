@@ -812,21 +812,11 @@ describe('V2 results-first workspace', () => {
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
-  it('waits for configuration saving before switching versions and stays in V2 when saving fails', async () => {
-    connect()
-    let finishSave!: (saved: boolean) => void
-    vi.mocked(session.flushConfigSave).mockReturnValueOnce(new Promise((resolve) => { finishSave = resolve }))
-    const user = userEvent.setup()
+  it.each([false, true])('omits V1 navigation for signed-in state %s', (signedIn) => {
+    if (signedIn) connect()
     mount('/')
-    const legacyEntry = screen.getByRole('link', { name: copy.v2.legacyEntry })
-    await user.click(legacyEntry)
+    expect(document.querySelector('a[href="/v1"]')).toBeNull()
     expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/')
-    await act(async () => finishSave(false))
-    expect(screen.getByRole('alert')).toHaveTextContent(copy.v2.saveFailed)
-    expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/')
-    await user.click(legacyEntry)
-    await waitFor(() => expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v1'))
-    expect(session.flushConfigSave).toHaveBeenCalledTimes(2)
   })
 
   it.each([
@@ -1736,8 +1726,7 @@ describe('V2 feature continuity', () => {
     await user.click(screen.getByRole('button', { name: copy.v2.regenerate }))
     expect(confirm).toHaveBeenCalledWith(copy.v2.discardManual)
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('link', { name: copy.v2.legacyEntry }))
-    expect(confirm).toHaveBeenCalledTimes(2)
+    expect(confirm).toHaveBeenCalledOnce()
     expect(session.flushConfigSave).not.toHaveBeenCalled()
     expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2')
     confirm.mockReturnValue(true)

@@ -97,7 +97,6 @@ export {
   HeartPulse as ServiceStatusIcon,
   FileClock as ResultHistoryIcon,
   Archive as ArchiveIcon,
-  History as LegacyWorkspaceIcon,
   AppWindow as WorkspaceEntryIcon,
   Ticket as RedemptionIcon,
   FileJson as JsonImportIcon,
