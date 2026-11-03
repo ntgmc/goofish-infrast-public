@@ -245,14 +245,26 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
       </aside>
       <div className="v2-workspace" inert={mobileNavigation || undefined}>
         <header className="v2-topbar">
-          <div className="v2-breadcrumb"><button ref={menuButton} className="v2-menu-button v2-icon-button" type="button" onClick={() => setMobileNavigation(true)} aria-label={text.menu} aria-expanded={mobileNavigation} aria-controls="v2-navigation"><Menu size={21} /></button>
-            <span>{text.workspace}</span><BreadcrumbIcon size={14} aria-hidden="true" /><strong>{sectionLabels[section]}</strong></div>
-          <div className="v2-topbar-actions"><div className="v2-feature-content">{taskCenterAction}</div>
-            <div className="v2-feature-content"><ThemeSwitcher iconOnly /></div>
-            <NotificationBell iconOnly onInventory={() => navigateSection('inventory')} />
-            <span className="v2-topbar-divider" />
-            <button className={`v2-profile-button ${profileName ? '' : 'v2-profile-button-text'}`} type="button" aria-label={profileLabel} title={profileLabel} onClick={() => openPanel('account')}>
-              {profileName ? <><span className="v2-profile-avatar" aria-hidden="true">{profileName.slice(0, 1)}</span><span>{profileLabel}</span><ChevronDown size={14} aria-hidden="true" /></> : <><LogIn size={17} aria-hidden="true" /><span>{profileLabel}</span></>}
+          <div className="v2-topbar-context">
+            <button ref={menuButton} className="v2-menu-button v2-icon-button" type="button" onClick={() => setMobileNavigation(true)} aria-label={text.menu} aria-expanded={mobileNavigation} aria-controls="v2-navigation"><Menu size={20} aria-hidden="true" /></button>
+            <nav className="v2-breadcrumb" aria-label={text.topbar.location}>
+              <ol>
+                <li><Link to={v2Path('overview', session.activeProfile?.id)}>{text.workspace}</Link></li>
+                <li><BreadcrumbIcon size={14} aria-hidden="true" /><span aria-current="page">{sectionLabels[section]}</span></li>
+              </ol>
+            </nav>
+          </div>
+          <div className="v2-topbar-actions">
+            <div className="v2-topbar-tools" role="group" aria-label={text.topbar.actions}>
+              {taskCenterAction && <div className="v2-feature-content" title={copy.optimize.pages_tool_optimize_OptimizationTaskCenter_033}>{taskCenterAction}</div>}
+              <div className="v2-feature-content" title={text.topbar.theme}><ThemeSwitcher iconOnly /></div>
+              <div title={copy.notifications.title}><NotificationBell iconOnly onInventory={() => navigateSection('inventory')} /></div>
+            </div>
+            <button className="v2-profile-button" type="button" aria-label={profileLabel} title={profileLabel} aria-haspopup="dialog" aria-expanded={panel === 'account'} onClick={() => openPanel('account')}>
+              {profileName && <span className="v2-profile-avatar" aria-hidden="true">{Array.from(profileName)[0]}</span>}
+              {!signedIn && <LogIn size={18} aria-hidden="true" />}
+              <span className="v2-profile-label">{profileName && <small>{text.topbar.profile}</small>}<span>{profileLabel}</span></span>
+              <ChevronDown className="v2-profile-chevron" size={14} aria-hidden="true" />
             </button>
           </div>
         </header>

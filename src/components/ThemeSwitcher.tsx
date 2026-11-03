@@ -56,7 +56,7 @@ function ThemeSwitcherContent({ iconOnly }: { iconOnly: boolean }) {
         align="end"
         aria-label={copy.common.components_ThemeSwitcher_002}
         aria-labelledby={undefined}
-        className="min-w-40"
+        className="min-w-[min(10rem,calc(100vw-2rem))]"
       >
         <DropdownMenuRadioGroup value={preference} onValueChange={handlePreferenceChange}>
           {options.map(({ value, label, Icon }) => (

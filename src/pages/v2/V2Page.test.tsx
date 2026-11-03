@@ -50,7 +50,7 @@ const summary: WorkspaceResultHistorySummary = {
 beforeEach(() => {
   vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
   mocks.features.mockReturnValue({ status: 'ready', features: DEFAULT_SITE_FEATURES, retry: vi.fn() })
-  mocks.tasks.mockReturnValue({ jobs: [], cancel: vi.fn(), busyJobId: null, error: null, notice: null })
+  mocks.tasks.mockReturnValue({ jobs: [], refresh: vi.fn(), cancel: vi.fn(), busyJobId: null, error: null, notice: null })
   mocks.image.mockReset().mockResolvedValue(undefined)
   session = {
     user: null, profiles: [], announcementUnreadCount: 0, popups: [], setAnnouncementUnreadCount: vi.fn(), activeProfile: null, license: null, workspace: null, configOverride: null,
@@ -117,7 +117,10 @@ it('keeps personal navigation in the account drawer and respects feature availab
   const navigation = within(screen.getByRole('navigation', { name: copy.v2.navigation }))
   expect(navigation.queryByRole('button', { name: copy.v2.settings })).not.toBeInTheDocument()
   const opener = screen.getByRole('button', { name: session.activeProfile!.display_name })
+  expect(opener).toHaveAttribute('aria-haspopup', 'dialog')
+  expect(opener).toHaveAttribute('aria-expanded', 'false')
   await user.click(opener)
+  expect(opener).toHaveAttribute('aria-expanded', 'true')
   const dialog = within(await screen.findByRole('dialog'))
   expect(dialog.queryByRole('button', { name: copy.inventory.nav })).not.toBeInTheDocument()
   expect(dialog.queryByRole('button', { name: copy.skland.title })).not.toBeInTheDocument()
@@ -128,6 +131,17 @@ it('keeps personal navigation in the account drawer and respects feature availab
   await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: copy.v2.manageProfiles }))
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('section=profiles&profile_id=profile-1'))
+  expect(opener).toHaveAttribute('aria-expanded', 'false')
+  const location = within(screen.getByRole('navigation', { name: copy.v2.topbar.location }))
+  expect(location.getByText(sectionLabels.profiles)).toHaveAttribute('aria-current', 'page')
+  await user.click(location.getByRole('link', { name: copy.v2.workspace }))
+  await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('profile_id=profile-1'))
+  expect(location.getByText(sectionLabels.overview)).toHaveAttribute('aria-current', 'page')
+  const taskCenter = screen.getByRole('button', { name: copy.optimize.pages_tool_optimize_OptimizationTaskCenter_033 })
+  await user.click(taskCenter)
+  expect(await screen.findByRole('dialog', { name: copy.optimize.pages_tool_optimize_OptimizationTaskCenter_001 })).toContainElement(document.activeElement as HTMLElement)
+  await user.keyboard('{Escape}')
+  await waitFor(() => expect(taskCenter).toHaveFocus())
 })
 
 it('closes mobile navigation with Escape and restores the menu trigger', async () => {

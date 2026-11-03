@@ -84,9 +84,6 @@ export default function OptimizationTaskCenterDialog({
           event.preventDefault()
           closeButtonRef.current?.focus()
         }}
-        onCloseAutoFocus={(event) => {
-          event.preventDefault()
-        }}
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>

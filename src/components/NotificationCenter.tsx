@@ -123,10 +123,10 @@ function NotificationBellContent({ center, iconOnly, onInventory }: { center: No
         align="end"
         collisionPadding={12}
         aria-label={copy.notifications.title}
-        className="w-[min(24rem,calc(100vw-1.5rem))] gap-0 overflow-hidden rounded-2xl p-0 shadow-2xl"
+        className="max-h-[var(--radix-popover-content-available-height)] w-[min(24rem,calc(100vw-1.5rem))] gap-0 overflow-y-auto rounded-2xl p-0 shadow-2xl"
       >
-        <div className="flex items-center justify-between gap-3 border-b border-surface-3 px-4 py-3">
-          <div>
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-surface-3 px-4 py-3">
+          <div className="min-w-0">
             <h2 className="text-sm font-semibold text-ink-primary">{copy.notifications.title}</h2>
             <p className="mt-0.5 text-xs text-ink-muted">{copy.notifications.unreadLive(center.unreadCount)}</p>
           </div>
@@ -134,7 +134,7 @@ function NotificationBellContent({ center, iconOnly, onInventory }: { center: No
             type="button"
             onClick={() => void center.markAllRead()}
             disabled={center.unreadCount === 0 || center.markingAll || center.markingId !== null}
-            className="tool-secondary-action h-9 px-3 text-xs disabled:cursor-wait disabled:opacity-60"
+            className="tool-secondary-action max-w-full whitespace-normal px-3 text-xs disabled:cursor-wait disabled:opacity-60"
           >
             {center.markingAll ? copy.notifications.markingAllRead : copy.notifications.markAllRead}
           </button>

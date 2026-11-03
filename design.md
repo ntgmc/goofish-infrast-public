@@ -91,6 +91,13 @@ it deliberately when changing the shared design.
   Home/End browse available entries, Escape returns to the trigger, and leaving
   with Tab closes the menu. Nested dialogs retain their opener and draft.
   Tool detail pages keep the tools entry highlighted. Preserve the Ft2 footer.
+- The top bar separates page location from utility actions and the account
+  opener. Use a semantic breadcrumb with a profile-preserving workspace link,
+  readable current page, consistent 44px utility buttons and visible open/focus
+  states. Show the current profile name with a secondary label on wide screens;
+  retain its name and full accessible label on mobile. Below 40rem, put location
+  above the actions so long page names never compete with icon controls. Keep
+  unread and calculation badges, native hints, existing dialogs and theme menu.
 - Use one production summary strip and one schedule panel with open room regions. Operator portraits
   and efficiency carry the visual weight.
 - Keep generation and export together beside result status. Copper marks
