@@ -69,10 +69,18 @@ it deliberately when changing the shared design.
   Dark paper: `oklch(0.205 0.016 255)`; accent: `oklch(0.770 0.125 45)`.
 - Keep Noto Sans SC display and Geist body fonts, with tabular numbers for
   production, efficiency, and shift times.
-- Keep six core tasks in the side rail: overview, generation, history,
-  comparison, cultivation projects and tools. Place operator and facility
-  configuration in paired shortcuts. The top-right account drawer owns profile
-  management, Skland data, inventory, account settings and available billing
+- Keep six core tasks in the side rail: overview, generation, history and
+  comparison under the schedule workspace; cultivation projects and tools in
+  their own group. Use full-width compact rows for operator and facility
+  configuration, with the owned-operator count aligned at the end.
+  The compact brand header and bottom help trigger stay visible while the
+  middle navigation scrolls independently. Keep consistent 44px targets,
+  visible inset focus rings and copper active icons. Page destinations are
+  real links with the current profile in the URL; configuration opens dialogs.
+  On mobile, align the close button with the brand, lock background scrolling,
+  retain the keyboard focus loop, and restore the menu trigger on dismissal.
+  The top-right account drawer owns profile management, Skland data, inventory,
+  account settings and available billing
   pages. Group guides, announcements, releases and site links under the rail's
   “帮助与更多” menu, which opens above its bottom trigger without moving the
   trigger or resizing the rail. Separate help and support from product news and

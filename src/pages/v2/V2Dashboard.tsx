@@ -109,10 +109,16 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   useEffect(() => {
     if (!mobileNavigation) return
     navigationClose.current?.focus()
+    const previousOverflow = document.documentElement.style.overflow
+    document.documentElement.style.overflow = 'hidden'
     const mobileViewport = window.matchMedia('(max-width: 60rem)')
     const closeOnDesktop = () => { if (!mobileViewport.matches) setMobileNavigation(false) }
     mobileViewport.addEventListener('change', closeOnDesktop)
-    return () => { mobileViewport.removeEventListener('change', closeOnDesktop); menuButton.current?.focus() }
+    return () => {
+      document.documentElement.style.overflow = previousOverflow
+      mobileViewport.removeEventListener('change', closeOnDesktop)
+      if (mobileViewport.matches && !document.querySelector('[data-slot="dialog-content"]')) menuButton.current?.focus()
+    }
   }, [mobileNavigation])
   const [downloadNotice, setDownloadNotice] = useState(false)
   const reduceMotion = useAppReducedMotion()
@@ -229,11 +235,13 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
           else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
         }}>
-        <Link to={v2Path('overview', session.activeProfile?.id)} className="v2-brand" onClick={() => setMobileNavigation(false)}><img className="v2-brand-mark" src="/assets/maatool-v2-icon.svg" width="44" height="44" alt="" />
-          <span><strong>{text.brand}</strong><small>{text.brandDescription}</small></span></Link>
-        <button ref={navigationClose} className="v2-mobile-close v2-icon-button" type="button" onClick={() => setMobileNavigation(false)} aria-label={text.close}><X size={20} /></button>
+        <div className="v2-sidebar-header">
+          <Link to={v2Path('overview', session.activeProfile?.id)} className="v2-brand" onClick={() => setMobileNavigation(false)}><img className="v2-brand-mark" src="/assets/maatool-v2-icon.svg" width="36" height="36" alt="" />
+            <span><strong>{text.brand}</strong><small>{text.brandDescription}</small></span></Link>
+          <button ref={navigationClose} className="v2-mobile-close v2-icon-button" type="button" onClick={() => setMobileNavigation(false)} aria-label={text.sidebar.close}><X size={20} aria-hidden="true" /></button>
+        </div>
         <V2Navigation section={section} session={session} operatorCount={owned.length} sampleOperators={sampleOperators}
-          onNavigate={navigateSection} onPanel={openPanel} onClose={() => setMobileNavigation(false)} />
+          onPanel={openPanel} onClose={() => setMobileNavigation(false)} />
       </aside>
       <div className="v2-workspace" inert={mobileNavigation || undefined}>
         <header className="v2-topbar">

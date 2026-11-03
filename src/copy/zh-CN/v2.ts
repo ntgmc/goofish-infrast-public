@@ -149,6 +149,7 @@ export const v2Copy = {
   navigation: '工作台导航',
   navigationMore: '帮助与更多',
   navigationGroups: { support: '帮助与支持', product: '产品与动态' },
+  sidebar: { schedule: '排班工作台', tools: '养成与工具', close: '收起导航' },
   contactSupport: '联系支持',
   unreadAnnouncements: (count: number) => `${count} 条未读公告`,
   guestNavigation: {
