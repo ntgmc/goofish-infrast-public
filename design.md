@@ -98,6 +98,13 @@ it deliberately when changing the shared design.
   retain its name and full accessible label on mobile. Below 40rem, put location
   above the actions so long page names never compete with icon controls. Keep
   unread and calculation badges, native hints, existing dialogs and theme menu.
+- Operator and account drawers share a compact fixed heading and an independently
+  scrolling body. Keep the operator profile, sync and MAA import actions compact;
+  binding timestamps and authorization details expand on demand. The list search
+  stays visible while browsing operators, including virtual rows. Account identity
+  precedes profile switching; mark the selected profile and show pending switches.
+  Personal destinations use simple rows, with logout in a separate fixed footer.
+  Preserve full names, feature availability, nested binding dialogs and focus return.
 - Use one production summary strip and one schedule panel with open room regions. Operator portraits
   and efficiency carry the visual weight.
 - Keep generation and export together beside result status. Copper marks
