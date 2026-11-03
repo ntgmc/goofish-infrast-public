@@ -75,8 +75,13 @@ it deliberately when changing the shared design.
   management, Skland data, inventory, account settings and available billing
   pages. Group guides, announcements, releases and site links under the rail's
   “帮助与更多” menu, which opens above its bottom trigger without moving the
-  trigger or resizing the rail. Keep scrolling inside the menu when needed and
-  retain the unread announcement count while collapsed.
+  trigger or resizing the rail. Separate help and support from product news and
+  comparisons, with appearance and service status in the footer. Use compact
+  group labels, 44px rows, readable labels and inset focus rings. Retain the
+  unread announcement count while collapsed and scroll inside the menu when
+  needed. Native disclosure semantics retain Tab navigation; arrow keys and
+  Home/End browse available entries, Escape returns to the trigger, and leaving
+  with Tab closes the menu. Nested dialogs retain their opener and draft.
   Tool detail pages keep the tools entry highlighted. Preserve the Ft2 footer.
 - Use one production summary strip and one schedule panel with open room regions. Operator portraits
   and efficiency carry the visual weight.

@@ -148,6 +148,7 @@ export const v2Copy = {
   infrastructure: '基建排班',
   navigation: '工作台导航',
   navigationMore: '帮助与更多',
+  navigationGroups: { support: '帮助与支持', product: '产品与动态' },
   contactSupport: '联系支持',
   unreadAnnouncements: (count: number) => `${count} 条未读公告`,
   guestNavigation: {

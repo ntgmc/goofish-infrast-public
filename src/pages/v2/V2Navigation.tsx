@@ -9,7 +9,9 @@ import { sectionLabels, v2Path, v2SectionAvailable, type V2Section } from './nav
 
 const text = copy.v2
 const workspaceEntries = ['overview', 'generation', 'plans', 'lab', 'cultivation-projects', 'tools'] as const
-const moreEntries = ['help', 'announcements', 'updates', 'benchmarks', 'pricing', 'support', 'status'] as const
+const supportEntries = ['help', 'support'] as const
+const productEntries = ['announcements', 'updates', 'benchmarks', 'pricing'] as const
+const moreEntries = [...supportEntries, ...productEntries, 'status'] as const
 const toolSections: V2Section[] = ['tools', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'training-ratio', 'material-demand', 'depot']
 const icons = {
   overview: OverviewIcon, generation: GenerateIcon, plans: ResultHistoryIcon, lab: ComparisonIcon, 'cultivation-projects': ProjectsIcon, tools: ToolsIcon,
@@ -71,22 +73,46 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
         <button type="button" className="v2-config-shortcut" onClick={() => onPanel('config')}><FacilitiesIcon size={20} aria-hidden="true" /><span>{text.facilities}</span></button>
       </div>
     <div className="v2-sidebar-bottom">
-      <details ref={more} className="v2-nav-disclosure" onKeyDown={(event) => {
-        if (event.key !== 'Escape' || !event.currentTarget.open) return
+      <details ref={more} className="v2-nav-disclosure" onBlur={(event) => {
+        if (event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget)
+          && !document.querySelector('[data-slot="dialog-content"]')) event.currentTarget.open = false
+      }} onKeyDown={(event) => {
+        const disclosure = event.currentTarget
+        if (!(event.target instanceof Node) || !disclosure.contains(event.target)) return
+        if (event.key === 'Escape' && disclosure.open) {
+          event.preventDefault()
+          event.stopPropagation()
+          disclosure.open = false
+          disclosure.querySelector('summary')?.focus()
+          return
+        }
+        if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key) || !disclosure.open && ['Home', 'End'].includes(event.key)) return
         event.preventDefault()
-        event.stopPropagation()
-        event.currentTarget.open = false
-        event.currentTarget.querySelector('summary')?.focus()
+        disclosure.open = true
+        const entries = Array.from(disclosure.querySelectorAll<HTMLElement>('.v2-nav-extra a[href], .v2-nav-extra button:not(:disabled)'))
+        const index = entries.indexOf(document.activeElement as HTMLElement)
+        let next = index + (event.key === 'ArrowUp' ? -1 : 1)
+        if (event.key === 'Home') next = 0
+        if (event.key === 'End' || index < 0 && event.key === 'ArrowUp') next = entries.length - 1
+        entries[(next + entries.length) % entries.length]?.focus()
       }}>
         <summary className={`v2-nav-item ${moreCurrent ? 'v2-nav-active' : ''}`}><HelpIcon size={19} aria-hidden="true" /><span>{text.navigationMore}</span>
           {features.announcements && session.announcementUnreadCount > 0 && <small aria-label={text.unreadAnnouncements(session.announcementUnreadCount)}>{session.announcementUnreadCount}</small>}
           <CollapsedIcon className="v2-nav-chevron" size={16} aria-hidden="true" />
         </summary>
         <div className="v2-nav-extra">
-          {moreEntries.filter((entry) => signedIn || entry !== 'pricing').map((entry) => item(entry, entry === 'pricing' ? text.guestNavigation.pricing : entry === 'support' ? text.contactSupport : sectionLabels[entry]))}
+          {(signedIn || supportEntries.some((entry) => v2SectionAvailable(entry, features))) && <div className="v2-nav-group" role="group" aria-label={text.navigationGroups.support}>
+            <p className="v2-nav-group-label" aria-hidden="true">{text.navigationGroups.support}</p>
+            {supportEntries.map((entry) => item(entry, entry === 'support' ? text.contactSupport : sectionLabels[entry]))}
+            {signedIn && <FeedbackButton className="v2-nav-item" profileId={session.activeProfile?.id} />}
+          </div>}
+          {productEntries.some((entry) => (signedIn || entry !== 'pricing') && v2SectionAvailable(entry, features)) && <div className="v2-nav-group" role="group" aria-label={text.navigationGroups.product}>
+            <p className="v2-nav-group-label" aria-hidden="true">{text.navigationGroups.product}</p>
+            {productEntries.filter((entry) => signedIn || entry !== 'pricing').map((entry) => item(entry, entry === 'pricing' ? text.guestNavigation.pricing : sectionLabels[entry]))}
+          </div>}
           <div className="v2-sidebar-menu-links">
             <button type="button" className="v2-nav-item" onClick={() => onPanel('settings')}><AnimationIcon size={19} aria-hidden="true" /><span>{copy.dashboard.animation.settings}</span></button>
-            {signedIn && <FeedbackButton className="v2-nav-item" profileId={session.activeProfile?.id} />}
+            {item('status')}
           </div>
         </div>
       </details>

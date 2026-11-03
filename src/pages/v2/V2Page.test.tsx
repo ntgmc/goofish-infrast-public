@@ -13,6 +13,7 @@ import { PublicContentProvider } from '../../lib/public-content-context'
 import type { OptimizeResult, UserGameAccount, WorkspaceResultHistorySummary } from '../../lib/types'
 import type { V2Session } from './OptionsDrawer'
 import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './sample-result'
+import { sectionLabels } from './navigation'
 import { SANITY_PER_LMD, SANITY_PER_PURE_GOLD } from '../../lib/orundum-economy'
 import { ApiError } from '../../lib/api-client'
 import { FIRST_SCHEDULE_INTENT_KEY } from '../../lib/first-schedule'
@@ -86,12 +87,21 @@ it('allows a guest to open the benchmark from navigation and return to the works
   const user = userEvent.setup()
   mount('/v2')
   const more = screen.getByText(copy.v2.navigationMore)
-  await user.click(more)
+  more.closest('summary')!.focus()
+  await user.keyboard('{ArrowDown}')
+  const disclosure = within(more.closest('details')!)
+  const support = disclosure.getByRole('group', { name: copy.v2.navigationGroups.support })
+  expect(within(support).getByRole('link', { name: sectionLabels.help })).toHaveFocus()
+  await user.keyboard('{End}')
+  expect(disclosure.getByRole('link', { name: sectionLabels.status })).toHaveFocus()
   await user.keyboard('{Escape}')
   expect(more.closest('details')).not.toHaveAttribute('open')
   expect(more.closest('summary')).toHaveFocus()
+  await user.keyboard('{ArrowUp}')
+  await user.tab()
+  expect(more.closest('details')).not.toHaveAttribute('open')
   await user.click(more)
-  await user.click(screen.getByRole('link', { name: copy.siteBenchmark.title }))
+  await user.click(within(disclosure.getByRole('group', { name: copy.v2.navigationGroups.product })).getByRole('link', { name: copy.siteBenchmark.title }))
   await screen.findByRole('heading', { name: copy.siteBenchmark.headline('MaaTool', 30).join('') }, { timeout: 3000 })
   expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2/benchmarks')
   expect(screen.queryByText(copy.v2.signInRequired)).not.toBeInTheDocument()
