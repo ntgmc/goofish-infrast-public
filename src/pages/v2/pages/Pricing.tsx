@@ -1,4 +1,4 @@
-import { SelectedIcon as Check, ExternalLinkIcon as ArrowUpRight, ExpandIcon as ChevronDown } from '../../../components/icons'
+import { SelectedIcon as Check, CloseIcon as X, ServiceCongestedIcon as Hourglass, ExternalLinkIcon as ArrowUpRight, ExpandIcon as ChevronDown } from '../../../components/icons'
 import { copy, CURRENT_LOCALE } from '../../../copy'
 import { PUBLIC_PRICING_PLAN_IDS } from '../../../lib/public-content'
 import { usePublicContent } from '../../../lib/public-content-context'
@@ -71,7 +71,7 @@ export default function Pricing() {
       <table className="v2-pricing-comparison" aria-label={pricing.comparison_heading}>
         <thead><tr><th scope="col">{text.pages_PricingPage_008}</th><th scope="col">{choice.free_title}</th>{planIds.map((id) => <th scope="col" key={id}>{choice.term_labels[id]}</th>)}</tr></thead>
         <tbody>{pricing.comparison_rows.map((row) => <tr key={row.id}>
-          <th scope="row">{row.feature}</th><td data-label={choice.free_title}>{row.free_preview}</td>{planIds.map((id) => <td key={id} data-label={choice.term_labels[id]}>{row[id] ?? '—'}</td>)}
+          <th scope="row">{row.feature}</th><td data-label={choice.free_title}><ComparisonValue value={row.free_preview} /></td>{planIds.map((id) => <td key={id} data-label={choice.term_labels[id]}><ComparisonValue value={row[id] ?? '—'} /></td>)}
         </tr>)}</tbody>
       </table>
       <p className="v2-muted">{choice.export_note}</p>
@@ -84,6 +84,13 @@ export default function Pricing() {
     {METERED_BILLING_AVAILABLE && <MeteredPricing />}
     <section className="v2-pricing-support"><SectionTitle title={pricing.support_heading} description={pricing.support_body} /><FeedbackLink className="v2-button v2-button-secondary">{text.pages_PricingPage_010}</FeedbackLink></section>
   </div>
+}
+
+function ComparisonValue({ value }: { value: string }) {
+  const marker = /^([✅❌⏳])\s*/u.exec(value)
+  if (!marker) return value
+  const Icon = marker[1] === '✅' ? Check : marker[1] === '❌' ? X : Hourglass
+  return <><Icon size={16} strokeWidth={2.5} aria-hidden="true" className="v2-pricing-status" data-marker={marker[1]} /> {value.slice(marker[0].length)}</>
 }
 
 function MeteredPricing() {

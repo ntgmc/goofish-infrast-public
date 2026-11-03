@@ -11,6 +11,47 @@ import {
 } from './public-content'
 
 describe('public content settings', () => {
+  it('refreshes saved comparison defaults in place without changing purchase settings or the stored input', () => {
+    const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 14, updated_at: '2026-11-02T00:00:00.000Z' }
+    stored.pricing.comparison_rows = copy.publicContent.legacy_pricing_comparison.map((row, index) => ({ ...row, id: `comparison-${index + 1}` }))
+      .filter((row) => row.feature !== copy.publicContent.retired_commercial_comparison).reverse()
+    stored.pricing.plans.single_account_monthly.purchase_url = 'https://example.com/custom-monthly'
+    stored.pricing.plans.single_account_monthly.original_price = '20 元 / 30 天'
+    stored.pricing.plans.single_account_monthly.display_price = '20 元 / 30 天'
+    const original = structuredClone(stored)
+
+    const migrated = normalizePublicContentSettings(stored)
+    expect(migrated.pricing.comparison_rows).toEqual([...DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.comparison_rows].reverse())
+    expect(migrated.pricing.plans).toEqual(original.pricing.plans)
+    expect(migrated.updated_at).toBe(original.updated_at)
+    expect(normalizePublicContentSettings(migrated)).toEqual(migrated)
+    expect(stored).toEqual(original)
+  })
+
+  it('preserves custom comparison fields, row IDs, removed rows, and content saved at the current revision', () => {
+    const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 14 }
+    const previous = copy.publicContent.legacy_pricing_comparison.find((row) => row.feature === 'MAA JSON 下载')!
+    const download = stored.pricing.comparison_rows.find((row) => row.feature === 'MAA JSON 一键下载')!
+    Object.assign(download, previous, { id: 'custom-download-id', single_account_annual: '管理员自定义导出说明' })
+    delete download.single_account_monthly
+    const manual = stored.pricing.comparison_rows.find((row) => row.feature === '手动排班')!
+    manual.feature = '管理员自定义手动排班标题'
+    stored.pricing.comparison_rows = stored.pricing.comparison_rows.filter((row) => row.feature !== '基建预设')
+    const custom = { ...download, id: 'custom-benefit', feature: '管理员新增权益' }
+    stored.pricing.comparison_rows.push(custom)
+
+    const migrated = normalizePublicContentSettings(stored)
+    expect(migrated.pricing.comparison_rows.find((row) => row.id === download.id)).toEqual({
+      ...DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.comparison_rows.find((row) => row.feature === 'MAA JSON 一键下载'),
+      id: download.id,
+      single_account_annual: '管理员自定义导出说明',
+    })
+    expect(migrated.pricing.comparison_rows.find((row) => row.id === manual.id)).toEqual(manual)
+    expect(migrated.pricing.comparison_rows).not.toContainEqual(expect.objectContaining({ feature: '基建预设' }))
+    expect(migrated.pricing.comparison_rows.find((row) => row.id === custom.id)).toEqual(custom)
+    expect(normalizePublicContentSettings({ ...stored, defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION }).pricing.comparison_rows).toEqual(stored.pricing.comparison_rows)
+  })
+
   it('updates saved default account binding copy without changing prices, links, or the stored input', () => {
     const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 13, updated_at: '2026-10-28T00:00:00.000Z' }
     for (const planId of PUBLIC_PRICING_PLAN_IDS) {
@@ -30,7 +71,7 @@ describe('public content settings', () => {
         ...original.pricing.plans[planId],
         account_scope: DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.plans[planId].account_scope,
       })
-      expect(migrated.pricing.comparison_rows.find((row) => row.id === comparison.id)?.[planId]).toBe('绑定森空岛 UID 后不支持自行更换')
+      expect(migrated.pricing.comparison_rows.find((row) => row.id === comparison.id)?.[planId]).toBe('❌ 绑定森空岛 UID 后不支持自行更换')
     }
     expect(migrated.faq).toEqual(DEFAULT_PUBLIC_CONTENT_DRAFT.faq)
     expect(migrated.updated_at).toBe(original.updated_at)
@@ -49,7 +90,7 @@ describe('public content settings', () => {
     const migrated = normalizePublicContentSettings(stored)
     expect(migrated.pricing.plans.single_account_monthly.account_scope).toBe('管理员自定义账号范围')
     expect(migrated.pricing.comparison_rows.find((row) => row.id === comparison.id)).toMatchObject({
-      single_account_monthly: '绑定森空岛 UID 后不支持自行更换',
+      single_account_monthly: '❌ 绑定森空岛 UID 后不支持自行更换',
       single_account_annual: '管理员自定义换绑说明',
     })
     expect(migrated.faq).toEqual(stored.faq)
@@ -96,17 +137,17 @@ describe('public content settings', () => {
     for (const planId of PUBLIC_PRICING_PLAN_IDS) preset[planId] = '支持右满252'
     preset.single_account_annual = '管理员自定义预设说明'
     legacy.pricing.comparison_rows = legacy.pricing.comparison_rows.filter((row) => row.feature !== '手动排班').reverse()
-    const roi = legacy.pricing.comparison_rows.find((row) => row.feature === '练度提升建议与 ROI')!
+    const roi = legacy.pricing.comparison_rows.find((row) => row.feature === '培养建议与回本分析')!
     delete roi.single_account_monthly
 
     const migrated = normalizePublicContentSettings(legacy)
     expect(migrated.defaults_revision).toBe(PUBLIC_CONTENT_DEFAULTS_REVISION)
     expect(migrated.pricing.comparison_rows.find((row) => row.feature === '基建预设')).toMatchObject({
       id: preset.id,
-      free_preview: '支持右满252（经验多 / 赤金多）与满血252',
+      free_preview: '✅ 243、333、右满 / 满血 252',
       single_account_annual: '管理员自定义预设说明',
     })
-    expect(migrated.pricing.comparison_rows.find((row) => row.feature === '练度提升建议与 ROI')?.single_account_monthly).toBe('支持')
+    expect(migrated.pricing.comparison_rows.find((row) => row.feature === '培养建议与回本分析')?.single_account_monthly).toBe('✅ 比较培养收益、材料成本与回本天数')
     expect(migrated.pricing.comparison_rows.filter((row) => row.feature === '手动排班')).toEqual([
       DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.comparison_rows.find((row) => row.feature === '手动排班'),
     ])
