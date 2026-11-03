@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { DEFAULT_SITE_FEATURE_SETTINGS } from '../../src/lib/site-features'
 import { initializeCultivationMaintenance, shutdownCultivationMaintenance } from './maintenance'
 
-const mocks = vi.hoisted(() => ({ refresh: vi.fn(), shutdown: vi.fn() }))
+const mocks = vi.hoisted(() => ({ refresh: vi.fn(), shutdown: vi.fn(), features: vi.fn() }))
 vi.mock('./worker-client', () => ({ refreshCultivationSnapshot: mocks.refresh, shutdownCultivationWorker: mocks.shutdown }))
+vi.mock('../storage/feature-settings-store', () => ({ getSiteFeatureSettings: mocks.features }))
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -10,6 +12,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.refresh.mockReset().mockResolvedValue(undefined)
   mocks.shutdown.mockResolvedValue(undefined)
+  mocks.features.mockReset().mockResolvedValue(DEFAULT_SITE_FEATURE_SETTINGS)
 })
 afterEach(async () => { await shutdownCultivationMaintenance(); vi.useRealTimers() })
 
@@ -23,6 +26,52 @@ describe('cultivation incremental maintenance', () => {
     expect(mocks.refresh).toHaveBeenCalledTimes(2)
     await vi.advanceTimersByTimeAsync(86400000)
     expect(mocks.refresh).toHaveBeenCalledTimes(3)
+  })
+
+  it.each(['cultivation_plan', 'tools', 'site'] as const)('skips startup and daily rebuilding while %s is disabled', async (feature) => {
+    mocks.features.mockResolvedValue({ ...DEFAULT_SITE_FEATURE_SETTINGS,
+      features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, [feature]: false } })
+    initializeCultivationMaintenance()
+    await vi.advanceTimersByTimeAsync(4 * 3600000)
+    expect(mocks.features).toHaveBeenCalledTimes(2)
+    expect(mocks.refresh).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(86400000)
+    expect(mocks.refresh).not.toHaveBeenCalled()
+  })
+
+  it('observes disabling and re-enabling without restarting the API', async () => {
+    initializeCultivationMaintenance()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mocks.refresh).toHaveBeenCalledOnce()
+    mocks.features.mockResolvedValue({ ...DEFAULT_SITE_FEATURE_SETTINGS,
+      features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, cultivation_plan: false } })
+    await vi.advanceTimersByTimeAsync(4 * 3600000 + 86400000)
+    expect(mocks.refresh).toHaveBeenCalledOnce()
+    mocks.features.mockResolvedValue(DEFAULT_SITE_FEATURE_SETTINGS)
+    await vi.advanceTimersByTimeAsync(86400000)
+    expect(mocks.refresh).toHaveBeenCalledTimes(2)
+  })
+
+  it('skips rebuilding if settings cannot be read and retries the next day', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    mocks.features.mockRejectedValueOnce(new Error('settings unavailable'))
+    initializeCultivationMaintenance()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mocks.refresh).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalledWith('PRTS cultivation incremental update failed:', 'settings unavailable')
+    await vi.advanceTimersByTimeAsync(4 * 3600000)
+    expect(mocks.refresh).toHaveBeenCalledOnce()
+  })
+
+  it('does not start rebuilding if shutdown happens while reading settings', async () => {
+    let resolve!: (settings: typeof DEFAULT_SITE_FEATURE_SETTINGS) => void
+    mocks.features.mockImplementationOnce(() => new Promise((done) => { resolve = done }))
+    initializeCultivationMaintenance()
+    const stopped = shutdownCultivationMaintenance()
+    resolve(DEFAULT_SITE_FEATURE_SETTINGS)
+    await stopped
+    expect(mocks.refresh).not.toHaveBeenCalled()
+    expect(mocks.shutdown).toHaveBeenCalledOnce()
   })
 
   it('does not overlap updates and releases the reader after cancellation', async () => {
