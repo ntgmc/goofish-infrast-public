@@ -42,11 +42,23 @@
 .feedback-form { gap: var(--space-sm); outline: none; }
 .feedback-form .feedback-label { gap: var(--space-2xs); }
 .feedback-label > :is(span, label) { color: var(--feedback-ink); font-size: var(--text-sm); font-weight: 600; }
-.feedback-context { display: grid; min-width: 0; gap: var(--space-xs); padding-top: var(--space-xs); }
-.feedback-context > legend { width: 100%; border-top: 1px solid var(--feedback-border); padding-top: var(--space-sm); color: var(--feedback-ink); font-size: var(--text-sm); font-weight: 600; }
+.feedback-context { min-width: 0; border-block: 1px solid var(--feedback-border); }
+.feedback-context > summary { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: var(--space-xs); color: var(--feedback-ink); font-size: var(--text-sm); font-weight: 600; cursor: pointer; list-style: none; }
+.feedback-context > summary::-webkit-details-marker { display: none; }
+.feedback-context > summary::after { content: '+'; }
+.feedback-context[open] > summary::after { content: '−'; }
+.feedback-context-body { display: grid; min-width: 0; gap: var(--space-xs); padding-bottom: var(--space-sm); }
+@supports (interpolate-size: allow-keywords) {
+  .feedback-context { interpolate-size: allow-keywords; }
+  .feedback-context::details-content { block-size: 0; overflow: clip; }
+  .feedback-context[open]::details-content { block-size: auto; }
+  @media (prefers-reduced-motion: no-preference) {
+    :root:not([data-reduced-motion]) .feedback-context::details-content { transition: block-size var(--motion-enter) var(--motion-ease-enter), content-visibility var(--motion-enter) allow-discrete; }
+  }
+}
 .feedback-context-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-sm); }
 .feedback-profile { display: flex; align-items: center; gap: var(--space-2xs); color: var(--feedback-ink); font-size: var(--text-sm); }
-.feedback-form-actions { position: sticky; bottom: calc(-1 * var(--space-md)); z-index: 1; display: flex; justify-content: flex-end; margin-inline: calc(-1 * var(--space-md)); margin-bottom: calc(-1 * var(--space-md)); border-top: 1px solid var(--feedback-border); padding: var(--space-sm) var(--space-md); background: var(--feedback-surface); }
+.feedback-form-actions { display: flex; justify-content: flex-end; border-top: 1px solid var(--feedback-border); padding-top: var(--space-sm); background: var(--feedback-surface); }
 .feedback-form-actions > button { min-width: 9rem; }
 .feedback-dialog .feedback-field.tool-field {
   border-color: var(--feedback-border);
@@ -81,7 +93,8 @@
 .feedback-image-thumbnail:active { border-color: var(--feedback-accent); }
 .feedback-image-thumbnail:focus-visible { outline: 2px solid var(--feedback-focus); outline-offset: 3px; }
 .feedback-image-dialog { max-width: 80rem; max-height: calc(100dvh - 2rem); }
-.feedback-image-dialog > img { display: block; max-width: 100%; max-height: calc(100dvh - 6rem); margin: auto; object-fit: contain; }
+.feedback-image-viewer { display: grid; place-items: center; min-width: 0; }
+.feedback-image-viewer > img { display: block; max-width: 100%; max-height: calc(100dvh - 10rem); margin: auto; object-fit: contain; }
 .feedback-image-meta { justify-content: space-between; flex-wrap: wrap; }
 .feedback-dialog .feedback-action {
   display: inline-flex;
@@ -106,7 +119,9 @@
 .feedback-dialog .feedback-action:active:not(:disabled) { background: var(--feedback-hover); }
 .feedback-dialog .feedback-action-primary:active:not(:disabled) { background: var(--feedback-accent-hover); }
 .feedback-dialog .feedback-action:disabled { background: var(--feedback-hover); color: var(--feedback-muted); cursor: not-allowed; opacity: .65; }
-.feedback-dialog :is(button, input, select, textarea, [role="alert"]):focus-visible { outline: 2px solid var(--feedback-focus); outline-offset: 3px; }
+.feedback-dialog :is(button, input, select, textarea, summary, [role="alert"]):focus-visible { outline: 2px solid var(--feedback-focus); outline-offset: 3px; }
+.feedback-submitted { display: grid; gap: var(--space-md); padding-block: var(--space-sm); }
+.feedback-success-actions { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
 .feedback-success { display: flex; align-items: flex-start; gap: var(--space-xs); color: var(--feedback-ink); }
 .feedback-success > svg { flex: none; color: var(--feedback-accent); }
 .feedback-tabs { display: flex; gap: var(--space-3xs); padding: var(--space-3xs); border: 1px solid var(--feedback-border); border-radius: var(--radius-input); background: var(--feedback-hover); }
@@ -124,7 +139,11 @@
 .feedback-tab[aria-selected="true"] { background: var(--feedback-surface); color: var(--feedback-accent); font-weight: 600; }
 .feedback-tab:active:not(:disabled) { background: var(--feedback-hover); }
 .feedback-tab:disabled { cursor: not-allowed; opacity: .65; }
-.feedback-tab-panel { min-width: 0; padding-top: var(--space-md); }
+.feedback-tab-panel { min-height: 0; min-width: 0; padding-top: var(--space-md); }
+.feedback-scroll { height: 100%; min-height: 0; }
+.feedback-scroll-viewport { height: 100%; width: 100%; }
+.feedback-scrollbar { display: flex; width: 10px; padding: 2px; transform: translateX(16px); }
+.feedback-scroll-thumb { flex: 1; min-height: 24px; border-radius: 999px; background: var(--feedback-muted); opacity: .75; }
 .feedback-tab-panel[data-state="active"] { display: grid; gap: var(--space-sm); }
 .feedback-history { display: grid; min-width: 0; gap: var(--space-sm); }
 .feedback-history-toolbar { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: var(--space-sm); border-bottom: 1px solid var(--feedback-border); padding-bottom: var(--space-sm); }
@@ -155,6 +174,9 @@
 .feedback-admin-workbench nav > div { justify-content: space-between; }
 .feedback-admin-index { max-height: 40rem; overflow-y: auto; overscroll-behavior: contain; }
 .feedback-admin-detail { scroll-margin-top: var(--space-md); border-left: 1px solid var(--feedback-border); padding-left: var(--space-md); }
+@media (max-width: 40rem), (max-height: 30rem) {
+  .feedback-scrollbar { transform: translateX(10px); }
+}
 @media (max-width: 40rem) {
   .feedback-context-fields { grid-template-columns: minmax(0, 1fr); }
   .feedback-form-actions > button { width: 100%; }

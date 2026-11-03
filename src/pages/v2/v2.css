@@ -137,7 +137,6 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
   scrollbar-width: thin;
   padding-block: var(--space-sm);
 }
@@ -234,7 +233,6 @@
   max-height: min(32rem, calc(100dvh - 6rem - env(safe-area-inset-bottom)));
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
   scrollbar-width: thin;
   padding: var(--space-2xs);
   border: 1px solid var(--color-v2-rail-line);
@@ -1906,8 +1904,6 @@
 .v2-management-drawer .v2-drawer-body {
   min-height: 0;
   overflow-y: auto;
-  padding-inline-end: var(--space-xs);
-  scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: var(--color-v2-control) transparent;
   overscroll-behavior: contain;
@@ -2294,7 +2290,6 @@
   .v2-management-drawer { gap: 12px !important; padding: 16px !important; padding-bottom: max(16px, env(safe-area-inset-bottom)) !important; }
   .v2-management-drawer .v2-drawer-heading { padding-bottom: 16px; }
   .v2-management-drawer .v2-drawer-heading p { margin-top: 8px; }
-  .v2-management-drawer .v2-drawer-body { padding-inline-end: 8px; }
   .v2-account-card, .v2-profile-option { gap: 12px; }
   .v2-profile-option, .v2-account-links button { padding: 12px; }
   .v2-account-avatar { width: 32px; height: 32px; }
@@ -2347,4 +2342,66 @@
 .v2-embedded-tool .public-document-header { padding-top: 0; }
 @media (max-width: 40rem) { .v2-section-heading h1 { font-size: var(--text-xl); } }
 .v2-dialog { background: var(--v2-paper); border-color: var(--v2-line); border-radius: var(--radius-v2-control); }
+.v2-dialog.v2-modal {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: calc(100vw - 32px);
+  max-width: 760px;
+  max-height: calc(100dvh - 32px);
+  gap: 16px;
+  overflow: hidden;
+  padding: 24px;
+}
+.v2-dialog.v2-modal:has(> .v2-modal-footer:not(:empty)) { grid-template-rows: auto minmax(0, 1fr) auto; }
+.v2-modal .v2-modal-heading { min-width: 0; padding: 0 44px 16px 0; border-bottom: 1px solid var(--v2-line); }
+.v2-modal-heading [data-slot="dialog-title"] { color: var(--v2-ink); font-size: var(--text-lg); line-height: 1.4; overflow-wrap: anywhere; }
+.v2-modal-heading [data-slot="dialog-description"] { margin-top: 8px; color: var(--v2-secondary); line-height: 1.65; }
+.v2-modal .v2-modal-close, .v2-modal > [data-slot="dialog-close"] { position: absolute; top: 12px; right: 12px; width: 44px; min-height: 44px; height: 44px; padding: 0; border-color: transparent; background: transparent; color: var(--v2-secondary); }
+.v2-modal .v2-modal-close > svg, .v2-modal > [data-slot="dialog-close"] > svg { width: 20px; height: 20px; }
+.v2-modal-content { min-height: 0; min-width: 0; }
+.v2-modal .v2-modal-body { min-height: 0; min-width: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scroll-padding-block: 12px; }
+.v2-modal .v2-modal-footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; margin: 0; padding: 16px 0 0; border-top: 1px solid var(--v2-line); }
+.v2-modal .v2-modal-footer:empty { display: none; }
+.v2-modal :is(button, summary):focus-visible { outline-offset: -2px; }
+.v2-modal :is(.tool-primary-action, .tool-secondary-action, .tool-status) { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.v2-modal .tool-status { flex: none; }
+.v2-modal .tool-alert { overflow-wrap: anywhere; }
+.v2-modal .task-center-counts:empty { display: none; }
+.v2-modal .task-center-actions { margin-left: auto; }
+.v2-modal .task-center-job { padding: 16px 0; border-width: 0 0 1px; border-radius: 0; background: transparent; overflow-wrap: anywhere; }
+.v2-modal .task-center-job:first-child { padding-top: 0; }
+.v2-modal .task-center-job > div { flex-wrap: wrap; }
+.v2-modal .task-center-job > div > div:first-child { flex: 1 1 16rem; }
+.v2-modal .task-center-job > div > div:last-child { min-width: 0; max-width: 100%; }
+.v2-modal .task-center-details { overflow-wrap: anywhere; }
+.v2-modal .task-center-details > summary { display: flex; min-height: 44px; align-items: center; gap: 12px; cursor: pointer; list-style: none; }
+.v2-modal .task-center-details > summary::-webkit-details-marker { display: none; }
+.v2-modal .task-center-details > summary::after { content: '+'; }
+.v2-modal .task-center-details[open] > summary::after { content: '−'; }
+.v2-dialog.v2-modal.feedback-dialog:not(.feedback-image-dialog) { height: 800px; }
+.v2-modal.feedback-dialog .feedback-workspace { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 16px; }
+.v2-modal.feedback-dialog .feedback-tab-panel { padding-top: 0; }
+.v2-modal.feedback-dialog .feedback-tab-panel[data-state="active"] { display: block; }
+.v2-modal.feedback-dialog .feedback-tabs { padding: 0; gap: 16px; border: 0; border-radius: 0; background: transparent; }
+.v2-modal.feedback-dialog .feedback-tab { flex: none; min-width: 0; padding: 8px 4px; border-radius: 0; border-bottom: 2px solid transparent; white-space: normal; }
+.v2-modal.feedback-dialog .feedback-tab[aria-selected="true"] { border-bottom-color: var(--v2-accent); background: transparent; }
+.v2-modal.feedback-dialog :is(button, input, select, textarea, summary, [role="alert"]):focus-visible { outline-offset: -2px; }
+.v2-modal.feedback-dialog .feedback-message-meta { flex-wrap: wrap; gap: 4px 12px; }
+.v2-modal.feedback-dialog .feedback-profile { min-height: 44px; align-items: start; padding-block: 8px; }
+.v2-modal.feedback-dialog .feedback-profile input { flex: none; margin-top: 4px; }
+.v2-modal.feedback-dialog .feedback-form-actions > button { max-width: 100%; min-width: min(9rem, 100%); white-space: normal; }
+.v2-modal.feedback-dialog .feedback-history-toolbar { flex-wrap: wrap; }
+.v2-modal.feedback-image-dialog { max-width: 1280px; }
+.v2-modal.feedback-image-dialog .feedback-image-viewer > img { max-height: calc(100dvh - 160px); }
+.v2-modal.skland-binding-dialog { max-width: 680px; }
+.v2-modal .skland-binding-steps { margin-top: 0; }
+.v2-modal .skland-import-modes { display: flex; flex-wrap: wrap; }
+.v2-modal .skland-import-modes > button { flex: 1 1 8rem; }
+.v2-modal .skland-scan-code { max-width: 100%; height: auto; aspect-ratio: 1; }
+@media (max-width: 40rem), (max-height: 30rem) {
+  .v2-dialog.v2-modal { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); gap: 12px; padding: 16px; }
+  .v2-modal .v2-modal-heading { padding-bottom: 12px; }
+  .v2-modal .v2-modal-footer { padding-top: 12px; }
+  .v2-modal .v2-modal-close, .v2-modal > [data-slot="dialog-close"] { top: 8px; right: 8px; }
+}
 .v2-dialog :is(button, input, select, textarea) { font-family: inherit; }

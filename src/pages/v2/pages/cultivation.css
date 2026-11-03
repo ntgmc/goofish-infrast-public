@@ -92,7 +92,7 @@
 .v2-special-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
 .v2-special-index { min-width: 0; }
 .v2-special-index > .v2-field { margin: 0 0 var(--space-sm); }
-.v2-special-items { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; max-height: 20rem; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; padding: var(--space-3xs); border-block: 1px solid var(--v2-line); }
+.v2-special-items { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; max-height: 20rem; overflow-y: auto; overscroll-behavior-y: contain; padding: var(--space-3xs); border-block: 1px solid var(--v2-line); }
 .v2-special-items > button { min-width: 0; min-height: 72px; padding: var(--space-xs); border-radius: var(--radius-v2-control); text-align: start; }
 .v2-special-items > button + button { border-top: 1px solid var(--v2-line); }
 .v2-special-items strong, .v2-special-items small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

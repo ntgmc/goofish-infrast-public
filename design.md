@@ -105,6 +105,17 @@ it deliberately when changing the shared design.
   precedes profile switching; mark the selected profile and show pending switches.
   Personal destinations use simple rows, with logout in a separate fixed footer.
   Preserve full names, feature availability, nested binding dialogs and focus return.
+- Large task, feedback and Skland dialogs share a fixed heading, bounded scrolling
+  body and separate actions. Keep feedback tabs visible during scrolling.
+  Feedback keeps a steady frame height across tabs and disclosure changes, with
+  an overlay scrollbar that occupies no content width. Start with the issue and
+  screenshot; associated IDs expand on demand with reduced-motion support.
+  Protect actual drafts and pending submissions, while allowing empty forms to
+  dismiss through the overlay. Task rows emphasize status and next action, with
+  diagnostic identifiers inside details. Image previews retain a visible close
+  target and return to their parent. Support narrow screens and enlarged text.
+  Use automatic scrollbars without a reserved gutter or asymmetric padding when
+  content fits. Let the dialog primitive compensate for page scroll locking.
 - Use one production summary strip and one schedule panel with open room regions. Operator portraits
   and efficiency carry the visual weight.
 - Keep generation and export together beside result status. Copper marks

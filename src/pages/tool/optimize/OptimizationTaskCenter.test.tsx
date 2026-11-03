@@ -81,6 +81,9 @@ describe('OptimizationTaskCenter', () => {
     render(<Harness controller={controller({ jobs: [failedScheduleJob()], attentionCount: 1 })} onRetry={onRetry} />)
     await user.click(screen.getByRole('button', { name: '查看后台计算，1 个计算未完成' }))
 
+    expect(screen.getByText('支持编号：OPT-12345678')).not.toBeVisible()
+    await user.click(screen.getByText('计算详情', { selector: 'summary' }))
+    expect(screen.getByText('支持编号：OPT-12345678')).toBeVisible()
     await user.click(screen.getByRole('button', { name: '按当前配置重新生成' }))
 
     expect(onRetry).toHaveBeenCalledOnce()

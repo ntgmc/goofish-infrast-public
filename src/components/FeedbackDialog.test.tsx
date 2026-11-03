@@ -12,8 +12,11 @@ import { copy } from '../copy'
 const mocks = vi.hoisted(() => ({ api: vi.fn(), prepareImage: vi.fn() }))
 vi.mock('../lib/api-client', () => ({ apiJson: mocks.api, getApiErrorMessage: (error: Error) => error.message }))
 vi.mock('../lib/feedback-image', () => ({ prepareFeedbackImage: mocks.prepareImage }))
-beforeEach(() => { vi.resetAllMocks() })
-afterEach(cleanup)
+beforeEach(() => {
+  vi.resetAllMocks()
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+})
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 it('preserves the draft after failure, submits the chosen category, and clears it only after success', async () => {
   const user = userEvent.setup()
@@ -66,6 +69,7 @@ it('opens website feedback and submits only the context the user chose to attach
   expect(screen.getByRole('link', { name: copy.feedback.submit })).toHaveAttribute('href', '/v2?feedback=new')
   await user.click(screen.getByRole('link', { name: copy.feedback.submit }))
   expect(screen.getByRole('dialog', { name: copy.feedback.title })).toBeVisible()
+  await user.click(screen.getByText(copy.feedback.context, { selector: 'summary' }))
   await user.click(screen.getByLabelText(copy.feedback.attachProfile))
   fireEvent.change(screen.getByLabelText(copy.feedback.resultId), { target: { value: 'result-42' } })
   fireEvent.change(screen.getByLabelText(copy.feedback.jobId), { target: { value: 'job-42' } })
@@ -80,6 +84,7 @@ it('omits hidden schedule IDs after switching categories while keeping the chose
   mocks.api.mockResolvedValue({ id: 'feedback' })
   render(<FeedbackButton profileId="profile-42" />)
   await user.click(screen.getByRole('button', { name: copy.feedback.title }))
+  await user.click(screen.getByText(copy.feedback.context, { selector: 'summary' }))
   fireEvent.change(screen.getByLabelText(copy.feedback.resultId), { target: { value: 'result-42' } })
   fireEvent.change(screen.getByLabelText(copy.feedback.jobId), { target: { value: 'job-42' } })
   await user.click(screen.getByLabelText(copy.feedback.attachProfile))
@@ -181,10 +186,13 @@ it('opens the saved feedback, keeps a failed follow-up draft, and blocks dismiss
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 })
 
-it('allows overlay dismissal while browsing the feedback list', async () => {
+it('allows overlay dismissal for an empty form and while browsing the feedback list', async () => {
   mocks.api.mockResolvedValue({ items: [], pagination: { page: 1, page_size: 25, total: 0, total_pages: 0 } })
   const user = userEvent.setup()
   render(<FeedbackButton />)
+  await user.click(screen.getByRole('button', { name: copy.feedback.title }))
+  await user.click(document.querySelector('[data-slot="dialog-overlay"]')!)
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   await user.click(screen.getByRole('button', { name: copy.feedback.title }))
   await user.click(screen.getByRole('tab', { name: copy.feedback.myFeedback }))
   await screen.findByText(copy.feedback.myEmpty)
