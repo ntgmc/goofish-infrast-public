@@ -508,11 +508,14 @@ function cloneConfig(config: LicenseConfig): LicenseConfig {
 
 function resolvePresetMode(config: LicenseConfig, preset: LicenseConfig): LicenseConfig {
   const resolved = cloneConfig(preset)
+  if (config.orundum_planning?.preference) resolved.orundum_planning = {
+    ...resolved.orundum_planning, preference: config.orundum_planning.preference,
+  }
   resolved.recycling_station_level = config.recycling_station_level
   resolved.intermediate_inventory = config.intermediate_inventory
   resolved.auto_balance_source = config.auto_balance_source
   resolved.allow_product_rebalance = config.allow_product_rebalance
-  if (resolved.layout === '2-5-2') resolved.facility_layout = config.facility_layout?.slice()
+  resolved.facility_layout = config.facility_layout?.slice()
   resolved.dormitory_rule = normalizeDormitoryRule(config.dormitory_rule)
   resolved.drones!.auto_strategy = normalizeDroneAutoStrategy(config.drones?.auto_strategy)
   if (normalizeScheduleMode(config.schedule_mode) === 'rotation') {
@@ -529,11 +532,14 @@ function resolvePresetMode(config: LicenseConfig, preset: LicenseConfig): Licens
 
 function resolveFreePreviewPresetMode(config: LicenseConfig, preset: LicenseConfig): LicenseConfig {
   const resolved = cloneConfig(preset)
+  if (config.orundum_planning?.preference) resolved.orundum_planning = {
+    ...resolved.orundum_planning, preference: config.orundum_planning.preference,
+  }
   resolved.recycling_station_level = config.recycling_station_level
   resolved.intermediate_inventory = config.intermediate_inventory
   resolved.auto_balance_source = config.auto_balance_source
   resolved.allow_product_rebalance = config.allow_product_rebalance
-  if (resolved.layout === '2-5-2') resolved.facility_layout = config.facility_layout?.slice()
+  resolved.facility_layout = config.facility_layout?.slice()
   resolved.dormitory_rule = normalizeDormitoryRule(config.dormitory_rule)
   delete resolved.optimizer_search
   resolved.drones!.auto_strategy = normalizeDroneAutoStrategy(config.drones?.auto_strategy)

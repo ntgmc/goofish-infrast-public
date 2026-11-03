@@ -131,7 +131,7 @@ export default function InvitationSettingsSection({ active = true }: { active?: 
   const cannotSave = saving || !dirty || invalidRewards.length > 0 || (settings.enabled && settings.rewards.length === 0)
 
   return (
-    <form onSubmit={submit} className="space-y-5" noValidate>
+    <form onSubmit={submit} className="admin-settings space-y-5" noValidate>
       <AdminTabs label="邀请管理任务" items={[{ id: 'rules', label: '奖励规则' }, { id: 'stats', label: '邀请统计' }]} value={view} onChange={(next) => { setView(next); setAddingFor(null) }} />
       {view === 'stats' && !stats && <p className="tool-panel p-5 text-sm text-ink-muted">邀请统计暂不可用，请重新载入。</p>}
       {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
@@ -257,17 +257,19 @@ function RewardGroup({ recipient, rewards, catalogByCode, giftPackVersionById, o
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div><h3 className="font-semibold text-ink-primary">{item?.name ?? reward.item_code}</h3><p className="mt-0.5 text-xs text-ink-muted">{kindLabel(item?.kind)} · {reward.item_code}</p></div>
-                      <button type="button" onClick={() => onRemove(recipient, reward.item_code)} className="tool-secondary-action min-h-9 px-3 py-1.5 text-xs" aria-label={`移除${item?.name ?? reward.item_code}`}>移除</button>
                     </div>
                     {!item?.selectable && <p className="mt-2 text-xs font-medium text-danger-500">{item?.unavailable_reason ?? '道具当前不可用。'}</p>}
                     {(configuredVersion ?? item?.latest_gift_pack_version) && <p className="mt-2 text-xs text-ink-secondary">礼包版本 v{(configuredVersion ?? item!.latest_gift_pack_version)!.version} · {packContents((configuredVersion ?? item!.latest_gift_pack_version)!.contents)}</p>}
                     {packVersion?.opening_rule && packVersion.opening_rule.mode !== 'all' && <p className="mt-2 text-xs text-ink-secondary">每个宝箱{packVersion.opening_rule.mode === 'random' ? '随机获得' : '自行选择'} {packVersion.opening_rule.count} 项奖励，{packVersion.opening_rule.allow_duplicates ? '可重复领取同一种' : '每种只领取一次'}</p>}
                   </div>
                 </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(6rem,.75fr)]">
+                <div className="admin-settings-fields mt-4">
                   <label><span className="mb-1.5 block text-xs font-medium text-ink-secondary">数量</span><input className="tool-field" type="number" min={1} max={10000} value={reward.quantity} onChange={(event) => onUpdate(recipient, reward.item_code, { quantity: Number(event.currentTarget.value) })} /></label>
                   <label><span className="mb-1.5 block text-xs font-medium text-ink-secondary">有效期</span><select className="tool-field" value={reward.expiry.mode} onChange={(event) => onUpdate(recipient, reward.item_code, { expiry: event.currentTarget.value === 'never' ? { mode: 'never' } : { mode: 'relative_days', days: 30 } })}><option value="never">永久有效</option><option value="relative_days">领取后 N 天</option></select></label>
                   {reward.expiry.mode === 'relative_days' && <label><span className="mb-1.5 block text-xs font-medium text-ink-secondary">天数</span><input className="tool-field" type="number" min={1} max={3650} value={reward.expiry.days} onChange={(event) => onUpdate(recipient, reward.item_code, { expiry: { mode: 'relative_days', days: Number(event.currentTarget.value) } })} /></label>}
+                </div>
+                <div className="admin-danger-actions">
+                  <button type="button" onClick={() => onRemove(recipient, reward.item_code)} className="tool-danger-action px-3 text-xs" aria-label={`移除${item?.name ?? reward.item_code}`}>移除</button>
                 </div>
               </article>
             )

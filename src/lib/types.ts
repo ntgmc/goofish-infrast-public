@@ -10,6 +10,7 @@ export interface LicenseOperator {
 export type IntermediateProduct = 'Originium Shard' | 'Pure Gold' | 'Orirock Cube';
 type IntermediateInventory = Partial<Record<IntermediateProduct | 'LMD', number>>;
 export type DormitoryRule = 'fixed' | 'maa_autofill' | 'maa_pure_autofill';
+export type OrundumPreference = 'production' | 'economy';
 
 export interface LicenseConfig {
   layout: string;
@@ -48,6 +49,7 @@ export interface LicenseConfig {
     targets: string[];
   };
   orundum_planning?: {
+    preference?: OrundumPreference;
     daily_sanity_budget?: number;
     monthly_card?: boolean;
   };
@@ -620,6 +622,12 @@ export interface DroneAssignment {
 }
 
 export interface DailyProduction {
+  orundum_optimization?: {
+    preference: OrundumPreference;
+    production_capacity: number;
+    baseline_sanity?: number;
+    opportunity_cost_per_orundum?: number | null;
+  };
   hours?: number;
   source_hours?: number;
   normalization_factor?: number;

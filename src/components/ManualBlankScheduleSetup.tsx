@@ -63,7 +63,7 @@ export default function ManualBlankScheduleSetup({ config, preset, enabled, onPr
             </div>
           ))}
         </dl>
-        {config.layout === '2-5-2' && <FacilityLayoutEditor key={preset} config={config} onUpdate={onUpdate} readOnly={!enabled} />}
+        <FacilityLayoutEditor key={preset} config={config} onUpdate={onUpdate} readOnly={!enabled} />
         <div className="manual-blank-footer">
           <p>{label.configHint}</p>
           <button type="button" className="tool-primary-action" disabled={!enabled} onClick={onStart}>

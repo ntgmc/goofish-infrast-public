@@ -1,6 +1,7 @@
 import { z } from 'zod'
-import { facilityLayoutSchema } from './facility-layout'
+import { facilityLayoutSchema, hasConfirmedFacilityLayout } from './facility-layout'
 import { copy } from '../copy/index'
+import type { LicenseConfig } from './types'
 
 const WORKSPACE_OPERATOR_LIMIT = 500
 const WORKSPACE_ELITE_OVERRIDE_LIMIT = 500
@@ -122,6 +123,7 @@ const licenseConfigShape = {
     targets: z.array(boundedString(64)).max(20).optional().default([]),
   }).optional(),
   orundum_planning: z.strictObject({
+    preference: z.enum(['production', 'economy']).optional(),
     daily_sanity_budget: finiteNumber.min(0).max(100_000).optional(),
     monthly_card: z.boolean().optional(),
   }).optional(),
@@ -131,9 +133,12 @@ const licenseConfigShape = {
   auto_balance_source: boundedString(40).optional(),
 }
 
-export const licenseConfigSchema = z.strictObject(licenseConfigShape)
+const optionalLayoutMatches = (config: Pick<LicenseConfig, 'trading_stations_count' | 'manufacturing_stations_count' | 'facility_layout'>) =>
+  !config.facility_layout || hasConfirmedFacilityLayout(config)
 
-export const extensibleLicenseConfigSchema = z.object(licenseConfigShape).passthrough()
+export const licenseConfigSchema = z.strictObject(licenseConfigShape).refine(optionalLayoutMatches, copy.common.facilityLayoutRequired)
+
+export const extensibleLicenseConfigSchema = z.object(licenseConfigShape).passthrough().refine(optionalLayoutMatches, copy.common.facilityLayoutRequired)
 
 export const eliteOverridesSchema = z.record(
   boundedString(128),

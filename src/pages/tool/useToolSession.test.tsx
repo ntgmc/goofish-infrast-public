@@ -3,7 +3,7 @@ import { act, renderHook, waitFor } from '../../test/query-render'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuthSuccessResponse, LicenseConfig } from '../../lib/types'
 import { CONFIG_PRESETS, normalizeConfig } from '../../lib/config'
-import { FACILITY_IDS } from '../../lib/facility-layout'
+import { FACILITY_IDS, getFacilityIds } from '../../lib/facility-layout'
 import { useToolSession } from './useToolSession'
 
 const baseConfig = {
@@ -13,6 +13,7 @@ const baseConfig = {
   dormitory_rule: 'fixed',
   trading_stations_count: 2,
   manufacturing_stations_count: 4,
+  facility_layout: getFacilityIds({ trading_stations_count: 2, manufacturing_stations_count: 4 }),
   product_requirements: { trading_stations: { gold: 2 }, manufacturing_stations: { gold: 2, exp: 2 } },
 } as LicenseConfig
 

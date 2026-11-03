@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { useToolSession } from '../useToolSession'
 import { normalizeConfig } from '../../../lib/config'
+import { getFacilityIds } from '../../../lib/facility-layout'
 import type { AuthSuccessResponse } from '../../../lib/types'
 import { copy } from '../../../copy'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -14,7 +15,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 describe('OptimizeShell compact navigation', () => {
   it.each(['desktop', 'mobile'])('flushes the real draft before the %s V2 entry and stays on save failure', async (entry) => {
-    const config = normalizeConfig({ desc: 'base', layout: '2-4-3', schedule_mode: 'maa', dormitory_rule: 'fixed', trading_stations_count: 2, manufacturing_stations_count: 4,
+    const config = normalizeConfig({ facility_layout: getFacilityIds({ trading_stations_count: 2, manufacturing_stations_count: 4 }), desc: 'base', layout: '2-4-3', schedule_mode: 'maa', dormitory_rule: 'fixed', trading_stations_count: 2, manufacturing_stations_count: 4,
       product_requirements: { trading_stations: { gold: 2 }, manufacturing_stations: { gold: 2, exp: 2 } } })
     let fail = true
     let saved!: (value: Response) => void

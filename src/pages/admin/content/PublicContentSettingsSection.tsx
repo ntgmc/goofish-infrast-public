@@ -138,8 +138,8 @@ export default function PublicContentSettingsSection() {
 
   return (
     <ValidationContext.Provider value={{ fieldErrors, focusPath, clearFieldError }}>
-    <form noValidate onSubmit={save} className="space-y-5">
-      <section className="tool-panel p-5 sm:p-6">
+    <form noValidate onSubmit={save} className="admin-settings space-y-5">
+      <section className="admin-settings-heading">
         <p className="tool-eyebrow">{copy.publicContent.admin_nav}</p>
         <h2 className="mt-2 text-lg font-semibold text-ink-primary">{copy.publicContent.admin_title}</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">{copy.publicContent.admin_description}</p>
@@ -183,7 +183,7 @@ export default function PublicContentSettingsSection() {
 function QqEditor({ settings, edit }: { settings: PublicContentSettingsV1; edit: EditSettings }) {
   return (
     <EditorPanel title={copy.publicContent.admin_tab_qq} description={copy.publicContent.admin_qq_description}>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="admin-settings-fields">
         <TextField path="qq_group.name" id="public-content-qq-name" label={copy.publicContent.admin_qq_name} value={settings.qq_group.name} maxLength={80} onChange={(value) => edit((next) => { next.qq_group.name = value })} />
         <TextField path="qq_group.number" id="public-content-qq-number" label={copy.publicContent.admin_qq_number} value={settings.qq_group.number} maxLength={12} inputMode="numeric" onChange={(value) => edit((next) => { next.qq_group.number = value })} />
         <TextField path="qq_group.link_label" id="public-content-qq-label" label={copy.publicContent.admin_qq_link_label} value={settings.qq_group.link_label} maxLength={80} onChange={(value) => edit((next) => { next.qq_group.link_label = value })} />
@@ -596,10 +596,10 @@ function PageFields({ prefix, page, edit }: {
   edit: (field: 'eyebrow' | 'title' | 'intro', value: string) => void
 }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="admin-settings-fields">
       <TextField path={`${prefix}.eyebrow`} id={`${prefix}-eyebrow`} label={copy.publicContent.admin_page_eyebrow} value={page.eyebrow} maxLength={80} onChange={(value) => edit('eyebrow', value)} />
       <TextField path={`${prefix}.title`} id={`${prefix}-title`} label={copy.publicContent.admin_page_title} value={page.title} maxLength={80} onChange={(value) => edit('title', value)} />
-      <div className="md:col-span-2">
+      <div className="admin-settings-wide-field">
         <TextareaField path={`${prefix}.intro`} id={`${prefix}-intro`} label={copy.publicContent.admin_page_intro} value={page.intro} maxLength={1000} onChange={(value) => edit('intro', value)} />
       </div>
     </div>
@@ -689,10 +689,14 @@ function RequiredMark() {
 
 function ListActions({ index, length, onMove, onDelete }: { index: number; length: number; onMove: (target: number) => void; onDelete: () => void }) {
   return (
-    <div className="flex flex-wrap justify-end gap-2">
-      <button type="button" disabled={index === 0} onClick={() => onMove(index - 1)} className="tool-secondary-action px-3 text-sm">{copy.publicContent.admin_move_up}</button>
-      <button type="button" disabled={index === length - 1} onClick={() => onMove(index + 1)} className="tool-secondary-action px-3 text-sm">{copy.publicContent.admin_move_down}</button>
-      <button type="button" onClick={onDelete} className="tool-secondary-action border-error/40 bg-error/10 px-3 text-sm text-error">{copy.publicContent.admin_delete}</button>
+    <div className="admin-list-actions">
+      <div className="flex flex-wrap justify-end gap-2">
+        <button type="button" disabled={index === 0} onClick={() => onMove(index - 1)} className="tool-secondary-action px-3 text-sm">{copy.publicContent.admin_move_up}</button>
+        <button type="button" disabled={index === length - 1} onClick={() => onMove(index + 1)} className="tool-secondary-action px-3 text-sm">{copy.publicContent.admin_move_down}</button>
+      </div>
+      <div className="admin-danger-actions">
+        <button type="button" onClick={onDelete} className="tool-danger-action px-3 text-sm">{copy.publicContent.admin_delete}</button>
+      </div>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import ConfigCapabilityPreview from '../../components/ConfigCapabilityPreview'
 import type { ConfigDiffItem } from '../../lib/workspace-history'
-import { NextIcon as ArrowRight, SelectedIcon as Check, LogoutIcon as LogOut, AccountIcon as UserRound, SuccessIcon } from '../../components/icons'
+import { BalanceIcon, BillingIcon, InventoryIcon, LoadingIcon, NextIcon as ArrowRight, OverviewIcon, SelectedIcon as Check, SettingsIcon, LogoutIcon as LogOut, AccountIcon as UserRound, SuccessIcon } from '../../components/icons'
 import AuthForm from '../../components/AuthForm'
 import AnimationSettings from '../../components/AnimationSettings'
 import ConfigEditor from '../../components/ConfigEditor'
@@ -21,11 +21,17 @@ import V2Transition from './V2Transition'
 import BuildingSkills from './BuildingSkills'
 import OperatorManagementPanel from './OperatorManagementPanel'
 import { RoomProduction } from './IncomeAnalysis'
-import type { V2Section } from './navigation'
+import { sectionLabels, v2SectionAvailable, type V2Section } from './navigation'
 
 const text = copy.v2
 export type OptionPanel = 'operators' | 'config' | 'account' | 'room' | 'settings'
 export type V2Session = ReturnType<typeof useToolSession>
+
+const accountEntries = [
+  { section: 'skland', icon: OverviewIcon },
+  { section: 'inventory', icon: InventoryIcon }, { section: 'settings', icon: SettingsIcon },
+  { section: 'commercial', icon: BillingIcon }, { section: 'balance', icon: BalanceIcon },
+] as const
 
 const titles: Record<OptionPanel, string> = {
   operators: text.operators, config: text.facilities, settings: copy.dashboard.animation.settings,
@@ -65,16 +71,18 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
   if (panel !== null && panel !== lastPanel) setLastPanel(panel)
   const shownPanel = panel ?? lastPanel
   const isConfig = shownPanel === 'config'
+  const isAccount = shownPanel === 'account'
+  const availableProfiles = session.cdkProfiles.filter((profile) => (METERED_BILLING_AVAILABLE && featureState.features.metered_billing) || !profile.kind.startsWith('metered_'))
   const validation = validateScheduleConfig(config)
   const exampleData = sample && !session.license
   const showAuthForm = shownPanel === 'account' && !session.user && featureState.status === 'ready' && featureState.features.site && featureState.features.login
   const description = shownPanel === 'settings' ? copy.dashboard.animation.description : isConfig ? exampleData ? text.demoConfigDescription : text.configDescription
     : shownPanel === 'operators' ? exampleData ? text.sampleOperatorDescription : text.operatorDescription
-      : shownPanel === 'account' ? text.accountDescription : text.roomDescription
+      : shownPanel === 'account' ? session.user ? text.accountManagementDescription : text.accountDescription : text.roomDescription
 
   return (
     <Dialog open={panel !== null} onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent className={`v2-drawer ${isConfig ? 'v2-drawer-wide' : shownPanel === 'operators' ? 'v2-operators-drawer' : ''}`} showCloseButton closeLabel={text.close}
+      <DialogContent className={`v2-drawer ${isConfig ? 'v2-drawer-wide' : shownPanel === 'operators' ? 'v2-management-drawer v2-operators-drawer' : isAccount ? 'v2-management-drawer v2-account-drawer' : ''}`} showCloseButton closeLabel={text.close}
         preventOutsideDismiss={showAuthForm}
         onOpenAutoFocus={() => { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null }}
         onCloseAutoFocus={(event) => { event.preventDefault(); setLastPanel(null); if (opener.current?.isConnected) opener.current.focus({ preventScroll: true }) }}>
@@ -91,7 +99,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
         {isConfig && (
           <>
             <ConfigCapabilityPreview config={config} enabled={!canEditConfig}>
-            <ConfigEditor profileId={session.activeProfile?.id} config={config} canEdit={canEditConfig} readOnly={configReadOnly} canEditIntermediateInventory={canUseIntermediateConfig}
+            <ConfigEditor showOrundumPreference profileId={session.activeProfile?.id} config={config} canEdit={canEditConfig} readOnly={configReadOnly} canEditIntermediateInventory={canUseIntermediateConfig}
               canSelectPreset={canUseIntermediateConfig} canEditFixedShiftHours={canEditConfig || Boolean(session.activeProfile && isFreePreviewProfile(session.activeProfile))} permission={permission}
               note={session.activeProfile && isFreePreviewProfile(session.activeProfile) && !canEditConfig
                 ? `${copy.common.components_ConfigEditor_024}${getProfileAccessLabel(session.activeProfile)}${copy.common.components_ConfigEditor_025}`
@@ -109,20 +117,37 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
           session={session} config={config} operators={operators} busy={busy} onImportOperators={onImportOperators}
           onAccount={onAccount} onManageProfiles={() => onNavigate('profiles')} />}
         {shownPanel === 'account' && (
-          <div className="v2-options-content">
+          <div className="v2-options-content v2-account-content">
             {session.user ? (
               <>
-                <div className="v2-account-card"><UserRound size={23} /><strong>{session.user.email}</strong>
-                  <button type="button" className="v2-icon-button" title={text.logout} aria-label={text.logout} disabled={busy} onClick={() => void session.handleLogout()}><LogOut size={18} /></button></div>
-                <h3>{text.profiles}</h3>
-                {session.cdkProfiles.filter((profile) => (METERED_BILLING_AVAILABLE && featureState.features.metered_billing) || !profile.kind.startsWith('metered_')).map((profile) => <button type="button" className="v2-profile-option" key={profile.id}
-                  disabled={busy || session.openingProfileId !== null} onClick={() => void onOpenProfile(profile)}>
-                  <span><strong>{profile.display_name}</strong><small>{getProfileAccessLabel(profile)}</small></span>
-                  {profile.id === session.activeProfile?.id ? <Check size={18} /> : <ArrowRight size={18} />}
-                </button>)}
-                {!session.cdkProfiles.some((profile) => (METERED_BILLING_AVAILABLE && featureState.features.metered_billing) || !profile.kind.startsWith('metered_')) && <p className="v2-muted">{text.noProfiles}</p>}
-                {session.workspaceLoadError && <p role="alert" className="v2-error">{session.workspaceLoadError}</p>}
-                <button type="button" className="v2-button v2-button-secondary" onClick={() => onNavigate('profiles')}>{text.manageProfiles}<ArrowRight size={16} /></button>
+                <div className="v2-account-card"><span className="v2-account-avatar"><UserRound size={22} aria-hidden="true" /></span>
+                  <div><span>{text.accountDrawer.signedIn}</span><strong>{session.user.email}</strong></div>
+                </div>
+                <section className="v2-account-profiles" aria-label={text.profiles}>
+                  <div className="v2-operator-section-heading"><h3>{text.accountDrawer.switchProfile}</h3>
+                    {v2SectionAvailable('profiles', featureState.features) && <button type="button" className="v2-text-button" onClick={() => onNavigate('profiles')}>{text.manageProfiles}<ArrowRight size={14} aria-hidden="true" /></button>}
+                  </div>
+                  <div className="v2-profile-options">{availableProfiles.map((profile) => {
+                    const current = profile.id === session.activeProfile?.id
+                    const opening = profile.id === session.openingProfileId
+                    return <button type="button" className="v2-profile-option" key={profile.id} aria-pressed={current} aria-busy={opening}
+                      disabled={busy || session.openingProfileId !== null} onClick={() => void onOpenProfile(profile)}>
+                      <span className="v2-account-avatar" aria-hidden="true">{Array.from(profile.display_name)[0] ?? text.guest[0]}</span>
+                      <span className="v2-profile-option-label"><strong>{profile.display_name}</strong><small>{opening ? text.accountDrawer.opening : getProfileAccessLabel(profile)}</small></span>
+                      <span className="v2-profile-option-state">{opening ? <LoadingIcon size={18} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                        : current ? <><span>{text.topbar.profile}</span><Check size={18} aria-hidden="true" /></> : <ArrowRight size={18} aria-hidden="true" />}</span>
+                    </button>
+                  })}</div>
+                  {!availableProfiles.length && <div className="v2-account-empty"><p className="v2-muted">{text.accountDrawer.empty}</p>
+                    {v2SectionAvailable('add-account', featureState.features) && <button type="button" className="v2-button v2-button-primary" onClick={() => onNavigate('add-account')}>{text.addAccount}<ArrowRight size={16} aria-hidden="true" /></button>}</div>}
+                  {session.workspaceLoadError && <p role="alert" className="v2-error">{session.workspaceLoadError}</p>}
+                </section>
+                {accountEntries.some((entry) => v2SectionAvailable(entry.section, featureState.features)) && <section className="v2-account-personal">
+                  <h3>{text.personal}</h3>
+                  <nav className="v2-account-links" aria-label={text.personal}>{accountEntries.filter((entry) => v2SectionAvailable(entry.section, featureState.features)).map(({ section, icon: Icon }) =>
+                    <button type="button" key={section} onClick={() => onNavigate(section)}><Icon size={20} aria-hidden="true" /><span>{sectionLabels[section]}</span><ArrowRight size={15} aria-hidden="true" /></button>
+                  )}</nav>
+                </section>}
               </>
             ) : showAuthForm ? (
               <AuthForm compact allowCdk={false} onAuthenticated={(payload) => { session.applyAuthPayload(payload); onClose() }} submitClassName="v2-button v2-button-primary w-full" />
@@ -153,6 +178,9 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
             : item}</li>)}</ul>
         </div>}
         </V2Transition>
+        {isAccount && session.user && <footer className="v2-account-footer">
+          <button type="button" className="v2-button v2-button-secondary" disabled={busy || session.openingProfileId !== null} onClick={() => void session.handleLogout()}><LogOut size={18} aria-hidden="true" />{text.logout}</button>
+        </footer>}
         {isConfig && <Popover>
           <PopoverTrigger asChild>
             <button type="button" className="v2-button v2-button-primary v2-drawer-done" aria-disabled={!validation.ok} aria-describedby={validation.ok ? undefined : 'v2-config-validation'}

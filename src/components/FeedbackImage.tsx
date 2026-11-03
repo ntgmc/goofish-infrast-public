@@ -10,9 +10,9 @@ export default function FeedbackImage({ src }: { src: string }) {
       <img src={src} alt={text.imagePreview} loading="lazy" />
     </button>
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="feedback-dialog feedback-image-dialog" aria-describedby={undefined} showCloseButton closeLabel={text.close}>
-        <DialogTitle className="sr-only">{text.imagePreview}</DialogTitle>
-        <img src={src} alt={text.imagePreview} />
+      <DialogContent className="feedback-dialog feedback-image-dialog v2-modal" aria-describedby={undefined} showCloseButton closeLabel={text.close}>
+        <div className="v2-modal-heading"><DialogTitle>{text.imagePreview}</DialogTitle></div>
+        <div className="v2-modal-body feedback-image-viewer"><img src={src} alt={text.imagePreview} /></div>
       </DialogContent>
     </Dialog>
   </>

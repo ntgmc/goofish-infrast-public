@@ -1,5 +1,5 @@
 export const siteBenchmarkCopy = {
-  title: '站点对比',
+  title: '排班效果对比',
   metadataTitle: '三站基建排班实测：90份排班的执行与收益 | MaaTool',
   metadataDescription: '10份干员输入、3种布局、3个站点的冻结实测。查看执行通过情况、心情冲突、配对收益、搓玉成本，以及全部90项排班证据。',
   introduction: '同一批干员、三种布局，直接对照排班通过率与产出。',

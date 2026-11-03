@@ -25,6 +25,7 @@ it.each([
 ])('imports the full configuration and inventory %j in one update without changing scheduling choices', async (intermediate_inventory) => {
   const { config, update, props } = setup()
   config.allow_product_rebalance = false
+  config.recycling_station_level = 3
   const { layout, desc, trading_stations_count, manufacturing_stations_count, product_requirements } = CONFIG_PRESETS['333']
   const fetch = vi.fn().mockResolvedValue(Response.json({ configuration: { layout, desc, trading_stations_count, manufacturing_stations_count, product_requirements, intermediate_inventory }, fetched_at: new Date().toISOString() }))
   vi.stubGlobal('fetch', fetch)
@@ -33,11 +34,27 @@ it.each([
   await screen.findByText(copy.skland.importConfigSuccess)
   expect(update).toHaveBeenCalledTimes(1)
   expect(config).toMatchObject({ layout: '3-3-3', trading_stations_count: 3, manufacturing_stations_count: 3,
-    product_requirements, shift_hours: [12, 12, 12], intermediate_inventory, allow_product_rebalance: false })
+    product_requirements, shift_hours: [12, 12, 12], intermediate_inventory, allow_product_rebalance: false, recycling_station_level: 3 })
   expect(config.trading_station_levels).toBeUndefined()
   expect(config.manufacturing_station_levels).toBeUndefined()
   expect(config.facility_layout).toBeUndefined()
   expect(fetch.mock.calls[0][0]).toBe('/api/user/skland/facilities')
+})
+
+it.each([undefined, 0, 1, 2, 3])('preserves recycling level %s when importing the last available Skland data', async (level) => {
+  const { config, props } = setup()
+  config.recycling_station_level = level
+  const fetched_at = '2026-11-02T12:00:00.000Z'
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ configuration: CONFIG_PRESETS['252'], fetched_at, refresh_warning: '刷新失败' })))
+  render(<ConfigEditor {...props} />)
+  await userEvent.click(screen.getByRole('button', { name: copy.skland.importConfig }))
+  await screen.findByText(copy.skland.configWarning(new Date(fetched_at).toLocaleString('zh-CN')))
+  expect(config.recycling_station_level).toBe(level)
+  const recycling = screen.getByRole('combobox', { name: copy.domain.recycling.level })
+  expect(recycling).toHaveValue(String(level ?? 0))
+  expect(recycling).toHaveAccessibleDescription(expect.stringContaining(copy.skland.configRecyclingManual))
+  await userEvent.selectOptions(recycling, '2')
+  expect(config.recycling_station_level).toBe(2)
 })
 
 it('leaves the existing configuration intact when the layout or product is unsupported', async () => {

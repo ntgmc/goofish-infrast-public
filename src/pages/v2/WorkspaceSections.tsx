@@ -28,6 +28,7 @@ const Cultivation = lazy(() => import('./pages/Cultivation'))
 const ThanksRecruitment = lazy(() => import('../ThanksRecruitmentPage'))
 const CultivationProjects = lazy(() => import('./pages/CultivationProjects'))
 const TrainingRatio = lazy(() => import('../TrainingRatioPage'))
+const MaterialDemand = lazy(() => import('./pages/MaterialDemand'))
 const Depot = lazy(() => import('./pages/Depot'))
 const Skland = lazy(() => import('./pages/Skland'))
 const Plans = lazy(() => import('./pages/History'))
@@ -50,7 +51,7 @@ const descriptions: Partial<Record<V2Section, string>> = {
   'add-account': copy.v2.addAccountDescription, settings: copy.v2.settingsDescription,
   inventory: copy.v2.inventoryDescription, skland: copy.skland.description,
 }
-const publicSections: V2Section[] = ['tools', 'depot', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'settings', ...V2_PUBLIC_SECTIONS]
+const publicSections: V2Section[] = ['tools', 'depot', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'material-demand', 'settings', ...V2_PUBLIC_SECTIONS]
 const workflowSections: V2Section[] = ['generation', 'plans', 'lab']
 
 export default function WorkspaceSections({ section, session, workflow, generationProgress, onAccountAdded, onToolDirtyChange, onOpenProfile, onNavigate, onConfig, onOperators, generationDisabledReason, firstSchedule = false, configConfirmed = false }: {
@@ -74,7 +75,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
   const available = v2SectionAvailable(section, features)
   const [openedTools, setOpenedTools] = useState<V2Section[]>([])
   useEffect(() => {
-    if (available && ['manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'depot'].includes(section)) setOpenedTools((current) => current.includes(section) ? current : [...current, section])
+    if (available && ['manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'material-demand', 'depot'].includes(section)) setOpenedTools((current) => current.includes(section) ? current : [...current, section])
   }, [section, available])
   const signedIn = Boolean(session.user)
   const needsLogin = !signedIn && !publicSections.includes(section)
@@ -84,7 +85,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
   const step = !signedIn ? 0 : !workflow || !operatorsReady ? 1 : !configConfirmed ? 2 : 3
   return <section hidden={section === 'overview'} className={`v2-feature-content v2-page-section${guided ? ' v2-first-schedule-layout' : ''}`} data-v2-section={section} aria-label={title}>
     <div className="v2-section-heading"><div><h1>{guided ? copy.v2.firstSchedule.title : title}</h1>{guided ? <p>{copy.v2.firstSchedule.description}</p> : descriptions[section] && <p>{descriptions[section]}</p>}</div>
-      {['manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'depot'].includes(section) && <Link className="v2-button v2-button-secondary" to={v2Path('tools', session.activeProfile?.id)}><ArrowLeft size={16} />{copy.v2.backToTools}</Link>}
+      {['manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'material-demand', 'depot'].includes(section) && <Link className="v2-button v2-button-secondary" to={v2Path('tools', session.activeProfile?.id)}><ArrowLeft size={16} />{copy.v2.backToTools}</Link>}
       {section === 'profiles' && v2SectionAvailable('add-account', features) && <button type="button" className="v2-button v2-button-primary" onClick={() => onNavigate('add-account')}>{copy.v2.addAccount}<ArrowRight size={16} /></button>}
     </div>
     {guided && <FirstScheduleGuide step={step} />}
@@ -130,6 +131,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
         {tool === 'thanks-recruitment' && v2SectionAvailable(tool, features) && <ThanksRecruitment session={session} embedded />}
         {tool === 'cultivation-projects' && v2SectionAvailable(tool, features) && <CultivationProjects session={session} onConfig={onConfig} />}
         {tool === 'training-ratio' && v2SectionAvailable(tool, features) && <TrainingRatio session={session} embedded />}
+        {tool === 'material-demand' && v2SectionAvailable(tool, features) && <MaterialDemand />}
         {tool === 'depot' && v2SectionAvailable(tool, features) && <Depot session={session} />}
       </Suspense>
     </div>)}

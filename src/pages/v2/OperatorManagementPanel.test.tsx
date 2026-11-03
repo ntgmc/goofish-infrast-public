@@ -32,9 +32,9 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
-function panel(operators = SAMPLE_OPERATORS) {
+function panel(operators = SAMPLE_OPERATORS, onImportOperators = vi.fn(async () => undefined)) {
   return <MotionPreferenceProvider><OperatorManagementPanel key={session.activeProfile!.id} session={session}
-    config={SAMPLE_CONFIG} operators={operators} busy={false} onImportOperators={vi.fn()}
+    config={SAMPLE_CONFIG} operators={operators} busy={false} onImportOperators={onImportOperators}
     onAccount={vi.fn()} onManageProfiles={vi.fn()} /></MotionPreferenceProvider>
 }
 function payload(overrides: Partial<NonNullable<SklandPayload['skland_import']>> = {}): SklandPayload {
@@ -134,6 +134,24 @@ it('keeps search results and counts in sync with imported operators and restores
   expect(within(list).getByText(text.ownedCount(1))).toBeInTheDocument()
   expect(operators.map((operator) => operator.id)).toEqual(SAMPLE_OPERATORS.slice(0, 3).map((operator) => operator.id))
   expect(imported.map((operator) => operator.id)).toEqual([SAMPLE_OPERATORS[0].id, SAMPLE_OPERATORS[3].id])
+})
+
+it('keeps operators after a malformed file and accepts a valid file on retry', async () => {
+  const user = userEvent.setup()
+  const onImport = vi.fn(async () => undefined)
+  render(panel(SAMPLE_OPERATORS, onImport))
+  const fileInput = screen.getByLabelText(copy.v2.uploadMaa, { selector: 'input' })
+  const invalid = new File(['{broken'], 'operators.json', { type: 'application/json' })
+  Object.defineProperty(invalid, 'text', { value: async () => '{broken' })
+  await user.upload(fileInput, invalid)
+  expect(await screen.findByRole('alert')).toHaveTextContent(copy.v2.uploadFailed)
+  expect(onImport).not.toHaveBeenCalled()
+  expect(screen.getByText(SAMPLE_OPERATORS[0].name)).toBeInTheDocument()
+  const valid = new File([JSON.stringify(SAMPLE_OPERATORS)], 'operators.json', { type: 'application/json' })
+  Object.defineProperty(valid, 'text', { value: async () => JSON.stringify(SAMPLE_OPERATORS) })
+  await user.upload(fileInput, valid)
+  await waitFor(() => expect(onImport).toHaveBeenCalledWith(SAMPLE_OPERATORS))
+  expect(await screen.findByRole('status')).toHaveTextContent(copy.v2.importSuccess)
 })
 
 it('clears account-specific state and ignores a late refresh response after switching profiles', async () => {

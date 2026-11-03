@@ -1,11 +1,14 @@
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
+import { ExpandIcon, ManufactureIcon, TradingStationIcon } from '../../components/icons'
 import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
 import { formatAmount, type PreparedResult } from '../../components/result-panel/formatters'
 import { PRODUCT_LABELS, ROOM_LABELS } from '../../components/result-panel/labels'
 import { calculateProductionSanity } from '../../lib/production-sanity'
-import { SANITY_PER_BATTLE_RECORD, SANITY_PER_LMD, SANITY_PER_ORIGINIUM_SHARD, SANITY_PER_ORUNDUM, SANITY_PER_PURE_GOLD } from '../../lib/orundum-economy'
+import { recyclingSanity } from '../../lib/recycling'
+import { SANITY_PER_BATTLE_RECORD, SANITY_PER_LMD, SANITY_PER_ORIGINIUM_SHARD_OPPORTUNITY, SANITY_PER_ORUNDUM, SANITY_PER_PURE_GOLD } from '../../lib/orundum-economy'
 import type { DailyProduction, OptimizeResult, OrundumEconomy } from '../../lib/types'
+import './income-analysis.css'
 
 const text = copy.v2
 const amount = (value: number) => value.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
@@ -14,7 +17,7 @@ const values: Record<string, { value: number; formula: string }> = {
   'Battle Record': { value: SANITY_PER_BATTLE_RECORD / 1000, formula: '36 ÷ 10,000' },
   'Pure Gold': { value: SANITY_PER_PURE_GOLD, formula: '36 ÷ 10,000 × 145 ÷ 229 × 50 ÷ 3 × 24' },
   Orundum: { value: SANITY_PER_ORUNDUM, formula: '3 ÷ 4' },
-  'Originium Shard': { value: SANITY_PER_ORIGINIUM_SHARD, formula: '2 × 4.8 + 1,600 × 0.0036 + 60 ÷ 72 × ' + SANITY_PER_PURE_GOLD.toFixed(6) },
+  'Originium Shard': { value: SANITY_PER_ORIGINIUM_SHARD_OPPORTUNITY, formula: '60 ÷ 72 × ' + SANITY_PER_PURE_GOLD.toFixed(6) },
 }
 
 const outputAmount = (product: string, value: number) => product === 'Battle Record' ? value * 1000 : value
@@ -58,42 +61,87 @@ export function RoomProduction({ daily, room, shift }: { daily: DailyProduction;
 export default function IncomeAnalysis({ result, prepared }: { result: OptimizeResult; prepared: PreparedResult }) {
   const daily = result.daily_production
   const rows = stationProductionRows(daily)
+  const stations = [...new Set(rows.map((row) => `${row.roomType}-${row.roomIndex}`))].map((key) => {
+    const stationRows = rows.filter((row) => `${row.roomType}-${row.roomIndex}` === key)
+    const production: Record<string, number> = {}
+    for (const row of stationRows) production[row.product] = (production[row.product] ?? 0) + row.amount
+    return { key, rows: stationRows, production }
+  })
   const sanity = calculateProductionSanity(daily)
-  const products = Object.keys(values).filter((key) => (daily?.manufacturing?.[key] ?? daily?.trading?.[key] ?? 0) !== 0 || (daily?.consumption?.[key] ?? 0) !== 0)
+  const products = Object.keys(values)
+    .filter((key) => (daily?.manufacturing?.[key] ?? daily?.trading?.[key] ?? 0) !== 0 || (daily?.consumption?.[key] ?? 0) !== 0)
+    .map((product) => {
+      const rawProduced = (daily?.manufacturing?.[product] ?? 0) + (daily?.trading?.[product] ?? 0)
+      const produced = outputAmount(product, rawProduced)
+      const consumed = outputAmount(product, daily?.consumption?.[product] ?? 0)
+      return { product, rawProduced, produced, consumed, unit: values[product], net: (produced - consumed) * values[product].value }
+    })
+  const recoveredSanity = recyclingSanity(daily?.recycling)
+  const contributions = [
+    ...products.map(({ product, produced, consumed, net }) => ({ product, label: outputLabel(product),
+      note: `${text.dailyOutput} ${amount(produced)}${consumed > 0 ? ` · ${text.consumption} ${amount(consumed)}` : ''}`, value: net })),
+    ...(recoveredSanity > 0 ? [{ product: null, label: copy.domain.recycling.title, note: text.outputValue, value: recoveredSanity }] : []),
+  ]
+  const maxContribution = Math.max(1, ...contributions.map(({ value }) => Math.abs(value)))
+
   return <div className="v2-income-content">
-    <h3>{text.stationOutput}</h3><p className="v2-muted">{text.stationOutputNote}</p>
-    {rows.length ? <div className="v2-table-scroll" tabIndex={0} role="region" aria-label={text.stationOutput}>
-      <table className="v2-income-table"><thead><tr><th>{text.room}</th><th>{text.shiftLabel}</th><th>{text.estimatedAmount}</th><th>{text.consumption}</th><th>{text.sanityContribution}</th></tr></thead>
-        <tbody>{rows.map((row, index) => <tr key={index}>
-          <th scope="row">{ROOM_LABELS[row.roomType]} {row.roomIndex}</th>
-          <td>{row.shift}{row.drones && <span className="v2-neutral-tag">{text.drones}</span>}{row.capacityLimited && <small>{text.capacityLimited}</small>}</td>
-          <td><ProductionAmount product={row.product} value={row.amount} /></td>
-          <td>{Object.entries(row.consume).map(([product, value]) => `${outputLabel(product)} ${amount(outputAmount(product, value))}`).join(' · ') || '—'}</td>
-          <td>{row.sanity === null ? '—' : amount(row.sanity)}</td>
-        </tr>)}</tbody></table>
-    </div> : <p className="v2-analysis-note">{text.noStationOutput}</p>}
+    {daily?.orundum_optimization && <div className="v2-income-inventory">
+      <dl>
+        <div><dt>{text.orundumPreference}</dt><dd>{text.orundumPreferences[daily.orundum_optimization.preference]}</dd></div>
+        {daily.orundum_optimization.opportunity_cost_per_orundum != null && <div>
+          <dt>{text.orundumUnitCost}</dt><dd>{daily.orundum_optimization.opportunity_cost_per_orundum.toLocaleString('zh-CN', { maximumFractionDigits: 3 })} {text.orundumUnitCostUnit}</dd>
+        </div>}
+      </dl>
+      {daily.orundum_optimization.opportunity_cost_per_orundum != null && <p className="v2-income-caption">{text.orundumUnitCostHelp}</p>}
+    </div>}
     {prepared.orundumEconomy && <OrundumProductionAnalysis economy={prepared.orundumEconomy} daily={daily} />}
-    <section className="v2-sanity-calculation" aria-label={text.sanityCalculation}>
-      <h3>{text.sanityCalculation} · {sanity.value.toFixed(2)} {text.daily}</h3>
-      <p>{text.sanityFormula}</p><p className="v2-muted">{sanity.note}</p>
-      <div className="v2-table-scroll" tabIndex={0} role="region" aria-label={text.conversion}>
-        <table className="v2-income-table"><thead><tr><th>{text.product}</th><th>{text.conversion}</th><th>{text.outputValue}</th><th>{text.consumptionValue}</th></tr></thead>
-          <tbody>{products.map((product) => {
-            const unit = values[product]
-            const rawProduced = (daily?.manufacturing?.[product] ?? 0) + (daily?.trading?.[product] ?? 0)
-            const produced = outputAmount(product, rawProduced)
-            const consumed = outputAmount(product, daily?.consumption?.[product] ?? 0)
-            return <tr key={product}><th scope="row">{outputLabel(product)}{product === 'Battle Record' && <small>{text.battleRecordEquivalent(amount(rawProduced))}</small>}</th>
-              <td>{unit.value.toFixed(6)}<small>{unit.formula}</small></td>
-              <td>{amount(produced)} × {unit.value.toFixed(6)} ≈ {amount(produced * unit.value)}</td>
-              <td>{consumed ? `${amount(consumed)} × ${unit.value.toFixed(6)} ≈ ${amount(consumed * unit.value)}` : '—'}</td></tr>
-          })}</tbody></table>
-      </div><p className="v2-muted">{text.sanityCalculationNote}</p>
+    <section className="v2-income-section" aria-label={text.stationOutput}>
+      <header className="v2-income-heading"><h3>{text.stationOutput}</h3><p>{text.stationOutputNote}</p></header>
+      {stations.length ? <div className="v2-income-stations">{stations.map((station) => {
+        const first = station.rows[0]
+        const Icon = first.roomType === 'trading' ? TradingStationIcon : ManufactureIcon
+        return <article className={`v2-income-station v2-income-station-${first.roomType}`} key={station.key}>
+          <details><summary>
+            <h4><Icon size={18} aria-hidden="true" />{ROOM_LABELS[first.roomType]} {first.roomIndex}<ExpandIcon className="v2-income-station-chevron" size={16} aria-hidden="true" /></h4>
+            <div className="v2-income-station-total">{Object.entries(station.production).map(([product, value]) => <ProductionAmount key={product} product={product} value={value} />)}</div>
+            <span className="v2-income-caption">{text.stationShiftDetails}</span>
+          </summary><ul>{station.rows.map((row, index) => <li key={index}>
+            <div className="v2-income-shift"><span>{row.shift}</span>{row.drones && <span className="v2-neutral-tag">{text.drones}</span>}{row.capacityLimited && <span className="v2-neutral-tag">{text.capacityLimited}</span>}</div>
+            <ProductionAmount product={row.product} value={row.amount} />
+            <dl className="v2-income-station-meta">
+              {Object.keys(row.consume).length > 0 && <div><dt>{text.consumption}</dt><dd>{Object.entries(row.consume).map(([product, value]) => `${outputLabel(product)} ${amount(outputAmount(product, value))}`).join(' · ')}</dd></div>}
+              <div><dt>{text.sanityContribution}</dt><dd>{row.sanity === null ? '—' : amount(row.sanity)}</dd></div>
+            </dl>
+          </li>)}</ul></details>
+        </article>
+      })}</div> : <p className="v2-analysis-note">{text.noStationOutput}</p>}
     </section>
-    <details className="v2-analysis-details v2-feature-content">
+    <section className="v2-income-section" aria-label={text.sanityCalculation}>
+      <header className="v2-income-heading"><h3>{text.sanityCalculation}</h3><p>{text.sanityCalculationNote}</p></header>
+      <div className="v2-income-sanity-total"><img src="/assets/products/AP_GAMEPLAY.png" alt="" width={36} height={36} /><strong>{daily ? sanity.value.toFixed(2) : '—'}</strong><span>{text.sanityUnit}</span></div>
+      <p className="v2-income-caption">{sanity.note}</p>
+      <ul className="v2-income-contributions">{contributions.map(({ product, label, note, value }) => <li key={label}>
+        {product ? <ProductIcon product={product} size={32} /> : <img src="/assets/products/AP_GAMEPLAY.png" alt="" width={32} height={32} />}
+        <div className="v2-income-contribution-label"><h4>{label}</h4><p>{note}</p></div>
+        <strong className={value < 0 ? 'v2-income-negative' : ''}>{value > 0 ? '+' : ''}{amount(value)}<small>{text.sanityUnit}</small></strong>
+        <div className="v2-income-contribution-track" aria-hidden="true"><span className={value < 0 ? 'v2-income-negative-bar' : ''} style={{ width: `${Math.abs(value) / maxContribution * 100}%` }} /></div>
+      </li>)}</ul>
+      <details className="v2-income-disclosure"><summary>{text.conversionDetails}</summary>
+        <p className="v2-income-caption">{text.sanityFormula}</p>
+        <dl className="v2-income-formulas">{products.map(({ product, rawProduced, produced, consumed, unit }) => <div key={product}>
+          <dt>{outputLabel(product)}</dt><dd>
+            <p>{text.conversion}：{unit.value.toFixed(6)}<span className="v2-income-caption">（{unit.formula}）</span></p>
+            {product === 'Battle Record' && <p className="v2-income-caption">{text.battleRecordEquivalent(amount(rawProduced))}</p>}
+            <p>{text.outputValue}：{amount(produced)} × {unit.value.toFixed(6)} ≈ {amount(produced * unit.value)}</p>
+            {consumed > 0 && <p>{text.consumptionValue}：{amount(consumed)} × {unit.value.toFixed(6)} ≈ {amount(consumed * unit.value)}</p>}
+          </dd>
+        </div>)}</dl>
+      </details>
+    </section>
+    <details className="v2-income-disclosure v2-feature-content">
       <summary>{text.efficiencyDetails}</summary>
       <h3>{text.totalEfficiency} · {formatAmount(prepared.totalEff)}%</h3>
-      <p className="v2-muted">{text.efficiencyHint}</p>
+      <p className="v2-income-caption">{text.efficiencyHint}</p>
       {prepared.rotationStatsNote && <p>{prepared.rotationStatsNote}</p>}
       {(result.raw_total_efficiency !== undefined || result.raw_results.length > 0) && Math.abs(prepared.totalEff - prepared.rawTotalEff) >= 0.05 && <p>{text.rawTotalEfficiency} · {formatAmount(prepared.rawTotalEff)}%</p>}
     </details>
@@ -101,39 +149,65 @@ export default function IncomeAnalysis({ result, prepared }: { result: OptimizeR
 }
 
 function OrundumProductionAnalysis({ economy, daily }: { economy: OrundumEconomy; daily?: DailyProduction }) {
-  const shards = daily?.manufacturing?.['Originium Shard'] ?? 0
-  const capacityRows = [
-    [text.dailySanityBudget, economy.daily_sanity_budget, text.sanityUnit],
-    [text.monthlyCardSanity, economy.total_daily_sanity_budget - economy.daily_sanity_budget, text.sanityUnit],
-    [text.totalSanityBudget, economy.total_daily_sanity_budget, text.sanityUnit],
-    [text.dailyOrirockSupply, economy.daily_orirock_supply, text.orirockUnit],
-    [text.rockLimitedOrundum, economy.rock_limited_orundum, text.orundumUnit],
-    ...(economy.lmd_limited_orundum !== undefined ? [[text.lmdLimitedOrundum, economy.lmd_limited_orundum, text.orundumUnit] as const] : []),
-    [text.factoryOrundumCapacity, economy.factory_orundum_capacity, text.orundumUnit],
-    [text.tradeOrundumCapacity, economy.trade_orundum_capacity, text.orundumUnit],
-    [text.sustainableOrundum, economy.sustainable_orundum, text.orundumUnit],
-    [text.shortTermOrundum, economy.short_term_orundum, text.orundumUnit],
-    [text.dailyShardProduction, shards, `${PRODUCT_LABELS['Originium Shard']} ${text.daily}`],
-    [text.dailyShardConsumption, daily?.consumption?.['Originium Shard'] ?? 0, `${PRODUCT_LABELS['Originium Shard']} ${text.daily}`],
-    ...(economy.daily_orirock_cost !== undefined ? [[text.orirockCost, economy.daily_orirock_cost, text.orirockUnit] as const] : []),
-    ...(economy.daily_lmd_income !== undefined ? [[text.dailyLmdIncome, economy.daily_lmd_income, `${PRODUCT_LABELS.LMD} ${text.daily}`] as const] : []),
-    [text.shardLmdCost, economy.hard_lmd_cost, `${PRODUCT_LABELS.LMD} ${text.daily}`],
-    ...(economy.daily_lmd_net !== undefined ? [[text.lmdNetChange, economy.daily_lmd_net, `${PRODUCT_LABELS.LMD} ${text.daily}`] as const] : []),
-    ...(economy.shard_inventory_depletion_days !== null ? [[text.shardInventoryDepletion, economy.shard_inventory_depletion_days, text.daysUnit] as const] : []),
-    ...(economy.orirock_inventory_depletion_days !== null ? [[text.orirockInventoryDepletion, economy.orirock_inventory_depletion_days, text.daysUnit] as const] : []),
-    ...(economy.lmd_inventory_depletion_days != null ? [[text.lmdInventoryDepletion, economy.lmd_inventory_depletion_days, text.daysUnit] as const] : []),
-    ...(economy.inventory_depletion_days !== null ? [[text.inventoryDepletion, economy.inventory_depletion_days, text.daysUnit] as const] : []),
+  const limits = [
+    { label: text.rockLimitedOrundum, value: economy.rock_limited_orundum },
+    ...(economy.lmd_limited_orundum !== undefined ? [{ label: text.lmdLimitedOrundum, value: economy.lmd_limited_orundum }] : []),
+    { label: text.factoryOrundumCapacity, value: economy.factory_orundum_capacity },
+    { label: text.tradeOrundumCapacity, value: economy.trade_orundum_capacity },
+  ]
+  const minCapacity = Math.min(...limits.map(({ value }) => value))
+  const maxCapacity = Math.max(1, ...limits.map(({ value }) => value))
+  const resources = [
+    { label: text.totalSanityBudget, product: null, rows: [
+      [text.dailySanityBudget, economy.daily_sanity_budget, text.sanityUnit],
+      [text.monthlyCardSanity, economy.total_daily_sanity_budget - economy.daily_sanity_budget, text.sanityUnit],
+      [text.totalSanityBudget, economy.total_daily_sanity_budget, text.sanityUnit],
+    ] },
+    { label: text.dailyOrirockSupply, product: 'Orirock Cube', rows: [
+      [text.dailyOrirockSupply, economy.daily_orirock_supply, text.orirockUnit],
+      ...(economy.daily_orirock_cost !== undefined ? [[text.orirockCost, economy.daily_orirock_cost, text.orirockUnit] as const] : []),
+    ] },
+    { label: text.dailyShardProduction, product: 'Originium Shard', rows: [
+      [text.dailyShardProduction, daily?.manufacturing?.['Originium Shard'] ?? 0, text.orirockUnit],
+      [text.dailyShardConsumption, daily?.consumption?.['Originium Shard'] ?? 0, text.orirockUnit],
+    ] },
+    { label: text.lmdNetChange, product: 'LMD', rows: [
+      ...(economy.daily_lmd_income !== undefined ? [[text.dailyLmdIncome, economy.daily_lmd_income, text.daily] as const] : []),
+      [text.shardLmdCost, economy.hard_lmd_cost, text.daily],
+      ...(economy.daily_lmd_net !== undefined ? [[text.lmdNetChange, economy.daily_lmd_net, text.daily] as const] : []),
+    ] },
   ] as const
+  const inventory = [
+    { label: text.shardInventoryDepletion, product: 'Originium Shard', days: economy.shard_inventory_depletion_days },
+    { label: text.orirockInventoryDepletion, product: 'Orirock Cube', days: economy.orirock_inventory_depletion_days },
+    { label: text.lmdInventoryDepletion, product: 'LMD', days: economy.lmd_inventory_depletion_days },
+  ].flatMap((item) => item.days == null ? [] : [{ ...item, days: item.days }])
 
-  return <section className="v2-sanity-calculation" aria-label={text.orundumInputs}>
-    <h3>{text.orundumCapacity}</h3><p className="v2-muted">{text.orundumCapacityNote}</p>
-    <div className="v2-table-scroll" tabIndex={0} role="region" aria-label={text.orundumCapacity}>
-      <table className="v2-income-table"><thead><tr><th>{text.calculationItem}</th><th>{text.calculationBasis}</th></tr></thead>
-        <tbody>{capacityRows.map(([label, value, unit]) => <tr key={label}>
-          <th scope="row">{label}</th><td>{amount(value)} {unit}</td>
-        </tr>)}</tbody></table>
+  return <section className="v2-income-section v2-income-orundum" aria-label={text.orundumInputs}>
+    <header className="v2-income-heading"><h3>{text.orundumCapacity}</h3><p>{text.orundumCapacitySummary}</p></header>
+    <dl className="v2-income-lead">
+      <div className="v2-income-primary"><dt><ProductIcon product="Orundum" size={28} />{text.sustainableOrundum}</dt><dd><strong>{amount(economy.sustainable_orundum)}</strong><span>{text.orundumUnit}</span></dd></div>
+      <div><dt>{text.shortTermOrundum}</dt><dd><strong>{amount(economy.short_term_orundum)}</strong><span>{text.orundumUnit}</span></dd></div>
+      <div><dt>{text.inventoryDepletion}</dt><dd>{economy.inventory_depletion_days !== null ? <><strong>{amount(economy.inventory_depletion_days)}</strong><span>{text.daysUnit}</span></> : <span>{economy.case === 'inventory_burst' ? text.orundumDurationUnavailable : text.orundumOutputSustainable}</span>}</dd></div>
+    </dl>
+    <div className="v2-income-capacity">
+      <h4>{text.capacityLimits}</h4>
+      <ul>{limits.map(({ label, value }) => <li key={label} data-limited={value === minCapacity}>
+        <div className="v2-income-capacity-label"><span>{label}</span>{value === minCapacity && <span className="v2-neutral-tag">{text.capacityBottleneck}</span>}<strong>{amount(value)}<small>{text.orundumUnit}</small></strong></div>
+        <div className="v2-income-capacity-track" aria-hidden="true"><span style={{ width: `${Math.max(0, value) / maxCapacity * 100}%` }} /></div>
+      </li>)}</ul>
     </div>
-    <p>{amount(economy.total_daily_sanity_budget)} ÷ 4.8 ≈ {amount(economy.daily_orirock_supply)} {text.orirockUnit}</p>
-    <p>{text.sustainableOrundum} = min({amount(economy.rock_limited_orundum)}, {economy.lmd_limited_orundum !== undefined && `${amount(economy.lmd_limited_orundum)}, `}{amount(economy.factory_orundum_capacity)}, {amount(economy.trade_orundum_capacity)}) ≈ {amount(economy.sustainable_orundum)} {text.orundumUnit}</p>
+    <div className="v2-income-resources"><h4>{text.dailyResourceFlow}</h4><div>{resources.map(({ label, product, rows: resourceRows }) => <dl key={label}>
+      <div className="v2-income-resource-icon" aria-hidden="true">{product ? <ProductIcon product={product} size={32} /> : <img src="/assets/products/AP_GAMEPLAY.png" alt="" width={32} height={32} />}</div>
+      {resourceRows.map(([rowLabel, value, unit]) => <div key={rowLabel}><dt>{rowLabel}</dt><dd className={value < 0 ? 'v2-income-negative' : ''}>{amount(value)} <small>{unit}</small></dd></div>)}
+    </dl>)}</div></div>
+    {inventory.length > 0 && <div className="v2-income-inventory"><h4>{text.inventorySupport}</h4><dl>{inventory.map(({ label, product, days }) => <div key={label}>
+      <dt><ProductIcon product={product} size={24} />{label}</dt><dd>{amount(days)} <small>{text.daysUnit}</small></dd>
+    </div>)}</dl></div>}
+    <details className="v2-income-disclosure"><summary>{text.calculationDetails}</summary>
+      <p className="v2-income-caption">{text.orundumCapacityNote}</p>
+      <p>{amount(economy.total_daily_sanity_budget)} ÷ 4.8 ≈ {amount(economy.daily_orirock_supply)} {text.orirockUnit}</p>
+      <p>{text.sustainableOrundum} = min({limits.map(({ value }) => amount(value)).join(', ')}) ≈ {amount(economy.sustainable_orundum)} {text.orundumUnit}</p>
+    </details>
   </section>
 }

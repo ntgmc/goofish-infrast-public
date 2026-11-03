@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { CONFIG_PRESETS, getRightFull252Variant, isFullBlood252Config, isRightFull252Config, normalizeConfig, normalizeDormitoryRule, parseShiftHours, resolveConfigLayout, validateConfig } from './config'
+import { CONFIG_PRESETS, getRightFull252Variant, isFullBlood252Config, isRightFull252Config, normalizeConfig, normalizeDormitoryRule, parseShiftHours, resolveConfigLayout, validateConfig, validateScheduleConfig } from './config'
 import { licenseConfigSchema } from './workspace-validation'
+import { getFacilityIds } from './facility-layout'
 
 describe('preset configs', () => {
   it('defines 333 pure LMD with three LMD trading stations and three Pure Gold factories', () => {
@@ -22,6 +23,17 @@ describe('preset configs', () => {
 })
 
 describe('layout normalization', () => {
+  it.each(Object.keys(CONFIG_PRESETS))('requires and preserves a map matching %s facility counts', (id) => {
+    const config = normalizeConfig(CONFIG_PRESETS[id])
+    expect(validateConfig(config)).toEqual({ ok: true })
+    expect(validateScheduleConfig(config).ok).toBe(false)
+    config.facility_layout = getFacilityIds(config).reverse()
+    const saved = licenseConfigSchema.parse(normalizeConfig(config))
+    expect(saved.facility_layout).toEqual(config.facility_layout)
+    expect(validateScheduleConfig(saved)).toEqual({ ok: true })
+    expect(licenseConfigSchema.safeParse({ ...saved, facility_layout: getFacilityIds(CONFIG_PRESETS[config.trading_stations_count === 3 ? '243' : '333']) }).success).toBe(false)
+    expect(licenseConfigSchema.safeParse({ ...saved, facility_layout: Array(9).fill('trading_1') }).success).toBe(false)
+  })
   it('accepts both right-full 252 variants and full-blood 252', () => {
     for (const variant of ['252', '252-1'] as const) {
       const config = normalizeConfig(CONFIG_PRESETS[variant])

@@ -30,10 +30,17 @@ function wilson(likes: number, dislikes: number) {
 
 const actionAliases: Record<string, string> = { 部署: 'Deploy', 技能: 'Skill', 撤退: 'Retreat', 二倍速: 'SpeedUp', 子弹时间: 'BulletTime', 技能用法: 'SkillUsage', 打印: 'Output', 摆完挂机: 'SkillDaemon', 移动相机: 'MoveCamera', 点击: 'Click', 滑动: 'Swipe', 设置单位坐标: 'SetUnitLocation' }
 const directions: Record<string, string> = { 左: 'Left', 右: 'Right', 上: 'Up', 下: 'Down', 无: 'None' }
-function parse(snapshot: PrtsSnapshot, homework: PrtsSnapshot['homeworks'][number]): Document | null {
+function parse(snapshot: PrtsSnapshot, homework: PrtsSnapshot['homeworks'][number], requirements: Map<string, Requirement>): Document | null {
   const published = Date.parse(homework.uploadedAt ?? '')
   if (!Number.isFinite(published) || homework.content.type === 'SSS' || !homework.stageId) return null
   const parsed = readHomeworkRequirements(homework.content, snapshot)
+  for (const rows of [parsed.fixed, ...parsed.groups]) for (const [index, row] of rows.entries()) {
+    if (!row.operator || row.warnings.length) continue
+    const key = JSON.stringify([row.operator.id, row.target, row.specified, row.moduleUnresolved])
+    const shared = requirements.get(key)
+    if (shared) rows[index] = shared
+    else requirements.set(key, row)
+  }
   const members: Member[] = parsed.fixed.map((requirement) => ({ requirement, share: 1, group: null, options: [] }))
   const aliases = new Map(parsed.fixed.map((row) => [row.name, row.operator?.id ?? row.name]))
   for (const [index, rows] of parsed.groups.entries()) {
@@ -78,8 +85,14 @@ function covers(target: CultivationTarget, other: CultivationTarget) {
     && (target.elite > other.elite || target.elite === other.elite && target.level >= other.level) && target.skillLevel >= other.skillLevel
 }
 
-export function prepareRecommendations(snapshot: PrtsSnapshot) {
-  const documents = snapshot.homeworks.map((row) => parse(snapshot, row)).filter((row): row is Document => row !== null)
+export function prepareRecommendations(snapshot: PrtsSnapshot, homeworks: Iterable<PrtsSnapshot['homeworks'][number]> = snapshot.homeworks) {
+  const requirements = new Map<string, Requirement>(), documents: Document[] = []
+  let count = 0
+  for (const row of homeworks) {
+    count++
+    const document = parse(snapshot, row, requirements)
+    if (document) documents.push(document)
+  }
   const buckets = new Map<string, Family[]>()
   for (const document of documents.sort((a, b) => a.published - b.published || a.homework.id - b.homework.id)) {
     const key = `${stageKey(document)}:${document.skeleton}`
@@ -105,7 +118,7 @@ export function prepareRecommendations(snapshot: PrtsSnapshot) {
     family.documents = [...variants.values()]
   }
   return { families,
-    invalid: snapshot.homeworks.length - documents.length + documents.reduce((sum, row) => sum + row.members.filter((member) => member.requirement.moduleUnresolved).length, 0),
+    invalid: count - documents.length + documents.reduce((sum, row) => sum + row.members.filter((member) => member.requirement.moduleUnresolved).length, 0),
     stages: [...new Set(documents.map((row) => row.homework.stageId))].map((id) => ({ id, ...stageInfo(snapshot, id) })),
     professions: [...new Set(Object.values(snapshot.operators).flatMap((row) => row.profession ? [row.profession] : []))].sort() }
 
@@ -187,10 +200,9 @@ export function calculateCultivationRecommendations(snapshot: PrtsSnapshot, quer
     }
     const total = samples.reduce((sum, row) => sum + row.weight, 0)
     for (const group of branches.values()) {
-      const targets = [...new Map(group.map((row) => [canonical(row.requirement.target), row.requirement.target])).values()]
       const branchWeight = group.reduce((sum, row) => sum + row.weight, 0)
-      const base = targets[0], operator = snapshot.operators[operatorId]
-      const values = (field: 'elite' | 'level' | 'skillLevel' | 'potential') => [...new Set(targets.map((row) => row[field]))].sort((a, b) => a - b)
+      const base = group[0].requirement.target, operator = snapshot.operators[operatorId]
+      const values = (field: 'elite' | 'level' | 'skillLevel' | 'potential') => [...new Set(group.map((row) => row.requirement.target[field]))].sort((a, b) => a - b)
       const elites = values('elite'), levels = values('level'), skills = values('skillLevel'), potentials = values('potential')
       const maxima = snapshot.costs.levels.maxLevel[operator.rarity - 1]
       const module = base.moduleId ? snapshot.costs.modules.equipDict[base.moduleId] : null

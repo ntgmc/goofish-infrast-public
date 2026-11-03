@@ -4,6 +4,7 @@ import { useSklandBinding, type SklandAccountOption, type SklandImportMode, type
 import { copy } from '../copy/index'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
 import SklandIcon from './SklandIcon'
+import { CloseIcon } from './icons'
 
 
 export type { SklandPayload } from '../hooks/useSklandBinding'
@@ -89,7 +90,7 @@ export default function SklandBindingDialog({
         preventOutsideDismiss={busy || sklandLogin.mode !== 'scan' || sklandLogin.status === 'account_selection_required' || sklandLogin.status === 'confirm_required'}
         aria-labelledby="skland-binding-title"
         aria-describedby="skland-binding-description"
-        className="block max-w-2xl"
+        className="v2-modal skland-binding-dialog block max-w-2xl"
         onOpenAutoFocus={(event) => {
           returnFocusRef.current = document.activeElement instanceof HTMLElement
             ? document.activeElement
@@ -103,24 +104,25 @@ export default function SklandBindingDialog({
           returnFocusRef.current = null
         }}
       >
-        <div className="flex items-start justify-between gap-4">
+        <div className="v2-modal-heading flex items-start justify-between gap-4">
           <div>
             <DialogTitle id="skland-binding-title" className="flex items-center gap-2 text-ink-primary"><SklandIcon size={20} />{title}</DialogTitle>
             <DialogDescription id="skland-binding-description" className="mt-1">{description}</DialogDescription>
           </div>
-          <button ref={closeButtonRef} type="button" onClick={close} className="tool-secondary-action shrink-0 px-3 py-2 text-sm" aria-label={copy.workspace.components_SklandBindingDialog_011}>
-            {copy.workspace.components_SklandBindingDialog_012}</button>
+          <button ref={closeButtonRef} type="button" onClick={close} className="v2-modal-close tool-secondary-action shrink-0 px-3 py-2 text-sm" aria-label={copy.workspace.components_SklandBindingDialog_011}>
+            <CloseIcon size={20} aria-hidden="true" /></button>
         </div>
 
-        <ol className="mt-5 grid gap-2 text-xs font-semibold text-ink-secondary sm:grid-cols-3">
+        <div className="v2-modal-body">
+        <ol className="skland-binding-steps mt-5 grid gap-2 text-xs font-semibold text-ink-secondary sm:grid-cols-3">
           {[copy.workspace.components_SklandBindingDialog_013, copy.workspace.components_SklandBindingDialog_014, copy.workspace.components_SklandBindingDialog_015].map((label, index) => (
-            <li key={label} className={'tool-inset px-3 py-2 ' + (currentStep === index + 1 ? 'border-brand-500 bg-brand-500/10 text-brand-300' : 'text-ink-secondary')}>
+            <li key={label} aria-current={currentStep === index + 1 ? 'step' : undefined} className={'tool-inset px-3 py-2 ' + (currentStep === index + 1 ? 'border-brand-500 bg-brand-500/10 text-brand-300' : 'text-ink-secondary')}>
               {index + 1}. {label}
             </li>
           ))}
         </ol>
 
-        <div className="mt-5 grid grid-cols-3 gap-2" role="group" aria-label={copy.workspace.components_SklandBindingDialog_016}>
+        <div className="skland-import-modes mt-5 grid grid-cols-3 gap-2" role="group" aria-label={copy.workspace.components_SklandBindingDialog_016}>
           {(Object.keys(MODE_LABELS) as SklandImportMode[]).map((mode) => (
             <button
               key={mode}
@@ -192,7 +194,8 @@ export default function SklandBindingDialog({
           </p>
         )}
 
-        <div className="mt-5 flex flex-wrap justify-end gap-2">
+        </div>
+        <div className="v2-modal-footer mt-5 flex flex-wrap justify-end gap-2">
           {hasError && sklandLogin.mode === 'scan' && (
             <button type="button" onClick={startSklandLogin} disabled={busy || (!profile && !canStartWithoutProfile)} className="tool-primary-action">
               {copy.workspace.components_SklandBindingDialog_018}</button>
@@ -250,7 +253,7 @@ function ScanModePanel({
       </div>
       {waiting && state.qrDataUrl && (
         <div className="tool-inset mt-4 flex flex-col items-center gap-3 p-4">
-          <img src={state.qrDataUrl} alt={copy.workspace.components_SklandBindingDialog_029} className="h-[240px] w-[240px] rounded-lg bg-white p-2" />
+          <img src={state.qrDataUrl} alt={copy.workspace.components_SklandBindingDialog_029} className="skland-scan-code h-[240px] w-[240px] rounded-lg bg-white p-2" />
           <button type="button" onClick={onCheck} disabled={busy} className="tool-secondary-action">
             {copy.workspace.components_SklandBindingDialog_030}</button>
         </div>

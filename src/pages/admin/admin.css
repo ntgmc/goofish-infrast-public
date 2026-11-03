@@ -65,6 +65,17 @@
 .admin-selection-index button[aria-pressed="true"] { background: var(--color-v2-accent-soft); color: var(--color-v2-accent); }
 .admin-selection-index :is(strong, small) { display: block; overflow-wrap: anywhere; }
 .admin-selection-index small { margin-top: 4px; color: var(--color-v2-muted); }
+.admin-settings { max-width: 68rem; }
+.admin-settings .admin-settings-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-sm); }
+.admin-settings .admin-settings-wide-field { grid-column: 1 / -1; }
+.admin-settings-heading { padding-bottom: var(--space-xs); }
+.admin-registration-heading { display: grid; gap: var(--space-md); }
+.admin-registration-switches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-xs); }
+.admin-feature-option { min-width: 0; padding-block: var(--space-xs); border-bottom: 1px solid var(--color-v2-line); cursor: pointer; }
+.admin-settings label:has(> input[type="checkbox"]) { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: var(--space-sm); }
+.admin-settings label > input[type="checkbox"] { order: 1; flex: none; margin: 0; }
+.admin-settings .admin-danger-actions { display: flex; justify-content: flex-end; margin-top: var(--space-lg); padding-top: var(--space-sm); border-top: 1px solid var(--color-v2-line); }
+@media (max-width: 40rem) { .admin-settings .admin-settings-fields, .admin-registration-switches { grid-template-columns: minmax(0, 1fr); } }
 .admin-savebar { position: sticky; bottom: 12px; z-index: 10; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 16px; border: 1px solid var(--color-v2-line); border-radius: var(--radius-v2-control); background: var(--color-v2-surface); }
 .admin-dialog { background: var(--color-v2-surface); border-color: var(--color-v2-line); border-radius: var(--radius-v2-panel); }
 .admin-login { display: grid; min-height: 100dvh; place-items: center; padding: 24px; }

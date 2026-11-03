@@ -450,7 +450,7 @@ export const publicCopy = {
     },
   },
   pricing_cards: {
-    features: ["不限次数生成，优先处理", "导出给 MAA 自动排班", "自定义配置与培养建议"],
+    features: ["不限次数生成，优先处理", "MAA JSON 一键下载，自动换班", "自定义基建配置与培养建议", "手动排班，模拟心情与效率"],
     archive_gift: (count: number) => `赠送 ${count} 个封存资格`,
     plan_details: "方案说明",
     rules: "购买、兑换与使用规则",

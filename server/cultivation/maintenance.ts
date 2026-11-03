@@ -1,3 +1,5 @@
+import { computeEffectiveSiteFeatures } from '../../src/lib/site-features'
+import { getSiteFeatureSettings } from '../storage/feature-settings-store'
 import { refreshCultivationSnapshot, shutdownCultivationWorker } from './worker-client'
 import { CULTIVATION_DAY_MS, cultivationDayStart } from './cache-policy'
 
@@ -6,8 +8,11 @@ let running: Promise<void> | null = null
 let controller: AbortController | null = null
 
 async function updateIfStale(signal: AbortSignal) {
-  try { await refreshCultivationSnapshot(signal) }
-  catch (error) {
+  try {
+    const features = computeEffectiveSiteFeatures(await getSiteFeatureSettings())
+    if (signal.aborted || !features.cultivation_plan) return
+    await refreshCultivationSnapshot(signal)
+  } catch (error) {
     if (!signal.aborted && !(error instanceof Error && 'code' in error && ['prts_data_unavailable', 'cultivation_busy'].includes(String(error.code)))) {
       console.warn('PRTS cultivation incremental update failed:', error instanceof Error ? error.message : 'unknown')
     }

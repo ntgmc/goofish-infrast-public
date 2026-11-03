@@ -211,7 +211,8 @@ function ComparisonWorkspace({ userId, profileId, operators, config, workspace }
       <div className="v2-schedule-comparison-inputs"><label className="v2-field"><span>{manual.layout}</span><select className="v2-input" value={preset} disabled={busy} onChange={(event) => { setPreset(event.target.value); setConfigDraft(null) }}>
         <option value="">{manual.currentLayout}</option>{Object.entries(CONFIG_PRESETS).map(([key, value]) => <option key={key} value={key}>{value.desc}</option>)}
       </select></label><Field label={manual.shiftHours} help={manual.shiftHint} value={configuredHours} disabled={busy} onChange={(event) => setShiftHours(event.target.value)} /></div>
-      {baseConfig.layout === '2-5-2' && <FacilityLayoutEditor config={baseConfig} onUpdate={(mutate) => { const next = structuredClone(baseConfig); mutate(next); setConfigDraft(next) }} />}
+      <FacilityLayoutEditor key={JSON.stringify([baseConfig.trading_stations_count, baseConfig.manufacturing_stations_count, baseConfig.trading_station_levels, baseConfig.manufacturing_station_levels])}
+        config={baseConfig} onUpdate={(mutate) => { const next = structuredClone(baseConfig); mutate(next); setConfigDraft(next) }} />
     </details>
     <div className="v2-actions v2-schedule-comparison-run"><button className="v2-button v2-button-primary" disabled={busy || !left || !right} onClick={() => void simulate()}><ComparisonIcon size={18} aria-hidden="true" />{busy ? text.running : text.start}</button><p role="status" aria-live="polite">{progress}</p></div>
     <Notice error>{error}</Notice>

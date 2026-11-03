@@ -13,11 +13,13 @@ import { Field, Notice, SectionTitle } from '../components/WorkspaceUI'
 import ManualResultExport from '../ManualResultExport'
 import type { V2Workflow } from '../WorkspaceSections'
 import type { V2Section } from '../navigation'
+import { materialDemandCopy } from '../../../copy/zh-CN/material-demand'
 
 export default function Tools({ profileId }: { profileId?: string }) {
   const { features } = useSiteFeatures()
   const tools = [
     { section: 'training-ratio' as const, enabled: features.tools, icon: Calculator, title: copy.trainingRatio.title, description: copy.trainingRatio.description },
+    { section: 'material-demand' as const, enabled: features.tools, icon: Gem, title: materialDemandCopy.title, description: materialDemandCopy.description },
     { section: 'manual-tool' as const, enabled: features.manual_schedule, icon: CalendarClock, title: copy.tools.manualSchedule.title, description: copy.tools.manualSchedule.description },
     { section: 'schedule-comparison' as const, enabled: features.manual_schedule, icon: ComparisonIcon, title: copy.tools.scheduleComparison.title, description: copy.tools.scheduleComparison.description },
     { section: 'cultivation-projects' as const, enabled: features.cultivation_plan, icon: ProjectsIcon, title: copy.cultivationProjects.title, description: copy.cultivationProjects.description },

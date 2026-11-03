@@ -69,8 +69,54 @@ it deliberately when changing the shared design.
   Dark paper: `oklch(0.205 0.016 255)`; accent: `oklch(0.770 0.125 45)`.
 - Keep Noto Sans SC display and Geist body fonts, with tabular numbers for
   production, efficiency, and shift times.
-- Preserve the side rail and Ft2 inline footer. Use one production summary
-  strip and one schedule panel with open room regions. Operator portraits
+- Keep six core tasks in the side rail: overview, generation, history and
+  comparison under the schedule workspace; cultivation projects and tools in
+  their own group. Use full-width compact rows for operator and facility
+  configuration, with the owned-operator count aligned at the end.
+  The compact brand header and bottom help trigger stay visible while the
+  middle navigation scrolls independently. Keep consistent 44px targets,
+  visible inset focus rings and copper active icons. Page destinations are
+  real links with the current profile in the URL; configuration opens dialogs.
+  On mobile, align the close button with the brand, lock background scrolling,
+  retain the keyboard focus loop, and restore the menu trigger on dismissal.
+  The top-right account drawer owns profile management, Skland data, inventory,
+  account settings and available billing
+  pages. Group guides, announcements, releases and site links under the rail's
+  “帮助与更多” menu, which opens above its bottom trigger without moving the
+  trigger or resizing the rail. Separate help and support from product news and
+  comparisons, with appearance and service status in the footer. Use compact
+  group labels, 44px rows, readable labels and inset focus rings. Retain the
+  unread announcement count while collapsed and scroll inside the menu when
+  needed. Native disclosure semantics retain Tab navigation; arrow keys and
+  Home/End browse available entries, Escape returns to the trigger, and leaving
+  with Tab closes the menu. Nested dialogs retain their opener and draft.
+  Tool detail pages keep the tools entry highlighted. Preserve the Ft2 footer.
+- The top bar separates page location from utility actions and the account
+  opener. Use a semantic breadcrumb with a profile-preserving workspace link,
+  readable current page, consistent 44px utility buttons and visible open/focus
+  states. Show the current profile name with a secondary label on wide screens;
+  retain its name and full accessible label on mobile. Below 40rem, put location
+  above the actions so long page names never compete with icon controls. Keep
+  unread and calculation badges, native hints, existing dialogs and theme menu.
+- Operator and account drawers share a compact fixed heading and an independently
+  scrolling body. Keep the operator profile, sync and MAA import actions compact;
+  binding timestamps and authorization details expand on demand. The list search
+  stays visible while browsing operators, including virtual rows. Account identity
+  precedes profile switching; mark the selected profile and show pending switches.
+  Personal destinations use simple rows, with logout in a separate fixed footer.
+  Preserve full names, feature availability, nested binding dialogs and focus return.
+- Large task, feedback and Skland dialogs share a fixed heading, bounded scrolling
+  body and separate actions. Keep feedback tabs visible during scrolling.
+  Feedback keeps a steady frame height across tabs and disclosure changes, with
+  an overlay scrollbar that occupies no content width. Start with the issue and
+  screenshot; associated IDs expand on demand with reduced-motion support.
+  Protect actual drafts and pending submissions, while allowing empty forms to
+  dismiss through the overlay. Task rows emphasize status and next action, with
+  diagnostic identifiers inside details. Image previews retain a visible close
+  target and return to their parent. Support narrow screens and enlarged text.
+  Use automatic scrollbars without a reserved gutter or asymmetric padding when
+  content fits. Let the dialog primitive compensate for page scroll locking.
+- Use one production summary strip and one schedule panel with open room regions. Operator portraits
   and efficiency carry the visual weight.
 - Keep generation and export together beside result status. Copper marks
   the primary action and focus; station colors identify room types only.

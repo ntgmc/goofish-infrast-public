@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
 import { useAppReducedMotion } from '../../lib/motion-preference'
 import { NextIcon as ArrowRight, SuccessIcon as Check, ExpandIcon as ChevronDown, BreadcrumbIcon, ExportIcon as Download, LoginIcon as LogIn, MenuIcon as Menu, GenerateIcon, LoadingIcon, ConfigIcon as Settings2, DataSourceIcon as ShieldCheck, InfoIcon as Sparkles, CloseIcon as X, PreviewIcon, SampleIcon } from '../../components/icons'
@@ -104,6 +104,22 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const [shift, setShift] = useState(0)
   const [boardView, setBoardView] = useState<'grid' | 'list'>('grid')
   const [mobileNavigation, setMobileNavigation] = useState(false)
+  const menuButton = useRef<HTMLButtonElement>(null)
+  const navigationClose = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!mobileNavigation) return
+    navigationClose.current?.focus()
+    const previousOverflow = document.documentElement.style.overflow
+    document.documentElement.style.overflow = 'hidden'
+    const mobileViewport = window.matchMedia('(max-width: 60rem)')
+    const closeOnDesktop = () => { if (!mobileViewport.matches) setMobileNavigation(false) }
+    mobileViewport.addEventListener('change', closeOnDesktop)
+    return () => {
+      document.documentElement.style.overflow = previousOverflow
+      mobileViewport.removeEventListener('change', closeOnDesktop)
+      if (mobileViewport.matches && !document.querySelector('[data-slot="dialog-content"]')) menuButton.current?.focus()
+    }
+  }, [mobileNavigation])
   const [downloadNotice, setDownloadNotice] = useState(false)
   const reduceMotion = useAppReducedMotion()
   const motionId = useId()
@@ -167,14 +183,6 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
     if (!await session.flushConfigSave()) { setNavigationError(text.saveFailed); return }
     await session.handleLogout()
   }
-  async function openLegacy(event: MouseEvent<HTMLAnchorElement>) {
-    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
-    event.preventDefault()
-    setMobileNavigation(false)
-    if ((manualDirty || toolDirty) && !window.confirm(text.discardManual)) return
-    if (!await session.flushConfigSave()) { setNavigationError(text.saveFailed); return }
-    void navigate('/v1')
-  }
   const guardedSession = { ...session, handleLogout: logout }
   function closePanel() {
     setPanel(null)
@@ -216,23 +224,47 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
         {mobileNavigation && <motion.button key="navigation-scrim" className="v2-nav-scrim" type="button" onClick={() => setMobileNavigation(false)} aria-label={text.close}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduceMotion ? 0 : motionTokens.duration.exit }} />}
       </AnimatePresence>
-      <aside id="v2-navigation" className={`v2-sidebar ${mobileNavigation ? 'v2-sidebar-open' : ''}`}>
-        <Link to={v2Path('overview', session.activeProfile?.id)} className="v2-brand"><img className="v2-brand-mark" src="/assets/maatool-v2-icon.svg" width="44" height="44" alt="" />
-          <span><strong>{text.brand}</strong><small>{text.brandDescription}</small></span></Link>
-        <button className="v2-mobile-close v2-icon-button" type="button" onClick={() => setMobileNavigation(false)} aria-label={text.close}><X size={20} /></button>
+      <aside id="v2-navigation" className={`v2-sidebar ${mobileNavigation ? 'v2-sidebar-open' : ''}`} role={mobileNavigation ? 'dialog' : undefined} aria-modal={mobileNavigation || undefined} aria-label={text.navigation}
+        onKeyDown={(event) => {
+          if (!mobileNavigation) return
+          if (event.key === 'Escape') { event.preventDefault(); setMobileNavigation(false) }
+          if (event.key !== 'Tab') return
+          const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('a[href], button:not(:disabled), summary'))
+            .filter((node) => node.getClientRects().length > 0 && (node.tagName === 'SUMMARY' || !node.closest('details:not([open])')))
+          const first = controls[0], last = controls[controls.length - 1]
+          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+        }}>
+        <div className="v2-sidebar-header">
+          <Link to={v2Path('overview', session.activeProfile?.id)} className="v2-brand" onClick={() => setMobileNavigation(false)}><img className="v2-brand-mark" src="/assets/maatool-v2-icon.svg" width="36" height="36" alt="" />
+            <span><strong>{text.brand}</strong><small>{text.brandDescription}</small></span></Link>
+          <button ref={navigationClose} className="v2-mobile-close v2-icon-button" type="button" onClick={() => setMobileNavigation(false)} aria-label={text.sidebar.close}><X size={20} aria-hidden="true" /></button>
+        </div>
         <V2Navigation section={section} session={session} operatorCount={owned.length} sampleOperators={sampleOperators}
-          onNavigate={navigateSection} onPanel={openPanel} onClose={() => setMobileNavigation(false)} onLegacy={openLegacy} />
+          onPanel={openPanel} onClose={() => setMobileNavigation(false)} />
       </aside>
-      <div className="v2-workspace">
+      <div className="v2-workspace" inert={mobileNavigation || undefined}>
         <header className="v2-topbar">
-          <div className="v2-breadcrumb"><button className="v2-menu-button v2-icon-button" type="button" onClick={() => setMobileNavigation(true)} aria-label={text.menu} aria-expanded={mobileNavigation} aria-controls="v2-navigation"><Menu size={21} /></button>
-            <span>{text.workspace}</span><BreadcrumbIcon size={14} aria-hidden="true" /><strong>{sectionLabels[section]}</strong></div>
-          <div className="v2-topbar-actions"><div className="v2-feature-content">{taskCenterAction}</div>
-            <div className="v2-feature-content"><ThemeSwitcher iconOnly /></div>
-            <NotificationBell iconOnly onInventory={() => navigateSection('inventory')} />
-            <span className="v2-topbar-divider" />
-            <button className={`v2-profile-button ${profileName ? '' : 'v2-profile-button-text'}`} type="button" aria-label={profileLabel} title={profileLabel} onClick={() => openPanel('account')}>
-              {profileName ? <><span className="v2-profile-avatar" aria-hidden="true">{profileName.slice(0, 1)}</span><span>{profileLabel}</span><ChevronDown size={14} aria-hidden="true" /></> : <><LogIn size={17} aria-hidden="true" /><span>{profileLabel}</span></>}
+          <div className="v2-topbar-context">
+            <button ref={menuButton} className="v2-menu-button v2-icon-button" type="button" onClick={() => setMobileNavigation(true)} aria-label={text.menu} aria-expanded={mobileNavigation} aria-controls="v2-navigation"><Menu size={20} aria-hidden="true" /></button>
+            <nav className="v2-breadcrumb" aria-label={text.topbar.location}>
+              <ol>
+                <li><Link to={v2Path('overview', session.activeProfile?.id)}>{text.workspace}</Link></li>
+                <li><BreadcrumbIcon size={14} aria-hidden="true" /><span aria-current="page">{sectionLabels[section]}</span></li>
+              </ol>
+            </nav>
+          </div>
+          <div className="v2-topbar-actions">
+            <div className="v2-topbar-tools" role="group" aria-label={text.topbar.actions}>
+              {taskCenterAction && <div className="v2-feature-content" title={copy.optimize.pages_tool_optimize_OptimizationTaskCenter_033}>{taskCenterAction}</div>}
+              <div className="v2-feature-content" title={text.topbar.theme}><ThemeSwitcher iconOnly /></div>
+              <div title={copy.notifications.title}><NotificationBell iconOnly onInventory={() => navigateSection('inventory')} /></div>
+            </div>
+            <button className="v2-profile-button" type="button" aria-label={profileLabel} title={profileLabel} aria-haspopup="dialog" aria-expanded={panel === 'account'} onClick={() => openPanel('account')}>
+              {profileName && <span className="v2-profile-avatar" aria-hidden="true">{Array.from(profileName)[0]}</span>}
+              {!signedIn && <LogIn size={18} aria-hidden="true" />}
+              <span className="v2-profile-label">{profileName && <small>{text.topbar.profile}</small>}<span>{profileLabel}</span></span>
+              <ChevronDown className="v2-profile-chevron" size={14} aria-hidden="true" />
             </button>
           </div>
         </header>

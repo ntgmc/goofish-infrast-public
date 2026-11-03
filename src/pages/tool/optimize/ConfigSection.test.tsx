@@ -129,6 +129,8 @@ describe('ConfigSection', () => {
     expect(screen.queryByText(/当前为 练度提升卡 权限/)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '当前免费配置' }))
     await user.click(await screen.findByRole('button', { name: '右满252（经验多）' }))
+    expect(screen.getByRole('tab', { name: copy.v2.configEditor.common })).toHaveAttribute('aria-selected', 'true')
+    await user.click(screen.getByRole('button', { name: copy.v2.configEditor.confirmLayout }))
     expect(screen.getByRole('tab', { name: /房间/ })).toHaveAttribute('aria-selected', 'true')
 
     expect(updateConfig).toHaveBeenCalledOnce()

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CONFIG_PRESETS } from '../../../src/lib/config'
+import { getFacilityIds } from '../../../src/lib/facility-layout'
 import type { OptimizeResult, UpgradeTrainingCost } from '../../../src/lib/types'
 import * as trainingCost from '../../handlers/training-cost'
 import { executeOptimizationJobWithPort } from './optimizer-dispatcher'
@@ -83,23 +84,23 @@ describe('optimization job dispatcher', () => {
     expect(result).toMatchObject({ schedule_source: 'manual' })
     expect(port.executeSchedule).toHaveBeenCalledWith(payload, { ...context, reportStage: expect.any(Function) })
   })
-  it.each(['252', '252-1'])('includes %s room levels in schedule result data', async (preset) => {
+  it.each(['243', '333', '252', '252-1'])('includes %s positions and room levels in schedule result data', async (preset) => {
     const payload = schedulePayload()
     payload.effectiveConfig = structuredClone(CONFIG_PRESETS[preset])
-    payload.effectiveConfig.facility_layout = ['manufacture_3', 'trading_2', 'power_2', 'manufacture_1', 'manufacture_4', 'trading_1', 'power_1', 'manufacture_5', 'manufacture_2']
+    payload.effectiveConfig.facility_layout = getFacilityIds(payload.effectiveConfig).reverse()
     const result = {
       ...scheduleResult(),
       plans: [{ name: 'Plan 1', rooms: {
-        trading: Array.from({ length: 2 }, () => ({ operators: ['Operator'] })),
-        manufacture: Array.from({ length: 5 }, () => ({ operators: ['Operator'] })),
+        trading: Array.from({ length: payload.effectiveConfig.trading_stations_count }, () => ({ operators: ['Operator'] })),
+        manufacture: Array.from({ length: payload.effectiveConfig.manufacturing_stations_count }, () => ({ operators: ['Operator'] })),
       } }],
     }
     const port = fakePort({ executeSchedule: vi.fn(async () => result) })
     const actual = await executeOptimizationJobWithPort(job(payload), context, port) as OptimizeResult
     expect(actual.facility_layout).toEqual(payload.effectiveConfig.facility_layout)
     expect(actual.facility_layout).not.toBe(payload.effectiveConfig.facility_layout)
-    expect(actual.plans[0].rooms.trading.map((room) => room.level)).toEqual(payload.effectiveConfig.trading_station_levels)
-    expect(actual.plans[0].rooms.manufacture.map((room) => room.level)).toEqual(payload.effectiveConfig.manufacturing_station_levels)
+    if (payload.effectiveConfig.trading_station_levels) expect(actual.plans[0].rooms.trading.map((room) => room.level)).toEqual(payload.effectiveConfig.trading_station_levels)
+    if (payload.effectiveConfig.manufacturing_station_levels) expect(actual.plans[0].rooms.manufacture.map((room) => room.level)).toEqual(payload.effectiveConfig.manufacturing_station_levels)
   })
   it('attaches short-term inventory warnings before capability projection and history serialization', async () => {
     const result: OptimizeResult = {

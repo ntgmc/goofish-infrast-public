@@ -95,7 +95,7 @@ export default function OperatorManagementPanel({ session, config, operators, bu
       await onImportOperators(parsed.data)
       if (mounted.current) setNotice({ kind: 'success', message: session.user ? copy.v2.importSuccess : copy.v2.sampleImportSuccess })
     } catch (caught) {
-      if (mounted.current) setNotice({ kind: 'error', message: caught instanceof Error ? caught.message : copy.v2.uploadFailed })
+      if (mounted.current) setNotice({ kind: 'error', message: caught instanceof Error && !(caught instanceof SyntaxError) ? caught.message : copy.v2.uploadFailed })
     } finally {
       if (mounted.current) setAction(null)
       if (fileInput.current) fileInput.current.value = ''
@@ -115,15 +115,28 @@ export default function OperatorManagementPanel({ session, config, operators, bu
       <section className="v2-operator-account" aria-label={text.currentProfile}>
         {session.user && <div className="v2-operator-section-heading">
           <p className="v2-operator-profile"><span>{text.currentProfile}</span><strong>{profile?.display_name ?? copy.v2.noProfiles}</strong></p>
-          <button type="button" className="v2-text-button" onClick={onManageProfiles}>{copy.v2.manageProfiles}<ArrowRight size={14} /></button>
+          {features.profiles && <button type="button" className="v2-text-button" onClick={onManageProfiles}>{copy.v2.manageProfiles}<ArrowRight size={14} aria-hidden="true" /></button>}
         </div>}
-        {binding ? <>
-          <div className="v2-operator-identity"><h3>{binding.nickname}</h3><span className="v2-neutral-tag">{text.bound}</span></div>
-          <div className="v2-operator-uid"><span>UID <span className="v2-selectable-uid">{binding.uid}</span></span>
-            <button type="button" className="v2-text-button" onClick={() => void copyUid()} aria-label={text.copyUid}>{copyState === 'copied' ? text.copied : text.copyUid}</button>
-            <span>{text.server} · {binding.channel_name}</span>
+        {binding ? <div className="v2-operator-source">
+          <div className="v2-operator-identity"><SklandIcon /><h3>{binding.nickname}</h3><span className={`v2-neutral-tag${invalid ? ' v2-error' : ''}`}>{invalid ? text.authorizationExpired : text.bound}</span></div>
+          <div className="v2-operator-uid"><span>UID <span className="v2-selectable-uid">{binding.uid}</span></span><span>{binding.channel_name}</span></div>
+        </div> : <div className="v2-operator-unbound"><h3><SklandIcon />{text.unbound}</h3><p>{text.unboundDescription}</p></div>}
+        <div className="v2-operator-import-actions">
+          {features.skland && <button type="button" className="v2-button v2-button-primary" disabled={disabled} aria-busy={action === 'refresh'}
+            onClick={() => { if (!binding || invalid) openBinding(); else void refreshSkland() }}>
+            {binding && !invalid ? <RefreshIcon size={16} aria-hidden="true" /> : <SklandIcon />}{action === 'refresh' ? text.refreshing : !binding ? text.bind : invalid ? text.reauthorize : text.refresh}
+          </button>}
+          <div className="v2-operator-file" role="group" aria-label={text.maaTitle}>
+            <button type="button" className="v2-button v2-button-secondary" disabled={!canUpload || disabled} aria-busy={action === 'file'}
+              onClick={() => fileInput.current?.click()}><UploadIcon size={15} aria-hidden="true" />{action === 'file' ? text.importing : text.chooseFile}</button>
+            <input className="sr-only" ref={fileInput} tabIndex={-1} type="file" accept=".json,application/json" disabled={!canUpload || disabled} aria-label={copy.v2.uploadMaa}
+              onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file) }} />
           </div>
-          {copyState !== 'idle' && <p role="status" className="v2-muted">{copyState === 'failed' ? text.copyFailed : text.copied}</p>}
+        </div>
+        {!features.skland && <p className="v2-muted">{text.syncUnavailable}</p>}
+        {!canUpload && <p className="v2-muted">{text.previewImport}</p>}
+        {binding && <details className="v2-operator-binding-details">
+          <summary>{text.bindingDetails}</summary>
           <dl className="v2-operator-binding-data">
             <div><dt>{text.boundAt}</dt><dd>{bindingTime(binding.bound_at, text.unavailableValue)}</dd></div>
             <div><dt>{text.refreshedAt}</dt><dd>{bindingTime(binding.last_imported_at, text.neverRefreshed)}</dd></div>
@@ -131,32 +144,23 @@ export default function OperatorManagementPanel({ session, config, operators, bu
               {invalid ? text.credentialInvalid : action === 'refresh' ? text.refreshing : verifiedAt ? <>{text.credentialVerified}{bindingTime(verifiedAt, text.unavailableValue)}</> : text.credentialSaved}
             </dd></div>
           </dl>
-        </> : <div className="v2-operator-unbound"><h3><SklandIcon />{text.unbound}</h3><p>{text.unboundDescription}</p></div>}
-        {features.skland ? <div className="v2-operator-sync-actions">
-          <button type="button" className="v2-button v2-button-primary" disabled={disabled} aria-busy={action === 'refresh'}
-            onClick={() => { if (!binding || invalid) openBinding(); else void refreshSkland() }}>
-            {binding && !invalid ? <RefreshIcon size={16} /> : <SklandIcon />}{action === 'refresh' ? text.refreshing : !binding ? text.bind : invalid ? text.reauthorize : text.refresh}
-          </button>
-          {binding && !invalid && <button type="button" className="v2-text-button" disabled={disabled} onClick={openBinding}>{text.reauthorize}</button>}
-        </div> : <p className="v2-muted">{text.syncUnavailable}</p>}
+          <div className="v2-operator-sync-actions">
+            <button type="button" className="v2-text-button" onClick={() => void copyUid()} aria-label={text.copyUid}>{copyState === 'copied' ? text.copied : text.copyUid}</button>
+            {features.skland && binding && !invalid && <button type="button" className="v2-text-button" disabled={disabled} onClick={openBinding}>{text.reauthorize}</button>}
+          </div>
+          {copyState !== 'idle' && <p role="status" className="v2-muted">{copyState === 'failed' ? text.copyFailed : text.copied}</p>}
+        </details>}
       </section>
       {notice && <div className={`v2-operator-notice ${notice.kind === 'error' ? 'v2-error' : ''}`} role={notice.kind === 'error' ? 'alert' : 'status'}>
         <p>{notice.message}</p>{notice.detail && notice.detail !== notice.message && <p>{notice.detail}</p>}
         {features.skland && notice.recovery && <button type="button" className="v2-text-button" disabled={disabled}
           onClick={() => { if (notice.recovery === 'rebind') openBinding(); else void refreshSkland() }}>{notice.recovery === 'rebind' ? text.reauthorize : text.retry}</button>}
       </div>}
-      <section className="v2-operator-file" aria-label={text.maaTitle}>
-        <div className="v2-operator-section-heading"><h3>{text.maaTitle}</h3>
-          <button type="button" className="v2-button v2-button-secondary" disabled={!canUpload || disabled} aria-busy={action === 'file'}
-            onClick={() => fileInput.current?.click()}><UploadIcon size={15} />{action === 'file' ? text.importing : text.chooseFile}</button>
+      <section className="v2-operator-list" aria-label={text.list}>
+        <div className="v2-operator-list-toolbar">
+          <div className="v2-operator-section-heading"><h3>{text.list}</h3><span className="v2-muted">{deferredSearch.trim() ? text.matchingCount(filtered.length) : text.ownedCount(ownedCount)}</span></div>
+          <label className="v2-search-label"><span className="sr-only">{copy.v2.searchOperators}</span><span className="v2-search"><SearchIcon size={17} aria-hidden="true" /><input value={search} placeholder={text.searchPlaceholder} onChange={(event) => setSearch(event.target.value)} aria-label={copy.v2.searchOperators} /></span></label>
         </div>
-        {!canUpload && <p className="v2-muted">{text.previewImport}</p>}
-        <input className="sr-only" ref={fileInput} type="file" accept=".json,application/json" disabled={!canUpload || disabled} aria-label={copy.v2.uploadMaa}
-          onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file) }} />
-      </section>
-      <section aria-label={text.list}>
-        <div className="v2-operator-section-heading"><h3>{text.list}</h3><span className="v2-muted">{deferredSearch.trim() ? text.matchingCount(filtered.length) : text.ownedCount(ownedCount)}</span></div>
-        <label className="v2-search-label"><span>{copy.v2.searchOperators}</span><span className="v2-search"><SearchIcon size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label={copy.v2.searchOperators} /></span></label>
         <div className="v2-operator-rows" aria-busy={search !== deferredSearch}>
           <OperatorRows operators={filtered} />
           {filtered.length === 0 && <div className="v2-operator-empty"><p className="v2-muted">{operators.length ? copy.v2.noOperators : text.empty}</p>

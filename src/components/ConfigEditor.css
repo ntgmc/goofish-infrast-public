@@ -17,15 +17,61 @@
   margin-top: var(--space-2xs);
 }
 
+.config-orundum-preference {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-xs);
+  border: 0;
+  padding: 0;
+}
+
+.config-preference-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-height: 44px;
+  padding: var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  cursor: pointer;
+}
+
+.config-preference-option:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--secondary);
+}
+
+.config-preference-option:has(input:focus-visible) {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.config-preference-option input {
+  order: 1;
+  flex: none;
+  accent-color: var(--primary);
+}
+
+.config-preference-option strong,
+.config-preference-option .config-help {
+  display: block;
+}
+
+.config-orundum-preference:disabled .config-preference-option {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .config-task-tabs {
   position: sticky;
   top: 0;
   z-index: 2;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  padding: var(--space-3xs);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-input);
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  padding-block: var(--space-3xs);
+  border-bottom: 1px solid var(--border);
   background: var(--background);
 }
 
@@ -67,6 +113,8 @@
   background: var(--primary);
 }
 
+.config-task-pending--orundum { background: var(--destructive); }
+
 .config-editor-fields {
   min-width: 0;
   margin: 0;
@@ -77,7 +125,7 @@
 .config-task-panel {
   display: grid;
   min-width: 0;
-  gap: var(--space-sm);
+  gap: var(--space-md);
   align-content: start;
 }
 
@@ -90,6 +138,19 @@
   min-width: 0;
   gap: var(--space-2xs);
   align-content: start;
+}
+
+.config-field--inline {
+  grid-template-columns: minmax(0, 1fr) minmax(8rem, .7fr);
+  align-items: center;
+}
+
+.config-field--inline > .config-help {
+  grid-column: 1 / -1;
+}
+
+.config-preset-section {
+  gap: var(--space-xs);
 }
 
 .config-field > :is(span, label, h3, h4),
@@ -151,16 +212,27 @@
   background: var(--theme-surface-3);
 }
 
-.config-preset[aria-pressed="true"] {
+.config-editor .config-preset[aria-pressed="true"] {
   border-color: var(--preset-color);
   background: var(--secondary);
   color: var(--primary);
+  outline: 1px solid var(--preset-color);
+  font-weight: 600;
 }
 
 .config-preset--balanced { --preset-color: var(--primary); }
 .config-preset--gold { --preset-color: var(--station-manufacturing); }
 .config-preset--experience { --preset-color: var(--station-trading); }
 .config-preset--orundum { --preset-color: var(--product-orundum); }
+
+.config-execution-settings {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-md);
+  padding: var(--space-sm);
+  border-radius: var(--radius-input);
+  background: var(--theme-surface-2);
+}
 
 .config-execution-options {
   display: grid;
@@ -175,16 +247,45 @@
   white-space: nowrap;
 }
 
-.config-layout-notice {
+.config-editor .config-layout-notice.tool-secondary-action {
   min-height: 44px;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  border-color: var(--primary);
+  background: var(--secondary);
+  color: var(--primary);
   white-space: normal;
   text-align: left;
 }
 
+.config-layout-arrows {
+  display: flex;
+  flex: none;
+  padding-right: 3px;
+}
+
+.config-layout-arrows svg {
+  margin-left: -4px;
+  animation: config-layout-guide 1.4s ease-in-out 3;
+}
+
+.config-layout-arrows svg:nth-child(2) { animation-delay: 120ms; }
+.config-layout-arrows svg:nth-child(3) { animation-delay: 240ms; }
+
+@keyframes config-layout-guide {
+  0%, 65%, 100% { opacity: .35; transform: translateX(0); }
+  30% { opacity: 1; transform: translateX(3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .config-layout-arrows svg { animation: none; }
+}
+
+[data-reduced-motion] .config-layout-arrows svg { animation: none; }
+
 .config-room-counts {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-sm);
+  gap: var(--space-2xs);
   margin-top: var(--space-xs);
 }
 
@@ -198,9 +299,12 @@
 
 .config-station {
   min-width: 0;
-  padding: var(--space-2xs);
-  border-top: 2px solid var(--station-color);
-  background: color-mix(in oklab, var(--station-color) 6%, var(--theme-surface-1));
+  padding-block: var(--space-2xs);
+}
+
+.config-room-counts .config-station {
+  grid-template-columns: minmax(0, 1fr) 132px;
+  border-bottom: 1px solid var(--border);
 }
 
 .config-station--trading { --station-color: var(--station-trading); }
@@ -287,8 +391,7 @@
 }
 
 .config-section-divider {
-  padding-top: var(--space-sm);
-  border-top: 1px solid var(--border);
+  padding-top: 0;
 }
 
 .config-explanation {
@@ -306,9 +409,22 @@
 
 .config-strategy-section {
   min-width: 0;
-  padding: var(--space-2xs);
+  padding: var(--space-sm);
+  border: 1px solid var(--border);
   border-top: 2px solid var(--strategy-color);
-  background: color-mix(in oklab, var(--strategy-color) 5%, var(--theme-surface-1));
+  border-radius: var(--radius-input);
+  background: var(--theme-surface-1);
+}
+
+.config-section-title,
+.config-strategy-heading {
+  margin-bottom: var(--space-xs);
+}
+
+.config-switch-row .config-strategy-heading,
+.config-field > .config-strategy-heading,
+.config-field > .config-section-title {
+  margin-bottom: 0;
 }
 
 .config-strategy-section--dormitory { --strategy-color: var(--primary); }
@@ -366,68 +482,58 @@
   border-top: 0;
 }
 
+.config-room-settings {
+  min-width: 0;
+  padding: var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  background: var(--theme-surface-2);
+}
+
+.config-room-settings > summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  cursor: pointer;
+  list-style: none;
+}
+
+.config-room-settings > summary::-webkit-details-marker { display: none; }
+.config-room-settings > summary strong,
+.config-room-settings > summary small { display: block; }
+.config-room-settings > summary strong { color: var(--theme-ink-primary); font-size: var(--text-sm); }
+.config-room-settings > summary small { margin-top: var(--space-3xs); color: var(--theme-ink-secondary); font-size: var(--text-xs); }
+.config-room-settings > summary svg { flex: none; transition: transform var(--dur-fast) var(--ease-out); }
+.config-room-settings[open] > summary svg { transform: rotate(180deg); }
+.config-room-settings-body { display: grid; gap: var(--space-md); padding-top: var(--space-md); }
+
 @container (min-width: 36rem) {
+  .config-task-panel--common,
   .config-strategy-panel {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: min-content 1fr;
     align-items: start;
-  }
-
-  .config-strategy-section--dormitory,
-  .config-strategy-section--fiammetta {
-    grid-column: 1;
-  }
-
-  .config-strategy-section--drones {
-    grid-column: 2;
-    grid-row: 1 / 3;
-  }
-
-  .config-task-panel--common {
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
     column-gap: var(--space-md);
   }
 
-  .config-preset-section {
-    grid-column: 1;
-    grid-row: 1 / 3;
-  }
-
-  .config-execution-field,
-  .config-shift-field {
-    grid-column: 2;
-  }
-
-  .config-layout-notice {
-    grid-column: 1 / -1;
-  }
+  .config-layout-notice { grid-column: 1 / -1; }
+  .config-strategy-section--drones { grid-column: 2; grid-row: 1 / 3; }
+  .config-strategy-section--dormitory,
+  .config-strategy-section--fiammetta { grid-column: 1; }
+  .config-product-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .config-orundum-preference { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .config-room-settings > summary svg { transition: none; }
+}
+[data-reduced-motion] .config-room-settings > summary svg { transition: none; }
+
 @media (max-width: 40rem) {
-  .config-room-counts > .config-station--power {
-    grid-column: 1 / -1;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    min-height: 44px;
-    align-items: center;
-  }
-
-  .config-station--power .config-station-count {
-    min-height: 0;
-  }
-
   .config-preset {
     gap: var(--space-3xs);
     padding-inline: var(--space-2xs);
     font-size: var(--text-xs);
-  }
-}
-
-@media (min-width: 40rem) {
-  .config-room-counts {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .config-product-groups {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

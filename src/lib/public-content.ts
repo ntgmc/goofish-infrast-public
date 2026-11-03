@@ -3,7 +3,7 @@ import { copy } from '../copy/index'
 import { getSku, productPolicies } from './product-catalog'
 
 export const PUBLIC_CONTENT_VERSION = 1 as const
-export const PUBLIC_CONTENT_DEFAULTS_REVISION = 14 as const
+export const PUBLIC_CONTENT_DEFAULTS_REVISION = 15 as const
 export const PUBLIC_PRICING_PLAN_IDS = [
   'free_preview',
   'single_account_monthly',
@@ -397,6 +397,19 @@ export function resolvePublicContentSettings(value: unknown): { content: PublicC
     migratedDraft.faq.items = migratedDraft.faq.items.map((item) => item.id === 'change-bound-account'
       && item.question === copy.public.pages_PublicInfoPage_095 && item.answer === previous.faq_answer
       ? { ...item, answer: copy.public.pages_PublicInfoPage_096 } : item)
+  }
+  if (storedDefaultsRevision < 15) {
+    for (const row of migratedDraft.pricing.comparison_rows) {
+      const index = copy.publicContent.legacy_pricing_comparison.findIndex((previous) => previous.feature === row.feature)
+      const previous = copy.publicContent.legacy_pricing_comparison[index]
+      // Default comparison IDs follow catalog order; keep saved IDs and custom fields intact.
+      const current = DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.comparison_rows.find((item) => item.id === `comparison-${index + 1}`)
+      if (!previous || !current) continue
+      for (const field of ['feature', ...PUBLIC_PRICING_PLAN_IDS] as const) {
+        const value = current[field]
+        if (value !== undefined && (row[field] === undefined || row[field] === previous[field])) row[field] = value
+      }
+    }
   }
   return {
     content: {

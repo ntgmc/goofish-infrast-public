@@ -136,7 +136,7 @@ describe('isolated cultivation reader lifecycle', () => {
     const pending = readCultivationPlan(input)
     expect(builder.postMessage).toHaveBeenCalledWith({ type: 'prepare', query: input.query })
     expect(mocks.create).toHaveBeenCalledWith(expect.any(URL), [], {
-      execArgv: ['--max-old-space-size=512'], stdio: ['ignore', 'ignore', 'inherit', 'ipc'], serialization: 'advanced',
+      execArgv: ['--max-old-space-size=256'], stdio: ['ignore', 'ignore', 'inherit', 'ipc'], serialization: 'advanced',
     })
     expect(worker.postMessage).not.toHaveBeenCalled()
     builder.emit('message', { ok: true, result: null })

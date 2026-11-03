@@ -38,7 +38,7 @@ function stopWorker(state: WorkerState) {
 function getWorker(state: WorkerState) {
   if (state.worker) return state.worker
   const entry = new URL('./cultivation-worker.js', import.meta.url)
-  const current = fork(entry, [], { execArgv: ['--max-old-space-size=512'],
+  const current = fork(entry, [], { execArgv: [`--max-old-space-size=${state === updater ? 256 : 512}`],
     stdio: ['ignore', 'ignore', 'inherit', 'ipc'], serialization: 'advanced' })
   state.worker = current
   current.on('message', (reply: CultivationWorkerReply) => {

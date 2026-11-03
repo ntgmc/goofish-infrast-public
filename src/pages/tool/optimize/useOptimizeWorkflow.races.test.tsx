@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '..
 import { MemoryRouter } from 'react-router'
 import { afterEach, expect, it, vi } from 'vitest'
 import { CONFIG_PRESETS, normalizeConfig } from '../../../lib/config'
+import { getFacilityIds } from '../../../lib/facility-layout'
 import type { AuthSuccessResponse, OptimizeJobAccepted, UserGameAccount, UserWorkspace, WorkspaceResultHistoryItem, WorkspaceResultHistorySummary } from '../../../lib/types'
 import { copy } from '../../../copy'
 import { tourStorageKey } from '../../../components/GuidedTour'
@@ -17,7 +18,7 @@ import { useOptimizeWorkflow, type Props } from './useOptimizeWorkflow'
 import { buildOptimizeJobStorageKey, writeActiveOptimizeJob } from './job-progress'
 import { buildOptimizeSignature } from './workflow-utils'
 
-const config = normalizeConfig(CONFIG_PRESETS['243'])
+const config = normalizeConfig({ ...CONFIG_PRESETS['243'], facility_layout: getFacilityIds(CONFIG_PRESETS['243']) })
 const operators = [{ id: 'char_002_amiya', name: '阿米娅', own: true, elite: 2, rarity: 4, level: 80 }]
 const profile: UserGameAccount = { id: 'race-profile', user_id: 'user', kind: 'cdk', permission: 'advanced', status: 'active',
   cdk_order_hash: 'order', display_name: 'Doctor', note: '', operator_count: 1, updated_at: null, created_at: '2026-10-01T00:00:00Z' }

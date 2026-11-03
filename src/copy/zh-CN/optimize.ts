@@ -886,7 +886,8 @@ export const optimizeCopy = {
   pages_tool_optimize_optimization_job_events_006: "点击查看后台计算详情。",
   // src/pages/tool/optimize/OptimizationTaskCenter.tsx
   pages_tool_optimize_OptimizationTaskCenter_001: "后台计算",
-  pages_tool_optimize_OptimizationTaskCenter_002: "系统在后台执行排班生成和场景分析。已结束的计算记录保留 7 天，结果是否可查看以历史记录和封存区为准。",
+  pages_tool_optimize_OptimizationTaskCenter_002: "查看计算进度和最近 7 天的记录，完成后可打开结果。",
+  taskCenterDetails: '计算详情',
   pages_tool_optimize_OptimizationTaskCenter_003: "刷新",
   pages_tool_optimize_OptimizationTaskCenter_004: "加载计算记录中…",
   pages_tool_optimize_OptimizationTaskCenter_005: "暂无进行中的计算或最近 7 天的记录。",
@@ -910,7 +911,7 @@ export const optimizeCopy = {
   pages_tool_optimize_OptimizationTaskCenter_023: "打开场景实验室",
   pages_tool_optimize_OptimizationTaskCenter_024: "查看更多",
   pages_tool_optimize_OptimizationTaskCenter_025: "次计算",
-  pages_tool_optimize_OptimizationTaskCenter_026: "队列位置",
+  pages_tool_optimize_OptimizationTaskCenter_026: "排队位置",
   pages_tool_optimize_OptimizationTaskCenter_027: "支持编号",
   pages_tool_optimize_OptimizationTaskCenter_028: "计算记录更新失败，请稍后重试。",
   pages_tool_optimize_OptimizationTaskCenter_029: "计算取消失败，请稍后重试。",

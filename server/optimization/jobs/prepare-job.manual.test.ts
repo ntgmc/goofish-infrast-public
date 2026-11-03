@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CONFIG_PRESETS, normalizeConfig } from '../../../src/lib/config'
+import { getFacilityIds } from '../../../src/lib/facility-layout'
 import { createManualPlans } from '../../../src/lib/manual-schedule'
 import { createBlankManualSchedule } from '../../../src/lib/manual-schedule-tool'
 import type { LicenseOperator, OptimizeResult } from '../../../src/lib/types'
@@ -43,7 +44,7 @@ const source: OptimizeResult = {
     manufacture: [{ level: 3, product: 'Battle Record', operators: ['芬'], efficiency: 999 }],
   } }],
 }
-const config = CONFIG_PRESETS['243']
+const config = { ...CONFIG_PRESETS['243'], facility_layout: getFacilityIds(CONFIG_PRESETS['243']) }
 function request(overrides: Record<string, unknown> = {}): Request {
   return new Request('http://local/api/optimization/jobs', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -83,7 +84,7 @@ describe('manual schedule admission', () => {
   })
 
   it('simulates a standalone source without requiring history or changing its facility configuration', async () => {
-    const standalone = createBlankManualSchedule({ ...normalizeConfig(CONFIG_PRESETS['333']), shift_hours: [12, 12, 12] })
+    const standalone = createBlankManualSchedule({ ...normalizeConfig(CONFIG_PRESETS['333']), facility_layout: getFacilityIds(CONFIG_PRESETS['333']), shift_hours: [12, 12, 12] })
     const result = await prepareOptimizeJob(request({
       manualSchedule: { source: standalone, plans: createManualPlans(standalone) },
     }))

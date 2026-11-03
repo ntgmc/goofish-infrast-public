@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { ScrollArea } from './ui/scroll-area'
 import { SuccessIcon as Check, AddImageIcon as ImagePlus, FeedbackIcon as MessageSquare, RemoveIcon as X } from './icons'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePrivateQueryScope } from '../lib/private-query-scope'
@@ -42,6 +43,7 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
   const [historyHasDraft, setHistoryHasDraft] = useState(false)
   const busy = processing || submitting || historyBusy
   const attachSchedule = category === 'schedule'
+  const hasDraft = Boolean(message.trim() || attachment || attachProfile || resultId.trim() || jobId.trim())
 
   useEffect(() => {
     const button = trigger.current
@@ -102,8 +104,8 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
       <MessageSquare size={18} aria-hidden="true" />{!iconOnly && <span>{text.title}</span>}
     </button>
     <Dialog open={open} onOpenChange={(next) => { if (!busy) setOpen(next) }}>
-      <DialogContent id={`${id}-dialog`} className="feedback-dialog"
-        preventOutsideDismiss={busy || view === 'new' && !success || historyHasDraft}
+      <DialogContent id={`${id}-dialog`} className="feedback-dialog v2-modal"
+        preventOutsideDismiss={busy || view === 'new' && !success && hasDraft || historyHasDraft}
         onPaste={(event) => {
           if (view !== 'new' || success) return
           const file = Array.from(event.clipboardData.items).find((item) => item.kind === 'file' && item.type.startsWith('image/'))?.getAsFile()
@@ -114,35 +116,35 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
         onOpenAutoFocus={(event) => { if (view === 'new') { event.preventDefault(); categoryInput.current?.focus() } }}
         onCloseAutoFocus={(event) => { event.preventDefault(); trigger.current?.focus() }}
         {...(busy ? { showCloseButton: false as const } : { showCloseButton: true as const, closeLabel: text.close })}>
-        <div className="feedback-dialog-header">
+        <div className="feedback-dialog-header v2-modal-heading">
           <DialogTitle>{text.title}</DialogTitle>
           <DialogDescription>{text.description}</DialogDescription>
         </div>
-        <Tabs.Root value={view} onValueChange={(value) => { if (value === 'history') setFeedbackId(null); setView(value as typeof view) }}>
+        <Tabs.Root className="v2-modal-content feedback-workspace" value={view} onValueChange={(value) => { if (value === 'history') setFeedbackId(null); setView(value as typeof view) }}>
           <Tabs.List className="feedback-tabs" aria-label={text.title}>
             <Tabs.Trigger value="new" className="feedback-tab" disabled={busy}>{text.newFeedback}</Tabs.Trigger>
             <Tabs.Trigger value="history" className="feedback-tab" disabled={busy}>{text.myFeedback}</Tabs.Trigger>
           </Tabs.List>
-          <Tabs.Content value="history" className="feedback-tab-panel"><FeedbackHistory key={feedbackId ?? 'list'} initialId={feedbackId} onBusyChange={setHistoryBusy} onDraftChange={setHistoryHasDraft} /></Tabs.Content>
+          <Tabs.Content value="history" className="feedback-tab-panel"><FeedbackScrollArea><FeedbackHistory key={feedbackId ?? 'list'} initialId={feedbackId} onBusyChange={setHistoryBusy} onDraftChange={setHistoryHasDraft} /></FeedbackScrollArea></Tabs.Content>
           <Tabs.Content value="new" className="feedback-tab-panel">
-        {success ? <>
+        <FeedbackScrollArea>{success ? <div className="feedback-submitted">
           <p role="status" className="feedback-success"><Check size={20} aria-hidden="true" />{text.submitted}</p>
-          <button ref={successClose} type="button" className="feedback-action feedback-action-primary" onClick={() => setOpen(false)}>{text.close}</button>
-          <button type="button" className="feedback-action" onClick={() => setView('history')}>{text.viewSubmitted}</button>
-        </> : <form ref={form} tabIndex={-1} aria-busy={busy} onSubmit={submit} className="feedback-form">
+          <div className="feedback-success-actions"><button ref={successClose} type="button" className="feedback-action feedback-action-primary" onClick={() => setOpen(false)}>{text.close}</button>
+          <button type="button" className="feedback-action" onClick={() => setView('history')}>{text.viewSubmitted}</button></div>
+        </div> : <form id={`${id}-form`} ref={form} tabIndex={-1} aria-busy={busy} onSubmit={submit} className="feedback-form">
           <label className="feedback-label"><span>{text.category}</span><select ref={categoryInput} className="tool-field feedback-field" value={category} disabled={busy} onChange={(event) => setCategory(event.target.value as FeedbackCategory)}>{FEEDBACK_CATEGORIES.map((value) => <option key={value} value={value}>{text.categories[value]}</option>)}</select></label>
           <div>
             <div className="feedback-label"><label htmlFor={`${id}-message`}>{text.message}</label><textarea id={`${id}-message`} className="tool-field feedback-field" rows={5} required maxLength={FEEDBACK_MESSAGE_MAX_LENGTH} value={message} disabled={busy} placeholder={text.placeholder} aria-describedby={`${id}-message-hint`} onChange={(event) => setMessage(event.target.value)} /></div>
             <div className="feedback-message-meta"><p id={`${id}-message-hint`}>{text.messageHint}</p><span className="feedback-count" aria-label={`${text.characterCount} ${message.length}/${FEEDBACK_MESSAGE_MAX_LENGTH}`}>{message.length}/{FEEDBACK_MESSAGE_MAX_LENGTH}</span></div>
           </div>
-          {(profileId || attachSchedule) && <fieldset className="feedback-context"><legend>{text.context}</legend>
+          {(profileId || attachSchedule) && <details className="feedback-context"><summary>{text.context}</summary><div className="feedback-context-body">
             {profileId && <label className="feedback-profile"><input type="checkbox" checked={attachProfile} disabled={busy} onChange={(event) => setAttachProfile(event.target.checked)} />{text.attachProfile}</label>}
             {attachSchedule && <div className="feedback-context-fields">
               <label className="feedback-label"><span>{text.resultId}</span><input className="tool-field feedback-field" maxLength={120} value={resultId} disabled={busy} onChange={(event) => setResultId(event.target.value)} /></label>
               <label className="feedback-label"><span>{text.jobId}</span><input className="tool-field feedback-field" maxLength={120} value={jobId} disabled={busy} onChange={(event) => setJobId(event.target.value)} /></label>
             </div>}
             <p className="feedback-hint">{text.contextHint}</p>
-          </fieldset>}
+          </div></details>}
           <div className="feedback-label">
             <span id={`${id}-image-label`}>{text.image}</span>
             <input ref={fileInput} type="file" hidden accept={FEEDBACK_IMAGE_TYPES.join(',')} disabled={busy} aria-label={text.image}
@@ -165,11 +167,20 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
             </div>}
           </div>
           {error && <p ref={errorNotice} tabIndex={-1} role="alert" className="tool-alert tool-alert--error">{error}</p>}
-          <div className="feedback-form-actions"><button type="submit" className="feedback-action feedback-action-primary" disabled={busy || !message.trim()}>{submitting ? text.submitting : text.submit}</button></div>
-        </form>}
+        </form>}</FeedbackScrollArea>
           </Tabs.Content>
         </Tabs.Root>
+        {view === 'new' && !success && <div className="feedback-form-actions v2-modal-footer"><button type="submit" form={`${id}-form`} className="feedback-action feedback-action-primary" disabled={busy || !message.trim()}>{submitting ? text.submitting : text.submit}</button></div>}
       </DialogContent>
     </Dialog>
   </>
+}
+
+function FeedbackScrollArea({ children }: { children: ReactNode }) {
+  return <ScrollArea.Root type="auto" className="feedback-scroll">
+    <ScrollArea.Viewport className="v2-modal-body feedback-scroll-viewport" tabIndex={0} role="region" aria-label={copy.feedback.title} disableImplicitContentElement>
+      <ScrollArea.Content style={{ display: 'block' }}>{children}</ScrollArea.Content>
+    </ScrollArea.Viewport>
+    <ScrollArea.Scrollbar orientation="vertical" className="feedback-scrollbar"><ScrollArea.Thumb className="feedback-scroll-thumb" /></ScrollArea.Scrollbar>
+  </ScrollArea.Root>
 }

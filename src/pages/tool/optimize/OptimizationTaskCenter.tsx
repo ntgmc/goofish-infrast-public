@@ -1,4 +1,4 @@
-import { TasksIcon as Activity } from '../../../components/icons'
+import { TasksIcon as Activity, CloseIcon, RefreshIcon } from '../../../components/icons'
 import { useEffect, useRef, type RefObject } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../../components/ui/dialog'
 import type { OptimizationJobListItem } from '../../../lib/optimization-contracts'
@@ -79,76 +79,76 @@ export default function OptimizationTaskCenterDialog({
         id="optimization-task-center-dialog"
         aria-labelledby="optimization-task-center-title"
         aria-describedby="optimization-task-center-description"
-        className="block max-h-[85dvh] max-w-3xl overflow-y-auto"
+        className="v2-modal task-center-dialog block max-h-[85dvh] max-w-3xl overflow-y-auto"
         onOpenAutoFocus={(event) => {
           event.preventDefault()
           closeButtonRef.current?.focus()
         }}
-        onCloseAutoFocus={(event) => {
-          event.preventDefault()
-        }}
       >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="v2-modal-heading flex items-start justify-between gap-3">
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <DialogTitle id="optimization-task-center-title" className="text-ink-primary">
-                {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_001}
-              </DialogTitle>
-              {activeCount > 0 && <span className="tool-status tool-status--current">{activeCount} {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_030}</span>}
-              {attentionCount > 0 && <span className="tool-status tool-status--error">{attentionCount} {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_035}</span>}
-            </div>
+            <DialogTitle id="optimization-task-center-title" className="text-ink-primary">
+              {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_001}
+            </DialogTitle>
             <DialogDescription id="optimization-task-center-description" className="mt-1">
               {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_002}
             </DialogDescription>
           </div>
-          <button ref={closeButtonRef} type="button" onClick={onClose} className="tool-secondary-action shrink-0" aria-label={copy.optimize.pages_tool_optimize_OptimizationTaskCenter_034}>
-            {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_034}
+          <button ref={closeButtonRef} type="button" onClick={onClose} className="v2-modal-close tool-secondary-action shrink-0" aria-label={copy.optimize.pages_tool_optimize_OptimizationTaskCenter_034}>
+            <CloseIcon size={20} aria-hidden="true" />
           </button>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2 border-t border-surface-3 pt-4">
-          <button type="button" onClick={() => void controller.toggleNotifications()} className="tool-secondary-action">
-            {notificationsEnabled ? copy.optimize.pages_tool_optimize_OptimizationTaskCenter_007 : copy.optimize.pages_tool_optimize_OptimizationTaskCenter_006}
-          </button>
-          <button type="button" onClick={() => void controller.refresh()} disabled={loading || refreshing} className="tool-secondary-action">
-            {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_003}
-          </button>
-        </div>
-
-        {notice && <p className="tool-alert tool-alert--warning mt-3" role="status">{notice}</p>}
-        {error && <p className="tool-alert tool-alert--error mt-3" role="alert">{error}</p>}
-        {loading && jobs.length === 0 ? (
-          <p className="mt-4 text-sm text-ink-muted" role="status">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_004}</p>
-        ) : jobs.length === 0 ? (
-          <p className="mt-4 text-sm text-ink-muted">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_005}</p>
-        ) : (
-          <div className="mt-4 space-y-5">
-            {groups.filter((group) => group.jobs.length > 0).map((group) => (
-              <section key={group.label} aria-label={group.label}>
-                <h3 className="mb-2 text-sm font-medium text-ink-secondary">{group.label} · {group.jobs.length}</h3>
-                <div className="space-y-2">
-                  {group.jobs.map((job) => (
-                    <JobRow
-                      key={job.id}
-                      job={job}
-                      busy={busyJobId === job.id}
-                      onCancel={() => void controller.cancel(job)}
-                      onRetrySchedule={onRetrySchedule}
-                      onOpenScenario={() => onOpenScenario(job)}
-                      onOpenResult={() => onOpenResult(job)}
-                      retryEnabled={retryEnabled}
-                    />
-                  ))}
-                </div>
-              </section>
-            ))}
+        <div className="v2-modal-body task-center-content">
+          <div className="task-center-toolbar flex flex-wrap items-center justify-between gap-2">
+            <div className="task-center-counts flex flex-wrap gap-2">
+              {activeCount > 0 && <span className="tool-status tool-status--current">{activeCount} {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_030}</span>}
+              {attentionCount > 0 && <span className="tool-status tool-status--error">{attentionCount} {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_035}</span>}
+            </div>
+            <div className="task-center-actions flex flex-wrap gap-2">
+              <button type="button" onClick={() => void controller.toggleNotifications()} aria-pressed={notificationsEnabled} className="tool-secondary-action">
+                {notificationsEnabled ? copy.optimize.pages_tool_optimize_OptimizationTaskCenter_007 : copy.optimize.pages_tool_optimize_OptimizationTaskCenter_006}
+              </button>
+              <button type="button" onClick={() => void controller.refresh()} disabled={loading || refreshing} className="tool-secondary-action">
+                <RefreshIcon size={16} aria-hidden="true" />{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_003}
+              </button>
+            </div>
           </div>
-        )}
-        {controller.hasMore && (
-          <button type="button" disabled={loadingMore} onClick={() => void controller.loadMore()} className="tool-secondary-action mt-4 w-full">
-            {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_024}
-          </button>
-        )}
+          {notice && <p className="tool-alert tool-alert--warning mt-3" role="status">{notice}</p>}
+          {error && <p className="tool-alert tool-alert--error mt-3" role="alert">{error}</p>}
+          {loading && jobs.length === 0 ? (
+            <p className="mt-4 text-sm text-ink-muted" role="status">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_004}</p>
+          ) : jobs.length === 0 ? (
+            <p className="mt-4 text-sm text-ink-muted">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_005}</p>
+          ) : (
+            <div className="mt-4 space-y-5">
+              {groups.filter((group) => group.jobs.length > 0).map((group) => (
+                <section key={group.label} aria-label={group.label}>
+                  <h3 className="mb-2 text-sm font-medium text-ink-secondary">{group.label} · {group.jobs.length}</h3>
+                  <div className="space-y-2">
+                    {group.jobs.map((job) => (
+                      <JobRow
+                        key={job.id}
+                        job={job}
+                        busy={busyJobId === job.id}
+                        onCancel={() => void controller.cancel(job)}
+                        onRetrySchedule={onRetrySchedule}
+                        onOpenScenario={() => onOpenScenario(job)}
+                        onOpenResult={() => onOpenResult(job)}
+                        retryEnabled={retryEnabled}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+          {controller.hasMore && (
+            <button type="button" disabled={loadingMore} onClick={() => void controller.loadMore()} className="tool-secondary-action mt-4 w-full">
+              {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_024}
+            </button>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   )
@@ -165,7 +165,7 @@ function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario, onOpenRe
 }) {
   const terminalFailure = job.status === 'failed' || job.status === 'cancelled' || job.status === 'dead_lettered'
   return (
-    <article className="tool-inset p-3">
+    <article className="task-center-job tool-inset p-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -173,19 +173,20 @@ function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario, onOpenRe
             <span className={statusClass(job.status)}>{statusLabel(job)}</span>
           </div>
           <p className="mt-2 text-xs leading-5 text-ink-muted">
-            {new Date(job.timestamps.submittedAt).toLocaleString(CURRENT_LOCALE)} · {job.attemptCount} {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_025}
+            <time dateTime={job.timestamps.submittedAt}>{new Date(job.timestamps.submittedAt).toLocaleString(CURRENT_LOCALE)}</time>
             {typeof job.queuePosition === 'number' ? ` · ${copy.optimize.pages_tool_optimize_OptimizationTaskCenter_026} ${job.queuePosition}` : ''}
-          </p>
-          <p className="mt-1 text-xs text-ink-muted">
-            {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_042} <span className="font-mono">{job.id.slice(0, 8)}</span>
           </p>
           {job.status === 'succeeded' && !job.resultAvailable && (
             <p className="mt-2 text-xs leading-5 text-ink-muted">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_041}</p>
           )}
           {terminalFailure && <div className="mt-2 text-sm leading-6 text-ink-secondary">
             <p>{job.error.message}</p>
-            <p className="mt-1 text-xs text-ink-muted">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_027}：{job.error.supportReference}</p>
           </div>}
+          <details className="task-center-details mt-2 text-xs text-ink-muted">
+            <summary>{copy.optimize.taskCenterDetails}</summary>
+            <p>{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_042} <span className="font-mono">{job.id.slice(0, 8)}</span> · {job.attemptCount} {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_025}</p>
+            {terminalFailure && <p>{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_027}：{job.error.supportReference}</p>}
+          </details>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           {job.canCancel && <button type="button" disabled={busy} onClick={onCancel} className="tool-secondary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_020}</button>}

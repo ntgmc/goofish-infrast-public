@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { isFiammettaShiftHoursSupported, isValidShiftHours, normalizeConfig, validateScheduleConfig } from './config'
-import { FACILITY_IDS, facilityLayoutSchema } from './facility-layout'
+import { FACILITY_IDS, facilityLayoutSchema, hasConfirmedFacilityLayout } from './facility-layout'
 import { createManualPlans, roomCapacity, validateManualPlans } from './manual-schedule'
 import { hasCapability } from './product-catalog'
 import { copy } from '../copy/index'
@@ -178,7 +178,9 @@ export function resolveManualScheduleConfig(source: OptimizeResult, input: Licen
   const shiftHours = source.plans.map((plan, index) => plan.shift_hours ?? source.shift_hours?.[index])
   if (shiftHours.some((hour) => typeof hour !== 'number' || !Number.isFinite(hour) || hour <= 0 || hour > 24)) throw new Error('Invalid shifts')
   if (source.schedule_mode !== 'rotation' && !isValidShiftHours(shiftHours as number[])) throw new Error(copy.domain.lib_config_035)
-  if (trading === 2 && manufacture === 5 && !facilityLayoutSchema.safeParse(source.facility_layout).success) {
+  if ((source.facility_layout || (trading === 2 && manufacture === 5)) && !hasConfirmedFacilityLayout({
+    trading_stations_count: trading, manufacturing_stations_count: manufacture, facility_layout: source.facility_layout,
+  })) {
     throw new Error(copy.common.facilityLayoutRequired)
   }
   const fiammetta = operators.find((operator) => operator.own && (operator.id === 'char_300_phenxi' || operator.name === copy.tools.manualSchedule.fiammettaName))

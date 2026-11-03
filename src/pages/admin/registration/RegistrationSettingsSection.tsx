@@ -94,7 +94,7 @@ export default function RegistrationSettingsSection() {
   const reserveTotalValid = settings.admin_invite_email_reserve + settings.password_reset_email_reserve <= emailStats.daily_limit
 
   return (
-    <div className="space-y-5"><AdminTabs label="注册管理任务" items={[{ id: 'policy', label: '注册策略' }, { id: 'mail', label: '邮件容量' }, { id: 'invites', label: '注册邀请' }]} value={view}
+    <div className="admin-settings space-y-5"><AdminTabs label="注册管理任务" items={[{ id: 'policy', label: '注册策略' }, { id: 'mail', label: '邮件容量' }, { id: 'invites', label: '注册邀请' }]} value={view}
       onChange={(next) => { setView(next); if (next === 'invites') setInvitesVisited(true) }} />
     <form onSubmit={submit} className="space-y-5" noValidate>
       {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
@@ -193,13 +193,13 @@ export default function RegistrationSettingsSection() {
         </p>
       </section>
       <section hidden={view !== 'policy'} role="tabpanel" className="tool-panel p-5 sm:p-6" aria-labelledby="admin-registration-title">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="admin-registration-heading">
           <div>
             <p className="tool-eyebrow">{copy.admin.registration_eyebrow}</p>
             <h2 id="admin-registration-title" className="mt-2 text-lg font-semibold text-ink-primary">{copy.admin.registration_title}</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">{copy.admin.registration_description}</p>
           </div>
-          <div className="flex flex-col gap-3">
+          <div className="admin-registration-switches">
             <label className="tool-inset flex min-h-11 cursor-pointer items-center gap-3 px-4 text-sm font-semibold text-ink-secondary">
               <input
                 type="checkbox"
@@ -279,7 +279,7 @@ export default function RegistrationSettingsSection() {
         <fieldset className="mt-5">
           <legend className="text-sm font-semibold text-ink-primary">{copy.admin.registration_reserve_title}</legend>
           <p id="registration-reserve-help" className="mt-2 text-sm leading-6 text-ink-secondary">{copy.admin.registration_reserve_help}</p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="admin-settings-fields mt-4">
             <ReserveInput
               id="admin-invite-email-reserve"
               label={copy.admin.registration_admin_invite_reserve}

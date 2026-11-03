@@ -2,12 +2,13 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
+import { gunzipSync } from 'node:zlib'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { planningFixture } from '../../scripts/prts-planning-fixture.mjs'
 import { defaultCultivationQuery } from '../../src/lib/cultivation-contract'
 import { prtsSnapshotSchema } from './catalog'
-import { calculateCultivationRecommendations } from './recommendations'
-import { compactRecommendations } from './public-evidence'
+import { calculateCultivationRecommendations, prepareRecommendations } from './recommendations'
+import { compactRecommendations, serializePreparedEvidence } from './public-evidence'
 
 let directory: string, store: typeof import('./public-store')
 const signal = () => new AbortController().signal
@@ -48,6 +49,27 @@ describe('persistent public recommendation evidence', () => {
     await store.buildPublicEvidence(secondQuery, signal())
     expect(store.hasStoredRecommendation(secondQuery)).toBe(true)
     expect(store.readStoredRecommendations({ ...query, rarityGroup: 'low', search: 'CSGY', profession: 'WARRIOR' })).toEqual(first)
+  })
+
+  it('round-trips chunked evidence across many families and rolls back an abandoned publication', async () => {
+    const fixture = planningFixture()
+    fixture.homeworks = Array.from({ length: 300 }, (_, index) => ({ ...fixture.homeworks[0], id: index + 1,
+      content: { ...fixture.homeworks[0].content, actions: [{ type: 'Deploy', name: '测试干员', location: [index, 0] }] } }))
+    const original = prtsSnapshotSchema.parse({ ...fixture, updatedAt: new Date(day).toISOString() })
+    await writeFile(join(directory, 'source.json'), JSON.stringify(original))
+    await store.buildPublicEvidence(query, signal())
+    sql((database) => {
+      const row = database.prepare('SELECT prepared FROM snapshot').get() as { prepared: Uint8Array }
+      expect(JSON.parse(gunzipSync(row.prepared).toString('utf8'))).toEqual(JSON.parse([...serializePreparedEvidence(prepareRecommendations(original))].join('')))
+    })
+    const first = store.readStoredRecommendations(query)
+    expect(first.recommendation).toEqual(compactRecommendations(calculateCultivationRecommendations(original, { ...query, rarityGroup: 'all' }, day)))
+    const controller = new AbortController()
+    const pending = store.buildPublicEvidence({ ...query, coverage: 0.9 }, controller.signal)
+    controller.abort()
+    await expect(pending).rejects.toThrow()
+    expect(store.readStoredRecommendations(query)).toEqual(first)
+    expect(store.hasStoredRecommendation({ ...query, coverage: 0.9 })).toBe(false)
   })
 
   it('marks results stale at Beijing midnight and rebuilds their daily time calculations from persisted evidence', async () => {

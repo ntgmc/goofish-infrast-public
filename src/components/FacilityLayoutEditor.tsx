@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { SelectedIcon as Check, ExpandIcon as ChevronDown, ManufactureIcon as Factory, TradingStationIcon as Store, PowerPlantIcon as Zap, SuccessIcon } from './icons'
 import { copy } from '../copy'
-import { FACILITY_IDS, facilityLayoutSchema } from '../lib/facility-layout'
+import { getFacilityIds, hasConfirmedFacilityLayout } from '../lib/facility-layout'
 import type { LicenseConfig } from '../lib/types'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
 import './FacilityLayoutEditor.css'
@@ -26,28 +26,29 @@ export default function FacilityLayoutEditor({ config, onUpdate, readOnly = fals
     const levels = type === 'trading' ? config.trading_station_levels : config.manufacturing_station_levels
     return { type, level: type === 'power' ? 3 : levels?.[Number(id.split('_')[1]) - 1] ?? 3 }
   }
-  const parsed = facilityLayoutSchema.safeParse(config.facility_layout)
-  const savedLayout = parsed.success ? parsed.data.join(',') : ''
+  const facilityIds = getFacilityIds(config)
+  const savedLayout = hasConfirmedFacilityLayout(config) ? config.facility_layout!.join(',') : ''
   const [editing, setEditing] = useState(false)
   const [reviewed, setReviewed] = useState(false)
   const collapsed = Boolean(savedLayout) && !editing
   const editButtonRef = useRef<HTMLButtonElement | null>(null)
-  const [rooms, setRooms] = useState(() => (parsed.success ? parsed.data : FACILITY_IDS).map(roomFor))
+  const [rooms, setRooms] = useState(() => (savedLayout ? config.facility_layout! : facilityIds).map(roomFor))
   const [selectedPosition, setSelectedPosition] = useState<number | null>(null)
   const [errors, setErrors] = useState<string[]>([])
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const statusRef = useRef<HTMLDivElement | null>(null)
-  const expected = FACILITY_IDS.map(roomFor)
+  const expected = facilityIds.map(roomFor)
   const expectedSignature = JSON.stringify(expected)
+  const idsSignature = facilityIds.join(',')
   useEffect(() => { if (readOnly) setSelectedPosition(null) }, [readOnly])
 
   useEffect(() => {
     if (savedLayout) {
       const requirements = JSON.parse(expectedSignature) as Room[]
-      setRooms(savedLayout.split(',').map((id) => requirements[FACILITY_IDS.indexOf(id as typeof FACILITY_IDS[number])]))
+      setRooms(savedLayout.split(',').map((id) => requirements[idsSignature.split(',').indexOf(id)]))
       setErrors([])
     }
-  }, [savedLayout, expectedSignature])
+  }, [savedLayout, expectedSignature, idsSignature])
 
   const updateRoom = (position: number, change: Partial<Room>) => {
     setReviewed(false)
@@ -74,7 +75,7 @@ export default function FacilityLayoutEditor({ config, onUpdate, readOnly = fals
       setReviewed(true)
       return
     }
-    const available = [...FACILITY_IDS]
+    const available = [...facilityIds]
     const layout = rooms.map((room) => {
       const index = available.findIndex((id) => {
         const candidate = roomFor(id)
@@ -99,7 +100,7 @@ export default function FacilityLayoutEditor({ config, onUpdate, readOnly = fals
       </div>
       <fieldset disabled={readOnly} className="min-w-0 border-0 p-0">
       {collapsed ? (
-        <div className="tool-inset mt-3 flex flex-wrap items-center justify-between gap-3 p-4">
+        <div className="facility-layout-summary">
           <div role="status">
             <p className="flex items-center gap-2 font-semibold text-ink-primary">
               <SuccessIcon size={18} aria-hidden="true" />{copy.common.facilityLayoutComplete}
@@ -133,20 +134,13 @@ export default function FacilityLayoutEditor({ config, onUpdate, readOnly = fals
                     aria-label={`${positionLabel(position)} · ${label} · ${room.level}${copy.common.facilityLayoutLevel}`}
                     aria-haspopup="dialog"
                     onClick={(event) => { triggerRef.current = event.currentTarget; setSelectedPosition(position) }}>
-                    <span className="facility-card-position">{copy.common.facilityLayoutColumns[column]}<ChevronDown size={14} aria-hidden="true" /></span>
+                    <span className="facility-card-position">{copy.common.facilityLayoutColumns[column]}<span>{room.level}{copy.common.facilityLayoutLevel}</span></span>
                     <span className="facility-card-identity">
                       <Icon className="facility-card-icon" aria-hidden="true" />
                       <span className="facility-card-name">{label}</span>
                     </span>
+                    <span className="facility-card-edit"><ChevronDown size={14} aria-hidden="true" /></span>
                   </button>
-                  <div className="facility-card-levels" role="group" aria-label={`${positionLabel(position)} · ${copy.common.facilityLayoutLevelLabel}`}>
-                    {[1, 2, 3].map((level) => (
-                      <button key={level} type="button" aria-pressed={room.level === level}
-                        onClick={() => { if (room.level !== level) updateRoom(position, { level }) }}>
-                        {level}{copy.common.facilityLayoutLevel}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               )
             })}
@@ -184,7 +178,6 @@ export default function FacilityLayoutEditor({ config, onUpdate, readOnly = fals
                 <button type="button" key={type} className={`tool-secondary-action facility-picker-option facility-card--${type} ${selected ? 'tool-option-selected' : ''}`}
                   aria-pressed={selected} onClick={() => {
                     if (selectedPosition !== null && !selected) updateRoom(selectedPosition, { type })
-                    setSelectedPosition(null)
                   }}>
                   <Icon className="facility-card-icon" aria-hidden="true" />
                   <span>{label}</span>
@@ -193,6 +186,16 @@ export default function FacilityLayoutEditor({ config, onUpdate, readOnly = fals
               )
             })}
           </div>
+          {selectedPosition !== null && <section className="facility-picker-level-section" aria-labelledby="facility-picker-level-heading">
+            <h3 id="facility-picker-level-heading">{copy.common.facilityLayoutLevelLabel}</h3>
+            <div className="facility-picker-levels" role="group" aria-label={`${positionLabel(selectedPosition)} · ${copy.common.facilityLayoutLevelLabel}`}>
+              {[1, 2, 3].map((level) => <button key={level} type="button" className="tool-secondary-action" aria-pressed={rooms[selectedPosition].level === level}
+                onClick={() => { if (rooms[selectedPosition].level !== level) updateRoom(selectedPosition, { level }) }}>
+                {level}{copy.common.facilityLayoutLevel}
+              </button>)}
+            </div>
+          </section>}
+          <div className="facility-picker-actions"><button type="button" className="tool-primary-action" onClick={() => setSelectedPosition(null)}>{copy.common.facilityLayoutRoomDone}</button></div>
         </DialogContent>
       </Dialog>
     </section>

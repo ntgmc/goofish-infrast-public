@@ -2,7 +2,7 @@ import { routesCopy } from '../../copy/zh-CN/routes'
 import type { SiteFeatures } from '../../lib/site-features'
 import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
 
-const V2_SECTIONS = ['overview', 'generation', 'plans', 'lab', 'tools', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'depot', 'skland', 'profiles', 'add-account', 'inventory', 'commercial', 'balance', 'announcements', 'settings', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing', 'benchmarks'] as const
+const V2_SECTIONS = ['overview', 'generation', 'plans', 'lab', 'tools', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'material-demand', 'depot', 'skland', 'profiles', 'add-account', 'inventory', 'commercial', 'balance', 'announcements', 'settings', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing', 'benchmarks'] as const
 export type V2Section = typeof V2_SECTIONS[number]
 
 export const V2_PUBLIC_SECTIONS: V2Section[] = ['announcements', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing', 'benchmarks']
@@ -27,7 +27,7 @@ export function v2Path(section: V2Section, profileId?: string | null): string {
 
 export function v2SectionAvailable(section: V2Section, features: SiteFeatures): boolean {
   switch (section) {
-    case 'tools': case 'training-ratio': return features.site && features.tools
+    case 'tools': case 'training-ratio': case 'material-demand': return features.site && features.tools
     case 'profiles': return features.site && features.profiles
     case 'add-account': return features.site && features.profiles && (features.free_preview || features.cdk_redemption)
     case 'generation': case 'plans': return features.site && features.profiles

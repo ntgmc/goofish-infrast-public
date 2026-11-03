@@ -101,11 +101,13 @@ describe('FeatureSettingsSection', () => {
     await user.click(screen.getByRole('tab', { name: '排班' }))
     expect(screen.getByRole('checkbox', { name: /一天一换/ })).not.toBeChecked()
     await user.click(screen.getByRole('tab', { name: '页面' }))
+    expect(screen.getByRole('checkbox', { name: /V1 旧版入口/ })).toBeChecked()
+    await user.click(screen.getByRole('checkbox', { name: /V1 旧版入口/ }))
     await user.click(screen.getByRole('checkbox', { name: /V2 工作台/ }))
     await user.click(screen.getByRole('button', { name: '保存功能开关' }))
     await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/feature-settings', expect.objectContaining({
       json: { expected_revision: 5, features: {
-        ...DEFAULT_SITE_FEATURE_SETTINGS.features, tools: false, depot_value: false, v2: false,
+        ...DEFAULT_SITE_FEATURE_SETTINGS.features, tools: false, depot_value: false, v1: false, v2: false,
       } },
     })))
   })

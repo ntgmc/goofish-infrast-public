@@ -31,6 +31,16 @@ describe('admin feature settings handler', () => {
     expect(store.saveSiteFeatureSettings).toHaveBeenCalledWith(settings.features, 2)
   })
 
+  it('publishes a saved V1 switch without disabling V2 or shared scheduling capabilities', async () => {
+    const saved = { ...settings, features: { ...settings.features, v1: false }, revision: 3 }
+    store.saveSiteFeatureSettings.mockResolvedValueOnce(saved)
+    expect((await handler(jsonRequest({ features: saved.features, expected_revision: 2 }))).status).toBe(200)
+    expect(store.saveSiteFeatureSettings).toHaveBeenCalledWith(saved.features, 2)
+    store.getSiteFeatureSettings.mockResolvedValueOnce(saved)
+    const response = await siteHandler(new Request('http://localhost/api/site/features'))
+    await expect(response.json()).resolves.toMatchObject({ features: { v1: false, v2: true, profiles: true, schedule_generation: true } })
+  })
+
   it('does not expose the management revision through the public endpoint', async () => {
     const response = await siteHandler(new Request('http://localhost/api/site/features'))
     const body = await response.json()

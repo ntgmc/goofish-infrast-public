@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { copy } from '../../../copy'
 import { CONFIG_PRESETS, normalizeConfig } from '../../../lib/config'
-import { FACILITY_IDS } from '../../../lib/facility-layout'
+import { FACILITY_IDS, getFacilityIds } from '../../../lib/facility-layout'
 import { createBlankManualSchedule } from '../../../lib/manual-schedule-tool'
 import type { LicenseOperator, UserGameAccount, UserWorkspace, WorkspaceResultHistoryItem } from '../../../lib/types'
 import type { V2Session } from '../OptionsDrawer'
@@ -25,7 +25,7 @@ const profile: UserGameAccount = {
   id: 'first', user_id: 'user', kind: 'cdk', permission: 'advanced', status: 'active',
   display_name: 'Account', cdk_order_hash: null, note: '', operator_count: 3, updated_at: null, created_at: '2026-01-01',
 }
-const config = normalizeConfig(CONFIG_PRESETS['243'])
+const config = normalizeConfig({ ...CONFIG_PRESETS['243'], facility_layout: getFacilityIds(CONFIG_PRESETS['243']) })
 const operators: LicenseOperator[] = [
   { id: 'f', name: '芬', own: true, elite: 1, rarity: 3 },
   { id: 'k', name: '克洛丝', own: true, elite: 1, rarity: 3 },

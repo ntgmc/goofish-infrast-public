@@ -71,7 +71,7 @@ export default function AnnouncementSettingsSection({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-5">
+    <form onSubmit={onSubmit} className="admin-settings space-y-5">
       <AdminTabs label="公告管理任务" items={[{ id: 'announcements', label: '站内公告' }, { id: 'banner', label: '全局横幅' }]} value={view} onChange={setView} />
       <section hidden={view !== 'banner'} role="tabpanel" aria-label="全局横幅" className="tool-panel p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -127,7 +127,6 @@ export default function AnnouncementSettingsSection({
                   <div className="flex flex-wrap gap-2">
                     <button type="button" disabled={selectedIndex === 0} onClick={() => onReorder(selectedIndex, selectedIndex - 1)} className="tool-secondary-action px-3 text-sm">上移</button>
                     <button type="button" disabled={selectedIndex === announcements.length - 1} onClick={() => onReorder(selectedIndex, selectedIndex + 1)} className="tool-secondary-action px-3 text-sm">下移</button>
-                    <button type="button" onClick={deleteSelected} className="tool-secondary-action border-error/40 bg-error/10 px-3 text-sm text-error">删除</button>
                   </div>
                 </div>
 
@@ -143,6 +142,7 @@ export default function AnnouncementSettingsSection({
                 <p id="announcement-reminder-help" className="mt-2 text-sm leading-6 text-ink-secondary">{copy.public.announcement_reminder_help}</p>
                 <AnnouncementBodyEditor id={`announcement-${selected.id}`} value={selected.body} onChange={(body) => onUpdate(selected.id, { body })} />
                 <p className="mt-3 text-xs text-ink-muted">更新时间：{formatDate(selected.updated_at)}</p>
+                <div className="admin-danger-actions"><button type="button" onClick={deleteSelected} className="tool-danger-action px-3 text-sm">删除</button></div>
               </article>
             ) : <div className="tool-inset border-dashed p-6 text-sm text-ink-muted">请从左侧列表选择一条公告查看和编辑详细内容。</div>}
           />
