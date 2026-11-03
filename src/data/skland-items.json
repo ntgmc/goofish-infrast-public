@@ -913,6 +913,11 @@
     "group": "other",
     "sort": 10326
   },
+  "LMTGS_COIN_7901": {
+    "name": "寻访数据契约",
+    "group": "other",
+    "sort": 10327
+  },
   "EPGS_COIN": {
     "name": "寻访参数模型",
     "group": "other",
@@ -1057,6 +1062,16 @@
     "name": "ID信息更新卡",
     "group": "other",
     "sort": 20030
+  },
+  "renamingCard_0_079": {
+    "name": "ID信息更新卡",
+    "group": "other",
+    "sort": 20031
+  },
+  "renamingCard_30_079": {
+    "name": "ID信息更新卡",
+    "group": "other",
+    "sort": 20032
   },
   "ap_supply_lt_100": {
     "name": "应急理智顶液",
@@ -1518,6 +1533,11 @@
     "group": "other",
     "sort": 40003
   },
+  "LIMITED_TKT_GACHA_10_7901": {
+    "name": "故土新程寻访凭证",
+    "group": "other",
+    "sort": 40003
+  },
   "voucher_item_4pick1": {
     "name": "干员兑换券",
     "icon": "voucher_item_4pick1",
@@ -1614,6 +1634,12 @@
     "group": "other",
     "sort": 50016
   },
+  "voucher_item_pick7901": {
+    "name": "感谢庆典干员凭证",
+    "icon": "voucher_recruitR6_g",
+    "group": "other",
+    "sort": 50017
+  },
   "voucher_class_pick5601": {
     "name": "中坚高级干员调用凭证",
     "icon": "voucher_class_pick5601",
@@ -1637,6 +1663,12 @@
     "icon": "voucher_class_pick6101",
     "group": "other",
     "sort": 50034
+  },
+  "voucher_class_pick7901": {
+    "name": "中坚高级干员调用凭证",
+    "icon": "voucher_class_pick6101",
+    "group": "other",
+    "sort": 50035
   },
   "voucher_recruitR5_pick1803": {
     "name": "资深干员调用凭证",
@@ -2230,10 +2262,20 @@
     "group": "other",
     "sort": 60124
   },
+  "randomMaterial_act55side": {
+    "name": "乌萨斯汇编集",
+    "group": "other",
+    "sort": 60123
+  },
   "randomMaterial_7d5": {
     "name": "2026感谢庆典物资补给",
     "group": "other",
     "sort": 60125
+  },
+  "randomMaterial_message5": {
+    "name": "“雪烬”",
+    "group": "other",
+    "sort": 60126
   },
   "mod_unlock_token": {
     "name": "模组数据块",
@@ -2952,6 +2994,11 @@
     "name": "协律的信物",
     "group": "other",
     "sort": 800059
+  },
+  "p_char_4170_hdbell": {
+    "name": "行铃的信物",
+    "group": "other",
+    "sort": 800060
   },
   "p_char_128_plosis": {
     "name": "白面鸮的信物",
@@ -3943,6 +3990,16 @@
     "group": "other",
     "sort": 700197
   },
+  "p_char_4245_alga": {
+    "name": "奥尔佳的信物",
+    "group": "other",
+    "sort": 700198
+  },
+  "p_char_4169_caledo": {
+    "name": "镜匠的信物",
+    "group": "other",
+    "sort": 700199
+  },
   "p_char_103_angel": {
     "name": "能天使的信物",
     "group": "other",
@@ -4627,6 +4684,21 @@
     "name": "克莱门莎的信物",
     "group": "other",
     "sort": 600137
+  },
+  "p_char_4247_oxi": {
+    "name": "塔露拉的信物",
+    "group": "other",
+    "sort": 600138
+  },
+  "p_char_4244_tocka": {
+    "name": "冻河的信物",
+    "group": "other",
+    "sort": 600139
+  },
+  "p_char_4246_dminon": {
+    "name": "国度的信物",
+    "group": "other",
+    "sort": 600140
   },
   "class_p_char_123_fang": {
     "name": "芬的中坚信物",
@@ -8032,6 +8104,26 @@
   },
   "act1museum_milestone_point": {
     "name": "积点卡券",
+    "group": "other",
+    "sort": -10000
+  },
+  "openserver3_point_token": {
+    "name": "见习笔记",
+    "group": "other",
+    "sort": -10000
+  },
+  "itempack_material_t1": {
+    "name": "罗德岛基础物资补给I",
+    "group": "other",
+    "sort": -10000
+  },
+  "itempack_material_t2": {
+    "name": "罗德岛基础物资补给II",
+    "group": "other",
+    "sort": -10000
+  },
+  "act55side_token_record": {
+    "name": "失效的记录",
     "group": "other",
     "sort": -10000
   }
