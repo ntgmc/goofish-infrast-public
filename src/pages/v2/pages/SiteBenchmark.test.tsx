@@ -50,7 +50,6 @@ it('opens a shared failed case with the actual frozen evidence, and retains full
   expect(ownScore).toHaveAttribute('aria-expanded', 'false')
   const downloads = document.getElementById('benchmark-downloads')!
   expect(within(downloads).getByRole('link', { name: /CSV/ })).toHaveAttribute('href', `${BENCHMARK_ASSETS}/results.csv`)
-  expect(within(downloads).getByRole('link', { name: text.archiveReport(siteBenchmark.archive.date) })).toHaveAttribute('href', siteBenchmark.archive.report)
 })
 
 it('rejects another case returned for the selected URL and retries the same evidence read', async () => {

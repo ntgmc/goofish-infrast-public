@@ -23,10 +23,6 @@
     "retainedRiicOriginals": 30,
     "riicOriginalDate": "2026-10-31"
   },
-  "archive": {
-    "date": "2026-10-31",
-    "report": "/benchmarks/2026-10-31/report.md"
-  },
   "sites": [
     {
       "id": "maatool",

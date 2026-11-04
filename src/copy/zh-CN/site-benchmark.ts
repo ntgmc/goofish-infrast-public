@@ -81,7 +81,6 @@ export const siteBenchmarkCopy = {
   samplesTitle: '10份冻结输入', fingerprint: '干员练度指纹',
   generationTitle: '本轮使用的站点版本',
   retainedGeneration: (date: string) => `沿用${date}原方案`,
-  archiveReport: (date: string) => `查看${date}历史报告`,
   downloadsTitle: '下载报告与完整证据',
   downloads: [['report.md', '测试报告', 'Markdown'], ['results.csv', '全部结果', 'CSV'], ['results.json', '结构化数据', 'JSON'], ['evidence.zip', '完整证据包', 'ZIP'], ['SHA256SUMS', '文件校验清单', 'SHA-256']],
   footer: '用自己的干员与练度，看看适合你的排班。',

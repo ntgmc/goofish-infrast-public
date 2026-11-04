@@ -79,7 +79,7 @@ export default function SiteBenchmark() {
         <details className="benchmark-disclosure"><summary>{text.generationTitle}</summary><dl className="benchmark-versions"><div><dt>{text.simulator}</dt><dd><code>{data.simulatorVersion}</code></dd></div><div><dt>{data.sites[0].label}</dt><dd>{data.generation.maatool}</dd></div><div><dt>{data.sites[1].label}</dt><dd>{data.generation.yituliuData} · {data.generation.yituliuEngine}</dd></div><div><dt>{data.sites[2].label}</dt><dd><code>{data.generation.riicClient}</code> · {text.retainedGeneration(data.generation.riicOriginalDate)}</dd></div></dl></details>
       </details>
     </section>
-    <section className="benchmark-section" id="benchmark-downloads"><h2>{text.downloadsTitle}</h2><div className="benchmark-downloads">{text.downloads.map(([file, label, format]) => <a key={file} href={`${BENCHMARK_ASSETS}/${file}`} download><ExportIcon size={18} aria-hidden="true" /><span>{label}</span><small>{format}</small></a>)}</div><a className="benchmark-link" href={data.archive.report}>{text.archiveReport(data.archive.date)}</a></section>
+    <section className="benchmark-section" id="benchmark-downloads"><h2>{text.downloadsTitle}</h2><div className="benchmark-downloads">{text.downloads.map(([file, label, format]) => <a key={file} href={`${BENCHMARK_ASSETS}/${file}`} download><ExportIcon size={18} aria-hidden="true" /><span>{label}</span><small>{format}</small></a>)}</div></section>
     <footer className="benchmark-cta"><SuccessIcon size={24} aria-hidden="true" /><div><p>{text.footer}</p><Link className="v2-button v2-button-primary" to={v2Path('generation')}>{text.generate}<NextIcon size={16} aria-hidden="true" /></Link></div></footer>
   </article>
 }
