@@ -379,6 +379,17 @@ export const requestSchemas = {
   qqBotRegistrationInvitation: strict({
     qq_number: z.string().trim().regex(/^[1-9][0-9]{4,11}$/),
   }),
+  qqBotReward: strict({
+    delivery_id: z.string().min(1).max(200).regex(/^[A-Za-z0-9:_-]+$/),
+    qq_number: z.string().regex(/^[1-9][0-9]{4,11}$/),
+    group_id: z.string().regex(/^[1-9][0-9]{0,19}$/),
+    actor_qq: z.string().regex(/^[1-9][0-9]{4,11}$/),
+    item_code: z.string().min(1).max(120).regex(/^[A-Za-z0-9_-]+$/),
+    quantity: z.number().int().min(1).max(10000),
+    validity_days: z.number().int().min(0).max(3650),
+    gift_pack_version_id: shortString(128).nullable(),
+    reason: shortString(200),
+  }),
   qqBotPreferences: strict({ notifications_enabled: z.boolean() }),
   qqBotBinding: strict({
     qq_number: z.string().trim().regex(/^[1-9][0-9]{4,11}$/),
@@ -777,6 +788,9 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/integrations/qqbot/notifications/ack', route({ POST: json('standard', requestSchemas.qqBotNotificationAck) })],
   ['/api/integrations/qqbot/results', route({ GET: none() }, ['qq_number', 'profile_id', 'scope', 'cursor', 'limit'])],
   ['/api/integrations/qqbot/maa-export', route({ POST: json('standard', requestSchemas.qqBotMaaExport) })],
+  ['/api/integrations/qqbot/reward-items', route({ GET: none() })],
+  ['/api/integrations/qqbot/member-account', route({ GET: none() }, ['qq_number'])],
+  ['/api/integrations/qqbot/rewards', route({ POST: json('standard', requestSchemas.qqBotReward) })],
   ['/api/user/qqbot', route({ GET: none(), POST: none(), PATCH: json('standard', requestSchemas.qqBotPreferences), DELETE: none() })],
   ['/api/internal/releases/confirm', route({ POST: json('standard', requestSchemas.releaseConfirmation) })],
   ['/api/usage-stats', route({ POST: json('standard', requestSchemas.usageStats) }, ['admin'])],

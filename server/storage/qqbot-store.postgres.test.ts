@@ -4,6 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { closePool, query, withTransaction } from './postgres'
 import { migrateDatabaseSchema } from './schema'
 import { saveUserAccount, saveUserProfile } from './user-store'
+import { deliverQqBotReward, listQqBotRewardItems, type QqBotRewardInput } from './qqbot-reward-store'
+import { createCustomGiftPack, createGiftPackDraft } from './admin-inventory-store'
 import {
   acknowledgeQqBotNotification, bindQqBotAccount, createQqBotBindingCode,
   enqueueQqBotScheduleNotificationInTransaction, getQqBotAccount, getUserQqBotBinding,
@@ -44,6 +46,107 @@ async function enqueue(profileId: string, resultId = randomUUID()) {
   }))
   return resultId
 }
+
+describe('QQ bot reward delivery in PostgreSQL', () => {
+  function reward(qq: string, changes: Partial<QqBotRewardInput> = {}): QqBotRewardInput {
+    return { delivery_id: `grant:123456:${randomUUID()}`, qq_number: qq, group_id: '123456', actor_qq: '987654321',
+      item_code: 'maa_export_trial_coupon', quantity: 2, validity_days: 30, gift_pack_version_id: null, reason: '群奖励', ...changes }
+  }
+
+  it('commits exactly one grant, ledger entry and notification for concurrent retries', async () => {
+    const first = await fixture()
+    await bindQqBotAccount(first.qq, first.code.binding_code)
+    const input = reward(first.qq)
+    const deliveries = await Promise.all(Array.from({ length: 5 }, () => deliverQqBotReward(input)))
+    expect(new Set(deliveries.map((delivery) => delivery.grant_id)).size).toBe(1)
+    const grants = await query<{ id: string; original_quantity: number; expires_at: string; created_at: string }>(
+      'select id, original_quantity, expires_at, created_at from reward_grants where source_type = $1 and source_id = $2', ['qqbot_reward', input.delivery_id],
+    )
+    expect(grants.rows).toHaveLength(1)
+    expect(grants.rows[0].original_quantity).toBe(2)
+    expect(Date.parse(grants.rows[0].expires_at) - Date.parse(grants.rows[0].created_at)).toBe(30 * 86_400_000)
+    expect((await query('select id from inventory_ledger where grant_id = $1', [grants.rows[0].id])).rows).toHaveLength(1)
+    expect((await query('select id from user_notifications where user_id = $1 and source_type = $2 and source_id = $3',
+      [first.user.id, 'qqbot_reward', input.delivery_id])).rows).toHaveLength(1)
+    for (const changes of [{ quantity: 3 }, { qq_number: '111111111' }, { validity_days: 0 }, { actor_qq: '111111111' }]) {
+      await expect(deliverQqBotReward({ ...input, ...changes })).rejects.toMatchObject({ code: 'idempotency_conflict' })
+    }
+  })
+
+  it('rolls back inventory, ledger and notification if saving the delivery receipt fails', async () => {
+    const first = await fixture()
+    await bindQqBotAccount(first.qq, first.code.binding_code)
+    const input = reward(first.qq)
+    await query(`create function qqbot_test_reject_receipt() returns trigger language plpgsql as $$
+      begin raise exception 'fixture receipt failure'; end $$`)
+    await query('create trigger qqbot_test_receipt_failure before insert on qqbot_reward_deliveries for each row execute function qqbot_test_reject_receipt()')
+    try {
+      await expect(deliverQqBotReward(input)).rejects.toThrow('fixture receipt failure')
+    } finally {
+      await query('drop trigger qqbot_test_receipt_failure on qqbot_reward_deliveries')
+      await query('drop function qqbot_test_reject_receipt()')
+    }
+    expect((await query('select id from reward_grants where source_id = $1', [input.delivery_id])).rows).toEqual([])
+    expect((await query('select id from inventory_ledger where reference_id = $1', [input.delivery_id])).rows).toEqual([])
+    expect((await query('select id from user_notifications where source_id = $1', [input.delivery_id])).rows).toEqual([])
+    expect((await deliverQqBotReward(input)).user_id).toBe(first.user.id)
+  })
+
+  it('leaves no receipt on unbound or unavailable accounts and delivers after binding', async () => {
+    const first = await fixture()
+    const input = reward(first.qq, { validity_days: 0 })
+    await expect(deliverQqBotReward(input)).rejects.toMatchObject({ code: 'account_not_bound' })
+    expect((await query('select delivery_id from qqbot_reward_deliveries where delivery_id = $1', [input.delivery_id])).rows).toEqual([])
+    await bindQqBotAccount(first.qq, first.code.binding_code)
+    await saveUserAccount({ ...first.user, status: 'frozen' })
+    await expect(deliverQqBotReward(input)).rejects.toMatchObject({ code: 'account_unavailable' })
+    await saveUserAccount(first.user)
+    const result = await deliverQqBotReward(input)
+    expect(result.user_id).toBe(first.user.id)
+    expect((await query<{ expires_at: string | null }>('select expires_at from reward_grants where id = $1', [result.grant_id])).rows[0].expires_at).toBeNull()
+  })
+
+  it('replays the original receipt after unbinding, rebinding or deleting the original account', async () => {
+    const first = await fixture()
+    await bindQqBotAccount(first.qq, first.code.binding_code)
+    const input = reward(first.qq)
+    const original = await deliverQqBotReward(input)
+    await unbindQqBotAccount(first.user.id)
+    const second = await fixture()
+    await bindQqBotAccount(first.qq, second.code.binding_code)
+    expect(await deliverQqBotReward(input)).toEqual(original)
+    await query('delete from user_accounts where id = $1', [first.user.id])
+    expect(await deliverQqBotReward(input)).toEqual(original)
+    expect((await query('select id from reward_grants where user_id = $1 and source_id = $2', [second.user.id, input.delivery_id])).rows).toEqual([])
+  })
+
+  it('rolls back unavailable items and excludes them from the reward catalog', async () => {
+    const first = await fixture()
+    await bindQqBotAccount(first.qq, first.code.binding_code)
+    const input = reward(first.qq, { item_code: 'missing_reward_item' })
+    await expect(deliverQqBotReward(input)).rejects.toMatchObject({ code: 'item_unknown' })
+    expect((await query('select delivery_id from qqbot_reward_deliveries where delivery_id = $1', [input.delivery_id])).rows).toEqual([])
+    const items = await listQqBotRewardItems()
+    expect(items.some((item) => item.code === 'maa_export_trial_coupon')).toBe(true)
+    const unavailable = await query<{ code: string }>("select code from item_definitions where not issuance_enabled or kind in ('cosmetic', 'badge')")
+    expect(items.some((item) => unavailable.rows.some((row) => row.code === item.code))).toBe(false)
+  })
+
+  it('delivers the snapshotted published gift pack version after a newer version is published', async () => {
+    const first = await fixture()
+    await bindQqBotAccount(first.qq, first.code.binding_code)
+    const contents = [{ item_code: 'maa_export_trial_coupon', quantity: 1, expiry: { mode: 'never' } }]
+    const pack = await createCustomGiftPack('qqbot-test', { name: '群活动礼包', description: '群活动测试', contents, publish: true })
+    const input = reward(first.qq, { item_code: pack.item_code as string, gift_pack_version_id: pack.version_id as string })
+    const newer = await createGiftPackDraft('qqbot-test', pack.item_code as string, contents, randomUUID(), { publish: true })
+    expect((await listQqBotRewardItems()).find((item) => item.code === pack.item_code)?.gift_pack_version_id).toBe(newer.version_id)
+    const delivery = await deliverQqBotReward(input)
+    const grant = await query<{ gift_pack_version_id: string }>('select gift_pack_version_id from reward_grants where id = $1', [delivery.grant_id])
+    expect(grant.rows[0].gift_pack_version_id).toBe(pack.version_id)
+    await expect(deliverQqBotReward({ ...input, delivery_id: input.delivery_id + '-missing', gift_pack_version_id: null }))
+      .rejects.toMatchObject({ code: 'gift_pack_version_required' })
+  })
+})
 
 describe('QQ bot binding and schedule outbox in PostgreSQL', () => {
   it('stores only a hash and rejects expired, regenerated and consumed binding codes', async () => {

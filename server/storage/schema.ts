@@ -1755,6 +1755,13 @@ CREATE INDEX IF NOT EXISTS idx_user_notifications_user_updated
 CREATE INDEX IF NOT EXISTS idx_user_notifications_user_unread
   ON user_notifications(user_id, updated_at DESC, id DESC) WHERE read_at IS NULL;
 
+CREATE TABLE IF NOT EXISTS qqbot_reward_deliveries (
+  delivery_id TEXT PRIMARY KEY,
+  request_hash TEXT NOT NULL,
+  response_json JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS qqbot_binding_codes (
   user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
   code_hash TEXT NOT NULL UNIQUE,
