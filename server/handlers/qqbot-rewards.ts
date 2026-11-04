@@ -4,7 +4,7 @@ import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson, RequestInputError } from '../security/request-validation'
 import { authenticateWebsiteIntegrationRequest, websiteIntegrationResponse } from '../security/website-integration-auth'
 import { getQqBotAccount, QqBotError } from '../storage/qqbot-store'
-import { deliverQqBotReward, listQqBotRewardItems } from '../storage/qqbot-reward-store'
+import { deliverQqBotReward, listQqBotRewardItems, listQqBotCampaigns } from '../storage/qqbot-reward-store'
 import { InventoryError } from '../storage/inventory-store'
 import { requireSiteFeatures } from '../feature-gate'
 
@@ -26,6 +26,14 @@ export default async function qqBotRewardsHandler(req: Request): Promise<Respons
     }
     const gate = await requireSiteFeatures(['inventory'])
     if (gate) return gate
+    if (url.pathname.endsWith('/reward-campaigns') && req.method === 'GET') {
+      const groupId = url.searchParams.get('group_id') ?? ''
+      const campaignId = url.searchParams.get('campaign_id')
+      if (!/^[1-9][0-9]{0,19}$/.test(groupId) || (campaignId !== null && !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(campaignId))) {
+        throw new QqBotError('campaign_query_invalid', '群号或活动编号格式不正确。', 400)
+      }
+      return websiteIntegrationResponse({ schema_version: 1, campaigns: await listQqBotCampaigns(groupId, campaignId) })
+    }
     if (url.pathname.endsWith('/reward-items') && req.method === 'GET') {
       return websiteIntegrationResponse({ schema_version: 1, items: await listQqBotRewardItems() })
     }

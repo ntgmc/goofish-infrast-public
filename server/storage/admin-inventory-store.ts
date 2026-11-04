@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
+import type { QqBotCampaign, QqBotCampaignInput } from '../../src/lib/qqbot-reward-contracts'
 import type { PoolClient } from 'pg'
 import {
   ITEM_ICON_PATHS,
@@ -24,7 +25,7 @@ const CAMPAIGN_MAX_ATTEMPTS = 3
 
 export async function getAdminInventoryOverview(): Promise<Record<string, unknown>> {
   await ensureDatabaseSchema()
-  const [definitions, versions, tasks, campaigns, audits, users] = await Promise.all([
+  const [definitions, versions, tasks, campaigns, audits, users, qqbotCampaigns] = await Promise.all([
     query<ItemDefinition>("select * from item_definitions where code <> 'reorder_check_coupon' order by system_owned desc, created_at asc, code asc"),
     query<{ id: string; item_code: string; version: number; status: GiftPackVersion['status']; created_at: string; published_at: string | null; contents: GiftPackContentInput[] }>(
       `select version.id, version.item_code, version.version, version.status, version.created_at, version.published_at, version.opening_rule,
@@ -69,15 +70,76 @@ export async function getAdminInventoryOverview(): Promise<Record<string, unknow
     ),
     query('select * from inventory_admin_audit order by created_at desc limit 100'),
     query<{ count: string }>('select count(*)::text as count from user_accounts'),
+    query<QqBotCampaign>('select * from qqbot_reward_campaigns order by created_at desc, group_id, campaign_id limit 100'),
   ])
   return {
     definitions: definitions.rows,
     gift_pack_versions: versions.rows,
     tasks: tasks.rows,
     campaigns: campaigns.rows,
+    qqbot_campaigns: qqbotCampaigns.rows,
     audits: audits.rows,
     user_count: Number(users.rows[0]?.count ?? 0),
   }
+}
+
+export async function createQqBotCampaign(
+  adminUsername: string,
+  input: QqBotCampaignInput & { idempotency_key: string },
+): Promise<Record<string, unknown>> {
+  await ensureDatabaseSchema()
+  return withTransaction(async (client) => {
+    const { idempotency_key: key, ...configuration } = input
+    const operation = await beginAdminOperation(client, adminUsername, key, 'create_qqbot_campaign', configuration)
+    if (operation.replayedResponse) return operation.replayedResponse
+    const now = new Date().toISOString()
+    if (input.ends_at && Date.parse(input.ends_at) <= Date.parse(now)) {
+      throw new InventoryError('campaign_end_invalid', '活动结束时间必须晚于当前时间。', 400)
+    }
+    const [reward] = await snapshotRewardContents(client, [{
+      item_code: input.item_code, quantity: input.quantity,
+      expiry: input.validity_days ? { mode: 'relative_days', days: input.validity_days } : { mode: 'never' },
+    }])
+    const inserted = await client.query(
+      `insert into qqbot_reward_campaigns
+        (group_id, campaign_id, item_code, quantity, validity_days, gift_pack_version_id,
+         min_join_days, joined_before, ends_at, created_by, created_at, updated_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)
+       on conflict (group_id, campaign_id) do nothing`,
+      [input.group_id, input.campaign_id, input.item_code, input.quantity, input.validity_days,
+        reward.gift_pack_version_id ?? null, input.min_join_days, input.joined_before, input.ends_at, adminUsername, now],
+    )
+    if (!inserted.rowCount) throw new InventoryError('campaign_exists', '该群已使用这个活动编号，请填写新的编号。', 409)
+    await audit(client, adminUsername, 'create_qqbot_campaign', 'qqbot_campaign', `${input.group_id}:${input.campaign_id}`,
+      '创建 QQ 群领取活动。', null, { ...configuration, gift_pack_version_id: reward.gift_pack_version_id ?? null }, now)
+    const response = { group_id: input.group_id, campaign_id: input.campaign_id }
+    await completeAdminOperation(client, operation.id, response, now)
+    return response
+  })
+}
+
+export async function setQqBotCampaignStatus(
+  adminUsername: string,
+  input: { group_id: string; campaign_id: string; enabled: boolean; expected_revision: number },
+): Promise<void> {
+  await ensureDatabaseSchema()
+  await withTransaction(async (client) => {
+    const selected = await client.query<QqBotCampaign>(
+      'select * from qqbot_reward_campaigns where group_id = $1 and campaign_id = $2 for update', [input.group_id, input.campaign_id],
+    )
+    const previous = selected.rows[0]
+    if (!previous) throw new InventoryError('campaign_missing', '群活动不存在。', 404)
+    if (previous.revision !== input.expected_revision) {
+      throw new InventoryError('campaign_changed', '活动状态已被修改，请刷新后重试。', 409)
+    }
+    const now = new Date().toISOString()
+    await client.query(
+      'update qqbot_reward_campaigns set enabled = $3, revision = revision + 1, updated_at = $4 where group_id = $1 and campaign_id = $2',
+      [input.group_id, input.campaign_id, input.enabled, now],
+    )
+    await audit(client, adminUsername, 'set_qqbot_campaign_status', 'qqbot_campaign', `${input.group_id}:${input.campaign_id}`,
+      input.enabled ? '开启 QQ 群领取活动。' : '停用 QQ 群领取活动。', previous, { enabled: input.enabled }, now)
+  })
 }
 
 export async function createCustomGiftPack(

@@ -104,7 +104,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/integrations/qqbot/registration-invitations', qqBotRegistrationInvitationsHandler as unknown as ApiHandler],
   ...['binding', 'account', 'notifications', 'notifications/ack', 'results', 'maa-export'].map((path) =>
     [`/api/integrations/qqbot/${path}`, qqBotAccountHandler as unknown as ApiHandler] as [string, ApiHandler]),
-  ...['reward-items', 'member-account', 'rewards'].map((path) =>
+  ...['reward-items', 'reward-campaigns', 'member-account', 'rewards'].map((path) =>
     [`/api/integrations/qqbot/${path}`, qqBotRewardsHandler as unknown as ApiHandler] as [string, ApiHandler]),
   ['/api/user/qqbot', userQqBotHandler as unknown as ApiHandler],
   ['/api/internal/releases/confirm', releaseConfirmationHandler as unknown as ApiHandler],

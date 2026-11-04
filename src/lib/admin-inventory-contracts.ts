@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { qqBotCampaignSchema } from './qqbot-reward-contracts'
 
 const expiryPolicySchema = z.discriminatedUnion('mode', [
   z.strictObject({ mode: z.literal('never') }),
@@ -99,6 +100,7 @@ export const adminInventoryOverviewSchema = z.strictObject({
   gift_pack_versions: z.array(giftVersionSchema),
   tasks: z.array(taskConfigSchema),
   campaigns: z.array(campaignSchema),
+  qqbot_campaigns: z.array(qqBotCampaignSchema),
   audits: z.array(auditSchema),
   user_count: z.number().int().nonnegative(),
 })

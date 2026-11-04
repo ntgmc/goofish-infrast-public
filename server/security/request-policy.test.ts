@@ -288,6 +288,18 @@ describe('administrator inventory request policy', () => {
     }).success).toBe(true)
   })
 
+  it('validates website-owned group activities and rejects client-selected snapshots', () => {
+    const campaign = { action: 'create_qqbot_campaign', group_id: '123456789', campaign_id: 'welcome7',
+      item_code: 'maa_export_trial_coupon', quantity: 2, validity_days: 30, min_join_days: 7,
+      joined_before: '2026-10-31T16:00:00.000Z', ends_at: null, idempotency_key: 'create-1' }
+    expect(requestSchemas.adminInventory.safeParse(campaign).success).toBe(true)
+    for (const changes of [{ group_id: 'x' }, { campaign_id: 'x:y' }, { quantity: 0 }, { min_join_days: -1 },
+      { joined_before: '2026-02-30' }, { ends_at: 'tomorrow' }, { idempotency_key: undefined },
+      { created_by: 'forged' }, { gift_pack_version_id: 'forged' }]) {
+      expect(requestSchemas.adminInventory.safeParse({ ...campaign, ...changes }).success).toBe(false)
+    }
+  })
+
   it('rejects missing accountability fields, unknown actions, and untyped reward fields', () => {
     const grant = {
       action: 'grant',

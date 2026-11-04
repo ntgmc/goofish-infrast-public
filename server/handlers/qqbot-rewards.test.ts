@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   getQqBotAccount: vi.fn(), deliverQqBotReward: vi.fn(), listQqBotRewardItems: vi.fn(),
-  reservePersistentRateLimit: vi.fn(), requireSiteFeatures: vi.fn(),
+  reservePersistentRateLimit: vi.fn(), requireSiteFeatures: vi.fn(), listQqBotCampaigns: vi.fn(),
 }))
 vi.mock('../storage/qqbot-store', async (original) => ({
   ...await original<typeof import('../storage/qqbot-store')>(), getQqBotAccount: mocks.getQqBotAccount,
 }))
-vi.mock('../storage/qqbot-reward-store', () => ({ deliverQqBotReward: mocks.deliverQqBotReward, listQqBotRewardItems: mocks.listQqBotRewardItems }))
+vi.mock('../storage/qqbot-reward-store', () => ({ deliverQqBotReward: mocks.deliverQqBotReward, listQqBotRewardItems: mocks.listQqBotRewardItems, listQqBotCampaigns: mocks.listQqBotCampaigns }))
 vi.mock('../security/persistent-rate-limit', () => ({ reservePersistentRateLimit: mocks.reservePersistentRateLimit }))
 vi.mock('../feature-gate', () => ({ requireSiteFeatures: mocks.requireSiteFeatures }))
 import handler from './qqbot-rewards'
@@ -69,6 +69,17 @@ describe('QQ bot rewards integration boundary', () => {
     expect(await (await handler(request('rewards', body))).json()).toMatchObject({ code: 'idempotency_conflict' })
     mocks.deliverQqBotReward.mockRejectedValue(new InventoryError('item_issuance_disabled', 'disabled', 409))
     expect((await handler(request('rewards', body))).status).toBe(409)
+  })
+
+  it('exposes group-scoped campaign reads and rejects bot campaign writes', async () => {
+    mocks.listQqBotCampaigns.mockResolvedValue([{ campaign_id: 'welcome7' }])
+    const response = await handler(request('reward-campaigns?group_id=123456&campaign_id=welcome7'))
+    expect(await response.json()).toEqual({ schema_version: 1, campaigns: [{ campaign_id: 'welcome7' }] })
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+    expect(mocks.listQqBotCampaigns).toHaveBeenCalledWith('123456', 'welcome7')
+    expect((await handler(request('reward-campaigns?group_id=bad'))).status).toBe(400)
+    expect((await handler(request('reward-campaigns?group_id=123456&campaign_id=x:y'))).status).toBe(400)
+    expect((await handler(request('reward-campaigns', { campaign_id: 'forged' }))).status).toBe(405)
   })
 
   it('shares the account request quota and respects inventory availability', async () => {

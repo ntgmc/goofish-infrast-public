@@ -5,7 +5,8 @@ import { closePool, query, withTransaction } from './postgres'
 import { migrateDatabaseSchema } from './schema'
 import { saveUserAccount, saveUserProfile } from './user-store'
 import { deliverQqBotReward, listQqBotRewardItems, type QqBotRewardInput } from './qqbot-reward-store'
-import { createCustomGiftPack, createGiftPackDraft } from './admin-inventory-store'
+import { createCustomGiftPack, createGiftPackDraft, createQqBotCampaign, setQqBotCampaignStatus } from './admin-inventory-store'
+import { listQqBotCampaigns } from './qqbot-reward-store'
 import {
   acknowledgeQqBotNotification, bindQqBotAccount, createQqBotBindingCode,
   enqueueQqBotScheduleNotificationInTransaction, getQqBotAccount, getUserQqBotBinding,
@@ -46,6 +47,31 @@ async function enqueue(profileId: string, resultId = randomUUID()) {
   }))
   return resultId
 }
+
+describe('QQ bot campaigns managed on the website', () => {
+  it('creates once, scopes by group, preserves snapshots and rejects stale status updates', async () => {
+    const pack = await createCustomGiftPack('qqbot-admin', { name: '群活动礼包', description: '活动奖励',
+      contents: [{ item_code: 'maa_export_trial_coupon', quantity: 1, expiry: { mode: 'never' } }], publish: true })
+    const input = { group_id: '7654321', campaign_id: 'website-event', item_code: pack.item_code as string,
+      quantity: 2, validity_days: 30, min_join_days: 7, joined_before: '2026-10-31T16:00:00.000Z', ends_at: null,
+      idempotency_key: randomUUID() }
+    const responses = await Promise.all(Array.from({ length: 3 }, () => createQqBotCampaign('qqbot-admin', input)))
+    expect(responses).toEqual(Array(3).fill({ group_id: input.group_id, campaign_id: input.campaign_id }))
+    await expect(createQqBotCampaign('qqbot-admin', { ...input, idempotency_key: randomUUID() }))
+      .rejects.toMatchObject({ code: 'campaign_exists' })
+    const [campaign] = await listQqBotCampaigns(input.group_id, input.campaign_id)
+    expect(campaign).toMatchObject({ enabled: true, revision: 1, gift_pack_version_id: pack.version_id, created_by: 'qqbot-admin' })
+    expect(await listQqBotCampaigns('7654322', input.campaign_id)).toEqual([])
+    await setQqBotCampaignStatus('qqbot-admin', { ...input, enabled: false, expected_revision: 1 })
+    await expect(setQqBotCampaignStatus('qqbot-admin', { ...input, enabled: true, expected_revision: 1 }))
+      .rejects.toMatchObject({ code: 'campaign_changed' })
+    expect((await listQqBotCampaigns(input.group_id, input.campaign_id))[0]).toMatchObject({ enabled: false, revision: 2 })
+    expect((await query("select id from inventory_admin_audit where action = 'create_qqbot_campaign' and target_id = $1", [`${input.group_id}:${input.campaign_id}`])).rows).toHaveLength(1)
+    for (const changes of [{ campaign_id: 'past', ends_at: '2020-01-01T00:00:00.000Z' }, { campaign_id: 'unknown', item_code: 'missing' }]) {
+      await expect(createQqBotCampaign('qqbot-admin', { ...input, ...changes, idempotency_key: randomUUID() })).rejects.toBeInstanceOf(Error)
+    }
+  })
+})
 
 describe('QQ bot reward delivery in PostgreSQL', () => {
   function reward(qq: string, changes: Partial<QqBotRewardInput> = {}): QqBotRewardInput {

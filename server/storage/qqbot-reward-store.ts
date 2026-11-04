@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import type { QqBotCampaign } from '../../src/lib/qqbot-reward-contracts'
 import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import { grantItemInTransaction } from './inventory-store'
@@ -30,6 +31,15 @@ export async function listQqBotRewardItems() {
       where item.issuance_enabled and item.kind not in ('cosmetic', 'badge')
         and (item.kind <> 'gift_pack' or version.id is not null)
       order by item.code`,
+  )
+  return result.rows
+}
+
+export async function listQqBotCampaigns(groupId: string, campaignId: string | null) {
+  await ensureDatabaseSchema()
+  const result = await query<QqBotCampaign>(
+    `select * from qqbot_reward_campaigns where group_id = $1 and ($2::text is null or campaign_id = $2)
+     order by created_at desc, campaign_id limit 50`, [groupId, campaignId],
   )
   return result.rows
 }
