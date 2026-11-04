@@ -268,7 +268,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
             </button>
           </div>
         </header>
-        <main className="v2-main motion-region-enter" tabIndex={-1} data-route-focus>
+        <main className="v2-main" tabIndex={-1} data-route-focus>
           {session.authStatus === 'error' && <p className="v2-feedback v2-feedback-error" role="alert">{text.loginServiceUnavailable}<button type="button" onClick={session.retryAuth}>{copy.common.pages_ToolPage_005}</button></p>}
           {navigationError && <p className="v2-feedback v2-feedback-error" role="alert">{navigationError}<button type="button" onClick={() => { session.retryConfigSave(); setNavigationError(null) }}>{text.loginRetry}</button></p>}
           <AnnouncementBanner announcement={session.banner} />

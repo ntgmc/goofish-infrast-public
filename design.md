@@ -123,9 +123,15 @@ it deliberately when changing the shared design.
 - Keep generation beside the overview title and export beside result navigation.
   Copper marks the primary action and focus; station colors identify room types
   through the same icon backgrounds on desktop and mobile.
-- V2 pages show the destination immediately, with a 180ms, 4px entrance and no
-  first-load animation. Preserve mounted drafts during navigation. Keep room
-  shells and operator slots across shifts; crossfade only their occupants and
+- V2 navigation keeps the rail and top bar steady. Use scoped native page
+  snapshots when supported: the old content leaves in 90ms and the destination
+  enters over 220ms with a 6px translation, without scaling. Loading screens
+  stay live; skip their snapshots and fade in the content once it arrives.
+  The fallback enters from 72% opacity over 220ms without a blank frame.
+  First load and reduced motion update directly. Wait for a deferred page to
+  commit before restoring history scroll and route focus; cancel superseded
+  transitions and preserve mounted drafts. Keep room shells and operator
+  slots across shifts; crossfade only their occupants and
   exclude departing occupants from interaction and accessibility. Animate room
   geometry over 280ms while keeping text and portraits at their original scale. Keep shared active
   indicators, result crossfades, and drawer enter/exit.

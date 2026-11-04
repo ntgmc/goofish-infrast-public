@@ -868,8 +868,38 @@
 .v2-result-view,
 .v2-manual-workspace { grid-area: board; min-width: 0; }
 
-.v2-page-transition {
-  min-width: 0;
+.v2-page-transition { min-width: 0; }
+.v2-page-transition[data-page-entering="native"] { view-transition-name: v2-page; }
+/* Finish nested entrances before capturing the destination; local panel changes retain their motion. */
+.v2-page-transition[data-page-entering] .v2-page-section :is(div, section, article) { animation-duration: 0s; }
+
+html:has(.v2-page-transition[data-page-entering="native"]) {
+  &::view-transition { pointer-events: none; }
+  &::view-transition-group(root),
+  &::view-transition-new(root) { animation: none; }
+  &::view-transition-old(root) { display: none; }
+  &::view-transition-group(v2-page) { animation: none; overflow: clip; }
+  &::view-transition-image-pair(v2-page) { isolation: auto; animation: none; }
+  &::view-transition-old(v2-page),
+  &::view-transition-new(v2-page) {
+    height: 100%;
+    object-fit: none;
+    object-position: left top;
+    mix-blend-mode: normal;
+    animation-duration: 220ms;
+    animation-timing-function: var(--ease-out);
+  }
+  &::view-transition-old(v2-page) { animation: v2-page-exit 90ms ease-out both; }
+  &::view-transition-new(v2-page) { animation-name: v2-page-enter; }
+}
+
+@keyframes v2-page-exit {
+  to { opacity: 0; }
+}
+
+@keyframes v2-page-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
 }
 
 .v2-main:has(> .v2-page-transition > .v2-feature-content:not([hidden]) > .v2-section-body:not([hidden]) > .v2-section-loading-region) :is(.v2-section-heading, .v2-footer) {

@@ -65,6 +65,36 @@ describe('RouteLifecycle', () => {
     await waitFor(() => expect(screen.getByRole('main')).toHaveFocus())
   })
 
+  it('restores scroll and focus after a deferred page commits, cancelling superseded restores', async () => {
+    function DeferredPage() {
+      const location = useLocation()
+      const [ready, setReady] = useState('')
+      return <><RouteLifecycle /><button onClick={() => setReady(location.pathname)}>显示页面</button>
+        <main tabIndex={-1} data-route-focus><div data-route-pending={ready !== location.pathname || undefined}>{location.pathname}</div></main></>
+    }
+    const user = userEvent.setup()
+    const router = createMemoryRouter([{ path: '*', element: <DeferredPage /> }], { initialEntries: ['/first'] })
+    render(<RouterProvider router={router} />)
+    expect(scrollToMock).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: '显示页面' }))
+    await waitFor(() => expect(screen.getByRole('main')).toHaveFocus())
+    window.scrollY = 340
+    screen.getByRole('button', { name: '显示页面' }).focus()
+    await act(async () => router.navigate('/second'))
+    const restored = scrollToMock.mock.calls.length
+    expect(screen.getByRole('main')).not.toHaveFocus()
+    await act(async () => router.navigate('/third'))
+    expect(scrollToMock).toHaveBeenCalledTimes(restored)
+    await user.click(screen.getByRole('button', { name: '显示页面' }))
+    await waitFor(() => expect(scrollToMock).toHaveBeenLastCalledWith(0, 0))
+    window.scrollY = 80
+    await act(async () => router.navigate(-2))
+    expect(scrollToMock).toHaveBeenLastCalledWith(0, 0)
+    await user.click(screen.getByRole('button', { name: '显示页面' }))
+    await waitFor(() => expect(scrollToMock).toHaveBeenLastCalledWith(0, 340))
+    expect(screen.getByRole('main')).toHaveFocus()
+  })
+
   it('evicts the oldest scroll positions during a long navigation session', async () => {
     const router = createMemoryRouter([
       { path: '*', element: <LifecycleHarness /> },
