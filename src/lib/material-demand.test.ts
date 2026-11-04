@@ -4,8 +4,8 @@ import { materialDemandChartMax, materialDemandCsv, materialDemandMonths, materi
 const data: MaterialDemandSnapshot = {
   version: 1, asOf: '2026-04-15', gameSha: 'a'.repeat(40), releaseDatesSha256: 'b'.repeat(64),
   materials: [{ id: 'rock', name: '源岩组', icon: 'rock' }, { id: 'sugar', name: '糖组', icon: 'sugar' }],
-  operators: [{ id: 'a', name: '干员A', rarity: 6, date: '2026-01-10', amounts: [12, 0] }, { id: 'b', name: '干员B', rarity: 4, date: '2026-03-10', amounts: [0, 6] }],
-  modules: [{ id: 'm', name: '老干员模组', rarity: 6, date: '2026-03-20', amounts: [6, 0] }, { id: 'future', name: '未来模组', rarity: 6, date: '2026-05-01', amounts: [100, 100] }],
+  operators: [{ id: 'a', name: '干员A', rarity: 6, date: '2026-01-10', amounts: [12, 0], origins: { direct: [12, 0], purple: [0, 0], gold: [0, 0] } }, { id: 'b', name: '干员B', rarity: 4, date: '2026-03-10', amounts: [0, 6], origins: { direct: [0, 6], purple: [0, 0], gold: [0, 0] } }],
+  modules: [{ id: 'm', name: '老干员模组', rarity: 6, date: '2026-03-20', amounts: [6, 0], origins: { direct: [6, 0], purple: [0, 0], gold: [0, 0] } }, { id: 'future', name: '未来模组', rarity: 6, date: '2026-05-01', amounts: [100, 100], origins: { direct: [100, 100], purple: [0, 0], gold: [0, 0] } }],
 }
 
 describe('material demand timeline', () => {

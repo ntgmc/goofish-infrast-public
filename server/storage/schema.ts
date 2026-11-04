@@ -1755,6 +1755,13 @@ CREATE INDEX IF NOT EXISTS idx_user_notifications_user_updated
 CREATE INDEX IF NOT EXISTS idx_user_notifications_user_unread
   ON user_notifications(user_id, updated_at DESC, id DESC) WHERE read_at IS NULL;
 
+CREATE TABLE IF NOT EXISTS qqbot_reward_deliveries (
+  delivery_id TEXT PRIMARY KEY,
+  request_hash TEXT NOT NULL,
+  response_json JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS qqbot_binding_codes (
   user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
   code_hash TEXT NOT NULL UNIQUE,
@@ -2066,6 +2073,24 @@ CREATE TABLE IF NOT EXISTS gift_pack_versions (
 );
 
 ALTER TABLE gift_pack_versions ADD COLUMN IF NOT EXISTS opening_rule JSONB NOT NULL DEFAULT '{"mode":"all"}'::jsonb;
+
+CREATE TABLE IF NOT EXISTS qqbot_reward_campaigns (
+  group_id TEXT NOT NULL CHECK (group_id ~ '^[1-9][0-9]{0,19}$'),
+  campaign_id TEXT NOT NULL CHECK (campaign_id ~ '^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$'),
+  item_code TEXT NOT NULL REFERENCES item_definitions(code) ON DELETE RESTRICT,
+  quantity INTEGER NOT NULL CHECK (quantity BETWEEN 1 AND 10000),
+  validity_days INTEGER NOT NULL CHECK (validity_days BETWEEN 0 AND 3650),
+  gift_pack_version_id TEXT REFERENCES gift_pack_versions(id) ON DELETE RESTRICT,
+  min_join_days INTEGER NOT NULL CHECK (min_join_days BETWEEN 0 AND 36500),
+  joined_before TIMESTAMPTZ,
+  ends_at TIMESTAMPTZ,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  revision INTEGER NOT NULL DEFAULT 1 CHECK (revision > 0),
+  created_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (group_id, campaign_id)
+);
 
 CREATE TABLE IF NOT EXISTS gift_pack_version_contents (
   gift_pack_version_id TEXT NOT NULL REFERENCES gift_pack_versions(id) ON DELETE CASCADE,

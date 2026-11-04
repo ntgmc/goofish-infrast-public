@@ -39,6 +39,7 @@ describe('administrator inventory runtime contract', () => {
           processed_at: timestamp,
         }],
       }],
+      qqbot_campaigns: [],
       audits: [],
       user_count: 2,
     })
@@ -55,6 +56,7 @@ describe('administrator inventory runtime contract', () => {
       gift_pack_versions: [],
       tasks: [],
       campaigns: [],
+      qqbot_campaigns: [],
       audits: [],
       user_count: 0,
     }).success).toBe(false)

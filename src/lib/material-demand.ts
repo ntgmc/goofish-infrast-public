@@ -1,6 +1,7 @@
 import { materialDemandCopy as text } from '../copy/zh-CN/material-demand'
 
-export type MaterialDemandEvent = { id: string; name: string; date: string; rarity: number; amounts: number[] }
+export type MaterialDemandOrigin = 'direct' | 'purple' | 'gold'
+export type MaterialDemandEvent = { id: string; name: string; date: string; rarity: number; amounts: number[]; origins: Record<MaterialDemandOrigin, number[]> }
 export type MaterialDemandSnapshot = {
   version: number; asOf: string; gameSha: string; releaseDatesSha256: string
   materials: { id: string; name: string; icon: string }[]

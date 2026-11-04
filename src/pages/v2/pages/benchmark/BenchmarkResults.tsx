@@ -39,7 +39,7 @@ function Results({ params }: { params: URLSearchParams }) {
     <p className="benchmark-legend"><span className="benchmark-valid">✓ {text.passLabel}</span><span className="benchmark-invalid">× <s>{text.failedReading}</s></span></p>
     {groups.length ? groups.map(({ layout, samples }) => <section className="benchmark-layout-board" key={layout.id}>
       <header><h3>{layout.label}</h3><p>{layout.id === 'S3' ? text.orundumDirection : text.yieldDirection}</p></header>
-      {layout.id === 'S3' && <p className="benchmark-muted">{text.orundumEfficiencyNote}</p>}
+      {layout.id === 'S3' && <><p className="benchmark-muted">{text.orundumEfficiencyNote}</p><p className="benchmark-muted">{text.orundumComparisonNote}</p></>}
       {samples.map((group) => <ResultGroup key={group.sample.alias} sample={group.sample.alias} cases={group.cases} selectedId={selectedId} />)}
     </section>) : <p className="benchmark-empty">{text.empty}</p>}
   </section>

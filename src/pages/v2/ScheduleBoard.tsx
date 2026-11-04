@@ -1,5 +1,5 @@
 import { memo, useId, useState, type KeyboardEvent, type ComponentType } from 'react'
-import { LayoutGroup, motion } from 'motion/react'
+import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
 import { OpenDetailsIcon as ArrowUpRight, DormitoryIcon as BedDouble, ControlRoomIcon as Building2, ShiftTimeIcon as Clock3, DroneIcon as Drone, ManufactureIcon as Factory, TrainingRoomIcon as GraduationCap, GridViewIcon as LayoutGrid, ListViewIcon as List, RecruitmentIcon as UserRoundSearch, MeetingRoomIcon, OperatorsIcon as Users, ProcessingRoomIcon as Wrench, PowerPlantIcon as Zap, UnknownFacilityIcon } from '../../components/icons'
 import { copy } from '../../copy'
 import type { PreparedResult } from '../../components/result-panel/formatters'
@@ -8,7 +8,7 @@ import type { RoomOperator } from '../../components/result-panel/types'
 import { buildBoardV2Rooms, type BoardRoom } from '../../components/result-panel/ResultBoardV2'
 import { isDroneTarget } from '../../components/result-panel/DroneMarker'
 import ProductIcon from '../../components/ProductIcon'
-import { MotionNavIndicator, motionTokens } from '../../components/MotionPrimitives'
+import { AnimatedValue, MotionNavIndicator, motionTokens } from '../../components/MotionPrimitives'
 import { useAppReducedMotion } from '../../lib/motion-preference'
 import type { OptimizeResult } from '../../lib/types'
 import TradingIcon from './TradingIcon'
@@ -51,7 +51,9 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
 }) {
   const id = useId()
   const selected = Math.min(shift, Math.max(result.plans.length - 1, 0))
-  const layoutKey = `${view}-${selected}`
+  const [transition, setTransition] = useState({ shift: selected, direction: 0 })
+  if (transition.shift !== selected) setTransition({ shift: selected, direction: selected > transition.shift ? 1 : -1 })
+  const layoutKey = `${view}-${expanded}`
   const plan = prepared.plans[selected]
   const fiammettaTarget = result.schedule_mode !== 'rotation' && plan?.Fiammetta?.enable ? plan.Fiammetta.target?.trim() : ''
   const allRooms = buildBoardV2Rooms(plan, result.schedule_mode === 'rotation')
@@ -124,7 +126,7 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
           <section key={group.label} className="v2-room-group" aria-label={group.label}>
             <h3 className="v2-room-group-title">{group.label}</h3>
             <div className={`v2-room-grid ${view === 'list' ? 'v2-room-list' : ''}`}>
-              {group.rooms.map((room) => <RoomCard key={room.key} room={room} layoutKey={layoutKey} compact={group.compact} onClick={() => onRoom(room)}
+              {group.rooms.map((room) => <RoomCard key={room.key} room={room} layoutKey={layoutKey} compact={group.compact} direction={transition.direction} onClick={() => onRoom(room)}
                 autofill={room.roomType === 'dormitory' && Boolean(plan?.rooms.dormitory?.[room.roomIndex]?.autofill)}
                 drone={isDroneTarget(plan?.drones, room.roomType, room.roomIndex)} />)}
             </div>
@@ -137,18 +139,18 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
   )
 })
 
-function RoomCard({ room, layoutKey, drone = false, compact = false, autofill = false, onClick }: { room: BoardRoom; layoutKey: string; drone?: boolean; compact?: boolean; autofill?: boolean; onClick: () => void }) {
+function RoomCard({ room, layoutKey, direction, drone = false, compact = false, autofill = false, onClick }: { room: BoardRoom; layoutKey: string; direction: number; drone?: boolean; compact?: boolean; autofill?: boolean; onClick: () => void }) {
   const reduceMotion = useAppReducedMotion()
   const layout = reduceMotion ? false : 'position'
+  const geometryTransition = { duration: 0.28, ease: motionTokens.ease.enter }
   const Icon = ROOM_ICONS[room.roomType] ?? UnknownFacilityIcon
   const automaticDormitory = autofill || room.row?.isAutofill
   const efficiency = room.row && room.row.efficiency !== '-' && ['trading', 'manufacture', 'power'].includes(room.roomType) ? room.row.efficiency : null
   const showBottom = !compact || room.product !== '-' || Boolean(efficiency)
   return (
     <motion.button type="button" className={`v2-room-card v2-room-${room.roomType} ${compact ? 'v2-room-card-compact' : ''}`} onClick={onClick}
-      layout={!reduceMotion} layoutDependency={layoutKey} transition={motionTokens.spring}
-      whileHover={reduceMotion ? undefined : { y: -2 }} whileTap={reduceMotion ? undefined : { scale: 0.99 }}>
-      <motion.div layout={layout} layoutDependency={layoutKey} transition={motionTokens.spring} className="v2-room-header">
+      layout={!reduceMotion} layoutDependency={layoutKey} transition={geometryTransition}>
+      <motion.div layout={layout} layoutDependency={layoutKey} transition={geometryTransition} className="v2-room-header">
         <span className="v2-room-icon"><Icon size={16} /></span>
         <span className="v2-room-title"><span>{room.label}</span><small>{room.indexLabel}</small></span>
       </motion.div>
@@ -156,23 +158,32 @@ function RoomCard({ room, layoutKey, drone = false, compact = false, autofill = 
         {drone && <span className="v2-drone-tag" title={text.drones}><Drone size={16} /></span>}
         <ArrowUpRight size={14} className="v2-room-arrow" />
       </span>
-      <motion.div layout={layout} layoutDependency={layoutKey} transition={motionTokens.spring} className="v2-room-operators">
-        {room.row?.operators.map((operator) => (
-          <motion.span className="v2-operator" key={operator.name} data-operator-name={operator.name}
-            layout={layout} layoutDependency={layoutKey}
-            initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }}
-            transition={{ ...motionTokens.spring, opacity: { duration: reduceMotion ? 0 : motionTokens.duration.instant } }}
+      <motion.div layout={layout} layoutDependency={layoutKey} transition={geometryTransition} className="v2-room-operators">
+        {room.row?.operators.map((operator, index) => (
+          <span className="v2-operator" key={index} data-operator-name={operator.name}
             data-operator-id={operator.id} data-operator-elite={operator.elite} data-operator-level={operator.level}>
-            <Avatar operator={operator} small={compact} /><span>{operator.name}</span>
-          </motion.span>
+            {reduceMotion ? <OperatorOccupant operator={operator} compact={compact} direction={0} reducedMotion /> : <AnimatePresence initial={false} mode="sync" custom={direction}>
+              <OperatorOccupant key={operator.name} operator={operator} compact={compact} direction={direction} reducedMotion={false} />
+            </AnimatePresence>}
+          </span>
         ))}
         {automaticDormitory && <span className="v2-muted">{room.row?.isAutofill ? room.row.operatorText : copy.domain.components_result_panel_formatters_005}</span>}
         {!room.row?.operators.length && !automaticDormitory && <span className="v2-muted">{copy.domain.result_board_v2.empty_room}</span>}
       </motion.div>
-      {showBottom && <motion.div layout={layout} layoutDependency={layoutKey} transition={motionTokens.spring} className="v2-room-bottom">
+      {showBottom && <motion.div layout={layout} layoutDependency={layoutKey} transition={geometryTransition} className="v2-room-bottom">
         {(!compact || room.product !== '-') && <span><ProductIcon product={room.product} size={18} />{room.product === '-' ? text.support : room.product}</span>}
-        {efficiency && <span className="v2-room-efficiency"><span>{room.roomType === 'trading' ? text.equivalentEfficiency : text.efficiency}</span><strong>{efficiency}</strong></span>}
+        {efficiency && <span className="v2-room-efficiency"><span>{room.roomType === 'trading' ? text.equivalentEfficiency : text.efficiency}</span><strong><AnimatedValue value={efficiency} /></strong></span>}
       </motion.div>}
     </motion.button>
   )
+}
+
+function OperatorOccupant({ operator, compact, direction, reducedMotion }: { operator: RoomOperator; compact: boolean; direction: number; reducedMotion: boolean }) {
+  const present = useIsPresent()
+  return <motion.span className="v2-operator-content" aria-hidden={!present || undefined} inert={!present || undefined}
+    initial={reducedMotion ? false : { opacity: 0, x: direction * 5 }} animate={{ opacity: 1, x: 0 }}
+    variants={{ exit: (exitDirection: number) => ({ opacity: 0, x: exitDirection * -3, transition: { duration: motionTokens.duration.exit } }) }} exit="exit"
+    transition={{ duration: reducedMotion ? 0 : motionTokens.duration.enter, ease: motionTokens.ease.enter }}>
+    <Avatar key={operator.id ?? operator.name} operator={operator} small={compact} /><span className="v2-operator-name">{operator.name}</span>
+  </motion.span>
 }

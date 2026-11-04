@@ -9,6 +9,7 @@ import { Field, itemKindLabel, type InventoryPanelProps } from './InventoryEdito
 import { InventoryPacksPanel } from './InventoryPacksPanel'
 import { InventoryOnboardingPanel } from './InventoryOnboardingPanel'
 import { InventoryDistributionPanel } from './InventoryDistributionPanel'
+import { InventoryQqBotCampaignsPanel } from './InventoryQqBotCampaignsPanel'
 import { AdminTabs } from '../shared/AdminTabs'
 
 const ADMIN_TABS = [
@@ -16,6 +17,7 @@ const ADMIN_TABS = [
   { id: 'packs', label: '礼包管理', description: '配置礼包、随机宝箱和自选宝箱' },
   { id: 'onboarding', label: '新人任务', description: '配置三项固定引导任务及奖励' },
   { id: 'distribution', label: '发放中心', description: '单用户、批量发放与批次撤回' },
+  { id: 'qqbot', label: 'QQ群活动', description: '创建群领取活动，配置入群条件与奖励' },
   { id: 'audit', label: '操作审计', description: '查看最近的后台道具操作' },
 ] as const
 type AdminTab = typeof ADMIN_TABS[number]['id']
@@ -96,6 +98,7 @@ export default function InventoryAdminSection() {
         {tab.id === 'packs' && <InventoryPacksPanel {...props} />}
         {tab.id === 'onboarding' && <InventoryOnboardingPanel {...props} />}
         {tab.id === 'distribution' && <InventoryDistributionPanel {...props} />}
+        {tab.id === 'qqbot' && <InventoryQqBotCampaignsPanel {...props} />}
         {tab.id === 'audit' && <AuditPanel data={data} />}
       </>}
     </fieldset>)}

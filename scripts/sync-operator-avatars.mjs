@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const SOURCE_OWNER = 'ZOOT-Plus'
 const SOURCE_REPO = 'zoot-plus-frontend'
-const SOURCE_REF = 'dev'
+const SOURCE_REF = 'scripts/update'
 const SOURCE_PATH = 'public/assets/operator-avatars/webp96'
 const API_VERSION = '2022-11-28'
 const CONCURRENCY = 6

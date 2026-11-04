@@ -116,12 +116,25 @@ it deliberately when changing the shared design.
   target and return to their parent. Support narrow screens and enlarged text.
   Use automatic scrollbars without a reserved gutter or asymmetric padding when
   content fits. Let the dialog primitive compensate for page scroll locking.
-- Use one production summary strip and one schedule panel with open room regions. Operator portraits
-  and efficiency carry the visual weight.
-- Keep generation and export together beside result status. Copper marks
-  the primary action and focus; station colors identify room types only.
-- Keep motion quiet: short page and metric entrances, shared active indicators,
-  result and shift crossfades, card layout transitions, and drawer enter/exit.
+- Use one production summary strip and a full-width schedule panel. Wide screens
+  show three room columns. Put configuration and detailed production below the
+  schedule in a native disclosure; keep its DOM order aligned with its position.
+  Operator portraits and efficiency carry the visual weight.
+- Keep generation beside the overview title and export beside result navigation.
+  Copper marks the primary action and focus; station colors identify room types
+  through the same icon backgrounds on desktop and mobile.
+- V2 navigation keeps the rail and top bar steady. Use scoped native page
+  snapshots when supported: the old content leaves in 90ms and the destination
+  enters over 220ms with a 6px translation, without scaling. Loading screens
+  stay live; skip their snapshots and fade in the content once it arrives.
+  The fallback enters from 72% opacity over 220ms without a blank frame.
+  First load and reduced motion update directly. Wait for a deferred page to
+  commit before restoring history scroll and route focus; cancel superseded
+  transitions and preserve mounted drafts. Keep room shells and operator
+  slots across shifts; crossfade only their occupants and
+  exclude departing occupants from interaction and accessibility. Animate room
+  geometry over 280ms while keeping text and portraits at their original scale. Keep shared active
+  indicators, result crossfades, and drawer enter/exit.
   Reduced motion removes translation, scaling, layout transitions, and chart
   drawing; retained opacity transitions stay at or below 150ms.
 - The public result layout at `riic.autos` informed result hierarchy,

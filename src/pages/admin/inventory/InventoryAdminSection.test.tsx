@@ -46,6 +46,7 @@ const overview = {
     { task_code: 'first_main_schedule' as const, version: 1, enabled: false, rewards_json: [], created_at: timestamp },
   ],
   campaigns: [],
+  qqbot_campaigns: [],
   audits: [],
   user_count: 3,
 }
@@ -62,6 +63,53 @@ afterEach(() => {
 })
 
 describe('InventoryAdminSection', () => {
+  it('creates a group campaign with a retry-safe key and updates status with its revision', async () => {
+    let saved = false
+    let enabled = true
+    let attempt = 0
+    const keys: unknown[] = []
+    adminApiJson.mockImplementation(async (_url: string, options?: { method?: string; json?: Record<string, unknown> }) => {
+      if (options?.method === 'POST') {
+        if (options.json?.action === 'create_qqbot_campaign') {
+          keys.push(options.json.idempotency_key)
+          attempt++
+          if (attempt === 1) throw new Error('response lost')
+          saved = true
+        } else if (options.json?.action === 'set_qqbot_campaign_status') enabled = false
+        return {}
+      }
+      return { ...overview, qqbot_campaigns: saved ? [{
+        group_id: '123456789', campaign_id: 'welcome7', item_code: 'priority_compute_coupon', quantity: 2,
+        validity_days: 30, gift_pack_version_id: null, min_join_days: 7, joined_before: '2026-10-31T16:00:00.000Z',
+        ends_at: null, enabled, revision: enabled ? 1 : 2, created_by: 'admin', created_at: timestamp, updated_at: timestamp,
+      }] : [] }
+    })
+    const user = userEvent.setup()
+    render(<InventoryAdminSection />)
+    await user.click(await screen.findByRole('tab', { name: /QQ群活动/ }))
+    await user.type(screen.getByLabelText('QQ 群号'), '123456789')
+    await user.type(screen.getByLabelText('活动编号'), 'welcome7')
+    await user.selectOptions(screen.getByLabelText('奖励道具'), 'priority_compute_coupon')
+    fireEvent.change(screen.getByLabelText('每人数量'), { target: { value: '2' } })
+    fireEvent.change(screen.getByLabelText('入群满多少天（0 不限）'), { target: { value: '7' } })
+    fireEvent.change(screen.getByLabelText('入群早于日期（可选）'), { target: { value: '2026-11-01' } })
+    await user.click(screen.getByRole('button', { name: '创建群活动' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('response lost')
+    expect(screen.getByLabelText('活动编号')).toHaveValue('welcome7')
+    await user.click(screen.getByRole('button', { name: '创建群活动' }))
+    expect(await screen.findByText('welcome7', { selector: 'h4' })).toBeInTheDocument()
+    expect(keys).toHaveLength(2)
+    expect(keys[0]).toBe(keys[1])
+    expect(adminApiJson).toHaveBeenCalledWith('/api/admin/inventory', expect.objectContaining({ json: expect.objectContaining({
+      action: 'create_qqbot_campaign', min_join_days: 7, joined_before: '2026-10-31T16:00:00.000Z', ends_at: null,
+    }) }))
+    await user.click(screen.getByRole('button', { name: '停用' }))
+    expect(adminApiJson).toHaveBeenCalledWith('/api/admin/inventory', expect.objectContaining({ json: {
+      action: 'set_qqbot_campaign_status', group_id: '123456789', campaign_id: 'welcome7', enabled: false, expected_revision: 1,
+    } }))
+    expect(await screen.findByRole('button', { name: '开启' })).toBeInTheDocument()
+  })
+
   it.each(['random', 'choice'])('publishes a %s chest with multiple rewards from one form', async (mode) => {
     const user = userEvent.setup()
     render(<InventoryAdminSection />)

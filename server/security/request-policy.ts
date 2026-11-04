@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { feedbackRequestSchema, feedbackReplySchema, adminFeedbackUpdateSchema } from '../../src/lib/feedback-contracts'
 import { giftPackOpeningRuleSchema } from '../../src/lib/admin-inventory-contracts'
+import { qqBotCampaignInputSchema } from '../../src/lib/qqbot-reward-contracts'
 import {
   MAX_DEPOT_ITEM_COUNT,
   MAX_DEPOT_ITEM_TYPES,
@@ -379,6 +380,17 @@ export const requestSchemas = {
   qqBotRegistrationInvitation: strict({
     qq_number: z.string().trim().regex(/^[1-9][0-9]{4,11}$/),
   }),
+  qqBotReward: strict({
+    delivery_id: z.string().min(1).max(200).regex(/^[A-Za-z0-9:_-]+$/),
+    qq_number: z.string().regex(/^[1-9][0-9]{4,11}$/),
+    group_id: z.string().regex(/^[1-9][0-9]{0,19}$/),
+    actor_qq: z.string().regex(/^[1-9][0-9]{4,11}$/),
+    item_code: z.string().min(1).max(120).regex(/^[A-Za-z0-9_-]+$/),
+    quantity: z.number().int().min(1).max(10000),
+    validity_days: z.number().int().min(0).max(3650),
+    gift_pack_version_id: shortString(128).nullable(),
+    reason: shortString(200),
+  }),
   qqBotPreferences: strict({ notifications_enabled: z.boolean() }),
   qqBotBinding: strict({
     qq_number: z.string().trim().regex(/^[1-9][0-9]{4,11}$/),
@@ -653,6 +665,14 @@ export const requestSchemas = {
     }),
   ]),
   adminInventory: z.discriminatedUnion('action', [
+    qqBotCampaignInputSchema.extend({ action: z.literal('create_qqbot_campaign'), idempotency_key: shortString(200) }),
+    strict({
+      action: z.literal('set_qqbot_campaign_status'),
+      group_id: z.string().regex(/^[1-9][0-9]{0,19}$/),
+      campaign_id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/),
+      enabled: z.boolean(),
+      expected_revision: z.number().int().positive(),
+    }),
     strict({
       action: z.literal('grant'),
       user_id: shortString(128),
@@ -777,6 +797,10 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/integrations/qqbot/notifications/ack', route({ POST: json('standard', requestSchemas.qqBotNotificationAck) })],
   ['/api/integrations/qqbot/results', route({ GET: none() }, ['qq_number', 'profile_id', 'scope', 'cursor', 'limit'])],
   ['/api/integrations/qqbot/maa-export', route({ POST: json('standard', requestSchemas.qqBotMaaExport) })],
+  ['/api/integrations/qqbot/reward-items', route({ GET: none() })],
+  ['/api/integrations/qqbot/reward-campaigns', route({ GET: none() }, ['group_id', 'campaign_id'])],
+  ['/api/integrations/qqbot/member-account', route({ GET: none() }, ['qq_number'])],
+  ['/api/integrations/qqbot/rewards', route({ POST: json('standard', requestSchemas.qqBotReward) })],
   ['/api/user/qqbot', route({ GET: none(), POST: none(), PATCH: json('standard', requestSchemas.qqBotPreferences), DELETE: none() })],
   ['/api/internal/releases/confirm', route({ POST: json('standard', requestSchemas.releaseConfirmation) })],
   ['/api/usage-stats', route({ POST: json('standard', requestSchemas.usageStats) }, ['admin'])],

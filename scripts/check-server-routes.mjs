@@ -13,7 +13,7 @@ const expectedRoutes = [
   '/api/changelog',
   '/api/integrations/qqbot/events',
   '/api/integrations/qqbot/registration-invitations',
-  ...['binding', 'account', 'notifications', 'notifications/ack', 'results', 'maa-export'].map((path) => `/api/integrations/qqbot/${path}`),
+  ...['binding', 'account', 'notifications', 'notifications/ack', 'results', 'maa-export', 'reward-items', 'reward-campaigns', 'member-account', 'rewards'].map((path) => `/api/integrations/qqbot/${path}`),
   '/api/user/qqbot',
   '/api/internal/releases/confirm',
   '/api/auth/login',

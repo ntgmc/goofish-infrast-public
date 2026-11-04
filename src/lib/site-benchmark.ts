@@ -1,4 +1,4 @@
-import snapshot from '../data/site-benchmark-2026-10-31.json'
+import snapshot from '../data/site-benchmark-2026-11-04.json'
 
 export const siteBenchmark = snapshot
 export const BENCHMARK_ASSETS = `/benchmarks/${snapshot.date}`

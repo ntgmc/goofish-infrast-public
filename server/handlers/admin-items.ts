@@ -5,6 +5,7 @@ import {
   createCustomGiftPack,
   createDistributionCampaign,
   createGiftPackDraft,
+  createQqBotCampaign,
   getAdminInventoryOverview,
   isAllUsersDistributionCampaign,
   processInventoryCampaignBatch,
@@ -12,11 +13,12 @@ import {
   retryFailedCampaignRecipients,
   retireGiftPackVersion,
   revokeGrant,
+  setQqBotCampaignStatus,
   updateCampaignStatus,
   updateItemPresentation,
 } from '../storage/admin-inventory-store'
 import { InventoryError } from '../storage/inventory-store'
-import { getValidatedJson } from '../security/request-validation'
+import { getValidatedJson, RequestInputError } from '../security/request-validation'
 import { requestSchemas } from '../security/request-policy'
 import { authenticateAdminRequest, requireRootAdminPassword } from './admin-auth'
 import { jsonResponse } from './license-utils'
@@ -63,7 +65,12 @@ export default async function adminItemsHandler(req: Request): Promise<Response>
     }
 
     if (path === '/api/admin/inventory') {
-      const body = await getValidatedJson(req, requestSchemas.adminInventory)
+      const body = await getValidatedJson(req, requestSchemas.adminInventory, true)
+      if (body.action === 'create_qqbot_campaign') return jsonResponse(await createQqBotCampaign(authentication.username, body), 201)
+      if (body.action === 'set_qqbot_campaign_status') {
+        await setQqBotCampaignStatus(authentication.username, body)
+        return jsonResponse({ ok: true })
+      }
       if (body.action === 'grant') {
         const grantId = await adminGrantItem(authentication.username, {
           userId: body.user_id,
@@ -117,7 +124,7 @@ export default async function adminItemsHandler(req: Request): Promise<Response>
 
     return jsonResponse({ error: 'API route not found' }, 404)
   } catch (error) {
-    if (error instanceof InventoryError) return jsonResponse({ error: error.message, code: error.code }, error.status)
+    if (error instanceof InventoryError || error instanceof RequestInputError) return jsonResponse({ error: error.message, code: error.code }, error.status)
     console.error('admin items error:', error)
     return jsonResponse({ error: 'Internal server error' }, 500)
   }

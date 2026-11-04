@@ -1,3 +1,5 @@
+const number = (value: number) => new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 }).format(value)
+
 export const materialDemandCopy = {
   title: '材料需求趋势',
   description: '查看各时期新干员与新模组的材料需求，比较 21 种蓝材料的数量和占比变化。',
@@ -29,6 +31,31 @@ export const materialDemandCopy = {
   completeMonth: '完整', partialMonth: '未结束',
   columns: { month: '月份', operators: '干员需求', modules: '模组需求', total: '合计', share: '占比', content: '养成内容', date: '实装日', amount: '蓝材料当量', source: '来源' },
   noContributions: '当月新增内容未消耗此材料。',
+  analysis: {
+    title: '近12个月变化', recent: '近12个月', previous: '前12个月', comparison: '年度对比',
+    total: '本期总需求', growth: '需求变化', shareChange: '占比变化', halfYear: '最近半年较前半年',
+    origins: { direct: '直接使用与低阶折算', purple: '紫材料合成', gold: '金材料合成' },
+    sources: '干员与模组贡献', recipeSources: '材料用途', contributors: '主要需求条目与峰值月份',
+    comparable: '完整年度可比', shortHistory: '需求历史不足两年', noDemand: '尚无普通材料需求',
+    since: (month: string) => `首次出现需求：${month}`,
+    shortHistoryHint: '完整需求历史不足两年，暂不计算年度增幅。',
+    noBaseline: '对比期需求为零，暂不计算增幅。',
+    range: (start: string, end: string) => `${start} 至 ${end}`,
+    compareRange: (recent: string, previous: string) => `${recent}，对比 ${previous}`,
+    summary: (demand: string, share: string) => `近12个月需求${demand}，占全部蓝材料的比例${share}。`,
+    describeChange: (value: number | null, unit: string) => value === null ? '暂无可比值' : Math.abs(value) < 0.05 ? '持平' : `${value > 0 ? '增加' : '减少'} ${number(Math.abs(value))}${unit}`,
+    signedChange: (value: number | null, unit: string) => value === null ? '—' : `${Math.abs(value) < 0.05 ? '0' : `${value > 0 ? '+' : '−'}${number(Math.abs(value))}`}${unit}`,
+    pp: '个百分点', unit: '蓝材料当量', previousDifference: '较前12个月',
+    driver: (source: string, direction: string) => `需求${direction}主要来自${source}。`,
+    directionUp: '增加', directionDown: '减少', balanced: '两期总需求持平。', bothSources: '新干员与新模组',
+    recipeHint: '按原始费用材料归类，金材料配方中的紫材料原料计入金材料合成。',
+    peak: (month: string) => `本期最高需求月 · ${month}`,
+    jumpMonth: (month: string) => `查看 ${month} 的趋势`,
+    card: (demand: string, share: string) => `需求 ${demand} · 占比 ${share}`,
+    cardHint: '各图下方对比最近两个完整年度，与上方趋势窗口分别计算。',
+    download: '下载年度对比 CSV',
+    csvColumns: ['材料ID', '材料', '首次需求月', '本期起始月', '本期结束月', '前期起始月', '前期结束月', '可比状态', '本期总需求', '前期总需求', '需求变化(%)', '本期占比(%)', '前期占比(%)', '占比变化(百分点)', '半年需求变化(%)', '本期干员需求', '前期干员需求', '本期模组需求', '前期模组需求', '本期直接需求', '前期直接需求', '本期紫材料合成需求', '前期紫材料合成需求', '本期金材料合成需求', '前期金材料合成需求'],
+  },
   chartTitle: (material: string) => `${material}的材料需求趋势`,
   selectMaterial: (material: string) => `查看${material}详细趋势`,
 } as const

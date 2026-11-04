@@ -21,22 +21,26 @@ export default function RouteLifecycle() {
     const currentKey = location.key
     let focusObserver: MutationObserver | null = null
 
-    const frame = window.requestAnimationFrame(() => {
+    const restore = () => {
+      if (document.querySelector('[data-route-pending]') || !focusRouteTarget()) return false
       if (navigationType === 'POP') {
         const position = positionsRef.current.get(location.key)
         if (position) window.scrollTo(position.x, position.y)
       } else {
         window.scrollTo(0, 0)
       }
-
-      if (!focusRouteTarget()) {
-        focusObserver = new MutationObserver(() => {
-          if (!focusRouteTarget()) return
-          focusObserver?.disconnect()
-          focusObserver = null
-        })
-        focusObserver.observe(document.getElementById('root') ?? document.body, { childList: true, subtree: true })
-      }
+      return true
+    }
+    const frame = window.requestAnimationFrame(() => {
+      if (restore()) return
+      focusObserver = new MutationObserver(() => {
+        if (!restore()) return
+        focusObserver?.disconnect()
+        focusObserver = null
+      })
+      focusObserver.observe(document.getElementById('root') ?? document.body, {
+        childList: true, subtree: true, attributes: true, attributeFilter: ['data-route-pending'],
+      })
     })
 
     return () => {

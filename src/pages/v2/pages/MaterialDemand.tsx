@@ -2,10 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { materialDemandCopy as text } from '../../../copy/zh-CN/material-demand'
 import snapshot from '../../../data/material-demand.json'
 import { materialDemandCsv, materialDemandMonths, materialDemandSeries, type MaterialDemandMetric } from '../../../lib/material-demand'
+import { materialDemandAnalysis, materialDemandAnalysisCsv } from '../../../lib/material-demand-analysis'
 import MaterialDemandChart from './MaterialDemandChart'
+import MaterialDemandInsights from './MaterialDemandInsights'
 import './material-demand.css'
 
 const months = materialDemandMonths(snapshot)
+const analyses = materialDemandAnalysis(snapshot, months)
 const format = (value: number) => new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 }).format(value)
 
 export default function MaterialDemand() {
@@ -34,11 +37,12 @@ export default function MaterialDemand() {
   const unit = metric === 'share' ? text.shareUnit : text.amountUnit
   const contributions = [...snapshot.operators.map((row) => ({ ...row, source: text.operators })), ...snapshot.modules.map((row) => ({ ...row, source: text.modules }))]
     .filter((row) => row.date.startsWith(month.month) && row.amounts[materialIndex] > 0).sort((a, b) => b.amounts[materialIndex] - a.amounts[materialIndex])
-  const download = () => {
-    const url = URL.createObjectURL(new Blob([materialDemandCsv(snapshot, months)], { type: 'text/csv;charset=utf-8' }))
+  const download = (comparison = false) => {
+    const csv = comparison ? materialDemandAnalysisCsv(snapshot, analyses) : materialDemandCsv(snapshot, months)
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `material-demand-${snapshot.asOf}.csv`
+    anchor.download = `material-demand-${comparison ? 'comparison-' : ''}${snapshot.asOf}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -63,6 +67,7 @@ export default function MaterialDemand() {
       <div className="material-demand-reading" aria-live="polite"><div><span>{text.reading(active.month)}</span><strong>{active.value === null ? '—' : `${format(active.value)}${suffix}`}</strong></div>
         {active.value !== null ? <p>{text.operators} {format(active.operators!)}{suffix} · {text.modules} {format(active.modules!)}{suffix}<small>{text.counts(active.operatorCount, active.moduleCount)}</small></p> : <p>{month.partial ? text.partial : metric === 'share' && selected >= window - 1 ? text.emptyShare : text.incompleteWindow}</p>}
         <p>{text.raw} <strong>{active.raw === null ? '—' : `${format(active.raw)}${suffix}`}</strong></p></div>
+      <MaterialDemandInsights analysis={analyses[materialIndex]} onMonth={(value) => { setSelected(months.findIndex((row) => row.month === value)); chartHeading.current?.focus({ preventScroll: true }); chartHeading.current?.scrollIntoView({ behavior: 'instant', block: 'nearest' }) }} />
     </section>
     <section aria-labelledby="material-demand-overview-title"><div className="material-demand-overview-heading"><h2 id="material-demand-overview-title">{text.overview}</h2><p>{text.overviewHint}</p></div>
       <div className="material-demand-overview">{snapshot.materials.map((item, index) => {
@@ -70,10 +75,11 @@ export default function MaterialDemand() {
         return <button type="button" key={item.id} aria-label={text.selectMaterial(item.name)} aria-pressed={item.id === materialId} onClick={() => selectMaterial(item.id)}>
           <span className="material-demand-card-heading"><img src={`/item-icons/${item.icon}.png`} alt="" width={32} height={32} loading="lazy" /><strong>{item.name}</strong><span>{last ? `${format(last.value!)}${suffix}` : '—'}</span></span>
           <MaterialDemandChart name={item.name} points={series[index]} share={metric === 'share'} rawPoints={rawPoints} fullScale={fullScale} compact />
+          <span className="material-demand-card-analysis">{analyses[index].comparable ? text.analysis.card(text.analysis.signedChange(analyses[index].change, '%'), text.analysis.signedChange(analyses[index].shareChange, text.analysis.pp)) : analyses[index].firstDemand ? `${text.analysis.shortHistory} · ${text.analysis.since(analyses[index].firstDemand!)}` : text.analysis.noDemand}</span>
         </button>
-      })}</div><p className="material-demand-footnote">{latest?.month} · {unit}</p>
+      })}</div><p className="material-demand-footnote">{latest?.month} · {unit}</p><p className="material-demand-footnote">{text.analysis.cardHint}</p>
     </section>
-    <details className="v2-disclosure material-demand-data"><summary>{text.data}</summary><button type="button" className="v2-button v2-button-secondary" onClick={download}>{text.download}</button>
+    <details className="v2-disclosure material-demand-data"><summary>{text.data}</summary><div className="v2-actions"><button type="button" className="v2-button v2-button-secondary" onClick={() => download()}>{text.download}</button><button type="button" className="v2-button v2-button-secondary" onClick={() => download(true)}>{text.analysis.download}</button></div>
       <div className="material-demand-table-scroll"><table><caption>{material.name} · {text.tableCaption}</caption><thead><tr><th scope="col">{text.columns.month}</th><th scope="col">{text.columns.operators}</th><th scope="col">{text.columns.modules}</th><th scope="col">{text.columns.total}</th><th scope="col">{text.columns.share}</th></tr></thead><tbody>{months.map((row) => {
         const total = row.operators[materialIndex] + row.modules[materialIndex]
         return <tr key={row.month}><th scope="row">{row.month}{row.partial && <small>{text.partial}</small>}</th><td>{format(row.operators[materialIndex])}</td><td>{format(row.modules[materialIndex])}</td><td>{format(total)}</td><td>{row.total > 0 ? `${format(total / row.total * 100)}%` : '—'}</td></tr>

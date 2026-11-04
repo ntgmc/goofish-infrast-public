@@ -61,6 +61,7 @@ export function MotionPreferenceProvider({ children }: { children: ReactNode }) 
     let previousTime = 0
     let slowFrames = 0
     let slowTime = 0
+    let smoothTime = 0
     const events = ['click', 'keydown', 'scroll', 'animationstart', 'transitionrun'] as const
 
     const stop = () => {
@@ -72,22 +73,26 @@ export function MotionPreferenceProvider({ children }: { children: ReactNode }) 
       if (document.visibilityState !== 'visible') return
       const elapsed = time - previousTime
       previousTime = time
-      // Require several slow frames so a single loading pause cannot change the preference.
-      if (elapsed >= 50) {
+      // Require prolonged severe stuttering, discarding pauses once rendering recovers.
+      if (elapsed >= 100) {
         slowFrames += 1
         slowTime += elapsed
+        smoothTime = 0
+      } else {
+        smoothTime += elapsed
+        if (smoothTime >= 1000) slowFrames = slowTime = 0
       }
-      if (slowFrames >= 3 && slowTime >= 300) {
+      if (slowFrames >= 5 && slowTime >= 5000) {
         setPreference(true)
         setShowAutoReducedToast(true)
         return
       }
-      if (time - startedAt < 1000) frame = window.requestAnimationFrame(sample)
+      if (time - startedAt < 10000) frame = window.requestAnimationFrame(sample)
     }
     const start = () => {
       if (frame !== null || document.visibilityState !== 'visible') return
       startedAt = previousTime = performance.now()
-      slowFrames = slowTime = 0
+      slowFrames = slowTime = smoothTime = 0
       frame = window.requestAnimationFrame(sample)
     }
     for (const event of events) document.addEventListener(event, start, { capture: true, passive: true })
