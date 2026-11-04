@@ -54,7 +54,55 @@
 .material-demand-data th, .material-demand-data td { padding: var(--space-xs); text-align: end; border-bottom: 1px solid var(--v2-line); }
 .material-demand-data th:first-child { text-align: start; }
 .material-demand-data th small { display: block; color: var(--v2-muted); font-weight: 400; }
-.material-demand-data > button { margin-top: var(--space-sm); }
+.material-demand-data > .v2-actions { margin-top: var(--space-sm); }
+.material-demand-insights { margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--v2-line); font-size: var(--text-sm); }
+.material-demand-insights-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-xs) var(--space-md); }
+.material-demand-insights-heading h3 { font-size: var(--text-lg); }
+.material-demand-insights-heading p, .material-demand-insights .v2-muted { color: var(--v2-secondary); font-size: var(--text-xs); }
+.material-demand-conclusion { margin-top: var(--space-sm); line-height: 1.8; }
+.material-demand-analysis-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-md); margin-block: var(--space-md); }
+.material-demand-analysis-metrics dt { color: var(--v2-secondary); font-size: var(--text-xs); }
+.material-demand-analysis-metrics dd { margin: var(--space-2xs) 0 0; font-size: var(--text-xl); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.material-demand-analysis-metrics small { display: block; color: var(--v2-secondary); font-size: var(--text-xs); }
+.material-demand-half-year { color: var(--v2-secondary); }
+.material-demand-comparison, .material-demand-origins { margin: var(--space-md) 0 0; }
+.material-demand-insights figcaption { margin-bottom: var(--space-sm); font-weight: 600; }
+.material-demand-comparison-row { display: grid; grid-template-columns: 5.5em minmax(0, 1fr) 5em; align-items: center; gap: var(--space-xs); margin-block: var(--space-xs); }
+.material-demand-comparison-row > strong { text-align: end; font-variant-numeric: tabular-nums; }
+.material-demand-comparison-track, .material-demand-origin-track { display: flex; overflow: hidden; height: 14px; background: var(--v2-bg); border-radius: 2px; }
+.material-demand-bar-operators, .material-demand-origin-direct { background: var(--v2-secondary); }
+.material-demand-bar-modules, .material-demand-origin-gold { background: var(--v2-accent); }
+.material-demand-origin-purple { background-color: var(--v2-accent); background-image: repeating-linear-gradient(135deg, transparent 0 3px, var(--v2-paper) 3px 5px); }
+.material-demand-source-labels { display: flex; flex-wrap: wrap; gap: var(--space-sm) var(--space-lg); margin-block: var(--space-sm); }
+.material-demand-source-labels > span::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-inline-end: var(--space-2xs); background: var(--v2-secondary); }
+.material-demand-source-labels > span:last-child::before { background: var(--v2-accent); }
+.material-demand-insights small { font-size: var(--text-xs); }
+.material-demand-source-labels small, .material-demand-origins dd small { display: block; color: var(--v2-secondary); margin-top: var(--space-2xs); }
+.material-demand-origins dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-sm); margin-block: var(--space-sm); }
+.material-demand-origins dt { color: var(--v2-secondary); }
+.material-demand-origins dt i { display: inline-block; width: 10px; height: 10px; margin-inline-end: var(--space-2xs); }
+.material-demand-origins dd { margin: var(--space-2xs) 0 0; font-variant-numeric: tabular-nums; }
+.material-demand-origins > p { color: var(--v2-secondary); font-size: var(--text-xs); line-height: 1.7; }
+.material-demand-contributors { margin-top: var(--space-sm); }
+.material-demand-contributors > button { margin-top: var(--space-sm); }
+.material-demand-contributors ol { margin: var(--space-xs) 0 0; padding-inline-start: 1.5em; }
+.material-demand-contributors li > button { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); width: 100%; min-height: 44px; padding-block: var(--space-xs); text-align: start; color: var(--v2-ink); background: none; border: 0; border-bottom: 1px solid var(--v2-line); cursor: pointer; }
+.material-demand-contributors li small { display: block; color: var(--v2-secondary); }
+.material-demand-contributors li > button > span { min-width: 0; }
+.material-demand-contributors li strong { flex-shrink: 0; white-space: nowrap; }
+.material-demand-contributors button:focus-visible { outline: 2px solid var(--v2-accent); outline-offset: 2px; }
+.material-demand-card-analysis { display: block; margin-top: var(--space-xs); color: var(--v2-secondary); font-size: var(--text-xs); line-height: 1.6; }
+@media (max-width: 639px) {
+  .material-demand-analysis-metrics { grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); }
+  .material-demand-analysis-metrics > div { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-xs) var(--space-md); }
+  .material-demand-analysis-metrics dd { margin: 0; text-align: end; }
+  .material-demand-comparison-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .material-demand-comparison-track { grid-row: 2; grid-column: 1 / -1; }
+  .material-demand-comparison-row > strong { grid-row: 1; grid-column: 2; }
+  .material-demand-origins dl { grid-template-columns: minmax(0, 1fr); }
+  .material-demand-origins dl > div { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-xs); }
+  .material-demand-origins dd { text-align: end; }
+}
 .material-demand-methodology p { margin-top: var(--space-sm); max-width: 85ch; color: var(--v2-secondary); font-size: var(--text-sm); line-height: 1.8; }
 @media (min-width: 640px) {
   .material-demand-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }

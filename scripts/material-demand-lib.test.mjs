@@ -33,6 +33,12 @@ test('expands all promotions, skill ranks and every mastery; adds all module lev
   assert.deepEqual(result.materials.map((x) => x.id), ['30013', '30023'])
   assert.deepEqual(result.operators.map((x) => [x.id, x.amounts]), [['char_test', [14, 3]], ['char_form', [2, 0]]])
   assert.deepEqual(result.modules.map((x) => [x.date, x.amounts]), [['2022-06-01', [12, 5]]])
+  assert.equal(result.version, 2)
+  assert.deepEqual(result.operators[0].origins, { direct: [2, 0], purple: [4, 0], gold: [8, 3] })
+  assert.deepEqual(result.modules[0].origins, { direct: [0, 2], purple: [4, 0], gold: [8, 3] })
+  for (const event of [...result.operators, ...result.modules]) event.amounts.forEach((amount, index) => {
+    assert.equal(Object.values(event.origins).reduce((sum, vector) => sum + vector[index], 0), amount)
+  })
 })
 
 test('keeps low-star and zero-material events, excludes future content, and uses China dates for modules', () => {

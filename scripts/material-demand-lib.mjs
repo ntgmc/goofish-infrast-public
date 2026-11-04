@@ -92,8 +92,12 @@ export function buildMaterialDemand(rawTables, releaseHtml, { gameSha, asOf, rel
     const direct = new Map()
     for (const cost of rows) if (ordinaryMaterial(cost.id)) direct.set(cost.id, (direct.get(cost.id) ?? 0) + cost.count)
     const amounts = materials.map(() => 0)
-    for (const [item, count] of direct) expand(item).forEach((value, index) => { amounts[index] += value * count })
-    return { id, name, date, rarity, amounts }
+    const origins = { direct: materials.map(() => 0), purple: materials.map(() => 0), gold: materials.map(() => 0) }
+    for (const [item, count] of direct) {
+      const origin = items[item].rarity === 'TIER_5' ? 'gold' : items[item].rarity === 'TIER_4' ? 'purple' : 'direct'
+      expand(item).forEach((value, index) => { amounts[index] += value * count; origins[origin][index] += value * count })
+    }
+    return { id, name, date, rarity, amounts, origins }
   }
   const operators = []
   const playable = new Map()
@@ -130,5 +134,5 @@ export function buildMaterialDemand(rawTables, releaseHtml, { gameSha, asOf, rel
   }
   const sortEvents = (rows) => rows.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
   assert(operators.length > 0, 'Missing operator costs')
-  return { version: 1, asOf, gameSha, releaseDatesSha256, materials, operators: sortEvents(operators), modules: sortEvents(modules) }
+  return { version: 2, asOf, gameSha, releaseDatesSha256, materials, operators: sortEvents(operators), modules: sortEvents(modules) }
 }
