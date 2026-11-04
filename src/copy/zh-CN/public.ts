@@ -457,11 +457,11 @@ export const publicCopy = {
   },
   pricing_evidence: {
     title: "排班效果，有实测可查",
-    description: "2026-10-31 · 10份干员输入，三种布局，三站共90份排班。",
+    description: "2026-11-04 · v2.0.1141复测，10份干员、三种布局共90份排班。",
     execution_label: "MaaTool排班通过执行检查",
     execution_value: "30／30份",
     yield_label: "双方通过的常规配对，MaaTool产出更高",
-    yield_value: "10／10组",
+    yield_value: "9／9组",
     action: "查看三站排班实测",
   },
   pricing_purchase_unavailable: "暂未开放购买",

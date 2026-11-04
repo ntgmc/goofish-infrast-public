@@ -5,11 +5,11 @@ import { cleanup, render, screen, waitFor, within } from '../../../test/query-re
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { copy } from '../../../copy'
-import { siteBenchmark } from '../../../lib/site-benchmark'
+import { BENCHMARK_ASSETS, siteBenchmark } from '../../../lib/site-benchmark'
 import SiteBenchmark from './SiteBenchmark'
 
 const text = copy.siteBenchmark
-const evidenceFile = `${process.cwd()}/public/benchmarks/2026-10-31/cases/A01-S2-yituliu.json`
+const evidenceFile = `${process.cwd()}/public${BENCHMARK_ASSETS}/cases/A01-S2-yituliu.json`
 
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
@@ -20,7 +20,7 @@ it('opens a shared failed case with the actual frozen evidence, and retains full
   expect(screen.getByText(text.shown(1, 90))).toBeInTheDocument()
   expect(document.querySelector('[data-score-id="A01-S2-yituliu"]')).toHaveAttribute('aria-expanded', 'true')
   await screen.findByText(text.moodError('香草', 0, 5.2))
-  expect(fetch).toHaveBeenCalledWith('/benchmarks/2026-10-31/cases/A01-S2-yituliu.json', expect.objectContaining({ credentials: 'omit', signal: expect.any(AbortSignal) }))
+  expect(fetch).toHaveBeenCalledWith(`${BENCHMARK_ASSETS}/cases/A01-S2-yituliu.json`, expect.objectContaining({ credentials: 'omit', signal: expect.any(AbortSignal) }))
   await user.click(screen.getByRole('button', { name: text.nativePlans }))
   expect(screen.queryByText(text.moodError('香草', 0, 5.2))).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: text.diagnosis }))
@@ -28,10 +28,12 @@ it('opens a shared failed case with the actual frozen evidence, and retains full
 
   await user.click(screen.getByRole('button', { name: text.reset }))
   await user.selectOptions(screen.getByRole('combobox', { name: text.state }), 'failed')
-  expect(screen.getByText(text.shown(49, 90))).toBeInTheDocument()
+  expect(screen.getByText(text.shown(50, 90))).toBeInTheDocument()
+  expect(screen.getByText(text.generationNote)).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: text.yieldTitle(9, 9) })).toBeInTheDocument()
   expect(screen.getByRole('heading', { name: text.headline('MaaTool', 30).join('') })).toBeInTheDocument()
-  expect(document.querySelectorAll('.benchmark-score')).toHaveLength(49)
-  expect(document.querySelectorAll('.benchmark-score s')).toHaveLength(49)
+  expect(document.querySelectorAll('.benchmark-score')).toHaveLength(50)
+  expect(document.querySelectorAll('.benchmark-score s')).toHaveLength(50)
   await user.click(screen.getByRole('button', { name: text.reset }))
   expect(document.querySelectorAll('.benchmark-score')).toHaveLength(90)
   expect(document.querySelectorAll('.benchmark-score-pass s')).toHaveLength(0)
@@ -47,7 +49,8 @@ it('opens a shared failed case with the actual frozen evidence, and retains full
   expect(ownScore).toHaveFocus()
   expect(ownScore).toHaveAttribute('aria-expanded', 'false')
   const downloads = document.getElementById('benchmark-downloads')!
-  expect(within(downloads).getByRole('link', { name: /CSV/ })).toHaveAttribute('href', '/benchmarks/2026-10-31/results.csv')
+  expect(within(downloads).getByRole('link', { name: /CSV/ })).toHaveAttribute('href', `${BENCHMARK_ASSETS}/results.csv`)
+  expect(within(downloads).getByRole('link', { name: text.archiveReport(siteBenchmark.archive.date) })).toHaveAttribute('href', siteBenchmark.archive.report)
 })
 
 it('rejects another case returned for the selected URL and retries the same evidence read', async () => {
@@ -60,7 +63,7 @@ it('rejects another case returned for the selected URL and retries the same evid
   expect(screen.queryByText(text.moodError('香草', 0, 5.2))).not.toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: text.retry }))
   await screen.findByText(text.moodError('香草', 0, 5.2))
-  expect(fetch.mock.calls.map(([url]) => url)).toEqual(Array(2).fill('/benchmarks/2026-10-31/cases/A01-S2-yituliu.json'))
+  expect(fetch.mock.calls.map(([url]) => url)).toEqual(Array(2).fill(`${BENCHMARK_ASSETS}/cases/A01-S2-yituliu.json`))
   await waitFor(() => expect(screen.queryByText(text.evidenceError)).not.toBeInTheDocument())
   expect(siteBenchmark.verification.commonFixturesConfirmed).toBe(false)
 })

@@ -1,0 +1,5509 @@
+{
+  "schemaVersion": 1,
+  "caseId": "A08-S1-yituliu",
+  "shiftHours": [
+    8,
+    8,
+    8
+  ],
+  "result": {
+    "id": "A08-S1-yituliu",
+    "sample": "A08",
+    "layout": "S1",
+    "site": "yituliu",
+    "passed": false,
+    "moodErrors": 4,
+    "stable": true,
+    "iterations": 4,
+    "resources": {
+      "sanity": 314.00679866148465,
+      "lmd": 69329.8317,
+      "exp": 30360.1,
+      "goldProduced": 81.3334,
+      "goldConsumed": 130.5519,
+      "goldNet": -49.2185,
+      "orundum": 0,
+      "shardsProduced": 0,
+      "shardsConsumed": 0,
+      "shardsNet": 0,
+      "recyclingSanity": 0
+    },
+    "opportunityCost": null,
+    "provenance": {
+      "originalSha256": "aeb62ab0afa87573b2190d68f7c85f2839186a27b2fa9f8aaa133804cd20cc32",
+      "simulationSha256": "d3085b816ac2021a90ac0362c5a1fc89070e032871e812f44dbe10ca4ae0f071",
+      "generationVersion": "v20261025.1958",
+      "generatedAt": "2026-11-03T15:41:06.603Z",
+      "retainedOriginal": false
+    }
+  },
+  "nativePlans": [
+    {
+      "shift": 1,
+      "hours": 8,
+      "rooms": [
+        {
+          "kind": "control",
+          "index": 1,
+          "operators": [
+            "八幡海铃",
+            "阿米娅",
+            "Mon3tr",
+            "战车",
+            "霜华"
+          ],
+          "level": 5,
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "trading",
+          "index": 1,
+          "operators": [
+            "但书",
+            "伺夜",
+            "贝洛内"
+          ],
+          "level": 3,
+          "product": "LMD",
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "trading",
+          "index": 2,
+          "operators": [
+            "巫恋",
+            "龙舌兰",
+            "卡夫卡"
+          ],
+          "level": 3,
+          "product": "LMD",
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "manufacture",
+          "index": 1,
+          "operators": [
+            "多萝西",
+            "娜斯提",
+            "至简"
+          ],
+          "level": 3,
+          "product": "Pure Gold",
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "manufacture",
+          "index": 2,
+          "operators": [
+            "清流",
+            "温蒂",
+            "森蚺"
+          ],
+          "level": 3,
+          "product": "Pure Gold",
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "manufacture",
+          "index": 3,
+          "operators": [
+            "断罪者",
+            "酒神",
+            "弑君者"
+          ],
+          "level": 3,
+          "product": "Battle Record",
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "manufacture",
+          "index": 4,
+          "operators": [
+            "红云",
+            "帕拉斯",
+            "稀音"
+          ],
+          "level": 3,
+          "product": "Battle Record",
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "power",
+          "index": 1,
+          "operators": [
+            "伊芙利特"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        },
+        {
+          "kind": "power",
+          "index": 2,
+          "operators": [
+            "烛煌"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        },
+        {
+          "kind": "power",
+          "index": 3,
+          "operators": [
+            "格雷伊"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        },
+        {
+          "kind": "meeting",
+          "index": 1,
+          "operators": [
+            "伊内丝",
+            "信仰搅拌机"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        },
+        {
+          "kind": "hire",
+          "index": 1,
+          "operators": [
+            "斥罪"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        },
+        {
+          "kind": "dormitory",
+          "index": 1,
+          "operators": [],
+          "level": 5,
+          "skip": false,
+          "sort": false,
+          "autofill": true
+        },
+        {
+          "kind": "dormitory",
+          "index": 2,
+          "operators": [],
+          "level": 5,
+          "skip": false,
+          "sort": false,
+          "autofill": true
+        },
+        {
+          "kind": "dormitory",
+          "index": 3,
+          "operators": [],
+          "level": 5,
+          "skip": false,
+          "sort": false,
+          "autofill": true
+        },
+        {
+          "kind": "dormitory",
+          "index": 4,
+          "operators": [
+            "菲亚梅塔"
+          ],
+          "level": 5,
+          "skip": false,
+          "sort": false,
+          "autofill": true
+        },
+        {
+          "kind": "processing",
+          "index": 1,
+          "operators": [
+            "塞雷娅"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        },
+        {
+          "kind": "recycling",
+          "index": 1,
+          "operators": [
+            "赫默",
+            "苇草"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        },
+        {
+          "kind": "training",
+          "index": 1,
+          "operators": [],
+          "level": 3
+        }
+      ],
+      "moodErrors": [],
+      "drones": {
+        "enable": true,
+        "room": "trading",
+        "index": 1,
+        "order": "pre",
+        "rule": "all"
+      },
+      "fiammetta": {
+        "enable": true,
+        "target": "但书",
+        "order": "pre"
+      }
+    },
+    {
+      "shift": 2,
+      "hours": 8,
+      "rooms": [
+        {
+          "kind": "control",
+          "index": 1,
+          "operators": [
+            "焰狐龙梓兰",
+            "诗怀雅",
+            "斩业星熊",
+            "薇薇安娜",
+            "焰尾"
+          ],
+          "level": 5,
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "trading",
+          "index": 1,
+          "operators": [
+            "但书",
+            "推进之王",
+            "摩根"
+          ],
+          "level": 3,
+          "product": "LMD",
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "trading",
+          "index": 2,
+          "operators": [
+            "可露希尔",
+            "蕾缪安",
+            "能天使"
+          ],
+          "level": 3,
+          "product": "LMD",
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "manufacture",
+          "index": 1,
+          "operators": [
+            "清流",
+            "温蒂",
+            "森蚺"
+          ],
+          "level": 3,
+          "product": "Pure Gold",
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "manufacture",
+          "index": 2,
+          "operators": [
+            "砾",
+            "迷迭香",
+            "引星棘刺"
+          ],
+          "level": 3,
+          "product": "Pure Gold",
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "manufacture",
+          "index": 3,
+          "operators": [
+            "红云",
+            "帕拉斯",
+            "稀音"
+          ],
+          "level": 3,
+          "product": "Battle Record",
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "manufacture",
+          "index": 4,
+          "operators": [
+            "远牙",
+            "灰毫",
+            "野鬃"
+          ],
+          "level": 3,
+          "product": "Battle Record",
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "power",
+          "index": 1,
+          "operators": [
+            "烛煌"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        },
+        {
+          "kind": "power",
+          "index": 2,
+          "operators": [
+            "格雷伊"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        },
+        {
+          "kind": "power",
+          "index": 3,
+          "operators": [
+            "澄闪"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        },
+        {
+          "kind": "meeting",
+          "index": 1,
+          "operators": [
+            "信仰搅拌机",
+            "陈"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        },
+        {
+          "kind": "hire",
+          "index": 1,
+          "operators": [
+            "艾雅法拉"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        },
+        {
+          "kind": "dormitory",
+          "index": 1,
+          "operators": [],
+          "level": 5,
+          "skip": false,
+          "sort": false,
+          "autofill": true
+        },
+        {
+          "kind": "dormitory",
+          "index": 2,
+          "operators": [],
+          "level": 5,
+          "skip": false,
+          "sort": false,
+          "autofill": true
+        },
+        {
+          "kind": "dormitory",
+          "index": 3,
+          "operators": [],
+          "level": 5,
+          "skip": false,
+          "sort": false,
+          "autofill": true
+        },
+        {
+          "kind": "dormitory",
+          "index": 4,
+          "operators": [
+            "菲亚梅塔"
+          ],
+          "level": 5,
+          "skip": false,
+          "sort": false,
+          "autofill": true
+        },
+        {
+          "kind": "recycling",
+          "index": 1,
+          "operators": [
+            "旅骨",
+            "爱丽丝"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        },
+        {
+          "kind": "processing",
+          "index": 1,
+          "operators": [],
+          "level": 3
+        },
+        {
+          "kind": "training",
+          "index": 1,
+          "operators": [],
+          "level": 3
+        }
+      ],
+      "moodErrors": [],
+      "drones": {
+        "enable": true,
+        "room": "trading",
+        "index": 1,
+        "order": "pre",
+        "rule": "all"
+      },
+      "fiammetta": {
+        "enable": true,
+        "target": "但书",
+        "order": "pre"
+      }
+    },
+    {
+      "shift": 3,
+      "hours": 8,
+      "rooms": [
+        {
+          "kind": "control",
+          "index": 1,
+          "operators": [
+            "焰狐龙梓兰",
+            "诗怀雅",
+            "斩业星熊",
+            "薇薇安娜",
+            "焰尾"
+          ],
+          "level": 5,
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "trading",
+          "index": 1,
+          "operators": [
+            "但书",
+            "推进之王",
+            "摩根"
+          ],
+          "level": 3,
+          "product": "LMD",
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "trading",
+          "index": 2,
+          "operators": [
+            "可露希尔",
+            "蕾缪安",
+            "能天使"
+          ],
+          "level": 3,
+          "product": "LMD",
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "manufacture",
+          "index": 1,
+          "operators": [
+            "多萝西",
+            "娜斯提",
+            "至简"
+          ],
+          "level": 3,
+          "product": "Pure Gold",
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "manufacture",
+          "index": 2,
+          "operators": [
+            "砾",
+            "迷迭香",
+            "引星棘刺"
+          ],
+          "level": 3,
+          "product": "Pure Gold",
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "manufacture",
+          "index": 3,
+          "operators": [
+            "断罪者",
+            "酒神",
+            "弑君者"
+          ],
+          "level": 3,
+          "product": "Battle Record",
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "manufacture",
+          "index": 4,
+          "operators": [
+            "远牙",
+            "灰毫",
+            "野鬃"
+          ],
+          "level": 3,
+          "product": "Battle Record",
+          "skip": false,
+          "sort": true
+        },
+        {
+          "kind": "power",
+          "index": 1,
+          "operators": [
+            "承曦格雷伊"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        },
+        {
+          "kind": "power",
+          "index": 2,
+          "operators": [
+            "伊芙利特"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        },
+        {
+          "kind": "power",
+          "index": 3,
+          "operators": [
+            "澄闪"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        },
+        {
+          "kind": "meeting",
+          "index": 1,
+          "operators": [
+            "陈",
+            "伊内丝"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        },
+        {
+          "kind": "hire",
+          "index": 1,
+          "operators": [
+            "艾雅法拉"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        },
+        {
+          "kind": "dormitory",
+          "index": 1,
+          "operators": [],
+          "level": 5,
+          "skip": false,
+          "sort": false,
+          "autofill": true
+        },
+        {
+          "kind": "dormitory",
+          "index": 2,
+          "operators": [],
+          "level": 5,
+          "skip": false,
+          "sort": false,
+          "autofill": true
+        },
+        {
+          "kind": "dormitory",
+          "index": 3,
+          "operators": [],
+          "level": 5,
+          "skip": false,
+          "sort": false,
+          "autofill": true
+        },
+        {
+          "kind": "dormitory",
+          "index": 4,
+          "operators": [],
+          "level": 5,
+          "skip": false,
+          "sort": false,
+          "autofill": true
+        },
+        {
+          "kind": "processing",
+          "index": 1,
+          "operators": [
+            "塞雷娅"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        },
+        {
+          "kind": "training",
+          "index": 1,
+          "operators": [
+            "麦哲伦"
+          ],
+          "level": 3,
+          "skip": false
+        },
+        {
+          "kind": "recycling",
+          "index": 1,
+          "operators": [
+            "旅骨",
+            "爱丽丝"
+          ],
+          "level": 3,
+          "skip": false,
+          "sort": false
+        }
+      ],
+      "moodErrors": [],
+      "drones": {
+        "enable": true,
+        "room": "trading",
+        "index": 1,
+        "order": "pre",
+        "rule": "all"
+      },
+      "fiammetta": {
+        "enable": true,
+        "target": "但书",
+        "order": "pre"
+      }
+    }
+  ],
+  "simulatedPlans": [
+    {
+      "shift": 1,
+      "hours": 8,
+      "rooms": [
+        {
+          "kind": "hire",
+          "index": 1,
+          "operators": [
+            "斥罪"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "mood": [
+            {
+              "operator": "斥罪",
+              "start": 24,
+              "end": 14,
+              "consumed": 10,
+              "cost_per_hour": 1.25,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "power",
+          "index": 1,
+          "operators": [
+            "伊芙利特"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "mood": [
+            {
+              "operator": "伊芙利特",
+              "start": 18,
+              "end": 12,
+              "consumed": 6,
+              "cost_per_hour": 0.75,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "power",
+          "index": 2,
+          "operators": [
+            "烛煌"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "mood": [
+            {
+              "operator": "烛煌",
+              "start": 24,
+              "end": 18,
+              "consumed": 6,
+              "cost_per_hour": 0.75,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "power",
+          "index": 3,
+          "operators": [
+            "格雷伊"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "mood": [
+            {
+              "operator": "格雷伊",
+              "start": 24,
+              "end": 18,
+              "consumed": 6,
+              "cost_per_hour": 0.75,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "control",
+          "index": 1,
+          "operators": [
+            "八幡海铃",
+            "阿米娅",
+            "Mon3tr",
+            "战车",
+            "霜华"
+          ],
+          "level": 5,
+          "facility_level": 5,
+          "mood": [
+            {
+              "operator": "Mon3tr",
+              "start": 24,
+              "end": 20,
+              "consumed": 4,
+              "cost_per_hour": 0.5,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "战车",
+              "start": 24,
+              "end": 20,
+              "consumed": 4,
+              "cost_per_hour": 0.5,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "霜华",
+              "start": 24,
+              "end": 20,
+              "consumed": 4,
+              "cost_per_hour": 0.5,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "阿米娅",
+              "start": 24,
+              "end": 20,
+              "consumed": 4,
+              "cost_per_hour": 0.5,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "八幡海铃",
+              "start": 24,
+              "end": 20,
+              "consumed": 4,
+              "cost_per_hour": 0.5,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "meeting",
+          "index": 1,
+          "operators": [
+            "伊内丝",
+            "信仰搅拌机"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "mood": [
+            {
+              "operator": "伊内丝",
+              "start": 18.4,
+              "end": 12.8,
+              "consumed": 5.6,
+              "cost_per_hour": 0.7,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "信仰搅拌机",
+              "start": 24,
+              "end": 18.4,
+              "consumed": 5.6,
+              "cost_per_hour": 0.7,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "trading",
+          "index": 1,
+          "operators": [
+            "但书",
+            "伺夜",
+            "贝洛内"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "product": "LMD",
+          "mood": [
+            {
+              "operator": "伺夜",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "但书",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "贝洛内",
+              "start": 24,
+              "end": 19.6,
+              "consumed": 4.4,
+              "cost_per_hour": 0.55,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "trading",
+          "index": 2,
+          "operators": [
+            "巫恋",
+            "龙舌兰",
+            "卡夫卡"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "product": "LMD",
+          "mood": [
+            {
+              "operator": "巫恋",
+              "start": 24,
+              "end": 20.8,
+              "consumed": 3.2,
+              "cost_per_hour": 0.4,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "卡夫卡",
+              "start": 24,
+              "end": 20.8,
+              "consumed": 3.2,
+              "cost_per_hour": 0.4,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "龙舌兰",
+              "start": 24,
+              "end": 20.8,
+              "consumed": 3.2,
+              "cost_per_hour": 0.4,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "training",
+          "index": 1,
+          "operators": [],
+          "level": 3,
+          "facility_level": 3
+        },
+        {
+          "kind": "dormitory",
+          "index": 1,
+          "operators": [
+            "可露希尔",
+            "引星棘刺",
+            "推进之王",
+            "摩根",
+            "斩业星熊"
+          ],
+          "level": 5,
+          "facility_level": 5,
+          "autofill": false,
+          "mood": [
+            {
+              "operator": "摩根",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "可露希尔",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "引星棘刺",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "推进之王",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "斩业星熊",
+              "start": 13.6,
+              "end": 24
+            }
+          ]
+        },
+        {
+          "kind": "dormitory",
+          "index": 2,
+          "operators": [
+            "旅骨",
+            "澄闪",
+            "灰毫",
+            "焰尾",
+            "焰狐龙梓兰"
+          ],
+          "level": 5,
+          "facility_level": 5,
+          "autofill": false,
+          "mood": [
+            {
+              "operator": "旅骨",
+              "start": 12.8,
+              "end": 24
+            },
+            {
+              "operator": "澄闪",
+              "start": 12,
+              "end": 24
+            },
+            {
+              "operator": "灰毫",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "焰尾",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "焰狐龙梓兰",
+              "start": 13.6,
+              "end": 24
+            }
+          ]
+        },
+        {
+          "kind": "dormitory",
+          "index": 3,
+          "operators": [
+            "爱丽丝",
+            "砾",
+            "能天使",
+            "艾雅法拉",
+            "蕾缪安"
+          ],
+          "level": 5,
+          "facility_level": 5,
+          "autofill": false,
+          "mood": [
+            {
+              "operator": "砾",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "爱丽丝",
+              "start": 12.8,
+              "end": 24
+            },
+            {
+              "operator": "能天使",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "蕾缪安",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "艾雅法拉",
+              "start": 12,
+              "end": 24
+            }
+          ]
+        },
+        {
+          "kind": "dormitory",
+          "index": 4,
+          "operators": [
+            "菲亚梅塔",
+            "薇薇安娜",
+            "诗怀雅",
+            "远牙",
+            "迷迭香"
+          ],
+          "level": 5,
+          "facility_level": 5,
+          "autofill": false,
+          "mood": [
+            {
+              "operator": "远牙",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "诗怀雅",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "迷迭香",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "菲亚梅塔",
+              "start": 18.8,
+              "end": 24
+            },
+            {
+              "operator": "薇薇安娜",
+              "start": 13.6,
+              "end": 24
+            }
+          ]
+        },
+        {
+          "kind": "recycling",
+          "index": 1,
+          "operators": [
+            "赫默",
+            "苇草"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "autofill": false,
+          "mood": [
+            {
+              "operator": "苇草",
+              "start": 24,
+              "end": 18.4,
+              "consumed": 5.6,
+              "cost_per_hour": 0.7,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "赫默",
+              "start": 24,
+              "end": 18.4,
+              "consumed": 5.6,
+              "cost_per_hour": 0.7,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "processing",
+          "index": 1,
+          "operators": [
+            "塞雷娅"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "mood": [
+            {
+              "operator": "塞雷娅",
+              "start": 16,
+              "end": 8,
+              "consumed": 8,
+              "cost_per_hour": 1,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "manufacture",
+          "index": 1,
+          "operators": [
+            "多萝西",
+            "娜斯提",
+            "至简"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "product": "Pure Gold",
+          "mood": [
+            {
+              "operator": "至简",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "多萝西",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "娜斯提",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "manufacture",
+          "index": 2,
+          "operators": [
+            "清流",
+            "温蒂",
+            "森蚺"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "product": "Pure Gold",
+          "mood": [
+            {
+              "operator": "森蚺",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "清流",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "温蒂",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "manufacture",
+          "index": 3,
+          "operators": [
+            "断罪者",
+            "酒神",
+            "弑君者"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "product": "Battle Record",
+          "mood": [
+            {
+              "operator": "酒神",
+              "start": 20.8,
+              "end": 17.6,
+              "consumed": 3.2,
+              "cost_per_hour": 0.4,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "弑君者",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "断罪者",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "manufacture",
+          "index": 4,
+          "operators": [
+            "红云",
+            "帕拉斯",
+            "稀音"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "product": "Battle Record",
+          "mood": [
+            {
+              "operator": "稀音",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "红云",
+              "start": 24,
+              "end": 20.8,
+              "consumed": 3.2,
+              "cost_per_hour": 0.4,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "帕拉斯",
+              "start": 24,
+              "end": 20.8,
+              "consumed": 3.2,
+              "cost_per_hour": 0.4,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        }
+      ],
+      "moodErrors": [],
+      "drones": {
+        "enable": true,
+        "mode": "manual",
+        "room": "trading",
+        "index": 1,
+        "order": "pre"
+      },
+      "fiammetta": {
+        "enable": true,
+        "target": "但书",
+        "order": "pre"
+      }
+    },
+    {
+      "shift": 2,
+      "hours": 8,
+      "rooms": [
+        {
+          "kind": "hire",
+          "index": 1,
+          "operators": [
+            "艾雅法拉"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "mood": [
+            {
+              "operator": "艾雅法拉",
+              "start": 24,
+              "end": 18,
+              "consumed": 6,
+              "cost_per_hour": 0.75,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "power",
+          "index": 1,
+          "operators": [
+            "烛煌"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "mood": [
+            {
+              "operator": "烛煌",
+              "start": 18,
+              "end": 12,
+              "consumed": 6,
+              "cost_per_hour": 0.75,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "power",
+          "index": 2,
+          "operators": [
+            "格雷伊"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "mood": [
+            {
+              "operator": "格雷伊",
+              "start": 18,
+              "end": 12,
+              "consumed": 6,
+              "cost_per_hour": 0.75,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "power",
+          "index": 3,
+          "operators": [
+            "澄闪"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "mood": [
+            {
+              "operator": "澄闪",
+              "start": 24,
+              "end": 18,
+              "consumed": 6,
+              "cost_per_hour": 0.75,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "control",
+          "index": 1,
+          "operators": [
+            "焰狐龙梓兰",
+            "诗怀雅",
+            "斩业星熊",
+            "薇薇安娜",
+            "焰尾"
+          ],
+          "level": 5,
+          "facility_level": 5,
+          "mood": [
+            {
+              "operator": "焰尾",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "诗怀雅",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "斩业星熊",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "薇薇安娜",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "焰狐龙梓兰",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "meeting",
+          "index": 1,
+          "operators": [
+            "信仰搅拌机",
+            "陈"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "mood": [
+            {
+              "operator": "陈",
+              "start": 0,
+              "end": 0,
+              "consumed": 5.6,
+              "cost_per_hour": 0.7,
+              "red_face": true,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "信仰搅拌机",
+              "start": 18.4,
+              "end": 12.8,
+              "consumed": 5.6,
+              "cost_per_hour": 0.7,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "trading",
+          "index": 1,
+          "operators": [
+            "但书",
+            "推进之王",
+            "摩根"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "product": "LMD",
+          "mood": [
+            {
+              "operator": "但书",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "摩根",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "推进之王",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "trading",
+          "index": 2,
+          "operators": [
+            "可露希尔",
+            "蕾缪安",
+            "能天使"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "product": "LMD",
+          "mood": [
+            {
+              "operator": "能天使",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "蕾缪安",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "可露希尔",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "training",
+          "index": 1,
+          "operators": [],
+          "level": 3,
+          "facility_level": 3
+        },
+        {
+          "kind": "dormitory",
+          "index": 1,
+          "operators": [
+            "伊内丝",
+            "伊芙利特",
+            "塞雷娅",
+            "多萝西",
+            "娜斯提"
+          ],
+          "level": 5,
+          "facility_level": 5,
+          "autofill": false,
+          "mood": [
+            {
+              "operator": "伊内丝",
+              "start": 12.8,
+              "end": 24
+            },
+            {
+              "operator": "塞雷娅",
+              "start": 8,
+              "end": 24
+            },
+            {
+              "operator": "多萝西",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "娜斯提",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "伊芙利特",
+              "start": 12,
+              "end": 24
+            }
+          ]
+        },
+        {
+          "kind": "dormitory",
+          "index": 2,
+          "operators": [
+            "弑君者",
+            "承曦格雷伊",
+            "断罪者",
+            "至简",
+            "酒神"
+          ],
+          "level": 5,
+          "facility_level": 5,
+          "autofill": false,
+          "mood": [
+            {
+              "operator": "至简",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "酒神",
+              "start": 17.6,
+              "end": 24
+            },
+            {
+              "operator": "弑君者",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "断罪者",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "承曦格雷伊",
+              "start": 18,
+              "end": 24
+            }
+          ]
+        },
+        {
+          "kind": "dormitory",
+          "index": 3,
+          "operators": [
+            "麦哲伦",
+            "霜华",
+            "龙舌兰"
+          ],
+          "level": 5,
+          "facility_level": 5,
+          "autofill": false,
+          "mood": [
+            {
+              "operator": "霜华",
+              "start": 20,
+              "end": 24
+            },
+            {
+              "operator": "麦哲伦",
+              "start": 18,
+              "end": 24
+            },
+            {
+              "operator": "龙舌兰",
+              "start": 20.8,
+              "end": 24
+            }
+          ]
+        },
+        {
+          "kind": "dormitory",
+          "index": 4,
+          "operators": [
+            "菲亚梅塔"
+          ],
+          "level": 5,
+          "facility_level": 5,
+          "autofill": false,
+          "mood": [
+            {
+              "operator": "菲亚梅塔",
+              "start": 18.8,
+              "end": 24
+            }
+          ]
+        },
+        {
+          "kind": "recycling",
+          "index": 1,
+          "operators": [
+            "旅骨",
+            "爱丽丝"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "autofill": false,
+          "mood": [
+            {
+              "operator": "旅骨",
+              "start": 24,
+              "end": 18.4,
+              "consumed": 5.6,
+              "cost_per_hour": 0.7,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "爱丽丝",
+              "start": 24,
+              "end": 18.4,
+              "consumed": 5.6,
+              "cost_per_hour": 0.7,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "processing",
+          "index": 1,
+          "operators": [],
+          "level": 3,
+          "facility_level": 3
+        },
+        {
+          "kind": "manufacture",
+          "index": 1,
+          "operators": [
+            "清流",
+            "温蒂",
+            "森蚺"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "product": "Pure Gold",
+          "mood": [
+            {
+              "operator": "森蚺",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "清流",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "温蒂",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "manufacture",
+          "index": 2,
+          "operators": [
+            "砾",
+            "迷迭香",
+            "引星棘刺"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "product": "Pure Gold",
+          "mood": [
+            {
+              "operator": "砾",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "迷迭香",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "引星棘刺",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "manufacture",
+          "index": 3,
+          "operators": [
+            "红云",
+            "帕拉斯",
+            "稀音"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "product": "Battle Record",
+          "mood": [
+            {
+              "operator": "稀音",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "红云",
+              "start": 20.8,
+              "end": 17.6,
+              "consumed": 3.2,
+              "cost_per_hour": 0.4,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "帕拉斯",
+              "start": 20.8,
+              "end": 17.6,
+              "consumed": 3.2,
+              "cost_per_hour": 0.4,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "manufacture",
+          "index": 4,
+          "operators": [
+            "远牙",
+            "灰毫",
+            "野鬃"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "product": "Battle Record",
+          "mood": [
+            {
+              "operator": "灰毫",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "远牙",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "野鬃",
+              "start": 0,
+              "end": 0,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": true,
+              "controlled_zero_mood": false
+            }
+          ]
+        }
+      ],
+      "moodErrors": [
+        {
+          "operator": "陈",
+          "start": 0,
+          "needed": 5.6,
+          "room_type": "meeting",
+          "room_index": 1
+        },
+        {
+          "operator": "野鬃",
+          "start": 0,
+          "needed": 5.2,
+          "room_type": "manufacture",
+          "room_index": 4
+        }
+      ],
+      "drones": {
+        "enable": true,
+        "mode": "manual",
+        "room": "trading",
+        "index": 1,
+        "order": "pre"
+      },
+      "fiammetta": {
+        "enable": true,
+        "target": "但书",
+        "order": "pre"
+      }
+    },
+    {
+      "shift": 3,
+      "hours": 8,
+      "rooms": [
+        {
+          "kind": "hire",
+          "index": 1,
+          "operators": [
+            "艾雅法拉"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "mood": [
+            {
+              "operator": "艾雅法拉",
+              "start": 18,
+              "end": 12,
+              "consumed": 6,
+              "cost_per_hour": 0.75,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "power",
+          "index": 1,
+          "operators": [
+            "承曦格雷伊"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "mood": [
+            {
+              "operator": "承曦格雷伊",
+              "start": 24,
+              "end": 18,
+              "consumed": 6,
+              "cost_per_hour": 0.75,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "power",
+          "index": 2,
+          "operators": [
+            "伊芙利特"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "mood": [
+            {
+              "operator": "伊芙利特",
+              "start": 24,
+              "end": 18,
+              "consumed": 6,
+              "cost_per_hour": 0.75,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "power",
+          "index": 3,
+          "operators": [
+            "澄闪"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "mood": [
+            {
+              "operator": "澄闪",
+              "start": 18,
+              "end": 12,
+              "consumed": 6,
+              "cost_per_hour": 0.75,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "control",
+          "index": 1,
+          "operators": [
+            "焰狐龙梓兰",
+            "诗怀雅",
+            "斩业星熊",
+            "薇薇安娜",
+            "焰尾"
+          ],
+          "level": 5,
+          "facility_level": 5,
+          "mood": [
+            {
+              "operator": "焰尾",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "诗怀雅",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "斩业星熊",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "薇薇安娜",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "焰狐龙梓兰",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "meeting",
+          "index": 1,
+          "operators": [
+            "陈",
+            "伊内丝"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "mood": [
+            {
+              "operator": "陈",
+              "start": 0,
+              "end": 0,
+              "consumed": 5.6,
+              "cost_per_hour": 0.7,
+              "red_face": true,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "伊内丝",
+              "start": 24,
+              "end": 18.4,
+              "consumed": 5.6,
+              "cost_per_hour": 0.7,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "trading",
+          "index": 1,
+          "operators": [
+            "但书",
+            "推进之王",
+            "摩根"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "product": "LMD",
+          "mood": [
+            {
+              "operator": "但书",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "摩根",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "推进之王",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "trading",
+          "index": 2,
+          "operators": [
+            "可露希尔",
+            "蕾缪安",
+            "能天使"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "product": "LMD",
+          "mood": [
+            {
+              "operator": "能天使",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "蕾缪安",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "可露希尔",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "training",
+          "index": 1,
+          "operators": [
+            "麦哲伦"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "mood": [
+            {
+              "operator": "麦哲伦",
+              "start": 24,
+              "end": 18,
+              "consumed": 6,
+              "cost_per_hour": 0.75,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "dormitory",
+          "index": 1,
+          "operators": [
+            "Mon3tr",
+            "伺夜",
+            "信仰搅拌机",
+            "八幡海铃",
+            "卡夫卡"
+          ],
+          "level": 5,
+          "facility_level": 5,
+          "autofill": false,
+          "mood": [
+            {
+              "operator": "Mon3tr",
+              "start": 20,
+              "end": 24
+            },
+            {
+              "operator": "伺夜",
+              "start": 18.8,
+              "end": 24
+            },
+            {
+              "operator": "卡夫卡",
+              "start": 20.8,
+              "end": 24
+            },
+            {
+              "operator": "八幡海铃",
+              "start": 20,
+              "end": 24
+            },
+            {
+              "operator": "信仰搅拌机",
+              "start": 12.8,
+              "end": 24
+            }
+          ]
+        },
+        {
+          "kind": "dormitory",
+          "index": 2,
+          "operators": [
+            "巫恋",
+            "帕拉斯",
+            "战车",
+            "斥罪",
+            "格雷伊"
+          ],
+          "level": 5,
+          "facility_level": 5,
+          "autofill": false,
+          "mood": [
+            {
+              "operator": "巫恋",
+              "start": 20.8,
+              "end": 24
+            },
+            {
+              "operator": "战车",
+              "start": 20,
+              "end": 24
+            },
+            {
+              "operator": "斥罪",
+              "start": 14,
+              "end": 24
+            },
+            {
+              "operator": "帕拉斯",
+              "start": 17.6,
+              "end": 24
+            },
+            {
+              "operator": "格雷伊",
+              "start": 12,
+              "end": 24
+            }
+          ]
+        },
+        {
+          "kind": "dormitory",
+          "index": 3,
+          "operators": [
+            "森蚺",
+            "清流",
+            "温蒂",
+            "烛煌",
+            "稀音"
+          ],
+          "level": 5,
+          "facility_level": 5,
+          "autofill": false,
+          "mood": [
+            {
+              "operator": "森蚺",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "清流",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "温蒂",
+              "start": 13.6,
+              "end": 24
+            },
+            {
+              "operator": "烛煌",
+              "start": 12,
+              "end": 24
+            },
+            {
+              "operator": "稀音",
+              "start": 13.6,
+              "end": 24
+            }
+          ]
+        },
+        {
+          "kind": "dormitory",
+          "index": 4,
+          "operators": [
+            "红云",
+            "苇草",
+            "贝洛内",
+            "赫默",
+            "阿米娅"
+          ],
+          "level": 5,
+          "facility_level": 5,
+          "autofill": false,
+          "mood": [
+            {
+              "operator": "红云",
+              "start": 17.6,
+              "end": 24
+            },
+            {
+              "operator": "苇草",
+              "start": 18.4,
+              "end": 24
+            },
+            {
+              "operator": "赫默",
+              "start": 18.4,
+              "end": 24
+            },
+            {
+              "operator": "贝洛内",
+              "start": 19.6,
+              "end": 24
+            },
+            {
+              "operator": "阿米娅",
+              "start": 20,
+              "end": 24
+            }
+          ]
+        },
+        {
+          "kind": "recycling",
+          "index": 1,
+          "operators": [
+            "旅骨",
+            "爱丽丝"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "autofill": false,
+          "mood": [
+            {
+              "operator": "旅骨",
+              "start": 18.4,
+              "end": 12.8,
+              "consumed": 5.6,
+              "cost_per_hour": 0.7,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "爱丽丝",
+              "start": 18.4,
+              "end": 12.8,
+              "consumed": 5.6,
+              "cost_per_hour": 0.7,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "processing",
+          "index": 1,
+          "operators": [
+            "塞雷娅"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "mood": [
+            {
+              "operator": "塞雷娅",
+              "start": 24,
+              "end": 16,
+              "consumed": 8,
+              "cost_per_hour": 1,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "manufacture",
+          "index": 1,
+          "operators": [
+            "多萝西",
+            "娜斯提",
+            "至简"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "product": "Pure Gold",
+          "mood": [
+            {
+              "operator": "至简",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "多萝西",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "娜斯提",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "manufacture",
+          "index": 2,
+          "operators": [
+            "砾",
+            "迷迭香",
+            "引星棘刺"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "product": "Pure Gold",
+          "mood": [
+            {
+              "operator": "砾",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "迷迭香",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "引星棘刺",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "manufacture",
+          "index": 3,
+          "operators": [
+            "断罪者",
+            "酒神",
+            "弑君者"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "product": "Battle Record",
+          "mood": [
+            {
+              "operator": "酒神",
+              "start": 24,
+              "end": 20.8,
+              "consumed": 3.2,
+              "cost_per_hour": 0.4,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "弑君者",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "断罪者",
+              "start": 24,
+              "end": 18.8,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            }
+          ]
+        },
+        {
+          "kind": "manufacture",
+          "index": 4,
+          "operators": [
+            "远牙",
+            "灰毫",
+            "野鬃"
+          ],
+          "level": 3,
+          "facility_level": 3,
+          "product": "Battle Record",
+          "mood": [
+            {
+              "operator": "灰毫",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "远牙",
+              "start": 18.8,
+              "end": 13.6,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": false,
+              "controlled_zero_mood": false
+            },
+            {
+              "operator": "野鬃",
+              "start": 0,
+              "end": 0,
+              "consumed": 5.2,
+              "cost_per_hour": 0.65,
+              "red_face": true,
+              "controlled_zero_mood": false
+            }
+          ]
+        }
+      ],
+      "moodErrors": [
+        {
+          "operator": "陈",
+          "start": 0,
+          "needed": 5.6,
+          "room_type": "meeting",
+          "room_index": 1
+        },
+        {
+          "operator": "野鬃",
+          "start": 0,
+          "needed": 5.2,
+          "room_type": "manufacture",
+          "room_index": 4
+        }
+      ],
+      "drones": {
+        "enable": true,
+        "mode": "manual",
+        "room": "trading",
+        "index": 1,
+        "order": "pre"
+      },
+      "fiammetta": {
+        "enable": true,
+        "target": "但书",
+        "order": "pre"
+      }
+    }
+  ],
+  "mood": {
+    "passed": false,
+    "stable": true,
+    "iterations": 4,
+    "additions": [],
+    "unassigned": [
+      {
+        "operator": "陈",
+        "shift_index": 1
+      },
+      {
+        "operator": "野鬃",
+        "shift_index": 1
+      },
+      {
+        "operator": "陈",
+        "shift_index": 2
+      },
+      {
+        "operator": "野鬃",
+        "shift_index": 2
+      }
+    ]
+  },
+  "dormitoryDiagnosis": {
+    "mood": {
+      "passed": false,
+      "stable": true,
+      "iterations": 9,
+      "additions": [
+        {
+          "operator": "可露希尔",
+          "room_index": 0,
+          "shift_index": 0
+        },
+        {
+          "operator": "引星棘刺",
+          "room_index": 0,
+          "shift_index": 0
+        },
+        {
+          "operator": "推进之王",
+          "room_index": 0,
+          "shift_index": 0
+        },
+        {
+          "operator": "摩根",
+          "room_index": 0,
+          "shift_index": 0
+        },
+        {
+          "operator": "斩业星熊",
+          "room_index": 0,
+          "shift_index": 0
+        },
+        {
+          "operator": "旅骨",
+          "room_index": 1,
+          "shift_index": 0
+        },
+        {
+          "operator": "澄闪",
+          "room_index": 1,
+          "shift_index": 0
+        },
+        {
+          "operator": "灰毫",
+          "room_index": 1,
+          "shift_index": 0
+        },
+        {
+          "operator": "焰尾",
+          "room_index": 1,
+          "shift_index": 0
+        },
+        {
+          "operator": "焰狐龙梓兰",
+          "room_index": 1,
+          "shift_index": 0
+        },
+        {
+          "operator": "爱丽丝",
+          "room_index": 2,
+          "shift_index": 0
+        },
+        {
+          "operator": "砾",
+          "room_index": 2,
+          "shift_index": 0
+        },
+        {
+          "operator": "能天使",
+          "room_index": 2,
+          "shift_index": 0
+        },
+        {
+          "operator": "艾雅法拉",
+          "room_index": 2,
+          "shift_index": 0
+        },
+        {
+          "operator": "蕾缪安",
+          "room_index": 2,
+          "shift_index": 0
+        },
+        {
+          "operator": "薇薇安娜",
+          "room_index": 3,
+          "shift_index": 0
+        },
+        {
+          "operator": "诗怀雅",
+          "room_index": 3,
+          "shift_index": 0
+        },
+        {
+          "operator": "远牙",
+          "room_index": 3,
+          "shift_index": 0
+        },
+        {
+          "operator": "迷迭香",
+          "room_index": 3,
+          "shift_index": 0
+        },
+        {
+          "operator": "伊内丝",
+          "room_index": 0,
+          "shift_index": 1
+        },
+        {
+          "operator": "伊芙利特",
+          "room_index": 0,
+          "shift_index": 1
+        },
+        {
+          "operator": "塞雷娅",
+          "room_index": 0,
+          "shift_index": 1
+        },
+        {
+          "operator": "多萝西",
+          "room_index": 0,
+          "shift_index": 1
+        },
+        {
+          "operator": "娜斯提",
+          "room_index": 0,
+          "shift_index": 1
+        },
+        {
+          "operator": "弑君者",
+          "room_index": 1,
+          "shift_index": 1
+        },
+        {
+          "operator": "承曦格雷伊",
+          "room_index": 1,
+          "shift_index": 1
+        },
+        {
+          "operator": "断罪者",
+          "room_index": 1,
+          "shift_index": 1
+        },
+        {
+          "operator": "至简",
+          "room_index": 1,
+          "shift_index": 1
+        },
+        {
+          "operator": "酒神",
+          "room_index": 1,
+          "shift_index": 1
+        },
+        {
+          "operator": "麦哲伦",
+          "room_index": 2,
+          "shift_index": 1
+        },
+        {
+          "operator": "Mon3tr",
+          "room_index": 0,
+          "shift_index": 2
+        },
+        {
+          "operator": "伺夜",
+          "room_index": 0,
+          "shift_index": 2
+        },
+        {
+          "operator": "信仰搅拌机",
+          "room_index": 0,
+          "shift_index": 2
+        },
+        {
+          "operator": "八幡海铃",
+          "room_index": 0,
+          "shift_index": 2
+        },
+        {
+          "operator": "卡夫卡",
+          "room_index": 0,
+          "shift_index": 2
+        },
+        {
+          "operator": "巫恋",
+          "room_index": 1,
+          "shift_index": 2
+        },
+        {
+          "operator": "帕拉斯",
+          "room_index": 1,
+          "shift_index": 2
+        },
+        {
+          "operator": "战车",
+          "room_index": 1,
+          "shift_index": 2
+        },
+        {
+          "operator": "斥罪",
+          "room_index": 1,
+          "shift_index": 2
+        },
+        {
+          "operator": "格雷伊",
+          "room_index": 1,
+          "shift_index": 2
+        },
+        {
+          "operator": "森蚺",
+          "room_index": 2,
+          "shift_index": 2
+        },
+        {
+          "operator": "清流",
+          "room_index": 2,
+          "shift_index": 2
+        },
+        {
+          "operator": "温蒂",
+          "room_index": 2,
+          "shift_index": 2
+        },
+        {
+          "operator": "烛煌",
+          "room_index": 2,
+          "shift_index": 2
+        },
+        {
+          "operator": "稀音",
+          "room_index": 2,
+          "shift_index": 2
+        },
+        {
+          "operator": "红云",
+          "room_index": 3,
+          "shift_index": 2
+        },
+        {
+          "operator": "苇草",
+          "room_index": 3,
+          "shift_index": 2
+        },
+        {
+          "operator": "贝洛内",
+          "room_index": 3,
+          "shift_index": 2
+        },
+        {
+          "operator": "赫默",
+          "room_index": 3,
+          "shift_index": 2
+        },
+        {
+          "operator": "阿米娅",
+          "room_index": 3,
+          "shift_index": 2
+        },
+        {
+          "operator": "霜华",
+          "room_index": 2,
+          "shift_index": 1
+        },
+        {
+          "operator": "龙舌兰",
+          "room_index": 2,
+          "shift_index": 1
+        }
+      ],
+      "unassigned": [
+        {
+          "operator": "陈",
+          "shift_index": 1
+        },
+        {
+          "operator": "野鬃",
+          "shift_index": 1
+        },
+        {
+          "operator": "陈",
+          "shift_index": 2
+        },
+        {
+          "operator": "野鬃",
+          "shift_index": 2
+        }
+      ]
+    },
+    "plans": [
+      {
+        "shift": 1,
+        "hours": 8,
+        "rooms": [
+          {
+            "kind": "hire",
+            "index": 1,
+            "operators": [
+              "斥罪"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "mood": [
+              {
+                "operator": "斥罪",
+                "start": 0,
+                "end": 0,
+                "consumed": 10,
+                "cost_per_hour": 1.25,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "power",
+            "index": 1,
+            "operators": [
+              "伊芙利特"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "mood": [
+              {
+                "operator": "伊芙利特",
+                "start": 0,
+                "end": 0,
+                "consumed": 6,
+                "cost_per_hour": 0.75,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "power",
+            "index": 2,
+            "operators": [
+              "烛煌"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "mood": [
+              {
+                "operator": "烛煌",
+                "start": 0,
+                "end": 0,
+                "consumed": 6,
+                "cost_per_hour": 0.75,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "power",
+            "index": 3,
+            "operators": [
+              "格雷伊"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "mood": [
+              {
+                "operator": "格雷伊",
+                "start": 0,
+                "end": 0,
+                "consumed": 6,
+                "cost_per_hour": 0.75,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "control",
+            "index": 1,
+            "operators": [
+              "八幡海铃",
+              "阿米娅",
+              "Mon3tr",
+              "战车",
+              "霜华"
+            ],
+            "level": 5,
+            "facility_level": 5,
+            "mood": [
+              {
+                "operator": "Mon3tr",
+                "start": 0,
+                "end": 0,
+                "consumed": 4,
+                "cost_per_hour": 0.5,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "战车",
+                "start": 0,
+                "end": 0,
+                "consumed": 4,
+                "cost_per_hour": 0.5,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "霜华",
+                "start": 0,
+                "end": 0,
+                "consumed": 4,
+                "cost_per_hour": 0.5,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "阿米娅",
+                "start": 0,
+                "end": 0,
+                "consumed": 4,
+                "cost_per_hour": 0.5,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "八幡海铃",
+                "start": 0,
+                "end": 0,
+                "consumed": 4,
+                "cost_per_hour": 0.5,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "meeting",
+            "index": 1,
+            "operators": [
+              "伊内丝",
+              "信仰搅拌机"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "mood": [
+              {
+                "operator": "伊内丝",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.6,
+                "cost_per_hour": 0.7,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "信仰搅拌机",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.6,
+                "cost_per_hour": 0.7,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "trading",
+            "index": 1,
+            "operators": [
+              "但书",
+              "伺夜",
+              "贝洛内"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "product": "LMD",
+            "mood": [
+              {
+                "operator": "伺夜",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "但书",
+                "start": 24,
+                "end": 18.8,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": false,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "贝洛内",
+                "start": 0,
+                "end": 0,
+                "consumed": 4.4,
+                "cost_per_hour": 0.55,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "trading",
+            "index": 2,
+            "operators": [
+              "巫恋",
+              "龙舌兰",
+              "卡夫卡"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "product": "LMD",
+            "mood": [
+              {
+                "operator": "巫恋",
+                "start": 0,
+                "end": 0,
+                "consumed": 3.2,
+                "cost_per_hour": 0.4,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "卡夫卡",
+                "start": 0,
+                "end": 0,
+                "consumed": 3.2,
+                "cost_per_hour": 0.4,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "龙舌兰",
+                "start": 0,
+                "end": 0,
+                "consumed": 3.2,
+                "cost_per_hour": 0.4,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "training",
+            "index": 1,
+            "operators": [],
+            "level": 3,
+            "facility_level": 3
+          },
+          {
+            "kind": "dormitory",
+            "index": 1,
+            "operators": [],
+            "level": 5,
+            "facility_level": 5,
+            "autofill": false
+          },
+          {
+            "kind": "dormitory",
+            "index": 2,
+            "operators": [],
+            "level": 5,
+            "facility_level": 5,
+            "autofill": false
+          },
+          {
+            "kind": "dormitory",
+            "index": 3,
+            "operators": [],
+            "level": 5,
+            "facility_level": 5,
+            "autofill": false
+          },
+          {
+            "kind": "dormitory",
+            "index": 4,
+            "operators": [
+              "菲亚梅塔"
+            ],
+            "level": 5,
+            "facility_level": 5,
+            "autofill": false,
+            "mood": [
+              {
+                "operator": "菲亚梅塔",
+                "start": 18.8,
+                "end": 24
+              }
+            ]
+          },
+          {
+            "kind": "recycling",
+            "index": 1,
+            "operators": [
+              "赫默",
+              "苇草"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "autofill": false,
+            "mood": [
+              {
+                "operator": "苇草",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.6,
+                "cost_per_hour": 0.7,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "赫默",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.6,
+                "cost_per_hour": 0.7,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "processing",
+            "index": 1,
+            "operators": [
+              "塞雷娅"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "mood": [
+              {
+                "operator": "塞雷娅",
+                "start": 0,
+                "end": 0,
+                "consumed": 8,
+                "cost_per_hour": 1,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "manufacture",
+            "index": 1,
+            "operators": [
+              "多萝西",
+              "娜斯提",
+              "至简"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "product": "Pure Gold",
+            "mood": [
+              {
+                "operator": "至简",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "多萝西",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "娜斯提",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "manufacture",
+            "index": 2,
+            "operators": [
+              "清流",
+              "温蒂",
+              "森蚺"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "product": "Pure Gold",
+            "mood": [
+              {
+                "operator": "森蚺",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "清流",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "温蒂",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "manufacture",
+            "index": 3,
+            "operators": [
+              "断罪者",
+              "酒神",
+              "弑君者"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "product": "Battle Record",
+            "mood": [
+              {
+                "operator": "酒神",
+                "start": 0,
+                "end": 0,
+                "consumed": 3.2,
+                "cost_per_hour": 0.4,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "弑君者",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "断罪者",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "manufacture",
+            "index": 4,
+            "operators": [
+              "红云",
+              "帕拉斯",
+              "稀音"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "product": "Battle Record",
+            "mood": [
+              {
+                "operator": "稀音",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "红云",
+                "start": 0,
+                "end": 0,
+                "consumed": 3.2,
+                "cost_per_hour": 0.4,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "帕拉斯",
+                "start": 0,
+                "end": 0,
+                "consumed": 3.2,
+                "cost_per_hour": 0.4,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          }
+        ],
+        "moodErrors": [
+          {
+            "operator": "斥罪",
+            "start": 0,
+            "needed": 10,
+            "room_type": "hire",
+            "room_index": 1
+          },
+          {
+            "operator": "伊芙利特",
+            "start": 0,
+            "needed": 6,
+            "room_type": "power",
+            "room_index": 1
+          },
+          {
+            "operator": "烛煌",
+            "start": 0,
+            "needed": 6,
+            "room_type": "power",
+            "room_index": 2
+          },
+          {
+            "operator": "格雷伊",
+            "start": 0,
+            "needed": 6,
+            "room_type": "power",
+            "room_index": 3
+          },
+          {
+            "operator": "八幡海铃",
+            "start": 0,
+            "needed": 4,
+            "room_type": "control",
+            "room_index": 1
+          },
+          {
+            "operator": "阿米娅",
+            "start": 0,
+            "needed": 4,
+            "room_type": "control",
+            "room_index": 1
+          },
+          {
+            "operator": "Mon3tr",
+            "start": 0,
+            "needed": 4,
+            "room_type": "control",
+            "room_index": 1
+          },
+          {
+            "operator": "战车",
+            "start": 0,
+            "needed": 4,
+            "room_type": "control",
+            "room_index": 1
+          },
+          {
+            "operator": "霜华",
+            "start": 0,
+            "needed": 4,
+            "room_type": "control",
+            "room_index": 1
+          },
+          {
+            "operator": "伊内丝",
+            "start": 0,
+            "needed": 5.6,
+            "room_type": "meeting",
+            "room_index": 1
+          },
+          {
+            "operator": "信仰搅拌机",
+            "start": 0,
+            "needed": 5.6,
+            "room_type": "meeting",
+            "room_index": 1
+          },
+          {
+            "operator": "伺夜",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "trading",
+            "room_index": 1
+          },
+          {
+            "operator": "贝洛内",
+            "start": 0,
+            "needed": 4.4,
+            "room_type": "trading",
+            "room_index": 1
+          },
+          {
+            "operator": "巫恋",
+            "start": 0,
+            "needed": 3.2,
+            "room_type": "trading",
+            "room_index": 2
+          },
+          {
+            "operator": "龙舌兰",
+            "start": 0,
+            "needed": 3.2,
+            "room_type": "trading",
+            "room_index": 2
+          },
+          {
+            "operator": "卡夫卡",
+            "start": 0,
+            "needed": 3.2,
+            "room_type": "trading",
+            "room_index": 2
+          },
+          {
+            "operator": "赫默",
+            "start": 0,
+            "needed": 5.6,
+            "room_type": "recycling",
+            "room_index": 1
+          },
+          {
+            "operator": "苇草",
+            "start": 0,
+            "needed": 5.6,
+            "room_type": "recycling",
+            "room_index": 1
+          },
+          {
+            "operator": "塞雷娅",
+            "start": 0,
+            "needed": 8,
+            "room_type": "processing",
+            "room_index": 1
+          },
+          {
+            "operator": "多萝西",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 1
+          },
+          {
+            "operator": "娜斯提",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 1
+          },
+          {
+            "operator": "至简",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 1
+          },
+          {
+            "operator": "清流",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 2
+          },
+          {
+            "operator": "温蒂",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 2
+          },
+          {
+            "operator": "森蚺",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 2
+          },
+          {
+            "operator": "断罪者",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 3
+          },
+          {
+            "operator": "酒神",
+            "start": 0,
+            "needed": 3.2,
+            "room_type": "manufacture",
+            "room_index": 3
+          },
+          {
+            "operator": "弑君者",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 3
+          },
+          {
+            "operator": "红云",
+            "start": 0,
+            "needed": 3.2,
+            "room_type": "manufacture",
+            "room_index": 4
+          },
+          {
+            "operator": "帕拉斯",
+            "start": 0,
+            "needed": 3.2,
+            "room_type": "manufacture",
+            "room_index": 4
+          },
+          {
+            "operator": "稀音",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 4
+          }
+        ],
+        "drones": {
+          "enable": true,
+          "mode": "manual",
+          "room": "trading",
+          "index": 1,
+          "order": "pre"
+        },
+        "fiammetta": {
+          "enable": true,
+          "target": "但书",
+          "order": "pre"
+        }
+      },
+      {
+        "shift": 2,
+        "hours": 8,
+        "rooms": [
+          {
+            "kind": "hire",
+            "index": 1,
+            "operators": [
+              "艾雅法拉"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "mood": [
+              {
+                "operator": "艾雅法拉",
+                "start": 0,
+                "end": 0,
+                "consumed": 6,
+                "cost_per_hour": 0.75,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "power",
+            "index": 1,
+            "operators": [
+              "烛煌"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "mood": [
+              {
+                "operator": "烛煌",
+                "start": 0,
+                "end": 0,
+                "consumed": 6,
+                "cost_per_hour": 0.75,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "power",
+            "index": 2,
+            "operators": [
+              "格雷伊"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "mood": [
+              {
+                "operator": "格雷伊",
+                "start": 0,
+                "end": 0,
+                "consumed": 6,
+                "cost_per_hour": 0.75,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "power",
+            "index": 3,
+            "operators": [
+              "澄闪"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "mood": [
+              {
+                "operator": "澄闪",
+                "start": 0,
+                "end": 0,
+                "consumed": 6,
+                "cost_per_hour": 0.75,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "control",
+            "index": 1,
+            "operators": [
+              "焰狐龙梓兰",
+              "诗怀雅",
+              "斩业星熊",
+              "薇薇安娜",
+              "焰尾"
+            ],
+            "level": 5,
+            "facility_level": 5,
+            "mood": [
+              {
+                "operator": "焰尾",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "诗怀雅",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "斩业星熊",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "薇薇安娜",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "焰狐龙梓兰",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "meeting",
+            "index": 1,
+            "operators": [
+              "信仰搅拌机",
+              "陈"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "mood": [
+              {
+                "operator": "陈",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.6,
+                "cost_per_hour": 0.7,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "信仰搅拌机",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.6,
+                "cost_per_hour": 0.7,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "trading",
+            "index": 1,
+            "operators": [
+              "但书",
+              "推进之王",
+              "摩根"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "product": "LMD",
+            "mood": [
+              {
+                "operator": "但书",
+                "start": 24,
+                "end": 18.8,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": false,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "摩根",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "推进之王",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "trading",
+            "index": 2,
+            "operators": [
+              "可露希尔",
+              "蕾缪安",
+              "能天使"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "product": "LMD",
+            "mood": [
+              {
+                "operator": "能天使",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "蕾缪安",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "可露希尔",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "training",
+            "index": 1,
+            "operators": [],
+            "level": 3,
+            "facility_level": 3
+          },
+          {
+            "kind": "dormitory",
+            "index": 1,
+            "operators": [],
+            "level": 5,
+            "facility_level": 5,
+            "autofill": false
+          },
+          {
+            "kind": "dormitory",
+            "index": 2,
+            "operators": [],
+            "level": 5,
+            "facility_level": 5,
+            "autofill": false
+          },
+          {
+            "kind": "dormitory",
+            "index": 3,
+            "operators": [],
+            "level": 5,
+            "facility_level": 5,
+            "autofill": false
+          },
+          {
+            "kind": "dormitory",
+            "index": 4,
+            "operators": [
+              "菲亚梅塔"
+            ],
+            "level": 5,
+            "facility_level": 5,
+            "autofill": false,
+            "mood": [
+              {
+                "operator": "菲亚梅塔",
+                "start": 18.8,
+                "end": 24
+              }
+            ]
+          },
+          {
+            "kind": "recycling",
+            "index": 1,
+            "operators": [
+              "旅骨",
+              "爱丽丝"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "autofill": false,
+            "mood": [
+              {
+                "operator": "旅骨",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.6,
+                "cost_per_hour": 0.7,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "爱丽丝",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.6,
+                "cost_per_hour": 0.7,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "processing",
+            "index": 1,
+            "operators": [],
+            "level": 3,
+            "facility_level": 3
+          },
+          {
+            "kind": "manufacture",
+            "index": 1,
+            "operators": [
+              "清流",
+              "温蒂",
+              "森蚺"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "product": "Pure Gold",
+            "mood": [
+              {
+                "operator": "森蚺",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "清流",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "温蒂",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "manufacture",
+            "index": 2,
+            "operators": [
+              "砾",
+              "迷迭香",
+              "引星棘刺"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "product": "Pure Gold",
+            "mood": [
+              {
+                "operator": "砾",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "迷迭香",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "引星棘刺",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "manufacture",
+            "index": 3,
+            "operators": [
+              "红云",
+              "帕拉斯",
+              "稀音"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "product": "Battle Record",
+            "mood": [
+              {
+                "operator": "稀音",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "红云",
+                "start": 0,
+                "end": 0,
+                "consumed": 3.2,
+                "cost_per_hour": 0.4,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "帕拉斯",
+                "start": 0,
+                "end": 0,
+                "consumed": 3.2,
+                "cost_per_hour": 0.4,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "manufacture",
+            "index": 4,
+            "operators": [
+              "远牙",
+              "灰毫",
+              "野鬃"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "product": "Battle Record",
+            "mood": [
+              {
+                "operator": "灰毫",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "远牙",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "野鬃",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          }
+        ],
+        "moodErrors": [
+          {
+            "operator": "艾雅法拉",
+            "start": 0,
+            "needed": 6,
+            "room_type": "hire",
+            "room_index": 1
+          },
+          {
+            "operator": "烛煌",
+            "start": 0,
+            "needed": 6,
+            "room_type": "power",
+            "room_index": 1
+          },
+          {
+            "operator": "格雷伊",
+            "start": 0,
+            "needed": 6,
+            "room_type": "power",
+            "room_index": 2
+          },
+          {
+            "operator": "澄闪",
+            "start": 0,
+            "needed": 6,
+            "room_type": "power",
+            "room_index": 3
+          },
+          {
+            "operator": "焰狐龙梓兰",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "control",
+            "room_index": 1
+          },
+          {
+            "operator": "诗怀雅",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "control",
+            "room_index": 1
+          },
+          {
+            "operator": "斩业星熊",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "control",
+            "room_index": 1
+          },
+          {
+            "operator": "薇薇安娜",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "control",
+            "room_index": 1
+          },
+          {
+            "operator": "焰尾",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "control",
+            "room_index": 1
+          },
+          {
+            "operator": "信仰搅拌机",
+            "start": 0,
+            "needed": 5.6,
+            "room_type": "meeting",
+            "room_index": 1
+          },
+          {
+            "operator": "陈",
+            "start": 0,
+            "needed": 5.6,
+            "room_type": "meeting",
+            "room_index": 1
+          },
+          {
+            "operator": "推进之王",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "trading",
+            "room_index": 1
+          },
+          {
+            "operator": "摩根",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "trading",
+            "room_index": 1
+          },
+          {
+            "operator": "可露希尔",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "trading",
+            "room_index": 2
+          },
+          {
+            "operator": "蕾缪安",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "trading",
+            "room_index": 2
+          },
+          {
+            "operator": "能天使",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "trading",
+            "room_index": 2
+          },
+          {
+            "operator": "旅骨",
+            "start": 0,
+            "needed": 5.6,
+            "room_type": "recycling",
+            "room_index": 1
+          },
+          {
+            "operator": "爱丽丝",
+            "start": 0,
+            "needed": 5.6,
+            "room_type": "recycling",
+            "room_index": 1
+          },
+          {
+            "operator": "清流",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 1
+          },
+          {
+            "operator": "温蒂",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 1
+          },
+          {
+            "operator": "森蚺",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 1
+          },
+          {
+            "operator": "砾",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 2
+          },
+          {
+            "operator": "迷迭香",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 2
+          },
+          {
+            "operator": "引星棘刺",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 2
+          },
+          {
+            "operator": "红云",
+            "start": 0,
+            "needed": 3.2,
+            "room_type": "manufacture",
+            "room_index": 3
+          },
+          {
+            "operator": "帕拉斯",
+            "start": 0,
+            "needed": 3.2,
+            "room_type": "manufacture",
+            "room_index": 3
+          },
+          {
+            "operator": "稀音",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 3
+          },
+          {
+            "operator": "远牙",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 4
+          },
+          {
+            "operator": "灰毫",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 4
+          },
+          {
+            "operator": "野鬃",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 4
+          }
+        ],
+        "drones": {
+          "enable": true,
+          "mode": "manual",
+          "room": "trading",
+          "index": 1,
+          "order": "pre"
+        },
+        "fiammetta": {
+          "enable": true,
+          "target": "但书",
+          "order": "pre"
+        }
+      },
+      {
+        "shift": 3,
+        "hours": 8,
+        "rooms": [
+          {
+            "kind": "hire",
+            "index": 1,
+            "operators": [
+              "艾雅法拉"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "mood": [
+              {
+                "operator": "艾雅法拉",
+                "start": 0,
+                "end": 0,
+                "consumed": 6,
+                "cost_per_hour": 0.75,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "power",
+            "index": 1,
+            "operators": [
+              "承曦格雷伊"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "mood": [
+              {
+                "operator": "承曦格雷伊",
+                "start": 0,
+                "end": 0,
+                "consumed": 6,
+                "cost_per_hour": 0.75,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "power",
+            "index": 2,
+            "operators": [
+              "伊芙利特"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "mood": [
+              {
+                "operator": "伊芙利特",
+                "start": 0,
+                "end": 0,
+                "consumed": 6,
+                "cost_per_hour": 0.75,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "power",
+            "index": 3,
+            "operators": [
+              "澄闪"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "mood": [
+              {
+                "operator": "澄闪",
+                "start": 0,
+                "end": 0,
+                "consumed": 6,
+                "cost_per_hour": 0.75,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "control",
+            "index": 1,
+            "operators": [
+              "焰狐龙梓兰",
+              "诗怀雅",
+              "斩业星熊",
+              "薇薇安娜",
+              "焰尾"
+            ],
+            "level": 5,
+            "facility_level": 5,
+            "mood": [
+              {
+                "operator": "焰尾",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "诗怀雅",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "斩业星熊",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "薇薇安娜",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "焰狐龙梓兰",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "meeting",
+            "index": 1,
+            "operators": [
+              "陈",
+              "伊内丝"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "mood": [
+              {
+                "operator": "陈",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.6,
+                "cost_per_hour": 0.7,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "伊内丝",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.6,
+                "cost_per_hour": 0.7,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "trading",
+            "index": 1,
+            "operators": [
+              "但书",
+              "推进之王",
+              "摩根"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "product": "LMD",
+            "mood": [
+              {
+                "operator": "但书",
+                "start": 24,
+                "end": 18.8,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": false,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "摩根",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "推进之王",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "trading",
+            "index": 2,
+            "operators": [
+              "可露希尔",
+              "蕾缪安",
+              "能天使"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "product": "LMD",
+            "mood": [
+              {
+                "operator": "能天使",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "蕾缪安",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "可露希尔",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "training",
+            "index": 1,
+            "operators": [
+              "麦哲伦"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "mood": [
+              {
+                "operator": "麦哲伦",
+                "start": 0,
+                "end": 0,
+                "consumed": 6,
+                "cost_per_hour": 0.75,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "dormitory",
+            "index": 1,
+            "operators": [],
+            "level": 5,
+            "facility_level": 5,
+            "autofill": false
+          },
+          {
+            "kind": "dormitory",
+            "index": 2,
+            "operators": [],
+            "level": 5,
+            "facility_level": 5,
+            "autofill": false
+          },
+          {
+            "kind": "dormitory",
+            "index": 3,
+            "operators": [],
+            "level": 5,
+            "facility_level": 5,
+            "autofill": false
+          },
+          {
+            "kind": "dormitory",
+            "index": 4,
+            "operators": [],
+            "level": 5,
+            "facility_level": 5,
+            "autofill": false
+          },
+          {
+            "kind": "recycling",
+            "index": 1,
+            "operators": [
+              "旅骨",
+              "爱丽丝"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "autofill": false,
+            "mood": [
+              {
+                "operator": "旅骨",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.6,
+                "cost_per_hour": 0.7,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "爱丽丝",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.6,
+                "cost_per_hour": 0.7,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "processing",
+            "index": 1,
+            "operators": [
+              "塞雷娅"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "mood": [
+              {
+                "operator": "塞雷娅",
+                "start": 0,
+                "end": 0,
+                "consumed": 8,
+                "cost_per_hour": 1,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "manufacture",
+            "index": 1,
+            "operators": [
+              "多萝西",
+              "娜斯提",
+              "至简"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "product": "Pure Gold",
+            "mood": [
+              {
+                "operator": "至简",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "多萝西",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "娜斯提",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "manufacture",
+            "index": 2,
+            "operators": [
+              "砾",
+              "迷迭香",
+              "引星棘刺"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "product": "Pure Gold",
+            "mood": [
+              {
+                "operator": "砾",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "迷迭香",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "引星棘刺",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "manufacture",
+            "index": 3,
+            "operators": [
+              "断罪者",
+              "酒神",
+              "弑君者"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "product": "Battle Record",
+            "mood": [
+              {
+                "operator": "酒神",
+                "start": 0,
+                "end": 0,
+                "consumed": 3.2,
+                "cost_per_hour": 0.4,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "弑君者",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "断罪者",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          },
+          {
+            "kind": "manufacture",
+            "index": 4,
+            "operators": [
+              "远牙",
+              "灰毫",
+              "野鬃"
+            ],
+            "level": 3,
+            "facility_level": 3,
+            "product": "Battle Record",
+            "mood": [
+              {
+                "operator": "灰毫",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "远牙",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              },
+              {
+                "operator": "野鬃",
+                "start": 0,
+                "end": 0,
+                "consumed": 5.2,
+                "cost_per_hour": 0.65,
+                "red_face": true,
+                "controlled_zero_mood": false
+              }
+            ]
+          }
+        ],
+        "moodErrors": [
+          {
+            "operator": "艾雅法拉",
+            "start": 0,
+            "needed": 6,
+            "room_type": "hire",
+            "room_index": 1
+          },
+          {
+            "operator": "承曦格雷伊",
+            "start": 0,
+            "needed": 6,
+            "room_type": "power",
+            "room_index": 1
+          },
+          {
+            "operator": "伊芙利特",
+            "start": 0,
+            "needed": 6,
+            "room_type": "power",
+            "room_index": 2
+          },
+          {
+            "operator": "澄闪",
+            "start": 0,
+            "needed": 6,
+            "room_type": "power",
+            "room_index": 3
+          },
+          {
+            "operator": "焰狐龙梓兰",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "control",
+            "room_index": 1
+          },
+          {
+            "operator": "诗怀雅",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "control",
+            "room_index": 1
+          },
+          {
+            "operator": "斩业星熊",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "control",
+            "room_index": 1
+          },
+          {
+            "operator": "薇薇安娜",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "control",
+            "room_index": 1
+          },
+          {
+            "operator": "焰尾",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "control",
+            "room_index": 1
+          },
+          {
+            "operator": "陈",
+            "start": 0,
+            "needed": 5.6,
+            "room_type": "meeting",
+            "room_index": 1
+          },
+          {
+            "operator": "伊内丝",
+            "start": 0,
+            "needed": 5.6,
+            "room_type": "meeting",
+            "room_index": 1
+          },
+          {
+            "operator": "推进之王",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "trading",
+            "room_index": 1
+          },
+          {
+            "operator": "摩根",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "trading",
+            "room_index": 1
+          },
+          {
+            "operator": "可露希尔",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "trading",
+            "room_index": 2
+          },
+          {
+            "operator": "蕾缪安",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "trading",
+            "room_index": 2
+          },
+          {
+            "operator": "能天使",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "trading",
+            "room_index": 2
+          },
+          {
+            "operator": "麦哲伦",
+            "start": 0,
+            "needed": 6,
+            "room_type": "training",
+            "room_index": 1
+          },
+          {
+            "operator": "旅骨",
+            "start": 0,
+            "needed": 5.6,
+            "room_type": "recycling",
+            "room_index": 1
+          },
+          {
+            "operator": "爱丽丝",
+            "start": 0,
+            "needed": 5.6,
+            "room_type": "recycling",
+            "room_index": 1
+          },
+          {
+            "operator": "塞雷娅",
+            "start": 0,
+            "needed": 8,
+            "room_type": "processing",
+            "room_index": 1
+          },
+          {
+            "operator": "多萝西",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 1
+          },
+          {
+            "operator": "娜斯提",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 1
+          },
+          {
+            "operator": "至简",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 1
+          },
+          {
+            "operator": "砾",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 2
+          },
+          {
+            "operator": "迷迭香",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 2
+          },
+          {
+            "operator": "引星棘刺",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 2
+          },
+          {
+            "operator": "断罪者",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 3
+          },
+          {
+            "operator": "酒神",
+            "start": 0,
+            "needed": 3.2,
+            "room_type": "manufacture",
+            "room_index": 3
+          },
+          {
+            "operator": "弑君者",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 3
+          },
+          {
+            "operator": "远牙",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 4
+          },
+          {
+            "operator": "灰毫",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 4
+          },
+          {
+            "operator": "野鬃",
+            "start": 0,
+            "needed": 5.2,
+            "room_type": "manufacture",
+            "room_index": 4
+          }
+        ],
+        "drones": {
+          "enable": true,
+          "mode": "manual",
+          "room": "trading",
+          "index": 1,
+          "order": "pre"
+        },
+        "fiammetta": {
+          "enable": true,
+          "target": "但书",
+          "order": "pre"
+        }
+      }
+    ],
+    "appliedAdditions": [
+      {
+        "operator": "可露希尔",
+        "room_index": 0,
+        "shift_index": 0
+      },
+      {
+        "operator": "引星棘刺",
+        "room_index": 0,
+        "shift_index": 0
+      },
+      {
+        "operator": "推进之王",
+        "room_index": 0,
+        "shift_index": 0
+      },
+      {
+        "operator": "摩根",
+        "room_index": 0,
+        "shift_index": 0
+      },
+      {
+        "operator": "斩业星熊",
+        "room_index": 0,
+        "shift_index": 0
+      },
+      {
+        "operator": "旅骨",
+        "room_index": 1,
+        "shift_index": 0
+      },
+      {
+        "operator": "澄闪",
+        "room_index": 1,
+        "shift_index": 0
+      },
+      {
+        "operator": "灰毫",
+        "room_index": 1,
+        "shift_index": 0
+      },
+      {
+        "operator": "焰尾",
+        "room_index": 1,
+        "shift_index": 0
+      },
+      {
+        "operator": "焰狐龙梓兰",
+        "room_index": 1,
+        "shift_index": 0
+      },
+      {
+        "operator": "爱丽丝",
+        "room_index": 2,
+        "shift_index": 0
+      },
+      {
+        "operator": "砾",
+        "room_index": 2,
+        "shift_index": 0
+      },
+      {
+        "operator": "能天使",
+        "room_index": 2,
+        "shift_index": 0
+      },
+      {
+        "operator": "艾雅法拉",
+        "room_index": 2,
+        "shift_index": 0
+      },
+      {
+        "operator": "蕾缪安",
+        "room_index": 2,
+        "shift_index": 0
+      },
+      {
+        "operator": "薇薇安娜",
+        "room_index": 3,
+        "shift_index": 0
+      },
+      {
+        "operator": "诗怀雅",
+        "room_index": 3,
+        "shift_index": 0
+      },
+      {
+        "operator": "远牙",
+        "room_index": 3,
+        "shift_index": 0
+      },
+      {
+        "operator": "迷迭香",
+        "room_index": 3,
+        "shift_index": 0
+      },
+      {
+        "operator": "伊内丝",
+        "room_index": 0,
+        "shift_index": 1
+      },
+      {
+        "operator": "伊芙利特",
+        "room_index": 0,
+        "shift_index": 1
+      },
+      {
+        "operator": "塞雷娅",
+        "room_index": 0,
+        "shift_index": 1
+      },
+      {
+        "operator": "多萝西",
+        "room_index": 0,
+        "shift_index": 1
+      },
+      {
+        "operator": "娜斯提",
+        "room_index": 0,
+        "shift_index": 1
+      },
+      {
+        "operator": "弑君者",
+        "room_index": 1,
+        "shift_index": 1
+      },
+      {
+        "operator": "承曦格雷伊",
+        "room_index": 1,
+        "shift_index": 1
+      },
+      {
+        "operator": "断罪者",
+        "room_index": 1,
+        "shift_index": 1
+      },
+      {
+        "operator": "至简",
+        "room_index": 1,
+        "shift_index": 1
+      },
+      {
+        "operator": "酒神",
+        "room_index": 1,
+        "shift_index": 1
+      },
+      {
+        "operator": "麦哲伦",
+        "room_index": 2,
+        "shift_index": 1
+      },
+      {
+        "operator": "Mon3tr",
+        "room_index": 0,
+        "shift_index": 2
+      },
+      {
+        "operator": "伺夜",
+        "room_index": 0,
+        "shift_index": 2
+      },
+      {
+        "operator": "信仰搅拌机",
+        "room_index": 0,
+        "shift_index": 2
+      },
+      {
+        "operator": "八幡海铃",
+        "room_index": 0,
+        "shift_index": 2
+      },
+      {
+        "operator": "卡夫卡",
+        "room_index": 0,
+        "shift_index": 2
+      },
+      {
+        "operator": "巫恋",
+        "room_index": 1,
+        "shift_index": 2
+      },
+      {
+        "operator": "帕拉斯",
+        "room_index": 1,
+        "shift_index": 2
+      },
+      {
+        "operator": "战车",
+        "room_index": 1,
+        "shift_index": 2
+      },
+      {
+        "operator": "斥罪",
+        "room_index": 1,
+        "shift_index": 2
+      },
+      {
+        "operator": "格雷伊",
+        "room_index": 1,
+        "shift_index": 2
+      },
+      {
+        "operator": "森蚺",
+        "room_index": 2,
+        "shift_index": 2
+      },
+      {
+        "operator": "清流",
+        "room_index": 2,
+        "shift_index": 2
+      },
+      {
+        "operator": "温蒂",
+        "room_index": 2,
+        "shift_index": 2
+      },
+      {
+        "operator": "烛煌",
+        "room_index": 2,
+        "shift_index": 2
+      },
+      {
+        "operator": "稀音",
+        "room_index": 2,
+        "shift_index": 2
+      },
+      {
+        "operator": "红云",
+        "room_index": 3,
+        "shift_index": 2
+      },
+      {
+        "operator": "苇草",
+        "room_index": 3,
+        "shift_index": 2
+      },
+      {
+        "operator": "贝洛内",
+        "room_index": 3,
+        "shift_index": 2
+      },
+      {
+        "operator": "赫默",
+        "room_index": 3,
+        "shift_index": 2
+      },
+      {
+        "operator": "阿米娅",
+        "room_index": 3,
+        "shift_index": 2
+      },
+      {
+        "operator": "霜华",
+        "room_index": 2,
+        "shift_index": 1
+      },
+      {
+        "operator": "龙舌兰",
+        "room_index": 2,
+        "shift_index": 1
+      }
+    ]
+  }
+}

@@ -1,0 +1,3383 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-04",
+  "organizer": "MaaTool",
+  "simulatorVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+  "sourceManifestSha256": "830ec8dce256e69eb41dce0c6d5cf84c002869bbb65e836b8fb81d12c71abeac",
+  "verification": {
+    "simulations": 90,
+    "structurePassed": 90,
+    "commonFixturesConfirmed": false,
+    "gameExecutionTested": false,
+    "longTermSupplyTested": false
+  },
+  "scoring": {
+    "recyclingRevenue": "excluded",
+    "shardMaterialCost": "charged-once"
+  },
+  "generation": {
+    "maatool": "2.0.1141",
+    "yituliuData": "v20261025.1958",
+    "yituliuEngine": "v20261031.0948",
+    "riicClient": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+    "retainedRiicOriginals": 30,
+    "riicOriginalDate": "2026-10-31"
+  },
+  "archive": {
+    "date": "2026-10-31",
+    "report": "/benchmarks/2026-10-31/report.md"
+  },
+  "sites": [
+    {
+      "id": "maatool",
+      "label": "MaaTool",
+      "url": "https://maatool.com",
+      "shiftHours": [
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "id": "yituliu",
+      "label": "一图流 V3",
+      "url": "https://ark.yituliu.cn/tools/scheduleV3",
+      "shiftHours": [
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "id": "riic",
+      "label": "可露希尔基建终端",
+      "url": "https://riic.autos",
+      "shiftHours": [
+        12,
+        6,
+        6
+      ]
+    }
+  ],
+  "samples": [
+    {
+      "alias": "A01",
+      "owned": 267,
+      "elite2": 33,
+      "rosterSha256": "2a5e88a8fecfca38147e1701c4b7676f35ac972a73e25e2a9137fc5a0362edb6"
+    },
+    {
+      "alias": "A02",
+      "owned": 427,
+      "elite2": 164,
+      "rosterSha256": "b88169f624288abaef04ec152cf8779228fe034a16a395df2646d04c184a569b"
+    },
+    {
+      "alias": "A03",
+      "owned": 220,
+      "elite2": 27,
+      "rosterSha256": "6d37449f40156426b7622afd0fd48984f69f3ef4fc4e76452b995e4b2eaeead1"
+    },
+    {
+      "alias": "A04",
+      "owned": 283,
+      "elite2": 58,
+      "rosterSha256": "a54cd2d7f12b54023601f7b394f79d9b320cd1903fd82a9047a243999ee24196"
+    },
+    {
+      "alias": "A05",
+      "owned": 302,
+      "elite2": 49,
+      "rosterSha256": "1a3f532597883df6ff1596ccbb9f2be26125825311c28e0f8dc898a6518d1ca7"
+    },
+    {
+      "alias": "A06",
+      "owned": 158,
+      "elite2": 23,
+      "rosterSha256": "fff4d522aa1d9d2742904d3906ef40f4e1acb50e7152cf6cbee96f02dc07257e"
+    },
+    {
+      "alias": "A07",
+      "owned": 289,
+      "elite2": 47,
+      "rosterSha256": "1b60861c06477b22771278cafc257ca945b68a99dd0da300c85dc6cc0b7162e5"
+    },
+    {
+      "alias": "A08",
+      "owned": 432,
+      "elite2": 183,
+      "rosterSha256": "e3bf723f23783b74bf8c72ea44ba66f0cfe83bb8c2d8f72799c779c051031cb2"
+    },
+    {
+      "alias": "A09",
+      "owned": 378,
+      "elite2": 88,
+      "rosterSha256": "4be969bb27a52149e7bf314b429da6e429f1bb634c63d42459d6a47f815cfda8"
+    },
+    {
+      "alias": "A10",
+      "owned": 286,
+      "elite2": 41,
+      "rosterSha256": "92a76b6f7200f6b8b8323732b2c4cbe94dc417751c20c27247c2e960003a4656"
+    }
+  ],
+  "layouts": [
+    {
+      "id": "S1",
+      "label": "243",
+      "dormitoryLevels": [
+        5,
+        5,
+        5,
+        5
+      ],
+      "powerLevels": [
+        3,
+        3,
+        3
+      ],
+      "config": {
+        "schedule_mode": "maa",
+        "dormitory_rule": "fixed",
+        "trading_stations_count": 2,
+        "manufacturing_stations_count": 4,
+        "trading_station_levels": [
+          3,
+          3
+        ],
+        "manufacturing_station_levels": [
+          3,
+          3,
+          3,
+          3
+        ],
+        "product_requirements": {
+          "trading_stations": {
+            "LMD": 2
+          },
+          "manufacturing_stations": {
+            "Pure Gold": 2,
+            "Battle Record": 2
+          }
+        },
+        "Fiammetta": {
+          "enable": true
+        },
+        "drones": {
+          "enable": true,
+          "auto": true,
+          "auto_strategy": "efficiency",
+          "order": "pre",
+          "targets": [
+            "LMD",
+            "Pure Gold",
+            "LMD"
+          ]
+        },
+        "shift_hours": [
+          8,
+          8,
+          8
+        ],
+        "recycling_station_level": 3,
+        "intermediate_inventory": {
+          "Originium Shard": 0,
+          "Pure Gold": 0,
+          "Orirock Cube": 0
+        }
+      }
+    },
+    {
+      "id": "S2",
+      "label": "右满252",
+      "dormitoryLevels": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "powerLevels": [
+        3,
+        3
+      ],
+      "config": {
+        "schedule_mode": "maa",
+        "dormitory_rule": "fixed",
+        "trading_stations_count": 2,
+        "manufacturing_stations_count": 5,
+        "trading_station_levels": [
+          3,
+          1
+        ],
+        "manufacturing_station_levels": [
+          2,
+          2,
+          3,
+          3,
+          2
+        ],
+        "product_requirements": {
+          "trading_stations": {
+            "LMD": 2
+          },
+          "manufacturing_stations": {
+            "Pure Gold": 2,
+            "Battle Record": 3
+          }
+        },
+        "Fiammetta": {
+          "enable": true
+        },
+        "drones": {
+          "enable": true,
+          "auto": true,
+          "auto_strategy": "efficiency",
+          "order": "pre",
+          "targets": [
+            "LMD",
+            "Pure Gold",
+            "Battle Record"
+          ]
+        },
+        "shift_hours": [
+          8,
+          8,
+          8
+        ],
+        "facility_layout": [
+          "trading_1",
+          "trading_2",
+          "manufacture_1",
+          "manufacture_2",
+          "manufacture_3",
+          "manufacture_4",
+          "manufacture_5",
+          "power_1",
+          "power_2"
+        ],
+        "recycling_station_level": 3,
+        "intermediate_inventory": {
+          "Originium Shard": 0,
+          "Pure Gold": 0,
+          "Orirock Cube": 0
+        }
+      }
+    },
+    {
+      "id": "S3",
+      "label": "333搓玉",
+      "dormitoryLevels": [
+        5,
+        5,
+        5,
+        5
+      ],
+      "powerLevels": [
+        3,
+        3,
+        3
+      ],
+      "config": {
+        "schedule_mode": "maa",
+        "dormitory_rule": "fixed",
+        "trading_stations_count": 3,
+        "manufacturing_stations_count": 3,
+        "trading_station_levels": [
+          3,
+          3,
+          3
+        ],
+        "manufacturing_station_levels": [
+          3,
+          3,
+          3
+        ],
+        "product_requirements": {
+          "trading_stations": {
+            "LMD": 2,
+            "Orundum": 1
+          },
+          "manufacturing_stations": {
+            "Pure Gold": 2,
+            "Originium Shard": 1
+          }
+        },
+        "Fiammetta": {
+          "enable": true
+        },
+        "drones": {
+          "enable": true,
+          "auto": true,
+          "auto_strategy": "efficiency",
+          "order": "pre",
+          "targets": [
+            "LMD",
+            "Pure Gold",
+            "LMD"
+          ]
+        },
+        "shift_hours": [
+          8,
+          8,
+          8
+        ],
+        "recycling_station_level": 3,
+        "intermediate_inventory": {
+          "Originium Shard": 0,
+          "Pure Gold": 0,
+          "Orirock Cube": 0
+        }
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "A01-S1-maatool",
+      "sample": "A01",
+      "layout": "S1",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 284.79297471091695,
+        "lmd": 45958.702,
+        "exp": 36202.6,
+        "goldProduced": 79.8667,
+        "goldConsumed": 91.9174,
+        "goldNet": -12.0507,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "63ef060d4a8a3cc1fc7985f0e0c3bd6452bda1260312cd90a586f3b4fbb5f00c",
+        "simulationSha256": "fcdaabf34fee7b7e2a350ad630c9cf155bfe99e9322938be95f8ad4f132c2119",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T15:44:19.600028+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A01-S1-yituliu",
+      "sample": "A01",
+      "layout": "S1",
+      "site": "yituliu",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 280.14861699510914,
+        "lmd": 57398.9677,
+        "exp": 29140,
+        "goldProduced": 80.3693,
+        "goldConsumed": 114.7979,
+        "goldNet": -34.4286,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "8648c902a7f4932d8038219850c5e5ae148cc92714116b23e9e74ed2a22f0874",
+        "simulationSha256": "7fe2ea76d82ac7db8e9534b609aeb3d2301b13ec81e242ac16537026573f4d13",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:39:17.387Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A01-S1-riic",
+      "sample": "A01",
+      "layout": "S1",
+      "site": "riic",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 278.4650612022707,
+        "lmd": 51292.9203,
+        "exp": 29597.6,
+        "goldProduced": 88.6125,
+        "goldConsumed": 102.5859,
+        "goldNet": -13.9734,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "d94c89836298142ed36ee531713cd23395b78fc00197d500b129bad12e04654b",
+        "simulationSha256": "1bdd50439783044baf2404af56edf87e56a1c0fe8b059f6f5028b7cb42888834",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T03:51:10.959220+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A01-S2-maatool",
+      "sample": "A01",
+      "layout": "S2",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 302.580532380262,
+        "lmd": 38885.5457,
+        "exp": 47267.899999999994,
+        "goldProduced": 69.4667,
+        "goldConsumed": 77.7711,
+        "goldNet": -8.3044,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "92ea1f1f967caf08acb4b24ccc505179c726bd7251a18580b470d72e25c50b0a",
+        "simulationSha256": "8625e94e9d4e66aa165e100e41074a8f38b790984f2b93c6602e47c87120c589",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T15:45:39.954172+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A01-S2-yituliu",
+      "sample": "A01",
+      "layout": "S2",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 5,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 304.6471115439302,
+        "lmd": 52102.0649,
+        "exp": 41387.799999999996,
+        "goldProduced": 69.2,
+        "goldConsumed": 104.2041,
+        "goldNet": -35.0041,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "1655637df6baffeed9d4257e96ff0bae58c32511e1a7ee297aca6369ccfc83b9",
+        "simulationSha256": "064ad891ff5422ba96c4e72c655ad8fd42bf24241b8b5040b69ba58b1ffbc1b9",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:39:18.269Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A01-S2-riic",
+      "sample": "A01",
+      "layout": "S2",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 7,
+      "stable": false,
+      "iterations": 12,
+      "resources": {
+        "sanity": 298.4913097467249,
+        "lmd": 48498.23,
+        "exp": 39537.6,
+        "goldProduced": 76.775,
+        "goldConsumed": 96.9964,
+        "goldNet": -20.2214,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "c9b10b9dd96087dd8bac95313ff2b5fe926cb7591ed9478ba097fe601d1c883f",
+        "simulationSha256": "5c8fe1de0c79a4fa1955817feb5873a81554fc75329d133ba64bc06b414946e9",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T03:51:16.559261+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A01-S3-maatool",
+      "sample": "A01",
+      "layout": "S3",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 150.94763034917028,
+        "lmd": 42215.9209,
+        "exp": 0,
+        "goldProduced": 83.3026,
+        "goldConsumed": 84.4319,
+        "goldNet": -1.1293,
+        "orundum": 551.25,
+        "shardsProduced": 53.8504,
+        "shardsConsumed": 55.125,
+        "shardsNet": -1.2746,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 151.63290203109173,
+        "materialCost": 846.7199999999999,
+        "dailyCost": 998.3529020310916,
+        "perOrundum": 1.8110710240926833,
+        "baselineScenario": "S2",
+        "baselineStatus": "unconfirmed"
+      },
+      "provenance": {
+        "originalSha256": "5084e7eb1a2e4f4884642d6f4af77c8464a3d4a3cae7c7443df2a863f0e1e17c",
+        "simulationSha256": "217584c6710624bc535890f9203a6ee74665a2ca520bf12ddcc445afd5626f48",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T15:46:55.185213+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A01-S3-yituliu",
+      "sample": "A01",
+      "layout": "S3",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 6,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 177.7644777930131,
+        "lmd": 57448.7465,
+        "exp": 0,
+        "goldProduced": 83.036,
+        "goldConsumed": 114.8975,
+        "goldNet": -31.8615,
+        "orundum": 396,
+        "shardsProduced": 38.56,
+        "shardsConsumed": 39.6,
+        "shardsNet": -1.04,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 126.88263375091708,
+        "materialCost": 608.256,
+        "dailyCost": 735.138633750917,
+        "perOrundum": 1.8564106912901945,
+        "baselineScenario": "S2",
+        "baselineStatus": "invalid"
+      },
+      "provenance": {
+        "originalSha256": "fd9f58037115e5292b9f04c489f2eed37411576ddc1fa04a66dd8728ee3a41dd",
+        "simulationSha256": "2af4b38c431d306cd3d65f090e35bde489eb943afd56d0f7cef268dc6f719c6a",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:39:18.054Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A01-S3-riic",
+      "sample": "A01",
+      "layout": "S3",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 4,
+      "stable": true,
+      "iterations": 3,
+      "resources": {
+        "sanity": 173.50934737362445,
+        "lmd": 50651.3274,
+        "exp": 0,
+        "goldProduced": 91.6125,
+        "goldConsumed": 101.3027,
+        "goldNet": -9.6902,
+        "orundum": 410,
+        "shardsProduced": 38.3556,
+        "shardsConsumed": 41,
+        "shardsNet": -2.6444,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 124.98196237310043,
+        "materialCost": 629.76,
+        "dailyCost": 754.7419623731005,
+        "perOrundum": 1.8408340545685378,
+        "baselineScenario": "S2",
+        "baselineStatus": "invalid"
+      },
+      "provenance": {
+        "originalSha256": "7e84dd8c6aeef9325b65d0401c9cb4786b1cc8f67119bbdcd8b1ff8ea7b2ca5b",
+        "simulationSha256": "3c3271193f7ccff1587dec92b5930166075bdcaa6cc54a25940bc662a28522b5",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T03:51:21.658759+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A02-S1-maatool",
+      "sample": "A02",
+      "layout": "S1",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 310.1951916738865,
+        "lmd": 51693.2153,
+        "exp": 39719.9,
+        "goldProduced": 82.6666,
+        "goldConsumed": 103.3863,
+        "goldNet": -20.7197,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "04d32c6eec78456e1021d4fb63276d2ffd4e93fd7d3086afd7813f190f2757d8",
+        "simulationSha256": "0e45d17e73c6aca23f34035a73f8c80930b97ad50d7f9bee9fd6986b3df5f147",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T15:48:07.767704+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A02-S1-yituliu",
+      "sample": "A02",
+      "layout": "S1",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 2,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 292.4259088087336,
+        "lmd": 64540.413,
+        "exp": 28106.8,
+        "goldProduced": 84.0001,
+        "goldConsumed": 129.0807,
+        "goldNet": -45.0806,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "c44979c24e63a2d5d248467155be59397ad56dc17fe203ad7de0997c62418828",
+        "simulationSha256": "196c1c3fb75cf6a11a3e0fac3cf9b083d1237ee1333704eac025da4430716ca0",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:39:33.624Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A02-S1-riic",
+      "sample": "A02",
+      "layout": "S1",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 17,
+      "stable": true,
+      "iterations": 7,
+      "resources": {
+        "sanity": 290.13287815965066,
+        "lmd": 54746.8024,
+        "exp": 31720,
+        "goldProduced": 86.3,
+        "goldConsumed": 109.4935,
+        "goldNet": -23.1935,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "f240531bf74e7092554d2a89063e1ecbe33417952720b9dfe658ebf739450b4c",
+        "simulationSha256": "7910c6ac319d8c654db2c9c7da44f790e4675e153e5a3b5317aade1fc60cc1c3",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T03:51:27.023385+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A02-S2-maatool",
+      "sample": "A02",
+      "layout": "S2",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 330.50886984,
+        "lmd": 52810.6194,
+        "exp": 47546.6,
+        "goldProduced": 71.8666,
+        "goldConsumed": 105.6212,
+        "goldNet": -33.7546,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "087657b744e85732651beedd97d7779aab708685dd1ab708ba5cbb505b541cd4",
+        "simulationSha256": "1c9de5dd15ba1ad23473cc758078c487be862c8b693ea5793253f8500464d19d",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T15:49:48.067308+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A02-S2-yituliu",
+      "sample": "A02",
+      "layout": "S2",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 2,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 318.06387869187773,
+        "lmd": 59397.3451,
+        "exp": 41413.5,
+        "goldProduced": 69.6,
+        "goldConsumed": 118.7946,
+        "goldNet": -49.1946,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "3a46510e54794182b99cf5a30723ac477cf05129d2ec0d2f51378225454898e2",
+        "simulationSha256": "2f9541386eb2120d050fba5eed25937027780f95c3c45dba76b5cfab61e356d4",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:39:35.188Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A02-S2-riic",
+      "sample": "A02",
+      "layout": "S2",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 9,
+      "stable": false,
+      "iterations": 12,
+      "resources": {
+        "sanity": 312.0662077655895,
+        "lmd": 48467.4778,
+        "exp": 44400,
+        "goldProduced": 72.525,
+        "goldConsumed": 96.9349,
+        "goldNet": -24.4099,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "30bd3ca71a359d6750d23ce34a3d032475099c3953adf83d4c447effc93eb125",
+        "simulationSha256": "0e22898cd95cb3db8177eaf84342e01001890d7ee29aa7c407b4008c85e08d2e",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T03:51:32.858169+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A02-S3-maatool",
+      "sample": "A02",
+      "layout": "S3",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 163.79526916925766,
+        "lmd": 46489.6754,
+        "exp": 0,
+        "goldProduced": 89.0666,
+        "goldConsumed": 92.9793,
+        "goldNet": -3.9127,
+        "orundum": 627.2,
+        "shardsProduced": 65.08,
+        "shardsConsumed": 62.72,
+        "shardsNet": 2.36,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 166.71360067074232,
+        "materialCost": 963.3792,
+        "dailyCost": 1130.0928006707422,
+        "perOrundum": 1.8018061235184026,
+        "baselineScenario": "S2",
+        "baselineStatus": "unconfirmed"
+      },
+      "provenance": {
+        "originalSha256": "5bef988970e27b5c56453754da1c2de58185d28ce06c5e57c7f1c70a5c130f22",
+        "simulationSha256": "82ac77ee5aa97856ed67b052dcb73ca179a3d608ad493e3da45db493186aed68",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T15:51:34.338548+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A02-S3-yituliu",
+      "sample": "A02",
+      "layout": "S3",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 10,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 192.92867474620084,
+        "lmd": 64395.2802,
+        "exp": 0,
+        "goldProduced": 86.1334,
+        "goldConsumed": 128.7905,
+        "goldNet": -42.6571,
+        "orundum": 456,
+        "shardsProduced": 48.96,
+        "shardsConsumed": 45.6,
+        "shardsNet": 3.36,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 125.13520394567689,
+        "materialCost": 700.4159999999999,
+        "dailyCost": 825.5512039456769,
+        "perOrundum": 1.8104193068984142,
+        "baselineScenario": "S2",
+        "baselineStatus": "invalid"
+      },
+      "provenance": {
+        "originalSha256": "dad9e1c5ca30c700612a6dd7c9cf680615a8041436081b98a79fbcab2114264f",
+        "simulationSha256": "d4e84724284662cc61a020484768de7185b28487298b9a1d3370b3a75bd0960f",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:39:35.313Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A02-S3-riic",
+      "sample": "A02",
+      "layout": "S3",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 16,
+      "stable": true,
+      "iterations": 8,
+      "resources": {
+        "sanity": 171.0737100628821,
+        "lmd": 51673.351,
+        "exp": 0,
+        "goldProduced": 86.95,
+        "goldConsumed": 103.3467,
+        "goldNet": -16.3967,
+        "orundum": 458,
+        "shardsProduced": 42.96,
+        "shardsConsumed": 45.8,
+        "shardsNet": -2.84,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 140.99249770270742,
+        "materialCost": 703.4879999999999,
+        "dailyCost": 844.4804977027073,
+        "perOrundum": 1.8438438814469593,
+        "baselineScenario": "S2",
+        "baselineStatus": "invalid"
+      },
+      "provenance": {
+        "originalSha256": "48f9bb506577ebd7e41777b61c09bbd7daad0662a0c7474ff0af7f2cda04344a",
+        "simulationSha256": "8704464dbf4c3079717e5d670c5c3919f253afb44158188c3e57569e0b4abfed",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T03:51:38.857604+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A03-S1-maatool",
+      "sample": "A03",
+      "layout": "S1",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 273.77593211633183,
+        "lmd": 40788.2006,
+        "exp": 37813.1,
+        "goldProduced": 71.4987,
+        "goldConsumed": 81.5764,
+        "goldNet": -10.0777,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "e824ab46e2f1a5c340c081ba23be1ab89215d9d4dbaef708b54cfea97472ca0d",
+        "simulationSha256": "0e2ee951e6c8c8351c62326d0894184d1dbce7c7dc272e3493ffa202b978606b",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T15:54:03.173860+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A03-S1-yituliu",
+      "sample": "A03",
+      "layout": "S1",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 2,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 258.74337943336246,
+        "lmd": 39008.8496,
+        "exp": 29659.9,
+        "goldProduced": 90.6695,
+        "goldConsumed": 78.0176,
+        "goldNet": 12.6519,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "3246f655f9204883e16af20832e0eb7a389795ef3cdb671399abab146d793b45",
+        "simulationSha256": "b559f82b0368332f39b4a73d22e30aa1f4de4c1639f9fdb1205c3092c062bc61",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:39:53.476Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A03-S1-riic",
+      "sample": "A03",
+      "layout": "S1",
+      "site": "riic",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 265.07905575720525,
+        "lmd": 45578.761,
+        "exp": 29780,
+        "goldProduced": 84.344,
+        "goldConsumed": 91.1575,
+        "goldNet": -6.8135,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "ed96869c01ea42b8ed39c44482ea50109929e82b208dcd74ab46e645c0948e29",
+        "simulationSha256": "2c9fa5b215a2571309cc2fd2005f49000c0c6933a4f6a5ae643d070b19a038a1",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T03:51:43.984344+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A03-S2-maatool",
+      "sample": "A03",
+      "layout": "S2",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 288.78392851388645,
+        "lmd": 34356.3422,
+        "exp": 46840.4,
+        "goldProduced": 64.8473,
+        "goldConsumed": 68.7126,
+        "goldNet": -3.8653,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "9553efcef47aef0b1aab21068034dd559fadd7c6affdc751c133956c387471fd",
+        "simulationSha256": "4c6d40579b6658eec7ccf3f437fb66f1cb9b632eb6cbe2acfe94aa4deab3fa58",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T15:55:10.638662+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A03-S2-yituliu",
+      "sample": "A03",
+      "layout": "S2",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 10,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 283.4044014026201,
+        "lmd": 34339.823,
+        "exp": 41926.6,
+        "goldProduced": 78.3807,
+        "goldConsumed": 68.6797,
+        "goldNet": 9.701,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "650cafa9f65d052dc0f64c962ccaf6f92e9fc6296c8c951ee612ff319834d7ad",
+        "simulationSha256": "cc098db64d4c839ad97623cbf1d88eb5e2da7859e1f70199608194428a2bb002",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:39:57.015Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A03-S2-riic",
+      "sample": "A03",
+      "layout": "S2",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 2,
+      "stable": false,
+      "iterations": 12,
+      "resources": {
+        "sanity": 283.9129706169432,
+        "lmd": 39526.1062,
+        "exp": 41890,
+        "goldProduced": 68.9785,
+        "goldConsumed": 79.0521,
+        "goldNet": -10.0736,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "d9acefc89f24f2edc0fc63aac8ec7ac682e46f0f1324bb7f4f5f2e749dbcc769",
+        "simulationSha256": "ec81807d2c453e634354a1eacbf2c3538883647a094f1ff3fc568c0f2abbed2d",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T03:51:49.754635+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A03-S3-maatool",
+      "sample": "A03",
+      "layout": "S3",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 133.3968181357205,
+        "lmd": 37450.5407,
+        "exp": 0,
+        "goldProduced": 73.3381,
+        "goldConsumed": 74.9011,
+        "goldNet": -1.563,
+        "orundum": 556,
+        "shardsProduced": 59.6784,
+        "shardsConsumed": 55.6,
+        "shardsNet": 4.0784,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 155.38711037816594,
+        "materialCost": 854.016,
+        "dailyCost": 1009.4031103781659,
+        "perOrundum": 1.815473220104615,
+        "baselineScenario": "S2",
+        "baselineStatus": "unconfirmed"
+      },
+      "provenance": {
+        "originalSha256": "d88c3bc7ad0bd728b32226279e7b0a71a31402c24c6a34524b274df6f358a66e",
+        "simulationSha256": "c831b9b5eb7da0594c969d43ed53eb6e8fb3bc911654b14d9f18e2ac4e184d72",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T15:56:22.541894+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A03-S3-yituliu",
+      "sample": "A03",
+      "layout": "S3",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 12,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 153.3353019028821,
+        "lmd": 39693.2154,
+        "exp": 0,
+        "goldProduced": 90.8361,
+        "goldConsumed": 79.3864,
+        "goldNet": 11.4497,
+        "orundum": 400,
+        "shardsProduced": 41.14,
+        "shardsConsumed": 40,
+        "shardsNet": 1.14,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 130.06909949973803,
+        "materialCost": 614.4,
+        "dailyCost": 744.469099499738,
+        "perOrundum": 1.861172748749345,
+        "baselineScenario": "S2",
+        "baselineStatus": "invalid"
+      },
+      "provenance": {
+        "originalSha256": "dff6ce65d7e16367353ec8134557d78911833ac2ff5731bc0a8c6a3a1cdcb698",
+        "simulationSha256": "1b98d43d306063fab201f710f3f7ba918b325fa059e09bebac707ec659e67c03",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:39:58.526Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A03-S3-riic",
+      "sample": "A03",
+      "layout": "S3",
+      "site": "riic",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 156.11589914934495,
+        "lmd": 46836.283,
+        "exp": 0,
+        "goldProduced": 79.969,
+        "goldConsumed": 93.6725,
+        "goldNet": -13.7035,
+        "orundum": 437.2,
+        "shardsProduced": 39.06,
+        "shardsConsumed": 43.72,
+        "shardsNet": -4.66,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 127.79707146759824,
+        "materialCost": 671.5391999999999,
+        "dailyCost": 799.3362714675982,
+        "perOrundum": 1.8283080317191176,
+        "baselineScenario": "S2",
+        "baselineStatus": "invalid"
+      },
+      "provenance": {
+        "originalSha256": "944afdeddd524a82009ec7e63ba1167de054a6be1b7271692282763c24251e2e",
+        "simulationSha256": "27699072ebde94b315b523cdb7d48d5eac6dd61373dbe16ec9e3f4c6685c0db7",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T03:51:54.911384+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A04-S1-maatool",
+      "sample": "A04",
+      "layout": "S1",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 314.5011122562445,
+        "lmd": 56758.4847,
+        "exp": 37409.4,
+        "goldProduced": 74.8047,
+        "goldConsumed": 101.6785,
+        "goldNet": -26.8738,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "1da00e3151dded46a45da823f28a4a6c7bf5bd2b7588505d63c8106fcaaa7094",
+        "simulationSha256": "bd2df390a4f7c505df260171da8dadff68c21f07bb1245b15763b3804292fd05",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T15:57:30.448150+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A04-S1-yituliu",
+      "sample": "A04",
+      "layout": "S1",
+      "site": "yituliu",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 306.15579336890823,
+        "lmd": 66676.3017,
+        "exp": 29976.7,
+        "goldProduced": 76.5026,
+        "goldConsumed": 122.341,
+        "goldNet": -45.8384,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "9d22dcbe0d06424b9c2536cb30eb051d20a731a2fd1a2b73715bc403caf868ad",
+        "simulationSha256": "afe00d97df825fb929c371f9703065109bd1bef4d036a1812a5f521a4520c490",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:40:06.323Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A04-S1-riic",
+      "sample": "A04",
+      "layout": "S1",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 11,
+      "stable": true,
+      "iterations": 7,
+      "resources": {
+        "sanity": 306.0144005077729,
+        "lmd": 61129.7687,
+        "exp": 29967.600000000002,
+        "goldProduced": 86.75,
+        "goldConsumed": 110.8083,
+        "goldNet": -24.0583,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "193422eea900a1472ee1fa53c8ed461cb8127807e0e82afb9b87ce3515ffa8d0",
+        "simulationSha256": "1d572bfded146bc9a7f5ecbd78cd13adeccb321f320b61e105196fdeff8dd3c6",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T03:52:00.083032+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A04-S2-maatool",
+      "sample": "A04",
+      "layout": "S2",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 330.9226349046288,
+        "lmd": 57562.8489,
+        "exp": 44126.9,
+        "goldProduced": 67.2475,
+        "goldConsumed": 105.8095,
+        "goldNet": -38.562,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "409439f3e2c03e9e01f5132a2922de5d097a95f28e0ac39b96d51cdcf1ecb1aa",
+        "simulationSha256": "6e89f2943d76cb69eae722fa0c02f37916f9afb45dfa70fb0c4d5ff1e25a3d7d",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T15:58:58.265646+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A04-S2-yituliu",
+      "sample": "A04",
+      "layout": "S2",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 2,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 320.9823621668122,
+        "lmd": 56696.4105,
+        "exp": 42810.1,
+        "goldProduced": 64.714,
+        "goldConsumed": 105.5579,
+        "goldNet": -40.8439,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "3c85d0ba8da2c3c6f761c25439dd5ecab4932db43e88e5312aab1a0e350695af",
+        "simulationSha256": "ca289dc3f18c2d9e38d8ecfc41b062a8ae41e5be9b3a4e6e0e36c93ff221368f",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:40:11.319Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A04-S2-riic",
+      "sample": "A04",
+      "layout": "S2",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 18,
+      "stable": false,
+      "iterations": 12,
+      "resources": {
+        "sanity": 314.3435565757205,
+        "lmd": 48983.1236,
+        "exp": 42117.600000000006,
+        "goldProduced": 74.6,
+        "goldConsumed": 89.5366,
+        "goldNet": -14.9366,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "7200a785606988f89f463f16d413e9f3bc4a5077a2d4ed287f5dcb4af7f47f03",
+        "simulationSha256": "d21918a608456c87acf8de223e69eb0ab3646d88a322cfcc48bff7319aeb14d8",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T03:52:05.787069+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A04-S3-maatool",
+      "sample": "A04",
+      "layout": "S3",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 174.53178585117905,
+        "lmd": 55016.8918,
+        "exp": 0,
+        "goldProduced": 77.59,
+        "goldConsumed": 103.3953,
+        "goldNet": -25.8053,
+        "orundum": 603.2,
+        "shardsProduced": 63.1752,
+        "shardsConsumed": 60.32,
+        "shardsNet": 2.8552,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 156.39084905344976,
+        "materialCost": 926.5151999999999,
+        "dailyCost": 1082.9060490534498,
+        "perOrundum": 1.7952686489612892,
+        "baselineScenario": "S2",
+        "baselineStatus": "unconfirmed"
+      },
+      "provenance": {
+        "originalSha256": "d8e352f4c3fc8223fc862865b5c65629e26399bf575ad60c459b79dd0cc4714f",
+        "simulationSha256": "66fa79d95d8d5df8793399f74944dacb61fe0394a0aeb1f9a3384121d2ee5ead",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T16:00:13.726660+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A04-S3-yituliu",
+      "sample": "A04",
+      "layout": "S3",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 4,
+      "stable": true,
+      "iterations": 5,
+      "resources": {
+        "sanity": 195.54817175999995,
+        "lmd": 66580.1366,
+        "exp": 0,
+        "goldProduced": 73.7333,
+        "goldConsumed": 122.1439,
+        "goldNet": -48.4106,
+        "orundum": 504,
+        "shardsProduced": 49.2,
+        "shardsConsumed": 50.4,
+        "shardsNet": -1.2,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 125.43419040681226,
+        "materialCost": 774.144,
+        "dailyCost": 899.5781904068123,
+        "perOrundum": 1.7848773619182783,
+        "baselineScenario": "S2",
+        "baselineStatus": "invalid"
+      },
+      "provenance": {
+        "originalSha256": "c69dd708beafca9aebdfa67091a68037207c258ae13ec2b9eb78ec41721c516a",
+        "simulationSha256": "068af670a0d84003af15819a476052f0cde1d3abdb39bf0d6c8f92dc98c3f84a",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:40:11.947Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A04-S3-riic",
+      "sample": "A04",
+      "layout": "S3",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 7,
+      "stable": true,
+      "iterations": 7,
+      "resources": {
+        "sanity": 197.3759680076856,
+        "lmd": 59298.6604,
+        "exp": 0,
+        "goldProduced": 90.45,
+        "goldConsumed": 108.1067,
+        "goldNet": -17.6567,
+        "orundum": 399.6,
+        "shardsProduced": 41.88,
+        "shardsConsumed": 39.96,
+        "shardsNet": 1.92,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 116.96758856803493,
+        "materialCost": 613.7856,
+        "dailyCost": 730.753188568035,
+        "perOrundum": 1.8287116831031904,
+        "baselineScenario": "S2",
+        "baselineStatus": "invalid"
+      },
+      "provenance": {
+        "originalSha256": "e124499d9a335fc4b59ac0eadb19c46a0f444601c552785929e230dbfb20e52f",
+        "simulationSha256": "21324c68aabaf8a980c9a0de6e3fffb64d78c52d8a5f31e018dbc9613982dd3e",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T04:01:30.452764+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A05-S1-maatool",
+      "sample": "A05",
+      "layout": "S1",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 311.5499568083843,
+        "lmd": 54234.8848,
+        "exp": 38213.5,
+        "goldProduced": 79.6,
+        "goldConsumed": 102.9214,
+        "goldNet": -23.3214,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "47c7999fc95a28b5b8aa2d42a2537f144935f492772f07588252ad98a2868d0c",
+        "simulationSha256": "7ef8eecb748da984e59a666ea1a68b2311981c6bb57b3e7a9ef5ab8c5151c4b4",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T16:01:23.836154+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A05-S1-yituliu",
+      "sample": "A05",
+      "layout": "S1",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 4,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 307.38774376611354,
+        "lmd": 65928.1001,
+        "exp": 30960,
+        "goldProduced": 80.5027,
+        "goldConsumed": 125.9182,
+        "goldNet": -45.4155,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "0b3774b48956706e7ec6932d3b2e46b9d5c6a728f4b5c34c96aadef7f165be4d",
+        "simulationSha256": "aeca8b9bfaf2409298ca62aa82ed3f83d4513170e217c9c45b0b4787a5022485",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:40:22.791Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A05-S1-riic",
+      "sample": "A05",
+      "layout": "S1",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 2,
+      "stable": true,
+      "iterations": 3,
+      "resources": {
+        "sanity": 313.71797105135374,
+        "lmd": 61990.2529,
+        "exp": 31400,
+        "goldProduced": 89.775,
+        "goldConsumed": 114.4374,
+        "goldNet": -24.6624,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "19c4a56f8458b2b161e96d142c5f59d04da0c0b504351413902e103ea2e3e576",
+        "simulationSha256": "cc852f01a809c753df395488e56e5b1676d3fe602b1ec0ed9ba0d2dd50c80bde",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T04:01:41.076750+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A05-S2-maatool",
+      "sample": "A05",
+      "layout": "S2",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 332.30485837886465,
+        "lmd": 56704.1479,
+        "exp": 45201.2,
+        "goldProduced": 68.9332,
+        "goldConsumed": 106.8305,
+        "goldNet": -37.8973,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "2df7c3aa1353cd903787819b17481fa8852bbb27ba48342763d7a79fdd2190d4",
+        "simulationSha256": "2dc965071ab96bfa6d7f810c18aa7ff4da10cd7602b46aae55e4ec4bb70cb20d",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T16:02:43.444069+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A05-S2-yituliu",
+      "sample": "A05",
+      "layout": "S2",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 8,
+      "stable": true,
+      "iterations": 5,
+      "resources": {
+        "sanity": 326.10323954829687,
+        "lmd": 59512.9974,
+        "exp": 42160,
+        "goldProduced": 68.6666,
+        "goldConsumed": 112.4481,
+        "goldNet": -43.7815,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "e144563801875ed13aa5dcd662f8df8189382be0ea59b7864646ca5801a97cdf",
+        "simulationSha256": "4830613d21fcbe3ab8beab600d8b8441b9b406c760bedf51a62485b920dcbaa3",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:40:27.348Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A05-S2-riic",
+      "sample": "A05",
+      "layout": "S2",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 5,
+      "stable": false,
+      "iterations": 12,
+      "resources": {
+        "sanity": 323.54801594253274,
+        "lmd": 51958.2611,
+        "exp": 43071.399999999994,
+        "goldProduced": 76.8,
+        "goldConsumed": 97.1542,
+        "goldNet": -20.3542,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "6326815c76c639110321ede35d600677113947e01d9760100df1a6b16749c01b",
+        "simulationSha256": "ce82e1f0550871c2cbf34505b94e46de85655583fe8ec9bb4e4f4a222ff7ada8",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T04:01:51.560257+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A05-S3-maatool",
+      "sample": "A05",
+      "layout": "S3",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 174.30261926305678,
+        "lmd": 52518.6021,
+        "exp": 0,
+        "goldProduced": 82.2667,
+        "goldConsumed": 98.4594,
+        "goldNet": -16.1927,
+        "orundum": 596,
+        "shardsProduced": 65.44,
+        "shardsConsumed": 59.6,
+        "shardsNet": 5.84,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 158.00223911580787,
+        "materialCost": 915.456,
+        "dailyCost": 1073.4582391158078,
+        "perOrundum": 1.8011044280466575,
+        "baselineScenario": "S2",
+        "baselineStatus": "unconfirmed"
+      },
+      "provenance": {
+        "originalSha256": "f46c823eaea41d2d99092375abb24566d20434498a3c7cd7f42f85d9937027d8",
+        "simulationSha256": "02163599f506641449a33841224ff037ed976f23c793c61d5c45b5335710fa0d",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T16:03:56.261356+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A05-S3-yituliu",
+      "sample": "A05",
+      "layout": "S3",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 14,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 194.01446286864626,
+        "lmd": 65243.7343,
+        "exp": 0,
+        "goldProduced": 79.7334,
+        "goldConsumed": 124.5496,
+        "goldNet": -44.8162,
+        "orundum": 504,
+        "shardsProduced": 48.64,
+        "shardsConsumed": 50.4,
+        "shardsNet": -1.76,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 132.0887766796506,
+        "materialCost": 774.144,
+        "dailyCost": 906.2327766796507,
+        "perOrundum": 1.798080906110418,
+        "baselineScenario": "S2",
+        "baselineStatus": "invalid"
+      },
+      "provenance": {
+        "originalSha256": "df616378ad81c753b9a6e7c1a0e3317d3b32ca16b54a46589669df5149c88c97",
+        "simulationSha256": "9969072e13bce4aa04cc9084650024ee3a5ae5681dff8436fde907a623fa7a72",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:40:27.983Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A05-S3-riic",
+      "sample": "A05",
+      "layout": "S3",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 6,
+      "stable": true,
+      "iterations": 7,
+      "resources": {
+        "sanity": 201.24143834934497,
+        "lmd": 61557.755,
+        "exp": 0,
+        "goldProduced": 93.25,
+        "goldConsumed": 115.5868,
+        "goldNet": -22.3368,
+        "orundum": 498,
+        "shardsProduced": 42.6,
+        "shardsConsumed": 49.8,
+        "shardsNet": -7.2,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 122.30657759318777,
+        "materialCost": 764.9279999999999,
+        "dailyCost": 887.2345775931876,
+        "perOrundum": 1.7815955373357182,
+        "baselineScenario": "S2",
+        "baselineStatus": "invalid"
+      },
+      "provenance": {
+        "originalSha256": "eedaa36cd30b8551dd201292566ea4c722cf6f45c2cc9420099f98a0f71d45df",
+        "simulationSha256": "8ccabe5ec3663ef632a823d63d87512ce6cade5520c8adf133189013c9e8ca6a",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T04:02:01.950531+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A06-S1-maatool",
+      "sample": "A06",
+      "layout": "S1",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 284.7657100087336,
+        "lmd": 44401.18,
+        "exp": 37841.6,
+        "goldProduced": 76.4001,
+        "goldConsumed": 88.8024,
+        "goldNet": -12.4023,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "1340ab1ccf1c4b9658f767a1e13080ecd7f40e7d2f147cc50fd9aa796b859d2a",
+        "simulationSha256": "05491a9cb5c1bc52820cf9ffe8c5cc4e9c1a6bbfc9dad4737c2b15bfb7e3c159",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T16:05:11.632564+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A06-S1-yituliu",
+      "sample": "A06",
+      "layout": "S1",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 4,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 261.9545720730131,
+        "lmd": 38324.4838,
+        "exp": 30400,
+        "goldProduced": 92.6027,
+        "goldConsumed": 76.649,
+        "goldNet": 15.9537,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "611175005329d26e1f03416a70ba3a9742a37b354137e3677c274cda47c981f1",
+        "simulationSha256": "e4c9eb11b87ed5e1218ee78e19d8b3370dbe580420c0148f7d3b51cf29d5a295",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:40:37.456Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A06-S1-riic",
+      "sample": "A06",
+      "layout": "S1",
+      "site": "riic",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 278.2947150094323,
+        "lmd": 49823.0089,
+        "exp": 30520,
+        "goldProduced": 87.6475,
+        "goldConsumed": 99.646,
+        "goldNet": -11.9985,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "bdb8dfe8749e6bc9b7d871b2d19f99f9a396cc2b61c8dd2b6e297c904a3551df",
+        "simulationSha256": "4cb58b04ed7e1b503ca14e1ed9740f20add9cb6234fb61ce99de58a03388620b",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T04:02:14.455481+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A06-S2-maatool",
+      "sample": "A06",
+      "layout": "S2",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 308.94893399790396,
+        "lmd": 48684.3658,
+        "exp": 44546.6,
+        "goldProduced": 68.1048,
+        "goldConsumed": 97.3687,
+        "goldNet": -29.2639,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "b6df23a96399d253ff5592876c01ab49b59b8c6db5bc9e85350aa0e902c7fc3d",
+        "simulationSha256": "f3cf83d8e1360d7d3db3c7a2550adda4f70cf22dd09880467b9de27d116682ee",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T16:07:08.098020+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A06-S2-yituliu",
+      "sample": "A06",
+      "layout": "S2",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 4,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 287.0397068494323,
+        "lmd": 33830.9733,
+        "exp": 42613.4,
+        "goldProduced": 80.6474,
+        "goldConsumed": 67.662,
+        "goldNet": 12.9854,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "d3a4ad3534196e792ea2716bd9f0c0c1fd377b53be2ef53a4e082ed6d688c92f",
+        "simulationSha256": "1b339d2a526dffdb127f09e1c4dde5a1ff93dc1249f4c1e02e333fb09f1c5044",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:40:42.034Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A06-S2-riic",
+      "sample": "A06",
+      "layout": "S2",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 1,
+      "stable": false,
+      "iterations": 12,
+      "resources": {
+        "sanity": 307.82795001484715,
+        "lmd": 47680.9735,
+        "exp": 42889,
+        "goldProduced": 75.375,
+        "goldConsumed": 95.362,
+        "goldNet": -19.987,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "cfd5abb5348a19434ed0a4780dd70213d3a209f0b8423ec7dd0983e11b7803bd",
+        "simulationSha256": "17526112574bdf0e335199748d813b210bf6ac804253af4e1dcfa6ae0a72c08d",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T04:02:24.995981+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A06-S3-maatool",
+      "sample": "A06",
+      "layout": "S3",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 147.40772993606984,
+        "lmd": 41239.1244,
+        "exp": 0,
+        "goldProduced": 81.3233,
+        "goldConsumed": 82.4783,
+        "goldNet": -1.155,
+        "orundum": 540,
+        "shardsProduced": 58.4312,
+        "shardsConsumed": 54,
+        "shardsNet": 4.4312,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 161.54120406183412,
+        "materialCost": 829.4399999999999,
+        "dailyCost": 990.9812040618341,
+        "perOrundum": 1.8351503778922853,
+        "baselineScenario": "S2",
+        "baselineStatus": "unconfirmed"
+      },
+      "provenance": {
+        "originalSha256": "d6768bb61b5cfe30149369bc5d8900ef6c6f3a4a94b02931ffd22e02a726b197",
+        "simulationSha256": "016c1369b846d3678fa75e9e86a129e9745fee6abf0adcabd2faa8aa81220c1d",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T16:08:12.156581+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A06-S3-yituliu",
+      "sample": "A06",
+      "layout": "S3",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 10,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 154.39653402131003,
+        "lmd": 39693.2152,
+        "exp": 0,
+        "goldProduced": 92,
+        "goldConsumed": 79.3864,
+        "goldNet": 12.6136,
+        "orundum": 384,
+        "shardsProduced": 44,
+        "shardsConsumed": 38.4,
+        "shardsNet": 5.6,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 132.6431728281223,
+        "materialCost": 589.824,
+        "dailyCost": 722.4671728281222,
+        "perOrundum": 1.8814249292399017,
+        "baselineScenario": "S2",
+        "baselineStatus": "invalid"
+      },
+      "provenance": {
+        "originalSha256": "24bd93e7779df0110f8430771a5924e7de3c691bdc2f9311dd561e1048452110",
+        "simulationSha256": "a1254b7e4ea4d049955abefd1c56ec51165501c43dd9216e8e7dfaf9bfe0017a",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:40:42.721Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A06-S3-riic",
+      "sample": "A06",
+      "layout": "S3",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 2,
+      "stable": true,
+      "iterations": 3,
+      "resources": {
+        "sanity": 171.68542431091703,
+        "lmd": 52238.938,
+        "exp": 0,
+        "goldProduced": 86.519,
+        "goldConsumed": 104.4779,
+        "goldNet": -17.9589,
+        "orundum": 436,
+        "shardsProduced": 40.08,
+        "shardsConsumed": 43.6,
+        "shardsNet": -3.52,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 136.14252570393012,
+        "materialCost": 669.696,
+        "dailyCost": 805.8385257039301,
+        "perOrundum": 1.8482534993209407,
+        "baselineScenario": "S2",
+        "baselineStatus": "invalid"
+      },
+      "provenance": {
+        "originalSha256": "9805625d29b413bbb03681011c9af4dcdd3a3c01d050b88b392b3b6bbdbe9b5b",
+        "simulationSha256": "58f5dabf4c94c5ebf09fba2076dda25259f929721851a119de2be2d9950683cf",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T04:02:35.466790+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A07-S1-maatool",
+      "sample": "A07",
+      "layout": "S1",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 300.104336367511,
+        "lmd": 46991.3864,
+        "exp": 39386.6,
+        "goldProduced": 77.1695,
+        "goldConsumed": 89.0762,
+        "goldNet": -11.9067,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "bf7ed2c667b0985bcd5857c384af727a762242b6db3d855c6d76c09303477ff9",
+        "simulationSha256": "acaed508ca09e18e905991cae9aa8f300c6eb5fc190a5d424ace033d2e6a745a",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T16:09:23.549274+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A07-S1-yituliu",
+      "sample": "A07",
+      "layout": "S1",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 2,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 296.40039087301307,
+        "lmd": 59466.6668,
+        "exp": 31359.9,
+        "goldProduced": 79.4668,
+        "goldConsumed": 113,
+        "goldNet": -33.5332,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "9f182f286dc07602aabd281f79c65bc2ef11da33bc5eb7e1469c84a210e32513",
+        "simulationSha256": "700de7eea3dedfa5f2ff5729153ba1307f6b4ae08d2ec14eaff524ab64aedcd0",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:40:49.464Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A07-S1-riic",
+      "sample": "A07",
+      "layout": "S1",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 11,
+      "stable": true,
+      "iterations": 7,
+      "resources": {
+        "sanity": 284.88371254427943,
+        "lmd": 53398.4956,
+        "exp": 28820,
+        "goldProduced": 89.1,
+        "goldConsumed": 101.277,
+        "goldNet": -12.177,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "bd3d1569e525d9f55d719d956d55213972bd1cfc9f347880f162c236cc3eb6a6",
+        "simulationSha256": "c521b0db2eb568146c3e5831d8c8a4089f3a04beb26ff2a90c3e1363f320f0e6",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T04:02:46.495900+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A07-S2-maatool",
+      "sample": "A07",
+      "layout": "S2",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 319.8564449905677,
+        "lmd": 50776.9911,
+        "exp": 45084.5,
+        "goldProduced": 68.9334,
+        "goldConsumed": 96.6206,
+        "goldNet": -27.6872,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "ebb7a1a9033525bfcfe7a8b07c3be189e45623e7eeda0eb54eecb19ee9c45bee",
+        "simulationSha256": "d0845a389ab6b6feeab694f9387d86692015f005fc09745952642bfd58a07b70",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T16:10:26.763760+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A07-S2-yituliu",
+      "sample": "A07",
+      "layout": "S2",
+      "site": "yituliu",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 319.6316171853275,
+        "lmd": 53068.0826,
+        "exp": 44472.4,
+        "goldProduced": 66.6667,
+        "goldConsumed": 101.2296,
+        "goldNet": -34.5629,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "32272169e84e5c0ace5ab8fcb083dcd54159588b5b257887c53d30722b4fe155",
+        "simulationSha256": "cc5552fb4ae8c2cfbd77b127974996f75b789a9dcde82b23dd10886fefe0fd6a",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:40:55.396Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A07-S2-riic",
+      "sample": "A07",
+      "layout": "S2",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 14,
+      "stable": false,
+      "iterations": 12,
+      "resources": {
+        "sanity": 312.4429748300437,
+        "lmd": 45760.3982,
+        "exp": 43580,
+        "goldProduced": 75.15,
+        "goldConsumed": 85.2208,
+        "goldNet": -10.0708,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "0d30005f200896dc72c4bbb0c033985ebd0e1e02942a03d48b26a8ed65f0b2a1",
+        "simulationSha256": "59935ec65f001a4b19c0568632f876113234198716c8eda075500708069f43bf",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T04:02:59.215071+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A07-S3-maatool",
+      "sample": "A07",
+      "layout": "S3",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 163.0209265294323,
+        "lmd": 46478.1121,
+        "exp": 0,
+        "goldProduced": 83.3334,
+        "goldConsumed": 88.0497,
+        "goldNet": -4.7163,
+        "orundum": 618,
+        "shardsProduced": 56.04,
+        "shardsConsumed": 61.8,
+        "shardsNet": -5.76,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 156.8355184611354,
+        "materialCost": 949.2479999999999,
+        "dailyCost": 1106.0835184611353,
+        "perOrundum": 1.7897791560859795,
+        "baselineScenario": "S2",
+        "baselineStatus": "unconfirmed"
+      },
+      "provenance": {
+        "originalSha256": "445001d001331860183f73c903a5d8e302cdfab891f7e2e8c92f008938008c97",
+        "simulationSha256": "ff7c14d92219817efbe554a913d0c2cba789cf3ac36f00fdaf652c157be9be39",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T16:11:42.658267+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A07-S3-yituliu",
+      "sample": "A07",
+      "layout": "S3",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 6,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 182.86903888978168,
+        "lmd": 59091.7404,
+        "exp": 0,
+        "goldProduced": 79.4666,
+        "goldConsumed": 112.2167,
+        "goldNet": -32.7501,
+        "orundum": 488,
+        "shardsProduced": 47.44,
+        "shardsConsumed": 48.8,
+        "shardsNet": -1.36,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 136.76257829554584,
+        "materialCost": 749.568,
+        "dailyCost": 886.3305782955458,
+        "perOrundum": 1.8162511850318561,
+        "baselineScenario": "S2",
+        "baselineStatus": "unconfirmed"
+      },
+      "provenance": {
+        "originalSha256": "de760c845f7e01c7ac1c4c04a3a839ee72d1447c0adaf4c587f7d40992816300",
+        "simulationSha256": "9f02cb674e812feab8c1cd14883c6df005c9908d21d085189cda52df55c929d4",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:40:55.919Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A07-S3-riic",
+      "sample": "A07",
+      "layout": "S3",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 9,
+      "stable": true,
+      "iterations": 3,
+      "resources": {
+        "sanity": 181.82572239930133,
+        "lmd": 52506.0176,
+        "exp": 0,
+        "goldProduced": 91.6,
+        "goldConsumed": 99.4921,
+        "goldNet": -7.8921,
+        "orundum": 440,
+        "shardsProduced": 41.58,
+        "shardsConsumed": 44,
+        "shardsNet": -2.42,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 130.61725243074235,
+        "materialCost": 675.8399999999999,
+        "dailyCost": 806.4572524307423,
+        "perOrundum": 1.8328573918880506,
+        "baselineScenario": "S2",
+        "baselineStatus": "invalid"
+      },
+      "provenance": {
+        "originalSha256": "17810b031dc94ba512a63c11048097411caa299caec0f8311837cc7787e20a6f",
+        "simulationSha256": "6209dd334f738f68a1b8cbaa0d9a1d76398333affa2e7ecf0b6502a879669e79",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T04:03:11.690835+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A08-S1-maatool",
+      "sample": "A08",
+      "layout": "S1",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 340.49502895126636,
+        "lmd": 61384.3586,
+        "exp": 40473.2,
+        "goldProduced": 84.2666,
+        "goldConsumed": 112.9927,
+        "goldNet": -28.7261,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "58c1137ea3214ccd859972af27d066da6927e7d19b31fdb34f6357f87443e1e9",
+        "simulationSha256": "63d3e933efba65b19b5d084988ef99c64c1e48bbbfb0a8b0ded3de6c28c7b414",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T16:12:43.860115+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A08-S1-yituliu",
+      "sample": "A08",
+      "layout": "S1",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 4,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 314.00679866148465,
+        "lmd": 69329.8317,
+        "exp": 30360.1,
+        "goldProduced": 81.3334,
+        "goldConsumed": 130.5519,
+        "goldNet": -49.2185,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "aeb62ab0afa87573b2190d68f7c85f2839186a27b2fa9f8aaa133804cd20cc32",
+        "simulationSha256": "d3085b816ac2021a90ac0362c5a1fc89070e032871e812f44dbe10ca4ae0f071",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:41:06.603Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A08-S1-riic",
+      "sample": "A08",
+      "layout": "S1",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 17,
+      "stable": true,
+      "iterations": 7,
+      "resources": {
+        "sanity": 320.04842322026195,
+        "lmd": 63843.6376,
+        "exp": 32439.999999999996,
+        "goldProduced": 86.3,
+        "goldConsumed": 115.4434,
+        "goldNet": -29.1434,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "09f2487fa0120cf659cfbcae00c7c35879679327e6d3d57d34bc44b5274b5ab3",
+        "simulationSha256": "dab2a24f6790550bb1c2308324388aed734bea5d8d82b6ef0392c5074ac762ba",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T04:11:35.242837+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A08-S2-maatool",
+      "sample": "A08",
+      "layout": "S2",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 3,
+      "resources": {
+        "sanity": 359.7033950237555,
+        "lmd": 66955.7451,
+        "exp": 46200.200000000004,
+        "goldProduced": 71.8667,
+        "goldConsumed": 124.1353,
+        "goldNet": -52.2686,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "daa4aa44a83e5d4c34d21f15344e9b065d829295c0dcb50f1a4b6d69dc9a7b47",
+        "simulationSha256": "73f16dd71ec2014a677f17cff1fc9e20e9e6408a9a42170dea05f45b46926f76",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T16:14:26.623013+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A08-S2-yituliu",
+      "sample": "A08",
+      "layout": "S2",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 2,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 337.86974195999994,
+        "lmd": 62143.1061,
+        "exp": 43506.799999999996,
+        "goldProduced": 69.6,
+        "goldConsumed": 116.1786,
+        "goldNet": -46.5786,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "7694813319481d5d4b85d0a1d75c38b4866806cf03bdf7d81c12d0a8c94876f4",
+        "simulationSha256": "8e6113d716f832788cf0180b69a1759420e1a34709e71a08b67f74a9c15c3648",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:41:12.211Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A08-S2-riic",
+      "sample": "A08",
+      "layout": "S2",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 15,
+      "stable": false,
+      "iterations": 12,
+      "resources": {
+        "sanity": 334.7521807991266,
+        "lmd": 54022.6575,
+        "exp": 45730,
+        "goldProduced": 69.95,
+        "goldConsumed": 96.6638,
+        "goldNet": -26.7138,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "4b373db65785d99bdcfee81d77edad1d02f4ee692afb64ff06f36b866490f33a",
+        "simulationSha256": "6d237e729d5cf8cb98df390c35d03cb734c92388f5168eb2a342e7d0ef010666",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T09:00:52.357336+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A08-S3-maatool",
+      "sample": "A08",
+      "layout": "S3",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 195.13585008,
+        "lmd": 58699.4028,
+        "exp": 0,
+        "goldProduced": 87.1419,
+        "goldConsumed": 104.8894,
+        "goldNet": -17.7475,
+        "orundum": 623.2,
+        "shardsProduced": 65.48,
+        "shardsConsumed": 62.32,
+        "shardsNet": 3.16,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 164.56754494375548,
+        "materialCost": 957.2352,
+        "dailyCost": 1121.8027449437554,
+        "perOrundum": 1.8000685894476176,
+        "baselineScenario": "S2",
+        "baselineStatus": "unconfirmed"
+      },
+      "provenance": {
+        "originalSha256": "314307e58da90383af0da7eaef24d8cc5de4f4312ede4ff8316256dff8f35640",
+        "simulationSha256": "f15371e543a955cd75bd11ea9c06aadcbbfc024cb2946927af8ee7f929f33047",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T16:16:06.393341+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A08-S3-yituliu",
+      "sample": "A08",
+      "layout": "S3",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 6,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 210.30272267895197,
+        "lmd": 69329.8317,
+        "exp": 0,
+        "goldProduced": 87.4667,
+        "goldConsumed": 130.5519,
+        "goldNet": -43.0852,
+        "orundum": 472,
+        "shardsProduced": 46.56,
+        "shardsConsumed": 47.2,
+        "shardsNet": -0.64,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 127.56701928104798,
+        "materialCost": 724.992,
+        "dailyCost": 852.559019281048,
+        "perOrundum": 1.806269108646288,
+        "baselineScenario": "S2",
+        "baselineStatus": "invalid"
+      },
+      "provenance": {
+        "originalSha256": "1e1f94f349a49b01b9013d3e8219795f3598aeba1f4c24a961b4fe26323b2e74",
+        "simulationSha256": "265f66a53f5baa69b1df879ff5f367ed606a64c9625ffd64edff5546fceb54b1",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:41:12.685Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A08-S3-riic",
+      "sample": "A08",
+      "layout": "S3",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 10,
+      "stable": true,
+      "iterations": 7,
+      "resources": {
+        "sanity": 209.25606658637557,
+        "lmd": 64372.3987,
+        "exp": 0,
+        "goldProduced": 91.85,
+        "goldConsumed": 116.5098,
+        "goldNet": -24.6598,
+        "orundum": 476.6,
+        "shardsProduced": 44.16,
+        "shardsConsumed": 47.66,
+        "shardsNet": -3.5,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 125.49611421275105,
+        "materialCost": 732.0575999999999,
+        "dailyCost": 857.553714212751,
+        "perOrundum": 1.7993153886125701,
+        "baselineScenario": "S2",
+        "baselineStatus": "invalid"
+      },
+      "provenance": {
+        "originalSha256": "102bf704dbf564c455345ecbdf5d6df803806f51ca1f5be778f3b6887d91f24e",
+        "simulationSha256": "f3558bac0fdaa808dad6770544a6bb45cafa1b7b5bb723bf795eb08b90610575",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T04:14:55.250553+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A09-S1-maatool",
+      "sample": "A09",
+      "layout": "S1",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 308.7729683308297,
+        "lmd": 51891.4454,
+        "exp": 38853.4,
+        "goldProduced": 84.1419,
+        "goldConsumed": 103.7829,
+        "goldNet": -19.641,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "4a3fc36e2666c8123a464f1f9736b02418fcd3555080af49135735c3e27be7db",
+        "simulationSha256": "6ac6675cfe4331f48d8ae0d5f2569f13602f244c665105be9c26fb7a0868e931",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T16:17:30.531051+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A09-S1-yituliu",
+      "sample": "A09",
+      "layout": "S1",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 6,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 297.77144255842796,
+        "lmd": 61946.9027,
+        "exp": 31614.4,
+        "goldProduced": 81.0667,
+        "goldConsumed": 123.8937,
+        "goldNet": -42.827,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "17a43af5f6c8c9bd4ab2b982467bfc6bc135eeb80df4f857475ae5efc45b8d50",
+        "simulationSha256": "5fe0fd80a4c22a7031f9d9299bdfa5c7c6f0e9a667fa0c50434c23820fefe5fa",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:41:31.902Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A09-S1-riic",
+      "sample": "A09",
+      "layout": "S1",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 5,
+      "stable": true,
+      "iterations": 7,
+      "resources": {
+        "sanity": 292.64839693310046,
+        "lmd": 54671.3122,
+        "exp": 31120,
+        "goldProduced": 91.575,
+        "goldConsumed": 109.3426,
+        "goldNet": -17.7676,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "8a84e4e0bd896410779d4ba3bb922194f232e7e3358707d4b13fda361f4cdec3",
+        "simulationSha256": "5861e35f88a8dc93c0c3540b34bc57dc55ab41c351ec34026e4e415638a4ff6f",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T04:15:06.599781+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A09-S2-maatool",
+      "sample": "A09",
+      "layout": "S2",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 3,
+      "resources": {
+        "sanity": 330.0459106574673,
+        "lmd": 59452.5074,
+        "exp": 44883.5,
+        "goldProduced": 68.9333,
+        "goldConsumed": 118.905,
+        "goldNet": -49.9717,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "5114bdf1534a5ad9146b7f83612bac8f0c3bf92ad63f86ba8479ac54ab44eefc",
+        "simulationSha256": "e9cf16f35377ebd85d159c1e51e372d5ab8fb9e0f3fdafad62a57a35acc311df",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T16:18:57.649588+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A09-S2-yituliu",
+      "sample": "A09",
+      "layout": "S2",
+      "site": "yituliu",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 327.7876053159825,
+        "lmd": 59212.9794,
+        "exp": 44441.899999999994,
+        "goldProduced": 68.6667,
+        "goldConsumed": 118.4259,
+        "goldNet": -49.7592,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "a35169f116b6625d9c0c3809202c560bf4f18b6be16ef63aa754e82daa55ca7f",
+        "simulationSha256": "d9f06601e4f83217ce3b74e7192861053f2e160579f32847b15ac8075a68d86c",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:41:36.730Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A09-S2-riic",
+      "sample": "A09",
+      "layout": "S2",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 10,
+      "stable": false,
+      "iterations": 12,
+      "resources": {
+        "sanity": 309.74597954724896,
+        "lmd": 43883.9228,
+        "exp": 44200,
+        "goldProduced": 79.7,
+        "goldConsumed": 87.7678,
+        "goldNet": -8.0678,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "14bdf04a8e12a55d12091cbf2745098150f714f3847cad9d1e7d7d7ab4f42d32",
+        "simulationSha256": "634bb51070228d888bcb55a80b01b937f0fb85d7044722e7fee0a743cf8cbef2",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T04:15:17.244254+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A09-S3-maatool",
+      "sample": "A09",
+      "layout": "S3",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 163.1973541676856,
+        "lmd": 46452.201,
+        "exp": 0,
+        "goldProduced": 88.4839,
+        "goldConsumed": 92.9044,
+        "goldNet": -4.4205,
+        "orundum": 596.8,
+        "shardsProduced": 62.48,
+        "shardsConsumed": 59.68,
+        "shardsNet": 2.8,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 166.84855648978169,
+        "materialCost": 916.6848,
+        "dailyCost": 1083.5333564897817,
+        "perOrundum": 1.8155719780324762,
+        "baselineScenario": "S2",
+        "baselineStatus": "unconfirmed"
+      },
+      "provenance": {
+        "originalSha256": "55aaa53d304fd04e373294f0452fe73f3c3cfe034a125698f2c8110cc53317b8",
+        "simulationSha256": "05605eb661bfa8192511761ec02c84d802213b257abef68c8a6ed8fe0f68eecc",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T16:20:23.403258+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A09-S3-yituliu",
+      "sample": "A09",
+      "layout": "S3",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 12,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 186.7557897966812,
+        "lmd": 61946.9026,
+        "exp": 0,
+        "goldProduced": 84.1334,
+        "goldConsumed": 123.8937,
+        "goldNet": -39.7603,
+        "orundum": 468,
+        "shardsProduced": 42.16,
+        "shardsConsumed": 46.8,
+        "shardsNet": -4.64,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 141.0318155193013,
+        "materialCost": 718.848,
+        "dailyCost": 859.8798155193012,
+        "perOrundum": 1.8373500331609,
+        "baselineScenario": "S2",
+        "baselineStatus": "unconfirmed"
+      },
+      "provenance": {
+        "originalSha256": "0c9f9ad75b58937d4bd711eb4a72623f1efe9f9e7367cb9e228e70dcb0335cac",
+        "simulationSha256": "3524984777f110fd8a5242e2569c7809772bc08247bae10d09f52005bd6921c5",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:41:41.262Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A09-S3-riic",
+      "sample": "A09",
+      "layout": "S3",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 6,
+      "stable": true,
+      "iterations": 7,
+      "resources": {
+        "sanity": 183.1804447173799,
+        "lmd": 54343.8787,
+        "exp": 0,
+        "goldProduced": 95.025,
+        "goldConsumed": 108.6877,
+        "goldNet": -13.6627,
+        "orundum": 507,
+        "shardsProduced": 39.66,
+        "shardsConsumed": 50.7,
+        "shardsNet": -11.04,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 126.56553482986905,
+        "materialCost": 778.7520000000001,
+        "dailyCost": 905.3175348298691,
+        "perOrundum": 1.785636163372523,
+        "baselineScenario": "S2",
+        "baselineStatus": "invalid"
+      },
+      "provenance": {
+        "originalSha256": "08aa916ddfb7d337ed61003b0e5dd1c2879be446810b10225f05d57cecceaa1e",
+        "simulationSha256": "0c1844c71ae7db436e3cb08d9ad0d0f83791007acbb39df4a9b27dc74bb8f668",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T04:15:30.139860+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A10-S1-maatool",
+      "sample": "A10",
+      "layout": "S1",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 320.9427619828821,
+        "lmd": 54466.7432,
+        "exp": 39306.7,
+        "goldProduced": 80.0001,
+        "goldConsumed": 98.2517,
+        "goldNet": -18.2516,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "7c2380473532a2a20118eb374d796ffea3505cc64aba5a06408d2433eed04606",
+        "simulationSha256": "c2878699a08919767aced139296265cdb4917a417fcfad85e3c9ad4e2191954b",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T16:21:42.752563+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A10-S1-yituliu",
+      "sample": "A10",
+      "layout": "S1",
+      "site": "yituliu",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 314.39253182777287,
+        "lmd": 65785.3274,
+        "exp": 30974.3,
+        "goldProduced": 83.0666,
+        "goldConsumed": 120.2924,
+        "goldNet": -37.2258,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "573d9c01ea8386a556fa86da932396a35954260d9187b1a23b0c34bd4153435d",
+        "simulationSha256": "7c344b9c8f9e2bbbf7e8d68f46bd1a193bfbbc448c7fd98ccb83674da852813b",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:41:52.617Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A10-S1-riic",
+      "sample": "A10",
+      "layout": "S1",
+      "site": "riic",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 314.62081363965063,
+        "lmd": 59281.0067,
+        "exp": 31900,
+        "goldProduced": 92.75,
+        "goldConsumed": 107.6995,
+        "goldNet": -14.9495,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "9ba930429013f95508112e41ed3eef44f5f2676a8bacd85a009ccf9eb5089919",
+        "simulationSha256": "fe6a5715fe1a850e58d3a435a3e8ae8cd0b7c6e90642cf3b19937f36d0dbfd0c",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T04:15:40.621734+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A10-S2-maatool",
+      "sample": "A10",
+      "layout": "S2",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 336.52201238253275,
+        "lmd": 57180.549,
+        "exp": 45124.4,
+        "goldProduced": 70.2667,
+        "goldConsumed": 105.1166,
+        "goldNet": -34.8499,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "9d6d6d7220ab19245c6322be547aace773314c9731d37424275a141d52634544",
+        "simulationSha256": "2706acd6e20d9066b699179397a75897f86a0610fe9eae164bfcfb2a31ea1464",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T16:22:36.115507+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A10-S2-yituliu",
+      "sample": "A10",
+      "layout": "S2",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 2,
+      "stable": true,
+      "iterations": 4,
+      "resources": {
+        "sanity": 336.0248268256769,
+        "lmd": 59647.2157,
+        "exp": 44106.8,
+        "goldProduced": 68.9334,
+        "goldConsumed": 110.0499,
+        "goldNet": -41.1165,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "cf2bce3c6795a3c5984fc535267179b0d4e855a8f151a4288bfb1ad7352bfadc",
+        "simulationSha256": "4654e01bb79aececbeb83aa9fe785bc96d8f784c6d1c6cebc5c2d30b4a2f1c5c",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:41:57.055Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A10-S2-riic",
+      "sample": "A10",
+      "layout": "S2",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 6,
+      "stable": false,
+      "iterations": 12,
+      "resources": {
+        "sanity": 331.5701398071615,
+        "lmd": 52545.6236,
+        "exp": 44480,
+        "goldProduced": 77.825,
+        "goldConsumed": 97.2616,
+        "goldNet": -19.4366,
+        "orundum": 0,
+        "shardsProduced": 0,
+        "shardsConsumed": 0,
+        "shardsNet": 0,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": null,
+      "provenance": {
+        "originalSha256": "1b41bd7c1c5e15f1b1924b561d93113bcbd3d838e03892dde83378b6eacc88d1",
+        "simulationSha256": "c0c677c72e301977b615c2c3e8f4df5c4cdfa29412f5bf6c587dfe2436edf86f",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T04:15:51.519702+00:00",
+        "retainedOriginal": true
+      }
+    },
+    {
+      "id": "A10-S3-maatool",
+      "sample": "A10",
+      "layout": "S3",
+      "site": "maatool",
+      "passed": true,
+      "moodErrors": 0,
+      "stable": true,
+      "iterations": 2,
+      "resources": {
+        "sanity": 174.8496934988646,
+        "lmd": 52518.6021,
+        "exp": 0,
+        "goldProduced": 82.8667,
+        "goldConsumed": 98.4594,
+        "goldNet": -15.5927,
+        "orundum": 583.2,
+        "shardsProduced": 64.32,
+        "shardsConsumed": 58.32,
+        "shardsNet": 6,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 161.67231888366814,
+        "materialCost": 895.7952,
+        "dailyCost": 1057.4675188836682,
+        "perOrundum": 1.8132159102943555,
+        "baselineScenario": "S2",
+        "baselineStatus": "unconfirmed"
+      },
+      "provenance": {
+        "originalSha256": "43693af4e21204d08dbe2661ffed69ad911eac97b773dc76505fd013a7ca9c6c",
+        "simulationSha256": "e6de7db371c05e27d0e4c2a8e52a6cdb6fdf7e48c6d603e936928a59ce4b23bf",
+        "generationVersion": "2.0.1141@c3ae7f97bb6d2b32c3181f0b962e754acca59b57",
+        "generatedAt": "2026-11-03T16:23:37.956097+00:00",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A10-S3-yituliu",
+      "sample": "A10",
+      "layout": "S3",
+      "site": "yituliu",
+      "passed": false,
+      "moodErrors": 8,
+      "stable": true,
+      "iterations": 5,
+      "resources": {
+        "sanity": 205.31643208978159,
+        "lmd": 65785.3274,
+        "exp": 0,
+        "goldProduced": 85.7332,
+        "goldConsumed": 120.2924,
+        "goldNet": -34.5592,
+        "orundum": 488,
+        "shardsProduced": 44,
+        "shardsConsumed": 48.8,
+        "shardsNet": -4.8,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 130.7083947358953,
+        "materialCost": 749.568,
+        "dailyCost": 880.2763947358953,
+        "perOrundum": 1.8038450711801135,
+        "baselineScenario": "S2",
+        "baselineStatus": "invalid"
+      },
+      "provenance": {
+        "originalSha256": "b205daaeba7147335648988235028d0c8142d63d3e5e5c5c348efb5148ce816a",
+        "simulationSha256": "864c158d12f4a8aee0083c7782720dfe36cd8eeaae7a4f39299fdebd45a7d55b",
+        "generationVersion": "v20261025.1958",
+        "generatedAt": "2026-11-03T15:42:03.387Z",
+        "retainedOriginal": false
+      }
+    },
+    {
+      "id": "A10-S3-riic",
+      "sample": "A10",
+      "layout": "S3",
+      "site": "riic",
+      "passed": false,
+      "moodErrors": 6,
+      "stable": true,
+      "iterations": 7,
+      "resources": {
+        "sanity": 204.63207697100432,
+        "lmd": 61828.9519,
+        "exp": 0,
+        "goldProduced": 92.175,
+        "goldConsumed": 111.8639,
+        "goldNet": -19.6889,
+        "orundum": 446.6,
+        "shardsProduced": 40.5156,
+        "shardsConsumed": 44.66,
+        "shardsNet": -4.1444,
+        "recyclingSanity": 0
+      },
+      "opportunityCost": {
+        "foregoneProduction": 126.9380628361572,
+        "materialCost": 685.9775999999999,
+        "dailyCost": 812.9156628361571,
+        "perOrundum": 1.8202321156205936,
+        "baselineScenario": "S2",
+        "baselineStatus": "invalid"
+      },
+      "provenance": {
+        "originalSha256": "b3f2489da43642f5bc617ae43d744e67a1b1e5353fa5d5ac7ba386ca4c1a981b",
+        "simulationSha256": "c74b95e737478ae196729144b05598556097c0a9a295772ba5020f2782eeb6f2",
+        "generationVersion": "d098c83f5d419489826bdf7e1fe0c662f499a84e",
+        "generatedAt": "2026-10-31T04:16:02.193070+00:00",
+        "retainedOriginal": true
+      }
+    }
+  ],
+  "conflicts": [
+    {
+      "caseId": "A01-S2-yituliu",
+      "operator": "香草",
+      "start": 0,
+      "needed": 5.2,
+      "shifts": [
+        {
+          "hours": 8,
+          "roomKind": "manufacture",
+          "roomIndex": 4
+        },
+        {
+          "hours": 8,
+          "roomKind": "manufacture",
+          "roomIndex": 3
+        },
+        {
+          "hours": 8,
+          "roomKind": null,
+          "roomIndex": null
+        }
+      ]
+    },
+    {
+      "caseId": "A08-S2-riic",
+      "operator": "多萝西",
+      "start": 0,
+      "needed": 7.8,
+      "shifts": [
+        {
+          "hours": 12,
+          "roomKind": "manufacture",
+          "roomIndex": 4
+        },
+        {
+          "hours": 6,
+          "roomKind": "manufacture",
+          "roomIndex": 4
+        },
+        {
+          "hours": 6,
+          "roomKind": "manufacture",
+          "roomIndex": 4
+        }
+      ]
+    }
+  ]
+}
