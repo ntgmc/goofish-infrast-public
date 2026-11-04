@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
 import { useAppReducedMotion } from '../../lib/motion-preference'
-import { NextIcon as ArrowRight, SuccessIcon as Check, ExpandIcon as ChevronDown, BreadcrumbIcon, ExportIcon as Download, LoginIcon as LogIn, MenuIcon as Menu, GenerateIcon, LoadingIcon, ConfigIcon as Settings2, DataSourceIcon as ShieldCheck, InfoIcon as Sparkles, CloseIcon as X, PreviewIcon, SampleIcon } from '../../components/icons'
+import { NextIcon as ArrowRight, ExpandIcon as ChevronDown, BreadcrumbIcon, ExportIcon as Download, LoginIcon as LogIn, MenuIcon as Menu, GenerateIcon, LoadingIcon, ConfigIcon as Settings2, DataSourceIcon as ShieldCheck, InfoIcon as Sparkles, CloseIcon as X, PreviewIcon, SampleIcon } from '../../components/icons'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import Link from '../../components/InternalLink'
 import { copy } from '../../copy'
@@ -276,20 +276,17 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           <WorkspaceSections section={displayedSection} session={guardedSession} workflow={workflow} generationProgress={generationProgress} onAccountAdded={accountAdded} onToolDirtyChange={setToolDirty} onOpenProfile={(profile) => openProfile(profile, section === 'skland' ? 'skland' : section === 'manual-tool' ? 'manual-tool' : 'overview')} onNavigate={navigateSection} onConfig={() => openPanel('config')} onOperators={() => openPanel('operators')} generationDisabledReason={generationDisabledReason}
             firstSchedule={firstSchedule} configConfirmed={configConfirmed} />
           <div hidden={displayedSection !== 'overview'}>
-          {sample ? <div className="v2-page-title v2-start-schedule">
-            <div><h1>{text.startTitle}</h1><p>{text.startDescription}</p></div>
-            <button type="button" className="v2-button v2-button-primary" disabled={busy || loadingResult || Boolean(startDisabledReason)} aria-describedby={startDisabledReason ? 'v2-start-unavailable' : undefined} onClick={() => navigateSection('generation')}><GenerateIcon size={18} aria-hidden="true" />{text.generateMine}</button>
-            {startDisabledReason && <p id="v2-start-unavailable" role="status">{startDisabledReason}</p>}
-          </div> : <div className="v2-page-title"><h1>{text.title}</h1></div>}
-          <InventoryDepletionWarning result={result} className="v2-inventory-warning" action={<button type="button" className="v2-button v2-button-secondary" onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" />{text.configure}</button>} />
-          <div className={`v2-ready-banner${sample ? ' v2-example-banner' : ''}`}>
-            <div className="v2-ready-status"><span className="v2-ready-icon"><Check size={22} strokeWidth={2} aria-hidden="true" /></span>
-              <h2>{sample ? text.exampleSchedule : text.resultReady}<span className="v2-ready-tag">{sample ? text.sample : SCHEDULE_MODE_LABELS[resultMode]}</span></h2></div>
-            <div className="v2-banner-actions"><button type="button" className="v2-button v2-button-white v2-config-button" aria-label={text.configure} title={text.configure} onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" /><span>{text.configure}</span></button>
-              {!sample && <button type="button" className="v2-button v2-button-primary" disabled={busy || loadingResult || Boolean(generationDisabledReason)} title={generationDisabledReason ?? undefined}
-                onClick={() => onGenerate?.()}>{busy ? <LoadingIcon size={16} className="v2-spin" aria-hidden="true" /> : <GenerateIcon size={16} aria-hidden="true" />}{busy ? text.generating : text.regenerate}</button>}
+          <div className="v2-page-title v2-overview-heading">
+            <div className="v2-overview-title"><h1>{sample ? text.exampleSchedule : text.title}</h1><span className="v2-ready-tag">{sample ? text.sample : SCHEDULE_MODE_LABELS[resultMode]}</span></div>
+            <div className="v2-banner-actions">
+              <button type="button" className="v2-button v2-button-white v2-config-button" aria-label={text.configure} title={text.configure} onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" /><span>{text.configure}</span></button>
+              <button type="button" className="v2-button v2-button-primary" disabled={busy || loadingResult || Boolean(sample ? startDisabledReason : generationDisabledReason)}
+                aria-describedby={sample && startDisabledReason ? 'v2-start-unavailable' : undefined} title={sample ? startDisabledReason ?? undefined : generationDisabledReason ?? undefined}
+                onClick={() => sample ? navigateSection('generation') : onGenerate?.()}>{busy ? <LoadingIcon size={16} className="v2-spin" aria-hidden="true" /> : <GenerateIcon size={16} aria-hidden="true" />}{busy ? text.generating : sample ? text.generateMine : text.regenerate}</button>
             </div>
+            {sample && startDisabledReason && <p id="v2-start-unavailable" role="status">{startDisabledReason}</p>}
           </div>
+          <InventoryDepletionWarning result={result} className="v2-inventory-warning" action={<button type="button" className="v2-button v2-button-secondary" onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" />{text.configure}</button>} />
           <AnimatePresence initial={false}>
           {(loadingResult || error || notice || downloadNotice || configChanged) && <FeedbackRegion key="feedback">
           <div className={`v2-feedback ${error ? 'v2-feedback-error' : ''}`} role={error ? 'alert' : 'status'} aria-live="polite">
@@ -301,12 +298,10 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           </AnimatePresence>
           {generationProgress}
           {children}
-          <div className={`v2-results-grid ${view !== 'schedule' ? 'v2-results-wide' : ''}`}>
+          <div className="v2-results-grid">
           <div className="v2-overview-metrics"><ProductionSummary result={result} prepared={prepared} sample={sample} userId={session.user?.id} profileId={session.activeProfile?.id} resultId={exportResultId}
             resultConfig={workflow?.historyItem?.result === result ? workflow.historyItem.config : undefined}
             history={[...(workflow?.resultHistory ?? []), ...(workflow?.archivedResults ?? [])]} newResult={Boolean(workflow?.currentResult || workflow?.finalResult)} onConfigure={() => openPanel('config')} /></div>
-          {view === 'schedule' && <ScheduleContext result={result} prepared={prepared} config={config} operators={owned} sampleOperators={sampleOperators}
-            onConfigure={() => openPanel('config')} onOperators={() => openPanel('operators')} />}
           <div className="v2-content-tabs" role="group" aria-label={text.resultTabs}>
             {([['schedule', text.scheduleTab], ['analysis', text.analysisTab], ...(showManual ? [['manual', text.manualTab] as const] : []), ...(restrictedPreview || !sample && (workflow?.suggestions?.length || result.upgrade_suggestions_status) ? [['training', text.trainingTab] as const] : [])] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => { setView(id); if (id === 'manual') setManualOpened(true) }}>
               {label}{view === id && <MotionNavIndicator layoutId="result-tab" variant="underline" />}
@@ -332,6 +327,8 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
             )}
           </V2Transition>
           </div>
+          {view === 'schedule' && <ScheduleContext result={result} prepared={prepared} config={config} operators={owned} sampleOperators={sampleOperators}
+            onConfigure={() => openPanel('config')} onOperators={() => openPanel('operators')} />}
           </div>
           <div className="v2-sample-notice"><span className="v2-notice-icon"><Sparkles size={16} /></span><p>{sample && <>{text.sampleHint} </>}{text.estimateNotice}</p>{sample && <button type="button" onClick={() => openPanel('account')}>{session.user ? text.account : text.login}<ArrowRight size={14} /></button>}</div>
           </div>

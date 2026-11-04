@@ -425,7 +425,7 @@ describe('V2 results-first workspace', () => {
     expect(loadMore).toHaveBeenCalledOnce()
   })
 
-  it('waits for service and login restoration before showing a confirmed guest example', () => {
+  it('waits for service and login restoration before showing a confirmed guest example', async () => {
     session.authStatus = 'loading'
     mocks.features.mockReturnValue({ status: 'loading', features: DEFAULT_SITE_FEATURES, retry: vi.fn() })
     const page = mount()
@@ -448,6 +448,8 @@ describe('V2 results-first workspace', () => {
     ])
     const count = SAMPLE_OPERATORS.filter((operator) => operator.own).length
     expect(navigation.getByRole('button', { name: copy.v2.operators })).toHaveTextContent(copy.v2.guestNavigation.operatorCount(count))
+    expect(screen.getByText(copy.v2.contextDetails, { selector: 'summary > span' }).closest('details')).not.toHaveAttribute('open')
+    await userEvent.click(screen.getByText(copy.v2.contextDetails, { selector: 'summary > span' }))
     expect(screen.getByText(copy.v2.guestNavigation.sampleOwned(count))).toBeVisible()
     expect(navigation.getByText(copy.v2.navigationMore).closest('details')).not.toHaveAttribute('open')
     expect(navigation.queryByRole('button', { name: copy.v2.settings })).not.toBeInTheDocument()
@@ -461,6 +463,7 @@ describe('V2 results-first workspace', () => {
     expect(personalNavigation.queryByRole('link', { name: copy.v2.guestNavigation.example })).not.toBeInTheDocument()
     expect(personalNavigation.getByRole('link', { name: copy.v2.history })).toHaveAttribute('href', '/v2?section=plans&profile_id=profile-1')
     expect(personalNavigation.getByRole('button', { name: copy.v2.operators }).querySelector('small')).toHaveTextContent(/^1$/)
+    await userEvent.click(screen.getByText(copy.v2.contextDetails, { selector: 'summary > span' }))
     expect(screen.getByText(copy.v2.owned(1))).toBeVisible()
     expect(screen.queryByText(copy.v2.guestNavigation.sampleOwned(1))).not.toBeInTheDocument()
   })
@@ -676,6 +679,7 @@ describe('V2 results-first workspace', () => {
     const user = userEvent.setup()
     mount()
     expect(screen.getByRole('region', { name: copy.v2.exp })).toHaveTextContent(`32,400${copy.v2.expUnit}`)
+    await user.click(screen.getByText(copy.v2.contextDetails, { selector: 'summary > span' }))
     const output = within(screen.getByRole('heading', { name: copy.v2.dailyOutput }).closest('section')!)
     expect(output.getByText('32,400').closest('.v2-output-row')).toHaveTextContent(`经验32,400${copy.v2.expUnit}`)
     expect(screen.queryByText(copy.v2.totalEfficiency)).not.toBeInTheDocument()
@@ -958,6 +962,7 @@ describe('V2 results-first workspace', () => {
     mount()
     const originalRoom = within(screen.getByRole('tabpanel')).getByRole('button', { name: /贸易站.*推进之王/ })
     const originalPane = originalRoom.closest('.v2-transition-pane')
+    const originalSlot = originalRoom.querySelector('.v2-operator')
     const second = screen.getByRole('tab', { name: /第2班/ })
     await user.click(second)
     expect(second).toHaveAttribute('aria-selected', 'true')
@@ -969,6 +974,7 @@ describe('V2 results-first workspace', () => {
     expect(third).toHaveFocus()
     expect(third).toHaveAttribute('aria-selected', 'true')
     expect(within(screen.getByRole('tabpanel')).getByRole('button', { name: /贸易站.*巫恋/ })).toBe(originalRoom)
+    expect(originalRoom.querySelector('.v2-operator')).toBe(originalSlot)
     await user.click(screen.getByRole('button', { name: /贸易站.*巫恋/ }))
     expect(await screen.findByRole('dialog')).toHaveTextContent(copy.v2.roomDetails)
     await dismissDrawer(user)
@@ -989,6 +995,7 @@ describe('V2 results-first workspace', () => {
     expect(within(screen.getByRole('tabpanel')).getByText('菲亚梅塔 → 德克萨斯')).toBeInTheDocument()
     expect(within(screen.getByRole('tabpanel')).queryByText('菲亚梅塔 → 但书')).not.toBeInTheDocument()
     const room = within(screen.getByRole('tabpanel')).getByRole('button', { name: /贸易站.*推进之王/ })
+    await user.click(screen.getByText(copy.v2.contextDetails, { selector: 'summary > span' }))
     const output = screen.getByRole('heading', { name: copy.v2.dailyOutput }).closest('section')
     const config = screen.getByRole('heading', { name: copy.v2.currentConfig }).closest('section')
     await user.click(screen.getByRole('button', { name: copy.v2.list }))
@@ -1037,6 +1044,24 @@ describe('V2 results-first workspace', () => {
     expect(board.getByRole('button', { name: /贸易站.*巫恋/ })).toBeInTheDocument()
     expect(board.queryByRole('button', { name: /贸易站.*推进之王/ })).not.toBeInTheDocument()
     expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
+  })
+
+  it('keeps occupants in their slots and exposes only the latest team while animations overlap', async () => {
+    vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(0)
+    const user = userEvent.setup()
+    render(<MotionPreferenceProvider><MemoryRouter initialEntries={['/v2']}><V2Page /></MemoryRouter></MotionPreferenceProvider>)
+    const room = within(screen.getByRole('tabpanel')).getByRole('button', { name: /贸易站.*推进之王/ })
+    const slot = room.querySelector<HTMLElement>('.v2-operator')!
+    await user.click(screen.getByRole('tab', { name: /第3班/ }))
+    expect(room.querySelector('.v2-operator')).toBe(slot)
+    expect(within(slot).getByRole('img', { name: '巫恋' })).toBeInTheDocument()
+    expect(within(slot).queryByRole('img', { name: '但书' })).not.toBeInTheDocument()
+    expect(slot.querySelector('[aria-hidden="true"]')).toHaveAttribute('inert')
+    await user.click(screen.getByRole('tab', { name: /第2班/ }))
+    await user.click(screen.getByRole('tab', { name: /第1班/ }))
+    expect(within(slot).getByRole('img', { name: '但书' })).toBeInTheDocument()
+    expect(within(slot).queryByRole('img', { name: '巫恋' })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('tabpanel')).getByRole('button', { name: /贸易站.*推进之王/ })).toBe(room)
   })
 
   it('applies the shared reduced-animation setting from V2 without generating or losing the selected team', async () => {
@@ -1645,6 +1670,7 @@ describe('V2 results-first workspace', () => {
     expect(document.querySelectorAll('.v2-metrics section')[3]).toBe(screen.getByRole('region', { name: copy.v2.shortTermPulls }))
     expect(screen.getByRole('region', { name: copy.v2.shortTermPulls })).toHaveTextContent(`5.2${copy.v2.pullsPer30Days}`)
     expect(screen.queryByRole('region', { name: copy.v2.sanity })).not.toBeInTheDocument()
+    await user.click(screen.getByText(copy.v2.contextDetails, { selector: 'summary > span' }))
     const panel = within(screen.getByRole('heading', { name: copy.v2.dailyOutput }).closest('section')!)
     expect(panel.getByText('合成玉')).toBeInTheDocument()
     expect(panel.getByText('103.5')).toBeInTheDocument()

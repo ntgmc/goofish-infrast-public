@@ -1,4 +1,4 @@
-import { NextIcon as ArrowRight, EditIcon as ArrowUpRight, DailyOutputIcon as CalendarClock, ManufactureIcon as Factory, PowerPlantIcon as Zap } from '../../components/icons'
+import { NextIcon as ArrowRight, EditIcon as ArrowUpRight, ExpandIcon as ChevronDown, DailyOutputIcon as CalendarClock, ManufactureIcon as Factory, PowerPlantIcon as Zap } from '../../components/icons'
 import ProductIcon from '../../components/ProductIcon'
 import { AnimatedValue } from '../../components/MotionPrimitives'
 import { formatAmount, type PreparedResult } from '../../components/result-panel/formatters'
@@ -22,7 +22,9 @@ export default function ScheduleContext({ result, prepared, config, operators, s
 }) {
   const shortTermOrundum = prepared.orundumEconomy?.short_term_orundum ?? prepared.productionStats.orundum
   const hours = parseShiftHours(config.shift_hours) ?? [8, 8, 8]
-  return <aside className="v2-result-aside">
+  return <aside className="v2-result-aside"><details className="v2-context-disclosure">
+    <summary><span>{text.contextDetails}</span><span className="v2-context-overview">{config.layout} · {hours.join(' / ')}h</span><ChevronDown size={16} aria-hidden="true" /></summary>
+    <div className="v2-context-body">
     <section className="v2-panel v2-production-panel">
       <div className="v2-panel-heading"><h2>{text.dailyOutput}</h2><span className="v2-output-clock"><CalendarClock size={16} aria-hidden="true" /></span></div>
       <div className="v2-output-grid">
@@ -46,7 +48,8 @@ export default function ScheduleContext({ result, prepared, config, operators, s
         <div><dt>{text.duration}</dt><dd>{hours.join(' / ')}h</dd></div><div><dt>{text.drones}</dt><dd>{config.drones?.enable ? config.drones.auto ? text.automatic : text.manual : text.disabled}</dd></div></dl>
       <button className="v2-operator-summary" type="button" onClick={onOperators}><div className="v2-avatar-stack">{operators.slice(0, 4).map((operator) => <Avatar key={operator.id} operator={operator} small />)}</div><span><strong>{text.operatorData}</strong><small>{sampleOperators ? text.guestNavigation.sampleOwned(operators.length) : text.owned(operators.length)}</small></span><ArrowRight size={15} aria-hidden="true" /></button>
     </section>
-  </aside>
+    </div>
+  </details></aside>
 }
 
 function OutputRow({ product, value, available = true }: { product: string; value: number; available?: boolean }) {

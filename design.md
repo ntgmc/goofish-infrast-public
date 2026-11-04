@@ -116,12 +116,19 @@ it deliberately when changing the shared design.
   target and return to their parent. Support narrow screens and enlarged text.
   Use automatic scrollbars without a reserved gutter or asymmetric padding when
   content fits. Let the dialog primitive compensate for page scroll locking.
-- Use one production summary strip and one schedule panel with open room regions. Operator portraits
-  and efficiency carry the visual weight.
-- Keep generation and export together beside result status. Copper marks
-  the primary action and focus; station colors identify room types only.
-- Keep motion quiet: short page and metric entrances, shared active indicators,
-  result and shift crossfades, card layout transitions, and drawer enter/exit.
+- Use one production summary strip and a full-width schedule panel. Wide screens
+  show three room columns. Put configuration and detailed production below the
+  schedule in a native disclosure; keep its DOM order aligned with its position.
+  Operator portraits and efficiency carry the visual weight.
+- Keep generation beside the overview title and export beside result navigation.
+  Copper marks the primary action and focus; station colors identify room types
+  through the same icon backgrounds on desktop and mobile.
+- V2 pages show the destination immediately, with a 180ms, 4px entrance and no
+  first-load animation. Preserve mounted drafts during navigation. Keep room
+  shells and operator slots across shifts; crossfade only their occupants and
+  exclude departing occupants from interaction and accessibility. Animate room
+  geometry over 280ms while keeping text and portraits at their original scale. Keep shared active
+  indicators, result crossfades, and drawer enter/exit.
   Reduced motion removes translation, scaling, layout transitions, and chart
   drawing; retained opacity transitions stay at or below 150ms.
 - The public result layout at `riic.autos` informed result hierarchy,

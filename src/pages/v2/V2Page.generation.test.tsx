@@ -249,7 +249,7 @@ it.each(['generation', 'overview'])('shows a failed configuration save beside th
   expect(alert).toBeVisible()
   expect(alert).toHaveTextContent(copy.optimize.generation.save_failed)
   const actionArea = section === 'generation' ? document.querySelector('.v2-generation-execution')!
-    : screen.getByRole('button', { name: generateLabel }).closest('.v2-ready-banner')!.parentElement!
+    : screen.getByRole('button', { name: generateLabel }).closest('.v2-overview-heading')!.parentElement!
   expect(actionArea).toContainElement(alert)
   expect(patches[0]!.config.layout).toBe('2-4-3')
   expect(submissions()).toHaveLength(0)
