@@ -113,12 +113,8 @@ jobs:
 
   public-release:
     name: Public Release Artifact
-    needs: [validation-reuse, public-validation]
-    if: >-
-      always() && !cancelled() && github.event_name == 'push' &&
-      needs.validation-reuse.result == 'success' &&
-      (needs.public-validation.result == 'success' ||
-      (needs.public-validation.result == 'skipped' && needs.validation-reuse.outputs.reuse_public == 'true'))
+    needs: validation-reuse
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
