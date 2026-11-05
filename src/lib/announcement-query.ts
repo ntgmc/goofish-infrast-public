@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query'
 import { copy } from '../copy'
 import { apiJson } from './api-client'
+import { markAnnouncementRead } from './announcement-reminders'
 import type { AnnouncementPageResponse, AnnouncementPublicResponse, UserAnnouncementRead } from './types'
 
 export function usePublicAnnouncementsQuery(enabled = true) {
@@ -19,11 +20,15 @@ export function userAnnouncementsKey(userId: string | null) {
 }
 
 export function useUserAnnouncementsQuery(userId: string | null) {
-  return useQuery({
+  const query = useQuery({
     queryKey: [...userAnnouncementsKey(userId), 'all'],
     enabled: Boolean(userId),
     queryFn: ({ signal }) => apiJson<UserAnnouncementsResponse>('/api/user/announcements', { signal, fallbackMessage: copy.dashboard.pages_tool_dashboard_AnnouncementsSection_001 }),
   })
+  useEffect(() => {
+    if (userId) rememberAnnouncementReads(query.data)
+  }, [userId, query.data])
+  return query
 }
 
 export function useAnnouncementPageQuery(userId: string | null, page: number, unreadOnly: boolean, announcementId: string) {
@@ -41,11 +46,18 @@ export function useAnnouncementPageQuery(userId: string | null, page: number, un
     queryFn: ({ signal }) => apiJson<AnnouncementPageResponse>(apiUrl, { signal }),
   })
   useEffect(() => {
+    if (userId) rememberAnnouncementReads(query.data)
     if (query.data && (queryKey !== pageKey || query.data.page !== page)) {
       client.setQueryData([...pageKey.slice(0, -2), query.data.page, unreadOnly], query.data, { updatedAt: query.dataUpdatedAt })
     }
-  }, [client, query.data, query.dataUpdatedAt, queryKey, pageKey, page, unreadOnly])
+  }, [client, query.data, query.dataUpdatedAt, queryKey, pageKey, page, unreadOnly, userId])
   return { ...query, queryKey, apiUrl }
+}
+
+function rememberAnnouncementReads(data: UserAnnouncementsResponse | undefined) {
+  for (const { announcement, read_at } of data?.announcements ?? []) {
+    if (read_at) markAnnouncementRead(announcement)
+  }
 }
 
 export async function updateUserAnnouncementQueries(client: QueryClient, userId: string, data: UserAnnouncementsResponse, pageKey?: QueryKey) {

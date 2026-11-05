@@ -11,6 +11,34 @@ import {
 } from './public-content'
 
 describe('public content settings', () => {
+  it('updates saved V1 workspace FAQ defaults while preserving order, removed entries, and the stored input', () => {
+    const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 15, updated_at: '2026-11-05T00:00:00.000Z' }
+    stored.faq.items = copy.publicContent.legacy_v1_workspace_faq.map((item) => ({ ...item, action: 'none' as const })).reverse()
+    stored.faq.items = stored.faq.items.filter((item) => item.id !== 'requirements')
+    const original = structuredClone(stored)
+
+    const migrated = normalizePublicContentSettings(stored)
+    expect(migrated.faq.items).toEqual(original.faq.items.map((item) => DEFAULT_PUBLIC_CONTENT_DRAFT.faq.items.find((entry) => entry.id === item.id)))
+    expect(migrated.pricing).toEqual(original.pricing)
+    expect(migrated.updated_at).toBe(original.updated_at)
+    expect(migrated.defaults_revision).toBe(PUBLIC_CONTENT_DEFAULTS_REVISION)
+    expect(normalizePublicContentSettings(migrated)).toEqual(migrated)
+    expect(stored).toEqual(original)
+  })
+
+  it.each(['question', 'answer', 'action'] as const)('preserves FAQ customizations to %s and content saved at the current revision', (field) => {
+    const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 15 }
+    const previous = copy.publicContent.legacy_v1_workspace_faq.find((item) => item.id === 'cdk-account')!
+    Object.assign(stored.faq.items.find((item) => item.id === previous.id)!, previous, {
+      [field]: field === 'action' ? 'qq_group' : '管理员自定义说明',
+    })
+    expect(normalizePublicContentSettings(stored).faq).toEqual(stored.faq)
+
+    Object.assign(stored.faq.items.find((item) => item.id === previous.id)!, previous)
+    stored.defaults_revision = PUBLIC_CONTENT_DEFAULTS_REVISION
+    expect(normalizePublicContentSettings(stored).faq).toEqual(stored.faq)
+  })
+
   it('refreshes saved comparison defaults in place without changing purchase settings or the stored input', () => {
     const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 14, updated_at: '2026-11-02T00:00:00.000Z' }
     stored.pricing.comparison_rows = copy.publicContent.legacy_pricing_comparison.map((row, index) => ({ ...row, id: `comparison-${index + 1}` }))

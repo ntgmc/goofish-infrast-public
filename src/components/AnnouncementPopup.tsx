@@ -4,13 +4,11 @@ import { useQueryClient } from '@tanstack/react-query'
 import { updateUserAnnouncementQueries, useUserAnnouncementsQuery, type UserAnnouncementsResponse } from '../lib/announcement-query'
 import type { Announcement } from '../lib/types'
 import { apiJson, apiVoid, getApiErrorMessage } from '../lib/api-client'
-import { getAnnouncementReminderState } from '../lib/announcement-reminders'
+import { getAnnouncementReminderState, isAnnouncementRead, markAnnouncementRead } from '../lib/announcement-reminders'
 import AnnouncementMarkdown from './AnnouncementMarkdown'
 import { copy } from '../copy/index'
 
-const READ_PREFIX = 'maa-announcement-read:'
 const VISIT_SHOWN_KEY = 'maa-announcement-popup-shown'
-const sessionReadVersions = new Set<string>()
 let visitShownWithoutStorage = false
 const FOCUSABLE_SELECTOR = [
   'a[href]',
@@ -115,7 +113,8 @@ export default function AnnouncementPopup({ announcements, userId, onUnreadCount
         await updateUserAnnouncementQueries(client, userId, payload)
         if (currentUserRef.current !== userId) return
         if (typeof payload.unread_count === 'number') onUnreadCountChange?.(payload.unread_count)
-      } else markAnnouncementRead(current)
+      }
+      markAnnouncementRead(current)
       void reportAnnouncementEvent('announcement_read', current, 'popup_read')
       dismiss()
     } catch (cause) {
@@ -182,18 +181,6 @@ function isAvailableFocusTarget(element: HTMLElement): boolean {
   return style.display !== 'none' && style.visibility !== 'hidden'
 }
 
-function isAnnouncementRead(announcement: Announcement): boolean {
-  if (sessionReadVersions.has(announcementVersionKey(announcement))) return true
-  try { return window.localStorage.getItem(readKey(announcement)) === announcement.updated_at }
-  catch { return false }
-}
-
-function markAnnouncementRead(announcement: Announcement): void {
-  sessionReadVersions.add(announcementVersionKey(announcement))
-  try { window.localStorage.setItem(readKey(announcement), announcement.updated_at) }
-  catch { /* Session memory retains the read state when storage is unavailable. */ }
-}
-
 async function reportAnnouncementEvent(
   event: 'announcement_impression' | 'announcement_read',
   announcement: Announcement,
@@ -205,8 +192,4 @@ async function reportAnnouncementEvent(
       json: { event, announcement_id: announcement.id, announcement_kind: announcement.kind, announcement_version: announcement.updated_at, source },
     })
   } catch { /* Existing observation failures must not prevent dismissal. */ }
-}
-
-function readKey(announcement: Announcement): string {
-  return `${READ_PREFIX}${announcement.id}`
 }

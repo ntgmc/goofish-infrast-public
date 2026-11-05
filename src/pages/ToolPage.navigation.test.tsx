@@ -129,7 +129,7 @@ describe('ToolPage route guards', () => {
       license: { operators: [], config: {}, order_hash: 'order' },
       flushConfigSave,
     })
-    await user.click(await screen.findByRole('button', { name: '前往保存与导出' }))
+    await user.click(await screen.findByRole('button', { name: '查看历史排班' }))
     expect(flushConfigSave).toHaveBeenCalledOnce()
     await waitFor(() => expect(router.state.location.pathname).toBe(saved ? '/tool/optimize/plans' : '/tool/setup/config'))
     expect(router.state.location.search).toBe(saved ? '?profile_id=expiring-profile' : '')

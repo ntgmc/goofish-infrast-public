@@ -95,6 +95,8 @@ textarea.v2-input { resize: vertical; }
 .v2-add-account { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.2fr); gap: var(--space-xl); }
 .v2-account-methods { display: flex; flex-direction: column; gap: var(--space-sm); button { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: var(--space-xs) var(--space-sm); text-align: left; padding: var(--space-md); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-panel); } svg { color: var(--v2-accent); } span { grid-column: 2; color: var(--v2-muted); line-height: 1.7; font-size: var(--text-sm); } button[aria-pressed="true"] { border-color: var(--v2-accent); background: var(--v2-paper); } }
 .v2-account-registration { padding: var(--space-lg); background: var(--v2-paper); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-panel); }
+.v2-profile-upgrade-entry { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-sm) var(--space-lg); margin-block: var(--space-md); padding: var(--space-md); background: var(--v2-accent-soft); border-radius: var(--radius-v2-panel); > div:first-child { flex: 1 1 16rem; min-width: 0; } strong { color: var(--v2-accent); font-size: var(--text-sm); } p { margin-top: var(--space-2xs); color: var(--v2-secondary); font-size: var(--text-sm); line-height: 1.75; } .v2-actions { margin-top: 0; } }
+.v2-profile-upgrade-form { max-width: 44rem; }
 
 /* Hallmark · component: first schedule checklist · theme: existing V2
  * states: current, completed, upcoming · pre-emit critique: P5 H5 E4 S5 R5 V4 */

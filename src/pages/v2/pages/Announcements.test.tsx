@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { act, cleanup, render, screen, waitFor, within } from '../../../test/query-render'
 import userEvent from '@testing-library/user-event'
@@ -8,9 +9,10 @@ import { copy } from '../../../copy'
 import type { AnnouncementPageResponse, UserAnnouncementRead } from '../../../lib/types'
 import type { V2Session } from '../OptionsDrawer'
 import Announcements from './Announcements'
+import AnnouncementPopup from '../../../components/AnnouncementPopup'
 
 const mocks = vi.hoisted(() => ({ api: vi.fn(), unread: vi.fn() }))
-vi.mock('../../../lib/api-client', () => ({ apiJson: mocks.api, getApiErrorMessage: (_error: unknown, fallback: string) => fallback }))
+vi.mock('../../../lib/api-client', () => ({ apiJson: mocks.api, apiVoid: vi.fn(), getApiErrorMessage: (_error: unknown, fallback: string) => fallback }))
 
 let items: UserAnnouncementRead[]
 function pageData(page: number, unreadOnly = false): AnnouncementPageResponse {
@@ -22,6 +24,8 @@ function pageData(page: number, unreadOnly = false): AnnouncementPageResponse {
 }
 
 beforeEach(() => {
+  window.localStorage.clear()
+  window.sessionStorage.clear()
   items = Array.from({ length: 23 }, (_, index) => ({
     announcement: {
       id: `popup-${index}`, kind: 'popup', active: true, title: `Announcement ${index}`, body: `Body ${index}`,
@@ -32,6 +36,7 @@ beforeEach(() => {
     const params = new URL(url, 'https://example.test').searchParams
     if (init.method === 'PATCH') items = items.map((item) => (!init.json?.announcement_id || init.json.announcement_id === item.announcement.id)
       ? { ...item, read_at: item.announcement.updated_at } : item)
+    if (!params.has('page')) return { announcements: items, unread_count: items.filter((item) => !item.read_at).length }
     const unreadOnly = params.get('unread_only') === '1'
     const visible = items.filter((item) => !unreadOnly || !item.read_at)
     const index = visible.findIndex((item) => item.announcement.id === params.get('announcement_id'))
@@ -52,6 +57,30 @@ function mount(path = '/v2?section=announcements&profile_id=doctor', signedIn = 
   const session = { authStatus: signedIn ? 'authenticated' : 'anonymous', user: signedIn ? { id: 'user-1' } : null, setAnnouncementUnreadCount: mocks.unread, announcementUnreadCount: 23 } as unknown as V2Session
   return render(<MemoryRouter initialEntries={[path]}><Announcements session={session} /><RouteControls /></MemoryRouter>)
 }
+
+it.each(['single', 'unread', 'all', 'already-read'])('keeps an announcement acknowledged in the inbox from reopening after logout (%s)', async (mode) => {
+  const user = userEvent.setup()
+  const announcement = { ...items[0].announcement, id: `logout-${mode}`, popup_until: new Date(Date.now() + 86_400_000).toISOString() }
+  items[0] = { announcement, read_at: mode === 'already-read' ? announcement.updated_at : null }
+  function LogoutFlow() {
+    const [signedIn, setSignedIn] = useState(true)
+    const client = useQueryClient()
+    const session = { authStatus: 'authenticated', user: { id: 'inbox-reader' }, popups: [], setAnnouncementUnreadCount: mocks.unread, announcementUnreadCount: 23 } as unknown as V2Session
+    return signedIn ? <><Announcements session={session} /><button onClick={() => { client.removeQueries({ queryKey: ['user'] }); setSignedIn(false) }}>Logout</button></>
+      : <AnnouncementPopup announcements={[announcement]} />
+  }
+  render(<MemoryRouter initialEntries={[`/v2?section=announcements${mode === 'unread' ? '&unread_only=1' : mode === 'all' ? '&page=3' : ''}`]}><LogoutFlow /></MemoryRouter>)
+  await screen.findByRole('heading', { name: mode === 'all' ? 'Announcement 20' : 'Announcement 0' })
+  if (mode !== 'already-read') {
+    const action = mode === 'all' ? copy.dashboard.pages_tool_dashboard_AnnouncementsSection_005 : copy.dashboard.pages_tool_dashboard_AnnouncementsSection_011
+    await waitFor(() => expect(screen.getByRole('button', { name: action })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: action }))
+  }
+  await waitFor(() => expect(mocks.unread).toHaveBeenLastCalledWith(mode === 'all' ? 0 : 22))
+  await user.click(screen.getByRole('button', { name: 'Logout' }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(window.localStorage.getItem(`maa-announcement-read:${announcement.id}`)).toBe(announcement.updated_at)
+})
 
 it('loads one page, renders only the selected body, and restores page and selection through history', async () => {
   const user = userEvent.setup()
@@ -148,6 +177,7 @@ it('retries reading after an acknowledgement error without submitting it again',
   mocks.api.mockRejectedValueOnce(new Error('Write failed'))
   await user.click(screen.getByRole('button', { name: copy.dashboard.pages_tool_dashboard_AnnouncementsSection_011 }))
   await screen.findByRole('alert')
+  expect(window.localStorage.getItem('maa-announcement-read:popup-0')).toBeNull()
   await user.click(screen.getByRole('button', { name: copy.v2.retry }))
   await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
   expect(screen.getByRole('heading', { name: 'Announcement 0' })).toBeInTheDocument()

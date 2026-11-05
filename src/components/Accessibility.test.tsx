@@ -200,8 +200,38 @@ describe('AnnouncementPopup accessibility', () => {
       method: 'PATCH', json: { announcement_id: 'server-read', updated_at: announcement.updated_at },
     })
     expect(onUnreadCountChange).toHaveBeenLastCalledWith(0)
-    expect(window.localStorage.getItem('maa-announcement-read:server-read')).toBeNull()
+    expect(window.localStorage.getItem('maa-announcement-read:server-read')).toBe(announcement.updated_at)
     expect(apiVoidMock.mock.calls.some(([, init]) => init.json.event === 'announcement_read')).toBe(true)
+  })
+
+  it('retains server-confirmed reads after logout and reminds again for an updated version', async () => {
+    const announcement = createAnnouncement('read-before-logout', '退出前已读公告')
+    const onUnreadCountChange = vi.fn()
+    apiJsonMock.mockResolvedValue({ announcements: [{ announcement, read_at: announcement.updated_at }], unread_count: 0 })
+    const { rerender } = render(<MemoryRouter><AnnouncementPopup announcements={[announcement]} userId="returning-user" onUnreadCountChange={onUnreadCountChange} /></MemoryRouter>)
+    await waitFor(() => expect(onUnreadCountChange).toHaveBeenCalledWith(0))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(window.sessionStorage.getItem('maa-announcement-popup-shown')).toBeNull()
+
+    rerender(<MemoryRouter><AnnouncementPopup announcements={[announcement]} /></MemoryRouter>)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    rerender(<MemoryRouter><AnnouncementPopup key="new-visit" announcements={[announcement]} /></MemoryRouter>)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    const updated = { ...announcement, updated_at: '2026-07-11T01:00:00.000Z' }
+    rerender(<MemoryRouter><AnnouncementPopup announcements={[updated]} /></MemoryRouter>)
+    expect(await screen.findByRole('dialog', { name: announcement.title })).toBeInTheDocument()
+  })
+
+  it('uses the next account read state even when this browser has already acknowledged the announcement', async () => {
+    const announcement = createAnnouncement('separate-account-read', '账号独立公告')
+    const onUnreadCountChange = vi.fn()
+    apiJsonMock.mockResolvedValueOnce({ announcements: [{ announcement, read_at: announcement.updated_at }], unread_count: 0 })
+      .mockResolvedValueOnce({ announcements: [{ announcement, read_at: null }], unread_count: 1 })
+    const { rerender } = render(<MemoryRouter><AnnouncementPopup announcements={[announcement]} userId="already-read-user" onUnreadCountChange={onUnreadCountChange} /></MemoryRouter>)
+    await waitFor(() => expect(onUnreadCountChange).toHaveBeenCalledWith(0))
+    rerender(<MemoryRouter><AnnouncementPopup announcements={[announcement]} userId="unread-user" /></MemoryRouter>)
+    expect(await screen.findByRole('dialog', { name: announcement.title })).toBeInTheDocument()
   })
 
   it('focuses the first available app control when the popup opened from body focus', async () => {

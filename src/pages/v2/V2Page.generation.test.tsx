@@ -133,7 +133,7 @@ it('continues from login and Skland import through saved configuration to the fi
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   expect(screen.getByRole('complementary', { name: copy.v2.firstSchedule.title }).querySelector('[aria-current="step"]')).toHaveTextContent(copy.v2.firstSchedule.generate)
   expect(await screen.findByText(copy.optimize.maa_export.free)).toBeVisible()
-  await user.click(await screen.findByRole('button', { name: copy.optimize.pages_tool_optimize_GenerateControlBar_030 }))
+  await user.click(await screen.findByRole('button', { name: copy.v2.execute }))
   await waitFor(() => expect(apiJson).toHaveBeenCalledWith('/api/optimization/jobs', expect.objectContaining({ method: 'POST' })))
   expect(vi.mocked(apiJson).mock.calls.filter(([url, options]) => url === '/api/optimization/jobs' && options?.method === 'POST')).toHaveLength(1)
 }, 15_000)
@@ -240,7 +240,7 @@ it.each(['generation', 'overview'])('shows a failed configuration save beside th
   await user.click(screen.getByRole('button', { name: copy.v2.done }))
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   await waitFor(() => expect(patches).toHaveLength(1))
-  const generateLabel = section === 'generation' ? copy.optimize.pages_tool_optimize_GenerateControlBar_029 : copy.v2.regenerate
+  const generateLabel = copy.v2.regenerate
   await user.click(screen.getByRole('button', { name: generateLabel }))
   expect(submissions()).toHaveLength(0)
   const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
@@ -344,7 +344,7 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and k
   await waitFor(() => expect(apiJson).toHaveBeenCalledWith('/api/user/workspace', expect.objectContaining({ method: 'PATCH' })))
   expect(await screen.findByText(copy.v2.configChanged)).toBeVisible()
   await userEvent.click(screen.getByRole('link', { name: copy.v2.generation }))
-  expect(await screen.findByRole('button', { name: copy.optimize.pages_tool_optimize_GenerateControlBar_029 })).toBeEnabled()
+  expect(await screen.findByRole('button', { name: copy.v2.regenerate })).toBeEnabled()
   await userEvent.click(screen.getByRole('link', { name: copy.v2.overview }))
   expect(screen.getByText(copy.v2.configChanged)).toBeVisible()
   expect(vi.mocked(apiJson).mock.calls.filter(([url, options]) => url === '/api/optimization/jobs' && options?.method === 'POST'))

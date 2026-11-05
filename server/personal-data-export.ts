@@ -30,6 +30,7 @@ export const PERSONAL_DATA_EXPORT_COVERAGE = {
   qqbot_account_bindings: { disposition: 'export', field: 'qqbot_binding' },
   qqbot_schedule_notifications: { disposition: 'export', field: 'qqbot_notifications' },
   qqbot_binding_codes: { disposition: 'exclude', reason: '一次性 QQ 绑定码摘要属于短期身份验证凭据，账号删除时级联清理。' },
+  qqbot_web_verifications: { disposition: 'exclude', reason: '短期 QQ 身份验证申请含一次性口令摘要，账号删除时级联清理；已到账奖励通过道具账本导出。' },
   reward_grants: { disposition: 'export', field: 'inventory.grants' },
   reward_consumptions: { disposition: 'export', field: 'inventory.consumptions' },
   inventory_ledger: { disposition: 'export', field: 'inventory.ledger' },

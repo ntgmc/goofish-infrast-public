@@ -35,6 +35,7 @@ import V2Transition, { V2PageTransition } from './V2Transition'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import ProfileExpiryPrompt from '../tool/ProfileExpiryPrompt'
+import { ProfileUpgradeEntry } from './ProfileUpgrade'
 
 const text = copy.v2
 type View = 'schedule' | 'analysis' | 'manual' | 'training'
@@ -164,7 +165,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
       setManualDirty(false)
       setToolDirty(false)
       setPanel(null)
-      void navigate(v2Path(next, profile.id))
+      void navigate(`${v2Path(next, profile.id)}${next === 'add-account' ? '&mode=upgrade' : ''}`)
     } catch (caught) { setNavigationError(caught instanceof Error ? caught.message : text.resultLoadFailed) }
   }
   async function accountAdded(payload: AuthSuccessResponse) {
@@ -273,7 +274,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           {navigationError && <p className="v2-feedback v2-feedback-error" role="alert">{navigationError}<button type="button" onClick={() => { session.retryConfigSave(); setNavigationError(null) }}>{text.loginRetry}</button></p>}
           <AnnouncementBanner announcement={session.banner} />
           <V2PageTransition motionKey={section} className="v2-page-transition">{(displayedSection) => <>
-          <WorkspaceSections section={displayedSection} session={guardedSession} workflow={workflow} generationProgress={generationProgress} onAccountAdded={accountAdded} onToolDirtyChange={setToolDirty} onOpenProfile={(profile) => openProfile(profile, section === 'skland' ? 'skland' : section === 'manual-tool' ? 'manual-tool' : 'overview')} onNavigate={navigateSection} onConfig={() => openPanel('config')} onOperators={() => openPanel('operators')} generationDisabledReason={generationDisabledReason}
+          <WorkspaceSections section={displayedSection} session={guardedSession} workflow={workflow} generationProgress={generationProgress} onAccountAdded={accountAdded} onToolDirtyChange={setToolDirty} onOpenProfile={(profile) => openProfile(profile, section === 'skland' ? 'skland' : section === 'manual-tool' ? 'manual-tool' : 'overview')} onUpgradeProfile={(profile) => openProfile(profile, 'add-account')} onNavigate={navigateSection} onConfig={() => openPanel('config')} onOperators={() => openPanel('operators')} generationDisabledReason={generationDisabledReason}
             firstSchedule={firstSchedule} configConfirmed={configConfirmed} />
           <div hidden={displayedSection !== 'overview'}>
           <div className="v2-page-title v2-overview-heading">
@@ -286,6 +287,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
             </div>
             {sample && startDisabledReason && <p id="v2-start-unavailable" role="status">{startDisabledReason}</p>}
           </div>
+          {session.activeProfile && <ProfileUpgradeEntry profile={session.activeProfile} />}
           <InventoryDepletionWarning result={result} className="v2-inventory-warning" action={<button type="button" className="v2-button v2-button-secondary" onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" />{text.configure}</button>} />
           <AnimatePresence initial={false}>
           {(loadingResult || error || notice || downloadNotice || configChanged) && <FeedbackRegion key="feedback">

@@ -77,7 +77,7 @@ export async function getQqBotAccount(qqNumber: string): Promise<{ binding: Bind
   await ensureSchema()
   const result = await query<Binding>('select * from qqbot_account_bindings where qq_number = $1', [qqNumber])
   const binding = result.rows[0]
-  if (!binding) throw new QqBotError('account_not_bound', '请先在网站生成绑定码，并私聊 bot 完成绑定。', 404)
+  if (!binding) throw new QqBotError('account_not_bound', '请先在网站完成 QQ 验证并确认绑定。', 404)
   const user = await getUserById(binding.user_id)
   if (!user || user.status !== 'active') throw new QqBotError('account_unavailable', '网站账号暂时不可用。', 403)
   return { binding, user }
@@ -104,6 +104,7 @@ export async function unbindQqBotAccount(userId: string, bindingId?: string): Pr
     const deleted = await client.query('delete from qqbot_account_bindings where user_id = $1 and ($2::text is null or id = $2)', [userId, bindingId ?? null])
     if (bindingId && !deleted.rowCount) throw new QqBotError('binding_changed', 'QQ 绑定已变化，请重新查询。', 409)
     await client.query('delete from qqbot_binding_codes where user_id = $1', [userId])
+    await client.query("update qqbot_web_verifications set status = 'expired' where user_id = $1 and status in ('pending', 'verified')", [userId])
   })
 }
 

@@ -22,13 +22,13 @@ export const dashboardCopy = {
     storageError: "本次使用已生效，浏览器未能保存此设置。刷新后可能需要重新调整。",
   },
   profile_expiry: {
-    title: "限时 CDK 档案即将到期",
-    description: (name: string, expiresAt: string) => `请尽快保存「${name}」需要保留的数据，并在排班方案中将排班 JSON 导出到本地。档案将于 ${expiresAt}（北京时间）到期，到期后需续期才能继续使用。`,
-    trial_description: (name: string, expiresAt: string) => `请尽快保存「${name}」需要保留的数据，并在排班方案中将排班 JSON 导出到本地。高级版限时体验将于 ${expiresAt}（北京时间）结束，之后恢复免费预览权限。`,
+    title: "档案权益即将到期",
+    description: (name: string, expiresAt: string) => `「${name}」将于 ${expiresAt}（北京时间）到期，之后需续期才能继续使用。请提前打开并导出需要保留的排班。`,
+    trial_description: (name: string, expiresAt: string) => `「${name}」的高级版体验将于 ${expiresAt}（北京时间）结束，之后可继续使用免费排班。请提前导出需要保留的高级版文件。`,
     unnamed: "限时 CDK 档案",
     dismiss: "今天不再提醒",
     close: "关闭到期提醒",
-    export: "前往保存与导出",
+    export: "查看历史排班",
   },
   behavior_observation: {
     title: "操作习惯记录",

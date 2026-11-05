@@ -27,10 +27,10 @@ export function InventoryQqBotCampaignsPanel({ data, busy, run }: InventoryPanel
       event.preventDefault()
       if (!valid || !input.success) return
       void run('/api/admin/inventory', { action: 'create_qqbot_campaign', ...input.data },
-        '群活动已创建，成员可在对应 QQ 群领取。', { idempotencyScope: 'create_qqbot_campaign' })
+        '群活动已创建，可将活动链接分享到对应 QQ 群。', { idempotencyScope: 'create_qqbot_campaign' })
     }}>
       <h3 className="text-base font-semibold text-ink-primary">创建 QQ 群活动</h3>
-      <p className="mt-2 text-sm leading-6 text-ink-secondary">成员在指定群发送领取命令，每人限领一次。群号须已配置为 Bot 网站通知群。</p>
+      <p className="mt-2 text-sm leading-6 text-ink-secondary">成员打开活动链接，在网站验证 QQ 并领取，每人限领一次。群号须已配置为 Bot 网站通知群。</p>
       <div className="mt-4 grid min-w-0 gap-4 sm:grid-cols-2">
         <Field label="QQ 群号"><input className="tool-field mt-2 min-w-0" required inputMode="numeric" maxLength={20} pattern="[1-9][0-9]*" value={groupId} onChange={(event) => setGroupId(event.currentTarget.value)} /></Field>
         <div className="min-w-0"><Field label="活动编号"><input className="tool-field mt-2 min-w-0" required maxLength={64} pattern="[A-Za-z0-9][A-Za-z0-9_-]*" placeholder="welcome7" value={campaignId} onChange={(event) => setCampaignId(event.currentTarget.value)} /></Field><p className="mt-1 text-xs text-ink-muted">英文字母、数字、下划线或短横线；同群内不可重复。</p></div>
@@ -43,7 +43,7 @@ export function InventoryQqBotCampaignsPanel({ data, busy, run }: InventoryPanel
         <Field label="入群早于日期（可选）"><input type="date" className="tool-field mt-2 min-w-0" value={joinedBefore} onChange={(event) => setJoinedBefore(event.currentTarget.value)} /></Field>
         <Field label="结束日期（可选）"><input type="date" className="tool-field mt-2 min-w-0" value={endsAt} onChange={(event) => setEndsAt(event.currentTarget.value)} /></Field>
       </div>
-      <p className="mt-4 text-sm leading-6 text-ink-secondary">入群条件须同时满足；天数按满 24 小时计算，日期按北京时间当天 00:00 截止。未绑定奖励由 Bot 保留，绑定后自动补发。</p>
+      <p className="mt-4 text-sm leading-6 text-ink-secondary">入群条件须同时满足；天数按满 24 小时计算，日期按北京时间当天 00:00 截止。首次绑定在群内发送一次验证消息，机器人静默核验，结果在网站显示。</p>
       <button className="tool-primary-action mt-4" disabled={busy || !valid}>创建群活动</button>
     </form>
     <section className="tool-panel min-w-0 p-5 sm:p-6">
@@ -63,7 +63,7 @@ export function InventoryQqBotCampaignsPanel({ data, busy, run }: InventoryPanel
           }, `群活动已${label}。`)}>{label}</button></div>
           <p className="mt-3 break-words text-sm text-ink-secondary">{data.definitions.find((item) => item.code === campaign.item_code)?.name ?? campaign.item_code} × {campaign.quantity} · {campaign.validity_days ? `到账后 ${campaign.validity_days} 天有效` : '永久有效'}</p>
           <p className="mt-2 text-xs leading-6 text-ink-secondary">{campaign.min_join_days ? `入群满 ${campaign.min_join_days} 天` : '入群天数不限'}{campaign.joined_before && ` · 入群早于 ${timestamp(campaign.joined_before)}`}{campaign.ends_at && ` · 结束于 ${timestamp(campaign.ends_at)}`}（北京时间）</p>
-          <p className="mt-2 break-all text-sm text-ink-primary">领取命令：<code>领取网站活动 {campaign.campaign_id}</code></p>
+          <label className="mt-3 block text-sm text-ink-secondary">活动分享链接<input className="tool-field mt-2 min-w-0 text-xs" readOnly value={`${window.location.origin}/v2?section=inventory&view=qq-groups&group_id=${campaign.group_id}&campaign_id=${campaign.campaign_id}`} onFocus={(event) => event.currentTarget.select()} /></label>
         </article>
       })}</div>
     </section>

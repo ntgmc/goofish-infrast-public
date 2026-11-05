@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UserGameAccount } from '../../lib/types'
+import { copy } from '../../copy'
 import ProfileExpiryPrompt from './ProfileExpiryPrompt'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -43,8 +44,8 @@ describe('ProfileExpiryPrompt', () => {
     render(<ProfileExpiryPrompt userId="user-1" profiles={[profile]} onOpenExport={onOpenExport} />)
     expect(screen.getByRole('dialog')).toHaveTextContent('测试档案')
     expect(screen.getByRole('dialog')).toHaveTextContent('2026/10/05 12:00')
-    expect(screen.getByRole('dialog')).toHaveTextContent('排班 JSON 导出到本地')
-    fireEvent.click(screen.getByRole('button', { name: '前往保存与导出' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('提前打开并导出需要保留的排班')
+    fireEvent.click(screen.getByRole('button', { name: copy.dashboard.profile_expiry.export }))
     expect(onOpenExport).toHaveBeenCalledWith(profile)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
@@ -79,7 +80,7 @@ describe('ProfileExpiryPrompt', () => {
     const props = { userId: 'user-1', onOpenExport: vi.fn() }
     const view = render(<ProfileExpiryPrompt {...props} profiles={[profile]} />)
     expect(screen.getByRole('dialog')).toHaveTextContent('2026/10/03 12:00')
-    expect(screen.getByRole('dialog')).toHaveTextContent('之后恢复免费预览权限')
+    expect(screen.getByRole('dialog')).toHaveTextContent('之后可继续使用免费排班')
     view.rerender(<ProfileExpiryPrompt {...props} profiles={[{ ...profile, trial: { ...profile.trial!, active: false } }]} />)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
@@ -133,9 +134,9 @@ describe('ProfileExpiryPrompt', () => {
     document.body.append(blocker)
     try {
       render(<ProfileExpiryPrompt userId="user-1" profiles={[createProfile()]} onOpenExport={vi.fn()} />)
-      expect(screen.queryByText('限时 CDK 档案即将到期')).not.toBeInTheDocument()
+      expect(screen.queryByText(copy.dashboard.profile_expiry.title)).not.toBeInTheDocument()
       blocker.removeAttribute('open')
-      await waitFor(() => expect(screen.getByText('限时 CDK 档案即将到期')).toBeInTheDocument())
+      await waitFor(() => expect(screen.getByText(copy.dashboard.profile_expiry.title)).toBeInTheDocument())
     } finally {
       blocker.remove()
     }

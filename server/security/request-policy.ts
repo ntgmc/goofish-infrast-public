@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { feedbackRequestSchema, feedbackReplySchema, adminFeedbackUpdateSchema } from '../../src/lib/feedback-contracts'
 import { giftPackOpeningRuleSchema } from '../../src/lib/admin-inventory-contracts'
 import { qqBotCampaignInputSchema } from '../../src/lib/qqbot-reward-contracts'
+import { qqBotVerificationActionSchema, qqBotVerificationProofSchema } from '../../src/lib/qqbot-verification-contracts'
 import {
   MAX_DEPOT_ITEM_COUNT,
   MAX_DEPOT_ITEM_TYPES,
@@ -802,6 +803,9 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/integrations/qqbot/member-account', route({ GET: none() }, ['qq_number'])],
   ['/api/integrations/qqbot/rewards', route({ POST: json('standard', requestSchemas.qqBotReward) })],
   ['/api/user/qqbot', route({ GET: none(), POST: none(), PATCH: json('standard', requestSchemas.qqBotPreferences), DELETE: none() })],
+  ['/api/user/qqbot/activities', route({ GET: none() }, ['group_id', 'campaign_id'])],
+  ['/api/user/qqbot/verification', route({ GET: none(), POST: json('standard', qqBotVerificationActionSchema) })],
+  ['/api/integrations/qqbot/verifications', route({ GET: none(), POST: json('standard', qqBotVerificationProofSchema) })],
   ['/api/internal/releases/confirm', route({ POST: json('standard', requestSchemas.releaseConfirmation) })],
   ['/api/usage-stats', route({ POST: json('standard', requestSchemas.usageStats) }, ['admin'])],
   ['/api/admin/usage-stats', route({ GET: none() }, ['admin', 'format', 'from', 'to', 'range', 'view'])],

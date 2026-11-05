@@ -5,9 +5,9 @@ import { NextIcon as ArrowRight } from '../../../components/icons'
 import { copy } from '../../../copy'
 import AnnouncementMarkdown from '../../../components/AnnouncementMarkdown'
 import { apiJson, getApiErrorMessage } from '../../../lib/api-client'
-import { getAnnouncementReminderState } from '../../../lib/announcement-reminders'
+import { getAnnouncementReminderState, markAnnouncementRead } from '../../../lib/announcement-reminders'
 import type { AnnouncementPageResponse } from '../../../lib/types'
-import { updateUserAnnouncementQueries, useAnnouncementPageQuery } from '../../../lib/announcement-query'
+import { updateUserAnnouncementQueries, useAnnouncementPageQuery, type UserAnnouncementsResponse } from '../../../lib/announcement-query'
 import { formatShanghaiDateTime } from '../../tool/tool-utils'
 import type { V2Session } from '../OptionsDrawer'
 import { EmptyState, Loading, Notice } from '../components/WorkspaceUI'
@@ -70,15 +70,18 @@ function AnnouncementFeed({ session }: { session: V2Session }) {
     setMarking(id ?? 'all')
     setWriteError(null)
     try {
-      const result = await apiJson<AnnouncementPageResponse>(apiUrl, {
+      const result = await apiJson<AnnouncementPageResponse | UserAnnouncementsResponse>(id ? apiUrl : '/api/user/announcements', {
         method: 'PATCH', signal: controller.signal, json: id ? { announcement_id: id, updated_at: data?.announcements.find((item) => item.announcement.id === id)?.announcement.updated_at } : { all: true },
         fallbackMessage: text.pages_tool_dashboard_AnnouncementsSection_002,
       })
       if (controller.signal.aborted) return
-      await updateUserAnnouncementQueries(client, session.user!.id, result, query.queryKey)
+      const acknowledged = id ? data?.announcements.filter((item) => item.announcement.id === id).map((item) => item.announcement) ?? []
+        : result.announcements?.filter((item) => item.read_at).map((item) => item.announcement) ?? []
+      for (const announcement of acknowledged) markAnnouncementRead(announcement)
+      await updateUserAnnouncementQueries(client, session.user!.id, result, id ? query.queryKey : undefined)
       if (controller.signal.aborted) return
       if (typeof result.unread_count === 'number') session.setAnnouncementUnreadCount(result.unread_count)
-      if (unreadOnly || result.page !== page) openPage(result.page, unreadOnly ? '' : announcementId)
+      if ('page' in result && (unreadOnly || result.page !== page)) openPage(result.page, unreadOnly ? '' : announcementId)
     } catch (cause: unknown) {
       if (!controller.signal.aborted) setWriteError(getApiErrorMessage(cause, text.pages_tool_dashboard_AnnouncementsSection_002))
     } finally {

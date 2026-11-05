@@ -20,6 +20,7 @@ import websiteEventsHandler from './handlers/website-events'
 import qqBotAccountHandler from './handlers/qqbot-account'
 import qqBotRewardsHandler from './handlers/qqbot-rewards'
 import userQqBotHandler from './handlers/user-qqbot'
+import qqBotVerificationsHandler from './handlers/qqbot-verifications'
 import qqBotRegistrationInvitationsHandler from './handlers/qqbot-registration-invitations'
 import releaseConfirmationHandler from './handlers/release-confirmation'
 import changelogHandler from './handlers/changelog'
@@ -107,6 +108,8 @@ const ROUTES = new Map<string, ApiHandler>([
   ...['reward-items', 'reward-campaigns', 'member-account', 'rewards'].map((path) =>
     [`/api/integrations/qqbot/${path}`, qqBotRewardsHandler as unknown as ApiHandler] as [string, ApiHandler]),
   ['/api/user/qqbot', userQqBotHandler as unknown as ApiHandler],
+  ...['/api/user/qqbot/activities', '/api/user/qqbot/verification', '/api/integrations/qqbot/verifications'].map((path) =>
+    [path, qqBotVerificationsHandler as unknown as ApiHandler] as [string, ApiHandler]),
   ['/api/internal/releases/confirm', releaseConfirmationHandler as unknown as ApiHandler],
   ['/api/usage-stats', usageStatsHandler as unknown as ApiHandler],
   ['/api/admin/usage-stats', usageStatsHandler as unknown as ApiHandler],

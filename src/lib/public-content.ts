@@ -3,7 +3,7 @@ import { copy } from '../copy/index'
 import { getSku, productPolicies } from './product-catalog'
 
 export const PUBLIC_CONTENT_VERSION = 1 as const
-export const PUBLIC_CONTENT_DEFAULTS_REVISION = 15 as const
+export const PUBLIC_CONTENT_DEFAULTS_REVISION = 16 as const
 export const PUBLIC_PRICING_PLAN_IDS = [
   'free_preview',
   'single_account_monthly',
@@ -410,6 +410,14 @@ export function resolvePublicContentSettings(value: unknown): { content: PublicC
         if (value !== undefined && (row[field] === undefined || row[field] === previous[field])) row[field] = value
       }
     }
+  }
+  if (storedDefaultsRevision < 16) {
+    migratedDraft.faq.items = migratedDraft.faq.items.map((item) => {
+      const previous = copy.publicContent.legacy_v1_workspace_faq.find((entry) => entry.id === item.id)
+      const current = DEFAULT_PUBLIC_CONTENT_DRAFT.faq.items.find((entry) => entry.id === item.id)
+      return previous && current && item.question === previous.question && item.answer === previous.answer && item.action === current.action
+        ? { ...item, question: current.question, answer: current.answer } : item
+    })
   }
   return {
     content: {

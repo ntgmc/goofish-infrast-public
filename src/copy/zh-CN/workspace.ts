@@ -422,29 +422,29 @@ export const workspaceCopy = {
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_097: "干员数据已通过校验并导入。",
   // src/pages/tool/optimize/useOptimizeWorkspace.ts
-  pages_tool_optimize_useOptimizeWorkspace_001: "请填写方案名称。",
+  pages_tool_optimize_useOptimizeWorkspace_001: "请填写配置名称。",
   // src/pages/tool/optimize/useOptimizeWorkspace.ts
-  pages_tool_optimize_useOptimizeWorkspace_002: "已保存方案“",
+  pages_tool_optimize_useOptimizeWorkspace_002: "已保存配置“",
   // src/pages/tool/optimize/useOptimizeWorkspace.ts
-  pages_tool_optimize_useOptimizeWorkspace_003: "新的方案名称",
+  pages_tool_optimize_useOptimizeWorkspace_003: "新的配置名称",
   // src/pages/tool/optimize/useOptimizeWorkspace.ts
   pages_tool_optimize_useOptimizeWorkspace_004: "已重命名为“",
   // src/pages/tool/optimize/useOptimizeWorkspace.ts
-  pages_tool_optimize_useOptimizeWorkspace_005: "删除方案“",
+  pages_tool_optimize_useOptimizeWorkspace_005: "删除配置“",
   // src/pages/tool/optimize/useOptimizeWorkspace.ts
-  pages_tool_optimize_useOptimizeWorkspace_006: "已删除方案“",
+  pages_tool_optimize_useOptimizeWorkspace_006: "已删除配置“",
   // src/pages/tool/optimize/useOptimizeWorkspace.ts
-  pages_tool_optimize_useOptimizeWorkspace_007: "已载入方案“",
+  pages_tool_optimize_useOptimizeWorkspace_007: "已载入配置“",
   // src/pages/tool/optimize/useOptimizeWorkspace.ts
-  pages_tool_optimize_useOptimizeWorkspace_008: "”，可以继续调整或重新生成。",
+  pages_tool_optimize_useOptimizeWorkspace_008: "”，可继续调整后重新排班。",
   // src/pages/tool/optimize/useOptimizeWorkspace.ts
-  pages_tool_optimize_useOptimizeWorkspace_009: "已载入方案“",
+  pages_tool_optimize_useOptimizeWorkspace_009: "已载入配置“",
   // src/pages/tool/optimize/useOptimizeWorkspace.ts
   pages_tool_optimize_useOptimizeWorkspace_010: "这条历史结果没有保存当时的配置，只能查看或下载。",
   // src/pages/tool/optimize/useOptimizeWorkspace.ts
   pages_tool_optimize_useOptimizeWorkspace_011: "已载入历史配置“",
   // src/pages/tool/optimize/useOptimizeWorkspace.ts
-  pages_tool_optimize_useOptimizeWorkspace_012: "”，可继续调整后重新生成。",
+  pages_tool_optimize_useOptimizeWorkspace_012: "”，可继续调整后重新排班。",
   // src/pages/tool/optimize/useOptimizeWorkspace.ts
   pages_tool_optimize_useOptimizeWorkspace_013: "游戏内轮换模式不生成 MAA JSON。",
   // src/pages/tool/tool-utils.ts

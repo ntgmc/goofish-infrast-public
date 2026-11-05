@@ -7,6 +7,7 @@ import { saveUserAccount, saveUserProfile } from './user-store'
 import { deliverQqBotReward, listQqBotRewardItems, type QqBotRewardInput } from './qqbot-reward-store'
 import { createCustomGiftPack, createGiftPackDraft, createQqBotCampaign, setQqBotCampaignStatus } from './admin-inventory-store'
 import { listQqBotCampaigns } from './qqbot-reward-store'
+import { actOnQqBotVerification, getUserQqBotVerification, listQqBotMembershipChecks, listUserQqBotActivities, recordQqBotVerification } from './qqbot-verification-store'
 import {
   acknowledgeQqBotNotification, bindQqBotAccount, createQqBotBindingCode,
   enqueueQqBotScheduleNotificationInTransaction, getQqBotAccount, getUserQqBotBinding,
@@ -70,6 +71,115 @@ describe('QQ bot campaigns managed on the website', () => {
     for (const changes of [{ campaign_id: 'past', ends_at: '2020-01-01T00:00:00.000Z' }, { campaign_id: 'unknown', item_code: 'missing' }]) {
       await expect(createQqBotCampaign('qqbot-admin', { ...input, ...changes, idempotency_key: randomUUID() })).rejects.toBeInstanceOf(Error)
     }
+  })
+})
+
+describe('website QQ verification and claims', () => {
+  async function activity(changes: Partial<Parameters<typeof createQqBotCampaign>[1]> = {}) {
+    const campaign_id = randomUUID()
+    await createQqBotCampaign('web-admin', { group_id: '2101', campaign_id, item_code: 'maa_export_trial_coupon', quantity: 1,
+      validity_days: 30, min_join_days: 7, joined_before: null, ends_at: null, idempotency_key: randomUUID(), ...changes })
+    return campaign_id
+  }
+  async function start(first: Awaited<ReturnType<typeof fixture>>, campaign_id: string | null) {
+    const result = await actOnQqBotVerification(first.user.id, { action: 'start', qq_number: first.qq, group_id: '2101', campaign_id })
+    if (!('verification' in result) || !('code' in result)) throw new Error('challenge missing')
+    return { id: result.verification.id, code: result.code! }
+  }
+  const proof = (qq: string, code: string) => ({ action: 'message' as const, qq_number: qq, group_id: '2101', code, joined_at: Math.floor(Date.now() / 1000) - 10 * 86400 })
+
+  it('requires the expected QQ, group and website owner, then binds and grants exactly once', async () => {
+    const first = await fixture(), other = await fixture(), campaign = await activity()
+    const challenge = await start(first, campaign)
+    await expect(recordQqBotVerification(proof(other.qq, challenge.code))).rejects.toMatchObject({ code: 'verification_missing' })
+    await expect(recordQqBotVerification({ ...proof(first.qq, challenge.code), group_id: '2102' })).rejects.toMatchObject({ code: 'verification_missing' })
+    await expect(actOnQqBotVerification(first.user.id, { action: 'confirm', verification_id: challenge.id })).rejects.toMatchObject({ code: 'verification_pending' })
+    await recordQqBotVerification(proof(first.qq, challenge.code))
+    expect(await getUserQqBotBinding(first.user.id)).toBeNull()
+    await expect(actOnQqBotVerification(other.user.id, { action: 'confirm', verification_id: challenge.id })).rejects.toMatchObject({ code: 'verification_missing' })
+    await Promise.all(Array.from({ length: 4 }, () => actOnQqBotVerification(first.user.id, { action: 'confirm', verification_id: challenge.id })))
+    expect(await getUserQqBotBinding(first.user.id)).toMatchObject({ qq_number: first.qq, notifications_enabled: false })
+    expect((await listUserQqBotActivities(first.user.id, '2101', campaign))[0]).toMatchObject({ claimed: true, claimed_elsewhere: false })
+    expect((await listUserQqBotActivities(first.user.id, '2101', campaign))[0]).not.toHaveProperty('created_by')
+    expect((await query('select id from reward_grants where source_id = $1', [`claim:2101:${campaign}:${first.qq}`])).rowCount).toBe(1)
+  })
+
+  it('expires old and regenerated codes, without creating a binding', async () => {
+    const first = await fixture()
+    const old = await start(first, null), current = await start(first, null)
+    expect(await recordQqBotVerification(proof(first.qq, old.code))).toEqual({ status: 'expired' })
+    await query("update qqbot_web_verifications set expires_at = now() - interval '1 second' where id = $1", [current.id])
+    await expect(recordQqBotVerification(proof(first.qq, current.code))).rejects.toMatchObject({ code: 'verification_expired' })
+    expect(await getUserQqBotVerification(first.user.id)).toMatchObject({ status: 'expired' })
+    expect(await getUserQqBotBinding(first.user.id)).toBeNull()
+  })
+
+  it('rolls back confirmation including binding when eligibility or the receipt fails', async () => {
+    const first = await fixture(), campaign = await activity(), challenge = await start(first, campaign)
+    await recordQqBotVerification({ ...proof(first.qq, challenge.code), joined_at: Math.floor(Date.now() / 1000) })
+    await expect(actOnQqBotVerification(first.user.id, { action: 'confirm', verification_id: challenge.id })).rejects.toMatchObject({ code: 'not_eligible' })
+    expect(await getUserQqBotBinding(first.user.id)).toBeNull()
+    await query('update qqbot_web_verifications set joined_at = $2 where id = $1', [challenge.id, proof(first.qq, challenge.code).joined_at])
+    await query(`create function web_verify_receipt_failure() returns trigger language plpgsql as $$ begin raise exception 'web receipt failure'; end $$`)
+    await query('create trigger web_verify_fail before insert on qqbot_reward_deliveries for each row execute function web_verify_receipt_failure()')
+    try {
+      await expect(actOnQqBotVerification(first.user.id, { action: 'confirm', verification_id: challenge.id })).rejects.toThrow('web receipt failure')
+      expect(await getUserQqBotBinding(first.user.id)).toBeNull()
+      expect((await query('select id from reward_grants where source_id = $1', [`claim:2101:${campaign}:${first.qq}`])).rowCount).toBe(0)
+    } finally { await query('drop trigger web_verify_fail on qqbot_reward_deliveries'); await query('drop function web_verify_receipt_failure()') }
+    await actOnQqBotVerification(first.user.id, { action: 'confirm', verification_id: challenge.id })
+  })
+
+  it('checks bound users in the background and preserves claim receipts across account changes', async () => {
+    const first = await fixture(), campaign = await activity()
+    await bindQqBotAccount(first.qq, first.code.binding_code)
+    const action = { action: 'claim' as const, group_id: '2101', campaign_id: campaign }
+    const result = await actOnQqBotVerification(first.user.id, action)
+    const repeated = await actOnQqBotVerification(first.user.id, action)
+    expect(repeated).toEqual(result)
+    if (!('verification' in result)) throw new Error('check missing')
+    expect(await listQqBotMembershipChecks()).toContainEqual({ id: result.verification.id, qq_number: first.qq, group_id: '2101' })
+    const membership = { action: 'membership' as const, verification_id: result.verification.id, qq_number: first.qq, group_id: '2101', member: true, joined_at: proof(first.qq, '').joined_at }
+    await Promise.all(Array.from({ length: 3 }, () => recordQqBotVerification(membership)))
+    expect(await actOnQqBotVerification(first.user.id, action)).toEqual({ status: 'completed' })
+    await unbindQqBotAccount(first.user.id)
+    const other = await fixture()
+    await bindQqBotAccount(first.qq, other.code.binding_code)
+    await expect(actOnQqBotVerification(other.user.id, action)).rejects.toMatchObject({ code: 'already_claimed' })
+  })
+
+  it('uses the exclusive Beijing join cutoff and checks the end time again at confirmation', async () => {
+    const cutoff = Date.parse('2026-11-03T16:00:00Z') / 1000
+    const campaign = await activity({ min_join_days: 0, joined_before: '2026-11-03T16:00:00.000Z' })
+    for (const joined of [cutoff - 1, cutoff, 0]) {
+      const first = await fixture(), challenge = await start(first, campaign)
+      await recordQqBotVerification({ ...proof(first.qq, challenge.code), joined_at: joined })
+      const operation = actOnQqBotVerification(first.user.id, { action: 'confirm', verification_id: challenge.id })
+      if (joined === cutoff - 1) await expect(operation).resolves.toEqual({ status: 'completed' })
+      else await expect(operation).rejects.toMatchObject({ code: joined ? 'not_eligible' : 'join_time_missing' })
+    }
+    const first = await fixture(), timed = await activity(), challenge = await start(first, timed)
+    await recordQqBotVerification(proof(first.qq, challenge.code))
+    await query("update qqbot_reward_campaigns set ends_at = now() - interval '1 second' where campaign_id = $1", [timed])
+    await expect(actOnQqBotVerification(first.user.id, { action: 'confirm', verification_id: challenge.id })).rejects.toMatchObject({ code: 'campaign_closed' })
+    expect(await getUserQqBotBinding(first.user.id)).toBeNull()
+  })
+
+  it('rejects stale binding checks and campaigns paused after the browser requested a claim', async () => {
+    const first = await fixture(), campaign = await activity()
+    await bindQqBotAccount(first.qq, first.code.binding_code)
+    const request = await actOnQqBotVerification(first.user.id, { action: 'claim', group_id: '2101', campaign_id: campaign })
+    if (!('verification' in request)) throw new Error('check missing')
+    await setQqBotCampaignStatus('web-admin', { group_id: '2101', campaign_id: campaign, enabled: false, expected_revision: 1 })
+    const result = await recordQqBotVerification({ action: 'membership', verification_id: request.verification.id, qq_number: first.qq, group_id: '2101', member: true, joined_at: proof(first.qq, '').joined_at })
+    expect(result).toEqual({ status: 'rejected' })
+    expect(await getUserQqBotVerification(first.user.id)).toMatchObject({ status: 'rejected', error_message: '活动已停用或结束。' })
+    await setQqBotCampaignStatus('web-admin', { group_id: '2101', campaign_id: campaign, enabled: true, expected_revision: 2 })
+    const pending = await actOnQqBotVerification(first.user.id, { action: 'claim', group_id: '2101', campaign_id: campaign })
+    if (!('verification' in pending)) throw new Error('check missing')
+    await unbindQqBotAccount(first.user.id)
+    await recordQqBotVerification({ action: 'membership', verification_id: pending.verification.id, qq_number: first.qq, group_id: '2101', member: true, joined_at: proof(first.qq, '').joined_at })
+    expect(await getUserQqBotVerification(first.user.id)).toMatchObject({ status: 'expired' })
   })
 })
 
