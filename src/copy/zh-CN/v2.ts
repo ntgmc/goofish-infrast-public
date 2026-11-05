@@ -107,6 +107,13 @@ export const v2Copy = {
   toolsDescription: '手动安排基建、规划干员培养，或计算仓库价值。',
   addAccount: '添加账号',
   addAccountDescription: '绑定森空岛添加游戏账号，也可兑换已有 CDK。',
+  profileUpgrade: {
+    title: '升级当前免费档案',
+    description: '用 CDK 升级，保留当前档案的干员、基建配置和历史排班。',
+    action: 'CDK 兑换 / 升级',
+    pricing: '查看价格与权益',
+    newProfile: '为其他游戏账号兑换新档案',
+  },
   settings: '账号设置',
   settingsDescription: '管理密码、通知、动画偏好和账号数据。',
   announcements: '查看公告',

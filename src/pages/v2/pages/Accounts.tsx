@@ -8,10 +8,11 @@ import { formatDate, formatShanghaiDateTime, getProfileAccessLabel, isFreePrevie
 import type { AuthSuccessResponse, UserGameAccount } from '../../../lib/types'
 import { EmptyState, Facts, Field, Notice } from '../components/WorkspaceUI'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
+import { ProfileUpgradeEntry } from '../ProfileUpgrade'
 
 const text = copy.dashboard
 
-export default function Accounts({ session, onOpen }: { session: V2Session; onOpen: (profile: UserGameAccount) => Promise<void> }) {
+export default function Accounts({ session, onOpen, onUpgrade }: { session: V2Session; onOpen: (profile: UserGameAccount) => Promise<void>; onUpgrade: (profile: UserGameAccount) => Promise<void> }) {
   const { features } = useSiteFeatures()
   const model = useProfiles({ profiles: session.cdkProfiles, onEdit: session.applyAuthPayload, meteredEnabled: features.metered_billing })
   const [chosen, setChosen] = useState(session.activeProfile?.id ?? '')
@@ -31,17 +32,18 @@ export default function Accounts({ session, onOpen }: { session: V2Session; onOp
         </div>
         {!profiles.length && <p className="v2-muted">{copy.v2.noMatches}</p>}
       </aside>
-      {selected && <AccountDetails key={selected.id} profile={selected} opening={session.openingProfileId === selected.id} onOpen={() => void onOpen(selected)} onSaved={session.applyAuthPayload} onConvert={() => model.createMetered(selected.id)} meteredEnabled={model.meteredEnabled} converting={model.meteredBusy} />}
+      {selected && <AccountDetails key={selected.id} profile={selected} opening={session.openingProfileId === selected.id} onOpen={() => void onOpen(selected)} onUpgrade={() => void onUpgrade(selected)} onSaved={session.applyAuthPayload} onConvert={() => model.createMetered(selected.id)} meteredEnabled={model.meteredEnabled} converting={model.meteredBusy} />}
     </div>}
     {model.declarationDialog}
   </div>
 }
 
-function AccountDetails({ profile, opening, onOpen, onSaved, onConvert, meteredEnabled, converting }: { profile: UserGameAccount; opening: boolean; onOpen: () => void; onSaved: (payload: AuthSuccessResponse) => void; onConvert: () => void; meteredEnabled: boolean; converting: boolean }) {
+function AccountDetails({ profile, opening, onOpen, onUpgrade, onSaved, onConvert, meteredEnabled, converting }: { profile: UserGameAccount; opening: boolean; onOpen: () => void; onUpgrade: () => void; onSaved: (payload: AuthSuccessResponse) => void; onConvert: () => void; meteredEnabled: boolean; converting: boolean }) {
   const model = useProfileDetails(profile, text.pages_tool_dashboard_ProfilesSection_003, onSaved)
   return <article className="v2-account-detail">
     <div className="v2-detail-heading"><UserRound size={28} aria-hidden="true" /><div><span className="v2-label">{getProfileAccessLabel(profile)}</span><h2>{profile.display_name || text.pages_tool_dashboard_ProfilesSection_003}</h2></div></div>
     {model.description && <p className="v2-lead">{model.description}</p>}
+    <ProfileUpgradeEntry profile={profile} onUpgrade={onUpgrade} disabled={opening} />
     <Facts items={[
       [copy.v2.operatorData, profile.operator_count ?? 0],
       [copy.v2.updated, formatDate(profile.updated_at)],
