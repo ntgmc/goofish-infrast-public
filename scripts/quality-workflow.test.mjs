@@ -61,13 +61,15 @@ test('only skips validation jobs when the matching successful record was found',
   assert.doesNotMatch(quality + security, /runs-on: ubuntu-latest/)
 })
 
-test('always rebuilds release metadata for the push SHA after successful or reused public checks', () => {
+test('builds fresh SHA-bound release artifacts alongside validation on pushes and manual runs', () => {
   const release = job('public-release')
-  assert.match(release, /needs: \[validation-reuse, public-validation\]/)
-  assert.match(release, /always\(\) && !cancelled\(\) && github\.event_name == 'push'/)
-  assert.match(release, /needs\.validation-reuse\.result == 'success'/)
-  assert.match(release, /needs\.public-validation\.result == 'success' \|\|/)
-  assert.match(release, /needs\.public-validation\.result == 'skipped' && needs\.validation-reuse\.outputs\.reuse_public == 'true'/)
+  assert.match(release, /needs: validation-reuse/)
+  assert.doesNotMatch(release, /needs:.*public-validation/)
+  assert.match(release, /if: github\.event_name == 'push' \|\| github\.event_name == 'workflow_dispatch'/)
+  assert.doesNotMatch(release, /reuse_public/)
+  for (const id of ['public-validation', 'postgres-integration', 'security']) {
+    assert.doesNotMatch(job(id), /continue-on-error|if:.*always\(/)
+  }
   assert.match(release, /VERSION_SOURCE_SHA: \$\{\{ github\.sha \}\}/)
   assert.match(release, /run: pnpm run build/)
   assert.doesNotMatch(release, /pnpm run check:public-export/)
