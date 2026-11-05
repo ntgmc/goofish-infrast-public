@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useState, type ComponentProps } from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '../../test/query-render'
+import { act, cleanup, configure, fireEvent, render, screen, waitFor, within } from '../../test/query-render'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -40,6 +40,9 @@ vi.mock('../../lib/site-feature-context', async (original) => ({
 }))
 
 import V2Page from './V2Page'
+
+// Lazy page imports share the dual-core CI runner with another test worker.
+configure({ asyncUtilTimeout: 3_000 })
 
 let session: V2Session
 const summary: WorkspaceResultHistorySummary = {
@@ -164,7 +167,7 @@ it('closes mobile navigation with Escape and restores the menu trigger', async (
 
 it('opens material demand charts from the V2 tools directory without an account', async () => {
   mount('/v2?section=tools')
-  await userEvent.click(await screen.findByRole('link', { name: /材料需求趋势/ }, { timeout: 3_000 }))
+  await userEvent.click(await screen.findByRole('link', { name: /材料需求趋势/ }))
   const chart = await screen.findByRole('slider', { name: /固源岩组的材料需求趋势/ }, { timeout: 5_000 })
   expect(screen.getByTestId('route-location')).toHaveTextContent('section=material-demand')
   expect(screen.queryByText(copy.v2.signInRequired)).not.toBeInTheDocument()
