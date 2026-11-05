@@ -184,7 +184,7 @@ function ComparisonPreview({ baseline }: { baseline: string }) {
           <legend className="sr-only">{text.paid_preview.readonly}</legend>
           <label className="v2-field"><span>{text.paid_preview.baseline}</span><input className="v2-input" value={baseline} readOnly /><small>{preview.baselineHelp}</small></label>
           <label className="v2-field"><span>{text.paid_preview.alternative}</span><select className="v2-input"><option>{text.paid_preview.add}</option></select><small>{preview.alternativeHelp}</small></label>
-          <div className="v2-comparison-preview-run"><button type="button" className="v2-button v2-button-secondary"><LockKeyhole size={16} aria-hidden="true" />{text.paid_preview.run}</button><small>{preview.runHelp}</small></div>
+          <div className="v2-comparison-preview-run"><button type="button" className="v2-button v2-button-secondary"><LockKeyhole size={16} aria-hidden="true" />{ui.run}</button><small>{preview.runHelp}</small></div>
         </fieldset>
       </section>
       <section className="v2-comparison-preview-results" aria-label={ui.results}>

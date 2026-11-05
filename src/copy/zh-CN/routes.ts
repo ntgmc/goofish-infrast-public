@@ -1,7 +1,7 @@
 // Route titles and loading states must stay independent of lazy page catalogs.
 export const routesCopy = {
   labels: {
-    overview: '排班总览', generation: '生成与计算', plans: '历史方案', lab: '方案对比', tools: '实用工具',
+    overview: '排班总览', generation: '生成排班', plans: '历史方案', lab: '方案对比', tools: '实用工具',
     'manual-tool': '手动排班模拟', 'schedule-comparison': '排班表对比', 'training-ratio': '钱书平衡建议', 'material-demand': '材料需求趋势',
     cultivation: '作业练度推荐', 'thanks-recruitment': '感谢庆典特别招募推荐', 'cultivation-projects': '我的养成项目',
     depot: '仓库价值分析', skland: '森空岛数据', profiles: '账号与档案', 'add-account': '添加账号', inventory: '背包',

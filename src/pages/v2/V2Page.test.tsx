@@ -311,7 +311,7 @@ describe('V2 results-first workspace', () => {
     // Cold imports of the lazy account and generation pages can exceed the default 1s wait in CI.
     expect(await screen.findByRole('button', { name: copy.v2.firstSchedule.importAction }, { timeout: 5_000 })).toBeVisible()
     await user.click(screen.getByText(copy.v2.firstSchedule.accountOptions))
-    await user.click(await screen.findByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_005 }))
+    await user.click(await screen.findByRole('button', { name: copy.v2.accountCreation.cdkTitle }))
     expect(fetch.mock.calls.some(([url]) => String(url).includes('/personal-use-declaration'))).toBe(false)
     fireEvent.change(screen.getByRole('textbox', { name: 'CDK' }), { target: { value: 'MAA-FIRST-ACCOUNT' } })
     await user.click(screen.getByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_015 }))
@@ -324,7 +324,7 @@ describe('V2 results-first workspace', () => {
     page.rerender(<MemoryRouter initialEntries={['/']}><V2Page /><RouteLocation /></MemoryRouter>)
     await screen.findByText(copy.v2.firstSchedule.configTitle, {}, { timeout: 5_000 })
     expect(guide().querySelector('[aria-current="step"]')).toHaveTextContent(copy.v2.firstSchedule.config)
-    expect(screen.queryByRole('button', { name: copy.optimize.pages_tool_optimize_GenerateControlBar_030 })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: copy.v2.execute })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: copy.v2.firstSchedule.configAction }))
     vi.mocked(session.flushConfigSave).mockResolvedValueOnce(false)
     await user.click(screen.getByRole('button', { name: copy.v2.firstSchedule.confirmConfig }))
@@ -343,7 +343,7 @@ describe('V2 results-first workspace', () => {
     expect(screen.getByTestId('route-location')).toHaveTextContent('section=generation&profile_id=profile-1')
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
     expect(fetch.mock.calls.some(([url]) => String(url).includes('/api/optimization/jobs'))).toBe(false)
-    await user.click(screen.getByRole('button', { name: copy.optimize.pages_tool_optimize_GenerateControlBar_030 }))
+    await user.click(screen.getByRole('button', { name: copy.v2.execute }))
     await waitFor(() => expect(workflow.handleGenerate).toHaveBeenCalledOnce())
     workflow.currentResult = SAMPLE_RESULT
     workflow.hasResult = true
@@ -1846,7 +1846,7 @@ describe('V2 feature continuity', () => {
     await user.click(screen.getByRole('button', { name: copy.v2.manualTab }))
     await user.click(await screen.findByRole('button', { name: 'Edit draft: original' }))
     await user.click(screen.getByRole('link', { name: copy.v2.generation }))
-    await user.click(await screen.findByRole('button', { name: copy.optimize.pages_tool_optimize_GenerateControlBar_029 }, { timeout: 3000 }))
+    await user.click(await screen.findByRole('button', { name: copy.v2.regenerate }, { timeout: 3000 }))
     expect(confirm).toHaveBeenCalledWith(copy.v2.discardManual)
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
     await user.click(screen.getByRole('link', { name: copy.v2.overview }))
@@ -1967,7 +1967,7 @@ describe('V2 feature continuity', () => {
       page.rerender(<MemoryRouter><V2Page /><RouteLocation /></MemoryRouter>)
     }
     expect(await screen.findByRole('textbox', { name: 'CDK' })).toBeVisible()
-    expect(screen.getByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_005 })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: copy.v2.accountCreation.cdkTitle })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByTestId('route-location')).toHaveTextContent('mode=cdk')
     expect(fetch.mock.calls.some(([url]) => String(url).includes('/cdk/redeem'))).toBe(false)
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
@@ -1999,9 +1999,9 @@ describe('V2 feature continuity', () => {
     connect()
     const user = userEvent.setup()
     mount('/v2?section=add-account')
-    const preview = await screen.findByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_006 }, { timeout: 3000 })
+    const preview = await screen.findByRole('button', { name: copy.v2.accountCreation.freeTitle }, { timeout: 3000 })
     expect(preview).toHaveAttribute('aria-pressed', 'true')
-    await user.click(screen.getByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_005 }))
+    await user.click(screen.getByRole('button', { name: copy.v2.accountCreation.cdkTitle }))
     expect(screen.getByRole('textbox', { name: 'CDK' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /邀请有礼/ })).not.toBeInTheDocument()
     expect(session.applyAuthPayload).not.toHaveBeenCalled()
@@ -2022,7 +2022,7 @@ describe('V2 feature continuity', () => {
     await user.click(screen.getByRole('button', { name: session.activeProfile!.display_name }))
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: copy.v2.manageProfiles }))
     await user.click(await screen.findByRole('button', { name: copy.v2.addAccount }))
-    await user.click(await screen.findByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_005 }))
+    await user.click(await screen.findByRole('button', { name: copy.v2.accountCreation.cdkTitle }))
     fireEvent.change(screen.getByRole('textbox', { name: 'CDK' }), { target: { value: 'MAA-NEW-ACCOUNT' } })
     await user.click(screen.getByRole('button', { name: copy.dashboard.pages_tool_dashboard_RedeemSection_015 }))
     await waitFor(() => expect(session.applyAuthPayload).toHaveBeenCalledOnce())
@@ -2057,7 +2057,7 @@ describe('V2 feature continuity', () => {
     expect(session.flushConfigSave).toHaveBeenCalledOnce()
     const request = fetch.mock.calls.find(([url]) => String(url) === '/api/user/cdk/redeem')!
     expect(JSON.parse(request[1]!.body as string)).toEqual({ profile_id: 'profile-1', cdk: 'MAA-EXISTING', idempotency_key: expect.any(String) })
-    expect(screen.getByTestId('route-location')).toHaveTextContent('section=profiles&profile_id=profile-1')
+    await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('section=profiles&profile_id=profile-1'))
   })
 
   it('keeps failed upgrade input and reuses the request key when retrying an unknown result', async () => {
