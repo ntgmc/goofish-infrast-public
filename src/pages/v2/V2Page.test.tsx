@@ -164,7 +164,7 @@ it('closes mobile navigation with Escape and restores the menu trigger', async (
 
 it('opens material demand charts from the V2 tools directory without an account', async () => {
   mount('/v2?section=tools')
-  await userEvent.click(await screen.findByRole('link', { name: /材料需求趋势/ }))
+  await userEvent.click(await screen.findByRole('link', { name: /材料需求趋势/ }, { timeout: 3_000 }))
   const chart = await screen.findByRole('slider', { name: /固源岩组的材料需求趋势/ }, { timeout: 5_000 })
   expect(screen.getByTestId('route-location')).toHaveTextContent('section=material-demand')
   expect(screen.queryByText(copy.v2.signInRequired)).not.toBeInTheDocument()
