@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router'
+import { useSiteFeatures } from '../../../lib/site-feature-context'
+import QqBotActivities from './QqBotActivities'
 import { NextIcon as ArrowRight, InventoryIcon as Package, SearchIcon as Search } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogClose } from '../../../components/ui/dialog'
@@ -16,14 +19,17 @@ type InventoryModel = ReturnType<typeof useInventory>
 
 export default function Inventory({ session, onProfiles }: { session: V2Session; onProfiles: () => void }) {
   const model = useInventory({ userId: session.user?.id ?? '', activeProfileId: session.activeProfile?.id ?? null, onPayload: session.applyAuthPayload, onLifetimeProfileCreated: onProfiles })
-  const [view, setView] = useState('items')
+  const [params] = useSearchParams()
+  const { features } = useSiteFeatures()
+  const [view, setView] = useState(params.get('view') === 'qq-groups' && features.qqbot ? 'qq-groups' : 'items')
   const tasks = model.tasks.filter((task) => task.enabled)
   if (model.loading && !model.inventory) return <V2SectionLoading label={text.loading} />
   return <div className="v2-inventory-workspace">
     <div className="v2-inventory-overview"><Package size={32} aria-hidden="true" /><div><h2>{text.title}</h2><p>{text.description}</p></div><strong>{model.inventory?.stacks.length ?? 0}<small>{copy.v2.inventoryItems}</small></strong></div>
     <Notice error>{model.error}{model.error && <button className="v2-text-button" onClick={() => void model.load()}>{copy.v2.retry}</button>}</Notice>
     <Notice>{model.notice?.message}{model.notice?.action === 'profiles' && <button className="v2-text-button" onClick={onProfiles}>{text.view_profiles}<ArrowRight size={16} /></button>}</Notice>
-    <nav className="v2-view-switch" aria-label={text.title}><button aria-pressed={view === 'items'} onClick={() => setView('items')}>{copy.v2.inventoryItems}</button>{tasks.length > 0 && <button aria-pressed={view === 'tasks'} onClick={() => setView('tasks')}>{text.tasks}<span>{tasks.filter((task) => task.status === 'claimable').length}</span></button>}<button aria-pressed={view === 'activity'} onClick={() => setView('activity')}>{copy.v2.inventoryActivity}</button></nav>
+    <nav className="v2-view-switch" aria-label={text.title}><button aria-pressed={view === 'items'} onClick={() => setView('items')}>{copy.v2.inventoryItems}</button>{tasks.length > 0 && <button aria-pressed={view === 'tasks'} onClick={() => setView('tasks')}>{text.tasks}<span>{tasks.filter((task) => task.status === 'claimable').length}</span></button>}{features.qqbot && <button aria-pressed={view === 'qq-groups'} onClick={() => setView('qq-groups')}>{copy.notifications.qqbotActivities.title}</button>}<button aria-pressed={view === 'activity'} onClick={() => setView('activity')}>{copy.v2.inventoryActivity}</button></nav>
+    {features.qqbot && view === 'qq-groups' && <QqBotActivities key={session.user?.id} userId={session.user?.id ?? ''} />}
     <section hidden={view !== 'items'}>
       <div className="v2-inventory-filters"><div className="v2-filter-group" role="group" aria-label={text.title}>{(['all', 'license_voucher', 'consumable', 'capacity_upgrade', 'gift_pack'] as const).map((category) => <button key={category} aria-pressed={model.category === category} onClick={() => model.setCategory(category)}>{categoryLabel(category)}</button>)}</div><label className="v2-search"><Search size={18} aria-hidden="true" /><input id="inventory-search" aria-label={text.search} placeholder={text.search} value={model.search} onChange={(event) => model.setSearch(event.target.value)} /></label></div>
       {!model.filtered.length ? <EmptyState title={text.empty} /> : <div key={model.category} className="v2-item-shelf">{model.filtered.map((stack) => <button key={stack.stack_id} className="v2-item-tile" onClick={(event) => {

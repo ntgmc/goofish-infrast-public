@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import QqBotVerificationPanel from './QqBotVerificationPanel'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { UserQueryScope, usePrivateQueryScope } from '../lib/private-query-scope'
 import { NotificationSettingsIcon as Bell } from './icons'
@@ -11,7 +12,6 @@ type Settings = {
   available: boolean
   binding: { binding_id: string; qq_number: string; notifications_enabled: boolean; bound_at: string } | null
 }
-type BindingCode = { binding_code: string; expires_at: string }
 const ENDPOINT = '/api/user/qqbot'
 
 export default function QqBotSettingsPanel() {
@@ -31,7 +31,6 @@ function QqBotSettingsContent() {
   const key = [...owner.key, 'qqbot']
   const query = useQuery({ queryKey: key, enabled: owner.enabled, queryFn: ({ signal }) => apiJson<Settings>(ENDPOINT, { signal }) })
   const settings = query.data
-  const [code, setCode] = useState<BindingCode | null>(null)
   const [saving, setBusy] = useState(false)
   const [writeError, setError] = useState<string | null>(null)
   const busy = saving || query.isFetching
@@ -39,7 +38,6 @@ function QqBotSettingsContent() {
   const text = copy.notifications.qqbot
 
   const refresh = async () => { if (owner.enabled) await client.invalidateQueries({ queryKey: key, exact: true }) }
-  useEffect(() => { if (settings?.binding) setCode(null) }, [settings])
 
   const run = useCallback(async (action: () => Promise<void>) => {
     setBusy(true)
@@ -79,28 +77,13 @@ function QqBotSettingsContent() {
               if (!window.confirm(text.unbindConfirm)) return
               void run(async () => {
                 await apiJson(ENDPOINT, { method: 'DELETE' })
-                setCode(null)
                 await refresh()
               })
             }}>{text.unbind}</button>
           </div>
         </div>
       ) : (
-        <div className="mt-4 space-y-4">
-          {code && <div role="status" className="space-y-2">
-            <label className="block text-sm text-ink-secondary">
-              {text.codeLabel}
-              <input className="tool-field mt-2 font-mono" readOnly value={text.bindingCommand(code.binding_code)} onFocus={(event) => event.currentTarget.select()} />
-            </label>
-            <p className="text-sm text-ink-secondary">{text.codeHelp(new Date(code.expires_at).toLocaleString('zh-CN'))}</p>
-          </div>}
-          <div className="flex flex-wrap gap-3">
-            <button type="button" className="tool-primary-action" disabled={busy || !settings?.available} onClick={() => void run(async () => {
-              setCode(await apiJson<BindingCode>(ENDPOINT, { method: 'POST' }))
-            })}>{code ? text.regenerate : text.generate}</button>
-            <button type="button" className="tool-secondary-action" disabled={busy} onClick={() => void run(refresh)}>{text.refresh}</button>
-          </div>
-        </div>
+        <div className="mt-4"><QqBotVerificationPanel userId={owner.identity ?? ''} disabled={busy || !settings?.available} /></div>
       )}
     </section>
   )

@@ -2092,6 +2092,25 @@ CREATE TABLE IF NOT EXISTS qqbot_reward_campaigns (
   PRIMARY KEY (group_id, campaign_id)
 );
 
+CREATE TABLE IF NOT EXISTS qqbot_web_verifications (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  qq_number TEXT NOT NULL CHECK (qq_number ~ '^[1-9][0-9]{4,11}$'),
+  group_id TEXT NOT NULL CHECK (group_id ~ '^[1-9][0-9]{0,19}$'),
+  campaign_id TEXT,
+  kind TEXT NOT NULL CHECK (kind IN ('message', 'membership')),
+  code_hash TEXT UNIQUE,
+  binding_id TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'verified', 'completed', 'rejected', 'expired')),
+  joined_at BIGINT,
+  verified_at TIMESTAMPTZ,
+  error_message TEXT,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS qqbot_web_verifications_user_created ON qqbot_web_verifications(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS qqbot_web_verifications_pending ON qqbot_web_verifications(created_at) WHERE kind = 'membership' AND status = 'pending';
+
 CREATE TABLE IF NOT EXISTS gift_pack_version_contents (
   gift_pack_version_id TEXT NOT NULL REFERENCES gift_pack_versions(id) ON DELETE CASCADE,
   item_code TEXT NOT NULL REFERENCES item_definitions(code) ON DELETE RESTRICT,

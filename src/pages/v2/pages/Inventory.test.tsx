@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { copy } from '../../../copy'
 import type { V2Session } from '../OptionsDrawer'
 import Inventory from './Inventory'
+import { MemoryRouter } from 'react-router'
 
 const mocks = vi.hoisted(() => ({ api: vi.fn() }))
 vi.mock('../../../lib/api-client', () => ({ apiJson: mocks.api, getApiErrorMessage: (error: Error) => error.message }))
@@ -25,7 +26,7 @@ it('keeps a failed item use open and reuses its idempotency key when retried fro
     return { stacks: [stack], capacities: [], recent_events: [] }
   })
   const user = userEvent.setup()
-  render(<Inventory session={{ user: { id: 'user' }, activeProfile: { id: 'profile-1' }, applyAuthPayload: vi.fn() } as unknown as V2Session} onProfiles={vi.fn()} />)
+  render(<MemoryRouter><Inventory session={{ user: { id: 'user' }, activeProfile: { id: 'profile-1' }, applyAuthPayload: vi.fn() } as unknown as V2Session} onProfiles={vi.fn()} /></MemoryRouter>)
   await user.click(await screen.findByRole('button', { name: /测试礼包/ }))
   const dialog = within(screen.getByRole('dialog'))
   const quantity = dialog.getByRole('spinbutton', { name: copy.inventory.use_quantity })

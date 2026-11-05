@@ -24,6 +24,8 @@ TanStack Query v5 管理普通页面读取：库存、新手任务、优化任�
 | 用户反馈列表与时间线 | `['user', userId, null, 'feedback', 'list'或'thread', ...分页或反馈ID]` |
 | 用户通知分页 | `['user', userId, null, 'notifications']` |
 | QQ Bot 设置 | `['user', userId, null, 'qqbot']` |
+| QQ 绑定与领取核验 | `['user', userId, null, 'qqbot-verification']` |
+| QQ 群活动与领取状态 | `['user', userId, null, 'qqbot-activities', groupId, campaignId]` |
 | 钱书平衡的账号培养资料 | `['user', userId, profileId, 'training-ratio', 森空岛快照版本]` |
 | 排班历史详情 | `['user', userId, profileId, 'result-history', 'detail', resultId]` |
 | 排班历史分页 | `['user', userId, profileId, 'result-history', 'pages', scope, 首屏快照]` |
@@ -90,7 +92,7 @@ V2 分页按用户或公开身份、页码与未读筛选隔离。直达尚未�
 
 反馈列表按筛选和页码查询，时间线使用 `before_revision` 分页，合并时按 revision 去重。回复保留 `expected_revision`、内容签名对应的请求幂等键、冲突提示和明确重试。成功后使同一身份下的反馈列表与时间线失效；后续读取失败不会重发回复。身份、权限或目标变化会取消未完成回复，输入保留到原有明确清除操作。
 
-通知每 60 秒查询，隐藏时暂停，回到前台或窗口重新聚焦时刷新。分页刷新跟随新的服务端游标并按 ID 去重；通知中的库存变化仍调用 `markInventoryStale()`。标记已读前后取消旧读取，单条标记只修改匹配 `updated_at` 的通知；迟到结果不会重建退出时删除的缓存。账号安全入口没有工作台身份时，QQ Bot 面板先确认会话再读取设置，避免在服务暂停时丢失解绑入口。QQ Bot 的绑定码生成、更换、解绑和通知开关仍手动提交，读取重试不重复提交。
+通知每 60 秒查询，隐藏时暂停，回到前台或窗口重新聚焦时刷新。分页刷新跟随新的服务端游标并按 ID 去重；通知中的库存变化仍调用 `markInventoryStale()`。标记已读前后取消旧读取，单条标记只修改匹配 `updated_at` 的通知；迟到结果不会重建退出时删除的缓存。账号安全入口没有工作台身份时，QQ Bot 面板先确认会话再读取设置，避免在服务暂停时丢失解绑入口。QQ 群验证消息生成、更换、网站确认绑定、活动领取、解绑和通知开关仍手动提交，读取重试不重复提交。验证等待期间每 3 秒查询，隐藏时暂停，回到前台刷新；结果属于用户账号，各档案共用。验证完成后失效绑定和活动查询，并通知库存刷新。活动链接的群号和编号保留在 URL 中，登录后继续原活动。
 
 后台设置通过 `useAdminPanelQuery` 保存线上快照；需要编辑的页面通过 `useAdminDraftQuery` 初始化草稿。同一管理员、权限和目标下，自动读取只初始化一次，保留输入；明确重载才重新应用快照，原有丢弃确认继续生效。保存后先取消旧 GET，再写入已有缓存，保留原 revision、操作原因和 Root 二次认证。服务历史的事件正文与成本配置同样保留独立草稿。
 
