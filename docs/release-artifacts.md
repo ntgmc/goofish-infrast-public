@@ -1,8 +1,11 @@
 # Public release artifact verification
 
-The `main` quality workflow publishes `public.tgz` only after generating a
-candidate changelog bound to the build SHA, verifying every staged file, and
-starting a clean runtime dependency check from the archive. The archive
+Quality Checks builds and uploads `public.tgz` on `main` pushes and manual runs.
+Artifact construction runs alongside application tests, PostgreSQL integration,
+and security checks. Use artifacts only from a successfully completed workflow.
+The artifact job generates a candidate changelog bound to the build SHA,
+verifies every staged file, and
+starts a clean runtime dependency check from the archive. The archive
 contains `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, and `release-sbom.cdx.json` so a
 rollback uses the same locked production dependency graph as the build.
 
@@ -25,8 +28,8 @@ in full. Dependency audits continue to check current vulnerability data.
 Validation records default to three days of retention, configurable through
 `CI_ARTIFACT_RETENTION_DAYS`. The Actions summary links each reused run. The
 first run executes all checks to create these records. Release archives are
-always rebuilt on `main` pushes with the current SHA and candidate changelog,
-including when public validation is reused.
+always rebuilt on `main` pushes and manual runs with the current SHA and candidate
+changelog, including when public validation is reused.
 
 ## Verifying release artifacts
 
