@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import type { AccountDeletionSurvey } from '../src/lib/account-deletion-contracts'
 import { ensureDatabaseSchema } from './storage/schema'
 import { query, withTransaction } from './storage/postgres'
 import {
@@ -24,6 +25,8 @@ type AccountDeletionRequestStatus = 'pending' | 'processing' | 'failed'
 type AccountDeletionRequest = {
   id: string
   user_id: string
+  reason: AccountDeletionSurvey['reason'] | null
+  reason_detail: string
   cancel_token_hash: string
   scheduled_for: string
   status: AccountDeletionRequestStatus
@@ -66,6 +69,7 @@ type AccountDeletionMaintenanceResult = {
 
 export async function requestAccountDeletion(
   user: UserAccountRecord,
+  survey: AccountDeletionSurvey,
   now = new Date(),
 ): Promise<AccountDeletionAccepted> {
   await ensureDatabaseSchema()
@@ -107,9 +111,9 @@ export async function requestAccountDeletion(
     await client.query(
       `insert into account_deletion_requests
         (id, user_id, cancel_token_hash, scheduled_for, status, attempts, next_attempt_at,
-         lease_token, lease_expires_at, last_error, created_at, updated_at)
-       values ($1, $2, $3, $4, 'pending', 0, $5, null, null, null, $5, $5)`,
-      [requestId, user.id, hashToken(token), scheduledFor, updatedAt],
+         lease_token, lease_expires_at, last_error, created_at, updated_at, reason, reason_detail)
+       values ($1, $2, $3, $4, 'pending', 0, $5, null, null, null, $5, $5, $6, $7)`,
+      [requestId, user.id, hashToken(token), scheduledFor, updatedAt, survey.reason, survey.reason_detail],
     )
     await client.query(
       `update user_accounts set status = $2, record_json = $3::jsonb, updated_at = $4 where id = $1`,
@@ -249,6 +253,11 @@ async function processAccountDeletionMaintenance(
   const deletedAccounts = await processDueAccountDeletions(now)
   sentEmails += await processAccountDeletionEmailOutbox(now)
   await purgeExpiredPersonalUseDeclarationAcceptances(now)
+  await query(
+    `update account_deletion_records set reason = null, reason_detail = ''
+      where deleted_at <= $1 and (reason is not null or reason_detail <> '')`,
+    [new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString()],
+  )
   await query(
     `delete from account_deletion_email_outbox
       where status = 'dead_letter' and delete_after <= $1`,
@@ -400,13 +409,19 @@ async function finalizeClaimedAccountDeletion(
   now: Date,
 ): Promise<boolean> {
   return withTransaction(async (client) => {
+    // Serialize deletion with registration so an insert waiting on the old email cannot recreate it.
+    await client.query(
+      `select pg_advisory_xact_lock(hashtextextended('registration-email:' || email, 0))
+         from user_accounts where id = $1`,
+      [claimed.user_id],
+    )
     const locked = await client.query<AccountDeletionRequest & { email: string }>(
       `select request.id, request.user_id, request.cancel_token_hash,
               request.scheduled_for::text, request.status, request.attempts,
               request.next_attempt_at::text, request.lease_token,
               request.lease_expires_at::text, request.last_error,
               request.created_at::text, request.updated_at::text,
-              account.email
+              account.email, request.reason, request.reason_detail
          from account_deletion_requests request
          join user_accounts account on account.id = request.user_id
         where request.id = $1 and request.status = 'processing' and request.lease_token = $2
@@ -437,6 +452,11 @@ async function finalizeClaimedAccountDeletion(
         timestamp,
         new Date(now.getTime() + OUTBOX_RETENTION_MS).toISOString(),
       ],
+    )
+    await client.query(
+      `insert into account_deletion_records (email_hash, reason, reason_detail, deleted_at)
+       values (encode(sha256(convert_to(lower(btrim($1)), 'UTF8')), 'hex'), $2, $3, $4)`,
+      [request.email, request.reason, request.reason_detail, timestamp],
     )
     await deleteUserAccountInTransaction(client, request.user_id)
     return true

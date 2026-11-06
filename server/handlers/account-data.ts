@@ -157,7 +157,7 @@ async function exportData(userId: string): Promise<Response> {
     ),
     query('select sample_json, sampled_at from depot_value_samples where contributor_profile_id = any($1::text[])', [profileIds]),
     query(
-      `select scheduled_for, created_at, status
+      `select scheduled_for, created_at, status, reason, reason_detail
          from account_deletion_requests where user_id = $1`,
       [userId],
     ),
@@ -368,7 +368,7 @@ async function requestDeletion(req: Request, auth: AuthContext): Promise<Respons
   if (normalizeEmail(body.email) !== auth.user.email || !(await verifyPasswordHash(body.password, auth.user)).verified) {
     return jsonResponse({ error: '邮箱或当前密码不正确。', code: 'account_confirmation_invalid' }, 400)
   }
-  const accepted = await requestAccountDeletion(auth.user)
+  const accepted = await requestAccountDeletion(auth.user, { reason: body.reason, reason_detail: body.reason_detail })
   return jsonResponse({
     ok: true,
     scheduled_for: accepted.scheduledFor,

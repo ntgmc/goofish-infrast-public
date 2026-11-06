@@ -70,6 +70,10 @@ export const PERSONAL_DATA_EXPORT_COVERAGE = {
   user_feedback: { disposition: 'export', field: 'feedback' },
   user_announcement_reads: { disposition: 'export', field: 'announcement_reads' },
   account_deletion_requests: { disposition: 'export', field: 'deletion_request' },
+  account_deletion_records: {
+    disposition: 'exclude',
+    reason: '正式注销后保留邮箱摘要以限制再次注册；注销问卷保留一年，记录不关联存续账号。',
+  },
   personal_use_declaration_acceptances: { disposition: 'export', field: 'personal_use_declarations' },
   personal_use_declaration_usage_events: { disposition: 'export', field: 'personal_use_declaration_usage_events' },
   account_deletion_email_outbox: {

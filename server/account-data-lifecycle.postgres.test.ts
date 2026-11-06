@@ -7,13 +7,14 @@ import {
   getAccountDeletionConfigurationHealth,
   processAccountDeletionEmailOutbox,
   processDueAccountDeletions,
-  requestAccountDeletion,
+  requestAccountDeletion as submitAccountDeletion,
+  startAccountDeletionWorker,
 } from './account-data-lifecycle'
 import { closePool, query, withTransaction } from './storage/postgres'
 import { getItemBalance, grantItem, reserveItemsInTransaction } from './storage/inventory-store'
 import { createPostgresOptimizeJobStore } from './storage/optimize-job-store'
 import { ensureDatabaseSchema } from './storage/schema'
-import type { UserAccountRecord, UserGameAccountRecord } from './storage/user-store'
+import { insertUserAccountForRegistration, RegistrationEmailConflictError, RegistrationEmailDeletedError, type UserAccountRecord, type UserGameAccountRecord } from './storage/user-store'
 import { createPasswordHash } from './security/password'
 import { loginUser } from './handlers/user-auth'
 
@@ -33,6 +34,8 @@ vi.mock('./behavior-risk/service', () => ({
 let container: StartedPostgreSqlContainer | undefined
 const originalPublicAppUrl = process.env.PUBLIC_APP_URL
 const originalDepotSecret = process.env.DEPOT_SAMPLE_HASH_SECRET
+const survey = { reason: 'privacy' as const, reason_detail: '希望减少数据留存' }
+const requestAccountDeletion = (user: UserAccountRecord, now: Date) => submitAccountDeletion(user, survey, now)
 
 beforeAll(async () => {
   container = await new PostgreSqlContainer('postgres:16-alpine').start()
@@ -43,7 +46,7 @@ beforeAll(async () => {
 })
 
 beforeEach(async () => {
-  await query('truncate table account_deletion_email_outbox, user_accounts cascade')
+  await query('truncate table account_deletion_records, account_deletion_email_outbox, user_accounts cascade')
   mocks.recordAccountDeletedBehaviorEvent.mockReset().mockResolvedValue(undefined)
   mocks.sendAccountDeletionReceiptEmail.mockReset().mockResolvedValue(undefined)
 })
@@ -324,6 +327,74 @@ describe('account deletion PostgreSQL lifecycle', () => {
     expect(mocks.sendAccountDeletionReceiptEmail).toHaveBeenCalledTimes(2)
   })
 
+  it('saves the survey once, then removes it when deletion is cancelled', async () => {
+    const now = new Date()
+    const user = await seedUser('survey-cancel@example.test', now)
+    await requestAccountDeletion(user, now)
+    await submitAccountDeletion(user, { reason: 'other', reason_detail: '重复请求' }, now)
+    expect((await query('select reason, reason_detail from account_deletion_requests where user_id = $1', [user.id])).rows)
+      .toEqual([survey])
+    expect(await cancelAccountDeletionOnLogin(user, now)).toMatchObject({ status: 'active' })
+    expect(await countRows('account_deletion_requests', 'user_id', user.id)).toBe(0)
+    expect((await query('select * from account_deletion_records')).rows).toEqual([])
+  })
+
+  it('keeps only the email digest and survey after deletion and blocks registration racing with deletion', async () => {
+    const now = new Date()
+    const user = await seedUser('deleted-registration@example.test', now)
+    const accepted = await requestAccountDeletion(user, now)
+    const [deleted, registered] = await Promise.all([
+      processDueAccountDeletions(new Date(accepted.scheduledFor)),
+      insertUserAccountForRegistration({ ...user, id: randomUUID() }).then(() => null, (error: unknown) => error),
+    ])
+    expect(deleted).toBe(1)
+    expect(registered instanceof RegistrationEmailConflictError || registered instanceof RegistrationEmailDeletedError).toBe(true)
+    expect(await countRows('user_accounts', 'email', user.email)).toBe(0)
+    const records = await query('select * from account_deletion_records')
+    expect(records.rows).toEqual([{
+      email_hash: createHash('sha256').update(user.email).digest('hex'),
+      ...survey,
+      deleted_at: new Date(accepted.scheduledFor),
+    }])
+    await expect(insertUserAccountForRegistration({ ...user, id: randomUUID(), email: ` ${user.email.toUpperCase()} ` }))
+      .rejects.toBeInstanceOf(RegistrationEmailDeletedError)
+  })
+
+  it('rolls back the permanent registration block if physical deletion fails', async () => {
+    const now = new Date()
+    const user = await seedUser('delete-rollback@example.test', now)
+    const accepted = await requestAccountDeletion(user, now)
+    await query(`create function reject_physical_deletion() returns trigger language plpgsql as $$
+      begin raise exception 'injected deletion failure'; end $$`)
+    await query('create trigger reject_physical_deletion before delete on user_accounts for each row execute function reject_physical_deletion()')
+    try {
+      expect(await processDueAccountDeletions(new Date(accepted.scheduledFor))).toBe(0)
+      expect((await query('select * from account_deletion_records')).rows).toEqual([])
+      expect(await readUserStatus(user.id)).toBe('pending_deletion')
+      expect(await countRows('account_deletion_email_outbox', 'kind', 'receipt')).toBe(0)
+    } finally {
+      await query('drop trigger reject_physical_deletion on user_accounts')
+      await query('drop function reject_physical_deletion()')
+    }
+    expect(await processDueAccountDeletions(new Date(Date.parse(accepted.scheduledFor) + 61_000))).toBe(1)
+    await expect(insertUserAccountForRegistration({ ...user, id: randomUUID() })).rejects.toBeInstanceOf(RegistrationEmailDeletedError)
+  })
+
+  it('expires survey answers after one year while preserving the registration block', async () => {
+    const now = new Date(Date.now() - 374 * 86_400_000)
+    const user = await seedUser('expired-survey@example.test', now)
+    const accepted = await requestAccountDeletion(user, now)
+    expect(await processDueAccountDeletions(new Date(accepted.scheduledFor))).toBe(1)
+    const worker = startAccountDeletionWorker()
+    try {
+      await worker.waitForIdle()
+    } finally {
+      worker.stop()
+    }
+    expect((await query('select reason, reason_detail from account_deletion_records')).rows).toEqual([{ reason: null, reason_detail: '' }])
+    await expect(insertUserAccountForRegistration({ ...user, id: randomUUID() })).rejects.toBeInstanceOf(RegistrationEmailDeletedError)
+  })
+
   it('reports whether the physical deletion dependency is configured', () => {
     expect(getAccountDeletionConfigurationHealth({})).toEqual({ ok: false })
     expect(getAccountDeletionConfigurationHealth({ DEPOT_SAMPLE_HASH_SECRET: 'configured' })).toEqual({ ok: true })
@@ -500,6 +571,7 @@ async function countRows(table: string, column: string, value: string): Promise<
     'account_deletion_email_outbox:kind',
     'account_deletion_requests:user_id',
     'user_sessions:user_id',
+    'user_accounts:email',
   ])
   if (!allowed.has(`${table}:${column}`)) throw new Error('Unsupported test count query')
   const result = await query<{ count: string }>(`select count(*)::text as count from ${table} where ${column} = $1`, [value])

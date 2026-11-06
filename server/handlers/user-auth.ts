@@ -34,6 +34,7 @@ import {
   verifyUserEmailWithToken,
   upgradeUserPasswordHash,
   RegistrationEmailConflictError,
+  RegistrationEmailDeletedError,
   type UserAccountRecord,
   type UserGameAccountRecord,
   type UserSessionRecord,
@@ -266,6 +267,9 @@ export async function registerUser(
     } catch (error) {
       if (error instanceof RegistrationEmailConflictError) {
         return acceptedRegistrationResult(null, verificationRequired)
+      }
+      if (error instanceof RegistrationEmailDeletedError) {
+        return { ok: false, status: 403, message: error.message, code: 'registration_email_deleted' }
       }
       if (error instanceof AdminRegistrationInvitationError) {
         return { ok: false, status: 400, message: error.message, code: error.code }
@@ -694,7 +698,7 @@ async function redeemRegistrationCdk(
     })
     return { ok: true, profile: redeemed.response }
   } catch (error) {
-    if (error instanceof RegistrationEmailConflictError) throw error
+    if (error instanceof RegistrationEmailConflictError || error instanceof RegistrationEmailDeletedError) throw error
     return redemptionFailure(error)
   }
 }

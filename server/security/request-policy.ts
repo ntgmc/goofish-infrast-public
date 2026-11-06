@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { accountDeletionSurveySchema } from '../../src/lib/account-deletion-contracts'
 import { feedbackRequestSchema, feedbackReplySchema, adminFeedbackUpdateSchema } from '../../src/lib/feedback-contracts'
 import { giftPackOpeningRuleSchema } from '../../src/lib/admin-inventory-contracts'
 import { qqBotCampaignInputSchema } from '../../src/lib/qqbot-reward-contracts'
@@ -163,7 +164,7 @@ export const requestSchemas = {
     new_password: z.string().min(AUTH_PASSWORD_MIN_LENGTH).max(AUTH_PASSWORD_MAX_LENGTH),
   }),
   userInvitationCode: strict({ action: z.enum(['ensure', 'rotate', 'pause', 'resume']) }),
-  accountDelete: strict({
+  accountDelete: accountDeletionSurveySchema.extend({
     email: z.string().email().max(AUTH_EMAIL_MAX_LENGTH),
     password: z.string().min(1).max(AUTH_PASSWORD_MAX_LENGTH),
   }),

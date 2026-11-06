@@ -1042,6 +1042,8 @@ ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS lease_token TEXT;
 ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ;
 ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS last_error TEXT;
 ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS reason TEXT;
+ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS reason_detail TEXT NOT NULL DEFAULT '';
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -1066,6 +1068,13 @@ CREATE INDEX IF NOT EXISTS idx_account_deletion_requests_due
   ON account_deletion_requests(status, next_attempt_at, scheduled_for);
 CREATE INDEX IF NOT EXISTS idx_account_deletion_requests_lease
   ON account_deletion_requests(lease_expires_at) WHERE status = 'processing';
+
+CREATE TABLE IF NOT EXISTS account_deletion_records (
+  email_hash TEXT PRIMARY KEY,
+  reason TEXT,
+  reason_detail TEXT NOT NULL DEFAULT '',
+  deleted_at TIMESTAMPTZ NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS account_deletion_email_outbox (
   id TEXT PRIMARY KEY,
