@@ -121,11 +121,34 @@ const OVERVIEW_SQL = `${OPERATIONS_COHORT_SQL}, cost as (
   select c.*, case when prices_configured and expected_hours > 0 and recorded_hours = expected_hours
                     then expected_hours * resident_hourly_price_cny + worker_hours * hourly_price_cny end as estimated_cny
   from cost c
+), deletion_entries as materialized (
+  select d.email_hash as sort_key, 'completed' as status, d.deleted_at as recorded_at,
+         case when d.deleted_at > b.observed_at - interval '365 days' then coalesce(d.reason, 'unrecorded') else 'unrecorded' end as reason,
+         case when d.deleted_at > b.observed_at - interval '365 days' then d.reason_detail else '' end as detail
+  from account_deletion_records d cross join bounds b where d.deleted_at <= b.observed_at
+  union all
+  select r.id, r.status, r.created_at, coalesce(r.reason, 'unrecorded'), r.reason_detail
+  from account_deletion_requests r cross join bounds b where r.created_at <= b.observed_at
+), deletion_reasons as (
+  select reason,
+         count(*) filter (where status = 'completed')::integer as deleted,
+         count(*) filter (where status <> 'completed')::integer as pending
+  from deletion_entries d cross join bounds b
+  where d.status <> 'completed' or (d.recorded_at >= b.start_at and d.recorded_at < b.end_at)
+  group by reason
+), deletion_feedback as (
+  select recorded_at as at, case when status = 'completed' then 'completed' else 'pending' end as status, reason, detail
+  from deletion_entries d cross join bounds b
+  where detail <> '' and (d.status <> 'completed' or (d.recorded_at >= b.start_at and d.recorded_at < b.end_at))
+  order by recorded_at desc, sort_key
+  limit 20
 ), summaries as (
   select p.name, jsonb_build_object(
     'from', p.from_day, 'to', p.to_day, 'observed_until', p.end_at,
     'complete', p.start_at >= b.retained_from and a.unattributed_successes = 0 and a.unknown_outcomes = 0,
     'successful_users', a.successful_users, 'registered_users', n.registered_users,
+    'deleted_users', (select count(*)::integer from deletion_entries d
+      where d.status = 'completed' and d.recorded_at >= p.start_at and d.recorded_at < p.end_at),
     'successful_generations', a.successful_generations, 'failed_requests', a.failed_requests,
     'success_rate', case when p.start_at >= b.retained_from and a.unknown_outcomes = 0 then round(100.0 * a.successful_generations / nullif(a.successful_generations + a.failed_requests, 0), 1) end,
     'latency_samples', a.latency_samples, 'p50_wait_ms', a.p50_wait_ms, 'p95_wait_ms', a.p95_wait_ms,
@@ -177,6 +200,12 @@ select jsonb_build_object(
   'previous', (select summary from summaries where name = 'previous'),
   'days', (select jsonb_agg(to_jsonb(days) order by date) from days),
   'failure_reasons', coalesce((select jsonb_agg(to_jsonb(failures) order by count desc, reason_code) from failures), '[]'::jsonb),
+  'deletions', jsonb_build_object(
+    'total_deleted', (select count(*)::integer from deletion_entries where status = 'completed'),
+    'pending', (select count(*)::integer from deletion_entries where status <> 'completed'),
+    'failed', (select count(*)::integer from deletion_entries where status = 'failed'),
+    'reasons', coalesce((select jsonb_agg(to_jsonb(r) order by r.deleted + r.pending desc, r.reason) from deletion_reasons r), '[]'::jsonb),
+    'recent_feedback', coalesce((select jsonb_agg(to_jsonb(f) order by f.at desc) from deletion_feedback f), '[]'::jsonb)),
   'skland', jsonb_build_object('successful', k.successful, 'failed', k.failed,
     'success_rate', round(100.0 * k.successful / nullif(k.successful + k.failed, 0), 1)),
   'coverage', jsonb_build_object('retained_from', b.retained_from,

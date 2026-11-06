@@ -4,6 +4,7 @@ import { operationsDate, type OperationsPeriod } from '../../../lib/operations-o
 import type { AdminController } from '../useAdminController'
 import ActivityTrend from './ActivityTrend'
 import OperationsTodosPanel from './OperationsTodosPanel'
+import DeletionStatistics from './DeletionStatistics'
 import { operationsUsersPath, operationsFailureLabels } from '../../../lib/operations-drilldown'
 import './overview.css'
 
@@ -100,6 +101,7 @@ export default function OverviewSection({ model: c, active = true }: Props) {
           <p className="ops-observation-note">计算资源费用包含常驻和弹性实例；数据库、存储和邮件费用需另行核算。</p>
         </section>
       </div>
+      <DeletionStatistics data={data} />
       <footer className="ops-data-note"><p>上期：{previous.from} 至 {previous.to}，按相同已过时长比较。观察期尚未完成和暂无样本的指标显示为“—”。</p>
         <p>MAA 文件获取统计服务器已提供文件的方案；实际导入和执行情况由用户在 MAA 中确认。</p>
         <p>生成成功率按已记录的成功和失败请求统计；排队中、已取消的任务可在任务监控中查看。</p>

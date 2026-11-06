@@ -54,6 +54,13 @@ it('cancels obsolete ranges and preserves only the current range snapshot on a f
   expect(result.current.overview.overviewPartialFailure).toBe(true)
 })
 
+it('rejects reports missing the deletion statistics contract', async () => {
+  api.json.mockResolvedValue({ ...createOperationsOverview(), deletions: undefined })
+  const { result } = renderHook(() => useAdminOverview(options))
+  await waitFor(() => expect(result.current.overviewError).toContain('版本不兼容'))
+  expect(result.current.businessOverview).toBeNull()
+})
+
 it('isolates administrators and permissions and cancels queries on navigation and logout', async () => {
   const requests: Array<{ signal: AbortSignal; finish: (data: unknown) => void }> = []
   api.json.mockImplementation((_url, init) => new Promise((resolve) => requests.push({ signal: init.signal, finish: resolve })))

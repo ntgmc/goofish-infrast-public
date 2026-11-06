@@ -78,6 +78,8 @@ describe('business operations aggregates', () => {
     expect(data.skland).toEqual({ successful: 1, failed: 1, success_rate: 50 })
     expect(data.failure_reasons).toEqual([{ reason_code: 'optimizer_runtime_error', count: 1 }])
     expect(data.coverage.complete).toBe(true)
+    expect(data.current.deleted_users).toBe(0)
+    expect(data.deletions).toEqual({ total_deleted: 0, pending: 0, failed: 0, reasons: [], recent_feedback: [] })
     expect(JSON.stringify(data)).not.toContain('@example.test')
     expect(JSON.stringify(data)).not.toContain('a-profile')
   })
@@ -155,6 +157,68 @@ describe('business operations aggregates', () => {
     const recent = await getOperationsOverview('2030-01-29', '2030-01-31', now)
     expect(recent.current.activation).toMatchObject({ eligible: 0, pending: 1, rate: null })
     expect(recent.current.reuse).toMatchObject({ eligible: 0, pending: 2, rate: null })
+  })
+
+  it('counts completed deletions by Shanghai dates and current requests separately, retaining no expired survey answers', async () => {
+    try {
+      for (const [id, at, reason, detail] of [
+        ['previous', '2030-01-19T15:59:59Z', 'privacy', '上期反馈'],
+        ['start', '2030-01-19T16:00:00Z', 'privacy', '本期隐私反馈'],
+        ['middle', '2030-01-25T12:00:00Z', 'results_unsatisfactory', '本期排班反馈'],
+        ['legacy', '2030-01-31T15:59:59Z', null, ''],
+        ['end', '2030-01-31T16:00:00Z', 'other', '范围外反馈'],
+        ['future', '2030-02-02T00:00:00Z', 'other', '未来反馈'],
+        ['expired', '2028-01-01T00:00:00Z', 'privacy', '已经到期的反馈'],
+      ] as const) {
+        await query('insert into account_deletion_records (email_hash, deleted_at, reason, reason_detail) values ($1, $2, $3, $4)',
+          [`deletion-test-${id}`, at, reason, detail])
+      }
+      for (const [id, status, at, reason] of [
+        ['pending', 'pending', '2030-01-01T00:00:00Z', 'privacy'],
+        ['processing', 'processing', '2030-01-30T00:00:00Z', 'results_unsatisfactory'],
+        ['failed', 'failed', '2030-01-31T00:00:00Z', 'other'],
+        ['future-request', 'pending', '2030-02-02T00:00:00Z', 'other'],
+      ] as const) {
+        const userId = `deletion-test-${id}`
+        await query(`insert into user_accounts (id, email, password_hash, salt, iterations, permission, status, record_json, created_at, updated_at)
+          values ($1, $1 || '@example.test', 'fixture', 'fixture', 1, 'growth', 'pending_deletion', '{}', '2020-01-01', '2020-01-01')`, [userId])
+        await query(`insert into account_deletion_requests (id, user_id, cancel_token_hash, scheduled_for, status, created_at, reason, reason_detail)
+          values ($1, $1, $1, $2::timestamptz + interval '7 days', $3, $2, $4, $5)`,
+        [userId, at, status, reason, `${id}申请反馈`])
+      }
+      const data = await getOperationsOverview('2030-01-20', '2030-01-31', now)
+      expect(data.current.deleted_users).toBe(3)
+      expect(data.previous.deleted_users).toBe(1)
+      expect(data.deletions).toMatchObject({ total_deleted: 6, pending: 3, failed: 1 })
+      expect(data.deletions.reasons).toEqual(expect.arrayContaining([
+        { reason: 'privacy', deleted: 1, pending: 1 },
+        { reason: 'results_unsatisfactory', deleted: 1, pending: 1 },
+        { reason: 'unrecorded', deleted: 1, pending: 0 },
+        { reason: 'other', deleted: 0, pending: 1 },
+      ]))
+      expect(data.deletions.reasons.reduce((sum, item) => sum + item.deleted, 0)).toBe(data.current.deleted_users)
+      expect(data.deletions.reasons.reduce((sum, item) => sum + item.pending, 0)).toBe(data.deletions.pending)
+      expect(data.deletions.recent_feedback).toHaveLength(5)
+      expect(JSON.stringify(data.deletions)).not.toMatch(/email_hash|deletion-test-|范围外反馈|未来反馈|上期反馈|已经到期的反馈/)
+      const expired = await getOperationsOverview('2028-01-01', '2028-01-01', now)
+      expect(expired.current.deleted_users).toBe(1)
+      expect(expired.deletions.reasons).toContainEqual({ reason: 'unrecorded', deleted: 1, pending: 0 })
+      expect(JSON.stringify(expired.deletions)).not.toContain('已经到期的反馈')
+      await query(`insert into account_deletion_records (email_hash, deleted_at, reason, reason_detail)
+        select 'deletion-test-bulk-' || n, '2030-01-26T00:00:00Z'::timestamptz + n * interval '1 hour', 'other', '批量反馈' || n
+        from generate_series(1, 25) n`)
+      const bounded = await getOperationsOverview('2030-01-20', '2030-01-31', now)
+      expect(bounded.deletions.recent_feedback).toHaveLength(20)
+      const dates = bounded.deletions.recent_feedback!.map((item) => Date.parse(item.at))
+      expect(dates).toEqual([...dates].sort((a, b) => b - a))
+      await query("delete from account_deletion_requests where id = 'deletion-test-pending'")
+      const cancelled = await getOperationsOverview('2030-01-20', '2030-01-31', now)
+      expect(cancelled.deletions.pending).toBe(2)
+      expect(cancelled.current.deleted_users).toBe(bounded.current.deleted_users)
+    } finally {
+      await query("delete from user_accounts where id like 'deletion-test-%'")
+      await query("delete from account_deletion_records where email_hash like 'deletion-test-%'")
+    }
   })
 
   it('does not turn missing cost hours, expired records or unknown outcomes into complete metrics', async () => {
