@@ -14,6 +14,7 @@ describe('projectOptimizeResultForCapabilities', () => {
     const input = result()
     input.daily_production = {
       hours: 24, manufacturing: { 'Pure Gold': 100, 'Battle Record': 30 },
+      support: { Clue: 2, 'Recruitment Refresh': 3 },
       trading: { LMD: 50000 }, consumption: { 'Pure Gold': 100 }, net: { 'Pure Gold': 0 },
       details: [{ secretCalculation: 'room-breakdown' }],
       dynamic_resource_details: [{ secretCalculation: 'dynamic-breakdown' }],
@@ -22,6 +23,7 @@ describe('projectOptimizeResultForCapabilities', () => {
     expect(projected.daily_production).toEqual({
       hours: 24, manufacturing: input.daily_production.manufacturing, trading: input.daily_production.trading,
       consumption: input.daily_production.consumption, net: input.daily_production.net,
+      support: input.daily_production.support,
     })
     expect(projected.total_efficiency).toBe(100)
     expect(projected.raw_results).toEqual([])

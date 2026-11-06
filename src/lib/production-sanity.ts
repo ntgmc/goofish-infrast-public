@@ -7,6 +7,7 @@ import {
 } from './orundum-economy'
 import type { DailyProduction } from './types'
 import { recyclingSanity } from './recycling'
+import { supportRoomSanity } from './support-room-economy'
 import { copy, CURRENT_LOCALE } from '../copy/index'
 
 
@@ -32,11 +33,12 @@ export function calculateProductionSanity(daily: Partial<DailyProduction> | null
     getResourceAmount(consumption, 'Originium Shard') * SANITY_PER_ORIGINIUM_SHARD_OPPORTUNITY +
     getResourceAmount(consumption, 'LMD') * SANITY_PER_LMD
   const recoveredSanity = recyclingSanity(daily?.recycling)
-  const value = manufacturingSanity + tradingSanity + recoveredSanity - consumptionSanity
+  const supportSanity = supportRoomSanity(daily?.support)
+  const value = manufacturingSanity + tradingSanity + recoveredSanity + supportSanity - consumptionSanity
 
   return {
     value,
-    note: `${copy.domain.lib_production_sanity_001}${formatSanityAmount(manufacturingSanity)}${copy.domain.lib_production_sanity_002}${formatSanityAmount(tradingSanity)}${copy.domain.lib_production_sanity_003}${formatSanityAmount(consumptionSanity)}${recoveredSanity > 0 ? copy.domain.recycling.sanityNote(formatSanityAmount(recoveredSanity)) : ''}`,
+    note: `${copy.domain.lib_production_sanity_001}${formatSanityAmount(manufacturingSanity)}${copy.domain.lib_production_sanity_002}${formatSanityAmount(tradingSanity)}${copy.domain.lib_production_sanity_003}${formatSanityAmount(consumptionSanity)}${recoveredSanity > 0 ? copy.domain.recycling.sanityNote(formatSanityAmount(recoveredSanity)) : ''}${supportSanity > 0 ? copy.domain.supportRooms.sanityNote(formatSanityAmount(supportSanity)) : ''}`,
   }
 }
 

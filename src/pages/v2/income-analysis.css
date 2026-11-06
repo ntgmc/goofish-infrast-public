@@ -15,7 +15,7 @@
 .v2-income-content h4 { font-size: var(--text-sm); }
 .v2-income-content ul { list-style: none; margin: 0; padding: 0; }
 .v2-income-content small { font-size: var(--text-xs); font-weight: 400; color: var(--v2-muted); }
-.v2-income-section { display: grid; gap: var(--space-md); }
+.v2-income-section { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
 .v2-income-section + .v2-income-section { border-top: 1px solid var(--v2-line); padding-top: var(--space-lg); }
 .v2-income-heading { display: grid; gap: var(--space-2xs); }
 .v2-income-heading p, .v2-income-caption { color: var(--v2-secondary); font-size: var(--text-sm); line-height: 1.8; }
@@ -81,7 +81,7 @@
 .v2-income-station-meta dd { color: var(--v2-ink); }
 
 .v2-income-sanity-total { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
-.v2-income-sanity-total > strong { font-size: var(--text-3xl); font-weight: 600; line-height: 1.2; letter-spacing: -0.04em; }
+.v2-income-sanity-total > strong { font-size: min(var(--text-3xl), 20vw); font-weight: 600; line-height: 1.2; letter-spacing: -0.04em; }
 .v2-income-sanity-total > span { align-self: end; padding-bottom: var(--space-3xs); color: var(--v2-secondary); font-size: var(--text-sm); }
 .v2-income-contributions { display: grid; gap: var(--space-md); }
 .v2-income-contributions li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-3xs) var(--space-xs); }

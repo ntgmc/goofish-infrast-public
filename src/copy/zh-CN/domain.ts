@@ -1,4 +1,9 @@
 export const domainCopy = {
+  supportRooms: {
+    clue: "线索",
+    recruitmentRefresh: "公招标签刷新",
+    sanityNote: (value: string) => ` + 会客室与办公室 ${value}`,
+  },
   recycling: {
     title: "回收站",
     level: "回收站等级",

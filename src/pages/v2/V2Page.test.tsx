@@ -671,8 +671,11 @@ describe('V2 results-first workspace', () => {
     const workflow = connect()
     workflow.historyItem = { result: { ...SAMPLE_RESULT, daily_production: {
       hours: 24, source_hours: 16, normalization_factor: 1.5,
+      support: { Clue: 2, 'Recruitment Refresh': 3 },
       manufacturing: { 'Pure Gold': 20, 'Battle Record': 32.4 }, trading: { LMD: 3000 }, consumption: { 'Pure Gold': 6 },
       details: [
+        { shift: '早班', room_type: 'meeting', room_index: 1, product: 'Clue', amount: 2 },
+        { shift: '早班', room_type: 'hire', room_index: 1, product: 'Recruitment Refresh', amount: 3 },
         { shift: '早班', room_type: 'manufacture', room_index: 1, product: 'Pure Gold', amount: 20 },
         { shift: '早班', room_type: 'manufacture', room_index: 2, product: 'Battle Record', amount: 32.4 },
         { shift: '早班', room_type: 'trading', room_index: 2, product: 'LMD', amount: 2500, consume: { 'Pure Gold': 5 } },
@@ -689,22 +692,25 @@ describe('V2 results-first workspace', () => {
     await user.click(screen.getByRole('button', { name: copy.v2.analysisTab }))
     const station = within(await screen.findByRole('region', { name: copy.v2.stationOutput }))
     const stations = station.getAllByRole('article')
-    expect(stations).toHaveLength(3)
-    expect(stations[0].querySelector('summary')).toHaveTextContent('赤金 20')
-    expect(stations[1].querySelector('summary')).toHaveTextContent('经验 32,400')
-    expect(stations[2].querySelector('summary')).toHaveTextContent('龙门币 3,000')
-    await user.click(within(stations[2]).getByText(copy.v2.stationShiftDetails))
-    const tradeRows = within(stations[2]).getAllByRole('listitem')
+    expect(stations).toHaveLength(5)
+    expect(stations[0].querySelector('summary')).toHaveTextContent('会客室 1线索 2')
+    expect(stations[1].querySelector('summary')).toHaveTextContent('办公室 1公招标签刷新 3')
+    expect(stations[2].querySelector('summary')).toHaveTextContent('赤金 20')
+    expect(stations[3].querySelector('summary')).toHaveTextContent('经验 32,400')
+    expect(stations[4].querySelector('summary')).toHaveTextContent('龙门币 3,000')
+    await user.click(within(stations[4]).getByText(copy.v2.stationShiftDetails))
+    const tradeRows = within(stations[4]).getAllByRole('listitem')
     expect(tradeRows).toHaveLength(2)
     expect(tradeRows[0]).toHaveTextContent(`早班龙门币 2,500${copy.v2.consumption}赤金 5`)
     expect(tradeRows[1]).toHaveTextContent(`早班${copy.v2.drones}龙门币 500${copy.v2.consumption}赤金 1`)
-    const sanity = (3000 + 32400) * SANITY_PER_LMD + 14 * SANITY_PER_PURE_GOLD
+    const sanity = (3000 + 32400) * SANITY_PER_LMD + 14 * SANITY_PER_PURE_GOLD + 2 * 1.296 + 3 * 2.384317143511598
     const calculation = screen.getByRole('region', { name: copy.v2.sanityCalculation })
     expect(calculation).toHaveTextContent(sanity.toFixed(2))
     expect(screen.getByRole('region', { name: copy.v2.sanity })).toHaveTextContent(`${sanity.toFixed(2)}${copy.v2.sanityUnit}`)
     await user.click(within(calculation).getByText(copy.v2.conversionDetails))
     expect(calculation).toHaveTextContent('32,400 × 0.003600 ≈ 116.64')
     expect(calculation).toHaveTextContent(copy.v2.battleRecordEquivalent('32.4'))
+    expect(calculation).toHaveTextContent(copy.v2.supportIncomeNote)
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
