@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import {
   ControlRoomIcon, TradingStationIcon, ManufactureIcon, PowerPlantIcon, DormitoryIcon, MeetingRoomIcon,
-  RecruitmentIcon, TrainingRoomIcon, DroneIcon, OperatorsIcon, TasksIcon, ShiftTimeIcon, ServiceStatusIcon,
-  LmdIcon, ExperienceIcon, type LucideIcon,
+  RecruitmentIcon, TrainingRoomIcon, DroneIcon, OperatorsIcon, TasksIcon, ShiftTimeIcon,
+  DoctorProfileIcon, SanityIcon, MoraleIcon, LmdIcon, ExperienceIcon, type LucideIcon,
 } from '../../../components/icons'
 import ProductIcon from '../../../components/ProductIcon'
 import { copy } from '../../../copy'
@@ -29,7 +29,7 @@ export function SklandOverview({ game, lmd, exp }: { game: SklandGame; lmd: numb
   return <div className="skland-game skland-overview">
     <section className="skland-profile">
       <div className="skland-profile-main">
-        <span className="skland-eyebrow"><ControlRoomIcon size={16} aria-hidden="true" />{text.doctorProfile}</span>
+        <span className="skland-eyebrow"><DoctorProfileIcon size={16} aria-hidden="true" />{text.doctorProfile}</span>
         <div className="skland-profile-name"><h2>{player.name ?? text.name}</h2>{player.level != null && <span className="skland-level">Lv.{player.level}</span>}</div>
         <dl className="skland-profile-details"><div><dt>{text.mainStage}</dt><dd>{player.mainStage ?? text.unavailable}</dd></div><div><dt>{text.lastOnline}</dt><dd>{date(player.lastOnline)}</dd></div></dl>
       </div>
@@ -38,7 +38,7 @@ export function SklandOverview({ game, lmd, exp }: { game: SklandGame; lmd: numb
       {player.dataAt != null && player.dataAt > 0 && <p className="skland-profile-time">{text.sourceTime(date(player.dataAt))}</p>}
     </section>
     <div className="skland-resource-grid">
-      <Resource label={text.sanity} icon={ServiceStatusIcon} value={ratio(player.sanity)} current={player.sanity?.current} max={player.sanity?.max} tone="trading">
+      <Resource label={text.sanity} icon={SanityIcon} value={ratio(player.sanity)} current={player.sanity?.current} max={player.sanity?.max} tone="trading">
         {player.sanity?.completeAt ? <span>{text.recovery} {date(player.sanity.completeAt)}</span> : null}
       </Resource>
       <Resource label={text.drones} icon={DroneIcon} value={ratio(game.building?.drones)} current={game.building?.drones?.current} max={game.building?.drones?.max} tone="power" />
@@ -123,7 +123,7 @@ function Resident({ operator, role, overlay = false }: { operator: SklandRoom['o
   return <li className="skland-resident" data-overlay={overlay} data-tired={morale != null && morale <= 4}>
     <span className="skland-portrait-frame">
       <span className="skland-portrait" aria-hidden="true">{!failed ? <img src={`/webp96/${encodeURIComponent(operator.id)}.webp`} alt="" width={96} height={96} loading="lazy" decoding="async" onError={() => setFailed(true)} /> : <span>{operator.name.slice(0, 1)}</span>}</span>
-      {overlay && <span className="skland-morale-overlay" aria-label={moraleLabel} title={morale == null ? text.unavailable : moraleLabel}><ServiceStatusIcon size={12} aria-hidden="true" /><b>{morale ?? '—'}</b></span>}
+      {overlay && <span className="skland-morale-overlay" aria-label={moraleLabel} title={morale == null ? text.unavailable : moraleLabel}><MoraleIcon size={12} aria-hidden="true" /><b>{morale ?? '—'}</b></span>}
     </span>
     <div className="skland-resident-name">{role && <small>{role}</small>}<strong>{operator.name}</strong></div>
     {!overlay && <><span className="skland-morale" title={morale == null ? text.unavailable : undefined}>{text.morale} <b>{morale == null ? text.moraleUnavailable : `${morale} / 24`}</b></span><Meter label={`${operator.name} · ${text.morale}`} current={operator.morale} max={24} /></>}

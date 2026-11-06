@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { AnimationIcon, AnnouncementIcon, CollapsedIcon, ComparisonIcon, FacilitiesIcon, GenerateIcon, HelpIcon, OperatorsIcon, OverviewIcon, PricingIcon, ProjectsIcon, ReleasesIcon, ResultHistoryIcon, ServiceStatusIcon, SupportIcon, ToolsIcon } from '../../components/icons'
+import { AnimationIcon, AnnouncementIcon, CollapsedIcon, ComparisonIcon, FacilitiesIcon, GenerateIcon, HelpIcon, MoreIcon, OperatorsIcon, OverviewIcon, PricingIcon, ProjectsIcon, ReleasesIcon, ResultHistoryIcon, ServiceStatusIcon, SiteBenchmarkIcon, SupportIcon, ToolsIcon } from '../../components/icons'
 import Link from '../../components/InternalLink'
 import FeedbackButton from '../../components/FeedbackDialog'
 import { copy } from '../../copy'
@@ -16,7 +16,7 @@ const moreEntries = [...supportEntries, ...productEntries, 'status'] as const
 const toolSections: V2Section[] = ['tools', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'training-ratio', 'material-demand', 'depot']
 const icons = {
   overview: OverviewIcon, generation: GenerateIcon, plans: ResultHistoryIcon, lab: ComparisonIcon, 'cultivation-projects': ProjectsIcon, tools: ToolsIcon,
-  announcements: AnnouncementIcon, pricing: PricingIcon, help: HelpIcon, support: SupportIcon, status: ServiceStatusIcon, updates: ReleasesIcon, benchmarks: ComparisonIcon,
+  announcements: AnnouncementIcon, pricing: PricingIcon, help: HelpIcon, support: SupportIcon, status: ServiceStatusIcon, updates: ReleasesIcon, benchmarks: SiteBenchmarkIcon,
 }
 
 export default function V2Navigation({ section, session, operatorCount, sampleOperators, onPanel, onClose }: {
@@ -103,7 +103,7 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
         if (event.key === 'End' || index < 0 && event.key === 'ArrowUp') next = entries.length - 1
         entries[(next + entries.length) % entries.length]?.focus()
       }}>
-        <summary className={`v2-nav-item ${moreCurrent ? 'v2-nav-active' : ''}`}><HelpIcon size={19} aria-hidden="true" /><span>{text.navigationMore}</span>
+        <summary className={`v2-nav-item ${moreCurrent ? 'v2-nav-active' : ''}`}><MoreIcon size={19} aria-hidden="true" /><span>{text.navigationMore}</span>
           {features.announcements && session.announcementUnreadCount > 0 && <small aria-label={text.unreadAnnouncements(session.announcementUnreadCount)}>{session.announcementUnreadCount}</small>}
           <CollapsedIcon className="v2-nav-chevron" size={16} aria-hidden="true" />
         </summary>

@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react'
 import ConfigCapabilityPreview from '../../components/ConfigCapabilityPreview'
 import type { ConfigDiffItem } from '../../lib/workspace-history'
-import { BalanceIcon, BillingIcon, InventoryIcon, LoadingIcon, NextIcon as ArrowRight, OverviewIcon, SelectedIcon as Check, SettingsIcon, LogoutIcon as LogOut, AccountIcon as UserRound, SuccessIcon } from '../../components/icons'
+import { BalanceIcon, BillingIcon, InventoryIcon, LoadingIcon, NextIcon as ArrowRight, SelectedIcon as Check, SettingsIcon, LogoutIcon as LogOut, AccountIcon as UserRound, SuccessIcon } from '../../components/icons'
 import AuthForm from '../../components/AuthForm'
+import SklandIcon from '../../components/SklandIcon'
 import AnimationSettings from '../../components/AnimationSettings'
 import ConfigEditor from '../../components/ConfigEditor'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/dialog'
@@ -28,7 +29,7 @@ export type OptionPanel = 'operators' | 'config' | 'account' | 'room' | 'setting
 export type V2Session = ReturnType<typeof useToolSession>
 
 const accountEntries = [
-  { section: 'skland', icon: OverviewIcon },
+  { section: 'skland', icon: SklandIcon },
   { section: 'inventory', icon: InventoryIcon }, { section: 'settings', icon: SettingsIcon },
   { section: 'commercial', icon: BillingIcon }, { section: 'balance', icon: BalanceIcon },
 ] as const
