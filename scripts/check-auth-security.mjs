@@ -1969,6 +1969,7 @@ function adminSessionStoreMock() {
 
 function userStoreMigrationMock() {
   return `
+    export class RegistrationEmailDeletedError extends Error {}
     export class RegistrationEmailConflictError extends Error {}
     export async function insertUserAccountForRegistration() {}
     export async function updateUserPasswordAtomically() { return { ok: false, reason: 'password_update_conflict' } }
@@ -2039,6 +2040,7 @@ function userStoreMigrationMock() {
 
 function userRegistrationCdkStoreMock() {
   return `
+    export class RegistrationEmailDeletedError extends Error {}
     export class RegistrationEmailConflictError extends Error {}
     export async function insertUserAccountForRegistration(user) {
       globalThis.__authSecurityRegistrationAccountSyncs.push(structuredClone(user))
@@ -2188,6 +2190,7 @@ function userRegistrationCdkRedemptionMock() {
 
 function userSessionAuthStoreMock() {
   return `
+    export class RegistrationEmailDeletedError extends Error {}
     export class RegistrationEmailConflictError extends Error {}
     export async function insertUserAccountForRegistration() {}
     export async function updateUserPasswordAtomically() { return { ok: false, reason: 'password_update_conflict' } }
@@ -2316,6 +2319,7 @@ function userSessionPostgresMock() {
 
 function passwordResetAuthStoreMock() {
   return `
+    export class RegistrationEmailDeletedError extends Error {}
     export class RegistrationEmailConflictError extends Error {}
     export async function insertUserAccountForRegistration() {}
     export async function deleteEmailVerificationTokenByHash() {}

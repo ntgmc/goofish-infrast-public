@@ -1,6 +1,6 @@
 import { memo, useId, useState, type KeyboardEvent, type ComponentType } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
-import { OpenDetailsIcon as ArrowUpRight, DormitoryIcon as BedDouble, ControlRoomIcon as Building2, ShiftTimeIcon as Clock3, DroneIcon as Drone, ManufactureIcon as Factory, TrainingRoomIcon as GraduationCap, GridViewIcon as LayoutGrid, ListViewIcon as List, RecruitmentIcon as UserRoundSearch, MeetingRoomIcon, OperatorsIcon as Users, ProcessingRoomIcon as Wrench, PowerPlantIcon as Zap, UnknownFacilityIcon } from '../../components/icons'
+import { OpenDetailsIcon as ArrowUpRight, DormitoryIcon as BedDouble, ControlRoomIcon as Building2, ShiftTimeIcon as Clock3, DroneIcon as Drone, ManufactureIcon as Factory, TrainingRoomIcon as GraduationCap, GridViewIcon as LayoutGrid, ListViewIcon as List, RecruitmentIcon as UserRoundSearch, MeetingRoomIcon, OperatorsIcon as Users, ProcessingRoomIcon as Wrench, PowerPlantIcon as Zap, RecyclingStationIcon, UnknownFacilityIcon } from '../../components/icons'
 import { copy } from '../../copy'
 import type { PreparedResult } from '../../components/result-panel/formatters'
 import OperatorSkillPreview from '../../components/result-panel/OperatorSkillPreview'
@@ -18,7 +18,7 @@ const ROOM_ORDER = ['trading', 'manufacture', 'control', 'power', 'meeting', 'pr
 const MAXIMUM_LEVELS: Record<string, number> = { trading: 3, manufacture: 3, power: 3, control: 5, dormitory: 5, meeting: 3, processing: 3, hire: 3, training: 3 }
 const ROOM_ICONS: Record<string, ComponentType<{size?: number}>> = {
   trading: TradingIcon, manufacture: Factory, control: Building2, power: Zap,
-  meeting: MeetingRoomIcon, processing: Wrench, hire: UserRoundSearch, training: GraduationCap, dormitory: BedDouble,
+  meeting: MeetingRoomIcon, processing: Wrench, hire: UserRoundSearch, training: GraduationCap, recycling: RecyclingStationIcon, dormitory: BedDouble,
 }
 
 export function roomLevelLabel(room: BoardRoom) {

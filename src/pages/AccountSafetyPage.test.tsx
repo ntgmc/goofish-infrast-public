@@ -39,6 +39,8 @@ describe('AccountSafetyPage lifecycle controls', () => {
     expect(password).toHaveAttribute('maxlength', '128')
     await user.type(email, 'user@example.test')
     await user.type(password, 'password')
+    expect(screen.getByRole('button', { name: '申请注销账号' })).toBeDisabled()
+    await user.selectOptions(screen.getByLabelText('注销原因（必选）'), 'privacy')
     await user.click(screen.getByRole('button', { name: '申请注销账号' }))
 
     expect(await screen.findByText('注销申请已受理')).toBeInTheDocument()

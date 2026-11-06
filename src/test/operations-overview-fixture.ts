@@ -5,7 +5,7 @@ export function createOperationsOverview(successfulUsers = 42): OperationsOvervi
   const from = shiftOperationsDate(to, -29)
   const current: OperationsPeriod = {
     from, to, observed_until: new Date().toISOString(), complete: true,
-    successful_users: successfulUsers, registered_users: 50, successful_generations: 100, failed_requests: 4,
+    successful_users: successfulUsers, registered_users: 50, deleted_users: 0, successful_generations: 100, failed_requests: 4,
     success_rate: 96.2, latency_samples: 98, p50_wait_ms: 30_000, p95_wait_ms: 125_000,
     activation: { eligible: 30, activated: 18, pending: 20, with_profile: 24, rate: 60 },
     reuse: { eligible: 35, reused: 14, pending: 7, rate: 40 },
@@ -18,6 +18,7 @@ export function createOperationsOverview(successfulUsers = 42): OperationsOvervi
     previous: { ...structuredClone(current), from: shiftOperationsDate(from, -30), to: shiftOperationsDate(from, -1), successful_users: 32 },
     days: Array.from({ length: 30 }, (_, index) => ({ date: shiftOperationsDate(from, index), successful_users: index % 6 + 1, registered_users: index % 4, successful_generations: index % 6 + 2, failed_requests: index % 8 === 0 ? 1 : 0 })),
     failure_reasons: [{ reason_code: 'optimizer_runtime_error', count: 4 }],
+    deletions: { total_deleted: 0, pending: 0, failed: 0, reasons: [], recent_feedback: [] },
     skland: { successful: 45, failed: 5, success_rate: 90 },
     coverage: { retained_from: shiftOperationsDate(from, -150), complete: true, unattributed_successes: 0, unknown_outcomes: 0, maa_tracking_started_at: `${shiftOperationsDate(from, -10)}T00:00:00Z` },
   }

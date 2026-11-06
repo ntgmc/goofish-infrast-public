@@ -1,5 +1,5 @@
 import { useId, type KeyboardEvent } from 'react'
-import { DormitoryIcon as BedDouble, ControlRoomIcon as Building2, DroneIcon as Drone, ManufactureIcon as Factory, TradingStationIcon as HandCoins, LockedOperatorIcon as LockKeyhole, MeetingRoomIcon as Users, ProcessingRoomIcon as Wrench, PowerPlantIcon as Zap, RecruitmentIcon, TrainingRoomIcon, UnknownFacilityIcon, type LucideIcon } from '../icons'
+import { DormitoryIcon as BedDouble, ControlRoomIcon as Building2, DroneIcon as Drone, ManufactureIcon as Factory, TradingStationIcon as HandCoins, LockedOperatorIcon as LockKeyhole, MeetingRoomIcon as Users, ProcessingRoomIcon as Wrench, PowerPlantIcon as Zap, RecruitmentIcon, TrainingRoomIcon, RecyclingStationIcon, UnknownFacilityIcon, type LucideIcon } from '../icons'
 import { copy } from '../../copy/index'
 import DroneSummary from './DroneSummary'
 import { formatCompactNumber, formatProduct, type PreparedResult } from './formatters'
@@ -20,7 +20,7 @@ const ROOM_STYLES: Record<string, { icon: LucideIcon; tone: string }> = {
   processing: { icon: Wrench, tone: 'text-ink-secondary' },
   hire: { icon: RecruitmentIcon, tone: 'text-ink-secondary' },
   training: { icon: TrainingRoomIcon, tone: 'text-ink-secondary' },
-  recycling: { icon: Wrench, tone: 'text-ink-secondary' },
+  recycling: { icon: RecyclingStationIcon, tone: 'text-ink-secondary' },
   dormitory: { icon: BedDouble, tone: 'text-success' },
 }
 

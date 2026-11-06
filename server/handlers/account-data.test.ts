@@ -241,9 +241,13 @@ describe('account data Skland controls', () => {
     const response = await accountDataHandler(new Request('http://localhost/api/user/data/delete-request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'user@example.test', password: 'password' }),
+      body: JSON.stringify({ email: 'user@example.test', password: 'password', reason: 'privacy', reason_detail: '  希望减少数据留存  ' }),
     }))
 
+    expect(mocks.requestAccountDeletion).toHaveBeenCalledWith(
+      { id: 'user-1', email: 'user@example.test' },
+      { reason: 'privacy', reason_detail: '希望减少数据留存' },
+    )
     expect(response.status).toBe(202)
     expect(response.headers.get('Set-Cookie')).toBe('session=; Max-Age=0')
     await expect(response.json()).resolves.toEqual({
@@ -257,7 +261,7 @@ describe('account data Skland controls', () => {
     const response = await accountDataHandler(new Request('http://localhost/api/user/data/delete-request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'user@example.test', password: 'password' }),
+      body: JSON.stringify({ email: 'user@example.test', password: 'password', reason: 'no_longer_needed' }),
     }))
 
     expect(response.status).toBe(429)

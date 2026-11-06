@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { ExportIcon } from '../../../components/icons'
+import { ExportMaaIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { buildMaaCultivationPlan, type CultivationProject, type ProjectOperator } from '../../../lib/cultivation-projects'
 import { Notice } from '../components/WorkspaceUI'
@@ -21,7 +21,7 @@ export function ProjectMaaExport({ projects, operators }: { projects: Cultivatio
     }
   }
   return <details className="v2-project-material-detail">
-    <summary><ExportIcon size={16} aria-hidden="true" />{text.maaExport}</summary>
+    <summary><ExportMaaIcon size={16} aria-hidden="true" />{text.maaExport}</summary>
     <p className="v2-muted" id={hintId}>{text.maaHint}</p>
     <p className="v2-muted">{text.maaLevelHint}</p>
     {!content ? <Notice>{plan === null ? text.maaUnavailable : text.maaEmpty}</Notice> : <>

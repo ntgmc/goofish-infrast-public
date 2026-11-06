@@ -20,7 +20,7 @@ afterEach(() => {
 })
 
 beforeEach(() => {
-  authenticateAdminRequest.mockReset().mockResolvedValue({ ok: true, username: 'usage-viewer' })
+  authenticateAdminRequest.mockReset().mockResolvedValue({ ok: true, username: 'usage-viewer', capabilities: ['usage_view'] })
   getOperationsOverview.mockReset().mockResolvedValue(createOperationsOverview())
   getOperationsTodos.mockReset().mockResolvedValue({ feedback_unassigned: null, feedback_reply: null, risk_pending: 3, abnormal_jobs: null })
 })
@@ -50,6 +50,28 @@ describe('usage stats handler', () => {
     expect(getOperationsOverview).toHaveBeenCalledWith(shiftOperationsDate(operationsDate(), -29), operationsDate())
     expect(set).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ event: 'business_metrics_started' }))
     await expect(response.json()).resolves.toMatchObject({ metrics_version: 'business.v1', timezone: 'Asia/Shanghai' })
+  })
+
+  it.each(['json', 'csv'])('restricts deletion feedback to user viewers in %s reports', async (format) => {
+    setUsageEventStoreForTesting({ set: async () => undefined, list: async () => [], getStats: async (dates) => buildUsageStats([], dates) })
+    const overview = createOperationsOverview()
+    overview.deletions = {
+      total_deleted: 5, pending: 2, failed: 0,
+      reasons: [{ reason: 'privacy', deleted: 3, pending: 2 }],
+      recent_feedback: [{ at: new Date().toISOString(), status: 'completed', reason: 'privacy', detail: '需要保护的注销补充说明' }],
+    }
+    getOperationsOverview.mockResolvedValue(overview)
+    const url = `http://localhost/api/admin/usage-stats?view=business&format=${format}`
+    const restricted = await usageStatsHandler(new Request(url))
+    expect(restricted.status).toBe(200)
+    const restrictedText = await restricted.text()
+    expect(restrictedText).not.toContain('需要保护的注销补充说明')
+    expect(restrictedText).toContain('privacy')
+    authenticateAdminRequest.mockResolvedValue({ ok: true, username: 'user-viewer', capabilities: ['usage_view', 'user_view'] })
+    const allowed = await usageStatsHandler(new Request(url))
+    expect(allowed.status).toBe(200)
+    expect(await allowed.text()).toContain('需要保护的注销补充说明')
+    expect(overview.deletions.recent_feedback).toHaveLength(1)
   })
 
   it('does not query or start tracking when the administrator lacks the usage capability', async () => {

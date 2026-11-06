@@ -248,7 +248,7 @@ textarea.v2-input { resize: vertical; }
 }
 
 /* Tools make their prerequisites and output explicit. */
-.v2-tools-directory > a { display: grid; grid-template-columns: 2rem 36px minmax(0, 1fr) 44px; align-items: start; gap: var(--space-lg); padding: var(--space-lg) var(--space-md); border-bottom: 1px solid var(--v2-line); > svg { color: var(--v2-accent); margin-top: var(--space-3xs); } p { font-size: var(--text-sm); margin-top: var(--space-xs); max-width: 65ch; } &:hover { background: var(--v2-paper); } }
+.v2-tools-directory > a { display: grid; grid-template-columns: 2rem 36px minmax(0, 1fr) 44px; align-items: start; gap: var(--space-lg); padding: var(--space-lg) var(--space-md); border-bottom: 1px solid var(--v2-line); > svg { color: var(--v2-accent); margin-top: var(--space-3xs); } > div { min-width: 0; white-space: normal; } p { font-size: var(--text-sm); margin-top: var(--space-xs); max-width: 65ch; } &:hover { background: var(--v2-paper); } }
 .v2-tool-number { color: var(--v2-muted); font-family: var(--font-mono); }
 .v2-tool-enter { display: grid; place-items: center; min-height: 44px; color: var(--v2-accent); }
 .v2-tool-source { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-md); padding-bottom: var(--space-lg); border-bottom: 1px solid var(--v2-line); > div:first-child { flex: 1 1 20rem; } p { font-size: var(--text-sm); max-width: 60ch; } .v2-field { flex: 1 1 12rem; margin: 0; max-width: 22rem; } }

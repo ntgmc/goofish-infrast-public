@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { FREE_PREVIEW_LIMITED_CDK_ACTIVITY } from '../free-preview-trial'
@@ -21,6 +21,7 @@ import {
   getWorkspace,
   insertUserAccountForRegistration,
   RegistrationEmailConflictError,
+  RegistrationEmailDeletedError,
   saveEmailVerificationToken,
   savePasswordResetToken,
   saveUserSession,
@@ -51,7 +52,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await query(
-    'truncate table user_accounts, brevo_email_deliveries, admin_registration_invitations, cdk_records cascade',
+    'truncate table account_deletion_records, user_accounts, brevo_email_deliveries, admin_registration_invitations, cdk_records cascade',
   )
 })
 
@@ -366,9 +367,13 @@ describe('registration email serialization', () => {
     expect(await countRows('user_accounts', 'email', email)).toBe(1)
   })
 
-  it('serializes ordinary, invitation, administrator invitation, and CDK registration', async () => {
+  it.each([false, true])('serializes all registration paths and honors deletion blocks (deleted: %s)', async (deleted) => {
     const now = new Date('2026-07-31T09:30:00.000Z')
     const email = 'cross-path@example.test'
+    if (deleted) {
+      await query('insert into account_deletion_records (email_hash, deleted_at) values ($1, $2)',
+        [createHash('sha256').update(email).digest('hex'), now.toISOString()])
+    }
     const inviter = await seedUser('inviter@example.test', now)
     const ordinaryUser = userRecord(email, now)
     const recommendedUser = userRecord(email, now)
@@ -409,9 +414,13 @@ describe('registration email serialization', () => {
     ])
 
     const winningIndex = attempts.findIndex((result) => result.status === 'fulfilled')
-    expect(attempts.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
-    expect(attempts.filter((result) => result.status === 'rejected')).toHaveLength(3)
-    expect(await countRows('user_accounts', 'email', email)).toBe(1)
+    expect(attempts.filter((result) => result.status === 'fulfilled')).toHaveLength(deleted ? 0 : 1)
+    const rejected = attempts.filter((result) => result.status === 'rejected')
+    expect(rejected).toHaveLength(deleted ? 4 : 3)
+    if (deleted) {
+      expect(rejected.every((result) => result.reason instanceof RegistrationEmailDeletedError)).toBe(true)
+    }
+    expect(await countRows('user_accounts', 'email', email)).toBe(deleted ? 0 : 1)
 
     const recommendationCount = await countRows('invitations', 'invitee_user_id', recommendedUser.id)
     expect(recommendationCount).toBe(winningIndex === 1 ? 1 : 0)

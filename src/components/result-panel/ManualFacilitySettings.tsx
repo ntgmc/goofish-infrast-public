@@ -1,7 +1,7 @@
 import { useId } from 'react'
 import { copy } from '../../copy'
 import type { OptimizeResult } from '../../lib/types'
-import { ControlRoomIcon, TradingStationIcon, ManufactureIcon, PowerPlantIcon, MeetingRoomIcon, ProcessingRoomIcon, RecruitmentIcon, TrainingRoomIcon, DormitoryIcon, ExpandIcon, type LucideIcon } from '../icons'
+import { ControlRoomIcon, TradingStationIcon, ManufactureIcon, PowerPlantIcon, MeetingRoomIcon, ProcessingRoomIcon, RecruitmentIcon, TrainingRoomIcon, RecyclingStationIcon, DormitoryIcon, ExpandIcon, type LucideIcon } from '../icons'
 import ProductIcon from '../ProductIcon'
 import { Tabs } from '../ui/tabs'
 import { PRODUCT_LABELS, ROOM_LABELS } from './labels'
@@ -10,7 +10,7 @@ import './ManualFacilitySettings.css'
 const icons: Record<string, LucideIcon> = {
   control: ControlRoomIcon, trading: TradingStationIcon, manufacture: ManufactureIcon, power: PowerPlantIcon,
   meeting: MeetingRoomIcon, processing: ProcessingRoomIcon, hire: RecruitmentIcon, training: TrainingRoomIcon,
-  recycling: ProcessingRoomIcon, dormitory: DormitoryIcon,
+  recycling: RecyclingStationIcon, dormitory: DormitoryIcon,
 }
 const groups = {
   production: ['trading', 'manufacture', 'power'],

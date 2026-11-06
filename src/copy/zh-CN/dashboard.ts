@@ -10,7 +10,22 @@ export const dashboardCopy = {
     credentials: "森空岛授权",
     no_credentials: "尚未绑定森空岛。导入游戏数据后，可在这里管理授权信息。",
     privacy_details: "个人数据的保存与删除",
-    deletion_help: "提交后立即退出登录，7 天内重新登录会自动取消注销。",
+    deletion_help: "提交后立即退出登录，7 天内重新登录可取消注销；到期后原邮箱无法再次注册。",
+    deletion_reason: '注销原因（必选）',
+    deletion_reason_placeholder: '请选择注销原因',
+    deletion_reasons: {
+      no_longer_needed: '暂时不需要使用',
+      results_unsatisfactory: '排班结果不符合预期',
+      difficult_to_use: '使用不方便',
+      price: '价格或付费方式不合适',
+      privacy: '担心个人数据和隐私',
+      other: '其他原因',
+      prefer_not_to_say: '不想说明',
+    },
+    deletion_detail: '补充说明（选填，最多 500 字）',
+    deletion_survey_help: '你的反馈将用于改进服务，请勿填写密码或授权凭据。',
+    deletion_survey_invalid: '请选择注销原因，补充说明最多 500 字。',
+    deletion_open_v2: '前往 V2 申请注销',
   },
   animation: {
     title: "动画效果",
@@ -245,7 +260,7 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_013: "失败，请稍后重试。",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_014: "提交注销申请后会显示注销时间并立即退出登录。7 天内重新登录会自动取消注销；到期后账号和个人数据将永久删除。确定继续吗？",
+  pages_tool_dashboard_SettingsSection_014: "提交注销申请后会显示注销时间并立即退出登录。7 天内重新登录会自动取消注销；到期后账号和个人数据将永久删除，原邮箱无法再次注册。确定继续吗？",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_015: "暂时无法提交注销申请，请确认邮箱和当前密码后重试。",
   // src/pages/tool/dashboard/SettingsSection.tsx
@@ -259,13 +274,13 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_021: "修改密码",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_023: "网站会保存登录资料、游戏档案、工作区和使用记录。仓库分析中的汇总样本会与网站档案关联，以便随账号一起删除。注销后有 7 天撤销期；到期后删除账号、工作区和关联样本。用于安全风控的去标识记录最长保留 90 天，个人使用声明记录在注销后最长保留一年。详情见隐私政策。",
+  pages_tool_dashboard_SettingsSection_023: "网站会保存登录资料、游戏档案、工作区和使用记录。仓库分析中的汇总样本会与网站档案关联，以便随账号一起删除。注销后有 7 天撤销期；到期后删除账号、工作区和关联样本。用于安全风控的去标识记录最长保留 90 天，个人使用声明记录和注销问卷在注销后最长保留一年。邮箱摘要会长期保留，用于限制再次注册。详情见隐私政策。",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_026: "清除授权信息",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_029: "注销账号",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_030: "提交后会显示注销时间并立即退出登录。7 天内重新登录会自动取消注销；到期后将永久删除账号、档案、授权信息、仓库样本、任务和常规使用记录。用于安全风控和法律留存的少量记录会按隐私政策所列期限自动删除。",
+  pages_tool_dashboard_SettingsSection_030: "提交后会显示注销时间并立即退出登录。7 天内重新登录会自动取消注销；到期后将永久删除账号、档案、授权信息、仓库样本、任务和常规使用记录。注销后原邮箱无法再次注册。注销问卷保留一年，邮箱摘要长期保留；其他安全及法律留存记录按隐私政策所列期限删除。",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_031: "确认邮箱",
   // src/pages/tool/dashboard/SettingsSection.tsx

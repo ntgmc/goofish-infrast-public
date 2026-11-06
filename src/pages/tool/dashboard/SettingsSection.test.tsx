@@ -100,7 +100,7 @@ describe('SettingsSection privacy controls', () => {
       scheduled_for: '2026-08-07T00:00:42.000Z',
     }), { status: 202, headers: { 'Content-Type': 'application/json' } })))
     const router = createMemoryRouter([
-      { path: '/tool/settings', element: <SettingsSection profiles={[]} onPayload={vi.fn()} /> },
+      { path: '/tool/settings', element: <SettingsSection safetyOnly profiles={[]} onPayload={vi.fn()} /> },
       { path: '/account-safety', element: <AccountSafetyPage /> },
     ], { initialEntries: ['/tool/settings'] })
     renderUi(<RouterProvider router={router} />)
@@ -111,6 +111,7 @@ describe('SettingsSection privacy controls', () => {
     expect(email).toHaveAttribute('maxlength', '254')
     await user.type(email, 'user@example.test')
     await user.type(screen.getByLabelText('当前密码', { selector: '#settings-delete-password' }), 'password')
+    await user.selectOptions(screen.getByLabelText('注销原因（必选）'), 'no_longer_needed')
     await user.click(screen.getByRole('button', { name: '申请注销账号' }))
 
     expect(await screen.findByText('注销申请已受理')).toBeInTheDocument()
@@ -129,11 +130,12 @@ describe('SettingsSection privacy controls', () => {
       status: 503, headers: { 'Content-Type': 'application/json' },
     })))
     const onDeletionStateChange = vi.fn()
-    render(<SettingsSection profiles={[]} onPayload={vi.fn()} onDeletionStateChange={onDeletionStateChange} />)
+    render(<SettingsSection safetyOnly profiles={[]} onPayload={vi.fn()} onDeletionStateChange={onDeletionStateChange} />)
     await user.click(screen.getByText('注销账号'))
     await user.type(screen.getByLabelText('确认邮箱'), 'user@example.test')
     const password = screen.getByLabelText('当前密码', { selector: '#settings-delete-password' })
     await user.type(password, 'password')
+    await user.selectOptions(screen.getByLabelText('注销原因（必选）'), 'privacy')
     await user.click(screen.getByRole('button', { name: '申请注销账号' }))
 
     const error = await screen.findByRole('alert')

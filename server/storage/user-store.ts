@@ -275,6 +275,13 @@ export class RegistrationEmailConflictError extends Error {
   }
 }
 
+export class RegistrationEmailDeletedError extends Error {
+  constructor() {
+    super('此邮箱对应的账号已注销，无法再次注册。')
+    this.name = 'RegistrationEmailDeletedError'
+  }
+}
+
 export async function insertUserAccountForRegistration(user: UserAccountRecord): Promise<void> {
   await ensureSchema()
   await withTransaction((client) => insertUserAccountForRegistrationInTransaction(client, user))
@@ -288,6 +295,12 @@ export async function insertUserAccountForRegistrationInTransaction(
     "select pg_advisory_xact_lock(hashtextextended('registration-email:' || $1, 0))",
     [user.email],
   )
+  const deleted = await client.query(
+    `select 1 from account_deletion_records
+      where email_hash = encode(sha256(convert_to(lower(btrim($1)), 'UTF8')), 'hex')`,
+    [user.email],
+  )
+  if (deleted.rowCount) throw new RegistrationEmailDeletedError()
   const inserted = await client.query(
     `insert into user_accounts
       (id, email, password_hash, salt, iterations, permission, status, cdk_key, cdk_code_hash, cdk_order_hash, email_verified_at, record_json, created_at, updated_at)

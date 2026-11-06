@@ -13,6 +13,8 @@ export const ROOM_LABELS: Record<string, string> = {
 }
 
 export const PRODUCT_LABELS: Record<string, string> = {
+  Clue: copy.domain.supportRooms.clue,
+  'Recruitment Refresh': copy.domain.supportRooms.recruitmentRefresh,
   LMD: copy.domain.components_result_panel_labels_009,
   Orundum: copy.domain.components_result_panel_labels_010,
   'Pure Gold': copy.domain.components_result_panel_labels_011,

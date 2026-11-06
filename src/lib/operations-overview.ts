@@ -1,3 +1,7 @@
+import type { AccountDeletionSurvey } from './account-deletion-contracts'
+
+export type OperationsDeletionReason = AccountDeletionSurvey['reason'] | 'unrecorded'
+
 export type OperationsRangeMode = '7d' | '14d' | '30d' | 'custom'
 
 export interface OperationsPeriod {
@@ -7,6 +11,7 @@ export interface OperationsPeriod {
   complete: boolean
   successful_users: number
   registered_users: number
+  deleted_users: number
   successful_generations: number
   failed_requests: number
   success_rate: number | null
@@ -41,6 +46,13 @@ export interface OperationsOverview {
   previous: OperationsPeriod
   days: Array<{ date: string; successful_users: number; registered_users: number; successful_generations: number; failed_requests: number }>
   failure_reasons: Array<{ reason_code: string; count: number }>
+  deletions: {
+    total_deleted: number
+    pending: number
+    failed: number
+    reasons: Array<{ reason: OperationsDeletionReason; deleted: number; pending: number }>
+    recent_feedback: Array<{ at: string; status: 'completed' | 'pending'; reason: OperationsDeletionReason; detail: string }> | null
+  }
   skland: { successful: number; failed: number; success_rate: number | null }
   coverage: {
     retained_from: string
@@ -80,7 +92,7 @@ export function operationsOverviewCsv(data: OperationsOverview): string {
     ['coverage', 'unknown_outcomes', data.coverage.unknown_outcomes, null],
     ['coverage', 'maa_tracking_started_at', data.coverage.maa_tracking_started_at, null],
   ]
-  for (const key of ['successful_users', 'registered_users', 'successful_generations', 'failed_requests', 'success_rate', 'latency_samples', 'p50_wait_ms', 'p95_wait_ms'] as const) {
+  for (const key of ['successful_users', 'registered_users', 'deleted_users', 'successful_generations', 'failed_requests', 'success_rate', 'latency_samples', 'p50_wait_ms', 'p95_wait_ms'] as const) {
     rows.push(['usage', key, data.current[key], data.previous[key]])
   }
   for (const key of ['eligible', 'activated', 'pending', 'with_profile', 'rate'] as const) {
@@ -102,6 +114,16 @@ export function operationsOverviewCsv(data: OperationsOverview): string {
     }
   }
   for (const reason of data.failure_reasons) rows.push(['failure_reason', reason.reason_code, '', reason.count, null])
+  for (const key of ['total_deleted', 'pending', 'failed'] as const) {
+    rows.push(['deletions', key, '', data.deletions[key], null])
+  }
+  for (const reason of data.deletions.reasons) {
+    rows.push(['deletion_reason', `${reason.reason}:deleted`, '', reason.deleted, null])
+    rows.push(['deletion_reason', `${reason.reason}:pending`, '', reason.pending, null])
+  }
+  for (const feedback of data.deletions.recent_feedback ?? []) {
+    rows.push(['deletion_feedback', `${feedback.status}:${feedback.reason}`, feedback.at, feedback.detail, null])
+  }
   return rows.map((row) => (row.length === 4 ? [row[0], row[1], '', row[2], row[3]] : row).map((value) => {
     const text = String(value ?? '')
     const safe = typeof value === 'string' && /^[\s]*[=+\-@]/.test(text) ? `'${text}` : text

@@ -46,6 +46,7 @@ export function projectOptimizeResultForCapabilities(
         ...(daily && { daily_production: {
           hours: daily.hours,
           manufacturing: daily.manufacturing,
+          ...(daily.support && { support: daily.support }),
           trading: daily.trading,
           consumption: daily.consumption,
           net: daily.net,

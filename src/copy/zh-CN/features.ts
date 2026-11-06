@@ -16,7 +16,7 @@ export const featuresCopy = {
   account_safety_body: '服务或登录暂停期间，已登录且登录状态仍有效的用户可以申请注销账号或安全退出。',
   delete_accepted_title: '注销申请已受理',
   delete_accepted_before: '账户将在 ',
-  delete_accepted_after: ' 起永久删除。7 天内重新登录会自动取消注销；到期后无法恢复。',
+  delete_accepted_after: ' 起永久删除。7 天内重新登录会自动取消注销；到期后无法恢复，原邮箱无法再次注册。',
   delete_signed_out: '你已退出登录，注销申请已生效。',
   delete_accepted_leave: '返回首页',
   account_error_authentication: '当前会话已失效，请重新登录后再试。',

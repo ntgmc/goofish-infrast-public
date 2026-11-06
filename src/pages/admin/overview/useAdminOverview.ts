@@ -28,7 +28,9 @@ export function useAdminOverview({ adminUsername, authenticated, capabilities, s
     enabled: usageEnabled,
     queryFn: async ({ signal }) => {
       const data = await adminApiJson<OperationsOverview>(`/api/admin/usage-stats?${query}`, { signal, fallbackMessage: '运营看板加载失败，请重新刷新。' })
-      if (data.metrics_version !== 'business.v1' || !data.current || !data.previous || !Array.isArray(data.days)) {
+      if (data.metrics_version !== 'business.v1' || !data.current || !data.previous || !Array.isArray(data.days)
+        || !data.deletions || !Array.isArray(data.deletions.reasons)
+        || data.deletions.recent_feedback !== null && !Array.isArray(data.deletions.recent_feedback)) {
         throw new Error('运营报表版本不兼容，请刷新页面后重试。')
       }
       return data

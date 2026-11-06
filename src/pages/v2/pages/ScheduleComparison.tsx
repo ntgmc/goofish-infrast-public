@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ComparisonIcon, UploadIcon } from '../../../components/icons'
+import { ScheduleComparisonIcon, UploadIcon } from '../../../components/icons'
 import FacilityLayoutEditor from '../../../components/FacilityLayoutEditor'
 import { OperatorAvatarTile } from '../../../components/result-panel/OperatorAvatarStrip'
 import { ROOM_LABELS } from '../../../components/result-panel/labels'
@@ -214,7 +214,7 @@ function ComparisonWorkspace({ userId, profileId, operators, config, workspace }
       <FacilityLayoutEditor key={JSON.stringify([baseConfig.trading_stations_count, baseConfig.manufacturing_stations_count, baseConfig.trading_station_levels, baseConfig.manufacturing_station_levels])}
         config={baseConfig} onUpdate={(mutate) => { const next = structuredClone(baseConfig); mutate(next); setConfigDraft(next) }} />
     </details>
-    <div className="v2-actions v2-schedule-comparison-run"><button className="v2-button v2-button-primary" disabled={busy || !left || !right} onClick={() => void simulate()}><ComparisonIcon size={18} aria-hidden="true" />{busy ? text.running : text.start}</button><p role="status" aria-live="polite">{progress}</p></div>
+    <div className="v2-actions v2-schedule-comparison-run"><button className="v2-button v2-button-primary" disabled={busy || !left || !right} onClick={() => void simulate()}><ScheduleComparisonIcon size={18} aria-hidden="true" />{busy ? text.running : text.start}</button><p role="status" aria-live="polite">{progress}</p></div>
     <Notice error>{error}</Notice>
     {outputs.some(Boolean) && <ProductionComparison outputs={outputs} names={[left?.name ?? '', right?.name ?? '']} />}
     {differences && <OperatorComparison differences={differences} operators={operators} />}

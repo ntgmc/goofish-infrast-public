@@ -634,6 +634,7 @@ export interface DailyProduction {
   shift_hours?: number[];
   manufacturing?: Record<string, number>;
   recycling?: Record<string, number>;
+  support?: Record<string, number>;
   trading?: Record<string, number>;
   consumption?: Record<string, number>;
   net?: Record<string, number>;
@@ -648,6 +649,7 @@ interface DailyProductionDelta {
   raw_total_efficiency: number;
   manufacturing: Record<string, number>;
   recycling?: Record<string, number>;
+  support?: Record<string, number>;
   trading: Record<string, number>;
   consumption: Record<string, number>;
   net: Record<string, number>;

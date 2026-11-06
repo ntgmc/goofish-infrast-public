@@ -222,19 +222,20 @@ describe('Skland confirmation request policy', () => {
 })
 
 describe('account deletion request policy', () => {
-  it('requires a valid email and non-empty bounded password', () => {
-    expect(requestSchemas.accountDelete.safeParse({
-      email: 'user@example.test',
-      password: 'current-password',
-    }).success).toBe(true)
-    expect(requestSchemas.accountDelete.safeParse({
-      email: 'not-an-email',
-      password: 'current-password',
-    }).success).toBe(false)
-    expect(requestSchemas.accountDelete.safeParse({
-      email: 'user@example.test',
-      password: '',
-    }).success).toBe(false)
+  it('requires valid credentials and a known reason, and bounds and trims optional feedback', () => {
+    const valid = { email: 'user@example.test', password: 'current-password', reason: 'privacy' }
+    expect(requestSchemas.accountDelete.parse(valid)).toMatchObject({ reason_detail: '' })
+    expect(requestSchemas.accountDelete.parse({ ...valid, reason_detail: '  我的反馈  ' }).reason_detail).toBe('我的反馈')
+    for (const invalid of [
+      { ...valid, email: 'not-an-email' },
+      { ...valid, password: '' },
+      { ...valid, reason: undefined },
+      { ...valid, reason: 'unknown' },
+      { ...valid, reason_detail: '字'.repeat(501) },
+      { ...valid, reason_detail: 123 },
+    ]) {
+      expect(requestSchemas.accountDelete.safeParse(invalid).success).toBe(false)
+    }
   })
 })
 

@@ -230,7 +230,7 @@ async function handleAdminGet(req: Request): Promise<Response> {
 
   const url = new URL(req.url)
   const view = url.searchParams.get('view')
-  if (view === 'business') return handleBusinessReport(url)
+  if (view === 'business') return handleBusinessReport(url, authentication.capabilities.includes('user_view'))
   if (view === 'todos') return jsonResponse(await getOperationsTodos(authentication.capabilities), 200, { 'Cache-Control': 'private, no-store' })
   if (view !== null) return jsonResponse({ error: '统计视图无效。' }, 400)
   const store = await getUsageEventStore()
@@ -247,7 +247,7 @@ async function handleAdminGet(req: Request): Promise<Response> {
   return jsonResponse(stats)
 }
 
-async function handleBusinessReport(url: URL): Promise<Response> {
+async function handleBusinessReport(url: URL, canViewFeedback: boolean): Promise<Response> {
   const today = operationsDate()
   const range = url.searchParams.get('range') ?? '7d'
   const fromValue = url.searchParams.get('from')
@@ -261,7 +261,10 @@ async function handleBusinessReport(url: URL): Promise<Response> {
     return jsonResponse({ error: '请选择不晚于今天的 1 至 90 天日期范围。' }, 400)
   }
   await startBusinessMetrics()
-  const overview = await getOperationsOverview(from, to)
+  const data = await getOperationsOverview(from, to)
+  const overview = canViewFeedback ? data : {
+    ...data, deletions: { ...data.deletions, recent_feedback: null },
+  }
   if (url.searchParams.get('format') === 'csv') {
     return csvResponse(operationsOverviewCsv(overview), `admin-business-report-${from}_${to}.csv`)
   }
