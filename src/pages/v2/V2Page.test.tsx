@@ -6,6 +6,7 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { copy } from '../../copy'
 import { MotionPreferenceProvider } from '../../lib/motion-preference'
+import { ThemeProvider } from '../../lib/theme'
 import { CONFIG_PRESETS, normalizeConfig, validateScheduleConfig } from '../../lib/config'
 import { DEFAULT_SITE_FEATURES } from '../../lib/site-features'
 import { cloneDefaultPublicContentSettings } from '../../lib/public-content'
@@ -70,6 +71,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   window.localStorage.removeItem('maatool-reduce-motion')
+  window.localStorage.removeItem('maatool-theme')
   window.localStorage.removeItem(FIRST_SCHEDULE_INTENT_KEY)
   window.sessionStorage.clear()
   vi.restoreAllMocks()
@@ -490,7 +492,7 @@ describe('V2 results-first workspace', () => {
       copy.v2.guestNavigation.example, copy.v2.generateMine, copy.v2.tools, copy.v2.guestNavigation.pricing,
     ])
     const count = SAMPLE_OPERATORS.filter((operator) => operator.own).length
-    expect(navigation.getByRole('button', { name: copy.v2.operators })).toHaveTextContent(copy.v2.guestNavigation.operatorCount(count))
+    expect(navigation.getByRole('button', { name: copy.v2.sidebar.editOperators })).toHaveTextContent(copy.v2.guestNavigation.operatorCount(count))
     expect(screen.getByText(copy.v2.contextDetails, { selector: 'summary > span' }).closest('details')).not.toHaveAttribute('open')
     await userEvent.click(screen.getByText(copy.v2.contextDetails, { selector: 'summary > span' }))
     expect(screen.getByText(copy.v2.guestNavigation.sampleOwned(count))).toBeVisible()
@@ -505,7 +507,7 @@ describe('V2 results-first workspace', () => {
     const personalNavigation = within(screen.getByRole('navigation', { name: copy.v2.navigation }))
     expect(personalNavigation.queryByRole('link', { name: copy.v2.guestNavigation.example })).not.toBeInTheDocument()
     expect(personalNavigation.getByRole('link', { name: copy.v2.history })).toHaveAttribute('href', '/v2?section=plans&profile_id=profile-1')
-    expect(personalNavigation.getByRole('button', { name: copy.v2.operators }).querySelector('small')).toHaveTextContent(/^1$/)
+    expect(personalNavigation.getByRole('button', { name: copy.v2.sidebar.editOperators }).querySelector('small')).toHaveTextContent(/^1$/)
     await userEvent.click(screen.getByText(copy.v2.contextDetails, { selector: 'summary > span' }))
     expect(screen.getByText(copy.v2.owned(1))).toBeVisible()
     expect(screen.queryByText(copy.v2.guestNavigation.sampleOwned(1))).not.toBeInTheDocument()
@@ -514,7 +516,7 @@ describe('V2 results-first workspace', () => {
   it('shows common configuration first and opens other tasks on demand', async () => {
     const user = userEvent.setup()
     mount('/v2')
-    await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
+    await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editConfig }))
     const dialog = within(await screen.findByRole('dialog'))
     expect(dialog.getByText(copy.workspace.config_sample, { exact: true })).toBeInTheDocument()
     expect(dialog.queryByText(copy.common.components_ConfigEditor_023)).not.toBeInTheDocument()
@@ -530,7 +532,7 @@ describe('V2 results-first workspace', () => {
     session.configSyncStatus = 'pending'
     const user = userEvent.setup()
     mount('/v2')
-    await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
+    await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editConfig }))
     expect(within(await screen.findByRole('dialog')).getByText(copy.workspace.config_save_pending_short, { exact: true })).toBeInTheDocument()
   })
 
@@ -951,7 +953,7 @@ describe('V2 results-first workspace', () => {
     connect()
     const user = userEvent.setup()
     mount(path)
-    if (!path.includes('panel=operators')) await user.click(screen.getByRole('button', { name: copy.v2.operators }))
+    if (!path.includes('panel=operators')) await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editOperators }))
     const dialog = within(await screen.findByRole('dialog'))
     await user.click(dialog.getByText(copy.v2.manageProfiles))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -982,7 +984,7 @@ describe('V2 results-first workspace', () => {
     const workflow = connect()
     const user = userEvent.setup()
     const page = mount()
-    await user.click(screen.getByRole('button', { name: copy.v2.operators }))
+    await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editOperators }))
     const dialog = within(await screen.findByRole('dialog'))
     await user.type(dialog.getByRole('textbox', { name: copy.v2.searchOperators }), '但书')
     expect(dialog.queryByText('违约索赔·β')).not.toBeInTheDocument()
@@ -1117,12 +1119,16 @@ describe('V2 results-first workspace', () => {
     // Keep CI frame delays from automatically enabling reduced motion before the manual toggle.
     vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(0)
     const user = userEvent.setup()
-    render(<MotionPreferenceProvider><MemoryRouter initialEntries={['/v2']}><V2Page /></MemoryRouter></MotionPreferenceProvider>)
+    render(<ThemeProvider><MotionPreferenceProvider><MemoryRouter initialEntries={['/v2']}><V2Page /></MemoryRouter></MotionPreferenceProvider></ThemeProvider>)
     await user.click(screen.getByRole('tab', { name: /第2班/ }))
-    await user.click(screen.getByText(copy.v2.navigationMore))
-    const settingsButton = screen.getByRole('button', { name: copy.dashboard.animation.settings })
+    const settingsButton = screen.getByRole('button', { name: copy.v2.appearance.title })
+    expect(settingsButton).toBeVisible()
     await user.click(settingsButton)
-    const dialog = within(await screen.findByRole('dialog', { name: copy.dashboard.animation.settings }))
+    const dialog = within(await screen.findByRole('dialog', { name: copy.v2.appearance.title }))
+    await user.click(dialog.getByRole('button', { name: `${copy.common.components_ThemeSwitcher_001}：${copy.common.components_ThemeSwitcher_003}` }))
+    await user.click(screen.getByRole('menuitemradio', { name: copy.common.components_ThemeSwitcher_005 }))
+    expect(document.documentElement).toHaveClass('dark')
+    expect(window.localStorage.getItem('maatool-theme')).toBe('dark')
     const toggle = dialog.getByRole('switch', { name: copy.dashboard.animation.reduce })
     expect(toggle).not.toBeChecked()
     await user.click(toggle)
@@ -1135,7 +1141,8 @@ describe('V2 results-first workspace', () => {
     await user.click(screen.getByRole('button', { name: copy.v2.list }))
     expect(screen.getByRole('button', { name: copy.v2.list })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('tab', { name: /第2班/ })).toHaveAttribute('aria-selected', 'true')
-    await user.click(screen.getByRole('button', { name: copy.dashboard.animation.settings }))
+    expect(screen.getByRole('button', { name: `${copy.common.components_ThemeSwitcher_001}：${copy.common.components_ThemeSwitcher_005}` })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: copy.v2.appearance.title }))
     expect(within(await screen.findByRole('dialog')).getByRole('switch', { name: copy.dashboard.animation.reduce })).toBeChecked()
     expect(mocks.workflow).not.toHaveBeenCalled()
   })
@@ -1143,7 +1150,7 @@ describe('V2 results-first workspace', () => {
   it('restores focus and releases the modal before reopening', async () => {
     const user = userEvent.setup()
     mount()
-    const opener = screen.getByRole('button', { name: copy.v2.operators })
+    const opener = screen.getByRole('button', { name: copy.v2.sidebar.editOperators })
     await user.click(opener)
     const dialog = await screen.findByRole('dialog', { name: copy.v2.operators })
     expect(dialog).toContainElement(document.activeElement as HTMLElement)
@@ -1341,7 +1348,7 @@ describe('V2 results-first workspace', () => {
   it('rejects malformed operator fields without replacing the currently displayed data', async () => {
     const user = userEvent.setup()
     mount()
-    await user.click(screen.getByRole('button', { name: copy.v2.operators }))
+    await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editOperators }))
     const dialog = await screen.findByRole('dialog')
     const input = within(dialog).getByLabelText(copy.v2.uploadMaa)
     const file = new File([JSON.stringify([{ ...SAMPLE_OPERATORS[0], name: 123 }])], 'operators.json', { type: 'application/json' })
@@ -1356,7 +1363,7 @@ describe('V2 results-first workspace', () => {
   it('imports valid operator data with additional metadata without running a calculation', async () => {
     const user = userEvent.setup()
     mount()
-    await user.click(screen.getByRole('button', { name: copy.v2.operators }))
+    await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editOperators }))
     const dialog = await screen.findByRole('dialog')
     const json = JSON.stringify([{ ...SAMPLE_OPERATORS[0], importedFrom: 'maa' }])
     const file = new File([json], 'operators.json', { type: 'application/json' })
@@ -1374,7 +1381,7 @@ describe('V2 results-first workspace', () => {
   it('keeps sample operator data read-only when searching and leaves the result unchanged', async () => {
     const user = userEvent.setup()
     mount()
-    await user.click(screen.getByRole('button', { name: copy.v2.operators }))
+    await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editOperators }))
     const dialog = await screen.findByRole('dialog')
     const search = within(dialog).getByRole('textbox', { name: copy.v2.searchOperators })
     await user.type(search, '但书')
@@ -1444,7 +1451,7 @@ describe('V2 results-first workspace', () => {
     const user = userEvent.setup()
     mount()
     expect(screen.getByRole('alert')).toHaveTextContent('Invalid schedule configuration')
-    await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
+    await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editConfig }))
     expect(within(await screen.findByRole('dialog')).getByRole('alert')).toHaveTextContent('Invalid schedule configuration')
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
@@ -1461,7 +1468,7 @@ describe('V2 results-first workspace', () => {
     const user = userEvent.setup()
     mount()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
+    await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editConfig }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText(message)).toHaveAttribute('role', 'status')
     expect(within(dialog).getAllByText(message)).toHaveLength(1)
@@ -1579,7 +1586,7 @@ describe('V2 results-first workspace', () => {
     ]
     const user = userEvent.setup()
     mount()
-    await user.click(screen.getByRole('button', { name: copy.v2.operators }))
+    await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editOperators }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText(copy.v2.operatorDescription)).toBeInTheDocument()
     expect(within(dialog).getByText(copy.v2.ownedLabel)).toBeInTheDocument()
@@ -1603,7 +1610,7 @@ describe('V2 results-first workspace', () => {
     const workflow = connect()
     const user = userEvent.setup()
     mount()
-    await user.click(screen.getByRole('button', { name: copy.v2.operators }))
+    await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editOperators }))
     const dialog = await screen.findByRole('dialog')
     const operators = SAMPLE_OPERATORS.map((operator) => operator.name === '但书' ? { ...operator, elite: 1 } : operator)
     const json = JSON.stringify(operators)
@@ -1627,7 +1634,7 @@ describe('V2 results-first workspace', () => {
     const user = userEvent.setup()
     vi.mocked(session.persistWorkspacePatch).mockRejectedValueOnce(new Error('干员数据异常，请核对当前游戏账号后重新导入。'))
     mount()
-    await user.click(screen.getByRole('button', { name: copy.v2.operators }))
+    await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editOperators }))
     const dialog = await screen.findByRole('dialog')
     const json = JSON.stringify([{ ...SAMPLE_OPERATORS[0], own: false, elite: 0 }])
     const file = new File([json], 'operators.json', { type: 'application/json' })
@@ -1648,7 +1655,7 @@ describe('V2 results-first workspace', () => {
     const workflow = connect()
     const user = userEvent.setup()
     mount()
-    await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
+    await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editConfig }))
     const dialog = await screen.findByRole('dialog')
     await user.click(await within(dialog).findByRole('button', { name: copy.common.components_ConfigEditor_007 }))
     expect(workflow.updateConfig).toHaveBeenCalledOnce()
@@ -1666,7 +1673,7 @@ describe('V2 results-first workspace', () => {
     workflow.userCanViewFullData = false
     const user = userEvent.setup()
     mount()
-    await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
+    await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editConfig }))
     const dialog = await screen.findByRole('dialog')
     expect(await within(dialog).findByRole('button', { name: '243 均衡' })).not.toBeDisabled()
     expect(within(dialog).queryByRole('spinbutton', { name: /贸易站/ })).not.toBeInTheDocument()
@@ -1689,7 +1696,7 @@ describe('V2 results-first workspace', () => {
     } : null
     const user = userEvent.setup()
     mount()
-    await user.click(await screen.findByRole('button', { name: copy.v2.facilities }))
+    await user.click(await screen.findByRole('button', { name: copy.v2.sidebar.editConfig }))
     const dialog = within(await screen.findByRole('dialog'))
     expect(await dialog.findByRole('button', { name: '243 均衡' })).not.toBeDisabled()
     await user.click(dialog.getByRole('tab', { name: copy.v2.configEditor.strategy }))
@@ -1924,12 +1931,12 @@ describe('V2 feature continuity', () => {
     expect(screen.getByText(copy.optimize.pages_tool_optimize_ResultSection_017)).toBeInTheDocument()
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
     expect(workflow.updateConfig).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: copy.v2.operators }))
+    await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editOperators }))
     const dialog = within(await screen.findByRole('dialog'))
     expect(dialog.getByRole('button', { name: copy.v2.operatorManagement.chooseFile })).toBeDisabled()
     expect(dialog.getByText(copy.v2.operatorManagement.previewImport)).toBeInTheDocument()
     await dismissDrawer(user)
-    await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
+    await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editConfig }))
     const configDialog = within(await screen.findByRole('dialog'))
     expect(configDialog.getByText(/当前为 免费预览 权限/)).toBeInTheDocument()
     expect(configDialog.queryByText(/当前为 练度提升卡 权限/)).not.toBeInTheDocument()

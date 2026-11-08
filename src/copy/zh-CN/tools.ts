@@ -71,7 +71,7 @@ export const toolsCopy = {
     queue: (key: string) => `队列 ${key}`, activity: '活动说明',
   },
   scheduleComparison: {
-    title: '排班表对比',
+    title: '比较已有排班',
     description: '选择两张已有排班表或导入排班 JSON，模拟日产量，查看产出变化和干员安排差异。',
     basis: '两张排班表均使用所选档案的当前练度，各自保留设施、班次和无人机安排。',
     unavailable: '当前账号没有可用于排班模拟的档案，请先添加具备高级版权限的档案。',

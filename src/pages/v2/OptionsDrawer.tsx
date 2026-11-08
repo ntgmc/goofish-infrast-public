@@ -4,7 +4,7 @@ import type { ConfigDiffItem } from '../../lib/workspace-history'
 import { BalanceIcon, BillingIcon, InventoryIcon, LoadingIcon, NextIcon as ArrowRight, SelectedIcon as Check, SettingsIcon, LogoutIcon as LogOut, AccountIcon as UserRound, SuccessIcon } from '../../components/icons'
 import AuthForm from '../../components/AuthForm'
 import SklandIcon from '../../components/SklandIcon'
-import AnimationSettings from '../../components/AnimationSettings'
+import AppearanceSettings from './AppearanceSettings'
 import ConfigEditor from '../../components/ConfigEditor'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover'
@@ -35,7 +35,7 @@ const accountEntries = [
 ] as const
 
 const titles: Record<OptionPanel, string> = {
-  operators: text.operators, config: text.facilities, settings: copy.dashboard.animation.settings,
+  operators: text.operators, config: text.facilities, settings: text.appearance.title,
   account: text.account, room: text.roomDetails,
 }
 
@@ -77,7 +77,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
   const validation = validateScheduleConfig(config)
   const exampleData = sample && !session.license
   const showAuthForm = shownPanel === 'account' && !session.user && featureState.status === 'ready' && featureState.features.site && featureState.features.login
-  const description = shownPanel === 'settings' ? copy.dashboard.animation.description : isConfig ? exampleData ? text.demoConfigDescription : text.configDescription
+  const description = shownPanel === 'settings' ? text.appearance.description : isConfig ? exampleData ? text.demoConfigDescription : text.configDescription
     : shownPanel === 'operators' ? exampleData ? text.sampleOperatorDescription : text.operatorDescription
       : shownPanel === 'account' ? session.user ? text.accountManagementDescription : text.accountDescription : text.roomDescription
 
@@ -158,7 +158,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
             )}
           </div>
         )}
-        {shownPanel === 'settings' && <AnimationSettings className="v2-options-content" />}
+        {shownPanel === 'settings' && <div className="v2-options-content"><AppearanceSettings /></div>}
         {shownPanel === 'room' && room && <div className="v2-options-content">
           <div className="v2-room-operator-details">{room.row?.operators.map((operator) => {
             const mood = room.data?.mood?.[operator.name]

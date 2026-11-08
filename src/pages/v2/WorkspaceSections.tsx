@@ -41,7 +41,7 @@ const Updates = lazy(() => import('./pages/Releases'))
 const Pricing = lazy(() => import('./pages/Pricing'))
 const Status = lazy(() => import('./pages/ServiceStatus'))
 const SiteBenchmark = lazy(() => import('./pages/SiteBenchmark'))
-const AnimationSettings = lazy(() => import('../../components/AnimationSettings'))
+const AppearanceSettings = lazy(() => import('./AppearanceSettings'))
 
 export type V2Workflow = ReturnType<typeof useOptimizeWorkflow> & {
   optimizationTasks?: OptimizationTaskCenterController
@@ -108,7 +108,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
                   {session.activeProfile && <ProfileUpgradeEntry profile={session.activeProfile} />}
                   <AddAccount onAdded={onAccountAdded} onInventory={() => onNavigate('inventory')} />
                 </>)}
-                {section === 'settings' && (signedIn ? <Settings session={session} /> : <AnimationSettings className="v2-guest-settings" />)}
+                {section === 'settings' && (signedIn ? <Settings session={session} /> : <div className="v2-guest-settings"><AppearanceSettings /></div>)}
                 {section === 'announcements' && <Announcements session={session} />}
                 {section === 'skland' && <Skland key={session.activeProfile?.id} session={session} onOpenProfile={onOpenProfile} onProfiles={() => onNavigate('profiles')} onConfig={onConfig} />}
                 {section === 'inventory' && <Inventory session={session} onProfiles={() => onNavigate('profiles')} />}

@@ -70,9 +70,10 @@ it deliberately when changing the shared design.
 - Keep Noto Sans SC display and Geist body fonts, with tabular numbers for
   production, efficiency, and shift times.
 - Keep six core tasks in the side rail: overview, generation, history and
-  comparison under the schedule workspace; cultivation projects and tools in
-  their own group. Use full-width compact rows for operator and facility
-  configuration, with the owned-operator count aligned at the end.
+  “比较基建配置” under the schedule workspace; cultivation projects and tools in
+  their own group. Tools label saved-schedule comparison “比较已有排班”. Use
+  full-width compact “编辑干员” and “编辑基建” actions with trailing pencil icons
+  for configuration drawers, retaining the owned-operator count.
   The compact brand header and bottom help trigger stay visible while the
   middle navigation scrolls independently. Keep consistent 44px targets,
   visible inset focus rings and copper active icons. Page destinations are
@@ -84,7 +85,9 @@ it deliberately when changing the shared design.
   pages. Group guides, announcements, releases and site links under the rail's
   “帮助与更多” menu, which opens above its bottom trigger without moving the
   trigger or resizing the rail. Separate help and support from product news and
-  comparisons, with appearance and service status in the footer. Use compact
+  comparisons, with service status in the menu footer. Keep “外观与动画” visible
+  above the help trigger, opening one drawer with theme and animation preferences;
+  reuse these controls in account preferences and keep the top-bar theme shortcut. Use compact
   group labels, 44px rows, readable labels and inset focus rings. Retain the
   unread announcement count while collapsed and scroll inside the menu when
   needed. Native disclosure semantics retain Tab navigation; arrow keys and

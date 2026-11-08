@@ -74,7 +74,7 @@ export const inventoryCopy = {
   recompute_coupon_help: '免费预览现可按页面规则重新生成完整排班，此历史道具无需再使用。',
   coupon_available: '可用：',
   scenario_coupon: '情景推演券',
-  scenario_coupon_help: '档案没有长期情景推演权益时，可用一张券完成一次方案对比。',
+  scenario_coupon_help: '档案没有长期情景推演权益时，可用一张券完成一次基建配置对比。',
   scenario_coupon_required: '当前档案需要使用一张情景推演券才能运行。',
   inventory_refresh_failed: '暂时无法读取背包，道具选项当前不可用。',
   balances_load_failed: '暂时无法加载道具数量，请稍后重试。',
