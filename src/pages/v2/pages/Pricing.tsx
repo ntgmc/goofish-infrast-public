@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { SelectedIcon as Check, CloseIcon as X, ServiceCongestedIcon as Hourglass, ExternalLinkIcon as ArrowUpRight, ExpandIcon as ChevronDown } from '../../../components/icons'
 import { copy, CURRENT_LOCALE } from '../../../copy'
 import { PUBLIC_PRICING_PLAN_IDS } from '../../../lib/public-content'
@@ -16,6 +17,15 @@ const planIds = PUBLIC_PRICING_PLAN_IDS.filter((id) => id !== 'free_preview')
 export default function Pricing() {
   const { content } = usePublicContent()
   const { features } = useSiteFeatures()
+  const [selectedPlan, setSelectedPlan] = useState<(typeof planIds)[number]>('single_account_monthly')
+  const [mobile, setMobile] = useState(() => Boolean(window.matchMedia?.('(max-width: 40rem)').matches))
+  useEffect(() => {
+    const query = window.matchMedia?.('(max-width: 40rem)')
+    if (!query) return
+    const update = () => setMobile(query.matches)
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
   const pricing = content.pricing
   const free = pricing.plans.free_preview
   const choice = text.pricing_choice
@@ -24,48 +34,61 @@ export default function Pricing() {
   const term = (label: string) => label.replace(/^单账号\s*/u, '').replace(/\s*CDK$/u, '')
   return <div className="v2-pricing-workspace">
     <div className="v2-pricing-intro">
-      <p className="v2-lead">{choice.intro}</p>
+      {mobile ? <div><h2>{choice.free_title} · {free.display_price}</h2><p>{choice.free_features} {free.summary}</p><p>{free.account_scope}</p></div> : <p className="v2-lead">{choice.intro}</p>}
       {freeAvailable ? <Link to="/tool/optimize/overview" className="v2-button v2-button-secondary">{choice.free_action}</Link> : <button disabled className="v2-button v2-button-secondary">{choice.free_unavailable}</button>}
     </div>
     {!features.maa_export && <Notice>{choice.export_unavailable}</Notice>}
+    {mobile && <>
+      <section className="v2-pricing-shared" aria-labelledby="pricing-shared-title">
+        <h2 id="pricing-shared-title">{choice.shared_benefits}</h2>
+        <ul className="v2-pricing-benefits">{text.pricing_cards.features.map((feature) => <li key={feature}><Check size={16} aria-hidden="true" /><span>{feature}</span></li>)}</ul>
+      </section>
+      <fieldset className="v2-pricing-terms">
+        <legend>{choice.choose_term}</legend>
+        <div>{planIds.map((id) => <label key={id} data-selected={selectedPlan === id}>
+          <input type="radio" name="pricing-term" value={id} checked={selectedPlan === id} onChange={() => setSelectedPlan(id)} />
+          <span>{choice.term_labels[id]}<strong>{pricing.plans[id].display_price.split('/')[0]!.trim()}</strong></span>
+        </label>)}</div>
+      </fieldset>
+    </>}
     <section className="v2-pricing-plans" aria-label={copy.v2.planChoice}>
-      {planIds.map((id) => {
+      {(mobile ? [selectedPlan] : planIds).map((id) => {
         const plan = pricing.plans[id]
         const [amount, period] = plan.display_price.split('/')
         const archiveCount = id === 'single_account_lifetime' ? 3 : 1
         return <article key={id} className={`v2-pricing-plan${id === 'single_account_lifetime' ? ' v2-pricing-plan-featured' : ''}`} aria-labelledby={`${id}-title`}>
           <header>
-            <span className="v2-pricing-badge">{plan.badge}</span>
+            {!mobile && <span className="v2-pricing-badge">{plan.badge}</span>}
             <h2 id={`${id}-title`}>{term(plan.label)}</h2>
-            <p className="v2-pricing-price"><strong>{amount.trim()}</strong>{period && <span>／{period.trim()}</span>}</p>
+            <p className="v2-pricing-price">{mobile && <span>{choice.total_price}</span>}<strong>{amount.trim()}</strong>{period && <span>／{period.trim()}</span>}</p>
             {plan.discount_fold < 10 && <small>{text.pages_PricingPage_017(plan.original_price, plan.discount_fold)}</small>}
             <p className="v2-pricing-audience">{getSku(id).audience}</p>
           </header>
-          <ul className="v2-pricing-benefits">
+          {mobile ? <p className="v2-pricing-gift">{text.pricing_archive_gift(archiveCount)}</p> : <ul className="v2-pricing-benefits">
             {[...text.pricing_cards.features, text.pricing_cards.archive_gift(archiveCount)].map((feature) => <li key={feature}><Check size={16} aria-hidden="true" /><span>{feature}</span></li>)}
-          </ul>
+          </ul>}
           <div className="v2-pricing-plan-footer">
-            <details className="v2-pricing-plan-details">
+            {mobile ? <div className="v2-pricing-account-scope"><p id={`${id}-purchase-terms`}>{plan.account_scope}</p><p id={`${id}-activation`}>{text.pricing_redemption.activation}</p></div> : <details className="v2-pricing-plan-details">
               <summary>{text.pricing_cards.plan_details}<ChevronDown size={16} aria-hidden="true" /></summary>
               <p>{plan.summary}</p><p id={`${id}-purchase-terms`}>{plan.account_scope}</p><p>{text.pricing_archive_gift(archiveCount)}</p>
-            </details>
-            {plan.purchase_url ? <a href={plan.purchase_url} target="_blank" rel="noopener noreferrer" aria-describedby={`${id}-purchase-terms pricing-purchase-terms pricing-purchase-flow`} className={`v2-button ${id === 'single_account_lifetime' ? 'v2-button-primary' : 'v2-button-secondary'}`}>{text.pricing_purchase_labels[id]}<ArrowUpRight size={16} aria-hidden="true" /></a> : <button disabled className="v2-button v2-button-secondary">{text.pricing_purchase_unavailable}</button>}
+            </details>}
+            {plan.purchase_url ? <a href={plan.purchase_url} target="_blank" rel="noopener noreferrer" aria-describedby={`${id}-purchase-terms ${mobile ? `${id}-activation` : 'pricing-purchase-terms'} pricing-purchase-flow`} className={`v2-button ${id === 'single_account_lifetime' ? 'v2-button-primary' : 'v2-button-secondary'}`}>{text.pricing_purchase_labels[id]}<ArrowUpRight size={16} aria-hidden="true" /></a> : <button disabled className="v2-button v2-button-secondary">{text.pricing_purchase_unavailable}</button>}
           </div>
         </article>
       })}
     </section>
     <div className="v2-pricing-checkout">
-      <div><p id="pricing-purchase-terms">{text.pages_PricingPage_016} {text.pricing_redemption.activation}</p><p id="pricing-purchase-flow">{text.pricing_redemption.flow}</p></div>
+      <div>{!mobile && <p id="pricing-purchase-terms">{text.pages_PricingPage_016} {text.pricing_redemption.activation}</p>}<p id="pricing-purchase-flow">{text.pricing_redemption.flow}</p></div>
       {redemptionAvailable ? <Link to="/tool/redeem?mode=cdk" className="v2-button v2-button-secondary">{text.pricing_redemption.action}</Link> : <span className="v2-muted">{text.pricing_redemption.unavailable}</span>}
     </div>
     <section className="v2-pricing-evidence" aria-label={text.pricing_evidence.title}>
       <div><h2>{text.pricing_evidence.title}</h2><p>{text.pricing_evidence.description}</p><Link to="/v2/benchmarks" className="v2-button v2-button-secondary">{text.pricing_evidence.action}</Link></div>
       <Facts items={[[text.pricing_evidence.execution_label, text.pricing_evidence.execution_value], [text.pricing_evidence.yield_label, text.pricing_evidence.yield_value]]} />
     </section>
-    <section className="v2-pricing-free-start" aria-labelledby="pricing-free-title">
+    {!mobile && <section className="v2-pricing-free-start" aria-labelledby="pricing-free-title">
       <div><h2 id="pricing-free-title">{choice.free_title} · {free.display_price}</h2><p>{choice.free_features}</p></div>
       <div><p>{free.summary}</p><p className="v2-muted">{free.account_scope}</p></div>
-    </section>
+    </section>}
     <details className="v2-pricing-details">
       <summary><h2>{choice.full_comparison}</h2><ChevronDown size={20} aria-hidden="true" /></summary>
       <table className="v2-pricing-comparison" aria-label={pricing.comparison_heading}>

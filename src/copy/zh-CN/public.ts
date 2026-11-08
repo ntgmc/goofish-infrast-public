@@ -440,6 +440,9 @@ export const publicCopy = {
     export_note: "MAA 导出需使用 MAA 排班模式。",
     export_unavailable: "MAA 排班导出暂未开放。",
     full_comparison: "查看完整权益对比",
+    shared_benefits: "维护卡共同权益",
+    choose_term: "选择维护期限",
+    total_price: "总价",
     term_labels: {
       single_account_monthly: "30 天",
       single_account_half_year: "90 天",

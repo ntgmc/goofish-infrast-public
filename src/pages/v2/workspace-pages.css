@@ -305,9 +305,11 @@ textarea.v2-input { resize: vertical; }
 .v2-release-detail { min-width: 0; > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-sm); padding-bottom: var(--space-lg); border-bottom: 1px solid var(--v2-line); } time, code { color: var(--v2-muted); font-size: var(--text-xs); } > section { padding-block: var(--space-lg); border-bottom: 1px solid var(--v2-line); } ul { list-style: disc; padding-left: var(--space-md); margin-top: var(--space-sm); } li { font-size: var(--text-sm); line-height: 1.9; margin-bottom: var(--space-xs); color: var(--v2-secondary); } }
 
 /* Hallmark · modern-minimal · Workbench · design-system: design.md
- * Four term cards lead with price, benefits and purchase; evidence and rules follow.
+ * Compare term cards on desktop; share benefits and select one term on mobile.
  * Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V4 */
 .v2-pricing-intro { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-sm); margin-bottom: var(--space-md); }
+.v2-pricing-shared { margin-block: var(--space-lg); h2 { font-size: var(--text-base); } .v2-pricing-benefits { margin-block: var(--space-xs) 0; gap: var(--space-2xs); } }
+.v2-pricing-terms { min-width: 0; margin-bottom: var(--space-sm); legend { margin-bottom: var(--space-xs); font-size: var(--text-base); font-weight: 600; } > div { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); gap: var(--space-xs); } label { display: flex; align-items: center; gap: var(--space-xs); min-width: 0; min-height: 72px; padding: var(--space-xs); border: 1px solid var(--color-v2-control); border-radius: var(--radius-v2-control); cursor: pointer; font-size: var(--text-sm); } label[data-selected="true"] { border-color: var(--v2-accent); background: var(--v2-accent-soft); } span { min-width: 0; } strong { display: block; margin-top: var(--space-3xs); font-variant-numeric: tabular-nums; } }
 .v2-pricing-plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-sm); }
 .v2-pricing-plan { display: flex; min-width: 0; flex-direction: column; padding: var(--space-sm); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-panel); background: var(--v2-paper); h2 { margin-block: var(--space-xs); font-size: var(--text-base); } > header > small { display: block; margin-top: var(--space-2xs); } .v2-button { width: 100%; white-space: nowrap; } }
 .v2-pricing-plan-featured { border-color: var(--v2-accent); background: var(--v2-accent-soft); }
@@ -392,7 +394,13 @@ textarea.v2-input { resize: vertical; }
   .v2-generation-history, .v2-generation-progress { margin-top: var(--space-lg); padding-top: var(--space-sm); }
   .v2-page-section .v2-section-heading { flex-direction: column; gap: var(--space-sm); }
   .v2-page-section .v2-section-heading h1 { font-size: var(--text-xl); }
-  .v2-pricing-plan .v2-pricing-audience { min-height: 0; }
+  .v2-pricing-intro { align-items: start; h2 { font-size: var(--text-base); margin-bottom: var(--space-2xs); } p { font-size: var(--text-sm); } p + p { margin-top: var(--space-2xs); } }
+  .v2-pricing-plan .v2-pricing-audience { min-height: 0; font-size: var(--text-sm); }
+  .v2-pricing-plan > header > small, .v2-pricing-price > span { font-size: var(--text-sm); }
+  .v2-pricing-plan h2 { margin-top: 0; }
+  .v2-pricing-gift { margin-top: var(--space-xs); font-size: var(--text-sm); }
+  .v2-pricing-account-scope { margin-block: var(--space-sm); p { font-size: var(--text-sm); line-height: 1.7; } p + p { margin-top: var(--space-xs); } }
+  .v2-pricing-checkout p { font-size: var(--text-sm); }
   .v2-block-title { flex-direction: column; gap: var(--space-xs); }
   .v2-account-detail, .v2-account-registration, .v2-experiment-builder, .v2-depot-source, .v2-announcement-reading { padding: var(--space-sm); }
   .v2-inventory-overview > strong { display: none; }

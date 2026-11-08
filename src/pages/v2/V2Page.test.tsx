@@ -10,6 +10,7 @@ import { ThemeProvider } from '../../lib/theme'
 import { CONFIG_PRESETS, normalizeConfig, validateScheduleConfig } from '../../lib/config'
 import { DEFAULT_SITE_FEATURES } from '../../lib/site-features'
 import { cloneDefaultPublicContentSettings } from '../../lib/public-content'
+import { getSku } from '../../lib/product-catalog'
 import { PublicContentProvider } from '../../lib/public-content-context'
 import type { OptimizeResult, UserGameAccount, WorkspaceResultHistorySummary } from '../../lib/types'
 import type { V2Session } from './OptionsDrawer'
@@ -1972,7 +1973,8 @@ describe('V2 feature continuity', () => {
     expect(screen.queryByRole('link', { name: copy.public.pricing_choice.free_action })).not.toBeInTheDocument()
   })
 
-  it('shows all maintenance cards with their configured purchase destinations and keeps an unlisted plan unavailable', async () => {
+  it.each([false, true])('keeps configured maintenance purchases and unavailable plans correct (mobile: %s)', async (mobile) => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: mobile && ['(max-width: 40rem)', '(max-width: 60rem)'].includes(query), addEventListener: vi.fn(), removeEventListener: vi.fn() }))
     const content = cloneDefaultPublicContentSettings()
     content.pricing.plans.single_account_monthly.purchase_url = 'https://example.com/monthly'
     content.pricing.plans.single_account_annual.purchase_url = 'https://example.com/annual'
@@ -1984,15 +1986,23 @@ describe('V2 feature continuity', () => {
     render(<MemoryRouter initialEntries={['/v2?section=pricing']}><PublicContentProvider><V2Page /></PublicContentProvider></MemoryRouter>, { wrapper: MotionPreferenceProvider })
     await screen.findByRole('link', { name: copy.public.pricing_purchase_labels.single_account_monthly })
     const cards = within(screen.getByRole('region', { name: copy.v2.planChoice }))
-    expect(cards.getAllByRole('article')).toHaveLength(4)
+    expect(cards.getAllByRole('article')).toHaveLength(mobile ? 1 : 4)
     for (const id of ['single_account_monthly', 'single_account_annual', 'single_account_lifetime'] as const) {
+      if (mobile) await user.click(screen.getByRole('radio', { name: new RegExp(copy.public.pricing_choice.term_labels[id]) }))
       const purchase = cards.getByRole('link', { name: copy.public.pricing_purchase_labels[id] })
       expect(purchase).toHaveAttribute('href', content.pricing.plans[id].purchase_url)
       expect(purchase).toHaveAttribute('target', '_blank')
       expect(purchase).toHaveAttribute('rel', 'noopener noreferrer')
       expect(purchase).toHaveAccessibleDescription(expect.stringContaining(content.pricing.plans[id].account_scope))
       expect(purchase).toHaveAccessibleDescription(expect.stringContaining(copy.public.pricing_redemption.activation))
+      if (mobile) {
+        expect(cards.getAllByRole('link')).toHaveLength(1)
+        expect(cards.getByText(content.pricing.plans[id].account_scope)).toBeVisible()
+        expect(cards.getByText(getSku(id).audience)).toBeVisible()
+        expect(cards.getByText(content.pricing.plans[id].display_price.split('/')[0]!.trim())).toBeVisible()
+      }
     }
+    if (mobile) await user.click(screen.getByRole('radio', { name: new RegExp(copy.public.pricing_choice.term_labels.single_account_half_year) }))
     expect(cards.getByRole('button', { name: copy.public.pricing_purchase_unavailable })).toBeDisabled()
     expect(cards.queryByRole('link', { name: copy.public.pricing_purchase_labels.single_account_half_year })).not.toBeInTheDocument()
     await user.click(screen.getByText(copy.public.pricing_cards.rules))

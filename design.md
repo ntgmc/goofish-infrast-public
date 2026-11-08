@@ -178,11 +178,16 @@ it deliberately when changing the shared design.
   conditions from priority, material, calendar and inventory results. Manual
   scheduling makes account, layout and starting schedule explicit steps.
 - Settings use task navigation and a single visible content region. Pricing
-  leads with four maintenance cards showing price, audience, checked benefits
-  and a direct purchase action. Keep free start visible above the cards, shared
-  activation terms beside redemption, and a compact benchmark proof strip below.
-  Plan descriptions, the full entitlement comparison, purchase rules and upgrade
-  details expand on demand. All pages use bounded content widths and V2 tokens.
+  keeps four maintenance cards on desktop, showing price, audience, checked benefits
+  and a direct purchase action. Below 40rem, show free capabilities and generation
+  limits first, list shared maintenance benefits once, and compare all four terms
+  and total prices in a compact native radio group that wraps with the available
+  width. Show only the selected plan's total, audience, archive gift and purchase
+  action, with UID binding and activation
+  conditions immediately above the action. Keep redemption and a compact benchmark
+  proof strip below. On desktop, plan descriptions expand on demand; at every width,
+  the full entitlement comparison, purchase rules and upgrade details are expandable.
+  All pages use bounded content widths and V2 tokens.
 - The workspace shell owns page headings. Legal documents place their index
   to the right of a reading area of up to 65ch. FAQ pairs search with expandable
   answers; support pairs a contact region with preparation steps. Releases and
