@@ -124,6 +124,9 @@ export const v2Copy = {
     open: '进入排班总览',
   },
   generationPage: {
+    options: '生成选项',
+    optionsSelected: '已选道具',
+    retry: '重试生成',
     configChanged: '配置已修改，生成后更新排班。',
     configUnchanged: '将使用当前基建配置生成排班。',
     priorityBalance: (count: number) => `可用 ${count} 张`,
@@ -158,8 +161,7 @@ export const v2Copy = {
   firstSchedule: {
     title: '生成第一份排班',
     description: '完成下面四步，用自己的干员生成排班。',
-    checklist: '首次排班进度',
-    progress: (step: number) => `第 ${step} 步，共 4 步`,
+    progress: (step: number) => `第 ${step}/4 步`,
     login: '登录或注册',
     import: '绑定并导入干员',
     config: '确认基建配置',
@@ -191,7 +193,7 @@ export const v2Copy = {
   navigationMore: '帮助与更多',
   navigationGroups: { support: '帮助与支持', product: '产品与动态' },
   sidebar: { schedule: '排班工作台', tools: '养成与工具', close: '收起导航' },
-  topbar: { location: '当前位置', actions: '快捷操作', theme: '选择界面主题', profile: '当前档案' },
+  topbar: { location: '当前位置', actions: '快捷操作', more: '更多操作', theme: '选择界面主题', profile: '当前档案' },
   contactSupport: '联系支持',
   unreadAnnouncements: (count: number) => `${count} 条未读公告`,
   guestNavigation: {

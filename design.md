@@ -95,9 +95,12 @@ it deliberately when changing the shared design.
   opener. Use a semantic breadcrumb with a profile-preserving workspace link,
   readable current page, consistent 44px utility buttons and visible open/focus
   states. Show the current profile name with a secondary label on wide screens;
-  retain its name and full accessible label on mobile. Below 40rem, put location
-  above the actions so long page names never compete with icon controls. Keep
-  unread and calculation badges, native hints, existing dialogs and theme menu.
+  retain its full accessible label and avatar on mobile. Below 40rem, keep one
+  compact row with location, notifications and account access; place theme and
+  calculation tools in the “更多操作” popover. Truncate long locations within
+  their column; retain the full page heading below. Mobile announcements show
+  their title and disclosure arrow, with the body available on expansion. Keep
+  unread and calculation badges, existing dialogs and theme menu.
 - Operator and account drawers share a compact fixed heading and an independently
   scrolling body. Keep the operator profile, sync and MAA import actions compact;
   binding timestamps and authorization details expand on demand. The list search
@@ -119,7 +122,8 @@ it deliberately when changing the shared design.
 - Use one production summary strip and a full-width schedule panel. Wide screens
   show three room columns. Put configuration and detailed production below the
   schedule in a native disclosure; keep its DOM order aligned with its position.
-  Operator portraits and efficiency carry the visual weight.
+  Below 40rem, place the schedule before the production strip so facilities are
+  visible on entry. Operator portraits and efficiency carry the visual weight.
 - Keep generation beside the overview title and export beside result navigation.
   Copper marks the primary action and focus; station colors identify room types
   through the same icon backgrounds on desktop and mobile.
@@ -148,7 +152,12 @@ it deliberately when changing the shared design.
   History separates result records from saved configurations, then exposes
   actions for the selected record. Inventory uses an item shelf, inspect/use
   dialogs, and separate task and activity views.
-- Generation separates preparation from execution. Comparison composes the
+- Generation separates preparation from execution. Below 40rem, the first-use
+  checklist collapses to the current step, and prepared operators and configuration
+  become two compact rows opening the existing editors. Coupon options expand on
+  demand. Keep the generation action and any charge summary at the bottom, reserve
+  its measured height in the page, and retain validation and retry messages.
+  Comparison composes the
   experiment before inspecting candidate results. Cultivation separates
   conditions from priority, material, calendar and inventory results. Manual
   scheduling makes account, layout and starting schedule explicit steps.

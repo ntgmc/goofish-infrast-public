@@ -21,6 +21,7 @@ import { LockedCapabilityPreview, UpgradeSuggestionStatusNotice } from '../tool/
 import WorkspaceSections, { type V2Workflow } from './WorkspaceSections'
 import { sectionLabels, v2Path, v2Section, v2SectionAvailable, type V2Section } from './navigation'
 import V2Navigation from './V2Navigation'
+import V2TopbarTools from './V2TopbarTools'
 import { normalizeScheduleMode, SCHEDULE_MODE_LABELS, validateScheduleConfig } from '../../lib/config'
 import type { AuthSuccessResponse, LicenseConfig, LicenseOperator, OptimizeResult, PermissionMode } from '../../lib/types'
 import ScheduleBoard from './ScheduleBoard'
@@ -257,8 +258,10 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           </div>
           <div className="v2-topbar-actions">
             <div className="v2-topbar-tools" role="group" aria-label={text.topbar.actions}>
-              {taskCenterAction && <div className="v2-feature-content" title={copy.optimize.pages_tool_optimize_OptimizationTaskCenter_033}>{taskCenterAction}</div>}
-              <div className="v2-feature-content" title={text.topbar.theme}><ThemeSwitcher iconOnly /></div>
+              <V2TopbarTools>
+                {taskCenterAction && <div className="v2-feature-content" title={copy.optimize.pages_tool_optimize_OptimizationTaskCenter_033}>{taskCenterAction}<span className="v2-tool-label">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_033}</span></div>}
+                <div className="v2-feature-content" title={text.topbar.theme}><ThemeSwitcher iconOnly /><span className="v2-tool-label">{text.topbar.theme}</span></div>
+              </V2TopbarTools>
               <div title={copy.notifications.title}><NotificationBell iconOnly onInventory={() => navigateSection('inventory')} /></div>
             </div>
             <button className="v2-profile-button" type="button" aria-label={profileLabel} title={profileLabel} aria-haspopup="dialog" aria-expanded={panel === 'account'} onClick={() => openPanel('account')}>

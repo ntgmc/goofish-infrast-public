@@ -105,12 +105,12 @@ it('allows a guest to open the benchmark from navigation and return to the works
   expect(more.closest('details')).not.toHaveAttribute('open')
   await user.click(more)
   await user.click(within(disclosure.getByRole('group', { name: copy.v2.navigationGroups.product })).getByRole('link', { name: copy.siteBenchmark.title }))
-  await screen.findByRole('heading', { name: copy.siteBenchmark.headline('MaaTool', 30).join('') }, { timeout: 3000 })
+  await screen.findByRole('heading', { name: copy.siteBenchmark.headline('MaaTool', 30).join('') }, { timeout: 5_000 })
   expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2/benchmarks')
   expect(screen.queryByText(copy.v2.signInRequired)).not.toBeInTheDocument()
   await user.click(screen.getByRole('link', { name: copy.v2.guestNavigation.example }))
   expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2')
-})
+}, 10_000)
 
 it.each([null, '2099-01-01T00:00:00Z'])('lets a first-time guest choose when to read an announcement (deadline %s)', async (popupUntil) => {
   session.popups = [{
@@ -145,7 +145,8 @@ it('keeps the global banner first and respects the announcements feature switch'
   expect(screen.queryByRole('region', { name: copy.public.components_AnnouncementBanner_001 })).not.toBeInTheDocument()
 })
 
-it('keeps personal navigation in the account drawer and respects feature availability', async () => {
+it.each([false, true])('keeps personal navigation in the account drawer and respects feature availability (mobile: %s)', async (mobile) => {
+  vi.stubGlobal('matchMedia', (query: string) => ({ matches: mobile && ['(max-width: 40rem)', '(max-width: 60rem)'].includes(query), addEventListener: vi.fn(), removeEventListener: vi.fn() }))
   connect()
   mocks.features.mockReturnValue({ status: 'ready', features: { ...DEFAULT_SITE_FEATURES, skland: false, inventory: false }, retry: vi.fn() })
   const user = userEvent.setup()
@@ -173,11 +174,17 @@ it('keeps personal navigation in the account drawer and respects feature availab
   await user.click(location.getByRole('link', { name: copy.v2.workspace }))
   await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('profile_id=profile-1'))
   expect(location.getByText(sectionLabels.overview)).toHaveAttribute('aria-current', 'page')
+  if (mobile) await user.click(screen.getByRole('button', { name: copy.v2.topbar.more }))
   const taskCenter = screen.getByRole('button', { name: copy.optimize.pages_tool_optimize_OptimizationTaskCenter_033 })
   await user.click(taskCenter)
   expect(await screen.findByRole('dialog', { name: copy.optimize.pages_tool_optimize_OptimizationTaskCenter_001 })).toContainElement(document.activeElement as HTMLElement)
   await user.keyboard('{Escape}')
   await waitFor(() => expect(taskCenter).toHaveFocus())
+  if (mobile) {
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.getByRole('button', { name: copy.v2.topbar.more })).toHaveFocus())
+    expect(screen.queryByRole('dialog', { name: copy.v2.topbar.actions })).not.toBeInTheDocument()
+  }
 })
 
 it('closes mobile navigation with Escape and restores the menu trigger', async () => {

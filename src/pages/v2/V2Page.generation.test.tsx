@@ -83,9 +83,11 @@ afterEach(() => {
   window.localStorage.removeItem(FIRST_SCHEDULE_INTENT_KEY)
   vi.resetAllMocks()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
-it('continues from login and Skland import through saved configuration to the first generation', async () => {
+it.each([false, true])('continues from login and Skland import through saved configuration to the first generation (mobile: %s)', async (mobile) => {
+  vi.stubGlobal('matchMedia', (query: string) => ({ matches: mobile && ['(max-width: 40rem)', '(max-width: 60rem)'].includes(query), addEventListener: vi.fn(), removeEventListener: vi.fn() }))
   const user = userEvent.setup()
   const firstWorkspace = { ...workspace, latest_result: null, result_history: [] }
   const firstProfile: UserGameAccount = { ...profile, kind: 'free_preview', permission: 'growth', skland_binding: { uid: '12345678', nickname: '首次博士', channel_name: '官服',
@@ -112,6 +114,9 @@ it('continues from login and Skland import through saved configuration to the fi
   })
   render(<MemoryRouter initialEntries={['/']}><MotionPreferenceProvider><V2Page /></MotionPreferenceProvider></MemoryRouter>)
   await user.click(await screen.findByRole('button', { name: copy.v2.generateMine }))
+  const guide = screen.getByRole('complementary', { name: copy.v2.firstSchedule.title }).querySelector('details')!
+  expect(guide.open).toBe(!mobile)
+  expect(guide.querySelector('summary')).toHaveTextContent(copy.v2.firstSchedule.progress(1))
   fireEvent.change(screen.getByLabelText(copy.auth.components_AuthForm_011), { target: { value: 'doctor@example.test' } })
   fireEvent.change(screen.getByLabelText(copy.auth.components_AuthForm_012), { target: { value: 'password123' } })
   await user.click(document.querySelector('.v2-login-panel button[type="submit"]')!)
