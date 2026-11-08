@@ -153,6 +153,11 @@ it deliberately when changing the shared design.
   business hooks with V1; compose each workspace around its user's next task.
   Keep the specialized configuration editor, schedule editor, binding dialog,
   progress renderer and comparison chart as shared controls.
+- The tools directory groups links under “基建”, “干员养成” and “材料与仓库”,
+  with base scheduling first and special recruitment after the ongoing cultivation
+  tools. Use two columns within each group and one column below 40rem, concise
+  purpose descriptions and larger gaps between groups. Omit sequence numbers;
+  preserve profile-aware links and hide groups with no available tools.
 - Accounts use a searchable selection index and one account detail region.
   History separates result records from saved configurations, then exposes
   actions for the selected record. Inventory uses an item shelf, inspect/use

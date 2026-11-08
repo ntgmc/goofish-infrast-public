@@ -1,4 +1,17 @@
 export const toolsCopy = {
+  directory: {
+    groups: { base: '基建', cultivation: '干员养成', materials: '材料与仓库' },
+    descriptions: {
+      manualSchedule: '手动安排干员与无人机，模拟心情和产量。',
+      scheduleComparison: '对比两张已有排班的产出和干员安排。',
+      cultivationProjects: '设定养成目标，规划材料与准备进度。',
+      cultivation: '对照作业要求，找到值得培养的干员。',
+      trainingRatio: '结合培养目标与库存，安排龙门币和经验。',
+      thanksRecruitment: '结合干员拥有情况，比较特别招募队列。',
+      materialDemand: '查看新干员与模组的材料需求变化。',
+      depot: '导入仓库，估算库存的等效理智价值。',
+    },
+  },
   cultivation: {
     title: '作业练度推荐',
     description: '对照 PRTS 作业需求与当前练度，找到值得培养的干员。选好目标后加入我的养成项目，继续安排材料和准备进度。',

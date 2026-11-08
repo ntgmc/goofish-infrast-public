@@ -260,10 +260,10 @@ textarea.v2-input { resize: vertical; }
   .v2-comparison-preview-metrics { grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
 }
 
-/* Tools make their prerequisites and output explicit. */
-.v2-tools-directory > a { display: grid; grid-template-columns: 2rem 36px minmax(0, 1fr) 44px; align-items: start; gap: var(--space-lg); padding: var(--space-lg) var(--space-md); border-bottom: 1px solid var(--v2-line); > svg { color: var(--v2-accent); margin-top: var(--space-3xs); } > div { min-width: 0; white-space: normal; } p { font-size: var(--text-sm); margin-top: var(--space-xs); max-width: 65ch; } &:hover { background: var(--v2-paper); } }
-.v2-tool-number { color: var(--v2-muted); font-family: var(--font-mono); }
-.v2-tool-enter { display: grid; place-items: center; min-height: 44px; color: var(--v2-accent); }
+/* Tools are grouped by task, with compact links inside each group. */
+.v2-tools-directory { display: grid; gap: var(--space-lg); > section { min-width: 0; } h2 { margin-bottom: var(--space-xs); } }
+.v2-tool-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--space-lg); > li { min-width: 0; border-bottom: 1px solid var(--v2-line); } a { display: grid; grid-template-columns: 24px minmax(0, 1fr) 20px; align-items: start; gap: var(--space-sm); min-height: 44px; height: 100%; padding: var(--space-sm) var(--space-xs); > svg { color: var(--v2-accent); } > div { min-width: 0; white-space: normal; } p { font-size: var(--text-sm); line-height: 1.6; margin-top: var(--space-2xs); } &:hover { background: var(--v2-paper); } &:focus-visible { outline-offset: -2px; } } }
+.v2-tool-enter { display: grid; place-items: center; min-height: 24px; color: var(--v2-muted); }
 .v2-tool-source { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-md); padding-bottom: var(--space-lg); border-bottom: 1px solid var(--v2-line); > div:first-child { flex: 1 1 20rem; } p { font-size: var(--text-sm); max-width: 60ch; } .v2-field { flex: 1 1 12rem; margin: 0; max-width: 22rem; } }
 .v2-choice-list { min-width: 0; legend { font-size: var(--text-sm); font-weight: 600; margin-bottom: var(--space-sm); } label { display: flex; align-items: start; gap: var(--space-xs); padding-block: var(--space-xs); } input { margin-top: var(--space-3xs); } strong, small { display: block; } strong { font-size: var(--text-sm); } small { margin-top: var(--space-2xs); } }
 .v2-material-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--space-lg); margin-bottom: var(--space-lg); > div { display: flex; justify-content: space-between; gap: var(--space-xs); padding-block: var(--space-xs); border-bottom: 1px solid var(--v2-line); font-size: var(--text-sm); } dd { font-variant-numeric: tabular-nums; } }
@@ -405,8 +405,7 @@ textarea.v2-input { resize: vertical; }
   .v2-task { grid-template-columns: 24px minmax(0, 1fr); > button { grid-column: 2; justify-self: start; } }
   .v2-activity-list li { grid-template-columns: 36px minmax(0, 1fr) auto; gap: var(--space-xs); time { grid-column: 1 / -1; } }
   .v2-item-dialog-heading > img { width: 56px; height: 56px; }
-  .v2-tools-directory > a { grid-template-columns: 28px minmax(0, 1fr) 28px; gap: var(--space-xs); padding: var(--space-md) 0; .v2-tool-number { display: none; } }
-  .v2-tools-directory h2 { font-size: var(--text-base); }
+  .v2-tool-list { grid-template-columns: minmax(0, 1fr); a { gap: var(--space-xs); padding: var(--space-xs) 0; } }
   .v2-drone-choices { column-gap: var(--space-2xs); }
   .v2-drone-choices .v2-factor-choice { font-size: var(--text-xs); gap: var(--space-3xs); padding-inline: var(--space-2xs); }
   .v2-experiment-options { grid-template-columns: minmax(0, 1fr); }
