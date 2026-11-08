@@ -86,9 +86,9 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
 
   return (
     <OperatorSkillPreview><LayoutGroup id={id}>
-    <section className="v2-panel v2-schedule">
+    <section className="v2-schedule" aria-label={text.result}>
       <div className="v2-panel-heading">
-        <div className="v2-heading-inline"><h2>{text.result}</h2><span className="v2-neutral-tag">{text.shifts(result.plans.length)}</span></div>
+        <span className="v2-schedule-count">{text.shifts(result.plans.length)}</span>
         <div className="v2-board-controls">
         <button type="button" className="v2-text-button" aria-pressed={expanded} aria-controls={`${id}-panel`} onClick={() => onExpandedChange(!expanded)}>
           {expanded ? text.compactRooms : text.expandRooms}

@@ -126,6 +126,7 @@ export const v2Copy = {
   generationPage: {
     options: '生成选项',
     optionsSelected: '已选道具',
+    couponsEmpty: '暂无可用券',
     retry: '重试生成',
     configChanged: '配置已修改，生成后更新排班。',
     configUnchanged: '将使用当前基建配置生成排班。',

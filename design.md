@@ -119,9 +119,11 @@ it deliberately when changing the shared design.
   target and return to their parent. Support narrow screens and enlarged text.
   Use automatic scrollbars without a reserved gutter or asymmetric padding when
   content fits. Let the dialog primitive compensate for page scroll locking.
-- Use one production summary strip and a full-width schedule panel. Wide screens
-  show three room columns. Put configuration and detailed production below the
-  schedule in a native disclosure; keep its DOM order aligned with its position.
+- Use one production summary strip and an open, full-width schedule region.
+  Facility cards provide the object boundaries; keep shift selection and controls
+  directly above them without a surrounding panel or repeated schedule heading.
+  Wide screens show three room columns. Put configuration and detailed production
+  below the schedule in a native disclosure; keep its DOM order aligned with its position.
   Below 40rem, place the schedule before the production strip so facilities are
   visible on entry. Operator portraits and efficiency carry the visual weight.
 - Keep generation beside the overview title and export beside result navigation.
@@ -152,11 +154,17 @@ it deliberately when changing the shared design.
   History separates result records from saved configurations, then exposes
   actions for the selected record. Inventory uses an item shelf, inspect/use
   dialogs, and separate task and activity views.
-- Generation separates preparation from execution. Below 40rem, the first-use
-  checklist collapses to the current step, and prepared operators and configuration
-  become two compact rows opening the existing editors. Coupon options expand on
-  demand. Keep the generation action and any charge summary at the bottom, reserve
-  its measured height in the page, and retain validation and retry messages.
+- Generation separates preparation from execution with a column gap and one rule.
+  Keep operator and configuration summaries beside their edit actions, with compact
+  row spacing and no enclosing panel or step numbers. Use at least 14px for action
+  guidance, operator names and inventory hints; reserve 12px for auxiliary metadata
+  such as times and facility levels. Separate room groups with larger gaps than the
+  spacing within a group. Below 40rem, the first-use checklist collapses to the
+  current step, and preparation rows open the existing editors across the whole row.
+  Coupon options expand on demand on mobile; when no coupons are available, show
+  “暂无可用券” and keep the rules collapsed at every width. Keep the generation action
+  and any charge summary at the bottom, reserve its measured height in the page,
+  and retain validation and retry messages.
   Comparison composes the
   experiment before inspecting candidate results. Cultivation separates
   conditions from priority, material, calendar and inventory results. Manual
