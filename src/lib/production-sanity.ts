@@ -16,11 +16,23 @@ export type ProductionSanitySummary = {
   note: string;
 }
 
-export function calculateProductionSanity(daily: Partial<DailyProduction> | null | undefined): ProductionSanitySummary {
+export function getProductionSanityLedger(daily: Partial<DailyProduction> | null | undefined) {
   const manufacturing = daily?.manufacturing ?? {}
   const trading = daily?.trading ?? {}
   const consumption = daily?.consumption ?? {}
+  const produced = Math.max(0, getResourceAmount(manufacturing, 'Originium Shard'))
+  const consumed = getResourceAmount(consumption, 'Originium Shard')
+  if (daily?.originium_shard_inventory !== 0 || consumed <= produced) return { manufacturing, trading, consumption }
 
+  return {
+    manufacturing,
+    trading: { ...trading, Orundum: getResourceAmount(trading, 'Orundum') * produced / consumed },
+    consumption: { ...consumption, 'Originium Shard': produced },
+  }
+}
+
+export function calculateProductionSanity(daily: Partial<DailyProduction> | null | undefined): ProductionSanitySummary {
+  const { manufacturing, trading, consumption } = getProductionSanityLedger(daily)
   const manufacturingSanity =
     getResourceAmount(manufacturing, 'Pure Gold') * SANITY_PER_PURE_GOLD +
     getResourceAmount(manufacturing, 'Battle Record') * SANITY_PER_BATTLE_RECORD +

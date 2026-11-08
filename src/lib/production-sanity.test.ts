@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calculateProductionSanity } from './production-sanity'
+import { calculateProductionSanity, getProductionSanityLedger } from './production-sanity'
 import { SANITY_PER_ORIGINIUM_SHARD_OPPORTUNITY } from './orundum-economy'
 import { supportRoomProduction } from './support-room-economy'
 
@@ -21,6 +21,32 @@ describe('production sanity resource accounting', () => {
   it('does not charge shard acquisition again when trading existing inventory', () => {
     expect(calculateProductionSanity({ trading: { Orundum: 20 }, consumption: { 'Originium Shard': 2 } }).value)
       .toBeCloseTo(15 - 2 * SANITY_PER_ORIGINIUM_SHARD_OPPORTUNITY, 10)
+  })
+
+  it('caps empty-stock shard trades at factory output without changing the resource ledger', () => {
+    const daily = {
+      originium_shard_inventory: 0,
+      manufacturing: { 'Originium Shard': 60 }, trading: { Orundum: 1000, LMD: 50000 },
+      consumption: { 'Originium Shard': 100, LMD: 96000 },
+    }
+    const original = structuredClone(daily)
+    const ledger = getProductionSanityLedger(daily)
+    expect(ledger.trading).toEqual({ Orundum: 600, LMD: 50000 })
+    expect(ledger.consumption).toEqual({ 'Originium Shard': 60, LMD: 96000 })
+    expect(calculateProductionSanity(daily).value).toBeCloseTo(284.4, 10)
+    expect(calculateProductionSanity({ ...daily, trading: { Orundum: 2000, LMD: 50000 },
+      consumption: { 'Originium Shard': 200, LMD: 96000 } })).toEqual(calculateProductionSanity(daily))
+    expect(daily).toEqual(original)
+  })
+
+  it('values no shard trades without stock or factory output and preserves stocked trades', () => {
+    const daily = { originium_shard_inventory: 0, trading: { Orundum: 20 }, consumption: { 'Originium Shard': 2 } }
+    expect(calculateProductionSanity(daily).value).toBe(0)
+    expect(calculateProductionSanity({ ...daily, originium_shard_inventory: 1 }).value)
+      .toBeCloseTo(15 - 2 * SANITY_PER_ORIGINIUM_SHARD_OPPORTUNITY, 10)
+    const balanced = { ...daily, manufacturing: { 'Originium Shard': 3 } }
+    expect(getProductionSanityLedger(balanced).trading).toBe(balanced.trading)
+    expect(calculateProductionSanity(balanced).value).toBeCloseTo(15 + SANITY_PER_ORIGINIUM_SHARD_OPPORTUNITY, 10)
   })
 
   it('values collected clues and incremental recruitment rewards without adding them to LMD', () => {

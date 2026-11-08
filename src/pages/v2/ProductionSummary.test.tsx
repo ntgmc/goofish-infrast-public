@@ -82,6 +82,35 @@ it('uses optimizer cash flow and depletion instead of recalculating the producti
   expect(changes.getByText(copy.v2.lmdNetChange).closest('div')).toHaveTextContent('-90,000')
 })
 
+it('uses the same empty-stock valuation for income details and schedule comparisons', async () => {
+  const daily = { originium_shard_inventory: 0, manufacturing: { 'Originium Shard': 60 },
+    trading: { Orundum: 1000 }, consumption: { 'Originium Shard': 100 },
+    details: [{ room_type: 'trading', room_index: 1, shift: '早班', product: 'Orundum', amount: 1000,
+      consume: { 'Originium Shard': 100 } }] }
+  const result = { ...SAMPLE_RESULT, daily_production: daily, maa_default_comparison: {
+    source: 'maa_default_simulation_v1' as const,
+    simulation: { algorithm: 'maa_default_room_local_greedy_v1', facility_order: [], drones: 'Money', shift_hours: [8, 8, 8] },
+    baseline: { daily_production: { originium_shard_inventory: 0, manufacturing: { 'Originium Shard': 40 },
+      trading: { Orundum: 400 }, consumption: { 'Originium Shard': 40 } },
+      total_efficiency: 0, raw_total_efficiency: 0, plan_count: 1, room_count: 1 },
+    delta: { total_efficiency: 0, raw_total_efficiency: 0, manufacturing: { 'Originium Shard': 20 },
+      trading: { Orundum: 600 }, consumption: { 'Originium Shard': 60 }, net: {}, drones: {} }, warnings: [],
+  } }
+  const prepared = prepareResult(result, false, false)
+  expect(prepared.productionSanity.value).toBeCloseTo(450, 10)
+  expect(prepared.maaDefaultComparison?.baselineSanity).toBeCloseTo(300, 10)
+  expect(prepared.maaDefaultComparison?.sanityDelta).toBeCloseTo(150, 10)
+  render(<IncomeAnalysis result={result} prepared={prepared} />)
+  const calculation = within(screen.getByRole('region', { name: copy.v2.sanityCalculation }))
+  expect(calculation.getByText('450.00')).toBeInTheDocument()
+  expect(calculation.getByText('+450')).toBeInTheDocument()
+  expect(calculation.getByText(`${copy.v2.dailyOutput} 600`)).toBeInTheDocument()
+  const station = within(screen.getByRole('region', { name: copy.v2.stationOutput }))
+  await userEvent.click(station.getByText(copy.v2.stationShiftDetails))
+  expect(station.getByText('404.41')).toBeInTheDocument()
+  expect(daily.trading.Orundum).toBe(1000)
+})
+
 it('keeps legacy income as gross income when the optimizer has not returned cash flow', () => {
   const result = { ...SAMPLE_RESULT, daily_production: { manufacturing: { 'Originium Shard': 10 }, trading: { LMD: 10000 } } }
   render(<ProductionSummary result={result} prepared={prepareResult(result, false, false)} sample
