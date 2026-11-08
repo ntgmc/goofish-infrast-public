@@ -2329,7 +2329,8 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
 .v2-modal .task-center-job { padding: 16px 0; border-width: 0 0 1px; border-radius: 0; background: transparent; overflow-wrap: anywhere; }
 .v2-modal .task-center-job:first-child { padding-top: 0; }
 .v2-modal .task-center-job > div { flex-wrap: wrap; }
-.v2-modal .task-center-job > div > div:first-child { flex: 1 1 16rem; }
+.v2-modal .task-center-job > div > div:first-child { flex: 1 1 auto; }
+@media (min-width: 40rem) { .v2-modal .task-center-job > div > div:first-child { flex-basis: 16rem; } }
 .v2-modal .task-center-job > div > div:last-child { min-width: 0; max-width: 100%; }
 .v2-modal .task-center-details { overflow-wrap: anywhere; }
 .v2-modal .task-center-details > summary { display: flex; min-height: 44px; align-items: center; gap: 12px; cursor: pointer; list-style: none; }

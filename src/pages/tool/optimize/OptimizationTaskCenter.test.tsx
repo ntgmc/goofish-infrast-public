@@ -96,6 +96,7 @@ describe('OptimizationTaskCenter', () => {
     render(<Harness controller={controller({ jobs: [successfulScheduleJob()] })} onOpenResult={onOpenResult} />)
     await user.click(screen.getByRole('button', { name: '查看后台计算' }))
 
+    expect(screen.queryByText('计算详情', { selector: 'summary' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '查看结果' }))
 
     expect(onOpenResult).toHaveBeenCalledOnce()
