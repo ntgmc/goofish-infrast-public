@@ -1,5 +1,5 @@
+import type { QueryClient } from './postgres'
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto'
-import type { PoolClient } from 'pg'
 import type { AdminRegistrationInvitation, AdminRegistrationInvitationStatus } from '../../src/lib/types'
 import { ensureDatabaseSchema } from './schema'
 import { query, withTransaction } from './postgres'
@@ -315,7 +315,7 @@ export async function validateAdminRegistrationInvitation(
 }
 
 export async function consumeAdminRegistrationInvitationInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   invitation: ValidatedAdminRegistrationInvitation,
   userId: string,
   now = new Date(),
@@ -363,7 +363,7 @@ export async function consumeAdminRegistrationInvitationInTransaction(
 }
 
 async function createQqBotInvitationInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   encryptionSecret: string,
   now: Date,
 ): Promise<{ id: string; code: string; expiresAt: string }> {
@@ -411,7 +411,7 @@ async function createQqBotInvitationInTransaction(
   throw new Error('生成 QQ 群资格注册邀请码失败，请重试。')
 }
 
-async function retireQqBotInvitation(client: PoolClient, invitationId: string, now: string): Promise<void> {
+async function retireQqBotInvitation(client: QueryClient, invitationId: string, now: string): Promise<void> {
   const reason = 'Bot 接口凭据已更新，原邀请码已失效。'
   const result = await client.query(
     `update admin_registration_invitations
@@ -528,7 +528,7 @@ async function releaseVerificationOutbox(
 }
 
 export async function saveRegistrationWithAdminInvitation(
-  saveUser: (client: PoolClient) => Promise<void>,
+  saveUser: (client: QueryClient) => Promise<void>,
   invitation: ValidatedAdminRegistrationInvitation,
   userId: string,
   now = new Date(),
@@ -790,7 +790,7 @@ function decryptAdminInviteCode(
   ]).toString('utf8')
 }
 
-async function insertAudit(client: PoolClient, input: {
+async function insertAudit(client: QueryClient, input: {
   invitationId: string
   adminUsername: string
   action: 'create' | 'revoke' | 'resend_verification'

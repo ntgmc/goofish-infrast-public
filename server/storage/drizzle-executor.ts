@@ -42,13 +42,9 @@ export function createDrizzleExecutor(client: NodePgClient, queryTimeoutMs?: num
   }
 }
 
-export function drizzleTransactionClient(client: PoolClient): PoolClient {
-  const execute = createDrizzleExecutor(client)
-  return new Proxy(client, {
-    get(target, property, receiver) {
-      if (property === 'query') return execute
-      const value: unknown = Reflect.get(target, property, receiver)
-      return typeof value === 'function' ? value.bind(target) : value
-    },
-  })
+export function drizzleTransactionClient(client: PoolClient) {
+  return {
+    query: createDrizzleExecutor(client),
+    release: client.release.bind(client),
+  }
 }

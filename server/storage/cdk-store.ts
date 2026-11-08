@@ -1,5 +1,4 @@
 import type { QueryClient } from './postgres'
-import type { PoolClient } from 'pg'
 import { matchesSearch } from '../../src/lib/search'
 import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
@@ -66,7 +65,7 @@ export async function settleCdkScheduleQuota(jobId: string, now = new Date().toI
 }
 
 export async function releaseCdkScheduleQuotaInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   jobId: string,
   now = new Date().toISOString(),
 ): Promise<boolean> {
@@ -100,7 +99,7 @@ export async function releaseCdkScheduleQuotaInTransaction(
 }
 
 export async function reserveCdkScenarioQuotaInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   input: { jobId: string; codeHash: string; now?: string },
 ): Promise<boolean> {
   const key = `cdk/${input.codeHash}.json`
@@ -129,7 +128,7 @@ export async function reserveCdkScenarioQuotaInTransaction(
 }
 
 export async function settleCdkScenarioQuotaInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   jobId: string,
   now = new Date().toISOString(),
 ): Promise<boolean> {
@@ -160,7 +159,7 @@ export async function settleCdkScenarioQuotaInTransaction(
 }
 
 export async function releaseCdkScenarioQuotaInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   jobId: string,
   now = new Date().toISOString(),
 ): Promise<boolean> {
@@ -200,7 +199,7 @@ export async function listCdkRecordsByKeys(keys: string[]): Promise<Map<string, 
   return new Map(result.rows.map((row) => [row.key, row.record_json]))
 }
 
-export async function claimCdkRecord(client: PoolClient, key: string): Promise<CdkRecord | null> {
+export async function claimCdkRecord(client: QueryClient, key: string): Promise<CdkRecord | null> {
   const result = await client.query<{ record_json: CdkRecord }>(
     `update cdk_records
      set status = 'claiming', record_revision = record_revision + 1, updated_at = now(),
@@ -212,7 +211,7 @@ export async function claimCdkRecord(client: PoolClient, key: string): Promise<C
   return result.rows[0]?.record_json ?? null
 }
 
-export async function completeCdkRedemption(client: PoolClient, key: string, record: CdkRecord): Promise<void> {
+export async function completeCdkRedemption(client: QueryClient, key: string, record: CdkRecord): Promise<void> {
   const storedRecord = normalizeCdkRecordForPersistence(record)
   const result = await client.query(
     `update cdk_records
@@ -226,7 +225,7 @@ export async function completeCdkRedemption(client: PoolClient, key: string, rec
 }
 
 export async function recordOperatorFingerprintInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   record: CdkRecord,
   fingerprint: OperatorFingerprint,
 ): Promise<CdkRecord> {
@@ -476,7 +475,7 @@ function normalizeCdkRecordForPersistence(record: CdkRecord): CdkRecord {
   return { ...record, permission: normalizeRuntimePermission(record.permission) }
 }
 
-async function syncLinkedProfileAuthorization(client: PoolClient, cdkKey: string, record: CdkRecord): Promise<void> {
+async function syncLinkedProfileAuthorization(client: QueryClient, cdkKey: string, record: CdkRecord): Promise<void> {
   if (!isProfileCdkRecord(record) || !['used', 'frozen', 'revoked'].includes(record.status)) return
   const permission = normalizeRuntimePermission(record.permission)
   const status = record.status === 'used' ? 'active' : record.status

@@ -4,14 +4,17 @@ import { Readable } from 'node:stream'
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify'
 import { nodeRequestToWebRequest, releaseWebRequestResources } from './http-adapter'
 import { RequestBodyTooLargeError } from './request-body-limits'
-import { routeRequest } from './routes'
+import { API_ROUTES, type ApiHandler } from './routes'
+import { enforceFeatureGate } from './feature-gate'
+import { isServiceReady } from './lifecycle'
 import { applyHttpSecurityHeaders, isSecureIncomingRequest } from './security/http-security'
 import { inspectIncomingRequest, type HttpBoundaryDecision } from './security/http-boundary'
-import { getDeclaredApiPolicyRoutes } from './security/request-policy'
 import { describeServerError } from './security/error-reporting'
 import { RequestInputError, validateAndStoreJsonBody } from './security/request-validation'
 import { observeHttpRequest } from './http-observation'
 import { withPerformanceContext } from './performance-observation'
+
+export { getRegisteredApiRoutes } from './routes'
 
 export function createApiServer(): Server {
   const requests = new WeakMap<IncomingMessage, Request>()
@@ -20,6 +23,7 @@ export function createApiServer(): Server {
     logger: false,
     exposeHeadRoutes: false,
     requestIdHeader: false,
+    routerOptions: { maxParamLength: 128 },
     rewriteUrl: (request) => {
       // Validate the original target before Fastify normalizes or decodes it.
       const boundary = inspectIncomingRequest(request)
@@ -39,7 +43,10 @@ export function createApiServer(): Server {
         res.setHeader('X-Request-ID', requestId)
         observeHttpRequest(req, res, requestId)
         withPerformanceContext({ request_id: requestId }, () => {
-          void app.ready().then(() => handler(req, res), (error) => server.emit('error', error))
+          void app.ready().then(
+            () => handler(req, res),
+            (error) => server.emit('error', error),
+          )
         })
       }
       server.on('request', dispatch)
@@ -113,13 +120,22 @@ export function createApiServer(): Server {
     return sendResponse(request, reply, errorResponse(500, 'internal_error', 'Internal server error.', requestId))
   })
 
-  const handle = async (request: FastifyRequest, reply: FastifyReply) => {
+  const handle = async (request: FastifyRequest, reply: FastifyReply, handler: ApiHandler, featureGate: boolean) => {
     const webRequest = requests.get(request.raw)
     if (!webRequest) throw new Error('HTTP boundary did not initialize the request')
-    return sendResponse(request, reply, await routeRequest(webRequest))
+    const drainingOptimization = !isServiceReady() && request.routeOptions.url?.startsWith('/api/optimization/')
+    if (featureGate && !drainingOptimization) {
+      const gated = await enforceFeatureGate(webRequest)
+      if (gated) return sendResponse(request, reply, gated)
+    }
+    return sendResponse(request, reply, await handler(webRequest))
   }
-  for (const path of getDeclaredApiPolicyRoutes()) app.all(path, handle)
-  app.setNotFoundHandler(handle)
+  for (const [path, handler, featureGate = true] of API_ROUTES) {
+    app.all(path, (request, reply) => handle(request, reply, handler, featureGate))
+  }
+  app.setNotFoundHandler((request, reply) =>
+    sendResponse(request, reply, Response.json({ error: 'API route not found' }, { status: 404 })),
+  )
 
   const server = app.server
   server.once('close', () => {
@@ -130,7 +146,7 @@ export function createApiServer(): Server {
 
 function sendResponse(request: FastifyRequest, reply: FastifyReply, response: Response): FastifyReply {
   const req = request.raw
-  const pathname = new URL(req.url ?? '/', 'http://request.invalid').pathname
+  const pathname = request.routeOptions.url ?? ''
   response = applyHttpSecurityHeaders(response, isSecureIncomingRequest(req))
   if (
     response.status >= 400 ||
@@ -164,16 +180,16 @@ function errorResponse(
   requestId: string,
   issues: Array<{ path: string; code: string }> = [],
 ): Response {
-  return new Response(
-    JSON.stringify({
+  return Response.json(
+    {
       error: message,
       code,
       request_id: requestId,
       ...(issues.length > 0 && { issues: issues.slice(0, 10) }),
-    }),
+    },
     {
       status,
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+      headers: { 'Cache-Control': 'no-store' },
     },
   )
 }

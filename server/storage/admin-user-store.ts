@@ -1,5 +1,4 @@
-import { getPool, query } from './postgres'
-import { drizzleTransactionClient } from './drizzle-executor'
+import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import type { AdminUserRecord } from '../handlers/admin-auth'
 import type { PasswordHashRecord } from '../security/password'
@@ -36,9 +35,7 @@ export function createPostgresAdminUserStore(): AdminUserStore {
     },
     set: async (username, user, audit) => {
       await ensureSchema()
-      const client = drizzleTransactionClient(await getPool().connect())
-      try {
-        await client.query('begin')
+      await withTransaction(async (client) => {
         await client.query(
           `insert into admin_users
           (username, password_hash, salt, iterations, disabled, record_json, created_at, updated_at)
@@ -63,19 +60,11 @@ export function createPostgresAdminUserStore(): AdminUserStore {
         )
         await client.query('delete from admin_sessions where username = $1', [username])
         if (audit) await recordAdminOperationAuditInTransaction(client, audit)
-        await client.query('commit')
-      } catch (error) {
-        await client.query('rollback')
-        throw error
-      } finally {
-        client.release()
-      }
+      })
     },
     create: async (username, user, audit) => {
       await ensureSchema()
-      const client = drizzleTransactionClient(await getPool().connect())
-      try {
-        await client.query('begin')
+      return withTransaction(async (client) => {
         const result = await client.query(
           `insert into admin_users
             (username, password_hash, salt, iterations, disabled, record_json, created_at, updated_at)
@@ -95,14 +84,8 @@ export function createPostgresAdminUserStore(): AdminUserStore {
         )
         const created = result.rowCount === 1
         if (created && audit) await recordAdminOperationAuditInTransaction(client, audit)
-        await client.query('commit')
         return created
-      } catch (error) {
-        await client.query('rollback')
-        throw error
-      } finally {
-        client.release()
-      }
+      })
     },
     upgradePasswordHash: async (username, expectedPasswordHash, replacement) => {
       await ensureSchema()
@@ -137,18 +120,10 @@ export function createPostgresAdminUserStore(): AdminUserStore {
     },
     delete: async (username, audit) => {
       await ensureSchema()
-      const client = drizzleTransactionClient(await getPool().connect())
-      try {
-        await client.query('begin')
+      await withTransaction(async (client) => {
         await client.query('delete from admin_users where username = $1', [username])
         if (audit) await recordAdminOperationAuditInTransaction(client, audit)
-        await client.query('commit')
-      } catch (error) {
-        await client.query('rollback')
-        throw error
-      } finally {
-        client.release()
-      }
+      })
     },
     list: async () => {
       await ensureSchema()

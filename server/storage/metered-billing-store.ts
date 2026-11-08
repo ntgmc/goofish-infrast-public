@@ -1,5 +1,5 @@
+import type { QueryClient } from './postgres'
 import { randomUUID } from 'node:crypto'
-import type { PoolClient } from 'pg'
 import {
   getCommercialTierSummary,
   getMeteredScheduleQuote,
@@ -90,7 +90,7 @@ export async function issueMeteredScheduleQuote(
 }
 
 export async function confirmMeteredQuoteInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   input: {
     jobId: string
     userId: string
@@ -154,7 +154,7 @@ export async function confirmMeteredQuoteInTransaction(
 }
 
 async function readBillingState(
-  client: PoolClient,
+  client: QueryClient,
   userId: string,
   profileId: string,
   lockProfile: boolean,

@@ -1,4 +1,4 @@
-import type { PoolClient } from 'pg'
+import type { QueryClient } from './postgres'
 import { query, withTransaction } from './postgres'
 
 type WebsiteNotificationEventType = 'announcement.published' | 'release.published'
@@ -88,7 +88,7 @@ export async function createWebsiteNotificationEvent(
 }
 
 export async function insertWebsiteNotificationEventsInTransaction(
-  client: Pick<PoolClient, 'query'>,
+  client: QueryClient,
   events: readonly WebsiteNotificationEventInput[],
 ): Promise<void> {
   for (const event of events) {
@@ -97,7 +97,7 @@ export async function insertWebsiteNotificationEventsInTransaction(
 }
 
 async function insertWebsiteNotificationEventInTransaction(
-  client: Pick<PoolClient, 'query'>,
+  client: QueryClient,
   rawEvent: WebsiteNotificationEventInput,
   rejectConflict: boolean,
 ): Promise<{ created: boolean; event: WebsiteNotificationEvent }> {

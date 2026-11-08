@@ -1,4 +1,4 @@
-import { Client, Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg'
+import { Client, Pool, type QueryResult, type QueryResultRow } from 'pg'
 import { DrizzleQueryError } from 'drizzle-orm'
 import { describeServerError } from '../security/error-reporting'
 import { observePostgresPool } from './postgres-observation'
@@ -172,7 +172,7 @@ export async function retryPostgresQuery<T>(work: () => PromiseLike<T>): Promise
   }
 }
 
-export async function withTransaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
+export async function withTransaction<T>(work: (client: QueryClient) => Promise<T>): Promise<T> {
   const client = await getPool().connect()
   let discard = false
   try {

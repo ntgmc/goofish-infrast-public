@@ -1,5 +1,5 @@
+import type { QueryClient } from './postgres'
 import { createHash, randomUUID } from 'node:crypto'
-import type { PoolClient } from 'pg'
 import type { UserAccountRecord, UserGameAccountRecord, UserWorkspaceRecord } from './user-store'
 import { emptyWorkspace, insertUserAccountForRegistrationInTransaction } from './user-store'
 import { claimCdkRecord, completeCdkRedemption } from './cdk-store'
@@ -39,7 +39,7 @@ export function buildLifetimeVoucherProfileAuthorization(operationId: string): L
 }
 
 export async function createLifetimeVoucherProfileAuthorizationInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   input: {
     operationId: string
     userId: string
@@ -85,8 +85,8 @@ export async function redeemCdkAtomically<T>(options: {
   idempotencyKey?: string | null
   idempotencyScope: string
   requestHash: string
-  prepare?: (client: PoolClient) => Promise<void>
-  complete: (client: PoolClient, record: CdkRecord) => Promise<{ record: CdkRecord; response: T }>
+  prepare?: (client: QueryClient) => Promise<void>
+  complete: (client: QueryClient, record: CdkRecord) => Promise<{ record: CdkRecord; response: T }>
 }): Promise<{ response: T; replayed: boolean }> {
   await ensureDatabaseSchema()
   return withTransaction(async (client) => {
@@ -156,12 +156,12 @@ export async function redeemCdkAtomically<T>(options: {
   })
 }
 
-export async function saveUserAccountInTransaction(client: PoolClient, user: UserAccountRecord): Promise<void> {
+export async function saveUserAccountInTransaction(client: QueryClient, user: UserAccountRecord): Promise<void> {
   await insertUserAccountForRegistrationInTransaction(client, user)
 }
 
 export async function updateRegisteredUserCdkInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   user: UserAccountRecord,
 ): Promise<void> {
   const patch = {
@@ -194,7 +194,7 @@ export async function updateRegisteredUserCdkInTransaction(
   if (updated.rowCount !== 1) throw new Error('Registered user disappeared during CDK redemption.')
 }
 
-export async function saveProfileInTransaction(client: PoolClient, profile: UserGameAccountRecord): Promise<void> {
+export async function saveProfileInTransaction(client: QueryClient, profile: UserGameAccountRecord): Promise<void> {
   await client.query(
     `insert into user_game_accounts
       (id,user_id,cdk_key,cdk_code_hash,cdk_order_hash,permission,status,display_name,note,kind,archived_at,record_json,created_at,updated_at)
@@ -207,7 +207,7 @@ export async function saveProfileInTransaction(client: PoolClient, profile: User
   )
 }
 
-export async function saveWorkspaceInTransaction(client: PoolClient, workspace: UserWorkspaceRecord = emptyWorkspace('')): Promise<void> {
+export async function saveWorkspaceInTransaction(client: QueryClient, workspace: UserWorkspaceRecord = emptyWorkspace('')): Promise<void> {
   await client.query(
     `insert into user_profile_workspaces
       (profile_id,operators_json,config_json,elite_overrides_json,last_result_json,record_json,updated_at)

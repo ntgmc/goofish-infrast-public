@@ -1,6 +1,5 @@
 import type { QueryClient } from './postgres'
 import { createHash, randomInt, randomUUID } from 'node:crypto'
-import type { PoolClient } from 'pg'
 import {
   ITEM_ICON_PATHS,
   normalizeGiftPackOpeningRule,
@@ -348,7 +347,7 @@ export async function grantItem(input: GrantInput): Promise<string | null> {
   return withTransaction((client) => grantItemInTransaction(client, input))
 }
 
-export async function grantItemInTransaction(client: PoolClient, input: GrantInput): Promise<string | null> {
+export async function grantItemInTransaction(client: QueryClient, input: GrantInput): Promise<string | null> {
   const definition = await client.query<{ kind: string; issuance_enabled: boolean; name: string; icon_key: string }>(
     'select kind, issuance_enabled, name, icon_key from item_definitions where code = $1',
     [input.itemCode],
@@ -363,7 +362,7 @@ export async function grantItemInTransaction(client: PoolClient, input: GrantInp
   return grantItemWithSnapshot(client, input, item ?? null, version)
 }
 
-export async function grantItemsInTransaction(client: PoolClient, inputs: GrantInput[]): Promise<Array<string | null>> {
+export async function grantItemsInTransaction(client: QueryClient, inputs: GrantInput[]): Promise<Array<string | null>> {
   if (inputs.length === 0) return []
   const itemCodes = [...new Set(inputs.map((input) => input.itemCode))]
   const definitions = await client.query<{
@@ -534,7 +533,7 @@ function grantKey(row: {
 }
 
 async function grantItemWithSnapshot(
-  client: PoolClient,
+  client: QueryClient,
   input: GrantInput,
   item: { kind: string; issuance_enabled: boolean; name: string; icon_key: string } | null,
   version: { status: string; item_code: string } | null,
@@ -601,7 +600,7 @@ async function grantItemWithSnapshot(
 }
 
 export async function reserveItemsInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   userId: string,
   itemCodes: string[],
   referenceType: string,
@@ -645,7 +644,7 @@ export async function reserveItemsInTransaction(
 }
 
 export async function commitReservedItemsInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   referenceType: string,
   referenceId: string,
   now = new Date().toISOString(),
@@ -665,7 +664,7 @@ export async function commitReservedItemsInTransaction(
 }
 
 export async function refundReservedItemsInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   referenceType: string,
   referenceId: string,
   now = new Date().toISOString(),
@@ -808,7 +807,7 @@ export async function grantFreePreviewLimitedVoucher(userId: string, now = new D
 }
 
 async function activateLimitedProfileInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   userId: string,
   itemCode: string,
   operationId: string,
@@ -943,7 +942,7 @@ export async function listOnboardingTasks(userId: string): Promise<OnboardingTas
   }))
 }
 
-async function lockInventoryItemInTransaction(client: PoolClient, userId: string, itemCode: string): Promise<void> {
+async function lockInventoryItemInTransaction(client: QueryClient, userId: string, itemCode: string): Promise<void> {
   await client.query(
     "select pg_advisory_xact_lock(hashtextextended('inventory-item:' || $1 || ':' || $2, 0))",
     [userId, itemCode],
@@ -956,7 +955,7 @@ export async function claimOnboardingTask(userId: string, taskCode: OnboardingTa
 }
 
 async function claimOnboardingTaskInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   userId: string,
   taskCode: OnboardingTaskCode,
   idempotencyKey: string,
@@ -1032,7 +1031,7 @@ async function claimOnboardingTaskInTransaction(
 }
 
 export async function claimWelcomeOnboardingTaskForRegistrationInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   userId: string,
   idempotencyKey: string,
   operationNow = new Date(),
@@ -1126,7 +1125,7 @@ async function getProfileCapacities(userId: string): Promise<ProfileCapacitySumm
 }
 
 async function openGiftPackInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   userId: string,
   input: ItemUseRequest,
   operationId: string,
@@ -1213,7 +1212,7 @@ async function openGiftPackInTransaction(
 }
 
 async function applyCapacityUpgradeInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   userId: string,
   itemCode: string,
   effectCode: string | null,
@@ -1288,7 +1287,7 @@ async function backfillOnboardingProgress(userId: string): Promise<void> {
   if (facts.rows[0]?.has_schedule) await markOnboardingTaskComplete(userId, 'first_main_schedule', now)
 }
 
-async function insertLedger(client: PoolClient, input: {
+async function insertLedger(client: QueryClient, input: {
   userId: string; itemCode: string; eventType: InventoryLedgerEvent['event_type']; quantity: number
   grantId: string | null; referenceType: string; referenceId: string; metadata: Record<string, unknown>; now: string
 }): Promise<void> {

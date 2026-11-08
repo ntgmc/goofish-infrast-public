@@ -1,3 +1,5 @@
+import { request } from 'node:http'
+
 const expectedRoutes = [
   '/api/admin/cdk',
   '/api/admin/risk-settings',
@@ -62,7 +64,7 @@ const expectedRoutes = [
   '/api/usage-stats',
 ]
 
-const { getRegisteredApiRoutes, routeRequest } = await import('../server/dist/routes.js')
+const { getRegisteredApiRoutes, createApiServer } = await import('../server/dist/routes.js')
 const actualRoutes = getRegisteredApiRoutes()
 const missing = expectedRoutes.filter((route) => !actualRoutes.includes(route))
 if (missing.length > 0) {
@@ -75,9 +77,29 @@ if (stale.length > 0) {
   throw new Error(`removed API routes are still registered: ${stale.join(', ')}`)
 }
 
-for (const route of ['/api/optimization/reorder-checks', '/api/user/rewards', '/api/redeem-cdk', '/api/license-status']) {
-  const response = await routeRequest(new Request(`http://local${route}`, { method: 'POST' }))
-  if (response.status !== 404) throw new Error(`removed API route ${route} returned ${response.status} instead of 404`)
+const server = createApiServer()
+try {
+  await new Promise((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', resolve)
+  })
+  const { port } = server.address()
+  const host = process.env.PUBLIC_APP_URL ? new URL(process.env.PUBLIC_APP_URL).host : 'localhost'
+  for (const route of ['/api/optimization/reorder-checks', '/api/user/rewards', '/api/redeem-cdk', '/api/license-status']) {
+    const status = await new Promise((resolve, reject) => {
+      const outgoing = request({ host: '127.0.0.1', port, method: 'POST', path: route, headers: { Host: host } }, (response) => {
+        response.resume()
+        response.once('error', reject)
+        response.once('end', () => resolve(response.statusCode))
+      })
+      outgoing.once('error', reject)
+      outgoing.end()
+    })
+    if (status !== 404) throw new Error(`removed API route ${route} returned ${status} instead of 404`)
+  }
+} finally {
+  server.closeAllConnections()
+  await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))
 }
 
 console.log(`[check-server-routes] ${actualRoutes.length} API routes registered`)

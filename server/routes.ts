@@ -52,162 +52,134 @@ import siteFeaturesHandler from './handlers/site-features'
 import sitePublicContentHandler from './handlers/site-public-content'
 import serviceStatusHandler from './handlers/service-status'
 import adminServiceStatusHandler from './handlers/admin-service-status'
-import { enforceFeatureGate } from './feature-gate'
 import { checkPostgresHealth, hasDatabaseUrl } from './storage/postgres'
-import { applyHttpSecurityHeaders, isSecureWebRequest } from './security/http-security'
 import { getServiceLifecycleState, isServiceReady } from './lifecycle'
 import { getAccountDeletionConfigurationHealth } from './account-data-lifecycle'
 import { getRuntimeDatabaseSchemaStatus } from './storage/schema'
 import { APP_BUILD_META } from '../src/lib/build-meta'
 
-type ApiHandler = (req: Request) => Promise<Response>
+export type ApiHandler = (req: Request) => Response | Promise<Response>
 
-const ROUTES = new Map<string, ApiHandler>([
+export const API_ROUTES: ReadonlyArray<readonly [path: string, handler: ApiHandler, featureGate?: boolean]> = [
+  ['/api/health', handleReadiness, false],
+  ['/api/health/live', handleLiveness, false],
+  ['/api/health/ready', handleReadiness, false],
+  ['/api/data', () => Response.json({ metadata: EFFICIENCY_DATA_METADATA, data: EFFICIENCY_DATA }), false],
+  ['/api/user/onboarding-tasks/:code/claim', userInventoryHandler],
+  ['/api/user/results/:resultId', userResultsHandler],
+  ['/api/optimization/jobs/:jobId', optimizationHandler],
+  ['/api/optimization/jobs/:jobId/cancel', optimizationHandler],
   ['/api/cultivation-plan', cultivationPlanHandler],
-  ['/api/admin/cdk', adminCdkHandler as unknown as ApiHandler],
-  ['/api/admin/risk-settings', adminRiskSettingsHandler as unknown as ApiHandler],
-  ['/api/admin/behavior-risk', adminBehaviorRiskHandler as unknown as ApiHandler],
-  ['/api/admin/invitation-settings', adminInvitationSettingsHandler as unknown as ApiHandler],
-  ['/api/admin/invitation-settlements', adminInvitationSettlementsHandler as unknown as ApiHandler],
-  ['/api/admin/registration-settings', adminRegistrationSettingsHandler as unknown as ApiHandler],
-  ['/api/admin/feature-settings', adminFeatureSettingsHandler as unknown as ApiHandler],
-  ['/api/admin/public-content', adminPublicContentHandler as unknown as ApiHandler],
-  ['/api/admin/registration-invitations', adminRegistrationInvitationsHandler as unknown as ApiHandler],
-  ['/api/admin/optimization', adminOptimizationHandler as unknown as ApiHandler],
-  ['/api/admin/service-status', adminServiceStatusHandler as unknown as ApiHandler],
-  ['/api/admin/session', adminSessionHandler as unknown as ApiHandler],
-  ['/api/admin/users', adminUsersHandler as unknown as ApiHandler],
-  ['/api/admin/items', adminItemsHandler as unknown as ApiHandler],
-  ['/api/admin/inventory', adminItemsHandler as unknown as ApiHandler],
-  ['/api/admin/balance', adminBalanceHandler as unknown as ApiHandler],
-  ['/api/admin/commercial', adminCommercialHandler as unknown as ApiHandler],
-  ['/api/auth/register', authHandler as unknown as ApiHandler],
-  ['/api/auth/registration-settings', authHandler as unknown as ApiHandler],
-  ['/api/auth/login', authHandler as unknown as ApiHandler],
-  ['/api/auth/logout', authHandler as unknown as ApiHandler],
-  ['/api/auth/forgot-password', authHandler as unknown as ApiHandler],
-  ['/api/auth/reset-password', authHandler as unknown as ApiHandler],
-  ['/api/auth/verify-email', authHandler as unknown as ApiHandler],
-  ['/api/auth/resend-verification', authHandler as unknown as ApiHandler],
-  ['/api/auth/change-password', authHandler as unknown as ApiHandler],
-  ['/api/auth/me', authHandler as unknown as ApiHandler],
-  ['/api/site/features', siteFeaturesHandler as unknown as ApiHandler],
-  ['/api/site/public-content', sitePublicContentHandler as unknown as ApiHandler],
+  ['/api/admin/cdk', adminCdkHandler],
+  ['/api/admin/risk-settings', adminRiskSettingsHandler],
+  ['/api/admin/behavior-risk', adminBehaviorRiskHandler],
+  ['/api/admin/invitation-settings', adminInvitationSettingsHandler],
+  ['/api/admin/invitation-settlements', adminInvitationSettlementsHandler],
+  ['/api/admin/registration-settings', adminRegistrationSettingsHandler],
+  ['/api/admin/feature-settings', adminFeatureSettingsHandler],
+  ['/api/admin/public-content', adminPublicContentHandler],
+  ['/api/admin/registration-invitations', adminRegistrationInvitationsHandler],
+  ['/api/admin/optimization', adminOptimizationHandler],
+  ['/api/admin/service-status', adminServiceStatusHandler],
+  ['/api/admin/session', adminSessionHandler],
+  ['/api/admin/users', adminUsersHandler],
+  ['/api/admin/items', adminItemsHandler],
+  ['/api/admin/inventory', adminItemsHandler],
+  ['/api/admin/balance', adminBalanceHandler],
+  ['/api/admin/commercial', adminCommercialHandler],
+  ['/api/auth/register', authHandler],
+  ['/api/auth/registration-settings', authHandler],
+  ['/api/auth/login', authHandler],
+  ['/api/auth/logout', authHandler],
+  ['/api/auth/forgot-password', authHandler],
+  ['/api/auth/reset-password', authHandler],
+  ['/api/auth/verify-email', authHandler],
+  ['/api/auth/resend-verification', authHandler],
+  ['/api/auth/change-password', authHandler],
+  ['/api/auth/me', authHandler],
+  ['/api/site/features', siteFeaturesHandler],
+  ['/api/site/public-content', sitePublicContentHandler],
   ['/api/changelog', changelogHandler],
-  ['/api/status', serviceStatusHandler as unknown as ApiHandler],
-  ['/api/user/data/export', accountDataHandler as unknown as ApiHandler],
-  ['/api/user/data/delete-request', accountDataHandler as unknown as ApiHandler],
-  ['/api/user/data/cancel', accountDataHandler as unknown as ApiHandler],
-  ['/api/user/data/credential/clear', accountDataHandler as unknown as ApiHandler],
-  ['/api/announcement', announcementHandler as unknown as ApiHandler],
-  ['/api/admin/announcement', announcementHandler as unknown as ApiHandler],
-  ['/api/integrations/qqbot/events', websiteEventsHandler as unknown as ApiHandler],
-  ['/api/integrations/qqbot/registration-invitations', qqBotRegistrationInvitationsHandler as unknown as ApiHandler],
+  ['/api/status', serviceStatusHandler],
+  ['/api/user/data/export', accountDataHandler],
+  ['/api/user/data/delete-request', accountDataHandler],
+  ['/api/user/data/cancel', accountDataHandler],
+  ['/api/user/data/credential/clear', accountDataHandler],
+  ['/api/announcement', announcementHandler],
+  ['/api/admin/announcement', announcementHandler],
+  ['/api/integrations/qqbot/events', websiteEventsHandler],
+  ['/api/integrations/qqbot/registration-invitations', qqBotRegistrationInvitationsHandler],
   ...['binding', 'account', 'notifications', 'notifications/ack', 'results', 'maa-export'].map((path) =>
-    [`/api/integrations/qqbot/${path}`, qqBotAccountHandler as unknown as ApiHandler] as [string, ApiHandler]),
+    [`/api/integrations/qqbot/${path}`, qqBotAccountHandler] as [string, ApiHandler]),
   ...['reward-items', 'reward-campaigns', 'member-account', 'rewards'].map((path) =>
-    [`/api/integrations/qqbot/${path}`, qqBotRewardsHandler as unknown as ApiHandler] as [string, ApiHandler]),
-  ['/api/user/qqbot', userQqBotHandler as unknown as ApiHandler],
+    [`/api/integrations/qqbot/${path}`, qqBotRewardsHandler] as [string, ApiHandler]),
+  ['/api/user/qqbot', userQqBotHandler],
   ...['/api/user/qqbot/activities', '/api/user/qqbot/verification', '/api/integrations/qqbot/verifications'].map((path) =>
-    [path, qqBotVerificationsHandler as unknown as ApiHandler] as [string, ApiHandler]),
-  ['/api/internal/releases/confirm', releaseConfirmationHandler as unknown as ApiHandler],
-  ['/api/usage-stats', usageStatsHandler as unknown as ApiHandler],
-  ['/api/admin/usage-stats', usageStatsHandler as unknown as ApiHandler],
-  ['/api/depot-value', depotValueHandler as unknown as ApiHandler],
-  ['/api/user/announcements', userAnnouncementsHandler as unknown as ApiHandler],
-  ['/api/user/notifications', userNotificationsHandler as unknown as ApiHandler],
+    [path, qqBotVerificationsHandler] as [string, ApiHandler]),
+  ['/api/internal/releases/confirm', releaseConfirmationHandler],
+  ['/api/usage-stats', usageStatsHandler],
+  ['/api/admin/usage-stats', usageStatsHandler],
+  ['/api/depot-value', depotValueHandler],
+  ['/api/user/announcements', userAnnouncementsHandler],
+  ['/api/user/notifications', userNotificationsHandler],
   ['/api/user/feedback', userFeedbackHandler],
   ['/api/admin/feedback', adminFeedbackHandler],
-  ['/api/user/profiles', userProfilesHandler as unknown as ApiHandler],
-  ['/api/user/profiles/depot-value', userProfilesHandler as unknown as ApiHandler],
-  ['/api/user/profiles/preview', userProfilesHandler as unknown as ApiHandler],
-  ['/api/user/profiles/redeem', userProfilesHandler as unknown as ApiHandler],
-  ['/api/user/profiles/metered-personal', userMeteredProfilesHandler as unknown as ApiHandler],
-  ['/api/user/commercial/profiles', userMeteredProfilesHandler as unknown as ApiHandler],
-  ['/api/user/billing/quote', userBillingHandler as unknown as ApiHandler],
-  ['/api/user/cdk/redeem', userCdkHandler as unknown as ApiHandler],
-  ['/api/user/skland/login/start', userSklandHandler as unknown as ApiHandler],
-  ['/api/user/skland/login/complete', userSklandHandler as unknown as ApiHandler],
-  ['/api/user/skland/login/confirm', userSklandHandler as unknown as ApiHandler],
-  ['/api/user/skland/pending/cancel', userSklandHandler as unknown as ApiHandler],
-  ['/api/user/skland/credential/preview', userSklandHandler as unknown as ApiHandler],
-  ['/api/user/skland/account/select', userSklandHandler as unknown as ApiHandler],
-  ['/api/user/skland/free-preview/login/start', userSklandHandler as unknown as ApiHandler],
-  ['/api/user/skland/free-preview/login/complete', userSklandHandler as unknown as ApiHandler],
-  ['/api/user/skland/free-preview/login/confirm', userSklandHandler as unknown as ApiHandler],
-  ['/api/user/skland/free-preview/pending/cancel', userSklandHandler as unknown as ApiHandler],
-  ['/api/user/skland/free-preview/credential/preview', userSklandHandler as unknown as ApiHandler],
-  ['/api/user/skland/free-preview/account/select', userSklandHandler as unknown as ApiHandler],
-  ['/api/user/skland/lifetime-voucher/login/start', userSklandHandler as unknown as ApiHandler],
-  ['/api/user/skland/lifetime-voucher/login/complete', userSklandHandler as unknown as ApiHandler],
-  ['/api/user/skland/lifetime-voucher/login/confirm', userSklandHandler as unknown as ApiHandler],
-  ['/api/user/skland/lifetime-voucher/pending/cancel', userSklandHandler as unknown as ApiHandler],
-  ['/api/user/skland/lifetime-voucher/credential/preview', userSklandHandler as unknown as ApiHandler],
-  ['/api/user/skland/lifetime-voucher/account/select', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/profiles', userProfilesHandler],
+  ['/api/user/profiles/depot-value', userProfilesHandler],
+  ['/api/user/profiles/preview', userProfilesHandler],
+  ['/api/user/profiles/redeem', userProfilesHandler],
+  ['/api/user/profiles/metered-personal', userMeteredProfilesHandler],
+  ['/api/user/commercial/profiles', userMeteredProfilesHandler],
+  ['/api/user/billing/quote', userBillingHandler],
+  ['/api/user/cdk/redeem', userCdkHandler],
+  ['/api/user/skland/login/start', userSklandHandler],
+  ['/api/user/skland/login/complete', userSklandHandler],
+  ['/api/user/skland/login/confirm', userSklandHandler],
+  ['/api/user/skland/pending/cancel', userSklandHandler],
+  ['/api/user/skland/credential/preview', userSklandHandler],
+  ['/api/user/skland/account/select', userSklandHandler],
+  ['/api/user/skland/free-preview/login/start', userSklandHandler],
+  ['/api/user/skland/free-preview/login/complete', userSklandHandler],
+  ['/api/user/skland/free-preview/login/confirm', userSklandHandler],
+  ['/api/user/skland/free-preview/pending/cancel', userSklandHandler],
+  ['/api/user/skland/free-preview/credential/preview', userSklandHandler],
+  ['/api/user/skland/free-preview/account/select', userSklandHandler],
+  ['/api/user/skland/lifetime-voucher/login/start', userSklandHandler],
+  ['/api/user/skland/lifetime-voucher/login/complete', userSklandHandler],
+  ['/api/user/skland/lifetime-voucher/login/confirm', userSklandHandler],
+  ['/api/user/skland/lifetime-voucher/pending/cancel', userSklandHandler],
+  ['/api/user/skland/lifetime-voucher/credential/preview', userSklandHandler],
+  ['/api/user/skland/lifetime-voucher/account/select', userSklandHandler],
   ['/api/user/skland/snapshot', sklandSnapshotHandler],
   ['/api/user/skland/snapshot/refresh', sklandSnapshotHandler],
-  ['/api/user/skland/import/refresh', userSklandHandler as unknown as ApiHandler],
-  ['/api/user/skland/facilities', userSklandHandler as unknown as ApiHandler],
-  ['/api/user/status', userStatusHandler as unknown as ApiHandler],
-  ['/api/user/workspace', userWorkspaceHandler as unknown as ApiHandler],
-  ['/api/user/behavior-risk/engagement', userBehaviorRiskHandler as unknown as ApiHandler],
-  ['/api/user/invitations', userInvitationsHandler as unknown as ApiHandler],
-  ['/api/user/invitations/code', userInvitationsHandler as unknown as ApiHandler],
-  ['/api/user/priority-coupon-balance', userRewardsHandler as unknown as ApiHandler],
-  ['/api/user/inventory', userInventoryHandler as unknown as ApiHandler],
-  ['/api/user/inventory/lifetime-profile', userInventoryHandler as unknown as ApiHandler],
-  ['/api/user/balance', userBalanceHandler as unknown as ApiHandler],
-  ['/api/user/balance/redeem', userBalanceHandler as unknown as ApiHandler],
-  ['/api/user/onboarding-tasks', userInventoryHandler as unknown as ApiHandler],
-  ['/api/user/onboarding-tasks/claim', userInventoryHandler as unknown as ApiHandler],
-  ['/api/user/results', userResultsHandler as unknown as ApiHandler],
-  ['/api/user/maa-export', userResultsHandler as unknown as ApiHandler],
-  ['/api/user/full-result-export', userResultsHandler as unknown as ApiHandler],
-  ['/api/user/result-archive', userResultsHandler as unknown as ApiHandler],
-  ['/api/user/personal-use-declaration', personalUseDeclarationHandler as unknown as ApiHandler],
-  ['/api/optimization/jobs', optimizationHandler as unknown as ApiHandler],
-])
-
-export async function routeRequest(req: Request): Promise<Response> {
-  const response = await dispatchRequest(req)
-  return applyHttpSecurityHeaders(response, isSecureWebRequest(req))
-}
-
-async function dispatchRequest(req: Request): Promise<Response> {
-  const url = new URL(req.url)
-
-  if (url.pathname === '/api/health/live') return handleLiveness()
-  if (url.pathname === '/api/health' || url.pathname === '/api/health/ready') return handleReadiness()
-  if (url.pathname === '/api/data') {
-    if (req.method !== 'GET') return jsonResponse({ error: 'Method not allowed' }, 405)
-    return jsonResponse({ metadata: EFFICIENCY_DATA_METADATA, data: EFFICIENCY_DATA })
-  }
-
-  const handler = /^\/api\/user\/onboarding-tasks\/(welcome_inventory|bind_skland|first_main_schedule)\/claim$/.test(url.pathname)
-    ? userInventoryHandler as unknown as ApiHandler
-    : url.pathname.startsWith('/api/user/results/')
-    ? userResultsHandler as unknown as ApiHandler
-    : url.pathname.startsWith('/api/optimization/jobs/')
-    ? optimizationHandler as unknown as ApiHandler
-    : ROUTES.get(url.pathname)
-  if (!handler) {
-    return jsonResponse({ error: 'API route not found' }, 404)
-  }
-
-  if (!isServiceReady() && url.pathname.startsWith('/api/optimization/')) return handler(req)
-
-  const gated = await enforceFeatureGate(req)
-  if (gated) return gated
-
-  return handler(req)
-}
+  ['/api/user/skland/import/refresh', userSklandHandler],
+  ['/api/user/skland/facilities', userSklandHandler],
+  ['/api/user/status', userStatusHandler],
+  ['/api/user/workspace', userWorkspaceHandler],
+  ['/api/user/behavior-risk/engagement', userBehaviorRiskHandler],
+  ['/api/user/invitations', userInvitationsHandler],
+  ['/api/user/invitations/code', userInvitationsHandler],
+  ['/api/user/priority-coupon-balance', userRewardsHandler],
+  ['/api/user/inventory', userInventoryHandler],
+  ['/api/user/inventory/lifetime-profile', userInventoryHandler],
+  ['/api/user/balance', userBalanceHandler],
+  ['/api/user/balance/redeem', userBalanceHandler],
+  ['/api/user/onboarding-tasks', userInventoryHandler],
+  ['/api/user/onboarding-tasks/claim', userInventoryHandler],
+  ['/api/user/results', userResultsHandler],
+  ['/api/user/maa-export', userResultsHandler],
+  ['/api/user/full-result-export', userResultsHandler],
+  ['/api/user/result-archive', userResultsHandler],
+  ['/api/user/personal-use-declaration', personalUseDeclarationHandler],
+  ['/api/optimization/jobs', optimizationHandler],
+]
 
 export function getRegisteredApiRoutes(): string[] {
-  return ['/api/health', '/api/health/live', '/api/health/ready', '/api/data', '/api/user/onboarding-tasks/:code/claim', '/api/user/results/:resultId', '/api/optimization/jobs/:jobId', '/api/optimization/jobs/:jobId/cancel', ...ROUTES.keys()].sort()
+  return API_ROUTES.map(([path]) => path).sort()
 }
 
 function handleLiveness(): Response {
-  return jsonResponse({
+  return Response.json({
     ok: true,
     state: getServiceLifecycleState(),
   })
@@ -216,7 +188,7 @@ function handleLiveness(): Response {
 async function handleReadiness(): Promise<Response> {
   const state = getServiceLifecycleState()
   if (!isServiceReady()) {
-    return jsonResponse({
+    return Response.json({
       ok: false,
       state,
       build_meta: APP_BUILD_META,
@@ -224,14 +196,14 @@ async function handleReadiness(): Promise<Response> {
         type: 'postgres',
         ok: false,
       },
-    }, 503)
+    }, { status: 503 })
   }
   const database = await checkPostgresHealth()
   const schema = getRuntimeDatabaseSchemaStatus()
   const accountDeletion = getAccountDeletionConfigurationHealth()
   const storageOk = database.ok && schema !== null
   const ok = hasDatabaseUrl() && storageOk && accountDeletion.ok
-  return jsonResponse(
+  return Response.json(
     {
       ok,
       state,
@@ -251,15 +223,6 @@ async function handleReadiness(): Promise<Response> {
       },
       account_deletion: accountDeletion,
     },
-    ok ? 200 : 503,
+    { status: ok ? 200 : 503 },
   )
-}
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(status === 204 ? null : JSON.stringify(body), {
-    status,
-    headers: {
-      ...(status === 204 ? {} : { 'Content-Type': 'application/json' }),
-    },
-  })
 }

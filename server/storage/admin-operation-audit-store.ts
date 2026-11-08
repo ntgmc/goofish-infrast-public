@@ -1,6 +1,5 @@
 import type { QueryClient } from './postgres'
 import { randomUUID } from 'node:crypto'
-import type { PoolClient } from 'pg'
 import { query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 
@@ -25,7 +24,7 @@ export async function recordAdminOperationAudit(input: AdminOperationAuditInput)
 }
 
 export async function recordAdminOperationAuditInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   input: AdminOperationAuditInput,
 ): Promise<void> {
   await insertAdminOperationAudit(client, input)

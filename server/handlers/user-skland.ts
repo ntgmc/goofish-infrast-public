@@ -1,6 +1,6 @@
+import type { QueryClient } from '../storage/postgres'
 import { createHash, createHmac, randomUUID } from 'node:crypto'
 import QRCode from 'qrcode'
-import type { PoolClient } from 'pg'
 import type { AuthSuccessResponse, LicenseConfig, SklandCredentialInvalidReason } from '../../src/lib/types'
 import { normalizeDroneAutoStrategy } from '../../src/lib/config'
 import {
@@ -619,7 +619,7 @@ async function getSklandConfirmationReplay(
 }
 
 async function beginSklandConfirmationOperation(
-  client: PoolClient,
+  client: QueryClient,
   input: {
     userId: string
     idempotencyKey: string
@@ -643,7 +643,7 @@ async function beginSklandConfirmationOperation(
 }
 
 async function completeSklandConfirmationOperation(
-  client: PoolClient,
+  client: QueryClient,
   operationId: string,
   response: SklandConfirmationOperationResponse,
   now: string,
@@ -693,7 +693,7 @@ async function prepareSklandImport(
 }
 
 async function persistPreparedSklandImportInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   userId: string,
   profileId: string,
   cred: string,

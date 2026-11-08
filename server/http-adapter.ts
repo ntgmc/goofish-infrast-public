@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer'
-import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { IncomingMessage } from 'node:http'
 import { RequestBodyTooLargeError } from './request-body-limits'
 import { INTERNAL_CLIENT_IP_HEADER, isTrustedProxyAddress, resolveIncomingClientIp } from './security/client-ip'
 import { storeRawRequestBody } from './security/request-validation'
@@ -72,75 +72,6 @@ function resolveIncomingProtocol(req: IncomingMessage): 'http' | 'https' {
   if (!isTrustedProxyAddress(req.socket.remoteAddress)) return 'http'
   const forwarded = firstHeaderValue(req.headers['x-forwarded-proto'])
   return forwarded?.split(',', 1)[0]?.trim().toLowerCase() === 'https' ? 'https' : 'http'
-}
-
-export async function writeWebResponse(res: ServerResponse, response: Response): Promise<void> {
-  if (res.destroyed || res.closed || res.writableEnded) {
-    await response.body?.cancel('Client connection closed').catch(() => undefined)
-    return
-  }
-  res.statusCode = response.status
-  res.statusMessage = response.statusText
-  response.headers.forEach((value, key) => {
-    res.setHeader(key, key === 'set-cookie' ? response.headers.getSetCookie() : value)
-  })
-
-  if (!response.body || res.req.method === 'HEAD') {
-    await response.body?.cancel()
-    res.end()
-    return
-  }
-
-  const reader = response.body.getReader()
-  let closed = false
-  const onClose = () => {
-    closed = true
-    void reader.cancel('Client connection closed').catch(() => undefined)
-  }
-  res.once('close', onClose)
-  try {
-    while (!closed) {
-      const chunk = await reader.read()
-      if (chunk.done || closed) break
-      if (!res.write(chunk.value) && !await waitForDrain(res)) {
-        closed = true
-        break
-      }
-    }
-    if (!closed && !res.writableEnded) res.end()
-  } catch (error) {
-    if (!closed && !res.destroyed) res.destroy(error instanceof Error ? error : new Error('Response stream failed'))
-    if (!closed) throw error
-  } finally {
-    res.off('close', onClose)
-    if (closed) await reader.cancel('Client connection closed').catch(() => undefined)
-  }
-}
-
-function waitForDrain(res: ServerResponse): Promise<boolean> {
-  if (res.destroyed || res.closed || res.writableEnded) return Promise.resolve(false)
-  return new Promise((resolve, reject) => {
-    const cleanup = () => {
-      res.off('drain', onDrain)
-      res.off('close', onClose)
-      res.off('error', onError)
-    }
-    const onDrain = () => {
-      cleanup()
-      resolve(true)
-    }
-    const onClose = () => {
-      cleanup()
-      resolve(false)
-    }
-    const onError = (error: Error) => {
-      cleanup()
-      reject(error)
-    }
-    res.once('drain', onDrain)
-    res.once('close', onClose)
-    res.once('error', onError)
-  })
 }
 
 function firstHeaderValue(value: string | string[] | undefined): string | null {

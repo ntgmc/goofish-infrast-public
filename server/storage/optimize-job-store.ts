@@ -1,5 +1,5 @@
+import type { QueryClient } from './postgres'
 import { randomUUID } from 'node:crypto'
-import type { PoolClient } from 'pg'
 import type { OptimizeCalculationStage, OptimizeResult, WorkspaceResultHistoryItem } from '../../src/lib/types'
 import { formatOptimizeJobHardTimeout, getOptimizeGlobalWorkerConcurrency, getOptimizeJobHardTimeoutMs, OPTIMIZE_JOB_HISTORY_RETENTION_MS } from '../optimize-job-config'
 import { query, withTransaction } from './postgres'
@@ -1904,7 +1904,7 @@ export function createMemoryOptimizeJobStore(
 }
 
 async function upsertBillingReconciliationCase(
-  client: PoolClient,
+  client: QueryClient,
   input: {
     anomalyKey: string
     kind: 'orphan_reservation' | 'reservation_job_mismatch' | 'account_projection_mismatch'
@@ -2194,7 +2194,7 @@ function positiveInteger(value: string | undefined, fallback: number, minimum: n
 }
 
 async function createDeadLetterInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   job: OptimizeJobRecord,
   failureKind: OptimizeJobFailureKind,
   errorMessage: string,
@@ -2652,14 +2652,14 @@ function fromDeadLetterRow(row: OptimizationDeadLetterRow): OptimizationDeadLett
 }
 
 export async function releaseOptimizationJobReservationsInTransaction(
-  client: PoolClient, jobId: string, payload: unknown, nowIso: string,
+  client: QueryClient, jobId: string, payload: unknown, nowIso: string,
 ): Promise<void> {
   await refundReservedItemsInTransaction(client, 'optimization_job', jobId, nowIso)
   await releaseQueuedEntitlementInTransaction(client, jobId, payload, nowIso)
   await releaseMeteredBillingInTransaction(client, jobId, nowIso)
 }
 
-async function releaseQueuedEntitlementInTransaction(client: PoolClient, jobId: string, payload: unknown, nowIso: string): Promise<void> {
+async function releaseQueuedEntitlementInTransaction(client: QueryClient, jobId: string, payload: unknown, nowIso: string): Promise<void> {
   await client.query(
     `update entitlement_ledger set status = 'released', settled_at = $2
      where reference_type = 'optimization_job' and reference_id = $1
@@ -2691,7 +2691,7 @@ async function releaseQueuedEntitlementInTransaction(client: PoolClient, jobId: 
   )
 }
 
-async function releaseMeteredBillingInTransaction(client: PoolClient, jobId: string, nowIso: string): Promise<void> {
+async function releaseMeteredBillingInTransaction(client: QueryClient, jobId: string, nowIso: string): Promise<void> {
   await releaseCdkScheduleQuotaInTransaction(client, jobId, nowIso)
   await releaseCdkScenarioQuotaInTransaction(client, jobId, nowIso)
   if (await releaseScheduleBalanceInTransaction(client, jobId, nowIso)) {
@@ -2710,7 +2710,7 @@ function normalizeFormalOptimizationJobPayload(value: unknown): OptimizationJobP
 }
 
 async function persistScheduleCompletionInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   job: OptimizeJobRecord,
   payload: OptimizeJobPayload,
   result: OptimizeResult,
@@ -2771,7 +2771,7 @@ async function persistScheduleCompletionInTransaction(
 }
 
 async function failInvalidCompletionInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   job: OptimizeJobRecord,
   attemptNo: number,
   workerId: string,

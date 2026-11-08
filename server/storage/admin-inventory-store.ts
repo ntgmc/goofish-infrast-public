@@ -1,6 +1,6 @@
+import type { QueryClient } from './postgres'
 import { createHash, randomUUID } from 'node:crypto'
 import type { QqBotCampaign, QqBotCampaignInput } from '../../src/lib/qqbot-reward-contracts'
-import type { PoolClient } from 'pg'
 import {
   ITEM_ICON_PATHS,
   normalizeExpiryPolicy,
@@ -629,7 +629,7 @@ async function grantCampaignBatch(campaignId: string, limit: number): Promise<nu
   return claimed.recipients.length
 }
 
-async function hasReservedGrantConsumption(client: PoolClient, grantId: string): Promise<boolean> {
+async function hasReservedGrantConsumption(client: QueryClient, grantId: string): Promise<boolean> {
   const reserved = await client.query("select 1 from reward_consumptions where grant_id = $1 and status = 'reserved' limit 1", [grantId])
   return Boolean(reserved.rowCount)
 }
@@ -675,7 +675,7 @@ function requireOpeningRule(value: unknown, contentCount: number): GiftPackOpeni
   return rule
 }
 
-async function saveGiftOpeningRule(client: PoolClient, versionId: string, rule: GiftPackOpeningRule, publish: boolean, now: string): Promise<void> {
+async function saveGiftOpeningRule(client: QueryClient, versionId: string, rule: GiftPackOpeningRule, publish: boolean, now: string): Promise<void> {
   await client.query(
     `update gift_pack_versions set opening_rule = $2::jsonb,
        status = case when $3 then 'published' else 'draft' end,
@@ -701,7 +701,7 @@ function normalizeContents(value: unknown): GiftPackContentInput[] {
   })
 }
 
-async function assertGiftContents(client: PoolClient, contents: GiftPackContentInput[]): Promise<void> {
+async function assertGiftContents(client: QueryClient, contents: GiftPackContentInput[]): Promise<void> {
   if (contents.length === 0) throw new InventoryError('gift_pack_empty', '礼包内容不能为空。', 400)
   const result = await client.query<{ code: string; kind: string; issuance_enabled: boolean }>(
     'select code, kind, issuance_enabled from item_definitions where code = any($1::text[])',
@@ -713,7 +713,7 @@ async function assertGiftContents(client: PoolClient, contents: GiftPackContentI
   if (result.rows.some((item) => !item.issuance_enabled)) throw new InventoryError('contents_item_disabled', '礼包包含当前不可发放的道具。', 409)
 }
 
-async function assertIssuableContents(client: PoolClient, contents: GiftPackContentInput[]): Promise<void> {
+async function assertIssuableContents(client: QueryClient, contents: GiftPackContentInput[]): Promise<void> {
   if (contents.length === 0) return
   const result = await client.query<{ code: string; kind: string; issuance_enabled: boolean }>(
     'select code, kind, issuance_enabled from item_definitions where code = any($1::text[])',
@@ -724,7 +724,7 @@ async function assertIssuableContents(client: PoolClient, contents: GiftPackCont
   }
 }
 
-async function snapshotRewardContents(client: PoolClient, contents: GiftPackContentInput[]): Promise<GiftPackContentInput[]> {
+async function snapshotRewardContents(client: QueryClient, contents: GiftPackContentInput[]): Promise<GiftPackContentInput[]> {
   await assertIssuableContents(client, contents)
   const snapshotted: GiftPackContentInput[] = []
   for (const content of contents) {
@@ -745,7 +745,7 @@ async function snapshotRewardContents(client: PoolClient, contents: GiftPackCont
   return snapshotted
 }
 
-async function replaceGiftContents(client: PoolClient, versionId: string, contents: GiftPackContentInput[]): Promise<void> {
+async function replaceGiftContents(client: QueryClient, versionId: string, contents: GiftPackContentInput[]): Promise<void> {
   await client.query('delete from gift_pack_version_contents where gift_pack_version_id = $1', [versionId])
   for (const item of contents) {
     await client.query(
@@ -757,7 +757,7 @@ async function replaceGiftContents(client: PoolClient, versionId: string, conten
 }
 
 async function audit(
-  client: PoolClient,
+  client: QueryClient,
   adminUsername: string,
   action: string,
   targetType: string,
@@ -776,7 +776,7 @@ async function audit(
 }
 
 async function beginAdminOperation(
-  client: PoolClient,
+  client: QueryClient,
   adminUsername: string,
   idempotencyKey: string,
   operationType: string,
@@ -810,7 +810,7 @@ async function beginAdminOperation(
 }
 
 async function completeAdminOperation(
-  client: PoolClient,
+  client: QueryClient,
   operationId: string,
   response: Record<string, unknown>,
   now: string,

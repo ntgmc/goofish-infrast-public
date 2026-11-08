@@ -31,18 +31,23 @@ tab order, document language and frame titles. Component interaction and semanti
 are also verified by the existing UI tests. Other diagnostics include advisory
 style suggestions; `check:lint` fails on errors.
 
-All API endpoints run through Fastify in `server/http-server.ts`, using the
-request-policy route inventory. The HTTP boundary validates the original target
-before URL normalization and reads the original request bytes before Fastify's
-body parser. Existing handlers retain their Web Request/Response contracts,
-authorization and feature gates. Fastify sends responses and streams; request
-observations, native server limits and graceful process shutdown are preserved.
+`server/routes.ts` declares API paths, handlers and feature-gate policy;
+`server/http-server.ts` registers those handlers directly with Fastify. Tests
+check the declarations against the request-policy inventory. The HTTP boundary
+validates the original target before URL normalization and reads the original
+request bytes before Fastify's body parser. Business handlers use Web
+Request/Response contracts. Fastify sends responses and streams; the HTTP server
+applies security headers, records observations and preserves native connection
+limits and graceful process shutdown.
 
 All business SQL uses Drizzle: shared `query()` and transaction callbacks execute
-parameterized SQL through `server/storage/drizzle-executor.ts`; directly borrowed
-business connections use `drizzleTransactionClient()`. Keep complex SQL in its
-parameterized form. The adapter preserves pg date/array decoding, result metadata,
-original PostgreSQL errors, connection timeouts and transaction ownership. Only
+parameterized SQL through `server/storage/drizzle-executor.ts`. Use
+`withTransaction()` for business transactions and `QueryClient` for their query
+parameters; it exposes the parameterized query interface. Maintenance that holds
+a connection across several transactions uses `drizzleTransactionClient()`.
+Keep complex SQL in its parameterized form. The adapter preserves pg date/array
+decoding, result metadata, original PostgreSQL errors and connection timeouts.
+The transaction helper owns commit, rollback and connection release. Only
 standalone statements use the existing deadlock/serialization retry policy; do
 not retry an individual failed statement inside a transaction.
 

@@ -1,6 +1,5 @@
 import type { QueryClient } from './postgres'
 import { createHash, randomUUID } from 'node:crypto'
-import type { PoolClient } from 'pg'
 import {
   BEHAVIOR_RISK_MODEL_VERSION,
   evaluateBehaviorRiskEvents,
@@ -321,7 +320,7 @@ export async function runBehaviorRiskEvaluation(now = new Date()): Promise<Behav
   }
 }
 
-async function enqueueLegacyModelUsers(client: PoolClient, now: Date): Promise<void> {
+async function enqueueLegacyModelUsers(client: QueryClient, now: Date): Promise<void> {
   await client.query(
     `insert into behavior_risk_dirty_users (user_id, first_event_at, last_event_at, updated_at)
      select event.user_id, min(event.occurred_at), max(event.occurred_at), $2
@@ -341,7 +340,7 @@ async function enqueueLegacyModelUsers(client: PoolClient, now: Date): Promise<v
 }
 
 async function loadAffectedBehaviorRiskEvents(
-  client: PoolClient,
+  client: QueryClient,
   dirtyUserIds: string[],
   now: Date,
 ): Promise<StoredEventRow[]> {
@@ -372,7 +371,7 @@ async function loadAffectedBehaviorRiskEvents(
 }
 
 async function selectBehaviorRiskEvents(
-  client: PoolClient,
+  client: QueryClient,
   userIds: string[],
   browserSignals: string[],
   networkSignals: string[],
@@ -418,7 +417,7 @@ function dedupeEvents(events: StoredEventRow[]): StoredEventRow[] {
   return [...new Map(events.map((event) => [event.id, event])).values()]
 }
 
-async function acknowledgeDirtyUsers(client: PoolClient, claims: DirtyUserClaim[]): Promise<void> {
+async function acknowledgeDirtyUsers(client: QueryClient, claims: DirtyUserClaim[]): Promise<void> {
   if (claims.length === 0) return
   await client.query(
     `delete from behavior_risk_dirty_users dirty
@@ -605,7 +604,7 @@ export async function reviewBehaviorRiskCase(input: BehaviorRiskReviewInput): Pr
   })
 }
 
-async function archiveLegacyPendingCases(client: PoolClient, now: Date): Promise<void> {
+async function archiveLegacyPendingCases(client: QueryClient, now: Date): Promise<void> {
   const legacyCases = await client.query<CaseRow>(
     `select * from behavior_risk_cases
       where status = 'pending' and model_version <> $1
@@ -645,7 +644,7 @@ async function archiveLegacyPendingCases(client: PoolClient, now: Date): Promise
 }
 
 async function upsertEvaluation(
-  client: PoolClient,
+  client: QueryClient,
   evaluation: BehaviorRiskEvaluation,
   events: StoredEventRow[],
   now: Date,
@@ -710,7 +709,7 @@ async function upsertEvaluation(
 }
 
 async function insertBehaviorRiskReviewAudit(
-  client: PoolClient,
+  client: QueryClient,
   input: {
     caseId: string
     adminUsername: string

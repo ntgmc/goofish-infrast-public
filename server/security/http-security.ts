@@ -66,10 +66,6 @@ export function applyHttpSecurityHeaders(response: Response, secureTransport: bo
   return response
 }
 
-export function isSecureWebRequest(req: Request): boolean {
-  return new URL(req.url).protocol === 'https:'
-}
-
 export function isSecureIncomingRequest(req: IncomingMessage): boolean {
   if ((req.socket as { encrypted?: boolean }).encrypted) return true
   if (!isTrustedProxyAddress(req.socket.remoteAddress)) return false

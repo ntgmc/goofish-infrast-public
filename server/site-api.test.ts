@@ -10,13 +10,23 @@ vi.mock('./storage/feature-settings-store', () => ({ getSiteFeatureSettings: sto
 vi.mock('./storage/public-content-settings-store', () => ({
   getPublicContentSettings: stores.getPublicContentSettings,
 }))
+const { routeHandler } = vi.hoisted(() => ({ routeHandler: vi.fn() }))
 vi.mock('./routes', async (original) => {
   const routes = await original<typeof import('./routes')>()
-  return { ...routes, routeRequest: vi.fn(routes.routeRequest) }
+  return {
+    ...routes,
+    API_ROUTES: routes.API_ROUTES.map(([path, handler, featureGate]) => [
+      path,
+      (request: Request) => {
+        routeHandler(request)
+        return handler(request)
+      },
+      featureGate,
+    ]),
+  }
 })
 
 import { createApiServer } from './http-server'
-import { routeRequest } from './routes'
 import { flushPerformanceDurations } from './performance-observation'
 
 const server = createApiServer()
@@ -61,7 +71,7 @@ describe('Fastify public site routes through the real HTTP server', () => {
           : cloneDefaultPublicContentSettings(),
       )
       expect(body).not.toHaveProperty('revision')
-      expect(routeRequest).toHaveBeenCalledOnce()
+      expect(routeHandler).toHaveBeenCalledOnce()
     },
   )
 
@@ -91,7 +101,7 @@ describe('Fastify public site routes through the real HTTP server', () => {
         request_id: response.headers.get('X-Request-ID'),
       }),
     )
-    expect(routeRequest).toHaveBeenCalledOnce()
+    expect(routeHandler).toHaveBeenCalledOnce()
   })
 
   it.each([
@@ -107,7 +117,22 @@ describe('Fastify public site routes through the real HTTP server', () => {
     expect(response.headers.get('X-Request-ID')).toBeTruthy()
     expect(stores.getSiteFeatureSettings).not.toHaveBeenCalled()
     expect(stores.getPublicContentSettings).not.toHaveBeenCalled()
-    expect(routeRequest).not.toHaveBeenCalled()
+    expect(routeHandler).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['/api/auth/me', 'login'],
+    ['/api/user/profiles', 'profiles'],
+    ['/api/user/results/result-id', 'profiles'],
+  ] as const)('checks the %s feature gate before its registered handler', async (path, feature) => {
+    stores.getSiteFeatureSettings.mockResolvedValueOnce({
+      ...DEFAULT_SITE_FEATURE_SETTINGS,
+      features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, [feature]: false },
+    })
+    const response = await fetch(`http://127.0.0.1:${port}${path}`)
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({ code: 'feature_disabled', feature })
+    expect(routeHandler).not.toHaveBeenCalled()
   })
 
   it('uses the same URL normalization as the existing HTTP boundary', async () => {
@@ -126,7 +151,7 @@ describe('Fastify public site routes through the real HTTP server', () => {
     })
     expect(response.status).toBe(200)
     expect(JSON.parse(response.body)).toHaveProperty('features')
-    expect(routeRequest).toHaveBeenCalledOnce()
+    expect(routeHandler).toHaveBeenCalledOnce()
   })
 
   it('keeps production host validation ahead of Fastify', async () => {
@@ -142,7 +167,7 @@ describe('Fastify public site routes through the real HTTP server', () => {
   it('serves health routes through the same Fastify lifecycle', async () => {
     const response = await fetch(`http://127.0.0.1:${port}/api/health/live`)
     await expect(response.json()).resolves.toMatchObject({ ok: true })
-    expect(routeRequest).toHaveBeenCalledOnce()
+    expect(routeHandler).toHaveBeenCalledOnce()
     expect(stores.getSiteFeatureSettings).not.toHaveBeenCalled()
     expect(stores.getPublicContentSettings).not.toHaveBeenCalled()
   })

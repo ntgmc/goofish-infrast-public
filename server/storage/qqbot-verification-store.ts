@@ -1,5 +1,5 @@
+import type { QueryClient } from './postgres'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import type { PoolClient } from 'pg'
 import type { QqBotCampaign } from '../../src/lib/qqbot-reward-contracts'
 import type { QqBotActivity, QqBotVerification, QqBotVerificationAction, QqBotVerificationProof } from '../../src/lib/qqbot-verification-contracts'
 import { query, withTransaction } from './postgres'
@@ -123,7 +123,7 @@ export async function recordQqBotVerification(input: QqBotVerificationProof) {
   })
 }
 
-async function confirm(client: PoolClient, userId: string, id: string) {
+async function confirm(client: QueryClient, userId: string, id: string) {
   const row = (await client.query<Verification>('select * from qqbot_web_verifications where id = $1 and user_id = $2 for update', [id, userId])).rows[0]
   if (!row) throw new QqBotError('verification_missing', '验证申请不存在。', 404)
   if (row.status === 'completed') return { status: 'completed' as const }
@@ -139,7 +139,7 @@ async function confirm(client: PoolClient, userId: string, id: string) {
   return { status: 'completed' as const }
 }
 
-async function finishClaim(client: PoolClient, row: Verification) {
+async function finishClaim(client: QueryClient, row: Verification) {
   if (!row.campaign_id) return
   const binding = (await client.query<{ id: string; qq_number: string }>('select id, qq_number from qqbot_account_bindings where user_id = $1', [row.user_id])).rows[0]
   if (!binding || binding.qq_number !== row.qq_number || (row.binding_id && binding.id !== row.binding_id)) {
@@ -160,25 +160,25 @@ async function finishClaim(client: PoolClient, row: Verification) {
   })
 }
 
-async function previousClaim(client: PoolClient, userId: string, group: string, campaign: string, qq: string) {
+async function previousClaim(client: QueryClient, userId: string, group: string, campaign: string, qq: string) {
   await client.query("select pg_advisory_xact_lock(hashtextextended('qqbot-reward:' || $1, 0))", [`claim:${group}:${campaign}:${qq}`])
   const receipt = (await client.query<{ response_json: { user_id: string } }>('select response_json from qqbot_reward_deliveries where delivery_id = $1', [`claim:${group}:${campaign}:${qq}`])).rows[0]
   if (receipt && receipt.response_json.user_id !== userId) throw new QqBotError('already_claimed', '该 QQ 已领取过本活动，奖励保留在原网站账号。', 409)
   return receipt
 }
 
-async function availableCampaign(client: PoolClient, group: string, campaignId: string) {
+async function availableCampaign(client: QueryClient, group: string, campaignId: string) {
   const campaign = (await client.query<QqBotCampaign>('select * from qqbot_reward_campaigns where group_id = $1 and campaign_id = $2 for share', [group, campaignId])).rows[0]
   if (!campaign) throw new QqBotError('campaign_missing', '活动不存在，请核对活动链接。', 404)
   if (!campaign.enabled || (campaign.ends_at && Date.parse(campaign.ends_at) <= Date.now())) throw new QqBotError('campaign_closed', '活动已停用或结束。', 409)
   return campaign
 }
 
-async function lockActiveUser(client: PoolClient, userId: string) {
+async function lockActiveUser(client: QueryClient, userId: string) {
   const result = await client.query('select id from user_accounts where id = $1 and status = $2 for update', [userId, 'active'])
   if (!result.rowCount) throw new QqBotError('account_unavailable', '网站账号暂时不可用。', 403)
 }
-async function reject(client: PoolClient, id: string, message: string) {
+async function reject(client: QueryClient, id: string, message: string) {
   await client.query("update qqbot_web_verifications set status = 'rejected', error_message = $2 where id = $1", [id, message])
 }
 function publicVerification(row: Verification): QqBotVerification {

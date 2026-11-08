@@ -1,5 +1,5 @@
+import type { QueryClient } from './postgres'
 import { Buffer } from 'node:buffer'
-import type { PoolClient, QueryResult, QueryResultRow } from 'pg'
 import type {
   WorkspaceResultHistoryExportItem,
   WorkspaceResultHistoryItem,
@@ -13,10 +13,6 @@ const OPTIMIZATION_RESULT_PAGE_SIZE = 20
 export const OPTIMIZATION_RESULT_PAGE_MAX_SIZE = 50
 
 type ResultScope = 'active' | 'archived'
-interface QueryClient {
-  query<T extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]): Promise<QueryResult<T>>
-}
-
 type OptimizationResultRow = {
   profile_id: string
   id: string
@@ -214,7 +210,7 @@ export async function listOptimizationResultsForProfiles(
 }
 
 export async function insertProfileOptimizationResultInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   profileId: string,
   item: WorkspaceResultHistoryItem,
   historyLimit: number,
@@ -237,7 +233,7 @@ export async function insertProfileOptimizationResultInTransaction(
 }
 
 export async function migrateLegacyWorkspaceResultsInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   profileId: string,
   legacy: {
     updated_at: string
@@ -269,7 +265,7 @@ export async function migrateLegacyWorkspaceResultsInTransaction(
 }
 
 export async function mutateProfileOptimizationResultInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   input: {
     profileId: string
     resultId: string
