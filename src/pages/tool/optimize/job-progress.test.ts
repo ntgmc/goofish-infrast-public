@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { OptimizeJobAccepted, OptimizeJobStatusResponse } from '../../../lib/types'
-import { buildOptimizeJobStorageKey, clearOptimizeSubmissionKey, getOrCreateOptimizeSubmissionKey, isActiveOptimizeJob, mergeOptimizeJobProgress, OPTIMIZE_POLL_REQUEST_TIMEOUT_MS, readActiveOptimizeJob, waitForOptimizePoll, writeActiveOptimizeJob } from './job-progress'
+import { ApiError } from '../../../lib/api-client'
+import { buildOptimizeJobStorageKey, clearOptimizeSubmissionKey, getOrCreateOptimizeSubmissionKey, isActiveOptimizeJob, isRetryableOptimizePollError, mergeOptimizeJobProgress, OPTIMIZE_POLL_REQUEST_TIMEOUT_MS, readActiveOptimizeJob, waitForOptimizePoll, writeActiveOptimizeJob } from './job-progress'
 import { getOptimizePollRetryDelayMs } from '../../../lib/optimize-poll'
 
 const accepted: OptimizeJobAccepted = {
@@ -58,6 +59,25 @@ describe('optimization job persistence', () => {
     writeActiveOptimizeJob(key, accepted)
     writeActiveOptimizeJob(key, { ...accepted, status: 'failed', error: 'failed' } as OptimizeJobStatusResponse)
     expect(window.sessionStorage.getItem(key)).toBeNull()
+  })
+})
+
+describe('optimization poll errors', () => {
+  it.each([
+    new ApiError('Network request failed.', 0, { code: 'network_error' }, ''),
+    new ApiError('Request timed out.', 0, { code: 'request_timeout' }, ''),
+    new ApiError('Request was cancelled.', 0, { code: 'request_aborted' }, ''),
+    new ApiError('Expected a JSON response.', 200, { code: 'invalid_response' }, ''),
+    new ApiError('Empty response.', 204, { code: 'invalid_response' }, ''),
+    ...[408, 425, 429, 500, 502, 503, 504].map((status) => new ApiError('Unavailable', status, null, '')),
+    new TypeError('Failed to fetch'),
+    new DOMException('Aborted', 'AbortError'),
+  ])('retries transient poll failures: %s', (error) => {
+    expect(isRetryableOptimizePollError(error)).toBe(true)
+  })
+
+  it.each([400, 401, 403, 404, 409, 422])('stops polling on HTTP %s', (status) => {
+    expect(isRetryableOptimizePollError(new ApiError('Rejected', status, null, ''))).toBe(false)
   })
 })
 

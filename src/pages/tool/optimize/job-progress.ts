@@ -76,7 +76,9 @@ export async function fetchOptimizeJobStatus(
 
 export function isRetryableOptimizePollError(error: unknown): boolean {
   if (error instanceof ApiError) {
-    return isRetryableOptimizePollStatus(error.status)
+    return error.status === 0
+      || error.code === 'invalid_response'
+      || isRetryableOptimizePollStatus(error.status)
   }
   return error instanceof TypeError || (error instanceof DOMException && error.name === 'AbortError')
 }
