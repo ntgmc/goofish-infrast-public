@@ -749,6 +749,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/admin/cdk', route({ GET: none(), POST: json('admin', requestSchemas.adminCdkCreate), PATCH: json('admin', requestSchemas.adminCdkPatch), DELETE: json('admin', requestSchemas.adminCdkDelete) }, ['code_hash', 'view', 'permission', 'cdk_type', 'risk', 'generated', 'status', 'page', 'page_size', 'search'])],
   ['/api/admin/risk-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminRiskSettings), PATCH: json('admin', requestSchemas.adminRiskSettings) })],
   ['/api/admin/behavior-risk', route({ GET: none(), POST: json('admin', requestSchemas.adminBehaviorRiskReview) }, ['status', 'page', 'page_size'])],
+  ['/api/admin/operation-audit', route({ GET: none() }, ['page', 'page_size', 'actor', 'from', 'to', 'action', 'target_type', 'target_id', 'request_id', 'source', 'id', 'related_source', 'related_id'])],
   ['/api/admin/invitation-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminInvitationSettings), PATCH: json('admin', requestSchemas.adminInvitationSettings) })],
   ['/api/admin/registration-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminRegistrationSettings) })],
   ['/api/admin/feature-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminFeatureSettings) })],

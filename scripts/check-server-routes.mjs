@@ -3,6 +3,7 @@ import { request } from 'node:http'
 const expectedRoutes = [
   '/api/admin/cdk',
   '/api/admin/risk-settings',
+  '/api/admin/operation-audit',
   '/api/admin/invitation-settings',
   '/api/admin/registration-settings',
   '/api/admin/optimization',

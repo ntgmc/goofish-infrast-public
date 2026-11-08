@@ -18,6 +18,7 @@ import CdkSection from './cdk/CdkSection'
 import UsersSection from './users/UsersSection'
 import FeedbackSection from './feedback/FeedbackSection'
 import RiskSection from './risk/RiskSection'
+import OperationAuditSection from './audit/OperationAuditSection'
 import AdminShell, { canAccessAdminSection } from './AdminShell'
 import { useAdminController } from './useAdminController'
 import { AdminToast } from './shared/AdminToast'
@@ -78,6 +79,7 @@ export default function AdminDashboardView() {
           {section === 'features' && <FeatureSettingsSection />}
           {section === 'content' && <PublicContentSettingsSection />}
           {section === 'items' && <InventoryAdminSection />}
+          {section === 'audit' && <OperationAuditSection />}
           {section === 'registration' && <RegistrationSettingsSection />}
           {section === 'invitation' && <InvitationSettingsSection active={displayedSection === 'invitation'} />}
           {section === 'announcement' && <AnnouncementSettingsSection banner={c.banner} announcements={c.announcements} stats={c.announcementStats}

@@ -25,6 +25,30 @@ Login and logout clear the previous `/api/admin` Cookie as well as managing the
 new `/api` Cookie. Capability decisions use the existing administrator operation
 audit.
 
+## Global operation audit
+
+`/admin/audit` provides a read-only search across administrator operations,
+items, risk reviews and access decisions, risk settings, registration invitations,
+commercial limits, and administrator balance adjustments. Both the page and
+`GET /api/admin/operation-audit` require `sensitive_data_view`.
+
+Filters match the complete administrator username, action, target type/ID or
+request ID. Start/end timestamps are inclusive; the form uses the device's local
+time zone and sends ISO timestamps. Results use server pagination and descending
+operation time, with source and ID as tie breakers. Details load on demand and
+show the reason, field differences, full change data and available metadata.
+Records are identified by both source and ID. Related records share the same
+target type/ID or a nonempty request ID and have independent pagination.
+
+The query preserves each source's existing retention and stored evidence. Risk
+reviews expose their original case snapshot, actions and integrity hashes;
+missing before/after snapshots remain marked as unavailable. Balance differences
+are reconstructed exactly in PostgreSQL from the signed transaction amount and
+balance after the transaction. Ordinary billing events are excluded. Sources
+without an action column use `risk.settings.update` or
+`commercial.limits.update`; risk review outcomes use `risk.review.`, registration
+actions use `registration_invitation.`, and balance kinds use `balance.`.
+
 ## Timestamp ownership
 
 The profile record and its workspace have separate timestamps:

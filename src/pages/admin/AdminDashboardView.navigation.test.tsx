@@ -145,6 +145,30 @@ describe('admin page loading and navigation', () => {
     expect(api.json.mock.calls.some(([url]) => url === '/api/admin/feature-settings')).toBe(false)
   })
 
+  it('opens global audits only for an administrator with sensitive-data access', async () => {
+    const implementation = api.json.getMockImplementation()!
+    api.json.mockImplementation(async (url: string) => {
+      if (url === '/api/admin/session') return { user: { username: 'admin', capabilities: ['usage_view', 'sensitive_data_view'] } }
+      if (url.startsWith('/api/admin/operation-audit?')) return { items: [], pagination: { page: 1, page_size: 25, total: 0, total_pages: 0 } }
+      return implementation(url)
+    })
+    mount('/admin/audit')
+    await screen.findByText('没有符合条件的操作记录。')
+    expect(screen.getByRole('link', { name: '操作审计' })).toHaveAttribute('aria-current', 'page')
+    expect(api.json.mock.calls.some(([url]) => /usage-stats|announcement|\/cdk|\/users/.test(url))).toBe(false)
+  })
+
+  it('redirects a reviewer away from the global audit and never requests its records', async () => {
+    const implementation = api.json.getMockImplementation()!
+    api.json.mockImplementation(async (url: string) => url === '/api/admin/session'
+      ? { user: { username: 'reviewer', capabilities: ['usage_view', 'user_view', 'risk_view'] } }
+      : implementation(url))
+    mount('/admin/audit')
+    await screen.findByRole('heading', { name: '有多少人真正用起来了？', level: 2 })
+    expect(screen.queryByRole('link', { name: '操作审计' })).not.toBeInTheDocument()
+    expect(api.json.mock.calls.some(([url]) => url.startsWith('/api/admin/operation-audit'))).toBe(false)
+  })
+
   it('refreshes the selected user detail without loading another user list or domain', async () => {
     const account = { id: 'user-1', email: 'user@example.test', status: 'active', profile_count: 0, profile_access: [], created_at: '2026-10-01T00:00:00.000Z' }
     const implementation = api.json.getMockImplementation()!

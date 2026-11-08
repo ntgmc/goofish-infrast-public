@@ -1,5 +1,6 @@
 import adminCdkHandler from './handlers/admin-cdk'
 import adminFeedbackHandler from './handlers/admin-feedback'
+import adminOperationAuditHandler from './handlers/admin-operation-audit'
 import userFeedbackHandler from './handlers/user-feedback'
 import adminRiskSettingsHandler from './handlers/admin-risk-settings'
 import adminBehaviorRiskHandler from './handlers/admin-behavior-risk'
@@ -73,6 +74,7 @@ export const API_ROUTES: ReadonlyArray<readonly [path: string, handler: ApiHandl
   ['/api/admin/cdk', adminCdkHandler],
   ['/api/admin/risk-settings', adminRiskSettingsHandler],
   ['/api/admin/behavior-risk', adminBehaviorRiskHandler],
+  ['/api/admin/operation-audit', adminOperationAuditHandler],
   ['/api/admin/invitation-settings', adminInvitationSettingsHandler],
   ['/api/admin/invitation-settlements', adminInvitationSettlementsHandler],
   ['/api/admin/registration-settings', adminRegistrationSettingsHandler],

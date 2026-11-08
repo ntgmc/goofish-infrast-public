@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { AdminIcon, AdminOverviewIcon, AdminUsersIcon, AnnouncementIcon, ContentManagementIcon, FeedbackIcon, InvitationIcon, ItemManagementIcon, QueueIcon, RedemptionIcon, RegistrationIcon, RiskIcon, SiteFeaturesIcon } from '../../components/icons'
+import { AdminIcon, AdminOverviewIcon, AdminUsersIcon, AnnouncementIcon, ContentManagementIcon, FeedbackIcon, InvitationIcon, ItemManagementIcon, QueueIcon, ResultHistoryIcon, RedemptionIcon, RegistrationIcon, RiskIcon, SiteFeaturesIcon } from '../../components/icons'
 import { Link } from 'react-router'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import CompactHeaderMenu from '../../components/CompactHeaderMenu'
@@ -10,15 +10,16 @@ import { sectionLabels, type AdminCapability, type AdminSection } from './contra
 const groups: Array<{ label: string; sections: AdminSection[] }> = [
   { label: '运营', sections: ['overview', 'users', 'feedback'] },
   { label: '权益与发放', sections: ['cdk', 'items', 'invitation'] },
-  { label: '服务与安全', sections: ['queue', 'risk'] },
+  { label: '服务与安全', sections: ['queue', 'risk', 'audit'] },
   { label: '站点管理', sections: ['features', 'registration', 'announcement', 'content'] },
 ]
 const icons = { overview: AdminOverviewIcon, users: AdminUsersIcon, cdk: RedemptionIcon, items: ItemManagementIcon, invitation: InvitationIcon, queue: QueueIcon,
-  risk: RiskIcon, features: SiteFeaturesIcon, registration: RegistrationIcon, announcement: AnnouncementIcon, content: ContentManagementIcon, feedback: FeedbackIcon }
+  audit: ResultHistoryIcon, risk: RiskIcon, features: SiteFeaturesIcon, registration: RegistrationIcon, announcement: AnnouncementIcon, content: ContentManagementIcon, feedback: FeedbackIcon }
 
 export function canAccessAdminSection(section: AdminSection, capabilities: AdminCapability[]): boolean {
   if (section === 'overview') return capabilities.includes('usage_view')
   if (section === 'risk') return capabilities.includes('risk_view')
+  if (section === 'audit') return capabilities.includes('sensitive_data_view')
   if (section === 'users' || section === 'feedback') return capabilities.includes('user_view')
   if (section === 'queue') return capabilities.includes('optimization_view')
   return capabilities.includes('admin_manage')

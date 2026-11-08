@@ -457,6 +457,7 @@ export const sectionLabels: Record<AdminSection, string> = {
   announcement: '公告管理',
   users: '用户维护',
   feedback: copy.feedback.title,
+  audit: '操作审计',
 }
 
 export const cdkProductPermissions: GeneratedPermission[] = listAdminIssuablePermissions()
