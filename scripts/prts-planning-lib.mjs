@@ -125,7 +125,10 @@ export async function loadPlanningAssets(gameSha, signal, includeCosts = false) 
       const prior = stageExp.get(row.stageId) ?? { ...farm, quantity: 0 }
       prior.quantity += farm.quantity * expValues[row.itemId]
       stageExp.set(row.stageId, prior)
-    } else (farms[row.itemId] ??= []).push(farm)
+    } else {
+      farms[row.itemId] ??= []
+      farms[row.itemId].push(farm)
+    }
   }
   farms.exp = [...stageExp.values()]
   // Fixed supply rewards are absent from Penguin's random-drop matrix.

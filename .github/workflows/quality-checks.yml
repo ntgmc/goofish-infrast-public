@@ -75,6 +75,7 @@ jobs:
         run: |
           pnpm run generate:data
           pnpm run generate:changelog
+          pnpm run check:lint
           pnpm run check:types
           pnpm run check:catalog
           pnpm run check:architecture

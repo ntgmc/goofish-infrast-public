@@ -24,7 +24,7 @@ await build({
   format: 'esm',
   sourcemap: true,
   banner: { js: `/*! APP_BUILD_META ${JSON.stringify(APP_BUILD_META).replaceAll('*/', '*\\/')} */` },
-  external: ['@aws-sdk/client-sesv2', '@node-rs/argon2', 'pg', 'qrcode'],
+  external: ['@aws-sdk/client-sesv2', '@node-rs/argon2', 'fastify', 'pg', 'qrcode'],
   logLevel: 'info',
 })
 

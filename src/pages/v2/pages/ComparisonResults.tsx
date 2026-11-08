@@ -32,8 +32,8 @@ export default function ComparisonResults({ result, disabled, onApply }: {
   const baseline = available.find((point) => point.id === baselineId) ?? available[0]
   const columns = production ? productionColumns : sanityColumns
   const sorted = [...result.points].sort((a, b) => {
-    const aValue = valueOf(a, sort?.key ?? 'productionSanityPerDay')
-    const bValue = valueOf(b, sort?.key ?? 'productionSanityPerDay')
+    const aValue = metricValue(a, sort?.key ?? 'productionSanityPerDay')
+    const bValue = metricValue(b, sort?.key ?? 'productionSanityPerDay')
     if (aValue == null || bValue == null) return aValue == null ? (bValue == null ? 0 : 1) : -1
     if (sort) return (aValue - bValue) * (sort.ascending ? 1 : -1)
     return Number(b.isFrontier) - Number(a.isFrontier) || bValue - aValue
@@ -69,10 +69,10 @@ export default function ComparisonResults({ result, disabled, onApply }: {
             <strong>{point.label}</strong>
             <small>{point.status === 'failed' ? text.failed : point.verified ? text.verified : text.estimated}{point.isFrontier ? ` · ${text.recommended}` : ''}{point.id === baseline?.id ? ` · ${text.baselineMark}` : ''}</small>
           </button></th>
-          <td>{valueOf(point, 'operationsPerDay') ?? '—'}</td>
+          <td>{metricValue(point, 'operationsPerDay') ?? '—'}</td>
           {columns.map((column) => {
-            const value = valueOf(point, column.key)
-            const reference = baseline ? valueOf(baseline, column.key) : null
+            const value = metricValue(point, column.key)
+            const reference = baseline ? metricValue(baseline, column.key) : null
             return <td key={column.key}><strong>{format(value)}</strong>
               {value != null && reference != null && point.id !== baseline?.id && <small className="v2-comparison-delta">{signed(value - reference)}</small>}
             </td>
@@ -95,10 +95,10 @@ function Selected({ point, production, disabled, onApply }: { point: ScenarioCom
     <SectionTitle title={text.selected} action={<button type="button" className="v2-button v2-button-primary" disabled={disabled || point.status !== 'succeeded' || !value} onClick={onApply}>{text.apply}</button>} />
     <h3>{point.label}</h3>
     <p className="v2-muted">{text.applyHelp}</p>
-    <Facts items={[[text.shifts, point.shiftHours.join(' / ')], [text.operations, valueOf(point, 'operationsPerDay') ?? '—'], ...(!production ? [[text.sanityDaily, format(valueOf(point, 'productionSanityPerDay'))] as [string, string]] : [])]} />
+    <Facts items={[[text.shifts, point.shiftHours.join(' / ')], [text.operations, metricValue(point, 'operationsPerDay') ?? '—'], ...(!production ? [[text.sanityDaily, format(metricValue(point, 'productionSanityPerDay'))] as [string, string]] : [])]} />
     {(point.error || point.status === 'failed') && <Notice error>{point.error ?? text.failed}</Notice>}
     {production && value && point.status === 'succeeded' && <>
-      <Facts items={productionColumns.map((column) => [column.label, format(valueOf(point, column.key))])} />
+      <Facts items={productionColumns.map((column) => [column.label, format(metricValue(point, column.key))])} />
       <h3>{text.balance}</h3>
       <div className="v2-comparison-table"><table>
         <thead><tr><th scope="col">{text.resource}</th><th scope="col">{text.produced}</th><th scope="col">{text.consumed}</th><th scope="col">{text.net}</th></tr></thead>
@@ -119,7 +119,7 @@ function Selected({ point, production, disabled, onApply }: { point: ScenarioCom
   </aside>
 }
 
-function valueOf(point: ScenarioComparisonPoint, key: MetricKey): number | null {
+function metricValue(point: ScenarioComparisonPoint, key: MetricKey): number | null {
   if (point.status !== 'succeeded') return null
   const value = key === 'operationsPerDay' ? point.operationsPerDay : (point.verified ?? point.screening)?.[key]
   if (value == null || !Number.isFinite(value)) return null

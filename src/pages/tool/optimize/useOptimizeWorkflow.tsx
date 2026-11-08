@@ -5,7 +5,7 @@ import { canEditConfig, canUseScenarioComparison, canUseUpgradeFeatures, getPerm
 import { canonicalJson } from '../../../lib/crypto'
 import { apiJson } from '../../../lib/api-client'
 import { normalizeConfig, validateConfig, validateScheduleConfig, normalizeScheduleMode, normalizeDormitoryRule, resolveConfigLayout } from '../../../lib/config'
-import { type ScheduleProgressState } from '../../../components/ScheduleProgress'
+import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { describeConfigDiff } from '../../../lib/workspace-history'
 import { mergeOptimizeJobProgress, buildOptimizeJobStorageKey, writeActiveOptimizeJob, readActiveOptimizeJob, isActiveOptimizeJob, clearActiveOptimizeJob, clearLegacyOptimizeJobStorage, isOptimizeJobPollCancelled } from './job-progress'
 import { isOptimizationJobCancelledError, useOptimizationJob } from './useOptimizationJob'

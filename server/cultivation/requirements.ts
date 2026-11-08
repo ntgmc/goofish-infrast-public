@@ -49,7 +49,10 @@ export function readHomeworkRequirements(content: Record<string, unknown>, snaps
       target[key] = typeof value === 'number' ? Math.max(Number(target[key] ?? value), value) : value
     })
     if (isGlobal) merge(global)
-    for (const name of matched) merge(specific[name] ??= {})
+    for (const name of matched) {
+      specific[name] ??= {}
+      merge(specific[name])
+    }
   }
   const parse = (row: Record<string, unknown>) => {
     const name = String(row.name ?? '')

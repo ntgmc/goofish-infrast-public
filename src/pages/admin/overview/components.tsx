@@ -1,5 +1,5 @@
 import type { AnnouncementStats as AnnouncementReachStats } from '../../../lib/types'
-import { AdminCdkRecord, RiskReasonStats, RiskTrendDay, CdkOpsSummary, permissionLabels } from '../contracts'
+import { type AdminCdkRecord, type RiskReasonStats, type RiskTrendDay, type CdkOpsSummary, permissionLabels } from '../contracts'
 import { StatusPill, SmallButton, formatDate } from '../shared/helpers'
 import { Metric } from '../cdk/components'
 import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'

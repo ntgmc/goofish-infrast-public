@@ -1,4 +1,5 @@
 import { getPool, query } from './postgres'
+import { drizzleTransactionClient } from './drizzle-executor'
 import { ensureDatabaseSchema } from './schema'
 import type { AdminUserRecord } from '../handlers/admin-auth'
 import type { PasswordHashRecord } from '../security/password'
@@ -35,7 +36,7 @@ export function createPostgresAdminUserStore(): AdminUserStore {
     },
     set: async (username, user, audit) => {
       await ensureSchema()
-      const client = await getPool().connect()
+      const client = drizzleTransactionClient(await getPool().connect())
       try {
         await client.query('begin')
         await client.query(
@@ -72,7 +73,7 @@ export function createPostgresAdminUserStore(): AdminUserStore {
     },
     create: async (username, user, audit) => {
       await ensureSchema()
-      const client = await getPool().connect()
+      const client = drizzleTransactionClient(await getPool().connect())
       try {
         await client.query('begin')
         const result = await client.query(
@@ -136,7 +137,7 @@ export function createPostgresAdminUserStore(): AdminUserStore {
     },
     delete: async (username, audit) => {
       await ensureSchema()
-      const client = await getPool().connect()
+      const client = drizzleTransactionClient(await getPool().connect())
       try {
         await client.query('begin')
         await client.query('delete from admin_users where username = $1', [username])

@@ -68,7 +68,7 @@ function createIncomingRequestAbortController(req: IncomingMessage): {
 }
 
 function resolveIncomingProtocol(req: IncomingMessage): 'http' | 'https' {
-  if (Boolean((req.socket as { encrypted?: boolean }).encrypted)) return 'https'
+  if ((req.socket as { encrypted?: boolean }).encrypted) return 'https'
   if (!isTrustedProxyAddress(req.socket.remoteAddress)) return 'http'
   const forwarded = firstHeaderValue(req.headers['x-forwarded-proto'])
   return forwarded?.split(',', 1)[0]?.trim().toLowerCase() === 'https' ? 'https' : 'http'
@@ -85,7 +85,8 @@ export async function writeWebResponse(res: ServerResponse, response: Response):
     res.setHeader(key, key === 'set-cookie' ? response.headers.getSetCookie() : value)
   })
 
-  if (!response.body) {
+  if (!response.body || res.req.method === 'HEAD') {
+    await response.body?.cancel()
     res.end()
     return
   }

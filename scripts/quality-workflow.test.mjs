@@ -8,6 +8,7 @@ const security = normalize(await readFile('.github/workflows/security-analysis.y
 
 test('keeps generation, relevance, release, and migrated-data checks in the quality workflow', () => {
   for (const command of [
+    'pnpm run check:lint',
     'pnpm run test:generate-data',
     'pnpm run test:product-catalog',
     'pnpm run test:migration-verifier',
@@ -26,15 +27,15 @@ test('keeps generation, relevance, release, and migrated-data checks in the qual
 test('attests the final tarball and calls Semgrep from main pull requests and pushes', () => {
   assert.match(quality, /actions\/attest-build-provenance@[0-9a-f]{40}/)
   assert.match(quality, /subject-path: \.release-packages\/public\/public\.tgz/)
-  assert.match(quality, /^  id-token: write$/m)
-  assert.match(quality, /^  attestations: write$/m)
-  assert.match(quality, /^  pull_request:\n    branches: \[main\]$/m)
-  assert.match(quality, /^  push:\n    branches: \[main\]$/m)
+  assert.match(quality, /^ {2}id-token: write$/m)
+  assert.match(quality, /^ {2}attestations: write$/m)
+  assert.match(quality, /^ {2}pull_request:\n {4}branches: \[main\]$/m)
+  assert.match(quality, /^ {2}push:\n {4}branches: \[main\]$/m)
   assert.match(job('security'), /uses: \.\/\.github\/workflows\/security-analysis\.yml/)
-  assert.match(security, /^  workflow_call:\n    inputs:\n      validation_key:/m)
-  assert.match(security, /^  schedule:/m)
-  assert.match(security, /^  workflow_dispatch:/m)
-  assert.doesNotMatch(security, /^  (pull_request|push):/m)
+  assert.match(security, /^ {2}workflow_call:\n {4}inputs:\n {6}validation_key:/m)
+  assert.match(security, /^ {2}schedule:/m)
+  assert.match(security, /^ {2}workflow_dispatch:/m)
+  assert.doesNotMatch(security, /^ {2}(pull_request|push):/m)
 })
 
 test('runs the full application suite once inside the independent public export', async () => {
@@ -57,7 +58,7 @@ test('only skips validation jobs when the matching successful record was found',
     assert.ok(recorder.includes(`name: ${VALIDATION_JOBS[kind].split(' / ').at(-1)}`))
   }
   assert.match(job('validation-reuse'), /run: node scripts\/ci-validation-reuse\.mjs resolve/)
-  assert.match(quality, /^  actions: read$/m)
+  assert.match(quality, /^ {2}actions: read$/m)
   assert.doesNotMatch(quality + security, /runs-on: ubuntu-latest/)
 })
 
@@ -78,7 +79,7 @@ test('builds fresh SHA-bound release artifacts alongside validation on pushes an
 function job(id) {
   const block = quality.split(`\n  ${id}:\n`)[1]
   assert.ok(block, `Missing job ${id}`)
-  return block.split(/\n  [a-z][a-z-]+:\n/)[0]
+  return block.split(/\n {2}[a-z][a-z-]+:\n/)[0]
 }
 
 function normalize(value) {

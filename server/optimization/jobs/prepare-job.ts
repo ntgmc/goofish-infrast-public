@@ -5,7 +5,7 @@ import { resolveProfileAuthorization } from '../../handlers/profile-authorizatio
 import { getProfileForUser, isDepotValueProfile, isFreePreviewProfile, normalizeProfileKind } from "../../storage/user-store";
 import { getProfileOptimizationResult } from '../../storage/optimization-result-store';
 import { requireUserSession } from "../../handlers/user-auth";
-import { type OptimizeJobPriority } from "../../storage/optimize-job-store";
+import type { OptimizeJobPriority } from "../../storage/optimize-job-store";
 import type { ScheduleUsageContext, OptimizeJobSource, PreparedOptimizeJob, OptimizeConfigPermission } from './shared';
 import { createPersistedOptimizeJobPayload } from './shared';
 import { sanitizeConfigForPublicOptimize, jsonResponse } from './http-core';

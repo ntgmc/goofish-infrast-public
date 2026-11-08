@@ -1805,7 +1805,7 @@ function passwordResetAuthPlugin() {
     name: 'auth-security-password-reset-mocks',
     setup(build) {
       for (const moduleName of ['user-store', 'inventory-store', 'password', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email', 'account-data-lifecycle']) {
-        build.onResolve({ filter: new RegExp(`(^|[\\/])${moduleName}(\.ts)?$`) }, () => ({
+        build.onResolve({ filter: new RegExp(`(^|[\\/])${moduleName}(.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-password-reset',
         }))
@@ -1834,11 +1834,11 @@ function passwordResetStoragePlugin() {
   return {
     name: 'auth-security-password-reset-storage-mocks',
     setup(build) {
-      build.onResolve({ filter: /(^|[\/])postgres(\.ts)?$/ }, () => ({
+      build.onResolve({ filter: /(^|[/])postgres(\.ts)?$/ }, () => ({
         path: 'postgres',
         namespace: 'auth-security-password-reset-storage',
       }))
-      build.onResolve({ filter: /(^|[\/])schema(\.ts)?$/ }, () => ({
+      build.onResolve({ filter: /(^|[/])schema(\.ts)?$/ }, () => ({
         path: 'schema',
         namespace: 'auth-security-password-reset-storage',
       }))

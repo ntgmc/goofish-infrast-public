@@ -17,7 +17,7 @@ describe('incremental cultivation snapshot loading', () => {
   it.each([false, true])('reads metadata and individual validated jobs with homeworks first=%s', async (first) => {
     const snapshot = planningFixture()
     snapshot.homeworks = Array.from({ length: 100 }, (_, index) => ({ ...snapshot.homeworks[0], id: index + 1,
-      content: { ...snapshot.homeworks[0].content, doc: { details: '中文😀\\\"\n[]{}'.repeat(1000) }, nested: [true, false, null, -1.5e3, ['边界']] } }))
+      content: { ...snapshot.homeworks[0].content, doc: { details: '中文😀\\"\n[]{}'.repeat(1000) }, nested: [true, false, null, -1.5e3, ['边界']] } }))
     const { homeworks, ...catalog } = snapshot
     await writeFile(path, JSON.stringify(first ? { homeworks, ...catalog } : { ...catalog, homeworks }, null, first ? 2 : undefined))
     expect(prtsSnapshotPath()).toBe(path)
@@ -28,7 +28,7 @@ describe('incremental cultivation snapshot loading', () => {
   it('preserves multibyte characters and escapes split exactly at an input block boundary', async () => {
     const snapshot = planningFixture(), prefix = '{"homeworks":[{"id":20,"hash":"h","stageId":"s","mode":1,"content":{"details":"'
     const padding = 'x'.repeat(65536 - Buffer.byteLength(prefix) - 1)
-    const body = `${padding}😀\\\"\nsecond`
+    const body = `${padding}😀\\"\nsecond`
     const { homeworks: _homeworks, ...catalog } = snapshot
     await writeFile(path, `${prefix}${JSON.stringify(body).slice(1)}}}],${JSON.stringify(catalog).slice(1)}`)
     expect([...readPrtsHomeworks()][0].content.details).toBe(body)

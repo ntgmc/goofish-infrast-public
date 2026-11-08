@@ -10,6 +10,7 @@ import { createApiServer } from './http-server'
 import { routeRequest } from './routes'
 import { flushPerformanceDurations, getPerformanceContext } from './performance-observation'
 import { observeHttpRequest } from './http-observation'
+import { getValidatedJsonRecord } from './security/request-validation'
 
 const server = createApiServer()
 let port: number
@@ -25,21 +26,24 @@ afterEach(() => {
 })
 afterAll(async () => {
   server.closeAllConnections()
-  await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))
+  await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
 })
 
 describe('API HTTP request lifecycle', () => {
   it.each(['100-continue', 'unsupported'])('rejects Expect: %s before accepting a body', async (expectation) => {
     vi.stubEnv('NODE_ENV', 'production')
     vi.stubEnv('PUBLIC_APP_URL', 'https://app.example.test')
-    const response = await rawRequest([
-      'POST /api/auth/login HTTP/1.1',
-      'Host: app.example.test',
-      `Expect: ${expectation}`,
-      'Content-Type: application/json',
-      'Content-Length: 2',
-      '', '',
-    ].join('\r\n'))
+    const response = await rawRequest(
+      [
+        'POST /api/auth/login HTTP/1.1',
+        'Host: app.example.test',
+        `Expect: ${expectation}`,
+        'Content-Type: application/json',
+        'Content-Length: 2',
+        '',
+        '',
+      ].join('\r\n'),
+    )
 
     expect(response).toMatch(/^HTTP\/1\.1 417 /)
     expect(response).not.toContain('100 Continue')
@@ -50,9 +54,63 @@ describe('API HTTP request lifecycle', () => {
     expect(routeRequest).not.toHaveBeenCalled()
   })
 
+  it('delivers validated POST data and separate session cookies through Fastify', async () => {
+    const payload = { email: 'user@example.test', password: 'example-password' }
+    vi.mocked(routeRequest).mockImplementationOnce(async (request) => {
+      expect(await getValidatedJsonRecord(request)).toEqual(payload)
+      expect(getPerformanceContext().request_id).toBeTruthy()
+      return new Response(null, {
+        status: 204,
+        headers: [
+          ['Set-Cookie', 'session=first; HttpOnly; Path=/'],
+          ['Set-Cookie', 'csrf=second; Path=/'],
+        ],
+      })
+    })
+    const response = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    expect(response.status).toBe(204)
+    expect(await response.text()).toBe('')
+    expect(response.headers.getSetCookie()).toEqual(['session=first; HttpOnly; Path=/', 'csrf=second; Path=/'])
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    expect(routeRequest).toHaveBeenCalledOnce()
+  })
+
+  it('streams binary downloads without serializing their contents', async () => {
+    const content = Uint8Array.from([0, 1, 127, 128, 255])
+    vi.mocked(routeRequest).mockImplementationOnce(
+      async () =>
+        new Response(content, {
+          headers: {
+            'Content-Type': 'application/octet-stream',
+            'Content-Disposition': 'attachment; filename="result.bin"',
+          },
+        }),
+    )
+    const response = await fetch(`http://127.0.0.1:${port}/api/user/results/result-id?profile_id=profile-id`)
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(content)
+    expect(response.headers.get('Content-Disposition')).toContain('result.bin')
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+  })
+
+  it.each(['//api/health/live', '/api/health/live#fragment'])(
+    'rejects the original target %s before URL normalization',
+    async (target) => {
+      const response = await rawRequest(`GET ${target} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n`)
+      expect(response).toMatch(/^HTTP\/1\.1 400 /)
+      expect(response).toMatch(/X-Content-Type-Options: nosniff/i)
+      expect(routeRequest).not.toHaveBeenCalled()
+    },
+  )
+
   it('aggregates ordinary requests without logging each request', async () => {
     const events: Array<Record<string, unknown>> = []
-    vi.spyOn(console, 'info').mockImplementation((line: string) => { events.push(JSON.parse(line)) })
+    vi.spyOn(console, 'info').mockImplementation((line: string) => {
+      events.push(JSON.parse(line))
+    })
     flushPerformanceDurations()
     events.length = 0
     const response = await fetch(`http://127.0.0.1:${port}/api/health/live`)
@@ -62,10 +120,14 @@ describe('API HTTP request lifecycle', () => {
     expect(routeRequest).toHaveBeenCalledOnce()
     expect(events).toHaveLength(0)
     flushPerformanceDurations()
-    expect(events).toEqual([expect.objectContaining({
-      event: 'performance.duration', metric: 'http.request', count: 1,
-      labels: { method: 'GET', route: '/api/health/live', status: 200, outcome: 'completed' },
-    })])
+    expect(events).toEqual([
+      expect.objectContaining({
+        event: 'performance.duration',
+        metric: 'http.request',
+        count: 1,
+        labels: { method: 'GET', route: '/api/health/live', status: 200, outcome: 'completed' },
+      }),
+    ])
   })
 
   it.each([
@@ -75,7 +137,9 @@ describe('API HTTP request lifecycle', () => {
     { status: 500, durationMs: 0, logged: true },
   ])('logs status $status at $durationMs ms: $logged', async ({ status, durationMs, logged }) => {
     const events: Array<Record<string, unknown>> = []
-    vi.spyOn(console, 'info').mockImplementation((line: string) => { events.push(JSON.parse(line)) })
+    vi.spyOn(console, 'info').mockImplementation((line: string) => {
+      events.push(JSON.parse(line))
+    })
     let now = 0
     vi.spyOn(performance, 'now').mockImplementation(() => now)
     vi.mocked(routeRequest).mockImplementationOnce(async () => {
@@ -85,15 +149,21 @@ describe('API HTTP request lifecycle', () => {
     const response = await fetch(`http://127.0.0.1:${port}/api/health/live`)
     await response.text()
     expect(events).toHaveLength(logged ? 1 : 0)
-    if (logged) expect(events[0]).toMatchObject({
-      event: 'http.request', status, duration_ms: durationMs, outcome: 'completed',
-      request_id: response.headers.get('X-Request-ID'),
-    })
+    if (logged)
+      expect(events[0]).toMatchObject({
+        event: 'http.request',
+        status,
+        duration_ms: durationMs,
+        outcome: 'completed',
+        request_id: response.headers.get('X-Request-ID'),
+      })
   })
 
   it('correlates concurrent failed requests and logs route templates without query values or result IDs', async () => {
     const events: Array<Record<string, unknown>> = []
-    vi.spyOn(console, 'info').mockImplementation((line: string) => { events.push(JSON.parse(line)) })
+    vi.spyOn(console, 'info').mockImplementation((line: string) => {
+      events.push(JSON.parse(line))
+    })
     const observed: string[] = []
     const handler = async () => {
       await new Promise<void>((resolve) => setImmediate(resolve))
@@ -109,13 +179,17 @@ describe('API HTTP request lifecycle', () => {
     const ids = responses.map((response) => response.headers.get('X-Request-ID')).sort()
     expect(observed.sort()).toEqual(ids)
     expect(events.map((event) => event.request_id).sort()).toEqual(ids)
-    expect(events).toContainEqual(expect.objectContaining({ route: '/api/user/results/:resultId', outcome: 'completed', status: 503 }))
+    expect(events).toContainEqual(
+      expect.objectContaining({ route: '/api/user/results/:resultId', outcome: 'completed', status: 503 }),
+    )
     expect(JSON.stringify(events)).not.toMatch(/private-result|secret-marker/)
   })
 
   it('counts an aborted response once even when multiple lifecycle events arrive', () => {
     const events: Array<Record<string, unknown>> = []
-    vi.spyOn(console, 'info').mockImplementation((line: string) => { events.push(JSON.parse(line)) })
+    vi.spyOn(console, 'info').mockImplementation((line: string) => {
+      events.push(JSON.parse(line))
+    })
     const request = new IncomingMessage(new Socket())
     request.method = 'GET'
     request.url = '/unknown-private-path?token=secret-marker'
@@ -125,7 +199,12 @@ describe('API HTTP request lifecycle', () => {
     response.emit('finish')
     response.emit('close')
     expect(events).toHaveLength(1)
-    expect(events[0]).toMatchObject({ request_id: 'aborted-request', route: 'unmatched', status: null, outcome: 'aborted' })
+    expect(events[0]).toMatchObject({
+      request_id: 'aborted-request',
+      route: 'unmatched',
+      status: null,
+      outcome: 'aborted',
+    })
     expect(JSON.stringify(events)).not.toMatch(/unknown-private-path|secret-marker/)
     expect(response.listenerCount('finish')).toBe(0)
     expect(response.listenerCount('close')).toBe(0)
@@ -140,7 +219,9 @@ function rawRequest(request: string): Promise<string> {
     socket.setEncoding('utf8')
     socket.setTimeout(2_000, () => socket.destroy(new Error('HTTP response timed out')))
     socket.on('connect', () => socket.write(request))
-    socket.on('data', (chunk) => { response += chunk })
+    socket.on('data', (chunk) => {
+      response += chunk
+    })
     socket.on('end', () => resolve(response))
     socket.on('error', reject)
   })

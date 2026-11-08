@@ -6,7 +6,7 @@ export function* readSnapshotEntries(path: string, homeworks: boolean): Generato
   const file = openSync(path, 'r')
   const bytes = Buffer.allocUnsafe(64 * 1024), decoder = new StringDecoder('utf8')
   let buffer = '', position = 0, ended = false
-  const strings = /["\\]/g, structures = /["{}\[\]]/g, delimiters = /[ \t\r\n,}\]]/g
+  const strings = /["\\]/g, structures = /["{}[\]]/g, delimiters = /[ \t\r\n,}\]]/g
   const invalid = () => new SyntaxError('Invalid PRTS snapshot JSON')
   function peek(): string {
     while (position === buffer.length && !ended) {

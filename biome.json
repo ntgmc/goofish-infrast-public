@@ -1,0 +1,82 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.6/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignoreUnknown": true,
+    "includes": [
+      "src/**",
+      "server/**",
+      "scripts/**",
+      "*.ts",
+      "*.mjs",
+      "*.js",
+      "*.json",
+      "!!**/dist",
+      "!!**/.generated",
+      "!!src/data",
+      "!src/pages/v2/sample-result.json",
+      "!server/database-schema-contract.json"
+    ]
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "asNeeded"
+    }
+  },
+  "css": { "parser": { "tailwindDirectives": true } },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "a11y": {
+        "preset": "none",
+        "useAltText": "error",
+        "useValidAriaProps": "error",
+        "useValidAriaRole": "error",
+        "useValidAriaValues": "error",
+        "noAriaHiddenOnFocusable": "error",
+        "noPositiveTabindex": "error",
+        "noDistractingElements": "error",
+        "useHtmlLang": "error",
+        "useIframeTitle": "error"
+      },
+      "style": { "noNonNullAssertion": "off", "noDescendingSpecificity": "off" },
+      "complexity": { "noImportantStyles": "off" },
+      "correctness": {
+        "useExhaustiveDependencies": "off",
+        "noComponentHookFactories": "off",
+        "noUnsafeFinally": "off"
+      },
+      "suspicious": {
+        "noArrayIndexKey": "off",
+        "noControlCharactersInRegex": "off",
+        "noImplicitAnyLet": "off",
+        "useIterableCallbackReturn": { "level": "error", "options": { "checkForEach": false } }
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["src/**"],
+      "linter": { "rules": { "suspicious": { "noPrototypeBuiltins": "off" } } }
+    },
+    {
+      "includes": ["server/**"],
+      "linter": { "rules": { "correctness": { "useHookAtTopLevel": "off" } } }
+    },
+    {
+      "includes": ["**/*.test.ts", "**/*.test.tsx"],
+      "linter": { "rules": { "correctness": { "useJsxKeyInIterable": "off" } } }
+    }
+  ]
+}

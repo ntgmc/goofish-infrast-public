@@ -16,6 +16,7 @@ import type {
   BehaviorRiskHealthDto,
   BehaviorRiskMemberDto,
 } from '../../src/lib/behavior-risk-contracts'
+import { drizzleTransactionClient } from './drizzle-executor'
 import { getPool, query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 
@@ -216,7 +217,7 @@ type DirtyUserClaim = { user_id: string; last_event_at: Date | string }
 export async function runBehaviorRiskEvaluation(now = new Date()): Promise<BehaviorRiskEvaluationRun> {
   const startedAt = Date.now()
   await ensureDatabaseSchema()
-  const client = await getPool().connect()
+  const client = drizzleTransactionClient(await getPool().connect())
   let locked = false
   let transactionStarted = false
   let discardClient = false

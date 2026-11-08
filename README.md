@@ -6,10 +6,11 @@
 
 | 分类 | 技术 |
 | --- | --- |
-| 前端 | React 19.2、TypeScript 7、Vite 8、React Router 8、TanStack Query 5 |
+| 前端 | React 19.3、TypeScript 7、Vite 8、React Router 8、TanStack Query 5 |
 | UI | Tailwind CSS 4、shadcn/ui、Radix UI、Motion 14、Lucide |
-| 后端 | Node.js 24、TypeScript、原生 HTTP API |
-| 数据库与任务队列 | PostgreSQL、node-postgres（pg） |
+| 后端 | Node.js 24、TypeScript、Fastify 5 |
+| 数据库与任务队列 | PostgreSQL、Drizzle、node-postgres（pg） |
+| 开发检查 | Biome 2、TypeScript、Knip |
 | 测试 | Vitest 5、Testing Library、Testcontainers |
 
 ## 本地开发
@@ -40,6 +41,7 @@ pnpm run start:server
 | `pnpm run build` | 构建前端和公共 API 服务端 |
 | `pnpm run preview` | 预览前端构建产物 |
 | `pnpm test` | 运行单元测试 |
+| `pnpm run check:lint` | 检查前后端、测试、脚本与配置 |
 | `pnpm run check:types` | 检查前端和后端生产源码类型 |
 | `pnpm run test:postgres` | 运行 PostgreSQL 集成测试，需要 Docker |
 | `pnpm run check:architecture` | 检查架构边界 |

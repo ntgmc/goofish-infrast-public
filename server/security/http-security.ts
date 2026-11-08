@@ -71,7 +71,7 @@ export function isSecureWebRequest(req: Request): boolean {
 }
 
 export function isSecureIncomingRequest(req: IncomingMessage): boolean {
-  if (Boolean((req.socket as { encrypted?: boolean }).encrypted)) return true
+  if ((req.socket as { encrypted?: boolean }).encrypted) return true
   if (!isTrustedProxyAddress(req.socket.remoteAddress)) return false
   const forwardedProto = firstHeaderValue(req.headers['x-forwarded-proto'])
   return forwardedProto?.split(',', 1)[0]?.trim().toLowerCase() === 'https'

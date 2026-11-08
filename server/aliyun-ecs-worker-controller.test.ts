@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  AliyunEcsApiError,
+  type AliyunEcsApiError,
   createAliyunEcsWorkerController,
   createAliyunEcsWorkerControllerFromEnvironment,
   signRpcRequest,

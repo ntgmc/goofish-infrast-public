@@ -6,7 +6,7 @@ import { ensureDatabaseSchema } from './schema'
 import { saveUserAccountInTransaction } from './cdk-redemption'
 import {
   AdminRegistrationInvitationError,
-  AdminRegistrationInvitationOperationError,
+  type AdminRegistrationInvitationOperationError,
   consumeAdminRegistrationInvitationInTransaction,
   createAdminRegistrationInvitation,
   issueQqBotRegistrationInvitation,

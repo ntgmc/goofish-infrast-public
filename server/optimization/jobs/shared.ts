@@ -1,7 +1,7 @@
 import type { FreeScheduleEntitlement, LicenseOperator, LicenseConfig, OptimizeEstimateBucket, PermissionMode } from "../../../src/lib/types"
-import { type CdkRecord } from "../../handlers/license-utils"
+import type { CdkRecord } from "../../handlers/license-utils"
 import type { UsageReasonCode } from "../../storage/usage-store";
-import { type OptimizeJobPriority } from "../../storage/optimize-job-store"
+import type { OptimizeJobPriority } from "../../storage/optimize-job-store"
 import type { ScenarioComparisonFactors } from '../../../src/lib/scenario-comparison'
 import type { MeteredBillingKind, MeteredBillingOperation, MeteredQuoteConfirmation } from '../../../src/lib/metered-billing'
 import { optimizationJobPayloadSchema } from './runtime-contracts'
