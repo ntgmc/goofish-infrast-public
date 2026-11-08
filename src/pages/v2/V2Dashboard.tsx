@@ -272,7 +272,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
         <main className="v2-main" tabIndex={-1} data-route-focus>
           {session.authStatus === 'error' && <p className="v2-feedback v2-feedback-error" role="alert">{text.loginServiceUnavailable}<button type="button" onClick={session.retryAuth}>{copy.common.pages_ToolPage_005}</button></p>}
           {navigationError && <p className="v2-feedback v2-feedback-error" role="alert">{navigationError}<button type="button" onClick={() => { session.retryConfigSave(); setNavigationError(null) }}>{text.loginRetry}</button></p>}
-          <AnnouncementBanner announcement={session.banner} />
+          <AnnouncementBanner announcement={session.banner ?? (features.announcements && section !== 'announcements' ? session.popups?.find((item) => item.active) ?? null : null)} />
           <V2PageTransition motionKey={section} className="v2-page-transition">{(displayedSection) => <>
           <WorkspaceSections section={displayedSection} session={guardedSession} workflow={workflow} generationProgress={generationProgress} onAccountAdded={accountAdded} onToolDirtyChange={setToolDirty} onOpenProfile={(profile) => openProfile(profile, section === 'skland' ? 'skland' : section === 'manual-tool' ? 'manual-tool' : 'overview')} onUpgradeProfile={(profile) => openProfile(profile, 'add-account')} onNavigate={navigateSection} onConfig={() => openPanel('config')} onOperators={() => openPanel('operators')} generationDisabledReason={generationDisabledReason}
             firstSchedule={firstSchedule} configConfirmed={configConfirmed} />
@@ -355,7 +355,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
         if (profile.id !== session.activeProfile?.id) { try { if (!await session.refreshProfileWorkspace(profile)) return } catch { return } }
         void navigate(v2Path('plans', profile.id))
       })() }} />}
-      {features.announcements && section !== 'announcements' && <AnnouncementPopup announcements={session.popups ?? []} userId={session.user?.id} onUnreadCountChange={session.setAnnouncementUnreadCount} announcementsPath={v2Path('announcements', session.activeProfile?.id)} />}
+      {signedIn && features.announcements && section !== 'announcements' && <AnnouncementPopup announcements={session.popups ?? []} userId={session.user?.id} onUnreadCountChange={session.setAnnouncementUnreadCount} announcementsPath={v2Path('announcements', session.activeProfile?.id)} />}
     </div>
     </LayoutGroup>
   )

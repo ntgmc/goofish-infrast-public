@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from '../test/query-render'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '../test/query-render'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -49,14 +49,14 @@ afterEach(() => {
 })
 
 describe('AnnouncementPopup accessibility', () => {
-  it('opens modally, focuses the defer action, and dismisses with Escape without marking read', async () => {
+  it('opens at the title and dismisses with Escape without marking read', async () => {
     const { container, opener } = createAppRoot()
     const announcement = createAnnouncement('escape-one', '第一条公告')
     const { rerender } = render(<MemoryRouter><AnnouncementPopup announcements={[announcement]} /></MemoryRouter>, { container })
 
     const dialog = await screen.findByRole('dialog', { name: '第一条公告' })
     expect(HTMLDialogElement.prototype.showModal).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: '稍后查看' })).toHaveFocus()
+    expect(screen.getByRole('heading', { name: '第一条公告' })).toHaveFocus()
     expect(document.documentElement).toHaveStyle({ overflow: 'hidden' })
 
     const cancelEvent = new Event('cancel', { cancelable: true })
@@ -73,6 +73,23 @@ describe('AnnouncementPopup accessibility', () => {
 
     rerender(<MemoryRouter><AnnouncementPopup announcements={[{ ...announcement }]} /></MemoryRouter>)
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('describes a long reminder, keeps its body keyboard accessible, and loops focus at both ends', async () => {
+    const user = userEvent.setup()
+    const announcement = { ...createAnnouncement('long-reminder', '服务调整'), body: '# 详细说明\n\n**请先保存排班。**\n\n' + '后续说明。\n\n'.repeat(100) }
+    render(<MemoryRouter><AnnouncementPopup announcements={[announcement]} /></MemoryRouter>)
+    const dialog = await screen.findByRole('dialog', { name: '服务调整' })
+    expect(dialog).toHaveAccessibleDescription('请先保存排班。')
+    expect(screen.getByRole('heading', { name: '服务调整' })).toHaveFocus()
+    expect(within(dialog).getByRole('region', { name: '服务调整' })).toHaveAttribute('tabindex', '0')
+    expect(within(dialog).getByRole('heading', { name: '详细说明' })).toBeInTheDocument()
+    await user.tab({ shift: true })
+    expect(within(dialog).getByRole('button', { name: '已读' })).toHaveFocus()
+    await user.tab()
+    expect(within(dialog).getByRole('link', { name: '公告中心' })).toHaveFocus()
+    await user.tab({ shift: true })
+    expect(within(dialog).getByRole('button', { name: '已读' })).toHaveFocus()
   })
 
   it('acknowledges only one reminder and keeps the other announcements unread across remounts', async () => {

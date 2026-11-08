@@ -112,6 +112,39 @@ it('allows a guest to open the benchmark from navigation and return to the works
   expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2')
 })
 
+it.each([null, '2099-01-01T00:00:00Z'])('lets a first-time guest choose when to read an announcement (deadline %s)', async (popupUntil) => {
+  session.popups = [{
+    id: 'guest-report', kind: 'popup', active: true, title: '排班实测报告',
+    body: '报告摘要。\n\n[查看实测](/v2/benchmarks)\n\n' + '报告正文。\n\n'.repeat(100),
+    popup_until: popupUntil, created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-01T00:00:00Z',
+  }]
+  const user = userEvent.setup()
+  mount('/')
+  const notice = screen.getByRole('region', { name: copy.public.components_AnnouncementBanner_001 })
+  expect(within(notice).getByText('排班实测报告')).toBeVisible()
+  expect(screen.getByRole('heading', { name: copy.v2.exampleSchedule })).toBeVisible()
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(within(notice).getByRole('link', { name: '查看实测', hidden: true })).not.toBeVisible()
+  expect(window.sessionStorage.getItem('maa-announcement-popup-shown')).toBeNull()
+  await user.click(within(notice).getByText(copy.public.components_AnnouncementBanner_002))
+  expect(within(notice).getByRole('link', { name: '查看实测' })).toBeVisible()
+  await user.click(within(notice).getByText(copy.public.components_AnnouncementBanner_003))
+  expect(within(notice).getByRole('link', { name: '查看实测', hidden: true })).not.toBeVisible()
+  expect(window.localStorage.getItem('maa-announcement-read:guest-report')).toBeNull()
+})
+
+it('keeps the global banner first and respects the announcements feature switch', () => {
+  session.popups = [{ id: 'ordinary-report', kind: 'popup', active: true, title: '普通报告', body: '正文', created_at: '', updated_at: '' }]
+  session.banner = { id: 'service-banner', kind: 'banner', active: true, title: '服务通知', body: '通知内容', created_at: '', updated_at: '' }
+  const view = mount()
+  expect(screen.getByRole('region', { name: copy.public.components_AnnouncementBanner_001 })).toHaveTextContent('服务通知')
+  expect(screen.queryByText('普通报告')).not.toBeInTheDocument()
+  session.banner = null
+  mocks.features.mockReturnValue({ status: 'ready', features: { ...DEFAULT_SITE_FEATURES, announcements: false }, retry: vi.fn() })
+  view.rerender(<MemoryRouter><V2Page /></MemoryRouter>)
+  expect(screen.queryByRole('region', { name: copy.public.components_AnnouncementBanner_001 })).not.toBeInTheDocument()
+})
+
 it('keeps personal navigation in the account drawer and respects feature availability', async () => {
   connect()
   mocks.features.mockReturnValue({ status: 'ready', features: { ...DEFAULT_SITE_FEATURES, skland: false, inventory: false }, retry: vi.fn() })

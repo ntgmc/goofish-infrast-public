@@ -11,7 +11,7 @@ interface Props {
 }
 
 export default function AnnouncementBanner({ announcement, className = '' }: Props) {
-  if (!announcement?.active || announcement.kind !== 'banner') return null
+  if (!announcement?.active) return null
 
   return (
     <section

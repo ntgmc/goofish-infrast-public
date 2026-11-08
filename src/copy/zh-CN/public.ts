@@ -18,8 +18,6 @@ export const publicCopy = {
   // src/components/AnnouncementBodyEditor.tsx
   components_AnnouncementBodyEditor_006: " 字符",
   // src/components/AnnouncementPopup.tsx
-  components_AnnouncementPopup_001: "站内公告",
-  // src/components/AnnouncementPopup.tsx
   components_AnnouncementPopup_002: "公告中心",
   // src/components/AnnouncementPopup.tsx
   components_AnnouncementPopup_003: "已读",
@@ -28,7 +26,7 @@ export const publicCopy = {
   announcement_popup_read_failed: "未能标记已读，请重试，或稍后到公告中心查看。",
   announcement_reminder_ended: "提醒已结束",
   announcement_reminder_deadline: "访问提醒截止时间（可选）",
-  announcement_reminder_help: "需要用户及时关注时填写；留空则在公告中心查看。到期后停止自动提醒，公告内容仍保留。",
+  announcement_reminder_help: "普通报告和功能介绍请留空，用户可展开公告条阅读。需要及时关注的通知可设置截止时间，登录用户访问时弹窗提醒；到期后仍可在公告中心查看。",
   // src/components/PublicFooter.tsx
   components_PublicFooter_001: "常见问题",
   // src/components/PublicFooter.tsx
