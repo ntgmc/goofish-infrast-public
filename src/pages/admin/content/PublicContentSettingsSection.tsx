@@ -16,6 +16,7 @@ import {
 import { SortableMasterDetailList } from '../shared/SortableMasterDetailList'
 import { AdminToast } from '../shared/AdminToast'
 import { AdminTabs } from '../shared/AdminTabs'
+import PurchaseImageField from './PurchaseImageField'
 
 type TabId = 'qq' | 'purchase' | 'faq' | 'pricing' | 'thanks'
 type EditSettings = (updater: (draft: AdminPublicContentSettingsV1) => void) => void
@@ -25,7 +26,8 @@ const ValidationContext = createContext<{
   fieldErrors: FieldErrors
   focusPath: string | null
   clearFieldError: (path: string) => void
-}>({ fieldErrors: {}, focusPath: null, clearFieldError: () => undefined })
+  onUploadingChange: (uploading: boolean) => void
+}>({ fieldErrors: {}, focusPath: null, clearFieldError: () => undefined, onUploadingChange: () => undefined })
 
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'qq', label: copy.publicContent.admin_tab_qq },
@@ -39,6 +41,8 @@ export default function PublicContentSettingsSection() {
   const [settings, setSettings] = useState<AdminPublicContentSettingsV1 | null>(null)
   const [activeTab, setActiveTab] = useState<TabId>('qq')
   const [saving, setSaving] = useState(false)
+  const [uploads, setUploads] = useState(0)
+  const onUploadingChange = (uploading: boolean) => setUploads((count) => count + (uploading ? 1 : -1))
   const [dirty, setDirty] = useState(false)
   const [conflict, setConflict] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
@@ -69,7 +73,7 @@ export default function PublicContentSettingsSection() {
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!settings) return
+    if (!settings || uploads > 0) return
     setError(null)
     setNotice(null)
     const parsed = publicContentDraftSchema.safeParse(toDraft(settings))
@@ -137,7 +141,7 @@ export default function PublicContentSettingsSection() {
   }
 
   return (
-    <ValidationContext.Provider value={{ fieldErrors, focusPath, clearFieldError }}>
+    <ValidationContext.Provider value={{ fieldErrors, focusPath, clearFieldError, onUploadingChange }}>
     <form noValidate onSubmit={save} className="admin-settings space-y-5">
       <section className="admin-settings-heading">
         <p className="tool-eyebrow">{copy.publicContent.admin_nav}</p>
@@ -167,10 +171,10 @@ export default function PublicContentSettingsSection() {
       </fieldset>
 
       <div className="admin-savebar"><span className="text-sm text-ink-muted">{dirty ? '有待发布的修改' : '已与线上内容同步'}</span>
-        <button type="submit" disabled={saving} className="tool-primary-action">
-          {saving ? copy.publicContent.admin_saving : copy.publicContent.admin_save}
+        <button type="submit" disabled={saving || uploads > 0} className="tool-primary-action">
+          {uploads > 0 ? copy.publicContent.admin_image_uploading : saving ? copy.publicContent.admin_saving : copy.publicContent.admin_save}
         </button>
-        <button type="button" onClick={reload} disabled={saving} className="tool-secondary-action">
+        <button type="button" onClick={reload} disabled={saving || uploads > 0} className="tool-secondary-action">
           {conflict ? copy.publicContent.admin_reload_online : copy.publicContent.admin_reload}
         </button>
         {settings.updated_at && <span className="text-xs text-ink-muted">{copy.publicContent.admin_updated_at}{new Date(settings.updated_at).toLocaleString('zh-CN')}</span>}
@@ -221,12 +225,15 @@ function PurchaseMediaFields({ prefix, media, onChange }: {
   media: { share_image_url: string; qr_code_url: string }
   onChange: (field: 'share_image_url' | 'qr_code_url', value: string) => void
 }) {
+  const { onUploadingChange } = useContext(ValidationContext)
   return <div className="my-4 space-y-3">
     <div className="grid gap-4 sm:grid-cols-2">
-      <TextField path={`${prefix}.share_image_url`} id={`${prefix}-share-image`} label={copy.publicContent.admin_share_image_url} value={media.share_image_url} maxLength={2048} required={false} onChange={(value) => onChange('share_image_url', value)} />
-      <TextField path={`${prefix}.qr_code_url`} id={`${prefix}-qr-code`} label={copy.publicContent.admin_qr_code_url} value={media.qr_code_url} maxLength={2048} required={false} onChange={(value) => onChange('qr_code_url', value)} />
+      {(['share_image_url', 'qr_code_url'] as const).map((field) => <PurchaseImageField key={field} label={field === 'share_image_url' ? copy.publicContent.admin_share_image_url : copy.publicContent.admin_qr_code_url} value={media[field]} onChange={(value) => onChange(field, value)} onUploadingChange={onUploadingChange}>
+        <TextField path={`${prefix}.${field}`} id={`${prefix}-${field}`} label={copy.publicContent.admin_image_url} value={media[field]} maxLength={2048} required={false} onChange={(value) => onChange(field, value)} />
+      </PurchaseImageField>)}
     </div>
     <p className="text-sm leading-6 text-ink-secondary">{copy.publicContent.admin_purchase_media_help}</p>
+    <p className="text-sm leading-6 text-ink-secondary">{copy.publicContent.admin_image_url_help}</p>
   </div>
 }
 

@@ -190,6 +190,10 @@ it deliberately when changing the shared design.
   Purchase guides retain the selected product and profile, then show its price,
   terms, external listing, copyable link, buying steps, redemption and optional
   share image/QR. Each product owns its media; blank images take no space.
+  Admin image fields support direct upload, preview, replacement and removal,
+  with optional URL entry. Preserve original image bytes, pause publishing during
+  uploads, and retain the previous image after a failed upload. Keep keyboard
+  focus clear of the settings save bar.
   Keep original-image links and recovery for failed media or content loads.
   All pages use bounded content widths and V2 tokens.
 - The workspace shell owns page headings. Legal documents place their index

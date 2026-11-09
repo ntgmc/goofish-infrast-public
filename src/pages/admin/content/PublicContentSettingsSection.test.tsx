@@ -69,7 +69,7 @@ describe('PublicContentSettingsSection', () => {
       expect(input).not.toBeRequired()
       await user.click(input)
       await user.paste(` https://example.com/${ids[index]} `)
-      await user.click(screen.getAllByLabelText('购买二维码图片地址')[index])
+      await user.click(within(screen.getAllByRole('group', { name: '购买二维码' })[index]).getByLabelText('图片地址'))
       await user.paste(`https://example.com/${ids[index]}.png`)
     }
     adminApiJson.mockImplementation(async (_url: string, init: { json: Record<string, unknown> }) => ({
@@ -179,8 +179,8 @@ describe('PublicContentSettingsSection', () => {
     expect(xianyuUrl).not.toBeRequired()
     await user.clear(xianyuUrl)
     await user.type(xianyuUrl, '  https://example.com/xianyu-listing  ')
-    await user.type(screen.getByLabelText('闲鱼分享图地址'), ' https://example.com/share.png ')
-    await user.type(screen.getByLabelText('购买二维码图片地址'), '/assets/purchase/qr.png')
+    await user.type(within(screen.getByRole('group', { name: '闲鱼分享图' })).getByLabelText('图片地址'), ' https://example.com/share.png ')
+    await user.type(within(screen.getByRole('group', { name: '购买二维码' })).getByLabelText('图片地址'), '/assets/purchase/qr.png')
     await user.type(screen.getByLabelText('购买补充说明'), ' 请在订单中领取 CDK。 ')
     await user.click(screen.getByRole('button', { name: '保存并发布' }))
 
@@ -191,6 +191,28 @@ describe('PublicContentSettingsSection', () => {
         cdk_purchase: { xianyu_url: 'https://example.com/xianyu-listing', share_image_url: 'https://example.com/share.png', qr_code_url: '/assets/purchase/qr.png', instructions: '请在订单中领取 CDK。' },
       }),
     })))
+  })
+
+  it('uploads a QR, blocks publication while uploading, and publishes the resulting URL', async () => {
+    const user = userEvent.setup()
+    render(<PublicContentSettingsSection />)
+    await screen.findByRole('heading', { name: '公开内容管理' })
+    await user.click(screen.getByRole('tab', { name: 'CDK 购买' }))
+    let resolveUpload!: (value: unknown) => void
+    const url = `/api/site/public-content-image?id=${'a'.repeat(64)}`
+    adminApiJson.mockImplementation(async (path: string, init?: { method?: string; json?: Record<string, unknown> }) => {
+      if (path === '/api/admin/public-content-image') return new Promise((resolve) => { resolveUpload = resolve })
+      return { settings: { ...cloneDefaultPublicContentSettings(), ...init?.json, revision: 4 } }
+    })
+    await user.upload(screen.getByLabelText('购买二维码 · 上传图片'), new File([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], 'qr.png', { type: 'image/png' }))
+    await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/public-content-image', expect.objectContaining({ method: 'POST', json: { type: 'image/png', base64: 'iVBORw0KGgo=' } })))
+    expect(screen.getByRole('button', { name: '正在上传…' })).toBeDisabled()
+    resolveUpload({ url })
+    const qr = within(screen.getByRole('group', { name: '购买二维码' }))
+    await waitFor(() => expect(qr.getByLabelText('图片地址')).toHaveValue(url))
+    expect(qr.getByRole('img')).toHaveAttribute('src', url)
+    await user.click(screen.getByRole('button', { name: '保存并发布' }))
+    await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/public-content', expect.objectContaining({ json: expect.objectContaining({ cdk_purchase: expect.objectContaining({ qr_code_url: url }) }) })))
   })
 
   it('allows the Xianyu purchase URL to be cleared', async () => {

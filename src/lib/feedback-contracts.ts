@@ -1,10 +1,11 @@
 import { z } from 'zod'
+import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_TYPES, imageUploadSchema } from './image-upload'
 
 export const FEEDBACK_CATEGORIES = ['account', 'schedule', 'import', 'payment', 'suggestion', 'other'] as const
-export const FEEDBACK_IMAGE_MAX_BYTES = 1024 * 1024
+export const FEEDBACK_IMAGE_MAX_BYTES = IMAGE_UPLOAD_MAX_BYTES
 export const FEEDBACK_SOURCE_IMAGE_MAX_BYTES = 20 * 1024 * 1024
 export const FEEDBACK_MESSAGE_MAX_LENGTH = 2000
-export const FEEDBACK_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
+export const FEEDBACK_IMAGE_TYPES = IMAGE_UPLOAD_TYPES
 
 const feedbackContextSchema = z.strictObject({
   profile_id: z.string().trim().min(1).max(120).optional(),
@@ -27,10 +28,7 @@ export const feedbackRequestSchema = z.strictObject({
   context: feedbackContextSchema.optional(),
   category: z.enum(FEEDBACK_CATEGORIES),
   message: z.string().trim().min(1).max(FEEDBACK_MESSAGE_MAX_LENGTH),
-  image: z.strictObject({
-    type: z.enum(FEEDBACK_IMAGE_TYPES),
-    base64: z.string().min(4).max(4 * Math.ceil(FEEDBACK_IMAGE_MAX_BYTES / 3)).regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/),
-  }).optional(),
+  image: imageUploadSchema.optional(),
 })
 
 export type FeedbackRequest = z.infer<typeof feedbackRequestSchema>

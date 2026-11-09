@@ -271,6 +271,10 @@ async function assertNginxTransportHardening() {
     assert(api.includes('zone=goofish_credential_ip burst=10 nodelay'))
     assert(api.includes('zone=goofish_compute_ip burst=10 nodelay'))
     assert(api.includes('include /etc/nginx/snippets/goofish-proxy-common.conf;'))
+    const imageUpload = api.match(/location = \/api\/admin\/public-content-image \{([^}]+)\}/)?.[1]
+    assert(imageUpload?.includes('client_max_body_size 2m;'), 'purchase image uploads need a dedicated 2 MB Nginx limit')
+    assert(imageUpload.includes('zone=goofish_admin_ip burst=20 nodelay'), 'image uploads retain the admin rate limit')
+    assert(imageUpload.includes('zone=goofish_auth_sensitive_ip burst=5 nodelay'), 'image uploads retain the sensitive-operation rate limit')
   }
 }
 

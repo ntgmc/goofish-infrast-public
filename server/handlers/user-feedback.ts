@@ -1,6 +1,7 @@
 import { feedbackCopy as text } from '../../src/copy/zh-CN/feedback'
 import { FEEDBACK_IMAGE_MAX_BYTES, type FeedbackRequest } from '../../src/lib/feedback-contracts'
 import { requestSchemas } from '../security/request-policy'
+import { hasImageSignature } from '../security/image-upload'
 import { getValidatedJson, RequestInputError, validateAndStoreJsonBody } from '../security/request-validation'
 import { reservePersistentRateLimit } from '../security/persistent-rate-limit'
 import { createFeedback, updateFeedback, FeedbackError } from '../storage/feedback-store'
@@ -43,10 +44,7 @@ function decodeImage(image: FeedbackRequest['image']): Buffer | null {
   if (!image) return null
   const bytes = Buffer.from(image.base64, 'base64')
   if (bytes.length > FEEDBACK_IMAGE_MAX_BYTES) throw new RequestInputError(text.imageTooLarge, 'payload_too_large', 413)
-  const valid = image.type === 'image/png' ? bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
-    : image.type === 'image/jpeg' ? bytes.length >= 4 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff && bytes[bytes.length - 2] === 0xff && bytes[bytes.length - 1] === 0xd9
-      : bytes.length >= 16 && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP' && ['VP8 ', 'VP8L', 'VP8X'].includes(bytes.toString('ascii', 12, 16))
-  if (!valid || bytes.toString('base64') !== image.base64) throw new RequestInputError(text.invalidImage)
+  if (!hasImageSignature(bytes, image.type) || bytes.toString('base64') !== image.base64) throw new RequestInputError(text.invalidImage)
   return bytes
 }
 

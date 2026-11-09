@@ -50,9 +50,11 @@ const pricingPriceLabel = z.string().trim().max(40).regex(/^\d+(?:\.\d{1,2})?\s*
 })
 const pricingDiscountFold = z.number().int().min(1).max(10)
 
+const purchaseImageUrl = z.string().trim().max(2048).refine((value) => value === '' || isHttpsUrl(value) || isSafeSiteAssetUrl(value)
+  || /^\/api\/site\/public-content-image\?id=[a-f0-9]{64}$/.test(value), { message: copy.publicContent.validation_invalid }).optional().default('')
 const purchaseMediaFields = {
-  share_image_url: optionalImageUrl,
-  qr_code_url: optionalImageUrl,
+  share_image_url: purchaseImageUrl,
+  qr_code_url: purchaseImageUrl,
 }
 
 const pricingPlanSchema = z.strictObject({
