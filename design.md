@@ -185,11 +185,15 @@ it deliberately when changing the shared design.
   width. Show only the selected plan's total, audience, archive gift and purchase
   action, with UID binding and activation
   conditions immediately above the action. Keep redemption before capability demonstrations.
-  Four capability chapters pair configuration and MAA screenshots with readable cultivation
-  results and a measured layout comparison. Screenshots in `public/assets/pricing/` capture
-  the real facility editor with `SAMPLE_CONFIG`, or crop the existing MAA import guide to its
-  setup controls. Light and dark assets follow the app theme and expand in a keyboard-accessible
-  dialog. Cultivation readings come from the public sample result's Mayer suggestion; the
+  Four capability chapters pair paid configuration controls and a compact MAA file flow with
+  readable cultivation results and a measured layout comparison. Screenshots in
+  `public/assets/pricing/` capture the real editor's drone strategy section with `SAMPLE_CONFIG`.
+  The configuration chapter names custom shift intervals, drone allocation and Fiammetta settings.
+  Light and dark assets follow the app theme and expand in a keyboard-accessible dialog. The
+  export chapter highlights unlimited downloads during maintenance for MAA schedules, with a small
+  file moving from the website download to MAA selection. Animate only while visible and show the
+  complete flow without motion under reduced motion. Cultivation readings come from the public
+  sample result's Mayer suggestion; the
   zero-based comparison chart uses A01's MaaTool S1/S2 cases from the frozen 2026-11-04 snapshot,
   with a link to the underlying evidence. Keep sample estimates distinct from measured results.
   At 80rem and above, native scrolling selects a chapter beside one sticky visual; smaller

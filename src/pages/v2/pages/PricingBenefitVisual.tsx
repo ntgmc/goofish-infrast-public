@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { useInView } from 'motion/react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../../components/ui/dialog'
 import Link from '../../../components/InternalLink'
-import { NextIcon, SelectedIcon } from '../../../components/icons'
+import { ExportMaaIcon, NextIcon, SelectedIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { benchmarkNumber as number, siteBenchmark } from '../../../lib/site-benchmark'
 import { useOptionalTheme } from '../../../lib/theme'
+import { useAppReducedMotion } from '../../../lib/motion-preference'
 import { getUpgradePaybackDays } from '../../../lib/upgrade-suggestion-roi'
 import { SAMPLE_RESULT } from '../sample-result'
 
@@ -14,18 +16,19 @@ const comparison = ['S1', 'S2'].map((layout) => siteBenchmark.cases.find((item) 
 const chartMaximum = Math.ceil(Math.max(...comparison.map((item) => item.resources.sanity)) / 100) * 100
 
 export default function PricingBenefitVisual({ step }: { step: number }) {
-  if (step < 2) return <Screenshot kind={step === 0 ? 'config' : 'exports'} />
+  if (step === 0) return <Screenshot />
+  if (step === 1) return <MaaDownload />
   return step === 2 ? <TrainingResult /> : <LayoutComparison />
 }
 
-function Screenshot({ kind }: { kind: 'config' | 'exports' }) {
+function Screenshot() {
   const [open, setOpen] = useState(false)
   const theme = useOptionalTheme()?.resolvedTheme ?? 'light'
-  const item = text[kind]
-  const src = `/assets/pricing/${kind === 'config' ? 'config' : 'maa-import'}-${theme}.webp`
-  const image = <img src={src} alt={item.alt} width={kind === 'config' ? 742 : 504} height={kind === 'config' ? 497 : 223} loading="lazy" decoding="async" />
+  const item = text.config
+  const image = <img src={`/assets/pricing/config-strategy-${theme}.webp`} alt={item.alt} width={511} height={343} loading="lazy" decoding="async" />
   return <figure className="v2-benefit-scene v2-benefit-screenshot">
     <figcaption className="v2-benefit-caption">{item.source}</figcaption>
+    <ul className="v2-benefit-config-options">{item.options.map((option) => <li key={option}><SelectedIcon size={16} aria-hidden="true" />{option}</li>)}</ul>
     <button type="button" className="v2-benefit-image" aria-label={`${text.enlarge} · ${item.source}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
       {image}<span>{text.enlarge}<NextIcon size={16} aria-hidden="true" /></span>
     </button>
@@ -37,6 +40,23 @@ function Screenshot({ kind }: { kind: 'config' | 'exports' }) {
         <div className="v2-benefit-zoom" tabIndex={0} role="region" aria-label={item.source}>{image}</div>
       </DialogContent>
     </Dialog>
+  </figure>
+}
+
+function MaaDownload() {
+  const element = useRef<HTMLElement>(null)
+  const visible = useInView(element, { amount: 0.3 })
+  const reduced = useAppReducedMotion()
+  const item = text.exports
+  return <figure ref={reduced || typeof IntersectionObserver === 'undefined' ? undefined : element} className="v2-benefit-scene v2-benefit-export" data-playing={visible && !reduced}>
+    <figcaption className="v2-benefit-caption">{item.source}</figcaption>
+    <div className="v2-benefit-unlimited"><strong aria-hidden="true">∞</strong><div><b>{item.unlimited}</b><span>{item.scope}</span></div></div>
+    <div className="v2-benefit-export-flow" role="img" aria-label={item.flow}>
+      <div className="v2-benefit-export-window" aria-hidden="true"><small>MaaTool</small><span className="v2-benefit-export-download"><ExportMaaIcon size={18} />{item.download}</span></div>
+      <div className="v2-benefit-export-file" aria-hidden="true"><ExportMaaIcon size={28} /><span>JSON</span></div>
+      <div className="v2-benefit-export-window" aria-hidden="true"><small>MAA</small><span className="v2-benefit-export-select"><SelectedIcon size={18} />{item.selected}</span></div>
+    </div>
+    <p className="v2-benefit-detail">{item.caption}</p>
   </figure>
 }
 
