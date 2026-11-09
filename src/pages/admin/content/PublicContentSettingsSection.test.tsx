@@ -48,7 +48,7 @@ describe('PublicContentSettingsSection', () => {
       json: expect.objectContaining({
         expected_revision: 3,
         pricing: expect.objectContaining({
-          lifetime_upgrade: { purchase_url: 'https://example.com/lifetime-upgrade', service_fee: '5 元' },
+          lifetime_upgrade: expect.objectContaining({ purchase_url: 'https://example.com/lifetime-upgrade', service_fee: '5 元' }),
         }),
       }),
     })))
@@ -69,6 +69,8 @@ describe('PublicContentSettingsSection', () => {
       expect(input).not.toBeRequired()
       await user.click(input)
       await user.paste(` https://example.com/${ids[index]} `)
+      await user.click(screen.getAllByLabelText('购买二维码图片地址')[index])
+      await user.paste(`https://example.com/${ids[index]}.png`)
     }
     adminApiJson.mockImplementation(async (_url: string, init: { json: Record<string, unknown> }) => ({
       settings: { ...cloneDefaultPublicContentSettings(), ...init.json, revision: 4 },
@@ -78,7 +80,7 @@ describe('PublicContentSettingsSection', () => {
       method: 'PUT',
       json: expect.objectContaining({
         pricing: expect.objectContaining({
-          plans: expect.objectContaining(Object.fromEntries(ids.map((id) => [id, expect.objectContaining({ purchase_url: `https://example.com/${id}` })]))),
+          plans: expect.objectContaining(Object.fromEntries(ids.map((id) => [id, expect.objectContaining({ purchase_url: `https://example.com/${id}`, qr_code_url: `https://example.com/${id}.png` })]))),
         }),
       }),
     })))
@@ -167,7 +169,7 @@ describe('PublicContentSettingsSection', () => {
     expect(screen.getByRole('button', { name: '重新加载' })).toBeInTheDocument()
   })
 
-  it('publishes a trimmed Xianyu purchase URL from the CDK purchase tab', async () => {
+  it('publishes trimmed Xianyu media and instructions from the CDK purchase tab', async () => {
     const user = userEvent.setup()
     render(<PublicContentSettingsSection />)
     await screen.findByRole('heading', { name: '公开内容管理' })
@@ -177,13 +179,16 @@ describe('PublicContentSettingsSection', () => {
     expect(xianyuUrl).not.toBeRequired()
     await user.clear(xianyuUrl)
     await user.type(xianyuUrl, '  https://example.com/xianyu-listing  ')
+    await user.type(screen.getByLabelText('闲鱼分享图地址'), ' https://example.com/share.png ')
+    await user.type(screen.getByLabelText('购买二维码图片地址'), '/assets/purchase/qr.png')
+    await user.type(screen.getByLabelText('购买补充说明'), ' 请在订单中领取 CDK。 ')
     await user.click(screen.getByRole('button', { name: '保存并发布' }))
 
     await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/public-content', expect.objectContaining({
       method: 'PUT',
       json: expect.objectContaining({
         expected_revision: 3,
-        cdk_purchase: { xianyu_url: 'https://example.com/xianyu-listing' },
+        cdk_purchase: { xianyu_url: 'https://example.com/xianyu-listing', share_image_url: 'https://example.com/share.png', qr_code_url: '/assets/purchase/qr.png', instructions: '请在订单中领取 CDK。' },
       }),
     })))
   })
@@ -198,7 +203,7 @@ describe('PublicContentSettingsSection', () => {
 
     await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/public-content', expect.objectContaining({
       method: 'PUT',
-      json: expect.objectContaining({ cdk_purchase: { xianyu_url: '' } }),
+      json: expect.objectContaining({ cdk_purchase: expect.objectContaining({ xianyu_url: '' }) }),
     })))
   })
 
@@ -236,9 +241,9 @@ describe('PublicContentSettingsSection', () => {
     })))
   })
 
-  it('switches to the CDK purchase tab and focuses a non-HTTPS Xianyu URL', async () => {
+  it.each(['xianyu_url', 'share_image_url', 'qr_code_url'] as const)('switches to the CDK purchase tab and focuses an invalid %s', async (field) => {
     const settings = { ...cloneDefaultPublicContentSettings(), revision: 3 }
-    settings.cdk_purchase.xianyu_url = 'http://example.com/xianyu-listing'
+    settings.cdk_purchase[field] = 'http://example.com/xianyu-listing'
     adminApiJson.mockReset().mockResolvedValue({ settings })
     const user = userEvent.setup()
     render(<PublicContentSettingsSection />)

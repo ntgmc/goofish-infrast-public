@@ -144,9 +144,11 @@ describe('public content settings', () => {
 
   it('validates and trims the manual lifetime upgrade listing and fee', () => {
     const draft = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
-    draft.pricing.lifetime_upgrade = { purchase_url: ' https://example.com/upgrade ', service_fee: ' 3.50 元 ' }
+    draft.pricing.lifetime_upgrade = { ...draft.pricing.lifetime_upgrade, purchase_url: ' https://example.com/upgrade ', service_fee: ' 3.50 元 ' }
     expect(parsePublicContentDraft(draft).pricing.lifetime_upgrade).toEqual({
       purchase_url: 'https://example.com/upgrade',
+      share_image_url: '',
+      qr_code_url: '',
       service_fee: '3.50 元',
     })
 
@@ -188,10 +190,17 @@ describe('public content settings', () => {
     const legacy = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
     for (const id of PUBLIC_PRICING_PLAN_IDS) {
       Reflect.deleteProperty(legacy.pricing.plans[id], 'purchase_url')
+      Reflect.deleteProperty(legacy.pricing.plans[id], 'share_image_url')
+      Reflect.deleteProperty(legacy.pricing.plans[id], 'qr_code_url')
     }
+    Reflect.deleteProperty(legacy.cdk_purchase, 'share_image_url')
+    Reflect.deleteProperty(legacy.cdk_purchase, 'qr_code_url')
+    Reflect.deleteProperty(legacy.cdk_purchase, 'instructions')
+    Reflect.deleteProperty(legacy.pricing.lifetime_upgrade, 'share_image_url')
+    Reflect.deleteProperty(legacy.pricing.lifetime_upgrade, 'qr_code_url')
     const parsed = parsePublicContentDraft(legacy)
     for (const id of PUBLIC_PRICING_PLAN_IDS) {
-      expect(parsed.pricing.plans[id].purchase_url).toBe('')
+      expect(parsed.pricing.plans[id]).toMatchObject({ purchase_url: '', share_image_url: '', qr_code_url: '' })
       expect(parsed.pricing.plans[id].display_price).toBe(DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.plans[id].display_price)
     }
     expect(resolvePublicContentSettings({ ...cloneDefaultPublicContentSettings(), ...legacy }).isFallback).toBe(false)
@@ -214,6 +223,17 @@ describe('public content settings', () => {
     const draft = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
     draft.pricing.plans.single_account_monthly.purchase_url = url
     expect(() => parsePublicContentDraft(draft)).toThrow()
+  })
+
+  it.each(['http://example.com/qr.png', 'javascript:alert(1)', 'data:image/png;base64,AA', '//example.com/qr.png', '/assets/../api/private', '/assets/qr.png?token=private'])('rejects unsafe purchase media %s for every product', (url) => {
+    const draft = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
+    for (const target of [draft.cdk_purchase, draft.pricing.plans.single_account_monthly, draft.pricing.lifetime_upgrade]) {
+      for (const field of ['share_image_url', 'qr_code_url'] as const) {
+        target[field] = url
+        expect(() => parsePublicContentDraft(draft)).toThrow()
+        target[field] = ''
+      }
+    }
   })
 
   it('provides a valid editable default with the CDK purchase link, QQ group, and forty-eight FAQ items', () => {

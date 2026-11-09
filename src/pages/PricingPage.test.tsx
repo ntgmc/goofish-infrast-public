@@ -26,7 +26,7 @@ afterEach(() => {
 describe('PricingPage', () => {
   it('uses the configured manual upgrade listing and disables it when cleared', () => {
     const content = cloneDefaultPublicContentSettings()
-    content.pricing.lifetime_upgrade = { purchase_url: 'https://example.com/lifetime-upgrade', service_fee: '5 元' }
+    content.pricing.lifetime_upgrade = { ...content.pricing.lifetime_upgrade, purchase_url: 'https://example.com/lifetime-upgrade', service_fee: '5 元' }
     vi.spyOn(publicContentContext, 'usePublicContent').mockReturnValue({
       content,
       status: 'ready',

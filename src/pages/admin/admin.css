@@ -77,6 +77,7 @@
 .admin-settings .admin-danger-actions { display: flex; justify-content: flex-end; margin-top: var(--space-lg); padding-top: var(--space-sm); border-top: 1px solid var(--color-v2-line); }
 @media (max-width: 40rem) { .admin-settings .admin-settings-fields, .admin-registration-switches { grid-template-columns: minmax(0, 1fr); } }
 .admin-savebar { position: sticky; bottom: 12px; z-index: 10; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 16px; border: 1px solid var(--color-v2-line); border-radius: var(--radius-v2-control); background: var(--color-v2-surface); }
+.admin-settings :is(input, textarea, select, button, a) { scroll-margin-block: 5rem 12rem; }
 .admin-dialog { background: var(--color-v2-surface); border-color: var(--color-v2-line); border-radius: var(--radius-v2-panel); }
 .admin-login { display: grid; min-height: 100dvh; place-items: center; padding: 24px; }
 .admin-login-frame { width: 100%; max-width: 440px; }

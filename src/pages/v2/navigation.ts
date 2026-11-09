@@ -2,10 +2,10 @@ import { routesCopy } from '../../copy/zh-CN/routes'
 import type { SiteFeatures } from '../../lib/site-features'
 import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
 
-const V2_SECTIONS = ['overview', 'generation', 'plans', 'lab', 'tools', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'material-demand', 'depot', 'skland', 'profiles', 'add-account', 'inventory', 'commercial', 'balance', 'announcements', 'settings', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing', 'benchmarks'] as const
+const V2_SECTIONS = ['overview', 'generation', 'plans', 'lab', 'tools', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'material-demand', 'depot', 'skland', 'profiles', 'add-account', 'inventory', 'commercial', 'balance', 'announcements', 'settings', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing', 'purchase', 'benchmarks'] as const
 export type V2Section = typeof V2_SECTIONS[number]
 
-export const V2_PUBLIC_SECTIONS: V2Section[] = ['announcements', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing', 'benchmarks']
+export const V2_PUBLIC_SECTIONS: V2Section[] = ['announcements', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing', 'purchase', 'benchmarks']
 
 export const sectionLabels: Record<V2Section, string> = routesCopy.labels
 
@@ -43,7 +43,7 @@ export function v2SectionAvailable(section: V2Section, features: SiteFeatures): 
     case 'settings': return features.site
     case 'status': return features.service_status
     case 'support': return features.support
-    case 'pricing': return features.pricing
+    case 'pricing': case 'purchase': return features.pricing
     case 'help': return features.faq
     case 'updates': return features.changelog
     default: return true

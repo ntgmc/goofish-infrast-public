@@ -28,7 +28,7 @@ const httpsUrlOrEmpty = z.string().trim().max(2048).refine((value) => value === 
   message: copy.publicContent.validation_invalid,
 })
 const optionalHttpsUrl = httpsUrlOrEmpty.optional().default('')
-const optionalAvatarUrl = z.string().trim().max(2048).refine((value) => value === '' || isHttpsUrl(value) || isSafeSiteAssetUrl(value), {
+const optionalImageUrl = z.string().trim().max(2048).refine((value) => value === '' || isHttpsUrl(value) || isSafeSiteAssetUrl(value), {
   message: copy.publicContent.validation_invalid,
 }).optional().default('')
 const defaultDeveloper = {
@@ -50,7 +50,13 @@ const pricingPriceLabel = z.string().trim().max(40).regex(/^\d+(?:\.\d{1,2})?\s*
 })
 const pricingDiscountFold = z.number().int().min(1).max(10)
 
+const purchaseMediaFields = {
+  share_image_url: optionalImageUrl,
+  qr_code_url: optionalImageUrl,
+}
+
 const pricingPlanSchema = z.strictObject({
+  ...purchaseMediaFields,
   purchase_url: optionalHttpsUrl,
   label: text(80),
   badge: text(40),
@@ -62,6 +68,7 @@ const pricingPlanSchema = z.strictObject({
 })
 
 const pricingPlanInputSchema = z.strictObject({
+  ...purchaseMediaFields,
   purchase_url: optionalHttpsUrl,
   label: text(80),
   badge: text(40),
@@ -87,6 +94,8 @@ const singleAccountLifetime = getSku('single_account_lifetime') as PublicPricing
 const defaultPricingPlans = {
   free_preview: {
     purchase_url: '',
+    share_image_url: '',
+    qr_code_url: '',
     label: freePreview.label,
     badge: copy.public.pages_PricingPage_005,
     display_price: freePreview.display_price!,
@@ -97,6 +106,8 @@ const defaultPricingPlans = {
   },
   single_account_monthly: {
     purchase_url: '',
+    share_image_url: '',
+    qr_code_url: '',
     label: singleAccountMonthly.label,
     badge: copy.publicContent.default_pricing_badge_monthly,
     display_price: singleAccountMonthly.display_price!,
@@ -107,6 +118,8 @@ const defaultPricingPlans = {
   },
   single_account_half_year: {
     purchase_url: '',
+    share_image_url: '',
+    qr_code_url: '',
     label: singleAccountHalfYear.label,
     badge: copy.publicContent.default_pricing_badge_half_year,
     display_price: singleAccountHalfYear.display_price!,
@@ -117,6 +130,8 @@ const defaultPricingPlans = {
   },
   single_account_annual: {
     purchase_url: '',
+    share_image_url: '',
+    qr_code_url: '',
     label: singleAccountAnnual.label,
     badge: copy.publicContent.default_pricing_badge_annual,
     display_price: singleAccountAnnual.display_price!,
@@ -127,6 +142,8 @@ const defaultPricingPlans = {
   },
   single_account_lifetime: {
     purchase_url: '',
+    share_image_url: '',
+    qr_code_url: '',
     label: singleAccountLifetime.label,
     badge: copy.publicContent.default_pricing_badge_lifetime,
     display_price: singleAccountLifetime.display_price!,
@@ -168,7 +185,7 @@ const thanksEntrySchema = z.strictObject({
   name: text(120),
   description: z.string().trim().max(1000),
   url: optionalHttpsUrl,
-  avatar_url: optionalAvatarUrl,
+  avatar_url: optionalImageUrl,
 })
 
 const thanksSectionSchema = z.strictObject({
@@ -180,7 +197,9 @@ const thanksSectionSchema = z.strictObject({
 
 export const publicContentDraftSchema = z.strictObject({
   cdk_purchase: z.strictObject({
+    ...purchaseMediaFields,
     xianyu_url: httpsUrlOrEmpty,
+    instructions: z.string().trim().max(2000).optional().default(''),
   }),
   qq_group: z.strictObject({
     name: text(80),
@@ -202,9 +221,10 @@ export const publicContentDraftSchema = z.strictObject({
     intro: text(1000),
     plans: pricingPlansSchema,
     lifetime_upgrade: z.strictObject({
+      ...purchaseMediaFields,
       purchase_url: optionalHttpsUrl,
       service_fee: pricingPriceLabel.default(copy.publicContent.default_lifetime_upgrade_fee),
-    }).default({ purchase_url: '', service_fee: copy.publicContent.default_lifetime_upgrade_fee }),
+    }).default({ purchase_url: '', share_image_url: '', qr_code_url: '', service_fee: copy.publicContent.default_lifetime_upgrade_fee }),
     policy_heading: text(120),
     disclosures: z.array(text(500)).max(PUBLIC_CONTENT_LIMITS.pricingDisclosures),
     comparison_heading: text(120),
@@ -233,6 +253,9 @@ export type AdminPublicContentSettingsV1 = PublicContentSettingsV1 & {
 export const DEFAULT_PUBLIC_CONTENT_DRAFT: PublicContentDraftV1 = {
   cdk_purchase: {
     xianyu_url: 'https://m.tb.cn/h.RGCWZHH?tk=X063g9yLZxZ%20MF287',
+    share_image_url: '',
+    qr_code_url: '',
+    instructions: '',
   },
   qq_group: {
     name: copy.publicContent.default_qq_name,
@@ -280,7 +303,7 @@ export const DEFAULT_PUBLIC_CONTENT_DRAFT: PublicContentDraftV1 = {
       single_account_annual: { ...defaultPricingPlans.single_account_annual },
       single_account_lifetime: { ...defaultPricingPlans.single_account_lifetime },
     },
-    lifetime_upgrade: { purchase_url: '', service_fee: copy.publicContent.default_lifetime_upgrade_fee },
+    lifetime_upgrade: { purchase_url: '', share_image_url: '', qr_code_url: '', service_fee: copy.publicContent.default_lifetime_upgrade_fee },
     policy_heading: copy.public.pages_PricingPage_006,
     disclosures: productPolicies.public_disclosures
       .filter((line) => line !== copy.publicContent.retired_personal_disclosure)
