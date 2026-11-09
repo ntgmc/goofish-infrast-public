@@ -83,9 +83,11 @@ afterEach(() => {
   window.localStorage.removeItem(FIRST_SCHEDULE_INTENT_KEY)
   vi.resetAllMocks()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
-it('continues from login and Skland import through saved configuration to the first generation', async () => {
+it.each([false, true])('continues from login and Skland import through saved configuration to the first generation (mobile: %s)', async (mobile) => {
+  vi.stubGlobal('matchMedia', (query: string) => ({ matches: mobile && ['(max-width: 40rem)', '(max-width: 60rem)'].includes(query), addEventListener: vi.fn(), removeEventListener: vi.fn() }))
   const user = userEvent.setup()
   const firstWorkspace = { ...workspace, latest_result: null, result_history: [] }
   const firstProfile: UserGameAccount = { ...profile, kind: 'free_preview', permission: 'growth', skland_binding: { uid: '12345678', nickname: '首次博士', channel_name: '官服',
@@ -112,6 +114,9 @@ it('continues from login and Skland import through saved configuration to the fi
   })
   render(<MemoryRouter initialEntries={['/']}><MotionPreferenceProvider><V2Page /></MotionPreferenceProvider></MemoryRouter>)
   await user.click(await screen.findByRole('button', { name: copy.v2.generateMine }))
+  const guide = screen.getByRole('complementary', { name: copy.v2.firstSchedule.title }).querySelector('details')!
+  expect(guide.open).toBe(!mobile)
+  expect(guide.querySelector('summary')).toHaveTextContent(copy.v2.firstSchedule.progress(1))
   fireEvent.change(screen.getByLabelText(copy.auth.components_AuthForm_011), { target: { value: 'doctor@example.test' } })
   fireEvent.change(screen.getByLabelText(copy.auth.components_AuthForm_012), { target: { value: 'password123' } })
   await user.click(document.querySelector('.v2-login-panel button[type="submit"]')!)
@@ -234,7 +239,7 @@ it.each(['generation', 'overview'])('shows a failed configuration save beside th
   const submissions = () => vi.mocked(apiJson).mock.calls.filter(([url, options]) => url === '/api/optimization/jobs' && options?.method === 'POST')
   render(<MemoryRouter initialEntries={[`/v2?section=${section}`]}><MotionPreferenceProvider><V2Page /></MotionPreferenceProvider></MemoryRouter>)
   await screen.findByText(copy.v2.ownSource)
-  await user.click(screen.getByRole('button', { name: copy.v2.facilities }))
+  await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editConfig }))
   await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: copy.common.components_ConfigEditor_030 }))
   await confirmLayout()
   await user.click(screen.getByRole('button', { name: copy.v2.done }))
@@ -304,7 +309,7 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and k
   }
   await waitFor(() => expect(apiJson).toHaveBeenCalledWith('/api/optimization/jobs/new-job', expect.anything()))
   expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('53,595')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: copy.v2.facilities }))
+  fireEvent.click(screen.getByRole('button', { name: copy.v2.sidebar.editConfig }))
   const configDialog = await screen.findByRole('dialog')
   expect(within(configDialog).getByRole('group', { name: copy.common.components_ConfigEditor_021 })).toBeDisabled()
   fireEvent.click(within(configDialog).getByRole('button', { name: copy.v2.done }))
@@ -334,7 +339,7 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and k
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   expect(screen.getByRole('button', { name: copy.v2.comparePrevious })).toHaveFocus()
   await waitFor(() => expect(screen.getByRole('button', { name: copy.v2.regenerate })).not.toBeDisabled())
-  fireEvent.click(screen.getByRole('button', { name: copy.v2.facilities }))
+  fireEvent.click(screen.getByRole('button', { name: copy.v2.sidebar.editConfig }))
   const unlockedDialog = await screen.findByRole('dialog')
   expect(within(unlockedDialog).getByRole('group', { name: copy.common.components_ConfigEditor_021 })).toBeEnabled()
   fireEvent.click(within(unlockedDialog).getByRole('button', { name: copy.common.components_ConfigEditor_030 }))

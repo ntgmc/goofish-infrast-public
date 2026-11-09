@@ -3,11 +3,11 @@ import { DEFAULT_SITE_FEATURE_SETTINGS, computeEffectiveSiteFeatures } from '../
 
 const auth = vi.hoisted(() => ({ authenticateAdminRequest: vi.fn() }))
 const store = vi.hoisted(() => ({ getSiteFeatureSettings: vi.fn(), saveSiteFeatureSettings: vi.fn() }))
-const routes = vi.hoisted(() => ({ routeRequest: vi.fn() }))
+const { routeHandler } = vi.hoisted(() => ({ routeHandler: vi.fn() }))
 
 vi.mock('./admin-auth', () => auth)
 vi.mock('../storage/feature-settings-store', () => store)
-vi.mock('../routes', () => routes)
+vi.mock('../routes', () => ({ API_ROUTES: [['/api/admin/feature-settings', routeHandler]] }))
 
 import handler from './admin-feature-settings'
 import { createApiServer } from '../http-server'
@@ -21,7 +21,7 @@ describe('admin feature settings handler', () => {
     auth.authenticateAdminRequest.mockReset().mockResolvedValue({ ok: true })
     store.getSiteFeatureSettings.mockReset().mockResolvedValue(settings)
     store.saveSiteFeatureSettings.mockReset().mockResolvedValue({ ...settings, revision: 3 })
-    routes.routeRequest.mockReset().mockImplementation(handler)
+    routeHandler.mockReset().mockImplementation(handler)
   })
 
   it('reads and writes a complete revisioned feature map', async () => {

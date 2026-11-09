@@ -4,7 +4,7 @@ import { ExpandIcon, ManufactureIcon, MeetingRoomIcon, RecruitmentIcon, TradingS
 import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
 import { formatAmount, type PreparedResult } from '../../components/result-panel/formatters'
 import { PRODUCT_LABELS, ROOM_LABELS } from '../../components/result-panel/labels'
-import { calculateProductionSanity } from '../../lib/production-sanity'
+import { calculateProductionSanity, getProductionSanityLedger } from '../../lib/production-sanity'
 import { recyclingSanity } from '../../lib/recycling'
 import { SANITY_PER_CLUE, SANITY_PER_RECRUITMENT_REFRESH } from '../../lib/support-room-economy'
 import { SANITY_PER_BATTLE_RECORD, SANITY_PER_LMD, SANITY_PER_ORIGINIUM_SHARD_OPPORTUNITY, SANITY_PER_ORUNDUM, SANITY_PER_PURE_GOLD } from '../../lib/orundum-economy'
@@ -33,18 +33,23 @@ function numericMap(raw: unknown): Record<string, number> {
 }
 
 function stationProductionRows(daily: DailyProduction | undefined) {
+  const ledger = getProductionSanityLedger(daily)
+  const shardConsumed = daily?.consumption?.['Originium Shard'] ?? 0
+  const tradeRatio = shardConsumed > 0 ? (ledger.consumption['Originium Shard'] ?? 0) / shardConsumed : 1
   return (daily?.details ?? []).flatMap((detail) => {
     if (!['trading', 'manufacture', 'meeting', 'hire'].includes(String(detail.room_type)) || typeof detail.room_index !== 'number'
       || !Number.isInteger(detail.room_index) || detail.room_index < 1 || typeof detail.product !== 'string'
       || typeof detail.amount !== 'number' || !Number.isFinite(detail.amount)) return []
     const consume = numericMap(detail.consume)
-    const output = { [detail.product]: detail.amount }
+    const ratio = detail.product === 'Orundum' ? tradeRatio : 1
+    const output = { [detail.product]: detail.amount * ratio }
+    const valuedConsume = Object.fromEntries(Object.entries(consume).map(([product, value]) => [product, value * ratio]))
     return [{
       roomType: String(detail.room_type), roomIndex: detail.room_index, product: detail.product,
       shift: typeof detail.shift === 'string' ? detail.shift : '—', amount: detail.amount,
       drones: detail.source === 'drones', capacityLimited: detail.capacity_limited === true, consume,
       sanity: values[detail.product] && Object.keys(consume).every((key) => values[key])
-        ? calculateProductionSanity({ [detail.room_type === 'trading' ? 'trading' : detail.room_type === 'manufacture' ? 'manufacturing' : 'support']: output, consumption: consume }).value : null,
+        ? calculateProductionSanity({ [detail.room_type === 'trading' ? 'trading' : detail.room_type === 'manufacture' ? 'manufacturing' : 'support']: output, consumption: valuedConsume }).value : null,
     }]
   })
 }
@@ -71,12 +76,13 @@ export default function IncomeAnalysis({ result, prepared }: { result: OptimizeR
     return { key, rows: stationRows, production }
   })
   const sanity = calculateProductionSanity(daily)
+  const ledger = getProductionSanityLedger(daily)
   const products = Object.keys(values)
-    .filter((key) => (daily?.manufacturing?.[key] ?? daily?.trading?.[key] ?? daily?.support?.[key] ?? 0) !== 0 || (daily?.consumption?.[key] ?? 0) !== 0)
+    .filter((key) => (ledger.manufacturing[key] ?? ledger.trading[key] ?? daily?.support?.[key] ?? 0) !== 0 || (ledger.consumption[key] ?? 0) !== 0)
     .map((product) => {
-      const rawProduced = (daily?.manufacturing?.[product] ?? 0) + (daily?.trading?.[product] ?? 0) + (daily?.support?.[product] ?? 0)
+      const rawProduced = (ledger.manufacturing[product] ?? 0) + (ledger.trading[product] ?? 0) + (daily?.support?.[product] ?? 0)
       const produced = outputAmount(product, rawProduced)
-      const consumed = outputAmount(product, daily?.consumption?.[product] ?? 0)
+      const consumed = outputAmount(product, ledger.consumption[product] ?? 0)
       return { product, rawProduced, produced, consumed, unit: values[product], net: (produced - consumed) * values[product].value }
     })
   const recoveredSanity = recyclingSanity(daily?.recycling)

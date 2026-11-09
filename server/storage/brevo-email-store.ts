@@ -6,7 +6,7 @@ import type {
   BrevoOfficialQuotaStatus,
   EmailProvider,
 } from '../../src/lib/types'
-import { withTransaction, query } from './postgres'
+import { withTransaction, query, type QueryClient } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 
 export const BREVO_DAILY_EMAIL_LIMIT = 300
@@ -323,7 +323,7 @@ async function completeReservation(
   )
 }
 
-async function lockQuotaDate(client: { query: (text: string, values?: unknown[]) => Promise<unknown> }, quotaDate: string): Promise<void> {
+async function lockQuotaDate(client: QueryClient, quotaDate: string): Promise<void> {
   await client.query(
     'select pg_advisory_xact_lock(hashtextextended($1, 0))',
     [`brevo-email-quota:${quotaDate}`],
@@ -331,7 +331,7 @@ async function lockQuotaDate(client: { query: (text: string, values?: unknown[])
 }
 
 async function countActiveDeliveries(
-  client: { query: <T>(text: string, values?: unknown[]) => Promise<{ rows: T[] }> },
+  client: QueryClient,
   quotaDate: string,
 ): Promise<number> {
   const result = await client.query<{ count: string }>(

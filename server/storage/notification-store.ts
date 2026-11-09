@@ -1,5 +1,5 @@
+import type { QueryClient } from './postgres'
 import { randomUUID } from 'node:crypto'
-import type { PoolClient } from 'pg'
 import type {
   UserNotification,
   UserNotificationItemGrantDetail,
@@ -37,7 +37,7 @@ export class NotificationError extends Error {
 
 let schemaReady: Promise<void> | null = null
 
-export async function upsertItemGrantNotificationInTransaction(client: PoolClient, input: {
+export async function upsertItemGrantNotificationInTransaction(client: QueryClient, input: {
   userId: string
   grantId: string
   sourceType: string
@@ -65,7 +65,7 @@ export async function upsertItemGrantNotificationInTransaction(client: PoolClien
   })
 }
 
-export async function upsertItemGrantNotificationGroupInTransaction(client: PoolClient, input: {
+export async function upsertItemGrantNotificationGroupInTransaction(client: QueryClient, input: {
   userId: string
   sourceType: string
   sourceId: string
@@ -130,7 +130,7 @@ export async function upsertItemGrantNotificationGroupInTransaction(client: Pool
   )
 }
 
-export async function upsertFeedbackNotificationInTransaction(client: PoolClient, input: {
+export async function upsertFeedbackNotificationInTransaction(client: QueryClient, input: {
   userId: string; feedbackId: string; now: string
 }): Promise<void> {
   await client.query(

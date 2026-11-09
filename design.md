@@ -70,9 +70,10 @@ it deliberately when changing the shared design.
 - Keep Noto Sans SC display and Geist body fonts, with tabular numbers for
   production, efficiency, and shift times.
 - Keep six core tasks in the side rail: overview, generation, history and
-  comparison under the schedule workspace; cultivation projects and tools in
-  their own group. Use full-width compact rows for operator and facility
-  configuration, with the owned-operator count aligned at the end.
+  “比较基建配置” under the schedule workspace; cultivation projects and tools in
+  their own group. Tools label saved-schedule comparison “比较已有排班”. Use
+  full-width compact “编辑干员” and “编辑基建” actions with trailing pencil icons
+  for configuration drawers, retaining the owned-operator count.
   The compact brand header and bottom help trigger stay visible while the
   middle navigation scrolls independently. Keep consistent 44px targets,
   visible inset focus rings and copper active icons. Page destinations are
@@ -84,7 +85,9 @@ it deliberately when changing the shared design.
   pages. Group guides, announcements, releases and site links under the rail's
   “帮助与更多” menu, which opens above its bottom trigger without moving the
   trigger or resizing the rail. Separate help and support from product news and
-  comparisons, with appearance and service status in the footer. Use compact
+  comparisons, with service status in the menu footer. Keep “外观与动画” visible
+  above the help trigger, opening one drawer with theme and animation preferences;
+  reuse these controls in account preferences and keep the top-bar theme shortcut. Use compact
   group labels, 44px rows, readable labels and inset focus rings. Retain the
   unread announcement count while collapsed and scroll inside the menu when
   needed. Native disclosure semantics retain Tab navigation; arrow keys and
@@ -95,9 +98,12 @@ it deliberately when changing the shared design.
   opener. Use a semantic breadcrumb with a profile-preserving workspace link,
   readable current page, consistent 44px utility buttons and visible open/focus
   states. Show the current profile name with a secondary label on wide screens;
-  retain its name and full accessible label on mobile. Below 40rem, put location
-  above the actions so long page names never compete with icon controls. Keep
-  unread and calculation badges, native hints, existing dialogs and theme menu.
+  retain its full accessible label and avatar on mobile. Below 40rem, keep one
+  compact row with location, notifications and account access; place theme and
+  calculation tools in the “更多操作” popover. Truncate long locations within
+  their column; retain the full page heading below. Mobile announcements show
+  their title and disclosure arrow, with the body available on expansion. Keep
+  unread and calculation badges, existing dialogs and theme menu.
 - Operator and account drawers share a compact fixed heading and an independently
   scrolling body. Keep the operator profile, sync and MAA import actions compact;
   binding timestamps and authorization details expand on demand. The list search
@@ -116,10 +122,13 @@ it deliberately when changing the shared design.
   target and return to their parent. Support narrow screens and enlarged text.
   Use automatic scrollbars without a reserved gutter or asymmetric padding when
   content fits. Let the dialog primitive compensate for page scroll locking.
-- Use one production summary strip and a full-width schedule panel. Wide screens
-  show three room columns. Put configuration and detailed production below the
-  schedule in a native disclosure; keep its DOM order aligned with its position.
-  Operator portraits and efficiency carry the visual weight.
+- Use one production summary strip and an open, full-width schedule region.
+  Facility cards provide the object boundaries; keep shift selection and controls
+  directly above them without a surrounding panel or repeated schedule heading.
+  Wide screens show three room columns. Put configuration and detailed production
+  below the schedule in a native disclosure; keep its DOM order aligned with its position.
+  Below 40rem, place the schedule before the production strip so facilities are
+  visible on entry. Operator portraits and efficiency carry the visual weight.
 - Keep generation beside the overview title and export beside result navigation.
   Copper marks the primary action and focus; station colors identify room types
   through the same icon backgrounds on desktop and mobile.
@@ -144,20 +153,41 @@ it deliberately when changing the shared design.
   business hooks with V1; compose each workspace around its user's next task.
   Keep the specialized configuration editor, schedule editor, binding dialog,
   progress renderer and comparison chart as shared controls.
+- The tools directory groups links under “基建”, “干员养成” and “材料与仓库”,
+  with base scheduling first and special recruitment after the ongoing cultivation
+  tools. Use two columns within each group and one column below 40rem, concise
+  purpose descriptions and larger gaps between groups. Omit sequence numbers;
+  preserve profile-aware links and hide groups with no available tools.
 - Accounts use a searchable selection index and one account detail region.
   History separates result records from saved configurations, then exposes
   actions for the selected record. Inventory uses an item shelf, inspect/use
   dialogs, and separate task and activity views.
-- Generation separates preparation from execution. Comparison composes the
+- Generation separates preparation from execution with a column gap and one rule.
+  Keep operator and configuration summaries beside their edit actions, with compact
+  row spacing and no enclosing panel or step numbers. Use at least 14px for action
+  guidance, operator names and inventory hints; reserve 12px for auxiliary metadata
+  such as times and facility levels. Separate room groups with larger gaps than the
+  spacing within a group. Below 40rem, the first-use checklist collapses to the
+  current step, and preparation rows open the existing editors across the whole row.
+  Coupon options expand on demand on mobile; when no coupons are available, show
+  “暂无可用券” and keep the rules collapsed at every width. Keep the generation action
+  and any charge summary at the bottom, reserve its measured height in the page,
+  and retain validation and retry messages.
+  Comparison composes the
   experiment before inspecting candidate results. Cultivation separates
   conditions from priority, material, calendar and inventory results. Manual
   scheduling makes account, layout and starting schedule explicit steps.
 - Settings use task navigation and a single visible content region. Pricing
-  leads with four maintenance cards showing price, audience, checked benefits
-  and a direct purchase action. Keep free start visible above the cards, shared
-  activation terms beside redemption, and a compact benchmark proof strip below.
-  Plan descriptions, the full entitlement comparison, purchase rules and upgrade
-  details expand on demand. All pages use bounded content widths and V2 tokens.
+  keeps four maintenance cards on desktop, showing price, audience, checked benefits
+  and a direct purchase action. Below 40rem, show free capabilities and generation
+  limits first, list shared maintenance benefits once, and compare all four terms
+  and total prices in a compact native radio group that wraps with the available
+  width. Show only the selected plan's total, audience, archive gift and purchase
+  action, with UID binding and activation
+  conditions immediately above the action. Keep redemption and a compact benchmark
+  proof strip below. On desktop, plan descriptions expand on demand; at every width,
+  the full entitlement comparison, purchase rules and upgrade details are expandable.
+  All pages use bounded content widths and V2 tokens.
 - The workspace shell owns page headings. Legal documents place their index
   to the right of a reading area of up to 65ch. FAQ pairs search with expandable
   answers; support pairs a contact region with preparation steps. Releases and

@@ -28,7 +28,7 @@ try {
     platform: 'node',
     target: 'node20',
     format: 'esm',
-    external: ['@aws-sdk/client-sesv2', '@node-rs/argon2', 'pg', 'qrcode'],
+    external: ['@aws-sdk/client-sesv2', '@node-rs/argon2', 'fastify', 'pg', 'qrcode'],
     logLevel: 'silent',
   })
 

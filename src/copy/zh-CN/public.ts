@@ -18,8 +18,6 @@ export const publicCopy = {
   // src/components/AnnouncementBodyEditor.tsx
   components_AnnouncementBodyEditor_006: " 字符",
   // src/components/AnnouncementPopup.tsx
-  components_AnnouncementPopup_001: "站内公告",
-  // src/components/AnnouncementPopup.tsx
   components_AnnouncementPopup_002: "公告中心",
   // src/components/AnnouncementPopup.tsx
   components_AnnouncementPopup_003: "已读",
@@ -28,7 +26,7 @@ export const publicCopy = {
   announcement_popup_read_failed: "未能标记已读，请重试，或稍后到公告中心查看。",
   announcement_reminder_ended: "提醒已结束",
   announcement_reminder_deadline: "访问提醒截止时间（可选）",
-  announcement_reminder_help: "需要用户及时关注时填写；留空则在公告中心查看。到期后停止自动提醒，公告内容仍保留。",
+  announcement_reminder_help: "普通报告和功能介绍请留空，用户可展开公告条阅读。需要及时关注的通知可设置截止时间，登录用户访问时弹窗提醒；到期后仍可在公告中心查看。",
   // src/components/PublicFooter.tsx
   components_PublicFooter_001: "常见问题",
   // src/components/PublicFooter.tsx
@@ -442,6 +440,9 @@ export const publicCopy = {
     export_note: "MAA 导出需使用 MAA 排班模式。",
     export_unavailable: "MAA 排班导出暂未开放。",
     full_comparison: "查看完整权益对比",
+    shared_benefits: "维护卡共同权益",
+    choose_term: "选择维护期限",
+    total_price: "总价",
     term_labels: {
       single_account_monthly: "30 天",
       single_account_half_year: "90 天",
@@ -562,7 +563,7 @@ export const publicCopy = {
     { id: 'manual-drafts', question: '手动排班草稿会自动保存、同步到其他设备吗？', answer: '需要点击“保存本地草稿”，草稿只保存在当前设备和浏览器。排班结果页与独立手动排班页各为每个档案保留一份草稿，再次保存会覆盖同一入口中该档案的旧草稿。刷新或离开前请保存或下载备份，换设备时可导入备份。\n恢复或导入的草稿必须与当前原排班匹配，并会替换当前手动安排；有未保存修改时会要求确认。导入后仍需保存才能存入浏览器，模拟成功也不会自动保存本地草稿。' },
     { id: 'manual-export', question: '手动排班的图片、草稿备份和 MAA 文件有什么区别？', answer: '图片展示当前手动安排，测算前不含效率和产量。草稿备份用于重新导入继续编辑。模拟测算成功后，点击“导出”即可按档案权益下载 MAA 文件和完整测算数据，也可从云端历史中打开结果后导出。草稿备份不能直接导入 MAA。' },
     { id: 'training-roi', question: '练度建议和回本天数怎么理解？一定要按建议培养吗？', answer: '练度建议结合培养成本、材料缺口和预计收益增量，帮助你决定优先培养谁。回本天数按当前库存和测算条件估算，实际产出与培养计划变化后也会改变。请结合自己的游戏目标判断；培养完成后，刷新干员数据再计算。相关分析需要高级权益或对应诊断券。' },
-    { id: 'scenario-comparison', question: '方案对比能比较什么？如何选择方案？', answer: '在「方案对比」添加不同布局与产物分配，再选择换班方式和无人机用途，即可比较每日产量与换班次数。部分方案收益更高，也需要更频繁换班，可结合自己的操作习惯选择。方案对比有独立的权益和次数限制，请查看当前档案及「价格与权益」；已有情景推演券可按页面规则用于一次对比。' },
+    { id: 'scenario-comparison', question: '如何比较不同基建配置？', answer: '在「比较基建配置」添加不同布局与产物分配，再选择换班方式和无人机用途，即可比较每日产量与换班次数。部分方案收益更高，也需要更频繁换班，可结合自己的操作习惯选择。基建配置对比有独立的权益和次数限制，请查看当前档案及「价格与权益」；已有情景推演券可按页面规则用于一次对比。' },
     { id: 'coupons', question: '背包里的体验券和计算券在哪里使用？', answer: '查看道具详情中的用途和有效期，在对应功能中选择使用。优先计算券用于提交排班，练度诊断券用于本次排班的培养分析，情景推演券用于场景比较，MAA 导出体验券用于下载符合条件的 MAA 文件。礼包和扩容道具按背包提示操作，不同道具不能互相替代。' },
     { id: 'invitation-rewards', question: '邀请好友后，为什么还没有收到奖励？', answer: '好友需在注册时填写你的邀请码，再通过森空岛绑定并激活有效档案，邀请才算完成。双方奖励按当前活动规则发放，你的奖励受每日名额限制。活动暂停时，已完成的邀请会在恢复后自动发奖；奖励发放后可在「背包」查看。' },
     { id: 'personal-use', question: '个人维护卡能用于代练、代做排班或转售吗？', answer: '个人权益仅用于本人非商业使用，不可用于批量代办、代做排班或转售。MaaTool 账号、CDK 和档案均不可转让或转售。使用前请阅读个人使用声明和服务协议。' },

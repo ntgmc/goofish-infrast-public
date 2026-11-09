@@ -82,11 +82,11 @@ describe('behavior risk evaluation maintenance limits', () => {
 
     expect(mocks.clientQuery).toHaveBeenNthCalledWith(
       2,
-      expect.stringContaining("set_config('statement_timeout'"),
+      expect.objectContaining({ text: expect.stringContaining("set_config('statement_timeout'") }),
       ['1200ms', '300ms'],
     )
     expect(mocks.clientQuery).toHaveBeenLastCalledWith(
-      expect.stringContaining("set_config('statement_timeout'"),
+      expect.objectContaining({ text: expect.stringContaining("set_config('statement_timeout'") }),
       ['17s', '2s'],
     )
     expect(mocks.release).toHaveBeenCalledWith(false)
@@ -94,7 +94,7 @@ describe('behavior risk evaluation maintenance limits', () => {
 
   it('propagates query timeouts after unlocking, restoring settings, and releasing the client', async () => {
     const timeout = Object.assign(new Error('canceling statement due to statement timeout'), { code: '57014' })
-    mocks.clientQuery.mockImplementation(async (sql: string) => {
+    mocks.clientQuery.mockImplementation(async ({ text: sql }: { text: string }) => {
       if (sql.includes("current_setting('statement_timeout')")) return { rows: [{ statement_timeout: '0', lock_timeout: '0' }] }
       if (sql.includes('pg_try_advisory_lock')) return { rows: [{ locked: true }] }
       if (sql === 'begin') throw timeout
@@ -105,11 +105,11 @@ describe('behavior risk evaluation maintenance limits', () => {
     await expect(runBehaviorRiskEvaluation()).rejects.toBe(timeout)
 
     expect(mocks.clientQuery).toHaveBeenCalledWith(
-      'select pg_advisory_unlock($1) as unlocked',
+      expect.objectContaining({ text: 'select pg_advisory_unlock($1) as unlocked' }),
       [1_743_861_291],
     )
     expect(mocks.clientQuery).toHaveBeenCalledWith(
-      expect.stringContaining("set_config('statement_timeout'"),
+      expect.objectContaining({ text: expect.stringContaining("set_config('statement_timeout'") }),
       ['0', '0'],
     )
     expect(mocks.release).toHaveBeenCalledWith(false)
@@ -117,7 +117,7 @@ describe('behavior risk evaluation maintenance limits', () => {
 })
 
 function mockSuccessfulEvaluation(): void {
-  mocks.clientQuery.mockImplementation(async (sql: string) => {
+  mocks.clientQuery.mockImplementation(async ({ text: sql }: { text: string }) => {
     if (sql.includes("current_setting('statement_timeout')")) {
       return { rows: [{ statement_timeout: '17s', lock_timeout: '2s' }] }
     }

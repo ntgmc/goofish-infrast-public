@@ -1,6 +1,5 @@
 import type { QueryClient } from './postgres'
 import { createHash, createHmac } from 'node:crypto'
-import type { PoolClient } from 'pg'
 import { matchesSearch } from '../../src/lib/search'
 import type { AdminUserFilters } from '../../src/lib/admin-user-filters'
 import type { OperationsDrilldown, OperationsUserProgress } from '../../src/lib/operations-drilldown'
@@ -288,7 +287,7 @@ export async function insertUserAccountForRegistration(user: UserAccountRecord):
 }
 
 export async function insertUserAccountForRegistrationInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   user: UserAccountRecord,
 ): Promise<void> {
   await client.query(
@@ -438,7 +437,7 @@ export async function deleteUserAccount(userId: string, audit?: AdminOperationAu
   })
 }
 
-export async function deleteUserAccountInTransaction(client: PoolClient, userId: string): Promise<void> {
+export async function deleteUserAccountInTransaction(client: QueryClient, userId: string): Promise<void> {
   const profileRows = await client.query<{ record_json: UserGameAccountRecord }>('select record_json from user_game_accounts where user_id = $1', [userId])
   const sampleSecrets = [
     process.env.DEPOT_SAMPLE_HASH_SECRET?.trim(),
@@ -935,7 +934,7 @@ async function saveUserProfileWithClient(
 }
 
 async function updateLinkedCdkPermissionInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   key: string,
   permission: UserGameAccountRecord['permission'],
 ): Promise<void> {
@@ -963,7 +962,7 @@ async function updateLinkedCdkPermissionInTransaction(
 }
 
 async function resetLinkedCdkOperatorBaselineInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   key: string,
   reason: string,
   at: string,
@@ -1384,7 +1383,7 @@ export async function updateProfileWorkspaceAtomically(
 }
 
 export async function updateProfileWorkspaceInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   profileId: string,
   updater: (workspace: UserWorkspaceRecord | null) => UserWorkspaceRecord,
 ): Promise<UserWorkspaceRecord> {
@@ -1396,7 +1395,7 @@ export async function updateProfileWorkspaceInTransaction(
 }
 
 export async function getProfileWorkspaceForUpdateInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   profileId: string,
 ): Promise<UserWorkspaceRecord | null> {
   await lockWorkspaceForUpdate(client, profileId)
@@ -1416,7 +1415,7 @@ class ProfileMergedError extends Error {
   }
 }
 
-async function lockWorkspaceForUpdate(client: PoolClient, profileId: string): Promise<void> {
+async function lockWorkspaceForUpdate(client: QueryClient, profileId: string): Promise<void> {
   await client.query("select pg_advisory_xact_lock(hashtextextended('workspace:' || $1, 0))", [profileId])
   const profile = await client.query(
     "select 1 from user_game_accounts where id = $1 and nullif(record_json->>'merged_into_profile_id', '') is not null",
@@ -1425,7 +1424,7 @@ async function lockWorkspaceForUpdate(client: PoolClient, profileId: string): Pr
   if (profile.rowCount) throw new ProfileMergedError()
 }
 
-async function saveProfileWorkspaceWithClient(client: PoolClient, normalized: UserWorkspaceRecord): Promise<void> {
+async function saveProfileWorkspaceWithClient(client: QueryClient, normalized: UserWorkspaceRecord): Promise<void> {
   await client.query(
     `insert into user_profile_workspaces
       (profile_id, operators_json, config_json, elite_overrides_json, last_result_json, record_json, updated_at)

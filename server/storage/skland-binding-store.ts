@@ -1,9 +1,9 @@
-import type { PoolClient } from 'pg'
+import type { QueryClient } from './postgres'
 import { saveProfileInTransaction } from './cdk-redemption'
 import type { UserGameAccountRecord } from './user-store'
 
 export async function lockSklandUidProfilesInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   uid: string,
 ): Promise<UserGameAccountRecord[]> {
   await client.query(
@@ -21,7 +21,7 @@ export async function lockSklandUidProfilesInTransaction(
 }
 
 export async function recordSklandUidMismatchInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   input: {
     userId: string
     profileId: string

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { GeneratedPermission, StatusFilter, CdkTypeFilter, PermissionFilter, BinaryFilter, CdkTableFilters, AdminCdkRecord, AdminCdkDetail, RiskControlSettings, RiskControlSettingsPatch, PaginationMeta, permissionLabels, statusLabels, cdkProductPermissions } from '../contracts'
+import { type GeneratedPermission, type StatusFilter, type CdkTypeFilter, type PermissionFilter, type BinaryFilter, type CdkTableFilters, type AdminCdkRecord, type AdminCdkDetail, type RiskControlSettings, type RiskControlSettingsPatch, type PaginationMeta, permissionLabels, statusLabels, cdkProductPermissions } from '../contracts'
 import { AdminDetailDialog } from '../shared/AdminDetailDialog'
 import { DetailItem, StatusPill, SmallButton, formatDate, getNextProductPermission, formatNullableNumber, formatRiskDetail } from '../shared/helpers'
 import { AnimatedValue, RevealItem } from '../../../components/MotionPrimitives'

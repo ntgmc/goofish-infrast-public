@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { motion } from 'motion/react'
 import { useAppReducedMotion } from '../lib/motion-preference'
-import { AnimatedValue } from './MotionPrimitives'
+import { motionTokens } from './MotionPrimitives'
 import type { OptimizeCalculationStage, OptimizeJobPriority, OptimizeResult } from '../lib/types'
 import type { OptimizationBillingSnapshot } from '../lib/optimization-contracts'
 import { copy } from '../copy/index'
 import { SuccessIcon } from './icons'
 import { getScheduleProgressPercent, isScheduleProgressPaused } from './schedule-progress-model'
 import { METERED_BILLING_AVAILABLE } from '../lib/site-features'
+import './ScheduleProgress.css'
 
 export { SCHEDULE_PROGRESS_COMPLETION_DURATION_MS } from './schedule-progress-model'
 
@@ -72,6 +73,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
   const task = useMemo(() => getTaskView(progress, rawPercent, now), [progress, rawPercent, now])
   const compact = variant === 'embedded'
   const reduceMotion = useAppReducedMotion()
+  const animating = !isScheduleProgressPaused(progress) && task.status !== 'completed'
 
   useEffect(() => {
     let timer = 0
@@ -97,97 +99,98 @@ export default function ScheduleProgress({ progress, className = '', variant = '
   }, [progress])
 
   return (
-    <section
-      className={`tool-panel ${compact ? 'p-4' : 'p-5 sm:p-6'} ${className}`}
+    <motion.section
+      className={`tool-panel schedule-progress ${compact ? 'schedule-progress--embedded' : 'schedule-progress--focus'} ${className}`}
       data-status={task.status}
+      data-animating={animating}
+      initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: reduceMotion ? 0 : motionTokens.duration.enter, ease: motionTokens.ease.enter }}
       aria-label={progress.mode === 'generate' ? copy.common.components_ScheduleProgress_001 : progress.mode === 'scenario' ? copy.common.components_ScheduleProgress_002 : copy.common.components_ScheduleProgress_003}
     >
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="tool-eyebrow">{task.eyebrow}</p>
-              <span className={`tool-status ${task.priorityClass}`}>{task.priorityLabel}</span>
-              {task.jobLabel && <span className="tool-status">{task.jobLabel}</span>}
-            </div>
-            <h3 role="status" aria-live="polite" aria-atomic="true" className={`${compact ? 'mt-2 text-base' : 'mt-3 text-lg'} font-semibold text-ink-primary`}>{task.title}</h3>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-secondary">{task.detail}</p>
-            {task.adjustmentLabel && <p className="mt-3 tool-status tool-status--current max-w-full">{task.adjustmentLabel}</p>}
-            {METERED_BILLING_AVAILABLE && progress.billing && <p className={`mt-3 tool-status max-w-full ${progress.billing.status === 'settled' ? 'tool-status--current' : progress.billing.status === 'released' ? 'tool-status--warning' : ''}`}>
-              {formatBillingStatus(progress.billing)}
-            </p>}
-          </div>
-          <div className="flex shrink-0 items-center justify-between gap-4 sm:justify-end">
-            <div className="text-left sm:text-right">
-              <p className="text-xs font-medium text-ink-muted">{task.meterLabel}</p>
-              <p className="mt-1 text-3xl font-semibold tabular-nums tracking-[-0.03em] text-ink-primary"><AnimatedValue value={`${percent}%`} /></p>
-            </div>
-            {action}
-          </div>
+      <div className="schedule-progress-meta">
+        <p className="tool-eyebrow">{task.eyebrow}</p>
+        <span className={`tool-status ${task.priorityClass}`}>{task.priorityLabel}</span>
+        {task.jobLabel && <span className="schedule-progress-job">{task.jobLabel}</span>}
+      </div>
+
+      <div className="schedule-progress-heading">
+        <h3 role="status" aria-live="polite" aria-atomic="true">{task.title}</h3>
+        <div className="schedule-progress-meter">
+          <span>{task.meterLabel}</span>
+          <p className="schedule-progress-percent">{percent}<span>%</span></p>
         </div>
+        <p className="schedule-progress-detail">{task.detail}</p>
+      </div>
 
-        <div
-          className="h-2 overflow-hidden rounded-full bg-surface-3"
-          role="progressbar"
-          aria-label={task.title}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percent}
-          aria-valuetext={task.ariaText}
-        >
-          <motion.div
-            className={`schedule-progress-fill h-full origin-left rounded-full ${task.status === 'cancelled' ? 'bg-surface-4' : task.status === 'failed' ? 'bg-error' : 'bg-brand-500'}`}
-            initial={false}
-            animate={{ scaleX: Math.max(0, Math.min(1, rawPercent / 100)) }}
-            transition={reduceMotion ? { duration: 0 } : { duration: 0.25, ease: 'linear' }}
-          />
-        </div>
+      <div
+        className="schedule-progress-track"
+        role="progressbar"
+        aria-label={task.title}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        aria-valuetext={task.ariaText}
+      >
+        <motion.div
+          className="schedule-progress-fill origin-left"
+          initial={false}
+          animate={{ scaleX: Math.max(0, Math.min(1, rawPercent / 100)) }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.25, ease: 'linear' }}
+        />
+      </div>
 
-        <ol className={`grid gap-2 sm:grid-cols-2 ${task.steps.length === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`} aria-label={copy.common.components_ScheduleProgress_004}>
-          {task.steps.map((step, index) => (
-            <li key={step.role} aria-current={getStepState(progress, task.status, index, task.steps) === 'active' ? 'step' : undefined}>
-              <TaskStep label={step.label} detail={step.detail} state={getStepState(progress, task.status, index, task.steps)} />
-            </li>
-          ))}
-        </ol>
+      {task.adjustmentLabel && <p className="schedule-progress-note">{task.adjustmentLabel}</p>}
+      {METERED_BILLING_AVAILABLE && progress.billing && <p className="schedule-progress-note">{formatBillingStatus(progress.billing)}</p>}
 
-        <div className="grid grid-cols-3 gap-2">
+      <ol className="schedule-progress-steps" data-step-count={task.steps.length} aria-label={copy.common.components_ScheduleProgress_004}>
+        {task.steps.map((step, index) => {
+          const state = getStepState(progress, task.status, index, task.steps)
+          return <li key={step.role} className="schedule-progress-step" data-state={state} aria-current={state === 'active' ? 'step' : undefined}>
+            <TaskStep label={step.label} detail={step.detail} state={state} index={index} />
+          </li>
+        })}
+      </ol>
+
+      <div className="schedule-progress-bottom">
+        <dl className="schedule-progress-stats">
           <TaskMiniStat label={copy.common.components_ScheduleProgress_005} value={task.remainingLabel} emphasis={task.status === 'overdue'} />
           <TaskMiniStat label={copy.common.components_ScheduleProgress_006} value={task.elapsedLabel} />
           <TaskMiniStat label={copy.common.components_ScheduleProgress_007} value={task.syncLabel} />
-        </div>
-
-        {!compact && (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-surface-3 pt-3 text-xs leading-5 text-ink-muted">
-            <span>{task.footer}</span>
-            <span className="tabular-nums">{task.queueLabel}</span>
-          </div>
-        )}
+        </dl>
+        {action && <div className="schedule-progress-action">{action}</div>}
       </div>
-    </section>
+
+      {!compact && (
+        <div className="schedule-progress-footer">
+          <span>{task.footer}</span>
+          <span>{task.queueLabel}</span>
+        </div>
+      )}
+    </motion.section>
   )
 }
 
 function TaskMiniStat({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
   return (
-    <div className={`tool-inset min-w-0 px-3 py-2 ${emphasis ? 'border-warning/40 bg-warning/10' : 'bg-surface-2/60'}`}>
-      <p className="text-[11px] font-medium text-ink-muted">{label}</p>
-      <p className="mt-0.5 truncate text-xs font-semibold tabular-nums text-ink-primary" title={value}>{value}</p>
+    <div className="schedule-progress-stat" data-emphasis={emphasis || undefined}>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
     </div>
   )
 }
 
-function TaskStep({ label, detail, state }: { label: string; detail: string; state: StepVisualState }) {
+function TaskStep({ label, detail, state, index }: { label: string; detail: string; state: StepVisualState; index: number }) {
   return (
-    <div data-state={state} className={`tool-inset h-full px-3 py-2.5 transition-colors duration-200 ${getStepClass(state)}`}>
-      <div className="flex items-center gap-2">
-        <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[11px] font-semibold ${getStepDotClass(state)}`}>
-          {state === 'done' ? <SuccessIcon className="h-3 w-3" aria-hidden="true" /> : state === 'failed' ? '!' : state === 'active' ? <span className="h-1.5 w-1.5 rounded-full bg-current" /> : null}
-        </span>
-        <span className="min-w-0 text-sm font-semibold text-ink-primary">{label}</span>
+    <>
+      <span className="schedule-progress-dot" aria-hidden="true">
+        {state === 'done' ? <SuccessIcon className="h-3.5 w-3.5" /> : state === 'failed' ? '!' : index + 1}
+      </span>
+      <div className="schedule-progress-step-copy">
+        <p className="schedule-progress-step-label">{label}</p>
+        <p className="schedule-progress-step-detail">{detail}</p>
       </div>
-      <p className="mt-1 line-clamp-2 text-xs leading-5 text-ink-muted">{detail}</p>
-    </div>
+    </>
   )
 }
 
@@ -458,20 +461,6 @@ function getCalculationStageRole(
   }
   if (stage === 'formatting_result' || stage === 'persisting_result' || stage === 'completed') return 'persist'
   return null
-}
-
-function getStepClass(state: StepVisualState): string {
-  if (state === 'done') return 'border-brand-500/25 bg-brand-600/10'
-  if (state === 'failed') return 'border-warning/40 bg-warning/10'
-  if (state === 'active') return 'border-brand-500/40 bg-surface-2'
-  return 'border-surface-3/70 bg-surface-2/35'
-}
-
-function getStepDotClass(state: StepVisualState): string {
-  if (state === 'done') return 'border-brand-500 bg-primary text-primary-foreground'
-  if (state === 'failed') return 'border-warning text-warning'
-  if (state === 'active') return 'border-brand-400 text-brand-400'
-  return 'border-surface-4 text-ink-muted'
 }
 
 function formatElapsed(ms: number): string {

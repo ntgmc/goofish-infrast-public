@@ -1,3 +1,4 @@
+import type { QueryClient } from './postgres'
 import { createHash, randomUUID } from 'node:crypto'
 import { matchesSearch } from '../../src/lib/search'
 import { getCommercialTierSummary, getMeteredBillingPolicy, pointsToMinor } from '../../src/lib/metered-billing'
@@ -439,7 +440,7 @@ export async function updateCommercialAccount(input: {
   })
 }
 
-async function lockCommercialAccount(client: import('pg').PoolClient, userId: string): Promise<void> {
+async function lockCommercialAccount(client: QueryClient, userId: string): Promise<void> {
   const user = await client.query('select id from user_accounts where id = $1 for update', [userId])
   if (!user.rowCount) throw new MeteredProfileError('commercial_not_eligible', '用户不存在。', 404)
   await client.query(
@@ -450,7 +451,7 @@ async function lockCommercialAccount(client: import('pg').PoolClient, userId: st
   )
 }
 
-async function assertCommercialEligibleInTransaction(client: import('pg').PoolClient, userId: string): Promise<void> {
+async function assertCommercialEligibleInTransaction(client: QueryClient, userId: string): Promise<void> {
   const result = await client.query<{
     lifetime_credited: string; qualification_reversed: string; debt: string; suspended_at: string | null;
   }>(
@@ -470,7 +471,7 @@ async function assertCommercialEligibleInTransaction(client: import('pg').PoolCl
   if (!summary.eligible) throw new MeteredProfileError('commercial_not_eligible', '累计获得积分未达到商用门槛或账户存在待追偿。', 409)
 }
 
-async function getCommercialLimitsInTransaction(client: import('pg').PoolClient, userId: string): Promise<CommercialProfileLimits> {
+async function getCommercialLimitsInTransaction(client: QueryClient, userId: string): Promise<CommercialProfileLimits> {
   const result = await client.query<{
     active: string; total: string; active_profile_limit: number | null; total_profile_limit: number | null;
     suspended_at: string | null; suspension_reason: string | null; revision: number | null;
@@ -521,7 +522,7 @@ function createMeteredProfile(
   }
 }
 
-async function insertProfileInTransaction(client: import('pg').PoolClient, profile: UserGameAccountRecord): Promise<void> {
+async function insertProfileInTransaction(client: QueryClient, profile: UserGameAccountRecord): Promise<void> {
   await client.query(
     `insert into user_game_accounts
       (id, user_id, cdk_key, cdk_code_hash, cdk_order_hash, permission, status, display_name, note,
@@ -532,7 +533,7 @@ async function insertProfileInTransaction(client: import('pg').PoolClient, profi
   )
 }
 
-async function updateProfileInTransaction(client: import('pg').PoolClient, profile: UserGameAccountRecord): Promise<void> {
+async function updateProfileInTransaction(client: QueryClient, profile: UserGameAccountRecord): Promise<void> {
   await client.query(
     `update user_game_accounts set kind = $2, permission = $3, status = $4,
             display_name = $5, note = $6, archived_at = $7, record_json = $8::jsonb, updated_at = $9
@@ -542,7 +543,7 @@ async function updateProfileInTransaction(client: import('pg').PoolClient, profi
   )
 }
 
-async function ensureProfileWorkspaceInTransaction(client: import('pg').PoolClient, profileId: string): Promise<void> {
+async function ensureProfileWorkspaceInTransaction(client: QueryClient, profileId: string): Promise<void> {
   await updateProfileWorkspaceInTransaction(client, profileId, (workspace) => workspace ?? emptyWorkspace(profileId))
 }
 

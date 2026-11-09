@@ -1,5 +1,5 @@
+import type { QueryClient } from './postgres'
 import { createHash } from 'node:crypto'
-import type { PoolClient } from 'pg'
 import type { QqBotCampaign } from '../../src/lib/qqbot-reward-contracts'
 import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
@@ -50,7 +50,7 @@ export async function deliverQqBotReward(input: QqBotRewardInput): Promise<Deliv
   return withTransaction((client) => deliverQqBotRewardInTransaction(client, input))
 }
 
-export async function deliverQqBotRewardInTransaction(client: PoolClient, input: QqBotRewardInput): Promise<DeliveryResponse> {
+export async function deliverQqBotRewardInTransaction(client: QueryClient, input: QqBotRewardInput): Promise<DeliveryResponse> {
   const requestHash = createHash('sha256').update(JSON.stringify([
     input.qq_number, input.group_id, input.actor_qq, input.item_code, input.quantity,
     input.validity_days, input.gift_pack_version_id, input.reason,
@@ -89,7 +89,7 @@ export async function deliverQqBotRewardInTransaction(client: PoolClient, input:
   return response
 }
 
-async function receipt(client: PoolClient, id: string, requestHash: string) {
+async function receipt(client: QueryClient, id: string, requestHash: string) {
   const result = await client.query<{ request_hash: string; response_json: DeliveryResponse }>(
     'select request_hash, response_json from qqbot_reward_deliveries where delivery_id = $1', [id],
   )

@@ -1,5 +1,5 @@
+import type { QueryClient } from './postgres'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import type { PoolClient } from 'pg'
 import { z } from 'zod'
 import type {
   AdminInvitationSettingsResponse,
@@ -176,7 +176,7 @@ async function getInvitationSettings(): Promise<InvitationSettings> {
   return { ...normalizeInvitationSettings(row?.record_json), revision: row?.revision ?? 0 }
 }
 
-async function getInvitationSettingsInTransaction(client: PoolClient): Promise<InvitationSettings> {
+async function getInvitationSettingsInTransaction(client: QueryClient): Promise<InvitationSettings> {
   const result = await client.query<{ record_json: unknown; revision: number }>(
     'select record_json, revision from invitation_settings where key = $1',
     [INVITATION_SETTINGS_KEY],
@@ -202,7 +202,7 @@ async function getInvitationRewardCatalog(): Promise<InvitationRewardCatalogItem
   return result.rows.map(catalogRow)
 }
 
-async function getInvitationRewardCatalogInTransaction(client: PoolClient): Promise<InvitationRewardCatalogItem[]> {
+async function getInvitationRewardCatalogInTransaction(client: QueryClient): Promise<InvitationRewardCatalogItem[]> {
   const result = await client.query<{
     item_code: string
     name: string
@@ -306,7 +306,7 @@ export async function saveInvitationSettings(
   })
 }
 
-export async function assertInvitationItemCanBeDisabled(client: PoolClient, itemCode: string): Promise<void> {
+export async function assertInvitationItemCanBeDisabled(client: QueryClient, itemCode: string): Promise<void> {
   const settingsResult = await client.query<{ record_json: unknown }>(
     'select record_json from invitation_settings where key = $1 for update', [INVITATION_SETTINGS_KEY],
   )
@@ -316,7 +316,7 @@ export async function assertInvitationItemCanBeDisabled(client: PoolClient, item
   }
 }
 
-export async function assertInvitationGiftVersionCanBeRetired(client: PoolClient, versionId: string): Promise<void> {
+export async function assertInvitationGiftVersionCanBeRetired(client: QueryClient, versionId: string): Promise<void> {
   const settingsResult = await client.query<{ record_json: unknown }>(
     'select record_json from invitation_settings where key = $1 for update', [INVITATION_SETTINGS_KEY],
   )
@@ -358,7 +358,7 @@ export async function saveRegistrationWithInvitation(user: UserAccountRecord, in
   })
 }
 
-export async function saveInvitationInTransaction(client: PoolClient, inviteeUserId: string, invitation: ValidatedInvitationCode): Promise<void> {
+export async function saveInvitationInTransaction(client: QueryClient, inviteeUserId: string, invitation: ValidatedInvitationCode): Promise<void> {
   if (invitation.inviter_user_id === inviteeUserId) throw new InvitationCodeError('invalid_invite_code', '不能使用自己的邀请码，请填写好友的邀请码。')
   const now = new Date().toISOString()
   await client.query(
@@ -459,7 +459,7 @@ export async function manageInvitationCode(
 }
 
 async function insertInvitationCodeAudit(
-  client: PoolClient,
+  client: QueryClient,
   userId: string,
   action: 'create' | 'rotate' | 'pause' | 'resume',
   previousCode: string | null,
@@ -799,7 +799,7 @@ function safeSettlementError(error: unknown): string {
 }
 
 async function settleInvitationInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   invitation: InvitationRow,
   snapshot: InvitationSettings,
 ): Promise<void> {
@@ -850,7 +850,7 @@ async function settleInvitationInTransaction(
 }
 
 async function grantRewardGroups(
-  client: PoolClient,
+  client: QueryClient,
   invitation: InvitationRow,
   inviterStatus: InviterRewardStatus,
   inviterRewards: InvitationRewardRule[],
@@ -880,7 +880,7 @@ async function grantRewardGroups(
   }))))
 }
 
-async function snapshotRewardRules(client: PoolClient, rewards: InvitationRewardRule[]): Promise<InvitationRewardRule[]> {
+async function snapshotRewardRules(client: QueryClient, rewards: InvitationRewardRule[]): Promise<InvitationRewardRule[]> {
   if (rewards.length === 0) return []
   const result: InvitationRewardRule[] = []
   const codes = [...new Set(rewards.map((reward) => reward.item_code))]
@@ -918,7 +918,7 @@ async function snapshotRewardRules(client: PoolClient, rewards: InvitationReward
 }
 
 async function describeRewardsInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   rewards: InvitationRewardRule[],
 ): Promise<InvitationRewardPreviewItem[]> {
   if (rewards.length === 0) return []
@@ -1009,7 +1009,7 @@ async function userCanInvite(userId: string): Promise<boolean> {
   return result.rows[0]?.eligible === true
 }
 
-async function userCanInviteInTransaction(client: PoolClient, userId: string): Promise<boolean> {
+async function userCanInviteInTransaction(client: QueryClient, userId: string): Promise<boolean> {
   const result = await client.query<{ eligible: boolean }>(
     `select exists (
        select 1 from user_accounts account
@@ -1024,7 +1024,7 @@ async function userCanInviteInTransaction(client: PoolClient, userId: string): P
   return result.rows[0]?.eligible === true
 }
 
-async function userHasActiveSklandProfile(client: PoolClient, userId: string): Promise<boolean> {
+async function userHasActiveSklandProfile(client: QueryClient, userId: string): Promise<boolean> {
   const active = await client.query<{ active: boolean }>(
     `select exists (select 1 from user_game_accounts profile
       where profile.user_id = $1 and ${BOUND_INVITATION_PROFILE}) as active`,
@@ -1262,7 +1262,7 @@ async function loadGiftPackSummaries(versionIds: string[]): Promise<Map<string, 
 }
 
 async function loadGiftPackSummariesInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   versionIds: string[],
 ): Promise<Map<string, InvitationGiftPackSummary>> {
   const uniqueIds = [...new Set(versionIds)]

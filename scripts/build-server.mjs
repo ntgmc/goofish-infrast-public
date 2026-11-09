@@ -5,7 +5,7 @@ import { APP_BUILD_META } from '../src/lib/.generated/build-meta.ts'
 const entryPoints = {
   index: 'server/index.ts',
   migrate: 'server/migrate.ts',
-  routes: 'server/routes.ts',
+  routes: 'server/http-server.ts',
   'cultivation-worker': 'server/cultivation/cultivation-worker.ts',
   'import-prts-planning': 'scripts/import-prts-planning.mjs',
   'sync-prts-planning': 'scripts/sync-prts-planning.mjs',
@@ -24,7 +24,7 @@ await build({
   format: 'esm',
   sourcemap: true,
   banner: { js: `/*! APP_BUILD_META ${JSON.stringify(APP_BUILD_META).replaceAll('*/', '*\\/')} */` },
-  external: ['@aws-sdk/client-sesv2', '@node-rs/argon2', 'pg', 'qrcode'],
+  external: ['@aws-sdk/client-sesv2', '@node-rs/argon2', 'fastify', 'pg', 'qrcode'],
   logLevel: 'info',
 })
 

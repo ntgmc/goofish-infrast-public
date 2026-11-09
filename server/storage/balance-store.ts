@@ -1,5 +1,5 @@
+import type { QueryClient } from './postgres'
 import { createHash, randomUUID } from 'node:crypto'
-import type { PoolClient } from 'pg'
 import {
   POINTS_CURRENCY,
   type AdminBalanceTransaction,
@@ -153,7 +153,7 @@ export async function adjustBalance(input: BalanceChangeInput): Promise<{
 }
 
 export async function applyBalanceChangeInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   input: BalanceChangeInput,
 ): Promise<{
   transaction: StoredBalanceTransaction
@@ -329,7 +329,7 @@ export async function reverseQualificationCredit(input: {
 }
 
 async function repayDebtAfterCreditInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   userId: string,
   creditTransactionId: string,
   now: string,
@@ -361,7 +361,7 @@ async function repayDebtAfterCreditInTransaction(
 }
 
 export async function reserveScheduleBalanceInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   input: ScheduleBalanceReservationInput,
 ): Promise<StoredScheduleBalanceReservation> {
   await ensureBalanceAccountInTransaction(client, input.userId)
@@ -401,7 +401,7 @@ export async function reserveScheduleBalanceInTransaction(
 }
 
 export async function settleScheduleBalanceInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   jobId: string,
   now = new Date().toISOString(),
 ): Promise<StoredScheduleBalanceReservation | null> {
@@ -446,7 +446,7 @@ export async function settleScheduleBalanceInTransaction(
 }
 
 export async function releaseScheduleBalanceInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   jobId: string,
   now = new Date().toISOString(),
 ): Promise<boolean> {
@@ -510,7 +510,7 @@ async function getBalancePage(
   })
 }
 
-async function ensureBalanceAccountInTransaction(client: PoolClient, userId: string): Promise<void> {
+async function ensureBalanceAccountInTransaction(client: QueryClient, userId: string): Promise<void> {
   await client.query(
     `insert into user_balance_accounts
       (user_id, available, reserved, lifetime_credited, qualification_reversed, debt, updated_at)
@@ -519,7 +519,7 @@ async function ensureBalanceAccountInTransaction(client: PoolClient, userId: str
   )
 }
 
-async function getBalanceSummaryInTransaction(client: PoolClient, userId: string): Promise<BalanceSummary> {
+async function getBalanceSummaryInTransaction(client: QueryClient, userId: string): Promise<BalanceSummary> {
   const result = await client.query<BalanceAccountRow>(
     `select available::text, reserved::text, lifetime_credited::text,
             qualification_reversed::text, debt::text
@@ -571,7 +571,7 @@ function toAdminTransaction(row: StoredBalanceTransaction): AdminBalanceTransact
 }
 
 async function claimBalanceOperationInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   userId: string,
   idempotencyKey: string,
   requestHash: string,
@@ -604,7 +604,7 @@ async function claimBalanceOperationInTransaction(
 }
 
 async function completeBalanceOperationInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   operationId: string,
   transactionId: string,
   response: { balance: BalanceSummary; transaction: AdminBalanceTransaction; replayed: boolean },
@@ -618,7 +618,7 @@ async function completeBalanceOperationInTransaction(
 }
 
 async function getStoredBalanceTransactionInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   transactionId: string,
 ): Promise<StoredBalanceTransaction | null> {
   const result = await client.query<StoredBalanceTransactionRow>(

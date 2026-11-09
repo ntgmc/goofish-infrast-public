@@ -26,6 +26,26 @@ describe('ScheduleProgress motion', () => {
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', before)
   })
 
+  it.each([
+    { connectionStatus: 'reconnecting' as const },
+    { executionPhase: 'retry_wait' as const },
+    { cancellationRequested: true },
+  ])('pauses activity feedback together with the meter for %j', async (patch) => {
+    const progress = createProgress({ queueStatus: 'running', observedRunning: true, startedAt: NOW - 5_000 })
+    const { rerender } = render(<ScheduleProgress progress={progress} />)
+    const panel = screen.getByRole('region', { name: '排班生成任务状态' })
+    const before = screen.getByRole('progressbar').getAttribute('aria-valuenow')
+    expect(panel).toHaveAttribute('data-animating', 'true')
+
+    rerender(<ScheduleProgress progress={{ ...progress, ...patch, lastUpdatedAt: NOW }} />)
+    await act(async () => vi.advanceTimersByTimeAsync(5_000))
+    expect(panel).toHaveAttribute('data-animating', 'false')
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', before)
+
+    rerender(<ScheduleProgress progress={progress} />)
+    expect(panel).toHaveAttribute('data-animating', 'true')
+  })
+
   it('reaches 100 and shows completion when only the completed phase arrives', async () => {
     const progress = createProgress({ observedRunning: true, estimatedRemainingMs: 0 })
     const { rerender } = render(<ScheduleProgress progress={progress} />)
@@ -33,6 +53,7 @@ describe('ScheduleProgress motion', () => {
     await act(async () => vi.advanceTimersByTimeAsync(1_000))
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100')
     expect(screen.getByRole('status')).toHaveTextContent('排班方案已就绪')
+    expect(screen.getByRole('region', { name: '排班生成任务状态' })).toHaveAttribute('data-animating', 'false')
   })
 
   it('resets the meter for a different job', () => {

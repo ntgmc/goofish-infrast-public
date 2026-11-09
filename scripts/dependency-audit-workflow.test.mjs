@@ -7,21 +7,21 @@ const workflow = normalizeLineEndings(await readFile('.github/workflows/dependen
 test('reports the production dependency audit for every pull request to main', () => {
   const pullRequestTrigger = readTriggerBlock('pull_request')
 
-  assert.match(pullRequestTrigger, /^  pull_request:\n    branches:\n      - main$/m)
-  assert.doesNotMatch(pullRequestTrigger, /^    paths:/m)
-  assert.match(workflow, /^    name: Audit Production Dependencies$/m)
+  assert.match(pullRequestTrigger, /^ {2}pull_request:\n {4}branches:\n {6}- main$/m)
+  assert.doesNotMatch(pullRequestTrigger, /^ {4}paths:/m)
+  assert.match(workflow, /^ {4}name: Audit Production Dependencies$/m)
 })
 
 test('audits production and development dependencies without lowering the severity threshold', () => {
-  assert.match(workflow, /^        run: pnpm audit --prod$/m)
-  assert.match(workflow, /^        run: pnpm audit$/m)
+  assert.match(workflow, /^ {8}run: pnpm audit --prod$/m)
+  assert.match(workflow, /^ {8}run: pnpm audit$/m)
   assert.doesNotMatch(workflow, /--audit-level|continue-on-error/)
 })
 
 test('keeps push audits scoped to dependency and workflow changes', () => {
   const pushTrigger = readTriggerBlock('push')
 
-  assert.match(pushTrigger, /^    paths:\n/m)
+  assert.match(pushTrigger, /^ {4}paths:\n/m)
   for (const path of ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.github/workflows/dependency-audit.yml']) {
     assert.match(pushTrigger, new RegExp(`^      - ${escapeRegExp(path)}$`, 'm'))
   }

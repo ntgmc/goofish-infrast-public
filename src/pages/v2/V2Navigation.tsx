@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { AnimationIcon, AnnouncementIcon, CollapsedIcon, ComparisonIcon, FacilitiesIcon, GenerateIcon, HelpIcon, MoreIcon, OperatorsIcon, OverviewIcon, PricingIcon, ProjectsIcon, ReleasesIcon, ResultHistoryIcon, ServiceStatusIcon, SiteBenchmarkIcon, SupportIcon, ToolsIcon } from '../../components/icons'
+import { AnnouncementIcon, CollapsedIcon, ComparisonIcon, EditIcon, FacilitiesIcon, GenerateIcon, HelpIcon, MoreIcon, OperatorsIcon, OverviewIcon, PreferencesIcon, PricingIcon, ProjectsIcon, ReleasesIcon, ResultHistoryIcon, ServiceStatusIcon, SiteBenchmarkIcon, SupportIcon, ToolsIcon } from '../../components/icons'
 import Link from '../../components/InternalLink'
 import FeedbackButton from '../../components/FeedbackDialog'
 import { copy } from '../../copy'
@@ -72,14 +72,15 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
       <div className="v2-nav-section" role="group" aria-label={signedIn ? text.configuration : text.guestNavigation.configuration}>
         <p className="v2-nav-label" aria-hidden="true">{signedIn ? text.configuration : text.guestNavigation.configuration}</p>
         <div className="v2-config-shortcuts">
-          <button type="button" className="v2-nav-item v2-config-shortcut" aria-label={text.operators} aria-describedby="v2-nav-operator-count" aria-haspopup="dialog" onClick={() => onPanel('operators')}>
-            <OperatorsIcon size={19} aria-hidden="true" /><span>{text.operators}</span><small id="v2-nav-operator-count">{sampleOperators ? text.guestNavigation.operatorCount(operatorCount) : operatorCount}</small>
+          <button type="button" className="v2-nav-item v2-config-shortcut" aria-label={text.sidebar.editOperators} aria-describedby="v2-nav-operator-count" aria-haspopup="dialog" onClick={() => onPanel('operators')}>
+            <OperatorsIcon size={19} aria-hidden="true" /><span>{text.sidebar.editOperators}</span><small id="v2-nav-operator-count">{sampleOperators ? text.guestNavigation.operatorCount(operatorCount) : operatorCount}</small><EditIcon className="v2-nav-edit" size={14} aria-hidden="true" />
           </button>
-          <button type="button" className="v2-nav-item v2-config-shortcut" aria-haspopup="dialog" onClick={() => onPanel('config')}><FacilitiesIcon size={19} aria-hidden="true" /><span>{text.facilities}</span></button>
+          <button type="button" className="v2-nav-item v2-config-shortcut" aria-haspopup="dialog" onClick={() => onPanel('config')}><FacilitiesIcon size={19} aria-hidden="true" /><span>{text.sidebar.editConfig}</span><EditIcon className="v2-nav-edit" size={14} aria-hidden="true" /></button>
         </div>
       </div>
     </div>
     <div className="v2-sidebar-bottom">
+      <button type="button" className="v2-nav-item" aria-haspopup="dialog" onClick={() => onPanel('settings')}><PreferencesIcon size={19} aria-hidden="true" /><span>{text.appearance.title}</span></button>
       <details ref={more} className="v2-nav-disclosure" onBlur={(event) => {
         if (event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget)
           && !document.querySelector('[data-slot="dialog-content"]')) event.currentTarget.open = false
@@ -118,7 +119,6 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
             {productEntries.filter((entry) => signedIn || entry !== 'pricing').map((entry) => item(entry, entry === 'pricing' ? text.guestNavigation.pricing : sectionLabels[entry]))}
           </div>}
           <div className="v2-sidebar-menu-links">
-            <button type="button" className="v2-nav-item" onClick={() => onPanel('settings')}><AnimationIcon size={19} aria-hidden="true" /><span>{copy.dashboard.animation.settings}</span></button>
             {item('status')}
           </div>
         </div>

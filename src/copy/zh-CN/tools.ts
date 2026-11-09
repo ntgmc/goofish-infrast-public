@@ -1,4 +1,17 @@
 export const toolsCopy = {
+  directory: {
+    groups: { base: '基建', cultivation: '干员养成', materials: '材料与仓库' },
+    descriptions: {
+      manualSchedule: '手动安排干员与无人机，模拟心情和产量。',
+      scheduleComparison: '对比两张已有排班的产出和干员安排。',
+      cultivationProjects: '设定养成目标，规划材料与准备进度。',
+      cultivation: '对照作业要求，找到值得培养的干员。',
+      trainingRatio: '结合培养目标与库存，安排龙门币和经验。',
+      thanksRecruitment: '结合干员拥有情况，比较特别招募队列。',
+      materialDemand: '查看新干员与模组的材料需求变化。',
+      depot: '导入仓库，估算库存的等效理智价值。',
+    },
+  },
   cultivation: {
     title: '作业练度推荐',
     description: '对照 PRTS 作业需求与当前练度，找到值得培养的干员。选好目标后加入我的养成项目，继续安排材料和准备进度。',
@@ -71,7 +84,7 @@ export const toolsCopy = {
     queue: (key: string) => `队列 ${key}`, activity: '活动说明',
   },
   scheduleComparison: {
-    title: '排班表对比',
+    title: '比较已有排班',
     description: '选择两张已有排班表或导入排班 JSON，模拟日产量，查看产出变化和干员安排差异。',
     basis: '两张排班表均使用所选档案的当前练度，各自保留设施、班次和无人机安排。',
     unavailable: '当前账号没有可用于排班模拟的档案，请先添加具备高级版权限的档案。',

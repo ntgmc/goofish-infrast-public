@@ -200,7 +200,7 @@ async function afterRead(
   const gate = new Promise<void>((resolve) => { release = resolve })
   let intercepted = false
   const spy = vi.spyOn(pool, 'query').mockImplementation((async (statement: string | { text: string; values?: unknown[] }, values?: unknown[]) => {
-    const result = typeof statement === 'string' ? await original(statement, values) : await original(statement)
+    const result = await original(statement, values)
     if (!intercepted && matches(typeof statement === 'string' ? statement : statement.text)) {
       intercepted = true
       observed()

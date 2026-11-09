@@ -2,7 +2,8 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CreateOptimizationJobRequest } from '../../../lib/optimization-contracts'
-import type { OptimizeJobAccepted, OptimizeJobStatusResponse } from '../../../lib/types'
+import type { OptimizeJobAccepted, OptimizeJobStatusResponse, OptimizeResult } from '../../../lib/types'
+import { ApiError } from '../../../lib/api-client'
 import { buildOptimizeJobStorageKey, readActiveOptimizeJob } from './job-progress'
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { useOptimizationJob } from './useOptimizationJob'
@@ -76,7 +77,7 @@ beforeEach(() => {
   vi.useFakeTimers()
   vi.setSystemTime(new Date('2026-07-10T00:00:00.000Z'))
   window.sessionStorage.clear()
-  mocks.fetchOptimizationJob.mockResolvedValue(cancelled)
+  mocks.fetchOptimizationJob.mockReset().mockResolvedValue(cancelled)
   mocks.submitOptimizationJob.mockReset()
 })
 
@@ -84,7 +85,70 @@ afterEach(() => {
   cleanup()
   vi.useRealTimers()
   vi.clearAllMocks()
+  vi.restoreAllMocks()
   mocks.listener = null
+})
+
+describe('useOptimizationJob connection recovery', () => {
+  it.each(['succeeded', 'failed'] as const)('keeps the active progress through transient failures until the job %s', async (status) => {
+    const running = {
+      ...accepted,
+      status: 'running',
+      poll_after_ms: 500,
+      estimate_phase: 'running',
+      calculation_stage: 'generating_schedule',
+    } as OptimizeJobStatusResponse
+    const generated = { upgrade_suggestions: [] } as unknown as OptimizeResult
+    const terminal = status === 'succeeded'
+      ? { ...running, status, estimate_phase: 'completed', result: generated } as OptimizeJobStatusResponse
+      : { ...cancelled, status, estimate_phase: 'failed', error: '计算失败', error_code: 'OPTIMIZATION_FAILED' } as OptimizeJobStatusResponse
+    const failures = [
+      new ApiError('Network request failed.', 0, { code: 'network_error' }, ''),
+      new ApiError('Request timed out.', 0, { code: 'request_timeout' }, ''),
+      new ApiError('Request was cancelled.', 0, { code: 'request_aborted' }, ''),
+      new ApiError('Expected a JSON response.', 200, { code: 'invalid_response' }, ''),
+      new ApiError('Service unavailable.', 503, null, ''),
+    ]
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    mocks.submitOptimizationJob.mockResolvedValue({ ...accepted, poll_after_ms: 500 })
+    mocks.fetchOptimizationJob.mockReset().mockResolvedValueOnce(running)
+    for (const error of failures) mocks.fetchOptimizationJob.mockRejectedValueOnce(error)
+    mocks.fetchOptimizationJob.mockResolvedValueOnce(running).mockResolvedValueOnce(terminal)
+    const progressRef = { current: null as ScheduleProgressState | null }
+    const { result } = renderHook(() => useOptimizationJob({
+      profileId: 'profile-1', orderHash: 'order-1', signature: 'signature-1', progressRef, setProgress: vi.fn(),
+    }))
+    const storageKey = buildOptimizeJobStorageKey('profile-1', 'order-1', 'signature-1', 'generate')
+    let polling!: Promise<OptimizeResult>
+    let settled = false
+    await act(async () => {
+      polling = result.current.runOptimizationJob({} as CreateOptimizationJobRequest, 'generate', '同步任务失败')
+      void polling.then(() => { settled = true }, () => { settled = true })
+    })
+    await act(async () => { await vi.advanceTimersByTimeAsync(500) })
+    const lastSuccessfulSyncAt = progressRef.current?.lastSuccessfulSyncAt
+    for (const [index, delay] of [500, 1_000, 2_000, 4_000, 8_000].entries()) {
+      await act(async () => { await vi.advanceTimersByTimeAsync(delay) })
+      expect(settled).toBe(false)
+      expect(progressRef.current).toMatchObject({
+        jobId: accepted.job_id, queueStatus: 'running', calculationStage: 'generating_schedule',
+        connectionStatus: 'reconnecting', consecutivePollFailures: index + 1, lastSuccessfulSyncAt,
+      })
+      expect(readActiveOptimizeJob(storageKey)?.progress).toMatchObject({ connectionStatus: 'reconnecting' })
+    }
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000) })
+    expect(progressRef.current).toMatchObject({ connectionStatus: 'connected', consecutivePollFailures: 0 })
+    expect(progressRef.current!.lastSuccessfulSyncAt).toBeGreaterThan(lastSuccessfulSyncAt!)
+    const completion = status === 'succeeded'
+      ? expect(polling).resolves.toBe(generated)
+      : expect(polling).rejects.toMatchObject({ status: 'failed', code: 'OPTIMIZATION_FAILED' })
+    await act(async () => { await vi.advanceTimersByTimeAsync(500) })
+    await completion
+    expect(mocks.submitOptimizationJob).toHaveBeenCalledOnce()
+    expect(readActiveOptimizeJob(storageKey)).toBeNull()
+    expect(mocks.listener).toBeNull()
+    expect(vi.getTimerCount()).toBe(0)
+  })
 })
 
 describe('useOptimizationJob cancellation synchronization', () => {

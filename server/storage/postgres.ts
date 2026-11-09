@@ -1,6 +1,8 @@
-import { Client, Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg'
+import { Client, Pool, type QueryResult, type QueryResultRow } from 'pg'
+import { DrizzleQueryError } from 'drizzle-orm'
 import { describeServerError } from '../security/error-reporting'
 import { observePostgresPool } from './postgres-observation'
+import { createDrizzleExecutor, drizzleTransactionClient } from './drizzle-executor'
 
 let pool: Pool | null = null
 let poolClosing: Promise<void> | null = null
@@ -150,30 +152,32 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,
   values: unknown[] = [],
 ): Promise<QueryResult<T>> {
+  return retryPostgresQuery(() => createDrizzleExecutor(getPool(), resolvePostgresQueryTimeoutMs())<T>(text, values))
+}
+
+export async function retryPostgresQuery<T>(work: () => PromiseLike<T>): Promise<T> {
   let attempt = 0
   while (true) {
     try {
-      return await getPool().query<T>({
-        text,
-        values,
-        query_timeout: resolvePostgresQueryTimeoutMs(),
-      })
+      return await work()
     } catch (error) {
+      // Drizzle's wrapper includes SQL and parameters; preserve the original pg error for callers and logs.
+      const cause = error instanceof DrizzleQueryError && error.cause instanceof Error ? error.cause : error
       attempt += 1
-      if (!isRetriablePostgresError(error) || attempt > MAX_QUERY_RETRIES) {
-        throw error
+      if (!isRetriablePostgresError(cause) || attempt > MAX_QUERY_RETRIES) {
+        throw cause
       }
       await sleep(retryDelayMs(attempt))
     }
   }
 }
 
-export async function withTransaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
+export async function withTransaction<T>(work: (client: QueryClient) => Promise<T>): Promise<T> {
   const client = await getPool().connect()
   let discard = false
   try {
     await client.query('begin')
-    const result = await work(client)
+    const result = await work(drizzleTransactionClient(client))
     await client.query('commit')
     return result
   } catch (error) {
@@ -243,10 +247,7 @@ function sleep(ms: number): Promise<void> {
 export async function checkPostgresHealth(): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!hasDatabaseUrl()) return { ok: false, error: 'DATABASE_URL not configured' }
   try {
-    await getPool().query({
-      text: 'select 1',
-      query_timeout: resolvePostgresHealthQueryTimeoutMs(),
-    })
+    await createDrizzleExecutor(getPool(), resolvePostgresHealthQueryTimeoutMs())('select 1')
     return { ok: true }
   } catch (error) {
     return { ok: false, error: describeServerError(error).message }

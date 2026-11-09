@@ -104,7 +104,7 @@ export default async (req: Request): Promise<Response> => {
       const include = url.searchParams.get('include')
       const authentication = await authenticateAdminRequest(
         req,
-        include === 'workspaces' || include === 'operators' || Boolean(userId)
+        include === 'workspaces' || include === 'operators' || userId
           ? 'sensitive_data_view'
           : 'user_view',
       )

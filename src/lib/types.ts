@@ -622,6 +622,7 @@ export interface DroneAssignment {
 }
 
 export interface DailyProduction {
+  originium_shard_inventory?: number;
   orundum_optimization?: {
     preference: OrundumPreference;
     production_capacity: number;

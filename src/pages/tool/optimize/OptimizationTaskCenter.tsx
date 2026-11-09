@@ -182,11 +182,13 @@ function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario, onOpenRe
           {terminalFailure && <div className="mt-2 text-sm leading-6 text-ink-secondary">
             <p>{job.error.message}</p>
           </div>}
-          <details className="task-center-details mt-2 text-xs text-ink-muted">
-            <summary>{copy.optimize.taskCenterDetails}</summary>
-            <p>{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_042} <span className="font-mono">{job.id.slice(0, 8)}</span> · {job.attemptCount} {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_025}</p>
-            {terminalFailure && <p>{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_027}：{job.error.supportReference}</p>}
-          </details>
+          {terminalFailure && (
+            <details className="task-center-details mt-2 text-xs text-ink-muted">
+              <summary>{copy.optimize.taskCenterDetails}</summary>
+              <p>{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_042} <span className="font-mono">{job.id.slice(0, 8)}</span> · {job.attemptCount} {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_025}</p>
+              <p>{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_027}：{job.error.supportReference}</p>
+            </details>
+          )}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           {job.canCancel && <button type="button" disabled={busy} onClick={onCancel} className="tool-secondary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_020}</button>}

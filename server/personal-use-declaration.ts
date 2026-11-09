@@ -6,7 +6,7 @@ import {
   type PublicPersonalUseDeclaration,
 } from '../src/lib/personal-use-declaration'
 
-export { type PersonalUseDeclarationAction }
+export type { PersonalUseDeclarationAction }
 
 export const CURRENT_PERSONAL_USE_DECLARATION = Object.freeze({
   ...PERSONAL_USE_DECLARATION,

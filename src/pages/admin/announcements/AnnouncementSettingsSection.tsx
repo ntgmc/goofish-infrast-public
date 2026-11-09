@@ -96,7 +96,7 @@ export default function AnnouncementSettingsSection({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-base font-semibold text-ink-primary">站内公告</h2>
-            <p className="mt-1 text-sm leading-6 text-ink-secondary">发布后可在公告中心查看。设置提醒截止时间可在用户访问时提醒；每次访问最多提醒一条，按列表顺序优先展示。</p>
+            <p className="mt-1 text-sm leading-6 text-ink-secondary">发布后可在公告中心查看，最新公告以简短公告条展示，用户可主动展开。设置提醒截止时间后，登录用户每次访问最多弹窗提醒一条，按列表顺序优先展示。</p>
           </div>
           <button type="button" onClick={addAnnouncement} className="tool-secondary-action px-3 text-sm">新增公告</button>
         </div>

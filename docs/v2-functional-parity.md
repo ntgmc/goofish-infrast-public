@@ -22,13 +22,16 @@ V2 导航不再提供旧版入口。旧版首页 `/v1` 与工作台 `/tool/*` �
 | 结果后的手动调整、草稿、导入导出与模拟 | 排班总览的手动调整 | `ManualScheduleEditor` |
 | 干员培养收益与成本建议 | 结果中的培养建议 | `UpgradeSuggestions` |
 | 常用配置、历史分页、归档、恢复与删除 | 历史方案 | 独立 `History` 页面、`useOptimizeWorkspace` |
-| 多配置计算和应用配置 | 方案对比 | 独立 `Comparison` 页面、`useScenarioComparison` |
+| 多配置计算和应用配置 | 比较基建配置 | 独立 `Comparison` 页面、`useScenarioComparison` |
+| 已有排班的产量、效率与干员安排对比 | 实用工具 → 比较已有排班 | `ScheduleComparison` 页面、共享排班模拟 |
 | 独立手动排班、培养规划、仓库价值 | 实用工具 | 独立 `ManualTool`、`Cultivation`、`Depot` 页面及共享业务 hook |
 | 切换账号、档案名称与备注 | 账号与档案、顶栏账号菜单 | 独立 `Accounts` 页面、`useProfiles`、`useProfileDetails`、`useToolSession` |
 | 免费账号绑定、CDK 和道具兑换 | 添加账号 | 独立 `AddAccount` 页面、`useAccountRedemption`、`SklandBindingDialog` |
 | 使用已有 CDK 升级当前免费档案 | 添加账号中的现有档案升级 | `PreviewUpgradePanel`、`handleUpgradePreviewProfile` |
-| 库存自动配置、固定换班时长、配置差异与保存重试 | 基建配置 | `ConfigEditor`、`ConfigSaveStatus` |
-| 密码、通知、授权、动画偏好与注销 | 账号设置 | 独立 `Settings` 页面、`useAccountSettings`、共享通知与偏好控件 |
+| 干员导入、同步与数据查看 | 编辑干员（打开抽屉） | `OperatorManagementPanel` |
+| 库存自动配置、固定换班时长、配置差异与保存重试 | 编辑基建（打开抽屉） | `ConfigEditor`、`ConfigSaveStatus` |
+| 主题与动画偏好 | 侧栏常驻的外观与动画、账号设置 → 使用偏好；顶栏保留主题快捷切换 | `AppearanceSettings`、`ThemeSwitcher`、`AnimationSettings` |
+| 密码、通知、授权与注销 | 账号设置 | 独立 `Settings` 页面、`useAccountSettings`、共享通知控件 |
 | 道具与档案容量 | 背包 | 独立 `Inventory` 页面、`useInventory` |
 | 已开放的按次账号和余额 | 对应导航入口 | 独立 `Billing` 页面、原业务 hook 与服务开关 |
 | 公告、未读数量、标记已读和弹窗 | 查看公告 | 独立 `Announcements` 页面、共享公告 hook 与弹窗 |

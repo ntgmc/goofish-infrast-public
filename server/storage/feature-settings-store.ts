@@ -4,7 +4,10 @@ import {
   SITE_FEATURE_KEYS,
   normalizeSiteFeatureSettings,
 } from '../../src/lib/site-features'
-import { query } from './postgres'
+import { and, eq, sql } from 'drizzle-orm'
+import { getDrizzle } from './drizzle'
+import { featureSettings } from './drizzle-schema'
+import { retryPostgresQuery } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import { SettingsConflictError } from './settings-conflict'
 
@@ -30,40 +33,33 @@ export function validateSiteFeatures(value: unknown): SiteFeatures {
 
 export async function getSiteFeatureSettings(): Promise<AdminSiteFeatureSettingsV1> {
   await ensureSchema()
-  const result = await query<{ record_json: SiteFeatureSettingsV1; revision: number }>(
-    'select record_json, revision from feature_settings where key = $1',
-    [FEATURE_SETTINGS_KEY],
-  )
-  const row = result.rows[0]
-  return { ...normalizeSiteFeatureSettings(row?.record_json), revision: row?.revision ?? 0 }
+  const rows = await retryPostgresQuery(() => getDrizzle()
+    .select({ recordJson: featureSettings.recordJson, revision: featureSettings.revision })
+    .from(featureSettings)
+    .where(eq(featureSettings.key, FEATURE_SETTINGS_KEY)))
+  const row = rows[0]
+  return { ...normalizeSiteFeatureSettings(row?.recordJson), revision: row?.revision ?? 0 }
 }
 
 export async function saveSiteFeatureSettings(features: SiteFeatures, expectedRevision: number): Promise<AdminSiteFeatureSettingsV1> {
   await ensureSchema()
+  const updatedAt = new Date().toISOString()
   const saved: SiteFeatureSettingsV1 = {
     version: 1,
     features: { ...features },
-    updated_at: new Date().toISOString(),
+    updated_at: updatedAt,
   }
-  const result = await query<{ revision: number }>(
-    `with updated as (
-       update feature_settings
-       set record_json = $2::jsonb, updated_at = $3::timestamptz, revision = revision + 1
-       where key = $1 and revision = $4
-       returning revision
-     ), inserted as (
-       insert into feature_settings (key, record_json, updated_at, revision)
-       select $1, $2::jsonb, $3::timestamptz, 1
-       where $4 = 0 and not exists (select 1 from feature_settings where key = $1)
-       on conflict (key) do nothing
-       returning revision
-     )
-     select revision from updated
-     union all
-     select revision from inserted`,
-    [FEATURE_SETTINGS_KEY, JSON.stringify(saved), saved.updated_at, expectedRevision],
-  )
-  const revision = result.rows[0]?.revision
+  const values = { recordJson: saved, updatedAt }
+  const rows = await retryPostgresQuery(() => expectedRevision === 0
+    ? getDrizzle().insert(featureSettings)
+      .values({ key: FEATURE_SETTINGS_KEY, ...values, revision: 1 })
+      .onConflictDoNothing({ target: featureSettings.key })
+      .returning({ revision: featureSettings.revision })
+    : getDrizzle().update(featureSettings)
+      .set({ ...values, revision: sql`${featureSettings.revision} + 1` })
+      .where(and(eq(featureSettings.key, FEATURE_SETTINGS_KEY), eq(featureSettings.revision, expectedRevision)))
+      .returning({ revision: featureSettings.revision }))
+  const revision = rows[0]?.revision
   if (revision === undefined) throw new SettingsConflictError()
   return { ...saved, revision }
 }

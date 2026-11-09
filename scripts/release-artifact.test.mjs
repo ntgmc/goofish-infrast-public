@@ -124,7 +124,7 @@ test('binds real Web and server builds to their compiled metadata across partial
     await cp(join(root, 'scripts/build-server.mjs'), join(fixture.source, 'scripts/build-server.mjs'))
     await writeFile(join(fixture.source, 'index.html'), '<!doctype html><script type="module" src="/src/main.ts"></script>')
     await writeFile(join(fixture.source, 'src/main.ts'), "import { APP_BUILD_META } from './lib/.generated/build-meta'; console.log(APP_BUILD_META)")
-    for (const entry of ['server/index.ts', 'server/routes.ts', 'server/migrate.ts', 'server/cultivation/cultivation-worker.ts', 'scripts/import-prts-planning.mjs', 'scripts/sync-prts-planning.mjs']) {
+    for (const entry of ['server/index.ts', 'server/http-server.ts', 'server/migrate.ts', 'server/cultivation/cultivation-worker.ts', 'scripts/import-prts-planning.mjs', 'scripts/sync-prts-planning.mjs']) {
       const target = join(fixture.source, entry)
       await mkdir(dirname(target), { recursive: true })
       const metadataImport = entry.includes('/cultivation/') ? '../../src/lib/.generated/build-meta.ts' : '../src/lib/.generated/build-meta.ts'

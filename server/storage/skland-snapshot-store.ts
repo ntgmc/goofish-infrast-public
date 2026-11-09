@@ -1,4 +1,4 @@
-import type { PoolClient } from 'pg'
+import type { QueryClient } from './postgres'
 import type { SklandResource } from '../../src/lib/skland-snapshot'
 import { query } from './postgres'
 import { ensureDatabaseSchema as ensureSchema } from './schema'
@@ -15,7 +15,7 @@ export type SklandSnapshotRecord = {
 }
 export type StoredSklandSnapshot = SklandSnapshotRecord & { version: string }
 
-export async function readSklandSnapshot(userId: string, uid: string, client?: Pick<PoolClient, 'query'>): Promise<StoredSklandSnapshot | null> {
+export async function readSklandSnapshot(userId: string, uid: string, client?: QueryClient): Promise<StoredSklandSnapshot | null> {
   if (!client) await ensureSchema()
   const result = await (client ?? { query }).query<{ record_json: SklandSnapshotRecord; version: string }>(
     "select record_json, version::text from skland_snapshots where user_id = $1 and uid = $2 and record_json->>'schemaVersion' = '1'", [userId, uid],
@@ -26,7 +26,7 @@ export async function readSklandSnapshot(userId: string, uid: string, client?: P
 
 // The profile lock serializes publication with credential clearing and binding changes.
 export async function saveSklandSnapshot(
-  client: Pick<PoolClient, 'query'>, profile: UserGameAccountRecord, snapshot: SklandSnapshotRecord,
+  client: QueryClient, profile: UserGameAccountRecord, snapshot: SklandSnapshotRecord,
 ): Promise<StoredSklandSnapshot | null> {
   const binding = profile.skland_binding
   if (!binding?.encrypted_cred) return null

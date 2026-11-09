@@ -1,5 +1,5 @@
+import type { QueryClient } from '../storage/postgres'
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
-import type { PoolClient } from 'pg'
 import type { OptimizeResult } from '../../src/lib/types'
 import { getRequestClientIp } from '../security/client-ip'
 import { hasDatabaseUrl } from '../storage/postgres'
@@ -54,7 +54,7 @@ export async function recordRequestBehaviorEvent(input: {
 }
 
 export async function recordRequestBehaviorEventInTransaction(
-  client: Pick<PoolClient, 'query'>,
+  client: QueryClient,
   input: Parameters<typeof recordRequestBehaviorEvent>[0],
 ): Promise<boolean> {
   const keyring = getBehaviorRiskKeyring()

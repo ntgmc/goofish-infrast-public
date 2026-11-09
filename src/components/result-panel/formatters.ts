@@ -179,19 +179,11 @@ export function prepareResult(
   const maaDefaultComparison = !isRotationMode && result.maa_default_comparison
     ? (() => {
         const comparison = result.maa_default_comparison
-        const deltaDaily: Partial<DailyProduction> = {
-          manufacturing: comparison.delta.manufacturing,
-          recycling: comparison.delta.recycling,
-          trading: comparison.delta.trading,
-          consumption: comparison.delta.consumption,
-          net: comparison.delta.net,
-          drones: comparison.delta.drones,
-        }
         const baselineSanity = calculateProductionSanity(comparison.baseline.daily_production ?? {})
-        const sanityDelta = calculateProductionSanity(deltaDaily)
+        const sanityDelta = productionSanity.value - baselineSanity.value
         return {
-          sanityDelta: sanityDelta.value,
-          sanityDeltaNote: `${copy.domain.components_result_panel_formatters_011}${formatSigned(sanityDelta.value)}${copy.domain.components_result_panel_formatters_012}${sanityDelta.note}）`,
+          sanityDelta,
+          sanityDeltaNote: `${copy.domain.components_result_panel_formatters_011}${formatSigned(sanityDelta)}${copy.domain.components_result_panel_formatters_012}（${productionSanity.note}）-（${baselineSanity.note}））`,
           baselineSanity: baselineSanity.value,
           totalEfficiencyDelta: comparison.delta.total_efficiency,
           rawTotalEfficiencyDelta: comparison.delta.raw_total_efficiency,

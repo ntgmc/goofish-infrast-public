@@ -1,7 +1,7 @@
 import type { Announcement, AnnouncementStats as AnnouncementReachStats } from '../../../lib/types'
 import type { ReactNode } from 'react'
 
-import { Permission, GeneratedPermission, CdkStatus, AppUserStatus, FieldErrors, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, CdkPermissionDistribution, CdkStatusDistribution, RiskReasonStats, RiskTrendDay, CdkOpsSummary, RiskControlSettings, AdminProfileAccessSummary, AdminProfileOperatorData, permissionLabels, statusLabels, appUserStatusLabels, cdkProductPermissions, cdkProductPermissionRank } from '../contracts'
+import { type Permission, type GeneratedPermission, type CdkStatus, type AppUserStatus, type FieldErrors, type GeneratedCdk, type AdminCdkCreateResponse, type AdminCdkRecord, type CdkPermissionDistribution, type CdkStatusDistribution, type RiskReasonStats, type RiskTrendDay, type CdkOpsSummary, type RiskControlSettings, type AdminProfileAccessSummary, type AdminProfileOperatorData, permissionLabels, statusLabels, appUserStatusLabels, cdkProductPermissions, cdkProductPermissionRank } from '../contracts'
 
 export function DetailItem({ label, value }: { label: ReactNode; value: string }) {
   return (

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type SyntheticEvent } from 'react'
 import { Link } from 'react-router'
+import ReactMarkdown from 'react-markdown'
 import { useQueryClient } from '@tanstack/react-query'
 import { updateUserAnnouncementQueries, useUserAnnouncementsQuery, type UserAnnouncementsResponse } from '../lib/announcement-query'
 import type { Announcement } from '../lib/types'
@@ -31,7 +32,8 @@ export default function AnnouncementPopup({ announcements, userId, onUnreadCount
   const [marking, setMarking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
-  const initialFocusRef = useRef<HTMLButtonElement>(null)
+  const initialFocusRef = useRef<HTMLHeadingElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
   const restoreFocusRef = useRef<HTMLElement | null>(null)
   const currentUserRef = useRef(userId)
   currentUserRef.current = userId
@@ -76,7 +78,9 @@ export default function AnnouncementPopup({ announcements, userId, onUnreadCount
       rememberShownThisVisit()
       void reportAnnouncementEvent('announcement_impression', current, 'popup_impression')
     }
-    initialFocusRef.current?.focus()
+    dialog.scrollTop = 0
+    if (bodyRef.current) bodyRef.current.scrollTop = 0
+    initialFocusRef.current?.focus({ preventScroll: true })
 
     let expiryTimer: number | undefined
     const checkExpiry = () => {
@@ -99,6 +103,7 @@ export default function AnnouncementPopup({ announcements, userId, onUnreadCount
 
   if (!current) return null
 
+  const summary = Array.from(current.body.split(/\r?\n\s*\r?\n/).find((block) => !block.trimStart().startsWith('#')) ?? '').slice(0, 160).join('')
   const dismiss = () => { setCurrent(null); setError(null) }
   const markCurrentRead = async () => {
     if (marking) return
@@ -118,7 +123,10 @@ export default function AnnouncementPopup({ announcements, userId, onUnreadCount
       void reportAnnouncementEvent('announcement_read', current, 'popup_read')
       dismiss()
     } catch (cause) {
-      if (currentUserRef.current === userId) setError(getApiErrorMessage(cause, copy.public.announcement_popup_read_failed))
+      if (currentUserRef.current === userId) {
+        setError(getApiErrorMessage(cause, copy.public.announcement_popup_read_failed))
+        if (bodyRef.current) bodyRef.current.scrollTop = 0
+      }
     } finally {
       if (currentUserRef.current === userId) setMarking(false)
     }
@@ -129,24 +137,39 @@ export default function AnnouncementPopup({ announcements, userId, onUnreadCount
     dismiss()
   }
 
+  const handleKeyDown = (event: KeyboardEvent<HTMLDialogElement>) => {
+    if (event.key !== 'Tab') return
+    const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(isAvailableFocusTarget)
+    const first = controls[0]
+    const last = controls[controls.length - 1]
+    const active = document.activeElement
+    let target: HTMLElement | undefined
+    if (event.shiftKey && (active === first || active === initialFocusRef.current)) target = last
+    else if (!event.shiftKey && active === last) target = first
+    if (target) {
+      event.preventDefault()
+      target.focus({ preventScroll: true })
+    }
+  }
+
   return (
-    <dialog ref={dialogRef} aria-labelledby="announcement-popup-title" aria-describedby="announcement-popup-body" aria-modal="true"
-      onCancel={handleCancel} className="m-auto max-h-[calc(100dvh-4rem)] w-[calc(100%-2rem)] max-w-lg overflow-y-auto border-0 bg-transparent p-0 text-left backdrop:bg-black/55">
-      <section className="tool-panel w-full max-w-lg p-5 text-left shadow-xl">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="tool-eyebrow">{copy.public.components_AnnouncementPopup_001}</p>
-            <h2 id="announcement-popup-title" className="mt-1 break-words text-lg font-semibold text-ink-primary">{current.title}</h2>
-          </div>
-          <Link to={announcementsPath} onClick={dismiss} className="tool-secondary-action shrink-0 whitespace-nowrap px-3 text-sm">
+    <dialog ref={dialogRef} aria-labelledby="announcement-popup-title" aria-describedby={summary ? 'announcement-popup-summary' : undefined} aria-modal="true"
+      onCancel={handleCancel} onKeyDown={handleKeyDown} className="m-auto max-h-[calc(100dvh-24px)] w-[calc(100%-24px)] max-w-lg overflow-hidden border-0 bg-transparent p-0 text-left backdrop:bg-black/55">
+      <section className="tool-panel flex max-h-[calc(100dvh-24px)] w-full max-w-lg flex-col p-4 text-left shadow-xl sm:p-5">
+        <div className="shrink-0">
+          <Link to={announcementsPath} onClick={dismiss} className="tool-eyebrow inline-flex min-h-[44px] items-center underline underline-offset-4">
             {copy.public.components_AnnouncementPopup_002}
           </Link>
+          <h2 ref={initialFocusRef} id="announcement-popup-title" tabIndex={-1} className="mt-2 break-words text-lg font-semibold text-ink-primary outline-none">{current.title}</h2>
         </div>
-        <AnnouncementMarkdown id="announcement-popup-body" className="mt-4" onInternalNavigate={dismiss}>{current.body}</AnnouncementMarkdown>
-        {error && <p className="tool-alert tool-alert--error mt-4" role="alert">{error}</p>}
-        <div className="mt-6 flex flex-wrap justify-end gap-2">
-          <button ref={initialFocusRef} type="button" onClick={dismiss} className="tool-secondary-action whitespace-nowrap">{copy.public.announcement_popup_later}</button>
-          <button type="button" onClick={() => void markCurrentRead()} disabled={marking} aria-busy={marking} className="tool-primary-action whitespace-nowrap">
+        {summary && <p id="announcement-popup-summary" className="mt-3 line-clamp-2 shrink-0 text-sm leading-6 text-ink-secondary"><ReactMarkdown allowedElements={[]} unwrapDisallowed skipHtml>{summary}</ReactMarkdown></p>}
+        <div ref={bodyRef} role="region" aria-labelledby="announcement-popup-title" tabIndex={0} className="mt-4 min-h-0 overflow-y-auto overscroll-contain border-y border-surface-3 py-3 focus-visible:outline-2 focus-visible:outline-brand-500">
+          {error && <p className="tool-alert tool-alert--error mb-4" role="alert">{error}</p>}
+          <AnnouncementMarkdown id="announcement-popup-body" onInternalNavigate={dismiss}>{current.body}</AnnouncementMarkdown>
+        </div>
+        <div className="mt-4 grid shrink-0 grid-cols-2 gap-2">
+          <button type="button" onClick={dismiss} className="tool-secondary-action whitespace-normal px-3">{copy.public.announcement_popup_later}</button>
+          <button type="button" onClick={() => void markCurrentRead()} disabled={marking} aria-busy={marking} className="tool-primary-action whitespace-normal px-3">
             {marking ? copy.public.announcement_popup_marking : copy.public.components_AnnouncementPopup_003}
           </button>
         </div>

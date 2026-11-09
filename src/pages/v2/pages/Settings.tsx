@@ -3,7 +3,7 @@ import { NotificationSettingsIcon as Bell, SecurityIcon as LockKeyhole, Personal
 import { copy } from '../../../copy'
 import { AUTH_EMAIL_MAX_LENGTH, AUTH_PASSWORD_MAX_LENGTH } from '../../../lib/auth-constraints'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
-import AnimationSettings from '../../../components/AnimationSettings'
+import AppearanceSettings from '../AppearanceSettings'
 import AccountDeletionSurvey from '../../../components/AccountDeletionSurvey'
 import DebugModePanel from '../../../components/DebugModePanel'
 import QqBotSettingsPanel from '../../../components/QqBotSettingsPanel'
@@ -39,7 +39,7 @@ export default function Settings({ session }: { session: V2Session }) {
           <button type="submit" className="v2-button v2-button-primary" disabled={model.loading}>{model.loading ? labels.pages_tool_dashboard_SettingsSection_020 : labels.pages_tool_dashboard_SettingsSection_021}</button>
         </form>
       </section>
-      <section hidden={section !== 'preferences'}><SectionTitle title={text.preferences} description={copy.v2.preferenceDescription} /><AnimationSettings className="v2-preference-control" /><DebugModePanel /></section>
+      <section hidden={section !== 'preferences'}><SectionTitle title={text.preferences} description={copy.v2.preferenceDescription} /><div className="v2-preference-control"><AppearanceSettings /></div><DebugModePanel /></section>
       {features.qqbot && <section hidden={section !== 'notifications'}><QqBotSettingsPanel /></section>}
       <section hidden={section !== 'data'}>
         <SectionTitle title={text.data} />

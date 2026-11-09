@@ -54,7 +54,7 @@ export const featuresCopy = {
     service_status: '服务状态页面',
     cultivation_plan: '练度推荐',
     manual_schedule: '手动排班与模拟',
-    scenario_comparison: '方案对比',
+    scenario_comparison: '基建配置对比',
     notifications: '站内通知',
     qqbot: 'QQ 绑定与通知',
     maa_export: 'MAA 排班导出',

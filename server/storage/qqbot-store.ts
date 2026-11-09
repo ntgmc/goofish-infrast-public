@@ -1,5 +1,5 @@
+import type { QueryClient } from './postgres'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import type { PoolClient } from 'pg'
 import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import { getUserById, type UserAccountRecord } from './user-store'
@@ -109,7 +109,7 @@ export async function unbindQqBotAccount(userId: string, bindingId?: string): Pr
 }
 
 export async function enqueueQqBotScheduleNotificationInTransaction(
-  client: PoolClient,
+  client: QueryClient,
   input: { profileId: string; resultId: string; title: string; now: string },
 ): Promise<void> {
   await client.query(

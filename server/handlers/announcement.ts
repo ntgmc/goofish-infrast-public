@@ -355,7 +355,7 @@ export function normalizeAnnouncementData(value: unknown): AnnouncementData {
     const items = value.announcements
       .map(normalizeAnnouncementItem)
       .filter((item): item is Announcement => Boolean(item))
-    const hasExplicitBanner = Object.prototype.hasOwnProperty.call(value, 'banner')
+    const hasExplicitBanner = Object.hasOwn(value, 'banner')
     const banner = hasExplicitBanner
       ? normalizeBannerItem(value.banner)
       : items.filter((item) => item.kind === 'banner').sort(compareNewestFirst)[0] ?? null

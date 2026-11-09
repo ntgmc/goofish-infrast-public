@@ -8,6 +8,7 @@ import { isPrivateOptimizerSource } from './private-optimizer-sources.mjs'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const temporaryRoot = await mkdtemp(join(root, '.public-export-check-'))
 const includedTopLevel = new Set([
+  '.gitignore',
   'src',
   'server',
   'scripts',
@@ -18,6 +19,7 @@ const includedTopLevel = new Set([
   'package.json',
   'pnpm-lock.yaml',
   'pnpm-workspace.yaml',
+  'biome.json',
   'optimizer-port-contract.json',
   'tsconfig.json',
   'tsconfig.server.json',
@@ -31,6 +33,7 @@ try {
   const nodeModulesTarget = join(root, 'node_modules')
   await symlink(nodeModulesTarget, join(temporaryRoot, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir')
 
+  runPnpm(['run', 'check:lint'], temporaryRoot)
   runPnpm(['run', 'build'], temporaryRoot)
   const assetsRoot = join(temporaryRoot, 'dist/assets')
   for (const file of await readdir(assetsRoot)) {
