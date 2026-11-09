@@ -1932,6 +1932,7 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
   scrollbar-color: var(--color-v2-control) transparent;
   overscroll-behavior: contain;
 }
+.v2-operators-drawer { width: min(800px, 100%) !important; }
 .v2-operators-drawer .v2-drawer-body { scroll-padding-top: calc(44px + 2 * var(--text-sm) + 3 * var(--space-xs)); }
 .v2-management-drawer .v2-text-button { min-height: 44px; }
 :is(.v2-operator-management, .v2-account-content) h3 { font-size: var(--text-sm); }
@@ -1985,20 +1986,34 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
   border-bottom: 1px solid var(--v2-line);
 }
 
-.v2-operator-entry {
-  padding-bottom: var(--space-sm);
-  border-bottom: 1px solid var(--v2-line);
-  content-visibility: auto;
-  contain-intrinsic-size: auto 140px;
-}
+.v2-operator-grid { min-width: 0; }
+.v2-operator-grid-row { display: grid; grid-template-columns: repeat(var(--v2-operator-columns), minmax(0, 1fr)); align-items: start; gap: var(--space-2xs); padding-bottom: var(--space-2xs); }
+.v2-operator-entry { position: relative; min-width: 0; padding: var(--space-2xs); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-control); background: var(--v2-paper); }
+.v2-operator-entry [data-reveal-content] { display: flex; min-height: calc(9.5rem - 2 * var(--space-2xs) - 2px); flex-direction: column; }
+.v2-operator-entry .v2-operator-row > strong { display: flex; align-items: center; height: 2.8em; line-height: 1.4; }
 .v2-operator-virtual-list { position: relative; overflow-anchor: none; }
-.v2-operator-virtual-row {
-  position: absolute;
-  inset: 0 0 auto;
-  content-visibility: visible;
-  contain-intrinsic-size: none;
-}
-.v2-operator-entry .v2-operator-row, .v2-room-operator .v2-operator-row { border: 0; }
+.v2-operator-virtual-row { position: absolute; inset: 0 0 auto; }
+.v2-room-operator .v2-operator-row { border: 0; }
+.v2-operator-entry .v2-operator-row { position: relative; display: grid; grid-template-columns: clamp(48px, calc(100% - 4em - var(--space-3xs)), 64px) minmax(0, 1fr); align-items: center; gap: var(--space-3xs); padding: 0; border: 0; font-size: var(--text-sm); }
+.v2-operator-entry .v2-operator-portrait { grid-row: span 2; align-self: start; }
+.v2-operator-entry .v2-avatar { display: block; width: 100%; height: auto; aspect-ratio: 1; }
+.v2-operator-entry .v2-operator-training { display: flex; height: 3em; align-content: start; align-items: start; flex-wrap: wrap; gap: 0 var(--space-3xs); text-align: left; font-size: var(--text-xs); line-height: 1.5; }
+.v2-operator-entry .v2-operator-status { font-size: var(--text-xs); }
+.v2-operator-entry .v2-operator-row > .v2-operator-status { position: absolute; inset-inline-start: 0; bottom: 0; }
+.v2-operator-entry > .v2-operator-card-trigger { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; padding: 0; border-radius: inherit; background: transparent; cursor: pointer; }
+.v2-operator-card-trigger:focus-visible { outline: 2px solid var(--v2-accent); outline-offset: -2px; }
+.v2-operator-skills-preview { display: flex; min-height: 44px; align-items: center; gap: var(--space-3xs); margin-top: auto; padding-top: var(--space-2xs); color: var(--v2-secondary); font-size: var(--text-xs); text-align: left; }
+.v2-operator-skills-preview > :last-child { margin-left: auto; }
+.v2-operator-entry .v2-skill-icons { flex-wrap: wrap; max-width: 44px; }
+.v2-operator-entry .v2-skill-icons img { width: 20px; height: 20px; }
+.v2-operator-entry [data-reveal-content] > .v2-muted { display: flex; align-items: center; min-height: 44px; margin-top: auto; font-size: var(--text-xs); }
+.v2-operator-detail .shared-card-scroll > header { display: flex; align-items: center; gap: var(--space-sm); padding-right: 40px; margin-bottom: var(--space-md); }
+.v2-operator-detail .v2-operator-portrait { flex: none; width: 80px; }
+.v2-operator-detail .v2-avatar { display: block; width: 100%; height: auto; aspect-ratio: 1; }
+.v2-operator-detail h2 { font-size: var(--text-lg); font-weight: 600; overflow-wrap: anywhere; }
+.v2-operator-detail [data-slot="dialog-description"] { margin-top: var(--space-xs); color: var(--v2-secondary); font-size: var(--text-sm); }
+.v2-operator-detail .v2-skill-list { gap: var(--space-md); }
+.v2-operator-detail .v2-skill { padding-top: var(--space-md); border-top: 1px solid var(--v2-line); }
 .v2-building-skills summary { display: flex; min-height: 44px; align-items: center; gap: var(--space-xs); cursor: pointer; color: var(--v2-secondary); }
 .v2-building-skills summary::after { content: '+'; margin-left: auto; font-size: var(--text-md); }
 .v2-building-skills[open] summary::after { content: '−'; }

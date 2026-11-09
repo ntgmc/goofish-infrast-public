@@ -18,6 +18,12 @@ export const motionTokens = {
     enter: [0.16, 1, 0.3, 1] as const,
     exit: [0.4, 0, 1, 1] as const,
   },
+  morph: {
+    type: 'spring',
+    stiffness: 380,
+    damping: 40,
+    mass: 0.85,
+  } satisfies Transition,
   spring: {
     type: 'spring',
     stiffness: 420,

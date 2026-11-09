@@ -24,8 +24,10 @@ it('reveals recycled rows once, preserves virtual positioning and cancels immedi
   }
   const view = render(<List />)
   const row = view.container.querySelector('[data-reveal-id]')!
+  expect(row).toHaveAttribute('data-reveal-pending')
   act(() => enter([{ isIntersecting: true, target: row }] as unknown as IntersectionObserverEntry[], {} as IntersectionObserver))
   expect(animate.mock.instances[0]).toBe(row.firstElementChild)
+  expect(row).not.toHaveAttribute('data-reveal-pending')
   expect(row).toHaveStyle({ transform: 'translateY(140px)' })
   fireEvent.focusIn(view.getByRole('button'))
   expect(cancel).toHaveBeenCalledOnce()
@@ -36,6 +38,35 @@ it('reveals recycled rows once, preserves virtual positioning and cancels immedi
   state.reduced = true
   view.rerender(<List />)
   expect(disconnect).toHaveBeenCalled()
+})
+
+it('animates normal scrolling with staggered cards and skips jumps of nearly a viewport', () => {
+  let enter: IntersectionObserverCallback
+  vi.stubGlobal('IntersectionObserver', class {
+    constructor(callback: IntersectionObserverCallback) { enter = callback }
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  })
+  const animate = vi.fn((_frames: Keyframe[], _options: KeyframeAnimationOptions) => ({ cancel: vi.fn(), onfinish: null }))
+  Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate })
+  function Cards() {
+    const ref = useListReveal(true, 50)
+    return <div className="v2-drawer-body"><div ref={ref}>{['one', 'two', 'three'].map((id) => <div key={id} data-reveal-id={id}>{id}</div>)}</div></div>
+  }
+  const view = render(<Cards />)
+  const scroll = view.container.firstElementChild!
+  Object.defineProperty(scroll, 'clientHeight', { value: 600 })
+  const rows = [...view.container.querySelectorAll('[data-reveal-id]')]
+  scroll.scrollTop = 100
+  fireEvent.scroll(scroll)
+  act(() => enter(rows.slice(0, 2).map((target) => ({ target, isIntersecting: true })) as IntersectionObserverEntry[], {} as IntersectionObserver))
+  expect(animate).toHaveBeenCalledTimes(2)
+  expect(animate.mock.calls[1][1]).toMatchObject({ duration: 240, delay: 50 })
+  scroll.scrollTop = 1100
+  fireEvent.scroll(scroll)
+  act(() => enter([{ target: rows[2], isIntersecting: true }] as IntersectionObserverEntry[], {} as IntersectionObserver))
+  expect(animate).toHaveBeenCalledTimes(2)
 })
 
 it('does not hide or animate search results, including after clearing the filter', () => {

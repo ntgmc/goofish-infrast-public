@@ -72,8 +72,8 @@ it deliberately when changing the shared design.
 - Keep six core tasks in the side rail: overview, generation, history and
   “比较基建配置” under the schedule workspace; cultivation projects and tools in
   their own group. Tools label saved-schedule comparison “比较已有排班”. Use
-  full-width compact “编辑干员” and “编辑基建” actions with trailing pencil icons
-  for configuration drawers, retaining the owned-operator count.
+  full-width compact “干员管理” and “编辑基建” actions for their drawers, retaining the
+  owned-operator count. Use an import icon for operator data and a pencil for configuration.
   The compact brand header and bottom help trigger stay visible while the
   middle navigation scrolls independently. Keep consistent 44px targets,
   visible inset focus rings and copper active icons. Page destinations are
@@ -107,7 +107,18 @@ it deliberately when changing the shared design.
 - Operator and account drawers share a compact fixed heading and an independently
   scrolling body. Keep the operator profile, sync and MAA import actions compact;
   binding timestamps and authorization details expand on demand. The list search
-  stays visible while browsing operators, including virtual rows. Account identity
+  stays visible while browsing operators. The operator drawer grows to 800px on desktop and
+  shows a compact responsive grid with a minimum card width of 8rem and 0.5rem gaps. Reserve two
+  lines for each name beside a prominent 48–64px portrait, with training data wrapping beneath
+  the name. Make the full card a single keyboard-accessible trigger, with skill previews aligned
+  at the bottom. Open full skill descriptions in a wide `SharedCardDialog`; keep the source card compact. Share the background, portrait and
+  name between card and detail, with a heavily damped spring and no bounce. Keep the source mounted
+  during the transition, block wheel input while the shared surface moves, contain detail scrolling
+  at its boundaries and restore the source button's focus on dismissal. Scroll descriptions inside
+  the detail surface so its top-right close control remains visible.
+  Reduced motion switches directly. Virtualize whole rows for large rosters, retaining focused and
+  adjacent rows. Reduce columns with text enlargement. Operator data comes from import or sync.
+  Account identity
   precedes profile switching; mark the selected profile and show pending switches.
   Personal destinations use simple rows, with logout in a separate fixed footer.
   Preserve full names, feature availability, nested binding dialogs and focus return.
@@ -282,9 +293,14 @@ it deliberately when changing the shared design.
   Its purchase action sweeps once on hover or focus. Pointer tilt and spotlight stay off
   on touch; reduced motion keeps the card and illustration static.
 - Operator, tool, inventory and benchmark lists reveal each stable item once per
-  mounted list: 5px travel, 180ms duration, up to six items at 25ms intervals.
-  Animate operator contents inside the virtual positioning shell. Searches show
-  immediately; fast scrolling skips reveals; focusing cancels the item's animation.
+  mounted list: 8px travel, 240ms duration, up to eight items at 25ms intervals, or 50ms for
+  operator cards. Animate operator contents inside the virtual positioning shell. Searches show
+  immediately; prepare each unseen item's initial state before paint to prevent a full-opacity
+  flash. Jumps exceeding 80% of the scrolling viewport skip reveals; focusing cancels the item's
+  animation. Shared card geometry updates on selection changes rather than virtual scrolling.
+- `SharedCardDialog` provides card-to-detail transitions with shared layout IDs and the morph
+  spring (stiffness 380, damping 40, mass 0.85). Keep text in its own shared element or fade it
+  into the destination; do not stretch long descriptions. Use `layoutScroll` on the scroll host.
 - No nested stagger cascades, bounce, overshoot, or parallax in workspaces.
 - Reduced-motion fallback · final numbers and content immediately; no transform;
   retained opacity transitions at or below 150ms.

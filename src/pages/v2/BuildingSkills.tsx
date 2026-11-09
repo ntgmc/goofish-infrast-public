@@ -21,11 +21,16 @@ export default memo(function BuildingSkills({ operator, defaultOpen = false, onO
       {skills.filter((skill) => skill.state === 'active' || skill.state === 'unknown').map((skill) =>
         <img key={skill.id} src={`/building-skills/${skill.icon}.png`} alt={skill.name} width={28} height={28} loading="lazy" decoding="async" />)}
     </span></summary>
-    {open && <div className="v2-skill-list">{skills.map((skill) => <div className={`v2-skill v2-skill-${skill.state}`} key={skill.id}>
-      <img src={`/building-skills/${skill.icon}.png`} alt="" width={32} height={32} loading="lazy" decoding="async" />
-      <div><strong>{skill.name}</strong><p className="v2-muted">{ROOM_LABELS[skill.room] ?? label.training} · {label.unlock(skill.elite, skill.level)}
-        {skill.state !== 'unknown' && <> · {label[skill.state as 'active' | 'locked' | 'upgraded']}</>}</p>
-        <p>{skill.description}</p></div>
-    </div>)}</div>}
+    {open && <BuildingSkillList skills={skills} />}
   </details>
 })
+
+export function BuildingSkillList({ skills }: { skills: ReturnType<typeof operatorBuildingSkills> }) {
+  const label = copy.domain.building_skills
+  return <div className="v2-skill-list">{skills.map((skill) => <div className={`v2-skill v2-skill-${skill.state}`} key={skill.id}>
+    <img src={`/building-skills/${skill.icon}.png`} alt="" width={32} height={32} loading="lazy" decoding="async" />
+    <div><strong>{skill.name}</strong><p className="v2-muted">{ROOM_LABELS[skill.room] ?? label.training} · {label.unlock(skill.elite, skill.level)}
+      {skill.state !== 'unknown' && <> · {label[skill.state as 'active' | 'locked' | 'upgraded']}</>}</p>
+      <p>{skill.description}</p></div>
+  </div>)}</div>
+}

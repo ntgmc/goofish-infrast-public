@@ -96,7 +96,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
                 : <ConfigSaveStatus status={session.configSyncStatus} onRetry={session.retryConfigSave} sample={exampleData} compact />}
           </div>}
         </div>
-        <V2Transition motionKey={isConfig ? 'config' : shownPanel === 'room' ? `room-${room?.key}` : shownPanel ?? 'closed'} className="v2-drawer-body">
+        <V2Transition motionKey={isConfig ? 'config' : shownPanel === 'room' ? `room-${room?.key}` : shownPanel ?? 'closed'} className="v2-drawer-body" layoutScroll>
         {isConfig && (
           <>
             <ConfigCapabilityPreview config={config} enabled={!canEditConfig}>

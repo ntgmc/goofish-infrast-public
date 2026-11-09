@@ -986,7 +986,7 @@ describe('V2 results-first workspace', () => {
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
-  it('refreshes cached teams and expanded skills when saved training and the result change', async () => {
+  it('refreshes cached teams and open skill details when saved training and the result change', async () => {
     const workflow = connect()
     const user = userEvent.setup()
     const page = mount()
@@ -994,18 +994,19 @@ describe('V2 results-first workspace', () => {
     const dialog = within(await screen.findByRole('dialog'))
     await user.type(dialog.getByRole('textbox', { name: copy.v2.searchOperators }), '但书')
     expect(dialog.queryByText('违约索赔·β')).not.toBeInTheDocument()
-    await user.click(dialog.getByText(copy.domain.building_skills.title))
-    expect((await dialog.findByText('违约索赔·β')).closest('.v2-skill')).toHaveClass('v2-skill-active')
+    await user.click(dialog.getByRole('button', { name: copy.v2.operatorManagement.skills('但书') }))
+    const skillDetails = within(await screen.findByRole('dialog', { name: '但书' }))
+    expect((await skillDetails.findByText('违约索赔·β')).closest('.v2-skill')).toHaveClass('v2-skill-active')
 
     workflow.mergedOperators = SAMPLE_OPERATORS.map((operator) => operator.name === '但书' ? { ...operator, elite: 0, level: 1 } : operator)
     const nextResult = structuredClone(SAMPLE_RESULT)
     nextResult.plans[0].rooms.trading[0].level = 2
     workflow.historyItem = { result: nextResult }
     page.rerender(<MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter>)
-    expect(dialog.getByText('违约索赔·β').closest('.v2-skill')).toHaveClass('v2-skill-locked')
-    expect(dialog.getByText('违约索赔·α').closest('.v2-skill')).toHaveClass('v2-skill-active')
-    await user.click(dialog.getByText(copy.domain.building_skills.title))
-    await waitFor(() => expect(dialog.queryByText('违约索赔·β')).not.toBeInTheDocument())
+    expect(skillDetails.getByText('违约索赔·β').closest('.v2-skill')).toHaveClass('v2-skill-locked')
+    expect(skillDetails.getByText('违约索赔·α').closest('.v2-skill')).toHaveClass('v2-skill-active')
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '但书' })).not.toBeInTheDocument())
     await dismissDrawer(user)
     const card = screen.getByRole('button', { name: /贸易站.*推进之王/ })
     expect(card).toHaveTextContent('Lv.2')
@@ -1400,7 +1401,7 @@ describe('V2 results-first workspace', () => {
     expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('combobox')).not.toBeInTheDocument()
     await user.tab()
-    expect(within(dialog).getByText(copy.domain.building_skills.title).closest('summary')).toHaveFocus()
+    expect(within(dialog).getByRole('button', { name: copy.v2.operatorManagement.skills('但书') })).toHaveFocus()
     await dismissDrawer(user)
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('53,595')).toBeInTheDocument()
@@ -2003,7 +2004,7 @@ describe('V2 feature continuity', () => {
         expect(cards.getAllByRole('link')).toHaveLength(1)
         expect(cards.getByText(content.pricing.plans[id].account_scope)).toBeVisible()
         expect(cards.getByText(getSku(id).audience)).toBeVisible()
-        expect(cards.getByText(content.pricing.plans[id].display_price.split('/')[0]!.trim())).toBeVisible()
+        await waitFor(() => expect(cards.getByText(content.pricing.plans[id].display_price.split('/')[0]!.trim())).toBeVisible())
       }
     }
     if (mobile) await user.click(screen.getByRole('radio', { name: new RegExp(copy.public.pricing_choice.term_labels.single_account_half_year) }))
