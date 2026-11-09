@@ -321,9 +321,10 @@ textarea.v2-input { resize: vertical; }
 @property --v2-beam-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
 @keyframes v2-pricing-edge { to { --v2-beam-angle: 360deg; } }
 @keyframes v2-pricing-sweep { from { transform: translateX(-180%) skewX(-20deg); } to { transform: translateX(380%) skewX(-20deg); } }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-reduced-motion]) .v2-pricing-plan-featured::before { content: ''; position: absolute; inset: -2px; z-index: 1; padding: 3px; border-radius: inherit; pointer-events: none; background: conic-gradient(from var(--v2-beam-angle), transparent 0deg 220deg, var(--v2-accent) 275deg, color-mix(in oklch, var(--v2-accent) 35%, white) 305deg, var(--v2-accent) 325deg, transparent 350deg); mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); mask-composite: exclude; filter: drop-shadow(0 0 4px color-mix(in oklch, var(--v2-accent) 55%, transparent)); animation: v2-pricing-edge 4s linear infinite; }
+}
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
-  :root:not([data-reduced-motion]) .v2-pricing-plan-featured::before { content: ''; position: absolute; inset: -1px; z-index: 1; padding: 2px; border-radius: inherit; pointer-events: none; opacity: 0; background: conic-gradient(from var(--v2-beam-angle), transparent 0% 65%, var(--v2-accent) 82%, transparent 100%); mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); mask-composite: exclude; }
-  :root:not([data-reduced-motion]) .v2-pricing-plan-featured:is(:hover, :focus-within)::before { opacity: 1; animation: v2-pricing-edge 1600ms ease-out 1 both; }
   :root:not([data-reduced-motion]) .v2-pricing-plan-featured .v2-button-primary { position: relative; overflow: clip; }
   :root:not([data-reduced-motion]) .v2-pricing-plan-featured .v2-button-primary::after { content: ''; position: absolute; inset: -30% auto; width: 40%; height: 160%; left: 0; pointer-events: none; opacity: 0; background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--color-accent-ink) 22%, transparent), transparent); }
   :root:not([data-reduced-motion]) .v2-pricing-plan-featured .v2-button-primary:is(:hover, :focus-visible)::after { opacity: 1; animation: v2-pricing-sweep 650ms var(--ease-out) 1 both; }
