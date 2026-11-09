@@ -39,6 +39,7 @@ const Lab = lazy(() => import('./pages/Comparison'))
 const PublicInfo = lazy(() => import('./pages/Documents'))
 const Updates = lazy(() => import('./pages/Releases'))
 const Pricing = lazy(() => import('./pages/Pricing'))
+const Purchase = lazy(() => import('./pages/Purchase'))
 const Status = lazy(() => import('./pages/ServiceStatus'))
 const SiteBenchmark = lazy(() => import('./pages/SiteBenchmark'))
 const AppearanceSettings = lazy(() => import('./AppearanceSettings'))
@@ -117,6 +118,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
                 {section === 'tools' && <Tools profileId={session.activeProfile?.id} />}
                 {(['help', 'terms', 'privacy', 'disclaimer', 'support'] as V2Section[]).includes(section) && <PublicInfo page={section === 'help' ? 'faq' : section as 'terms' | 'privacy' | 'disclaimer' | 'support'} />}
                 {section === 'pricing' && <Pricing />}
+                {section === 'purchase' && <Purchase />}
                 {section === 'status' && <Status />}
                 {section === 'benchmarks' && <SiteBenchmark />}
                 {section === 'updates' && <Updates />}

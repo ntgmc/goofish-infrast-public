@@ -51,6 +51,36 @@ beforeAll(async () => {
 afterAll(async () => { await closePool(); await container?.stop() })
 
 describe('business operations aggregates', () => {
+  it('aggregates page visitors and tool quality across users, outcomes and Shanghai boundaries', async () => {
+    const store = createPostgresUsageEventStore()
+    await store.set('tools-start', { id: 'tools-start', event: 'tool_metrics_started', visitor_id: null, created_at: '2030-01-19T00:00:00Z', date: '2030-01-19' })
+    for (const [id, user, at, outcome, duration] of [
+      ['one', 'a', '2030-01-20T00:00:00Z', 'success', 1_000],
+      ['two', 'a', '2030-01-21T00:00:00Z', 'success', 3_000],
+      ['fail', 'b', '2030-01-21T00:00:00Z', 'failure', 900_000],
+      ['cancel', 'b', '2030-01-21T00:00:00Z', 'cancelled', 900_000],
+      ['bad-duration', 'b', '2030-01-21T00:00:00Z', 'success', Number.NaN],
+      ['previous', 'a', '2030-01-10T00:00:00Z', 'success', 5_000],
+      ['after-range', 'c', '2030-01-31T16:00:00Z', 'success', 1_000],
+    ] as const) await store.set(`tool-${id}`, { id, event: 'tool_run', tool: 'cultivation_projects', visitor_id: null, user_id: user,
+      tool_outcome: outcome, duration_ms: duration, created_at: at, date: at.slice(0, 10) })
+    await store.set('anonymous-tool', { id: 'anonymous', event: 'tool_run', tool: 'depot_value', visitor_id: 'browser-a', tool_outcome: 'success',
+      duration_ms: 200, created_at: '2030-01-21T00:00:00Z', date: '2030-01-21' })
+    for (const [id, visitor, at] of [['visit-a', 'browser-a', '2030-01-19T16:00:00Z'], ['visit-a2', 'browser-a', '2030-01-20T00:00:00Z'],
+      ['visit-b', 'browser-b', '2030-01-20T00:00:00Z'], ['visit-before', 'browser-c', '2030-01-19T15:59:59Z']] as const) {
+      await store.set(id, { id, event: 'page_view', visitor_id: visitor, page: 'cultivation', created_at: at, date: at.slice(0, 10) })
+    }
+    const data = await getOperationsOverview('2030-01-20', '2030-01-31', now)
+    expect(data.tools?.pages).toEqual([{ page: 'cultivation', visitors: 2, views: 3 }])
+    expect(data.tools?.current.find((row) => row.tool === 'cultivation_projects')).toEqual({ tool: 'cultivation_projects', users: 2,
+      anonymous_visitors: 0, attempts: 5, successful: 3, failed: 1, cancelled: 1, success_rate: 75, latency_samples: 2, p50_ms: 2_000, p95_ms: 2_900 })
+    expect(data.tools?.previous.find((row) => row.tool === 'cultivation_projects')).toMatchObject({ users: 1, attempts: 1, p95_ms: 5_000 })
+    expect(data.tools?.current.find((row) => row.tool === 'depot_value')).toMatchObject({ users: 0, anonymous_visitors: 1 })
+    expect(data.tools?.tracking_started_at).toBe('2030-01-19T00:00:00+00:00')
+    expect(JSON.stringify(data.tools)).not.toContain('browser-a')
+    expect(JSON.stringify(data.tools)).not.toContain('user_id')
+  })
+
   it('preserves the original tracking start across refreshes and event retention', async () => {
     const store = createPostgresUsageEventStore()
     const base = { id: 'start', event: 'business_metrics_started' as const, visitor_id: null, date: '2030-01-19', created_at: '2030-01-19T00:00:00Z' }

@@ -180,6 +180,13 @@ CREATE TABLE IF NOT EXISTS public_content_settings (
   revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1)
 );
 
+CREATE TABLE IF NOT EXISTS public_content_images (
+  id TEXT PRIMARY KEY CHECK (id ~ '^[a-f0-9]{64}$'),
+  image_type TEXT NOT NULL CHECK (image_type IN ('image/jpeg', 'image/png', 'image/webp')),
+  image_data BYTEA NOT NULL CHECK (octet_length(image_data) BETWEEN 1 AND 1048576),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 ALTER TABLE feature_settings ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1);
 ALTER TABLE public_content_settings ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1);
 
@@ -2710,6 +2717,7 @@ const TABLE_CONSTRAINT_KEYWORDS = new Set(['and', 'check', 'constraint', 'foreig
 const API_ONLY_RUNTIME_TABLES = new Set([
   'feature_settings',
   'public_content_settings',
+  'public_content_images',
   'website_notification_events',
   'qqbot_registration_qualifications',
   'personal_use_declaration_versions',

@@ -20,6 +20,13 @@ export function createOperationsOverview(successfulUsers = 42): OperationsOvervi
     failure_reasons: [{ reason_code: 'optimizer_runtime_error', count: 4 }],
     deletions: { total_deleted: 0, pending: 0, failed: 0, reasons: [], recent_feedback: [] },
     skland: { successful: 45, failed: 5, success_rate: 90 },
+    tools: {
+      tracking_started_at: `${shiftOperationsDate(from, -60)}T00:00:00Z`,
+      pages: [{ page: 'cultivation-projects', visitors: 72, views: 135 }, { page: 'depot', visitors: 51, views: 80 }],
+      current: [{ tool: 'cultivation_projects', users: 18, anonymous_visitors: 0, attempts: 30, successful: 27, failed: 2, cancelled: 1, success_rate: 93.1, latency_samples: 27, p50_ms: 1_200, p95_ms: 4_500 },
+        { tool: 'depot_value', users: 15, anonymous_visitors: 4, attempts: 25, successful: 25, failed: 0, cancelled: 0, success_rate: 100, latency_samples: 25, p50_ms: 800, p95_ms: 2_100 }],
+      previous: [],
+    },
     coverage: { retained_from: shiftOperationsDate(from, -150), complete: true, unattributed_successes: 0, unknown_outcomes: 0, maa_tracking_started_at: `${shiftOperationsDate(from, -10)}T00:00:00Z` },
   }
 }

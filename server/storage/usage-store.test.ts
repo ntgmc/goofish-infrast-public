@@ -40,6 +40,9 @@ describe('usage statistics data quality and resource bounds', () => {
       { ...base, id: 'unknown', event: 'schedule_generate' },
       { ...base, id: 'success', event: 'schedule_generate', status: 'success' },
       { ...base, id: 'failure', event: 'schedule_generate', status: 'failure', reason_code: 'optimizer_runtime_error' },
+      { ...base, id: 'tool-failure', event: 'tool_run', status: 'failure', tool_outcome: 'failure' },
+      { ...base, id: 'tool-cancel', event: 'tool_run', tool_outcome: 'cancelled' },
+      { ...base, id: 'page', event: 'page_view', status: 'success' },
     ], [date])
 
     expect(stats.metrics_version).toMatch(/^2026-08-03\./)
@@ -53,6 +56,7 @@ describe('usage statistics data quality and resource bounds', () => {
     })
     expect(stats.totals.schedule_generates).toBe(1)
     expect(stats.totals.schedule_failures).toBe(1)
+    expect(stats.totals.failures).toBe(1)
     expect(stats.funnel.every((step) => step.conversion_rate === 0 && step.dropoff === 0)).toBe(true)
   })
 

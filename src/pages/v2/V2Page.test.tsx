@@ -30,7 +30,9 @@ const mocks = vi.hoisted(() => ({
   tasks: vi.fn(),
   manual: vi.fn(),
   image: vi.fn(),
+  pageVisit: vi.fn(),
 }))
+vi.mock('../../lib/usage-tracking', () => ({ reportPageVisit: mocks.pageVisit }))
 vi.mock('../../components/result-panel/ManualScheduleEditor', () => ({ default: mocks.manual }))
 vi.mock('../../components/result-panel/schedule-image', () => ({ downloadScheduleImage: mocks.image }))
 vi.mock('../tool/useToolSession', () => ({ useToolSession: mocks.session }))
@@ -57,6 +59,7 @@ beforeEach(() => {
   mocks.features.mockReturnValue({ status: 'ready', features: DEFAULT_SITE_FEATURES, retry: vi.fn() })
   mocks.tasks.mockReturnValue({ jobs: [], refresh: vi.fn(), cancel: vi.fn(), busyJobId: null, error: null, notice: null })
   mocks.image.mockReset().mockResolvedValue(undefined)
+  mocks.pageVisit.mockReset().mockResolvedValue(undefined)
   session = {
     user: null, profiles: [], announcementUnreadCount: 0, popups: [], setAnnouncementUnreadCount: vi.fn(), activeProfile: null, license: null, workspace: null, configOverride: null,
     authStatus: 'anonymous', cdkProfiles: [], openingProfileId: null, workspaceLoadError: null,
@@ -110,9 +113,11 @@ it('allows a guest to open the benchmark from navigation and return to the works
   await user.click(within(disclosure.getByRole('group', { name: copy.v2.navigationGroups.product })).getByRole('link', { name: copy.siteBenchmark.title }))
   await screen.findByRole('heading', { name: copy.siteBenchmark.headline('MaaTool', 30).join('') }, { timeout: 5_000 })
   expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2/benchmarks')
+  expect(mocks.pageVisit.mock.calls).toEqual([['overview'], ['benchmarks']])
   expect(screen.queryByText(copy.v2.signInRequired)).not.toBeInTheDocument()
   await user.click(screen.getByRole('link', { name: copy.v2.guestNavigation.example }))
   expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2')
+  expect(mocks.pageVisit.mock.calls).toEqual([['overview'], ['benchmarks'], ['overview']])
 }, 10_000)
 
 it.each([null, '2099-01-01T00:00:00Z'])('lets a first-time guest choose when to read an announcement (deadline %s)', async (popupUntil) => {
@@ -1990,9 +1995,8 @@ describe('V2 feature continuity', () => {
     for (const id of ['single_account_monthly', 'single_account_annual', 'single_account_lifetime'] as const) {
       if (mobile) await user.click(screen.getByRole('radio', { name: new RegExp(copy.public.pricing_choice.term_labels[id]) }))
       const purchase = cards.getByRole('link', { name: copy.public.pricing_purchase_labels[id] })
-      expect(purchase).toHaveAttribute('href', content.pricing.plans[id].purchase_url)
-      expect(purchase).toHaveAttribute('target', '_blank')
-      expect(purchase).toHaveAttribute('rel', 'noopener noreferrer')
+      expect(purchase).toHaveAttribute('href', `/v2?section=purchase&offer=${id}`)
+      expect(purchase).not.toHaveAttribute('target')
       expect(purchase).toHaveAccessibleDescription(expect.stringContaining(content.pricing.plans[id].account_scope))
       expect(purchase).toHaveAccessibleDescription(expect.stringContaining(copy.public.pricing_redemption.activation))
       if (mobile) {
@@ -2006,10 +2010,16 @@ describe('V2 feature continuity', () => {
     expect(cards.getByRole('button', { name: copy.public.pricing_purchase_unavailable })).toBeDisabled()
     expect(cards.queryByRole('link', { name: copy.public.pricing_purchase_labels.single_account_half_year })).not.toBeInTheDocument()
     await user.click(screen.getByText(copy.public.pricing_cards.rules))
-    expect(screen.getByRole('link', { name: copy.public.pricing_upgrade_purchase })).toHaveAttribute('href', 'https://example.com/upgrade')
+    expect(screen.getByRole('link', { name: copy.public.pricing_upgrade_purchase })).toHaveAttribute('href', '/v2?section=purchase&offer=lifetime_upgrade')
+    await user.click(screen.getByRole('link', { name: copy.public.pricing_upgrade_purchase }))
+    expect(await screen.findByRole('heading', { name: copy.public.purchase.title, level: 1 })).toBeVisible()
+    expect(await screen.findByRole('link', { name: copy.public.purchase.open })).toHaveAttribute('href', 'https://example.com/upgrade')
+    expect(screen.getByText(copy.public.purchase.upgrade_steps[0].description)).toBeVisible()
+    expect(screen.getByRole('link', { name: copy.public.purchase.check_profiles })).toBeVisible()
+    expect(screen.queryByRole('link', { name: copy.public.pricing_redemption.action })).not.toBeInTheDocument()
   })
 
-  it.each([true, false])('opens CDK redemption from pricing and retains the destination through login: signed in %s', async (signedIn) => {
+  it.each([true, false])('opens CDK redemption from purchase and retains the destination through login: signed in %s', async (signedIn) => {
     const guest = session
     const workflow = connect()
     const authenticated = session
@@ -2020,7 +2030,7 @@ describe('V2 feature continuity', () => {
       String(url) === '/api/auth/login' ? payload : { notifications: [], unread_count: 0, next_cursor: null },
     ))
     const user = userEvent.setup()
-    const page = mount(signedIn ? '/v2?section=pricing&profile_id=profile-1' : '/v2?section=pricing')
+    const page = mount(signedIn ? '/v2?section=purchase&profile_id=profile-1' : '/v2?section=purchase')
     const redemption = await screen.findByRole('link', { name: copy.public.pricing_redemption.action })
     expect(redemption).toHaveAttribute('href', signedIn ? '/v2?section=add-account&profile_id=profile-1&mode=cdk' : '/v2?section=add-account&mode=cdk')
     await user.click(redemption)

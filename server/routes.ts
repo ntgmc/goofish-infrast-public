@@ -9,6 +9,8 @@ import adminInvitationSettlementsHandler from './handlers/admin-invitation-settl
 import adminRegistrationSettingsHandler from './handlers/admin-registration-settings'
 import adminFeatureSettingsHandler from './handlers/admin-feature-settings'
 import adminPublicContentHandler from './handlers/admin-public-content'
+import adminPublicContentImageHandler from './handlers/admin-public-content-image'
+import sitePublicContentImageHandler from './handlers/site-public-content-image'
 import adminRegistrationInvitationsHandler from './handlers/admin-registration-invitations'
 import adminOptimizationHandler from './handlers/admin-optimization'
 import adminSessionHandler from './handlers/admin-session'
@@ -80,6 +82,7 @@ export const API_ROUTES: ReadonlyArray<readonly [path: string, handler: ApiHandl
   ['/api/admin/registration-settings', adminRegistrationSettingsHandler],
   ['/api/admin/feature-settings', adminFeatureSettingsHandler],
   ['/api/admin/public-content', adminPublicContentHandler],
+  ['/api/admin/public-content-image', adminPublicContentImageHandler],
   ['/api/admin/registration-invitations', adminRegistrationInvitationsHandler],
   ['/api/admin/optimization', adminOptimizationHandler],
   ['/api/admin/service-status', adminServiceStatusHandler],
@@ -101,6 +104,7 @@ export const API_ROUTES: ReadonlyArray<readonly [path: string, handler: ApiHandl
   ['/api/auth/me', authHandler],
   ['/api/site/features', siteFeaturesHandler],
   ['/api/site/public-content', sitePublicContentHandler],
+  ['/api/site/public-content-image', sitePublicContentImageHandler],
   ['/api/changelog', changelogHandler],
   ['/api/status', serviceStatusHandler],
   ['/api/user/data/export', accountDataHandler],

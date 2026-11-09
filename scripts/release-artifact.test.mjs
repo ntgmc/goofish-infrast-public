@@ -86,16 +86,46 @@ test('requires the production release confirmation runner in release artifacts',
   }
 })
 
-test('rejects private optimizer sources embedded in a public sourcemap', async () => {
+test('allows dependency sourcemap sources with private entrypoint filenames', async () => {
   const fixture = await createFixture('public')
   try {
     await writeFile(join(fixture.artifact, 'server/dist/index.js.map'), JSON.stringify({
       version: 3,
-      sources: ['../../server/optimization/engine/optimizer-engine.ts'],
-      sourcesContent: ['export class OptimizerEngine {}'],
+      sources: [
+        '../../node_modules/src/pg-core/columns/all.ts',
+        '../../node_modules/src/worker.ts',
+        '../../node_modules/src/optimize-worker.ts',
+        '../../node_modules/src/optimize-job-runner.ts',
+      ],
+      sourcesContent: [],
       mappings: '',
     }), 'utf8')
-    assert.throws(() => run(fixture, ['create', '--kind', 'public', '--sha', sha]), /references private optimizer source/)
+    run(fixture, ['create', '--kind', 'public', '--sha', sha])
+    run(fixture, ['verify', '--kind', 'public', '--sha', sha])
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true })
+  }
+})
+
+test('rejects private optimizer sources embedded in a public sourcemap', async () => {
+  const fixture = await createFixture('public')
+  try {
+    for (const source of [
+      '../../server/all.ts',
+      '../../server/worker.ts',
+      '../../server/optimize-worker.ts',
+      '../../server/optimize-job-runner.ts',
+      '..\\..\\server\\all.ts',
+      '../../server/optimization/engine/optimizer-engine.ts',
+    ]) {
+      await writeFile(join(fixture.artifact, 'server/dist/index.js.map'), JSON.stringify({
+        version: 3,
+        sources: [source],
+        sourcesContent: ['export {}'],
+        mappings: '',
+      }), 'utf8')
+      assert.throws(() => run(fixture, ['create', '--kind', 'public', '--sha', sha]), /references private optimizer source/)
+    }
   } finally {
     await rm(fixture.root, { recursive: true, force: true })
   }

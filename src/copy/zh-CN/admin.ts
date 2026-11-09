@@ -1,5 +1,10 @@
 export const adminCopy = {
   operations_filter_invalid: '运营名单筛选无效，请从运营看板重新打开。',
+  operations_tools: {
+    schedule_generate: '排班生成', cultivation: '养成建议', cultivation_projects: '养成规划',
+    training_ratio: '练度与材料需求', depot_value: '仓库估值', manual_simulation: '手动模拟',
+    schedule_comparison: '已有排班比较', scenario_comparison: '基建配置比较',
+  },
   operations_cohorts: {
     registered: '新注册用户', successful: '成功排班用户',
     activation_missing_profile: '7 天内未添加游戏账号', activation_no_generation: '添加了账号但未完成首次排班', activated: '7 天内完成首次排班',

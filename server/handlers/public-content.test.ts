@@ -16,6 +16,10 @@ describe('public content handlers', () => {
     const draft = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
     draft.pricing.plans.single_account_monthly.purchase_url = ' https://example.com/month '
     draft.pricing.plans.single_account_lifetime.purchase_url = 'https://example.com/lifetime'
+    draft.pricing.plans.single_account_monthly.qr_code_url = ' https://example.com/month-qr.png '
+    draft.pricing.lifetime_upgrade.share_image_url = '/assets/purchase/upgrade.png'
+    draft.cdk_purchase.share_image_url = 'https://example.com/general.png'
+    draft.cdk_purchase.instructions = '  通过闲鱼订单领取 CDK。  '
     const response = await adminHandler(new Request('http://localhost/api/admin/public-content', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -37,6 +41,10 @@ describe('public content handlers', () => {
     const body = await publicResponse.json()
     expect(body.pricing.plans.single_account_monthly.purchase_url).toBe('https://example.com/month')
     expect(body.pricing.plans.single_account_lifetime.purchase_url).toBe('https://example.com/lifetime')
+    expect(body.pricing.plans.single_account_monthly.qr_code_url).toBe('https://example.com/month-qr.png')
+    expect(body.pricing.lifetime_upgrade.share_image_url).toBe('/assets/purchase/upgrade.png')
+    expect(body.cdk_purchase.share_image_url).toBe('https://example.com/general.png')
+    expect(body.cdk_purchase.instructions).toBe('通过闲鱼订单领取 CDK。')
   })
 
   beforeEach(() => {

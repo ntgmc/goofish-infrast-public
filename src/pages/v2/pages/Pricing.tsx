@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { SelectedIcon as Check, CloseIcon as X, ServiceCongestedIcon as Hourglass, ExternalLinkIcon as ArrowUpRight, ExpandIcon as ChevronDown } from '../../../components/icons'
+import { useSearchParams } from 'react-router'
+import { SelectedIcon as Check, CloseIcon as X, ServiceCongestedIcon as Hourglass, NextIcon as ArrowRight, ExpandIcon as ChevronDown } from '../../../components/icons'
 import { copy, CURRENT_LOCALE } from '../../../copy'
 import { PUBLIC_PRICING_PLAN_IDS } from '../../../lib/public-content'
 import { usePublicContent } from '../../../lib/public-content-context'
@@ -10,6 +11,7 @@ import { getSku } from '../../../lib/product-catalog'
 import Link from '../../../components/InternalLink'
 import { FeedbackLink } from '../../../components/PublicFooter'
 import { Facts, Notice, SectionTitle } from '../components/WorkspaceUI'
+import { v2Path } from '../navigation'
 
 const text = copy.public
 const planIds = PUBLIC_PRICING_PLAN_IDS.filter((id) => id !== 'free_preview')
@@ -17,6 +19,8 @@ const planIds = PUBLIC_PRICING_PLAN_IDS.filter((id) => id !== 'free_preview')
 export default function Pricing() {
   const { content } = usePublicContent()
   const { features } = useSiteFeatures()
+  const [params] = useSearchParams()
+  const purchasePath = v2Path('purchase', params.get('profile_id'))
   const [selectedPlan, setSelectedPlan] = useState<(typeof planIds)[number]>('single_account_monthly')
   const [mobile, setMobile] = useState(() => Boolean(window.matchMedia?.('(max-width: 40rem)').matches))
   useEffect(() => {
@@ -72,14 +76,17 @@ export default function Pricing() {
               <summary>{text.pricing_cards.plan_details}<ChevronDown size={16} aria-hidden="true" /></summary>
               <p>{plan.summary}</p><p id={`${id}-purchase-terms`}>{plan.account_scope}</p><p>{text.pricing_archive_gift(archiveCount)}</p>
             </details>}
-            {plan.purchase_url ? <a href={plan.purchase_url} target="_blank" rel="noopener noreferrer" aria-describedby={`${id}-purchase-terms ${mobile ? `${id}-activation` : 'pricing-purchase-terms'} pricing-purchase-flow`} className={`v2-button ${id === 'single_account_lifetime' ? 'v2-button-primary' : 'v2-button-secondary'}`}>{text.pricing_purchase_labels[id]}<ArrowUpRight size={16} aria-hidden="true" /></a> : <button disabled className="v2-button v2-button-secondary">{text.pricing_purchase_unavailable}</button>}
+            {plan.purchase_url || plan.share_image_url || plan.qr_code_url ? <Link to={`${purchasePath}&offer=${id}`} aria-describedby={`${id}-purchase-terms ${mobile ? `${id}-activation` : 'pricing-purchase-terms'} pricing-purchase-flow`} className={`v2-button ${id === 'single_account_lifetime' ? 'v2-button-primary' : 'v2-button-secondary'}`}>{text.pricing_purchase_labels[id]}<ArrowRight size={16} aria-hidden="true" /></Link> : <button disabled className="v2-button v2-button-secondary">{text.pricing_purchase_unavailable}</button>}
           </div>
         </article>
       })}
     </section>
     <div className="v2-pricing-checkout">
       <div>{!mobile && <p id="pricing-purchase-terms">{text.pages_PricingPage_016} {text.pricing_redemption.activation}</p>}<p id="pricing-purchase-flow">{text.pricing_redemption.flow}</p></div>
-      {redemptionAvailable ? <Link to="/tool/redeem?mode=cdk" className="v2-button v2-button-secondary">{text.pricing_redemption.action}</Link> : <span className="v2-muted">{text.pricing_redemption.unavailable}</span>}
+      <div className="v2-actions">
+        {(content.cdk_purchase.xianyu_url || content.cdk_purchase.share_image_url || content.cdk_purchase.qr_code_url) && <Link to={purchasePath} className="v2-button v2-button-secondary">{text.purchase.general_action}</Link>}
+        {redemptionAvailable ? <Link to="/tool/redeem?mode=cdk" className="v2-button v2-button-secondary">{text.pricing_redemption.action}</Link> : <span className="v2-muted">{text.pricing_redemption.unavailable}</span>}
+      </div>
     </div>
     <section className="v2-pricing-evidence" aria-label={text.pricing_evidence.title}>
       <div><h2>{text.pricing_evidence.title}</h2><p>{text.pricing_evidence.description}</p><Link to="/v2/benchmarks" className="v2-button v2-button-secondary">{text.pricing_evidence.action}</Link></div>
@@ -102,7 +109,7 @@ export default function Pricing() {
     <details className="v2-pricing-details">
       <summary><h2>{text.pricing_cards.rules}</h2><ChevronDown size={20} aria-hidden="true" /></summary>
       <section className="v2-pricing-policy"><SectionTitle title={pricing.policy_heading} description={text.pricing_redemption.instructions} /><ul>{pricing.disclosures.map((disclosure, index) => <li key={index}>{disclosure}</li>)}</ul></section>
-      <section className="v2-pricing-upgrade"><SectionTitle title={text.pricing_upgrade_title} description={text.pricing_upgrade_description(pricing.lifetime_upgrade.service_fee)} /><p>{text.pricing_upgrade_process}</p><div className="v2-actions">{features.support && <Link to="/support" className="v2-button v2-button-secondary">{text.pricing_upgrade_contact}</Link>}{pricing.lifetime_upgrade.purchase_url ? <a href={pricing.lifetime_upgrade.purchase_url} target="_blank" rel="noopener noreferrer" className="v2-button v2-button-primary">{text.pricing_upgrade_purchase}</a> : <button disabled className="v2-button v2-button-primary">{text.pricing_upgrade_unavailable}</button>}</div></section>
+      <section className="v2-pricing-upgrade"><SectionTitle title={text.pricing_upgrade_title} description={text.pricing_upgrade_description(pricing.lifetime_upgrade.service_fee)} /><p>{text.pricing_upgrade_process}</p><div className="v2-actions">{features.support && <Link to="/support" className="v2-button v2-button-secondary">{text.pricing_upgrade_contact}</Link>}{pricing.lifetime_upgrade.purchase_url || pricing.lifetime_upgrade.share_image_url || pricing.lifetime_upgrade.qr_code_url ? <Link to={`${purchasePath}&offer=lifetime_upgrade`} className="v2-button v2-button-primary">{text.pricing_upgrade_purchase}</Link> : <button disabled className="v2-button v2-button-primary">{text.pricing_upgrade_unavailable}</button>}</div></section>
     </details>
     {METERED_BILLING_AVAILABLE && <MeteredPricing />}
     <section className="v2-pricing-support"><SectionTitle title={pricing.support_heading} description={pricing.support_body} /><FeedbackLink className="v2-button v2-button-secondary">{text.pages_PricingPage_010}</FeedbackLink></section>

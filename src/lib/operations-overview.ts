@@ -1,4 +1,5 @@
 import type { AccountDeletionSurvey } from './account-deletion-contracts'
+import type { OperationsToolsOverview } from './operations-tools'
 
 export type OperationsDeletionReason = AccountDeletionSurvey['reason'] | 'unrecorded'
 
@@ -54,6 +55,7 @@ export interface OperationsOverview {
     recent_feedback: Array<{ at: string; status: 'completed' | 'pending'; reason: OperationsDeletionReason; detail: string }> | null
   }
   skland: { successful: number; failed: number; success_rate: number | null }
+  tools?: OperationsToolsOverview
   coverage: {
     retained_from: string
     complete: boolean
@@ -123,6 +125,20 @@ export function operationsOverviewCsv(data: OperationsOverview): string {
   }
   for (const feedback of data.deletions.recent_feedback ?? []) {
     rows.push(['deletion_feedback', `${feedback.status}:${feedback.reason}`, feedback.at, feedback.detail, null])
+  }
+  if (data.tools) {
+    rows.push(['tools', 'tracking_started_at', '', data.tools.tracking_started_at, null])
+    for (const page of data.tools.pages) {
+      rows.push(['pages', `${page.page}:visitors`, '', page.visitors, null], ['pages', `${page.page}:views`, '', page.views, null])
+    }
+    const tools = new Set([...data.tools.current, ...data.tools.previous].map((row) => row.tool))
+    for (const tool of tools) {
+      const current = data.tools.current.find((row) => row.tool === tool)
+      const previous = data.tools.previous.find((row) => row.tool === tool)
+      for (const metric of ['users', 'anonymous_visitors', 'attempts', 'successful', 'failed', 'cancelled', 'success_rate', 'latency_samples', 'p50_ms', 'p95_ms'] as const) {
+        rows.push(['tools', `${tool}:${metric}`, '', current?.[metric] ?? null, previous?.[metric] ?? null])
+      }
+    }
   }
   return rows.map((row) => (row.length === 4 ? [row[0], row[1], '', row[2], row[3]] : row).map((value) => {
     const text = String(value ?? '')

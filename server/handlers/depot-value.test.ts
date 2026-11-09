@@ -2,7 +2,9 @@ import { afterEach, expect, it, vi } from 'vitest'
 import handler from './depot-value'
 import { encryptSklandCredential } from './skland-client'
 
-vi.mock('./user-auth', () => ({ requireUserSession: async () => ({ profiles: [{ id: 'profile', status: 'active',
+const usage = vi.hoisted(() => vi.fn())
+vi.mock('../storage/tool-usage-store', () => ({ recordToolRun: usage }))
+vi.mock('./user-auth', () => ({ requireUserSession: async () => ({ user: { id: 'user-1' }, profiles: [{ id: 'profile', status: 'active',
   skland_binding: { uid: 'fixture', encrypted_cred: encryptSklandCredential('fixture-credential') } }] }) }))
 vi.mock('../feature-gate', () => ({ requireSiteFeatures: async () => null }))
 vi.mock('../skland-snapshot', async (original) => ({ ...await original<typeof import('../skland-snapshot')>(),
@@ -18,6 +20,7 @@ it.each(['credential', 'temporary', 'timeout', 'unknown'])('maps %s failures at 
   })
   const response = await handler(new Request('http://localhost/api/depot-value', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ source: 'skland', profile_id: 'profile', sample_consent: false }) }))
+  expect(usage).toHaveBeenLastCalledWith(expect.objectContaining({ tool: 'depot_value', userId: 'user-1', outcome: 'failure' }))
   expect(response.status).toBe(mode === 'credential' ? 400 : mode === 'unknown' ? 500 : 503)
   expect(await response.json()).toMatchObject(mode === 'unknown' ? { error: 'Internal server error' }
     : { code: mode === 'credential' ? 'skland_credential_invalid' : 'skland_upstream_failed', action: mode === 'credential' ? 'rebind' : 'retry' })

@@ -162,7 +162,7 @@ async function assertPublicRuntimeContract(base) {
 function isPrivatePublicMapReference(value) {
   const normalized = String(value).replaceAll('\\', '/')
   if (containsPrivateOptimizerSourcePath(normalized)) return true
-  return /(?:^|\/)(?:all|worker|optimize-worker|optimize-job-runner)\.ts$/.test(normalized)
+  return /(?:^|\/)server\/(?:all|worker|optimize-worker|optimize-job-runner)\.ts$/.test(normalized)
     || /optimization\/(?:candidates|domain|economics|engine|formatting|rules|solvers)\//.test(normalized)
     || /optimization\/scenario-comparison\/service\.ts$/.test(normalized)
     || /optimization\/jobs\/(?:executor(?:-[^/]*)?|result-formatting)\.ts$/.test(normalized)

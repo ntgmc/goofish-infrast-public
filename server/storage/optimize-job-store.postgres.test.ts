@@ -1325,6 +1325,29 @@ describe('PostgreSQL optimization job admission', () => {
     await expect(getWorkspace(profileId)).resolves.toMatchObject({ elite_overrides: { alpha: 1, beta: 2 } })
   })
 
+  it('records one final tool outcome after retries and records queued cancellation separately', async () => {
+    const profileId = await seedProfile()
+    const store = createPostgresOptimizeJobStore()
+    const payload = formalSchedulePayload(profileId)
+    const admitted = await store.admitJob(input({ priority: 2_100_000_000, owner_key: `profile:${profileId}`, profile_id: profileId,
+      payload_json: { ...payload, request: { ...payload.request, manual_schedule: formalScheduleResult('retry-baseline') } },
+    }))
+    const first = (await store.claimNextJob('metrics-worker', 'metrics-lock', new Date(Date.now() + 60_000).toISOString(), 2, 100))!
+    expect(first.id).toBe(admitted.job.id)
+    await store.retryFailedAttempt(first.id, first.attempt_count, 'metrics-worker', 'metrics-lock', 'worker_crash', 'fixture', 2)
+    expect((await query('select * from usage_events where key = $1', [`events/tool-job/${first.id}`])).rows).toHaveLength(0)
+    await query("update optimize_jobs set next_attempt_at = now() - interval '1 second' where id = $1", [first.id])
+    const second = (await store.claimNextJob('metrics-worker', 'metrics-lock-2', new Date(Date.now() + 60_000).toISOString(), 2, 100))!
+    await store.retryFailedAttempt(second.id, second.attempt_count, 'metrics-worker', 'metrics-lock-2', 'worker_crash', 'fixture', 2)
+    const records = await query<{ record_json: Record<string, unknown> }>('select record_json from usage_events where key = $1', [`events/tool-job/${first.id}`])
+    expect(records.rows).toHaveLength(1)
+    expect(records.rows[0].record_json).toMatchObject({ tool: 'manual_simulation', tool_outcome: 'failure', duration_ms: expect.any(Number) })
+    const cancelled = await store.admitJob(input({ owner_key: `profile:${profileId}`, profile_id: profileId, payload_json: payload }))
+    await store.requestCancel(cancelled.job.id)
+    expect((await query<{ record_json: unknown }>('select record_json from usage_events where key = $1', [`events/tool-job/${cancelled.job.id}`])).rows[0].record_json)
+      .toMatchObject({ tool: 'schedule_generate', tool_outcome: 'cancelled' })
+  })
+
   it('persists a manual simulation with provenance without sending a QQ notification', async () => {
     const profileId = await seedProfile()
     await query(
@@ -1346,6 +1369,8 @@ describe('PostgreSQL optimization job admission', () => {
       mood_simulation: { valid: false, daily_loop_stable: false, iterations: 12, degrading_operators: [] },
     }
     await expect(store.completeAttempt(claimed!.id, claimed!.attempt_count, 'manual-worker', 'manual-lock', result)).resolves.toBe(true)
+    const metrics = await query<{ record_json: unknown; user_id: string }>('select record_json, user_id from usage_events where key = $1', [`events/tool-job/${admitted.job.id}`])
+    expect(metrics.rows[0]).toMatchObject({ user_id: expect.any(String), record_json: { tool: 'manual_simulation', tool_outcome: 'success', duration_ms: expect.any(Number) } })
     await expect(getLatestProfileOptimizationResult(profileId)).resolves.toMatchObject({
       id: admitted.job.id, source: 'manual', name: expect.stringContaining('手动排班'),
       result: { schedule_source: 'manual', mood_simulation: { daily_loop_stable: false } },
@@ -1392,6 +1417,8 @@ describe('PostgreSQL optimization job admission', () => {
     expect((await query('select job_id from optimization_job_effects where job_id = $1', [admitted.job.id])).rows).toEqual([])
     expect((await query('select result_id from qqbot_schedule_notifications where result_id = $1', [admitted.job.id])).rows).toEqual([])
     expect((await store.listJobsByProfile(profileId))[0].historyResultId).toBeNull()
+    const metrics = await query<{ record_json: unknown }>('select record_json from usage_events where key = $1', [`events/tool-job/${admitted.job.id}`])
+    expect(metrics.rows[0].record_json).toMatchObject({ tool: 'schedule_comparison', tool_outcome: 'success' })
   })
 
   it('persists a successful schedule into rolling workspace history and a durable effect outbox', async () => {

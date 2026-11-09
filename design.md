@@ -179,7 +179,7 @@ it deliberately when changing the shared design.
   scheduling makes account, layout and starting schedule explicit steps.
 - Settings use task navigation and a single visible content region. Pricing
   keeps four maintenance cards on desktop, showing price, audience, checked benefits
-  and a direct purchase action. Below 40rem, show free capabilities and generation
+  and a purchase action leading to the V2 purchase guide. Below 40rem, show free capabilities and generation
   limits first, list shared maintenance benefits once, and compare all four terms
   and total prices in a compact native radio group that wraps with the available
   width. Show only the selected plan's total, audience, archive gift and purchase
@@ -187,6 +187,19 @@ it deliberately when changing the shared design.
   conditions immediately above the action. Keep redemption and a compact benchmark
   proof strip below. On desktop, plan descriptions expand on demand; at every width,
   the full entitlement comparison, purchase rules and upgrade details are expandable.
+  Purchase guides retain the selected product and profile. Group the product,
+  price, terms, listing action and copy action first, with the raw URL available
+  on demand. Keep redemption before long media; pair this overview with the QR
+  on desktop and place the QR before the buying steps on mobile. Show steps in
+  three columns on desktop and a vertical list on mobile. Share posters expand
+  on demand, showing the full image without cropping; open them by default when
+  they are the only way to reach the product. Each product owns its media;
+  blank images take no space.
+  Admin image fields support direct upload, preview, replacement and removal,
+  with optional URL entry. Preserve original image bytes, pause publishing during
+  uploads, and retain the previous image after a failed upload. Keep keyboard
+  focus clear of the settings save bar.
+  Keep original-image links and recovery for failed media or content loads.
   All pages use bounded content widths and V2 tokens.
 - The workspace shell owns page headings. Legal documents place their index
   to the right of a reading area of up to 65ch. FAQ pairs search with expandable

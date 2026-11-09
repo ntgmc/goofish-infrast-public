@@ -16,6 +16,7 @@ import {
 import { SortableMasterDetailList } from '../shared/SortableMasterDetailList'
 import { AdminToast } from '../shared/AdminToast'
 import { AdminTabs } from '../shared/AdminTabs'
+import PurchaseImageField from './PurchaseImageField'
 
 type TabId = 'qq' | 'purchase' | 'faq' | 'pricing' | 'thanks'
 type EditSettings = (updater: (draft: AdminPublicContentSettingsV1) => void) => void
@@ -25,7 +26,8 @@ const ValidationContext = createContext<{
   fieldErrors: FieldErrors
   focusPath: string | null
   clearFieldError: (path: string) => void
-}>({ fieldErrors: {}, focusPath: null, clearFieldError: () => undefined })
+  onUploadingChange: (uploading: boolean) => void
+}>({ fieldErrors: {}, focusPath: null, clearFieldError: () => undefined, onUploadingChange: () => undefined })
 
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'qq', label: copy.publicContent.admin_tab_qq },
@@ -39,6 +41,8 @@ export default function PublicContentSettingsSection() {
   const [settings, setSettings] = useState<AdminPublicContentSettingsV1 | null>(null)
   const [activeTab, setActiveTab] = useState<TabId>('qq')
   const [saving, setSaving] = useState(false)
+  const [uploads, setUploads] = useState(0)
+  const onUploadingChange = (uploading: boolean) => setUploads((count) => count + (uploading ? 1 : -1))
   const [dirty, setDirty] = useState(false)
   const [conflict, setConflict] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
@@ -69,7 +73,7 @@ export default function PublicContentSettingsSection() {
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!settings) return
+    if (!settings || uploads > 0) return
     setError(null)
     setNotice(null)
     const parsed = publicContentDraftSchema.safeParse(toDraft(settings))
@@ -137,7 +141,7 @@ export default function PublicContentSettingsSection() {
   }
 
   return (
-    <ValidationContext.Provider value={{ fieldErrors, focusPath, clearFieldError }}>
+    <ValidationContext.Provider value={{ fieldErrors, focusPath, clearFieldError, onUploadingChange }}>
     <form noValidate onSubmit={save} className="admin-settings space-y-5">
       <section className="admin-settings-heading">
         <p className="tool-eyebrow">{copy.publicContent.admin_nav}</p>
@@ -167,10 +171,10 @@ export default function PublicContentSettingsSection() {
       </fieldset>
 
       <div className="admin-savebar"><span className="text-sm text-ink-muted">{dirty ? '有待发布的修改' : '已与线上内容同步'}</span>
-        <button type="submit" disabled={saving} className="tool-primary-action">
-          {saving ? copy.publicContent.admin_saving : copy.publicContent.admin_save}
+        <button type="submit" disabled={saving || uploads > 0} className="tool-primary-action">
+          {uploads > 0 ? copy.publicContent.admin_image_uploading : saving ? copy.publicContent.admin_saving : copy.publicContent.admin_save}
         </button>
-        <button type="button" onClick={reload} disabled={saving} className="tool-secondary-action">
+        <button type="button" onClick={reload} disabled={saving || uploads > 0} className="tool-secondary-action">
           {conflict ? copy.publicContent.admin_reload_online : copy.publicContent.admin_reload}
         </button>
         {settings.updated_at && <span className="text-xs text-ink-muted">{copy.publicContent.admin_updated_at}{new Date(settings.updated_at).toLocaleString('zh-CN')}</span>}
@@ -196,18 +200,41 @@ function QqEditor({ settings, edit }: { settings: PublicContentSettingsV1; edit:
 function PurchaseEditor({ settings, edit }: { settings: PublicContentSettingsV1; edit: EditSettings }) {
   return (
     <EditorPanel title={copy.publicContent.admin_tab_purchase} description={copy.publicContent.admin_purchase_description}>
-      <TextField
-        path="cdk_purchase.xianyu_url"
-        id="public-content-xianyu-url"
-        label={copy.publicContent.admin_xianyu_url}
-        value={settings.cdk_purchase.xianyu_url}
-        maxLength={2048}
-        type="url"
-        required={false}
-        onChange={(value) => edit((next) => { next.cdk_purchase.xianyu_url = value })}
-      />
+      <div className="space-y-5">
+        <TextField
+          path="cdk_purchase.xianyu_url"
+          id="public-content-xianyu-url"
+          label={copy.publicContent.admin_xianyu_url}
+          value={settings.cdk_purchase.xianyu_url}
+          maxLength={2048}
+          type="url"
+          required={false}
+          onChange={(value) => edit((next) => { next.cdk_purchase.xianyu_url = value })}
+        />
+        <PurchaseMediaFields prefix="cdk_purchase" media={settings.cdk_purchase} onChange={(field, value) => edit((next) => { next.cdk_purchase[field] = value })} />
+        <TextareaField path="cdk_purchase.instructions" id="purchase-instructions" label={copy.publicContent.admin_purchase_instructions} value={settings.cdk_purchase.instructions} maxLength={2000} required={false} onChange={(value) => edit((next) => { next.cdk_purchase.instructions = value })} />
+        <p className="text-sm leading-6 text-ink-secondary">{copy.publicContent.admin_purchase_instructions_help}</p>
+        <a href="/v2?section=purchase" target="_blank" rel="noopener noreferrer" className="tool-secondary-action">{copy.publicContent.admin_purchase_preview}</a>
+      </div>
     </EditorPanel>
   )
+}
+
+function PurchaseMediaFields({ prefix, media, onChange }: {
+  prefix: string
+  media: { share_image_url: string; qr_code_url: string }
+  onChange: (field: 'share_image_url' | 'qr_code_url', value: string) => void
+}) {
+  const { onUploadingChange } = useContext(ValidationContext)
+  return <div className="my-4 space-y-3">
+    <div className="grid gap-4 sm:grid-cols-2">
+      {(['share_image_url', 'qr_code_url'] as const).map((field) => <PurchaseImageField key={field} label={field === 'share_image_url' ? copy.publicContent.admin_share_image_url : copy.publicContent.admin_qr_code_url} value={media[field]} onChange={(value) => onChange(field, value)} onUploadingChange={onUploadingChange}>
+        <TextField path={`${prefix}.${field}`} id={`${prefix}-${field}`} label={copy.publicContent.admin_image_url} value={media[field]} maxLength={2048} required={false} onChange={(value) => onChange(field, value)} />
+      </PurchaseImageField>)}
+    </div>
+    <p className="text-sm leading-6 text-ink-secondary">{copy.publicContent.admin_purchase_media_help}</p>
+    <p className="text-sm leading-6 text-ink-secondary">{copy.publicContent.admin_image_url_help}</p>
+  </div>
 }
 
 function FaqEditor({ settings, edit }: { settings: PublicContentSettingsV1; edit: EditSettings }) {
@@ -377,7 +404,10 @@ function PricingEditor({ settings, edit }: { settings: PublicContentSettingsV1; 
                       </p>
                     </div>
                   </div>
-                  {planId !== 'free_preview' && <TextField path={`pricing.plans.${planId}.purchase_url`} id={`${planId}-purchase-url`} label={copy.publicContent.admin_plan_purchase_url} value={plan.purchase_url} maxLength={2048} type="url" required={false} onChange={(value) => edit((next) => { next.pricing.plans[planId].purchase_url = value })} />}
+                  {planId !== 'free_preview' && <>
+                    <TextField path={`pricing.plans.${planId}.purchase_url`} id={`${planId}-purchase-url`} label={copy.publicContent.admin_plan_purchase_url} value={plan.purchase_url} maxLength={2048} type="url" required={false} onChange={(value) => edit((next) => { next.pricing.plans[planId].purchase_url = value })} />
+                    <PurchaseMediaFields prefix={`pricing.plans.${planId}`} media={plan} onChange={(field, value) => edit((next) => { next.pricing.plans[planId][field] = value })} />
+                  </>}
                   <TextareaField path={`pricing.plans.${planId}.summary`} id={`${planId}-summary`} label={copy.publicContent.admin_plan_summary} value={plan.summary} maxLength={1000} onChange={(value) => edit((next) => { next.pricing.plans[planId].summary = value })} />
                   <TextareaField path={`pricing.plans.${planId}.account_scope`} id={`${planId}-scope`} label={copy.publicContent.admin_plan_scope} value={plan.account_scope} maxLength={500} onChange={(value) => edit((next) => { next.pricing.plans[planId].account_scope = value })} />
                 </div>
@@ -391,6 +421,7 @@ function PricingEditor({ settings, edit }: { settings: PublicContentSettingsV1; 
           <TextField path="pricing.lifetime_upgrade.service_fee" id="lifetime-upgrade-service-fee" label={copy.publicContent.admin_lifetime_upgrade_service_fee} value={settings.pricing.lifetime_upgrade.service_fee} maxLength={40} onChange={(value) => edit((next) => { next.pricing.lifetime_upgrade.service_fee = value })} />
           <TextField path="pricing.lifetime_upgrade.purchase_url" id="lifetime-upgrade-purchase-url" label={copy.publicContent.admin_lifetime_upgrade_purchase_url} value={settings.pricing.lifetime_upgrade.purchase_url} maxLength={2048} type="url" required={false} onChange={(value) => edit((next) => { next.pricing.lifetime_upgrade.purchase_url = value })} />
         </div>
+        <PurchaseMediaFields prefix="pricing.lifetime_upgrade" media={settings.pricing.lifetime_upgrade} onChange={(field, value) => edit((next) => { next.pricing.lifetime_upgrade[field] = value })} />
       </EditorPanel>
       <EditorPanel title={copy.publicContent.admin_disclosures} description={copy.publicContent.admin_list_order_help} action={<CollectionAddAction path="pricing.disclosures" count={settings.pricing.disclosures.length} limit={PUBLIC_CONTENT_LIMITS.pricingDisclosures} label={copy.publicContent.admin_add_disclosure} onAdd={addDisclosure} />}>
         <TextField path="pricing.policy_heading" id="pricing-policy-heading" label={copy.publicContent.admin_policy_heading} value={settings.pricing.policy_heading} maxLength={120} onChange={(value) => edit((next) => { next.pricing.policy_heading = value })} />

@@ -20,11 +20,11 @@ const tempDir = await mkdtemp(join(tmpdir(), 'operator-avatars-'))
 let exitCode = 0
 
 try {
-  const remoteFiles = await listRemoteAvatarFiles()
+  const { files: remoteFiles, sourceRef } = await listRemoteAvatarFiles()
   await downloadRemoteFiles(remoteFiles, tempDir)
 
   const plan = await compareFiles(remoteFiles, tempDir, targetDir)
-  printPlan(plan)
+  printPlan(plan, sourceRef)
 
   if (!plan.hasChanges) {
     console.log('Operator avatars are already up to date.')
@@ -41,15 +41,20 @@ try {
 
 if (exitCode !== 0) process.exit(exitCode)
 
-async function listRemoteAvatarFiles() {
+async function listRemoteAvatarFiles(sourceRef = SOURCE_REF) {
   const url = new URL(`https://api.github.com/repos/${SOURCE_OWNER}/${SOURCE_REPO}/contents/${SOURCE_PATH}`)
-  url.searchParams.set('ref', SOURCE_REF)
+  url.searchParams.set('ref', sourceRef)
 
   const response = await fetchWithRetry(url, {
     headers: githubHeaders({ accept: 'application/vnd.github+json' }),
   }, `Failed to list ${SOURCE_OWNER}/${SOURCE_REPO}:${SOURCE_PATH}`)
 
   if (!response.ok) {
+    if (sourceRef === SOURCE_REF && response.status === 404
+      && (await response.clone().json()).message === `No commit found for the ref ${sourceRef}`) {
+      console.log(`Upstream branch ${sourceRef} is unavailable; using dev.`)
+      return listRemoteAvatarFiles('dev')
+    }
     throw new Error(await formatGithubError(response, `Failed to list ${SOURCE_OWNER}/${SOURCE_REPO}:${SOURCE_PATH}`))
   }
 
@@ -79,7 +84,7 @@ async function listRemoteAvatarFiles() {
     seen.add(file.name)
   }
 
-  return files
+  return { files, sourceRef }
 }
 
 async function downloadRemoteFiles(files, destinationDir) {
@@ -176,8 +181,8 @@ async function listLocalWebpFiles(directory) {
   }
 }
 
-function printPlan(plan) {
-  console.log(`Source: ${SOURCE_OWNER}/${SOURCE_REPO}@${SOURCE_REF}/${SOURCE_PATH}`)
+function printPlan(plan, sourceRef) {
+  console.log(`Source: ${SOURCE_OWNER}/${SOURCE_REPO}@${sourceRef}/${SOURCE_PATH}`)
   console.log(`Target: ${relativeToRoot(targetDir)}`)
   console.log(`Remote files: ${plan.remoteFiles.length}`)
   console.log(`Changes: +${plan.added.length} ~${plan.updated.length} -${plan.deleted.length}`)

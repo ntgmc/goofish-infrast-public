@@ -3,7 +3,8 @@ import handler from './cultivation-plan'
 import { CultivationReadError } from '../cultivation/worker-client'
 import { DEFAULT_SITE_FEATURE_SETTINGS } from '../../src/lib/site-features'
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), read: vi.fn(), gate: vi.fn(), snapshot: vi.fn(), features: vi.fn() }))
+const mocks = vi.hoisted(() => ({ session: vi.fn(), read: vi.fn(), gate: vi.fn(), snapshot: vi.fn(), features: vi.fn(), usage: vi.fn() }))
+vi.mock('../storage/tool-usage-store', () => ({ recordToolRun: mocks.usage }))
 vi.mock('./user-auth', () => ({ requireUserSession: mocks.session, jsonResponse: (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }) }))
 vi.mock('../feature-gate', () => ({ requireSiteFeatures: mocks.gate }))
 vi.mock('../cultivation/worker-client', async (original) => ({ ...await original<typeof import('../cultivation/worker-client')>(), readCultivationPlan: mocks.read }))
@@ -16,13 +17,27 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.gate.mockResolvedValue(null)
   mocks.features.mockResolvedValue(DEFAULT_SITE_FEATURE_SETTINGS)
-  mocks.session.mockResolvedValue({ profiles: [{ id: 'mine', status: 'active', skland_binding: { uid: 'player-uid', encrypted_cred: 'encrypted' } }] })
+  mocks.session.mockResolvedValue({ user: { id: 'user-1' }, profiles: [{ id: 'mine', status: 'active', skland_binding: { uid: 'player-uid', encrypted_cred: 'encrypted' } }] })
   mocks.snapshot.mockResolvedValue({ game: { data: { chars: [] }, fetchedAt: '2026-10-17T00:00:00Z' },
     inventory: { data: { items: [] }, fetchedAt: '2026-10-17T00:00:00Z' }, version: '1', errors: {} })
   mocks.read.mockResolvedValue(new TextEncoder().encode(JSON.stringify({ candidates: [], recommendation: { query: { rarityGroup: 'high' } } })).buffer)
 })
 
 describe('cultivation planning authorization and data boundary', () => {
+  it('records the actual tool and final outcome without player data', async () => {
+    for (const [body, tool] of [[{ profile_id: 'mine' }, 'cultivation'], [{ profile_id: 'mine', projects: [] }, 'cultivation_projects'], [{ profile_id: 'mine', training: true }, 'training_ratio']] as const) {
+      expect((await handler(request(body))).status).toBe(200)
+      expect(mocks.usage).toHaveBeenLastCalledWith({ tool, userId: 'user-1', outcome: 'success', startedAt: expect.any(Number) })
+    }
+    mocks.read.mockRejectedValueOnce(new CultivationReadError('超时', 504, 'cultivation_timeout'))
+    expect((await handler(request())).status).toBe(504)
+    expect(mocks.usage).toHaveBeenLastCalledWith(expect.objectContaining({ tool: 'cultivation', userId: 'user-1', outcome: 'failure' }))
+    mocks.usage.mockClear()
+    mocks.session.mockResolvedValueOnce(null)
+    expect((await handler(request())).status).toBe(401)
+    expect(mocks.usage).not.toHaveBeenCalled()
+  })
+
   it('requires a session and never reads an unrelated profile or upstream data', async () => {
     mocks.session.mockResolvedValueOnce(null)
     expect((await handler(request())).status).toBe(401)
@@ -34,7 +49,7 @@ describe('cultivation planning authorization and data boundary', () => {
     for (const body of [{ profile_id: 'mine', mode: 'invalid' }, ...[{ scope: 'invalid' }, { coverage: 2 }, { rarityGroup: 'invalid' }].map((recommendation) => ({ profile_id: 'mine', recommendation }))]) {
       expect((await handler(request(body))).status).toBe(400)
     }
-    mocks.session.mockResolvedValueOnce({ profiles: [{ id: 'mine', status: 'active', archived_at: '2026-01-01' }] })
+    mocks.session.mockResolvedValueOnce({ user: { id: 'user-1' }, profiles: [{ id: 'mine', status: 'active', archived_at: '2026-01-01' }] })
     expect((await handler(request())).status).toBe(403)
     expect(mocks.read).not.toHaveBeenCalled()
   })

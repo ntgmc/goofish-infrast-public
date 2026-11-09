@@ -16,6 +16,7 @@ import {
   AUTH_PASSWORD_MIN_LENGTH,
 } from '../../src/lib/auth-constraints'
 import { publicContentDraftSchema } from '../../src/lib/public-content'
+import { imageUploadSchema } from '../../src/lib/image-upload'
 import { SITE_FEATURE_KEYS, type SiteFeatureKey } from '../../src/lib/site-features'
 import { listAdminIssuablePermissions } from '../../src/lib/product-catalog'
 import type { ProductPermissionMode } from '../../src/lib/types'
@@ -38,6 +39,7 @@ export const REQUEST_BODY_LIMITS = Object.freeze({
   compute: 256 * 1024,
   depot: 1024 * 1024,
   feedback: 2 * 1024 * 1024,
+  image: 2 * 1024 * 1024,
 })
 
 export type RequestBodyProfile = keyof typeof REQUEST_BODY_LIMITS
@@ -142,6 +144,7 @@ export const requestSchemas = {
     includeClosed: z.boolean().optional(), includeAlternatives: z.boolean().optional(), includeUncertain: z.boolean().optional(),
   }).optional() }).refine((body) => !body.training || body.projects === undefined && body.recommendation === undefined, '培养目标读取不能同时指定养成项目或推荐条件。'),
   depotValue: depotValueRequestSchema,
+  adminPublicContentImage: imageUploadSchema,
   userFeedback: feedbackRequestSchema,
   userFeedbackReply: feedbackReplySchema,
   adminFeedbackUpdate: adminFeedbackUpdateSchema,
@@ -417,6 +420,7 @@ export const requestSchemas = {
   }).refine((body) => !body.automatic || !body.use_coupon, { message: '自动发送不能消耗体验券。' }),
   usageStats: strict({
     event: shortString(64),
+    page: optionalString(64),
     announcement_id: optionalString(120),
     announcement_kind: optionalString(32),
     announcement_version: optionalString(64),
@@ -754,6 +758,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/admin/registration-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminRegistrationSettings) })],
   ['/api/admin/feature-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminFeatureSettings) })],
   ['/api/admin/public-content', route({ GET: none(), PUT: json('admin', requestSchemas.adminPublicContent) })],
+  ['/api/admin/public-content-image', route({ POST: json('image', requestSchemas.adminPublicContentImage) })],
   ['/api/admin/registration-invitations', route({
     GET: none(),
     POST: json('admin', requestSchemas.adminRegistrationInvitationCreate),
@@ -782,6 +787,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/auth/me', route({ GET: none() }, ['profile_id'])],
   ['/api/site/features', route({ GET: none() })],
   ['/api/site/public-content', route({ GET: none() })],
+  ['/api/site/public-content-image', route({ GET: none() }, ['id'])],
   ['/api/changelog', route({ GET: none() }, ['page', 'release'])],
   ['/api/status', route({ GET: none() })],
   ['/api/user/data/export', route({ GET: none() })],
