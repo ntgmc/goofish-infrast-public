@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ExportImageIcon as Download, ClearIcon as Eraser, LockedOperatorIcon as LockKeyhole, UploadIcon as Upload, BackupIcon } from '../icons'
+import { ExportImageIcon as Download, ClearIcon as Eraser, LockedOperatorIcon as LockKeyhole, UploadIcon as Upload, BackupIcon, LoadingIcon } from '../icons'
 import type { LicenseConfig, LicenseOperator, OptimizeResult } from '../../lib/types'
 import { copy } from '../../copy/index'
 import { canonicalJson } from '../../lib/crypto'
@@ -287,7 +287,10 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
       <div className="workspace-manual-toolbar tool-panel space-y-3 p-4">
         {draftStorageKey === profileId && <p className="text-sm leading-6 text-ink-secondary">{label.result_scope}</p>}
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="tool-primary-action" disabled={!simulationBaseline || simulating || Boolean(settingsError)} aria-busy={simulating} onClick={() => void simulate()}>{label.simulate}</button>
+          <button type="button" className="tool-primary-action" disabled={!simulationBaseline || simulating || Boolean(settingsError)} aria-busy={simulating} onClick={() => void simulate()}>
+            {simulating && <LoadingIcon size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />}
+            {label.simulate}
+          </button>
           {completed && renderExport?.({ ...completed, prepared, shift: activePlan })}
           <button type="button" className="tool-primary-action" disabled={!changed || busy} onClick={save}>{label.save}</button>
           <button type="button" className="tool-secondary-action" disabled={!stored || busy}
