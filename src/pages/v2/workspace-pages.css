@@ -317,7 +317,17 @@ textarea.v2-input { resize: vertical; }
 .v2-pricing-terms { min-width: 0; margin-bottom: var(--space-sm); legend { margin-bottom: var(--space-xs); font-size: var(--text-base); font-weight: 600; } > div { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); gap: var(--space-xs); } label { display: flex; align-items: center; gap: var(--space-xs); min-width: 0; min-height: 72px; padding: var(--space-xs); border: 1px solid var(--color-v2-control); border-radius: var(--radius-v2-control); cursor: pointer; font-size: var(--text-sm); } label[data-selected="true"] { border-color: var(--v2-accent); background: var(--v2-accent-soft); } span { min-width: 0; } strong { display: block; margin-top: var(--space-3xs); font-variant-numeric: tabular-nums; } }
 .v2-pricing-plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-sm); }
 .v2-pricing-plan { display: flex; min-width: 0; flex-direction: column; padding: var(--space-sm); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-panel); background: var(--v2-paper); transition: border-color var(--dur-fast) ease-out; &:hover, &:focus-within { border-color: var(--v2-accent); } h2 { margin-block: var(--space-xs); font-size: var(--text-base); } > header > small { display: block; margin-top: var(--space-2xs); } .v2-button { width: 100%; white-space: nowrap; } }
-.v2-pricing-plan-featured { border-color: var(--v2-accent); background: var(--v2-accent-soft); }
+.v2-pricing-plan-featured { position: relative; isolation: isolate; border-color: var(--v2-accent); background: var(--v2-accent-soft); }
+@property --v2-beam-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+@keyframes v2-pricing-edge { to { --v2-beam-angle: 360deg; } }
+@keyframes v2-pricing-sweep { from { transform: translateX(-180%) skewX(-20deg); } to { transform: translateX(380%) skewX(-20deg); } }
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  :root:not([data-reduced-motion]) .v2-pricing-plan-featured::before { content: ''; position: absolute; inset: -1px; z-index: 1; padding: 2px; border-radius: inherit; pointer-events: none; opacity: 0; background: conic-gradient(from var(--v2-beam-angle), transparent 0% 65%, var(--v2-accent) 82%, transparent 100%); mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); mask-composite: exclude; }
+  :root:not([data-reduced-motion]) .v2-pricing-plan-featured:is(:hover, :focus-within)::before { opacity: 1; animation: v2-pricing-edge 1600ms ease-out 1 both; }
+  :root:not([data-reduced-motion]) .v2-pricing-plan-featured .v2-button-primary { position: relative; overflow: clip; }
+  :root:not([data-reduced-motion]) .v2-pricing-plan-featured .v2-button-primary::after { content: ''; position: absolute; inset: -30% auto; width: 40%; height: 160%; left: 0; pointer-events: none; opacity: 0; background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--color-accent-ink) 22%, transparent), transparent); }
+  :root:not([data-reduced-motion]) .v2-pricing-plan-featured .v2-button-primary:is(:hover, :focus-visible)::after { opacity: 1; animation: v2-pricing-sweep 650ms var(--ease-out) 1 both; }
+}
 .v2-pricing-badge { color: var(--v2-accent); font-size: var(--text-xs); font-weight: 600; }
 .v2-pricing-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-3xs); strong { font-size: var(--text-v2-metric); line-height: 1.2; color: var(--v2-ink); white-space: nowrap; } > span { font-size: var(--text-xs); color: var(--v2-muted); white-space: nowrap; } }
 .v2-pricing-plan .v2-pricing-audience { min-height: 3.5em; font-size: var(--text-xs); margin-top: var(--space-xs); }

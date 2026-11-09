@@ -33,6 +33,6 @@ it('preserves configured price text and renders final numbers without an observe
   state.reduced = true
   const view = render(<><RollingValue value="6.45 元" /><CountUp value={16.7} digits={1} /></>)
   expect(view.container.querySelector('[aria-label="6.45 元"]')).toHaveTextContent('6.45 元')
-  expect(view.container.querySelector('.sr-only')).toHaveTextContent('16.7')
+  expect(view.container.querySelector('.number-motion-count .sr-only')).toHaveTextContent('16.7')
   expect(state.update).toBeUndefined()
 })

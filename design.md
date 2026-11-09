@@ -264,8 +264,11 @@ it deliberately when changing the shared design.
   units, denominators, evidence and dense comparison readings remain stable.
 - Pointer hover may lift item tiles by 2px and move directory arrows by 3px.
   Pricing cards use border emphasis while their controls stay in place.
-- Pricing and capability demonstrations may use contained reveal and scroll storytelling;
-  keep native scrolling and immediate access to prices and actions.
+- Pricing and capability demonstrations use contained reveal and scroll storytelling;
+  keep native scrolling and immediate access to prices and actions. The desktop capability
+  illustration follows a fine pointer with a low-opacity copper spotlight and at most 2deg
+  tilt per axis, returning to rest on leave. The lifetime card traces its edge once on hover
+  or focus; its purchase action sweeps once. Touch and reduced motion retain static surfaces.
 - Operator, tool, inventory and benchmark lists reveal each stable item once per
   mounted list: 5px travel, 180ms duration, up to six items at 25ms intervals.
   Animate operator contents inside the virtual positioning shell. Searches show

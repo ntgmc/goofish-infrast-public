@@ -4,6 +4,11 @@
 .v2-benefit-step { min-width: 0; padding-block: var(--space-lg); > svg { color: var(--v2-accent); margin-bottom: var(--space-sm); } h3 { font-family: var(--font-display); font-size: var(--text-lg); line-height: 1.5; } > p { max-width: 48ch; margin-top: var(--space-sm); color: var(--v2-secondary); font-size: var(--text-sm); line-height: 1.8; } .v2-benefit-note { color: var(--v2-accent); } }
 .v2-benefit-inline { margin-top: var(--space-lg); }
 .v2-benefit-stage { display: none; }
+.v2-benefit-showcase { position: relative; border-radius: var(--radius-v2-panel); }
+.v2-benefit-showcase::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; background: radial-gradient(280px circle at var(--spot-x, 50%) var(--spot-y, 50%), color-mix(in oklch, var(--v2-accent) 9%, transparent), transparent 75%); transition: opacity var(--dur-base) ease-out; }
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  :root:not([data-reduced-motion]) .v2-benefit-stage:hover .v2-benefit-showcase::after { opacity: 1; }
+}
 .v2-benefit-scene { position: relative; min-width: 0; padding: var(--space-lg); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-panel); background: var(--v2-paper); color: var(--v2-ink); font-size: var(--text-sm); }
 .v2-benefit-caption { display: block; margin-bottom: var(--space-lg); font-size: var(--text-xs); color: var(--v2-muted); letter-spacing: .08em; }
 .v2-benefit-rooms { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr)); gap: var(--space-xs); > div { min-width: 0; padding: var(--space-sm); background: var(--color-v2-inset); border-radius: var(--radius-v2-control); > svg { display: block; color: var(--v2-accent); margin-bottom: var(--space-xs); } > span { display: block; } } }
@@ -21,6 +26,7 @@
   :root:not([data-reduced-motion]) .v2-benefit-inline { display: none; }
   :root:not([data-reduced-motion]) .v2-benefit-stage { display: block; position: sticky; top: var(--space-xl); padding-block: var(--space-xl); > div { min-height: 24rem; display: grid; align-content: center; } }
   .v2-benefit-scene { padding: var(--space-xl); }
+  .v2-benefit-showcase .v2-benefit-scene { min-height: 24rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .v2-benefit-content { display: block !important; }

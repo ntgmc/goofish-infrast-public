@@ -27,7 +27,7 @@ export function CountUp({ value, digits = 0 }: { value: number; digits?: number 
     observer.observe(element)
     return () => { observer.disconnect(); animation?.stop(); element.textContent = final }
   }, [value, digits, reduced, final])
-  return <span className="number-motion"><span className="sr-only">{final}</span><span ref={visual} aria-hidden="true">{final}</span></span>
+  return <span className="number-motion number-motion-count"><span className="sr-only">{final}</span><span ref={visual} aria-hidden="true">{final}</span><span className="number-motion-size" aria-hidden="true">{final}</span></span>
 }
 
 export function RollingValue({ value }: { value: string }) {
