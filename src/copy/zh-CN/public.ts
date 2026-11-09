@@ -459,11 +459,13 @@ export const publicCopy = {
   pricing_story: {
     title: "从基建配置到自动换班",
     description: "四种维护期限均可使用这些高级能力，按自己的培养和排班习惯选择。",
-    illustration: "功能示意",
-    config: { title: "按你的基建安排生产", body: "调整房间、生产目标、班次与无人机策略，让排班适配实际布局。", labels: ["贸易站", "制造站", "发电站", "宿舍"], controls: ["生产目标", "换班时间", "无人机策略"] },
-    exports: { title: "下载后，交给 MAA 自动换班", body: "使用 MAA 排班模式生成方案后，下载执行文件并导入 MAA，按安排执行换班。完整计算 JSON 可另行下载，用于分析和复盘。", labels: ["排班方案", "MAA 执行文件", "自动换班"], mode: "MAA 排班模式" },
-    training: { title: "培养之前，先看成本与收益", body: "结合材料缺口、预计每日收益提升和回本时间，决定优先培养谁。培养完成后更新干员数据，再优化排班。", labels: ["培养成本", "材料缺口", "预计每日收益", "回本时间"], flow: ["选择干员", "评估培养", "更新排班"] },
-    comparison: { title: "把不同配置放在一起比较", body: "用同一份干员数据比较当前方案和最多三套额外配置，结合每日产量与换班次数做选择。", labels: ["当前配置", "额外配置"], metrics: ["每日产量", "换班次数"], availability: "对比次数随维护期限提供" },
+    enlarge: "放大查看界面",
+    close: "关闭大图",
+    pan: "左右滑动查看截图细节",
+    config: { title: "按你的基建安排生产", body: "按游戏中的位置设置设施与等级，再调整生产目标、班次和无人机策略。", source: "基建配置实际界面", caption: "右满 252 示例：每间设施的位置、类型和等级都可以单独设置。", alt: "基建配置编辑器：B1 至 B3 的九间设施，包含贸易站、制造站和发电站及各自等级" },
+    exports: { title: "下载后，交给 MAA 自动换班", body: "使用 MAA 排班模式生成方案后，下载执行文件并导入 MAA，按安排执行换班。完整计算 JSON 可另行下载，用于分析和复盘。", source: "MAA 导入实际界面", caption: "打开「基建换班」设置，选择「自定义基建配置」和「自定义」，再选择下载的执行文件。", alt: "MAA 基建换班设置截图，标出自定义基建配置、自定义内容配置和选择文件的位置" },
+    training: { title: "培养之前，先看成本与收益", body: "把培养所需材料、当前缺口和预计收益放在一起，判断是否值得投入。培养后更新干员数据，再生成排班。", source: "公开示例排班 · 培养建议", upgrade: (name: string, current: number, target: number) => `${name} · 精${current} → 精${target}`, daily: "预计每日提升", payback: "预计回本", total: "培养总成本", missing_cost: "补齐成本", missing: "待补材料", sanity: "理智", per_day: "理智 / 日", days: "天", caption: "示例读数基于该名单与库存；回本时间按补齐材料的成本估算。你的结果以实际计算为准。" },
+    comparison: { title: "把不同配置放在一起比较", body: "用同一份干员数据比较当前方案和最多三套额外配置，结合每日产量与换班次数做选择。", source: (date: string) => `${date} 实测 · A01 · MaaTool`, metric: "净理智 / 日", lmd: "龙门币 / 日", exp: "经验 / 日", passed: "两种布局均通过执行检查", caption: "同一份干员、相同换班时长，对照净产出，再看龙门币与经验的取舍。", evidence: "查看这份名单的实测结果", chart: (first: string, second: string) => `同名单布局实测：243 每日净理智 ${first}，右满252 每日净理智 ${second}` },
   },
   pricing_evidence: {
     title: "排班效果，有实测可查",

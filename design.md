@@ -185,10 +185,15 @@ it deliberately when changing the shared design.
   width. Show only the selected plan's total, audience, archive gift and purchase
   action, with UID binding and activation
   conditions immediately above the action. Keep redemption before capability demonstrations.
-  Four capability chapters explain configuration, MAA execution, cultivation analysis and
-  configuration comparison using labelled diagrams without invented results. At 80rem and
-  above, native scrolling selects a chapter beside one sticky demonstration; smaller screens
-  and reduced motion show the corresponding diagrams inline. Keep comparison quotas and
+  Four capability chapters pair configuration and MAA screenshots with readable cultivation
+  results and a measured layout comparison. Screenshots in `public/assets/pricing/` capture
+  the real facility editor with `SAMPLE_CONFIG`, or crop the existing MAA import guide to its
+  setup controls. Light and dark assets follow the app theme and expand in a keyboard-accessible
+  dialog. Cultivation readings come from the public sample result's Mayer suggestion; the
+  zero-based comparison chart uses A01's MaaTool S1/S2 cases from the frozen 2026-11-04 snapshot,
+  with a link to the underlying evidence. Keep sample estimates distinct from measured results.
+  At 80rem and above, native scrolling selects a chapter beside one sticky visual; smaller
+  screens and reduced motion show the corresponding visual inline. Keep comparison quotas and
   current service availability beside the relevant chapter, then the compact benchmark proof strip. On desktop, plan descriptions expand on demand; at every width,
   the full entitlement comparison, purchase rules and upgrade details are expandable.
   Purchase guides retain the selected product and profile. Group the product,
