@@ -1,12 +1,13 @@
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import { memo, useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { copy } from '../../copy'
+import { useListReveal } from '../../lib/use-list-reveal'
 import type { LicenseOperator } from '../../lib/types'
 import BuildingSkills from './BuildingSkills'
 import { Avatar } from './ScheduleBoard'
 
-export default memo(function OperatorRows({ operators }: { operators: LicenseOperator[] }) {
-  const list = useRef<HTMLDivElement>(null)
+export default memo(function OperatorRows({ operators, reveal = true }: { operators: LicenseOperator[]; reveal?: boolean }) {
+  const list = useListReveal(reveal)
   const expanded = useRef(new Set<string>())
   const [scrollMargin, setScrollMargin] = useState(0)
   const [focusedId, setFocusedId] = useState<string | null>(null)
@@ -64,9 +65,9 @@ export default memo(function OperatorRows({ operators }: { operators: LicenseOpe
       const operator = operators[row.index]
       return <div key={row.key} ref={virtual ? virtualizer.measureElement : undefined} data-index={row.index}
         className={`v2-operator-entry${virtual ? ' v2-operator-virtual-row' : ''}`} data-owned={operator.own !== false}
-        role="listitem" aria-posinset={row.index + 1} aria-setsize={operators.length}
+        role="listitem" data-reveal-id={operator.id} aria-posinset={row.index + 1} aria-setsize={operators.length}
         style={virtual ? { transform: `translateY(${row.start - scrollMargin}px)` } : undefined}>
-        <OperatorRow operator={operator} expanded={expanded.current} />
+        <div data-reveal-content><OperatorRow operator={operator} expanded={expanded.current} /></div>
       </div>
     })}
   </div>

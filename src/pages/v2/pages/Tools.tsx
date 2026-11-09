@@ -1,6 +1,7 @@
 import { ScheduleComparisonIcon, NextIcon as ArrowRight, TrainingRatioIcon as Calculator, ProjectsIcon, CultivationIcon, ThanksRecruitmentIcon, MaterialDemandIcon, ManualScheduleIcon as CalendarClock, DepotValueIcon as Gem } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
+import { useListReveal } from '../../../lib/use-list-reveal'
 import type { V2Session } from '../OptionsDrawer'
 import { v2Path } from '../navigation'
 import Link from '../../../components/InternalLink'
@@ -17,6 +18,7 @@ import { materialDemandCopy } from '../../../copy/zh-CN/material-demand'
 
 export default function Tools({ profileId }: { profileId?: string }) {
   const { features } = useSiteFeatures()
+  const reveal = useListReveal()
   const text = copy.tools.directory
   const groups = [
     { id: 'base', title: text.groups.base, tools: [
@@ -34,10 +36,10 @@ export default function Tools({ profileId }: { profileId?: string }) {
       { section: 'depot' as const, enabled: features.depot_value, icon: Gem, title: copy.dashboard.pages_tool_dashboard_ToolsSection_001, description: text.descriptions.depot },
     ] },
   ].map((group) => ({ ...group, tools: group.tools.filter((tool) => tool.enabled) })).filter((group) => group.tools.length)
-  return <div className="v2-tools-directory">
+  return <div ref={reveal} className="v2-tools-directory">
     {groups.map((group) => <section key={group.id} aria-labelledby={`v2-tool-group-${group.id}`}>
       <h2 id={`v2-tool-group-${group.id}`}>{group.title}</h2>
-      <ul className="v2-tool-list">{group.tools.map((tool) => <li key={tool.section}>
+      <ul className="v2-tool-list">{group.tools.map((tool) => <li key={tool.section} data-reveal-id={tool.section}>
         <Link to={v2Path(tool.section, profileId)}><tool.icon size={24} aria-hidden="true" /><div><h3>{tool.title}</h3><p>{tool.description}</p></div><span className="v2-tool-enter"><ArrowRight size={20} aria-hidden="true" /></span></Link>
       </li>)}</ul>
     </section>)}

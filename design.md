@@ -266,6 +266,10 @@ it deliberately when changing the shared design.
   Pricing cards use border emphasis while their controls stay in place.
 - Pricing and capability demonstrations may use contained reveal and scroll storytelling;
   keep native scrolling and immediate access to prices and actions.
+- Operator, tool, inventory and benchmark lists reveal each stable item once per
+  mounted list: 5px travel, 180ms duration, up to six items at 25ms intervals.
+  Animate operator contents inside the virtual positioning shell. Searches show
+  immediately; fast scrolling skips reveals; focusing cancels the item's animation.
 - No nested stagger cascades, bounce, overshoot, or parallax in workspaces.
 - Reduced-motion fallback · final numbers and content immediately; no transform;
   retained opacity transitions at or below 150ms.

@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router'
 import { copy } from '../../../../copy'
 import { BENCHMARK_ASSETS, benchmarkCasePath, benchmarkNumber as number, siteBenchmark as data, type BenchmarkCase } from '../../../../lib/site-benchmark'
 import BenchmarkEvidence from './BenchmarkEvidence'
+import { useListReveal } from '../../../../lib/use-list-reveal'
 
 const text = copy.siteBenchmark
 
@@ -22,6 +23,7 @@ function Results({ params }: { params: URLSearchParams }) {
     const frame = requestAnimationFrame(() => document.querySelector(`[data-case-id="${selectedId}"]`)?.scrollIntoView?.({ block: 'start' }))
     return () => cancelAnimationFrame(frame)
   }, [selectedId])
+  const reveal = useListReveal(!sample && !layout && !site && !status)
   const shown = data.cases.filter((item) => (!sample || sample === item.sample) && (!layout || layout === item.layout) && (!site || site === item.site) && (!status || item.passed === (status === 'passed')))
   const groups = data.layouts.map((layout) => ({ layout, samples: data.samples.map((sample) => ({ sample, cases: shown.filter((item) => item.sample === sample.alias && item.layout === layout.id) })).filter((group) => group.cases.length) })).filter((group) => group.samples.length)
   const filters = new URLSearchParams(Object.entries({ sample, layout, site, status }).filter(([, value]) => value))
@@ -37,11 +39,11 @@ function Results({ params }: { params: URLSearchParams }) {
     </div>
     <div className="benchmark-filter-summary"><p className="benchmark-muted" role="status" aria-live="polite">{text.shown(shown.length, data.cases.length)}</p>{filters.size > 0 && <Link className="benchmark-link" to={`/v2/benchmarks?${filters}#benchmark-data`}>{text.filterLink}</Link>}</div>
     <p className="benchmark-legend"><span className="benchmark-valid">✓ {text.passLabel}</span><span className="benchmark-invalid">× <s>{text.failedReading}</s></span></p>
-    {groups.length ? groups.map(({ layout, samples }) => <section className="benchmark-layout-board" key={layout.id}>
+    <div ref={reveal}>{groups.length ? groups.map(({ layout, samples }) => <section className="benchmark-layout-board" key={layout.id}>
       <header><h3>{layout.label}</h3><p>{layout.id === 'S3' ? text.orundumDirection : text.yieldDirection}</p></header>
       {layout.id === 'S3' && <><p className="benchmark-muted">{text.orundumEfficiencyNote}</p><p className="benchmark-muted">{text.orundumComparisonNote}</p></>}
       {samples.map((group) => <ResultGroup key={group.sample.alias} sample={group.sample.alias} cases={group.cases} selectedId={selectedId} />)}
-    </section>) : <p className="benchmark-empty">{text.empty}</p>}
+    </section>) : <p className="benchmark-empty">{text.empty}</p>}</div>
   </section>
 }
 
@@ -53,7 +55,7 @@ function ResultGroup({ sample, cases, selectedId }: { sample: string; cases: Ben
   const minimum = Math.min(...values)
   const maximum = Math.max(...values)
   const range = maximum - minimum
-  return <div className="benchmark-result-group" role="group" aria-label={`${sample} · ${data.layouts.find((layout) => layout.id === cases[0].layout)!.label}`}>
+  return <div className="benchmark-result-group" data-reveal-id={`${sample}-${cases[0].layout}`} role="group" aria-label={`${sample} · ${data.layouts.find((layout) => layout.id === cases[0].layout)!.label}`}>
     <h4>{sample}</h4>
     <div className="benchmark-match">
       {data.sites.map((site) => {
