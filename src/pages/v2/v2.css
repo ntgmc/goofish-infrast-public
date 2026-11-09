@@ -1700,6 +1700,22 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
   line-height: 1.8;
 }
 
+@supports (scrollbar-gutter: stable) {
+  html:has(.v2-app) { scrollbar-gutter: stable; }
+
+  /* The gutter already reserves the scrollbar width during modal scroll locking. */
+  body[data-scroll-locked]:has(.v2-app) { margin-right: 0 !important; }
+}
+
+[data-slot="dialog-overlay"]:has(+ .v2-drawer) {
+  animation-duration: 260ms;
+  animation-timing-function: var(--motion-ease-enter);
+}
+
+[data-slot="dialog-overlay"][data-state="closed"]:has(+ .v2-drawer) {
+  animation-duration: 200ms;
+}
+
 .v2-drawer {
   inset: 0 0 0 auto !important;
   width: min(490px, 100%) !important;
@@ -1718,7 +1734,7 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
 }
 
 .v2-drawer[data-state="closed"] {
-  animation: v2-drawer-exit 140ms var(--motion-ease-exit) both !important;
+  animation: v2-drawer-exit 200ms var(--motion-ease-enter) both !important;
 }
 
 @keyframes v2-drawer-enter {
