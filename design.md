@@ -196,8 +196,9 @@ it deliberately when changing the shared design.
   sample result's Mayer suggestion; the
   zero-based comparison chart uses A01's MaaTool S1/S2 cases from the frozen 2026-11-04 snapshot,
   with a link to the underlying evidence. Keep sample estimates distinct from measured results.
-  At 80rem and above, native scrolling selects a chapter beside one sticky visual; smaller
-  screens and reduced motion show the corresponding visual inline. Keep comparison quotas and
+  At 80rem and above, native scrolling selects a chapter beside one sticky visual, based on
+  current chapter positions at 45% of the viewport. Recalculate on scroll and resize; select the
+  last chapter when its bottom is visible. Smaller screens and reduced motion show visuals inline. Keep comparison quotas and
   current service availability beside the relevant chapter, then the compact benchmark proof strip. On desktop, plan descriptions expand on demand; at every width,
   the full entitlement comparison, purchase rules and upgrade details are expandable.
   Purchase guides retain the selected product and profile. Group the product,

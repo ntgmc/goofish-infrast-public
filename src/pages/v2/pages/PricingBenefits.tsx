@@ -22,13 +22,25 @@ export default function PricingBenefits() {
   const spotX = useMotionValue('50%'), spotY = useMotionValue('50%')
   const tiltX = useSpring(0, { stiffness: 240, damping: 30 }), tiltY = useSpring(0, { stiffness: 240, damping: 30 })
   useEffect(() => {
-    if (reduced || typeof IntersectionObserver === 'undefined') return
-    const observer = new IntersectionObserver((entries) => {
-      const entry = entries.find((entry) => entry.isIntersecting)
-      if (entry) setActive(Number((entry.target as HTMLElement).dataset.step))
-    }, { rootMargin: '-25% 0px -45% 0px' })
-    section.current?.querySelectorAll('.v2-benefit-step').forEach((element) => observer.observe(element))
-    return () => observer.disconnect()
+    const element = section.current
+    if (reduced || !element) return
+    const chapters = [...element.querySelectorAll<HTMLElement>('.v2-benefit-step')]
+    let frame = 0
+    const update = () => {
+      frame = 0
+      const anchor = window.innerHeight * 0.45
+      let index = 0
+      chapters.forEach((chapter, position) => { if (chapter.getBoundingClientRect().top <= anchor) index = position })
+      if (chapters[chapters.length - 1].getBoundingClientRect().bottom <= window.innerHeight) index = chapters.length - 1
+      setActive(index)
+    }
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(update) }
+    update()
+    window.addEventListener('scroll', schedule, { passive: true })
+    window.addEventListener('resize', schedule)
+    const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule)
+    resize?.observe(element)
+    return () => { cancelAnimationFrame(frame); resize?.disconnect(); window.removeEventListener('scroll', schedule); window.removeEventListener('resize', schedule) }
   }, [reduced])
   const quotas = productPolicies.metered_billing.scenario_quotas
   return <section ref={section} className="v2-benefit-story" aria-labelledby="pricing-benefits-title">
