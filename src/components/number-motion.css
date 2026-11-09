@@ -1,0 +1,3 @@
+.number-motion { display: inline-block; position: relative; font-variant-numeric: tabular-nums; }
+.number-motion-roll { overflow: clip; vertical-align: bottom; }
+.number-motion-roll > span { display: inline-block; }

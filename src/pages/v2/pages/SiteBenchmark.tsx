@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { copy } from '../../../copy'
+import { CountUp } from '../../../components/NumberMotion'
 import { ExportIcon, NextIcon, SuccessIcon } from '../../../components/icons'
 import { BENCHMARK_ASSETS, benchmarkCasePath, benchmarkNumber as number, regularBenchmarkComparison, siteBenchmark as data } from '../../../lib/site-benchmark'
 import { v2Path } from '../navigation'
@@ -20,8 +21,8 @@ export default function SiteBenchmark() {
       <p className="benchmark-stamp"><time dateTime={data.date}>{data.date}</time><span>{text.organizer} · {data.organizer}</span><span>{text.simulator} · {data.simulatorVersion.split('@')[0]}</span></p>
       <h2>{text.headline(data.sites[0].label, own.length).map((part) => <span key={part}>{part}</span>)}</h2>
       <div className="benchmark-hero-metrics">
-        <div><strong>{number(passed / own.length * 100, 0)}<span>%</span></strong><p>{text.heroPass(passed, own.length)}</p></div>
-        <div><strong>{higher}<span>／{pairs.length}</span></strong><p>{text.heroYield}</p></div>
+        <div><strong><CountUp value={passed / own.length * 100} /><span>%</span></strong><p>{text.heroPass(passed, own.length)}</p></div>
+        <div><strong><CountUp value={higher} /><span>／{pairs.length}</span></strong><p>{text.heroYield}</p></div>
       </div>
       <p className="benchmark-muted">{text.scope(data.samples.length, data.layouts.length, data.sites.length)} · {text.heroScope}</p>
       <p>{text.generationNote}</p>
@@ -36,7 +37,7 @@ export default function SiteBenchmark() {
           const passes = cases.filter((item) => item.passed).length
           return <div className={`benchmark-site ${site.id === 'maatool' ? 'benchmark-site-own' : ''}`} key={site.id}>
             <a className="benchmark-site-name" href={site.url} target="_blank" rel="noreferrer">{text.siteShort[site.id as keyof typeof text.siteShort]}</a>
-            <strong className="benchmark-pass-percent">{number(passes / cases.length * 100, passes === cases.length ? 0 : 1)}<small>%</small></strong>
+            <strong className="benchmark-pass-percent"><CountUp value={passes / cases.length * 100} digits={passes === cases.length ? 0 : 1} /><small>%</small></strong>
             <p className="benchmark-site-total">{text.passCount(passes, cases.length)}</p>
             <div className="benchmark-check-grid" aria-hidden="true">{cases.map((item) => <span key={item.id} className={item.passed ? 'benchmark-check-pass' : 'benchmark-check-fail'}>{item.passed ? '✓' : '×'}</span>)}</div>
             <p className={passes === cases.length ? 'benchmark-valid' : 'benchmark-invalid'}>{text.failureTotal(cases.length - passes)}</p>
@@ -49,7 +50,7 @@ export default function SiteBenchmark() {
       <div className="benchmark-section-heading"><h2>{text.yieldTitle(higher, pairs.length)}</h2><p>{text.yieldBody(aboveOne, pairs.length - aboveOne)}</p></div>
       <div className="benchmark-gains">{comparisons.filter((group) => group.pairs.length).sort((a, b) => b.median! - a.median!).map(({ layout, site, pairs, median }) => <article className="benchmark-gain" key={`${layout.id}-${site.id}`}>
         <p>{layout.label}<span>{text.against(text.siteShort[site.id as keyof typeof text.siteShort])}</span></p>
-        <strong className="benchmark-gain-number">{median! > 0 ? '+' : ''}{number(median)}<small>%</small></strong>
+        <strong className="benchmark-gain-number">{median! > 0 ? '+' : ''}<CountUp value={median!} digits={2} /><small>%</small></strong>
         <p className="benchmark-muted">{text.medianGain}</p>
         <div className="benchmark-gain-bar" aria-hidden="true"><span style={{ transform: `scaleX(${Math.abs(median!) / Math.max(...comparisons.map((group) => Math.abs(group.median ?? 0)))})` }} /></div>
         <p className="benchmark-pair-count">{text.pairCount(pairs.length)}</p>

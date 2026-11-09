@@ -254,9 +254,17 @@ it deliberately when changing the shared design.
 
 ## Motion stance
 
-- Composed and quiet: route opacity/short translate plus direct state transitions only.
-- No nested stagger cascades, bounce, overshoot, parallax, or scroll-linked ornament.
-- Reduced-motion fallback · no transform; opacity transitions at or below 150ms.
+- Keep workspace motion short and tied to navigation, state, or the object being used.
+- Pricing changes roll the exact configured amount over 300ms. Benchmark headline,
+  pass-rate and median metrics count once on entering the viewport over 750ms;
+  units, denominators, evidence and dense comparison readings remain stable.
+- Pointer hover may lift item tiles by 2px and move directory arrows by 3px.
+  Pricing cards use border emphasis while their controls stay in place.
+- Pricing and capability demonstrations may use contained reveal and scroll storytelling;
+  keep native scrolling and immediate access to prices and actions.
+- No nested stagger cascades, bounce, overshoot, or parallax in workspaces.
+- Reduced-motion fallback · final numbers and content immediately; no transform;
+  retained opacity transitions at or below 150ms.
 
 ## Responsive contract
 

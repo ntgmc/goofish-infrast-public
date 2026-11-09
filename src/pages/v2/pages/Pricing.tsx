@@ -11,6 +11,7 @@ import { getSku } from '../../../lib/product-catalog'
 import Link from '../../../components/InternalLink'
 import { FeedbackLink } from '../../../components/PublicFooter'
 import { Facts, Notice, SectionTitle } from '../components/WorkspaceUI'
+import { RollingValue } from '../../../components/NumberMotion'
 import { v2Path } from '../navigation'
 
 const text = copy.public
@@ -60,11 +61,11 @@ export default function Pricing() {
         const plan = pricing.plans[id]
         const [amount, period] = plan.display_price.split('/')
         const archiveCount = id === 'single_account_lifetime' ? 3 : 1
-        return <article key={id} className={`v2-pricing-plan${id === 'single_account_lifetime' ? ' v2-pricing-plan-featured' : ''}`} aria-labelledby={`${id}-title`}>
+        return <article key={mobile ? 'selected-plan' : id} className={`v2-pricing-plan${id === 'single_account_lifetime' ? ' v2-pricing-plan-featured' : ''}`} aria-labelledby={`${id}-title`}>
           <header>
             {!mobile && <span className="v2-pricing-badge">{plan.badge}</span>}
             <h2 id={`${id}-title`}>{term(plan.label)}</h2>
-            <p className="v2-pricing-price">{mobile && <span>{choice.total_price}</span>}<strong>{amount.trim()}</strong>{period && <span>／{period.trim()}</span>}</p>
+            <p className="v2-pricing-price">{mobile && <span>{choice.total_price}</span>}<strong><RollingValue value={amount.trim()} /></strong>{period && <span>／{period.trim()}</span>}</p>
             {plan.discount_fold < 10 && <small>{text.pages_PricingPage_017(plan.original_price, plan.discount_fold)}</small>}
             <p className="v2-pricing-audience">{getSku(id).audience}</p>
           </header>
