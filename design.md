@@ -184,8 +184,12 @@ it deliberately when changing the shared design.
   and total prices in a compact native radio group that wraps with the available
   width. Show only the selected plan's total, audience, archive gift and purchase
   action, with UID binding and activation
-  conditions immediately above the action. Keep redemption and a compact benchmark
-  proof strip below. On desktop, plan descriptions expand on demand; at every width,
+  conditions immediately above the action. Keep redemption before capability demonstrations.
+  Four capability chapters explain configuration, MAA execution, cultivation analysis and
+  configuration comparison using labelled diagrams without invented results. At 80rem and
+  above, native scrolling selects a chapter beside one sticky demonstration; smaller screens
+  and reduced motion show the corresponding diagrams inline. Keep comparison quotas and
+  current service availability beside the relevant chapter, then the compact benchmark proof strip. On desktop, plan descriptions expand on demand; at every width,
   the full entitlement comparison, purchase rules and upgrade details are expandable.
   Purchase guides retain the selected product and profile. Group the product,
   price, terms, listing action and copy action first, with the raw URL available
