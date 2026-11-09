@@ -45,7 +45,9 @@ jobs:
       - name: Sync operator avatars
         env:
           GITHUB_TOKEN: ${{ secrets.OPERATOR_AVATAR_SOURCE_TOKEN || secrets.GITHUB_TOKEN }}
-        run: pnpm run sync:operator-avatars
+        run: |
+          node --test scripts/sync-operator-avatars.test.mjs
+          pnpm run sync:operator-avatars
 
       - name: Sync cultivation icons
         env:
