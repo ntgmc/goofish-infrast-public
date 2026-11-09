@@ -187,9 +187,14 @@ it deliberately when changing the shared design.
   conditions immediately above the action. Keep redemption and a compact benchmark
   proof strip below. On desktop, plan descriptions expand on demand; at every width,
   the full entitlement comparison, purchase rules and upgrade details are expandable.
-  Purchase guides retain the selected product and profile, then show its price,
-  terms, external listing, copyable link, buying steps, redemption and optional
-  share image/QR. Each product owns its media; blank images take no space.
+  Purchase guides retain the selected product and profile. Group the product,
+  price, terms, listing action and copy action first, with the raw URL available
+  on demand. Keep redemption before long media; pair this overview with the QR
+  on desktop and place the QR before the buying steps on mobile. Show steps in
+  three columns on desktop and a vertical list on mobile. Share posters expand
+  on demand, showing the full image without cropping; open them by default when
+  they are the only way to reach the product. Each product owns its media;
+  blank images take no space.
   Admin image fields support direct upload, preview, replacement and removal,
   with optional URL entry. Preserve original image bytes, pause publishing during
   uploads, and retain the previous image after a failed upload. Keep keyboard

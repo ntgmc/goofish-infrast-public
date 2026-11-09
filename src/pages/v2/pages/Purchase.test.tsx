@@ -69,6 +69,7 @@ it('copies the selected link and provides manual copying when clipboard access f
   write.mockRejectedValueOnce(new Error('denied'))
   await user.click(screen.getByRole('button', { name: text.copy }))
   expect(screen.getByRole('alert')).toHaveTextContent(text.copy_failed)
+  await user.click(screen.getByText(text.show_link, { exact: true }))
   expect(screen.getByRole('textbox', { name: text.link })).toHaveValue('https://example.com/monthly')
 })
 

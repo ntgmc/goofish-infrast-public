@@ -330,16 +330,22 @@ textarea.v2-input { resize: vertical; }
 .v2-pricing-policy ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-md) var(--space-xl); li { font-size: var(--text-sm); line-height: 1.8; white-space: pre-line; } }
 .v2-tier-list article { padding-block: var(--space-sm); border-bottom: 1px solid var(--v2-line); dl { display: flex; flex-wrap: wrap; gap: var(--space-md); margin-top: var(--space-xs); font-size: var(--text-sm); } dt { color: var(--v2-muted); font-size: var(--text-xs); } }
 
-.v2-purchase-workspace { max-width: 68rem; > .v2-text-button { margin-bottom: var(--space-md); } p { font-size: var(--text-sm); line-height: 1.8; } }
-.v2-purchase-product { display: flex; flex-wrap: wrap; gap: var(--space-lg) var(--space-xl); padding-bottom: var(--space-lg); > div { flex: 1 1 20rem; min-width: 0; } h2 { font-size: var(--text-xl); } p { margin-top: var(--space-xs); white-space: pre-line; } .v2-purchase-price { font-size: var(--text-2xl); font-weight: 600; color: var(--v2-accent); font-variant-numeric: tabular-nums; } }
-.v2-purchase-link { .v2-button { margin-bottom: var(--space-sm); } .v2-field { margin-block: 0 var(--space-2xs); } }
-.v2-purchase-layout { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: var(--space-xl); padding-block: var(--space-lg); > * { min-width: 0; } .v2-block-title { margin-bottom: var(--space-md); } }
-.v2-purchase-instructions { padding-top: var(--space-md); border-top: 1px solid var(--v2-line); h3 { font-size: var(--text-base); } p { margin-top: var(--space-xs); white-space: pre-line; overflow-wrap: anywhere; } }
-.v2-purchase-media { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: var(--space-lg); align-items: start; }
-.v2-purchase-image { min-width: 0; h3 { font-size: var(--text-base); } figcaption { margin-bottom: var(--space-sm); } figcaption p { margin-top: var(--space-2xs); color: var(--v2-secondary); } img { display: block; width: 100%; max-height: 32rem; object-fit: contain; border: 1px solid var(--v2-line); border-radius: var(--radius-v2-control); } > a:first-of-type { display: block; } > .v2-text-button { margin-top: var(--space-xs); } }
-.v2-purchase-qr img { max-width: 15rem; background: white; }
+.v2-purchase-workspace { max-width: 68rem; > .v2-text-button { margin-bottom: var(--space-sm); } p { font-size: var(--text-sm); line-height: 1.8; } }
+.v2-purchase-overview { display: flex; flex-direction: column; gap: var(--space-md); > * { min-width: 0; } }
+.v2-purchase-product { grid-area: product; h2 { font-size: var(--text-xl); } p { margin-top: var(--space-xs); white-space: pre-line; } .v2-purchase-price { font-size: var(--text-2xl); font-weight: 600; color: var(--v2-accent); font-variant-numeric: tabular-nums; } }
+.v2-purchase-link { .v2-actions { margin-block: var(--space-sm) var(--space-xs); } }
+.v2-purchase-link-details { font-size: var(--text-xs); color: var(--v2-secondary); > summary { width: fit-content; min-height: 36px; padding-block: var(--space-xs); cursor: pointer; } .v2-field { margin-block: 0 var(--space-sm); } }
+.v2-purchase-redeem { grid-area: redeem; padding: var(--space-sm); background: var(--v2-paper); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-control); h2 { font-size: var(--text-base); } p { margin-top: var(--space-2xs); color: var(--v2-secondary); } .v2-actions { margin-top: var(--space-sm); } }
+.v2-purchase-layout { display: grid; gap: var(--space-lg); margin-top: var(--space-lg); padding-top: var(--space-lg); border-top: 1px solid var(--v2-line); > * { min-width: 0; } .v2-block-title { margin-bottom: var(--space-md); h2 { font-size: var(--text-base); } } .v2-support-steps { display: grid; gap: var(--space-md); li { min-width: 0; padding-bottom: 0; } } }
+.v2-purchase-instructions { margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--v2-line); h3 { font-size: var(--text-base); } p { margin-top: var(--space-xs); white-space: pre-line; overflow-wrap: anywhere; } }
+.v2-purchase-image { min-width: 0; figcaption { margin-bottom: var(--space-sm); h2 { font-size: var(--text-base); } p { margin-top: var(--space-2xs); color: var(--v2-secondary); } } img { display: block; width: 100%; height: auto; border: 1px solid var(--v2-line); border-radius: var(--radius-v2-control); } > a:first-of-type { display: block; } > .v2-text-button { margin-top: var(--space-xs); } }
+.v2-purchase-qr { grid-area: qr; align-self: start; width: min(100%, 20rem); margin-inline: auto; padding: var(--space-sm); text-align: center; background: var(--v2-paper); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-control); img { max-width: 17rem; margin-inline: auto; background: white; } }
 .v2-purchase-image-error { padding: var(--space-sm); background: var(--v2-paper); color: var(--color-v2-error); }
-.v2-purchase-redeem { padding-block: var(--space-lg); border-top: 1px solid var(--v2-line); .v2-actions { margin-top: var(--space-md); } }
+.v2-purchase-share { border-top: 1px solid var(--v2-line); > summary { display: flex; min-height: 72px; align-items: center; justify-content: space-between; gap: var(--space-sm); cursor: pointer; list-style: none; strong { font-size: var(--text-base); font-weight: 600; } small { display: block; margin-top: var(--space-2xs); font-size: var(--text-sm); color: var(--v2-secondary); } svg { flex: none; color: var(--v2-accent); } } > summary::-webkit-details-marker { display: none; } &[open] > summary svg { transform: rotate(180deg); } .v2-purchase-image { max-width: 23rem; margin-top: var(--space-sm); } }
+@media (min-width: 60rem) {
+  .v2-purchase-overview:has(.v2-purchase-qr) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 18rem); grid-template-areas: "product qr" "redeem qr"; gap: var(--space-md) var(--space-xl); }
+  .v2-purchase-layout .v2-support-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 
 /* Service availability, components and observed history. */
 .v2-service-summary { display: flex; flex-wrap: wrap; align-items: start; gap: var(--space-lg); padding: var(--space-lg); background: var(--v2-paper); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-panel); > div { flex: 1 1 16rem; } p { font-size: var(--text-xs); margin-top: var(--space-sm); } }
