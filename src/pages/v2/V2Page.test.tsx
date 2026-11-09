@@ -30,7 +30,9 @@ const mocks = vi.hoisted(() => ({
   tasks: vi.fn(),
   manual: vi.fn(),
   image: vi.fn(),
+  pageVisit: vi.fn(),
 }))
+vi.mock('../../lib/usage-tracking', () => ({ reportPageVisit: mocks.pageVisit }))
 vi.mock('../../components/result-panel/ManualScheduleEditor', () => ({ default: mocks.manual }))
 vi.mock('../../components/result-panel/schedule-image', () => ({ downloadScheduleImage: mocks.image }))
 vi.mock('../tool/useToolSession', () => ({ useToolSession: mocks.session }))
@@ -57,6 +59,7 @@ beforeEach(() => {
   mocks.features.mockReturnValue({ status: 'ready', features: DEFAULT_SITE_FEATURES, retry: vi.fn() })
   mocks.tasks.mockReturnValue({ jobs: [], refresh: vi.fn(), cancel: vi.fn(), busyJobId: null, error: null, notice: null })
   mocks.image.mockReset().mockResolvedValue(undefined)
+  mocks.pageVisit.mockReset().mockResolvedValue(undefined)
   session = {
     user: null, profiles: [], announcementUnreadCount: 0, popups: [], setAnnouncementUnreadCount: vi.fn(), activeProfile: null, license: null, workspace: null, configOverride: null,
     authStatus: 'anonymous', cdkProfiles: [], openingProfileId: null, workspaceLoadError: null,
@@ -110,9 +113,11 @@ it('allows a guest to open the benchmark from navigation and return to the works
   await user.click(within(disclosure.getByRole('group', { name: copy.v2.navigationGroups.product })).getByRole('link', { name: copy.siteBenchmark.title }))
   await screen.findByRole('heading', { name: copy.siteBenchmark.headline('MaaTool', 30).join('') }, { timeout: 5_000 })
   expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2/benchmarks')
+  expect(mocks.pageVisit.mock.calls).toEqual([['overview'], ['benchmarks']])
   expect(screen.queryByText(copy.v2.signInRequired)).not.toBeInTheDocument()
   await user.click(screen.getByRole('link', { name: copy.v2.guestNavigation.example }))
   expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/v2')
+  expect(mocks.pageVisit.mock.calls).toEqual([['overview'], ['benchmarks'], ['overview']])
 }, 10_000)
 
 it.each([null, '2099-01-01T00:00:00Z'])('lets a first-time guest choose when to read an announcement (deadline %s)', async (popupUntil) => {

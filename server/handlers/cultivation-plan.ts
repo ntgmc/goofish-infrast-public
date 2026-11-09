@@ -1,3 +1,5 @@
+import type { OperationsTool } from '../../src/lib/operations-tools'
+import { recordToolRun } from '../storage/tool-usage-store'
 import { defaultCultivationQuery } from '../../src/lib/cultivation-contract'
 import { computeEffectiveSiteFeatures } from '../../src/lib/site-features'
 import { getSiteFeatureSettings } from '../storage/feature-settings-store'
@@ -12,10 +14,16 @@ export default async function cultivationPlanHandler(req: Request): Promise<Resp
   if (req.method !== 'POST') return jsonResponse({ error: '方法不允许。' }, 405)
   const gated = await requireSiteFeatures(['tools', 'skland'])
   if (gated) return gated
+  const startedAt = Date.now()
+  let tool: OperationsTool = 'cultivation'
+  let userId: string | undefined
+  let outcome: 'success' | 'failure' | 'cancelled' = 'failure'
   try {
     const auth = await requireUserSession(req)
     if (!auth) return jsonResponse({ error: '请先登录。' }, 401)
+    userId = auth.user.id
     const body = await getValidatedJson(req, requestSchemas.cultivationPlan, true)
+    tool = body.projects !== undefined ? 'cultivation_projects' : body.training ? 'training_ratio' : 'cultivation'
     const profile = auth.profiles.find((row) => row.id === body.profile_id)
     if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
     if (profile.status !== 'active' || profile.archived_at) return jsonResponse({ error: '当前档案不可用。' }, 403)
@@ -27,12 +35,16 @@ export default async function cultivationPlanHandler(req: Request): Promise<Resp
     const data = await readCultivationPlan({ game: snapshot.game!.data, inventory: snapshot.inventory!.data,
       importedAt: snapshot.inventory!.fetchedAt, snapshotVersion: snapshot.version, warnings: Object.values(snapshot.errors),
       query: { ...defaultCultivationQuery, ...body.recommendation }, thanksRecruitmentEnabled: effectiveFeatures.thanks_recruitment, ...(body.training ? { training: true } : {}), ...(body.projects !== undefined ? { projects: body.projects } : {}) }, req.signal)
+    outcome = 'success'
     return new Response(data, { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
   } catch (error) {
+    if (req.signal.aborted) outcome = 'cancelled'
     if (error instanceof RequestInputError) return jsonResponse({ error: error.message, code: error.code }, error.status)
     if (error instanceof SklandSnapshotError) return jsonResponse({ error: error.message, code: error.code }, error.status)
     if (error instanceof CultivationReadError) return jsonResponse({ error: error.message, code: error.code }, error.status)
     console.error('cultivation planning data failed:', error instanceof Error ? error.name : 'unknown')
     return jsonResponse({ error: '读取养成数据失败，请稍后重试。' }, 502)
+  } finally {
+    if (userId) await recordToolRun({ tool, userId, startedAt, outcome })
   }
 }

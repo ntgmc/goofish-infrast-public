@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { OptimizeCalculationStage, OptimizeResult, WorkspaceResultHistoryItem } from '../../src/lib/types'
 import { formatOptimizeJobHardTimeout, getOptimizeGlobalWorkerConcurrency, getOptimizeJobHardTimeoutMs, OPTIMIZE_JOB_HISTORY_RETENTION_MS } from '../optimize-job-config'
 import { query, withTransaction } from './postgres'
+import { recordOptimizationToolRunInTransaction } from './tool-usage-store'
 import { recordAdminOperationAuditInTransaction } from './admin-operation-audit-store'
 import { ensureDatabaseSchema } from './schema'
 import {
@@ -898,6 +899,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           'where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = $8 and cancel_requested_at is null',
         ].join(' '), [id, attemptNo, workerId, lockToken, resultJson, now, 'succeeded', 'running'])
         if (!completed.rowCount) return false
+        await recordOptimizationToolRunInTransaction(client, id)
         if (selectedJob.source === 'scenario_comparison') {
           await settleCdkScenarioQuotaInTransaction(client, id, now)
         }
@@ -2224,6 +2226,7 @@ async function createDeadLetterInTransaction(
       nowIso,
     ],
   )
+  await recordOptimizationToolRunInTransaction(client, job.id)
 }
 
 function buildDeadLetterDiagnostic(job: OptimizeJobRecord): Record<string, unknown> {
@@ -2657,6 +2660,7 @@ export async function releaseOptimizationJobReservationsInTransaction(
   await refundReservedItemsInTransaction(client, 'optimization_job', jobId, nowIso)
   await releaseQueuedEntitlementInTransaction(client, jobId, payload, nowIso)
   await releaseMeteredBillingInTransaction(client, jobId, nowIso)
+  await recordOptimizationToolRunInTransaction(client, jobId)
 }
 
 async function releaseQueuedEntitlementInTransaction(client: QueryClient, jobId: string, payload: unknown, nowIso: string): Promise<void> {

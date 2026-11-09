@@ -11,6 +11,9 @@ let usageCleanupPromise: Promise<void> | null = null
 
 export type UsageEventName =
   | 'tool_visit'
+  | 'page_view'
+  | 'tool_run'
+  | 'tool_metrics_started'
   | 'free_preview'
   | 'register'
   | 'cdk_redeem'
@@ -61,6 +64,10 @@ export interface UsageEventRecord {
   id: string
   event: UsageEventName
   visitor_id: string | null
+  user_id?: string
+  page?: string
+  tool?: string
+  tool_outcome?: 'success' | 'failure' | 'cancelled'
   created_at: string
   date: string
   status?: UsageEventStatus
@@ -273,6 +280,7 @@ export function createPostgresUsageEventStore(): UsageEventStore {
       `select record_json
        from usage_events
        where key like $1 and date between $2 and $3 and expires_at > now()
+         and event not in ('page_view', 'tool_run', 'tool_metrics_started')
        order by created_at desc
        limit $4`,
       [`${prefix}%`, startDate, endDate, USAGE_STATS_RAW_EVENT_LIMIT + 1],
@@ -345,13 +353,13 @@ export function createPostgresUsageEventStore(): UsageEventStore {
   return {
     set: async (key, record) => {
       await maybeCleanupExpiredUsageEvents()
-      const expiresAt = record.event === 'business_metrics_started' ? 'infinity' : new Date(
+      const expiresAt = record.event === 'business_metrics_started' || record.event === 'tool_metrics_started' ? 'infinity' : new Date(
         Date.parse(record.created_at) + USAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000,
       ).toISOString()
       await query(
         `insert into usage_events
-          (key, event, visitor_id, date, created_at, expires_at, profile_id, record_json)
-         values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+          (key, event, visitor_id, date, created_at, expires_at, profile_id, record_json, user_id)
+         values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
          on conflict (key) do nothing`,
         [
           key,
@@ -362,6 +370,7 @@ export function createPostgresUsageEventStore(): UsageEventStore {
           expiresAt,
           record.profile_id ?? null,
           JSON.stringify(record),
+          record.user_id ?? null,
         ],
       )
     },
@@ -389,6 +398,7 @@ export function buildUsageStats(
   accountAdditions?: UsageAccountAdditionStats[],
   options: { rawEventsTruncated?: boolean } = {},
 ): UsageStats {
+  events = events.filter((event) => event.event !== 'page_view' && event.event !== 'tool_run' && event.event !== 'tool_metrics_started')
   const normalizedDates = dates.filter(Boolean)
   const range: UsageRange = {
     from: normalizedDates[0] ?? '',

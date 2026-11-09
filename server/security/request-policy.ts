@@ -417,6 +417,7 @@ export const requestSchemas = {
   }).refine((body) => !body.automatic || !body.use_coupon, { message: '自动发送不能消耗体验券。' }),
   usageStats: strict({
     event: shortString(64),
+    page: optionalString(64),
     announcement_id: optionalString(120),
     announcement_kind: optionalString(32),
     announcement_version: optionalString(64),

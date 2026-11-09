@@ -37,6 +37,7 @@ import { useSiteFeatures } from '../../lib/site-feature-context'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import ProfileExpiryPrompt from '../tool/ProfileExpiryPrompt'
 import { ProfileUpgradeEntry } from './ProfileUpgrade'
+import { reportPageVisit } from '../../lib/usage-tracking'
 
 const text = copy.v2
 type View = 'schedule' | 'analysis' | 'manual' | 'training'
@@ -78,6 +79,17 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const { hash, pathname } = useLocation()
   const navigate = useNavigate()
   const section = v2Section(params, hash, pathname)
+  const reportedPage = useRef<string | null>(null)
+  useEffect(() => {
+    const report = () => {
+      if (document.visibilityState === 'hidden' || !v2SectionAvailable(section, features) || reportedPage.current === section) return
+      reportedPage.current = section
+      void reportPageVisit(section)
+    }
+    report()
+    document.addEventListener('visibilitychange', report)
+    return () => document.removeEventListener('visibilitychange', report)
+  }, [section, features])
   const startDisabledReason = generationDisabledReason ?? (!features.profiles || !features.schedule_generation ? copy.features.schedule_read_only : null)
   const [navigationError, setNavigationError] = useState<string | null>(null)
   const [manualOpened, setManualOpened] = useState(false)

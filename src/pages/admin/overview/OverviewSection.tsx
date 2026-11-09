@@ -5,6 +5,7 @@ import type { AdminController } from '../useAdminController'
 import ActivityTrend from './ActivityTrend'
 import OperationsTodosPanel from './OperationsTodosPanel'
 import DeletionStatistics from './DeletionStatistics'
+import ToolUsageStatistics from './ToolUsageStatistics'
 import { operationsUsersPath, operationsFailureLabels } from '../../../lib/operations-drilldown'
 import './overview.css'
 
@@ -65,6 +66,7 @@ export default function OverviewSection({ model: c, active = true }: Props) {
       </div>
         <ActivityTrend days={data.days} />
       </section>
+      <ToolUsageStatistics data={data.tools} from={current.from} to={current.to} previousFrom={previous.from} />
       <div className="ops-question-grid">
         <section className="tool-panel ops-question" aria-labelledby="ops-activation-title"><h2 id="ops-activation-title">新人在哪一步停下来了？</h2>
           <p>观察同一批新注册用户在 7 天内的使用进展。</p>

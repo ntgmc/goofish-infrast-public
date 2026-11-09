@@ -1,4 +1,5 @@
-import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
+import { resolveUsageVisitor, usageHmac } from '../usage-visitor'
 import { authenticateAdminRequest } from './admin-auth'
 import { jsonResponse } from './license-utils'
 import {
@@ -9,6 +10,7 @@ import {
   type UsageEventStore,
 } from '../storage/usage-store'
 import { requestSchemas } from '../security/request-policy'
+import { operationsPageLabels } from '../../src/lib/operations-tools'
 import { getValidatedJson, RequestInputError } from '../security/request-validation'
 import { getRequestClientIp } from '../security/client-ip'
 import { getOperationsOverview } from '../storage/operations-overview-store'
@@ -16,17 +18,14 @@ import { getOperationsTodos } from '../storage/operations-todos-store'
 import { isOperationsDate, operationsDate, operationsOverviewCsv, shiftOperationsDate } from '../../src/lib/operations-overview'
 
 const EVENT_PREFIX = 'events/'
-const VALID_VISITOR_ID = /^[A-Za-z0-9_-]{8,128}$/
 const VALID_RANGE_VALUES = new Set(['7d', '14d', '30d'])
 const MAX_CUSTOM_RANGE_DAYS = 90
-const USAGE_VISITOR_COOKIE = 'maa_usage_visitor'
-const USAGE_VISITOR_MAX_AGE_SECONDS = 180 * 24 * 60 * 60
 const USAGE_EVENT_BUCKET_MS = 10 * 60 * 1000
-const DEVELOPMENT_USAGE_SECRET = randomBytes(32).toString('base64url')
 
 type UsageEventInput = string | null | Partial<Pick<
   UsageEventRecord,
   | 'visitor_id'
+  | 'page'
   | 'created_at'
   | 'status'
   | 'duration_ms'
@@ -80,6 +79,7 @@ export async function recordUsageEvent(event: UsageEventName, input: UsageEventI
     id,
     event,
     visitor_id: options.visitor_id,
+    ...(options.page && { page: options.page }),
     created_at: createdAt,
     date,
     ...(options.status && { status: options.status }),
@@ -141,6 +141,13 @@ async function handlePublicPost(req: Request): Promise<Response> {
     }, `${body.event}:${visitor.id}:${announcementId}:${announcementVersion}`)
     return publicUsageResponse(visitor.cookie)
   }
+  if (body.event === 'page_view') {
+    if (!body.page || !Object.hasOwn(operationsPageLabels, body.page)) return jsonResponse({ error: '页面栏目无效。' }, 400)
+    await recordUsageEvent('tool_metrics_started', { status: 'success', source: 'tools.v1' }, 'tools.v1/tracking-start')
+    await recordUsageEvent('page_view', { visitor_id: visitor.id, page: body.page, status: 'success', source: 'v2_signed_visitor' },
+      `page_view:${visitor.id}:${body.page}:${Math.floor(Date.now() / USAGE_EVENT_BUCKET_MS)}`)
+    return publicUsageResponse(visitor.cookie)
+  }
   if (body.event !== 'tool_visit') {
     return jsonResponse({ error: '不支持该统计操作。' }, 400)
   }
@@ -156,72 +163,6 @@ async function handlePublicPost(req: Request): Promise<Response> {
 
 function publicUsageResponse(cookie: string | null): Response {
   return jsonResponse({ ok: true }, 200, cookie ? { 'Set-Cookie': cookie } : undefined)
-}
-
-function resolveUsageVisitor(req: Request, now = new Date()): { id: string; cookie: string | null } {
-  const secrets = usageSecrets()
-  const raw = readCookie(req.headers.get('cookie'), USAGE_VISITOR_COOKIE)
-  const existing = raw ? verifyUsageVisitorCookie(raw, secrets, now) : null
-  if (existing && existing.secretIndex === 0) return { id: existing.id, cookie: null }
-  const id = existing?.id ?? randomBytes(24).toString('base64url')
-  const issuedAt = Math.floor(now.getTime() / 1000)
-  const payload = `${id}.${issuedAt}`
-  const signature = signUsageVisitorCookie(secrets[0], payload)
-  return {
-    id,
-    cookie: `${USAGE_VISITOR_COOKIE}=${payload}.${signature}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${USAGE_VISITOR_MAX_AGE_SECONDS}${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`,
-  }
-}
-
-function verifyUsageVisitorCookie(
-  value: string,
-  secrets: string[],
-  now: Date,
-): { id: string; secretIndex: number } | null {
-  const [id, issuedAtValue, signature, ...extra] = value.split('.')
-  if (extra.length > 0 || !id || !issuedAtValue || !signature) return null
-  if (!VALID_VISITOR_ID.test(id) || !/^\d{1,12}$/.test(issuedAtValue)) return null
-  const issuedAtMs = Number(issuedAtValue) * 1000
-  if (!Number.isSafeInteger(issuedAtMs)
-    || issuedAtMs > now.getTime() + 5 * 60 * 1000
-    || issuedAtMs < now.getTime() - USAGE_VISITOR_MAX_AGE_SECONDS * 1000) return null
-  const payload = `${id}.${issuedAtValue}`
-  const secretIndex = secrets.findIndex((secret) => safeEqual(signature, signUsageVisitorCookie(secret, payload)))
-  return secretIndex >= 0 ? { id, secretIndex } : null
-}
-
-function usageSecrets(): string[] {
-  const current = process.env.USAGE_VISITOR_SECRET?.trim()
-    || process.env.MAA_ADMIN_SECRET?.trim()
-    || (process.env.NODE_ENV === 'production' ? '' : DEVELOPMENT_USAGE_SECRET)
-  if (!current) throw new Error('USAGE_VISITOR_SECRET or MAA_ADMIN_SECRET is required for public usage events')
-  const previous = process.env.USAGE_VISITOR_SECRET_PREVIOUS?.trim()
-    || process.env.MAA_ADMIN_SECRET_PREVIOUS?.trim()
-  return previous && previous !== current ? [current, previous] : [current]
-}
-
-function signUsageVisitorCookie(secret: string, payload: string): string {
-  return createHmac('sha256', secret).update(`usage-visitor-cookie:${payload}`).digest('base64url')
-}
-
-function usageHmac(value: string): string {
-  return createHmac('sha256', usageSecrets()[0]).update(`usage-event:${value}`).digest('hex')
-}
-
-function safeEqual(left: string, right: string): boolean {
-  const leftBytes = Buffer.from(left)
-  const rightBytes = Buffer.from(right)
-  return leftBytes.length === rightBytes.length && timingSafeEqual(leftBytes, rightBytes)
-}
-
-function readCookie(header: string | null, name: string): string | null {
-  const match = (header ?? '').match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`))
-  if (!match?.[1]) return null
-  try {
-    return decodeURIComponent(match[1])
-  } catch {
-    return null
-  }
 }
 
 async function handleAdminGet(req: Request): Promise<Response> {
@@ -325,6 +266,7 @@ function normalizeUsageEventInput(input: UsageEventInput): Required<Pick<UsageEv
   const status = input.status === 'success' || input.status === 'failure' ? input.status : undefined
   return {
     visitor_id: normalizeNullableString(input.visitor_id, 128),
+    ...(input.page && { page: input.page }),
     ...(normalizeIsoString(input.created_at) && { created_at: normalizeIsoString(input.created_at) as string }),
     ...(status && { status: status as UsageEventStatus }),
     ...(typeof input.duration_ms === 'number' && Number.isFinite(input.duration_ms)

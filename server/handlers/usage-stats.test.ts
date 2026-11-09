@@ -108,7 +108,27 @@ describe('usage stats handler', () => {
     expect([...records.values()].find((record) => record.event === 'maa_export')).toMatchObject({ generation_id: generation.id, status: 'success', profile_id: 'profile-1' })
   })
 
-  it.each(['maa_export', 'business_metrics_started'])('rejects client fabrication of server-owned business events (%s)', async (event) => {
+  it('records only fixed V2 pages with signed browser identities and per-page deduplication', async () => {
+    const records = new Map<string, UsageEventRecord>()
+    const set = vi.fn(async (key: string, record: UsageEventRecord) => { if (!records.has(key)) records.set(key, record) })
+    setUsageEventStoreForTesting({ set, list: async () => [...records.values()], getStats: async (dates) => buildUsageStats([...records.values()], dates) })
+    const post = (page: string, cookie?: string) => usageStatsHandler(new Request('http://localhost/api/usage-stats', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...(cookie && { Cookie: cookie }) }, body: JSON.stringify({ event: 'page_view', page }),
+    }))
+    const first = await post('cultivation')
+    expect(first.status).toBe(200)
+    const cookie = first.headers.get('Set-Cookie')!.split(';')[0]!
+    await post('cultivation', cookie)
+    await post('depot', cookie)
+    const pages = [...records.values()].filter((record) => record.event === 'page_view')
+    expect(pages.map((record) => record.page)).toEqual(['cultivation', 'depot'])
+    expect(new Set(pages.map((record) => record.visitor_id)).size).toBe(1)
+    expect((await post('/v2?profile_id=private')).status).toBe(400)
+    expect((await post('__proto__')).status).toBe(400)
+    expect([...records.values()].filter((record) => record.event === 'tool_metrics_started')).toHaveLength(1)
+  })
+
+  it.each(['maa_export', 'business_metrics_started', 'tool_run', 'tool_metrics_started'])('rejects client fabrication of server-owned business events (%s)', async (event) => {
     const response = await usageStatsHandler(new Request('http://localhost/api/usage-stats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event }) }))
     expect(response.status).toBe(400)
   })

@@ -410,6 +410,9 @@ function memorySklandPlugin() {
   return {
     name: 'depot-value-memory-skland',
     setup(build) {
+      build.onResolve({ filter: /(^|[\\/])tool-usage-store(\.ts)?$/ }, () => ({
+        path: 'memory-tool-usage-store', namespace: 'depot-smoke',
+      }))
       build.onResolve({ filter: /(^|[\\/])user-auth(\.ts)?$/ }, () => ({
         path: 'memory-user-auth',
         namespace: 'depot-smoke',
@@ -430,7 +433,9 @@ function memorySklandPlugin() {
         namespace: 'depot-smoke',
       }))
       build.onLoad({ filter: /.*/, namespace: 'depot-smoke' }, (args) => ({
-        contents: args.path === 'memory-user-auth'
+        contents: args.path === 'memory-tool-usage-store'
+          ? 'export async function recordToolRun() {}'
+          : args.path === 'memory-user-auth'
           ? memoryUserAuthModule()
           : args.path === 'memory-skland-snapshot'
             ? memorySklandSnapshotModule()

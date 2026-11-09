@@ -278,7 +278,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_020: "当你选择添加游戏账号或通过森空岛导入时，服务会处理游戏 UID、昵称、区服或渠道信息、干员与养成库存、基建配置、排班结果和必要的授权状态。用于持续导入的森空岛凭据会在服务端加密保存。",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_021: "为保障服务稳定和防止滥用，服务还会记录必要的使用事件、请求时间和安全相关日志。浏览器会保存必要的会话 Cookie 与少量本地状态，例如公告已读状态。",
+  pages_PublicInfoPage_021: "为保障服务稳定和防止滥用，服务会记录必要的使用事件、请求时间和安全相关日志。为了解功能使用情况和改善工具质量，还会记录页面栏目、工具使用结果与处理耗时，使用记录最长保留 180 天。页面统计通过 Cookie 区分浏览器，不包含完整网址或参数；工具记录关联登录账号，未登录的仓库分析按浏览器计数。浏览器也会保存必要的会话 Cookie 与少量本地状态，例如公告已读状态。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_022: "使用目的与第三方处理",
   // src/pages/PublicInfoPage.tsx

@@ -1,6 +1,7 @@
 import type { OperationsOverview } from '../../src/lib/operations-overview'
 import { query } from './postgres'
 import { USAGE_RETENTION_DAYS } from './usage-store'
+import { OPERATIONS_TOOLS_SQL } from './operations-tools-sql'
 
 export async function getOperationsOverview(from: string, to: string, now = new Date()): Promise<OperationsOverview> {
   const result = await query<{ overview: OperationsOverview }>(OVERVIEW_SQL, [from, to, now.toISOString(), USAGE_RETENTION_DAYS])
@@ -102,7 +103,7 @@ with bounds as (
   group by p.name, p.start_at, t.started_at
 )`
 
-const OVERVIEW_SQL = `${OPERATIONS_COHORT_SQL}, cost as (
+const OVERVIEW_SQL = `${OPERATIONS_COHORT_SQL}, ${OPERATIONS_TOOLS_SQL}, cost as (
   select p.name,
          count(h.bucket_start)::integer as recorded_hours,
          greatest(0, extract(epoch from (date_trunc('hour', p.end_at, 'UTC') - p.start_at)) / 3600)::integer as expected_hours,
@@ -196,6 +197,7 @@ const OVERVIEW_SQL = `${OPERATIONS_COHORT_SQL}, cost as (
 )
 select jsonb_build_object(
   'metrics_version', 'business.v1', 'generated_at', b.observed_at, 'timezone', 'Asia/Shanghai',
+  'tools', (select summary from tool_overview),
   'current', (select summary from summaries where name = 'current'),
   'previous', (select summary from summaries where name = 'previous'),
   'days', (select jsonb_agg(to_jsonb(days) order by date) from days),

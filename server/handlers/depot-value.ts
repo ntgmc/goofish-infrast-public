@@ -12,6 +12,8 @@ import { APP_BUILD_META } from '../../src/lib/build-meta'
 import { MAX_DEPOT_ITEM_COUNT } from '../../src/lib/depot-value-constraints'
 import { getValidatedJsonValue } from '../security/request-validation'
 import { requireUserSession } from './user-auth'
+import { resolveUsageVisitor } from '../usage-visitor'
+import { recordToolRun } from '../storage/tool-usage-store'
 import { requireSiteFeatures } from '../feature-gate'
 import { convertSklandCharactersToOperators, decryptSklandCredential, SklandClient, SklandClientError } from './skland-client'
 import { getSklandSnapshot, SklandSnapshotError } from '../skland-snapshot'
@@ -171,42 +173,57 @@ const ITEM_NAMES: Record<string, string> = {
 
 export default async (req: Request): Promise<Response> => {
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-
+  const startedAt = Date.now()
+  let userId: string | undefined
+  let visitor: ReturnType<typeof resolveUsageVisitor> | undefined
+  let outcome: 'success' | 'failure' | 'cancelled' = 'failure'
+  try { visitor = resolveUsageVisitor(req) } catch { /* Reporting must not interrupt valuation. */ }
+  const respond = (body: unknown, status = 200) => {
+    if (status < 400) outcome = 'success'
+    const response = jsonResponse(body, status)
+    if (visitor?.cookie) response.headers.set('Set-Cookie', visitor.cookie)
+    return response
+  }
   try {
     const body = await readLimitedJsonBody(req)
-    if (!isRecord(body)) return jsonResponse({ error: '请求体必须是对象。' }, 400)
+    if (!isRecord(body)) return respond({ error: '请求体必须是对象。' }, 400)
+    const auth = await requireUserSession(req)
+    userId = auth?.user.id
     if (body.source === 'upload') {
-      return jsonResponse(await buildDepotValueResponse(normalizeDepotInventory(body.inventory), 'upload'))
+      return respond(await buildDepotValueResponse(normalizeDepotInventory(body.inventory), 'upload'))
     }
     if (body.source === 'skland') {
       const gated = await requireSiteFeatures(['login', 'profiles', 'skland'])
       if (gated) return gated
       const sampleConsent = body.sample_consent !== false
-      const skland = await readSklandInventory(req, body.profile_id, sampleConsent)
+      const skland = await readSklandInventory(auth, body.profile_id, sampleConsent)
       const result = await buildDepotValueResponse(skland.inventory, 'skland', undefined, {
         sample: skland.sample,
         contributorProfileId: typeof body.profile_id === 'string' ? body.profile_id : null,
         sampleConsent,
       })
-      return jsonResponse({ ...result, imported_at: skland.importedAt, snapshot_version: skland.snapshotVersion,
+      return respond({ ...result, imported_at: skland.importedAt, snapshot_version: skland.snapshotVersion,
         warnings: [...result.warnings, ...skland.warnings] })
     }
-    return jsonResponse({ error: '请指定 source 为 upload 或 skland。' }, 400)
+    return respond({ error: '请指定 source 为 upload 或 skland。' }, 400)
   } catch (error) {
+    if (req.signal.aborted) outcome = 'cancelled'
     console.error('depot value error:', error instanceof Error ? error.message : error)
-    if (error instanceof SklandSnapshotError) return jsonResponse({ error: error.message, code: error.code,
+    if (error instanceof SklandSnapshotError) return respond({ error: error.message, code: error.code,
       action: error.code === 'skland_credential_invalid' ? 'rebind' : 'retry' }, error.status)
     if (error instanceof SklandClientError) {
       const invalid = error.code === 'credential_invalid' || error.code === 'credential_format_invalid'
-      return jsonResponse({ error: error.message, code: invalid ? 'skland_credential_invalid' : 'skland_upstream_failed',
+      return respond({ error: error.message, code: invalid ? 'skland_credential_invalid' : 'skland_upstream_failed',
         action: invalid ? 'rebind' : 'retry' }, invalid ? 400 : 503)
     }
     if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
-      return jsonResponse({ error: '森空岛响应超时，请稍后重试。', code: 'skland_upstream_failed', action: 'retry' }, 503)
+      return respond({ error: '森空岛响应超时，请稍后重试。', code: 'skland_upstream_failed', action: 'retry' }, 503)
     }
     const status = isHandlerError(error) ? error.status ?? 500 : 500
     const message = isHandlerError(error) ? error.message : 'Internal server error'
-    return jsonResponse({ error: message, ...(isHandlerError(error) && error.code ? { code: error.code } : {}) }, status)
+    return respond({ error: message, ...(isHandlerError(error) && error.code ? { code: error.code } : {}) }, status)
+  } finally {
+    await recordToolRun({ tool: 'depot_value', userId, visitorId: visitor?.id, startedAt, outcome })
   }
 }
 
@@ -519,11 +536,10 @@ function assertFiniteValuation(value: number, label: string): void {
 }
 
 async function readSklandInventory(
-  req: Request,
+  auth: Awaited<ReturnType<typeof requireUserSession>>,
   profileId: unknown,
   includeSample: boolean,
 ): Promise<SklandDepotRead> {
-  const auth = await requireUserSession(req)
   if (!auth) throw createError('请先登录。', 401)
   if (typeof profileId !== 'string' || !profileId.trim()) throw createError('请先选择游戏账号。', 400)
   const profile = auth.profiles.find((item) => item.id === profileId.trim())
