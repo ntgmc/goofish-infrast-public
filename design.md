@@ -52,6 +52,13 @@ it deliberately when changing the shared design.
 - Content pages use a reading width of 60 to 65ch, a line height of at least 1.65, and whitespace instead of card stacks.
 - Display headings use `overflow-wrap: anywhere` and `min-width: 0`; document copy stays left aligned.
 - Accent is a signal only: primary action, active state, focus, and compact status marks.
+- The deployment dialog interrupts an outdated page with the new version's release
+  notes and a refresh action. Reopening a newer build welcomes returning users
+  with the latest three nonempty release summaries since their last version, a
+  full changelog link and a dismissible continue action. Read returning summaries
+  lazily from the opened build's published history. Remember the latest visited
+  build on this browser; record the refresh target before reloading so that
+  entering that build does not show a second prompt. First visits stay quiet.
 
 ## Variants
 

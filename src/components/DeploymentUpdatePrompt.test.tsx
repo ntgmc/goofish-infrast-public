@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { StrictMode } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '../test/query-render'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -8,6 +9,12 @@ import type { ChangelogPageData, ChangelogRelease } from '../lib/changelog-contr
 import DeploymentUpdatePrompt from './DeploymentUpdatePrompt'
 
 vi.mock('../lib/api-client', () => ({ apiJson: vi.fn() }))
+const { releases } = vi.hoisted(() => ({ releases: [] as ChangelogRelease[] }))
+vi.mock('../lib/changelog', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../lib/changelog')>(),
+  CHANGELOG_RELEASES: releases,
+}))
+const LAST_VISIT_KEY = 'maatool:last-visited-build'
 
 const currentMeta = buildMeta('2.0.0', '2026-08-04T08:00:00.000Z', 'a')
 const latestMeta = buildMeta('2.1.0', '2026-08-04T09:00:00.000Z', 'new')
@@ -18,6 +25,8 @@ const latestRelease: ChangelogRelease = {
 }
 
 beforeEach(() => {
+  window.localStorage.clear()
+  releases.splice(0, releases.length, latestRelease)
   vi.mocked(apiJson).mockReset().mockResolvedValue(emptyPage)
   document.documentElement.style.overflow = ''
   Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
@@ -139,6 +148,114 @@ describe('DeploymentUpdatePrompt', () => {
     expect(await screen.findByText('本次发布暂无面向用户的更新记录。')).toBeInTheDocument()
     expect(screen.queryByText('模组预算')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '立即刷新' })).toBeEnabled()
+  })
+
+  it('remembers the first visit without a welcome and shows updates once after reopening a newer build', async () => {
+    const first = render(<DeploymentUpdatePrompt meta={currentMeta} fetchHealth={vi.fn().mockResolvedValue(currentMeta)} />)
+    await waitFor(() => expect(localStorage.getItem(LAST_VISIT_KEY)).toBe(JSON.stringify(currentMeta)))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    first.unmount()
+
+    const second = render(<StrictMode><DeploymentUpdatePrompt meta={latestMeta} fetchHealth={vi.fn().mockResolvedValue(latestMeta)} /></StrictMode>)
+    expect(await screen.findByRole('dialog', { name: '欢迎回来' })).toBeInTheDocument()
+    expect(await screen.findByText('模组预算')).toBeInTheDocument()
+    expect(screen.getByText('v2.1.0')).toBeInTheDocument()
+    expect(screen.getByText('2.0.0')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '继续使用' })).toHaveFocus()
+    expect(screen.getByRole('link', { name: '查看完整更新日志' })).toHaveAttribute('href', '/changelog')
+    expect(apiJson).not.toHaveBeenCalled()
+    second.unmount()
+
+    render(<DeploymentUpdatePrompt meta={latestMeta} fetchHealth={vi.fn().mockResolvedValue(latestMeta)} />)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('summarizes only the latest three releases after the previous version and through the opened version', async () => {
+    const version = (value: string, items: string[]): ChangelogRelease => ({
+      ...latestRelease, id: `v${value}`, version: value, displayVersion: `v${value}`,
+      sections: [{ id: 'feature', kind: 'feature', items }],
+    })
+    localStorage.setItem(LAST_VISIT_KEY, JSON.stringify(currentMeta))
+    releases.splice(0, releases.length,
+      version('2.10.1', ['尚未打开的新版本']),
+      version('2.10.0', ['最新更新']),
+      version('2.9.0', []),
+      version('2.8.0', ['第二次更新']),
+      version('2.7.0', ['第三次更新']),
+      version('2.6.0', ['更早更新']),
+      version('2.0.0', ['上次已用版本']),
+      version('1.9.0', ['旧版本内容']),
+    )
+    const meta = buildMeta('2.10.0', '2026-08-05T09:00:00.000Z', 'latest')
+    render(<DeploymentUpdatePrompt meta={meta} fetchHealth={vi.fn().mockResolvedValue(meta)} />)
+    expect(await screen.findByText('最新更新')).toBeInTheDocument()
+    expect(screen.getByText('第二次更新')).toBeInTheDocument()
+    expect(screen.getByText('第三次更新')).toBeInTheDocument()
+    for (const text of ['尚未打开的新版本', '更早更新', '上次已用版本', '旧版本内容']) expect(screen.queryByText(text)).not.toBeInTheDocument()
+  })
+
+  it.each(['button', 'Escape'])('dismisses the welcome with %s and keeps the current page usable', async (action) => {
+    localStorage.setItem(LAST_VISIT_KEY, JSON.stringify(currentMeta))
+    const reloadPage = vi.fn()
+    render(<DeploymentUpdatePrompt meta={latestMeta} fetchHealth={vi.fn().mockResolvedValue(latestMeta)} reloadPage={reloadPage} />)
+    const dialog = await screen.findByRole('dialog', { name: '欢迎回来' })
+    if (action === 'button') fireEvent.click(screen.getByRole('button', { name: '继续使用' }))
+    else fireEvent(dialog, new Event('cancel', { cancelable: true }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(document.documentElement.style.overflow).toBe('')
+    expect(reloadPage).not.toHaveBeenCalled()
+  })
+
+  it('does not welcome again after refreshing from the update prompt, but still welcomes a later release', async () => {
+    const reloadPage = vi.fn()
+    const oldPage = render(<DeploymentUpdatePrompt meta={currentMeta} fetchHealth={vi.fn().mockResolvedValue(latestMeta)} reloadPage={reloadPage} />)
+    fireEvent.click(await screen.findByRole('button', { name: '立即刷新' }))
+    expect(reloadPage).toHaveBeenCalledOnce()
+    expect(localStorage.getItem(LAST_VISIT_KEY)).toBe(JSON.stringify(latestMeta))
+    oldPage.unmount()
+
+    const refreshed = render(<DeploymentUpdatePrompt meta={latestMeta} fetchHealth={vi.fn().mockResolvedValue(latestMeta)} />)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    refreshed.unmount()
+
+    const newer = buildMeta('2.2.0', '2026-08-05T09:00:00.000Z', 'newer')
+    render(<DeploymentUpdatePrompt meta={newer} fetchHealth={vi.fn().mockResolvedValue(newer)} />)
+    expect(await screen.findByRole('dialog', { name: '欢迎回来' })).toBeInTheDocument()
+    expect(await screen.findByText('当前版本已更新，暂无新的更新摘要。')).toBeInTheDocument()
+  })
+
+  it('gives a newer service deployment priority over the welcome without mixing their notes', async () => {
+    localStorage.setItem(LAST_VISIT_KEY, JSON.stringify(currentMeta))
+    const newer = buildMeta('2.2.0', '2026-08-05T09:00:00.000Z', 'newer')
+    vi.mocked(apiJson).mockResolvedValue({ ...emptyPage, releases: [{ ...latestRelease, version: '2.2.0', sections: [{ id: 'fix', kind: 'fix', items: ['需要刷新的更新'] }] }] })
+    render(<DeploymentUpdatePrompt meta={latestMeta} fetchHealth={vi.fn().mockResolvedValue(newer)} />)
+    expect(await screen.findByRole('dialog', { name: '新版本已发布' })).toBeInTheDocument()
+    expect(await screen.findByText('需要刷新的更新')).toBeInTheDocument()
+    expect(screen.queryByText('模组预算')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '继续使用' })).not.toBeInTheDocument()
+  })
+
+  it('does not let an older reopened tab overwrite the last seen deployment', async () => {
+    localStorage.setItem(LAST_VISIT_KEY, JSON.stringify(latestMeta))
+    render(<DeploymentUpdatePrompt meta={currentMeta} fetchHealth={vi.fn().mockResolvedValue(currentMeta)} />)
+    await waitFor(() => expect(localStorage.getItem(LAST_VISIT_KEY)).toBe(JSON.stringify(latestMeta)))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it.each(['{broken', '{"frontend_version":"old"}'])('treats invalid stored metadata as a first visit: %s', async (stored) => {
+    localStorage.setItem(LAST_VISIT_KEY, stored)
+    render(<DeploymentUpdatePrompt meta={latestMeta} fetchHealth={vi.fn().mockResolvedValue(latestMeta)} />)
+    await waitFor(() => expect(localStorage.getItem(LAST_VISIT_KEY)).toBe(JSON.stringify(latestMeta)))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('keeps refresh working when browser storage is blocked', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked') })
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked') })
+    const reloadPage = vi.fn()
+    render(<DeploymentUpdatePrompt meta={currentMeta} fetchHealth={vi.fn().mockResolvedValue(latestMeta)} reloadPage={reloadPage} />)
+    fireEvent.click(await screen.findByRole('button', { name: '立即刷新' }))
+    expect(reloadPage).toHaveBeenCalledOnce()
   })
 
   it('polls on the configured interval and ignores transient health failures', async () => {

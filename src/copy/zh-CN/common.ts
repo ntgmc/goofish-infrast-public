@@ -141,6 +141,13 @@ export const commonCopy = {
   components_DeploymentUpdatePrompt_006: "立即刷新",
   // src/components/DeploymentUpdatePrompt.tsx
   deploymentUpdateNotes: "更新内容",
+  deploymentWelcomeTitle: "欢迎回来",
+  deploymentWelcomeDescription: "你离开期间有了这些更新，可以继续使用。",
+  deploymentPreviousVersion: "上次使用",
+  deploymentRecentUpdates: "最近更新",
+  deploymentWelcomeEmpty: "当前版本已更新，暂无新的更新摘要。",
+  deploymentAllUpdates: "查看完整更新日志",
+  deploymentWelcomeContinue: "继续使用",
   // src/components/MobileBrowserPrompt.tsx
   mobileBrowserTitle: "推荐在电脑上打开",
   mobileBrowserDescription: "使用电脑浏览器打开，配置基建和查看排班会更方便。你也可以继续在手机上使用。",
