@@ -6,6 +6,7 @@ import type { ChangelogPageData, ChangelogRelease } from '../lib/changelog-contr
 import { appBuildMetaSchema } from '../lib/app-build-meta-validation'
 import { RefreshIcon as RefreshCw } from './icons'
 import { APP_BUILD_META } from '../lib/build-meta'
+import { reloadDeployment } from '../lib/deployment-refresh'
 import type { AppBuildMeta } from '../lib/types'
 import { copy } from '../copy/index'
 import { AnimatedPresenceRegion } from './MotionPrimitives'
@@ -26,7 +27,7 @@ interface Props {
   meta?: AppBuildMeta
   pollIntervalMs?: number
   fetchHealth?: (signal: AbortSignal) => Promise<AppBuildMeta>
-  reloadPage?: () => void
+  reloadPage?: () => void | Promise<unknown>
 }
 
 export default function DeploymentUpdatePrompt({
@@ -86,7 +87,7 @@ export default function DeploymentUpdatePrompt({
       if (isWelcome) setWelcomeOpen(false)
       else {
         rememberVisit(promptMeta)
-        reloadPage()
+        reloadDeployment(reloadPage)
       }
     }}
   />
@@ -241,6 +242,11 @@ function rememberVisit(meta: AppBuildMeta): void {
   } catch { /* Storage may be disabled. */ }
 }
 
-function reloadCurrentPage(): void {
+function reloadCurrentPage(): void | Promise<unknown> {
+  if (window.navigation) {
+    const navigation = window.navigation.reload()
+    void navigation.committed?.catch(() => undefined)
+    return navigation.finished
+  }
   window.location.reload()
 }

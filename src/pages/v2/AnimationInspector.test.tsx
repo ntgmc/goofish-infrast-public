@@ -51,7 +51,7 @@ it('isolates saved preferences and stops recording when the website user changes
   expect(screen.getByRole('switch')).not.toBeChecked()
   rerender(view())
   expect(await screen.findByRole('switch')).toBeChecked()
-  expect(mocks.observe).toHaveBeenCalledTimes(2)
+  await waitFor(() => expect(mocks.observe).toHaveBeenCalledTimes(2))
   act(() => window.dispatchEvent(new StorageEvent('storage', { key: key('user-a'), newValue: 'false' })))
   expect(screen.getByRole('switch')).not.toBeChecked()
   expect(mocks.stop).toHaveBeenCalledTimes(2)

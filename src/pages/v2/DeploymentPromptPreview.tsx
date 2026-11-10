@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { DeploymentUpdateDialog } from '../../components/DeploymentUpdatePrompt'
 import { copy } from '../../copy'
 import { APP_BUILD_META } from '../../lib/build-meta'
 import { CHANGELOG_RELEASES } from '../../lib/changelog'
+import { hideDeploymentRefresh, showDeploymentRefresh } from '../../lib/deployment-refresh'
 import { useAdminPreviewSession } from './useAdminPreviewSession'
 
 const text = copy.v2.deploymentPreview
@@ -11,7 +12,24 @@ const releases = CHANGELOG_RELEASES.filter((release) => release.sections.some((s
 export default function DeploymentPromptPreview() {
   const authorized = useAdminPreviewSession()
   const [scenario, setScenario] = useState<'update' | 'welcome' | null>(null)
-  useEffect(() => { if (!authorized) setScenario(null) }, [authorized])
+  const refreshing = useRef(false)
+  function stopRefresh() {
+    if (!refreshing.current) return
+    refreshing.current = false
+    void hideDeploymentRefresh()
+  }
+  useEffect(() => { if (!authorized) { setScenario(null); stopRefresh() } }, [authorized])
+  useEffect(() => stopRefresh, [])
+  async function continuePreview() {
+    if (scenario !== 'update') { setScenario(null); return }
+    refreshing.current = true
+    await showDeploymentRefresh()
+    if (!refreshing.current) return
+    setScenario('welcome')
+    await hideDeploymentRefresh()
+    if (refreshing.current) document.querySelector<HTMLButtonElement>('.deployment-update-dialog[open] .deployment-update-refresh')?.focus()
+    refreshing.current = false
+  }
   if (!authorized) return null
   return <section>
     <h3 className="text-base font-semibold text-ink-primary">{text.title}</h3>
@@ -27,7 +45,7 @@ export default function DeploymentPromptPreview() {
       changelog={{ data: releases.slice(0, scenario === 'welcome' ? 3 : 1) }}
       preview={text}
       onDismiss={() => setScenario(null)}
-      onContinue={() => setScenario(scenario === 'update' ? 'welcome' : null)}
+      onContinue={() => void continuePreview()}
     />}
   </section>
 }

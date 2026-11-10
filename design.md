@@ -63,6 +63,11 @@ it deliberately when changing the shared design.
   administrator session confirmation. Reuse the production dialog with local
   release notes; simulated refresh advances to the welcome, and closing restores
   the opener without reloading or changing the last visited build.
+  Refresh fades into a full-screen update surface before reloading the document.
+  The next document restores that surface before the app bundle runs, then fades
+  it out after the application's first paint. Keep the same theme, logo and light
+  timeline across the reload; reduced motion switches directly. Administrator
+  previews use the same transition without navigating or writing refresh markers.
 
 ## Variants
 

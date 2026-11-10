@@ -23,6 +23,7 @@ import NotFoundPage from './components/NotFoundPage'
 import { recordDebugNavigation } from './lib/debug-diagnostics'
 import QueryProvider from './lib/query-provider'
 import V1Route from './components/V1Route'
+import { completeDeploymentRefresh } from './lib/deployment-refresh'
 
 
 const LandingPage = lazy(() => import('./pages/LandingPage'))
@@ -68,6 +69,8 @@ function AnimatedApp() {
 function AppContent() {
   const navigate = useNavigate()
   const location = useLocation()
+
+  useEffect(() => { completeDeploymentRefresh() }, [])
 
   useEffect(() => {
     recordDebugNavigation(location.pathname)

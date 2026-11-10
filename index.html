@@ -7,6 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <script src="/theme-init.js"></script>
+    <link rel="stylesheet" href="/deployment-refresh.css" />
     <meta name="description" content="导入森空岛或 MAA 干员数据，生成明日方舟基建排班，查看预计日产出、等效理智、培养建议和仓库估值。" />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://maatool.com/" />
@@ -40,6 +41,14 @@
     <title>MAA 基建排班优化器 | MaaTool</title>
   </head>
   <body>
+    <dialog id="deployment-refresh" class="deployment-refresh" aria-label="正在更新 MaaTool">
+      <div class="deployment-refresh-content" role="status">
+        <img src="/assets/maatool-v2-icon.svg" width="64" height="64" alt="MaaTool" />
+        <p>正在更新…</p>
+        <span class="deployment-refresh-track" aria-hidden="true"></span>
+      </div>
+    </dialog>
+    <script src="/deployment-refresh.js"></script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
