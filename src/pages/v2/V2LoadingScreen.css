@@ -28,23 +28,14 @@
   min-height: calc(100dvh - 64px - 2 * var(--v2-main-padding));
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-md);
+  justify-content: flex-start;
+  padding-block: clamp(2rem, 6vh, 4rem);
   color: var(--color-v2-muted);
   font-size: var(--text-sm);
-  text-align: center;
 }
 
-.v2-loading-screen .page-loading-spinner {
-  width: 48px;
-  height: 48px;
-}
-
-.v2-loading-screen .page-loading-spinner circle,
-.v2-section-loading-region .page-loading-spinner circle {
-  stroke: var(--color-v2-accent);
-}
+.v2-section-loading-region > .v2-data-activity { max-width: 64rem; margin-inline: auto; }
+.v2-loading-screen > .v2-data-activity { max-width: 24rem; }
 
 .v2-loading-retry {
   min-height: 44px;

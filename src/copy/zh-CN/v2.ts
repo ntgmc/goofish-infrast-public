@@ -435,6 +435,13 @@ export const v2Copy = {
   demoConfigChanged: '示例配置已修改，排班保持原样。登录后可生成个人方案。',
   dataPending: '先导入干员并调整基建配置，再点击「重新排班」生成个人方案。',
   loading: '正在加载排班…',
+  dataActivity: {
+    slow: '这次加载需要更长时间，请稍候。',
+    syncing: '正在同步游戏数据',
+    calculating: '正在计算养成需求',
+    current: '可继续查看当前数据。',
+    updated: '数据已更新',
+  },
   loadingResult: '正在读取最近一次排班…',
   updatesLoading: '正在加载更新日志…',
   updatesLoadFailed: '更新日志加载失败，请重试。',

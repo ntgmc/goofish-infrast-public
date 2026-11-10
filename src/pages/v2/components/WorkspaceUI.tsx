@@ -1,6 +1,7 @@
 import { Children, useId, type InputHTMLAttributes, type ReactNode } from 'react'
-import { EmptyIcon, ErrorIcon, InfoIcon, LoadingIcon } from '../../../components/icons'
+import { EmptyIcon, ErrorIcon, InfoIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
+import { DataActivity } from './DataActivity'
 
 export function Notice({ children, error = false }: { children?: ReactNode; error?: boolean }) {
   const Icon = error ? ErrorIcon : InfoIcon
@@ -12,7 +13,7 @@ export function EmptyState({ title, children, action }: { title: string; childre
 }
 
 export function Loading({ label = copy.v2.loading }: { label?: string }) {
-  return <div className="v2-loading" role="status"><LoadingIcon size={20} aria-hidden="true" className="v2-spin" />{label}</div>
+  return <DataActivity label={label} />
 }
 
 export function SectionTitle({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {

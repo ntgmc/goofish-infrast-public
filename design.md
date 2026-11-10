@@ -299,6 +299,10 @@ it deliberately when changing the shared design.
   every four seconds on desktop and touch, using a 3px copper band with a bright core.
   Its purchase action sweeps once on hover or focus. Pointer tilt and spotlight stay off
   on touch; reduced motion keeps the card and illustration static.
+- V2 data waits use a copper source-to-record graphic and quiet, synchronized skeleton sweeps.
+  Keep the real status readable, introduce decorative movement after 180ms, and add a longer-wait
+  message after eight seconds. Pause loops in hidden pages; system or app reduced motion shows
+  static shapes. Section loads retain the workbench navigation and reserve the content layout.
 - Operator, tool, inventory and benchmark lists reveal each stable item once per
   mounted list: 8px travel, 240ms duration, up to eight items at 25ms intervals, or 50ms for
   operator cards and V2 manual/cultivation operator candidates. Candidate pickers observe their own
