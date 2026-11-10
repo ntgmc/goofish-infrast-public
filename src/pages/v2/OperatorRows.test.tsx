@@ -26,7 +26,11 @@ beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (this: HTMLElement) { return this.classList.contains('v2-drawer-body') ? 600 : 0 })
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => containerWidth)
   vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
-    return this.classList.contains('v2-operator-grid-row') ? 160 : 600
+    return this.classList.contains('v2-operator-grid-row') ? 160 : this.classList.contains('v2-operator-entry') ? 152 : 600
+  })
+  vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(() => 140)
+  vi.spyOn(HTMLElement.prototype, 'offsetParent', 'get').mockImplementation(function (this: HTMLElement) {
+    return this.hasAttribute('data-operator-index') ? this.parentElement : null
   })
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
     const top = this.getAttribute('role') === 'list' ? 200 - (this.closest('.v2-drawer-body')?.scrollTop ?? 0) : 0
@@ -41,16 +45,28 @@ it('releases modal interaction immediately on close so another card can open dur
   for (const index of [0, 1, 0]) {
     fireEvent.click(triggers[index])
     expect(page.getByRole('dialog')).toHaveTextContent(SAMPLE_OPERATORS[index].name)
+    expect(document.querySelector('.v2-operator-return')).not.toBeInTheDocument()
+    page.getByRole('dialog').querySelector('.shared-card-scroll')!.scrollTop = 120
     fireEvent.click(within(page.getByRole('dialog')).getByRole('button', { name: '关闭' }))
     expect(page.queryByRole('dialog')).not.toBeInTheDocument()
     expect(document.querySelector('.shared-card-overlay')).not.toBeInTheDocument()
     expect(document.body.style.pointerEvents).not.toBe('none')
+    expect(document.querySelector('.v2-operator-return')).toHaveAttribute('aria-hidden', 'true')
+    expect(document.querySelector('.v2-operator-return')).toHaveAttribute('inert')
+    const scroll = document.querySelector('.v2-operator-return .shared-card-scroll')!
+    expect(scroll.scrollTop).toBe(120)
+    fireEvent.scroll(scroll)
+    expect(document.querySelector('.v2-operator-return')).toBeInTheDocument()
+    expect(triggers[index].parentElement).toHaveAttribute('data-card-returning', 'true')
     expect(page.container.querySelectorAll('[data-shared-card-front]')).toHaveLength(1)
     expect(triggers[index].parentElement).toHaveAttribute('data-shared-card-front', 'true')
     const wheel = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })
     document.body.dispatchEvent(wheel)
     expect(wheel.defaultPrevented).toBe(false)
   }
+  fireEvent.scroll(document.body)
+  expect(document.querySelector('.v2-operator-return')).not.toBeInTheDocument()
+  expect(page.container.querySelector('[data-card-returning]')).not.toBeInTheDocument()
 })
 
 it('keeps grid rows compact while details open separately and retains keyboard focus while recycling', async () => {

@@ -320,10 +320,14 @@ it deliberately when changing the shared design.
   expand on demand. The heading retains facility level and shows the selected shift and duration. Keep text in its own shared element or fade it
   into the destination; do not stretch long descriptions. Use `layoutScroll` on the scroll host.
   Dismissal unmounts the modal immediately, releasing its overlay, focus trap and scroll lock.
-  The source card handles the return morph, so opening another card, reopening the same card or
-  scrolling can interrupt the return without waiting for the spring. Keep the most recently opened
-  source card and its virtual row above neighbouring cards so the return never slips underneath
-  a later sibling. Opening another card transfers this priority. Keep background scrolling
+  Facility source cards handle their return morph. Operator details return through a decorative,
+  inert portal above the drawer and its search toolbar, starting at the detail's current visual bounds
+  and ending at the source card's untransformed bounds within its virtual row. Crossfade the detail
+  and compact content without scaling their text. Keep the shared geometry on the inner return surface
+  so reopening continues from its current bounds. Opening another card, changing the list, scrolling,
+  resizing or enabling reduced motion cancels the return immediately. Keep the most recently opened
+  source card and its virtual row above neighbouring cards. The decorative return stays above the
+  search toolbar while ordinary scrolling keeps the toolbar above the list. Opening another card transfers this priority. Keep background scrolling
   locked only while the modal is open. Skill previews on dialog triggers respond to pointer hover;
   keyboard users read skills in the dialog, and returning focus does not reopen a preview.
 - Overview production numbers interpolate from their displayed value when a result changes, keeping

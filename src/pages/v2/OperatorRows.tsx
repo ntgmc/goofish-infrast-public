@@ -1,6 +1,7 @@
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
-import { memo, useCallback, useId, useLayoutEffect, useState, type CSSProperties } from 'react'
+import { memo, useCallback, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { LayoutGroup, motion } from 'motion/react'
+import { createPortal } from 'react-dom'
 import { copy } from '../../copy'
 import { motionTokens } from '../../components/MotionPrimitives'
 import SharedCardDialog from '../../components/ui/shared-card-dialog'
@@ -18,6 +19,7 @@ export default memo(function OperatorRows({ operators, reveal = true }: { operat
   const reduced = useAppReducedMotion()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [frontId, setFrontId] = useState<string | null>(null)
+  const [returning, setReturning] = useState<ReturningOperator | null>(null)
   const selected = selectedId === null ? null : operators.find((operator) => operator.id === selectedId) ?? null
   const [columns, setColumns] = useState(1)
   const [scrollMargin, setScrollMargin] = useState(0)
@@ -66,7 +68,9 @@ export default memo(function OperatorRows({ operators, reveal = true }: { operat
   }, [])
 
   useLayoutEffect(() => { virtualizer.measure() }, [columns, virtualizer])
+  useLayoutEffect(() => { setReturning(null) }, [columns, reduced])
   useLayoutEffect(() => {
+    setReturning(null)
     const element = list.current
     const scroll = element?.closest<HTMLDivElement>('.v2-drawer-body')
     if (!element || !scroll) return
@@ -74,7 +78,18 @@ export default memo(function OperatorRows({ operators, reveal = true }: { operat
     if (scroll.scrollTop > top) scroll.scrollTop = top
   }, [operators])
 
-  const selectedSkills = selected ? operatorBuildingSkills(selected) : []
+  const close = (surface: HTMLDivElement | null) => {
+    const source = list.current?.querySelector<HTMLElement>('[data-shared-card-front]')
+    if (!reduced && selected && surface && source?.offsetParent) {
+      const parent = source.offsetParent.getBoundingClientRect()
+      const bounds = surface.getBoundingClientRect()
+      setReturning({ operator: selected, scrollTop: surface.querySelector('.shared-card-scroll')?.scrollTop ?? 0, from: { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height }, to: {
+        left: parent.left + source.offsetLeft, top: parent.top + source.offsetTop,
+        width: source.offsetWidth, height: source.offsetHeight,
+      } })
+    }
+    setSelectedId(null)
+  }
   const rows = virtual ? virtualizer.getVirtualItems() : Array.from({ length: rowCount }, (_, index) => ({ key: operators[index * columns].id, index, start: 0 }))
   return <LayoutGroup id={group}>
     <div ref={list} className={`v2-operator-grid${virtual ? ' v2-operator-virtual-list' : ''}`} role="list" aria-label={copy.v2.operatorManagement.list}
@@ -88,36 +103,31 @@ export default memo(function OperatorRows({ operators, reveal = true }: { operat
         className={`v2-operator-grid-row${virtual ? ' v2-operator-virtual-row' : ''}`}
         style={virtual ? { transform: `translateY(${row.start - scrollMargin}px)` } : undefined}>
         {operators.slice(row.index * columns, (row.index + 1) * columns).map((operator, column) => <motion.div key={operator.id}
-          layoutDependency={selectedId} layoutId={reduced ? undefined : `card-${operator.id}`} transition={reduced ? { duration: 0 } : motionTokens.morph}
-          className="v2-operator-entry" data-shared-card-front={frontId === operator.id || undefined} data-owned={operator.own !== false} data-operator-index={row.index * columns + column}
+          layoutDependency={selectedId} layoutId={reduced ? undefined : `card-${operator.id}`} transition={reduced || selectedId !== operator.id ? { duration: 0 } : motionTokens.morph}
+          className="v2-operator-entry" data-card-returning={returning?.operator.id === operator.id || undefined} data-shared-card-front={frontId === operator.id || undefined} data-owned={operator.own !== false} data-operator-index={row.index * columns + column}
           style={{ borderRadius: 6 }} role="listitem" data-reveal-id={operator.id}
           aria-posinset={row.index * columns + column + 1} aria-setsize={operators.length}>
-          <button type="button" className="v2-operator-card-trigger" aria-label={copy.v2.operatorManagement.skills(operator.name)} aria-haspopup="dialog" onClick={() => { setFrontId(operator.id); setSelectedId(operator.id) }} />
-          <div data-reveal-content><OperatorCard operator={operator} /></div>
+          <button type="button" className="v2-operator-card-trigger" aria-label={copy.v2.operatorManagement.skills(operator.name)} aria-haspopup="dialog" onClick={() => { setReturning(null); setFrontId(operator.id); setSelectedId(operator.id) }} />
+          <div data-reveal-content><OperatorCard operator={operator} active={selectedId === operator.id} /></div>
         </motion.div>)}
       </div>)}
     </div>
     {selected && <SharedCardDialog key={selected.id} layoutId={`card-${selected.id}`}
-      onClose={() => setSelectedId(null)} closeLabel={copy.v2.close} className="v2-operator-detail">
-      <header>
-        <motion.span className="v2-operator-portrait" layoutId={reduced ? undefined : `portrait-${selected.id}`} transition={motionTokens.morph}><Avatar operator={selected} /></motion.span>
-        <div><DialogTitle asChild><motion.h2 layoutId={reduced ? undefined : `name-${selected.id}`} transition={motionTokens.morph}>{selected.name}</motion.h2></DialogTitle>
-          <DialogDescription>{copy.domain.building_skills.title} · {copy.v2.elite(selected.elite)} · {copy.v2.operatorLevel(typeof selected.level === 'number' || typeof selected.level === 'string' ? selected.level : undefined)}</DialogDescription></div>
-      </header>
-      <motion.div initial={{ opacity: reduced ? 1 : 0 }} animate={{ opacity: 1 }} transition={{ duration: reduced ? 0 : 0.18 }}>
-        {selectedSkills.length ? <BuildingSkillList skills={selectedSkills} /> : <p className="v2-muted">{copy.v2.skillsUnavailable}</p>}
-      </motion.div>
+      onClose={close} closeLabel={copy.v2.close} className="v2-operator-detail">
+      <OperatorDetails operator={selected} />
     </SharedCardDialog>}
+    {returning && !reduced && <OperatorReturn key={returning.operator.id} returning={returning} onComplete={() => setReturning(null)} />}
   </LayoutGroup>
 })
 
-const OperatorCard = memo(function OperatorCard({ operator }: { operator: LicenseOperator }) {
-  const reduced = useAppReducedMotion()
+const OperatorCard = memo(function OperatorCard({ operator, active = false, shared = true }: { operator: LicenseOperator; active?: boolean; shared?: boolean }) {
+  const reduced = useAppReducedMotion() || !shared
+  const transition = reduced || !active ? { duration: 0 } : motionTokens.morph
   const skills = operatorBuildingSkills(operator)
   return <>
     <div className="v2-operator-row">
-      <motion.span className="v2-operator-portrait" layoutId={reduced ? undefined : `portrait-${operator.id}`} transition={motionTokens.morph}><Avatar operator={operator} /></motion.span>
-      <motion.strong layoutId={reduced ? undefined : `name-${operator.id}`} transition={motionTokens.morph}>{operator.name}</motion.strong>
+      <motion.span className="v2-operator-portrait" layoutId={reduced ? undefined : `portrait-${operator.id}`} transition={transition}><Avatar operator={operator} /></motion.span>
+      <motion.strong layoutId={reduced ? undefined : `name-${operator.id}`} transition={transition}>{operator.name}</motion.strong>
       <div className="v2-operator-training"><span className="v2-operator-status">{copy.v2.elite(operator.elite)}</span>
         <span className="v2-operator-status">{copy.v2.operatorLevel(typeof operator.level === 'number' || typeof operator.level === 'string' ? operator.level : undefined)}</span></div>
       <span className={operator.own === false ? 'v2-operator-status' : 'sr-only'}>{operator.own === false ? copy.v2.notOwnedLabel : copy.v2.ownedLabel}</span>
@@ -128,3 +138,48 @@ const OperatorCard = memo(function OperatorCard({ operator }: { operator: Licens
     </div> : <p className="v2-muted">{copy.v2.skillsUnavailable}</p>}
   </>
 })
+
+type CardBounds = { left: number; top: number; width: number; height: number }
+type ReturningOperator = { operator: LicenseOperator; from: CardBounds; to: CardBounds; scrollTop: number }
+
+function OperatorReturn({ returning: { operator, from, to, scrollTop }, onComplete }: { returning: ReturningOperator; onComplete: () => void }) {
+  const content = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => { if (content.current) content.current.scrollTop = scrollTop }, [scrollTop])
+  useLayoutEffect(() => {
+    const interrupt = (event: Event) => { if (event.target !== content.current) onComplete() }
+    document.addEventListener('scroll', interrupt, true)
+    window.addEventListener('resize', onComplete)
+    return () => { document.removeEventListener('scroll', interrupt, true); window.removeEventListener('resize', onComplete) }
+  }, [onComplete])
+  return createPortal(<motion.div className="v2-dialog shared-card-dialog v2-operator-return" aria-hidden inert
+    initial={from} animate={to} style={{ borderRadius: 6 }}
+    transition={motionTokens.morph} onAnimationComplete={onComplete}>
+    <motion.div className="v2-operator-return-surface" layoutId={`card-${operator.id}`} transition={{ duration: 0 }}>
+      <motion.div className="v2-operator-detail v2-operator-return-details" style={{ width: from.width, height: from.height }}
+        initial={{ opacity: 1 }} animate={{ opacity: 0 }} transition={{ duration: motionTokens.duration.instant }}>
+        <div ref={content} className="shared-card-scroll"><OperatorDetails operator={operator} decorative /></div>
+      </motion.div>
+      <motion.div className="v2-operator-entry v2-operator-return-preview" style={{ width: to.width - 2, height: to.height - 2 }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: motionTokens.duration.enter, delay: motionTokens.duration.instant }}>
+        <div data-reveal-content><OperatorCard operator={operator} shared={false} /></div>
+      </motion.div>
+    </motion.div>
+  </motion.div>, document.body)
+}
+
+function OperatorDetails({ operator, decorative = false }: { operator: LicenseOperator; decorative?: boolean }) {
+  const reduced = useAppReducedMotion()
+  const skills = operatorBuildingSkills(operator)
+  const title = <motion.h2 layoutId={reduced ? undefined : `name-${operator.id}`} transition={motionTokens.morph}>{operator.name}</motion.h2>
+  const description = <>{copy.domain.building_skills.title} · {copy.v2.elite(operator.elite)} · {copy.v2.operatorLevel(typeof operator.level === 'number' || typeof operator.level === 'string' ? operator.level : undefined)}</>
+  return <>
+    <header>
+      <motion.span className="v2-operator-portrait" layoutId={reduced ? undefined : `portrait-${operator.id}`} transition={motionTokens.morph}><Avatar operator={operator} /></motion.span>
+      <div>{decorative ? title : <DialogTitle asChild>{title}</DialogTitle>}
+        {decorative ? <p data-slot="dialog-description">{description}</p> : <DialogDescription>{description}</DialogDescription>}</div>
+    </header>
+    <motion.div initial={{ opacity: reduced || decorative ? 1 : 0 }} animate={{ opacity: 1 }} transition={{ duration: reduced ? 0 : 0.18 }}>
+      {skills.length ? <BuildingSkillList skills={skills} /> : <p className="v2-muted">{copy.v2.skillsUnavailable}</p>}
+    </motion.div>
+  </>
+}

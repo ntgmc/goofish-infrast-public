@@ -2026,6 +2026,11 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
 .v2-room-detail-heading h2 { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2xs); font-size: var(--text-lg); font-weight: 600; }
 .v2-room-detail-heading h2 small { color: var(--v2-secondary); font-size: var(--text-sm); font-weight: 400; }
 .v2-room-detail-heading [data-slot="dialog-description"] { margin-top: var(--space-2xs); color: var(--v2-secondary); font-size: var(--text-sm); }
+.v2-operator-return.shared-card-dialog { inset: auto; max-height: none; margin: 0; pointer-events: none; }
+.v2-operator-entry[data-card-returning] { opacity: 0 !important; }
+.v2-operator-return-surface { position: absolute; inset: -1px; }
+.v2-operator-return-details { position: absolute; inset: 0 auto auto 0; }
+.v2-operator-return-preview.v2-operator-entry { position: absolute; inset: 0 auto auto 0; border: 0; background: transparent; }
 .v2-operator-detail .v2-skill-list { gap: var(--space-md); }
 .v2-operator-detail .v2-skill { padding-top: var(--space-md); border-top: 1px solid var(--v2-line); }
 .v2-building-skills { display: flex; min-width: 0; min-height: 44px; align-items: center; gap: var(--space-3xs); color: var(--v2-secondary); font-size: var(--text-xs); text-align: left; }

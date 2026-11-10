@@ -9,7 +9,7 @@ import './shared-card-dialog.css'
 
 export default function SharedCardDialog({ layoutId, onClose, closeLabel, children, className = '' }: {
   layoutId: string
-  onClose: () => void
+  onClose: (surface: HTMLDivElement | null) => void
   closeLabel: string
   children: ReactNode
   className?: string
@@ -26,7 +26,7 @@ export default function SharedCardDialog({ layoutId, onClose, closeLabel, childr
     document.addEventListener('wheel', guard, { capture: true, passive: false })
     return () => document.removeEventListener('wheel', guard, true)
   }, [])
-  return <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+  return <Dialog open onOpenChange={(open) => { if (!open) onClose(surface.current) }}>
     <DialogPrimitive.Portal forceMount>
       <DialogPrimitive.Overlay forceMount asChild>
         <motion.div className="shared-card-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
