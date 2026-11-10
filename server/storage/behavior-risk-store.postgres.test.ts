@@ -26,6 +26,35 @@ afterAll(async () => {
 })
 
 describe('behavior risk PostgreSQL store', () => {
+  it('loads all pages with tied timestamps and retains both environment expansion hops', async () => {
+    const first = await seedAccount('pagination-first')
+    const bridge = await seedAccount('pagination-bridge')
+    const last = await seedAccount('pagination-last')
+    const now = new Date('2026-07-25T12:00:00.000Z')
+    try {
+      await Promise.all(Array.from({ length: 501 }, (_, index) =>
+        insert(`pagination:${index}`, 'login', first, now, 0, {
+          browserHmac: 'pagination-first', networkHmac: 'pagination-first', uaHmac: 'pagination-first',
+        }),
+      ))
+      await insert('pagination:bridge', 'login', bridge, now, 0, {
+        browserHmac: 'pagination-first', networkHmac: 'pagination-bridge', uaHmac: 'pagination-bridge',
+      })
+      await insert('pagination:last', 'login', last, now, 0, {
+        browserHmac: 'pagination-last', networkHmac: 'pagination-bridge', uaHmac: 'pagination-bridge',
+      })
+      await query('delete from behavior_risk_dirty_users where user_id = any($1::text[])', [[bridge.userId, last.userId]])
+
+      await expect(runBehaviorRiskEvaluation(now)).resolves.toMatchObject({
+        status: 'success', eventsProcessed: 503, backlog: 0,
+      })
+    } finally {
+      await query('delete from behavior_risk_cases')
+      await query('delete from behavior_risk_events')
+      await query('delete from user_accounts where id = any($1::text[])', [[first.userId, bridge.userId, last.userId]])
+    }
+  })
+
   it('returns searchable member identities and applies only selected member actions with audit', async () => {
     const first = await seedAccount('first')
     const second = await seedAccount('second')

@@ -15,6 +15,20 @@ afterEach(() => {
 })
 
 describe('UpgradeSuggestionStatusNotice', () => {
+  it('labels quick values as references and does not claim all upgrades have been ruled out', () => {
+    render(<UpgradeSuggestionStatusNotice result={{
+      author: 'test', title: 'quick', description: '', buildingType: 243,
+      planTimes: '3 班', plans: [], raw_results: [],
+      calculation_mode: 'quick', upgrade_suggestions_status: 'partial',
+      upgrade_suggestions: [], upgrade_suggestions_evaluated_count: 4,
+      upgrade_suggestions_candidate_count: 16, upgrade_suggestions_truncated_reason: 'simulation_limit',
+    } as OptimizeResult} />)
+    expect(screen.getByRole('status')).toHaveTextContent('收益和回本数值供参考')
+    expect(screen.getByRole('status')).toHaveTextContent('本次快速复核未确认有收益的升级建议')
+    expect(screen.getByRole('status')).toHaveTextContent('完整计算继续查找')
+    expect(screen.queryByText('排班和优化建议均已完成，本次没有发现可推荐的升级项。')).not.toBeInTheDocument()
+  })
+
   it.each([
     ['completed', '排班和优化建议均已完成，本次没有发现可推荐的升级项。', 'status'],
     ['not_requested', '排班已完成，本次未请求优化建议。', 'status'],

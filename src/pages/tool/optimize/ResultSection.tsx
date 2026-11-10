@@ -280,7 +280,10 @@ export function UpgradeSuggestionStatusNotice({ result }: { result: OptimizeResu
   const partialTemplate = result.upgrade_suggestions_truncated_reason === 'simulation_limit'
     ? copy.optimize.pages_tool_optimize_ResultSection_014
     : copy.optimize.pages_tool_optimize_ResultSection_013
-  const message = status === 'completed'
+  const quick = result.calculation_mode === 'quick' && (status === 'completed' || status === 'partial')
+  const message = quick && !result.upgrade_suggestions?.length
+    ? copy.optimize.quickUpgradeEmpty
+    : status === 'completed'
     ? result.upgrade_suggestions?.length
       ? copy.optimize.pages_tool_optimize_ResultSection_008
       : copy.optimize.pages_tool_optimize_ResultSection_009
@@ -302,6 +305,7 @@ export function UpgradeSuggestionStatusNotice({ result }: { result: OptimizeResu
       role={status === 'failed' ? 'alert' : 'status'}
       aria-live={status === 'failed' ? 'assertive' : 'polite'}
     >
+      {quick && <p className="mb-1">{copy.optimize.quickUpgradeNotice}</p>}
       {message}
     </div>
   )

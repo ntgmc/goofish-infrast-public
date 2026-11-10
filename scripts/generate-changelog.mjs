@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { writeFileIfChanged } from './atomic-write.mjs'
 import {
@@ -186,15 +187,38 @@ function resolveReleaseVersion(meta) {
 }
 
 async function requestJson(url, token, accept = 'application/vnd.github+json') {
-  const response = await fetch(url, {
-    headers: {
-      Accept: accept,
-      Authorization: `Bearer ${token}`,
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-  })
-  if (!response.ok) throw new Error(`GitHub changelog history request failed: ${response.status} ${response.statusText}`)
-  return response.json()
+  const maxAttempts = 5
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    let response
+    let failure
+    try {
+      response = await fetch(url, {
+        signal: AbortSignal.timeout(30_000),
+        headers: {
+          Accept: accept,
+          Authorization: `Bearer ${token}`,
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+      })
+    } catch (error) {
+      failure = error instanceof Error ? error.name : 'network error'
+    }
+    if (response?.ok) return response.json()
+    if (response) failure = `${response.status} ${response.statusText}`
+    const message = `GitHub changelog request failed: ${failure} (${new URL(url).pathname}, attempt ${attempt}/${maxAttempts})`
+    if ((response && response.status < 500) || attempt === maxAttempts) throw new Error(message)
+    await response?.body?.cancel()
+    const retryAfter = response?.headers.get('retry-after')
+    const retryAfterMs = !retryAfter
+      ? 0
+      : Number.isFinite(Number(retryAfter))
+        ? Math.max(0, Number(retryAfter) * 1000)
+        : Math.max(0, Date.parse(retryAfter) - Date.now()) || 0
+    const delayMs = Math.max(1000 * 2 ** (attempt - 1), retryAfterMs)
+    if (delayMs > 60_000) throw new Error(`${message}; Retry-After exceeds the retry budget`)
+    console.warn(`[generate-changelog] ${message}; retrying in ${delayMs}ms`)
+    await delay(delayMs)
+  }
 }
 
 function readObjectLiteral(source, name) {

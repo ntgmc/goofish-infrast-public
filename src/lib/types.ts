@@ -15,6 +15,7 @@ export type OrundumPreference = 'production' | 'economy';
 export interface LicenseConfig {
   layout: string;
   desc: string;
+  calculation_mode?: 'standard' | 'quick';
   mode?: string;
   schedule_mode?: 'maa' | 'rotation' | 'variable' | string;
   dormitory_rule?: DormitoryRule | string;
@@ -393,6 +394,7 @@ export interface OptimizeResult {
     };
   };
   optimization_mode?: 'fast' | 'exact' | 'exhaustive' | string;
+  calculation_mode?: 'standard' | 'quick';
   optimality?: 'global_within_candidate_set' | 'bounded_candidate_optimum' | 'approximate' | string;
   search_nodes?: number;
   /** Observed search-state visits, including intermediate and repeated states. */

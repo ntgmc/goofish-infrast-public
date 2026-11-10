@@ -326,6 +326,18 @@ export default function ConfigEditor({
             <p className="config-help" role="status">{text.currentPreset(presetId ? CONFIG_PRESETS[presetId].desc : copy.v2.configCustomPreset)}</p>
           </section>}
           <div className="config-execution-settings">
+            <section aria-labelledby="config-calculation-heading" className="config-field">
+              <h4 id="config-calculation-heading">{copy.common.calculationModeLabel}</h4>
+              <div className="config-execution-options" role="group" aria-label={copy.common.calculationModeLabel} aria-describedby="config-calculation-help">
+                {(['standard', 'quick'] as const).map((mode) => <button key={mode} type="button"
+                  aria-pressed={(config.calculation_mode ?? 'standard') === mode}
+                  className={`tool-secondary-action ${(config.calculation_mode ?? 'standard') === mode ? 'tool-option-selected' : ''}`}
+                  onClick={() => update((next) => { if (mode === 'quick') next.calculation_mode = mode; else delete next.calculation_mode })}>
+                  {mode === 'quick' ? copy.common.quickCalculationLabel : copy.common.standardCalculationLabel}
+                </button>)}
+              </div>
+              <p id="config-calculation-help" className="config-help">{copy.common.quickCalculationHelp}</p>
+            </section>
             <section aria-labelledby="config-schedule-heading" className="config-field">
               <h4 id="config-schedule-heading">{copy.v2.configExecution}</h4>
               <div className="config-execution-options" role="group" aria-label={copy.common.components_ConfigEditor_061}>

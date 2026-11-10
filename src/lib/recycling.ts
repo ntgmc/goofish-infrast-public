@@ -1,24 +1,12 @@
 import pool from '../data/recycling.json'
 import type { LicenseConfig } from './types'
 
-export const RECYCLING_SKILL_OPERATOR_IDS: ReadonlySet<string> = new Set([
-  'char_4232_hbound', 'char_4246_dminon', 'char_4170_hdbell',
-])
-
 const totalWeight = pool.items.reduce((sum, item) => sum + item.weight, 0)
 // shortcut: value the published normal pool only; include the extra pool once its reset rules are confirmed.
 export const RECYCLING_SANITY_PER_ITEM = pool.items.reduce((sum, item) => sum + item.weight * item.sanity, 0) / totalWeight
 
 export function recyclingLevel(config: LicenseConfig): number {
   return config.recycling_station_level ?? 0
-}
-
-export function recyclingEfficiency(level: number, operators: { id: string; elite: number }[], ignoreElite = false): number {
-  if (level === 0) return 0
-  const skillEfficiency = operators.reduce((sum, operator) => sum + (
-    RECYCLING_SKILL_OPERATOR_IDS.has(operator.id) ? (ignoreElite || operator.elite >= 2 ? 30 : 20) : 0
-  ), 0)
-  return (level === 3 ? 120 : 100) + operators.length + skillEfficiency
 }
 
 export function recyclingProduction(hours: number, efficiency: number): Record<string, number> {

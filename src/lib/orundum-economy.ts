@@ -15,7 +15,6 @@ const SHARD_CRAFT_SECONDS = 60 * 60
 const PURE_GOLD_CRAFT_SECONDS = 72 * 60
 const ORUNDUM_PER_ORDER = 20
 const SHARDS_PER_ORUNDUM_ORDER = 2
-const LMD_PER_ORUNDUM_ORDER = SHARDS_PER_ORUNDUM_ORDER * SHARD_LMD_COST
 const ORUNDUM_PER_ORIROCK_CUBE = ORUNDUM_PER_ORDER / (SHARDS_PER_ORUNDUM_ORDER * ORIROCK_CUBES_PER_SHARD)
 const ORUNDUM_PER_SHARD = ORUNDUM_PER_ORDER / SHARDS_PER_ORUNDUM_ORDER
 
@@ -55,41 +54,51 @@ export function calculateOrundumEconomy(
   const dailyOrirockSupply = planning.total_daily_sanity_budget / ORIROCK_CUBE_SANITY
   const rockLimitedOrundum = dailyOrirockSupply * ORUNDUM_PER_ORIROCK_CUBE
   const shardProduced = amount(daily?.manufacturing, 'Originium Shard')
-  const shardConsumed = amount(daily?.consumption, 'Originium Shard')
-  const shardNet = amount(daily?.net, 'Originium Shard') || shardProduced - shardConsumed
   const factoryOrundumCapacity = shardProduced * ORUNDUM_PER_SHARD
   const tradeOrundumCapacity = potentialShortTermOrundum
+  const dailyLmdIncome = amount(daily?.trading, 'LMD')
+  const lmdLimitedOrundum = Math.max(0, dailyLmdIncome / SHARD_LMD_COST * ORUNDUM_PER_SHARD)
+  const hardLmdCost = daily?.consumption?.LMD !== undefined
+    ? amount(daily.consumption, 'LMD') : shardProduced * SHARD_LMD_COST
   const sustainableOrundum = Math.max(
     0,
-    Math.min(rockLimitedOrundum, factoryOrundumCapacity, tradeOrundumCapacity),
+    Math.min(rockLimitedOrundum, lmdLimitedOrundum, factoryOrundumCapacity, tradeOrundumCapacity),
   )
-  const shardInventory = Math.max(0, Number(config?.intermediate_inventory?.['Originium Shard'] ?? 0))
-  const orirockInventory = Math.max(0, Number(config?.intermediate_inventory?.['Orirock Cube'] ?? 0))
-  const shardDeficit = Math.max(0, -shardNet)
+  const shardInventory = Math.max(0, amount(config?.intermediate_inventory, 'Originium Shard'))
+  const orirockInventory = Math.max(0, amount(config?.intermediate_inventory, 'Orirock Cube'))
+  const lmdInventory = Math.max(0, amount(config?.intermediate_inventory, 'LMD'))
+  const lmdDeficit = Math.max(0, hardLmdCost - dailyLmdIncome)
+  const inventorySupportedOrundum = shardInventory > EPSILON
+    ? tradeOrundumCapacity
+    : Math.min(factoryOrundumCapacity, tradeOrundumCapacity)
+  const shardDeficit = Math.max(0, inventorySupportedOrundum / ORUNDUM_PER_SHARD - shardProduced)
   const orirockDeficit = Math.max(0, shardProduced * ORIROCK_CUBES_PER_SHARD - dailyOrirockSupply)
   const hasBurstInventory =
     (shardDeficit <= EPSILON || shardInventory > EPSILON) &&
-    (orirockDeficit <= EPSILON || orirockInventory > EPSILON)
-  const shortTermOrundum = hasBurstInventory ? potentialShortTermOrundum : sustainableOrundum
+    (orirockDeficit <= EPSILON || orirockInventory > EPSILON) &&
+    (lmdDeficit <= EPSILON || lmdInventory > EPSILON)
+  const shortTermOrundum = hasBurstInventory ? inventorySupportedOrundum : sustainableOrundum
   const shardInventoryDepletionDays = shardDeficit > EPSILON ? shardInventory / shardDeficit : null
   const orirockInventoryDepletionDays = orirockDeficit > EPSILON ? orirockInventory / orirockDeficit : null
+  const lmdInventoryDepletionDays = lmdDeficit > EPSILON ? lmdInventory / lmdDeficit : null
   const inventoryDepletionDays = earliestDepletionDays(
     shardInventoryDepletionDays,
     orirockInventoryDepletionDays,
+    lmdInventoryDepletionDays,
   )
   const bottleneck = findBottleneck({
     orirock_budget: rockLimitedOrundum,
+    lmd_budget: lmdLimitedOrundum,
     manufacture: factoryOrundumCapacity,
     trading: tradeOrundumCapacity,
   })
   const scenario =
     inventoryDepletionDays !== null && inventoryDepletionDays > EPSILON && shortTermOrundum > sustainableOrundum + EPSILON
       ? 'inventory_burst'
-      : sustainableOrundum + EPSILON < rockLimitedOrundum
+      : sustainableOrundum + EPSILON < Math.min(rockLimitedOrundum, lmdLimitedOrundum)
         ? 'capacity_limited'
         : 'budget_limited'
 
-  const hardLmdCost = (sustainableOrundum / ORUNDUM_PER_ORDER) * LMD_PER_ORUNDUM_ORDER
   const shardCostSanity = (sustainableOrundum / ORUNDUM_PER_SHARD) * SANITY_PER_ORIGINIUM_SHARD
   const orundumValueSanity = sustainableOrundum * SANITY_PER_ORUNDUM
   const opportunityCostSanity = Math.max(0, shardCostSanity - orundumValueSanity)
@@ -107,6 +116,12 @@ export function calculateOrundumEconomy(
     case: scenario,
     bottleneck: scenario === 'inventory_burst' ? 'inventory' : bottleneck,
     hard_lmd_cost: round(hardLmdCost, 4),
+    daily_lmd_income: round(dailyLmdIncome, 4),
+    daily_lmd_net: round(dailyLmdIncome - hardLmdCost, 4),
+    daily_orirock_cost: round(shardProduced * ORIROCK_CUBES_PER_SHARD, 4),
+    lmd_limited_orundum: round(lmdLimitedOrundum, 4),
+    lmd_inventory_depletion_days:
+      lmdInventoryDepletionDays === null ? null : round(lmdInventoryDepletionDays, 2),
     inventory_depletion_days: inventoryDepletionDays === null ? null : round(inventoryDepletionDays, 2),
     shard_inventory_depletion_days:
       shardInventoryDepletionDays === null ? null : round(shardInventoryDepletionDays, 2),
@@ -149,7 +164,7 @@ function earliestDepletionDays(...values: Array<number | null>): number | null {
   return finiteValues.length > 0 ? Math.min(...finiteValues) : null
 }
 
-function findBottleneck(values: Record<'orirock_budget' | 'manufacture' | 'trading', number>): OrundumEconomy['bottleneck'] {
+function findBottleneck(values: Record<'orirock_budget' | 'lmd_budget' | 'manufacture' | 'trading', number>): OrundumEconomy['bottleneck'] {
   return (Object.entries(values).sort((left, right) => left[1] - right[1])[0]?.[0] ?? 'orirock_budget') as OrundumEconomy['bottleneck']
 }
 
