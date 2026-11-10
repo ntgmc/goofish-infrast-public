@@ -2028,9 +2028,10 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
 .v2-room-detail-heading [data-slot="dialog-description"] { margin-top: var(--space-2xs); color: var(--v2-secondary); font-size: var(--text-sm); }
 .v2-operator-detail .v2-skill-list { gap: var(--space-md); }
 .v2-operator-detail .v2-skill { padding-top: var(--space-md); border-top: 1px solid var(--v2-line); }
-.v2-building-skills summary { display: flex; min-height: 44px; align-items: center; gap: var(--space-xs); cursor: pointer; color: var(--v2-secondary); }
-.v2-building-skills summary::after { content: '+'; margin-left: auto; font-size: var(--text-md); }
-.v2-building-skills[open] summary::after { content: '−'; }
+.v2-building-skills { display: flex; min-width: 0; min-height: 44px; align-items: center; gap: var(--space-3xs); color: var(--v2-secondary); font-size: var(--text-xs); text-align: left; }
+.v2-building-skills > span:first-child { white-space: nowrap; }
+.v2-skill-toggle { flex: none; width: 1ch; margin-left: auto; font-size: var(--text-sm); text-align: center; }
+.v2-building-skills-panel { grid-column: 1 / -1; min-width: 0; overflow: hidden; }
 .v2-skill-icons { display: flex; gap: var(--space-3xs); }
 .v2-skill-icons img, .v2-skill > img { flex: none; border-radius: var(--radius-v2-control); background: var(--color-v2-rail); padding: var(--space-3xs); }
 .v2-skill-list { display: grid; gap: var(--space-sm); padding-block: var(--space-xs); }
@@ -2047,16 +2048,13 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
 .v2-room-detail-stats .v2-room-production dd { display: grid; margin: 0; }
 .v2-room-detail-stats .v2-room-production dd > div { display: flex; align-items: center; justify-content: start; flex-wrap: wrap; gap: var(--space-2xs); }
 .v2-room-detail-stats .v2-product-amount { white-space: normal; }
-.v2-room-operator-details { display: grid; min-width: 0; }
-.v2-room-operator-details > h3 { color: var(--v2-secondary); font-size: var(--text-xs); font-weight: 500; }
-.v2-room-operator { display: grid; min-width: 0; gap: var(--space-2xs); padding-block: var(--space-xs); border-bottom: 1px solid var(--v2-line); }
+.v2-room-operator-details { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; column-gap: var(--space-sm); }
+.v2-room-operator-details > h3 { grid-column: 1 / -1; color: var(--v2-secondary); font-size: var(--text-xs); font-weight: 500; }
+.v2-room-operator { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; min-width: 0; row-gap: var(--space-2xs); padding-block: var(--space-xs); border-bottom: 1px solid var(--v2-line); }
 .v2-room-operator .v2-operator-row { min-width: 0; gap: var(--space-2xs); padding: 0; border: 0; }
 .v2-room-operator .v2-avatar { flex: none; width: 40px; height: 40px; }
-.v2-room-operator > .v2-building-skills { grid-column: 1 / -1; min-width: 0; }
-.v2-room-operator > .v2-muted { grid-column: 1 / -1; font-size: var(--text-xs); }
-.v2-room-operator .v2-building-skills summary { gap: var(--space-3xs); font-size: var(--text-xs); }
-.v2-room-operator .v2-building-skills summary > span:first-child { white-space: nowrap; }
-.v2-room-operator .v2-building-skills summary::after { font-size: var(--text-sm); }
+.v2-room-operator > .v2-building-skills { grid-column: 1 / -1; }
+.v2-room-operator > .v2-muted { font-size: var(--text-xs); }
 .v2-room-operator .v2-skill-icons { flex-wrap: wrap; }
 .v2-room-operator .v2-skill-icons img { width: 1.5rem; height: 1.5rem; }
 .v2-room-mood { display: grid; min-width: 0; gap: var(--space-2xs); align-content: center; --mood-color: var(--v2-accent); }
@@ -2080,14 +2078,15 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
 .v2-room-calculation[open] > summary::after { content: '−'; }
 .v2-room-calculation .v2-room-detail-list { padding-bottom: var(--space-xs); }
 @container room-detail (min-width: 15rem) {
-  .v2-room-operator { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+  .v2-room-operator-details { grid-template-columns: minmax(0, 1fr) auto; }
+  .v2-room-operator { align-items: center; }
   .v2-room-mood { grid-column: 1 / -1; grid-row: 2; }
-  .v2-room-operator > .v2-building-skills:not([open]) { grid-column: 2; grid-row: 1; }
+  .v2-room-operator > .v2-building-skills { grid-column: 2; grid-row: 1; }
 }
 @container room-detail (min-width: 30rem) {
-  .v2-room-operator { grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr) auto; column-gap: var(--space-sm); }
+  .v2-room-operator-details { grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr) auto; }
   .v2-room-mood { grid-column: 2; grid-row: 1; }
-  .v2-room-operator > .v2-building-skills:not([open]) { grid-column: 3; }
+  .v2-room-operator > .v2-building-skills { grid-column: 3; }
 }
 @media (max-width: 40rem) { .v2-room-detail .shared-card-scroll { padding: var(--space-sm); } }
 

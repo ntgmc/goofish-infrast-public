@@ -306,8 +306,11 @@ it deliberately when changing the shared design.
   a lighter segment shows the change, and a marker identifies starting mood. Scale to the selected
   plan's maximum mood, defaulting to 24. Clamp drawing only; retain actual numeric readings and
   show missing values as unavailable without drawing a change. Recovery uses the positive token.
-  Skills and full calculation details expand on demand. The heading retains facility level and
-  shows the selected shift and duration. Keep text in its own shared element or fade it
+  Operator rows share their column widths, keeping mood tracks aligned when skill icon counts vary.
+  The skill trigger, icons and mood track keep their columns while skill details expand below the row;
+  animate only the details height and opacity, and apply changes immediately with reduced motion.
+  Keep collapsed skill content inert and hidden from assistive technology. Full calculation details
+  expand on demand. The heading retains facility level and shows the selected shift and duration. Keep text in its own shared element or fade it
   into the destination; do not stretch long descriptions. Use `layoutScroll` on the scroll host.
   Dismissal unmounts the modal immediately, releasing its overlay, focus trap and scroll lock.
   The source card handles the return morph, so opening another card, reopening the same card or
