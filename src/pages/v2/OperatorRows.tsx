@@ -17,6 +17,7 @@ export default memo(function OperatorRows({ operators, reveal = true }: { operat
   const group = useId()
   const reduced = useAppReducedMotion()
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [frontId, setFrontId] = useState<string | null>(null)
   const selected = selectedId === null ? null : operators.find((operator) => operator.id === selectedId) ?? null
   const [columns, setColumns] = useState(1)
   const [scrollMargin, setScrollMargin] = useState(0)
@@ -88,10 +89,10 @@ export default memo(function OperatorRows({ operators, reveal = true }: { operat
         style={virtual ? { transform: `translateY(${row.start - scrollMargin}px)` } : undefined}>
         {operators.slice(row.index * columns, (row.index + 1) * columns).map((operator, column) => <motion.div key={operator.id}
           layoutDependency={selectedId} layoutId={reduced ? undefined : `card-${operator.id}`} transition={reduced ? { duration: 0 } : motionTokens.morph}
-          className="v2-operator-entry" data-owned={operator.own !== false} data-operator-index={row.index * columns + column}
+          className="v2-operator-entry" data-shared-card-front={frontId === operator.id || undefined} data-owned={operator.own !== false} data-operator-index={row.index * columns + column}
           style={{ borderRadius: 6 }} role="listitem" data-reveal-id={operator.id}
           aria-posinset={row.index * columns + column + 1} aria-setsize={operators.length}>
-          <button type="button" className="v2-operator-card-trigger" aria-label={copy.v2.operatorManagement.skills(operator.name)} aria-haspopup="dialog" onClick={() => setSelectedId(operator.id)} />
+          <button type="button" className="v2-operator-card-trigger" aria-label={copy.v2.operatorManagement.skills(operator.name)} aria-haspopup="dialog" onClick={() => { setFrontId(operator.id); setSelectedId(operator.id) }} />
           <div data-reveal-content><OperatorCard operator={operator} /></div>
         </motion.div>)}
       </div>)}

@@ -1143,6 +1143,8 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
   .v2-room-card:hover { background: var(--color-v2-hover); }
 }
 .v2-room-card:active { background: var(--v2-accent-soft); }
+:is(.v2-room-card, .v2-operator-entry)[data-shared-card-front] { z-index: 1; }
+.v2-operator-grid-row:has([data-shared-card-front]) { z-index: 1; }
 
 .v2-room-header {
   display: flex;
@@ -1994,8 +1996,8 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
 }
 
 .v2-operator-grid { min-width: 0; }
-.v2-operator-grid-row { display: grid; grid-template-columns: repeat(var(--v2-operator-columns), minmax(0, 1fr)); align-items: start; gap: var(--space-2xs); padding-bottom: var(--space-2xs); }
-.v2-operator-entry { position: relative; min-width: 0; padding: var(--space-2xs); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-control); background: var(--v2-paper); }
+.v2-operator-grid-row { position: relative; display: grid; grid-template-columns: repeat(var(--v2-operator-columns), minmax(0, 1fr)); align-items: start; gap: var(--space-2xs); padding-bottom: var(--space-2xs); }
+.v2-operator-entry { position: relative; z-index: 0; min-width: 0; padding: var(--space-2xs); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-control); background: var(--v2-paper); }
 .v2-operator-entry [data-reveal-content] { display: flex; min-height: calc(9.5rem - 2 * var(--space-2xs) - 2px); flex-direction: column; }
 .v2-operator-entry .v2-operator-row > strong { display: flex; align-items: center; height: 2.8em; line-height: 1.4; }
 .v2-operator-virtual-list { position: relative; overflow-anchor: none; }

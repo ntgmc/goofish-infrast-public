@@ -56,6 +56,7 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
   const id = useId()
   const reduced = useAppReducedMotion()
   const [roomKey, setRoomKey] = useState<string | null>(null)
+  const [frontRoomKey, setFrontRoomKey] = useState<string | null>(null)
   const selected = Math.min(shift, Math.max(result.plans.length - 1, 0))
   const [transition, setTransition] = useState({ shift: selected, direction: 0 })
   if (transition.shift !== selected) setTransition({ shift: selected, direction: selected > transition.shift ? 1 : -1 })
@@ -133,7 +134,7 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
           <section key={group.label} className="v2-room-group" aria-label={group.label}>
             <h3 className="v2-room-group-title">{group.label}</h3>
             <div className={`v2-room-grid ${view === 'list' ? 'v2-room-list' : ''}`}>
-              {group.rooms.map((room) => <RoomCard key={room.key} room={room} layoutKey={layoutKey} compact={group.compact} direction={transition.direction} selectedKey={roomKey} onClick={() => setRoomKey(room.key)}
+              {group.rooms.map((room) => <RoomCard key={room.key} room={room} layoutKey={layoutKey} compact={group.compact} direction={transition.direction} selectedKey={roomKey} front={frontRoomKey === room.key} onClick={() => { setFrontRoomKey(room.key); setRoomKey(room.key) }}
                 autofill={room.roomType === 'dormitory' && Boolean(plan?.rooms.dormitory?.[room.roomIndex]?.autofill)}
                 drone={isDroneTarget(plan?.drones, room.roomType, room.roomIndex)} />)}
             </div>
@@ -161,7 +162,7 @@ function FacilityIcon({ room }: { room: BoardRoom }) {
   return <Icon size={16} />
 }
 
-function RoomCard({ room, layoutKey, direction, selectedKey, drone = false, compact = false, autofill = false, onClick }: { room: BoardRoom; layoutKey: string; direction: number; selectedKey: string | null; drone?: boolean; compact?: boolean; autofill?: boolean; onClick: () => void }) {
+function RoomCard({ room, layoutKey, direction, selectedKey, front, drone = false, compact = false, autofill = false, onClick }: { room: BoardRoom; layoutKey: string; direction: number; selectedKey: string | null; front: boolean; drone?: boolean; compact?: boolean; autofill?: boolean; onClick: () => void }) {
   const reduceMotion = useAppReducedMotion()
   const layout = reduceMotion ? false : 'position'
   const geometryTransition = { duration: 0.28, ease: motionTokens.ease.enter }
@@ -169,7 +170,7 @@ function RoomCard({ room, layoutKey, direction, selectedKey, drone = false, comp
   const efficiency = room.row && room.row.efficiency !== '-' && ['trading', 'manufacture', 'power'].includes(room.roomType) ? room.row.efficiency : null
   const showBottom = !compact || room.product !== '-' || Boolean(efficiency)
   return (
-    <motion.button type="button" className={`v2-room-card v2-room-${room.roomType} ${compact ? 'v2-room-card-compact' : ''}`} onClick={onClick}
+    <motion.button type="button" className={`v2-room-card v2-room-${room.roomType} ${compact ? 'v2-room-card-compact' : ''}`} onClick={onClick} data-shared-card-front={front || undefined}
       aria-haspopup="dialog" layout={!reduceMotion} layoutId={reduceMotion ? undefined : `room-${room.key}`} style={{ borderRadius: 6 }} layoutDependency={`${layoutKey}-${selectedKey}`} transition={motionTokens.morph}>
       <motion.div layout={layout} layoutDependency={layoutKey} transition={geometryTransition} className="v2-room-header">
         <motion.span className="v2-room-icon" layoutId={reduceMotion ? undefined : `room-icon-${room.key}`} transition={motionTokens.morph}><FacilityIcon room={room} /></motion.span>

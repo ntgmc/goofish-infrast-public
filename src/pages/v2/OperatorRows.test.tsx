@@ -45,6 +45,8 @@ it('releases modal interaction immediately on close so another card can open dur
     expect(page.queryByRole('dialog')).not.toBeInTheDocument()
     expect(document.querySelector('.shared-card-overlay')).not.toBeInTheDocument()
     expect(document.body.style.pointerEvents).not.toBe('none')
+    expect(page.container.querySelectorAll('[data-shared-card-front]')).toHaveLength(1)
+    expect(triggers[index].parentElement).toHaveAttribute('data-shared-card-front', 'true')
     const wheel = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })
     document.body.dispatchEvent(wheel)
     expect(wheel.defaultPrevented).toBe(false)
