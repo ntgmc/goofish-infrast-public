@@ -12,6 +12,10 @@ import { AnimatedValue, MotionNavIndicator, motionTokens } from '../../component
 import { useAppReducedMotion } from '../../lib/motion-preference'
 import type { OptimizeResult } from '../../lib/types'
 import TradingIcon from './TradingIcon'
+import SharedCardDialog from '../../components/ui/shared-card-dialog'
+import { DialogDescription, DialogTitle } from '../../components/ui/dialog'
+import BuildingSkills from './BuildingSkills'
+import { RoomProduction } from './IncomeAnalysis'
 
 const text = copy.v2
 const ROOM_ORDER = ['trading', 'manufacture', 'control', 'power', 'meeting', 'processing', 'hire', 'training', 'dormitory']
@@ -38,7 +42,7 @@ export function Avatar({ operator, small = false }: { operator: RoomOperator; sm
   )
 }
 
-export default memo(function ScheduleBoard({ result, prepared, expanded, onExpandedChange, shift, onShiftChange, view, onViewChange, onRoom }: {
+export default memo(function ScheduleBoard({ result, prepared, expanded, onExpandedChange, shift, onShiftChange, view, onViewChange, showProduction }: {
   result: OptimizeResult
   prepared: PreparedResult
   expanded: boolean
@@ -47,9 +51,11 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
   onShiftChange: (shift: number) => void
   view: 'grid' | 'list'
   onViewChange: (view: 'grid' | 'list') => void
-  onRoom: (room: BoardRoom) => void
+  showProduction: boolean
 }) {
   const id = useId()
+  const reduced = useAppReducedMotion()
+  const [roomKey, setRoomKey] = useState<string | null>(null)
   const selected = Math.min(shift, Math.max(result.plans.length - 1, 0))
   const [transition, setTransition] = useState({ shift: selected, direction: 0 })
   if (transition.shift !== selected) setTransition({ shift: selected, direction: selected > transition.shift ? 1 : -1 })
@@ -65,6 +71,7 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
       const bRank = ROOM_ORDER.indexOf(b.roomType)
       return (aRank < 0 ? ROOM_ORDER.length : aRank) - (bRank < 0 ? ROOM_ORDER.length : bRank)
     })
+  const openedRoom = allRooms.find((room) => room.key === roomKey)
   const roomGroups = [
     { label: text.productionRooms, compact: false, rooms: allRooms.filter((room) => ['trading', 'manufacture'].includes(room.roomType)) },
     { label: text.controlAndPower, compact: !expanded, rooms: allRooms.filter((room) => ['control', 'power'].includes(room.roomType)) },
@@ -126,7 +133,7 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
           <section key={group.label} className="v2-room-group" aria-label={group.label}>
             <h3 className="v2-room-group-title">{group.label}</h3>
             <div className={`v2-room-grid ${view === 'list' ? 'v2-room-list' : ''}`}>
-              {group.rooms.map((room) => <RoomCard key={room.key} room={room} layoutKey={layoutKey} compact={group.compact} direction={transition.direction} onClick={() => onRoom(room)}
+              {group.rooms.map((room) => <RoomCard key={room.key} room={room} layoutKey={layoutKey} compact={group.compact} direction={transition.direction} selectedKey={roomKey} onClick={() => setRoomKey(room.key)}
                 autofill={room.roomType === 'dormitory' && Boolean(plan?.rooms.dormitory?.[room.roomIndex]?.autofill)}
                 drone={isDroneTarget(plan?.drones, room.roomType, room.roomIndex)} />)}
             </div>
@@ -135,24 +142,38 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
         </div>
       </div>
     </section>
+    <AnimatePresence>{openedRoom && <SharedCardDialog key={openedRoom.key} layoutId={`room-${openedRoom.key}`} onClose={() => setRoomKey(null)} closeLabel={text.close} className={`v2-room-detail v2-room-${openedRoom.roomType}`}>
+      <header className="v2-room-detail-heading">
+        <motion.span className="v2-room-icon" layoutId={reduced ? undefined : `room-icon-${openedRoom.key}`} transition={motionTokens.morph}><FacilityIcon room={openedRoom} /></motion.span>
+        <div><DialogTitle asChild><motion.h2 layoutId={reduced ? undefined : `room-title-${openedRoom.key}`} transition={motionTokens.morph}>{openedRoom.label}<small>{openedRoom.indexLabel}</small></motion.h2></DialogTitle>
+          <DialogDescription>{text.roomDescription}</DialogDescription></div>
+      </header>
+      <motion.div initial={{ opacity: reduced ? 1 : 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduced ? 0 : 0.18 }}>
+        <RoomDetails room={openedRoom} result={result} shift={selected} showProduction={showProduction} />
+      </motion.div>
+    </SharedCardDialog>}</AnimatePresence>
     </LayoutGroup></OperatorSkillPreview>
   )
 })
 
-function RoomCard({ room, layoutKey, direction, drone = false, compact = false, autofill = false, onClick }: { room: BoardRoom; layoutKey: string; direction: number; drone?: boolean; compact?: boolean; autofill?: boolean; onClick: () => void }) {
+function FacilityIcon({ room }: { room: BoardRoom }) {
+  const Icon = ROOM_ICONS[room.roomType] ?? UnknownFacilityIcon
+  return <Icon size={16} />
+}
+
+function RoomCard({ room, layoutKey, direction, selectedKey, drone = false, compact = false, autofill = false, onClick }: { room: BoardRoom; layoutKey: string; direction: number; selectedKey: string | null; drone?: boolean; compact?: boolean; autofill?: boolean; onClick: () => void }) {
   const reduceMotion = useAppReducedMotion()
   const layout = reduceMotion ? false : 'position'
   const geometryTransition = { duration: 0.28, ease: motionTokens.ease.enter }
-  const Icon = ROOM_ICONS[room.roomType] ?? UnknownFacilityIcon
   const automaticDormitory = autofill || room.row?.isAutofill
   const efficiency = room.row && room.row.efficiency !== '-' && ['trading', 'manufacture', 'power'].includes(room.roomType) ? room.row.efficiency : null
   const showBottom = !compact || room.product !== '-' || Boolean(efficiency)
   return (
     <motion.button type="button" className={`v2-room-card v2-room-${room.roomType} ${compact ? 'v2-room-card-compact' : ''}`} onClick={onClick}
-      layout={!reduceMotion} layoutDependency={layoutKey} transition={geometryTransition}>
+      aria-haspopup="dialog" layout={!reduceMotion} layoutId={reduceMotion ? undefined : `room-${room.key}`} style={{ borderRadius: 6 }} layoutDependency={`${layoutKey}-${selectedKey}`} transition={motionTokens.morph}>
       <motion.div layout={layout} layoutDependency={layoutKey} transition={geometryTransition} className="v2-room-header">
-        <span className="v2-room-icon"><Icon size={16} /></span>
-        <span className="v2-room-title"><span>{room.label}</span><small>{room.indexLabel}</small></span>
+        <motion.span className="v2-room-icon" layoutId={reduceMotion ? undefined : `room-icon-${room.key}`} transition={motionTokens.morph}><FacilityIcon room={room} /></motion.span>
+        <motion.span className="v2-room-title" layoutId={reduceMotion ? undefined : `room-title-${room.key}`} transition={motionTokens.morph}><span>{room.label}</span><small>{room.indexLabel}</small></motion.span>
       </motion.div>
       <span className="v2-room-marker">
         {drone && <span className="v2-drone-tag" title={text.drones}><Drone size={16} /></span>}
@@ -176,6 +197,28 @@ function RoomCard({ room, layoutKey, direction, drone = false, compact = false, 
       </motion.div>}
     </motion.button>
   )
+}
+
+function RoomDetails({ room, result, shift, showProduction }: { room: BoardRoom; result: OptimizeResult; shift: number; showProduction: boolean }) {
+  return <div className="v2-options-content">
+    <div className="v2-room-operator-details">{room.row?.operators.map((operator) => {
+      const mood = room.data?.mood?.[operator.name]
+      const moodValue = (value: number | undefined) => value !== undefined && Number.isFinite(value) ? value.toFixed(1) : text.moodUnavailable
+      return <section className="v2-room-operator" key={operator.name}>
+        <div className="v2-operator-row"><Avatar operator={operator} /><strong>{operator.name}</strong></div>
+        <dl className="v2-detail-data v2-mood-data"><div><dt>{text.startMood}</dt><dd>{moodValue(mood?.start)}</dd></div>
+          <div><dt>{text.endMood}</dt><dd>{moodValue(mood?.end)}</dd></div></dl>
+        <BuildingSkills operator={operator} />
+      </section>
+    })}</div>
+    <dl className="v2-detail-data"><div><dt>{text.level}</dt><dd>{roomLevelLabel(room)}</dd></div>
+      <div><dt>{text.product}</dt><dd>{room.product}</dd></div><div><dt>{room.roomType === 'trading' ? text.equivalentEfficiency : text.efficiency}</dt><dd>{room.row?.efficiency ?? '—'}</dd></div>
+      {showProduction && result.daily_production && <RoomProduction daily={result.daily_production} room={room} shift={result.plans[shift]?.name} />}</dl>
+    <h3>{text.roomDetails}</h3><ul className="v2-room-detail-list">{room.row?.detailItems.map((item, index) => <li key={item}>{room.roomType === 'trading'
+      ? index === 0 ? `${text.equivalentEfficiency} ${room.row?.efficiency}`
+        : item.startsWith(copy.domain.components_result_panel_formatters_023) ? `${text.expectedFullOrders}${room.data?.overflow?.time}` : item
+      : item}</li>)}</ul>
+  </div>
 }
 
 function OperatorOccupant({ operator, compact, direction, reducedMotion }: { operator: RoomOperator; compact: boolean; direction: number; reducedMotion: boolean }) {

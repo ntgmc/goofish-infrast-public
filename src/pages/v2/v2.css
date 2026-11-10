@@ -2012,6 +2012,11 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
 .v2-operator-detail .v2-avatar { display: block; width: 100%; height: auto; aspect-ratio: 1; }
 .v2-operator-detail h2 { font-size: var(--text-lg); font-weight: 600; overflow-wrap: anywhere; }
 .v2-operator-detail [data-slot="dialog-description"] { margin-top: var(--space-xs); color: var(--v2-secondary); font-size: var(--text-sm); }
+.v2-room-detail-heading { display: flex; align-items: center; gap: var(--space-sm); padding-right: 40px; margin-bottom: var(--space-md); }
+.v2-room-detail-heading > .v2-room-icon { flex: none; width: 44px; height: 44px; }
+.v2-room-detail-heading h2 { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2xs); font-size: var(--text-lg); font-weight: 600; }
+.v2-room-detail-heading h2 small { color: var(--v2-secondary); font-size: var(--text-sm); font-weight: 400; }
+.v2-room-detail-heading [data-slot="dialog-description"] { margin-top: var(--space-2xs); color: var(--v2-secondary); font-size: var(--text-sm); }
 .v2-operator-detail .v2-skill-list { gap: var(--space-md); }
 .v2-operator-detail .v2-skill { padding-top: var(--space-md); border-top: 1px solid var(--v2-line); }
 .v2-building-skills summary { display: flex; min-height: 44px; align-items: center; gap: var(--space-xs); cursor: pointer; color: var(--v2-secondary); }

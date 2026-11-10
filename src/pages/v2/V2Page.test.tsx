@@ -241,7 +241,7 @@ it.each(['/#release-v2.0.1016', '/v2#release-v2.0.1016'])('opens the changelog f
 
 async function dismissDrawer(user: ReturnType<typeof userEvent.setup>) {
   await user.keyboard('{Escape}')
-  await waitFor(() => expect(document.querySelector('[data-slot="dialog-content"]')).not.toBeInTheDocument())
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 }
 
 it.each(['/#announcement-popup-21', '/v2#announcement-popup-21'])('opens announcements from an announcement anchor at %s without the popup feed', async (path) => {
@@ -1037,6 +1037,7 @@ describe('V2 results-first workspace', () => {
     expect(await screen.findByRole('dialog')).toHaveTextContent(copy.v2.roomDetails)
     await dismissDrawer(user)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(originalRoom).toHaveFocus()
   })
 
   it('preserves the selected shift, Fiammetta target and display mode across result views without generating', async () => {

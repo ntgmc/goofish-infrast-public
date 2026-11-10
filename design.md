@@ -299,7 +299,8 @@ it deliberately when changing the shared design.
   flash. Jumps exceeding 80% of the scrolling viewport skip reveals; focusing cancels the item's
   animation. Shared card geometry updates on selection changes rather than virtual scrolling.
 - `SharedCardDialog` provides card-to-detail transitions with shared layout IDs and the morph
-  spring (stiffness 380, damping 40, mass 0.85). Keep text in its own shared element or fade it
+  spring (stiffness 380, damping 40, mass 0.85). Facility cards use it for their background, icon
+  and title; details retain operator mood, skills, production and efficiency. Keep text in its own shared element or fade it
   into the destination; do not stretch long descriptions. Use `layoutScroll` on the scroll host.
 - Overview production numbers interpolate from their displayed value when a result changes, keeping
   the final accessible value and units stable. Fresh generated results settle metrics and room groups

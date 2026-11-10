@@ -8,7 +8,6 @@ import { copy } from '../../copy'
 import { MotionNavIndicator, motionTokens } from '../../components/MotionPrimitives'
 import { prepareResult } from '../../components/result-panel/formatters'
 import InventoryDepletionWarning from '../../components/result-panel/InventoryDepletionWarning'
-import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
 import { getMaaExportNotice } from '../tool/optimize/maa-export-notice'
 import { manualSourceKey } from '../../lib/manual-schedule'
 import { hasCapability } from '../../lib/product-catalog'
@@ -111,7 +110,6 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
     } catch { /* Storage may be disabled. */ }
   }, [firstSchedule, section, session.user, sample])
   const [panel, setPanel] = useState<OptionPanel | null>(() => params.get('feedback') === 'new' && !session.user ? 'account' : null)
-  const [room, setRoom] = useState<BoardRoom | null>(null)
   const [view, setView] = useState<View>('schedule')
   const [expanded, setExpanded] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
@@ -145,7 +143,6 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const signedIn = Boolean(session.user)
   const profileLabel = profileName ?? (signedIn ? text.account : text.login)
   const openPanel = useCallback((next: OptionPanel) => { setPanel(next); setMobileNavigation(false) }, [])
-  const openRoom = useCallback((next: BoardRoom) => { setRoom(next); openPanel('room') }, [openPanel])
   const restrictedPreview = Boolean(session.activeProfile && isFreePreviewProfile(session.activeProfile) && !isFreePreviewTrialActive(session.activeProfile))
   const canManual = Boolean(features.manual_schedule && !sample && session.activeProfile && session.activeProfile.kind !== 'free_preview' && !result.preview_limit
     && hasCapability({ kind: session.activeProfile.kind, permission }, 'edit_full_config') && result.plans.length)
@@ -354,7 +351,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
                 : <div className="v2-analysis-note"><PreviewIcon size={21} aria-hidden="true" /><div><p>{text.previewAnalysis}</p>{features.pricing && <Link className="v2-text-button" to="/pricing">{text.comparePlans}<ArrowRight size={14} /></Link>}</div></div>}</section>
             ) : (
               <ScheduleBoard result={result} prepared={prepared} expanded={expanded} onExpandedChange={setExpanded} shift={shift} onShiftChange={setShift}
-                view={boardView} onViewChange={setBoardView} onRoom={openRoom} />
+                view={boardView} onViewChange={setBoardView} showProduction={!sample && canViewAnalysis && !result.preview_limit} />
             )}
           </V2Transition>
           </div>
@@ -374,9 +371,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
       <OptionsDrawer panel={panel} onClose={closePanel} onOpenProfile={openProfile} onNavigate={navigateSection} session={guardedSession} config={config} operators={sortedOperators}
         onUpdateConfig={onUpdateConfig} permission={permission} canEditConfig={canEditConfig} canUseIntermediateConfig={canUseIntermediateConfig}
         sample={sample} busy={busy} configReadOnly={workflow?.loading} onImportOperators={onImportOperators} configDiffRows={workflow?.configDiffRows} hasPreviousResult={Boolean(workflow?.latestWorkspaceResult)}
-        onAccount={() => openPanel('account')} room={room} error={navigationError ?? error}
-        dailyProduction={!sample && canViewAnalysis && !result.preview_limit ? result.daily_production : undefined}
-        shiftName={result.plans[Math.min(shift, Math.max(result.plans.length - 1, 0))]?.name}
+        onAccount={() => openPanel('account')} error={navigationError ?? error}
         onConfirmConfig={firstSchedule && section === 'generation' && session.license ? confirmConfig : undefined} confirmingConfig={confirmingConfig} />
       {session.user && features.profiles && <ProfileExpiryPrompt userId={session.user.id} profiles={session.cdkProfiles} onOpenExport={(profile) => { void (async () => {
         if ((manualDirty || toolDirty) && !window.confirm(text.discardManual)) return

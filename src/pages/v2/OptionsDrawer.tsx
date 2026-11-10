@@ -12,20 +12,16 @@ import { copy } from '../../copy'
 import { validateScheduleConfig } from '../../lib/config'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
-import type { DailyProduction, LicenseConfig, LicenseOperator, PermissionMode } from '../../lib/types'
-import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
+import type { LicenseConfig, LicenseOperator, PermissionMode } from '../../lib/types'
 import type { useToolSession } from '../tool/useToolSession'
-import { Avatar, roomLevelLabel } from './ScheduleBoard'
 import { getProfileAccessLabel, isFreePreviewProfile } from '../tool/tool-utils'
 import ConfigSaveStatus from '../tool/workspace/ConfigSaveStatus'
 import V2Transition from './V2Transition'
-import BuildingSkills from './BuildingSkills'
 import OperatorManagementPanel from './OperatorManagementPanel'
-import { RoomProduction } from './IncomeAnalysis'
 import { sectionLabels, v2SectionAvailable, type V2Section } from './navigation'
 
 const text = copy.v2
-export type OptionPanel = 'operators' | 'config' | 'account' | 'room' | 'settings'
+export type OptionPanel = 'operators' | 'config' | 'account' | 'settings'
 export type V2Session = ReturnType<typeof useToolSession>
 
 const accountEntries = [
@@ -36,11 +32,11 @@ const accountEntries = [
 
 const titles: Record<OptionPanel, string> = {
   operators: text.operators, config: text.facilities, settings: text.appearance.title,
-  account: text.account, room: text.roomDetails,
+  account: text.account,
 }
 
 export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigate, session, config, operators, onUpdateConfig, permission,
-  canEditConfig = true, canUseIntermediateConfig = true, configReadOnly = false, sample, busy, onImportOperators, onAccount, room, dailyProduction, shiftName, error, configDiffRows, hasPreviousResult, onConfirmConfig, confirmingConfig = false }: {
+  canEditConfig = true, canUseIntermediateConfig = true, configReadOnly = false, sample, busy, onImportOperators, onAccount, error, configDiffRows, hasPreviousResult, onConfirmConfig, confirmingConfig = false }: {
   panel: OptionPanel | null
   onClose: () => void
   onOpenProfile: (profile: V2Session['profiles'][number]) => Promise<void>
@@ -57,9 +53,6 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
   busy: boolean
   onImportOperators: (operators: LicenseOperator[]) => Promise<void>
   onAccount: () => void
-  room: BoardRoom | null
-  dailyProduction?: DailyProduction
-  shiftName?: string
   error?: string | null
   configDiffRows?: ConfigDiffItem[]
   hasPreviousResult?: boolean
@@ -79,7 +72,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
   const showAuthForm = shownPanel === 'account' && !session.user && featureState.status === 'ready' && featureState.features.site && featureState.features.login
   const description = shownPanel === 'settings' ? text.appearance.description : isConfig ? exampleData ? text.demoConfigDescription : text.configDescription
     : shownPanel === 'operators' ? exampleData ? text.sampleOperatorDescription : text.operatorDescription
-      : shownPanel === 'account' ? session.user ? text.accountManagementDescription : text.accountDescription : text.roomDescription
+      : session.user ? text.accountManagementDescription : text.accountDescription
 
   return (
     <Dialog open={panel !== null} onOpenChange={(open) => { if (!open) onClose() }}>
@@ -88,7 +81,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
         onOpenAutoFocus={() => { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null }}
         onCloseAutoFocus={(event) => { event.preventDefault(); setLastPanel(null); if (opener.current?.isConnected) opener.current.focus({ preventScroll: true }) }}>
         <div className="v2-drawer-heading">
-          <DialogTitle>{shownPanel === 'room' && room ? `${room.label} ${room.indexLabel}` : shownPanel ? titles[shownPanel] : ''}</DialogTitle>
+          <DialogTitle>{shownPanel ? titles[shownPanel] : ''}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
           {isConfig && <div className="v2-config-feedback">
             {!validation.ok ? <p id="v2-config-validation" role="status" className="tool-alert tool-alert--warning">{validation.message}</p>
@@ -96,7 +89,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
                 : <ConfigSaveStatus status={session.configSyncStatus} onRetry={session.retryConfigSave} sample={exampleData} compact />}
           </div>}
         </div>
-        <V2Transition motionKey={isConfig ? 'config' : shownPanel === 'room' ? `room-${room?.key}` : shownPanel ?? 'closed'} className="v2-drawer-body" layoutScroll>
+        <V2Transition motionKey={shownPanel ?? 'closed'} className="v2-drawer-body" layoutScroll>
         {isConfig && (
           <>
             <ConfigCapabilityPreview config={config} enabled={!canEditConfig}>
@@ -159,25 +152,6 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
           </div>
         )}
         {shownPanel === 'settings' && <div className="v2-options-content"><AppearanceSettings /></div>}
-        {shownPanel === 'room' && room && <div className="v2-options-content">
-          <div className="v2-room-operator-details">{room.row?.operators.map((operator) => {
-            const mood = room.data?.mood?.[operator.name]
-            const moodValue = (value: number | undefined) => value !== undefined && Number.isFinite(value) ? value.toFixed(1) : text.moodUnavailable
-            return <section className="v2-room-operator" key={operator.name}>
-              <div className="v2-operator-row"><Avatar operator={operator} /><strong>{operator.name}</strong></div>
-              <dl className="v2-detail-data v2-mood-data"><div><dt>{text.startMood}</dt><dd>{moodValue(mood?.start)}</dd></div>
-                <div><dt>{text.endMood}</dt><dd>{moodValue(mood?.end)}</dd></div></dl>
-              <BuildingSkills operator={operator} />
-            </section>
-          })}</div>
-          <dl className="v2-detail-data"><div><dt>{text.level}</dt><dd>{roomLevelLabel(room)}</dd></div>
-            <div><dt>{text.product}</dt><dd>{room.product}</dd></div><div><dt>{room.roomType === 'trading' ? text.equivalentEfficiency : text.efficiency}</dt><dd>{room.row?.efficiency ?? '—'}</dd></div>
-            {dailyProduction && <RoomProduction daily={dailyProduction} room={room} shift={shiftName} />}</dl>
-          <h3>{text.roomDetails}</h3><ul className="v2-room-detail-list">{room.row?.detailItems.map((item, index) => <li key={item}>{room.roomType === 'trading'
-            ? index === 0 ? `${text.equivalentEfficiency} ${room.row?.efficiency}`
-              : item.startsWith(copy.domain.components_result_panel_formatters_023) ? `${text.expectedFullOrders}${room.data?.overflow?.time}` : item
-            : item}</li>)}</ul>
-        </div>}
         </V2Transition>
         {isAccount && session.user && <footer className="v2-account-footer">
           <button type="button" className="v2-button v2-button-secondary" disabled={busy || session.openingProfileId !== null} onClick={() => void session.handleLogout()}><LogOut size={18} aria-hidden="true" />{text.logout}</button>
