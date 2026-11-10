@@ -1111,7 +1111,12 @@ describe('V2 results-first workspace', () => {
     render(<MotionPreferenceProvider><MemoryRouter initialEntries={['/v2']}><V2Page /></MemoryRouter></MotionPreferenceProvider>)
     const room = within(screen.getByRole('tabpanel')).getByRole('button', { name: /贸易站.*推进之王/ })
     const slot = room.querySelector<HTMLElement>('.v2-operator')!
+    const originalOccupants = new Map([...document.querySelectorAll<HTMLElement>('.v2-room-card .v2-operator')].map((element) => [element, element.dataset.operatorName]))
     await user.click(screen.getByRole('tab', { name: /第3班/ }))
+    for (const [element, name] of originalOccupants) {
+      if (!element.isConnected) continue
+      expect(element.querySelector('.v2-operator-content:not([inert])')?.hasAttribute('data-shift-change')).toBe(element.dataset.operatorName !== name)
+    }
     expect(room.querySelector('.v2-operator')).toBe(slot)
     expect(within(slot).getByRole('img', { name: '巫恋' })).toBeInTheDocument()
     expect(within(slot).queryByRole('img', { name: '但书' })).not.toBeInTheDocument()

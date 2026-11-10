@@ -56,7 +56,7 @@ it('uses optimizer cash flow and depletion instead of recalculating the producti
     <ProductionSummary userId="user-1" result={result} prepared={prepared} sample={false}
       profileId="profile-1" resultId={current.id} resultConfig={SAMPLE_CONFIG}
       history={[current, previous]} newResult={false} onConfigure={vi.fn()} />
-    <IncomeAnalysis result={result} prepared={prepared} />
+    <IncomeAnalysis result={result} prepared={prepared} revealedCharts={new Set()} />
   </>)
 
   expect(screen.getByText(copy.v2.orundumPreferences.economy)).toBeInTheDocument()
@@ -100,7 +100,7 @@ it('uses the same empty-stock valuation for income details and schedule comparis
   expect(prepared.productionSanity.value).toBeCloseTo(450, 10)
   expect(prepared.maaDefaultComparison?.baselineSanity).toBeCloseTo(300, 10)
   expect(prepared.maaDefaultComparison?.sanityDelta).toBeCloseTo(150, 10)
-  render(<IncomeAnalysis result={result} prepared={prepared} />)
+  render(<IncomeAnalysis result={result} prepared={prepared} revealedCharts={new Set()} />)
   const calculation = within(screen.getByRole('region', { name: copy.v2.sanityCalculation }))
   expect(calculation.getByText('450.00')).toBeInTheDocument()
   expect(calculation.getByText('+450')).toBeInTheDocument()

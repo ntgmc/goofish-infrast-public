@@ -1235,6 +1235,11 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
   gap: inherit;
 }
 .v2-operator-content[aria-hidden="true"] { pointer-events: none; }
+.v2-operator-content[data-shift-change] { border-radius: 4px; animation: v2-seat-change 650ms ease-out; }
+@keyframes v2-seat-change {
+  0%, 30% { box-shadow: 0 0 0 2px var(--v2-accent); }
+  100% { box-shadow: 0 0 0 2px transparent; }
+}
 .v2-operator-name { max-width: 100%; overflow-wrap: anywhere; }
 
 .v2-avatar {

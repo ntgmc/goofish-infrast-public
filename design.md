@@ -305,6 +305,9 @@ it deliberately when changing the shared design.
 - Overview production numbers interpolate from their displayed value when a result changes, keeping
   the final accessible value and units stable. Fresh generated results settle metrics and room groups
   in order over roughly half a second; navigation back and ordinary data refreshes do not replay it.
+- Shift changes briefly outline incoming occupants; unchanged seats remain still. Income contribution
+  and capacity bars grow to their real proportions when entering view. Remember seen bars per result
+  across analysis-tab visits; new result IDs start a fresh reveal. Reduced motion shows final bars.
 - No nested stagger cascades, bounce, overshoot, or parallax in workspaces.
 - Reduced-motion fallback · final numbers and content immediately; no transform;
   retained opacity transitions at or below 150ms.

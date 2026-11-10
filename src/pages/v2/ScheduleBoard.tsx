@@ -1,4 +1,4 @@
-import { memo, useId, useState, type KeyboardEvent, type ComponentType } from 'react'
+import { memo, useId, useRef, useState, type KeyboardEvent, type ComponentType } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
 import { OpenDetailsIcon as ArrowUpRight, DormitoryIcon as BedDouble, ControlRoomIcon as Building2, ShiftTimeIcon as Clock3, DroneIcon as Drone, ManufactureIcon as Factory, TrainingRoomIcon as GraduationCap, GridViewIcon as LayoutGrid, ListViewIcon as List, RecruitmentIcon as UserRoundSearch, MeetingRoomIcon, OperatorsIcon as Users, ProcessingRoomIcon as Wrench, PowerPlantIcon as Zap, RecyclingStationIcon, UnknownFacilityIcon } from '../../components/icons'
 import { copy } from '../../copy'
@@ -223,7 +223,8 @@ function RoomDetails({ room, result, shift, showProduction }: { room: BoardRoom;
 
 function OperatorOccupant({ operator, compact, direction, reducedMotion }: { operator: RoomOperator; compact: boolean; direction: number; reducedMotion: boolean }) {
   const present = useIsPresent()
-  return <motion.span className="v2-operator-content" aria-hidden={!present || undefined} inert={!present || undefined}
+  const changedShift = useRef(direction !== 0)
+  return <motion.span className="v2-operator-content" data-shift-change={!reducedMotion && changedShift.current || undefined} aria-hidden={!present || undefined} inert={!present || undefined}
     initial={reducedMotion ? false : { opacity: 0, x: direction * 5 }} animate={{ opacity: 1, x: 0 }}
     variants={{ exit: (exitDirection: number) => ({ opacity: 0, x: exitDirection * -3, transition: { duration: motionTokens.duration.exit } }) }} exit="exit"
     transition={{ duration: reducedMotion ? 0 : motionTokens.duration.enter, ease: motionTokens.ease.enter }}>

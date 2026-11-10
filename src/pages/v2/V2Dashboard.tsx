@@ -153,6 +153,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const resultGrid = useRef<HTMLDivElement>(null)
   const arrivalKey = exportResultId ?? manualKey
   const lastArrival = useRef(arrivalKey)
+  const revealedCharts = useMemo(() => new Set<string>(), [arrivalKey])
   useLayoutEffect(() => {
     if (section !== 'overview') return
     const changed = lastArrival.current !== arrivalKey
@@ -347,7 +348,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
               ? <Suspense fallback={<p role="status">{text.loading}</p>}><UpgradeSuggestionStatusNotice result={result} /><UpgradeSuggestions suggestions={workflow?.suggestions ?? []} embedded projectScope={session.user && session.activeProfile ? { userId: session.user.id, profileId: session.activeProfile.id } : undefined} /></Suspense>
               : <LockedCapabilityPreview title={copy.optimize.pages_tool_optimize_ResultSection_016} description={copy.optimize.pages_tool_optimize_ResultSection_017} />}</section> : view === 'analysis' ? (
               <section className="v2-panel v2-analysis"><div className="v2-panel-heading"><h2>{text.analysisTab}</h2><span className="v2-neutral-tag">24h</span></div>{canViewAnalysis
-                ? <IncomeAnalysis result={result} prepared={prepared} />
+                ? <IncomeAnalysis key={arrivalKey} result={result} prepared={prepared} revealedCharts={revealedCharts} />
                 : <div className="v2-analysis-note"><PreviewIcon size={21} aria-hidden="true" /><div><p>{text.previewAnalysis}</p>{features.pricing && <Link className="v2-text-button" to="/pricing">{text.comparePlans}<ArrowRight size={14} /></Link>}</div></div>}</section>
             ) : (
               <ScheduleBoard result={result} prepared={prepared} expanded={expanded} onExpandedChange={setExpanded} shift={shift} onShiftChange={setShift}
