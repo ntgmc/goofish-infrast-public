@@ -21,10 +21,11 @@ import {
   manualSourceKey, parseManualDraft, readManualDraft, saveManualDraft, type ManualDraft, type ManualPlan,
 } from '../../lib/manual-schedule'
 
-export default function ManualScheduleEditor({ source: initialSource, profileId, operators, simulationBaseline, draftStorageKey = profileId, onDirtyChange, renderExport }: {
+export default function ManualScheduleEditor({ source: initialSource, profileId, operators, simulationBaseline, draftStorageKey = profileId, onDirtyChange, renderExport, revealCandidates = false }: {
   source: OptimizeResult;
   profileId: string;
   operators: LicenseOperator[];
+  revealCandidates?: boolean;
   simulationBaseline?: { id?: string; config: LicenseConfig };
   draftStorageKey?: string;
   onDirtyChange?: (dirty: boolean) => void;
@@ -326,7 +327,7 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
       </div>
       {error && <p className="tool-alert tool-alert--warning p-3 text-sm" role="alert">{error}</p>}
       {settingsError && <p className="tool-alert tool-alert--warning p-3 text-sm" role="alert">{settingsError}</p>}
-      {standalone && <ManualScheduleSettings result={manualResult(source, plans, true)} operators={operators}
+      {standalone && <ManualScheduleSettings revealCandidates={revealCandidates} result={manualResult(source, plans, true)} operators={operators}
         activePlan={activePlan} onChange={updateSettings} onError={setError} />}
       {simulation && <ResultMetrics isRotationMode={source.schedule_mode === 'rotation'} prepared={prepared} />}
       {simulation?.mood_simulation && <ManualMoodSummary result={simulation} activePlan={activePlan}
@@ -364,7 +365,7 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
             ))}
           </div>
           {locked.has(selectedName) ? <p className="text-sm text-warning">{label.lock_operator}</p> : (
-            <ManualOperatorPicker key={room?.key} operators={operators} locked={locked} rooms={plans[activePlan].rooms} roomType={room?.roomType ?? ''}
+            <ManualOperatorPicker reveal={revealCandidates} key={room?.key} operators={operators} locked={locked} rooms={plans[activePlan].rooms} roomType={room?.roomType ?? ''}
               selectedName={selectedName} onChoose={chooseOperator} />
           )}
           <div className="flex items-center justify-between gap-3 border-t border-surface-3 pt-3">

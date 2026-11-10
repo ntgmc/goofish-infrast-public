@@ -2,14 +2,14 @@ import { useLayoutEffect, useRef } from 'react'
 import { useAppReducedMotion } from './motion-preference'
 import './list-reveal.css'
 
-export function useListReveal(enabled = true, stagger = 25) {
+export function useListReveal(enabled = true, stagger = 25, scrollRoot?: 'self') {
   const container = useRef<HTMLDivElement>(null)
   const seen = useRef(new Set<string>())
   const reduced = useAppReducedMotion()
   useLayoutEffect(() => {
     const element = container.current
     if (!element || reduced || typeof IntersectionObserver === 'undefined') return
-    const scroll = element.closest<HTMLElement>('.v2-drawer-body')
+    const scroll = scrollRoot === 'self' ? element : element.closest<HTMLElement>('.v2-drawer-body')
     const animations = new Map<Element, Animation>()
     const observed = new Set<Element>()
     let previousTop = scroll?.scrollTop ?? window.scrollY
@@ -65,6 +65,6 @@ export function useListReveal(enabled = true, stagger = 25) {
       for (const row of observed) row.removeAttribute('data-reveal-pending')
       for (const animation of animations.values()) animation.cancel()
     }
-  }, [enabled, reduced, stagger])
+  }, [enabled, reduced, stagger, scrollRoot])
   return container
 }

@@ -71,7 +71,7 @@ export function ManualTool({ session, workflow, onDirtyChange, onOpenProfile, on
       onPresetChange={(preset) => { m.setPreset(preset); m.setConfigDraft(null) }}
       onUpdate={(mutate) => { const next = structuredClone(m.baseConfig); mutate(next); m.setConfigDraft(next) }} onStart={m.start} />
     <Notice error>{m.error ?? session.workspaceLoadError}{session.workspaceLoadError && m.profile && <button className="v2-text-button" disabled={Boolean(session.openingProfileId)} onClick={() => void session.refreshProfileWorkspace(m.profile!).catch(() => undefined)}>{text.retryWorkspace}</button>}</Notice>
-    {m.canUse && m.draft && m.draft.profileId === m.profile?.id && <div className="v2-manual-editor"><ManualScheduleEditor key={`${m.draft.profileId}:${m.draft.revision}`} source={m.draft.source} profileId={m.draft.profileId} draftStorageKey={`tool:${m.draft.profileId}`} operators={m.operators} simulationBaseline={{ config: m.draft.config }} onDirtyChange={onDirtyChange} renderExport={(props) => workflow && <ManualResultExport key={props.resultId} {...props} workflow={workflow}
+    {m.canUse && m.draft && m.draft.profileId === m.profile?.id && <div className="v2-manual-editor"><ManualScheduleEditor revealCandidates key={`${m.draft.profileId}:${m.draft.revision}`} source={m.draft.source} profileId={m.draft.profileId} draftStorageKey={`tool:${m.draft.profileId}`} operators={m.operators} simulationBaseline={{ config: m.draft.config }} onDirtyChange={onDirtyChange} renderExport={(props) => workflow && <ManualResultExport key={props.resultId} {...props} workflow={workflow}
       onRecover={(action) => { onNavigate(action === 'login' ? 'generation' : action); if (action === 'login') session.retryAuth() }} />} /></div>}
   </div>
 }

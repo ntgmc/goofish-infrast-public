@@ -301,7 +301,9 @@ it deliberately when changing the shared design.
   on touch; reduced motion keeps the card and illustration static.
 - Operator, tool, inventory and benchmark lists reveal each stable item once per
   mounted list: 8px travel, 240ms duration, up to eight items at 25ms intervals, or 50ms for
-  operator cards. Animate operator contents inside the virtual positioning shell. Searches show
+  operator cards and V2 manual/cultivation operator candidates. Candidate pickers observe their own
+  scroll viewport; newly reached batches reveal once during each opening. Animate operator contents
+  inside the virtual positioning shell. Searches show
   immediately; prepare each unseen item's initial state before paint to prevent a full-opacity
   flash. Jumps exceeding 80% of the scrolling viewport skip reveals; focusing cancels the item's
   animation. Shared card geometry updates on selection changes rather than virtual scrolling.

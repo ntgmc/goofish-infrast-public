@@ -40,10 +40,11 @@ it('reveals recycled rows once, preserves virtual positioning and cancels immedi
   expect(disconnect).toHaveBeenCalled()
 })
 
-it('animates normal scrolling with staggered cards and skips jumps of nearly a viewport', () => {
+it.each(['drawer', 'self'] as const)('uses the %s scroll viewport for staggered cards and skips large jumps', (root) => {
   let enter: IntersectionObserverCallback
+  let observerRoot: Element | Document | null | undefined
   vi.stubGlobal('IntersectionObserver', class {
-    constructor(callback: IntersectionObserverCallback) { enter = callback }
+    constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) { enter = callback; observerRoot = options?.root }
     observe() {}
     unobserve() {}
     disconnect() {}
@@ -51,19 +52,22 @@ it('animates normal scrolling with staggered cards and skips jumps of nearly a v
   const animate = vi.fn((_frames: Keyframe[], _options: KeyframeAnimationOptions) => ({ cancel: vi.fn(), onfinish: null }))
   Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate })
   function Cards() {
-    const ref = useListReveal(true, 50)
+    const ref = useListReveal(true, 50, root === 'self' ? 'self' : undefined)
     return <div className="v2-drawer-body"><div ref={ref}>{['one', 'two', 'three'].map((id) => <div key={id} data-reveal-id={id}>{id}</div>)}</div></div>
   }
   const view = render(<Cards />)
-  const scroll = view.container.firstElementChild!
-  Object.defineProperty(scroll, 'clientHeight', { value: 600 })
+  const drawer = view.container.firstElementChild!
+  const scroll = root === 'self' ? drawer.firstElementChild! : drawer
+  expect(observerRoot).toBe(scroll)
+  Object.defineProperty(drawer, 'clientHeight', { value: 600, configurable: true })
+  Object.defineProperty(scroll, 'clientHeight', { value: root === 'self' ? 208 : 600, configurable: true })
   const rows = [...view.container.querySelectorAll('[data-reveal-id]')]
   scroll.scrollTop = 100
   fireEvent.scroll(scroll)
   act(() => enter(rows.slice(0, 2).map((target) => ({ target, isIntersecting: true })) as IntersectionObserverEntry[], {} as IntersectionObserver))
   expect(animate).toHaveBeenCalledTimes(2)
   expect(animate.mock.calls[1][1]).toMatchObject({ duration: 240, delay: 50 })
-  scroll.scrollTop = 1100
+  scroll.scrollTop = root === 'self' ? 300 : 1100
   fireEvent.scroll(scroll)
   act(() => enter([{ target: rows[2], isIntersecting: true }] as IntersectionObserverEntry[], {} as IntersectionObserver))
   expect(animate).toHaveBeenCalledTimes(2)

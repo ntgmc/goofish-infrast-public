@@ -173,7 +173,7 @@ function GoalForm({ operators, projects, editing, busy, onSave, onCancel }: { op
       </button>
       <DialogContent className="v2-dialog v2-project-picker" showCloseButton closeLabel={copy.v2.close}>
         <div><DialogTitle>{text.operator}</DialogTitle><DialogDescription>{text.pickerHint}</DialogDescription></div>
-        <OperatorPicker operators={choices} selectedId={operator?.baseId ?? operator?.id} searchLabel={text.search}
+        <OperatorPicker reveal operators={choices} selectedId={operator?.baseId ?? operator?.id} searchLabel={text.search}
           onChoose={(row) => { choose(row.id); setPickerOpen(false) }}
           details={(row) => <><strong>★{row.rarity} · {profession(row)}</strong><p>{text.elites[row.current.elite]} · Lv.{row.current.level}</p></>} />
       </DialogContent>
