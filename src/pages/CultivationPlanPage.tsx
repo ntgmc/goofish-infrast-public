@@ -33,7 +33,8 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
   const snapshot = useSklandSnapshot(session.user?.id, profiles.find((row) => row.id === profileId))
   const calculatedVersion = useRef('')
   const [data, setData] = useState<CultivationData | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [phase, setPhase] = useState<'syncing' | 'calculating' | null>(null)
+  const busy = phase !== null
   const [error, setError] = useState<string | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const queryFromUrl = () => Object.fromEntries(Object.entries(defaultCultivationQuery).map(([key, fallback]) => {
@@ -53,7 +54,7 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
     request.current?.abort()
     setData(null)
     setError(null)
-    setBusy(false)
+    setPhase(null)
     setOptions((value) => ({ ...value, excluded: [] }))
     setAppliedOptions((value) => ({ ...value, excluded: [] }))
     return () => { generation.current++; request.current?.abort() }
@@ -64,7 +65,7 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
       generation.current++
       request.current?.abort()
       setData(null)
-      setBusy(false)
+      setPhase(null)
     }
   }, [snapshot.available])
 
@@ -81,11 +82,12 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
     request.current?.abort()
     request.current = controller
     const run = ++generation.current
-    setBusy(true)
+    setPhase(refresh ? 'syncing' : 'calculating')
     setError(null)
     try {
       if (refresh) await snapshot.refresh()
       if (controller.signal.aborted) return
+      setPhase('calculating')
       const result = await apiJson<CultivationData>('/api/cultivation-plan', { method: 'POST', json: { profile_id: profileId, recommendation }, signal: controller.signal, timeoutMs: 90000, fallbackMessage: label.failed })
       if (generation.current === run) {
         setData(result)
@@ -94,7 +96,7 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
       }
     } catch (caught) {
       if (generation.current === run && !controller.signal.aborted) setError(caught instanceof Error ? caught.message : label.failed)
-    } finally { if (generation.current === run) setBusy(false) }
+    } finally { if (generation.current === run) setPhase(null) }
   }
 
   useEffect(() => {
@@ -131,7 +133,7 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
     if (data && JSON.stringify(next.recommendation) !== JSON.stringify(data.recommendation?.query ?? defaultCultivationQuery)) void load(next.recommendation, true, false)
   }
 
-  return { profiles, profileId, setChosenProfile, data, busy: busy || snapshot.busy, error: error || snapshot.error || null, options, setOptions, appliedOptions,
+  return { profiles, profileId, setChosenProfile, data, busy: busy || snapshot.busy, phase: phase ?? (snapshot.busy ? 'syncing' : null), error: error || snapshot.error || null, options, setOptions, appliedOptions,
     limit, setLimit, recommendations, load, exclude, changed, apply }
 }
 

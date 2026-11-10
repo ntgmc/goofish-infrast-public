@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { BackIcon, CollapsedIcon, ExperienceIcon, LmdIcon, MaterialIcon, NextIcon, ProcessingRoomIcon } from '../../../components/icons'
 import { PageTransition } from '../../../components/MotionPrimitives'
+import { TweenValue } from '../../../components/NumberMotion'
 import { copy } from '../../../copy'
 import type { CultivationData } from '../../../lib/cultivation-contract'
 import { buildMaterialRoutes, type MaterialIngredient } from '../../../lib/cultivation-materials'
@@ -8,6 +9,7 @@ import itemIcons from '../../../data/cultivation-item-icons.json'
 
 const text = copy.cultivationProjects
 const number = (amount: number) => amount.toLocaleString('zh-CN', { maximumFractionDigits: 1 })
+const requiredAmount = (amount: number) => text.requiredAmount(number(amount))
 type SelectMaterial = (id: string, count: number) => void
 
 function ResourceArt({ id, data }: { id: string; data: CultivationData }) {
@@ -22,7 +24,7 @@ function ResourceArt({ id, data }: { id: string; data: CultivationData }) {
 
 export function MaterialButton({ id, count, data, onSelect, children, className = '' }: { id: string; count: number; data: CultivationData; onSelect: SelectMaterial; children?: ReactNode; className?: string }) {
   return <button type="button" className={`v2-project-material-button ${className}`} data-material-id={id} title={data.itemNames[id] ?? id} aria-label={text.viewMaterial(data.itemNames[id] ?? id)} onClick={() => onSelect(id, count)}>
-    <ResourceArt id={id} data={data} /><span><span>{data.itemNames[id] ?? id}</span><strong>{children ?? text.requiredAmount(number(count))}</strong></span><CollapsedIcon size={14} aria-hidden="true" />
+    <ResourceArt id={id} data={data} /><span><span>{data.itemNames[id] ?? id}</span><strong>{children ?? <TweenValue value={count} format={requiredAmount} />}</strong></span><CollapsedIcon size={14} aria-hidden="true" />
   </button>
 }
 

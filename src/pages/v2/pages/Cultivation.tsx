@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { matchesSearch } from '../../../lib/search'
 import { RefreshIcon, UndoIcon, ExcludeIcon, NextIcon, ExternalLinkIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
+import { AnimatedValue } from '../../../components/MotionPrimitives'
+import { DataRefresh } from '../components/DataActivity'
 import { defaultCultivationQuery, type CultivationCandidate, type CultivationData, type CultivationOptions } from '../../../lib/cultivation-contract'
 import { useCultivation } from '../../CultivationPlanPage'
 import CultivationProjectImport from '../../../components/CultivationProjectImport'
@@ -30,14 +32,17 @@ export default function Cultivation({ session }: { session: V2Session }) {
       <div className="v2-cultivation-source-controls">
         {session.authStatus === 'authenticated' && m.profiles.length ? <>
           <label className="v2-field"><span>{text.profile}</span><select className="v2-input" value={m.profileId} onChange={(event) => m.setChosenProfile(event.target.value)}>{m.profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.display_name}</option>)}</select></label>
-          <button type="button" className="v2-button v2-button-primary" disabled={m.busy} onClick={() => void m.load()}><RefreshIcon size={16} aria-hidden="true" className={m.busy ? 'v2-spin' : undefined} />{m.busy ? text.loadingData : copy.skland.refresh}</button>
+          <button type="button" className="v2-button v2-button-primary" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}><RefreshIcon size={16} aria-hidden="true" />{m.busy ? text.loadingData : copy.skland.refresh}</button>
         </> : session.authLoading ? <Loading label={text.loading} /> : <div className="v2-cultivation-access"><p>{session.authStatus === 'authenticated' ? text.noProfile : text.login}</p><Link className="v2-button v2-button-secondary" to={v2Path('profiles', session.activeProfile?.id)}>{text.loginAction}</Link></div>}
         {projectScope && <Link className="v2-text-button v2-cultivation-project-link" to={v2Path('cultivation-projects', m.profileId)}>{copy.cultivationProjects.title}<NextIcon size={14} aria-hidden="true" /></Link>}
       </div>
     </div>
     <Notice error>{m.error}</Notice>
+    <DataRefresh key={m.profileId} pending={m.busy} revision={m.data} error={Boolean(m.error)}
+      kind={m.phase === 'syncing' ? 'sync' : 'cultivation'} label={m.phase === 'syncing' ? copy.v2.dataActivity.syncing : copy.v2.dataActivity.calculating}
+      description={m.data ? copy.v2.dataActivity.current : undefined} skeleton={m.data ? undefined : 'cards'} />
     {m.data && m.recommendations ? <>
-      <div className="v2-cultivation-overview"><Facts items={[[text.stats.homeworks, number(m.data.stats.homeworks)], [text.stats.owned, number(m.data.stats.owned)], [text.stats.satisfied, number(m.data.candidates.filter((row) => row.satisfied).length)], [text.stats.incomplete, number(m.data.stats.incomplete)]]} /></div>
+      <div className="v2-cultivation-overview v2-data-arrival"><Facts items={[[text.stats.homeworks, <AnimatedValue value={number(m.data.stats.homeworks)} />], [text.stats.owned, <AnimatedValue value={number(m.data.stats.owned)} />], [text.stats.satisfied, <AnimatedValue value={number(m.data.candidates.filter((row) => row.satisfied).length)} />], [text.stats.incomplete, <AnimatedValue value={number(m.data.stats.incomplete)} />]]} /></div>
       {m.data.warnings.map((warning) => <Notice key={warning}>{warning}</Notice>)}
       <details className="v2-cultivation-conditions">
         <summary><strong>{text.parameters}</strong><span>{text.scopes[appliedQuery.scope]} · {appliedQuery.rarity ? text.rarityName(appliedQuery.rarity) : text.rarityGroups[appliedQuery.rarityGroup]} · {text.preferences[m.appliedOptions.preference]}</span>{m.changed && <small>{text.unapplied}</small>}</summary>
@@ -52,7 +57,7 @@ export default function Cultivation({ session }: { session: V2Session }) {
           <div className="v2-cultivation-apply"><button type="button" className="v2-button v2-button-primary" disabled={m.busy} onClick={m.apply}>{text.apply}</button>{m.changed && <p role="status">{text.settingsChanged}</p>}</div>
         </div>
       </details>
-      <div className="v2-cultivation-outcome" aria-busy={m.busy}>
+      <div className="v2-cultivation-outcome v2-data-arrival" aria-busy={m.busy}>
         <nav className="v2-view-switch v2-cultivation-views" aria-label={text.title}>{[['priorities', text.suggestions], ['comparison', text.comparison], ['special', text.specialItems]].map(([id, title]) => <button type="button" key={id} title={title} aria-pressed={view === id} onClick={() => setView(id)}>{text.views[id as keyof typeof text.views]}</button>)}</nav>
         <section hidden={view !== 'priorities'}>
           <SectionTitle title={text.suggestions} description={text.adviceHint} action={projectScope && <CultivationProjectImport key={`${projectScope.profileId}:${JSON.stringify(importProjects)}`} scope={projectScope} projects={importProjects} batch v2 partial={m.recommendations.some((candidate) => Boolean(candidate.target.moduleId) || candidate.target.potential > candidate.current.potential)} />} />
@@ -79,7 +84,7 @@ export default function Cultivation({ session }: { session: V2Session }) {
         <section hidden={view !== 'special'}><SpecialItems key={m.profileId} data={m.data} preference={m.appliedOptions.preference} /></section>
       </div>
       <div className="v2-cultivation-dates"><p>{text.dataDate}<time dateTime={m.data.updatedAt}>{new Date(m.data.updatedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</time></p><p>{text.importDate}<time dateTime={m.data.importedAt}>{new Date(m.data.importedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</time></p></div>
-    </> : m.busy ? <Loading label={text.loadingData} /> : !session.authLoading && <EmptyState title={text.load}>{text.description}</EmptyState>}
+    </> : !m.busy && !session.authLoading && <EmptyState title={text.load}>{text.description}</EmptyState>}
   </div>
 }
 

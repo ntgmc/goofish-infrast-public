@@ -308,7 +308,9 @@ it deliberately when changing the shared design.
   Refreshes retain readable data. Confirm completion only after a pending request returns a new
   revision without errors; failed, partial or cancelled refreshes keep their existing error state.
   Changed readings interpolate from the old value and outline their own card for 600ms without
-  remounting the content or replaying unchanged cards.
+  remounting the content or replaying unchanged cards. Cultivation waits follow the actual snapshot
+  refresh and cultivation request, preserving saved targets, input drafts and expanded material
+  details. First visits reserve the unknown results; returned materials and dates update in place.
 - Operator, tool, inventory and benchmark lists reveal each stable item once per
   mounted list: 8px travel, 240ms duration, up to eight items at 25ms intervals, or 50ms for
   operator cards and V2 manual/cultivation operator candidates. Candidate pickers observe their own

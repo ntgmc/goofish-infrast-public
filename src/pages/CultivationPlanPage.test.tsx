@@ -34,6 +34,28 @@ afterEach(cleanup)
 const content = (v2: boolean) => <MemoryRouter>{v2 ? <Cultivation session={mocks.session()} /> : <CultivationPlanPage />}</MemoryRouter>
 
 describe('homework training recommendations', () => {
+  it('shows real sync and calculation waits and preserves results and drafts after a failed refresh', async () => {
+    let finishSync!: () => void, finishCalculation!: (data: CultivationData) => void
+    mocks.refresh.mockReturnValue(new Promise<void>((resolve) => { finishSync = resolve }))
+    mocks.api.mockReturnValueOnce(new Promise<CultivationData>((resolve) => { finishCalculation = resolve }))
+    render(content(true))
+    fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
+    expect(screen.getByRole('status', { name: copy.v2.dataActivity.syncing })).toHaveAttribute('aria-busy', 'true')
+    expect(mocks.api).not.toHaveBeenCalled()
+    await act(async () => finishSync())
+    expect(screen.getByRole('status', { name: copy.v2.dataActivity.calculating })).toBeInTheDocument()
+    await act(async () => finishCalculation(sample()))
+    expect(screen.getAllByRole('heading', { level: 3 })[0]).toHaveTextContent('银灰')
+    fireEvent.click(screen.getByText(text.parameters))
+    fireEvent.change(screen.getByRole('spinbutton', { name: text.limit }), { target: { value: '12' } })
+    mocks.api.mockRejectedValueOnce(new Error('Retry cultivation'))
+    fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
+    expect(await screen.findByText('Retry cultivation')).toBeInTheDocument()
+    expect(screen.getByRole('spinbutton', { name: text.limit })).toHaveValue(12)
+    expect(screen.getAllByRole('heading', { level: 3 })[0]).toHaveTextContent('银灰')
+    expect(screen.queryByText(copy.v2.dataActivity.updated)).not.toBeInTheDocument()
+  })
+
   it('recalculates from shared snapshot versions without refreshing upstream or replacing input drafts', async () => {
     mocks.snapshot.mockReturnValue({ data: { version: '1' }, busy: false, error: '', refresh: mocks.refresh })
     const page = render(content(false))
