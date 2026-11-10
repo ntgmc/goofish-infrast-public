@@ -162,7 +162,7 @@ export default function OperatorManagementPanel({ session, config, operators, bu
           <label className="v2-search-label"><span className="sr-only">{copy.v2.searchOperators}</span><span className="v2-search"><SearchIcon size={17} aria-hidden="true" /><input value={search} placeholder={text.searchPlaceholder} onChange={(event) => setSearch(event.target.value)} aria-label={copy.v2.searchOperators} /></span></label>
         </div>
         <div className="v2-operator-rows" aria-busy={search !== deferredSearch}>
-          <OperatorRows operators={filtered} />
+          <OperatorRows operators={filtered} reveal={!search.trim() && !deferredSearch.trim()} />
           {filtered.length === 0 && <div className="v2-operator-empty"><p className="v2-muted">{operators.length ? copy.v2.noOperators : text.empty}</p>
             {deferredSearch && <button type="button" className="v2-text-button" onClick={() => setSearch('')}>{text.clearSearch}</button>}
           </div>}

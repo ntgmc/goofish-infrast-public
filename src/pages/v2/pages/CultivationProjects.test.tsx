@@ -49,6 +49,26 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
+it('keeps saved goals mounted while syncing and calculating their first material results', async () => {
+  const goal: CultivationProject = { operatorId: 'char_test', elite: 2, level: 60, skill: 1, skillLevel: 7, paused: false, deadline: '' }
+  localStorage.setItem('maatool:cultivation-projects:user1:mine', JSON.stringify([goal]))
+  let finishSync!: () => void, finishCalculation!: (data: CultivationData) => void
+  mocks.refresh.mockReturnValue(new Promise<void>((resolve) => { finishSync = resolve }))
+  mocks.api.mockReturnValueOnce(new Promise<CultivationData>((resolve) => { finishCalculation = resolve }))
+  const view = render(<MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /></MemoryRouter>)
+  const row = view.container.querySelector('.v2-project-list > li')
+  await userEvent.setup().click(screen.getByRole('button', { name: text.refresh }))
+  expect(screen.getByRole('status', { name: copy.v2.dataActivity.syncing })).toBeInTheDocument()
+  expect(view.container.querySelector('.v2-data-skeleton')).not.toBeInTheDocument()
+  expect(mocks.api).not.toHaveBeenCalled()
+  await act(async () => finishSync())
+  expect(screen.getByRole('status', { name: copy.v2.dataActivity.calculating })).toBeInTheDocument()
+  await act(async () => finishCalculation(data([goal])))
+  expect(view.container.querySelector('.v2-project-list > li')).toBe(row)
+  expect(screen.getByRole('heading', { name: /测试干员/ })).toBeInTheDocument()
+  expect(screen.queryByRole('status', { name: copy.v2.dataActivity.calculating })).not.toBeInTheDocument()
+})
+
 it('turns a selected goal into an income-linked route and changes configuration only on an explicit action', async () => {
   const user = userEvent.setup()
   const current = session()

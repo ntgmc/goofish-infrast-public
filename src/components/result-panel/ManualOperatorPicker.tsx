@@ -6,13 +6,14 @@ import OperatorPicker from '../OperatorPicker'
 import { operatorBuildingSkills } from './building-skills'
 import { ROOM_LABELS } from './labels'
 
-export default function ManualOperatorPicker({ operators, locked, rooms, roomType, selectedName, onChoose }: {
+export default function ManualOperatorPicker({ operators, locked, rooms, roomType, selectedName, onChoose, reveal = false }: {
   operators: LicenseOperator[];
   locked: Set<string>;
   rooms: ManualPlan['rooms'];
   roomType: string;
   selectedName: string;
   onChoose: (name: string) => void;
+  reveal?: boolean;
 }) {
   const [facility, setFacility] = useState(roomType)
   const available = useMemo(() => operators
@@ -22,7 +23,7 @@ export default function ManualOperatorPicker({ operators, locked, rooms, roomTyp
       return { ...operator, known: skills.length > 0, skills: skills.filter((skill) => skill.state === 'active') }
     }), [operators, locked])
   const candidates = useMemo(() => available.filter(({ known, skills }) => !facility || !known || skills.some((skill) => skill.room === facility)), [available, facility])
-  return <OperatorPicker operators={candidates} selectedId={operators.find((operator) => operator.name === selectedName)?.id}
+  return <OperatorPicker reveal={reveal} operators={candidates} selectedId={operators.find((operator) => operator.name === selectedName)?.id}
     onChoose={(operator) => onChoose(operator.name)}
     title={(operator) => {
       const assigned = Object.entries(rooms).find(([, entries]) => entries.some((room) => room.includes(operator.name)))

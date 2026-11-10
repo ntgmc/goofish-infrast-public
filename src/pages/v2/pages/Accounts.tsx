@@ -21,7 +21,7 @@ export default function Accounts({ session, onOpen, onUpgrade }: { session: V2Se
   const selected = profiles.find((profile) => profile.id === chosen) ?? profiles[0]
   return <div className="v2-accounts">
     <Notice error>{model.meteredError}</Notice>
-    {model.meteredEnabled && !model.profiles.some((profile) => profile.kind === 'metered_personal') && <button className="v2-button v2-button-secondary" disabled={model.meteredBusy} onClick={() => model.createMetered()}>{copy.metered.personal_profiles.create}</button>}
+    {model.meteredEnabled && !model.profiles.some((profile) => profile.kind === 'metered_personal') && <button className="v2-button v2-button-secondary" disabled={model.meteredBusy} aria-busy={model.meteredBusy} onClick={() => model.createMetered()}>{copy.metered.personal_profiles.create}</button>}
     {model.profiles.length === 0 ? <EmptyState title={text.pages_tool_dashboard_ProfilesSection_001}>{copy.v2.accounts.empty}</EmptyState> : <div className="v2-selection-workspace">
       <aside className="v2-account-index">
         <label className="v2-search"><Search size={18} aria-hidden="true" /><input aria-label={copy.v2.profileSearch} placeholder={copy.v2.profileSearch} value={search} onChange={(event) => setSearch(event.target.value)} /></label>
@@ -49,8 +49,8 @@ function AccountDetails({ profile, opening, onOpen, onUpgrade, onSaved, onConver
       [copy.v2.updated, formatDate(profile.updated_at)],
       [copy.v2.validity, model.activeTrial ? formatShanghaiDateTime(model.activeTrial.ends_at) : profile.expires_at ? formatShanghaiDateTime(profile.expires_at) : copy.inventory.permanent],
     ]} />
-    <div className="v2-actions"><button className="v2-button v2-button-primary" disabled={opening} onClick={onOpen}>{opening ? copy.v2.accounts.opening : copy.v2.accounts.open}<ArrowRight size={16} /></button><button className="v2-text-button" onClick={() => model.setEditing(!model.editing)} aria-expanded={model.editing}>{text.pages_tool_dashboard_ProfilesSection_011}</button></div>
-    {meteredEnabled && isFreePreviewProfile(profile) && <button className="v2-button v2-button-secondary" disabled={converting} onClick={onConvert}>{copy.metered.personal_profiles.convert}</button>}
+    <div className="v2-actions"><button className="v2-button v2-button-primary" disabled={opening} aria-busy={opening} onClick={onOpen}>{opening ? copy.v2.accounts.opening : copy.v2.accounts.open}<ArrowRight size={16} /></button><button className="v2-text-button" onClick={() => model.setEditing(!model.editing)} aria-expanded={model.editing}>{text.pages_tool_dashboard_ProfilesSection_011}</button></div>
+    {meteredEnabled && isFreePreviewProfile(profile) && <button className="v2-button v2-button-secondary" disabled={converting} aria-busy={converting} onClick={onConvert}>{copy.metered.personal_profiles.convert}</button>}
     {model.editing && <form className="v2-inline-editor" onSubmit={(event) => { event.preventDefault(); void model.save() }}>
       <Notice error>{model.error}</Notice>
       <Field label={text.pages_tool_dashboard_ProfilesSection_012} value={model.displayName} maxLength={40} onChange={(event) => model.setDisplayName(event.target.value)} />

@@ -1,5 +1,5 @@
 .v2-projects { min-width: 0; }
-.v2-project-source { padding-top: var(--space-xs); border-bottom: 0; }
+.v2-project-source { padding-top: var(--space-xs); padding-bottom: 0; row-gap: 0; border-bottom: 0; }
 .v2-project-source .v2-label { margin-bottom: var(--space-2xs); }
 .v2-project-source p { line-height: 1.75; }
 .v2-project-columns { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); align-items: start; margin-bottom: var(--space-lg); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-panel); background: var(--v2-paper); }

@@ -8,8 +8,8 @@ const number = (value: number) => value.toLocaleString('zh-CN', { maximumFractio
 export default function TrainingRatioAccount({ model: m, accountName }: { model: ReturnType<typeof useTrainingRatio>; accountName: string }) {
   const required = m.requirements
   const balance = m.accountBalance
-  if (!m.data) return <p role="status">{m.busy ? text.importing : text.noInventory}</p>
-  if (m.account.isPending) return <p role="status">{text.targetsLoading}</p>
+  if (!m.data) return <p role="status" aria-busy={m.busy} className={m.busy ? 'tool-loading-status' : undefined}>{m.busy ? text.importing : text.noInventory}</p>
+  if (m.account.isPending) return <p role="status" aria-busy="true" className="tool-loading-status">{text.targetsLoading}</p>
   if (m.account.isError) return <div role="alert"><p>{m.account.error.message}</p><button className="tool-secondary-action" type="button" onClick={() => void m.account.refetch()}>{text.retryTargets}</button></div>
   if (!required || !m.accountData) return null
   return <>
@@ -32,7 +32,7 @@ export default function TrainingRatioAccount({ model: m, accountName }: { model:
       return names.length > 0 && <details key={reason}><summary>{text.issueReasons[reason]}</summary><p>{names.join('、')}</p></details>
     })}</div>}
     {balance && balance.focus !== 'ready' && <div className="training-ratio-supplement"><h3>{text.supplement}</h3>
-      {m.incomeLoading ? <p role="status">{text.recoveryLoading}</p> : <>
+      {m.incomeLoading ? <p role="status" aria-busy="true" className="tool-loading-status">{text.recoveryLoading}</p> : <>
         {m.accountDays !== null && <><p className="training-ratio-value">{text.recoveryDays(number(m.accountDays))}</p><p>{text.accountRecoveryPlan}</p></>}
         {m.income ? <><p>{text.baseIncome(number(m.income.lmd), number(m.income.exp))}</p><p>{text.baseSource(accountName, m.incomeName ?? '')}</p></> : <p>{m.incomeFailed ? text.baseIncomeFailed : text.noBaseIncome}</p>}
         <p>{text.farmingBudget} {text.ceCalendar}</p><p>{text.accountScope}</p>

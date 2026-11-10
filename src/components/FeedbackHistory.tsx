@@ -36,7 +36,7 @@ function FeedbackHistoryContent({ initialId, onBusyChange, onDraftChange }: Prop
   const feedback = thread.data?.feedback
   return <div className="feedback-history">
     {(selected ? thread.error : listError) && <p role="alert" className="tool-alert tool-alert--error">{selected ? thread.error : listError}</p>}
-    {(selected ? thread.loading : listLoading) && <p role="status" className="feedback-hint">{text.loading}</p>}
+    {(selected ? thread.loading : listLoading) && <p role="status" aria-busy="true" className="tool-loading-status feedback-hint">{text.loading}</p>}
     {selected ? <>
       <div className="feedback-history-toolbar">
         <button type="button" className="feedback-action feedback-action-quiet" disabled={thread.saving} onClick={() => { setSelected(null); setReply(''); setNotice(null) }}><ArrowLeft size={16} aria-hidden="true" />{text.backToList}</button>
@@ -50,7 +50,7 @@ function FeedbackHistoryContent({ initialId, onBusyChange, onDraftChange }: Prop
           <label className="feedback-label"><span>{text.reply}</span><textarea className="tool-field feedback-field" rows={3} required maxLength={FEEDBACK_MESSAGE_MAX_LENGTH} disabled={thread.saving} value={reply} placeholder={text.replyPlaceholder} onChange={(event) => { setReply(event.target.value); setNotice(null) }} /></label>
           <p className="feedback-hint">{text.replyHint}</p>
           {notice && <p role="status" className="text-sm text-ink-secondary">{notice}</p>}
-          <button type="submit" className="feedback-action feedback-action-primary" disabled={thread.saving || thread.loading || !reply.trim()}>{thread.saving ? text.sending : text.sendReply}</button>
+          <button type="submit" className="feedback-action feedback-action-primary" aria-busy={thread.saving} disabled={thread.saving || thread.loading || !reply.trim()}>{thread.saving ? text.sending : text.sendReply}</button>
         </form>
       </>}
     </> : <>

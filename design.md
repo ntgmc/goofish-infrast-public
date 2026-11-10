@@ -52,6 +52,22 @@ it deliberately when changing the shared design.
 - Content pages use a reading width of 60 to 65ch, a line height of at least 1.65, and whitespace instead of card stacks.
 - Display headings use `overflow-wrap: anywhere` and `min-width: 0`; document copy stays left aligned.
 - Accent is a signal only: primary action, active state, focus, and compact status marks.
+- The deployment dialog interrupts an outdated page with the new version's release
+  notes and a refresh action. Reopening a newer build welcomes returning users
+  with the latest three nonempty release summaries since their last version, a
+  full changelog link and a dismissible continue action. Read returning summaries
+  lazily from the opened build's published history. Remember the latest visited
+  build on this browser; record the refresh target before reloading so that
+  entering that build does not show a second prompt. First visits stay quiet.
+  V2 account preferences expose repeatable update and welcome previews after
+  administrator session confirmation. Reuse the production dialog with local
+  release notes; simulated refresh advances to the welcome, and closing restores
+  the opener without reloading or changing the last visited build.
+  Refresh fades into a full-screen update surface before reloading the document.
+  The next document restores that surface before the app bundle runs, then fades
+  it out after the application's first paint. Keep the same theme, logo and light
+  timeline across the reload; reduced motion switches directly. Administrator
+  previews use the same transition without navigating or writing refresh markers.
 
 ## Variants
 
@@ -72,8 +88,8 @@ it deliberately when changing the shared design.
 - Keep six core tasks in the side rail: overview, generation, history and
   “比较基建配置” under the schedule workspace; cultivation projects and tools in
   their own group. Tools label saved-schedule comparison “比较已有排班”. Use
-  full-width compact “编辑干员” and “编辑基建” actions with trailing pencil icons
-  for configuration drawers, retaining the owned-operator count.
+  full-width compact “干员管理” and “编辑基建” actions for their drawers, retaining the
+  owned-operator count. Use an import icon for operator data and a pencil for configuration.
   The compact brand header and bottom help trigger stay visible while the
   middle navigation scrolls independently. Keep consistent 44px targets,
   visible inset focus rings and copper active icons. Page destinations are
@@ -107,7 +123,18 @@ it deliberately when changing the shared design.
 - Operator and account drawers share a compact fixed heading and an independently
   scrolling body. Keep the operator profile, sync and MAA import actions compact;
   binding timestamps and authorization details expand on demand. The list search
-  stays visible while browsing operators, including virtual rows. Account identity
+  stays visible while browsing operators. The operator drawer grows to 800px on desktop and
+  shows a compact responsive grid with a minimum card width of 8rem and 0.5rem gaps. Reserve two
+  lines for each name beside a prominent 48–64px portrait, with training data wrapping beneath
+  the name. Make the full card a single keyboard-accessible trigger, with skill previews aligned
+  at the bottom. Open full skill descriptions in a wide `SharedCardDialog`; keep the source card compact. Share the background, portrait and
+  name between card and detail, with a heavily damped spring and no bounce. Keep the source mounted
+  during the transition, allow detail scrolling immediately, contain it at its boundaries
+  and restore the source button's focus on dismissal. Scroll descriptions inside
+  the detail surface so its top-right close control remains visible.
+  Reduced motion switches directly. Virtualize whole rows for large rosters, retaining focused and
+  adjacent rows. Reduce columns with text enlargement. Operator data comes from import or sync.
+  Account identity
   precedes profile switching; mark the selected profile and show pending switches.
   Personal destinations use simple rows, with logout in a separate fixed footer.
   Preserve full names, feature availability, nested binding dialogs and focus return.
@@ -184,8 +211,22 @@ it deliberately when changing the shared design.
   and total prices in a compact native radio group that wraps with the available
   width. Show only the selected plan's total, audience, archive gift and purchase
   action, with UID binding and activation
-  conditions immediately above the action. Keep redemption and a compact benchmark
-  proof strip below. On desktop, plan descriptions expand on demand; at every width,
+  conditions immediately above the action. Keep redemption before capability demonstrations.
+  Four capability chapters pair paid configuration controls and a compact MAA file flow with
+  readable cultivation results and a measured layout comparison. Screenshots in
+  `public/assets/pricing/` capture the real editor's drone strategy section with `SAMPLE_CONFIG`.
+  The configuration chapter names custom shift intervals, drone allocation and Fiammetta settings.
+  Light and dark assets follow the app theme and expand in a keyboard-accessible dialog. The
+  export chapter highlights unlimited downloads during maintenance for MAA schedules, with a small
+  file moving from the website download to MAA selection. Animate only while visible and show the
+  complete flow without motion under reduced motion. Cultivation readings come from the public
+  sample result's Mayer suggestion; the
+  zero-based comparison chart uses A01's MaaTool S1/S2 cases from the frozen 2026-11-04 snapshot,
+  with a link to the underlying evidence. Keep sample estimates distinct from measured results.
+  At 80rem and above, native scrolling selects a chapter beside one sticky visual, based on
+  current chapter positions at 45% of the viewport. Recalculate on scroll and resize; select the
+  last chapter when its bottom is visible. Smaller screens and reduced motion show visuals inline. Keep comparison quotas and
+  current service availability beside the relevant chapter, then the compact benchmark proof strip. On desktop, plan descriptions expand on demand; at every width,
   the full entitlement comparison, purchase rules and upgrade details are expandable.
   Purchase guides retain the selected product and profile. Group the product,
   price, terms, listing action and copy action first, with the raw URL available
@@ -254,9 +295,116 @@ it deliberately when changing the shared design.
 
 ## Motion stance
 
-- Composed and quiet: route opacity/short translate plus direct state transitions only.
-- No nested stagger cascades, bounce, overshoot, parallax, or scroll-linked ornament.
-- Reduced-motion fallback · no transform; opacity transitions at or below 150ms.
+- Keep workspace motion short and tied to navigation, state, or the object being used.
+- Pricing changes roll the exact configured amount over 300ms. Benchmark headline,
+  pass-rate and median metrics count once on entering the viewport over 750ms;
+  units, denominators, evidence and dense comparison readings remain stable.
+- Pointer hover may lift item tiles by 2px and move directory arrows by 3px.
+  Pricing cards use border emphasis while their controls stay in place.
+- Pricing and capability demonstrations use contained reveal and scroll storytelling;
+  keep native scrolling and immediate access to prices and actions. The desktop capability
+  illustration follows a fine pointer with a low-opacity copper spotlight and at most 2deg
+  tilt per axis, returning to rest on leave. The lifetime card automatically traces its edge
+  every four seconds on desktop and touch, using a 3px copper band with a bright core.
+  Its purchase action sweeps once on hover or focus. Pointer tilt and spotlight stay off
+  on touch; reduced motion keeps the card and illustration static.
+- V2 data waits use a 16px copper ring beside the readable status, with a longer-wait message
+  after eight seconds. Pause loops in hidden pages; system or app reduced motion keeps the ring
+  static. Full-screen startup centers the brand, readable status and a short moving line on
+  one axis. Section loads retain navigation and the column heading, with a compact centered wait
+  inside the content region. Known first-read layouts use static, lightly tinted placeholders;
+  generic lazy sections use the status alone.
+  Refreshes retain readable data. Confirm completion only after a pending request returns a new
+  revision without errors; failed, partial or cancelled refreshes keep their existing error state.
+  Changed readings interpolate from the old value and outline their own card for 600ms without
+  remounting the content or replaying unchanged cards. Cultivation waits follow the actual snapshot
+  refresh and cultivation request, preserving saved targets, input drafts and expanded material
+  details. Cultivation status stays below the source controls in a reserved feedback row, so refreshes
+  do not insert a separate loading panel or shift the results. First visits reserve the unknown results;
+  returned materials and dates update in place.
+  Other V2 lists use row-shaped placeholders on first read and at the pagination tail. Existing
+  results remain readable during refresh. Busy controls carry `aria-busy` and a quiet bottom-edge
+  light; small operations keep feedback inside their own control. Shared notification, feedback,
+  binding and training tools use compact status lines within V2, including portalled surfaces.
+  Skland binding keeps credentials, the QR code, account selection and preview available during requests,
+  with the actual request message beside a small ring.
+  The V2 root scopes these enhancements so shared V1 screens retain their existing presentation.
+- Operator, tool, inventory and benchmark lists reveal each stable item once per
+  mounted list: 8px travel, 240ms duration, up to eight items at 25ms intervals, or 50ms for
+  operator cards and V2 manual/cultivation operator candidates. Candidate pickers observe their own
+  scroll viewport; newly reached batches reveal once during each opening. Animate operator contents
+  inside the virtual positioning shell. Searches show
+  immediately; prepare each unseen item's initial state before paint to prevent a full-opacity
+  flash. Jumps exceeding 80% of the scrolling viewport skip reveals; focusing cancels the item's
+  animation. Shared card geometry updates on selection changes rather than virtual scrolling.
+- `SharedCardDialog` provides card-to-detail transitions with shared layout IDs and the morph
+  spring (stiffness 380, damping 40, mass 0.85). Facility cards use it for their background, icon
+  and title. Facility details put product, efficiency and shift production first, then compact operator
+  rows with identity beside a mood track on wide surfaces and stacked on narrow ones. Keep exact
+  starting and ending mood readings beside the track; its filled level represents ending mood,
+  a lighter segment shows the change, and a marker identifies starting mood. Scale to the selected
+  plan's maximum mood, defaulting to 24. Clamp drawing only; retain actual numeric readings and
+  show missing values as unavailable without drawing a change. Recovery uses the positive token.
+  Operator rows share their column widths, keeping mood tracks aligned when skill icon counts vary.
+  The skill trigger, icons and mood track keep their columns while skill details expand below the row;
+  animate only the details height and opacity, and apply changes immediately with reduced motion.
+  Keep collapsed skill content inert and hidden from assistive technology. Full calculation details
+  expand on demand. The heading retains facility level and shows the selected shift and duration. Keep text in its own shared element or fade it
+  into the destination; do not stretch long descriptions. Use `layoutScroll` on the scroll host.
+  Dismissal unmounts the modal immediately, releasing its overlay, focus trap and scroll lock.
+  Facility source cards handle their return morph. Operator details return through a decorative,
+  inert portal above the drawer and its search toolbar, starting at the detail's current visual bounds
+  and ending at the source card's untransformed bounds within its virtual row. Crossfade the detail
+  and compact content without scaling their text. Keep the shared geometry on the inner return surface
+  so reopening continues from its current bounds. Opening another card, changing the list, scrolling,
+  resizing or enabling reduced motion cancels the return immediately. Keep the most recently opened
+  source card and its virtual row above neighbouring cards. The decorative return stays above the
+  search toolbar while ordinary scrolling keeps the toolbar above the list. Opening another card transfers this priority. Keep background scrolling
+  locked only while the modal is open. Skill previews on dialog triggers respond to pointer hover;
+  keyboard users read skills in the dialog, and returning focus does not reopen a preview.
+- Overview production numbers interpolate from their displayed value when a result changes, keeping
+  the final accessible value and units stable. Fresh generated results settle metrics and room groups
+  in order over roughly half a second; navigation back and ordinary data refreshes do not replay it.
+- Shift changes briefly outline incoming occupants; unchanged seats remain still. Income contribution
+  and capacity bars grow to their real proportions when entering view. Remember seen bars per result
+  across analysis-tab visits; new result IDs start a fresh reveal. Reduced motion shows final bars.
+- V2 generation progress uses a compact SVG state symbol: waiting dots, a running arc, a
+  closed ring while saving, and a drawn completion check. Reconnection, cancellation and failure
+  stay visually distinct and stop activity. Step connectors fill when the real stage advances,
+  vertically on small cards and horizontally on wide cards. Once the result is available,
+  collapse the card 620ms after confirmed completion, giving its meter and number time to settle;
+  reduced motion shows the result directly. Only V2 enables these stage effects. The percentage
+  uses the shared numeric tween with a stable three-digit width; timer readings remain still.
+  Backend completion targets 100% immediately so both meter and number finish before dismissal.
+  Transition stage titles and descriptions only when the stage changes. On narrow cards, animate
+  the active step's description height with the morph spring; wide cards keep all descriptions
+  visible. A short copper tail and bright leading edge follow the existing meter value, stopping
+  on paused or terminal states. Reduced motion removes the leading edge and moving text.
+  Generation and appearance settings offer a local progress preview after `/api/admin/session`
+  confirms an administrator session. Hide it until confirmed, on failed checks or session expiration,
+  and recheck when the window regains focus. Its normal, quick, reconnection, failure and
+  cancellation scenarios use the same component and support replay and stepping;
+  closing the dialog stops its timers. Preview state stays outside the optimization workflow,
+  account storage and billing, and its completion message is explicitly a demonstration.
+  The animation inspector additionally requires an explicit switch in Settings → Preferences,
+  off by default and stored per website user in the current browser. A server-confirmed admin session
+  is still required. Disabled inspection installs no observer or native instrumentation; switching users,
+  disabling inspection or losing the admin session tears down the recorder and preview.
+  When enabled, the bottom-right inspector records native animations, CSS transitions, sampled layout changes and numeric tweens from
+  the current page, retaining the latest 24 effects in memory until navigation. A detached,
+  inert copy inside a shadow root replays each effect once at 0.1×–4× with pause and replay
+  controls; global page selectors, business events, original animation callbacks and page data
+  stay outside the preview. Preserve SVG references
+  with distinct snapshot IDs. Snapshot roots freeze immediately; descendant styles copy in 4ms batches
+  with a 16ms yield. Pending effects with the same identity coalesce. Large snapshots retain at most
+  80 elements and show a simplified-preview notice; mutation batches sample each changed element once.
+  Hide the inspector while a page modal owns focus; captured effects
+  remain available after it closes. Session expiration stops observation and clears the preview.
+  Reduced-motion settings determine which page effects exist to capture; explicit replay stays
+  local to the inspector. Route, pending timers and native instrumentation clean up on departure.
+- No nested stagger cascades, bounce, overshoot, or parallax in workspaces.
+- Reduced-motion fallback · final numbers and content immediately; no transform;
+  retained opacity transitions at or below 150ms.
 
 ## Responsive contract
 

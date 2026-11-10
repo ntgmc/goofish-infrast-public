@@ -9,8 +9,8 @@ import { OperatorAvatarTile } from './OperatorAvatarStrip'
 import ManualOperatorPicker from './ManualOperatorPicker'
 import { createManualPlans } from '../../lib/manual-schedule'
 
-export default function ManualScheduleSettings({ result, operators, activePlan, onChange, onError }: {
-  result: OptimizeResult; operators: LicenseOperator[]; activePlan: number;
+export default function ManualScheduleSettings({ result, operators, activePlan, onChange, onError, revealCandidates = false }: {
+  result: OptimizeResult; operators: LicenseOperator[]; activePlan: number; revealCandidates?: boolean;
   onChange: (source: OptimizeResult) => void; onError: (message: string) => void;
 }) {
   const label = copy.tools.manualSchedule
@@ -78,7 +78,7 @@ export default function ManualScheduleSettings({ result, operators, activePlan, 
         <DialogContent className="max-w-3xl" showCloseButton closeLabel={copy.domain.manual_schedule.close}>
           <DialogTitle>{label.fiammettaTarget}</DialogTitle>
           <DialogDescription>{label.fiammettaHint}</DialogDescription>
-          <ManualOperatorPicker operators={canUseFiammetta ? operators : []} locked={new Set(fiammetta ? [fiammetta.name] : [])}
+          <ManualOperatorPicker reveal={revealCandidates} operators={canUseFiammetta ? operators : []} locked={new Set(fiammetta ? [fiammetta.name] : [])}
             rooms={createManualPlans(result)[activePlan].rooms} roomType="" selectedName={target}
             onChoose={(name) => { changeFiammetta(name); setChoosingTarget(false) }} />
           <div className="flex flex-wrap justify-between gap-3 border-t border-surface-3 pt-3">

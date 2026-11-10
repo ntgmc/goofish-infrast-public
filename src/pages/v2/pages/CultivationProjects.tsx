@@ -2,6 +2,9 @@ import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { NextIcon as ArrowRight, PauseIcon as Pause, ResumeIcon as Play, AddIcon as Plus, RemoveIcon as X, RefreshIcon, SaveIcon, CultivationIcon, ResourceCalendarIcon, ResourceStockIcon, DailyOutputIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
 import OperatorPicker from '../../../components/OperatorPicker'
+import { AnimatedValue } from '../../../components/MotionPrimitives'
+import { TweenValue } from '../../../components/NumberMotion'
+import { DataActivity, DataRefresh, DataSkeleton, useDataUpdate } from '../components/DataActivity'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../../components/ui/dialog'
 import { Avatar } from '../ScheduleBoard'
 import { canEditConfig } from '../../../lib/license'
@@ -12,7 +15,7 @@ import { useCultivationProjects } from '../../cultivation/useCultivationProjects
 import Link from '../../../components/InternalLink'
 import type { V2Session } from '../OptionsDrawer'
 import { v2Path } from '../navigation'
-import { EmptyState, Facts, Field, Notice, SectionTitle } from '../components/WorkspaceUI'
+import { EmptyState, Facts, Field, Loading, Notice, SectionTitle } from '../components/WorkspaceUI'
 import { MaterialBrowser, MaterialButton, MaterialNeeds } from './ProjectMaterials'
 import { ProjectMaaExport } from './ProjectMaaExport'
 import './cultivation-projects.css'
@@ -23,7 +26,7 @@ const profession = (operator: ProjectOperator) => copy.tools.cultivation.profess
 
 export default function CultivationProjects({ session, onConfig }: { session: V2Session; onConfig: () => void }) {
   const profile = session.activeProfile
-  if (session.authLoading) return <Notice>{copy.v2.loading}</Notice>
+  if (session.authLoading) return <Loading label={copy.v2.loading} />
   if (session.authStatus === 'error') return <Notice error>{session.authError?.message ?? text.authFailed}<button className="v2-text-button" onClick={session.retryAuth}>{text.retry}</button></Notice>
   if (!session.user || !profile?.skland_binding || profile.status !== 'active' || profile.archived_at) return <EmptyState title={session.user ? text.noBinding : text.login} action={<Link className="v2-button v2-button-primary" to={v2Path('profiles', profile?.id)}>{text.profiles}</Link>} />
   return <ProjectWorkspace key={`${session.user.id}:${profile.id}`} session={session} profile={profile} onConfig={onConfig} />
@@ -46,11 +49,15 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
     setApplied(true)
   }
   return <div className="v2-projects">
-    <div className="v2-tool-source v2-project-source"><div><span className="v2-label">{text.account} · {profile.display_name}</span><p>{text.description}</p><Link className="v2-text-button" to={v2Path('cultivation', profile.id)}>{text.suggestionsEntry}<ArrowRight size={14} /></Link></div><button className="v2-button v2-button-primary" disabled={m.busy} onClick={() => void m.load()}>{m.busy ? text.loading : copy.skland.refresh}<RefreshIcon size={16} aria-hidden="true" /></button></div>
+    <div className="v2-tool-source v2-project-source"><div><span className="v2-label">{text.account} · {profile.display_name}</span><p>{text.description}</p><Link className="v2-text-button" to={v2Path('cultivation', profile.id)}>{text.suggestionsEntry}<ArrowRight size={14} /></Link></div><button className="v2-button v2-button-primary" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}>{copy.skland.refresh}<RefreshIcon size={16} aria-hidden="true" /></button>
+      <div className="v2-data-feedback"><DataRefresh pending={m.busy} revision={m.data} error={Boolean(m.error)}
+        label={m.phase === 'syncing' ? copy.v2.dataActivity.syncing : copy.v2.dataActivity.calculating} /></div>
+    </div>
     <Notice error>{m.error}</Notice><Notice>{m.storageError ? text.storageFailed : null}</Notice>
+    {m.busy && !m.data && !m.projects.length && <DataSkeleton layout="projects" />}
     {m.data?.warnings.map((warning) => <Notice key={warning}>{warning}</Notice>)}
     {(m.data || m.projects.length > 0) && <>
-      <div className="v2-project-columns">
+      <div className="v2-project-columns v2-data-arrival">
         <section className="v2-project-targets"><SectionTitle title={text.targets} description={text.orderHint} />
           <ProjectMaaExport projects={m.projects} operators={m.data?.projectOperators ?? []} />
           <ol className="v2-project-list">{m.projects.map((project, index) => {
@@ -71,7 +78,9 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
                   {operator && <><div><span>{text.current}</span><strong>{text.elites[operator.current.elite]} <b>Lv.{operator.current.level}</b></strong><small>{operator.current.skillLevel === null ? text.pending : text.skillRank(operator.current.skillLevel)}</small></div><ArrowRight size={18} aria-hidden="true" /></>}
                   <div data-target="true"><span>{text.target}</span><strong>{text.elites[project.elite]} <b>Lv.{project.level}</b></strong><small className="v2-project-skill"><span>{text.skillName(project.skill)}</span><span>{text.skillRank(project.skillLevel)}</span></small></div>
                 </div>
-                {!project.paused && <div className="v2-project-ready" data-ready={Boolean(row?.estimatedDate)}><ResourceCalendarIcon size={20} aria-hidden="true" /><div><span>{text.goalReadyDate}</span><strong>{!materials?.candidate ? m.busy ? text.calculating : text.pendingRefresh : row?.estimatedDate ?? text.pending}</strong>{project.deadline && <small>{project.deadline} · {deadlineDays === null ? text.deadlineUnknown : deadlineDays < 0 ? text.overdue(-deadlineDays) : text.onTime}</small>}</div></div>}
+                {!project.paused && <ProjectReady date={row?.estimatedDate}
+                  value={!materials?.candidate ? m.busy ? text.calculating : text.pendingRefresh : row?.estimatedDate ?? text.pending}
+                  deadline={project.deadline ? `${project.deadline} · ${deadlineDays === null ? text.deadlineUnknown : deadlineDays < 0 ? text.overdue(-deadlineDays) : text.onTime}` : undefined} />}
                 </div>
                 {!project.paused && <>
                   {materials?.candidate && m.data && <details className="v2-project-material-detail">
@@ -106,9 +115,9 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
           <section className="v2-project-production"><SectionTitle title={text.production} description={text.incomeHint} />
           {select(text.normal, m.normalId, m.setNormalId, text.noResult)}
           {select(text.temporary, m.temporaryId, m.setTemporaryId, text.noTemporary)}
-          {!m.production ? <Notice>{text.incomeLoading}</Notice> : m.production.error ? <Notice error>{m.production.error}<button className="v2-text-button" onClick={m.retryProduction}>{text.retry}</button></Notice> : m.productionInvalid ? <Notice>{text.incomeUnavailable}</Notice> : !m.normalIncome && <Notice>{text.noIncome}</Notice>}
-          {m.normalIncome && <Facts items={[[text.dailyLmd, number(m.normalIncome.lmd)], [text.dailyExp, number(m.normalIncome.exp)]]} />}
-          {m.temporaryIncome && <Facts items={[[text.temporaryLmd, number(m.temporaryIncome.lmd)], [text.temporaryExp, number(m.temporaryIncome.exp)]]} />}
+          {!m.production ? <DataActivity label={text.incomeLoading} /> : m.production.error ? <Notice error>{m.production.error}<button className="v2-text-button" onClick={m.retryProduction}>{text.retry}</button></Notice> : m.productionInvalid ? <Notice>{text.incomeUnavailable}</Notice> : !m.normalIncome && <Notice>{text.noIncome}</Notice>}
+          {m.normalIncome && <Facts items={[[text.dailyLmd, <TweenValue key="daily-lmd" value={m.normalIncome.lmd} format={number} />], [text.dailyExp, <TweenValue key="daily-exp" value={m.normalIncome.exp} format={number} />]]} />}
+          {m.temporaryIncome && <Facts items={[[text.temporaryLmd, <TweenValue key="temporary-lmd" value={m.temporaryIncome.lmd} format={number} />], [text.temporaryExp, <TweenValue key="temporary-exp" value={m.temporaryIncome.exp} format={number} />]]} />}
           {(m.normalIncome?.lmd && m.normalIncome.goldNet === null || m.temporaryIncome?.lmd && m.temporaryIncome.goldNet === null) ? <Notice>{text.goldUnknown}</Notice> : null}
           <div className="v2-actions"><Link className="v2-text-button" to={v2Path('generation', profile.id)}>{text.generate}<ArrowRight size={14} /></Link><button className="v2-text-button" onClick={onConfig}>{text.configure}</button></div>
           </section>
@@ -121,11 +130,18 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
           </div>
         </aside>
       </div>
-      {m.pendingRefresh && <Notice>{m.busy ? text.calculating : text.pendingRefresh}</Notice>}
+      {m.pendingRefresh && !m.busy && <Notice>{text.pendingRefresh}</Notice>}
       {m.materials.some((row) => row.candidate) && !m.plans && <Notice>{text.materialPlanPending}</Notice>}
       {m.data && route && route.rows.length > 0 && <ProjectResults key={`${m.normalId}:${m.temporaryId}`} route={route} data={m.data} useTemporary={Boolean(m.plans?.useTemporary)} />}
       {m.data && <p className="v2-data-date">{text.dataTime} {new Date(m.data.importedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</p>}
     </>}
+  </div>
+}
+
+function ProjectReady({ value, date, deadline }: { value: string; date?: string | null; deadline?: string }) {
+  const update = useDataUpdate(date)
+  return <div ref={date ? update : undefined} className="v2-project-ready v2-data-update" data-ready={Boolean(date)}>
+    <ResourceCalendarIcon size={20} aria-hidden="true" /><div><span>{text.goalReadyDate}</span><strong><AnimatedValue value={value} /></strong>{deadline && <small>{deadline}</small>}</div>
   </div>
 }
 
@@ -173,7 +189,7 @@ function GoalForm({ operators, projects, editing, busy, onSave, onCancel }: { op
       </button>
       <DialogContent className="v2-dialog v2-project-picker" showCloseButton closeLabel={copy.v2.close}>
         <div><DialogTitle>{text.operator}</DialogTitle><DialogDescription>{text.pickerHint}</DialogDescription></div>
-        <OperatorPicker operators={choices} selectedId={operator?.baseId ?? operator?.id} searchLabel={text.search}
+        <OperatorPicker reveal operators={choices} selectedId={operator?.baseId ?? operator?.id} searchLabel={text.search}
           onChoose={(row) => { choose(row.id); setPickerOpen(false) }}
           details={(row) => <><strong>★{row.rarity} · {profession(row)}</strong><p>{text.elites[row.current.elite]} · Lv.{row.current.level}</p></>} />
       </DialogContent>
@@ -195,9 +211,9 @@ function GoalForm({ operators, projects, editing, busy, onSave, onCancel }: { op
 function ProjectResults({ route, data, useTemporary }: { route: ProjectRoute; data: CultivationData; useTemporary: boolean }) {
   const [visible, setVisible] = useState(7)
   const material = (id: string) => data.itemNames[id] ?? id
-  return <section className="v2-project-results">
+  return <section className="v2-project-results v2-data-arrival">
     <header className="v2-project-result-summary" data-ready={Boolean(route.readyDate)}><div><SectionTitle title={text.route} /><p className="v2-muted">{text.dateHint}</p></div><ResourceCalendarIcon size={28} aria-hidden="true" /></header>
-    <Facts items={[[text.readyDate, route.readyDate ?? text.pending], [text.totalSanity, number(route.phases.reduce((sum, day) => sum + day.spent, 0))], [text.farmingDays, String(route.phases.length)]]} />
+    <Facts items={[[text.readyDate, <AnimatedValue key="ready-date" value={route.readyDate ?? text.pending} />], [text.totalSanity, <TweenValue key="total-sanity" value={route.phases.reduce((sum, day) => sum + day.spent, 0)} format={number} />], [text.farmingDays, <AnimatedValue key="farming-days" value={String(route.phases.length)} />]]} />
     {(route.blocked.length > 0 || route.remaining.length > 0 || route.goldLimited) && <div className="v2-project-blockers"><h3>{text.bottlenecks}</h3>
       {route.blocked.length > 0 && <Notice>{text.noSource}{[...new Set(route.blocked.map((row) => material(row.item)))].join('、')}</Notice>}
       {route.goldLimited && <Notice>{text.goldLimited}</Notice>}

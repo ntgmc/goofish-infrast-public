@@ -292,7 +292,7 @@ export default function ConfigEditor({
         <Tabs.Trigger value="strategy">{text.strategy}</Tabs.Trigger>
       </Tabs.List>
       {profileId && <div className="config-field mt-4">
-        <button type="button" className="tool-secondary-action min-h-11 px-4" disabled={readOnly || importing} onClick={() => void importSklandConfig()}><SklandIcon />{importing ? copy.skland.importingConfig : copy.skland.importConfig}</button>
+        <button type="button" className="tool-secondary-action min-h-11 px-4" disabled={readOnly || importing} aria-busy={importing} onClick={() => void importSklandConfig()}><SklandIcon />{importing ? copy.skland.importingConfig : copy.skland.importConfig}</button>
         <p className="config-help">{copy.skland.importConfigHelp}</p>
       </div>}
       {importNotice && <p role="status" className="tool-alert mt-3">{importNotice}</p>}

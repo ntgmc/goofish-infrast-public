@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -51,6 +51,8 @@ describe('SklandBindingDialog accessibility', () => {
     const user = userEvent.setup()
     const onOpenChange = vi.fn()
     const mockedApiJson = vi.mocked(apiJson)
+    let resolveAccount!: (value: unknown) => void
+    let rejectImport!: (reason: Error) => void
     mockedApiJson
       .mockResolvedValueOnce({
         status: 'account_selection_required',
@@ -61,16 +63,8 @@ describe('SklandBindingDialog accessibility', () => {
         ],
         warning: '检测到多个明日方舟账号，请选择要导入的账号。',
       })
-      .mockResolvedValueOnce({
-        status: 'confirm_required',
-        confirmation_id: 'confirmation-1',
-        skland_preview: {
-          uid: '87654321',
-          nickname: '另一个博士',
-          channel_name: 'B服',
-          operator_count: 88,
-        },
-      })
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveAccount = resolve }))
+      .mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectImport = reject }))
 
     render(
       <SklandBindingDialog
@@ -114,9 +108,24 @@ describe('SklandBindingDialog accessibility', () => {
         uid: '87654321',
       },
     })))
+    expect(otherAccount).toBeChecked()
+    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByRole('status')).toHaveTextContent(copy.workspace.hooks_useSklandBinding_021)
+    await act(async () => resolveAccount({
+      status: 'confirm_required', confirmation_id: 'confirmation-1',
+      skland_preview: { uid: '87654321', nickname: '另一个博士', channel_name: 'B服', operator_count: 88 },
+    }))
     expect(await screen.findByText('88 名')).toBeInTheDocument()
+    expect(document.querySelector('[role="status"][aria-busy="false"]')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '确认保存并导入' })).toBeEnabled()
     expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '确认保存并导入' }))
+    expect(document.querySelector('[role="status"][aria-busy="true"]')).toBeInTheDocument()
+    expect(screen.getByText('88 名')).toBeInTheDocument()
+    await act(async () => rejectImport(new Error('导入暂时失败')))
+    expect(await screen.findByRole('alert')).toHaveTextContent('导入暂时失败')
+    expect(document.querySelector('[role="status"][aria-busy="true"]')).not.toBeInTheDocument()
+    expect(onOpenChange).not.toHaveBeenCalled()
   })
 
   it('starts a free-preview QR login without a request body', async () => {

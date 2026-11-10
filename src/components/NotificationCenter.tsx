@@ -134,6 +134,7 @@ function NotificationBellContent({ center, iconOnly, onInventory }: { center: No
             type="button"
             onClick={() => void center.markAllRead()}
             disabled={center.unreadCount === 0 || center.markingAll || center.markingId !== null}
+            aria-busy={center.markingAll}
             className="tool-secondary-action max-w-full whitespace-normal px-3 text-xs disabled:cursor-wait disabled:opacity-60"
           >
             {center.markingAll ? copy.notifications.markingAllRead : copy.notifications.markAllRead}
@@ -151,7 +152,7 @@ function NotificationBellContent({ center, iconOnly, onInventory }: { center: No
 
         <div className="max-h-[min(32rem,calc(100dvh-9rem))] overflow-y-auto overscroll-contain">
           {center.loading && center.notifications.length === 0 && (
-            <p className="p-6 text-center text-sm text-ink-secondary" role="status">{copy.notifications.loading}</p>
+            <p className="tool-loading-status p-6 text-center text-sm text-ink-secondary" role="status" aria-busy="true">{copy.notifications.loading}</p>
           )}
           {!center.loading && center.notifications.length === 0 && (
             <p className="p-8 text-center text-sm text-ink-secondary">{copy.notifications.empty}</p>
@@ -162,6 +163,7 @@ function NotificationBellContent({ center, iconOnly, onInventory }: { center: No
               type="button"
               onClick={() => void openNotification(notification)}
               disabled={center.markingId === notification.id}
+              aria-busy={center.markingId === notification.id}
               className={`block w-full border-b border-surface-3 px-4 py-4 text-left transition-colors last:border-b-0 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500 ${notification.read_at ? '' : 'bg-brand-500/5'}`}
             >
               <span className="flex items-start justify-between gap-3">
@@ -193,6 +195,7 @@ function NotificationBellContent({ center, iconOnly, onInventory }: { center: No
                 type="button"
                 onClick={() => void center.loadMore()}
                 disabled={center.loadingMore}
+                aria-busy={center.loadingMore}
                 className="tool-secondary-action h-9 px-4 text-xs disabled:cursor-wait"
               >
                 {center.loadingMore ? copy.notifications.loadingMore : copy.notifications.loadMore}

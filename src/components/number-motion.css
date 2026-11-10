@@ -1,0 +1,7 @@
+.number-motion { display: inline-block; position: relative; font-variant-numeric: tabular-nums; }
+.number-motion-roll { overflow: clip; vertical-align: bottom; }
+.number-motion-roll > span:not(.sr-only) { display: inline-block; }
+.number-motion-count { display: inline-grid; }
+.number-motion-count > span:not(.sr-only) { grid-area: 1 / 1; }
+.number-motion-size { visibility: hidden; }
+.number-motion-tween::after { content: attr(data-value); grid-area: 1 / 1; visibility: hidden; }

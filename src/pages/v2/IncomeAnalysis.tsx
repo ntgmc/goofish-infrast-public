@@ -1,4 +1,7 @@
+import { motion } from 'motion/react'
 import { copy } from '../../copy'
+import { motionTokens } from '../../components/MotionPrimitives'
+import { useAppReducedMotion } from '../../lib/motion-preference'
 import ProductIcon, { getProductIconSrc } from '../../components/ProductIcon'
 import { ExpandIcon, ManufactureIcon, MeetingRoomIcon, RecruitmentIcon, TradingStationIcon } from '../../components/icons'
 import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
@@ -66,7 +69,7 @@ export function RoomProduction({ daily, room, shift }: { daily: DailyProduction;
   </div>)}</dd></div>
 }
 
-export default function IncomeAnalysis({ result, prepared }: { result: OptimizeResult; prepared: PreparedResult }) {
+export default function IncomeAnalysis({ result, prepared, revealedCharts }: { result: OptimizeResult; prepared: PreparedResult; revealedCharts: Set<string> }) {
   const daily = result.daily_production
   const rows = stationProductionRows(daily)
   const stations = [...new Set(rows.map((row) => `${row.roomType}-${row.roomIndex}`))].map((key) => {
@@ -103,7 +106,7 @@ export default function IncomeAnalysis({ result, prepared }: { result: OptimizeR
       </dl>
       {daily.orundum_optimization.opportunity_cost_per_orundum != null && <p className="v2-income-caption">{text.orundumUnitCostHelp}</p>}
     </div>}
-    {prepared.orundumEconomy && <OrundumProductionAnalysis economy={prepared.orundumEconomy} daily={daily} />}
+    {prepared.orundumEconomy && <OrundumProductionAnalysis economy={prepared.orundumEconomy} daily={daily} revealedCharts={revealedCharts} />}
     <section className="v2-income-section" aria-label={text.stationOutput}>
       <header className="v2-income-heading"><h3>{text.stationOutput}</h3><p>{text.stationOutputNote}</p></header>
       {stations.length ? <div className="v2-income-stations">{stations.map((station) => {
@@ -129,11 +132,11 @@ export default function IncomeAnalysis({ result, prepared }: { result: OptimizeR
       <header className="v2-income-heading"><h3>{text.sanityCalculation}</h3><p>{text.sanityCalculationNote}</p></header>
       <div className="v2-income-sanity-total"><img src="/assets/products/AP_GAMEPLAY.png" alt="" width={36} height={36} /><strong>{daily ? sanity.value.toFixed(2) : '—'}</strong><span>{text.sanityUnit}</span></div>
       <p className="v2-income-caption">{sanity.note}</p>
-      <ul className="v2-income-contributions">{contributions.map(({ product, label, note, value }) => <li key={label}>
+      <ul className="v2-income-contributions">{contributions.map(({ product, label, note, value }, index) => <li key={label}>
         {product && getProductIconSrc(product) ? <ProductIcon product={product} size={32} /> : <img src="/assets/products/AP_GAMEPLAY.png" alt="" width={32} height={32} />}
         <div className="v2-income-contribution-label"><h4>{label}</h4><p>{note}</p></div>
         <strong className={value < 0 ? 'v2-income-negative' : ''}>{value > 0 ? '+' : ''}{amount(value)}<small>{text.sanityUnit}</small></strong>
-        <div className="v2-income-contribution-track" aria-hidden="true"><span className={value < 0 ? 'v2-income-negative-bar' : ''} style={{ width: `${Math.abs(value) / maxContribution * 100}%` }} /></div>
+        <div className="v2-income-contribution-track" aria-hidden="true"><IncomeBar id={`contribution-${label}`} value={Math.abs(value) / maxContribution * 100} index={index} revealed={revealedCharts} className={value < 0 ? 'v2-income-negative-bar' : ''} /></div>
       </li>)}</ul>
       <details className="v2-income-disclosure"><summary>{text.conversionDetails}</summary>
         <p className="v2-income-caption">{text.sanityFormula}</p>
@@ -158,7 +161,16 @@ export default function IncomeAnalysis({ result, prepared }: { result: OptimizeR
   </div>
 }
 
-function OrundumProductionAnalysis({ economy, daily }: { economy: OrundumEconomy; daily?: DailyProduction }) {
+function IncomeBar({ id, value, index, revealed, className }: { id: string; value: number; index: number; revealed: Set<string>; className?: string }) {
+  const reduced = useAppReducedMotion()
+  const enabled = !reduced && typeof IntersectionObserver !== 'undefined'
+  return <motion.span data-income-bar={id} className={className} style={{ width: `${value}%`, transformOrigin: 'left' }}
+    initial={enabled && !revealed.has(id) ? { scaleX: 0 } : false} animate={enabled ? undefined : { scaleX: 1 }}
+    whileInView={enabled ? { scaleX: 1 } : undefined} viewport={{ once: true, amount: 0.2 }} onViewportEnter={enabled ? () => { revealed.add(id) } : undefined}
+    transition={{ duration: reduced ? 0 : 0.45, delay: reduced ? 0 : Math.min(index, 4) * 0.045, ease: motionTokens.ease.enter }} />
+}
+
+function OrundumProductionAnalysis({ economy, daily, revealedCharts }: { economy: OrundumEconomy; daily?: DailyProduction; revealedCharts: Set<string> }) {
   const limits = [
     { label: text.rockLimitedOrundum, value: economy.rock_limited_orundum },
     ...(economy.lmd_limited_orundum !== undefined ? [{ label: text.lmdLimitedOrundum, value: economy.lmd_limited_orundum }] : []),
@@ -202,9 +214,9 @@ function OrundumProductionAnalysis({ economy, daily }: { economy: OrundumEconomy
     </dl>
     <div className="v2-income-capacity">
       <h4>{text.capacityLimits}</h4>
-      <ul>{limits.map(({ label, value }) => <li key={label} data-limited={value === minCapacity}>
+      <ul>{limits.map(({ label, value }, index) => <li key={label} data-limited={value === minCapacity}>
         <div className="v2-income-capacity-label"><span>{label}</span>{value === minCapacity && <span className="v2-neutral-tag">{text.capacityBottleneck}</span>}<strong>{amount(value)}<small>{text.orundumUnit}</small></strong></div>
-        <div className="v2-income-capacity-track" aria-hidden="true"><span style={{ width: `${Math.max(0, value) / maxCapacity * 100}%` }} /></div>
+        <div className="v2-income-capacity-track" aria-hidden="true"><IncomeBar id={`capacity-${label}`} value={Math.max(0, value) / maxCapacity * 100} index={index} revealed={revealedCharts} /></div>
       </li>)}</ul>
     </div>
     <div className="v2-income-resources"><h4>{text.dailyResourceFlow}</h4><div>{resources.map(({ label, product, rows: resourceRows }) => <dl key={label}>

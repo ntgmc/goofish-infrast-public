@@ -1830,6 +1830,11 @@
     "group": "other",
     "sort": 50098
   },
+  "RandomSkinbox_arkhub_2": {
+    "name": "卫戍时装回顾展",
+    "group": "other",
+    "sort": 50099
+  },
   "2020recruitment10_1": {
     "name": "α类新年寻访凭证",
     "group": "other",
@@ -7992,6 +7997,11 @@
     "group": "other",
     "sort": -10000
   },
+  "act3autochess_token_chess": {
+    "name": "卫戍认证",
+    "group": "other",
+    "sort": -10000
+  },
   "rogue_6_token_grow": {
     "name": "演化算子",
     "group": "other",
@@ -8104,6 +8114,11 @@
   },
   "act1museum_milestone_point": {
     "name": "积点卡券",
+    "group": "other",
+    "sort": -10000
+  },
+  "autochess_mission_point": {
+    "name": "任务点数",
     "group": "other",
     "sort": -10000
   },

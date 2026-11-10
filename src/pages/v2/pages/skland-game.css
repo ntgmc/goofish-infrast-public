@@ -57,7 +57,7 @@
 .skland-resource > p { color: var(--v2-muted); font-size: var(--text-xs); }
 .skland-meter { display: block; width: 100%; min-width: 0; height: 4px; border: 0; border-radius: 0; appearance: none; background: var(--v2-line); color: var(--skland-tone); accent-color: var(--skland-tone); }
 .skland-meter::-webkit-progress-bar { background: var(--v2-line); }
-.skland-meter::-webkit-progress-value { background: var(--skland-tone); }
+.skland-meter::-webkit-progress-value { background: var(--skland-tone); transition: width .45s ease-out; }
 .skland-meter::-moz-progress-bar { background: var(--skland-tone); }
 .skland-progress-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-lg) var(--space-xl); margin-top: var(--space-lg); }
 .skland-progress-item { min-width: 0; }

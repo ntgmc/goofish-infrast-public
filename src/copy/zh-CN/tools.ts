@@ -120,7 +120,7 @@ export const toolsCopy = {
     profile: "使用档案",
     operatorsRequired: "请先在此档案中导入干员，再开始手动排班。",
     setup: "前往导入干员",
-    editOperators: "查看或调整档案练度",
+    editOperators: "查看与导入干员数据",
     start: "从零开始排班",
     import: "导入排班 JSON",
     importHint: "支持完整计算结果 JSON 和 MAA 排班 JSON，最大 5 MB。设施等级、产物与进驻干员从文件读取，缺少等级时自动推断；导入后可调整。",

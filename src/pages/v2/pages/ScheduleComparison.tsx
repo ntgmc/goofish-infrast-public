@@ -21,7 +21,7 @@ import { useResultHistoryPagination } from '../../tool/optimize/useResultHistory
 import type { V2Session } from '../OptionsDrawer'
 import { v2Path } from '../navigation'
 import Link from '../../../components/InternalLink'
-import { Facts, Field, Notice, SectionTitle } from '../components/WorkspaceUI'
+import { Facts, Field, Loading, Notice, SectionTitle } from '../components/WorkspaceUI'
 import './schedule-comparison.css'
 
 const text = copy.tools.scheduleComparison
@@ -198,7 +198,7 @@ function ComparisonWorkspace({ userId, profileId, operators, config, workspace }
           event.target.value = ''
         }} />
       </label>
-      {slot.loading && <p role="status">{text.loading}</p>}
+      {slot.loading && <Loading label={text.loading} />}
       <Notice error>{slot.error}</Notice>
       {slot.choice && <div className="v2-schedule-comparison-choice"><strong>{slot.choice.name}</strong><p>{text.summary(slot.choice.source.plans.length, slot.choice.source.total_schedule_hours ?? 24)}</p></div>}
     </section>)}</div>
@@ -214,7 +214,7 @@ function ComparisonWorkspace({ userId, profileId, operators, config, workspace }
       <FacilityLayoutEditor key={JSON.stringify([baseConfig.trading_stations_count, baseConfig.manufacturing_stations_count, baseConfig.trading_station_levels, baseConfig.manufacturing_station_levels])}
         config={baseConfig} onUpdate={(mutate) => { const next = structuredClone(baseConfig); mutate(next); setConfigDraft(next) }} />
     </details>
-    <div className="v2-actions v2-schedule-comparison-run"><button className="v2-button v2-button-primary" disabled={busy || !left || !right} onClick={() => void simulate()}><ScheduleComparisonIcon size={18} aria-hidden="true" />{busy ? text.running : text.start}</button><p role="status" aria-live="polite">{progress}</p></div>
+    <div className="v2-actions v2-schedule-comparison-run"><button className="v2-button v2-button-primary" disabled={busy || !left || !right} aria-busy={busy} onClick={() => void simulate()}><ScheduleComparisonIcon size={18} aria-hidden="true" />{busy ? text.running : text.start}</button>{busy ? <Loading label={progress || text.running} /> : <p role="status" aria-live="polite">{progress}</p>}</div>
     <Notice error>{error}</Notice>
     {outputs.some(Boolean) && <ProductionComparison outputs={outputs} names={[left?.name ?? '', right?.name ?? '']} />}
     {differences && <OperatorComparison differences={differences} operators={operators} />}

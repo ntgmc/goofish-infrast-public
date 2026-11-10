@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
 import { copy } from '../../../../copy'
+import { Loading } from '../../components/WorkspaceUI'
 import { BENCHMARK_ASSETS, benchmarkNumber as number, type BenchmarkCase } from '../../../../lib/site-benchmark'
 
 const text = copy.siteBenchmark
@@ -33,7 +34,7 @@ export default function BenchmarkEvidence({ item }: { item: BenchmarkCase }) {
       return evidence
     },
   })
-  if (query.isPending) return <p role="status">{text.evidenceLoading}</p>
+  if (query.isPending) return <Loading label={text.evidenceLoading} skeleton="list" />
   if (!query.data) return <div role="alert"><p>{text.evidenceError}</p><button type="button" className="v2-button v2-button-secondary" onClick={() => void query.refetch()}>{text.retry}</button></div>
   const evidence = query.data
   const plans = source === 'native' ? evidence.nativePlans : source === 'diagnosis' ? evidence.dormitoryDiagnosis!.plans : evidence.simulatedPlans

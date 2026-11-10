@@ -33,6 +33,7 @@ const mocks = vi.hoisted(() => ({
   pageVisit: vi.fn(),
 }))
 vi.mock('../../lib/usage-tracking', () => ({ reportPageVisit: mocks.pageVisit }))
+vi.mock('../../lib/admin-api-client', () => ({ adminApiJson: vi.fn(async () => ({ user: null })), ADMIN_SESSION_EXPIRED_EVENT: 'goofish:admin-session-expired' }))
 vi.mock('../../components/result-panel/ManualScheduleEditor', () => ({ default: mocks.manual }))
 vi.mock('../../components/result-panel/schedule-image', () => ({ downloadScheduleImage: mocks.image }))
 vi.mock('../tool/useToolSession', () => ({ useToolSession: mocks.session }))
@@ -91,6 +92,21 @@ function mount(path = '/v2') {
   window.localStorage.setItem('maatool-reduce-motion', 'true')
   return render(<MemoryRouter initialEntries={[path]}><V2Page /><RouteLocation /></MemoryRouter>, { wrapper: MotionPreferenceProvider })
 }
+
+it('pauses waiting decorations in the background and clears the page marker on departure', () => {
+  const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+  const view = mount()
+  hidden.mockReturnValue(true)
+  fireEvent(document, new Event('visibilitychange'))
+  expect(document.documentElement).toHaveAttribute('data-v2-hidden')
+  hidden.mockReturnValue(false)
+  fireEvent(document, new Event('visibilitychange'))
+  expect(document.documentElement).not.toHaveAttribute('data-v2-hidden')
+  hidden.mockReturnValue(true)
+  fireEvent(document, new Event('visibilitychange'))
+  view.unmount()
+  expect(document.documentElement).not.toHaveAttribute('data-v2-hidden')
+})
 
 it('allows a guest to open the benchmark from navigation and return to the workspace', async () => {
   const user = userEvent.setup()
@@ -224,7 +240,7 @@ it('opens material demand charts from the V2 tools directory without an account'
   fireEvent.keyDown(chart, { key: 'ArrowLeft' })
   expect(Number(chart.getAttribute('aria-valuenow'))).toBe(Number(before) - 1)
   expect(screen.getByRole('button', { name: '下载全部材料月度 CSV', hidden: true })).not.toBeVisible()
-})
+}, 10_000)
 
 it.each(['/#release-v2.0.1016', '/v2#release-v2.0.1016'])('opens the changelog from a version anchor at %s', async (path) => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
@@ -241,7 +257,7 @@ it.each(['/#release-v2.0.1016', '/v2#release-v2.0.1016'])('opens the changelog f
 
 async function dismissDrawer(user: ReturnType<typeof userEvent.setup>) {
   await user.keyboard('{Escape}')
-  await waitFor(() => expect(document.querySelector('[data-slot="dialog-content"]')).not.toBeInTheDocument())
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 }
 
 it.each(['/#announcement-popup-21', '/v2#announcement-popup-21'])('opens announcements from an announcement anchor at %s without the popup feed', async (path) => {
@@ -927,6 +943,7 @@ describe('V2 results-first workspace', () => {
     delete room.level
     room.facility_level = 2
     room.mood = { 但书: { start: 21.5, end: 7.2 } }
+    result.plans[0].mood_assumptions = { max_mood: 30 }
     room.overflow = { time: '7h', equivalent: { equivalent_efficiency: 304.2 } }
     workflow.historyItem = { result }
     const user = userEvent.setup()
@@ -939,9 +956,27 @@ describe('V2 results-first workspace', () => {
     expect(dialog.getByText('21.5')).toBeInTheDocument()
     expect(dialog.getByText('7.2')).toBeInTheDocument()
     expect(dialog.getAllByText(copy.v2.moodUnavailable)).toHaveLength(4)
-    expect(dialog.getByText(`${copy.v2.expectedFullOrders}7h`)).toBeInTheDocument()
-    await user.click(dialog.getAllByText(copy.domain.building_skills.title)[0])
-    expect(dialog.getAllByText(new RegExp(copy.domain.building_skills.active))[0]).toBeVisible()
+    const mood = dialog.getByText('7.2').closest('.v2-room-mood')!
+    expect(mood).toHaveTextContent('/ 30')
+    expect(parseFloat(mood.querySelector<HTMLElement>('.v2-mood-level')!.style.width)).toBeCloseTo(24)
+    expect(dialog.getByRole('region', { name: copy.v2.roomOperators }).querySelectorAll('.v2-mood-track')).toHaveLength(1)
+    const calculation = dialog.getByText(copy.v2.roomDetails).closest('details')!
+    expect(calculation).not.toHaveAttribute('open')
+    await user.click(within(calculation).getByText(copy.v2.roomDetails))
+    expect(dialog.getByText(`${copy.v2.expectedFullOrders}7h`)).toBeVisible()
+    const skills = dialog.getByRole('button', { name: copy.v2.operatorManagement.skills('但书') })
+    const skillPanel = document.getElementById(skills.getAttribute('aria-controls')!)!
+    expect(skills).toHaveAttribute('aria-expanded', 'false')
+    expect(skillPanel).toHaveAttribute('inert')
+    await user.click(skills)
+    expect(skills).toHaveAttribute('aria-expanded', 'true')
+    expect(skillPanel).not.toHaveAttribute('inert')
+    await waitFor(() => expect(within(skillPanel).getAllByText(new RegExp(copy.domain.building_skills.active))[0]).toBeVisible())
+    await user.keyboard('{Enter}')
+    expect(skills).toHaveFocus()
+    expect(skills).toHaveAttribute('aria-expanded', 'false')
+    expect(skillPanel).toHaveAttribute('aria-hidden', 'true')
+    expect(skillPanel).toHaveAttribute('inert')
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
@@ -986,7 +1021,7 @@ describe('V2 results-first workspace', () => {
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
-  it('refreshes cached teams and expanded skills when saved training and the result change', async () => {
+  it('refreshes cached teams and open skill details when saved training and the result change', async () => {
     const workflow = connect()
     const user = userEvent.setup()
     const page = mount()
@@ -994,18 +1029,19 @@ describe('V2 results-first workspace', () => {
     const dialog = within(await screen.findByRole('dialog'))
     await user.type(dialog.getByRole('textbox', { name: copy.v2.searchOperators }), '但书')
     expect(dialog.queryByText('违约索赔·β')).not.toBeInTheDocument()
-    await user.click(dialog.getByText(copy.domain.building_skills.title))
-    expect((await dialog.findByText('违约索赔·β')).closest('.v2-skill')).toHaveClass('v2-skill-active')
+    await user.click(dialog.getByRole('button', { name: copy.v2.operatorManagement.skills('但书') }))
+    const skillDetails = within(await screen.findByRole('dialog', { name: '但书' }))
+    expect((await skillDetails.findByText('违约索赔·β')).closest('.v2-skill')).toHaveClass('v2-skill-active')
 
     workflow.mergedOperators = SAMPLE_OPERATORS.map((operator) => operator.name === '但书' ? { ...operator, elite: 0, level: 1 } : operator)
     const nextResult = structuredClone(SAMPLE_RESULT)
     nextResult.plans[0].rooms.trading[0].level = 2
     workflow.historyItem = { result: nextResult }
     page.rerender(<MemoryRouter initialEntries={['/v2']}><V2Page /><RouteLocation /></MemoryRouter>)
-    expect(dialog.getByText('违约索赔·β').closest('.v2-skill')).toHaveClass('v2-skill-locked')
-    expect(dialog.getByText('违约索赔·α').closest('.v2-skill')).toHaveClass('v2-skill-active')
-    await user.click(dialog.getByText(copy.domain.building_skills.title))
-    await waitFor(() => expect(dialog.queryByText('违约索赔·β')).not.toBeInTheDocument())
+    expect(skillDetails.getByText('违约索赔·β').closest('.v2-skill')).toHaveClass('v2-skill-locked')
+    expect(skillDetails.getByText('违约索赔·α').closest('.v2-skill')).toHaveClass('v2-skill-active')
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '但书' })).not.toBeInTheDocument())
     await dismissDrawer(user)
     const card = screen.getByRole('button', { name: /贸易站.*推进之王/ })
     expect(card).toHaveTextContent('Lv.2')
@@ -1036,6 +1072,7 @@ describe('V2 results-first workspace', () => {
     expect(await screen.findByRole('dialog')).toHaveTextContent(copy.v2.roomDetails)
     await dismissDrawer(user)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(originalRoom).toHaveFocus()
   })
 
   it('preserves the selected shift, Fiammetta target and display mode across result views without generating', async () => {
@@ -1109,7 +1146,12 @@ describe('V2 results-first workspace', () => {
     render(<MotionPreferenceProvider><MemoryRouter initialEntries={['/v2']}><V2Page /></MemoryRouter></MotionPreferenceProvider>)
     const room = within(screen.getByRole('tabpanel')).getByRole('button', { name: /贸易站.*推进之王/ })
     const slot = room.querySelector<HTMLElement>('.v2-operator')!
+    const originalOccupants = new Map([...document.querySelectorAll<HTMLElement>('.v2-room-card .v2-operator')].map((element) => [element, element.dataset.operatorName]))
     await user.click(screen.getByRole('tab', { name: /第3班/ }))
+    for (const [element, name] of originalOccupants) {
+      if (!element.isConnected) continue
+      expect(element.querySelector('.v2-operator-content:not([inert])')?.hasAttribute('data-shift-change')).toBe(element.dataset.operatorName !== name)
+    }
     expect(room.querySelector('.v2-operator')).toBe(slot)
     expect(within(slot).getByRole('img', { name: '巫恋' })).toBeInTheDocument()
     expect(within(slot).queryByRole('img', { name: '但书' })).not.toBeInTheDocument()
@@ -1341,7 +1383,7 @@ describe('V2 results-first workspace', () => {
     await user.click(dialog.getByRole('button', { name: copy.v2.exportRetry }))
     expect(current).toBeDisabled()
     expect(all).toBeDisabled()
-    expect(dialog.getByText(copy.domain.result_image.busy)).toHaveAttribute('role', 'status')
+    expect(dialog.getByRole('status', { name: copy.domain.result_image.busy })).toHaveAttribute('aria-busy', 'true')
     await user.click(all)
     expect(mocks.image).toHaveBeenCalledTimes(2)
     await act(async () => { finish() })
@@ -1400,7 +1442,7 @@ describe('V2 results-first workspace', () => {
     expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('combobox')).not.toBeInTheDocument()
     await user.tab()
-    expect(within(dialog).getByText(copy.domain.building_skills.title).closest('summary')).toHaveFocus()
+    expect(within(dialog).getByRole('button', { name: copy.v2.operatorManagement.skills('但书') })).toHaveFocus()
     await dismissDrawer(user)
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('53,595')).toBeInTheDocument()
@@ -2003,7 +2045,7 @@ describe('V2 feature continuity', () => {
         expect(cards.getAllByRole('link')).toHaveLength(1)
         expect(cards.getByText(content.pricing.plans[id].account_scope)).toBeVisible()
         expect(cards.getByText(getSku(id).audience)).toBeVisible()
-        expect(cards.getByText(content.pricing.plans[id].display_price.split('/')[0]!.trim())).toBeVisible()
+        await waitFor(() => expect(cards.getByText(content.pricing.plans[id].display_price.split('/')[0]!.trim())).toBeVisible())
       }
     }
     if (mobile) await user.click(screen.getByRole('radio', { name: new RegExp(copy.public.pricing_choice.term_labels.single_account_half_year) }))

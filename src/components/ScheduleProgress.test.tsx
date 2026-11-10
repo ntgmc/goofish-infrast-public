@@ -3,6 +3,7 @@
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ScheduleProgress, { type ScheduleProgressState } from './ScheduleProgress'
+import { copy } from '../copy'
 
 const NOW = new Date('2026-07-19T10:00:00.000Z').getTime()
 
@@ -44,6 +45,23 @@ describe('ScheduleProgress motion', () => {
 
     rerender(<ScheduleProgress progress={progress} />)
     expect(panel).toHaveAttribute('data-animating', 'true')
+  })
+
+  it('matches the V2 state symbol and active step to real lifecycle updates', () => {
+    const progress = createProgress({ queueStatus: 'queued', estimatePhase: 'queued' })
+    const view = render(<ScheduleProgress progress={progress} stageMotion />)
+    const symbol = () => view.container.querySelector('.schedule-progress-symbol')!
+    expect(symbol()).toHaveAttribute('data-state', 'queued')
+    view.rerender(<ScheduleProgress progress={{ ...progress, queueStatus: 'running', calculationStage: 'generating_schedule' }} stageMotion />)
+    expect(symbol()).toHaveAttribute('data-state', 'running')
+    expect(screen.getByText(copy.common.components_ScheduleProgress_012).closest('li')).toHaveAttribute('data-state', 'active')
+    view.rerender(<ScheduleProgress progress={{ ...progress, connectionStatus: 'reconnecting' }} stageMotion />)
+    expect(symbol()).toHaveAttribute('data-state', 'reconnecting')
+    for (const estimatePhase of ['failed', 'cancelled', 'completed'] as const) {
+      view.rerender(<ScheduleProgress progress={{ ...progress, estimatePhase }} stageMotion />)
+      expect(symbol()).toHaveAttribute('data-state', estimatePhase)
+      if (estimatePhase === 'completed') expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100')
+    }
   })
 
   it('reaches 100 and shows completion when only the completed phase arrives', async () => {

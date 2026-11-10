@@ -48,7 +48,7 @@ function QqBotSettingsContent() {
   }, [])
 
   return (
-    <section className="tool-panel p-5 sm:p-6">
+    <section className="tool-panel p-5 sm:p-6" aria-busy={query.isFetching} data-loading={query.isFetching || undefined}>
       <div className="flex items-center gap-3">
         <Bell size={20} className="shrink-0 text-brand-500" aria-hidden="true" />
         <h2 className="text-lg font-semibold text-ink-primary">{text.title}</h2>
@@ -73,7 +73,7 @@ function QqBotSettingsContent() {
               }} />
           </label>
           <div className="settings-danger-actions">
-            <button type="button" className="tool-secondary-action" disabled={busy} onClick={() => {
+            <button type="button" className="tool-secondary-action" disabled={busy} aria-busy={saving} onClick={() => {
               if (!window.confirm(text.unbindConfirm)) return
               void run(async () => {
                 await apiJson(ENDPOINT, { method: 'DELETE' })

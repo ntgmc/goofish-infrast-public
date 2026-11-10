@@ -7,6 +7,10 @@ import type { V2Session } from '../OptionsDrawer'
 import Settings from './Settings'
 
 vi.mock('../../../components/QqBotSettingsPanel', () => ({ default: () => null }))
+vi.mock('../../../lib/admin-api-client', () => ({
+  adminApiJson: vi.fn(async () => ({ user: null })),
+  ADMIN_SESSION_EXPIRED_EVENT: 'goofish:admin-session-expired',
+}))
 
 afterEach(() => {
   cleanup()

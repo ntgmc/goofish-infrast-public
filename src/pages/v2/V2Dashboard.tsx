@@ -1,14 +1,14 @@
-import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
 import { useAppReducedMotion } from '../../lib/motion-preference'
 import { NextIcon as ArrowRight, ExpandIcon as ChevronDown, BreadcrumbIcon, ExportIcon as Download, LoginIcon as LogIn, MenuIcon as Menu, GenerateIcon, LoadingIcon, ConfigIcon as Settings2, DataSourceIcon as ShieldCheck, InfoIcon as Sparkles, CloseIcon as X, PreviewIcon, SampleIcon } from '../../components/icons'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import Link from '../../components/InternalLink'
 import { copy } from '../../copy'
+import { Loading } from './components/WorkspaceUI'
 import { MotionNavIndicator, motionTokens } from '../../components/MotionPrimitives'
 import { prepareResult } from '../../components/result-panel/formatters'
 import InventoryDepletionWarning from '../../components/result-panel/InventoryDepletionWarning'
-import type { BoardRoom } from '../../components/result-panel/ResultBoardV2'
 import { getMaaExportNotice } from '../tool/optimize/maa-export-notice'
 import { manualSourceKey } from '../../lib/manual-schedule'
 import { hasCapability } from '../../lib/product-catalog'
@@ -111,7 +111,6 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
     } catch { /* Storage may be disabled. */ }
   }, [firstSchedule, section, session.user, sample])
   const [panel, setPanel] = useState<OptionPanel | null>(() => params.get('feedback') === 'new' && !session.user ? 'account' : null)
-  const [room, setRoom] = useState<BoardRoom | null>(null)
   const [view, setView] = useState<View>('schedule')
   const [expanded, setExpanded] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
@@ -145,7 +144,6 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const signedIn = Boolean(session.user)
   const profileLabel = profileName ?? (signedIn ? text.account : text.login)
   const openPanel = useCallback((next: OptionPanel) => { setPanel(next); setMobileNavigation(false) }, [])
-  const openRoom = useCallback((next: BoardRoom) => { setRoom(next); openPanel('room') }, [openPanel])
   const restrictedPreview = Boolean(session.activeProfile && isFreePreviewProfile(session.activeProfile) && !isFreePreviewTrialActive(session.activeProfile))
   const canManual = Boolean(features.manual_schedule && !sample && session.activeProfile && session.activeProfile.kind !== 'free_preview' && !result.preview_limit
     && hasCapability({ kind: session.activeProfile.kind, permission }, 'edit_full_config') && result.plans.length)
@@ -153,6 +151,21 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const canViewTraining = Boolean(workflow?.userCanUseUpgradeFeatures || workflow?.suggestions?.length)
   const manualKey = useMemo(() => manualSourceKey(result), [result])
   const exportResultId = workflow?.currentResult || workflow?.finalResult ? workflow.progress?.historyResultId ?? workflow.progress?.jobId : workflow?.historyItem?.id ?? workflow?.latestWorkspaceResult?.id
+  const resultGrid = useRef<HTMLDivElement>(null)
+  const arrivalKey = exportResultId ?? manualKey
+  const lastArrival = useRef(arrivalKey)
+  const revealedCharts = useMemo(() => new Set<string>(), [arrivalKey])
+  useLayoutEffect(() => {
+    if (section !== 'overview') return
+    const changed = lastArrival.current !== arrivalKey
+    lastArrival.current = arrivalKey
+    if (!changed || reduceMotion || !(workflow?.currentResult || workflow?.finalResult)) return
+    const animations = [...(resultGrid.current?.querySelectorAll<HTMLElement>('.v2-overview-metrics, .v2-room-group') ?? [])]
+      .filter((element) => typeof element.animate === 'function')
+      .map((element, index) => element.animate([{ opacity: 0.6, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }],
+        { duration: 280, delay: index * 60, fill: 'backwards', easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }))
+    return () => { for (const animation of animations) animation.cancel() }
+  }, [arrivalKey, reduceMotion, section, workflow?.currentResult, workflow?.finalResult])
   const exportFailure = !sample && workflow?.exportFailure?.resultId === exportResultId ? workflow?.exportFailure : null
   const exportNotice = getMaaExportNotice(sample ? config.schedule_mode : result.schedule_mode, features.maa_export, workflow)
   const simulationBaseline = workflow?.historyItem?.config ? { id: workflow.historyItem.id, config: workflow.historyItem.config }
@@ -306,7 +319,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           <InventoryDepletionWarning result={result} className="v2-inventory-warning" action={<button type="button" className="v2-button v2-button-secondary" onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" />{text.configure}</button>} />
           <AnimatePresence initial={false}>
           {(loadingResult || error || notice || downloadNotice || configChanged) && <FeedbackRegion key="feedback">
-          <div className={`v2-feedback ${error ? 'v2-feedback-error' : ''}`} role={error ? 'alert' : 'status'} aria-live="polite">
+          <div className={`v2-feedback ${error ? 'v2-feedback-error' : loadingResult ? 'tool-loading-status' : ''}`} role={error ? 'alert' : 'status'} aria-busy={loadingResult && !error} aria-live="polite">
             {loadingResult ? text.loadingResult : error ?? notice ?? (downloadNotice ? text.exported : sample ? text.demoConfigChanged : text.configChanged)}
             {error && (workflow?.inlineError?.retry === 'save'
               ? <button type="button" disabled={busy || session.configSyncStatus === 'pending' || session.configSyncStatus === 'saving'} onClick={session.retryConfigSave}>{session.configSyncStatus === 'pending' || session.configSyncStatus === 'saving' ? copy.optimize.generation.saving : copy.optimize.generation.retry_save}</button>
@@ -315,7 +328,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           </AnimatePresence>
           {generationProgress}
           {children}
-          <div className="v2-results-grid">
+          <div ref={resultGrid} className="v2-results-grid">
           <div className="v2-overview-metrics"><ProductionSummary result={result} prepared={prepared} sample={sample} userId={session.user?.id} profileId={session.activeProfile?.id} resultId={exportResultId}
             resultConfig={workflow?.historyItem?.result === result ? workflow.historyItem.config : undefined}
             history={[...(workflow?.resultHistory ?? []), ...(workflow?.archivedResults ?? [])]} newResult={Boolean(workflow?.currentResult || workflow?.finalResult)} onConfigure={() => openPanel('config')} /></div>
@@ -326,21 +339,21 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           </div>
           {view !== 'manual' && <ResultActions plans={result.plans} shift={shift} showShift={view === 'schedule'} onShiftChange={setShift} onExport={() => setExportOpen(true)} sample={sample} busy={busy} loadingResult={loadingResult} />}
           <div className="v2-feature-content v2-manual-workspace" hidden={view !== 'manual'}>
-            {canManual && manualOpened && session.activeProfile && <Suspense fallback={<p role="status">{text.loading}</p>}><ManualScheduleEditor key={manualKey} source={result} profileId={session.activeProfile.id} operators={operators} simulationBaseline={simulationBaseline} onDirtyChange={setManualDirty} renderExport={(props) => workflow && <ManualResultExport key={props.resultId} {...props} workflow={workflow}
+            {canManual && manualOpened && session.activeProfile && <Suspense fallback={<Loading label={text.loading} />}><ManualScheduleEditor revealCandidates key={manualKey} source={result} profileId={session.activeProfile.id} operators={operators} simulationBaseline={simulationBaseline} onDirtyChange={setManualDirty} renderExport={(props) => workflow && <ManualResultExport key={props.resultId} {...props} workflow={workflow}
               onRecover={(action) => { navigateSection(action === 'login' ? 'generation' : action); if (action === 'login') session.retryAuth() }} />} /></Suspense>}
             {!canManual && restrictedPreview && view === 'manual' && <LockedCapabilityPreview title={copy.optimize.paid_preview.manual_title} description={copy.optimize.paid_preview.manual_description} />}
           </div>
           <div className="v2-result-view" hidden={view === 'manual'}>
           <V2Transition motionKey={view}>
             {view === 'training' ? <section className="v2-panel v2-feature-content v2-training-workspace v2-section-loading">{canViewTraining
-              ? <Suspense fallback={<p role="status">{text.loading}</p>}><UpgradeSuggestionStatusNotice result={result} /><UpgradeSuggestions suggestions={workflow?.suggestions ?? []} embedded projectScope={session.user && session.activeProfile ? { userId: session.user.id, profileId: session.activeProfile.id } : undefined} /></Suspense>
+              ? <Suspense fallback={<Loading label={text.loading} />}><UpgradeSuggestionStatusNotice result={result} /><UpgradeSuggestions suggestions={workflow?.suggestions ?? []} embedded projectScope={session.user && session.activeProfile ? { userId: session.user.id, profileId: session.activeProfile.id } : undefined} /></Suspense>
               : <LockedCapabilityPreview title={copy.optimize.pages_tool_optimize_ResultSection_016} description={copy.optimize.pages_tool_optimize_ResultSection_017} />}</section> : view === 'analysis' ? (
               <section className="v2-panel v2-analysis"><div className="v2-panel-heading"><h2>{text.analysisTab}</h2><span className="v2-neutral-tag">24h</span></div>{canViewAnalysis
-                ? <IncomeAnalysis result={result} prepared={prepared} />
+                ? <IncomeAnalysis key={arrivalKey} result={result} prepared={prepared} revealedCharts={revealedCharts} />
                 : <div className="v2-analysis-note"><PreviewIcon size={21} aria-hidden="true" /><div><p>{text.previewAnalysis}</p>{features.pricing && <Link className="v2-text-button" to="/pricing">{text.comparePlans}<ArrowRight size={14} /></Link>}</div></div>}</section>
             ) : (
               <ScheduleBoard result={result} prepared={prepared} expanded={expanded} onExpandedChange={setExpanded} shift={shift} onShiftChange={setShift}
-                view={boardView} onViewChange={setBoardView} onRoom={openRoom} />
+                view={boardView} onViewChange={setBoardView} showProduction={!sample && canViewAnalysis && !result.preview_limit} />
             )}
           </V2Transition>
           </div>
@@ -360,9 +373,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
       <OptionsDrawer panel={panel} onClose={closePanel} onOpenProfile={openProfile} onNavigate={navigateSection} session={guardedSession} config={config} operators={sortedOperators}
         onUpdateConfig={onUpdateConfig} permission={permission} canEditConfig={canEditConfig} canUseIntermediateConfig={canUseIntermediateConfig}
         sample={sample} busy={busy} configReadOnly={workflow?.loading} onImportOperators={onImportOperators} configDiffRows={workflow?.configDiffRows} hasPreviousResult={Boolean(workflow?.latestWorkspaceResult)}
-        onAccount={() => openPanel('account')} room={room} error={navigationError ?? error}
-        dailyProduction={!sample && canViewAnalysis && !result.preview_limit ? result.daily_production : undefined}
-        shiftName={result.plans[Math.min(shift, Math.max(result.plans.length - 1, 0))]?.name}
+        onAccount={() => openPanel('account')} error={navigationError ?? error}
         onConfirmConfig={firstSchedule && section === 'generation' && session.license ? confirmConfig : undefined} confirmingConfig={confirmingConfig} />
       {session.user && features.profiles && <ProfileExpiryPrompt userId={session.user.id} profiles={session.cdkProfiles} onOpenExport={(profile) => { void (async () => {
         if ((manualDirty || toolDirty) && !window.confirm(text.discardManual)) return

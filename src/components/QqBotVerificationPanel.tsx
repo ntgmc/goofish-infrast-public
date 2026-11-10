@@ -57,7 +57,7 @@ export default function QqBotVerificationPanel({ userId, groupId, campaignId = n
     } catch (caught) { setError(caught instanceof Error ? caught.message : text.failed) }
     finally { setSaving(false) }
   }
-  const refreshButton = <button type="button" className="tool-secondary-action" disabled={saving || query.isFetching} onClick={() => void query.refetch({ cancelRefetch: false })}>{text.refresh}</button>
+  const refreshButton = <button type="button" className="tool-secondary-action" disabled={saving || query.isFetching} aria-busy={query.isFetching} onClick={() => void query.refetch({ cancelRefetch: false })}>{text.refresh}</button>
 
   return <div className="qqbot-verification space-y-4">
     {(error || query.error) && <p className="tool-alert tool-alert--error" role="alert">{error ?? query.error?.message}</p>}
@@ -78,16 +78,16 @@ export default function QqBotVerificationPanel({ userId, groupId, campaignId = n
       </div>}
       {row?.status === 'verified' ? <div className="space-y-3">
         <p className="text-sm text-ink-secondary" role="status">{text.verified(row.qq_number)}</p>
-        <button type="button" className="tool-primary-action" disabled={busy} onClick={() => void submit({ action: 'confirm', verification_id: row.id })}>{saving ? text.confirming : row.campaign_id ? text.confirmClaim : text.confirm}</button>
+        <button type="button" className="tool-primary-action" disabled={busy} aria-busy={saving} onClick={() => void submit({ action: 'confirm', verification_id: row.id })}>{saving ? text.confirming : row.campaign_id ? text.confirmClaim : text.confirm}</button>
       </div> : <div className="flex flex-wrap gap-3">
-        <button type="button" className="tool-primary-action" disabled={busy || !/^[1-9][0-9]{4,11}$/.test(qq) || !/^[1-9][0-9]{0,19}$/.test(groupId ?? group)} onClick={() => void submit({ action: 'start', qq_number: qq, group_id: groupId ?? group, campaign_id: campaignId })}>{saving ? text.generating : pending ? text.regenerate : text.generate}</button>
+        <button type="button" className="tool-primary-action" aria-busy={saving} disabled={busy || !/^[1-9][0-9]{4,11}$/.test(qq) || !/^[1-9][0-9]{0,19}$/.test(groupId ?? group)} onClick={() => void submit({ action: 'start', qq_number: qq, group_id: groupId ?? group, campaign_id: campaignId })}>{saving ? text.generating : pending ? text.regenerate : text.generate}</button>
         {pending && refreshButton}
       </div>}
     </>}
     {boundQq && campaignId && groupId && row?.status !== 'completed' && <>
       <p className="text-sm text-ink-secondary">{text.claimHelp(boundQq)}</p>
       {pending && <p role="status" className="text-sm text-ink-secondary">{text.checkingHelp}</p>}
-      <div className="flex flex-wrap gap-3"><button type="button" className="tool-primary-action" disabled={busy || pending} onClick={() => void submit({ action: 'claim', group_id: groupId, campaign_id: campaignId })}>{pending ? text.checking : saving ? text.submitting : text.claim}</button>{pending && refreshButton}</div>
+      <div className="flex flex-wrap gap-3"><button type="button" className="tool-primary-action" disabled={busy || pending} aria-busy={saving || pending} onClick={() => void submit({ action: 'claim', group_id: groupId, campaign_id: campaignId })}>{pending ? text.checking : saving ? text.submitting : text.claim}</button>{pending && refreshButton}</div>
     </>}
     {query.error && !pending && refreshButton}
   </div>

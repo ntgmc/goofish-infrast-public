@@ -9,7 +9,7 @@ import { NotificationCenterProvider } from '../../components/NotificationCenter'
 import { InternalLinkProvider } from '../../components/InternalLink'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { copy } from '../../copy'
-import ScheduleProgress from '../../components/ScheduleProgress'
+import V2GenerationProgress from './V2GenerationProgress'
 import { normalizeConfig } from '../../lib/config'
 import { hasCapability } from '../../lib/product-catalog'
 import { useSiteFeatures } from '../../lib/site-feature-context'
@@ -20,6 +20,7 @@ import { useOptimizeWorkflow } from '../tool/optimize/useOptimizeWorkflow'
 import { useOptimizationTaskCenter } from '../tool/optimize/useOptimizationTaskCenter'
 import V2Dashboard from './V2Dashboard'
 import V2LoadingScreen from './V2LoadingScreen'
+import AnimationInspector from './AnimationInspector'
 import type { V2Session } from './OptionsDrawer'
 import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './sample-result'
 import { V2_PUBLIC_SECTIONS, v2Href, v2Path, v2Section } from './navigation'
@@ -37,6 +38,13 @@ export default function V2Page() {
   const [config, setConfig] = useState<LicenseConfig>(() => normalizeConfig(SAMPLE_CONFIG))
   const [operators, setOperators] = useState(SAMPLE_OPERATORS)
   const [changed, setChanged] = useState(false)
+  useEffect(() => {
+    const root = document.documentElement
+    const visibility = () => root.toggleAttribute('data-v2-hidden', document.hidden)
+    visibility()
+    document.addEventListener('visibilitychange', visibility)
+    return () => { document.removeEventListener('visibilitychange', visibility); root.removeAttribute('data-v2-hidden') }
+  }, [])
   const activeConfig = session.configOverride ?? session.workspace?.config ?? config
   const profile = session.activeProfile
   const permission = profile ? getEffectiveProfilePermission(profile) : undefined
@@ -75,7 +83,7 @@ export default function V2Page() {
 
 function SessionProviders({ session, children }: { session: V2Session; children: ReactNode }) {
   const resolveHref = useCallback((href: string) => v2Href(href, session.activeProfile?.id), [session.activeProfile?.id])
-  return <InternalLinkProvider value={resolveHref}><DialogSurfaceProvider value="v2-dialog v2-feature-content">{session.authStatus === 'authenticated' && session.user ? <NotificationCenterProvider userId={session.user.id}>{children}</NotificationCenterProvider> : children}</DialogSurfaceProvider></InternalLinkProvider>
+  return <InternalLinkProvider value={resolveHref}><DialogSurfaceProvider value="v2-dialog v2-feature-content"><AnimationInspector userId={session.authStatus === 'authenticated' ? session.user?.id ?? null : null}>{session.authStatus === 'authenticated' && session.user ? <NotificationCenterProvider userId={session.user.id}>{children}</NotificationCenterProvider> : children}</AnimationInspector></DialogSurfaceProvider></InternalLinkProvider>
 }
 
 function ConnectedDashboard({ session }: { session: V2Session }) {
@@ -199,10 +207,10 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
   const stopping = Boolean(activeJob && (tasks.busyJobId === activeJob.id || activeJob.cancellationRequested))
   const stopAction = workflow.loading && activeJob && <button type="button" className="v2-button v2-button-secondary v2-stop-schedule" disabled={stopping} aria-busy={stopping}
     onClick={() => void tasks.cancel(activeJob)}>{stopping ? <LoaderCircle size={16} className="v2-spin" aria-hidden="true" /> : <Square size={16} aria-hidden="true" />}{stopping ? copy.v2.stopping : copy.v2.stopSchedule}</button>
-  const progress = workflow.progress && (workflow.progress.estimatePhase !== 'completed' || !current) && <div className="v2-progress"><ScheduleProgress progress={workflow.progress} action={stopAction} />
+  const progress = workflow.progress && <V2GenerationProgress progress={workflow.progress} resultReady={Boolean(current)} action={stopAction}>
     {tasks.error && <p role="alert" className="v2-error">{tasks.error}</p>}
     {tasks.notice && <p role="status" className="v2-muted">{tasks.notice}</p>}
-  </div>
+  </V2GenerationProgress>
   if (!result && latest && section === 'overview') {
     const pending = reading || loadedId.current !== latest.id
     return <V2LoadingScreen error={pending ? null : error ?? workflow.workspaceError ?? copy.v2.resultLoadFailed} onRetry={() => void readLatestResult()}>

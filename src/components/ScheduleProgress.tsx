@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { motion } from 'motion/react'
 import { useAppReducedMotion } from '../lib/motion-preference'
-import { motionTokens } from './MotionPrimitives'
+import { AnimatedValue, motionTokens } from './MotionPrimitives'
+import { TweenValue } from './NumberMotion'
 import type { OptimizeCalculationStage, OptimizeJobPriority, OptimizeResult } from '../lib/types'
 import type { OptimizationBillingSnapshot } from '../lib/optimization-contracts'
 import { copy } from '../copy/index'
@@ -53,6 +54,7 @@ interface Props {
   className?: string;
   variant?: 'embedded' | 'focus';
   action?: ReactNode;
+  stageMotion?: boolean;
 }
 
 type TaskStatus = 'preparing' | 'queued' | 'retrying' | 'cancelling' | 'cancelled' | 'failed' | 'running' | 'overdue' | 'finishing' | 'completed'
@@ -60,7 +62,7 @@ type StepVisualState = 'done' | 'active' | 'pending' | 'failed'
 type TaskStepRole = 'submit' | 'queue' | 'schedule' | 'suggestions' | 'persist'
 type TaskStepDefinition = { label: string; detail: string; role: TaskStepRole }
 
-export default function ScheduleProgress({ progress, className = '', variant = 'embedded', action }: Props) {
+export default function ScheduleProgress({ progress, className = '', variant = 'embedded', action, stageMotion = false }: Props) {
   const progressKey = `${progress.jobId ?? 'local'}:${progress.startedAt}`
   const [progressFrame, setProgressFrame] = useState(() => {
     const now = Date.now()
@@ -69,11 +71,16 @@ export default function ScheduleProgress({ progress, className = '', variant = '
   const now = progressFrame.now
   const targetPercent = getScheduleProgressPercent(progress, now)
   const rawPercent = progressFrame.key === progressKey ? progressFrame.value : targetPercent
-  const percent = Math.max(0, Math.min(100, Math.round(rawPercent)))
   const task = useMemo(() => getTaskView(progress, rawPercent, now), [progress, rawPercent, now])
+  const meterPercent = stageMotion && task.status === 'completed' ? 100 : rawPercent
+  const percent = Math.max(0, Math.min(100, Math.round(meterPercent)))
   const compact = variant === 'embedded'
   const reduceMotion = useAppReducedMotion()
   const animating = !isScheduleProgressPaused(progress) && task.status !== 'completed'
+  const symbol = task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled' ? task.status
+    : progress.connectionStatus === 'reconnecting' ? 'reconnecting'
+      : !animating ? 'paused' : task.status === 'finishing' ? 'finishing'
+        : task.status === 'running' || task.status === 'overdue' ? 'running' : 'queued'
 
   useEffect(() => {
     let timer = 0
@@ -102,6 +109,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
     <motion.section
       className={`tool-panel schedule-progress ${compact ? 'schedule-progress--embedded' : 'schedule-progress--focus'} ${className}`}
       data-status={task.status}
+      data-stage-motion={stageMotion || undefined}
       data-animating={animating}
       initial={reduceMotion ? false : { opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
@@ -115,12 +123,17 @@ export default function ScheduleProgress({ progress, className = '', variant = '
       </div>
 
       <div className="schedule-progress-heading">
-        <h3 role="status" aria-live="polite" aria-atomic="true">{task.title}</h3>
+        <div className="schedule-progress-title">
+          {stageMotion && <StatusSymbol state={symbol} reduced={reduceMotion} />}
+          <h3 role="status" aria-live="polite" aria-atomic="true">{stageMotion ? <AnimatedValue value={task.title} /> : task.title}</h3>
+        </div>
         <div className="schedule-progress-meter">
           <span>{task.meterLabel}</span>
-          <p className="schedule-progress-percent">{percent}<span>%</span></p>
+          <p className="schedule-progress-percent">{stageMotion ? <TweenValue value={percent} format={formatPercent} /> : percent}<span className="schedule-progress-percent-unit">%</span></p>
         </div>
-        <p className="schedule-progress-detail">{task.detail}</p>
+        <motion.p key={stageMotion ? task.title : undefined} className="schedule-progress-detail"
+          initial={stageMotion && !reduceMotion ? { opacity: 0.45, y: 3 } : false} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.18, ease: motionTokens.ease.enter }}>{task.detail}</motion.p>
       </div>
 
       <div
@@ -135,9 +148,12 @@ export default function ScheduleProgress({ progress, className = '', variant = '
         <motion.div
           className="schedule-progress-fill origin-left"
           initial={false}
-          animate={{ scaleX: Math.max(0, Math.min(1, rawPercent / 100)) }}
+          animate={{ scaleX: Math.max(0, Math.min(1, meterPercent / 100)) }}
           transition={reduceMotion ? { duration: 0 } : { duration: 0.25, ease: 'linear' }}
         />
+        {stageMotion && <motion.div className="schedule-progress-front" aria-hidden="true" initial={false}
+          animate={{ x: `${Math.max(0, Math.min(100, meterPercent))}%`, opacity: animating && meterPercent > 0 ? 1 : 0 }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.25, ease: 'linear' }} />}
       </div>
 
       {task.adjustmentLabel && <p className="schedule-progress-note">{task.adjustmentLabel}</p>}
@@ -147,7 +163,10 @@ export default function ScheduleProgress({ progress, className = '', variant = '
         {task.steps.map((step, index) => {
           const state = getStepState(progress, task.status, index, task.steps)
           return <li key={step.role} className="schedule-progress-step" data-state={state} aria-current={state === 'active' ? 'step' : undefined}>
-            <TaskStep label={step.label} detail={step.detail} state={state} index={index} />
+            {stageMotion && index < task.steps.length - 1 && <span className="schedule-progress-connector" aria-hidden="true">
+              <motion.span initial={false} animate={{ scale: state === 'done' ? 1 : 0 }} transition={{ duration: reduceMotion ? 0 : 0.32, ease: motionTokens.ease.enter }} />
+            </span>}
+            <TaskStep label={step.label} detail={step.detail} state={state} index={index} animated={stageMotion && !reduceMotion} stageMotion={stageMotion} reduced={reduceMotion} />
           </li>
         })}
       </ol>
@@ -171,6 +190,20 @@ export default function ScheduleProgress({ progress, className = '', variant = '
   )
 }
 
+function StatusSymbol({ state, reduced }: { state: string; reduced: boolean }) {
+  const complete = state === 'completed'
+  const stopped = state === 'failed' || state === 'cancelled' || state === 'paused' || state === 'reconnecting'
+  return <motion.svg className="schedule-progress-symbol" data-state={state} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"
+    initial={false} animate={{ color: complete ? 'var(--color-positive)' : state === 'failed' ? 'var(--color-error)' : 'var(--progress-color)' }} transition={{ duration: reduced ? 0 : 0.2 }}>
+    <circle className="schedule-progress-symbol-track" cx="16" cy="16" r="12" />
+    <motion.circle className="schedule-progress-symbol-ring" cx="16" cy="16" r="12" pathLength="1" strokeDasharray=".7 .3"
+      initial={false} animate={{ opacity: state === 'queued' || stopped ? 0 : 1, strokeDasharray: complete || state === 'finishing' ? '1 0' : '.7 .3' }} transition={{ duration: reduced ? 0 : 0.3 }} />
+    <g className="schedule-progress-symbol-dots">{[10, 16, 22].map((x) => <circle key={x} cx={x} cy="16" r="1.5" fill="currentColor" stroke="none" />)}</g>
+    <motion.path d="M10 16 L14 20 L22 12" initial={false} animate={{ pathLength: complete ? 1 : 0, opacity: complete ? 1 : 0 }} transition={{ duration: reduced ? 0 : 0.3 }} />
+    {stopped && <path d={state === 'failed' ? 'M12 12 L20 20 M20 12 L12 20' : state === 'cancelled' ? 'M12 12 H20 V20 H12 Z' : state === 'reconnecting' ? 'M11 17 A7 7 0 0 1 21 17 M14 20 A3 3 0 0 1 18 20' : 'M13 12 V20 M19 12 V20'} />}
+  </motion.svg>
+}
+
 function TaskMiniStat({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
   return (
     <div className="schedule-progress-stat" data-emphasis={emphasis || undefined}>
@@ -180,21 +213,26 @@ function TaskMiniStat({ label, value, emphasis = false }: { label: string; value
   )
 }
 
-function TaskStep({ label, detail, state, index }: { label: string; detail: string; state: StepVisualState; index: number }) {
+function TaskStep({ label, detail, state, index, animated, stageMotion, reduced }: { label: string; detail: string; state: StepVisualState; index: number; animated: boolean; stageMotion: boolean; reduced: boolean }) {
   return (
     <>
       <span className="schedule-progress-dot" aria-hidden="true">
-        {state === 'done' ? <SuccessIcon className="h-3.5 w-3.5" /> : state === 'failed' ? '!' : index + 1}
+        {state === 'done' ? animated ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><motion.path d="M5 12 L10 17 L19 7" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.24 }} /></svg> : <SuccessIcon className="h-3.5 w-3.5" /> : state === 'failed' ? '!' : index + 1}
       </span>
       <div className="schedule-progress-step-copy">
         <p className="schedule-progress-step-label">{label}</p>
-        <p className="schedule-progress-step-detail">{detail}</p>
+        {stageMotion ? <motion.div className="schedule-progress-step-disclosure" initial={false}
+          animate={{ height: state === 'active' || state === 'failed' ? 'auto' : 0, opacity: state === 'active' || state === 'failed' ? 1 : 0 }}
+          transition={reduced ? { duration: 0 } : motionTokens.morph}>
+          <p className="schedule-progress-step-detail">{detail}</p>
+        </motion.div> : <p className="schedule-progress-step-detail">{detail}</p>}
       </div>
     </>
   )
 }
 
 
+const formatPercent = (value: number) => String(Math.round(value))
 const ESTIMATED_DURATION_MS = 10_000
 const PROGRESS_REFRESH_INTERVAL_MS = 250
 

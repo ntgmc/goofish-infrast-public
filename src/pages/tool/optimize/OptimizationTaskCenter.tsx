@@ -109,7 +109,7 @@ export default function OptimizationTaskCenterDialog({
               <button type="button" onClick={() => void controller.toggleNotifications()} aria-pressed={notificationsEnabled} className="tool-secondary-action">
                 {notificationsEnabled ? copy.optimize.pages_tool_optimize_OptimizationTaskCenter_007 : copy.optimize.pages_tool_optimize_OptimizationTaskCenter_006}
               </button>
-              <button type="button" onClick={() => void controller.refresh()} disabled={loading || refreshing} className="tool-secondary-action">
+              <button type="button" onClick={() => void controller.refresh()} disabled={loading || refreshing} aria-busy={loading || refreshing} className="tool-secondary-action">
                 <RefreshIcon size={16} aria-hidden="true" />{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_003}
               </button>
             </div>
@@ -117,7 +117,7 @@ export default function OptimizationTaskCenterDialog({
           {notice && <p className="tool-alert tool-alert--warning mt-3" role="status">{notice}</p>}
           {error && <p className="tool-alert tool-alert--error mt-3" role="alert">{error}</p>}
           {loading && jobs.length === 0 ? (
-            <p className="mt-4 text-sm text-ink-muted" role="status">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_004}</p>
+            <p className="tool-loading-status mt-4 text-sm text-ink-muted" role="status" aria-busy="true">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_004}</p>
           ) : jobs.length === 0 ? (
             <p className="mt-4 text-sm text-ink-muted">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_005}</p>
           ) : (
@@ -144,7 +144,7 @@ export default function OptimizationTaskCenterDialog({
             </div>
           )}
           {controller.hasMore && (
-            <button type="button" disabled={loadingMore} onClick={() => void controller.loadMore()} className="tool-secondary-action mt-4 w-full">
+            <button type="button" disabled={loadingMore} aria-busy={loadingMore} onClick={() => void controller.loadMore()} className="tool-secondary-action mt-4 w-full">
               {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_024}
             </button>
           )}

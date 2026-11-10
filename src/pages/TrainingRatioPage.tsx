@@ -66,7 +66,7 @@ function TrainingRatioContent({ session, embedded }: { session: Session; embedde
           </Tabs.List>
           <Tabs.Content value="imported" forceMount hidden={m.source !== 'imported'}>
           {session.user && session.profiles.length > 0 && <label className="training-ratio-field"><span>{text.account}</span><select className="tool-field" value={profile?.id ?? ''} onChange={(event) => navigate(embedded ? v2Path('training-ratio', event.target.value) : profileScopedPath('/tools/training-ratio', event.target.value))}><option value="" disabled>{text.account}</option>{session.profiles.filter((row) => row.status === 'active' && !row.archived_at).map((row) => <option key={row.id} value={row.id}>{row.display_name}</option>)}</select></label>}
-          {m.canImport ? <div className="training-ratio-actions"><button type="button" className="tool-secondary-action training-ratio-import" disabled={m.busy} onClick={() => void m.load()}><RefreshCw size={16} aria-hidden="true" />{m.busy ? copy.skland.refreshing : copy.skland.refresh}</button></div> : session.authLoading ? <p role="status">{text.accountLoading}</p> : <p>{text.loginHint} <Link className="training-ratio-link" to={embedded ? v2Path('profiles', profile?.id) : '/tool/profiles'}>{text.accountEntry}<ArrowRight size={14} /></Link></p>}
+          {m.canImport ? <div className="training-ratio-actions"><button type="button" className="tool-secondary-action training-ratio-import" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}><RefreshCw size={16} aria-hidden="true" />{m.busy ? copy.skland.refreshing : copy.skland.refresh}</button></div> : session.authLoading ? <p role="status" aria-busy="true" className="tool-loading-status">{text.accountLoading}</p> : <p>{text.loginHint} <Link className="training-ratio-link" to={embedded ? v2Path('profiles', profile?.id) : '/tool/profiles'}>{text.accountEntry}<ArrowRight size={14} /></Link></p>}
           {m.data && <><ResourceStock inventory={m.data.inventory} /><p>{text.importedAt} {new Date(m.data.importedAt).toLocaleString('zh-CN')}</p></>}
           {m.error && <p role="alert" className="training-ratio-error">{m.error}</p>}
           <TrainingRatioGoals model={m} />
@@ -93,14 +93,14 @@ function TrainingRatioContent({ session, embedded }: { session: Session; embedde
             <h3>{text.inventoryRatio}</h3><p className="training-ratio-value">{inventoryRatio}</p>
             {m.balance.supplement > 0 && <div className="training-ratio-supplement">
               <h3><ProductIcon product={m.balance.focus === 'lmd' ? 'LMD' : 'Battle Record'} size={28} />{text.supplement}</h3>
-              {m.incomeLoading ? <p role="status">{text.recoveryLoading}</p> : m.recovery && <>
+              {m.incomeLoading ? <p role="status" aria-busy="true" className="tool-loading-status">{text.recoveryLoading}</p> : m.recovery && <>
                 {m.recovery.days !== null ? <><p className="training-ratio-value">{text.recoveryDays(number(m.recovery.days))}</p><p>{text.recoveryPlan(m.recovery.stage, Boolean(m.income))}</p></> : <p>{text.recoveryBlocked}</p>}
                 {m.income ? <><p>{text.baseIncome(number(m.income.lmd), number(m.income.exp))}</p><p>{text.baseSource(profile?.display_name ?? '', m.incomeName ?? '')}</p></> : <p>{m.incomeFailed ? text.baseIncomeFailed : text.noBaseIncome}</p>}
                 <p>{text.farmingBudget}{m.recovery.stage === 'CE-6' && ` ${text.ceCalendar}`}</p>
                 <p>{text.supplementHint}</p>
               </>}
             </div>}
-          </> : <p role="status">{m.source === 'manual' ? text.noManualInventory : m.busy ? text.importing : text.noInventory}</p>}
+          </> : <p role="status" aria-busy={m.source !== 'manual' && m.busy} className={m.source !== 'manual' && m.busy ? 'tool-loading-status' : undefined}>{m.source === 'manual' ? text.noManualInventory : m.busy ? text.importing : text.noInventory}</p>}
         </section>
       </div>
       <TrainingRatioEvidence accountMode={accountMode} projectHref={features.cultivation_plan ? v2Path('cultivation-projects', profile?.id) : undefined} />

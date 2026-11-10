@@ -456,6 +456,17 @@ export const publicCopy = {
     plan_details: "方案说明",
     rules: "购买、兑换与使用规则",
   },
+  pricing_story: {
+    title: "从基建配置到自动换班",
+    description: "四种维护期限均可使用这些高级能力，按自己的培养和排班习惯选择。",
+    enlarge: "放大查看界面",
+    close: "关闭大图",
+    pan: "左右滑动查看截图细节",
+    config: { title: "自由调整换班与生产策略", body: "高级配置支持自定义换班间隔、无人机分配策略和菲亚梅塔开关，让排班按你的使用习惯运行。", source: "高级配置 · 无人机策略", options: ["自定义换班间隔", "无人机分配与使用顺序", "菲亚梅塔开关"], caption: "可选择效率优先或库存平衡优先，决定无人机在换班前还是换班后使用，也可关闭自动配置、逐班指定用途。", alt: "高级配置中的无人机选项：自动配置开关、库存平衡优先策略，以及换班前或换班后的使用顺序" },
+    exports: { title: "MAA 排班，不限次数下载", body: "维护期内，按需要生成排班并下载 MAA 执行文件，次数不限。调整配置或更新干员后，可重新生成并下载新方案。", source: "MAA 执行文件", unlimited: "不限次数下载", scope: "维护期内 · MAA 排班模式", download: "下载排班", selected: "已选择排班文件", flow: "从 MaaTool 下载 JSON 排班文件，在 MAA 中选择后自动换班。", caption: "执行文件包含班次、入驻干员和生产安排，用于 MAA 自动换班。" },
+    training: { title: "培养之前，先看成本与收益", body: "把培养所需材料、当前缺口和预计收益放在一起，判断是否值得投入。培养后更新干员数据，再生成排班。", source: "公开示例排班 · 培养建议", upgrade: (name: string, current: number, target: number) => `${name} · 精${current} → 精${target}`, daily: "预计每日提升", payback: "预计回本", total: "培养总成本", missing_cost: "补齐成本", missing: "待补材料", sanity: "理智", per_day: "理智 / 日", days: "天", caption: "示例读数基于该名单与库存；回本时间按补齐材料的成本估算。你的结果以实际计算为准。" },
+    comparison: { title: "把不同配置放在一起比较", body: "用同一份干员数据比较当前方案和最多三套额外配置，结合每日产量与换班次数做选择。", source: (date: string) => `${date} 实测 · A01 · MaaTool`, metric: "净理智 / 日", lmd: "龙门币 / 日", exp: "经验 / 日", passed: "两种布局均通过执行检查", caption: "同一份干员、相同换班时长，对照净产出，再看龙门币与经验的取舍。", evidence: "查看这份名单的实测结果", chart: (first: string, second: string) => `同名单布局实测：243 每日净理智 ${first}，右满252 每日净理智 ${second}` },
+  },
   pricing_evidence: {
     title: "排班效果，有实测可查",
     description: "2026-11-04 · v2.0.1141复测，10份干员、三种布局共90份排班。",

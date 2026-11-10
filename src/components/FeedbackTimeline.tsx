@@ -13,7 +13,7 @@ export default function FeedbackTimeline({ data, admin = false, loading, onOlder
   const statuses = admin ? text.adminStatuses : text.statuses
   return <section className="feedback-timeline" aria-label={text.history}>
     <h3 className="text-sm font-semibold">{text.history}</h3>
-    {data.next_before_revision && <button type="button" className="tool-secondary-action mt-3" disabled={loading} onClick={onOlder}>{text.older}</button>}
+    {data.next_before_revision && <button type="button" className="tool-secondary-action mt-3" disabled={loading} aria-busy={loading} onClick={onOlder}>{text.older}</button>}
     <ol className="feedback-conversation">
       <li className="feedback-message feedback-message--user">
         <div className="feedback-message-heading"><span>{text.message}</span><time dateTime={data.feedback.created_at}>{feedbackTime(data.feedback.created_at)}</time></div>

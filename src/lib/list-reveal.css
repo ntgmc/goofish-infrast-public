@@ -1,0 +1,5 @@
+[data-reveal-pending] > [data-reveal-content],
+[data-reveal-pending]:not(:has([data-reveal-content])) {
+  opacity: 0.35;
+  transform: translateY(8px);
+}

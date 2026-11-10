@@ -14,6 +14,8 @@ export default function OperatorSkillPreview({ children }: { children: ReactNode
   const close = () => { cancel(); setTarget(null) }
   const findTile = (node: EventTarget | null, fromFocus = false) => {
     if (!(node instanceof Element)) return null
+    // Dialog triggers expose keyboard details through their dialog, including after focus return.
+    if (fromFocus && node.closest('[aria-haspopup="dialog"]')) return null
     const tile = node.closest<HTMLElement>('[data-operator-name]')
     if (tile || !fromFocus) return tile
     const tiles = node.closest('button')?.querySelectorAll<HTMLElement>('[data-operator-name]')

@@ -11,7 +11,9 @@ import { getSku } from '../../../lib/product-catalog'
 import Link from '../../../components/InternalLink'
 import { FeedbackLink } from '../../../components/PublicFooter'
 import { Facts, Notice, SectionTitle } from '../components/WorkspaceUI'
+import { RollingValue } from '../../../components/NumberMotion'
 import { v2Path } from '../navigation'
+import PricingBenefits from './PricingBenefits'
 
 const text = copy.public
 const planIds = PUBLIC_PRICING_PLAN_IDS.filter((id) => id !== 'free_preview')
@@ -60,11 +62,11 @@ export default function Pricing() {
         const plan = pricing.plans[id]
         const [amount, period] = plan.display_price.split('/')
         const archiveCount = id === 'single_account_lifetime' ? 3 : 1
-        return <article key={id} className={`v2-pricing-plan${id === 'single_account_lifetime' ? ' v2-pricing-plan-featured' : ''}`} aria-labelledby={`${id}-title`}>
+        return <article key={mobile ? 'selected-plan' : id} className={`v2-pricing-plan${id === 'single_account_lifetime' ? ' v2-pricing-plan-featured' : ''}`} aria-labelledby={`${id}-title`}>
           <header>
             {!mobile && <span className="v2-pricing-badge">{plan.badge}</span>}
             <h2 id={`${id}-title`}>{term(plan.label)}</h2>
-            <p className="v2-pricing-price">{mobile && <span>{choice.total_price}</span>}<strong>{amount.trim()}</strong>{period && <span>／{period.trim()}</span>}</p>
+            <p className="v2-pricing-price">{mobile && <span>{choice.total_price}</span>}<strong><RollingValue value={amount.trim()} /></strong>{period && <span>／{period.trim()}</span>}</p>
             {plan.discount_fold < 10 && <small>{text.pages_PricingPage_017(plan.original_price, plan.discount_fold)}</small>}
             <p className="v2-pricing-audience">{getSku(id).audience}</p>
           </header>
@@ -88,6 +90,7 @@ export default function Pricing() {
         {redemptionAvailable ? <Link to="/tool/redeem?mode=cdk" className="v2-button v2-button-secondary">{text.pricing_redemption.action}</Link> : <span className="v2-muted">{text.pricing_redemption.unavailable}</span>}
       </div>
     </div>
+    <PricingBenefits />
     <section className="v2-pricing-evidence" aria-label={text.pricing_evidence.title}>
       <div><h2>{text.pricing_evidence.title}</h2><p>{text.pricing_evidence.description}</p><Link to="/v2/benchmarks" className="v2-button v2-button-secondary">{text.pricing_evidence.action}</Link></div>
       <Facts items={[[text.pricing_evidence.execution_label, text.pricing_evidence.execution_value], [text.pricing_evidence.yield_label, text.pricing_evidence.yield_value]]} />

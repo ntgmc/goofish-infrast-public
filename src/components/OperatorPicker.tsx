@@ -1,10 +1,11 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { SearchIcon } from './icons'
 import { matchesSearch } from '../lib/search'
+import { useListReveal } from '../lib/use-list-reveal'
 import { copy } from '../copy'
 import { OperatorAvatarTile } from './result-panel/OperatorAvatarStrip'
 
-export default function OperatorPicker<T extends { id: string; name: string }>({ operators, selectedId, onChoose, details, title, controls, hint, searchLabel = copy.domain.manual_schedule.search }: {
+export default function OperatorPicker<T extends { id: string; name: string }>({ operators, selectedId, onChoose, details, title, controls, hint, reveal = false, searchLabel = copy.domain.manual_schedule.search }: {
   operators: T[]
   selectedId?: string
   onChoose: (operator: T) => void
@@ -13,12 +14,13 @@ export default function OperatorPicker<T extends { id: string; name: string }>({
   controls?: ReactNode
   hint?: ReactNode
   searchLabel?: string
+  reveal?: boolean
 }) {
   const [search, setSearch] = useState('')
   const [query, setQuery] = useState('')
   const [composing, setComposing] = useState(false)
   const [visibleCount, setVisibleCount] = useState(30)
-  const grid = useRef<HTMLDivElement>(null)
+  const grid = useListReveal(reveal && !search.trim() && !query && !composing, 50, 'self')
   useEffect(() => {
     if (composing || search.trim() === query) return
     const timer = window.setTimeout(() => setQuery(search.trim()), 200)
@@ -51,7 +53,7 @@ export default function OperatorPicker<T extends { id: string; name: string }>({
         const element = event.currentTarget
         if (element.scrollHeight - element.scrollTop - element.clientHeight < 120) showMore()
       }}>
-      {candidates.length > 0 ? candidates.slice(0, visibleCount).map((operator, index) => <button key={operator.id} type="button" aria-label={operator.name} aria-pressed={selectedId === operator.id}
+      {candidates.length > 0 ? candidates.slice(0, visibleCount).map((operator, index) => <button key={operator.id} data-reveal-id={reveal ? operator.id : undefined} type="button" aria-label={operator.name} aria-pressed={selectedId === operator.id}
         title={title?.(operator) ?? operator.name}
         className={`flex min-h-22 min-w-0 items-start gap-2.5 rounded-lg border p-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 ${selectedId === operator.id ? 'border-brand-400 bg-brand-500/10' : 'border-surface-3 hover:bg-surface-2'}`}
         onFocus={index === visibleCount - 1 ? showMore : undefined} onClick={() => onChoose(operator)}>

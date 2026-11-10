@@ -10,6 +10,7 @@ import SklandBackpack from './SklandBackpack'
 import { SklandOverview, SklandInfrastructure } from './SklandGamePanels'
 import type { V2Session } from '../OptionsDrawer'
 import { Notice } from '../components/WorkspaceUI'
+import { DataRefresh } from '../components/DataActivity'
 
 const text = copy.skland
 
@@ -46,18 +47,19 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
         </label> : <button type="button" className="v2-button v2-button-secondary" onClick={onProfiles}>{text.manageAccounts}</button>}
         <div className="v2-actions">
           {profile && rebind ? <button type="button" className="v2-button v2-button-primary" onClick={() => setBinding(true)}><SklandIcon />{text.bind}</button>
-            : profile && <button type="button" className="v2-button v2-button-secondary" disabled={snapshot.busy || !snapshot.available || Boolean(data?.retryAt && Date.parse(data.retryAt) > now)}
+            : profile && <button type="button" className="v2-button v2-button-secondary" aria-busy={snapshot.busy} disabled={snapshot.busy || !snapshot.available || Boolean(data?.retryAt && Date.parse(data.retryAt) > now)}
               onClick={() => void snapshot.refresh()}><RefreshIcon size={16} aria-hidden="true" />{snapshot.busy ? text.refreshing : text.refresh}</button>}
           {session.license && <button type="button" className="v2-button v2-button-secondary" onClick={onConfig}><ConfigIcon size={16} aria-hidden="true" />{text.configure}</button>}
         </div>
       </div>
       {rebind && <p className="mt-4 text-sm text-ink-secondary">{text.bindFirst}</p>}
       {snapshot.error && <Notice error>{snapshot.error}</Notice>}
-      {snapshot.busy && <p className="mt-4 text-sm text-ink-secondary" role="status">{text.refreshing}</p>}
+      <DataRefresh pending={snapshot.busy} revision={data} error={Boolean(snapshot.error)}
+        label={copy.v2.dataActivity.syncing} description={data ? copy.v2.dataActivity.current : undefined} skeleton={data ? undefined : 'cards'} />
       <p className="mt-4 text-sm leading-6 text-ink-secondary">{text.snapshotHelp}</p>
       {profile?.skland_binding && <p className="mt-2 text-sm text-ink-muted">UID {profile.skland_binding.uid}</p>}
     </section>
-    {data && <Tabs.Root value={tab} onValueChange={setTab}>
+    {data && <Tabs.Root className="v2-data-arrival" value={tab} onValueChange={setTab}>
       <Tabs.List className="mb-5 flex border-b border-surface-3" aria-label={text.title}>
         {(['overview', 'backpack', 'infrastructure'] as const).map((entry) => <Tabs.Trigger key={entry} value={entry}
           className="min-h-11 flex-1 border-b-2 border-transparent px-3 py-3 text-sm font-medium text-ink-secondary data-[state=active]:border-brand-500 data-[state=active]:text-ink-primary focus-visible:outline-2 focus-visible:outline-brand-500 sm:flex-none sm:px-6">{text[entry]}</Tabs.Trigger>)}

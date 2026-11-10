@@ -1,0 +1,6 @@
+.shared-card-overlay { position: fixed; inset: 0; z-index: 50; background: var(--color-v2-scrim); }
+.shared-card-dialog { position: fixed; inset: 0; z-index: 50; width: min(44rem, calc(100vw - 2rem)); height: fit-content; max-height: calc(100dvh - 2rem); margin: auto; overflow: hidden; border: 1px solid var(--v2-line); background: var(--v2-paper); color: var(--v2-ink); box-shadow: 0 1rem 3rem -1rem var(--menu-shadow); outline: none; }
+.shared-card-scroll { max-height: calc(100dvh - 2rem - 2px); overflow-y: auto; overscroll-behavior: contain; padding: var(--space-lg); }
+.shared-card-dialog.v2-dialog > .shared-card-close { position: absolute; z-index: 1; top: var(--space-xs); right: var(--space-xs); background: var(--v2-paper); }
+.shared-card-dialog:focus-visible { outline: 2px solid var(--v2-accent); outline-offset: 2px; }
+@media (max-width: 40rem) { .shared-card-scroll { padding: var(--space-sm); } }

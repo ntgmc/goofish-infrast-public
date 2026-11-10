@@ -1,4 +1,4 @@
-import { memo, useId, useState, type KeyboardEvent, type ComponentType } from 'react'
+import { memo, useId, useRef, useState, type KeyboardEvent, type ComponentType } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
 import { OpenDetailsIcon as ArrowUpRight, DormitoryIcon as BedDouble, ControlRoomIcon as Building2, ShiftTimeIcon as Clock3, DroneIcon as Drone, ManufactureIcon as Factory, TrainingRoomIcon as GraduationCap, GridViewIcon as LayoutGrid, ListViewIcon as List, RecruitmentIcon as UserRoundSearch, MeetingRoomIcon, OperatorsIcon as Users, ProcessingRoomIcon as Wrench, PowerPlantIcon as Zap, RecyclingStationIcon, UnknownFacilityIcon } from '../../components/icons'
 import { copy } from '../../copy'
@@ -12,6 +12,10 @@ import { AnimatedValue, MotionNavIndicator, motionTokens } from '../../component
 import { useAppReducedMotion } from '../../lib/motion-preference'
 import type { OptimizeResult } from '../../lib/types'
 import TradingIcon from './TradingIcon'
+import SharedCardDialog from '../../components/ui/shared-card-dialog'
+import { DialogDescription, DialogTitle } from '../../components/ui/dialog'
+import BuildingSkills from './BuildingSkills'
+import { RoomProduction } from './IncomeAnalysis'
 
 const text = copy.v2
 const ROOM_ORDER = ['trading', 'manufacture', 'control', 'power', 'meeting', 'processing', 'hire', 'training', 'dormitory']
@@ -38,7 +42,7 @@ export function Avatar({ operator, small = false }: { operator: RoomOperator; sm
   )
 }
 
-export default memo(function ScheduleBoard({ result, prepared, expanded, onExpandedChange, shift, onShiftChange, view, onViewChange, onRoom }: {
+export default memo(function ScheduleBoard({ result, prepared, expanded, onExpandedChange, shift, onShiftChange, view, onViewChange, showProduction }: {
   result: OptimizeResult
   prepared: PreparedResult
   expanded: boolean
@@ -47,9 +51,12 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
   onShiftChange: (shift: number) => void
   view: 'grid' | 'list'
   onViewChange: (view: 'grid' | 'list') => void
-  onRoom: (room: BoardRoom) => void
+  showProduction: boolean
 }) {
   const id = useId()
+  const reduced = useAppReducedMotion()
+  const [roomKey, setRoomKey] = useState<string | null>(null)
+  const [frontRoomKey, setFrontRoomKey] = useState<string | null>(null)
   const selected = Math.min(shift, Math.max(result.plans.length - 1, 0))
   const [transition, setTransition] = useState({ shift: selected, direction: 0 })
   if (transition.shift !== selected) setTransition({ shift: selected, direction: selected > transition.shift ? 1 : -1 })
@@ -65,6 +72,7 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
       const bRank = ROOM_ORDER.indexOf(b.roomType)
       return (aRank < 0 ? ROOM_ORDER.length : aRank) - (bRank < 0 ? ROOM_ORDER.length : bRank)
     })
+  const openedRoom = allRooms.find((room) => room.key === roomKey)
   const roomGroups = [
     { label: text.productionRooms, compact: false, rooms: allRooms.filter((room) => ['trading', 'manufacture'].includes(room.roomType)) },
     { label: text.controlAndPower, compact: !expanded, rooms: allRooms.filter((room) => ['control', 'power'].includes(room.roomType)) },
@@ -126,7 +134,7 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
           <section key={group.label} className="v2-room-group" aria-label={group.label}>
             <h3 className="v2-room-group-title">{group.label}</h3>
             <div className={`v2-room-grid ${view === 'list' ? 'v2-room-list' : ''}`}>
-              {group.rooms.map((room) => <RoomCard key={room.key} room={room} layoutKey={layoutKey} compact={group.compact} direction={transition.direction} onClick={() => onRoom(room)}
+              {group.rooms.map((room) => <RoomCard key={room.key} room={room} layoutKey={layoutKey} compact={group.compact} direction={transition.direction} selectedKey={roomKey} front={frontRoomKey === room.key} onClick={() => { setFrontRoomKey(room.key); setRoomKey(room.key) }}
                 autofill={room.roomType === 'dormitory' && Boolean(plan?.rooms.dormitory?.[room.roomIndex]?.autofill)}
                 drone={isDroneTarget(plan?.drones, room.roomType, room.roomIndex)} />)}
             </div>
@@ -135,24 +143,38 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
         </div>
       </div>
     </section>
+    {openedRoom && <SharedCardDialog key={openedRoom.key} layoutId={`room-${openedRoom.key}`} onClose={() => setRoomKey(null)} closeLabel={text.close} className={`v2-room-detail v2-room-${openedRoom.roomType}`}>
+      <header className="v2-room-detail-heading">
+        <motion.span className="v2-room-icon" layoutId={reduced ? undefined : `room-icon-${openedRoom.key}`} transition={motionTokens.morph}><FacilityIcon room={openedRoom} /></motion.span>
+        <div><DialogTitle asChild><motion.h2 layoutId={reduced ? undefined : `room-title-${openedRoom.key}`} transition={motionTokens.morph}>{openedRoom.label}<small>{openedRoom.indexLabel}</small></motion.h2></DialogTitle>
+          <DialogDescription>{text.roomDescription(result.plans[selected]?.name || text.shift(selected + 1), hours[selected] ?? 8)}</DialogDescription></div>
+      </header>
+      <motion.div initial={{ opacity: reduced ? 1 : 0 }} animate={{ opacity: 1 }} transition={{ duration: reduced ? 0 : 0.18 }}>
+        <RoomDetails room={openedRoom} result={result} shift={selected} showProduction={showProduction} />
+      </motion.div>
+    </SharedCardDialog>}
     </LayoutGroup></OperatorSkillPreview>
   )
 })
 
-function RoomCard({ room, layoutKey, direction, drone = false, compact = false, autofill = false, onClick }: { room: BoardRoom; layoutKey: string; direction: number; drone?: boolean; compact?: boolean; autofill?: boolean; onClick: () => void }) {
+function FacilityIcon({ room }: { room: BoardRoom }) {
+  const Icon = ROOM_ICONS[room.roomType] ?? UnknownFacilityIcon
+  return <Icon size={16} />
+}
+
+function RoomCard({ room, layoutKey, direction, selectedKey, front, drone = false, compact = false, autofill = false, onClick }: { room: BoardRoom; layoutKey: string; direction: number; selectedKey: string | null; front: boolean; drone?: boolean; compact?: boolean; autofill?: boolean; onClick: () => void }) {
   const reduceMotion = useAppReducedMotion()
   const layout = reduceMotion ? false : 'position'
   const geometryTransition = { duration: 0.28, ease: motionTokens.ease.enter }
-  const Icon = ROOM_ICONS[room.roomType] ?? UnknownFacilityIcon
   const automaticDormitory = autofill || room.row?.isAutofill
   const efficiency = room.row && room.row.efficiency !== '-' && ['trading', 'manufacture', 'power'].includes(room.roomType) ? room.row.efficiency : null
   const showBottom = !compact || room.product !== '-' || Boolean(efficiency)
   return (
-    <motion.button type="button" className={`v2-room-card v2-room-${room.roomType} ${compact ? 'v2-room-card-compact' : ''}`} onClick={onClick}
-      layout={!reduceMotion} layoutDependency={layoutKey} transition={geometryTransition}>
+    <motion.button type="button" className={`v2-room-card v2-room-${room.roomType} ${compact ? 'v2-room-card-compact' : ''}`} onClick={onClick} data-shared-card-front={front || undefined}
+      aria-haspopup="dialog" layout={!reduceMotion} layoutId={reduceMotion ? undefined : `room-${room.key}`} style={{ borderRadius: 6 }} layoutDependency={`${layoutKey}-${selectedKey}`} transition={motionTokens.morph}>
       <motion.div layout={layout} layoutDependency={layoutKey} transition={geometryTransition} className="v2-room-header">
-        <span className="v2-room-icon"><Icon size={16} /></span>
-        <span className="v2-room-title"><span>{room.label}</span><small>{room.indexLabel}</small></span>
+        <motion.span className="v2-room-icon" layoutId={reduceMotion ? undefined : `room-icon-${room.key}`} transition={motionTokens.morph}><FacilityIcon room={room} /></motion.span>
+        <motion.span className="v2-room-title" layoutId={reduceMotion ? undefined : `room-title-${room.key}`} transition={motionTokens.morph}><span>{room.label}</span><small>{room.indexLabel}</small></motion.span>
       </motion.div>
       <span className="v2-room-marker">
         {drone && <span className="v2-drone-tag" title={text.drones}><Drone size={16} /></span>}
@@ -178,9 +200,56 @@ function RoomCard({ room, layoutKey, direction, drone = false, compact = false, 
   )
 }
 
+function RoomDetails({ room, result, shift, showProduction }: { room: BoardRoom; result: OptimizeResult; shift: number; showProduction: boolean }) {
+  const maximum = result.plans[shift]?.mood_assumptions?.max_mood
+  const maxMood = maximum !== undefined && Number.isFinite(maximum) && maximum > 0 ? maximum : 24
+  return <div className="v2-room-detail-content">
+    <dl className="v2-room-detail-stats">
+      <div><dt>{text.product}</dt><dd><ProductIcon product={room.product} size={20} />{room.product === '-' ? text.support : room.product}</dd></div>
+      {room.row && room.row.efficiency !== '-' && <div><dt>{room.roomType === 'trading' ? text.equivalentEfficiency : text.efficiency}</dt><dd>{room.row.efficiency}</dd></div>}
+      {showProduction && result.daily_production && <RoomProduction daily={result.daily_production} room={room} shift={result.plans[shift]?.name} />}
+    </dl>
+    <section className="v2-room-operator-details" aria-label={text.roomOperators}>
+      <h3>{text.roomOperators}</h3>
+      {room.row?.operators.length ? room.row.operators.map((operator) => {
+        const mood = room.data?.mood?.[operator.name]
+        return <section className="v2-room-operator" key={operator.name} aria-label={operator.name}>
+          <div className="v2-operator-row"><Avatar operator={operator} /><strong>{operator.name}</strong></div>
+          <RoomMood start={mood?.start} end={mood?.end} maximum={maxMood} />
+          <BuildingSkills operator={operator} />
+        </section>
+      }) : <p className="v2-muted">{room.row?.isAutofill || room.data?.autofill ? copy.domain.components_result_panel_formatters_005 : copy.domain.result_board_v2.empty_room}</p>}
+    </section>
+    {Boolean(room.row?.detailItems.length) && <details className="v2-room-calculation"><summary>{text.roomDetails}</summary>
+      <ul className="v2-room-detail-list">{room.row?.detailItems.map((item, index) => <li key={item}>{room.roomType === 'trading'
+        ? index === 0 ? `${text.equivalentEfficiency} ${room.row?.efficiency}`
+          : item.startsWith(copy.domain.components_result_panel_formatters_023) ? `${text.expectedFullOrders}${room.data?.overflow?.time}` : item
+        : item}</li>)}</ul>
+    </details>}
+  </div>
+}
+
+function RoomMood({ start, end, maximum }: { start?: number; end?: number; maximum: number }) {
+  const known = start !== undefined && end !== undefined && Number.isFinite(start) && Number.isFinite(end)
+  const percent = (value: number) => Math.min(100, Math.max(0, value / maximum * 100))
+  const value = (mood: number | undefined) => mood !== undefined && Number.isFinite(mood) ? mood.toFixed(1) : text.moodUnavailable
+  const startPercent = known ? percent(start) : 0
+  const endPercent = known ? percent(end) : 0
+  return <div className="v2-room-mood" data-recovering={known && end > start || undefined} data-empty={known && end <= 0 || undefined}>
+    <dl><div><dt>{text.startMood}</dt><dd>{value(start)}<span aria-hidden="true">→</span></dd></div>
+      <div><dt>{text.endMood}</dt><dd>{value(end)}<small>/ {maximum}</small></dd></div></dl>
+    {known && <div className="v2-mood-track" aria-hidden="true">
+      <span className="v2-mood-level" style={{ width: `${endPercent}%` }} />
+      <span className="v2-mood-change" style={{ left: `${Math.min(startPercent, endPercent)}%`, width: `${Math.abs(endPercent - startPercent)}%` }} />
+      <span className="v2-mood-start" style={{ left: `${startPercent}%` }} />
+    </div>}
+  </div>
+}
+
 function OperatorOccupant({ operator, compact, direction, reducedMotion }: { operator: RoomOperator; compact: boolean; direction: number; reducedMotion: boolean }) {
   const present = useIsPresent()
-  return <motion.span className="v2-operator-content" aria-hidden={!present || undefined} inert={!present || undefined}
+  const changedShift = useRef(direction !== 0)
+  return <motion.span className="v2-operator-content" data-shift-change={!reducedMotion && changedShift.current || undefined} aria-hidden={!present || undefined} inert={!present || undefined}
     initial={reducedMotion ? false : { opacity: 0, x: direction * 5 }} animate={{ opacity: 1, x: 0 }}
     variants={{ exit: (exitDirection: number) => ({ opacity: 0, x: exitDirection * -3, transition: { duration: motionTokens.duration.exit } }) }} exit="exit"
     transition={{ duration: reducedMotion ? 0 : motionTokens.duration.enter, ease: motionTokens.ease.enter }}>

@@ -45,7 +45,7 @@ function ComparisonWorkspace({ workflow: w, onConfig }: { workflow: V2Workflow; 
       <div aria-live="polite" aria-atomic="true">{expansion.value ? <strong>{ui.scenarioCount(expansion.value.scenarios.length)}</strong> : <Notice error>{expansion.error}</Notice>}
         {!w.scenarioQuoteRequired && <p className="v2-muted">{ui.remainingRuns}：{!w.inventoryLoaded || w.inventoryError || remaining === undefined ? '—' : remaining === null ? <span aria-label={ui.unlimitedRuns}>∞</span> : remaining}</p>}
       </div>
-      <button type="button" className="v2-button v2-button-primary" disabled={model.loading || !expansion.value || (w.scenarioCouponRequired && (!useCoupon || couponBalance < 1)) || quoteUnavailable} onClick={() => void model.run(w.scenarioCouponRequired && useCoupon, w.scenarioBillingQuote)}>{model.loading ? ui.running : ui.run}</button>
+      <button type="button" className="v2-button v2-button-primary" aria-busy={model.loading} disabled={model.loading || !expansion.value || (w.scenarioCouponRequired && (!useCoupon || couponBalance < 1)) || quoteUnavailable} onClick={() => void model.run(w.scenarioCouponRequired && useCoupon, w.scenarioBillingQuote)}>{model.loading ? ui.running : ui.run}</button>
     </div>
     {skippedCount > 0 && <details className="v2-comparison-skips"><summary>{ui.skippedCount(skippedCount)}</summary><ul>{expansion.value?.skipped.map((item) => <li key={`${item.code}:${item.droneStrategy}`}>{ui.skippedItem(item.message, item.count)}</li>)}</ul></details>}
     {w.scenarioQuoteRequired && <Notice>{w.scenarioBillingQuoteLoading ? text.pages_tool_optimize_ScenarioLabSection_055 : w.scenarioBillingQuoteError ?? (w.scenarioBillingQuote?.sufficient === false ? text.pages_tool_optimize_ScenarioLabSection_056 : text.pages_tool_optimize_ScenarioLabSection_057)}{w.scenarioBillingQuoteError && <button className="v2-text-button" onClick={() => void w.refreshScenarioBillingQuote()}>{text.pages_tool_optimize_ScenarioLabSection_058}</button>}</Notice>}
@@ -57,7 +57,7 @@ function ComparisonWorkspace({ workflow: w, onConfig }: { workflow: V2Workflow; 
   {history && <section className="v2-generation-history" aria-label={ui.historyTitle}>
     <SectionTitle title={ui.historyTitle} description={ui.historyDescription} action={<button type="button" className="v2-button v2-button-secondary" disabled={history.loading || history.refreshing || history.loadingMore} onClick={() => void history.refresh()}>{text.pages_tool_optimize_OptimizationTaskCenter_003}</button>} />
     <Notice error>{history.error}</Notice>
-    {history.loading ? <Loading label={text.pages_tool_optimize_OptimizationTaskCenter_004} /> : <>
+    {history.loading ? <Loading label={text.pages_tool_optimize_OptimizationTaskCenter_004} skeleton="list" /> : <>
       {historyResults.map((job) => <article key={job.id} className="v2-record" aria-current={model.job?.id === job.id ? 'true' : undefined}>
         <div className="v2-record-select"><time dateTime={job.timestamps.finishedAt ?? job.timestamps.submittedAt}>{formatWorkspaceDate(job.timestamps.finishedAt ?? job.timestamps.submittedAt)}</time><strong>{ui.historyResult(formatWorkspaceDate(job.timestamps.submittedAt))}</strong>{!job.resultAvailable && <span>{text.pages_tool_optimize_OptimizationTaskCenter_041}</span>}</div>
         <button type="button" className="v2-text-button" disabled={model.loading || !job.resultAvailable} onClick={() => restoreScenarioComparisonJob(w.profile.id, job.id)}>{text.pages_tool_optimize_OptimizationTaskCenter_037}</button>

@@ -83,7 +83,7 @@ function compareChangelogReleaseOrder(left: ChangelogRelease, right: ChangelogRe
   return versionOrder !== 0 ? versionOrder : right.id.localeCompare(left.id)
 }
 
-function compareReleaseVersions(left: string | null, right: string | null): number {
+export function compareReleaseVersions(left: string | null, right: string | null): number {
   if (left === right) return 0
   if (left === null) return 1
   if (right === null) return -1

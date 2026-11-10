@@ -48,16 +48,17 @@ export function V2PageTransition<T extends string>({ motionKey, children, classN
   return <motion.div ref={region} className={className} data-route-pending={displayedKey !== motionKey || undefined} data-page-entering={entering ?? undefined} initial={false} animate={controls}>{children(displayedKey)}</motion.div>
 }
 
-export default function V2Transition({ motionKey, children, className }: {
+export default function V2Transition({ motionKey, children, className, layoutScroll = false }: {
   motionKey: string
   children: ReactNode
   className?: string
+  layoutScroll?: boolean
 }) {
   return (
-    <div className={`v2-transition ${className ?? ''}`}>
+    <motion.div layoutScroll={layoutScroll} className={`v2-transition ${className ?? ''}`}>
       <AnimatedPresenceRegion motionKey={motionKey} className="v2-transition-pane">
         {children}
       </AnimatedPresenceRegion>
-    </div>
+    </motion.div>
   )
 }
