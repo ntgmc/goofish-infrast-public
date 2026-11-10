@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../com
 import { copy } from '../../copy'
 import ProductIcon from '../../components/ProductIcon'
 import { AnimatedValue, RevealItem, StaggeredReveal } from '../../components/MotionPrimitives'
+import { TweenValue } from '../../components/NumberMotion'
 import { formatAmount, formatIntermediateDepletionSummary, type PreparedResult } from '../../components/result-panel/formatters'
 import { useResultHistoryDetailQuery } from '../tool/optimize/result-history-query'
 import { calculateProductionSanity } from '../../lib/production-sanity'
@@ -12,6 +13,8 @@ import type { LicenseConfig, OptimizeResult, WorkspaceResultHistorySummary } fro
 
 const text = copy.v2
 const signedAmount = (value: number) => value.toLocaleString('zh-CN', { maximumFractionDigits: 2, signDisplay: 'exceptZero' })
+const fixedOne = (value: number) => value.toFixed(1)
+const fixedTwo = (value: number) => value.toFixed(2)
 
 export default function ProductionSummary({ result, prepared, sample, userId, profileId, resultId, resultConfig, history, newResult, onConfigure }: {
   result: OptimizeResult
@@ -86,22 +89,22 @@ export default function ProductionSummary({ result, prepared, sample, userId, pr
 
   return <>
     <StaggeredReveal className="v2-metrics">
-      <Metric label={hasLmdCashFlow ? text.lmdNetChange : text.lmd} value={daily ? formatAmount(netLmd) : '—'} unit={text.daily} product="LMD"
+      <Metric label={hasLmdCashFlow ? text.lmdNetChange : text.lmd} value={daily ? netLmd : null} unit={text.daily} product="LMD"
         hint={hasLmdCashFlow && economy ? text.lmdCashFlowHint(formatAmount(economy.daily_lmd_income ?? prepared.productionStats.lmd), formatAmount(economy.hard_lmd_cost)) : undefined}
         change={showChanges ? changes[0].compact : undefined} />
-      <Metric label={showOrundum ? text.orundum : text.exp} value={daily ? formatAmount(showOrundum ? orundum : experience) : '—'}
+      <Metric label={showOrundum ? text.orundum : text.exp} value={daily ? showOrundum ? orundum : experience : null}
         unit={showOrundum ? text.daily : text.expUnit} product={showOrundum ? 'Orundum' : 'Battle Record'}
         hint={showOrundum && economy ? [text.shortTermOrundumHint, burstNote].filter(Boolean).join(' · ') : undefined}
         change={showChanges ? changes[1].compact : undefined} />
-      <Metric label={text.goldNetChange} value={hasGoldNet ? signedAmount(goldNet) : '—'} unit={text.goldUnit} product="Pure Gold">
+      <Metric label={text.goldNetChange} value={hasGoldNet ? goldNet : null} format={signedAmount} unit={text.goldUnit} product="Pure Gold">
         <button type="button" className="v2-text-button v2-metric-inventory" onClick={onConfigure} title={text.adjustProduction}>
           <span>{goldHint}</span><Settings2 size={14} aria-hidden="true" /><span className="sr-only">{text.adjustProduction}</span>
         </button>
       </Metric>
-      {isOrundum ? <Metric label={text.shortTermPulls} value={daily ? (orundum * 30 / 600).toFixed(1) : '—'} unit={text.pullsPer30Days}
+      {isOrundum ? <Metric label={text.shortTermPulls} value={daily ? orundum * 30 / 600 : null} format={fixedOne} unit={text.pullsPer30Days}
         icon={<img src="/assets/products/TKT_GACHA.png" alt="" width={24} height={24} decoding="async" />}
         hint={text.shortTermPullsHint(formatAmount(orundum), burstNote || (economy ? text.orundumOutputSustainable : text.orundumDurationUnavailable))} />
-        : <Metric label={text.sanity} value={daily ? prepared.productionSanity.value.toFixed(2) : '—'} unit={text.sanityUnit}
+        : <Metric label={text.sanity} value={daily ? prepared.productionSanity.value : null} format={fixedTwo} unit={text.sanityUnit}
           icon={<img src="/assets/products/AP_GAMEPLAY.png" alt="" width={24} height={24} decoding="async" />}
           change={showChanges ? changes[3]?.compact : undefined} />}
     </StaggeredReveal>
@@ -143,14 +146,14 @@ export default function ProductionSummary({ result, prepared, sample, userId, pr
   </>
 }
 
-function Metric({ label, value, unit, hint, change, product, icon, children }: {
-  label: string; value: string; unit: string; hint?: string; change?: string; product?: string; icon?: ReactNode; children?: ReactNode
+function Metric({ label, value, format = formatAmount, unit, hint, change, product, icon, children }: {
+  label: string; value: number | null; format?: (value: number) => string; unit: string; hint?: string; change?: string; product?: string; icon?: ReactNode; children?: ReactNode
 }) {
   return <RevealItem className="v2-metric"><section aria-label={label}>
     <div className="v2-metric-top"><span>{label}</span><span className="v2-metric-icon" aria-hidden="true">{product ? <ProductIcon product={product} size={24} /> : icon}</span></div>
-    <p className="v2-metric-value"><AnimatedValue value={value} /><small>{unit}</small></p>
+    <p className="v2-metric-value">{value === null ? '—' : <TweenValue value={value} format={format} />}<small>{unit}</small></p>
     {hint && <p className="v2-metric-hint">{hint}</p>}
-    {change && <p className="v2-metric-change">{change !== text.sameAsPrevious && <span>{text.changeFromPrevious} </span>}{change}</p>}
+    {change && <p className="v2-metric-change">{change !== text.sameAsPrevious && <span>{text.changeFromPrevious} </span>}<AnimatedValue value={change} /></p>}
     {children}
   </section></RevealItem>
 }

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { CountUp, RollingValue } from './NumberMotion'
+import { animate } from 'motion/react'
+import { CountUp, RollingValue, TweenValue } from './NumberMotion'
 
 const state = vi.hoisted(() => ({ reduced: false, stop: vi.fn(), update: undefined as ((value: number) => void) | undefined }))
 vi.mock('../lib/motion-preference', () => ({ useAppReducedMotion: () => state.reduced }))
@@ -27,6 +28,21 @@ it('keeps the accessible result stable and stops counting immediately when anima
   expect(state.stop).toHaveBeenCalledOnce()
   expect(visual).toHaveTextContent('2.08')
   expect(disconnect).toHaveBeenCalled()
+})
+
+it('continues interrupted metric updates from the displayed number and keeps the accessible final value', () => {
+  const format = (value: number) => value.toFixed(2)
+  const view = render(<TweenValue value={100} format={format} />)
+  expect(animate).not.toHaveBeenCalled()
+  view.rerender(<TweenValue value={200} format={format} />)
+  act(() => state.update?.(150))
+  expect(view.container.querySelector('[aria-hidden]')).toHaveTextContent('150.00')
+  expect(view.container.querySelector('.number-motion-tween')).toHaveAttribute('aria-label', '200.00')
+  view.rerender(<TweenValue value={-10} format={format} />)
+  expect(animate).toHaveBeenLastCalledWith(150, -10, expect.anything())
+  state.reduced = true
+  view.rerender(<TweenValue value={-10} format={format} />)
+  expect(view.container.querySelector('[aria-hidden]')).toHaveTextContent('-10.00')
 })
 
 it('preserves configured price text and renders final numbers without an observer or animation', () => {

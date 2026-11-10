@@ -301,6 +301,9 @@ it deliberately when changing the shared design.
 - `SharedCardDialog` provides card-to-detail transitions with shared layout IDs and the morph
   spring (stiffness 380, damping 40, mass 0.85). Keep text in its own shared element or fade it
   into the destination; do not stretch long descriptions. Use `layoutScroll` on the scroll host.
+- Overview production numbers interpolate from their displayed value when a result changes, keeping
+  the final accessible value and units stable. Fresh generated results settle metrics and room groups
+  in order over roughly half a second; navigation back and ordinary data refreshes do not replay it.
 - No nested stagger cascades, bounce, overshoot, or parallax in workspaces.
 - Reduced-motion fallback · final numbers and content immediately; no transform;
   retained opacity transitions at or below 150ms.

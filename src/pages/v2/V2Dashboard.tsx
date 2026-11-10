@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
 import { useAppReducedMotion } from '../../lib/motion-preference'
 import { NextIcon as ArrowRight, ExpandIcon as ChevronDown, BreadcrumbIcon, ExportIcon as Download, LoginIcon as LogIn, MenuIcon as Menu, GenerateIcon, LoadingIcon, ConfigIcon as Settings2, DataSourceIcon as ShieldCheck, InfoIcon as Sparkles, CloseIcon as X, PreviewIcon, SampleIcon } from '../../components/icons'
@@ -153,6 +153,20 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const canViewTraining = Boolean(workflow?.userCanUseUpgradeFeatures || workflow?.suggestions?.length)
   const manualKey = useMemo(() => manualSourceKey(result), [result])
   const exportResultId = workflow?.currentResult || workflow?.finalResult ? workflow.progress?.historyResultId ?? workflow.progress?.jobId : workflow?.historyItem?.id ?? workflow?.latestWorkspaceResult?.id
+  const resultGrid = useRef<HTMLDivElement>(null)
+  const arrivalKey = exportResultId ?? manualKey
+  const lastArrival = useRef(arrivalKey)
+  useLayoutEffect(() => {
+    if (section !== 'overview') return
+    const changed = lastArrival.current !== arrivalKey
+    lastArrival.current = arrivalKey
+    if (!changed || reduceMotion || !(workflow?.currentResult || workflow?.finalResult)) return
+    const animations = [...(resultGrid.current?.querySelectorAll<HTMLElement>('.v2-overview-metrics, .v2-room-group') ?? [])]
+      .filter((element) => typeof element.animate === 'function')
+      .map((element, index) => element.animate([{ opacity: 0.6, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }],
+        { duration: 280, delay: index * 60, fill: 'backwards', easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }))
+    return () => { for (const animation of animations) animation.cancel() }
+  }, [arrivalKey, reduceMotion, section, workflow?.currentResult, workflow?.finalResult])
   const exportFailure = !sample && workflow?.exportFailure?.resultId === exportResultId ? workflow?.exportFailure : null
   const exportNotice = getMaaExportNotice(sample ? config.schedule_mode : result.schedule_mode, features.maa_export, workflow)
   const simulationBaseline = workflow?.historyItem?.config ? { id: workflow.historyItem.id, config: workflow.historyItem.config }
@@ -315,7 +329,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           </AnimatePresence>
           {generationProgress}
           {children}
-          <div className="v2-results-grid">
+          <div ref={resultGrid} className="v2-results-grid">
           <div className="v2-overview-metrics"><ProductionSummary result={result} prepared={prepared} sample={sample} userId={session.user?.id} profileId={session.activeProfile?.id} resultId={exportResultId}
             resultConfig={workflow?.historyItem?.result === result ? workflow.historyItem.config : undefined}
             history={[...(workflow?.resultHistory ?? []), ...(workflow?.archivedResults ?? [])]} newResult={Boolean(workflow?.currentResult || workflow?.finalResult)} onConfigure={() => openPanel('config')} /></div>
