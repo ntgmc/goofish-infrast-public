@@ -35,6 +35,22 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); observers.clear() })
 
+it('releases modal interaction immediately on close so another card can open during the return', () => {
+  const page = render(<div className="v2-drawer-body"><OperatorRows operators={SAMPLE_OPERATORS.slice(0, 2)} reveal={false} /></div>)
+  const triggers = within(page.getByRole('list')).getAllByRole('button')
+  for (const index of [0, 1, 0]) {
+    fireEvent.click(triggers[index])
+    expect(page.getByRole('dialog')).toHaveTextContent(SAMPLE_OPERATORS[index].name)
+    fireEvent.click(within(page.getByRole('dialog')).getByRole('button', { name: '关闭' }))
+    expect(page.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(document.querySelector('.shared-card-overlay')).not.toBeInTheDocument()
+    expect(document.body.style.pointerEvents).not.toBe('none')
+    const wheel = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true })
+    document.body.dispatchEvent(wheel)
+    expect(wheel.defaultPrevented).toBe(false)
+  }
+})
+
 it('keeps grid rows compact while details open separately and retains keyboard focus while recycling', async () => {
   const user = userEvent.setup()
   const operators = Array.from({ length: 150 }, (_, index) => ({ ...SAMPLE_OPERATORS[0], id: `operator-${index}` }))

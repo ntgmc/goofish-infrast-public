@@ -113,8 +113,8 @@ it deliberately when changing the shared design.
   the name. Make the full card a single keyboard-accessible trigger, with skill previews aligned
   at the bottom. Open full skill descriptions in a wide `SharedCardDialog`; keep the source card compact. Share the background, portrait and
   name between card and detail, with a heavily damped spring and no bounce. Keep the source mounted
-  during the transition, block wheel input while the shared surface moves, contain detail scrolling
-  at its boundaries and restore the source button's focus on dismissal. Scroll descriptions inside
+  during the transition, allow detail scrolling immediately, contain it at its boundaries
+  and restore the source button's focus on dismissal. Scroll descriptions inside
   the detail surface so its top-right close control remains visible.
   Reduced motion switches directly. Virtualize whole rows for large rosters, retaining focused and
   adjacent rows. Reduce columns with text enlargement. Operator data comes from import or sync.
@@ -302,6 +302,10 @@ it deliberately when changing the shared design.
   spring (stiffness 380, damping 40, mass 0.85). Facility cards use it for their background, icon
   and title; details retain operator mood, skills, production and efficiency. Keep text in its own shared element or fade it
   into the destination; do not stretch long descriptions. Use `layoutScroll` on the scroll host.
+  Dismissal unmounts the modal immediately, releasing its overlay, focus trap and scroll lock.
+  The source card handles the return morph, so opening another card, reopening the same card or
+  scrolling can interrupt the return without waiting for the spring. Keep background scrolling
+  locked only while the modal is open.
 - Overview production numbers interpolate from their displayed value when a result changes, keeping
   the final accessible value and units stable. Fresh generated results settle metrics and room groups
   in order over roughly half a second; navigation back and ordinary data refreshes do not replay it.

@@ -1,6 +1,6 @@
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import { memo, useCallback, useId, useLayoutEffect, useState, type CSSProperties } from 'react'
-import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
+import { LayoutGroup, motion } from 'motion/react'
 import { copy } from '../../copy'
 import { motionTokens } from '../../components/MotionPrimitives'
 import SharedCardDialog from '../../components/ui/shared-card-dialog'
@@ -96,17 +96,17 @@ export default memo(function OperatorRows({ operators, reveal = true }: { operat
         </motion.div>)}
       </div>)}
     </div>
-    <AnimatePresence>{selected && <SharedCardDialog key={selected.id} layoutId={`card-${selected.id}`}
+    {selected && <SharedCardDialog key={selected.id} layoutId={`card-${selected.id}`}
       onClose={() => setSelectedId(null)} closeLabel={copy.v2.close} className="v2-operator-detail">
       <header>
         <motion.span className="v2-operator-portrait" layoutId={reduced ? undefined : `portrait-${selected.id}`} transition={motionTokens.morph}><Avatar operator={selected} /></motion.span>
         <div><DialogTitle asChild><motion.h2 layoutId={reduced ? undefined : `name-${selected.id}`} transition={motionTokens.morph}>{selected.name}</motion.h2></DialogTitle>
           <DialogDescription>{copy.domain.building_skills.title} · {copy.v2.elite(selected.elite)} · {copy.v2.operatorLevel(typeof selected.level === 'number' || typeof selected.level === 'string' ? selected.level : undefined)}</DialogDescription></div>
       </header>
-      <motion.div initial={{ opacity: reduced ? 1 : 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduced ? 0 : 0.18 }}>
+      <motion.div initial={{ opacity: reduced ? 1 : 0 }} animate={{ opacity: 1 }} transition={{ duration: reduced ? 0 : 0.18 }}>
         {selectedSkills.length ? <BuildingSkillList skills={selectedSkills} /> : <p className="v2-muted">{copy.v2.skillsUnavailable}</p>}
       </motion.div>
-    </SharedCardDialog>}</AnimatePresence>
+    </SharedCardDialog>}
   </LayoutGroup>
 })
 

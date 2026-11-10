@@ -142,16 +142,16 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
         </div>
       </div>
     </section>
-    <AnimatePresence>{openedRoom && <SharedCardDialog key={openedRoom.key} layoutId={`room-${openedRoom.key}`} onClose={() => setRoomKey(null)} closeLabel={text.close} className={`v2-room-detail v2-room-${openedRoom.roomType}`}>
+    {openedRoom && <SharedCardDialog key={openedRoom.key} layoutId={`room-${openedRoom.key}`} onClose={() => setRoomKey(null)} closeLabel={text.close} className={`v2-room-detail v2-room-${openedRoom.roomType}`}>
       <header className="v2-room-detail-heading">
         <motion.span className="v2-room-icon" layoutId={reduced ? undefined : `room-icon-${openedRoom.key}`} transition={motionTokens.morph}><FacilityIcon room={openedRoom} /></motion.span>
         <div><DialogTitle asChild><motion.h2 layoutId={reduced ? undefined : `room-title-${openedRoom.key}`} transition={motionTokens.morph}>{openedRoom.label}<small>{openedRoom.indexLabel}</small></motion.h2></DialogTitle>
           <DialogDescription>{text.roomDescription}</DialogDescription></div>
       </header>
-      <motion.div initial={{ opacity: reduced ? 1 : 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduced ? 0 : 0.18 }}>
+      <motion.div initial={{ opacity: reduced ? 1 : 0 }} animate={{ opacity: 1 }} transition={{ duration: reduced ? 0 : 0.18 }}>
         <RoomDetails room={openedRoom} result={result} shift={selected} showProduction={showProduction} />
       </motion.div>
-    </SharedCardDialog>}</AnimatePresence>
+    </SharedCardDialog>}
     </LayoutGroup></OperatorSkillPreview>
   )
 })
