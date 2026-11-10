@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../com
 import { GameQueueGuide, MaaImportGuide } from '../../components/result-panel/Guides'
 import type { PreparedResult } from '../../components/result-panel/formatters'
 import { copy } from '../../copy'
+import { Loading } from './components/WorkspaceUI'
 import type { OptimizeResult } from '../../lib/types'
 import { ApiError, getApiErrorMessage } from '../../lib/api-client'
 import type { ResultExportFailure } from '../tool/optimize/useResultDownloads'
@@ -86,7 +87,7 @@ export default function ResultExportDrawer({ open, onOpenChange, result, prepare
               <ExportImageIcon size={16} aria-hidden="true" />{imageCopy.all}
             </button>
           </div>
-          {imageExporting && <p role="status">{imageCopy.busy}</p>}
+          {imageExporting && <Loading label={imageCopy.busy} />}
           {imageError && <div className="v2-export-failure" role="alert"><p className="v2-error">{imageError.message}</p><p>{text.exportImageHelp}</p>
             <button type="button" className="v2-button v2-button-secondary" disabled={busy || imageExporting} onClick={() => void exportImage(imageError.allPlans)}>{text.exportRetry}</button>
           </div>}

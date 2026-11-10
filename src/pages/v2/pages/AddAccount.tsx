@@ -32,7 +32,7 @@ export default function AddAccount({ onAdded, onInventory, guided = false }: { o
       <Notice error>{model.error}</Notice>
       {model.mode === 'cdk' && <Field label="CDK" value={model.cdk} maxLength={256} required autoComplete="off" onChange={(event) => model.setCdk(event.target.value)} />}
       {!firstBinding && fields}
-      <button className="v2-button v2-button-primary" type="submit" disabled={model.loading}>{model.mode === 'preview' && <SklandIcon />}{model.loading ? ui.redeeming : model.mode === 'preview' ? firstBinding ? copy.v2.firstSchedule.importAction : ui.freeAction : text.pages_tool_dashboard_RedeemSection_015}</button>
+      <button className="v2-button v2-button-primary" type="submit" disabled={model.loading} aria-busy={model.loading}>{model.mode === 'preview' && <SklandIcon />}{model.loading ? ui.redeeming : model.mode === 'preview' ? firstBinding ? copy.v2.firstSchedule.importAction : ui.freeAction : text.pages_tool_dashboard_RedeemSection_015}</button>
       {firstBinding && <details className="v2-disclosure"><summary>{copy.v2.firstSchedule.accountOptions}</summary>{methods}{fields}</details>}
     </form>
     {model.features.free_preview && <SklandBindingDialog open={model.claimDialogOpen} profile={null} context="free_preview_claim" claimProfileMeta={{ displayName: model.displayName, note: model.note }} onOpenChange={model.setClaimDialogOpen} onPayload={model.handleClaimPayload} />}

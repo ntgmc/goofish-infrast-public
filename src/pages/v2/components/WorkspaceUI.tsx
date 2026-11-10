@@ -12,8 +12,8 @@ export function EmptyState({ title, children, action }: { title: string; childre
   return <div className="v2-empty"><EmptyIcon size={24} aria-hidden="true" /><h2>{title}</h2>{children && <p>{children}</p>}{action}</div>
 }
 
-export function Loading({ label = copy.v2.loading }: { label?: string }) {
-  return <DataActivity label={label} />
+export function Loading({ label = copy.v2.loading, skeleton }: { label?: string; skeleton?: 'cards' | 'list' | 'projects' }) {
+  return <DataActivity label={label} skeleton={skeleton} />
 }
 
 export function SectionTitle({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {

@@ -7,7 +7,7 @@ import { copy } from '../../../copy'
 import type { QqBotActivitiesResponse } from '../../../lib/qqbot-verification-contracts'
 import { itemIconPath } from '../../../lib/inventory-contracts'
 import { formatShanghaiDateTime } from '../../tool/tool-utils'
-import { EmptyState, Notice } from '../components/WorkspaceUI'
+import { EmptyState, Loading, Notice } from '../components/WorkspaceUI'
 
 const text = copy.notifications.qqbotActivities
 export default function QqBotActivities({ userId }: { userId: string }) {
@@ -28,7 +28,7 @@ export default function QqBotActivities({ userId }: { userId: string }) {
     <p className="v2-lead">{text.introduction}</p>
     <Notice error>{query.error?.message ?? settings.error?.message}</Notice>
     {(query.error || settings.error) && <button type="button" className="v2-button v2-button-secondary" onClick={() => { void query.refetch({ cancelRefetch: false }); void settings.refetch({ cancelRefetch: false }) }}>{text.reload}</button>}
-    {query.isPending ? <p role="status">{text.loading}</p> : !query.data?.campaigns.length && !query.error ? <EmptyState title={text.empty}>{text.emptyHelp}</EmptyState> : query.data?.campaigns.map((row) => {
+    {query.isPending ? <Loading label={text.loading} skeleton="list" /> : !query.data?.campaigns.length && !query.error ? <EmptyState title={text.empty}>{text.emptyHelp}</EmptyState> : query.data?.campaigns.map((row) => {
       const id = `${row.group_id}:${row.campaign_id}`
       const closed = !row.enabled || Boolean(row.ends_at && Date.parse(row.ends_at) <= Date.now())
       const open = selected === id || (query.data.campaigns.length === 1 && selected === null)

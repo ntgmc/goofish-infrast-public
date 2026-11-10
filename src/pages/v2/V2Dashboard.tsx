@@ -5,6 +5,7 @@ import { NextIcon as ArrowRight, ExpandIcon as ChevronDown, BreadcrumbIcon, Expo
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import Link from '../../components/InternalLink'
 import { copy } from '../../copy'
+import { Loading } from './components/WorkspaceUI'
 import { MotionNavIndicator, motionTokens } from '../../components/MotionPrimitives'
 import { prepareResult } from '../../components/result-panel/formatters'
 import InventoryDepletionWarning from '../../components/result-panel/InventoryDepletionWarning'
@@ -338,14 +339,14 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           </div>
           {view !== 'manual' && <ResultActions plans={result.plans} shift={shift} showShift={view === 'schedule'} onShiftChange={setShift} onExport={() => setExportOpen(true)} sample={sample} busy={busy} loadingResult={loadingResult} />}
           <div className="v2-feature-content v2-manual-workspace" hidden={view !== 'manual'}>
-            {canManual && manualOpened && session.activeProfile && <Suspense fallback={<p role="status">{text.loading}</p>}><ManualScheduleEditor revealCandidates key={manualKey} source={result} profileId={session.activeProfile.id} operators={operators} simulationBaseline={simulationBaseline} onDirtyChange={setManualDirty} renderExport={(props) => workflow && <ManualResultExport key={props.resultId} {...props} workflow={workflow}
+            {canManual && manualOpened && session.activeProfile && <Suspense fallback={<Loading label={text.loading} />}><ManualScheduleEditor revealCandidates key={manualKey} source={result} profileId={session.activeProfile.id} operators={operators} simulationBaseline={simulationBaseline} onDirtyChange={setManualDirty} renderExport={(props) => workflow && <ManualResultExport key={props.resultId} {...props} workflow={workflow}
               onRecover={(action) => { navigateSection(action === 'login' ? 'generation' : action); if (action === 'login') session.retryAuth() }} />} /></Suspense>}
             {!canManual && restrictedPreview && view === 'manual' && <LockedCapabilityPreview title={copy.optimize.paid_preview.manual_title} description={copy.optimize.paid_preview.manual_description} />}
           </div>
           <div className="v2-result-view" hidden={view === 'manual'}>
           <V2Transition motionKey={view}>
             {view === 'training' ? <section className="v2-panel v2-feature-content v2-training-workspace v2-section-loading">{canViewTraining
-              ? <Suspense fallback={<p role="status">{text.loading}</p>}><UpgradeSuggestionStatusNotice result={result} /><UpgradeSuggestions suggestions={workflow?.suggestions ?? []} embedded projectScope={session.user && session.activeProfile ? { userId: session.user.id, profileId: session.activeProfile.id } : undefined} /></Suspense>
+              ? <Suspense fallback={<Loading label={text.loading} />}><UpgradeSuggestionStatusNotice result={result} /><UpgradeSuggestions suggestions={workflow?.suggestions ?? []} embedded projectScope={session.user && session.activeProfile ? { userId: session.user.id, profileId: session.activeProfile.id } : undefined} /></Suspense>
               : <LockedCapabilityPreview title={copy.optimize.pages_tool_optimize_ResultSection_016} description={copy.optimize.pages_tool_optimize_ResultSection_017} />}</section> : view === 'analysis' ? (
               <section className="v2-panel v2-analysis"><div className="v2-panel-heading"><h2>{text.analysisTab}</h2><span className="v2-neutral-tag">24h</span></div>{canViewAnalysis
                 ? <IncomeAnalysis key={arrivalKey} result={result} prepared={prepared} revealedCharts={revealedCharts} />

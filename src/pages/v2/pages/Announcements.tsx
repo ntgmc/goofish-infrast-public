@@ -101,9 +101,9 @@ function AnnouncementFeed({ session }: { session: V2Session }) {
       <div className="v2-filter-group"><button disabled={busy} aria-pressed={!unreadOnly} onClick={() => openPage(1, '', false)}>{copy.v2.readAll}</button><button disabled={busy} aria-pressed={unreadOnly} onClick={() => openPage(1, '', true)}>{copy.v2.readUnread} {unreadCount}</button></div>
       <button className="v2-text-button" disabled={busy || unreadCount === 0} onClick={() => void markRead()}>{marking === 'all' ? text.pages_tool_dashboard_AnnouncementsSection_004 : text.pages_tool_dashboard_AnnouncementsSection_005}</button>
     </div>}
-    {loading && <Loading label={copy.public.pages_AnnouncementsPage_006} />}
+    {loading && <Loading label={copy.public.pages_AnnouncementsPage_006} skeleton={data ? undefined : 'list'} />}
     {data && <>
-      <div className="v2-selection-workspace v2-inbox-layout" aria-busy={busy}>
+      <div className="v2-selection-workspace v2-inbox-layout v2-data-arrival" aria-busy={busy}>
         <nav className="v2-inbox-index" aria-label={copy.v2.announcements}>
           {data.announcements.map(({ announcement, read_at }) => {
             const unread = signedIn && announcement.kind === 'popup' && !read_at

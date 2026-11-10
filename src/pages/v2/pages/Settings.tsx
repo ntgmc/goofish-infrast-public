@@ -36,7 +36,7 @@ export default function Settings({ session }: { session: V2Session }) {
             ['newPassword', labels.pages_tool_dashboard_SettingsSection_018, model.newPassword, model.setNewPassword, 'new-password'],
             ['confirmPassword', labels.pages_tool_dashboard_SettingsSection_019, model.confirmPassword, model.setConfirmPassword, 'new-password'],
           ] as const).map(([key, label, value, update, autocomplete]) => <div key={key}><Field label={label} type="password" autoComplete={autocomplete} value={value} maxLength={AUTH_PASSWORD_MAX_LENGTH} aria-invalid={Boolean(model.fieldErrors[key])} aria-describedby={model.fieldErrors[key] ? `v2-${key}-error` : undefined} onChange={(event) => { update(event.target.value); model.clearFieldError(key); if (key === 'newPassword') model.clearFieldError('confirmPassword') }} onFocus={() => model.clearFieldError(key)} />{model.fieldErrors[key] && <p id={`v2-${key}-error`} role="alert" className="v2-field-error">{model.fieldErrors[key]}</p>}</div>)}
-          <button type="submit" className="v2-button v2-button-primary" disabled={model.loading}>{model.loading ? labels.pages_tool_dashboard_SettingsSection_020 : labels.pages_tool_dashboard_SettingsSection_021}</button>
+          <button type="submit" className="v2-button v2-button-primary" disabled={model.loading} aria-busy={model.loading}>{model.loading ? labels.pages_tool_dashboard_SettingsSection_020 : labels.pages_tool_dashboard_SettingsSection_021}</button>
         </form>
       </section>
       <section hidden={section !== 'preferences'}><SectionTitle title={text.preferences} description={copy.v2.preferenceDescription} /><div className="v2-preference-control"><AppearanceSettings /></div><DebugModePanel /></section>

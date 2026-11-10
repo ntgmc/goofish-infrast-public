@@ -68,7 +68,7 @@ export default function ProfileUpgrade({ session, onUpgraded }: {
     <SectionTitle title={profile.display_name || copy.v2.account} description={text.description} />
     <Field label={copy.workspace.pages_tool_WorkspaceSetupPage_054} value={cdk} maxLength={256} required autoComplete="off" disabled={loading} onChange={(event) => { request.current = null; setCdk(event.target.value) }} placeholder="MAA-XXXX-XXXX-XXXX" />
     <Notice error>{error}</Notice>
-    <div className="v2-actions"><button type="submit" className="v2-button v2-button-primary" disabled={loading}>{loading ? copy.workspace.pages_tool_WorkspaceSetupPage_055 : copy.workspace.pages_tool_WorkspaceSetupPage_056}</button>
+    <div className="v2-actions"><button type="submit" className="v2-button v2-button-primary" disabled={loading} aria-busy={loading}>{loading ? copy.workspace.pages_tool_WorkspaceSetupPage_055 : copy.workspace.pages_tool_WorkspaceSetupPage_056}</button>
       {features.pricing && <Link className="v2-button v2-button-secondary" to={v2Path('pricing', profile.id)}>{text.pricing}</Link>}
     </div>
     <div className="v2-actions"><Link className="v2-text-button" to={`${v2Path('add-account', profile.id)}&mode=cdk`}>{text.newProfile}<NextIcon size={16} aria-hidden="true" /></Link></div>

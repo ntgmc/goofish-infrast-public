@@ -41,6 +41,17 @@
   opacity: .55;
 }
 
+:is(.v2-app, .v2-drawer, .v2-dialog) button[aria-busy="true"] { position: relative; overflow: hidden; }
+:is(.v2-app, .v2-drawer, .v2-dialog) button[aria-busy="true"]::after {
+  position: absolute; content: ''; inset: auto 0 0; height: 2px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, currentColor, transparent);
+  opacity: .65; animation: v2-button-working 1.8s ease-in-out infinite;
+}
+@keyframes v2-button-working { from { transform: translateX(-110%); } to { transform: translateX(110%); } }
+@media (prefers-reduced-motion: reduce) {
+  :is(.v2-app, .v2-drawer, .v2-dialog) button[aria-busy="true"]::after { animation: none; }
+}
+
 :is(.v2-app, .v2-drawer, .v2-dialog) :focus-visible {
   outline: 2px solid var(--color-v2-focus);
   outline-offset: 3px;

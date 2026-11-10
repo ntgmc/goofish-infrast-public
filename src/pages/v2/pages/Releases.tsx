@@ -54,9 +54,9 @@ export default function Releases() {
   return <div className="v2-releases">
     <p className="v2-lead">{copy.public.pages_ChangelogPage_003}</p>
     {error && <Notice error>{error}<button className="v2-text-button" onClick={() => void query.refetch({ cancelRefetch: false })}>{copy.v2.retry}</button></Notice>}
-    {loading && <Loading label={copy.v2.updatesLoading} />}
+    {loading && <Loading label={copy.v2.updatesLoading} skeleton={data ? undefined : 'list'} />}
     {data && <>
-      <div className="v2-selection-workspace" aria-busy={loading}>
+      <div className="v2-selection-workspace v2-data-arrival" aria-busy={loading}>
         <nav className="v2-release-index" aria-label={copy.public.pages_ChangelogPage_002}>
           {data.releases.map((release) => <button key={release.id} disabled={loading} aria-pressed={selected?.id === release.id} onClick={() => openPage(data.page, release.id)}><strong>{release.displayVersion}</strong><time dateTime={release.releasedAt}>{release.releasedAt}</time></button>)}
         </nav>

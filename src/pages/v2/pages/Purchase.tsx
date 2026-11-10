@@ -6,7 +6,7 @@ import { copy } from '../../../copy'
 import { PUBLIC_PRICING_PLAN_IDS } from '../../../lib/public-content'
 import { usePublicContent } from '../../../lib/public-content-context'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
-import { Notice, SectionTitle } from '../components/WorkspaceUI'
+import { Loading, Notice, SectionTitle } from '../components/WorkspaceUI'
 import { v2Path } from '../navigation'
 
 const text = copy.public.purchase
@@ -29,7 +29,7 @@ export default function Purchase() {
   return <div className="v2-purchase-workspace">
     <Link to={v2Path('pricing', profileId)} className="v2-text-button"><BackIcon size={16} aria-hidden="true" />{text.back}</Link>
     <div className="v2-purchase-overview">
-    {status === 'loading' ? <p role="status">{copy.features.loading}</p> : status === 'error' || isFallback ? <Notice error>
+    {status === 'loading' ? <Loading label={copy.features.loading} skeleton="cards" /> : status === 'error' || isFallback ? <Notice error>
       <p>{text.load_failed}</p><button type="button" className="v2-button v2-button-secondary" onClick={() => void refresh()}>{text.retry}</button>
     </Notice> : available && details ? <section className="v2-purchase-product" aria-labelledby="purchase-product-title">
           <div><h2 id="purchase-product-title">{plan?.label ?? (upgrade ? copy.public.pricing_upgrade_title : text.general)}</h2>

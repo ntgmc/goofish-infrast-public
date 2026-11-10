@@ -1367,7 +1367,7 @@ describe('V2 results-first workspace', () => {
     await user.click(dialog.getByRole('button', { name: copy.v2.exportRetry }))
     expect(current).toBeDisabled()
     expect(all).toBeDisabled()
-    expect(dialog.getByText(copy.domain.result_image.busy)).toHaveAttribute('role', 'status')
+    expect(dialog.getByRole('status', { name: copy.domain.result_image.busy })).toHaveAttribute('aria-busy', 'true')
     await user.click(all)
     expect(mocks.image).toHaveBeenCalledTimes(2)
     await act(async () => { finish() })
