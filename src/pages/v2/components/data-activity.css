@@ -1,7 +1,7 @@
 .v2-data-activity { min-width: 0; width: 100%; text-align: start; }
 .v2-data-state { display: flex; align-items: center; gap: 1rem; min-width: 0; min-height: 5rem; padding-block: 1rem; animation: v2-data-appear .24s .18s both; }
-.v2-data-mark { position: relative; flex: 0 0 5.25rem; width: 5.25rem; height: 3rem; color: var(--color-v2-accent); }
-.v2-data-mark > span { position: absolute; inset: .5rem auto .5rem 0; display: grid; width: 2rem; place-items: center; border: 1px solid var(--color-v2-line); border-radius: .6rem; background: var(--color-v2-accent-soft); }
+.v2-data-mark { position: relative; flex: 0 0 84px; width: 84px; height: 48px; color: var(--color-v2-accent); }
+.v2-data-mark > span { position: absolute; inset: 8px auto 8px 0; display: grid; width: 32px; place-items: center; border: 1px solid var(--color-v2-line); border-radius: 10px; background: var(--color-v2-accent-soft); }
 .v2-data-mark > svg { width: 100%; height: 100%; overflow: visible; stroke: currentColor; stroke-width: 1.25; }
 .v2-data-mark rect { fill: var(--color-v2-surface); stroke: var(--color-v2-line); }
 .v2-data-wire { opacity: .2; }
@@ -23,6 +23,8 @@
 .v2-data-skeleton[data-layout="projects"] { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
 .v2-data-skeleton[data-layout="projects"] .v2-data-placeholder { min-height: 12rem; }
 .v2-data-arrival { animation: v2-data-appear .24s both; }
+.v2-data-complete { display: flex; align-items: center; gap: .5rem; min-height: 3rem; padding-block: .75rem; color: var(--color-v2-accent); font-size: var(--text-sm); animation: v2-data-appear .24s both; }
+.v2-data-update { outline: 1px solid transparent; outline-offset: 2px; }
 .v2-data-activity[data-paused] .v2-data-flow,
 .v2-data-activity[data-paused] .v2-data-placeholder::after { animation-play-state: paused; }
 @keyframes v2-data-stream { to { stroke-dashoffset: -74; } }
@@ -33,7 +35,7 @@
   .v2-data-state { gap: .75rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .v2-data-state, .v2-data-flow, .v2-data-placeholder::after, .v2-data-arrival { animation: none; }
+  .v2-data-state, .v2-data-flow, .v2-data-placeholder::after, .v2-data-arrival, .v2-data-complete { animation: none; }
 }
-:root[data-reduced-motion] :is(.v2-data-state, .v2-data-flow, .v2-data-arrival),
+:root[data-reduced-motion] :is(.v2-data-state, .v2-data-flow, .v2-data-arrival, .v2-data-complete),
 :root[data-reduced-motion] .v2-data-placeholder::after { animation: none; }

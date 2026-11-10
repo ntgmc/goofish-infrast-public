@@ -302,7 +302,13 @@ it deliberately when changing the shared design.
 - V2 data waits use a copper source-to-record graphic and quiet, synchronized skeleton sweeps.
   Keep the real status readable, introduce decorative movement after 180ms, and add a longer-wait
   message after eight seconds. Pause loops in hidden pages; system or app reduced motion shows
-  static shapes. Section loads retain the workbench navigation and reserve the content layout.
+  static shapes. Full-screen startup centers the brand, readable status and a short moving line on
+  one axis; data-source graphics belong to local waits. Section loads retain the workbench
+  navigation and reserve the content layout.
+  Refreshes retain readable data. Confirm completion only after a pending request returns a new
+  revision without errors; failed, partial or cancelled refreshes keep their existing error state.
+  Changed readings interpolate from the old value and outline their own card for 600ms without
+  remounting the content or replaying unchanged cards.
 - Operator, tool, inventory and benchmark lists reveal each stable item once per
   mounted list: 8px travel, 240ms duration, up to eight items at 25ms intervals, or 50ms for
   operator cards and V2 manual/cultivation operator candidates. Candidate pickers observe their own

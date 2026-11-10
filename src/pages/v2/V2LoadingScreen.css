@@ -14,7 +14,8 @@
 }
 
 .v2-loading-brand {
-  margin-bottom: var(--space-2xs);
+  margin-bottom: 1.25rem;
+  animation: v2-loading-brand-arrive .45s cubic-bezier(.16, 1, .3, 1) both;
 }
 
 .v2-loading-status {
@@ -35,7 +36,21 @@
 }
 
 .v2-section-loading-region > .v2-data-activity { max-width: 64rem; margin-inline: auto; }
-.v2-loading-screen > .v2-data-activity { max-width: 24rem; }
+.v2-loading-screen > .v2-data-activity { max-width: 28rem; }
+.v2-loading-screen .v2-data-state { flex-direction: column-reverse; gap: 1rem; min-height: 0; padding: 0; text-align: center; animation: none; }
+.v2-loading-screen .v2-data-label { width: 100%; }
+.v2-loading-screen .v2-data-label strong { font-weight: 500; }
+.v2-loading-screen .v2-data-mark { flex: none; width: 112px; height: 2px; overflow: hidden; border-radius: 2px; background: var(--color-v2-line); }
+.v2-loading-screen .v2-data-mark > :is(span, svg) { display: none; }
+.v2-loading-screen .v2-data-mark::after { position: absolute; inset: 0; content: ''; background: linear-gradient(90deg, transparent, var(--color-v2-accent), transparent); animation: v2-loading-glide 1.8s ease-in-out infinite; }
+.v2-loading-screen .v2-data-activity[data-paused] .v2-data-mark::after { animation-play-state: paused; }
+@keyframes v2-loading-glide { from { transform: translateX(-110%); } to { transform: translateX(110%); } }
+@keyframes v2-loading-brand-arrive { from { opacity: .5; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .v2-loading-brand, .v2-loading-screen .v2-data-mark::after { animation: none; }
+}
+:root[data-reduced-motion] .v2-loading-brand,
+:root[data-reduced-motion] .v2-loading-screen .v2-data-mark::after { animation: none; }
 
 .v2-loading-retry {
   min-height: 44px;

@@ -5,6 +5,8 @@ import {
   DoctorProfileIcon, SanityIcon, MoraleIcon, LmdIcon, ExperienceIcon, type LucideIcon,
 } from '../../../components/icons'
 import ProductIcon from '../../../components/ProductIcon'
+import { TweenValue } from '../../../components/NumberMotion'
+import { useDataUpdate } from '../components/DataActivity'
 import { copy } from '../../../copy'
 import itemCatalog from '../../../data/skland-items.json'
 import { SKLAND_PRODUCTION_SLOTS } from '../../../lib/facility-layout'
@@ -14,6 +16,7 @@ import './skland-game.css'
 const text = copy.skland
 const catalog: Record<string, { name: string; icon?: string }> = itemCatalog
 const number = (value: number | null | undefined) => value == null ? text.unavailable : value.toLocaleString('zh-CN')
+const integer = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 0 }).format
 const date = (value: number | null | undefined) => value ? new Date(value * 1000).toLocaleString('zh-CN') : text.unavailable
 const shortDate = (value: number | null | undefined) => value ? new Date(value * 1000).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : text.unavailable
 const ratio = (value: { current: number; max?: number; total?: number } | null | undefined) => value ? `${number(value.current)} / ${number(value.max ?? value.total)}` : text.unavailable
@@ -42,8 +45,8 @@ export function SklandOverview({ game, lmd, exp }: { game: SklandGame; lmd: numb
         {player.sanity?.completeAt ? <span>{text.recovery} {date(player.sanity.completeAt)}</span> : null}
       </Resource>
       <Resource label={text.drones} icon={DroneIcon} value={ratio(game.building?.drones)} current={game.building?.drones?.current} max={game.building?.drones?.max} tone="power" />
-      <Resource label={text.lmd} icon={LmdIcon} value={number(lmd)} product="LMD" tone="manufacture" />
-      <Resource label={text.exp} icon={ExperienceIcon} value={number(exp)} product="Battle Record" tone="manufacture" />
+      <Resource label={text.lmd} icon={LmdIcon} value={number(lmd)} amount={lmd} product="LMD" tone="manufacture" />
+      <Resource label={text.exp} icon={ExperienceIcon} value={number(exp)} amount={exp} product="Battle Record" tone="manufacture" />
     </div>
     <section className="skland-panel">
       <PanelHeading icon={TasksIcon} title={text.progress} />
@@ -102,12 +105,14 @@ function PanelHeading({ icon: Icon, title }: { icon: LucideIcon; title: string }
   return <div className="skland-panel-heading"><Icon size={20} aria-hidden="true" /><h2>{title}</h2></div>
 }
 
-function Resource({ label, icon: Icon, value, current, max, tone, product, children }: {
-  label: string; icon: LucideIcon; value: string; current?: number | null; max?: number; tone: string; product?: string; children?: ReactNode
+function Resource({ label, icon: Icon, value, amount, current, max, tone, product, children }: {
+  label: string; icon: LucideIcon; value: string; amount?: number | null; current?: number | null; max?: number; tone: string; product?: string; children?: ReactNode
 }) {
-  return <div className="skland-resource" data-tone={tone}>
+  const update = useDataUpdate(value)
+  return <div ref={update} className="skland-resource v2-data-update" data-tone={tone}>
     <div className="skland-resource-icon">{product ? <ProductIcon product={product} size={36} /> : <Icon size={26} aria-hidden="true" />}</div>
-    <dl><dt>{label}</dt><dd>{value}</dd></dl>
+    <dl><dt>{label}</dt><dd><span className="sr-only">{value}</span><span aria-hidden="true">{current != null && max != null ? <><TweenValue value={current} format={integer} /> / {number(max)}</>
+      : amount != null ? <TweenValue value={amount} format={integer} /> : value}</span></dd></dl>
     <Meter label={label} current={current} max={max} />{children && <p>{children}</p>}
   </div>
 }
