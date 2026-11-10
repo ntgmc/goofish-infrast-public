@@ -9,7 +9,7 @@ import { NotificationCenterProvider } from '../../components/NotificationCenter'
 import { InternalLinkProvider } from '../../components/InternalLink'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { copy } from '../../copy'
-import ScheduleProgress from '../../components/ScheduleProgress'
+import V2GenerationProgress from './V2GenerationProgress'
 import { normalizeConfig } from '../../lib/config'
 import { hasCapability } from '../../lib/product-catalog'
 import { useSiteFeatures } from '../../lib/site-feature-context'
@@ -199,10 +199,10 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
   const stopping = Boolean(activeJob && (tasks.busyJobId === activeJob.id || activeJob.cancellationRequested))
   const stopAction = workflow.loading && activeJob && <button type="button" className="v2-button v2-button-secondary v2-stop-schedule" disabled={stopping} aria-busy={stopping}
     onClick={() => void tasks.cancel(activeJob)}>{stopping ? <LoaderCircle size={16} className="v2-spin" aria-hidden="true" /> : <Square size={16} aria-hidden="true" />}{stopping ? copy.v2.stopping : copy.v2.stopSchedule}</button>
-  const progress = workflow.progress && (workflow.progress.estimatePhase !== 'completed' || !current) && <div className="v2-progress"><ScheduleProgress progress={workflow.progress} action={stopAction} />
+  const progress = workflow.progress && <V2GenerationProgress progress={workflow.progress} resultReady={Boolean(current)} action={stopAction}>
     {tasks.error && <p role="alert" className="v2-error">{tasks.error}</p>}
     {tasks.notice && <p role="status" className="v2-muted">{tasks.notice}</p>}
-  </div>
+  </V2GenerationProgress>
   if (!result && latest && section === 'overview') {
     const pending = reading || loadedId.current !== latest.id
     return <V2LoadingScreen error={pending ? null : error ?? workflow.workspaceError ?? copy.v2.resultLoadFailed} onRetry={() => void readLatestResult()}>

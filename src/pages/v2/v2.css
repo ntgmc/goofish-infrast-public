@@ -1653,6 +1653,7 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
   }
 }
 
+.v2-progress-handoff { overflow: hidden; }
 .v2-progress {
   margin-bottom: 18px;
 }

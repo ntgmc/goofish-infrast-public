@@ -308,6 +308,12 @@ it deliberately when changing the shared design.
 - Shift changes briefly outline incoming occupants; unchanged seats remain still. Income contribution
   and capacity bars grow to their real proportions when entering view. Remember seen bars per result
   across analysis-tab visits; new result IDs start a fresh reveal. Reduced motion shows final bars.
+- V2 generation progress uses a compact SVG state symbol: waiting dots, a running arc, a
+  closed ring while saving, and a drawn completion check. Reconnection, cancellation and failure
+  stay visually distinct and stop activity. Step connectors fill when the real stage advances,
+  vertically on small cards and horizontally on wide cards. Keep the completed card alongside
+  the available result for the existing 420ms meter completion plus 200ms, then collapse its space;
+  reduced motion shows the result directly. Only V2 enables these stage effects.
 - No nested stagger cascades, bounce, overshoot, or parallax in workspaces.
 - Reduced-motion fallback · final numbers and content immediately; no transform;
   retained opacity transitions at or below 150ms.
