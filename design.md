@@ -314,7 +314,13 @@ it deliberately when changing the shared design.
   Other V2 lists use row-shaped placeholders on first read and at the pagination tail. Existing
   results remain readable during refresh. Busy controls carry `aria-busy` and a quiet bottom-edge
   light; small operations keep feedback inside their own control. Shared notification, feedback,
-  binding and training tools use compact status lines within V2, including portalled surfaces.
+  and training tools use compact status lines within V2, including portalled surfaces.
+  V2 Skland binding pairs the real request message with a source-to-record illustration: Skland
+  branches into operator records and base configuration, or account and inventory for depot binding.
+  Authorization pulses only at the source; the selected-account request moves packets to the records;
+  confirmation highlights the receiving cards while saving. These loops show activity, never progress
+  or completion. Results and errors replace the illustration immediately; hidden and reduced-motion
+  settings pause or remove decorative movement.
   The V2 root scopes these enhancements so shared V1 screens retain their existing presentation.
 - Operator, tool, inventory and benchmark lists reveal each stable item once per
   mounted list: 8px travel, 240ms duration, up to eight items at 25ms intervals, or 50ms for

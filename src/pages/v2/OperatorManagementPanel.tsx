@@ -169,7 +169,7 @@ export default function OperatorManagementPanel({ session, config, operators, bu
         </div>
       </section>
     </div>
-    <SklandBindingDialog open={sklandOpen} profile={profile} onOpenChange={setSklandOpen}
+    <SklandBindingDialog importMotion open={sklandOpen} profile={profile} onOpenChange={setSklandOpen}
       onPayload={(payload) => {
         if (!mounted.current || !payload.user) return
         session.applyAuthPayload(payload)

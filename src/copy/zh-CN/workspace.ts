@@ -19,6 +19,13 @@ export const workspaceCopy = {
   components_SklandBindingDialog_009: "核对游戏 UID 后，创建免费档案并导入干员。",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_010: "先预览游戏昵称和 UID，确认后才会保存绑定并导入干员。",
+  sklandImportActivity: {
+    source: '森空岛',
+    operators: '干员资料',
+    configuration: '基建配置',
+    account: '账号资料',
+    inventory: '仓库库存',
+  },
   components_SklandBindingDialog_lifetime_title: "绑定终身版档案",
   components_SklandBindingDialog_lifetime_description: "选择森空岛账号并核对信息，导入数据并保存档案后才会消耗终身版兑换 CDK。",
   // src/components/SklandBindingDialog.tsx
