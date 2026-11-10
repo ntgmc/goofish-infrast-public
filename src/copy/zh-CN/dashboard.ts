@@ -7,6 +7,7 @@ export const dashboardCopy = {
     preferences: "使用偏好",
     preferences_help: "调整动画效果和进入工作区的方式。",
     data: "数据与隐私",
+    data_help: "管理森空岛授权，了解个人数据的保存与删除。",
     credentials: "森空岛授权",
     no_credentials: "尚未绑定森空岛。导入游戏数据后，可在这里管理授权信息。",
     privacy_details: "个人数据的保存与删除",

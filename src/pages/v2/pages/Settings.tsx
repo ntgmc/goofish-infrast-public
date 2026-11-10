@@ -23,7 +23,7 @@ export default function Settings({ session }: { session: V2Session }) {
     { id: 'security', label: text.security, icon: LockKeyhole, hint: text.password_help },
     { id: 'preferences', label: text.preferences, icon: SlidersHorizontal, hint: copy.v2.preferenceDescription },
     ...(features.qqbot ? [{ id: 'notifications', label: copy.notifications.title, icon: Bell, hint: copy.notifications.title }] : []),
-    { id: 'data', label: text.data, icon: ShieldCheck, hint: text.deletion_help },
+    { id: 'data', label: text.data, icon: ShieldCheck, hint: text.data_help },
   ]
   return <div className="v2-settings-workspace">
     <nav className="v2-settings-index" aria-label={text.navigation}>{sections.map((item) => <button key={item.id} type="button" aria-label={item.label} aria-pressed={section === item.id} onClick={() => setSection(item.id)}><item.icon size={20} aria-hidden="true" /><span><strong>{item.label}</strong><small>{item.hint}</small></span></button>)}</nav>
