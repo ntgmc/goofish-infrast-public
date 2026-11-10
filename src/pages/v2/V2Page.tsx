@@ -37,6 +37,13 @@ export default function V2Page() {
   const [config, setConfig] = useState<LicenseConfig>(() => normalizeConfig(SAMPLE_CONFIG))
   const [operators, setOperators] = useState(SAMPLE_OPERATORS)
   const [changed, setChanged] = useState(false)
+  useEffect(() => {
+    const root = document.documentElement
+    const visibility = () => root.toggleAttribute('data-v2-hidden', document.hidden)
+    visibility()
+    document.addEventListener('visibilitychange', visibility)
+    return () => { document.removeEventListener('visibilitychange', visibility); root.removeAttribute('data-v2-hidden') }
+  }, [])
   const activeConfig = session.configOverride ?? session.workspace?.config ?? config
   const profile = session.activeProfile
   const permission = profile ? getEffectiveProfilePermission(profile) : undefined

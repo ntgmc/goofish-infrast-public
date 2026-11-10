@@ -115,8 +115,8 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
           {select(text.normal, m.normalId, m.setNormalId, text.noResult)}
           {select(text.temporary, m.temporaryId, m.setTemporaryId, text.noTemporary)}
           {!m.production ? <DataActivity label={text.incomeLoading} /> : m.production.error ? <Notice error>{m.production.error}<button className="v2-text-button" onClick={m.retryProduction}>{text.retry}</button></Notice> : m.productionInvalid ? <Notice>{text.incomeUnavailable}</Notice> : !m.normalIncome && <Notice>{text.noIncome}</Notice>}
-          {m.normalIncome && <Facts items={[[text.dailyLmd, <TweenValue value={m.normalIncome.lmd} format={number} />], [text.dailyExp, <TweenValue value={m.normalIncome.exp} format={number} />]]} />}
-          {m.temporaryIncome && <Facts items={[[text.temporaryLmd, <TweenValue value={m.temporaryIncome.lmd} format={number} />], [text.temporaryExp, <TweenValue value={m.temporaryIncome.exp} format={number} />]]} />}
+          {m.normalIncome && <Facts items={[[text.dailyLmd, <TweenValue key="daily-lmd" value={m.normalIncome.lmd} format={number} />], [text.dailyExp, <TweenValue key="daily-exp" value={m.normalIncome.exp} format={number} />]]} />}
+          {m.temporaryIncome && <Facts items={[[text.temporaryLmd, <TweenValue key="temporary-lmd" value={m.temporaryIncome.lmd} format={number} />], [text.temporaryExp, <TweenValue key="temporary-exp" value={m.temporaryIncome.exp} format={number} />]]} />}
           {(m.normalIncome?.lmd && m.normalIncome.goldNet === null || m.temporaryIncome?.lmd && m.temporaryIncome.goldNet === null) ? <Notice>{text.goldUnknown}</Notice> : null}
           <div className="v2-actions"><Link className="v2-text-button" to={v2Path('generation', profile.id)}>{text.generate}<ArrowRight size={14} /></Link><button className="v2-text-button" onClick={onConfig}>{text.configure}</button></div>
           </section>
@@ -212,7 +212,7 @@ function ProjectResults({ route, data, useTemporary }: { route: ProjectRoute; da
   const material = (id: string) => data.itemNames[id] ?? id
   return <section className="v2-project-results v2-data-arrival">
     <header className="v2-project-result-summary" data-ready={Boolean(route.readyDate)}><div><SectionTitle title={text.route} /><p className="v2-muted">{text.dateHint}</p></div><ResourceCalendarIcon size={28} aria-hidden="true" /></header>
-    <Facts items={[[text.readyDate, <AnimatedValue value={route.readyDate ?? text.pending} />], [text.totalSanity, <TweenValue value={route.phases.reduce((sum, day) => sum + day.spent, 0)} format={number} />], [text.farmingDays, <AnimatedValue value={String(route.phases.length)} />]]} />
+    <Facts items={[[text.readyDate, <AnimatedValue key="ready-date" value={route.readyDate ?? text.pending} />], [text.totalSanity, <TweenValue key="total-sanity" value={route.phases.reduce((sum, day) => sum + day.spent, 0)} format={number} />], [text.farmingDays, <AnimatedValue key="farming-days" value={String(route.phases.length)} />]]} />
     {(route.blocked.length > 0 || route.remaining.length > 0 || route.goldLimited) && <div className="v2-project-blockers"><h3>{text.bottlenecks}</h3>
       {route.blocked.length > 0 && <Notice>{text.noSource}{[...new Set(route.blocked.map((row) => material(row.item)))].join('、')}</Notice>}
       {route.goldLimited && <Notice>{text.goldLimited}</Notice>}

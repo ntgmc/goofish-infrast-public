@@ -41,16 +41,31 @@
   opacity: .55;
 }
 
-:is(.v2-app, .v2-drawer, .v2-dialog) button[aria-busy="true"] { position: relative; overflow: hidden; }
-:is(.v2-app, .v2-drawer, .v2-dialog) button[aria-busy="true"]::after {
+:root:has(.v2-app) button[aria-busy="true"] { position: relative; overflow: hidden; }
+:root:has(.v2-app) button[aria-busy="true"]::after {
   position: absolute; content: ''; inset: auto 0 0; height: 2px; pointer-events: none;
   background: linear-gradient(90deg, transparent, currentColor, transparent);
   opacity: .65; animation: v2-button-working 1.8s ease-in-out infinite;
 }
 @keyframes v2-button-working { from { transform: translateX(-110%); } to { transform: translateX(110%); } }
 @media (prefers-reduced-motion: reduce) {
-  :is(.v2-app, .v2-drawer, .v2-dialog) button[aria-busy="true"]::after { animation: none; }
+  :root:has(.v2-app) button[aria-busy="true"]::after { animation: none; }
 }
+:root:has(.v2-app) .tool-loading-status { position: relative; min-height: 3.5rem; padding-block: 1rem; overflow: hidden; color: var(--color-v2-muted); }
+:root:has(.v2-app) .tool-panel[data-loading] { position: relative; }
+:root:has(.v2-app) .tool-loading-status::after,
+:root:has(.v2-app) .tool-panel[data-loading]::after {
+  position: absolute; content: ''; inset: auto 0 .5rem; height: 2px; width: min(7rem, 100%);
+  background: linear-gradient(90deg, transparent, var(--color-v2-accent), transparent);
+  animation: v2-button-working 1.8s ease-in-out infinite;
+}
+:root:has(.v2-app) .tool-loading-status.text-center::after { left: 50%; margin-left: -3.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  :root:has(.v2-app) .tool-loading-status::after,
+  :root:has(.v2-app) .tool-panel[data-loading]::after { animation: none; }
+}
+:root[data-v2-hidden] :is(button[aria-busy="true"], .tool-loading-status, .tool-panel[data-loading], .v2-data-mark, .v2-data-placeholder)::after,
+:root[data-v2-hidden] .v2-data-flow { animation-play-state: paused; }
 
 :is(.v2-app, .v2-drawer, .v2-dialog) :focus-visible {
   outline: 2px solid var(--color-v2-focus);

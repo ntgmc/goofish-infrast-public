@@ -282,7 +282,7 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
   return (
     <section className="workspace-manual-editor space-y-4" aria-label={label.title}>
       <div className="tool-alert tool-alert--warning space-y-2 p-4">
-        <p className="font-semibold" role="status">{simulating ? label.simulating : simulation ? label.simulated : label.warning}</p>
+        <p className={simulating ? 'font-semibold tool-loading-status' : 'font-semibold'} role="status" aria-busy={simulating}>{simulating ? label.simulating : simulation ? label.simulated : label.warning}</p>
         {!standalone && <p className="text-sm"><LockKeyhole size={14} className="mr-1 inline" aria-hidden="true" />{label.locked}</p>}
       </div>
       <div className="workspace-manual-toolbar tool-panel space-y-3 p-4">

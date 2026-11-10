@@ -32,7 +32,7 @@ export function DataActivity({ label, description, kind = 'data', skeleton }: {
           {[8, 24, 40].map((y) => <rect key={y} x="69" y={y - 4} width="10" height="8" rx="2" />)}
         </svg>
       </div>
-      <div className="v2-data-label"><strong>{label}</strong>{description && <p>{description}</p>}{slow && <p>{copy.v2.dataActivity.slow}</p>}</div>
+      <div className="v2-data-label"><strong>{label}</strong>{description && <p>{description}</p>}{slow && <p>{copy.common.dataActivity.slow}</p>}</div>
     </div>
     {skeleton && <DataSkeleton layout={skeleton} />}
   </div>
@@ -56,7 +56,7 @@ export function DataRefresh({ pending, revision, error, ...activity }: {
     return () => window.clearTimeout(timer)
   }, [pending, revision, error])
   if (pending) return <DataActivity {...activity} />
-  return completed ? <p className="v2-data-complete" role="status"><SuccessIcon size={18} aria-hidden="true" />{copy.v2.dataActivity.updated}</p> : null
+  return completed ? <p className="v2-data-complete" role="status"><SuccessIcon size={18} aria-hidden="true" />{copy.common.dataActivity.updated}</p> : null
 }
 
 export function useDataUpdate(revision: unknown) {

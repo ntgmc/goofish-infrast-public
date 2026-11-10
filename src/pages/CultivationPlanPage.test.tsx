@@ -53,7 +53,7 @@ describe('homework training recommendations', () => {
     expect(await screen.findByText('Retry cultivation')).toBeInTheDocument()
     expect(screen.getByRole('spinbutton', { name: text.limit })).toHaveValue(12)
     expect(screen.getAllByRole('heading', { level: 3 })[0]).toHaveTextContent('银灰')
-    expect(screen.queryByText(copy.v2.dataActivity.updated)).not.toBeInTheDocument()
+    expect(screen.queryByText(copy.common.dataActivity.updated)).not.toBeInTheDocument()
   })
 
   it('recalculates from shared snapshot versions without refreshing upstream or replacing input drafts', async () => {

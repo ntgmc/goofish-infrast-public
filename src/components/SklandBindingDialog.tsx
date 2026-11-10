@@ -186,7 +186,8 @@ export default function SklandBindingDialog({
 
         {sklandLogin.message && (
           <p
-            className={'tool-alert mt-4 ' + (hasError ? 'tool-alert--error' : '')}
+            className={'tool-alert mt-4 ' + (hasError ? 'tool-alert--error' : busy ? 'tool-loading-status' : '')}
+            aria-busy={busy && !hasError}
             role={hasError ? 'alert' : 'status'}
             aria-live={hasError ? 'assertive' : 'polite'}
           >
@@ -205,11 +206,11 @@ export default function SklandBindingDialog({
               {copy.workspace.components_SklandBindingDialog_019}</button>
           )}
           {sklandLogin.status === 'waiting' && sklandLogin.scanId && (
-            <button type="button" onClick={() => void completeSklandLogin(sklandLogin.scanId!)} disabled={busy} className="tool-secondary-action">
+            <button type="button" onClick={() => void completeSklandLogin(sklandLogin.scanId!)} aria-busy={busy} disabled={busy} className="tool-secondary-action">
               {copy.workspace.components_SklandBindingDialog_020}</button>
           )}
           {sklandLogin.status === 'account_selection_required' && (
-            <button type="button" onClick={previewSelectedAccount} disabled={busy || !sklandLogin.selectedUid} className="tool-primary-action">
+            <button type="button" onClick={previewSelectedAccount} aria-busy={busy} disabled={busy || !sklandLogin.selectedUid} className="tool-primary-action">
               {busy ? copy.workspace.components_SklandBindingDialog_021 : copy.workspace.components_SklandBindingDialog_022}
             </button>
           )}

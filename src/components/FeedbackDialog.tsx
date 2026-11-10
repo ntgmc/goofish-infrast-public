@@ -158,7 +158,7 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
               </span>
             </button>
             <p id={`${id}-image-hint`} className="feedback-hint">{text.imageHint}</p>
-            {processing && <p role="status" className="feedback-hint">{text.processingImage}</p>}
+            {processing && <p role="status" aria-busy="true" className="tool-loading-status feedback-hint">{text.processingImage}</p>}
             {attachment && <div className="feedback-image-preview">
               <FeedbackImage src={`data:${attachment.image.type};base64,${attachment.image.base64}`} />
               <div className="feedback-image-meta"><p role="status" className="feedback-hint">{attachment.compressed ? text.imageCompressed : text.imageReady} · {Math.ceil(attachment.bytes / 1024)} KB</p>
@@ -170,7 +170,7 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
         </form>}</FeedbackScrollArea>
           </Tabs.Content>
         </Tabs.Root>
-        {view === 'new' && !success && <div className="feedback-form-actions v2-modal-footer"><button type="submit" form={`${id}-form`} className="feedback-action feedback-action-primary" disabled={busy || !message.trim()}>{submitting ? text.submitting : text.submit}</button></div>}
+        {view === 'new' && !success && <div className="feedback-form-actions v2-modal-footer"><button type="submit" form={`${id}-form`} className="feedback-action feedback-action-primary" disabled={busy || !message.trim()} aria-busy={submitting}>{submitting ? text.submitting : text.submit}</button></div>}
       </DialogContent>
     </Dialog>
   </>

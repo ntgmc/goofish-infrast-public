@@ -1,4 +1,8 @@
 export const commonCopy = {
+  dataActivity: {
+    slow: '这次加载需要更长时间，请稍候。',
+    updated: '数据已更新',
+  },
   animationAutoReduced: "检测到持续卡顿，已自动开启减少动画。",
   animationDismissToast: "关闭提示",
   configGenerationReadOnly: "排班生成期间，基建配置为只读。生成结束后可继续修改。",

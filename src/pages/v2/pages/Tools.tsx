@@ -61,7 +61,7 @@ export function ManualTool({ session, workflow, onDirtyChange, onOpenProfile, on
         </>}
       </section>
       <section><span className="v2-step-number">02</span><SectionTitle title={text.prepareSchedule} description={text.importHint} />
-        <div className="v2-actions"><button className="v2-button v2-button-primary" disabled={!m.enabled} onClick={() => m.upload.current?.click()}>{text.import}<ArrowRight size={16} /></button></div>
+        <div className="v2-actions"><button className="v2-button v2-button-primary" disabled={!m.enabled} aria-busy={m.importing} onClick={() => m.upload.current?.click()}>{text.import}<ArrowRight size={16} /></button></div>
         <input ref={m.upload} type="file" accept=".json,application/json" hidden aria-label={text.import} disabled={!m.enabled} onChange={(event) => void m.importSchedule(event.target.files?.[0])} />
         <Field label={text.shiftHours} help={text.shiftHint} value={m.configuredHours} disabled={!m.enabled} onChange={(event) => m.setShiftHours(event.target.value)} />
         {m.draft && <Notice>{text.replace}</Notice>}

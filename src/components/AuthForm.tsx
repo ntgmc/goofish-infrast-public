@@ -372,7 +372,7 @@ export default function AuthForm({
         </button>
       )}
 
-      <button type="submit" disabled={loading || (mode === 'register' && inviteCodeRequired === null)} className={`min-h-12 ${submitClassName ?? 'tool-primary-action w-full px-6 py-3'}`}>
+      <button type="submit" aria-busy={loading} disabled={loading || (mode === 'register' && inviteCodeRequired === null)} className={`min-h-12 ${submitClassName ?? 'tool-primary-action w-full px-6 py-3'}`}>
         {loading ? copy.auth.components_AuthForm_019 : mode === 'login' ? copy.auth.components_AuthForm_020 : mode === 'register' ? copy.auth.components_AuthForm_021 : copy.auth.components_AuthForm_022}
       </button>
     </form>

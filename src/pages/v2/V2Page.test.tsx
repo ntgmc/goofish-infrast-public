@@ -92,6 +92,21 @@ function mount(path = '/v2') {
   return render(<MemoryRouter initialEntries={[path]}><V2Page /><RouteLocation /></MemoryRouter>, { wrapper: MotionPreferenceProvider })
 }
 
+it('pauses waiting decorations in the background and clears the page marker on departure', () => {
+  const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
+  const view = mount()
+  hidden.mockReturnValue(true)
+  fireEvent(document, new Event('visibilitychange'))
+  expect(document.documentElement).toHaveAttribute('data-v2-hidden')
+  hidden.mockReturnValue(false)
+  fireEvent(document, new Event('visibilitychange'))
+  expect(document.documentElement).not.toHaveAttribute('data-v2-hidden')
+  hidden.mockReturnValue(true)
+  fireEvent(document, new Event('visibilitychange'))
+  view.unmount()
+  expect(document.documentElement).not.toHaveAttribute('data-v2-hidden')
+})
+
 it('allows a guest to open the benchmark from navigation and return to the workspace', async () => {
   const user = userEvent.setup()
   mount('/v2')
