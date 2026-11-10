@@ -134,6 +134,23 @@ export const v2Copy = {
     priorityExpiry: (date: string) => `最早到期：${date}`,
     historyEmpty: '生成后会自动保存排班，可在「历史方案」查看、导出或复用配置。',
   },
+  progressDemo: {
+    open: '预览计算动效',
+    title: '计算动效演示',
+    description: '模拟播放排队、计算及完成过程，不生成排班、不消耗额度。',
+    scenario: '演示场景',
+    scenarios: {
+      normal: '正常完成',
+      quick: '快速完成',
+      reconnect: '重连后恢复',
+      failed: '计算失败',
+      cancelled: '取消计算',
+    },
+    restart: '重新播放',
+    next: '下一阶段',
+    completed: '演示已完成',
+    result: '可重新播放，或切换其他场景继续观察。',
+  },
   historyPage: {
     configDescription: '保存常用配置，载入后可继续调整，再点击「重新排班」生成结果。',
     configName: '配置名称',

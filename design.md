@@ -320,6 +320,12 @@ it deliberately when changing the shared design.
   the active step's description height with the morph spring; wide cards keep all descriptions
   visible. A short copper tail and bright leading edge follow the existing meter value, stopping
   on paused or terminal states. Reduced motion removes the leading edge and moving text.
+  Generation and appearance settings offer a local progress preview after `/api/admin/session`
+  confirms an administrator session. Hide it until confirmed, on failed checks or session expiration,
+  and recheck when the window regains focus. Its normal, quick, reconnection, failure and
+  cancellation scenarios use the same component and support replay and stepping;
+  closing the dialog stops its timers. Preview state stays outside the optimization workflow,
+  account storage and billing, and its completion message is explicitly a demonstration.
 - No nested stagger cascades, bounce, overshoot, or parallax in workspaces.
 - Reduced-motion fallback · final numbers and content immediately; no transform;
   retained opacity transitions at or below 150ms.

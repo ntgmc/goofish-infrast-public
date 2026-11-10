@@ -1653,6 +1653,10 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
   }
 }
 
+.v2-dialog.v2-modal.v2-progress-demo { max-width: 60rem; }
+.v2-progress-demo-controls { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-sm); margin-block-end: var(--space-sm); }
+.v2-progress-demo-controls .v2-field { flex: 1 1 12rem; margin: 0; }
+.v2-progress-demo-controls .v2-actions { margin: 0; }
 .v2-progress-handoff { overflow: hidden; }
 .v2-progress {
   margin-bottom: 18px;

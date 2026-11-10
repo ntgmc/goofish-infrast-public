@@ -8,6 +8,7 @@ import { useSiteFeatures } from '../../../lib/site-feature-context'
 import { getMaaExportNotice } from '../../tool/optimize/maa-export-notice'
 import type { V2Workflow } from '../WorkspaceSections'
 import type { V2Section } from '../navigation'
+import GenerationProgressDemo from '../GenerationProgressDemo'
 import { Facts, Notice, SectionTitle } from '../components/WorkspaceUI'
 
 const text = copy.optimize
@@ -66,6 +67,7 @@ export default function Generation({ workflow: w, progress: progressContent, dis
         {w.billingQuote && <p className="v2-generation-quote">{copy.metered.quote.summary(w.billingQuote.charge, w.billingQuote.available, w.billingQuote.tier, w.billingQuote.sufficient)}</p>}
         <button className="v2-button v2-button-primary v2-generate-submit" disabled={disabled} aria-busy={busy} onClick={() => void w.handleGenerate()}>{busy ? <RefreshCw size={18} className="v2-spin" aria-hidden="true" /> : w.resultIsCurrent ? <Check size={18} /> : <GenerateIcon size={18} aria-hidden="true" />}{busy ? busyLabel : w.resultIsCurrent ? text.pages_tool_optimize_GenerateControlBar_028 : w.hasResult ? copy.v2.regenerate : copy.v2.execute}</button>
         </div>
+        <GenerationProgressDemo />
         {w.resultIsCurrent && <p className="v2-muted">{text.pages_tool_optimize_GenerateControlBar_031}</p>}
         <Notice error>{error && <>{error.message}<div className="v2-actions"><button type="button" className="v2-button v2-button-secondary" disabled={busy || saving} onClick={() => error.retry === 'save' ? w.retryConfigSave() : void w.handleGenerate()}>{saving ? text.generation.saving : error.retry === 'save' ? text.generation.retry_save : copy.v2.generationPage.retry}</button>{error.retry !== 'save' && <button type="button" className="v2-text-button" onClick={onOperators}>{copy.v2.operators}</button>}</div></>}</Notice>
       </div>
