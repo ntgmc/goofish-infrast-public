@@ -136,6 +136,9 @@ export const v2Copy = {
   },
   animationInspector: {
     title: '动画检查',
+    enable: '启用动画检查',
+    settingHelp: '开启悬浮窗后可捕获和重播当前页动画，检查完成后可关闭。设置按账号分别保存在当前浏览器，默认关闭。',
+    simplified: '大型区域已简化预览。',
     collapse: '收起动画检查',
     detected: (count: number) => `已捕获 ${count} 种动画，可随时重播。`,
     empty: '正在观察当前页，操作页面后可重播动画。',

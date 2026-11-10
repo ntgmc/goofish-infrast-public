@@ -1,17 +1,57 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router'
 import { CloseIcon, PreviewIcon } from '../../components/icons'
 import { copy } from '../../copy'
+import { Switch } from '../../components/ui/switch'
 import { createAnimationPreview, observePageAnimations, type CapturedAnimation } from './animation-inspector'
 import { useAdminPreviewSession } from './useAdminPreviewSession'
 import './animation-inspector.css'
 
 const text = copy.v2.animationInspector
 
-export default function AnimationInspector() {
+const InspectorPreference = createContext<{ enabled: boolean; change: (enabled: boolean) => void; error: boolean } | null>(null)
+
+export default function AnimationInspector({ userId, children }: { userId: string | null; children: ReactNode }) {
+  return <InspectorSession key={userId ?? 'guest'} userId={userId}>{children}</InspectorSession>
+}
+
+function InspectorSession({ userId, children }: { userId: string | null; children: ReactNode }) {
   const authorized = useAdminPreviewSession()
-  return authorized ? <Inspector /> : null
+  const storageKey = `maatool-animation-inspector:${userId}`
+  const [enabled, setEnabled] = useState(() => {
+    try { return Boolean(userId) && localStorage.getItem(storageKey) === 'true' } catch { return false }
+  })
+  const [error, setError] = useState(false)
+  function change(next: boolean) {
+    setEnabled(next)
+    try { localStorage.setItem(storageKey, String(next)); setError(false) } catch { setError(true) }
+  }
+  useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      if (event.key === storageKey || event.key === null) setEnabled(event.newValue === 'true')
+    }
+    window.addEventListener('storage', sync)
+    return () => window.removeEventListener('storage', sync)
+  }, [storageKey])
+  return <InspectorPreference.Provider value={authorized && userId ? { enabled, change, error } : null}>
+    {children}
+    {authorized && userId && enabled && <Inspector />}
+  </InspectorPreference.Provider>
+}
+
+export function AnimationInspectorSetting() {
+  const preference = useContext(InspectorPreference)
+  const id = useId()
+  if (!preference) return null
+  return <section>
+    <h3 className="text-base font-semibold text-ink-primary">{text.title}</h3>
+    <label htmlFor={id} className="mt-4 flex min-h-11 items-center justify-between gap-4 text-sm font-medium">
+      <span>{text.enable}</span><Switch id={id} checked={preference.enabled} aria-describedby={`${id}-help`} onChange={(event) => preference.change(event.currentTarget.checked)} />
+    </label>
+    <p id={`${id}-help`} className="mt-2 text-sm leading-6 text-ink-secondary">{text.settingHelp}</p>
+    {preference.error && <p className="mt-2 text-sm text-error" role="status">{copy.dashboard.animation.storageError}</p>}
+  </section>
 }
 
 function Inspector() {
@@ -109,6 +149,7 @@ function Preview({ record, rate }: { record: CapturedAnimation; rate: number }) 
       <button type="button" className="v2-text-button" disabled={error} onClick={() => setRun((value) => value + 1)}>{text.replay}</button>
     </div></header>
     <div ref={host} className="v2-inspector-stage" aria-hidden="true" inert />
+    {record.snapshot.simplified && <p className="v2-inspector-hint">{text.simplified}</p>}
     {error ? <p role="alert">{text.unavailable}</p> : <p className="v2-inspector-play-state" role="status">{finished ? text.finished : paused ? text.paused : text.playing(rate)}</p>}
   </section>
 }

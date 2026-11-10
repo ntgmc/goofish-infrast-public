@@ -2,7 +2,7 @@ const marker = '[data-animation-inspector]'
 const properties = ['transform', 'translate', 'scale', 'rotate', 'opacity', 'width', 'height', 'left', 'top', 'outline-color']
 let snapshotId = 0
 
-type Snapshot = { node: Element; css: string; width: number; height: number; nested: boolean }
+type Snapshot = { node: Element; css: string; width: number; height: number; nested: boolean; simplified: boolean }
 export type CapturedAnimation = {
   id: string
   name: string
@@ -20,6 +20,27 @@ type Track = { snapshot: Snapshot; started: number; samples: Sample[]; timer: nu
 export function observePageAnimations(onCapture: (animation: CapturedAnimation) => void, onModal: (open: boolean) => void) {
   const seen = new WeakSet<Animation>()
   const tracks = new Map<Element, Track>()
+  const snapshots = new Map<Element | string, { value: Snapshot; copy: () => boolean; done?: (value: Snapshot) => void }>()
+  let snapshotTimer = 0
+  function flushSnapshots() {
+    snapshotTimer = 0
+    const started = performance.now()
+    while (snapshots.size && performance.now() - started < 4) {
+      const [key, work] = snapshots.entries().next().value!
+      snapshots.delete(key)
+      if (work.copy()) work.done?.(work.value)
+      else snapshots.set(key, work)
+    }
+    if (snapshots.size) snapshotTimer = window.setTimeout(flushSnapshots, 16)
+  }
+  function queueSnapshot(key: Element | string, target: Element, numeric = false, done?: (value: Snapshot) => void) {
+    const pending = snapshots.get(key)
+    if (pending) return pending.value
+    const work = { ...snapshot(target, numeric), done }
+    snapshots.set(key, work)
+    if (!snapshotTimer) snapshotTimer = window.setTimeout(flushSnapshots, 16)
+    return work.value
+  }
   const original = Element.prototype.animate
   let active = true
   const eligible = (element: Element) => {
@@ -38,8 +59,9 @@ export function observePageAnimations(onCapture: (animation: CapturedAnimation) 
     const frames = effect.getKeyframes().map(({ computedOffset, ...frame }) => ({ ...frame, offset: frame.offset ?? computedOffset }))
     if (frames.length < 2) return
     const pseudo = effect.pseudoElement
-    onCapture({ id: `native:${name}:${signature(target)}:${pseudo ?? ''}`, name, kind: 'native', snapshot: snapshot(target), frames, duration,
-      timing: { ...effect.getTiming(), duration, iterations: 1, fill: 'both', ...(pseudo ? { pseudoElement: pseudo } : {}) } })
+    const id = `native:${name}:${signature(target)}:${pseudo ?? ''}`
+    queueSnapshot(id, target, false, (snapshot) => onCapture({ id, name, kind: 'native', snapshot, frames, duration,
+      timing: { ...effect.getTiming(), duration, iterations: 1, fill: 'both', ...(pseudo ? { pseudoElement: pseudo } : {}) } }))
   }
   function instrument(this: Element, ...args: Parameters<Element['animate']>) {
     const animation = original.apply(this, args)
@@ -55,6 +77,8 @@ export function observePageAnimations(onCapture: (animation: CapturedAnimation) 
   const modal = () => onModal([...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].some((element) => !element.closest(marker)))
   function sample(element: Element, mutation: MutationRecord, text: boolean) {
     if (!eligible(element) || text && (element.children.length > 0 || !/\d/.test(element.textContent ?? ''))) return
+    const now = performance.now()
+    let track = tracks.get(element)
     if (!text) {
       const previous = document.createElement('div').style
       previous.cssText = mutation.oldValue ?? ''
@@ -63,11 +87,9 @@ export function observePageAnimations(onCapture: (animation: CapturedAnimation) 
       const changed = properties.filter((property) => previous.getPropertyValue(property) !== style.getPropertyValue(property))
       if (!changed.length || nativeOwnsChange(element, changed)) return
     }
-    const now = performance.now()
-    const current = getComputedStyle(element)
-    const frame = text ? {} : Object.fromEntries(properties.map((property) => [property, current.getPropertyValue(property)]))
+    const current = text ? null : getComputedStyle(element)
+    const frame = current ? Object.fromEntries(properties.map((property) => [property, current.getPropertyValue(property)])) : {}
     const value = element.textContent ?? ''
-    let track = tracks.get(element)
     if (!track) {
       const before = { ...frame }
       if (!text) {
@@ -76,7 +98,7 @@ export function observePageAnimations(onCapture: (animation: CapturedAnimation) 
         for (const property of properties) if (previous.getPropertyValue(property)) before[property] = previous.getPropertyValue(property)
       }
       const oldText = mutation.type === 'characterData' ? mutation.oldValue : [...mutation.removedNodes].map((node) => node.textContent).join('')
-      track = { snapshot: snapshot(element, text), started: now, samples: [{ at: 0, frame: before, text: oldText ?? value }], timer: 0, text }
+      track = { snapshot: queueSnapshot(element, element, text), started: now, samples: [{ at: 0, frame: before, text: oldText ?? value }], timer: 0, text }
       tracks.set(element, track)
     }
     track.samples.push({ at: now - track.started, frame, text: value })
@@ -86,26 +108,35 @@ export function observePageAnimations(onCapture: (animation: CapturedAnimation) 
       const duration = track.samples[track.samples.length - 1].at
       if (!active || track.samples.length < 3 || duration < 24) return
       const kind = track.text ? 'text' : 'layout'
-      onCapture({ id: `${kind}:${signature(element)}`, name: label(element), kind, snapshot: track.snapshot, duration,
+      const record: CapturedAnimation = { id: `${kind}:${signature(element)}`, name: label(element), kind, snapshot: track.snapshot, duration,
         frames: track.samples.map((sample) => ({ ...sample.frame, offset: sample.at / duration, easing: 'linear' })),
-        timing: { duration, fill: 'both' }, ...(track.text ? { texts: track.samples.map((sample) => ({ at: sample.at, value: sample.text })) } : {}) })
+        timing: { duration, fill: 'both' }, ...(track.text ? { texts: track.samples.map((sample) => ({ at: sample.at, value: sample.text })) } : {}) }
+      const pending = snapshots.get(element)
+      if (pending) pending.done = () => onCapture(record)
+      else onCapture(record)
     }, 180)
   }
   const observer = new MutationObserver((mutations) => {
+    const styles = new Map<Element, MutationRecord>(), texts = new Map<Element, MutationRecord>()
+    let checkModal = false, rescan = false
     for (const mutation of mutations) {
       if (mutation.type === 'attributes' && mutation.target instanceof Element) {
-        if (mutation.attributeName === 'style') sample(mutation.target, mutation, false)
+        if (mutation.attributeName === 'style') { if (!styles.has(mutation.target)) styles.set(mutation.target, mutation) }
         else if (!mutation.target.closest(marker)) {
-          modal()
-          if (mutation.attributeName === 'hidden' || mutation.attributeName === 'data-route-pending') scan()
+          checkModal = true
+          if (mutation.attributeName === 'hidden' || mutation.attributeName === 'data-route-pending') rescan = true
         }
       }
-      else if (mutation.type === 'characterData' && mutation.target.parentElement) sample(mutation.target.parentElement, mutation, true)
+      else if (mutation.type === 'characterData' && mutation.target.parentElement) { if (!texts.has(mutation.target.parentElement)) texts.set(mutation.target.parentElement, mutation) }
       else if (mutation.type === 'childList' && mutation.target instanceof Element) {
-        if ([...mutation.addedNodes, ...mutation.removedNodes].some((node) => node instanceof Element && !node.closest(marker))) modal()
-        if ([...mutation.addedNodes, ...mutation.removedNodes].every((node) => node.nodeType === Node.TEXT_NODE)) sample(mutation.target, mutation, true)
+        if ([...mutation.addedNodes, ...mutation.removedNodes].some((node) => node instanceof Element && !node.closest(marker))) checkModal = true
+        if ([...mutation.addedNodes, ...mutation.removedNodes].every((node) => node.nodeType === Node.TEXT_NODE) && !texts.has(mutation.target)) texts.set(mutation.target, mutation)
       }
     }
+    for (const [element, mutation] of styles) sample(element, mutation, false)
+    for (const [element, mutation] of texts) sample(element, mutation, true)
+    if (checkModal) modal()
+    if (rescan) scan()
   })
   observer.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['style', 'role', 'aria-modal', 'hidden', 'data-route-pending'], attributeOldValue: true, characterData: true, characterDataOldValue: true, childList: true })
   document.addEventListener('animationstart', scan, true)
@@ -119,6 +150,8 @@ export function observePageAnimations(onCapture: (animation: CapturedAnimation) 
     if (Element.prototype.animate === instrument) Element.prototype.animate = original
     for (const track of tracks.values()) window.clearTimeout(track.timer)
     tracks.clear()
+    window.clearTimeout(snapshotTimer)
+    snapshots.clear()
   }
 }
 
@@ -141,38 +174,59 @@ function signature(element: Element) {
   return `${element.tagName.toLowerCase()}.${[...element.classList].slice(0, 2).join('.') || element.parentElement?.classList.item(0) || 'element'}`
 }
 
-function snapshot(target: Element, numeric = false): Snapshot {
+function snapshot(target: Element, numeric = false) {
   const source = target instanceof SVGElement ? target.ownerSVGElement ?? target : numeric ? target.closest('.number-motion') ?? target : target
-  const node = source.cloneNode(true) as HTMLElement | SVGElement
-  const originals = [source, ...source.querySelectorAll('*')]
-  const clones = [node, ...node.querySelectorAll('*')]
+  const originals: Element[] = [], clones: Element[] = []
+  let simplified = false
+  function cloneTree(element: Element): Element | null {
+    // shortcut: cap previews at 80 elements; use a dedicated page capture for complete large surfaces.
+    if (originals.length >= 80) { simplified = true; return null }
+    const clone = element.cloneNode(false) as Element
+    originals.push(element); clones.push(clone)
+    for (const child of element.childNodes) {
+      if (child instanceof Element) {
+        if (child.matches('script, style, link, iframe, audio, video')) continue
+        const nested = cloneTree(child)
+        if (nested) clone.append(nested)
+        else break
+      } else clone.append(child.cloneNode(false))
+    }
+    return clone
+  }
+  const node = cloneTree(source)! as HTMLElement | SVGElement
   const prefix = `v2-animation-snapshot-${++snapshotId}-`
   const ids = new Map(originals.filter((element) => element.id).map((element, index) => [element.id, `${prefix}${index}`]))
   const css: string[] = []
-  originals.forEach((element, index) => {
-    const clone = clones[index] as HTMLElement | SVGElement
-    const style = getComputedStyle(element)
-    if (clone.style) {
-      clone.style.cssText = `${declarations(style)};animation:none;transition:none`
-    }
-    if (typeof CSS !== 'undefined' && typeof CSS.supports === 'function') for (const pseudo of ['::before', '::after']) {
-      const computed = getComputedStyle(element, pseudo)
-      if (!computed.content || computed.content === 'none' || computed.content === 'normal') continue
-      clone.setAttribute('data-animation-snapshot-node', String(index))
-      css.push(`[data-animation-snapshot-node="${index}"]${pseudo}{${declarations(computed)};animation:none!important;transition:none!important}`)
-    }
-    if (element.id) clone.id = ids.get(element.id)!
-    for (const attribute of [...clone.attributes]) {
-      const value = rewriteReferences(attribute.value, ids)
-      if (value !== attribute.value) clone.setAttributeNS(attribute.namespaceURI, attribute.name, value)
-    }
-    clone.removeAttribute('autofocus')
-    if (element === target) clone.setAttribute('data-animation-inspector-target', '')
-  })
-  node.querySelectorAll('script, style, link, iframe, audio, video').forEach((element) => element.remove())
   const bounds = source.getBoundingClientRect()
   const width = source instanceof HTMLElement ? source.offsetWidth || bounds.width : bounds.width
   const height = source instanceof HTMLElement ? source.offsetHeight || bounds.height : bounds.height
+  const value: Snapshot = { node, css: '', width, height, nested: source !== target, simplified }
+  let index = 0
+  function copy() {
+    if (index >= originals.length) return true
+    const element = originals[index], clone = clones[index] as HTMLElement | SVGElement
+    if (element.isConnected) {
+      if (clone.style) clone.style.cssText = `${rewriteReferences(declarations(getComputedStyle(element)), ids)};animation:none;transition:none`
+      if (typeof CSS !== 'undefined' && typeof CSS.supports === 'function') for (const pseudo of ['::before', '::after']) {
+        const computed = getComputedStyle(element, pseudo)
+        if (!computed.content || computed.content === 'none' || computed.content === 'normal') continue
+        clone.setAttribute('data-animation-snapshot-node', String(index))
+        css.push(`[data-animation-snapshot-node="${index}"]${pseudo}{${declarations(computed)};animation:none!important;transition:none!important}`)
+      }
+    } else value.simplified = true
+    if (element.id) clone.id = ids.get(element.id)!
+    for (const attribute of [...clone.attributes]) {
+      const rewritten = rewriteReferences(attribute.value, ids)
+      if (rewritten !== attribute.value) clone.setAttributeNS(attribute.namespaceURI, attribute.name, rewritten)
+    }
+    clone.removeAttribute('autofocus')
+    if (element === target) clone.setAttribute('data-animation-inspector-target', '')
+    value.css = rewriteReferences(css.join('\n'), ids)
+    index++
+    return index >= originals.length
+  }
+  // Freeze the animated root before it can leave the page; copy descendants between frames.
+  copy()
   node.style.position = 'absolute'
   node.style.margin = '0'
   node.style.left = '0'
@@ -180,7 +234,7 @@ function snapshot(target: Element, numeric = false): Snapshot {
   node.style.boxSizing = 'border-box'
   node.style.width = `${width}px`
   node.style.height = `${height}px`
-  return { node, css: rewriteReferences(css.join('\n'), ids), width, height, nested: source !== target }
+  return { value, copy }
 }
 
 function declarations(style: CSSStyleDeclaration) {

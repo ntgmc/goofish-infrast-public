@@ -379,13 +379,19 @@ it deliberately when changing the shared design.
   cancellation scenarios use the same component and support replay and stepping;
   closing the dialog stops its timers. Preview state stays outside the optimization workflow,
   account storage and billing, and its completion message is explicitly a demonstration.
-  The same server-confirmed session enables a bottom-right animation inspector throughout V2.
-  It records native animations, CSS transitions, sampled layout changes and numeric tweens from
+  The animation inspector additionally requires an explicit switch in Settings → Preferences,
+  off by default and stored per website user in the current browser. A server-confirmed admin session
+  is still required. Disabled inspection installs no observer or native instrumentation; switching users,
+  disabling inspection or losing the admin session tears down the recorder and preview.
+  When enabled, the bottom-right inspector records native animations, CSS transitions, sampled layout changes and numeric tweens from
   the current page, retaining the latest 24 effects in memory until navigation. A detached,
   inert copy inside a shadow root replays each effect once at 0.1×–4× with pause and replay
   controls; global page selectors, business events, original animation callbacks and page data
   stay outside the preview. Preserve SVG references
-  with distinct snapshot IDs. Hide the inspector while a page modal owns focus; captured effects
+  with distinct snapshot IDs. Snapshot roots freeze immediately; descendant styles copy in 4ms batches
+  with a 16ms yield. Pending effects with the same identity coalesce. Large snapshots retain at most
+  80 elements and show a simplified-preview notice; mutation batches sample each changed element once.
+  Hide the inspector while a page modal owns focus; captured effects
   remain available after it closes. Session expiration stops observation and clears the preview.
   Reduced-motion settings determine which page effects exist to capture; explicit replay stays
   local to the inspector. Route, pending timers and native instrumentation clean up on departure.

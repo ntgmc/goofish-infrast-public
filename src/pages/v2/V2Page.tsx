@@ -29,10 +29,6 @@ import './v2.css'
 import './workspace-pages.css'
 
 export default function V2Page() {
-  return <><V2Workspace /><AnimationInspector /></>
-}
-
-function V2Workspace() {
   const [params] = useSearchParams()
   const { hash, pathname } = useLocation()
   const section = v2Section(params, hash, pathname)
@@ -87,7 +83,7 @@ function V2Workspace() {
 
 function SessionProviders({ session, children }: { session: V2Session; children: ReactNode }) {
   const resolveHref = useCallback((href: string) => v2Href(href, session.activeProfile?.id), [session.activeProfile?.id])
-  return <InternalLinkProvider value={resolveHref}><DialogSurfaceProvider value="v2-dialog v2-feature-content">{session.authStatus === 'authenticated' && session.user ? <NotificationCenterProvider userId={session.user.id}>{children}</NotificationCenterProvider> : children}</DialogSurfaceProvider></InternalLinkProvider>
+  return <InternalLinkProvider value={resolveHref}><DialogSurfaceProvider value="v2-dialog v2-feature-content"><AnimationInspector userId={session.authStatus === 'authenticated' ? session.user?.id ?? null : null}>{session.authStatus === 'authenticated' && session.user ? <NotificationCenterProvider userId={session.user.id}>{children}</NotificationCenterProvider> : children}</AnimationInspector></DialogSurfaceProvider></InternalLinkProvider>
 }
 
 function ConnectedDashboard({ session }: { session: V2Session }) {

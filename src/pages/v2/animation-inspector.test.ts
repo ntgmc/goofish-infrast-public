@@ -5,6 +5,7 @@ import { observePageAnimations } from './animation-inspector'
 afterEach(() => { document.body.replaceChildren(); vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers() })
 
 it('records short native effects without changing their player and restores instrumentation on departure', () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
   class Effect {
     target: Element
     constructor(target: Element) { this.target = target }
@@ -29,6 +30,8 @@ it('records short native effects without changing their player and restores inst
   const stop = observePageAnimations(capture, vi.fn())
   try {
     expect(source.animate([{ opacity: 0 }, { opacity: 1 }], 40)).toBe(player)
+    expect(capture).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(16)
     const record = capture.mock.calls[0][0]
     expect(record.snapshot.node).not.toBe(source)
     expect(record.snapshot.node.id).not.toBe(source.id)
@@ -43,12 +46,36 @@ it('records short native effects without changing their player and restores inst
     Object.defineProperty(source, 'getAnimations', { value: getAnimations })
     source.dispatchEvent(new Event('animationstart', { bubbles: true }))
     expect(getAnimations).toHaveBeenCalledWith({ subtree: true })
+    vi.advanceTimersByTime(16)
     expect(capture).toHaveBeenCalledTimes(2)
     expect(capture.mock.calls[1][0].timing.pseudoElement).toBe('::after')
+    const large = document.createElement('div')
+    large.append(...Array.from({ length: 600 }, () => document.createElement('span')))
+    document.body.append(large)
+    original.mockImplementation(function (this: Element) { return { ...player, effect: new Effect(this) } })
+    const computedStyle = window.getComputedStyle.bind(window)
+    const styles = vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => pseudo ? { content: 'none' } as CSSStyleDeclaration : computedStyle(element))
+    large.animate([], 40)
+    large.animate([], 40)
+    expect(styles.mock.calls.every(([element]) => element === large)).toBe(true)
+    expect(styles.mock.calls.length).toBeLessThanOrEqual(3)
+    vi.advanceTimersByTime(16)
+    expect(capture).toHaveBeenCalledTimes(3)
+    expect(capture.mock.calls[2][0].snapshot.simplified).toBe(true)
+    expect(capture.mock.calls[2][0].snapshot.node.querySelectorAll('*')).toHaveLength(79)
+    expect(large.children).toHaveLength(600)
+    large.className = 'pending-on-departure'
+    large.animate([], 40)
+    let clock = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => clock++)
+    vi.advanceTimersByTime(16)
+    expect(capture).toHaveBeenCalledTimes(3)
     stop()
     expect(Element.prototype.animate).toBe(original)
     source.animate([], 1)
-    expect(capture).toHaveBeenCalledTimes(2)
+    vi.advanceTimersByTime(500)
+    expect(capture).toHaveBeenCalledTimes(3)
+    expect(vi.getTimerCount()).toBe(0)
   } finally {
     stop()
     if (descriptor) Object.defineProperty(Element.prototype, 'animate', descriptor)
