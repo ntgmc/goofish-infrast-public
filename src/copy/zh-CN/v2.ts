@@ -156,6 +156,16 @@ export const v2Copy = {
     unavailable: '这段动画暂时无法重播，请再次操作页面后重试。',
     hint: '操作页面即可捕获短动画。预览使用页面副本，切换页面后清空；减少动画会影响可捕获的效果。',
   },
+  deploymentPreview: {
+    title: '版本提示预览',
+    description: '可反复查看更新与欢迎提示，使用本地更新记录。模拟刷新后会显示欢迎提示，并保留当前页面。',
+    update: '模拟更新提醒',
+    welcome: '模拟欢迎回来',
+    label: '版本更新 · 本地预览',
+    refresh: '模拟刷新',
+    close: '关闭预览',
+    previousVersion: '较早版本',
+  },
   progressDemo: {
     open: '预览计算动效',
     title: '计算动效演示',

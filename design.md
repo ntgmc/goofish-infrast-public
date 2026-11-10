@@ -59,6 +59,10 @@ it deliberately when changing the shared design.
   lazily from the opened build's published history. Remember the latest visited
   build on this browser; record the refresh target before reloading so that
   entering that build does not show a second prompt. First visits stay quiet.
+  V2 account preferences expose repeatable update and welcome previews after
+  administrator session confirmation. Reuse the production dialog with local
+  release notes; simulated refresh advances to the welcome, and closing restores
+  the opener without reloading or changing the last visited build.
 
 ## Variants
 

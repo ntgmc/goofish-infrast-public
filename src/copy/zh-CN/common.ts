@@ -145,6 +145,9 @@ export const commonCopy = {
   components_DeploymentUpdatePrompt_006: "立即刷新",
   // src/components/DeploymentUpdatePrompt.tsx
   deploymentUpdateNotes: "更新内容",
+  deploymentNotesLoading: "正在加载更新日志…",
+  deploymentNotesLoadFailed: "更新日志加载失败，请重试。",
+  deploymentNotesRetry: "重新读取",
   deploymentWelcomeTitle: "欢迎回来",
   deploymentWelcomeDescription: "你离开期间有了这些更新，可以继续使用。",
   deploymentPreviousVersion: "上次使用",

@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, type SyntheticEvent } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { serviceBuildQueryOptions } from '../lib/service-build-query'
 import { apiJson } from '../lib/api-client'
-import type { ChangelogPageData } from '../lib/changelog-contract'
+import type { ChangelogPageData, ChangelogRelease } from '../lib/changelog-contract'
 import { appBuildMetaSchema } from '../lib/app-build-meta-validation'
 import { RefreshIcon as RefreshCw } from './icons'
 import { APP_BUILD_META } from '../lib/build-meta'
@@ -40,9 +40,6 @@ export default function DeploymentUpdatePrompt({
   const [availableMeta, setAvailableMeta] = useState<AppBuildMeta | null>(null)
   const isWelcome = !availableMeta && welcomeOpen
   const promptMeta = availableMeta ?? (welcomeOpen ? meta : null)
-  const dialogRef = useRef<HTMLDialogElement>(null)
-  const refreshButtonRef = useRef<HTMLButtonElement>(null)
-
   const query = useQuery({ ...serviceBuildQueryOptions,
     queryKey: fetchHealth ? ['public', 'service-build', 'custom'] : serviceBuildQueryOptions.queryKey,
     queryFn: fetchHealth ? async ({ signal }) => ({ meta: await fetchHealth(signal), ok: true }) : serviceBuildQueryOptions.queryFn,
@@ -77,11 +74,49 @@ export default function DeploymentUpdatePrompt({
     return () => window.removeEventListener('focus', onFocus)
   }, [availableMeta, query.refetch])
 
+  if (!promptMeta) return null
+
+  return <DeploymentUpdateDialog
+    isWelcome={isWelcome}
+    previousVersion={isWelcome ? previousMeta!.frontend_version : meta.frontend_version}
+    promptVersion={promptMeta.frontend_version}
+    changelog={changelog}
+    onDismiss={isWelcome ? () => setWelcomeOpen(false) : undefined}
+    onContinue={() => {
+      if (isWelcome) setWelcomeOpen(false)
+      else {
+        rememberVisit(promptMeta)
+        reloadPage()
+      }
+    }}
+  />
+}
+
+interface DialogProps {
+  isWelcome: boolean
+  previousVersion: string
+  promptVersion: string
+  changelog: {
+    data?: ChangelogRelease[]
+    isPending?: boolean
+    isFetching?: boolean
+    isError?: boolean
+    refetch?: (options: { cancelRefetch: boolean }) => unknown
+  }
+  onContinue: () => void
+  onDismiss?: () => void
+  preview?: { label: string; close: string; refresh: string }
+}
+
+export function DeploymentUpdateDialog({ isWelcome, previousVersion, promptVersion, changelog, onContinue, onDismiss, preview }: DialogProps) {
+  const id = useId()
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const refreshButtonRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
-    if (!promptMeta) return
     const dialog = dialogRef.current
     if (!dialog) return
 
+    const previousFocus = document.activeElement
     const previousOverflow = document.documentElement.style.overflow
     document.documentElement.style.overflow = 'hidden'
     if (!dialog.open) dialog.showModal()
@@ -89,62 +124,51 @@ export default function DeploymentUpdatePrompt({
     return () => {
       if (dialog.open) dialog.close()
       document.documentElement.style.overflow = previousOverflow
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus({ preventScroll: true })
     }
-  }, [promptMeta])
-
-  if (!promptMeta) return null
+  }, [])
+  useEffect(() => { refreshButtonRef.current?.focus() }, [isWelcome])
 
   const SectionHeading = isWelcome ? 'h5' : 'h4'
-  const handleCancel = (event: SyntheticEvent<HTMLDialogElement>) => {
-    event.preventDefault()
-    if (isWelcome) setWelcomeOpen(false)
-  }
-  const handleContinue = () => {
-    if (isWelcome) setWelcomeOpen(false)
-    else {
-      rememberVisit(promptMeta)
-      reloadPage()
-    }
-  }
 
   return (
     <dialog
       ref={dialogRef}
-      aria-labelledby="deployment-update-title"
-      aria-describedby="deployment-update-description"
+      aria-labelledby={`${id}-title`}
+      aria-describedby={`${id}-description`}
       aria-modal="true"
-      onCancel={handleCancel}
+      onCancel={(event) => { event.preventDefault(); onDismiss?.() }}
       className="v2-dialog deployment-update-dialog"
     >
-      <AnimatedPresenceRegion motionKey={deploymentIdentity(promptMeta)} className="deployment-update-content">
+      <AnimatedPresenceRegion motionKey={`${isWelcome}:${promptVersion}`} className="deployment-update-content">
         <header>
-          <p className="deployment-update-label">{copy.common.components_DeploymentUpdatePrompt_001}</p>
-          <h2 id="deployment-update-title">
+          <p className="deployment-update-label">{preview?.label ?? copy.common.components_DeploymentUpdatePrompt_001}</p>
+          <h2 id={`${id}-title`}>
             {isWelcome ? copy.common.deploymentWelcomeTitle : copy.common.components_DeploymentUpdatePrompt_002}
           </h2>
         </header>
-        <p id="deployment-update-description" className="deployment-update-description">
+        <p id={`${id}-description`} className="deployment-update-description">
           {isWelcome ? copy.common.deploymentWelcomeDescription : copy.common.components_DeploymentUpdatePrompt_003}
         </p>
         <dl className="deployment-update-versions">
           <div>
             <dt>{isWelcome ? copy.common.deploymentPreviousVersion : copy.common.components_DeploymentUpdatePrompt_004}</dt>
-            <dd>{isWelcome ? previousMeta!.frontend_version : meta.frontend_version}</dd>
+            <dd>{previousVersion}</dd>
           </div>
           <div>
             <dt>{isWelcome ? copy.common.components_DeploymentUpdatePrompt_004 : copy.common.components_DeploymentUpdatePrompt_005}</dt>
-            <dd className="deployment-update-latest">{promptMeta.frontend_version}</dd>
+            <dd className="deployment-update-latest">{promptVersion}</dd>
           </div>
         </dl>
-        <section className="deployment-update-notes" aria-labelledby="deployment-update-notes-title" aria-busy={changelog.isFetching} tabIndex={0}>
-          <h3 id="deployment-update-notes-title">{isWelcome ? copy.common.deploymentRecentUpdates : copy.common.deploymentUpdateNotes}</h3>
+        <section className="deployment-update-notes" aria-labelledby={`${id}-notes-title`} aria-busy={changelog.isFetching} tabIndex={0}>
+          <h3 id={`${id}-notes-title`}>{isWelcome ? copy.common.deploymentRecentUpdates : copy.common.deploymentUpdateNotes}</h3>
           {changelog.isPending ? (
-            <p role="status">{copy.v2.updatesLoading}</p>
+            <p role="status">{copy.common.deploymentNotesLoading}</p>
           ) : changelog.isError ? (
             <p role="alert">
-              {copy.v2.updatesLoadFailed}{' '}
-              <button type="button" className="deployment-update-retry" onClick={() => void changelog.refetch({ cancelRefetch: false })}>
-                {copy.v2.retry}
+              {copy.common.deploymentNotesLoadFailed}{' '}
+              <button type="button" className="deployment-update-retry" onClick={() => void changelog.refetch?.({ cancelRefetch: false })}>
+                {copy.common.deploymentNotesRetry}
               </button>
             </p>
           ) : changelog.data?.some((release) => release.sections.length > 0) ? (
@@ -167,14 +191,15 @@ export default function DeploymentUpdatePrompt({
         </section>
         <div className="deployment-update-actions">
           {isWelcome && <a className="deployment-update-history" href="/changelog">{copy.common.deploymentAllUpdates}</a>}
+          {preview && <button type="button" className="v2-button v2-button-secondary" onClick={onDismiss}>{preview.close}</button>}
           <button
             ref={refreshButtonRef}
             type="button"
-            onClick={handleContinue}
+            onClick={onContinue}
             className="tool-primary-action deployment-update-refresh"
           >
             {!isWelcome && <RefreshCw size={16} aria-hidden="true" />}
-            {isWelcome ? copy.common.deploymentWelcomeContinue : copy.common.components_DeploymentUpdatePrompt_006}
+            {isWelcome ? copy.common.deploymentWelcomeContinue : preview ? preview.refresh : copy.common.components_DeploymentUpdatePrompt_006}
           </button>
         </div>
       </AnimatedPresenceRegion>
