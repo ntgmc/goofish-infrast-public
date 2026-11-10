@@ -300,7 +300,14 @@ it deliberately when changing the shared design.
   animation. Shared card geometry updates on selection changes rather than virtual scrolling.
 - `SharedCardDialog` provides card-to-detail transitions with shared layout IDs and the morph
   spring (stiffness 380, damping 40, mass 0.85). Facility cards use it for their background, icon
-  and title; details retain operator mood, skills, production and efficiency. Keep text in its own shared element or fade it
+  and title. Facility details put product, efficiency and shift production first, then compact operator
+  rows with identity beside a mood track on wide surfaces and stacked on narrow ones. Keep exact
+  starting and ending mood readings beside the track; its filled level represents ending mood,
+  a lighter segment shows the change, and a marker identifies starting mood. Scale to the selected
+  plan's maximum mood, defaulting to 24. Clamp drawing only; retain actual numeric readings and
+  show missing values as unavailable without drawing a change. Recovery uses the positive token.
+  Skills and full calculation details expand on demand. The heading retains facility level and
+  shows the selected shift and duration. Keep text in its own shared element or fade it
   into the destination; do not stretch long descriptions. Use `layoutScroll` on the scroll host.
   Dismissal unmounts the modal immediately, releasing its overlay, focus trap and scroll lock.
   The source card handles the return morph, so opening another card, reopening the same card or

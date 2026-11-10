@@ -927,6 +927,7 @@ describe('V2 results-first workspace', () => {
     delete room.level
     room.facility_level = 2
     room.mood = { 但书: { start: 21.5, end: 7.2 } }
+    result.plans[0].mood_assumptions = { max_mood: 30 }
     room.overflow = { time: '7h', equivalent: { equivalent_efficiency: 304.2 } }
     workflow.historyItem = { result }
     const user = userEvent.setup()
@@ -939,7 +940,14 @@ describe('V2 results-first workspace', () => {
     expect(dialog.getByText('21.5')).toBeInTheDocument()
     expect(dialog.getByText('7.2')).toBeInTheDocument()
     expect(dialog.getAllByText(copy.v2.moodUnavailable)).toHaveLength(4)
-    expect(dialog.getByText(`${copy.v2.expectedFullOrders}7h`)).toBeInTheDocument()
+    const mood = dialog.getByText('7.2').closest('.v2-room-mood')!
+    expect(mood).toHaveTextContent('/ 30')
+    expect(parseFloat(mood.querySelector<HTMLElement>('.v2-mood-level')!.style.width)).toBeCloseTo(24)
+    expect(dialog.getByRole('region', { name: copy.v2.roomOperators }).querySelectorAll('.v2-mood-track')).toHaveLength(1)
+    const calculation = dialog.getByText(copy.v2.roomDetails).closest('details')!
+    expect(calculation).not.toHaveAttribute('open')
+    await user.click(within(calculation).getByText(copy.v2.roomDetails))
+    expect(dialog.getByText(`${copy.v2.expectedFullOrders}7h`)).toBeVisible()
     await user.click(dialog.getAllByText(copy.domain.building_skills.title)[0])
     expect(dialog.getAllByText(new RegExp(copy.domain.building_skills.active))[0]).toBeVisible()
     expect(workflow.handleGenerate).not.toHaveBeenCalled()

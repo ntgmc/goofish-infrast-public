@@ -146,7 +146,7 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
       <header className="v2-room-detail-heading">
         <motion.span className="v2-room-icon" layoutId={reduced ? undefined : `room-icon-${openedRoom.key}`} transition={motionTokens.morph}><FacilityIcon room={openedRoom} /></motion.span>
         <div><DialogTitle asChild><motion.h2 layoutId={reduced ? undefined : `room-title-${openedRoom.key}`} transition={motionTokens.morph}>{openedRoom.label}<small>{openedRoom.indexLabel}</small></motion.h2></DialogTitle>
-          <DialogDescription>{text.roomDescription}</DialogDescription></div>
+          <DialogDescription>{text.roomDescription(result.plans[selected]?.name || text.shift(selected + 1), hours[selected] ?? 8)}</DialogDescription></div>
       </header>
       <motion.div initial={{ opacity: reduced ? 1 : 0 }} animate={{ opacity: 1 }} transition={{ duration: reduced ? 0 : 0.18 }}>
         <RoomDetails room={openedRoom} result={result} shift={selected} showProduction={showProduction} />
@@ -200,24 +200,48 @@ function RoomCard({ room, layoutKey, direction, selectedKey, drone = false, comp
 }
 
 function RoomDetails({ room, result, shift, showProduction }: { room: BoardRoom; result: OptimizeResult; shift: number; showProduction: boolean }) {
-  return <div className="v2-options-content">
-    <div className="v2-room-operator-details">{room.row?.operators.map((operator) => {
-      const mood = room.data?.mood?.[operator.name]
-      const moodValue = (value: number | undefined) => value !== undefined && Number.isFinite(value) ? value.toFixed(1) : text.moodUnavailable
-      return <section className="v2-room-operator" key={operator.name}>
-        <div className="v2-operator-row"><Avatar operator={operator} /><strong>{operator.name}</strong></div>
-        <dl className="v2-detail-data v2-mood-data"><div><dt>{text.startMood}</dt><dd>{moodValue(mood?.start)}</dd></div>
-          <div><dt>{text.endMood}</dt><dd>{moodValue(mood?.end)}</dd></div></dl>
-        <BuildingSkills operator={operator} />
-      </section>
-    })}</div>
-    <dl className="v2-detail-data"><div><dt>{text.level}</dt><dd>{roomLevelLabel(room)}</dd></div>
-      <div><dt>{text.product}</dt><dd>{room.product}</dd></div><div><dt>{room.roomType === 'trading' ? text.equivalentEfficiency : text.efficiency}</dt><dd>{room.row?.efficiency ?? '—'}</dd></div>
-      {showProduction && result.daily_production && <RoomProduction daily={result.daily_production} room={room} shift={result.plans[shift]?.name} />}</dl>
-    <h3>{text.roomDetails}</h3><ul className="v2-room-detail-list">{room.row?.detailItems.map((item, index) => <li key={item}>{room.roomType === 'trading'
-      ? index === 0 ? `${text.equivalentEfficiency} ${room.row?.efficiency}`
-        : item.startsWith(copy.domain.components_result_panel_formatters_023) ? `${text.expectedFullOrders}${room.data?.overflow?.time}` : item
-      : item}</li>)}</ul>
+  const maximum = result.plans[shift]?.mood_assumptions?.max_mood
+  const maxMood = maximum !== undefined && Number.isFinite(maximum) && maximum > 0 ? maximum : 24
+  return <div className="v2-room-detail-content">
+    <dl className="v2-room-detail-stats">
+      <div><dt>{text.product}</dt><dd><ProductIcon product={room.product} size={20} />{room.product === '-' ? text.support : room.product}</dd></div>
+      {room.row && room.row.efficiency !== '-' && <div><dt>{room.roomType === 'trading' ? text.equivalentEfficiency : text.efficiency}</dt><dd>{room.row.efficiency}</dd></div>}
+      {showProduction && result.daily_production && <RoomProduction daily={result.daily_production} room={room} shift={result.plans[shift]?.name} />}
+    </dl>
+    <section className="v2-room-operator-details" aria-label={text.roomOperators}>
+      <h3>{text.roomOperators}</h3>
+      {room.row?.operators.length ? room.row.operators.map((operator) => {
+        const mood = room.data?.mood?.[operator.name]
+        return <section className="v2-room-operator" key={operator.name} aria-label={operator.name}>
+          <div className="v2-operator-row"><Avatar operator={operator} /><strong>{operator.name}</strong></div>
+          <RoomMood start={mood?.start} end={mood?.end} maximum={maxMood} />
+          <BuildingSkills operator={operator} />
+        </section>
+      }) : <p className="v2-muted">{room.row?.isAutofill || room.data?.autofill ? copy.domain.components_result_panel_formatters_005 : copy.domain.result_board_v2.empty_room}</p>}
+    </section>
+    {Boolean(room.row?.detailItems.length) && <details className="v2-room-calculation"><summary>{text.roomDetails}</summary>
+      <ul className="v2-room-detail-list">{room.row?.detailItems.map((item, index) => <li key={item}>{room.roomType === 'trading'
+        ? index === 0 ? `${text.equivalentEfficiency} ${room.row?.efficiency}`
+          : item.startsWith(copy.domain.components_result_panel_formatters_023) ? `${text.expectedFullOrders}${room.data?.overflow?.time}` : item
+        : item}</li>)}</ul>
+    </details>}
+  </div>
+}
+
+function RoomMood({ start, end, maximum }: { start?: number; end?: number; maximum: number }) {
+  const known = start !== undefined && end !== undefined && Number.isFinite(start) && Number.isFinite(end)
+  const percent = (value: number) => Math.min(100, Math.max(0, value / maximum * 100))
+  const value = (mood: number | undefined) => mood !== undefined && Number.isFinite(mood) ? mood.toFixed(1) : text.moodUnavailable
+  const startPercent = known ? percent(start) : 0
+  const endPercent = known ? percent(end) : 0
+  return <div className="v2-room-mood" data-recovering={known && end > start || undefined} data-empty={known && end <= 0 || undefined}>
+    <dl><div><dt>{text.startMood}</dt><dd>{value(start)}<span aria-hidden="true">→</span></dd></div>
+      <div><dt>{text.endMood}</dt><dd>{value(end)}<small>/ {maximum}</small></dd></div></dl>
+    {known && <div className="v2-mood-track" aria-hidden="true">
+      <span className="v2-mood-level" style={{ width: `${endPercent}%` }} />
+      <span className="v2-mood-change" style={{ left: `${Math.min(startPercent, endPercent)}%`, width: `${Math.abs(endPercent - startPercent)}%` }} />
+      <span className="v2-mood-start" style={{ left: `${startPercent}%` }} />
+    </div>}
   </div>
 }
 
