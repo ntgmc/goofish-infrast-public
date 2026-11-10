@@ -4,7 +4,6 @@ import { useSklandBinding, type SklandAccountOption, type SklandImportMode, type
 import { copy } from '../copy/index'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
 import SklandIcon from './SklandIcon'
-import SklandImportActivity from './SklandImportActivity'
 import { CloseIcon } from './icons'
 
 
@@ -19,7 +18,6 @@ type SklandBindingDialogProps = {
     note?: string
   }
   autoStart?: boolean
-  importMotion?: boolean
   onOpenChange: (open: boolean) => void
   onPayload: (payload: SklandPayload) => void
   onCompleted?: (payload: SklandPayload) => void
@@ -40,7 +38,6 @@ export default function SklandBindingDialog({
   context = 'workspace',
   claimProfileMeta,
   autoStart = false,
-  importMotion = false,
   onOpenChange,
   onPayload,
   onCompleted,
@@ -76,8 +73,6 @@ export default function SklandBindingDialog({
   const currentStep = stepForStatus(sklandLogin.status)
   const hasError = sklandLogin.status === 'error' || sklandLogin.status === 'account_mismatch' || sklandLogin.status === 'frozen'
   const confirmDisabled = busy || sklandLogin.status !== 'confirm_required' || !sklandLogin.confirmationId
-  const showActivity = importMotion && busy && !hasError && sklandLogin.status !== 'waiting'
-  const activityPhase = sklandLogin.status === 'importing' ? 'save' : sklandLogin.status === 'account_selection_required' ? 'read' : 'authorize'
   const title = isFreePreviewClaim
     ? copy.workspace.components_SklandBindingDialog_006
     : isLifetimeVoucherUse ? copy.workspace.components_SklandBindingDialog_lifetime_title : copy.workspace.components_SklandBindingDialog_007
@@ -142,9 +137,6 @@ export default function SklandBindingDialog({
         </div>
         <p className="mt-2 text-xs text-ink-muted">{copy.workspace.components_SklandBindingDialog_017}</p>
 
-        {showActivity && sklandLogin.message && <SklandImportActivity phase={activityPhase} message={sklandLogin.message} depot={isDepot} />}
-
-        <div hidden={showActivity}>
         <div className="mt-5">
           {sklandLogin.mode === 'scan' && (
             <ScanModePanel
@@ -192,9 +184,7 @@ export default function SklandBindingDialog({
           />
         )}
 
-        </div>
-
-        {sklandLogin.message && !showActivity && (
+        {sklandLogin.message && (
           <p
             className={'tool-alert mt-4 ' + (hasError ? 'tool-alert--error' : busy ? 'tool-loading-status' : '')}
             aria-busy={busy && !hasError}

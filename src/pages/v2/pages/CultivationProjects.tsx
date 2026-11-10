@@ -4,7 +4,7 @@ import { copy } from '../../../copy'
 import OperatorPicker from '../../../components/OperatorPicker'
 import { AnimatedValue } from '../../../components/MotionPrimitives'
 import { TweenValue } from '../../../components/NumberMotion'
-import { DataActivity, DataRefresh, useDataUpdate } from '../components/DataActivity'
+import { DataActivity, DataRefresh, DataSkeleton, useDataUpdate } from '../components/DataActivity'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../../components/ui/dialog'
 import { Avatar } from '../ScheduleBoard'
 import { canEditConfig } from '../../../lib/license'
@@ -49,11 +49,12 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
     setApplied(true)
   }
   return <div className="v2-projects">
-    <div className="v2-tool-source v2-project-source"><div><span className="v2-label">{text.account} · {profile.display_name}</span><p>{text.description}</p><Link className="v2-text-button" to={v2Path('cultivation', profile.id)}>{text.suggestionsEntry}<ArrowRight size={14} /></Link></div><button className="v2-button v2-button-primary" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}>{m.busy ? text.loading : copy.skland.refresh}<RefreshIcon size={16} aria-hidden="true" /></button></div>
+    <div className="v2-tool-source v2-project-source"><div><span className="v2-label">{text.account} · {profile.display_name}</span><p>{text.description}</p><Link className="v2-text-button" to={v2Path('cultivation', profile.id)}>{text.suggestionsEntry}<ArrowRight size={14} /></Link></div><button className="v2-button v2-button-primary" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}>{copy.skland.refresh}<RefreshIcon size={16} aria-hidden="true" /></button>
+      <div className="v2-data-feedback"><DataRefresh pending={m.busy} revision={m.data} error={Boolean(m.error)}
+        label={m.phase === 'syncing' ? copy.v2.dataActivity.syncing : copy.v2.dataActivity.calculating} /></div>
+    </div>
     <Notice error>{m.error}</Notice><Notice>{m.storageError ? text.storageFailed : null}</Notice>
-    <DataRefresh pending={m.busy} revision={m.data} error={Boolean(m.error)} kind={m.phase === 'syncing' ? 'sync' : 'cultivation'}
-      label={m.phase === 'syncing' ? copy.v2.dataActivity.syncing : copy.v2.dataActivity.calculating}
-      description={m.data ? copy.v2.dataActivity.current : undefined} skeleton={!m.data && !m.projects.length ? 'projects' : undefined} />
+    {m.busy && !m.data && !m.projects.length && <DataSkeleton layout="projects" />}
     {m.data?.warnings.map((warning) => <Notice key={warning}>{warning}</Notice>)}
     {(m.data || m.projects.length > 0) && <>
       <div className="v2-project-columns v2-data-arrival">

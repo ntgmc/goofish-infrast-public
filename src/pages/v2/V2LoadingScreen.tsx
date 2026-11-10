@@ -8,7 +8,7 @@ import { DataActivity } from './components/DataActivity'
 import './V2LoadingScreen.css'
 
 export function V2SectionLoading({ label = copy.common.pages_tool_AccountDashboard_015 }: { label?: string }) {
-  return <div className="v2-section-loading-region"><DataActivity label={label} skeleton="cards" /></div>
+  return <div className="v2-section-loading-region"><DataActivity label={label} /></div>
 }
 
 export default function V2LoadingScreen({ error, onRetry, retryLabel = routesCopy.v2.retry, children }: {

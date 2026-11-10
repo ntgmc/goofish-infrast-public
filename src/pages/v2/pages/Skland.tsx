@@ -54,7 +54,7 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
       </div>
       {rebind && <p className="mt-4 text-sm text-ink-secondary">{text.bindFirst}</p>}
       {snapshot.error && <Notice error>{snapshot.error}</Notice>}
-      <DataRefresh pending={snapshot.busy} revision={data} error={Boolean(snapshot.error)} kind="sync"
+      <DataRefresh pending={snapshot.busy} revision={data} error={Boolean(snapshot.error)}
         label={copy.v2.dataActivity.syncing} description={data ? copy.v2.dataActivity.current : undefined} skeleton={data ? undefined : 'cards'} />
       <p className="mt-4 text-sm leading-6 text-ink-secondary">{text.snapshotHelp}</p>
       {profile?.skland_binding && <p className="mt-2 text-sm text-ink-muted">UID {profile.skland_binding.uid}</p>}

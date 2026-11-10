@@ -72,7 +72,6 @@ describe('SklandBindingDialog accessibility', () => {
         profile={createProfile()}
         onOpenChange={onOpenChange}
         onPayload={vi.fn()}
-        importMotion
       />,
     )
 
@@ -109,7 +108,7 @@ describe('SklandBindingDialog accessibility', () => {
         uid: '87654321',
       },
     })))
-    expect(document.querySelector('.skland-import-activity')).toHaveAttribute('data-phase', 'read')
+    expect(otherAccount).toBeChecked()
     expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true')
     expect(screen.getByRole('status')).toHaveTextContent(copy.workspace.hooks_useSklandBinding_021)
     await act(async () => resolveAccount({
@@ -117,14 +116,15 @@ describe('SklandBindingDialog accessibility', () => {
       skland_preview: { uid: '87654321', nickname: '另一个博士', channel_name: 'B服', operator_count: 88 },
     }))
     expect(await screen.findByText('88 名')).toBeInTheDocument()
-    expect(document.querySelector('.skland-import-activity')).not.toBeInTheDocument()
+    expect(document.querySelector('[role="status"][aria-busy="false"]')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '确认保存并导入' })).toBeEnabled()
     expect(screen.queryByRole('radio')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '确认保存并导入' }))
-    expect(document.querySelector('.skland-import-activity')).toHaveAttribute('data-phase', 'save')
+    expect(document.querySelector('[role="status"][aria-busy="true"]')).toBeInTheDocument()
+    expect(screen.getByText('88 名')).toBeInTheDocument()
     await act(async () => rejectImport(new Error('导入暂时失败')))
     expect(await screen.findByRole('alert')).toHaveTextContent('导入暂时失败')
-    expect(document.querySelector('.skland-import-activity')).not.toBeInTheDocument()
+    expect(document.querySelector('[role="status"][aria-busy="true"]')).not.toBeInTheDocument()
     expect(onOpenChange).not.toHaveBeenCalled()
   })
 

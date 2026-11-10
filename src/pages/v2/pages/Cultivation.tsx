@@ -3,7 +3,7 @@ import { matchesSearch } from '../../../lib/search'
 import { RefreshIcon, UndoIcon, ExcludeIcon, NextIcon, ExternalLinkIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { AnimatedValue } from '../../../components/MotionPrimitives'
-import { DataRefresh } from '../components/DataActivity'
+import { DataRefresh, DataSkeleton } from '../components/DataActivity'
 import { defaultCultivationQuery, type CultivationCandidate, type CultivationData, type CultivationOptions } from '../../../lib/cultivation-contract'
 import { useCultivation } from '../../CultivationPlanPage'
 import CultivationProjectImport from '../../../components/CultivationProjectImport'
@@ -32,15 +32,15 @@ export default function Cultivation({ session }: { session: V2Session }) {
       <div className="v2-cultivation-source-controls">
         {session.authStatus === 'authenticated' && m.profiles.length ? <>
           <label className="v2-field"><span>{text.profile}</span><select className="v2-input" value={m.profileId} onChange={(event) => m.setChosenProfile(event.target.value)}>{m.profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.display_name}</option>)}</select></label>
-          <button type="button" className="v2-button v2-button-primary" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}><RefreshIcon size={16} aria-hidden="true" />{m.busy ? text.loadingData : copy.skland.refresh}</button>
+          <button type="button" className="v2-button v2-button-primary" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}><RefreshIcon size={16} aria-hidden="true" />{copy.skland.refresh}</button>
         </> : session.authLoading ? <Loading label={text.loading} /> : <div className="v2-cultivation-access"><p>{session.authStatus === 'authenticated' ? text.noProfile : text.login}</p><Link className="v2-button v2-button-secondary" to={v2Path('profiles', session.activeProfile?.id)}>{text.loginAction}</Link></div>}
         {projectScope && <Link className="v2-text-button v2-cultivation-project-link" to={v2Path('cultivation-projects', m.profileId)}>{copy.cultivationProjects.title}<NextIcon size={14} aria-hidden="true" /></Link>}
       </div>
+      <div className="v2-data-feedback"><DataRefresh key={m.profileId} pending={m.busy} revision={m.data} error={Boolean(m.error)}
+        label={m.phase === 'syncing' ? copy.v2.dataActivity.syncing : copy.v2.dataActivity.calculating} /></div>
     </div>
     <Notice error>{m.error}</Notice>
-    <DataRefresh key={m.profileId} pending={m.busy} revision={m.data} error={Boolean(m.error)}
-      kind={m.phase === 'syncing' ? 'sync' : 'cultivation'} label={m.phase === 'syncing' ? copy.v2.dataActivity.syncing : copy.v2.dataActivity.calculating}
-      description={m.data ? copy.v2.dataActivity.current : undefined} skeleton={m.data ? undefined : 'cards'} />
+    {m.busy && !m.data && <DataSkeleton layout="cards" />}
     {m.data && m.recommendations ? <>
       <div className="v2-cultivation-overview v2-data-arrival"><Facts items={[[text.stats.homeworks, <AnimatedValue key="homeworks" value={number(m.data.stats.homeworks)} />], [text.stats.owned, <AnimatedValue key="owned" value={number(m.data.stats.owned)} />], [text.stats.satisfied, <AnimatedValue key="satisfied" value={number(m.data.candidates.filter((row) => row.satisfied).length)} />], [text.stats.incomplete, <AnimatedValue key="incomplete" value={number(m.data.stats.incomplete)} />]]} /></div>
       {m.data.warnings.map((warning) => <Notice key={warning}>{warning}</Notice>)}

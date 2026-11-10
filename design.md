@@ -299,28 +299,26 @@ it deliberately when changing the shared design.
   every four seconds on desktop and touch, using a 3px copper band with a bright core.
   Its purchase action sweeps once on hover or focus. Pointer tilt and spotlight stay off
   on touch; reduced motion keeps the card and illustration static.
-- V2 data waits use a copper source-to-record graphic and quiet, synchronized skeleton sweeps.
-  Keep the real status readable, introduce decorative movement after 180ms, and add a longer-wait
-  message after eight seconds. Pause loops in hidden pages; system or app reduced motion shows
-  static shapes. Full-screen startup centers the brand, readable status and a short moving line on
-  one axis; data-source graphics belong to local waits. Section loads retain the workbench
-  navigation and reserve the content layout.
+- V2 data waits use a 16px copper ring beside the readable status, with a longer-wait message
+  after eight seconds. Pause loops in hidden pages; system or app reduced motion keeps the ring
+  static. Full-screen startup centers the brand, readable status and a short moving line on
+  one axis. Section loads retain navigation and the column heading, with a compact centered wait
+  inside the content region. Known first-read layouts use static, lightly tinted placeholders;
+  generic lazy sections use the status alone.
   Refreshes retain readable data. Confirm completion only after a pending request returns a new
   revision without errors; failed, partial or cancelled refreshes keep their existing error state.
   Changed readings interpolate from the old value and outline their own card for 600ms without
   remounting the content or replaying unchanged cards. Cultivation waits follow the actual snapshot
   refresh and cultivation request, preserving saved targets, input drafts and expanded material
-  details. First visits reserve the unknown results; returned materials and dates update in place.
+  details. Cultivation status stays below the source controls in a reserved feedback row, so refreshes
+  do not insert a separate loading panel or shift the results. First visits reserve the unknown results;
+  returned materials and dates update in place.
   Other V2 lists use row-shaped placeholders on first read and at the pagination tail. Existing
   results remain readable during refresh. Busy controls carry `aria-busy` and a quiet bottom-edge
   light; small operations keep feedback inside their own control. Shared notification, feedback,
-  and training tools use compact status lines within V2, including portalled surfaces.
-  V2 Skland binding pairs the real request message with a source-to-record illustration: Skland
-  branches into operator records and base configuration, or account and inventory for depot binding.
-  Authorization pulses only at the source; the selected-account request moves packets to the records;
-  confirmation highlights the receiving cards while saving. These loops show activity, never progress
-  or completion. Results and errors replace the illustration immediately; hidden and reduced-motion
-  settings pause or remove decorative movement.
+  binding and training tools use compact status lines within V2, including portalled surfaces.
+  Skland binding keeps credentials, the QR code, account selection and preview available during requests,
+  with the actual request message beside a small ring.
   The V2 root scopes these enhancements so shared V1 screens retain their existing presentation.
 - Operator, tool, inventory and benchmark lists reveal each stable item once per
   mounted list: 8px travel, 240ms duration, up to eight items at 25ms intervals, or 50ms for

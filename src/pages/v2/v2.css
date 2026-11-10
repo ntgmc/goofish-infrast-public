@@ -51,21 +51,21 @@
 @media (prefers-reduced-motion: reduce) {
   :root:has(.v2-app) button[aria-busy="true"]::after { animation: none; }
 }
-:root:has(.v2-app) .tool-loading-status { position: relative; min-height: 3.5rem; padding-block: 1rem; overflow: hidden; color: var(--color-v2-muted); }
+:root:has(.v2-app) .tool-loading-status { min-height: 2.75rem; padding-block: .625rem; color: var(--color-v2-muted); }
+:root:has(.v2-app) .tool-loading-status::before { content: ''; display: inline-block; width: 14px; height: 14px; margin-inline-end: .625rem; border: 1.5px solid var(--color-v2-line); border-top-color: var(--color-v2-accent); border-right-color: var(--color-v2-accent); border-radius: 50%; vertical-align: -.125em; animation: v2-data-turn 1s linear infinite; }
 :root:has(.v2-app) .tool-panel[data-loading] { position: relative; }
-:root:has(.v2-app) .tool-loading-status::after,
 :root:has(.v2-app) .tool-panel[data-loading]::after {
   position: absolute; content: ''; inset: auto 0 .5rem; height: 2px; width: min(7rem, 100%);
   background: linear-gradient(90deg, transparent, var(--color-v2-accent), transparent);
   animation: v2-button-working 1.8s ease-in-out infinite;
 }
-:root:has(.v2-app) .tool-loading-status.text-center::after { left: 50%; margin-left: -3.5rem; }
 @media (prefers-reduced-motion: reduce) {
-  :root:has(.v2-app) .tool-loading-status::after,
+  :root:has(.v2-app) .tool-loading-status::before,
   :root:has(.v2-app) .tool-panel[data-loading]::after { animation: none; }
 }
-:root[data-v2-hidden] :is(button[aria-busy="true"], .tool-loading-status, .tool-panel[data-loading], .v2-data-mark, .v2-data-placeholder)::after,
-:root[data-v2-hidden] .v2-data-flow { animation-play-state: paused; }
+:root[data-v2-hidden] :is(button[aria-busy="true"], .tool-panel[data-loading], .v2-data-mark)::after,
+:root[data-v2-hidden] .tool-loading-status::before { animation-play-state: paused; }
+:root[data-reduced-motion] .tool-loading-status::before { animation: none; }
 
 :is(.v2-app, .v2-drawer, .v2-dialog) :focus-visible {
   outline: 2px solid var(--color-v2-focus);
@@ -966,7 +966,7 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
   to { opacity: 1; transform: none; }
 }
 
-.v2-main:has(> .v2-page-transition > .v2-feature-content:not([hidden]) > .v2-section-body:not([hidden]) > .v2-section-loading-region) :is(.v2-section-heading, .v2-footer) {
+.v2-main:has(> .v2-page-transition > .v2-feature-content:not([hidden]) > .v2-section-body:not([hidden]) > .v2-section-loading-region) .v2-footer {
   display: none;
 }
 
