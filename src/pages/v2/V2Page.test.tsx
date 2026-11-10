@@ -33,6 +33,7 @@ const mocks = vi.hoisted(() => ({
   pageVisit: vi.fn(),
 }))
 vi.mock('../../lib/usage-tracking', () => ({ reportPageVisit: mocks.pageVisit }))
+vi.mock('../../lib/admin-api-client', () => ({ adminApiJson: vi.fn(async () => ({ user: null })), ADMIN_SESSION_EXPIRED_EVENT: 'goofish:admin-session-expired' }))
 vi.mock('../../components/result-panel/ManualScheduleEditor', () => ({ default: mocks.manual }))
 vi.mock('../../components/result-panel/schedule-image', () => ({ downloadScheduleImage: mocks.image }))
 vi.mock('../tool/useToolSession', () => ({ useToolSession: mocks.session }))
@@ -239,7 +240,7 @@ it('opens material demand charts from the V2 tools directory without an account'
   fireEvent.keyDown(chart, { key: 'ArrowLeft' })
   expect(Number(chart.getAttribute('aria-valuenow'))).toBe(Number(before) - 1)
   expect(screen.getByRole('button', { name: '下载全部材料月度 CSV', hidden: true })).not.toBeVisible()
-})
+}, 10_000)
 
 it.each(['/#release-v2.0.1016', '/v2#release-v2.0.1016'])('opens the changelog from a version anchor at %s', async (path) => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({

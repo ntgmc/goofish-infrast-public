@@ -373,6 +373,16 @@ it deliberately when changing the shared design.
   cancellation scenarios use the same component and support replay and stepping;
   closing the dialog stops its timers. Preview state stays outside the optimization workflow,
   account storage and billing, and its completion message is explicitly a demonstration.
+  The same server-confirmed session enables a bottom-right animation inspector throughout V2.
+  It records native animations, CSS transitions, sampled layout changes and numeric tweens from
+  the current page, retaining the latest 24 effects in memory until navigation. A detached,
+  inert copy inside a shadow root replays each effect once at 0.1×–4× with pause and replay
+  controls; global page selectors, business events, original animation callbacks and page data
+  stay outside the preview. Preserve SVG references
+  with distinct snapshot IDs. Hide the inspector while a page modal owns focus; captured effects
+  remain available after it closes. Session expiration stops observation and clears the preview.
+  Reduced-motion settings determine which page effects exist to capture; explicit replay stays
+  local to the inspector. Route, pending timers and native instrumentation clean up on departure.
 - No nested stagger cascades, bounce, overshoot, or parallax in workspaces.
 - Reduced-motion fallback · final numbers and content immediately; no transform;
   retained opacity transitions at or below 150ms.

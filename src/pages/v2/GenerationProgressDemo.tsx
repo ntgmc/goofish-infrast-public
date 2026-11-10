@@ -4,7 +4,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } fr
 import type { ScheduleProgressState } from '../../components/ScheduleProgress'
 import { getScheduleProgressPercent } from '../../components/schedule-progress-model'
 import { copy } from '../../copy'
-import { adminApiJson, ADMIN_SESSION_EXPIRED_EVENT } from '../../lib/admin-api-client'
+import { useAdminPreviewSession } from './useAdminPreviewSession'
 import V2GenerationProgress from './V2GenerationProgress'
 
 const text = copy.v2.progressDemo
@@ -31,27 +31,8 @@ type Scenario = keyof typeof scenarios
 
 export default function GenerationProgressDemo() {
   const [open, setOpen] = useState(false)
-  const [authorized, setAuthorized] = useState(false)
-  useEffect(() => {
-    let active = true
-    const hide = () => { if (active) { setAuthorized(false); setOpen(false) } }
-    const check = () => {
-      void adminApiJson<{ user?: { username?: unknown } }>('/api/admin/session')
-        .then(({ user }) => {
-          if (!active) return
-          if (typeof user?.username === 'string' && user.username) setAuthorized(true)
-          else hide()
-        }).catch(hide)
-    }
-    check()
-    window.addEventListener('focus', check)
-    window.addEventListener(ADMIN_SESSION_EXPIRED_EVENT, hide)
-    return () => {
-      active = false
-      window.removeEventListener('focus', check)
-      window.removeEventListener(ADMIN_SESSION_EXPIRED_EVENT, hide)
-    }
-  }, [])
+  const authorized = useAdminPreviewSession()
+  useEffect(() => { if (!authorized) setOpen(false) }, [authorized])
   if (!authorized) return null
   return <>
     <button type="button" className="v2-text-button" onClick={() => setOpen(true)}><PreviewIcon size={16} aria-hidden="true" />{text.open}</button>

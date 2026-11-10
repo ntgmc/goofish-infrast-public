@@ -20,6 +20,7 @@ import { useOptimizeWorkflow } from '../tool/optimize/useOptimizeWorkflow'
 import { useOptimizationTaskCenter } from '../tool/optimize/useOptimizationTaskCenter'
 import V2Dashboard from './V2Dashboard'
 import V2LoadingScreen from './V2LoadingScreen'
+import AnimationInspector from './AnimationInspector'
 import type { V2Session } from './OptionsDrawer'
 import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './sample-result'
 import { V2_PUBLIC_SECTIONS, v2Href, v2Path, v2Section } from './navigation'
@@ -28,6 +29,10 @@ import './v2.css'
 import './workspace-pages.css'
 
 export default function V2Page() {
+  return <><V2Workspace /><AnimationInspector /></>
+}
+
+function V2Workspace() {
   const [params] = useSearchParams()
   const { hash, pathname } = useLocation()
   const section = v2Section(params, hash, pathname)
