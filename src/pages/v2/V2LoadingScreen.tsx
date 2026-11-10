@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { copy } from '../../copy'
 import { routesCopy } from '../../copy/zh-CN/routes'
@@ -18,8 +18,15 @@ export default function V2LoadingScreen({ error, onRetry, retryLabel = routesCop
   children?: ReactNode
 }) {
   const { features } = useSiteFeatures()
+  const screen = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    // Startup gates share one timeline so remounts do not restart the light.
+    for (const animation of screen.current?.getAnimations?.({ subtree: true }) ?? []) {
+      if (animation instanceof CSSAnimation && animation.animationName === 'v2-loading-glide') animation.startTime = 0
+    }
+  }, [error])
   return (
-    <main className="v2-app v2-loading-screen" tabIndex={-1} data-route-focus>
+    <main ref={screen} className="v2-app v2-loading-screen" tabIndex={-1} data-route-focus>
       <img className="v2-loading-brand" src="/assets/maatool-v2-icon.svg" width="64" height="64" alt={routesCopy.v2.brand} />
       {error ? <div className="v2-loading-status" role="alert"><p>{error}</p></div>
         : <DataActivity label={routesCopy.v2.loading} />}
