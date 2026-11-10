@@ -67,13 +67,18 @@
   line-height: 1.25;
   letter-spacing: -.04em;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   transition: color var(--motion-enter) ease-out;
 }
 
-.schedule-progress-percent span { margin-inline-start: 2px; font-size: .55em; letter-spacing: 0; }
+.schedule-progress-percent > .schedule-progress-percent-unit { margin-inline-start: 2px; font-size: .55em; letter-spacing: 0; }
+.schedule-progress-percent > .number-motion { min-width: 3ch; text-align: end; }
+.schedule-progress-title .motion-value { white-space: normal; }
+.schedule-progress-step-disclosure { overflow: hidden; }
+.schedule-progress[data-stage-motion] .schedule-progress-step-detail { display: block; }
 .schedule-progress .schedule-progress-detail { grid-column: 1 / -1; color: var(--color-ink-secondary); font-size: var(--text-sm); line-height: 1.75; }
 
-.schedule-progress-track { height: 6px; overflow: hidden; border-radius: var(--radius-pill); background: var(--color-surface-3); }
+.schedule-progress-track { position: relative; height: 6px; overflow: hidden; border-radius: var(--radius-pill); background: var(--color-surface-3); }
 .schedule-progress-track .schedule-progress-fill {
   position: relative;
   width: 100%;
@@ -83,6 +88,13 @@
   background: var(--progress-color);
   transition: background-color var(--motion-enter) ease-out;
 }
+
+.schedule-progress-front { position: absolute; inset: 0; pointer-events: none; }
+.schedule-progress-front::before { content: ""; position: absolute; inset-block: 0; inset-inline-start: -28px; width: 28px; background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--progress-color) 30%, var(--color-on-brand)) 85%, var(--color-on-brand)); }
+.schedule-progress[data-stage-motion] .schedule-progress-fill { background: linear-gradient(90deg, color-mix(in oklch, var(--progress-color) 65%, var(--color-surface-2)), var(--progress-color)); }
+
+@media (prefers-reduced-motion: reduce) { .schedule-progress-front { display: none; } }
+:root[data-reduced-motion] .schedule-progress-front { display: none; }
 
 @media (prefers-reduced-motion: no-preference) {
   :root:not([data-reduced-motion]) .schedule-progress[data-animating="true"] .schedule-progress-fill::after {
@@ -167,6 +179,7 @@
 @container schedule-progress (max-width: 14rem) {
   .schedule-progress-heading { grid-template-columns: minmax(0, 1fr); }
   .schedule-progress-meter { grid-column: 1; grid-row: auto; display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-xs); text-align: start; }
+  .schedule-progress[data-stage-motion] .schedule-progress-meter { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3xs); }
   .schedule-progress-stats { grid-template-columns: minmax(0, 1fr); }
   .schedule-progress-stat { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2xs); }
   .schedule-progress-stat dd { margin: 0; }
@@ -181,5 +194,6 @@
   .schedule-progress-step { grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-xs); padding-block: var(--space-2xs); }
   .schedule-progress-step:not(:last-child)::after { inset-inline-start: calc(1.5rem + var(--space-xs)); inset-inline-end: calc(-1 * var(--space-2xs)); top: calc(.75rem + var(--space-2xs)); bottom: auto; width: auto; height: 1px; }
   .schedule-progress-step[data-state] .schedule-progress-step-detail { display: block; }
+  .schedule-progress-step-disclosure { height: auto !important; opacity: 1 !important; }
   .schedule-progress-connector { inset-inline-start: calc(1.5rem + var(--space-xs)); inset-inline-end: calc(-1 * var(--space-2xs)); top: calc(.75rem + var(--space-2xs)); bottom: auto; width: auto; height: 2px; }
 }

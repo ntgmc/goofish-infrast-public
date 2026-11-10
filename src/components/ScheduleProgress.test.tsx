@@ -60,6 +60,7 @@ describe('ScheduleProgress motion', () => {
     for (const estimatePhase of ['failed', 'cancelled', 'completed'] as const) {
       view.rerender(<ScheduleProgress progress={{ ...progress, estimatePhase }} stageMotion />)
       expect(symbol()).toHaveAttribute('data-state', estimatePhase)
+      if (estimatePhase === 'completed') expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100')
     }
   })
 

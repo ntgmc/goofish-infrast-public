@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { motion } from 'motion/react'
 import { useAppReducedMotion } from '../lib/motion-preference'
-import { motionTokens } from './MotionPrimitives'
+import { AnimatedValue, motionTokens } from './MotionPrimitives'
+import { TweenValue } from './NumberMotion'
 import type { OptimizeCalculationStage, OptimizeJobPriority, OptimizeResult } from '../lib/types'
 import type { OptimizationBillingSnapshot } from '../lib/optimization-contracts'
 import { copy } from '../copy/index'
@@ -70,8 +71,9 @@ export default function ScheduleProgress({ progress, className = '', variant = '
   const now = progressFrame.now
   const targetPercent = getScheduleProgressPercent(progress, now)
   const rawPercent = progressFrame.key === progressKey ? progressFrame.value : targetPercent
-  const percent = Math.max(0, Math.min(100, Math.round(rawPercent)))
   const task = useMemo(() => getTaskView(progress, rawPercent, now), [progress, rawPercent, now])
+  const meterPercent = stageMotion && task.status === 'completed' ? 100 : rawPercent
+  const percent = Math.max(0, Math.min(100, Math.round(meterPercent)))
   const compact = variant === 'embedded'
   const reduceMotion = useAppReducedMotion()
   const animating = !isScheduleProgressPaused(progress) && task.status !== 'completed'
@@ -123,13 +125,15 @@ export default function ScheduleProgress({ progress, className = '', variant = '
       <div className="schedule-progress-heading">
         <div className="schedule-progress-title">
           {stageMotion && <StatusSymbol state={symbol} reduced={reduceMotion} />}
-          <h3 role="status" aria-live="polite" aria-atomic="true">{task.title}</h3>
+          <h3 role="status" aria-live="polite" aria-atomic="true">{stageMotion ? <AnimatedValue value={task.title} /> : task.title}</h3>
         </div>
         <div className="schedule-progress-meter">
           <span>{task.meterLabel}</span>
-          <p className="schedule-progress-percent">{percent}<span>%</span></p>
+          <p className="schedule-progress-percent">{stageMotion ? <TweenValue value={percent} format={formatPercent} /> : percent}<span className="schedule-progress-percent-unit">%</span></p>
         </div>
-        <p className="schedule-progress-detail">{task.detail}</p>
+        <motion.p key={stageMotion ? task.title : undefined} className="schedule-progress-detail"
+          initial={stageMotion && !reduceMotion ? { opacity: 0.45, y: 3 } : false} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.18, ease: motionTokens.ease.enter }}>{task.detail}</motion.p>
       </div>
 
       <div
@@ -144,9 +148,12 @@ export default function ScheduleProgress({ progress, className = '', variant = '
         <motion.div
           className="schedule-progress-fill origin-left"
           initial={false}
-          animate={{ scaleX: Math.max(0, Math.min(1, rawPercent / 100)) }}
+          animate={{ scaleX: Math.max(0, Math.min(1, meterPercent / 100)) }}
           transition={reduceMotion ? { duration: 0 } : { duration: 0.25, ease: 'linear' }}
         />
+        {stageMotion && <motion.div className="schedule-progress-front" aria-hidden="true" initial={false}
+          animate={{ x: `${Math.max(0, Math.min(100, meterPercent))}%`, opacity: animating && meterPercent > 0 ? 1 : 0 }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.25, ease: 'linear' }} />}
       </div>
 
       {task.adjustmentLabel && <p className="schedule-progress-note">{task.adjustmentLabel}</p>}
@@ -159,7 +166,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
             {stageMotion && index < task.steps.length - 1 && <span className="schedule-progress-connector" aria-hidden="true">
               <motion.span initial={false} animate={{ scale: state === 'done' ? 1 : 0 }} transition={{ duration: reduceMotion ? 0 : 0.32, ease: motionTokens.ease.enter }} />
             </span>}
-            <TaskStep label={step.label} detail={step.detail} state={state} index={index} animated={stageMotion && !reduceMotion} />
+            <TaskStep label={step.label} detail={step.detail} state={state} index={index} animated={stageMotion && !reduceMotion} stageMotion={stageMotion} reduced={reduceMotion} />
           </li>
         })}
       </ol>
@@ -206,7 +213,7 @@ function TaskMiniStat({ label, value, emphasis = false }: { label: string; value
   )
 }
 
-function TaskStep({ label, detail, state, index, animated }: { label: string; detail: string; state: StepVisualState; index: number; animated: boolean }) {
+function TaskStep({ label, detail, state, index, animated, stageMotion, reduced }: { label: string; detail: string; state: StepVisualState; index: number; animated: boolean; stageMotion: boolean; reduced: boolean }) {
   return (
     <>
       <span className="schedule-progress-dot" aria-hidden="true">
@@ -214,13 +221,18 @@ function TaskStep({ label, detail, state, index, animated }: { label: string; de
       </span>
       <div className="schedule-progress-step-copy">
         <p className="schedule-progress-step-label">{label}</p>
-        <p className="schedule-progress-step-detail">{detail}</p>
+        {stageMotion ? <motion.div className="schedule-progress-step-disclosure" initial={false}
+          animate={{ height: state === 'active' || state === 'failed' ? 'auto' : 0, opacity: state === 'active' || state === 'failed' ? 1 : 0 }}
+          transition={reduced ? { duration: 0 } : motionTokens.morph}>
+          <p className="schedule-progress-step-detail">{detail}</p>
+        </motion.div> : <p className="schedule-progress-step-detail">{detail}</p>}
       </div>
     </>
   )
 }
 
 
+const formatPercent = (value: number) => String(Math.round(value))
 const ESTIMATED_DURATION_MS = 10_000
 const PROGRESS_REFRESH_INTERVAL_MS = 250
 

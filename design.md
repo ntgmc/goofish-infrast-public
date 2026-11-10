@@ -311,9 +311,15 @@ it deliberately when changing the shared design.
 - V2 generation progress uses a compact SVG state symbol: waiting dots, a running arc, a
   closed ring while saving, and a drawn completion check. Reconnection, cancellation and failure
   stay visually distinct and stop activity. Step connectors fill when the real stage advances,
-  vertically on small cards and horizontally on wide cards. Keep the completed card alongside
-  the available result for the existing 420ms meter completion plus 200ms, then collapse its space;
-  reduced motion shows the result directly. Only V2 enables these stage effects.
+  vertically on small cards and horizontally on wide cards. Once the result is available,
+  collapse the card 620ms after confirmed completion, giving its meter and number time to settle;
+  reduced motion shows the result directly. Only V2 enables these stage effects. The percentage
+  uses the shared numeric tween with a stable three-digit width; timer readings remain still.
+  Backend completion targets 100% immediately so both meter and number finish before dismissal.
+  Transition stage titles and descriptions only when the stage changes. On narrow cards, animate
+  the active step's description height with the morph spring; wide cards keep all descriptions
+  visible. A short copper tail and bright leading edge follow the existing meter value, stopping
+  on paused or terminal states. Reduced motion removes the leading edge and moving text.
 - No nested stagger cascades, bounce, overshoot, or parallax in workspaces.
 - Reduced-motion fallback · final numbers and content immediately; no transform;
   retained opacity transitions at or below 150ms.
