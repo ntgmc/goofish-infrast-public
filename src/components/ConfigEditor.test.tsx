@@ -288,6 +288,20 @@ describe('ConfigEditor inventory and presets', () => {
     return () => latest
   }
 
+  it('switches calculation mode without requiring advanced configuration permissions', async () => {
+    const latest = setup(undefined, { canEdit: false })
+    expect(screen.getByRole('button', { name: '完整计算' })).toHaveAttribute('aria-pressed', 'true')
+    const quick = screen.getByRole('button', { name: '快速计算' })
+    quick.focus()
+    await userEvent.keyboard('{Enter}')
+    expect(quick).toHaveAttribute('aria-pressed', 'true')
+    expect(latest().calculation_mode).toBe('quick')
+    await selectPreset('243-1')
+    expect(latest().calculation_mode).toBe('quick')
+    await userEvent.click(screen.getByRole('button', { name: '完整计算' }))
+    expect(latest().calculation_mode).toBeUndefined()
+  })
+
   it.each(['efficiency', 'inventory_balance'])('preserves %s through stock and preset changes', async (strategy) => {
     const latest = setup()
     await openSection(labels.strategy)

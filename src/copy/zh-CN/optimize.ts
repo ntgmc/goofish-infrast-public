@@ -1,4 +1,6 @@
 export const optimizeCopy = {
+  quickUpgradeNotice: '快速计算仅展示已验证有收益的部分升级建议，收益和回本数值供参考，可能遗漏其他可用建议。',
+  quickUpgradeEmpty: '本次快速复核未确认有收益的升级建议。可切换完整计算继续查找。',
   generation: {
     save_failed: '配置保存失败，排班尚未开始，当前输入已保留。请重试保存，成功后再生成排班。',
     retry_save: '重试保存',

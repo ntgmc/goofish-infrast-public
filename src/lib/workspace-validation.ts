@@ -91,6 +91,7 @@ const intermediateInventorySchema = z.strictObject({
 const licenseConfigShape = {
   layout: boundedString(32),
   desc: z.string().max(200),
+  calculation_mode: z.enum(['standard', 'quick']).optional(),
   schedule_mode: boundedString(40).optional(),
   mode: boundedString(40).optional(),
   dormitory_rule: boundedString(40).optional(),

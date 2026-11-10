@@ -27,6 +27,7 @@ const PURGE_LOCK_KEY = 1_743_861_292
 const AUDIT_CHAIN_LOCK_KEY = 1_743_861_293
 const HEALTH_KEY = 'global'
 const DEFAULT_EVALUATION_BATCH_SIZE = 500
+const EVENT_FETCH_PAGE_SIZE = 100
 const MODEL_RECALIBRATION_ADMIN = `system:${BEHAVIOR_RISK_MODEL_VERSION}`
 const MODEL_RECALIBRATION_NOTE = `评分模型升级至 ${BEHAVIOR_RISK_MODEL_VERSION}，旧待复核单已自动归档并按新模型重算。`
 const DEFAULT_MAINTENANCE_STATEMENT_TIMEOUT_MS = 30_000
@@ -354,6 +355,7 @@ async function loadAffectedBehaviorRiskEvents(
     firstSignals.network,
     firstSignals.ua,
     now,
+    seed.map((event) => event.id),
   )
   const firstPass = dedupeEvents([...seed, ...firstExpansion])
   const expandedUserIds = [...new Set(firstPass.flatMap((event) => event.user_id ? [event.user_id] : []))]
@@ -365,6 +367,7 @@ async function loadAffectedBehaviorRiskEvents(
     expandedSignals.network,
     expandedSignals.ua,
     now,
+    firstPass.map((event) => event.id),
   )
   return dedupeEvents([...firstPass, ...secondExpansion])
     .sort((left, right) => Date.parse(left.occurred_at) - Date.parse(right.occurred_at))
@@ -377,26 +380,38 @@ async function selectBehaviorRiskEvents(
   networkSignals: string[],
   uaSignals: string[],
   now: Date,
+  excludedEventIds: string[] = [],
 ): Promise<StoredEventRow[]> {
-  const result = await client.query<StoredEventRow>(
-    `select id, event_type, user_id, profile_id, job_id, browser_hmac, session_hmac, network_hmac, ua_hmac,
-            uid_hmac, signal_aliases_json as signal_aliases, output_hash, page_category, key_version, model_version,
-            optimizer_version, structure_summary, activity_claimed_at::text, declaration_version,
-            declaration_accepted_at::text, occurred_at::text, expires_at::text
-       from behavior_risk_events
-      where expires_at > $1 and (
-        user_id = any($2::text[])
-        or browser_hmac = any($3::text[])
-        or coalesce(signal_aliases_json->'browser', '[]'::jsonb) ?| $3::text[]
-        or (
-          (network_hmac = any($4::text[]) or coalesce(signal_aliases_json->'network', '[]'::jsonb) ?| $4::text[])
-          and (ua_hmac = any($5::text[]) or coalesce(signal_aliases_json->'ua', '[]'::jsonb) ?| $5::text[])
+  const events: StoredEventRow[] = []
+  let cursor: StoredEventRow | null = null
+  // Keep each result small so the shared Worker SSH tunnel can serve other connections.
+  while (true) {
+    const result = await client.query<StoredEventRow>(
+      `select id, event_type, user_id, profile_id, job_id, browser_hmac, session_hmac, network_hmac, ua_hmac,
+              uid_hmac, signal_aliases_json as signal_aliases, output_hash, page_category, key_version, model_version,
+              optimizer_version, structure_summary, activity_claimed_at::text, declaration_version,
+              declaration_accepted_at::text, occurred_at::text, expires_at::text
+         from behavior_risk_events
+        where expires_at > $1 and (
+          user_id = any($2::text[])
+          or browser_hmac = any($3::text[])
+          or coalesce(signal_aliases_json->'browser', '[]'::jsonb) ?| $3::text[]
+          or (
+            (network_hmac = any($4::text[]) or coalesce(signal_aliases_json->'network', '[]'::jsonb) ?| $4::text[])
+            and (ua_hmac = any($5::text[]) or coalesce(signal_aliases_json->'ua', '[]'::jsonb) ?| $5::text[])
+          )
         )
-      )
-      order by occurred_at asc`,
-    [now.toISOString(), userIds, browserSignals, networkSignals, uaSignals],
-  )
-  return result.rows
+          and not (id = any($9::text[]))
+          and ($6::timestamptz is null or (occurred_at, id) > ($6::timestamptz, $7::text))
+        order by occurred_at asc, id asc limit $8`,
+      [now.toISOString(), userIds, browserSignals, networkSignals, uaSignals,
+        cursor?.occurred_at ?? null, cursor?.id ?? null, EVENT_FETCH_PAGE_SIZE, excludedEventIds],
+    )
+    events.push(...result.rows)
+    const last = result.rows.at(-1)
+    if (!last || result.rows.length < EVENT_FETCH_PAGE_SIZE) return events
+    cursor = last
+  }
 }
 
 function collectEnvironmentSignals(events: StoredEventRow[]): { browser: string[]; network: string[]; ua: string[] } {

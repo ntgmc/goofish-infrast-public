@@ -1,4 +1,8 @@
 export const commonCopy = {
+  calculationModeLabel: "计算方式",
+  standardCalculationLabel: "完整计算",
+  quickCalculationLabel: "快速计算",
+  quickCalculationHelp: "快速计算保留完整排班，只缩小升级建议的复核范围。仅展示已验证有收益的建议，收益数值供参考。",
   dataActivity: {
     slow: '这次加载需要更长时间，请稍候。',
     updated: '数据已更新',
@@ -206,13 +210,13 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_024: "当前为 ",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_025: " 权限，可通过中间产物库存自动调整推荐配置，并可修改排班模式与宿舍规则。",
+  components_ConfigEditor_025: " 权限，可通过中间产物库存自动调整推荐配置，并可修改计算方式、排班模式与宿舍规则。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_026: "练度提升卡",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_027: "当前为 ",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_028: " 权限，可修改排班模式与宿舍规则；其他配置按当前套餐固定。",
+  components_ConfigEditor_028: " 权限，可修改计算方式、排班模式与宿舍规则；其他配置按当前套餐固定。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_029: "练度提升卡",
   // src/components/ConfigEditor.tsx

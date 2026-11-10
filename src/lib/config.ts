@@ -241,6 +241,7 @@ export function normalizeDroneAutoStrategy(strategy: string | undefined): 'effic
 export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   const next = cloneConfig(config)
   delete next.optimization_mode
+  if (next.calculation_mode !== 'quick') delete next.calculation_mode
   delete next.optimizer_search
   if (next.Fiammetta) delete next.Fiammetta.candidate_mode
   const parsedShiftHours = parseShiftHours(next.shift_hours)

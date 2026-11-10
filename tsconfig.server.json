@@ -26,6 +26,7 @@
   ],
   "exclude": [
     "server/dist",
+    "server/optimization/solvers/rust/target",
     "node_modules",
     "**/*.test.ts",
     "**/*.test.tsx"

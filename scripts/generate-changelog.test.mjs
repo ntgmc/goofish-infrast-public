@@ -407,6 +407,127 @@ test('generates a production baseline candidate without requiring Git history', 
   }
 })
 
+test('retries transient GitHub reads without losing release history or overwriting output on failure', async () => {
+  const currentSha = runGit(['rev-parse', 'HEAD'])
+  const previousReleaseSha = runGit(['rev-parse', 'HEAD^'])
+  const historyEnvelope = createChangelogEnvelope(true, createReleaseRecord({
+    version: '2.0.998',
+    targetSha: previousReleaseSha,
+    releasedAt: '2026-07-23T00:00:00.000Z',
+  }))
+  const payload = createPrChangelogPayload({
+    pullRequestNumber: 42,
+    headSha: currentSha,
+    manualSummary: null,
+    modelResult: {
+      summary: '修复用户端更新说明读取。',
+      public_sections: [{ kind: 'fix', items: ['保留审核后的中文更新说明'] }],
+      internal_sections: [],
+    },
+    generatedAt: '2026-07-23T12:00:00.000Z',
+    model: 'test-model',
+  })
+  const outputPaths = [generatedModulePath, releaseRecordPath, releaseNotesPath]
+  const snapshots = await Promise.all([buildMetaPath, ...outputPaths].map(snapshotFile))
+  const script = `
+    import assert from 'node:assert/strict'
+    import { syncBuiltinESMExports } from 'node:module'
+    import timers from 'node:timers/promises'
+    const scenario = JSON.parse(process.env.TEST_SCENARIO)
+    const delays = []
+    let failures = 0
+    timers.setTimeout = async (ms) => { delays.push(ms) }
+    syncBuiltinESMExports()
+    const assetUrl = 'https://github.example.test/repos/owner/repo/releases/assets/1'
+    globalThis.fetch = async (url, options) => {
+      assert.ok(options.signal instanceof AbortSignal)
+      assert.equal(options.headers.Authorization, 'Bearer test-token')
+      const path = new URL(url).pathname
+      const endpoint = path.endsWith('/releases') ? 'releases'
+        : path.endsWith('/assets/1') ? 'asset'
+        : path.includes('/commits/') ? 'commits'
+        : path.endsWith('/comments') ? 'comments' : 'pr'
+      if (endpoint === scenario.endpoint && failures < scenario.errors.length) {
+        const error = scenario.errors[failures++]
+        if (error === 'network') throw new TypeError('test-token must not be logged')
+        if (error === 'timeout') throw new DOMException('test-token must not be logged', 'TimeoutError')
+        if (error === 'json') return new Response('invalid json')
+        return new Response('server failure', {
+          status: error,
+          headers: scenario.retryAfter ? { 'Retry-After': scenario.retryAfter } : {},
+        })
+      }
+      if (endpoint === 'releases') return Response.json([{
+        draft: false, prerelease: false, published_at: '2026-07-23T00:00:00Z',
+        assets: [{ name: 'changelog-release.json', url: assetUrl }],
+      }])
+      if (endpoint === 'asset') {
+        assert.equal(options.headers.Accept, 'application/octet-stream')
+        return Response.json(JSON.parse(process.env.TEST_HISTORY_ENVELOPE))
+      }
+      if (endpoint === 'commits') return Response.json([{ number: 42, merged_at: '2026-07-23', base: { ref: 'main' } }])
+      if (endpoint === 'pr') return Response.json({ head: { sha: process.env.TEST_CURRENT_SHA } })
+      if (endpoint === 'comments') return Response.json([{ user: { login: 'github-actions[bot]' }, body: process.env.TEST_PR_BODY }])
+      throw new Error('Unexpected request: ' + path)
+    }
+    try {
+      await import('./scripts/generate-changelog.mjs')
+    } catch (error) {
+      console.error(error.message)
+      process.exitCode = 1
+    }
+    assert.deepEqual(delays, scenario.delays)
+    assert.equal(failures, scenario.errors.length)
+  `
+  const scenarios = [
+    { endpoint: 'asset', errors: [500], delays: [3000], retryAfter: '3' },
+    { endpoint: 'releases', errors: [502, 503, 504], delays: [1000, 2000, 4000] },
+    ...['commits', 'pr', 'comments'].map((endpoint) => ({ endpoint, errors: [500], delays: [1000] })),
+    ...['network', 'timeout'].map((error) => ({ endpoint: 'asset', errors: [error], delays: [1000] })),
+    { endpoint: 'asset', errors: [503, 503, 503, 503, 503], delays: [1000, 2000, 4000, 8000], fails: true },
+    ...[403, 404, 'json'].map((error) => ({ endpoint: 'asset', errors: [error], delays: [], fails: true })),
+    { endpoint: 'asset', errors: [503], delays: [], retryAfter: '120', fails: true },
+  ]
+  try {
+    await mkdir(dirname(buildMetaPath), { recursive: true })
+    await writeFile(buildMetaPath, `export const APP_BUILD_META = ${JSON.stringify({
+      frontend_version: '2.0.999',
+      backend_version: '2.0.999',
+      generated_at: '2026-07-23T12:00:00.000Z',
+      git_sha: currentSha,
+    })} as const;\n`, 'utf8')
+    for (const scenario of scenarios) {
+      const before = await Promise.all(outputPaths.map(snapshotFile))
+      const result = spawnSync(process.execPath, ['--input-type=module', '--eval', script], {
+        cwd: root,
+        encoding: 'utf8',
+        timeout: 10000,
+        env: {
+          ...process.env,
+          GENERATE_CHANGELOG_CANDIDATE: 'true',
+          CHANGELOG_HISTORY_FILE: '', CHANGELOG_BASE_SHA: '', CHANGELOG_GIT_ROOT: root,
+          GITHUB_REPOSITORY: 'owner/repo', GITHUB_TOKEN: 'test-token',
+          GITHUB_API_URL: 'https://github.example.test', CHANGELOG_BOT_LOGIN: 'github-actions[bot]',
+          TEST_SCENARIO: JSON.stringify(scenario), TEST_CURRENT_SHA: currentSha,
+          TEST_HISTORY_ENVELOPE: JSON.stringify(historyEnvelope), TEST_PR_BODY: renderPrChangelogBlock(payload),
+        },
+      })
+      assert.equal(result.status, scenario.fails ? 1 : 0, result.stderr || String(result.error))
+      assert.doesNotMatch(result.stderr, /AssertionError|test-token/)
+      if (scenario.fails) {
+        assert.deepEqual(await Promise.all(outputPaths.map(snapshotFile)), before)
+      } else {
+        const envelope = JSON.parse(await readFile(releaseRecordPath, 'utf8'))
+        assert.equal(envelope.release.previousTargetSha, previousReleaseSha)
+        assert.deepEqual(envelope.release.sections, [{ id: 'fix', kind: 'fix', items: ['保留审核后的中文更新说明'] }])
+        assert.match(await readFile(generatedModulePath, 'utf8'), /v2\.0\.998/)
+      }
+    }
+  } finally {
+    await Promise.all([buildMetaPath, ...outputPaths].map((path, index) => restoreFile(path, snapshots[index])))
+  }
+})
+
 function runGit(argumentsList) {
   const result = spawnSync('git', argumentsList, { cwd: root, encoding: 'utf8' })
   if (result.status !== 0) throw new Error(result.stderr || result.stdout)

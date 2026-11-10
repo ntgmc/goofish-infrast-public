@@ -1203,6 +1203,8 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         )
         await client.query(
           `delete from optimize_jobs job where status = any($2) and coalesce(job.finished_at, job.updated_at) < $1
+             and not exists (select 1 from optimization_dead_letters letter
+               where letter.job_id = job.id)
              and not exists (select 1 from user_balance_reservations reservation
                where reservation.job_id = job.id and reservation.status = 'reserved')
              and not exists (select 1 from optimization_job_effects effect

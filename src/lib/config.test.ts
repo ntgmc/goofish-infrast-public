@@ -23,6 +23,14 @@ describe('preset configs', () => {
 })
 
 describe('layout normalization', () => {
+  it('preserves quick calculation through persistence and validates its public values', () => {
+    const config = normalizeConfig({ ...CONFIG_PRESETS['243'], calculation_mode: 'quick' })
+    expect(config.calculation_mode).toBe('quick')
+    expect(licenseConfigSchema.parse(JSON.parse(JSON.stringify(config))).calculation_mode).toBe('quick')
+    expect(normalizeConfig({ ...config, calculation_mode: 'standard' }).calculation_mode).toBeUndefined()
+    expect(licenseConfigSchema.safeParse({ ...config, calculation_mode: 'unsafe' }).success).toBe(false)
+  })
+
   it.each(Object.keys(CONFIG_PRESETS))('requires and preserves a map matching %s facility counts', (id) => {
     const config = normalizeConfig(CONFIG_PRESETS[id])
     expect(validateConfig(config)).toEqual({ ok: true })
