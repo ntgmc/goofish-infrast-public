@@ -308,6 +308,25 @@ function connect() {
   return workflow
 }
 
+it('shows the full-page connection error when a result view cannot load', async () => {
+  vi.spyOn(console, 'error').mockImplementation(() => undefined)
+  connect()
+  mocks.manual.mockImplementation(() => { throw new TypeError('Failed to fetch dynamically imported module: /assets/ManualScheduleEditor.js') })
+  try {
+    mount('/v2?profile_id=profile-1')
+    await userEvent.click(screen.getByRole('button', { name: copy.v2.manualTab }))
+    const error = await screen.findByRole('alert')
+    expect(error).toHaveTextContent(copy.common.pageLoadFailed)
+    expect(error.closest('main')).toHaveClass('v2-loading-screen')
+    expect(screen.getByRole('button', { name: '重新加载' })).toBeVisible()
+    expect(screen.getByRole('link', { name: sectionLabels.status })).toBeVisible()
+    expect(screen.queryByText(copy.inventory.result_data_incompatible)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '下载完整计算数据' })).not.toBeInTheDocument()
+  } finally {
+    mocks.manual.mockReset()
+  }
+})
+
 it('opens the Skland data page with partial game data and keeps unsupported resources unavailable', async () => {
   connect()
   session.activeProfile!.skland_binding = { uid: 'skland-uid', credential_status: 'available' } as NonNullable<UserGameAccount['skland_binding']>

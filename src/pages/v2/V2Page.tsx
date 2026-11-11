@@ -217,7 +217,8 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
       {progress}
     </V2LoadingScreen>
   }
-  return <ResultErrorBoundary resetKey={[profile.id, workflow.historyItem?.id ?? workflow.progress?.jobId ?? 'none', section].join(':')} onDownloadDiagnostic={features.features.full_result_export && workflow.userCanDownloadFullResult ? workflow.handleDownloadFullResult : undefined} diagnosticDownloadBusy={Boolean(workflow.workspaceBusyAction?.startsWith('download'))}><V2Dashboard session={session} workflow={{ ...workflow, optimizationTasks: tasks, handleGenerate: generate, handleViewHistory: async (item) => {
+  return <ResultErrorBoundary resetKey={[profile.id, workflow.historyItem?.id ?? workflow.progress?.jobId ?? 'none', section].join(':')} onDownloadDiagnostic={features.features.full_result_export && workflow.userCanDownloadFullResult ? workflow.handleDownloadFullResult : undefined} diagnosticDownloadBusy={Boolean(workflow.workspaceBusyAction?.startsWith('download'))}
+    loadErrorFallback={<V2LoadingScreen error={copy.common.pageLoadFailed} onRetry={() => window.location.reload()} retryLabel={copy.common.pageReload} />}><V2Dashboard session={session} workflow={{ ...workflow, optimizationTasks: tasks, handleGenerate: generate, handleViewHistory: async (item) => {
       if (!confirmResultChange()) return
       await workflow.handleViewHistory(item)
     }, handleIncrementalRecompute: async () => {
