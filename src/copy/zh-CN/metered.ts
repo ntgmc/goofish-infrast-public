@@ -62,7 +62,7 @@ export const meteredCopy = {
     batch_confirm: (count: number) => `确认归档选中的 ${count} 个商用档案？`,
     eyebrow: '服务商账户',
     title: '商用账号管理',
-    description: '点击“添加账号”创建独立档案，打开后可上传 JSON 或绑定森空岛；仅在排班结果成功生成后计费，且只能处理已获授权的数据。账号、档案和积分不可转让。',
+    description: '每份档案独立保存游戏数据，仅在排班成功后计费。请仅处理已获授权的数据；账号、档案和积分不可转让。',
     creating: '正在添加…',
     create: '添加账号',
     limits: (active: number, activeLimit: number, total: number, totalLimit: number) => `活跃 ${active} / ${activeLimit} · 总量 ${total} / ${totalLimit}`,
@@ -90,7 +90,7 @@ export const meteredCopy = {
     restore: '恢复',
     archive: '归档',
     permanent_delete: '永久删除',
-    empty: '当前筛选下还没有商用账号，可点击上方“添加账号”开始。',
+    empty: '当前筛选下没有商用账号。',
     load_more: '加载更多',
   },
   quote: {

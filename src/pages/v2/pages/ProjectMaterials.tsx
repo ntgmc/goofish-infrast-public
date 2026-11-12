@@ -155,6 +155,6 @@ export function MaterialNeeds({ items, data, shortage = false }: { items: Record
   const entries = Object.entries(items)
   return <div className="v2-project-materials" data-shortage={shortage}>
     <div className="v2-project-material-heading"><h4>{shortage ? text.materialShortage : text.requiredMaterials}</h4><span>{text.materialKinds(entries.length)}</span></div>
-    <MaterialBrowser data={data}>{(select) => entries.length ? <><p className="v2-project-material-hint">{text.materialRouteHint}</p><ul className="v2-project-material-list">{entries.map(([id, count]) => <li key={id}><MaterialButton id={id} count={count} data={data} onSelect={select} /></li>)}</ul></> : <p className="v2-muted">{text.noShortage}</p>}</MaterialBrowser>
+    <MaterialBrowser data={data}>{(select) => entries.length ? <ul className="v2-project-material-list">{entries.map(([id, count]) => <li key={id}><MaterialButton id={id} count={count} data={data} onSelect={select} /></li>)}</ul> : <p className="v2-muted">{text.noShortage}</p>}</MaterialBrowser>
   </div>
 }

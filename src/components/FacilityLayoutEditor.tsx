@@ -105,7 +105,6 @@ export default function FacilityLayoutEditor({ config, onUpdate, readOnly = fals
             <p className="flex items-center gap-2 font-semibold text-ink-primary">
               <SuccessIcon size={18} aria-hidden="true" />{copy.common.facilityLayoutComplete}
             </p>
-            <p className="mt-1 text-sm text-ink-secondary">{copy.common.facilityLayoutCompleteHelp}</p>
           </div>
           <button ref={editButtonRef} type="button" className="tool-secondary-action min-h-11 px-4"
             aria-expanded={false}

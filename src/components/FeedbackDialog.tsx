@@ -7,7 +7,7 @@ import { copy } from '../copy'
 import { apiJson, getApiErrorMessage } from '../lib/api-client'
 import { FEEDBACK_CATEGORIES, FEEDBACK_IMAGE_TYPES, FEEDBACK_MESSAGE_MAX_LENGTH, type FeedbackCategory } from '../lib/feedback-contracts'
 import { prepareFeedbackImage } from '../lib/feedback-image'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 import { Tabs } from './ui/tabs'
 import FeedbackHistory from './FeedbackHistory'
 import FeedbackImage from './FeedbackImage'
@@ -104,7 +104,7 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
       <MessageSquare size={18} aria-hidden="true" />{!iconOnly && <span>{text.title}</span>}
     </button>
     <Dialog open={open} onOpenChange={(next) => { if (!busy) setOpen(next) }}>
-      <DialogContent id={`${id}-dialog`} className="feedback-dialog v2-modal"
+      <DialogContent id={`${id}-dialog`} className="feedback-dialog v2-modal" aria-describedby={undefined}
         preventOutsideDismiss={busy || view === 'new' && !success && hasDraft || historyHasDraft}
         onPaste={(event) => {
           if (view !== 'new' || success) return
@@ -118,7 +118,6 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
         {...(busy ? { showCloseButton: false as const } : { showCloseButton: true as const, closeLabel: text.close })}>
         <div className="feedback-dialog-header v2-modal-heading">
           <DialogTitle>{text.title}</DialogTitle>
-          <DialogDescription>{text.description}</DialogDescription>
         </div>
         <Tabs.Root className="v2-modal-content feedback-workspace" value={view} onValueChange={(value) => { if (value === 'history') setFeedbackId(null); setView(value as typeof view) }}>
           <Tabs.List className="feedback-tabs" aria-label={text.title}>
@@ -143,7 +142,6 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
               <label className="feedback-label"><span>{text.resultId}</span><input className="tool-field feedback-field" maxLength={120} value={resultId} disabled={busy} onChange={(event) => setResultId(event.target.value)} /></label>
               <label className="feedback-label"><span>{text.jobId}</span><input className="tool-field feedback-field" maxLength={120} value={jobId} disabled={busy} onChange={(event) => setJobId(event.target.value)} /></label>
             </div>}
-            <p className="feedback-hint">{text.contextHint}</p>
           </div></details>}
           <div className="feedback-label">
             <span id={`${id}-image-label`}>{text.image}</span>

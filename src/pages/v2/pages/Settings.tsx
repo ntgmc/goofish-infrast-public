@@ -21,16 +21,16 @@ export default function Settings({ session }: { session: V2Session }) {
   const model = useAccountSettings({ profiles: session.profiles, activeProfileId: session.activeProfile?.id, onPayload: session.applyAuthPayload })
   const [section, setSection] = useState('security')
   const sections = [
-    { id: 'security', label: text.security, icon: LockKeyhole, hint: text.password_help },
-    { id: 'preferences', label: text.preferences, icon: SlidersHorizontal, hint: copy.v2.preferenceDescription },
-    ...(features.qqbot ? [{ id: 'notifications', label: copy.notifications.title, icon: Bell, hint: copy.notifications.title }] : []),
-    { id: 'data', label: text.data, icon: ShieldCheck, hint: text.data_help },
+    { id: 'security', label: text.security, icon: LockKeyhole },
+    { id: 'preferences', label: text.preferences, icon: SlidersHorizontal },
+    ...(features.qqbot ? [{ id: 'notifications', label: copy.notifications.title, icon: Bell }] : []),
+    { id: 'data', label: text.data, icon: ShieldCheck },
   ]
   return <div className="v2-settings-workspace">
-    <nav className="v2-settings-index" aria-label={text.navigation}>{sections.map((item) => <button key={item.id} type="button" aria-label={item.label} aria-pressed={section === item.id} onClick={() => setSection(item.id)}><item.icon size={20} aria-hidden="true" /><span><strong>{item.label}</strong><small>{item.hint}</small></span></button>)}</nav>
+    <nav className="v2-settings-index" aria-label={text.navigation}>{sections.map((item) => <button key={item.id} type="button" aria-label={item.label} aria-pressed={section === item.id} onClick={() => setSection(item.id)}><item.icon size={20} aria-hidden="true" /><span><strong>{item.label}</strong></span></button>)}</nav>
     <div className="v2-settings-content">
       <section hidden={section !== 'security'}>
-        <SectionTitle title={text.security} description={text.password_help} />
+        <SectionTitle title={text.security} />
         <form className="v2-settings-form" onSubmit={model.submit} noValidate>
           <Notice error>{model.error}</Notice><Notice>{model.status}</Notice>
           {([
@@ -41,7 +41,7 @@ export default function Settings({ session }: { session: V2Session }) {
           <button type="submit" className="v2-button v2-button-primary" disabled={model.loading} aria-busy={model.loading}>{model.loading ? labels.pages_tool_dashboard_SettingsSection_020 : labels.pages_tool_dashboard_SettingsSection_021}</button>
         </form>
       </section>
-      <section hidden={section !== 'preferences'}><SectionTitle title={text.preferences} description={copy.v2.preferenceDescription} /><div className="v2-preference-control v2-appearance-settings"><AppearanceSettings /><AnimationInspectorSetting /><DeploymentPromptPreview /></div><DebugModePanel /></section>
+      <section hidden={section !== 'preferences'}><SectionTitle title={text.preferences} /><div className="v2-preference-control v2-appearance-settings"><AppearanceSettings /><AnimationInspectorSetting /><DeploymentPromptPreview /></div><DebugModePanel /></section>
       {features.qqbot && <section hidden={section !== 'notifications'}><QqBotSettingsPanel /></section>}
       <section hidden={section !== 'data'}>
         <SectionTitle title={text.data} />

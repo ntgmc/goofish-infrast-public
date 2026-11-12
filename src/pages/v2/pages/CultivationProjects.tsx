@@ -89,7 +89,7 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
               onPrioritize={() => m.setProjects(rows => [project, ...rows.filter(row => row.operatorId !== project.operatorId)])}
               onRemove={() => m.setProjects(rows => rows.filter(row => row.operatorId !== project.operatorId))} />
           })}</ol>
-          {!m.projects.length && <div className="v2-project-empty"><CultivationIcon size={32} aria-hidden="true" /><h3>{text.empty}</h3><p className="v2-muted">{text.emptyHint}</p></div>}
+          {!m.projects.length && <div className="v2-project-empty"><CultivationIcon size={32} aria-hidden="true" /><h3>{text.empty}</h3></div>}
           <ProjectMaaExport projects={m.projects} operators={m.data?.projectOperators ?? []} />
           <p className="v2-data-date">{text.stored}</p>
         </Tabs.Content>
@@ -179,10 +179,10 @@ function GoalForm({ operators, projects, editing, busy, onSave, onCancel }: { op
   return <form className="v2-project-form" onSubmit={submit}>
     <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
       <button type="button" className="v2-project-choose" aria-label={text.operator} onClick={() => setPickerOpen(true)} disabled={Boolean(editing) || busy || projects.length >= 30}>
-        {operator ? <><Avatar key={operator.baseId ?? operator.id} operator={{ id: operator.baseId ?? operator.id, name: operator.name }} /><span><strong>{operator.name}</strong><small>★{operator.rarity} · {profession(operator)}</small></span>{!editing && <span className="v2-project-choose-action">{text.changeOperator}</span>}</> : <><Plus size={24} aria-hidden="true" /><span><strong>{text.operator}</strong><small>{text.pickerHint}</small></span><ArrowRight size={18} aria-hidden="true" /></>}
+        {operator ? <><Avatar key={operator.baseId ?? operator.id} operator={{ id: operator.baseId ?? operator.id, name: operator.name }} /><span><strong>{operator.name}</strong><small>★{operator.rarity} · {profession(operator)}</small></span>{!editing && <span className="v2-project-choose-action">{text.changeOperator}</span>}</> : <><Plus size={24} aria-hidden="true" /><span><strong>{text.operator}</strong></span><ArrowRight size={18} aria-hidden="true" /></>}
       </button>
-      <DialogContent className="v2-dialog v2-project-picker" showCloseButton closeLabel={copy.v2.close}>
-        <div><DialogTitle>{text.operator}</DialogTitle><DialogDescription>{text.pickerHint}</DialogDescription></div>
+      <DialogContent className="v2-dialog v2-project-picker" aria-describedby={undefined} showCloseButton closeLabel={copy.v2.close}>
+        <DialogTitle>{text.operator}</DialogTitle>
         <OperatorPicker reveal operators={choices} selectedId={operator?.baseId ?? operator?.id} searchLabel={text.search}
           onChoose={(row) => { choose(row.id); setPickerOpen(false) }}
           details={(row) => <><strong>★{row.rarity} · {profession(row)}</strong><p>{text.elites[row.current.elite]} · Lv.{row.current.level}</p></>} />

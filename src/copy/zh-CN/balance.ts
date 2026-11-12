@@ -9,7 +9,7 @@ export const balanceCopy = {
   lifetime_credited: '累计获得积分',
   unit: '积分',
   redeem_title: '兑换积分 CDK',
-  redeem_description: '输入积分 CDK，兑换成功后积分立即到账，可在当前账号使用。',
+  redeem_description: '兑换成功后，积分立即存入当前账号。',
   redeem_placeholder: '输入积分 CDK',
   redeem: '确认兑换',
   redeeming: '兑换中…',

@@ -84,7 +84,7 @@ function Factors({ factors, disabled, onChange }: { factors: ScenarioComparisonF
   return <fieldset className="v2-experiment-factors" disabled={disabled}>
     <legend className="sr-only">{ui.builderTitle}</legend>
     <section className="v2-production-builder">
-      <div className="v2-comparison-section-heading"><h3>{ui.productionPlans}</h3><p>{ui.productionHelp}</p></div>
+      <div className="v2-comparison-section-heading"><h3>{ui.productionPlans}</h3></div>
       <div className="v2-production-workspace">
       <div className="v2-production-draft">
         <div className="v2-production-draft-heading"><h4>{ui.draftPlan}</h4>

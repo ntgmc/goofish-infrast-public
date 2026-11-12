@@ -60,6 +60,5 @@ export default function CultivationFilters({ query, data, onChange, v2 = false }
       <label className={fieldClass}><span>{text.search}</span><input className={inputClass} value={query.search} onChange={(event) => update('search', event.target.value)} /></label>
     </div></details>
     <div className="flex flex-wrap gap-4">{(['includeClosed', 'includeAlternatives', 'includeUncertain'] as const).map((key) => <label key={key} className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={query[key]} onChange={(event) => update(key, event.target.checked)} />{text[key]}</label>)}</div>
-    <p className={v2 ? 'v2-muted' : 'text-xs leading-5 text-ink-muted'}>{text.recommendationHint}</p>
   </fieldset>
 }

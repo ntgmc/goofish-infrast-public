@@ -2,7 +2,7 @@ export const inventoryCopy = {
   nav: '背包',
   eyebrow: '我的道具',
   title: '背包',
-  description: '查看道具数量、用途和有效期。部分道具需前往对应功能使用，详情见道具说明。',
+  description: '部分道具需前往对应功能使用。',
   loading: '正在加载背包…',
   refresh_failed: '暂时无法刷新道具数量，请稍后重试。',
   load_failed: '暂时无法加载背包，请稍后重试。',
