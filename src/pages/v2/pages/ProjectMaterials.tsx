@@ -84,6 +84,7 @@ function MaterialGraph({ graph, data, onSelect }: { graph: ReturnType<typeof bui
   const canvas = useRef<HTMLDivElement>(null)
   const scroll = useRef<HTMLDivElement>(null)
   const [paths, setPaths] = useState<Array<{ key: string; d: string }>>([])
+  const bypasses = useMemo(() => graph.edges.filter((edge) => graph.nodes.find((node) => node.key === edge.to)!.column - graph.nodes.find((node) => node.key === edge.from)!.column > 1), [graph])
   const columns = Array.from({ length: Math.max(...graph.nodes.map((node) => node.column)) + 1 }, (_, column) => graph.nodes.filter((node) => node.column === column))
   useLayoutEffect(() => {
     const element = canvas.current!
@@ -105,6 +106,12 @@ function MaterialGraph({ graph, data, onSelect }: { graph: ReturnType<typeof bui
         const x1 = from.left + from.width, y1 = from.top + from.height / 2
         const x2 = to.left, y2 = to.top + to.height / 2
         const middle = (x1 + x2) / 2
+        const bypass = bypasses.indexOf(edge)
+        if (bypass >= 0) {
+          const gap = Number.parseFloat(getComputedStyle(element).columnGap)
+          const exit = x1 + gap / 2, entry = x2 - gap / 2, lane = 16 + bypass * 12
+          return { key: `${edge.from}:${edge.to}`, d: `M ${x1} ${y1} C ${exit} ${y1}, ${exit} ${y1}, ${exit} ${lane} L ${entry} ${lane} C ${entry} ${y2}, ${entry} ${y2}, ${x2} ${y2}` }
+        }
         return { key: `${edge.from}:${edge.to}`, d: `M ${x1} ${y1} C ${middle} ${y1}, ${middle} ${y2}, ${x2} ${y2}` }
       }))
     }
@@ -114,9 +121,9 @@ function MaterialGraph({ graph, data, onSelect }: { graph: ReturnType<typeof bui
     observer.observe(element)
     observer.observe(scroll.current!)
     return () => observer.disconnect()
-  }, [graph])
+  }, [graph, bypasses])
   return <div ref={scroll} className="v2-project-route-scroll" role="region" aria-label={text.routeDiagram} tabIndex={0}>
-    <motion.div ref={canvas} className="v2-project-route-graph" initial={{ opacity: reduced ? 1 : 0 }} animate={{ opacity: 1 }} transition={{ duration: reduced ? 0 : 0.18 }}>
+    <motion.div ref={canvas} className="v2-project-route-graph" style={bypasses.length ? { paddingTop: `calc(var(--space-lg) + ${bypasses.length * 12}px)` } : undefined} initial={{ opacity: reduced ? 1 : 0 }} animate={{ opacity: 1 }} transition={{ duration: reduced ? 0 : 0.18 }}>
       <svg className="v2-project-route-lines" aria-hidden="true"><defs><marker id={marker} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M 1 1 L 7 4 L 1 7" /></marker></defs>
         {paths.map((path) => <motion.path key={path.key} d={path.d} markerEnd={`url(#${marker})`} initial={{ pathLength: reduced ? 1 : 0 }} animate={{ pathLength: 1 }} transition={{ duration: reduced ? 0 : 0.28, ease: motionTokens.ease.enter }} />)}
       </svg>

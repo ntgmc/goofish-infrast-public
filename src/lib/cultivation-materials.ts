@@ -73,6 +73,11 @@ export function buildMaterialGraph(id: string, count: number, data: Pick<Cultiva
     return node
   }
   const selected = addIngredient(routes.ingredient, 'selected')
+  const alignIngredients = (item: MaterialIngredient, key: string, column: number) => {
+    nodes.find((node) => node.key === key)!.column = column
+    for (const input of item.ingredients.filter((input) => !isMaterialFee(input.id))) alignIngredients(input, `${key}/${input.id}`, column - 1)
+  }
+  alignIngredients(routes.ingredient, 'selected', selected.column)
   const recipes = new Map(routes.products.map((product) => [product.id, product.recipe]))
   const products = new Map<string, MaterialGraphNode>([[id, selected]])
   const addProduct = (item: string, path: Set<string>): MaterialGraphNode | null => {

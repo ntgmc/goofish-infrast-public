@@ -53,6 +53,26 @@ it('places ingredients before their products, merges downstream branches and kee
   expect(graph.edges.filter((edge) => edge.to === 'product/final').map((edge) => edge.from).sort()).toEqual(['product/left', 'product/right', 'selected'])
 })
 
+it('aligns the short alloy ingredient branches with the other materials used in the same craft', () => {
+  const data = { recipes: {
+    '30062': { count: 1, items: { '4001': 100, '30061': 3 } },
+    '30063': { count: 1, items: { '4001': 200, '30062': 4 } },
+    '31024': { count: 1, items: { '4001': 300, '30063': 1, '30093': 1, '31023': 1 } },
+    '30145': { count: 1, items: { '4001': 400, '31014': 2, '31024': 1, '31034': 1 } },
+  } }
+  const graph = buildMaterialGraph('31024', 5, data)
+  const node = (id: string) => graph.nodes.find((node) => node.id === id)!
+  expect(node('30061')).toMatchObject({ column: 0, count: 60 })
+  expect(node('30062')).toMatchObject({ column: 1, count: 20 })
+  for (const id of ['30063', '30093', '31023']) expect(node(id)).toMatchObject({ column: 2, count: 5 })
+  expect(node('31024')).toMatchObject({ column: 3, count: 5 })
+  expect(node('30145')).toMatchObject({ column: 4, count: 1 })
+  for (const edge of graph.edges) {
+    const from = graph.nodes.find((node) => node.key === edge.from)!, to = graph.nodes.find((node) => node.key === edge.to)!
+    expect(to.column - from.column).toBe(1)
+  }
+})
+
 it('retains currency entry points and optional chip conversions without expanding cycles into the graph', () => {
   const data = { recipes: { '3243': { count: 1, items: { '3242': 2, '32001': 1 } }, '3242': { count: 2, items: { '3252': 3 } }, '3252': { count: 2, items: { '3242': 3 } } } }
   const graph = buildMaterialGraph('3243', 4, data)
