@@ -66,6 +66,22 @@ describe('goal-driven resource routes', () => {
     const paused = buildProjectRoute(input, [{ ...project('a'), paused: true }, project('b')], settings, normal)
     expect(paused.missing).toEqual({ exp: 100 })
     expect(paused.readyDate).toBe('2026-10-06')
+    expect(route.rows.flatMap((row) => row.allocation?.steps ?? [])).toEqual([
+      { item: 'high', count: 1, batches: 1, ingredients: { rock: 3, '4001': 100 }, kind: 'craft' },
+    ])
+    expect(paused.rows.flatMap((row) => row.allocation?.steps ?? [])).toEqual([])
+  })
+
+  it('reuses surplus craft outputs between projects and reallocates conversions when priority changes', () => {
+    const input = data([candidate('a', { chipA: 1 }), candidate('b', { chipA: 1 })], {
+      inventory: { chipB: 3 }, recipes: { chipA: { count: 2, items: { chipB: 3 } }, chipB: { count: 2, items: { chipA: 3 } } },
+    })
+    for (const goals of [[project('a'), project('b')], [project('b'), project('a')], [{ ...project('a'), paused: true }, project('b')]]) {
+      const route = buildProjectRoute(input, goals, settings, null)
+      expect(route.missing).toEqual({})
+      expect(route.rows[0].allocation?.steps).toEqual([{ item: 'chipA', count: 2, batches: 1, ingredients: { chipB: 3 }, kind: 'craft' }])
+      expect(route.rows.slice(1).flatMap((row) => row.allocation?.steps ?? [])).toEqual([])
+    }
   })
 
   it('changes production only until the focused resource is ready and then restores normal income', () => {

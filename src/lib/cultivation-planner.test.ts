@@ -38,6 +38,33 @@ describe('cultivation recommendations and project resource allocation', () => {
     const result = allocateCultivationMaterials({ high: 2, rock: 2 }, { rock: 6, '4001': 100 }, input)
     expect(result.missing).toEqual({ rock: 2, '4001': 100 })
     expect(result.sanity).toBeCloseTo(10.36)
+    expect(result.steps).toEqual([{ item: 'high', count: 2, batches: 2, ingredients: { rock: 6, '4001': 200 }, kind: 'craft' }])
+  })
+
+  it('records only required crafts in ingredient-first order after reserving direct stock', () => {
+    const input = data({ recipes: {
+      high: { count: 1, items: { middle: 3, '4001': 400 } },
+      middle: { count: 1, items: { rock: 3, '4001': 100 } },
+    } })
+    const items = { high: 2, middle: 2 }
+    const inventory: Record<string, number> = { high: 1, middle: 3, rock: 4, '4001': 500 }
+    const result = allocateCultivationMaterials(items, inventory, input)
+    expect(result.missing).toEqual({ rock: 2, '4001': 100 })
+    expect(result.steps).toEqual([
+      { item: 'middle', count: 2, batches: 2, ingredients: { rock: 6, '4001': 200 }, kind: 'craft' },
+      { item: 'high', count: 1, batches: 1, ingredients: { middle: 3, '4001': 400 }, kind: 'craft' },
+    ])
+    const available = { ...inventory }
+    for (const [id, count] of Object.entries(result.missing)) available[id] = (available[id] ?? 0) + count
+    for (const step of result.steps) {
+      for (const [id, count] of Object.entries(step.ingredients)) {
+        expect(available[id]).toBeGreaterThanOrEqual(count)
+        available[id] -= count
+      }
+      available[step.item] = (available[step.item] ?? 0) + step.count
+    }
+    for (const [id, count] of Object.entries(items)) expect(available[id]).toBeGreaterThanOrEqual(count)
+    expect(allocateCultivationMaterials(items, { high: 2, middle: 2 }, input).steps).toEqual([])
   })
 
   it('exchanges catalysts using shared procurement certificates and includes missing certificates', () => {
@@ -46,7 +73,21 @@ describe('cultivation recommendations and project resource allocation', () => {
     expect(result.exchanges).toEqual([{ item: '32001', count: 1, currency: '4006', cost: 90 }])
     expect(result.missing).toEqual({ '4006': 20 })
     expect(result.sanity).toBe(20)
+    expect(result.steps).toEqual([
+      { item: '32001', count: 1, batches: 1, ingredients: { '4006': 90 }, kind: 'exchange' },
+      { item: 'double', count: 2, batches: 2, ingredients: { '32001': 2, chip: 4 }, kind: 'craft' },
+    ])
     expect(allocateCultivationMaterials({ '32001': 10 }, { '4006': 900 }, input).missing).toEqual({})
+  })
+
+  it('records whole chip conversion batches only when existing input stock can supply them', () => {
+    const input = data({ recipes: { chipA: { count: 2, items: { chipB: 3 } }, chipB: { count: 2, items: { chipA: 3 } } } })
+    const converted = allocateCultivationMaterials({ chipA: 1 }, { chipB: 3 }, input)
+    expect(converted.steps).toEqual([{ item: 'chipA', count: 2, batches: 1, ingredients: { chipB: 3 }, kind: 'craft' }])
+    expect(converted.stock.chipA).toBe(1)
+    const missing = allocateCultivationMaterials({ chipA: 1 }, { chipB: 2 }, input)
+    expect(missing.steps).toEqual([])
+    expect(missing.missing).toEqual({ chipA: 1 })
   })
 
   it('fulfills an alternative group once while retaining an independent fixed demand', () => {

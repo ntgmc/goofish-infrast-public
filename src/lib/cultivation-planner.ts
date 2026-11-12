@@ -1,12 +1,20 @@
 import type { CultivationCandidate, CultivationData, CultivationOptions } from './cultivation-contract'
 import { cultivatedCurrent, cultivationSatisfied } from './cultivation-target'
 
-type Allocation = { missing: Record<string, number>; stock: Record<string, number>; sanity: number | null; knownSanity: number; exchanges: Array<{ item: string; count: number; currency: string; cost: number }> }
+type Allocation = {
+  missing: Record<string, number>
+  stock: Record<string, number>
+  sanity: number | null
+  knownSanity: number
+  exchanges: Array<{ item: string; count: number; currency: string; cost: number }>
+  steps: Array<{ item: string; count: number; batches: number; ingredients: Record<string, number>; kind: 'craft' | 'exchange' }>
+}
 
 export function allocateCultivationMaterials(items: Record<string, number>, inventory: Record<string, number>, data: Pick<CultivationData, 'recipes' | 'prices'>): Allocation {
   const stock = { ...inventory }
   const missing: Record<string, number> = {}
   const exchanges: Allocation['exchanges'] = []
+  const steps: Allocation['steps'] = []
   const consume = (id: string, count: number, seen: Set<string>) => {
     const have = Math.min(count, stock[id] ?? 0)
     stock[id] = (stock[id] ?? 0) - have
@@ -15,6 +23,7 @@ export function allocateCultivationMaterials(items: Record<string, number>, inve
     if (id === '32001') {
       exchanges.push({ item: id, count: shortage, currency: '4006', cost: shortage * 90 })
       consume('4006', shortage * 90, new Set(seen).add(id))
+      steps.push({ item: id, count: shortage, batches: shortage, ingredients: { '4006': shortage * 90 }, kind: 'exchange' })
       return
     }
     const recipe = data.recipes[id]
@@ -22,7 +31,9 @@ export function allocateCultivationMaterials(items: Record<string, number>, inve
     if (recipe && !seen.has(id) && (recipe.count === 1 || Object.entries(recipe.items).every(([ingredient, amount]) => (stock[ingredient] ?? 0) >= amount * Math.ceil(shortage / recipe.count)))) {
       const batches = Math.ceil(shortage / recipe.count)
       stock[id] += recipe.count * batches - shortage
-      for (const [ingredient, amount] of Object.entries(recipe.items)) consume(ingredient, amount * batches, new Set(seen).add(id))
+      const ingredients = Object.fromEntries(Object.entries(recipe.items).map(([ingredient, amount]) => [ingredient, amount * batches]))
+      for (const [ingredient, amount] of Object.entries(ingredients)) consume(ingredient, amount, new Set(seen).add(id))
+      steps.push({ item: id, count: recipe.count * batches, batches, ingredients, kind: 'craft' })
     } else missing[id] = (missing[id] ?? 0) + shortage
   }
   // Reserve directly required materials before crafting higher tiers from shared stock.
@@ -33,7 +44,7 @@ export function allocateCultivationMaterials(items: Record<string, number>, inve
   })
   for (const [id, count] of shortages) consume(id, count, new Set())
   const knownSanity = Object.entries(missing).reduce((sum, [id, count]) => sum + (data.prices[id] ?? 0) * count, 0)
-  return { stock, missing, exchanges, knownSanity, sanity: Object.keys(missing).some((id) => data.prices[id] === undefined) ? null : knownSanity }
+  return { stock, missing, exchanges, steps, knownSanity, sanity: Object.keys(missing).some((id) => data.prices[id] === undefined) ? null : knownSanity }
 }
 
 export function recommendCultivationTargets(data: CultivationData, options: CultivationOptions) {
