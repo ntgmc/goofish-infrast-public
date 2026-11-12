@@ -308,6 +308,25 @@ function connect() {
   return workflow
 }
 
+it('shows the full-page connection error when a result view cannot load', async () => {
+  vi.spyOn(console, 'error').mockImplementation(() => undefined)
+  connect()
+  mocks.manual.mockImplementation(() => { throw new TypeError('Failed to fetch dynamically imported module: /assets/ManualScheduleEditor.js') })
+  try {
+    mount('/v2?profile_id=profile-1')
+    await userEvent.click(screen.getByRole('button', { name: copy.v2.manualTab }))
+    const error = await screen.findByRole('alert')
+    expect(error).toHaveTextContent(copy.common.pageLoadFailed)
+    expect(error.closest('main')).toHaveClass('v2-loading-screen')
+    expect(screen.getByRole('button', { name: '重新加载' })).toBeVisible()
+    expect(screen.getByRole('link', { name: sectionLabels.status })).toBeVisible()
+    expect(screen.queryByText(copy.inventory.result_data_incompatible)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '下载完整计算数据' })).not.toBeInTheDocument()
+  } finally {
+    mocks.manual.mockReset()
+  }
+})
+
 it('opens the Skland data page with partial game data and keeps unsupported resources unavailable', async () => {
   connect()
   session.activeProfile!.skland_binding = { uid: 'skland-uid', credential_status: 'available' } as NonNullable<UserGameAccount['skland_binding']>
@@ -1177,11 +1196,11 @@ describe('V2 results-first workspace', () => {
     await user.click(screen.getByRole('menuitemradio', { name: copy.common.components_ThemeSwitcher_005 }))
     expect(document.documentElement).toHaveClass('dark')
     expect(window.localStorage.getItem('maatool-theme')).toBe('dark')
-    const toggle = dialog.getByRole('switch', { name: copy.dashboard.animation.reduce })
+    const toggle = dialog.getByRole('radio', { name: copy.v2.appearance.motionModes.reduced })
     expect(toggle).not.toBeChecked()
     await user.click(toggle)
     expect(document.documentElement).toHaveAttribute('data-reduced-motion')
-    expect(window.localStorage.getItem('maatool-reduce-motion')).toBe('true')
+    expect(window.localStorage.getItem('maatool-reduce-motion')).toBe('reduced')
     await user.click(document.querySelector('[data-slot="dialog-overlay"]')!)
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     await waitFor(() => expect(settingsButton).toHaveFocus())
@@ -1191,7 +1210,7 @@ describe('V2 results-first workspace', () => {
     expect(screen.getByRole('tab', { name: /第2班/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('button', { name: `${copy.common.components_ThemeSwitcher_001}：${copy.common.components_ThemeSwitcher_005}` })).toBeVisible()
     await user.click(screen.getByRole('button', { name: copy.v2.appearance.title }))
-    expect(within(await screen.findByRole('dialog')).getByRole('switch', { name: copy.dashboard.animation.reduce })).toBeChecked()
+    expect(within(await screen.findByRole('dialog')).getByRole('radio', { name: copy.v2.appearance.motionModes.reduced })).toBeChecked()
     expect(mocks.workflow).not.toHaveBeenCalled()
   })
 
@@ -2107,7 +2126,7 @@ describe('V2 feature continuity', () => {
     // Cold imports of the lazy settings page can exceed the default 1s wait in CI.
     expect(await screen.findByLabelText(copy.dashboard.pages_tool_dashboard_SettingsSection_018, {}, { timeout: 5_000 })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: copy.dashboard.settings.preferences }))
-    expect(screen.getByRole('switch', { name: copy.dashboard.animation.reduce })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: copy.v2.appearance.motionModes.reduced })).toBeInTheDocument()
     expect(screen.queryByText(copy.dashboard.workspace_entry.settings_title)).not.toBeInTheDocument()
     expect(screen.getByTestId('route-location')).toHaveTextContent('section=settings')
     expect(screen.queryByRole('link', { name: '返回 V1' })).not.toBeInTheDocument()

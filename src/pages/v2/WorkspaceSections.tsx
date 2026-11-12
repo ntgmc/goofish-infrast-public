@@ -49,9 +49,8 @@ export type V2Workflow = ReturnType<typeof useOptimizeWorkflow> & {
 }
 const descriptions: Partial<Record<V2Section, string>> = {
   generation: copy.v2.generationDescription, plans: copy.v2.plansDescription, benchmarks: copy.siteBenchmark.introduction,
-  tools: copy.v2.toolsDescription, profiles: copy.v2.profilesDescription,
-  'add-account': copy.v2.addAccountDescription, settings: copy.v2.settingsDescription,
-  inventory: copy.v2.inventoryDescription, skland: copy.skland.description,
+  tools: copy.v2.toolsDescription,
+  'add-account': copy.v2.addAccountDescription,
 }
 const publicSections: V2Section[] = ['tools', 'depot', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'material-demand', 'settings', ...V2_PUBLIC_SECTIONS]
 const workflowSections: V2Section[] = ['generation', 'plans', 'lab']

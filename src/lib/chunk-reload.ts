@@ -8,8 +8,8 @@ export function installStaleChunkReloadHandler(): void {
   window.addEventListener('error', handleWindowError, true)
 }
 
-function handleVitePreloadError(event: Event): void {
-  event.preventDefault()
+function handleVitePreloadError(): void {
+  // Cancelling this event turns a failed import into an undefined lazy component.
   reloadOnceForStaleChunk('vite preload error')
 }
 
@@ -82,7 +82,7 @@ function isBundledAssetUrl(url: string): boolean {
   }
 }
 
-function isStaleChunkError(error: unknown): boolean {
+export function isStaleChunkError(error: unknown): boolean {
   const message = readErrorMessage(error).toLowerCase()
   return (
     message.includes('failed to fetch dynamically imported module')
@@ -91,6 +91,7 @@ function isStaleChunkError(error: unknown): boolean {
     || message.includes('dynamically imported module')
     || message.includes('chunkloaderror')
     || message.includes('loading chunk')
+    || message.includes('unable to preload css')
   )
 }
 

@@ -2,7 +2,7 @@
   const dialog = document.getElementById('deployment-refresh')
   dialog.addEventListener('cancel', (event) => event.preventDefault())
   let reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
-  try { reduceMotion ||= localStorage.getItem('maatool-reduce-motion') === 'true' } catch { /* Use the system preference. */ }
+  try { reduceMotion ||= ['true', 'reduced', 'off'].includes(localStorage.getItem('maatool-reduce-motion')) } catch { /* Use the system preference. */ }
   try {
     const key = 'maatool:deployment-refresh'
     const stored = sessionStorage.getItem(key)

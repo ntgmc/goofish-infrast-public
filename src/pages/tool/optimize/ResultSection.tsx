@@ -14,6 +14,7 @@ import { recordDebugError } from '../../../lib/debug-diagnostics'
 import type { ResultPanelProps } from '../../../components/result-panel/types'
 import type { CultivationProjectScope } from '../../../lib/cultivation-project-import'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
+import { isStaleChunkError } from '../../../lib/chunk-reload'
 
 
 const ResultPanel = lazy(() => import('../../../components/ResultPanel'))
@@ -230,12 +231,13 @@ export class ResultErrorBoundary extends Component<{
   resetKey: string
   onDownloadDiagnostic?: () => void
   diagnosticDownloadBusy: boolean
+  loadErrorFallback?: ReactNode
   children: ReactNode
-}, { failed: boolean }> {
-  state = { failed: false }
+}, { failed: boolean; loadFailed: boolean }> {
+  state = { failed: false, loadFailed: false }
 
-  static getDerivedStateFromError() {
-    return { failed: true }
+  static getDerivedStateFromError(error: unknown) {
+    return { failed: true, loadFailed: isStaleChunkError(error) }
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
@@ -245,12 +247,20 @@ export class ResultErrorBoundary extends Component<{
 
   componentDidUpdate(previous: Readonly<{ resetKey: string }>) {
     if (this.state.failed && previous.resetKey !== this.props.resetKey) {
-      this.setState({ failed: false })
+      this.setState({ failed: false, loadFailed: false })
     }
   }
 
   render() {
     if (!this.state.failed) return this.props.children
+    if (this.state.loadFailed) return this.props.loadErrorFallback ?? (
+      <div className="tool-alert tool-alert--error" role="alert">
+        <p>{copy.common.pageLoadFailed}</p>
+        <button type="button" className="tool-secondary-action mt-3" onClick={() => window.location.reload()}>
+          {copy.common.pageReload}
+        </button>
+      </div>
+    )
     return (
       <div className="tool-alert tool-alert--warning" role="alert">
         <p>{copy.inventory.result_data_incompatible}</p>

@@ -7,12 +7,13 @@ import { motionTokens } from '../MotionPrimitives'
 import { useAppReducedMotion } from '../../lib/motion-preference'
 import './shared-card-dialog.css'
 
-export default function SharedCardDialog({ layoutId, onClose, closeLabel, children, className = '' }: {
+export default function SharedCardDialog({ layoutId, onClose, closeLabel, children, className = '', stationaryContent = false }: {
   layoutId: string
   onClose: (surface: HTMLDivElement | null) => void
   closeLabel: string
   children: ReactNode
   className?: string
+  stationaryContent?: boolean
 }) {
   const reduced = useAppReducedMotion()
   const opener = useRef<HTMLElement | null>(null)
@@ -37,10 +38,12 @@ export default function SharedCardDialog({ layoutId, onClose, closeLabel, childr
         onCloseAutoFocus={(event) => {
           if (opener.current?.isConnected) { event.preventDefault(); opener.current.focus({ preventScroll: true }) }
         }}>
-        <motion.div ref={surface} layoutId={reduced ? undefined : layoutId}
-          className={`v2-dialog shared-card-dialog ${className}`}
+        <motion.div ref={surface} layoutId={reduced || stationaryContent ? undefined : layoutId}
+          className={`v2-dialog shared-card-dialog ${className}`} data-stationary-content={stationaryContent || undefined}
           style={{ borderRadius: 8 }} initial={false}
           transition={reduced ? { duration: 0 } : motionTokens.morph}>
+          {stationaryContent && <motion.div aria-hidden="true" className="shared-card-surface" layoutId={reduced ? undefined : layoutId} initial={false}
+            style={{ borderRadius: 8 }} transition={reduced ? { duration: 0 } : motionTokens.morph} />}
           <DialogClose asChild><button type="button" className="v2-icon-button shared-card-close" aria-label={closeLabel}><CloseIcon size={20} aria-hidden="true" /></button></DialogClose>
           <div className="shared-card-scroll">{children}</div>
         </motion.div>

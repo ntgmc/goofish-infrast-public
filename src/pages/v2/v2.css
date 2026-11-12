@@ -278,6 +278,40 @@
   display: inline;
 }
 
+.v2-motion-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  max-width: 100%;
+  margin-left: auto;
+  padding: 4px;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--radius-v2-control);
+  background: var(--color-v2-inset);
+}
+.v2-motion-options label { position: relative; min-width: 0; cursor: pointer; }
+.v2-motion-options label > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 6px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-v2-control) - 3px);
+  color: var(--v2-secondary);
+  font-weight: 500;
+  transition: background-color var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+}
+.v2-motion-check { visibility: hidden; font-size: 12px; }
+.v2-motion-options input:checked + span { border-color: var(--v2-accent); background: var(--v2-paper); color: var(--v2-accent); font-weight: 600; }
+.v2-motion-options input:checked + span .v2-motion-check { visibility: visible; }
+.v2-motion-options input:focus-visible + span { outline: 2px solid var(--v2-accent); outline-offset: 2px; }
+.v2-motion-options label:has(input:disabled) { cursor: not-allowed; opacity: .5; }
+@media (hover: hover) {
+  .v2-motion-options label:hover input:not(:checked):not(:disabled) + span { background: var(--v2-paper); color: var(--v2-ink); }
+}
+
 .v2-nav-disclosure {
   position: relative;
 }

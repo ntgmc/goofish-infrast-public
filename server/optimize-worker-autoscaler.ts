@@ -46,7 +46,8 @@ export function createOptimizeWorkerAutoscaler(
       if (status === 'running' && powerOperation === 'start') powerOperation = null
       if (status === 'stopped' && powerOperation === 'stop') powerOperation = null
 
-      if (load.queued > configuration.scaleUpQueueThreshold) {
+      if (load.queued > configuration.scaleUpQueueThreshold
+        || (load.queued > 0 && load.workerInstances === 0)) {
         lowQueueSince = null
         if (powerOperation === 'start') return 'waiting'
         if (status === 'stopped') {

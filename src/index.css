@@ -1120,10 +1120,37 @@ dialog[open] > * {
 
 html:root[data-reduced-motion] *,
 html:root[data-reduced-motion] *::before,
-html:root[data-reduced-motion] *::after {
+html:root[data-reduced-motion] *::after,
+html:root[data-reduced-motion] *::backdrop {
   animation: none !important;
-  transition: none !important;
+  transition-property: none !important;
   scroll-behavior: auto !important;
+}
+
+html:root[data-motion="reduced"] *,
+html:root[data-motion="reduced"] *::before,
+html:root[data-motion="reduced"] *::after {
+  transition-property: color, background-color, border-color, opacity !important;
+  transition-delay: 0s !important;
+}
+
+html:root[data-motion="reduced"] .motion-region-enter,
+html:root[data-motion="reduced"] .tool-alert,
+html:root[data-motion="reduced"] dialog[open] > *,
+html:root[data-motion="reduced"] dialog[open]::backdrop,
+html:root[data-motion="reduced"] [data-slot="dialog-content"][data-state="open"],
+html:root[data-motion="reduced"] [data-slot="dialog-overlay"][data-state="open"] {
+  animation: motion-backdrop-enter 120ms ease-out both !important;
+}
+
+html:root[data-motion="reduced"] [data-slot="dialog-content"][data-state="closed"],
+html:root[data-motion="reduced"] [data-slot="dialog-overlay"][data-state="closed"] {
+  animation: motion-backdrop-exit 120ms ease-out both !important;
+}
+
+@keyframes motion-backdrop-exit {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
 @theme inline {

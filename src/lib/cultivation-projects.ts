@@ -156,8 +156,46 @@ export function buildProjectRoute(data: CultivationData, projects: CultivationPr
   }
   const remaining = tasks.filter((task) => task.remaining > epsilon)
   const blocked = remaining.filter((task) => !data.farms[task.item]?.length && !(task.item === 'exp' && (normal?.exp || temporary?.exp) || task.item === '4001' && (normal?.lmd || temporary?.lmd)))
-  return { rows, missing, focus, phases, supplied, farmed, remaining, blocked, goldLimited, switchDate,
+  return { rows, missing, focus, phases, supplied, farmed, remaining, blocked, goldLimited, switchDate, synthesis: buildProjectSynthesis(rows, data.inventory),
     readyDate: rows.length && rows.every((row) => row.estimatedDate) ? rows.reduce((last, row) => row.estimatedDate! > last ? row.estimatedDate! : last, settings.startDate) : null }
+}
+
+function buildProjectSynthesis(rows: ReturnType<typeof allocateProjectMaterials>, inventory: Record<string, number>) {
+  const stock = { ...inventory }
+  const ready: NonNullable<(typeof rows)[number]['allocation']>['steps'] = []
+  const waiting: Array<{ item: string; count: number }> = []
+  for (const { candidate, allocation } of rows) {
+    if (!candidate || !allocation) continue
+    const shortages = Object.entries(candidate.items).map(([id, count]) => {
+      const reserved = Math.min(count, stock[id] ?? 0)
+      stock[id] = (stock[id] ?? 0) - reserved
+      return [id, count - reserved] as const
+    })
+    for (const step of allocation.steps) {
+      const available = Object.entries(step.ingredients).every(([id, count]) => (stock[id] ?? 0) >= count)
+      for (const [id, count] of Object.entries(step.ingredients)) stock[id] = Math.max(0, (stock[id] ?? 0) - count)
+      if (available) {
+        stock[step.item] = (stock[step.item] ?? 0) + step.count
+        ready.push(step)
+      } else waiting.push({ item: step.item, count: step.count })
+    }
+    for (const [id, count] of shortages) stock[id] = Math.max(0, (stock[id] ?? 0) - count)
+  }
+  const merged = new Map<string, { item: string; count: number; ingredients: Record<string, number> }>()
+  for (const step of ready) {
+    const previous = merged.get(step.item)
+    merged.set(step.item, { item: step.item, count: (previous?.count ?? 0) + step.count, ingredients: step.ingredients })
+  }
+  const ordered: Array<{ item: string; count: number }> = []
+  let pending = [...merged.values()]
+  while (pending.length) {
+    const available = pending.filter((step) => !Object.keys(step.ingredients).some((id) => pending.some((other) => other.item === id)))
+    // Keep the executable sequence when reciprocal conversions cannot be merged into one pass.
+    if (!available.length) return { ready: ready.map(({ item, count }) => ({ item, count })), waiting }
+    ordered.push(...available.map(({ item, count }) => ({ item, count })))
+    pending = pending.filter((step) => !available.includes(step))
+  }
+  return { ready: ordered, waiting }
 }
 
 export function projectDaysEarlier(before: string | null, after: string | null): number | null {

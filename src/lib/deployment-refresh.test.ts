@@ -104,6 +104,14 @@ it.each(['system', 'setting'])('switches directly with reduced motion from the %
   expect(dialog.open).toBe(false)
 })
 
+it.each(['true', 'off', 'reduced', 'full'])('restores the saved %s motion mode before app startup', (mode) => {
+  localStorage.setItem('maatool-reduce-motion', mode)
+  sessionStorage.setItem(key, JSON.stringify({ path: location.pathname, startedAt: Date.now() }))
+  new Function(bootstrap)()
+  expect(dialog.open).toBe(true)
+  expect(dialog.hasAttribute('data-reduced-motion')).toBe(mode !== 'full')
+})
+
 it('still reloads when session storage rejects the marker', async () => {
   vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked') })
   const reload = vi.fn()

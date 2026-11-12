@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { lazy, Suspense } from 'react'
+import { act, cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { OptimizeResult } from '../../../lib/types'
-import ResultSection, { UpgradeSuggestionStatusNotice } from './ResultSection'
+import ResultSection, { ResultErrorBoundary, UpgradeSuggestionStatusNotice } from './ResultSection'
+import { copy } from '../../../copy'
 import { disableDebugMode, enableDebugMode, getDebugDiagnosticsSnapshot } from '../../../lib/debug-diagnostics'
 
 afterEach(() => {
@@ -57,6 +59,34 @@ describe('UpgradeSuggestionStatusNotice', () => {
 })
 
 describe('ResultSection compatibility fallback', () => {
+  it.each([
+    'Failed to fetch dynamically imported module: /assets/ResultPanel.js',
+    'Importing a module script failed.',
+    'Unable to preload CSS for /assets/ResultPanel.css',
+  ])('offers reload instead of blaming result data when lazy loading fails: %s', async (message) => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const FailedPanel = lazy(() => Promise.reject(new TypeError(message)))
+    render(<ResultErrorBoundary resetKey="history:1" diagnosticDownloadBusy={false} onDownloadDiagnostic={vi.fn()}>
+      <Suspense fallback={<p>Loading</p>}><FailedPanel /></Suspense>
+    </ResultErrorBoundary>)
+    expect(await screen.findByRole('alert')).toHaveTextContent(copy.common.pageLoadFailed)
+    expect(screen.getByRole('button', { name: copy.common.pageReload })).toBeVisible()
+    expect(screen.queryByText(copy.inventory.result_data_incompatible)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '下载完整计算数据' })).not.toBeInTheDocument()
+  })
+
+  it('keeps a slow lazy import loading until it succeeds', async () => {
+    let finishLoading!: (module: { default: () => React.JSX.Element }) => void
+    const SlowPanel = lazy(() => new Promise<{ default: () => React.JSX.Element }>((resolve) => { finishLoading = resolve }))
+    render(<ResultErrorBoundary resetKey="history:1" diagnosticDownloadBusy={false}>
+      <Suspense fallback={<p role="status">Loading</p>}><SlowPanel /></Suspense>
+    </ResultErrorBoundary>)
+    expect(screen.getByRole('status')).toHaveTextContent('Loading')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await act(async () => finishLoading({ default: () => <p>Loaded result</p> }))
+    expect(screen.getByText('Loaded result')).toBeVisible()
+  })
+
   it('contains malformed history rendering and keeps the diagnostic download action', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     expect(enableDebugMode()).toBe(true)

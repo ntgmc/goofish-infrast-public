@@ -38,7 +38,7 @@ export const trainingRatioCopy = {
   importedAt: '库存读取时间', noInventory: '绑定账号后自动读取库存，也可切换到“手动填写”计算。',
   lmd: '龙门币', exp: '作战经验', books: '按经验书数量填写',
   bookNames: ['基础作战记录', '初级作战记录', '中级作战记录', '高级作战记录'],
-  inventoryHint: '填写龙门币和经验，点击“按填写库存计算”查看建议。经验可直接填写总值，也可按作战记录数量换算。',
+  inventoryHint: '经验可填写总值，也可按作战记录数量换算。',
   invalidAmount: '请填写非负整数，单项数量不得超过 1 万亿。',
   result: '刷取建议', inventoryRatio: '当前库存钱书比', noExp: '暂无经验库存', noResources: '暂无钱书库存',
   belowRange: '低于 1.2∶1', aboveRange: '高于 1.4∶1',

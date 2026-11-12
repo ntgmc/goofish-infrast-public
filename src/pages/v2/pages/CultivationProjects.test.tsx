@@ -28,11 +28,23 @@ const data = (projects: CultivationProject[] = []): CultivationData => ({
   stats: { homeworks: 0, owned: 1, missingOperators: 0, incomplete: 0 }, updatedAt: '2026-10-06T00:00:00Z', importedAt: '2026-10-06T00:00:00Z', pricingStatus: 'fresh', warnings: [],
 })
 async function chooseOperator(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByRole('button', { name: text.operator }))
-  await user.click(await within(screen.getByRole('dialog')).findByRole('button', { name: '测试干员' }))
+  await user.click(await screen.findByRole('button', { name: text.add }))
+  await user.click(screen.getByRole('button', { name: text.operator }))
+  await user.click(await within(screen.getByRole('dialog', { name: text.operator })).findByRole('button', { name: '测试干员' }))
 }
 async function openMaterials(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByText(text.requiredMaterials, { selector: 'summary' }))
+  const summary = (await screen.findAllByText(text.goalDetails, { selector: 'summary', exact: false }))[0]
+  if (!(summary.parentElement as HTMLDetailsElement).open) await user.click(summary)
+}
+async function openPlan(user: ReturnType<typeof userEvent.setup>, settings = false) {
+  await user.click(screen.getByRole('tab', { name: text.route }))
+  const summary = screen.getByText(text.planSettings, { selector: 'summary > span' }).parentElement!
+  if (settings && !(summary.parentElement as HTMLDetailsElement).open) await user.click(summary)
+}
+async function toggleGoal(user: ReturnType<typeof userEvent.setup>, action: string) {
+  await user.click(screen.getByRole('tab', { name: text.targetList }))
+  await openMaterials(user)
+  await user.click(screen.getByRole('button', { name: action }))
 }
 function session(id = 'mine'): V2Session {
   return { user: { id: 'user1' }, authStatus: 'authenticated', authLoading: false, activeProfile: { id, display_name: id, status: 'active', skland_binding: {} },
@@ -41,6 +53,7 @@ function session(id = 'mine'): V2Session {
   } as unknown as V2Session
 }
 beforeEach(() => {
+  Element.prototype.scrollIntoView = vi.fn()
   localStorage.clear()
   mocks.api.mockImplementation(async (_url, options) => data(options.json.projects))
   mocks.result.mockImplementation(async (_profile, id) => ({ id, config: CONFIG_PRESETS['243'], result: {
@@ -74,8 +87,9 @@ it('turns a selected goal into an income-linked route and changes configuration 
   const current = session()
   render(<MemoryRouter><CultivationProjects session={current} onConfig={vi.fn()} /></MemoryRouter>)
   await user.click(screen.getByRole('button', { name: text.import }))
-  await user.click(await screen.findByRole('button', { name: text.operator }))
-  const picker = within(screen.getByRole('dialog'))
+  await user.click(await screen.findByRole('button', { name: text.add }))
+  await user.click(screen.getByRole('button', { name: text.operator }))
+  const picker = within(screen.getByRole('dialog', { name: text.operator }))
   const search = picker.getByRole('searchbox', { name: text.search })
   await user.type(search, 'CSGY')
   expect(await picker.findByRole('button', { name: '测试干员' })).toBeInTheDocument()
@@ -85,22 +99,26 @@ it('turns a selected goal into an income-linked route and changes configuration 
   await user.click(screen.getByRole('button', { name: text.add }))
   await waitFor(() => expect(mocks.api).toHaveBeenCalledTimes(2))
   expect(mocks.refresh).toHaveBeenCalledTimes(1)
-  expect(screen.getByRole('button', { name: text.operator })).toHaveTextContent(text.operator)
-  expect(screen.getByRole('button', { name: text.add })).toBeDisabled()
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  await openPlan(user, true)
   const budget = screen.getByRole('spinbutton', { name: text.dailySanity })
   await user.clear(budget)
   await user.type(budget, '0')
   await user.selectOptions(screen.getByRole('combobox', { name: text.temporary }), 'temporary')
   expect(await screen.findByText(text.temporaryBetter(1))).toBeInTheDocument()
+  await user.click(screen.getByRole('tab', { name: text.synthesis }))
+  expect(screen.getByText(text.noSynthesis)).toBeInTheDocument()
   expect(current.setConfigOverride).not.toHaveBeenCalled()
   await user.click(screen.getByRole('button', { name: text.apply }))
   expect(current.setConfigOverride).toHaveBeenCalledWith(CONFIG_PRESETS['243'])
   expect(JSON.parse(localStorage.getItem('maatool:cultivation-projects:user1:mine')!)).toMatchObject([{ operatorId: 'char_test', elite: 2, level: 60, skillLevel: 7 }])
   expect(localStorage.getItem('maatool:cultivation-projects:user1:mine')).not.toContain('inventory')
-  await user.click(screen.getByRole('button', { name: text.pause }))
-  expect(screen.getByText(text.paused)).toBeInTheDocument()
+  await toggleGoal(user, text.pause)
+  expect(screen.getAllByText(text.paused).length).toBeGreaterThan(0)
+  await openPlan(user)
   expect(screen.queryByRole('heading', { name: text.route })).not.toBeInTheDocument()
-  await user.click(screen.getByRole('button', { name: text.resume }))
+  await toggleGoal(user, text.resume)
+  await openPlan(user)
   expect(await screen.findByRole('heading', { name: text.route })).toBeInTheDocument()
 })
 
@@ -119,11 +137,12 @@ it('groups Amiya forms into one choice and saves the selected profession without
   })
   render(<MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /></MemoryRouter>)
   await user.click(screen.getByRole('button', { name: text.import }))
-  await user.click(await screen.findByRole('button', { name: text.operator }))
-  const dialog = within(screen.getByRole('dialog'))
+  await user.click(await screen.findByRole('button', { name: text.add }))
+  await user.click(screen.getByRole('button', { name: text.operator }))
+  const dialog = within(screen.getByRole('dialog', { name: text.operator }))
   expect(await dialog.findAllByRole('button', { name: '阿米娅' })).toHaveLength(1)
   await user.click(dialog.getByRole('button', { name: '阿米娅' }))
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(screen.queryByRole('dialog', { name: text.operator })).not.toBeInTheDocument()
   expect(screen.getByRole('radio', { name: '术师' })).toBeChecked()
   await user.click(screen.getByRole('radio', { name: '医疗' }))
   await user.selectOptions(screen.getByRole('combobox', { name: text.skill }), '2')
@@ -132,8 +151,9 @@ it('groups Amiya forms into one choice and saves the selected profession without
   const goals = JSON.parse(localStorage.getItem('maatool:cultivation-projects:user1:mine')!)
   expect(goals).toMatchObject([{ operatorId: 'char_1037_amiya3', skill: 2, skillLevel: 10 }])
   await waitFor(() => expect(mocks.api).toHaveBeenLastCalledWith('/api/cultivation-plan', expect.objectContaining({ json: { profile_id: 'mine', projects: goals } })))
+  await user.click(screen.getByRole('button', { name: text.add }))
   await user.click(screen.getByRole('button', { name: text.operator }))
-  const next = within(screen.getByRole('dialog'))
+  const next = within(screen.getByRole('dialog', { name: text.operator }))
   expect(await next.findByRole('button', { name: '测试干员' })).toBeVisible()
   expect(next.queryByRole('button', { name: '阿米娅' })).not.toBeInTheDocument()
   await user.keyboard('{Escape}')
@@ -160,6 +180,7 @@ it('exports the latest active goals to the MAA clipboard even when production ca
   expect(write).toHaveBeenCalledWith((content as HTMLTextAreaElement).value)
   expect(await screen.findByText(text.maaCopied)).toBeVisible()
   expect(JSON.parse(localStorage.getItem('maatool:cultivation-projects:user1:mine')!)[0]).toEqual(goal)
+  await openMaterials(user)
   await user.click(screen.getByRole('button', { name: text.pause }))
   expect(screen.getByText(text.maaEmpty)).toBeVisible()
   expect(screen.queryByText(text.maaCopied)).not.toBeInTheDocument()
@@ -203,6 +224,7 @@ it('calculates manual materials even when production fails, then includes crafti
   expect(within(shortage).getByText('固源岩')).toBeInTheDocument()
   expect(within(shortage).getByText(text.requiredAmount('3'))).toBeInTheDocument()
   expect(within(shortage).getByText(text.requiredAmount('1,100'))).toBeInTheDocument()
+  await openPlan(user, true)
   expect(screen.getByText('production unavailable')).toBeInTheDocument()
   expect(screen.queryByRole('heading', { name: text.route })).not.toBeInTheDocument()
   expect(mocks.api).toHaveBeenCalledTimes(2)
@@ -211,7 +233,55 @@ it('calculates manual materials even when production fails, then includes crafti
   const resources = await screen.findByRole('heading', { name: text.resources })
   expect(resources.parentElement).toHaveTextContent('固源岩')
   expect(resources.parentElement).toHaveTextContent('1,100')
+  await user.click(screen.getByRole('tab', { name: text.synthesis }))
+  const synthesis = screen.getByRole('region', { name: text.synthesis })
+  expect(within(synthesis).getByRole('list', { name: text.synthesisWaiting })).toBeInTheDocument()
+  const steps = within(synthesis).getAllByRole('listitem')
+  expect(steps).toHaveLength(1)
+  expect(within(synthesis).queryByRole('button', { name: text.viewMaterial('固源岩') })).not.toBeInTheDocument()
+  expect(within(synthesis).queryByText('龙门币')).not.toBeInTheDocument()
+  const output = within(steps[0]).getByRole('button', { name: text.viewMaterial('提纯源岩') })
+  expect(output).toHaveTextContent(text.recipeOutput('2'))
+  await user.click(output)
+  expect(await screen.findByRole('dialog', { name: text.materialRoute('提纯源岩') })).toBeInTheDocument()
+  await user.keyboard('{Escape}')
+  await waitFor(() => expect(within(synthesis).getByRole('button', { name: text.viewMaterial('提纯源岩') })).toHaveFocus())
+  await toggleGoal(user, text.pause)
+  await openPlan(user)
+  expect(screen.queryByRole('region', { name: text.synthesis })).not.toBeInTheDocument()
+  await toggleGoal(user, text.resume)
+  await openPlan(user)
+  await user.click(screen.getByRole('tab', { name: text.synthesis }))
+  expect(await screen.findByRole('region', { name: text.synthesis })).toHaveTextContent(text.recipeOutput('2'))
   expect(mocks.api).toHaveBeenCalledTimes(2)
+})
+
+it('shows merged output quantities across routes in dependency order and opens their recipes', async () => {
+  const user = userEvent.setup()
+  const goal: CultivationProject = { operatorId: 'char_test', elite: 2, level: 60, skill: 1, skillLevel: 7, paused: false, deadline: '' }
+  const goals = [goal, { ...goal, operatorId: 'char_other' }]
+  localStorage.setItem('maatool:cultivation-projects:user1:mine', JSON.stringify(goals))
+  mocks.api.mockImplementation(async (_url, options) => {
+    const result = data(options.json.projects)
+    result.candidates.forEach((candidate, index) => { candidate.items = { [index ? 'right' : 'left']: 1 } })
+    return { ...result, inventory: { raw: 4 }, itemNames: { raw: '固源岩', middle: '固源岩组', left: '提纯源岩', right: '炽合金块' },
+      recipes: { middle: { count: 1, items: { raw: 1 } }, left: { count: 1, items: { middle: 2 } }, right: { count: 1, items: { middle: 2 } } } }
+  })
+  render(<MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /></MemoryRouter>)
+  await user.click(screen.getByRole('button', { name: text.import }))
+  await openPlan(user)
+  await user.click(screen.getByRole('tab', { name: text.synthesis }))
+  const synthesis = await screen.findByRole('region', { name: text.synthesis })
+  const ready = within(synthesis).getByRole('list', { name: text.synthesisReady })
+  expect(within(ready).getAllByRole('button').map((button) => button.textContent)).toEqual([
+    `固源岩组${text.recipeOutput('4')}`, `提纯源岩${text.recipeOutput('1')}`, `炽合金块${text.recipeOutput('1')}`,
+  ])
+  expect(within(synthesis).queryByRole('list', { name: text.synthesisWaiting })).not.toBeInTheDocument()
+  expect(within(synthesis).queryByRole('button', { name: text.viewMaterial('固源岩') })).not.toBeInTheDocument()
+  await user.click(within(ready).getByRole('button', { name: text.viewMaterial('固源岩组') }))
+  expect(await screen.findByRole('dialog', { name: text.materialRoute('固源岩组') })).toHaveTextContent(text.requiredAmount('4'))
+  await user.keyboard('{Escape}')
+  await waitFor(() => expect(within(ready).getByRole('button', { name: text.viewMaterial('固源岩组') })).toHaveFocus())
 })
 
 it('shows farming sources for materials and reserves income contributions for money and experience', async () => {
@@ -225,6 +295,7 @@ it('shows farming sources for materials and reserves income contributions for mo
   await user.click(screen.getByRole('button', { name: text.import }))
   await chooseOperator(user)
   await user.click(screen.getByRole('button', { name: text.add }))
+  await openPlan(user)
   const section = (await screen.findByRole('heading', { name: text.resources })).parentElement!
   const material = within(section).getByRole('button', { name: text.viewMaterial('技巧概要') }).closest('li')!
   expect(within(material).getByText('CA-5')).toBeInTheDocument()
@@ -244,7 +315,7 @@ it('recalculates the latest edited target after an in-flight calculation without
   await user.click(screen.getByRole('button', { name: text.add }))
   await openMaterials(user)
   await screen.findByRole('heading', { name: text.requiredMaterials })
-  await user.click(screen.getByRole('button', { name: text.edit }))
+  await user.click(screen.getByRole('button', { name: `${text.edit} 测试干员` }))
   const level = screen.getByRole('spinbutton', { name: text.level })
   await user.clear(level)
   await user.type(level, '90')
@@ -290,11 +361,11 @@ it('imports a bundle from training suggestions into an already mounted project p
   ] }
   render(<MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /><UpgradeSuggestions suggestions={[suggestion]} projectScope={{ userId: 'user1', profileId: 'mine' }} /></MemoryRouter>)
   await user.click(screen.getByRole('button', { name: text.import }))
-  await screen.findByRole('button', { name: text.operator })
+  await screen.findByRole('button', { name: text.add })
   await user.click(screen.getByRole('button', { name: text.importSuggestion }))
   expect(await screen.findByText(text.imported(1, 1))).toBeInTheDocument()
   expect(screen.getByRole('link', { name: text.openProjects })).toHaveAttribute('href', '/v2?section=cultivation-projects&profile_id=mine')
-  expect(screen.getByRole('button', { name: `${text.remove} 测试干员` })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: `${text.edit} 测试干员` })).toBeInTheDocument()
   const goals = JSON.parse(localStorage.getItem('maatool:cultivation-projects:user1:mine')!)
   expect(goals).toEqual([saved, { operatorId: 'char_test', elite: 2, level: 1, skill: 1, skillLevel: 1, paused: false, deadline: '' }])
   await waitFor(() => expect(mocks.api).toHaveBeenLastCalledWith('/api/cultivation-plan', expect.objectContaining({ json: { profile_id: 'mine', projects: goals } })))
@@ -319,4 +390,48 @@ it('keeps imports in their own account and profile and reports storage failure w
   expect(await screen.findByText(text.imported(1, 0))).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: `${text.remove} 测试干员` })).not.toBeInTheDocument()
   expect(localStorage.getItem('maatool:cultivation-projects:user1:mine')).toBeNull()
+})
+
+it('keeps a ten-goal queue usable while editing, adding from the plan and reallocating priority', async () => {
+  const user = userEvent.setup()
+  const goals: CultivationProject[] = Array.from({ length: 10 }, (_, index) => ({ operatorId: `char_${index}`, elite: 2, level: 60, skill: 3, skillLevel: 10, paused: false, deadline: '' }))
+  localStorage.setItem('maatool:cultivation-projects:user1:mine', JSON.stringify(goals))
+  mocks.api.mockImplementation(async (_url, options) => {
+    const result = data(options.json.projects)
+    result.projectOperators = Array.from({ length: 11 }, (_, index) => ({ ...result.projectOperators![0], id: `char_${index}`, name: `干员 ${index + 1}`, skills: ['s1', 's2', 's3'],
+      current: { elite: 2, level: 60, skillLevel: 7, masteries: { s1: 3, s2: 3, s3: 1 }, modules: {}, potential: 1 } }))
+    return result
+  })
+  const view = render(<MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /></MemoryRouter>)
+  await user.click(screen.getByRole('button', { name: text.import }))
+  const first = (await screen.findByRole('heading', { name: '干员 1' })).closest('li')!
+  const upgrades = within(first).getByRole('list', { name: text.upgrades })
+  expect(upgrades).toHaveTextContent(`${text.skillName(3)}${text.skillRank(8)}${text.skillRank(10)}`)
+  expect(upgrades).not.toHaveTextContent('Lv.60')
+  expect(within(first).getByText(text.trainingMetDetail('精英二 Lv.60'))).toBeInTheDocument()
+  const last = screen.getByRole('heading', { name: '干员 10' }).closest('li')!
+  await user.click(within(last).getByRole('button', { name: `${text.edit} 干员 10` }))
+  await user.selectOptions(screen.getByRole('combobox', { name: text.skillLevel }), '9')
+  await user.click(screen.getByRole('button', { name: text.save }))
+  expect(JSON.parse(localStorage.getItem('maatool:cultivation-projects:user1:mine')!)[9].skillLevel).toBe(9)
+  await openPlan(user, true)
+  await user.selectOptions(screen.getByRole('combobox', { name: text.normal }), '')
+  await user.click(screen.getByRole('button', { name: text.add }))
+  await user.click(screen.getByRole('button', { name: text.operator }))
+  await user.click(await within(screen.getByRole('dialog', { name: text.operator })).findByRole('button', { name: '干员 11' }))
+  await user.click(screen.getByRole('button', { name: text.add }))
+  await waitFor(() => expect(mocks.api).toHaveBeenLastCalledWith('/api/cultivation-plan', expect.objectContaining({ json: expect.objectContaining({ projects: expect.arrayContaining([expect.objectContaining({ operatorId: 'char_10' })]) }) })))
+  expect(screen.getByRole('tab', { name: text.route })).toHaveAttribute('aria-selected', 'true')
+  await user.click(screen.getByRole('tab', { name: text.targetList }))
+  expect(view.container.querySelectorAll('.v2-project-list > li')).toHaveLength(11)
+  await user.click(within(last).getByText(text.goalDetails, { selector: 'summary', exact: false }))
+  await user.click(within(last).getByRole('button', { name: text.makeMain }))
+  expect(view.container.querySelector('.v2-project-list > li')).toBe(last)
+  expect(within(last).getByText(text.main)).toBeInTheDocument()
+  await user.click(within(last).getByRole('button', { name: text.pause }))
+  expect(within(last).getAllByText(text.paused).length).toBeGreaterThan(0)
+  expect(view.container.querySelector('[data-primary="true"]')).toBe(first)
+  await openPlan(user, true)
+  expect(screen.getByRole('combobox', { name: text.normal })).toHaveValue('')
+  expect(mocks.refresh).toHaveBeenCalledTimes(1)
 })

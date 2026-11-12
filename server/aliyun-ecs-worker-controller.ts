@@ -53,11 +53,11 @@ export function createAliyunEcsWorkerController(
   return {
     getStatus: async () => {
       const response = await callApi('DescribeInstanceStatus', {
-        InstanceId: instanceId,
+        'InstanceId.1': instanceId,
         IncludeAllStatus: 'true',
       })
       const statuses = response.InstanceStatuses?.InstanceStatus
-      const status = Array.isArray(statuses) ? statuses[0]?.Status : undefined
+      const status = Array.isArray(statuses) ? statuses.find((entry) => entry?.InstanceId === instanceId)?.Status : undefined
       return normalizeStatus(status)
     },
     start: async () => {
@@ -211,7 +211,7 @@ type AliyunRpcResponse = {
   Message?: unknown
   RequestId?: unknown
   InstanceStatuses?: {
-    InstanceStatus?: Array<{ Status?: unknown }>
+    InstanceStatus?: Array<{ InstanceId?: unknown; Status?: unknown }>
   }
   [key: string]: unknown
 }

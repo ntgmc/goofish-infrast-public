@@ -39,7 +39,7 @@ export function readCultivationPlayer(playerInfo: unknown, cultivatePlayer: unkn
   const cultivateChars = new Map(asRows(player.characters).map((row) => [String(row.id ?? row.characterId ?? row.charId), row]))
   for (const raw of asRows(game.chars)) {
     const id = String(raw.charId ?? raw.id ?? '')
-    if (!snapshot.operators[id]) continue
+    if (!snapshot.operators[id]) throw new Error('部分已持有干员的培养资料暂不可用，请稍后重试。')
     const cal = cultivateChars.get(id)
     const skillLevel = cal?.mainSkillLvl ?? cal?.mainSkillLevel ?? raw.mainSkillLvl ?? raw.mainSkillLevel
     const masteries: Record<string, number> = {}

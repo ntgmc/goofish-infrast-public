@@ -125,6 +125,38 @@ it('cancels a pending snapshot when reduced motion is enabled', async () => {
   expect(container.firstChild).not.toHaveAttribute('data-page-entering')
 })
 
+it('fades without movement or snapshots in simplified mode and cancels the fade when switched off', async () => {
+  window.localStorage.setItem('maatool-reduce-motion', 'reduced')
+  const { start } = mockViewTransitions()
+  function DisableAnimations() {
+    const preference = useMotionPreference()
+    return <button onClick={() => preference?.setMotionMode('off')}>Disable animations</button>
+  }
+  function Page({ section }: { section: string }) {
+    return <MotionPreferenceProvider><V2PageTransition motionKey={section}>{content}</V2PageTransition><DisableAnimations /></MotionPreferenceProvider>
+  }
+  const { rerender, container } = render(<Page section="overview" />)
+  const draft = screen.getByRole('textbox', { name: 'Schedule draft' })
+  fireEvent.change(draft, { target: { value: 'edited' } })
+  expect(container.firstChild).not.toHaveAttribute('data-page-entering')
+  rerender(<Page section="tools" />)
+  expect(start).not.toHaveBeenCalled()
+  expect(screen.getByRole('heading', { name: 'tools' })).toBeInTheDocument()
+  expect(container.firstChild).toHaveAttribute('data-page-entering', 'fallback')
+  await waitFor(() => {
+    expect(container.firstChild).toHaveStyle({ transform: 'none' })
+    expect(Number((container.firstChild as HTMLElement).style.opacity)).toBeLessThan(1)
+  })
+  rerender(<Page section="overview" />)
+  expect(screen.getByRole('textbox', { name: 'Schedule draft' })).toBe(draft)
+  expect(draft).toHaveValue('edited')
+  await waitFor(() => expect(container.firstChild).toHaveStyle({ opacity: '1', transform: 'none' }))
+  rerender(<Page section="tools" />)
+  fireEvent.click(screen.getByRole('button', { name: 'Disable animations' }))
+  expect(container.firstChild).not.toHaveAttribute('data-page-entering')
+  await waitFor(() => expect(container.firstChild).toHaveStyle({ opacity: '1', transform: 'none' }))
+})
+
 it('switches immediately when the user reduces animations', () => {
   window.localStorage.setItem('maatool-reduce-motion', 'true')
   function Page({ section }: { section: string }) {

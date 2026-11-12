@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { buildMaterialRoutes } from './cultivation-materials'
+import { buildMaterialGraph, buildMaterialRoutes } from './cultivation-materials'
 
 it('expands every ingredient tier with whole recipe batches and follows all later products', () => {
   const data = { recipes: {
@@ -28,6 +28,61 @@ it('includes chip packs and the entire catalyst exchange while keeping reciproca
   expect(route.ingredient.ingredients[0]).toMatchObject({ id: '3242', count: 8, ingredients: [], conversion: { id: '3252', count: 3, output: 2 } })
   expect(route.ingredient.ingredients[1]).toMatchObject({ id: '32001', count: 4, ingredients: [{ id: '4006', count: 360 }] })
   expect(buildMaterialRoutes('4006', 90, data).products.map((product) => product.id)).toEqual(['32001', '3243'])
+})
+
+it('places ingredients before their products, merges downstream branches and keeps fees beside their material', () => {
+  const data = { recipes: {
+    middle: { count: 2, items: { raw: 3, '4001': 50 } },
+    selected: { count: 1, items: { middle: 3, '4001': 100 } },
+    left: { count: 1, items: { selected: 2, other: 1 } },
+    right: { count: 1, items: { selected: 1 } },
+    final: { count: 1, items: { left: 1, right: 1, selected: 1 } },
+  } }
+  const graph = buildMaterialGraph('selected', 3, data)
+  const selected = graph.nodes.find((node) => node.kind === 'selected')!
+  expect(selected.fees).toEqual({ '4001': 300 })
+  expect(graph.nodes.some((node) => node.id === '4001')).toBe(false)
+  expect(graph.nodes.find((node) => node.id === 'raw')).toMatchObject({ count: 15, column: 0 })
+  expect(graph.nodes.find((node) => node.id === 'middle')).toMatchObject({ count: 9, column: 1, fees: { '4001': 250 } })
+  expect(graph.nodes.find((node) => node.id === 'final')).toMatchObject({ column: 4, count: 1, kind: 'product' })
+  expect(graph.nodes.find((node) => node.id === 'left')?.extra).toEqual({ selected: 2, other: 1 })
+  for (const edge of graph.edges) {
+    const from = graph.nodes.find((node) => node.key === edge.from)!, to = graph.nodes.find((node) => node.key === edge.to)!
+    expect(from.column).toBeLessThan(to.column)
+  }
+  expect(graph.edges.filter((edge) => edge.to === 'product/final').map((edge) => edge.from).sort()).toEqual(['product/left', 'product/right', 'selected'])
+})
+
+it('aligns the short alloy ingredient branches with the other materials used in the same craft', () => {
+  const data = { recipes: {
+    '30062': { count: 1, items: { '4001': 100, '30061': 3 } },
+    '30063': { count: 1, items: { '4001': 200, '30062': 4 } },
+    '31024': { count: 1, items: { '4001': 300, '30063': 1, '30093': 1, '31023': 1 } },
+    '30145': { count: 1, items: { '4001': 400, '31014': 2, '31024': 1, '31034': 1 } },
+  } }
+  const graph = buildMaterialGraph('31024', 5, data)
+  const node = (id: string) => graph.nodes.find((node) => node.id === id)!
+  expect(node('30061')).toMatchObject({ column: 0, count: 60 })
+  expect(node('30062')).toMatchObject({ column: 1, count: 20 })
+  for (const id of ['30063', '30093', '31023']) expect(node(id)).toMatchObject({ column: 2, count: 5 })
+  expect(node('31024')).toMatchObject({ column: 3, count: 5 })
+  expect(node('30145')).toMatchObject({ column: 4, count: 1 })
+  for (const edge of graph.edges) {
+    const from = graph.nodes.find((node) => node.key === edge.from)!, to = graph.nodes.find((node) => node.key === edge.to)!
+    expect(to.column - from.column).toBe(1)
+  }
+})
+
+it('retains currency entry points and optional chip conversions without expanding cycles into the graph', () => {
+  const data = { recipes: { '3243': { count: 1, items: { '3242': 2, '32001': 1 } }, '3242': { count: 2, items: { '3252': 3 } }, '3252': { count: 2, items: { '3242': 3 } } } }
+  const graph = buildMaterialGraph('3243', 4, data)
+  expect(graph.nodes.find((node) => node.id === '3242')).toMatchObject({ conversion: { id: '3252', count: 3, output: 2 } })
+  expect(graph.nodes.some((node) => node.id === '3252')).toBe(false)
+  expect(graph.nodes.find((node) => node.id === '32001')?.fees).toEqual({ '4006': 360 })
+  expect(buildMaterialGraph('4006', 90, data).nodes[0]).toMatchObject({ id: '4006', kind: 'selected', count: 90 })
+  const cyclic = buildMaterialGraph('a', 1, { recipes: { a: { count: 1, items: { b: 1 } }, b: { count: 1, items: { a: 1 } } } })
+  expect(cyclic.nodes.some((node) => node.cycle)).toBe(true)
+  expect(cyclic.nodes).toHaveLength(4)
 })
 
 it('terminates cyclic source data without dropping other branches or repeating later products', () => {

@@ -88,6 +88,12 @@ describe('PRTS and Skland cultivation data', () => {
     expect(result.stats.owned).toBe(1)
   })
 
+  it('rejects incomplete operator catalogs instead of silently undercounting owned operators', () => {
+    const owned = game()
+    owned.data.chars.push({ ...owned.data.chars[0], charId: 'char_new' })
+    expect(() => buildCultivationData(snapshot(), owned, { items: [] }, pricing)).toThrow('部分已持有干员的培养资料暂不可用')
+  })
+
   it('extracts unlock conditions from old homework and module prerequisites from equip metadata', () => {
     const input = snapshot()
     input.operators.char_test.skills.push('s3')

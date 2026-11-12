@@ -588,7 +588,7 @@ export const publicCopy = {
   faq_search_placeholder: "试试“森空岛”“MAA 导出”或“草稿”",
   faq_search_clear: "清空",
   faq_search_results: (count: number) => `找到 ${count} 个相关问题`,
-  faq_total: (count: number) => `共 ${count} 个问题，点击问题查看答案`,
+  faq_total: (count: number) => `共 ${count} 个问题`,
   faq_search_empty: "没有找到相关问题",
   faq_search_empty_hint: "换个关键词试试，也可以通过下方入口提交反馈。",
   faq_additional_items: [

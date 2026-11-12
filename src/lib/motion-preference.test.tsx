@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import AnimationSettings from '../components/AnimationSettings'
+import AppearanceSettings from '../pages/v2/AppearanceSettings'
 import SettingsSection from '../pages/tool/dashboard/SettingsSection'
 import { MotionPreferenceProvider, useAppReducedMotion } from './motion-preference'
 
@@ -59,8 +60,8 @@ it('shares and persists the account setting across mounted settings controls and
   await user.click(screen.getByRole('switch', { name: '减少动画' }))
   expect(screen.getByLabelText('motion mode')).toHaveTextContent('reduced')
   expect(document.documentElement).toHaveAttribute('data-reduced-motion')
-  expect(window.localStorage.getItem(key)).toBe('true')
-  expect(screen.queryByText('检测到持续卡顿，已自动开启减少动画。')).not.toBeInTheDocument()
+  expect(window.localStorage.getItem(key)).toBe('off')
+  expect(screen.queryByText('检测到持续卡顿，已自动切换为精简动画。')).not.toBeInTheDocument()
   first.unmount()
 
   render(<MotionPreferenceProvider><AnimationSettings /><Probe /></MotionPreferenceProvider>)
@@ -69,7 +70,7 @@ it('shares and persists the account setting across mounted settings controls and
   await user.click(screen.getByRole('switch', { name: '减少动画' }))
   expect(screen.getByLabelText('motion mode')).toHaveTextContent('full')
   expect(document.documentElement).not.toHaveAttribute('data-reduced-motion')
-  expect(window.localStorage.getItem(key)).toBe('false')
+  expect(window.localStorage.getItem(key)).toBe('full')
 })
 
 it.each([100, 500, 1000])('automatically reduces motion after five seconds of sustained %ims frames and briefly notifies once', (interval) => {
@@ -80,13 +81,13 @@ it.each([100, 500, 1000])('automatically reduces motion after five seconds of su
   fireEvent.click(document.body)
   for (let elapsed = interval; elapsed < 5000; elapsed += interval) frames.advance(interval)
   expect(screen.getByLabelText('motion mode')).toHaveTextContent('full')
-  expect(screen.queryByText('检测到持续卡顿，已自动开启减少动画。')).not.toBeInTheDocument()
+  expect(screen.queryByText('检测到持续卡顿，已自动切换为精简动画。')).not.toBeInTheDocument()
   frames.advance(interval)
   expect(screen.getByRole('switch', { name: '减少动画' })).toBeChecked()
   expect(screen.getByLabelText('motion mode')).toHaveTextContent('reduced')
   expect(document.documentElement).toHaveAttribute('data-reduced-motion')
-  expect(window.localStorage.getItem(key)).toBe('true')
-  const toast = screen.getByText('检测到持续卡顿，已自动开启减少动画。').closest('[role="status"]')
+  expect(window.localStorage.getItem(key)).toBe('reduced')
+  const toast = screen.getByText('检测到持续卡顿，已自动切换为精简动画。').closest('[role="status"]')
   expect(toast).toHaveAttribute('aria-live', 'polite')
   fireEvent.scroll(document)
   expect(frames.callbacks.size).toBe(0)
@@ -98,7 +99,7 @@ it.each([100, 500, 1000])('automatically reduces motion after five seconds of su
   page.unmount()
   mountSettings()
   expect(screen.getByLabelText('motion mode')).toHaveTextContent('reduced')
-  expect(screen.queryByText('检测到持续卡顿，已自动开启减少动画。')).not.toBeInTheDocument()
+  expect(screen.queryByText('检测到持续卡顿，已自动切换为精简动画。')).not.toBeInTheDocument()
 })
 
 it('keeps smooth animations and isolated loading pauses, and bounds monitoring to interaction windows', () => {
@@ -134,7 +135,7 @@ it.each([
   for (let index = 0; index < 625; index += 1) frames.advance(16)
   expect(screen.getByLabelText('motion mode')).toHaveTextContent('full')
   expect(window.localStorage.getItem(key)).toBeNull()
-  expect(screen.queryByText('检测到持续卡顿，已自动开启减少动画。')).not.toBeInTheDocument()
+  expect(screen.queryByText('检测到持续卡顿，已自动切换为精简动画。')).not.toBeInTheDocument()
   expect(frames.callbacks.size).toBe(0)
 })
 
@@ -179,14 +180,14 @@ it('respects manually disabling automatic reduction for the rest of the visit', 
   fireEvent.click(document.body)
   for (let index = 0; index < 50; index += 1) frames.advance(100)
   fireEvent.click(screen.getByRole('button', { name: '关闭提示' }))
-  expect(screen.queryByText('检测到持续卡顿，已自动开启减少动画。')).not.toBeInTheDocument()
+  expect(screen.queryByText('检测到持续卡顿，已自动切换为精简动画。')).not.toBeInTheDocument()
   expect(screen.getByLabelText('motion mode')).toHaveTextContent('reduced')
   fireEvent.click(screen.getByRole('switch', { name: '减少动画' }))
   fireEvent.scroll(document)
   for (let index = 0; index < 50; index += 1) frames.advance(100)
   expect(frames.callbacks.size).toBe(0)
   expect(screen.getByLabelText('motion mode')).toHaveTextContent('full')
-  expect(window.localStorage.getItem(key)).toBe('false')
+  expect(window.localStorage.getItem(key)).toBe('full')
 })
 
 it('still reduces animation automatically when browser storage is blocked', () => {
@@ -217,7 +218,7 @@ it('reacts to system motion changes without replacing the saved browser preferen
   expect(toggle).toBeChecked()
   expect(toggle).toBeDisabled()
   expect(screen.getByLabelText('motion mode')).toHaveTextContent('reduced')
-  expect(screen.queryByText('检测到持续卡顿，已自动开启减少动画。')).not.toBeInTheDocument()
+  expect(screen.queryByText('检测到持续卡顿，已自动切换为精简动画。')).not.toBeInTheDocument()
   expect(window.localStorage.getItem(key)).toBeNull()
   act(() => {
     query.matches = false
@@ -240,4 +241,61 @@ it('keeps the preference usable and reports failed persistence when browser stor
   expect(screen.getByText(/浏览器未能保存此设置/)).toHaveAttribute('role', 'status')
   await user.click(screen.getByRole('switch', { name: '减少动画' }))
   expect(screen.getByLabelText('motion mode')).toHaveTextContent('full')
+})
+
+it('clears the automatic reduction notice when a V2 mode is chosen manually', () => {
+  const frames = mockFrames()
+  render(<MotionPreferenceProvider><AppearanceSettings /></MotionPreferenceProvider>)
+  fireEvent.click(document.body)
+  for (let index = 0; index < 50; index += 1) frames.advance(100)
+  expect(screen.getByText('检测到持续卡顿，已自动切换为精简动画。')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('radio', { name: '完整' }))
+  expect(screen.queryByText('检测到持续卡顿，已自动切换为精简动画。')).not.toBeInTheDocument()
+  expect(document.documentElement).toHaveAttribute('data-motion', 'full')
+  expect(frames.callbacks.size).toBe(0)
+  fireEvent.scroll(document)
+  for (let index = 0; index < 50; index += 1) frames.advance(100)
+  expect(document.documentElement).toHaveAttribute('data-motion', 'full')
+})
+
+it('persists all three V2 modes and preserves the old disabled preference', async () => {
+  window.localStorage.setItem(key, 'true')
+  const user = userEvent.setup()
+  const mount = () => render(<MotionPreferenceProvider><AppearanceSettings /><Probe /></MotionPreferenceProvider>)
+  let page = mount()
+  expect(screen.getByRole('radio', { name: '关闭' })).toBeChecked()
+  for (const [label, mode] of [['精简', 'reduced'], ['关闭', 'off'], ['完整', 'full']] as const) {
+    await user.click(screen.getByRole('radio', { name: label }))
+    expect(document.documentElement).toHaveAttribute('data-motion', mode)
+    expect(screen.getByLabelText('motion mode')).toHaveTextContent(mode === 'full' ? 'full' : 'reduced')
+    expect(window.localStorage.getItem(key)).toBe(mode)
+    page.unmount()
+    expect(document.documentElement).not.toHaveAttribute('data-motion')
+    page = mount()
+    expect(screen.getByRole('radio', { name: label })).toBeChecked()
+    expect(document.documentElement).toHaveAttribute('data-motion', mode)
+  }
+})
+
+it('temporarily disables V2 animations for the system preference without replacing the saved mode', () => {
+  window.localStorage.setItem(key, 'reduced')
+  const listeners = new Set<(event: MediaQueryListEvent) => void>()
+  const query = {
+    matches: true,
+    addEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void) => listeners.add(listener),
+    removeEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void) => listeners.delete(listener),
+  }
+  vi.stubGlobal('matchMedia', () => query)
+  render(<MotionPreferenceProvider><AppearanceSettings /></MotionPreferenceProvider>)
+  expect(screen.getByRole('radio', { name: '关闭' })).toBeChecked()
+  expect(screen.getByRole('radio', { name: '完整' })).toBeDisabled()
+  expect(screen.getByRole('radio', { name: '精简' })).toBeDisabled()
+  expect(document.documentElement).toHaveAttribute('data-motion', 'off')
+  act(() => {
+    query.matches = false
+    for (const listener of listeners) listener({ matches: false } as MediaQueryListEvent)
+  })
+  expect(screen.getByRole('radio', { name: '精简' })).toBeChecked()
+  expect(document.documentElement).toHaveAttribute('data-motion', 'reduced')
+  expect(window.localStorage.getItem(key)).toBe('reduced')
 })

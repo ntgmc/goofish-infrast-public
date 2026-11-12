@@ -6,7 +6,7 @@ export const materialDemandCopy = {
   metric: '观察指标', amount: '材料需求量', share: '材料需求占比', window: '趋势窗口',
   windows: { 1: '原始月度', 3: '最近 3 个月', 6: '最近 6 个月', 12: '最近 12 个月' },
   amountUnit: '蓝材料当量 / 月', shareUnit: '占全部蓝材料的比例',
-  overview: '全部材料', overviewHint: '点击图表查看详细趋势。各小图独立刻度，纵轴均从零开始。',
+  overview: '全部材料', overviewHint: '各小图独立刻度，纵轴均从零开始。',
   all: '合计', operators: '新干员', modules: '新模组', raw: '当月原始值',
   sources: '显示干员与模组分项', rawPoints: '显示当月原始点', month: '查看月份', partial: '该月尚未结束',
   fullScale: '显示完整纵轴',
