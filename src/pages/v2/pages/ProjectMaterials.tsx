@@ -56,7 +56,7 @@ export function MaterialBrowser({ data, children }: { data: CultivationData; chi
   }
   return <LayoutGroup id={group}>
     <div className="v2-project-material-browser">{children(select)}</div>
-    {selected && <SharedCardDialog layoutId={`material-${selected.source}`} onClose={() => setSelected(null)} closeLabel={copy.v2.close} className="v2-project-material-dialog">
+    {selected && <SharedCardDialog stationaryContent layoutId={`material-${selected.source}`} onClose={() => setSelected(null)} closeLabel={copy.v2.close} className="v2-project-material-dialog">
       <MaterialRoute selection={selected} data={data} onSelect={select} />
     </SharedCardDialog>}
   </LayoutGroup>
@@ -85,6 +85,7 @@ function MaterialGraph({ graph, data, onSelect }: { graph: ReturnType<typeof bui
   const scroll = useRef<HTMLDivElement>(null)
   const [paths, setPaths] = useState<Array<{ key: string; d: string }>>([])
   const bypasses = useMemo(() => graph.edges.filter((edge) => graph.nodes.find((node) => node.key === edge.to)!.column - graph.nodes.find((node) => node.key === edge.from)!.column > 1), [graph])
+  const selectedColumn = graph.nodes.find((node) => node.kind === 'selected')!.column
   const columns = Array.from({ length: Math.max(...graph.nodes.map((node) => node.column)) + 1 }, (_, column) => graph.nodes.filter((node) => node.column === column))
   useLayoutEffect(() => {
     const element = canvas.current!
@@ -100,7 +101,10 @@ function MaterialGraph({ graph, data, onSelect }: { graph: ReturnType<typeof bui
         return [node.dataset.routeNode, { left, top, width: button.offsetWidth, height: button.offsetHeight }] as const
       }))
       const selected = element.querySelector<HTMLElement>('[data-kind="selected"]')!
-      if (scroll.current) scroll.current.scrollLeft = Math.max(0, selected.offsetLeft - scroll.current.clientWidth / 2 + selected.offsetWidth / 2)
+      if (scroll.current) {
+        scroll.current.scrollLeft = Math.max(0, selected.offsetLeft - scroll.current.clientWidth / 2 + selected.offsetWidth / 2)
+        scroll.current.scrollTop = Math.max(0, selected.offsetTop - scroll.current.clientHeight / 2 + selected.offsetHeight / 2)
+      }
       setPaths(graph.edges.map((edge) => {
         const from = positions.get(edge.from)!, to = positions.get(edge.to)!
         const x1 = from.left + from.width, y1 = from.top + from.height / 2
@@ -123,12 +127,15 @@ function MaterialGraph({ graph, data, onSelect }: { graph: ReturnType<typeof bui
     return () => observer.disconnect()
   }, [graph, bypasses])
   return <div ref={scroll} className="v2-project-route-scroll" role="region" aria-label={text.routeDiagram} tabIndex={0}>
-    <motion.div ref={canvas} className="v2-project-route-graph" style={bypasses.length ? { paddingTop: `calc(var(--space-lg) + ${bypasses.length * 12}px)` } : undefined} initial={{ opacity: reduced ? 1 : 0 }} animate={{ opacity: 1 }} transition={{ duration: reduced ? 0 : 0.18 }}>
+    <div ref={canvas} className="v2-project-route-graph" style={bypasses.length ? { paddingTop: `calc(var(--space-lg) + ${bypasses.length * 12}px)` } : undefined}>
       <svg className="v2-project-route-lines" aria-hidden="true"><defs><marker id={marker} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M 1 1 L 7 4 L 1 7" /></marker></defs>
-        {paths.map((path) => <motion.path key={path.key} d={path.d} markerEnd={`url(#${marker})`} initial={{ pathLength: reduced ? 1 : 0 }} animate={{ pathLength: 1 }} transition={{ duration: reduced ? 0 : 0.28, ease: motionTokens.ease.enter }} />)}
+        {paths.map((path) => <motion.path key={path.key} d={path.d} markerEnd={`url(#${marker})`} initial={{ pathLength: reduced ? 1 : 0, opacity: reduced ? 1 : 0 }} animate={{ pathLength: 1, opacity: 1 }} transition={{ duration: reduced ? 0 : motionTokens.duration.enter, delay: reduced ? 0 : 0.34, ease: motionTokens.ease.enter }} />)}
       </svg>
-      {columns.map((nodes, column) => <div className="v2-project-route-column" key={column}>{nodes.map((node) => <MaterialNode key={node.key} node={node} hasInputs={graph.edges.some((edge) => edge.to === node.key)} data={data} onSelect={onSelect} />)}</div>)}
-    </motion.div>
+      {columns.map((nodes, column) => <motion.div className="v2-project-route-column" key={column} initial={{ opacity: reduced ? 1 : 0 }} animate={{ opacity: 1 }}
+        transition={{ duration: reduced ? 0 : motionTokens.duration.instant, delay: reduced ? 0 : 0.28 + Math.min(3, Math.abs(column - selectedColumn)) * 0.03, ease: motionTokens.ease.enter }}>
+        {nodes.map((node) => <MaterialNode key={node.key} node={node} hasInputs={graph.edges.some((edge) => edge.to === node.key)} data={data} onSelect={onSelect} />)}
+      </motion.div>)}
+    </div>
   </div>
 }
 

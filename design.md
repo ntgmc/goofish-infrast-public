@@ -362,6 +362,18 @@ it deliberately when changing the shared design.
   search toolbar while ordinary scrolling keeps the toolbar above the list. Opening another card transfers this priority. Keep background scrolling
   locked only while the modal is open. Skill previews on dialog triggers respond to pointer hover;
   keyboard users read skills in the dialog, and returning focus does not reopen a preview.
+- Cultivation projects use a compact goal queue and a separate resource-plan tab. Keep the tab
+  navigation and add action available while scrolling; adding or editing opens a focused dialog.
+  Lead each goal with the actual level or selected-skill improvement, keeping fulfilled training
+  secondary. Reveal materials and priority actions on demand. Keep plan settings collapsed when
+  valid, preserve their state across tabs and start each workspace at its heading when switching.
+  Give acquisition, synthesis and daily arrangements their own plan views so a long list of
+  material steps does not put the calendar out of reach.
+- Cultivation material routes share only the card background, heading artwork and name with the
+  source. Use `SharedCardDialog`'s `stationaryContent` mode so the route graph stays at its final
+  coordinates while the background morphs. Reveal the selected column first with opacity alone,
+  then neighbouring columns with at most 90ms of stagger; draw connectors after the initial reveal.
+  Keep source focus restoration and direct rendering under reduced motion.
 - Overview production numbers interpolate from their displayed value when a result changes, keeping
   the final accessible value and units stable. Fresh generated results settle metrics and room groups
   in order over roughly half a second; navigation back and ordinary data refreshes do not replay it.
