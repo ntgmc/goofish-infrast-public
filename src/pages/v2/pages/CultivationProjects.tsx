@@ -10,14 +10,13 @@ import { Avatar } from '../ScheduleBoard'
 import { canEditConfig } from '../../../lib/license'
 import { isCultivationProject, prepareProjectProduction, projectDaysEarlier, type CultivationProject, type ProjectOperator, type ProjectRoute } from '../../../lib/cultivation-projects'
 import type { CultivationData } from '../../../lib/cultivation-contract'
-import { isMaterialFee } from '../../../lib/cultivation-materials'
 import type { UserGameAccount, WorkspaceResultHistorySummary } from '../../../lib/types'
 import { useCultivationProjects } from '../../cultivation/useCultivationProjects'
 import Link from '../../../components/InternalLink'
 import type { V2Session } from '../OptionsDrawer'
 import { v2Path } from '../navigation'
 import { EmptyState, Facts, Field, Loading, Notice, SectionTitle } from '../components/WorkspaceUI'
-import { MaterialBrowser, MaterialButton, MaterialFeeNotes, MaterialNeeds } from './ProjectMaterials'
+import { MaterialBrowser, MaterialButton, MaterialNeeds } from './ProjectMaterials'
 import { ProjectMaaExport } from './ProjectMaaExport'
 import './cultivation-projects.css'
 
@@ -212,8 +211,7 @@ function GoalForm({ operators, projects, editing, busy, onSave, onCancel }: { op
 function ProjectResults({ route, data, useTemporary }: { route: ProjectRoute; data: CultivationData; useTemporary: boolean }) {
   const [visible, setVisible] = useState(7)
   const material = (id: string) => data.itemNames[id] ?? id
-  const steps = route.rows.flatMap((row) => (row.allocation?.steps ?? []).map((step) => ({ ...step, operator: row.candidate!.name })))
-  const craftingLmd = steps.reduce((sum, step) => sum + (step.kind === 'craft' ? step.ingredients['4001'] ?? 0 : 0), 0)
+  const { ready, waiting } = route.synthesis
   return <section className="v2-project-results v2-data-arrival">
     <header className="v2-project-result-summary" data-ready={Boolean(route.readyDate)}><div><SectionTitle title={text.route} /><p className="v2-muted">{text.dateHint}</p></div><ResourceCalendarIcon size={28} aria-hidden="true" /></header>
     <Facts items={[[text.readyDate, <AnimatedValue key="ready-date" value={route.readyDate ?? text.pending} />], [text.totalSanity, <TweenValue key="total-sanity" value={route.phases.reduce((sum, day) => sum + day.spent, 0)} format={number} />], [text.farmingDays, <AnimatedValue key="farming-days" value={String(route.phases.length)} />]]} />
@@ -234,12 +232,12 @@ function ProjectResults({ route, data, useTemporary }: { route: ProjectRoute; da
       </li>
     })}</ul>}</MaterialBrowser> : <p className="v2-muted">{text.noShortage}</p>}</section>
     <section className="v2-project-result-section" aria-labelledby="project-synthesis-title"><h3 id="project-synthesis-title">{text.synthesis}</h3>
-      {steps.length ? <><p className="v2-muted">{text.synthesisHint}</p>{craftingLmd > 0 && <p className="v2-project-synthesis-cost">{text.synthesisCost(number(craftingLmd))}</p>}
-        <MaterialBrowser data={data}>{(select) => <ol className="v2-project-recipe-products v2-project-synthesis">{steps.map((step, index) => <li key={index}>
-          <span className="v2-project-recipe-batch"><b>{String(index + 1).padStart(2, '0')}</b><span>{step.operator} · {step.kind === 'exchange' ? text.exchangeBatches(step.batches) : text.synthesisBatches(step.batches)}</span></span>
-          <div className="v2-project-recipe-inputs">{Object.entries(step.ingredients).filter(([id]) => !isMaterialFee(id)).map(([id, count]) => <MaterialButton key={id} id={id} count={count} data={data} onSelect={select} />)}<MaterialFeeNotes items={step.ingredients} data={data} /></div>
-          <ArrowRight size={18} aria-hidden="true" /><MaterialButton id={step.item} count={step.count} data={data} onSelect={select} className="v2-project-recipe-output">{text.recipeOutput(number(step.count))}</MaterialButton>
-        </li>)}</ol>}</MaterialBrowser>
+      {ready.length || waiting.length ? <><p className="v2-muted">{text.synthesisHint}</p>
+        <MaterialBrowser data={data}>{(select) => <>{([[text.synthesisReady, ready], [text.synthesisWaiting, waiting]] as const).map(([label, steps]) => steps.length > 0 && <div className="v2-project-synthesis" key={label}>
+          <h4>{label}</h4><ol className="v2-project-synthesis-list" aria-label={label}>{steps.map((step, index) => <li key={`${step.item}:${index}`}>
+            <MaterialButton id={step.item} count={step.count} data={data} onSelect={select}>{text.recipeOutput(number(step.count))}</MaterialButton>
+          </li>)}</ol>
+        </div>)}</>}</MaterialBrowser>
       </> : <p className="v2-muted">{text.noSynthesis}</p>}
     </section>
     {route.phases.length > 0 && <section className="v2-project-result-section"><h3>{text.calendar}</h3><ol className="v2-project-calendar">{route.phases.slice(0, visible).map((day, index) => <li key={day.date}>

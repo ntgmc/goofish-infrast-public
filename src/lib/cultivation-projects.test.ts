@@ -84,6 +84,61 @@ describe('goal-driven resource routes', () => {
     }
   })
 
+  it('merges executable material outputs across projects and recipe branches before their dependent products', () => {
+    const input = data([candidate('a', { left: 1 }), candidate('b', { right: 1 }), candidate('c', { left: 2 })], {
+      inventory: { raw: 18 }, recipes: { middle: { count: 1, items: { raw: 2 } }, left: { count: 1, items: { middle: 2 } }, right: { count: 1, items: { middle: 3 } } },
+    })
+    const route = buildProjectRoute(input, [project('a'), project('b'), project('c')], settings, null)
+    expect(route.synthesis).toEqual({ ready: [{ item: 'middle', count: 9 }, { item: 'left', count: 3 }, { item: 'right', count: 1 }], waiting: [] })
+    expect(route.missing).toEqual({})
+    expect(input.inventory).toEqual({ raw: 18 })
+  })
+
+  it('keeps resource-dependent steps separate and reallocates executable crafts after priorities, pauses and stock change', () => {
+    const input = data([candidate('a', { high: 1 }), candidate('b', { high: 2 }), candidate('c', { high: 1 })], {
+      inventory: { raw: 5 }, recipes: { middle: { count: 1, items: { raw: 1 } }, high: { count: 1, items: { middle: 2 } } },
+    })
+    const goals = [project('a'), project('b'), project('c')]
+    expect(buildProjectRoute(input, goals, settings, null).synthesis).toEqual({
+      ready: [{ item: 'middle', count: 2 }, { item: 'high', count: 1 }],
+      waiting: [{ item: 'middle', count: 4 }, { item: 'high', count: 2 }, { item: 'middle', count: 2 }, { item: 'high', count: 1 }],
+    })
+    for (const projects of [[project('b'), project('a'), project('c')], [{ ...project('a'), paused: true }, project('b'), project('c')]]) {
+      expect(buildProjectRoute(input, projects, settings, null).synthesis).toEqual({
+        ready: [{ item: 'middle', count: 4 }, { item: 'high', count: 2 }],
+        waiting: projects[0].paused
+          ? [{ item: 'middle', count: 2 }, { item: 'high', count: 1 }]
+          : [{ item: 'middle', count: 2 }, { item: 'high', count: 1 }, { item: 'middle', count: 2 }, { item: 'high', count: 1 }],
+      })
+    }
+    expect(buildProjectRoute({ ...input, inventory: { raw: 8 } }, goals, settings, null).synthesis).toEqual({
+      ready: [{ item: 'middle', count: 8 }, { item: 'high', count: 4 }], waiting: [],
+    })
+  })
+
+  it('reserves directly required stock and costs, and never treats unready intermediate outputs as usable inventory', () => {
+    const input = data([candidate('a', { middle: 2, high: 1 }), candidate('b', { high: 1 })], {
+      inventory: { middle: 2, raw: 2, '4001': 50 }, recipes: { middle: { count: 1, items: { raw: 1 } }, high: { count: 1, items: { middle: 2, '4001': 100 } } },
+    })
+    const route = buildProjectRoute(input, [project('a'), project('b')], settings, null)
+    expect(route.synthesis).toEqual({
+      ready: [{ item: 'middle', count: 2 }],
+      waiting: [{ item: 'high', count: 1 }, { item: 'middle', count: 2 }, { item: 'high', count: 1 }],
+    })
+    expect(route.missing).toEqual({ raw: 2, '4001': 150 })
+  })
+
+  it('merges catalyst exchanges while retaining whole-batch chip output and shared surplus', () => {
+    const input = data([candidate('a', { chipA: 1, '32001': 1 }), candidate('b', { chipA: 1, '32001': 1 })], {
+      inventory: { chipB: 3, '4006': 180 }, recipes: { chipA: { count: 2, items: { chipB: 3 } }, chipB: { count: 2, items: { chipA: 3 } } },
+    })
+    const goals = [project('a'), project('b')]
+    expect(buildProjectRoute(input, goals, settings, null).synthesis).toEqual({ ready: [{ item: '32001', count: 2 }, { item: 'chipA', count: 2 }], waiting: [] })
+    expect(buildProjectRoute({ ...input, inventory: { ...input.inventory, '4006': 90 } }, goals, settings, null).synthesis).toEqual({
+      ready: [{ item: '32001', count: 1 }, { item: 'chipA', count: 2 }], waiting: [{ item: '32001', count: 1 }],
+    })
+  })
+
   it('changes production only until the focused resource is ready and then restores normal income', () => {
     const input = data([candidate('a', { exp: 500, '4001': 900 })])
     const ordinary = { lmd: 300, exp: 100, goldNet: 0 }

@@ -213,11 +213,11 @@ it('calculates manual materials even when production fails, then includes crafti
   expect(resources.parentElement).toHaveTextContent('固源岩')
   expect(resources.parentElement).toHaveTextContent('1,100')
   const synthesis = screen.getByRole('region', { name: text.synthesis })
-  expect(within(synthesis).getByText(text.synthesisCost('200'))).toBeInTheDocument()
+  expect(within(synthesis).getByRole('list', { name: text.synthesisWaiting })).toBeInTheDocument()
   const steps = within(synthesis).getAllByRole('listitem')
   expect(steps).toHaveLength(1)
-  expect(steps[0]).toHaveTextContent(text.synthesisBatches(2))
-  expect(within(steps[0]).getByRole('button', { name: text.viewMaterial('固源岩') })).toHaveTextContent(text.requiredAmount('6'))
+  expect(within(synthesis).queryByRole('button', { name: text.viewMaterial('固源岩') })).not.toBeInTheDocument()
+  expect(within(synthesis).queryByText('龙门币')).not.toBeInTheDocument()
   const output = within(steps[0]).getByRole('button', { name: text.viewMaterial('提纯源岩') })
   expect(output).toHaveTextContent(text.recipeOutput('2'))
   await user.click(output)
@@ -227,8 +227,34 @@ it('calculates manual materials even when production fails, then includes crafti
   await user.click(screen.getByRole('button', { name: text.pause }))
   expect(screen.queryByRole('region', { name: text.synthesis })).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: text.resume }))
-  expect(await screen.findByRole('region', { name: text.synthesis })).toHaveTextContent(text.synthesisCost('200'))
+  expect(await screen.findByRole('region', { name: text.synthesis })).toHaveTextContent(text.recipeOutput('2'))
   expect(mocks.api).toHaveBeenCalledTimes(2)
+})
+
+it('shows merged output quantities across routes in dependency order and opens their recipes', async () => {
+  const user = userEvent.setup()
+  const goal: CultivationProject = { operatorId: 'char_test', elite: 2, level: 60, skill: 1, skillLevel: 7, paused: false, deadline: '' }
+  const goals = [goal, { ...goal, operatorId: 'char_other' }]
+  localStorage.setItem('maatool:cultivation-projects:user1:mine', JSON.stringify(goals))
+  mocks.api.mockImplementation(async (_url, options) => {
+    const result = data(options.json.projects)
+    result.candidates.forEach((candidate, index) => { candidate.items = { [index ? 'right' : 'left']: 1 } })
+    return { ...result, inventory: { raw: 4 }, itemNames: { raw: '固源岩', middle: '固源岩组', left: '提纯源岩', right: '炽合金块' },
+      recipes: { middle: { count: 1, items: { raw: 1 } }, left: { count: 1, items: { middle: 2 } }, right: { count: 1, items: { middle: 2 } } } }
+  })
+  render(<MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /></MemoryRouter>)
+  await user.click(screen.getByRole('button', { name: text.import }))
+  const synthesis = await screen.findByRole('region', { name: text.synthesis })
+  const ready = within(synthesis).getByRole('list', { name: text.synthesisReady })
+  expect(within(ready).getAllByRole('button').map((button) => button.textContent)).toEqual([
+    `固源岩组${text.recipeOutput('4')}`, `提纯源岩${text.recipeOutput('1')}`, `炽合金块${text.recipeOutput('1')}`,
+  ])
+  expect(within(synthesis).queryByRole('list', { name: text.synthesisWaiting })).not.toBeInTheDocument()
+  expect(within(synthesis).queryByRole('button', { name: text.viewMaterial('固源岩') })).not.toBeInTheDocument()
+  await user.click(within(ready).getByRole('button', { name: text.viewMaterial('固源岩组') }))
+  expect(await screen.findByRole('dialog', { name: text.materialRoute('固源岩组') })).toHaveTextContent(text.requiredAmount('4'))
+  await user.keyboard('{Escape}')
+  await waitFor(() => expect(within(ready).getByRole('button', { name: text.viewMaterial('固源岩组') })).toHaveFocus())
 })
 
 it('shows farming sources for materials and reserves income contributions for money and experience', async () => {

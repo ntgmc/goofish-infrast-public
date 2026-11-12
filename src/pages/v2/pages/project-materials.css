@@ -41,7 +41,6 @@
 .v2-project-route-conversion > .v2-project-material-button { width: 100%; }
 .v2-project-route-conversion > svg { color: var(--v2-accent); }
 .v2-project-route-empty { flex: none; padding: var(--space-xs) var(--space-lg); border-top: 1px solid var(--v2-line); color: var(--v2-muted); font-size: var(--text-xs); }
-.v2-project-synthesis .v2-project-material-fees { margin-top: var(--space-2xs); padding-inline: var(--space-3xs); }
 @media (max-width: 40rem) {
   .v2-project-material-dialog { width: calc(100vw - 1rem); }
   .v2-project-route-heading { grid-template-columns: 44px minmax(0, 1fr); gap: var(--space-xs); padding: var(--space-sm); padding-right: calc(var(--space-sm) + 32px); }

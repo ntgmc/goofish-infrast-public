@@ -38,7 +38,7 @@ export function MaterialButton({ id, count, data, onSelect, children, className 
   </motion.button>
 }
 
-export function MaterialFeeNotes({ items, data }: { items: Record<string, number>; data: CultivationData }) {
+function MaterialFeeNotes({ items, data }: { items: Record<string, number>; data: CultivationData }) {
   return <div className="v2-project-material-fees">{Object.entries(items).filter(([id]) => isMaterialFee(id)).map(([id, count]) => <span key={id}>
     <ResourceArt id={id} data={data} /><span>{data.itemNames[id] ?? id} × {number(count)}</span>{id === '4006' && data.farms[id]?.[0] && <small>{text.farmSource(data.farms[id][0].stage)}</small>}
   </span>)}</div>
