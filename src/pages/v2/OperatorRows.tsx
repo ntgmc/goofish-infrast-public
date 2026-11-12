@@ -160,7 +160,7 @@ function OperatorReturn({ returning: { operator, from, to, scrollTop }, onComple
         <div ref={content} className="shared-card-scroll"><OperatorDetails operator={operator} decorative /></div>
       </motion.div>
       <motion.div className="v2-operator-entry v2-operator-return-preview" style={{ width: to.width - 2, height: to.height - 2 }}
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: motionTokens.duration.enter, delay: motionTokens.duration.instant }}>
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: motionTokens.duration.instant, delay: motionTokens.duration.instant }}>
         <div data-reveal-content><OperatorCard operator={operator} shared={false} /></div>
       </motion.div>
     </motion.div>

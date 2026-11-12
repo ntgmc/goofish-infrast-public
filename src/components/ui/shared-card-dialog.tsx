@@ -44,8 +44,8 @@ export default function SharedCardDialog({ layoutId, onClose, closeLabel, childr
           transition={reduced ? { duration: 0 } : motionTokens.morph}>
           {stationaryContent && <motion.div aria-hidden="true" className="shared-card-surface" layoutId={reduced ? undefined : layoutId} initial={false}
             style={{ borderRadius: 8 }} transition={reduced ? { duration: 0 } : motionTokens.morph} />}
-          <DialogClose asChild><button type="button" className="v2-icon-button shared-card-close" aria-label={closeLabel}><CloseIcon size={20} aria-hidden="true" /></button></DialogClose>
-          <div className="shared-card-scroll">{children}</div>
+          <DialogClose asChild><motion.button layout={reduced ? false : 'position'} type="button" className="v2-icon-button shared-card-close" aria-label={closeLabel} transition={motionTokens.morph}><CloseIcon size={20} aria-hidden="true" /></motion.button></DialogClose>
+          <motion.div layout={reduced ? false : 'position'} layoutScroll className="shared-card-scroll" transition={motionTokens.morph}>{children}</motion.div>
         </motion.div>
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>

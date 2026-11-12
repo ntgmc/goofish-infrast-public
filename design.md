@@ -338,9 +338,11 @@ it deliberately when changing the shared design.
   flash. Jumps exceeding 80% of the scrolling viewport skip reveals; focusing cancels the item's
   animation. Shared card geometry updates on selection changes rather than virtual scrolling.
 - `SharedCardDialog` provides card-to-detail transitions with shared layout IDs and the morph
-  spring (stiffness 380, damping 40, mass 0.85). Facility cards use it for their background, icon
-  and title. Facility details put product, efficiency and shift production first, then compact operator
-  rows with identity beside a mood track on wide surfaces and stacked on narrow ones. Keep exact
+  spring (320ms, no bounce) for both opening and return. Keep the close target at 44px and the
+  scrolling content at its natural size throughout the transition; track the scroll offset for
+  nested shared elements. Facility cards use it for their background, icon and title. Facility
+  details put product, efficiency and shift production first, then compact operator rows with
+  identity beside a mood track on wide surfaces and stacked on narrow ones. Keep exact
   starting and ending mood readings beside the track; its filled level represents ending mood,
   a lighter segment shows the change, and a marker identifies starting mood. Scale to the selected
   plan's maximum mood, defaulting to 24. Clamp drawing only; retain actual numeric readings and
