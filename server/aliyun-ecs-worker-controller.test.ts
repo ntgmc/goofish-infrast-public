@@ -33,11 +33,27 @@ describe('Aliyun ECS worker controller', () => {
     const url = requestedUrl!
     expect(url.protocol).toBe('https:')
     expect(url.searchParams.get('Action')).toBe('DescribeInstanceStatus')
-    expect(url.searchParams.get('InstanceId')).toBe('i-test-worker')
+    expect(url.searchParams.get('InstanceId.1')).toBe('i-test-worker')
+    expect(url.searchParams.has('InstanceId')).toBe(false)
     expect(url.searchParams.get('Timestamp')).toBe('2026-08-09T04:00:00Z')
     expect(url.toString()).not.toContain('test-secret')
     const parameters = Object.fromEntries([...url.searchParams.entries()].filter(([key]) => key !== 'Signature'))
     expect(url.searchParams.get('Signature')).toBe(signRpcRequest(parameters, 'test-secret'))
+  })
+
+  it('matches the requested instance instead of another running worker', async () => {
+    const responses = [
+      [{ InstanceId: 'i-other-worker', Status: 'Running' }, { InstanceId: 'i-test-worker', Status: 'Stopped' }],
+      [{ InstanceId: 'i-other-worker', Status: 'Running' }],
+      [],
+    ]
+    const controller = createAliyunEcsWorkerController({
+      ...baseOptions,
+      fetch: vi.fn(async () => Response.json({ InstanceStatuses: { InstanceStatus: responses.shift() } })) as typeof fetch,
+    })
+    await expect(controller.getStatus()).resolves.toBe('stopped')
+    await expect(controller.getStatus()).resolves.toBe('unknown')
+    await expect(controller.getStatus()).resolves.toBe('unknown')
   })
 
   it('starts and stops the instance in stop-charging mode', async () => {
@@ -62,7 +78,7 @@ describe('Aliyun ECS worker controller', () => {
     })))
     const controller = createAliyunEcsWorkerController({ ...baseOptions, timeoutMs: 20, fetch: request as typeof fetch })
     await expect(controller.getStatus()).rejects.toThrow('request timed out')
-    request.mockImplementationOnce(async () => Response.json({ InstanceStatuses: { InstanceStatus: [{ Status: 'Running' }] } }))
+    request.mockImplementationOnce(async () => Response.json({ InstanceStatuses: { InstanceStatus: [{ InstanceId: 'i-test-worker', Status: 'Running' }] } }))
     await expect(controller.getStatus()).resolves.toBe('running')
   })
 

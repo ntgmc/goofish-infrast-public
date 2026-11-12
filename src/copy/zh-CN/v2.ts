@@ -207,6 +207,8 @@ export const v2Copy = {
     title: '外观与动画',
     description: '选择界面主题，调整动画效果。',
     theme: '界面主题',
+    motionModes: { full: '完整', reduced: '精简', off: '关闭' },
+    motionHelp: '完整保留所有效果，精简仅保留淡入和颜色过渡，关闭后立即切换。设置自动保存在当前浏览器；持续卡顿时会自动切到精简，手动选择后本次访问不再自动调整。',
   },
   announcements: '查看公告',
   profilesDescription: '切换游戏账号，编辑档案名称与备注，或添加新账号。',

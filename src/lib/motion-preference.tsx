@@ -5,7 +5,11 @@ import { copy } from '../copy/index'
 const STORAGE_KEY = 'maatool-reduce-motion'
 const SYSTEM_QUERY = '(prefers-reduced-motion: reduce)'
 
+type MotionMode = 'full' | 'reduced' | 'off'
+
 type MotionPreference = {
+  motionMode: MotionMode
+  setMotionMode: (mode: MotionMode) => void
   reducedMotion: boolean
   systemReducedMotion: boolean
   storageError: boolean
@@ -14,17 +18,22 @@ type MotionPreference = {
 
 const MotionPreferenceContext = createContext<MotionPreference | null>(null)
 
-function readPreference() {
-  try { return window.localStorage.getItem(STORAGE_KEY) === 'true' } catch { return false }
+function readPreference(): MotionMode {
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY)
+    if (stored === 'true' || stored === 'off') return 'off'
+    return stored === 'reduced' ? 'reduced' : 'full'
+  } catch { return 'full' }
 }
 
 export function MotionPreferenceProvider({ children }: { children: ReactNode }) {
-  const [reduceAnimations, setReduceAnimations] = useState(readPreference)
+  const [savedMotionMode, setSavedMotionMode] = useState(readPreference)
   const [systemReducedMotion, setSystemReducedMotion] = useState(() => typeof window !== 'undefined' && Boolean(window.matchMedia?.(SYSTEM_QUERY).matches))
   const [storageError, setStorageError] = useState(false)
   const [autoDetect, setAutoDetect] = useState(true)
   const [showAutoReducedToast, setShowAutoReducedToast] = useState(false)
-  const reducedMotion = reduceAnimations || systemReducedMotion
+  const motionMode = systemReducedMotion ? 'off' : savedMotionMode
+  const reducedMotion = motionMode !== 'full'
 
   useEffect(() => {
     if (!showAutoReducedToast) return
@@ -43,13 +52,17 @@ export function MotionPreferenceProvider({ children }: { children: ReactNode }) 
 
   useLayoutEffect(() => {
     document.documentElement.toggleAttribute('data-reduced-motion', reducedMotion)
-    return () => document.documentElement.removeAttribute('data-reduced-motion')
-  }, [reducedMotion])
+    document.documentElement.dataset.motion = motionMode
+    return () => {
+      document.documentElement.removeAttribute('data-reduced-motion')
+      delete document.documentElement.dataset.motion
+    }
+  }, [reducedMotion, motionMode])
 
-  const setPreference = useCallback((enabled: boolean) => {
-    setReduceAnimations(enabled)
+  const setPreference = useCallback((mode: MotionMode) => {
+    setSavedMotionMode(mode)
     try {
-      window.localStorage.setItem(STORAGE_KEY, String(enabled))
+      window.localStorage.setItem(STORAGE_KEY, mode)
       setStorageError(false)
     } catch { setStorageError(true) }
   }, [])
@@ -83,7 +96,7 @@ export function MotionPreferenceProvider({ children }: { children: ReactNode }) 
         if (smoothTime >= 1000) slowFrames = slowTime = 0
       }
       if (slowFrames >= 5 && slowTime >= 5000) {
-        setPreference(true)
+        setPreference('reduced')
         setShowAutoReducedToast(true)
         return
       }
@@ -105,12 +118,18 @@ export function MotionPreferenceProvider({ children }: { children: ReactNode }) 
   }, [reducedMotion, autoDetect, setPreference])
 
   const value = useMemo(() => ({
-    reducedMotion, systemReducedMotion, storageError,
+    motionMode, reducedMotion, systemReducedMotion, storageError,
+    setMotionMode: (mode: MotionMode) => {
+      setAutoDetect(false)
+      setShowAutoReducedToast(false)
+      setPreference(mode)
+    },
     setReduceAnimations: (enabled: boolean) => {
       setAutoDetect(false)
-      setPreference(enabled)
+      setShowAutoReducedToast(false)
+      setPreference(enabled ? 'off' : 'full')
     },
-  }), [reducedMotion, systemReducedMotion, storageError, setPreference])
+  }), [motionMode, reducedMotion, systemReducedMotion, storageError, setPreference])
   return <MotionPreferenceContext.Provider value={value}>
     {children}
     {showAutoReducedToast && <div className="pointer-events-none fixed inset-x-4 top-4 z-[70] flex justify-center sm:inset-x-auto sm:right-6 sm:top-6" role="status" aria-live="polite" aria-atomic="true">

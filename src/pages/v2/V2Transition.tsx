@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { motion, useAnimationControls } from 'motion/react'
 import { AnimatedPresenceRegion, motionTokens } from '../../components/MotionPrimitives'
-import { useAppReducedMotion } from '../../lib/motion-preference'
+import { useAppReducedMotion, useMotionPreference } from '../../lib/motion-preference'
 
 export function V2PageTransition<T extends string>({ motionKey, children, className }: {
   motionKey: T
@@ -10,6 +10,7 @@ export function V2PageTransition<T extends string>({ motionKey, children, classN
   className?: string
 }) {
   const reducedMotion = useAppReducedMotion()
+  const mode = useMotionPreference()?.motionMode ?? (reducedMotion ? 'off' : 'full')
   const controls = useAnimationControls()
   const [displayedKey, setDisplayedKey] = useState(motionKey)
   const [entering, setEntering] = useState<'native' | 'fallback' | null>(null)
@@ -18,14 +19,14 @@ export function V2PageTransition<T extends string>({ motionKey, children, classN
   useLayoutEffect(() => {
     controls.set({ opacity: 1, y: 0 })
     const commit = () => { currentKey.current = motionKey; setDisplayedKey(motionKey) }
-    if (currentKey.current === motionKey || reducedMotion) {
+    if (currentKey.current === motionKey || mode === 'off') {
       if (currentKey.current !== motionKey) commit()
       setEntering(null)
       return
     }
     let cancelled = false
     const finish = () => { if (!cancelled) setEntering(null) }
-    if (document.startViewTransition) {
+    if (mode === 'full' && document.startViewTransition) {
       setEntering('native')
       const transition = document.startViewTransition(() => {
         if (cancelled) return
@@ -39,11 +40,11 @@ export function V2PageTransition<T extends string>({ motionKey, children, classN
       return () => { cancelled = true; transition.skipTransition() }
     }
     setEntering('fallback')
-    controls.set({ opacity: 0.72, y: 6 })
+    controls.set({ opacity: 0.72, y: mode === 'reduced' ? 0 : 6 })
     commit()
-    void controls.start({ opacity: 1, y: 0, transition: { duration: 0.22, ease: motionTokens.ease.enter } }).then(finish)
+    void controls.start({ opacity: 1, y: 0, transition: { duration: mode === 'reduced' ? 0.12 : 0.22, ease: motionTokens.ease.enter } }).then(finish)
     return () => { cancelled = true; controls.stop() }
-  }, [motionKey, reducedMotion, controls])
+  }, [motionKey, mode, controls])
 
   return <motion.div ref={region} className={className} data-route-pending={displayedKey !== motionKey || undefined} data-page-entering={entering ?? undefined} initial={false} animate={controls}>{children(displayedKey)}</motion.div>
 }

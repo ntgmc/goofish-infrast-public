@@ -27,6 +27,31 @@ describe('optimization worker autoscaling', () => {
     expect(fixture.start).toHaveBeenCalledOnce()
   })
 
+  it('starts the backup for one waiting job when no healthy worker remains', async () => {
+    const fixture = createFixture({ queued: 1, running: 1, workerInstances: 0 }, 'stopped')
+    const autoscaler = createOptimizeWorkerAutoscaler(fixture.options)
+    await expect(autoscaler.runOnce()).resolves.toBe('started')
+    await expect(autoscaler.runOnce()).resolves.toBe('waiting')
+    expect(fixture.start).toHaveBeenCalledOnce()
+
+    fixture.status = 'starting'
+    await expect(autoscaler.runOnce()).resolves.toBe('waiting')
+    fixture.status = 'running'
+    await expect(autoscaler.runOnce()).resolves.toBe('noop')
+    expect(fixture.stop).not.toHaveBeenCalled()
+  })
+
+  it('leaves an empty queue and an unknown instance alone after heartbeat loss', async () => {
+    const fixture = createFixture({ queued: 0, running: 0, workerInstances: 0 }, 'stopped')
+    const autoscaler = createOptimizeWorkerAutoscaler(fixture.options)
+    await expect(autoscaler.runOnce()).resolves.toBe('noop')
+    fixture.load.queued = 1
+    fixture.status = 'unknown'
+    await expect(autoscaler.runOnce()).resolves.toBe('waiting')
+    expect(fixture.start).not.toHaveBeenCalled()
+    expect(fixture.stop).not.toHaveBeenCalled()
+  })
+
   it('stops a running worker after ten continuous low-queue minutes', async () => {
     const fixture = createFixture({ queued: 1, running: 0, workerInstances: 2 }, 'running')
     const autoscaler = createOptimizeWorkerAutoscaler(fixture.options)

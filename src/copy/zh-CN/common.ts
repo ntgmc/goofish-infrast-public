@@ -9,7 +9,7 @@ export const commonCopy = {
   },
   pageLoadFailed: "页面加载失败，请检查网络连接后重试。",
   pageReload: "重新加载",
-  animationAutoReduced: "检测到持续卡顿，已自动开启减少动画。",
+  animationAutoReduced: "检测到持续卡顿，已自动切换为精简动画。",
   animationDismissToast: "关闭提示",
   configGenerationReadOnly: "排班生成期间，基建配置为只读。生成结束后可继续修改。",
   droneAutoStrategyLabel: "无人机自动模式",
