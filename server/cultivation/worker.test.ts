@@ -19,6 +19,7 @@ beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), 'cultivation-worker-'))
   const snapshot = { ...planningFixture(), updatedAt: new Date().toISOString() }
   await writeFile(join(directory, 'snapshot.json'), JSON.stringify(snapshot))
+  await writeFile(join(directory, 'project-game-data.json'), JSON.stringify(snapshot))
   vi.stubEnv('MAA_PRTS_PLANNING_PATH', join(directory, 'snapshot.json'))
   await build({ entryPoints: { client: 'server/cultivation/worker-client.ts', 'cultivation-worker': 'server/cultivation/cultivation-worker.ts' },
     outdir: directory, outExtension: { '.js': '.mjs' }, bundle: true, platform: 'node', format: 'esm', logLevel: 'silent',
@@ -73,6 +74,42 @@ describe('cultivation worker integration', () => {
     expect(JSON.parse(text).candidates[0]).toMatchObject({ operatorId: 'char_test', items: { rock: 2, book: 6, exp: 300, '4001': 130 } })
     expect(text).not.toContain('private-credential')
     expect(text).not.toContain('player-uid')
+  })
+
+  it('counts all 408 owned operators when the homework catalog only includes 401', async () => {
+    await client.shutdownCultivationWorker()
+    const previousPath = process.env.MAA_PRTS_PLANNING_PATH
+    const catalogPath = join(directory, 'project-game-data.json')
+    const previousCatalog = await readFile(catalogPath, 'utf8')
+    const snapshot = { ...planningFixture(), updatedAt: new Date().toISOString() }
+    const chars = [input.game.data.chars[0]]
+    for (let index = 1; index <= 400; index++) {
+      const id = `char_owned_${index}`
+      snapshot.operators[id] = { ...snapshot.operators.char_test, name: `干员${index}` }
+      snapshot.costs.cultivate[id.slice(5)] = snapshot.costs.cultivate.test
+      chars.push({ ...chars[0], charId: id })
+    }
+    const catalog = structuredClone(snapshot)
+    catalog.costs.cultivate.test.evolve = [{ rock: 5 }]
+    for (let index = 1; index <= 7; index++) {
+      const id = `char_new_${index}`
+      catalog.operators[id] = { ...catalog.operators.char_test, name: `新干员${index}` }
+      catalog.costs.cultivate[id.slice(5)] = catalog.costs.cultivate.test
+      chars.push({ ...chars[0], charId: id })
+    }
+    try {
+      vi.stubEnv('MAA_PRTS_PLANNING_PATH', join(directory, 'operator-count.json'))
+      await writeFile(join(directory, 'operator-count.json'), JSON.stringify(snapshot))
+      await writeFile(catalogPath, JSON.stringify(catalog))
+      const data = JSON.parse(new TextDecoder().decode(await client.readCultivationPlan({ ...input, game: { data: { chars } } })))
+      expect(data.stats.owned).toBe(408)
+      expect(data.candidates[0]).toMatchObject({ operatorId: 'char_test', items: { rock: 5 } })
+      expect(data.importedAt).toBe(input.importedAt)
+    } finally {
+      await client.shutdownCultivationWorker()
+      vi.stubEnv('MAA_PRTS_PLANNING_PATH', previousPath)
+      await writeFile(catalogPath, previousCatalog)
+    }
   })
 
   it('keeps a fresh snapshot without attempting an incremental crawl', async () => {

@@ -57,15 +57,7 @@ async function execute(task: CultivationTask, signal: AbortSignal): Promise<Arra
     return null
   }
   if (task.type === 'plan' && (task.projects !== undefined || task.training)) {
-    let snapshot
-    try {
-      const ownedIds = asRows(asRecord(asRecord(task.game).data ?? task.game).chars).map((row) => String(row.charId ?? row.id ?? ''))
-      snapshot = await readProjectCatalog(signal, ownedIds)
-    }
-    catch {
-      signal.throwIfAborted()
-      throw new CultivationReadError('养成资料暂不可用，请稍后重试。', 503, 'cultivation_data_unavailable')
-    }
+    const snapshot = await readOwnedCatalog(task.game, signal)
     if (task.training) {
       const community = await getCultivationStatistics()
       signal.throwIfAborted()
@@ -79,13 +71,26 @@ async function execute(task: CultivationTask, signal: AbortSignal): Promise<Arra
   let saved: ReturnType<typeof readStoredRecommendations>
   try { saved = readStoredRecommendations(task.query) }
   catch { throw new CultivationReadError('作业数据暂不可用，请稍后重试。', 503, 'public_evidence_invalid') }
-  const { snapshot, recommendation } = saved
+  const catalog = await readOwnedCatalog(task.game, signal)
+  const snapshot = { ...saved.snapshot, operators: catalog.operators, costs: catalog.costs,
+    warnings: [...saved.snapshot.warnings, ...catalog.warnings] }
+  const { recommendation } = saved
   signal.throwIfAborted()
   const [pricing, community, specialCatalog] = await Promise.all([
     getYituliuPricing(), getCultivationStatistics(), getSpecialItemCatalog(snapshot.operators),
   ])
   signal.throwIfAborted()
   return encodePlan(buildCultivationData(snapshot, task.game, task.inventory, pricing, community, specialCatalog, task.query, recommendation, task.thanksRecruitmentEnabled !== false), task)
+}
+
+async function readOwnedCatalog(game: unknown, signal: AbortSignal) {
+  try {
+    const ownedIds = asRows(asRecord(asRecord(game).data ?? game).chars).map((row) => String(row.charId ?? row.id ?? ''))
+    return await readProjectCatalog(signal, ownedIds)
+  } catch {
+    signal.throwIfAborted()
+    throw new CultivationReadError('养成资料暂不可用，请稍后重试。', 503, 'cultivation_data_unavailable')
+  }
 }
 
 function encodePlan(data: { warnings: string[] }, task: Extract<CultivationTask, { type: 'plan' }>): ArrayBuffer {
