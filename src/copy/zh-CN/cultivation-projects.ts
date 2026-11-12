@@ -1,5 +1,6 @@
 export const cultivationProjectsCopy = {
   title: '我的养成项目',
+  description: '选择想培养的干员，结合库存、每日理智和基建产出安排资源。',
   account: '当前档案', import: '导入练度与库存', refresh: '更新资源准备计划', loading: '正在读取练度与库存…',
   failed: '读取养成项目失败，请稍后重试。', login: '登录并绑定森空岛后，即可为自己的干员安排资源。',
   noBinding: '为当前档案绑定森空岛后，导入练度与库存开始规划。', profiles: '管理账号档案',

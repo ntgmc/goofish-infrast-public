@@ -1,7 +1,7 @@
 .v2-projects { min-width: 0; }
 .v2-tool-source.v2-project-source { padding-top: var(--space-xs); padding-bottom: 0; row-gap: 0; border-bottom: 0; }
 .v2-project-source .v2-label { margin-bottom: var(--space-2xs); }
-.v2-tool-source.v2-project-source > div:first-child { flex-basis: 8rem; }
+.v2-project-source p { line-height: 1.75; }
 .v2-project-workbench { margin-top: var(--space-md); }
 .v2-project-toolbar { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-xs) var(--space-md); padding: var(--space-xs) var(--space-md); border-bottom: 1px solid var(--v2-line); background: var(--v2-paper); }
 .v2-project-tabs { display: flex; flex-wrap: wrap; gap: var(--space-sm); }

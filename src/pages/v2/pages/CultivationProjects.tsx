@@ -55,7 +55,7 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
     setApplied(true)
   }
   return <div className="v2-projects">
-    <div className="v2-tool-source v2-project-source"><div><span className="v2-label">{text.account} · {profile.display_name}</span></div><button className="v2-button v2-button-secondary" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}>{copy.skland.refresh}<RefreshIcon size={16} aria-hidden="true" /></button>
+    <div className="v2-tool-source v2-project-source"><div><span className="v2-label">{text.account} · {profile.display_name}</span><p>{text.description}</p><Link className="v2-text-button" to={v2Path('cultivation', profile.id)}>{text.suggestionsEntry}<ArrowRight size={14} /></Link></div><button className="v2-button v2-button-primary" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}>{copy.skland.refresh}<RefreshIcon size={16} aria-hidden="true" /></button>
       <div className="v2-data-feedback"><DataRefresh pending={m.busy} revision={m.data} error={Boolean(m.error)}
         label={m.phase === 'syncing' ? copy.v2.dataActivity.syncing : copy.v2.dataActivity.calculating} /></div>
     </div>
@@ -90,7 +90,6 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
               onRemove={() => m.setProjects(rows => rows.filter(row => row.operatorId !== project.operatorId))} />
           })}</ol>
           {!m.projects.length && <div className="v2-project-empty"><CultivationIcon size={32} aria-hidden="true" /><h3>{text.empty}</h3><p className="v2-muted">{text.emptyHint}</p></div>}
-          <Link className="v2-text-button" to={v2Path('cultivation', profile.id)}>{text.suggestionsEntry}<ArrowRight size={14} /></Link>
           <ProjectMaaExport projects={m.projects} operators={m.data?.projectOperators ?? []} />
           <p className="v2-data-date">{text.stored}</p>
         </Tabs.Content>
