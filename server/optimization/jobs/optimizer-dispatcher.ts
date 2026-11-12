@@ -83,7 +83,7 @@ async function enrichScheduleTrainingCosts(
   }
   if (suggestions.length === 0) return scheduleResult
 
-  await context.reportStage?.('enriching_training_costs')
+  await context.reportStage?.('persisting_result')
   const profile = payload.activeProfileId
     ? await getProfileById(payload.activeProfileId).catch(() => null)
     : null
