@@ -295,7 +295,7 @@ describe('optimization job dispatcher', () => {
       })
   })
 
-  it('assigns stable suggestion ids and deterministically attaches unavailable training costs', async () => {
+  it('keeps finalization progress while assigning stable ids and attaching training costs', async () => {
     const payload = {
       ...schedulePayload(),
       activeProfileId: null,
@@ -316,7 +316,11 @@ describe('optimization job dispatcher', () => {
     }
     const reportStage = vi.fn()
     const executionContext = { ...context, reportStage }
-    const port = fakePort({ executeSchedule: vi.fn(async () => result) })
+    const port = fakePort({ executeSchedule: vi.fn(async (_payload: unknown, execution: OptimizeExecutionContext) => {
+      await execution.reportStage?.('formatting_result')
+      await execution.reportStage?.('persisting_result')
+      return result
+    }) })
 
     const received = await executeOptimizationJobWithPort(job(payload), executionContext, port)
     expect('upgrade_suggestions' in received && received.upgrade_suggestions?.[0]).toMatchObject({
@@ -324,7 +328,9 @@ describe('optimization job dispatcher', () => {
       training_cost: { status: 'unavailable' },
       roi: { payback_days: null },
     })
-    expect(reportStage).toHaveBeenCalledWith('enriching_training_costs')
+    expect(reportStage.mock.calls.map(([stage]) => stage)).toEqual([
+      'formatting_result', 'persisting_result', 'persisting_result',
+    ])
   })
 })
 

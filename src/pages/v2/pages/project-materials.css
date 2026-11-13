@@ -1,7 +1,7 @@
 .v2-project-material-dialog { width: min(76rem, calc(100vw - 2rem)); }
 .v2-project-material-dialog .shared-card-scroll { display: flex; flex-direction: column; padding: 0; overflow-y: auto; }
 .v2-project-route-heading > div > p, .v2-project-route-heading [data-slot="dialog-description"], .v2-project-route-heading h2 small, .v2-project-route-direction, .v2-project-route-empty { animation: motion-content-enter 140ms var(--motion-ease-enter) 280ms both; }
-.v2-project-material-dialog.shared-card-dialog > .shared-card-close { background: transparent; animation: motion-content-enter 140ms var(--motion-ease-enter) 380ms both; }
+.v2-project-material-dialog.shared-card-dialog > .shared-card-close { background: transparent; }
 .v2-project-route-heading { display: grid; grid-template-columns: 56px minmax(0, 1fr); flex: none; align-items: start; gap: var(--space-xs) var(--space-sm); padding: var(--space-lg); padding-right: calc(var(--space-lg) + 32px); }
 .v2-project-route-heading > .v2-project-resource-art { width: 56px; height: 56px; }
 .v2-project-route-heading > div { min-width: 0; }
