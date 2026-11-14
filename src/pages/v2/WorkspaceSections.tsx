@@ -96,7 +96,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
     <div className="v2-section-body">
       <Suspense fallback={<V2SectionLoading label={section === 'inventory' ? copy.inventory.loading : undefined} />}>
         {section === 'overview' ? null : !available ? <p className="v2-panel v2-section-loading" role="status">{copy.v2.featureUnavailable}</p>
-          : needsLogin ? <div className="v2-panel v2-login-panel"><p>{section === 'generation' ? copy.v2.generationSignIn : copy.v2.signInRequired}</p><AuthForm compact allowCdk={false} onAuthenticated={session.applyAuthPayload} submitClassName="v2-button v2-button-primary w-full" /></div>
+          : needsLogin ? <div className="v2-panel v2-login-panel"><p>{section === 'generation' ? copy.v2.generationSignIn : copy.v2.signInRequired}</p><AuthForm compact animateActions allowCdk={false} onAuthenticated={session.applyAuthPayload} submitClassName="v2-button v2-button-primary w-full" /></div>
             : needsWorkspace ? section === 'generation' && session.activeProfile && isSchedulableProfile(session.activeProfile)
               ? <div className="v2-panel v2-section-loading"><p>{copy.v2.generationImport}</p><button className="v2-button v2-button-primary" type="button" onClick={onOperators}>{copy.public.pages_LandingPage_001}</button></div>
               : section === 'generation' && session.cdkProfiles.length === 0 && v2SectionAvailable('add-account', features)

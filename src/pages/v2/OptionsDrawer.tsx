@@ -144,7 +144,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
                 </section>}
               </>
             ) : showAuthForm ? (
-              <AuthForm compact allowCdk={false} onAuthenticated={(payload) => { session.applyAuthPayload(payload); onClose() }} submitClassName="v2-button v2-button-primary w-full" />
+              <AuthForm compact animateActions allowCdk={false} onAuthenticated={(payload) => { session.applyAuthPayload(payload); onClose() }} submitClassName="v2-button v2-button-primary w-full" />
             ) : (
               <div className="v2-empty-state"><UserRound size={30} /><p>{text.loginUnavailable}</p>
                 <button type="button" className="v2-button v2-button-secondary" onClick={() => { featureState.retry(); session.retryAuth() }}>{text.loginRetry}</button></div>

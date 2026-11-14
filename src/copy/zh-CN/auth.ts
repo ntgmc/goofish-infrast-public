@@ -1,4 +1,6 @@
 export const authCopy = {
+  actionCompleted: '已完成',
+  actionFailed: '未完成，请重试',
   api_bot_registration_disabled: 'Bot 注册暂未开放，请联系管理员。',
   // server/handlers/auth.ts and server/handlers/user-auth.ts
   api_method_not_allowed: "当前操作不受支持，请刷新页面后重试。",
