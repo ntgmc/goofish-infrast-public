@@ -1,6 +1,6 @@
 import { memo, useId, useRef, useState, type KeyboardEvent, type ComponentType } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
-import { OpenDetailsIcon as ArrowUpRight, DormitoryIcon as BedDouble, ControlRoomIcon as Building2, ShiftTimeIcon as Clock3, DroneIcon as Drone, ManufactureIcon as Factory, TrainingRoomIcon as GraduationCap, GridViewIcon as LayoutGrid, ListViewIcon as List, RecruitmentIcon as UserRoundSearch, MeetingRoomIcon, OperatorsIcon as Users, ProcessingRoomIcon as Wrench, PowerPlantIcon as Zap, RecyclingStationIcon, UnknownFacilityIcon } from '../../components/icons'
+import { OpenDetailsIcon as ArrowUpRight, DormitoryIcon as BedDouble, ControlRoomIcon as Building2, ShiftTimeIcon as Clock3, DroneIcon as Drone, ManufactureIcon as Factory, TrainingRoomIcon as GraduationCap, GridViewIcon as LayoutGrid, ListViewIcon as List, RecruitmentIcon as UserRoundSearch, MeetingRoomIcon, OperatorsIcon as Users, ProcessingRoomIcon as Wrench, PowerPlantIcon as Zap, RecyclingStationIcon, UnknownFacilityIcon, FiammettaIcon } from '../../components/icons'
 import { copy } from '../../copy'
 import type { PreparedResult } from '../../components/result-panel/formatters'
 import OperatorSkillPreview from '../../components/result-panel/OperatorSkillPreview'
@@ -129,7 +129,7 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
       <div id={`${id}-panel`} role="tabpanel" aria-labelledby={`${id}-tab-${selected}`} tabIndex={0}>
         <div className="v2-transition-pane">
         <div className="v2-board-meta"><span><Users size={14} />{text.assigned(count)}</span><span><Clock3 size={14} />{text.shiftHours(String(hours[selected] ?? 8))}</span>
-          {fiammettaTarget && <span>{copy.domain.components_result_panel_ResultBoard_017}{fiammettaTarget}</span>}
+          {fiammettaTarget && <span><FiammettaIcon size={14} aria-hidden="true" />{copy.domain.components_result_panel_ResultBoard_017}{fiammettaTarget}</span>}
         </div>
         {roomGroups.filter((group) => group.rooms.length > 0).map((group) => (
           <section key={group.label} className="v2-room-group" aria-label={group.label}>

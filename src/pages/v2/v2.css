@@ -1156,19 +1156,27 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
 }
 
 .v2-board-meta {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  justify-items: start;
   gap: 10px;
   padding-block: var(--space-xs);
   color: var(--v2-muted);
   font-size: var(--text-sm);
 }
 
-.v2-board-meta span {
+.v2-board-meta > span {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 5px;
+  overflow-wrap: anywhere;
 }
+
+.v2-board-meta > span:nth-child(2) { justify-self: center; }
+.v2-board-meta > span:nth-child(3) { justify-self: end; text-align: right; }
+.v2-board-meta svg { flex: none; }
 
 .v2-room-group + .v2-room-group {
   margin-top: var(--space-lg);
@@ -2382,9 +2390,7 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
   .v2-shifts > button { padding-inline: var(--space-2xs); }
   .v2-shifts small { font-size: var(--text-xs); letter-spacing: -.025em; }
   .v2-shift-dot { display: none; }
-  .v2-board-meta { flex-wrap: wrap; gap: var(--space-2xs) var(--space-xs); padding: var(--space-xs) 0; font-size: var(--text-xs); }
-  .v2-board-meta > span { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
-  .v2-board-meta svg { flex: none; }
+  .v2-board-meta { grid-template-columns: minmax(0, 1fr); gap: var(--space-2xs); padding: var(--space-xs) 0; font-size: var(--text-xs); }
   .v2-room-grid { grid-template-columns: minmax(0, 1fr); gap: var(--space-2xs); padding: 0; }
   .v2-room-group-title { padding-inline: 0; }
   .v2-room-card,
