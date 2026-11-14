@@ -97,12 +97,41 @@ describe('feature gate', () => {
     await expect(gated?.json()).resolves.toMatchObject({ feature: 'login' })
   })
 
+  it('keeps announcement and release events available when personal QQ features are closed', async () => {
+    getSiteFeatureSettings.mockResolvedValue(settingsWith({
+      site: false, login: false, announcements: false, changelog: false, notifications: false, qqbot: false,
+    }))
+    await expect(enforceFeatureGate(new Request('http://localhost/api/integrations/qqbot/events?cursor=101'))).resolves.toBeNull()
+
+    getSiteFeatureSettings.mockResolvedValue(settingsWith({ qqbot: false }))
+    for (const path of [
+      '/api/user/qqbot', '/api/user/qqbot/verification', '/api/integrations/qqbot/binding',
+      '/api/integrations/qqbot/notifications', '/api/integrations/qqbot/notifications/ack',
+    ]) {
+      const response = await enforceFeatureGate(new Request(`http://localhost${path}`))
+      expect(response?.status).toBe(503)
+      await expect(response?.json()).resolves.toMatchObject({ feature: 'qqbot' })
+    }
+  })
+
+  it('closes the event feed without disabling personal QQ or public content', async () => {
+    getSiteFeatureSettings.mockResolvedValue(settingsWith({ website_events: false }))
+    const response = await enforceFeatureGate(new Request('http://localhost/api/integrations/qqbot/events?cursor=latest'))
+    expect(response?.status).toBe(503)
+    await expect(response?.json()).resolves.toMatchObject({ code: 'feature_disabled', feature: 'website_events' })
+    for (const path of ['/api/user/qqbot', '/api/integrations/qqbot/notifications', '/api/announcement', '/api/changelog']) {
+      await expect(enforceFeatureGate(new Request(`http://localhost${path}`))).resolves.toBeNull()
+    }
+  })
+
   it('fails closed when settings cannot be read and lets preflight pass', async () => {
     getSiteFeatureSettings.mockRejectedValue(new Error('database unavailable'))
     const response = await enforceFeatureGate(new Request('http://localhost/api/auth/login', { method: 'POST' }))
     expect(response?.status).toBe(503)
     await expect(response?.json()).resolves.toMatchObject({ code: 'feature_settings_unavailable' })
+    expect((await enforceFeatureGate(new Request('http://localhost/api/integrations/qqbot/events?cursor=latest')))?.status).toBe(503)
     await expect(enforceFeatureGate(new Request('http://localhost/api/auth/login', { method: 'OPTIONS' }))).resolves.toBeNull()
+    await expect(enforceFeatureGate(new Request('http://localhost/api/integrations/qqbot/events', { method: 'OPTIONS' }))).resolves.toBeNull()
   })
 
   it.each([

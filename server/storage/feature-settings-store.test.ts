@@ -9,9 +9,9 @@ import {
 describe('feature settings', () => {
   it('defaults missing and legacy values to all enabled', () => {
     expect(normalizeSiteFeatureSettings(null)).toEqual(DEFAULT_SITE_FEATURE_SETTINGS)
-    expect(normalizeSiteFeatureSettings({ version: 0, features: { login: false } })).toMatchObject({
+    expect(normalizeSiteFeatureSettings({ version: 0, features: { login: false, qqbot: false } })).toMatchObject({
       version: 1,
-      features: { login: false, site: true, profiles: true, tools: true },
+      features: { login: false, site: true, profiles: true, tools: true, qqbot: false, website_events: true },
     })
   })
 
@@ -26,6 +26,8 @@ describe('feature settings', () => {
       login: false,
       profiles: false,
       schedule_generation: false,
+      qqbot: false,
+      website_events: true,
     })
   })
 

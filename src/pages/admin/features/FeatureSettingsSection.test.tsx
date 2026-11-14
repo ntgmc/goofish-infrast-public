@@ -112,6 +112,40 @@ describe('FeatureSettingsSection', () => {
     })))
   })
 
+  it('defaults legacy event feeds on and saves the event and personal QQ switches independently', async () => {
+    const user = userEvent.setup()
+    adminApiJson.mockResolvedValueOnce({ settings: {
+      version: 1, features: { qqbot: false, login: false }, updated_at: null, revision: 5,
+    } })
+    render(<FeatureSettingsSection />)
+    await user.click(await screen.findByRole('tab', { name: '社区内容' }))
+    const events = screen.getByRole('checkbox', { name: /公告与版本群通知/ })
+    const personal = screen.getByRole('checkbox', { name: /个人 QQ 绑定与排班通知/ })
+    expect(events).toBeChecked()
+    expect(events.closest('label')).toHaveTextContent('当前实际开放')
+    expect(personal).not.toBeChecked()
+    await user.click(events)
+    expect(personal).not.toBeChecked()
+    await user.click(personal)
+    expect(events).not.toBeChecked()
+
+    const saved = {
+      ...DEFAULT_SITE_FEATURE_SETTINGS,
+      features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, login: false, website_events: false, qqbot: true },
+      revision: 6,
+    }
+    adminApiJson.mockResolvedValue({ settings: saved })
+    await user.click(screen.getByRole('button', { name: '保存功能开关' }))
+    await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/feature-settings', expect.objectContaining({
+      method: 'PUT',
+      json: { features: saved.features, expected_revision: 5 },
+    })))
+    await screen.findByText('功能开关已保存并立即生效。')
+    await user.click(screen.getByRole('button', { name: '重新加载' }))
+    expect(await screen.findByRole('checkbox', { name: /公告与版本群通知/ })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: /个人 QQ 绑定与排班通知/ })).toBeChecked()
+  })
+
   it('does not expose settings or save when the initial load fails', async () => {
     const user = userEvent.setup()
     adminApiJson.mockRejectedValueOnce(new Error('数据库不可用'))

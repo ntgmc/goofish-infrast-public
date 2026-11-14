@@ -42,6 +42,7 @@ function requiredFeatures(pathname: string, method: string): SiteFeatureKey[] {
   if (pathname === '/api/user/announcements') return ['login', 'announcements']
   if (pathname === '/api/user/qqbot' || pathname.startsWith('/api/user/qqbot/')) return ['login', 'qqbot']
   if (pathname === '/api/user/notifications') return ['login', 'notifications']
+  if (pathname === '/api/integrations/qqbot/events') return ['website_events']
   if (pathname.startsWith('/api/integrations/qqbot/')) return ['qqbot']
   if (pathname === '/api/user/profiles/preview') return ['free_preview']
   if (pathname === '/api/user/profiles/redeem') return ['cdk_redemption']

@@ -17,6 +17,14 @@ Bot 侧提供私聊与群命令、轮询、文件发送和奖励投递状态管�
 个人排班使用新的待发送列表，不共用事件游标。内测注册中的资格关联不自动
 开启本功能，已有网站账号和通过 bot 注册的账号都要主动完成绑定并开启通知。
 
+管理后台“功能开关 → 社区内容”分别提供：
+
+- “公告与版本群通知”（`website_events`）：控制 `/api/integrations/qqbot/events`，默认开启；关闭后返回 `503 feature_disabled`，保留事件和消费游标，重新开启后可从原游标继续拉取。
+- “个人 QQ 绑定与排班通知”（`qqbot`）：控制个人 QQ 绑定、排班通知及其余 QQ Bot 接口。
+
+公告与版本群通知独立于全站业务、登录、公告展示、更新日志页面和个人 QQ 开关，继续使用
+`WEBSITE_EVENTS_TOKEN` 鉴权及原有请求限流。已有设置缺少 `website_events` 时按开启处理，无需数据库迁移。
+
 ## 公告群通知的 Markdown 正文
 
 `GET /api/integrations/qqbot/events` 的 `schema_version: 1` 保持兼容，事件新增
